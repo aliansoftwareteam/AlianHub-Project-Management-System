@@ -16,6 +16,39 @@ Two things are being done at once, and keeping them apart is the point.
 
 The honest headline: **the parts of this platform that were designed as a safety boundary are strong, and the parts that were designed as plumbing are missing.** Tenant isolation is structural rather than filtered. The action registry genuinely bounds what an agent can do. The automation engine treats idempotency, checkpointing and retry as first-class. The agent engine, which is the newer half, has none of the three, and the observability layer does not exist at all.
 
+Section letters follow the brief, which has no section D.
+
+### Domain mapping
+
+The brief is written for a marketing agency; the codebase is a project-management product. The mapping is stated once so nothing below has to guess.
+
+| Brief term | In AlianHub |
+|---|---|
+| Client | Either a **tenant**, when each client is onboarded as its own workspace, or a **portfolio or project** inside an agency's workspace. Both readings are answered below |
+| Campaign | A project, with its sprints, tasks, pages and run history |
+| Media, Creative and Analytics agents | Agent revisions composed from skills, per ADR 003 |
+| Campaign brief | The approved brief the project generator produces, stored on the project |
+| Creative | Task attachments and page revisions |
+| Performance data | Custom fields, time and billing records, and integration connectors |
+| Business systems | The integrations module and the MCP surface |
+
+The document takes the first reading of *client* as primary, because it is what the codebase enforces structurally. Under the second reading, an agency running many clients in one workspace, cross-client isolation is only as strong as project-scoped attributes, and the two verified scope escapes in section G stop being "within-tenant" findings and become the cross-client control for that deployment. They are ranked first among the defects for that reason.
+
+### Assumptions and scale envelope
+
+| | Now | Design target, twelve months |
+|---|---|---|
+| Tenants per instance | Tens, self-hosted; one hosted instance | Hundreds |
+| Active agents per tenant | Under ten | Fifty |
+| Runs per day per instance | Hundreds | Tens of thousands |
+| Steps per workflow run | One | Fifteen, with fan-out |
+| Corpus per tenant | Pages and tasks, no bodies indexed | Tens of thousands of chunks |
+| Model calls at peak | Single digits per second | Fifty per second |
+| Per-tenant database pool | Ten connections | Ten, with the limit enforced above it |
+| Deployment mix | Compose file, one app container, one database | Same image in three roles, optional workers |
+
+Where a number below is a target rather than a measurement, that is where it comes from.
+
 ### Scorecard
 
 | Area | Shipped on beta | Verdict | The one thing that matters |
@@ -25,7 +58,7 @@ The honest headline: **the parts of this platform that were designed as a safety
 | **C** Workflow orchestration | Two half-engines. Automations are durable; agent runs are a fire-and-forget function | **Partial** | No DAG, no parallel steps, no dependencies, no resume for agents |
 | **E** Memory and knowledge | Regex over task text and page *titles*. Per-task QA dedupe | **Weak** | No embeddings, no vector store, no ingestion, page bodies unreachable |
 | **F** Model routing | One provider chosen from an environment variable at process start | **Absent** | No per-call model, no failover, no retry, no circuit breaker |
-| **G** Security | Database-per-tenant, an absent-not-disabled action registry, full audit with undo | **Strong, two live holes** | Retrieval and one MCP tool bypass their own scope checks |
+| **G** Security | Database-per-tenant, an absent-not-disabled action registry, full audit with undo | **Strong boundary, advisory authorization** | Permission checks are skipped for browser sessions, and two tools bypass their own scope checks |
 | **H** Observability | Rotating text logs with a request id that never leaves the log file | **Absent** | No metrics, no tracing, no error tracker, no run replay record |
 | **I** Failure recovery | Automations resume from a cursor. Agent runs are hard-failed on restart | **Split** | An agent crash leaves partial writes and no way to continue |
 
@@ -72,6 +105,18 @@ A run pins `agentRevisionId` at start and never re-reads the mutable record. Edi
 
 **Deployment** then becomes promotion of a revision rather than a process restart, which is what makes canarying a prompt change possible at all.
 
+### The eight stages under revisions
+
+**Created.** Creating an agent writes two rows: the identity and revision one, with the creator recorded, or the plan executor for the auto-created project guide, which takes the same path. The wizard's four templates become seeded skills per ADR 003, so a template is a starting revision rather than a code path. At save, every skill reference is resolved against the company's skill catalogue and pinned to that skill's current revision, and the allowed actions are validated as the intersection of the registry and the skills' emitted actions, so the skill key that is stored unvalidated today becomes a form error instead of a run-time "unknown skill". An agent is created paused until its first revision is promoted, which is what makes creation and deployment separate acts.
+
+**Registered.** Registration is what makes an agent bindable. The agent record is the registry entry, and a revision declares what it serves: the step kinds it can execute and the input and output schemas the workflow validator checks at authoring time. A workflow step or an automation rule names an agent and, optionally, a revision; an unpinned binding resolves the current revision at dispatch and pins it on the step run, so the step always says which revision ran. A manifest endpoint lists the company's agents with status, current revision, skills and effective actions, mirroring the skill manifest in ADR 003, and both the workflow editor and the rule action pick from it rather than storing a free-text key. Only an active agent is bindable; a paused or retired one is listed and refused at save, with the reason shown.
+
+**Deployed.** A revision carries a state: draft, candidate, live, superseded. Promotion moves the current pointer and rollback moves it back, and both are audited rows carrying the from and to revision. A canary is a candidate revision with a traffic share, either a percentage of new runs or a named list of projects, and the outcome signals section F relies on, approval, decline reason, revert and repair rate, are compared per revision over the canary window. A candidate is promoted when it holds the golden-set floor for its task classes and matches or beats the live revision on those signals, and is demoted automatically when its revert rate crosses the alert threshold in section H. A fix to a seeded skill lands as a new skill revision per tenant, and an agent picks it up only through a new agent revision, so a prompt never changes under a live agent silently.
+
+**Executed, monitored and updated** are sections C, H and the revision model above: a run pins the revision, a step record carries its trace, and an edit is a new revision that in-flight runs do not see.
+
+**Retired.** Retirement keeps today's in-flight refusal and extends it to the engine: no new steps are admitted for the agent, claimed steps drain, and retirement is refused until that count is zero. It is also refused while a live workflow revision or an enabled automation rule binds the agent, and the refusal names them, so a retired agent cannot silently break a workflow the way a removed skill slug can today. Revisions, run records, audit rows and replay records are retained under the retention policy in section H, nothing is deleted, and the identity is never reused, which is what lets a run six weeks old still be explained after the agent is gone.
+
 ---
 
 ## B. Multi-agent communication
@@ -102,13 +147,30 @@ So: **agents never invoke each other. They complete a step and emit a typed resu
 
 Two details that matter. Payloads travel **by reference** into tenant storage, because a campaign brief inlined into every message makes the queue the bottleneck and the run log unreadable. Every message carries a **deadline and a budget**, so a step cannot outlive its usefulness or outspend its worth, and both shrink as they pass down a chain.
 
+**Transport.** Dispatch rides the durable queue, never the in-process event bus. The bus is a process-local emitter with in-memory debounce state and subscribes only to task events today, so it cannot carry dispatch across worker processes; it stays the trigger source, extended to page, comment, attachment and memory events before section E's ingestion can rely on it. The queue is the existing adapter, backed by the job collection on the global database now and by a Redis-backed driver when measured queue age says so. A result comes back the same way: the executor writes the step record, a completion job wakes the engine, and the interface learns of it over the existing socket channel rather than by polling.
+
+**The chain in the brief, walked.** Media to Creative to Analytics and back to Media, one row per hop.
+
+| Hop | Emits, as a typed result | What changes in the envelope |
+|---|---|---|
+| Media agent → Creative | A placement plan: channels, budgets, audience, deadline | New causation id; deadline and budget minus what Media spent |
+| Creative → Analytics | Creative variants as asset references, each with its brief | Causation id; the variant schema validated at the edge |
+| Analytics → Media | Predicted performance per variant with the evidence used | Causation id; the loop counter increments |
+| Media, again | A revised plan, or the exit condition satisfied | Bounded by the iteration cap and the remaining budget |
+
+The return to Media is the part a directed acyclic graph cannot express, so it is not an edge. It is a bounded loop node with an iteration counter, an exit condition evaluated on the analytics result, and a hard cap, so the causation chain shows which iteration produced which step and the budget that shrinks down the chain also shrinks across iterations. Where the return is genuinely new work rather than a refinement, it is a new workflow run triggered off the event bus by the analytics result, with the bus's depth guard bounding re-entry once the depth-reset defect is fixed.
+
+**Handoffs.** Every handoff carries a typed contract. The producing step's output is validated against the schema the consuming step declares, the engine writes it to tenant storage and passes a reference, and a shape mismatch is a deterministic failure at the edge rather than a model error three steps later.
+
 **Agent identity.** Already right, and should be extended rather than replaced. Actor kinds distinguish person, automation, agent and system; every agent action carries the agent, the run, and the human it acts on behalf of. Add the revision, and a step-scoped credential rather than an ambient one, per section G.
 
-**Task state.** Owned by the workflow, never by an agent. An agent is a pure function from input to result plus audited side effects. State in the agent is what makes a rerun unsafe.
+**Task state.** Owned by the workflow, never by an agent. An agent is a pure function from input to result plus audited side effects, and it reports a result, never a status. The step's states and transitions are written down because resume, retry and approval all depend on them: pending, then ready when its dependencies are satisfied, then claimed by exactly one worker through a compare-and-set, then running, and from there succeeded; or transient-failed, re-enqueued with backoff until the attempt cap; or failed, when the error was deterministic or attempts ran out; or waiting-approval, with an owner, a deadline and an escalation; or skipped; or compensated. Only the engine writes these transitions. The workflow run derives its own state from the ready set and the terminal policy its definition chose, and is done when no step is ready or running.
 
-**Synchronous or asynchronous.** Asynchronous by default. Synchronous only for a sub-second read where the caller cannot proceed, and even then behind a timeout that degrades rather than fails. The single-call design of the current engine is a real asset here: cost and latency are bounded by construction.
+**Synchronous or asynchronous.** Asynchronous by default. The one synchronous case is a person waiting on a read, which today is Ask, and it runs behind a timeout with a degraded path rather than a failure: lexical retrieval instead of hybrid, a smaller model, or a cached answer for a question already asked. The single-call design of the current engine is a real asset here: cost and latency are bounded by construction.
 
-**Failure, retry, timeouts, idempotency.** The automation runner already encodes the right answers and the agent path should adopt them rather than invent new ones: a deterministic-versus-transient split so a permanent error is not retried three times, capped attempts with exponential backoff, a persisted cursor, and idempotency by unique key rather than find-then-insert. Section I gives the concrete mechanism.
+**Failure, retry and idempotency.** The automation runner already encodes the right answers and the agent path should adopt them rather than invent new ones: a deterministic-versus-transient split so a permanent error is not retried three times, capped attempts with exponential backoff, a persisted cursor, and idempotency by unique key rather than find-then-insert. Section I gives the concrete mechanism.
+
+**Timeouts.** Deadline propagation is in the envelope; expiry is the engine's job. Three nested budgets: a model-call timeout below the step deadline, the step deadline below the workflow deadline, each derived by subtracting elapsed time as the chain descends, so a late upstream step cannot hand a downstream step a deadline it has already missed. The deadline is passed into the provider call as an abort signal. On expiry the worker cancels the call and the step is marked transient-failed with a timed-out flag; the retry policy then decides whether the remaining workflow deadline still permits another attempt, and a step that would exceed it fails deterministically instead of being retried into the wall. A late result from a worker that lost its claim is rejected by a fencing token, which is the attempt number on the claim. Approval steps carry their own deadline and escalation rather than inheriting the workflow's, so a person's week does not consume an agent's minute.
 
 One live defect to fix first. The agent action context hardcodes loop depth to zero, so an agent write resets the counter the bus uses to break cycles, and the depth limit can never trip through an agent hop. Today the only thing preventing a rule-agent-rule loop is a per-rule flag that defaults off. That flag should not be the only guard.
 
@@ -136,11 +198,39 @@ workflowStepRun   { id, workflowRunId, stepId, attempt, status,
                     startedAt, finishedAt, durationMs, cost, traceId }
 ```
 
+**Interfaces.** Every control in the interface map is an endpoint, and none exists yet. Runs and steps live under one prefix:
+
+```
+POST   /api/v2/workflows/:id/runs           Idempotency-Key header; a retried request cannot start twice
+GET    /api/v2/workflows/runs/:runId         run, steps, ready set, blocked-on
+POST   /api/v2/workflows/runs/:runId/steps/:stepId/{retry|skip|resume|compensate}
+POST   /api/v2/workflows/runs/:runId/steps/:stepId/{reassign|escalate}   approval steps only
+POST   /api/v2/agents/:id/revisions/:n/{promote|rollback}
+```
+
+Each verb is refused unless the step is in the state it expects, writes an audit row with the actor, and is gated on the caller's project visibility and a capability the permission catalogue declares. The queue job is a pointer, never the payload: tenant, workflow run, step, attempt and claim token. The definition an admin authors is a document of typed nodes and dependency edges, validated like an automation rule with field-level errors, refusing cycles other than a declared loop node, unknown step kinds, and actions outside the bound agent's effective set. The step collection carries a unique index on run and step, and a second on run and status for the ready-set query and the queue-age metric.
+
 The step record is the unit of everything: resume, retry, tracing, cost attribution and the audit trail. The automation runner already writes most of these fields, which is the strongest argument for generalising it rather than starting over.
 
 **Parallel and dependencies.** Steps declare `dependsOn`. The engine runs the ready set, bounded by a per-tenant concurrency limit, which is the missing piece that makes parallelism safe given the connection-pool constraint that motivated the current sequential design. Fan-out and fan-in become ordinary nodes.
 
+**The campaign pipeline, walked.** The brief's example, with the step type each stage takes.
+
+| Stage | Step type | Notes |
+|---|---|---|
+| Campaign request | Trigger | A form, a task, or an external event; the campaign is a project |
+| Research | Agent, fanned out | Audience, competitors and channels run in parallel and fan in |
+| Creative | Agent | Consumes the research result by reference |
+| Campaign build | Tool calls | Writes into the project: tasks, pages, assets |
+| Launch | Human approval, then tool calls | The approval sits before any irreversible or money-moving action |
+| Monitoring | Wait, then agent | A timer or a metrics event wakes it |
+| Optimisation | Agent, approval when spend changes | Loops back to monitoring |
+
+Monitoring to optimisation is a cycle, and the design says which of two shapes it takes. A campaign is not one run. It is a short **build** workflow, request through launch, followed by a re-entrant **optimise** workflow started by a timer or a metrics event, each run resumable on its own, with the project record as the long-lived shared state. That needs a time-based entry in the trigger catalogue, where today every trigger is a task or form event, and it can sit on the queue driver's existing scheduling. For a refinement loop inside one run, a loop node carries an explicit exit condition, an iteration cap, a per-iteration budget slice and a wait between iterations. Either way the loop is bounded the way a chain is: deadline and budget shrink per iteration, the hourly run limit that is stored and never enforced today becomes the loop's admission control, and the depth guard applies to workflow re-entry so a rule to workflow to rule cycle trips it.
+
 **Checkpoints.** Every step boundary is a checkpoint. Within a step, the executor is responsible for its own atomicity, and an agent step's checkpoint granularity is its node. That is a real limitation and should be stated rather than hidden: a step that dies mid-write is replayed whole, which is safe only because every write goes through an idempotent tool layer.
+
+**Long-running runs.** A long-running run is a series of short steps separated by durable waits, and that needs three things. A wait step, until a timestamp, an event or an approval, backed by the queue driver's existing scheduling, tenant-scoped and restart-safe, so a run waiting three days holds no worker and no connection. Step claims held as leases renewed by heartbeat with a lifetime derived from the step's deadline, which closes the lock-versus-timeout defect by design rather than by tuning a constant. And a sweep that marks an expired run and routes it to the definition's on-timeout branch, with run and checkpoint expiry keyed to terminal status only, so a pending approval is never deleted under its proposal. Multi-day campaign workflows are in scope; what stays short is each individual run between waits, which is what keeps the Temporal trigger in the trade-offs honest.
 
 **Human approval.** Already the right shape and should be lifted from a per-run interrupt to a first-class step type with an owner, a deadline and an escalation. Two live defects to fix in passing: nothing expires a run waiting on a person, and the run collection's time-to-live is unconditional on status, so a long-pending approval eventually has its run deleted while its proposal survives, pointing at nothing.
 
@@ -178,10 +268,12 @@ Conflating these is the usual cause of both cost blowups and wrong answers.
 |---|---|---|---|
 | **Working state** | One run | Private to the run | Checkpoints, on PR #552 only |
 | **Episodic** | Retention window | Project, shared | Run records; episodes on PR #552 |
-| **Semantic** | Until retired | Project shared, or per user | Decisions, constraints, preferences, on PR #552 |
+| **Semantic** | Until retired | Project shared, per agent, or per user | Decisions, constraints, preferences, on PR #552 |
 | **Retrieval corpus** | Follows the source | Per document, ACL-bearing | **Missing entirely** |
 
-Only the fourth needs embeddings. Treating agent memory as a retrieval problem is the mistake that produces a vector store full of preferences nobody can read back reliably.
+Only the fourth needs embeddings.
+
+**Shared against agent-specific.** A memory row carries its scope: run, agent, project or user. Agent-scoped memory keys to the stable agent identity, not the revision, so editing a prompt does not erase what the agent has learned; it is written only by that agent's runs and read only by them, at gather time. Project-scoped memory is what every agent in the project sees. User-scoped memory is the requester's preferences and travels with the person the run acts for. Promotion from agent-scoped to project-scoped is an explicit, audited proposal like any other write, never automatic, so the shared tier does not fill with one agent's unreviewed inferences. Treating agent memory as a retrieval problem is the mistake that produces a vector store full of preferences nobody can read back reliably.
 
 ### Recommendation
 
@@ -202,6 +294,23 @@ Only the fourth needs embeddings. Treating agent memory as a retrieval problem i
 
 Recommendation: define a retrieval interface with hybrid lexical-plus-vector search, ship the lexical implementation first because it works in every deployment and is a strict improvement on the current regular expression, and ship a vector adapter for hosted deployments. Hybrid search with reciprocal rank fusion outperforms either alone often enough that this is the right destination regardless.
 
+### Where each knowledge source lives
+
+| Brief source | In AlianHub | Ingested by | Tier |
+|---|---|---|---|
+| Company knowledge | Workspace-level pages, which have no project and are unreachable by retrieval today | Page events on the bus | Corpus |
+| SOPs | Two homes. Ones that must always apply are a skill's prompt partial per ADR 003, enforced by construction. The rest are pages tagged as procedures, and the project guide is one instance | Page events; tagged so a gather step can ask for them first | Corpus, and skill |
+| Client information | The portfolio, or a project for a small account: its record, its pages, and custom fields for structured attributes such as contacts and brand rules | Record and page events | Corpus, with the client identifier on every chunk |
+| Campaign history | The project's task graph, transitions, comments, approvals and audit rows. Embedding every row is noise, so at project close a summary step writes one record with objectives, what shipped, what was declined and why, and outcome | The close event; the raw history stays reachable through read tools | Episodic, and one corpus record |
+| Creative history | Task attachments in object storage and page revisions, with the trust layer's approval and decline outcomes | Upload hook: metadata plus a model-written description at upload, the asset by reference and never inlined, re-described only when the content hash changes | Corpus |
+| Performance data | Time and billing records, custom fields, and external platform metrics through an integration connector on a schedule | Not chunked or embedded at all | Structured, see below |
+| Internal documentation | Project and workspace pages with their versions, comments, meeting transcripts | Page, comment and call events | Corpus |
+| Agent-generated knowledge | Agent-authored pages held as drafts until approved, memory rows, and run episodes | Written only by the run that produced them, with provenance | Semantic and corpus |
+
+**Structured knowledge is queried, not retrieved.** Performance data is numbers, and chunking numbers produces confident nonsense. It is reached through a registry read action, scoped by project and date range, that an agent calls as a tool step, and the query and result are written to the replay record so a number in an answer traces back to a query. The corpus holds only the human-written narrative about performance: reports, retrospectives and the campaign-close summary.
+
+**Machine-authored content ranks below human-authored.** A chunk written by an agent carries the agent actor kind, the run and the revision in its metadata, and retrieval ranks it below a human-authored chunk at equal score, so the corpus cannot amplify its own inferences.
+
 **Deletion and erasure.** Tombstone on delete, cascade on project and user deletion, and a genuine erasure path. Memory today has no time-to-live and no cascade, so orphaned rows persist forever, which is a compliance problem before it is a cost problem.
 
 ---
@@ -210,9 +319,9 @@ Recommendation: define a retrieval interface with hybrid lexical-plus-vector sea
 
 ### Today
 
-One provider is selected from an environment variable when the process starts. The chat interface has no model parameter, so no caller can request a specific model. The agent record has a model field that nothing reads. There is no retry, no failover, no circuit breaker and no rate-limit handling, and the carefully assigned provider error codes are discarded one frame above where they are set.
+Three providers ship: OpenAI, Anthropic and DeepSeek. Google is named in the brief and is not one of them; adding it is a fourth adapter under the factory plus pricing entries, and the pricing defect below applies the moment it lands. One provider is selected from an environment variable when the process starts. The chat interface has no model parameter, so no caller can request a specific model. The agent record has a model field that nothing reads. There is no retry, no failover, no circuit breaker and no rate-limit handling, and the carefully assigned provider error codes are discarded one frame above where they are set.
 
-Three provider differences a router would have to normalise are already present and undocumented: output-token ceilings differ by an order of magnitude, JSON mode is native on two providers and emulated by appending a sentence to the system prompt on the third, and reasoning models require different parameters.
+Three provider differences a router would have to normalise are already present and undocumented. Output-token ceilings differ by an order of magnitude and the default when none is requested differs too, with DeepSeek's an order larger than the others. Structured output is native on OpenAI and DeepSeek and emulated on Anthropic by appending a sentence to the system prompt, which no caller can see. Reasoning models take different parameters, and OpenAI and DeepSeek each omit temperature for theirs in their own way. A Google adapter would add a fourth set: very large context windows, which is a real input to routing on context, a different structured-output mechanism, safety-settings parameters, and two authentication paths.
 
 ### Recommendation
 
@@ -226,9 +335,25 @@ route({ taskClass, contextTokens, tenantPolicy, slo }) -> { provider, model, par
 
 **Health-aware selection with a circuit breaker.** Per provider and model, track error rate, rate-limit responses and latency in a short window. Open the breaker on sustained failure and route to the next candidate. Half-open probes restore it. This is the mechanism that answers the thirty-minute outage scenario.
 
+**The routing decision.** Each task class carries an ordered candidate list, cheapest first among the models that passed the class's golden set, and a tenant policy can pin, forbid or reorder. The router filters that list by capability fit, tenant policy, breaker state and remaining budget and takes the first survivor; only when the survivor's recent latency misses the class's target does it step to the next. The decision and its reasons, including which candidates were excluded and why, are written to the model-call span and the replay record, because a choice that cannot be explained cannot be evaluated. When no candidate survives, the step fails transient if the cause is health or budget and deterministic if it is capability, so section I's retry policy applies unchanged.
+
+**Context requirements.** Every candidate model carries a capability record: context window, output ceiling, whether structured output is native, and whether it takes reasoning parameters, which is the undocumented differences above made into data. The router excludes any candidate whose window cannot hold the estimated prompt plus the class's expected output, and among those that can it prefers the smaller window, because context is priced. When nothing fits, that is a deterministic failure of the step rather than a reason to reach for the largest model: the gather stage must reduce its inputs, and section E's chunked retrieval is the mechanism. The parameters half of the router's output is where the per-provider differences are resolved, so no caller ever sees them.
+
+**Rate limits are not outages.** A rate-limit response should not open the breaker on its own. The router keeps a token bucket per provider key for requests and tokens per minute, seeded from published limits and tightened by observed responses, and a step that would exceed it waits briefly or takes the next candidate rather than burning one of its capped attempts. A response carrying a retry-after is honoured as a bounded wait that does not count against the step's retries; only sustained rate limiting across the health window contributes to the breaker. A tenant that brings its own key gets its own bucket and its own breaker, so one tenant's burst cannot exhaust a shared key or open the shared breaker.
+
 **Budget as a first-class input.** Estimate tokens before the call, reserve against the tenant's remaining budget, and reconcile after. Today the run cap is checked after the model call, so it can stop the acting phase but never the spend.
 
 **Fix the pricing defect first.** Default pricing covers one vendor's model identifiers. An unpriced model books zero cost, and every downstream control silently stops working: per-agent cap, per-run cap, company budget and both alert thresholds. It fails quietly and looks like healthy zero spend. A router that cannot price its own choices cannot make them.
+
+### Cost levers beyond routing
+
+Routing is one lever of five, and all five are measured on the same number, cost per approved change.
+
+- **Prompt caching.** A prompt is shared partials plus a skill's instructions plus a template, so the stable prefix is cached at the provider, and revision pinning is what keeps the hit rate high because the prefix does not drift under a live agent. The hit is recorded on the model-call span that already names the model.
+- **Prompt size.** Each task class carries an input budget alongside its quality floor and latency target; retrieval returns a chunk count and a token cap per class, the document-read tool is capped the same way, and output ceilings are set per class instead of requested per call. Enforcing the budget before the call is also what fixes the post-hoc run cap by construction.
+- **Batching.** Steps with no latency target, digests and summaries, go through provider batch endpoints at their discount, and embeddings are batched at ingestion.
+- **Memoisation.** The identical-call detector from the loop scenario already recognises a repeated call; a step whose input hash matches a completed step in the same run returns that output instead of a second bill, and a response cache keyed on tenant, prompt hash and chunk set serves read-only questions already asked.
+- **Embedding cost.** The content-hash upsert in section E bounds re-embedding to what actually changed, and the embedding model version on every chunk makes a model migration a background job rather than a surprise.
 
 ### Evaluating whether routing improves business performance
 
@@ -284,15 +409,19 @@ Second, performing an action consults the registry and never the permission cata
 
 ### Recommendation
 
-**Authentication.** Human sessions stay as they are. Machine identity should move from a long-lived personal token to a short-lived, workflow-scoped credential minted per step, carrying tenant, workflow, step, agent revision and an expiry. A leaked token then buys minutes and one step's authority rather than a day and the token's full scope.
+**Authentication.** Human sessions do not stay as they are: session and refresh cookies become http-only, secure and same-site, and the content security policy is re-enabled, because today any script injection yields both tokens. Company membership is revalidated on every machine-facing path, which also closes the MCP gap. Machine identity moves from a long-lived personal token to a short-lived, workflow-scoped credential minted per step by the engine at dispatch, signed, carrying tenant, workflow, step, agent revision and an expiry, and verified by the tool layer against the live step record on every call, so a credential for a step that has finished or failed is refused before it expires. A leaked token then buys minutes and one step's authority rather than a day and the token's full scope.
+
+**Service identities.** Every non-human principal has its own identity. The workflow engine, its workers, the indexer and the router run under service identities with a fixed permission set that no person holds, and the per-step credential is derived from the engine's identity rather than from any user's token, so a person leaving does not orphan running work. Against an external business system an agent acts through the tenant's integration grant, resolved by handle for that step only into a token scoped to the tool's declared capability, never exposed to the model or the skill, with the agent and step identifiers attached wherever the system accepts them so the external record joins back to the step. A tenant's own model key is the same mechanism. In the actor envelope, the service identity is the identifier when the kind is system.
 
 **Authorization: role-based, with attributes for scope.** Roles decide capability. Attributes, meaning project membership, visibility and ownership, decide reach. This is what already exists in the permission layer; the change is to apply it uniformly to agent reads, which today are enforced structurally at run start rather than checked per read.
 
 **The narrowing chain.** Effective authority is the intersection of the registry, the agent revision's allowed actions, the skill's declared actions per ADR 003, and the step's granted scope. Every layer may narrow and none may widen. Checked when authored and again when performed.
 
-**Credentials.** Provider keys are environment variables today, which is adequate for one operator and inadequate the moment a tenant brings its own key. They belong in a secrets store, referenced by handle, resolved at call time by the router, never logged and never returned by an API. The settings endpoint already reports key presence without the value, which is the right pattern to generalise.
+**Credentials.** Provider keys are environment variables today, which is adequate for one operator and inadequate the moment a tenant brings its own key. They belong in a secrets store, referenced by handle, resolved at call time by the router, never logged and never returned by an API. The settings endpoint already reports key presence without the value, which is the right pattern to generalise. Integration credentials move first onto the authenticated-encryption path the codebase already uses for cloud storage tokens, with a one-shot migration, and from there into the same store. Every secret carries an owning tenant, a handle, a creation time and a rotation deadline; rotation writes the new value under the same handle so a step resolves the current one at call time, and revocation invalidates it immediately for steps not yet dispatched while in-flight steps fail on their next call rather than finishing on a revoked secret. A tenant-brought key is resolvable only for that tenant's steps, and its spend books to that tenant.
 
 **Egress.** Agents fetch external pages, and the private-host check runs on the initial URL but not on redirects, so a redirect to a link-local address is followed. Outbound needs an allowlist per tenant, revalidation on every hop, and a response size and time cap.
+
+**Sandboxing and untrusted content.** The position is stated rather than implied: no tenant-authored code runs in this process. The execution boundary is the closed skill vocabulary from ADR 003 plus the action registry, and every tool call runs under a per-call time limit, output-size cap and the egress policy above. What does reach the model is untrusted content: task descriptions today, and after section E lands, page bodies, comments, transcripts, uploaded files and fetched pages, all member-authored or external. Containment is structural rather than lexical. The narrowing chain means nothing the model reads can widen what the step may do; retrieved passages and fetched bodies are delimited and labelled as data with their provenance; and an emitted action rated above the agent's autonomy goes to approval regardless of the model's confidence. The instruction guard's phrase detection becomes a signal, flagging rather than silently stripping, and a step whose context included external or member-authored content is marked as tainted: it may perform low-risk actions unattended, its medium and high-risk actions route to approval regardless of autonomy, and the taint is written onto the audit row so a hijacked run is found by query rather than inferred after the damage. The golden set carries injection cases per task class, so a routing change that makes a model more compliant with injected instructions fails the evaluation before it ships.
 
 **Audit immutability.** Append-only with a per-tenant hash chain, so tampering is detectable rather than merely discouraged. Audit rows currently have no expiry while the runs that explain them expire after six months, which should be reversed: keep the explanation at least as long as the record.
 
@@ -310,7 +439,9 @@ Token and cost are recorded for agent runs only. Ask, the project generator, mee
 
 ### Recommendation
 
-**Three pillars, one identifier.** Adopt OpenTelemetry and make the trace identifier the join key that appears on the workflow run, every step run, every audit row and every log line.
+**Three pillars, one identifier.** Adopt OpenTelemetry and make the trace identifier the join key that appears on the workflow run, every step run, every audit row and every log line. Instrumentation is the standard; the backend is a choice with the same shape as the vector store. The default is a collector in the compose file feeding one self-hosted store for traces, metrics and logs, so a small team gets all three from a single added container, and an operator with a managed backend points the collector at it instead. Every span carries the tenant as a resource attribute, so the operator's view and a per-tenant view are the same data filtered, and the run console can show a workspace admin the trace for its own agent without exposing another tenant's. Every model call in every feature goes through the core's single call function per ADR 003, and that function is the one place spans, token and cost counters and the replay record are written, which makes coverage of the entire platform a property of one file rather than thirteen.
+
+**Logs.** Logs become structured records through the existing logger rather than formatted strings. Every line carries tenant, trace and span identifiers, workflow run, step, agent and revision, taken from the same request context that supplies the request identifier today, which is retired in favour of the trace identifier. Lines ship off the host through the collector alongside spans and metrics instead of rotating on disk, so a step's log is one query rather than a search across files. Prompt bodies, retrieved chunks and credentials never reach a log line; they belong to the replay record, which has its own redaction and retention. Log retention follows the run record it explains and is at least as long as the audit row.
 
 Span structure, which is what makes the brief's questions answerable by construction:
 
@@ -324,9 +455,13 @@ workflow.run
 
 **Metrics.** Rate, errors and duration per workflow, step, agent and model; token and cost counters with the same dimensions; queue depth and age; approval, decline and revert rates as first-class product metrics because they are the quality signal that section F depends on.
 
+**Error tracking.** Every failed step, refused action, provider error and uncaught exception is reported as one error event carrying the trace identifier, tenant, workflow and step, agent and skill revision, provider and model, the provider's own error code and the deterministic flag, so the code the router needs and the code the operator needs are the same record. Events are fingerprinted on error class and step rather than message text, so an agent failing its last twenty runs is one issue with a count rather than twenty lines, each linked to the trace and the replay record of the run that raised it. The two competing uncaught-exception handlers collapse into one path that reports, flushes and exits. A self-hosted deployment gets a compatible endpoint it can point at its own tracker or leave unset, in which case events land as exception events on the span, so the record exists in every deployment.
+
 **The run replay record.** One record per model call storing the prompt hash, the resolved prompt or its reference, the retrieved chunk identifiers, the raw response, the model and parameters, and the agent and skill revisions. This is what turns "why did this agent produce this result" from an inference into a lookup. It carries a retention and redaction policy, because the prompt contains tenant content.
 
 **Alerting on rate, not on events.** Error rate per agent and workflow, approval rate falling, cost per tenant against forecast, queue age, and provider breaker state. Today the only alerts are budget thresholds, and nothing tells anyone that an agent has failed its last twenty runs.
+
+**The objectives the alerts fire against.** The router takes a latency target and the alerts fire on rates, so both need numbers. Three per instance: a workflow step completes, or fails with a recorded error, inside its deadline ninety-nine and a half percent of the time; conversation and extraction calls return under three seconds at the ninety-fifth percentile and planning under thirty; a changed document is retrievable within a minute. Each alert threshold derives from these, and an error budget against them is what decides whether a routing or prompt change ships. A deploy drains: on the stop signal a worker stops claiming steps, finishes what it holds inside its lease, and exits, so a restart is a pause rather than the hard fail it is today.
 
 **Answering the brief directly:**
 
@@ -353,7 +488,7 @@ Fifteen steps, step eleven fails after ten succeed.
 
 **How is step eleven retried?** With a stable idempotency key derived from workflow run and step, so every attempt is the same logical operation. Capped attempts with exponential backoff. Deterministic failures, meaning a missing task or an unknown action, fail immediately rather than three times, because retrying a permanent error only multiplies the cost of a broken definition.
 
-**How is duplicate execution prevented?** At three levels. A unique index on workflow run and step so a re-delivery cannot create a second attempt record. Idempotent tool operations keyed on that identifier so a replay is a no-op rather than a second write. A compare-and-set claim on the step so two workers cannot both hold it.
+**How is duplicate execution prevented?** At three levels, and the claim is a lease rather than a flag. A unique index on workflow run and step, so a re-delivery cannot create a second attempt record. A compare-and-set claim that moves the step from ready to running with the claiming worker and a lease expiry, renewed by heartbeat while the executor runs and never shorter than the step's deadline; a worker that cannot renew must abandon the step and stop writing, and a lapsed lease is the only path back to ready, incrementing the attempt so the re-delivery is a new attempt on the same idempotency key rather than a second copy of the first. That is the rule today's job lock lacks. And idempotent tool operations: each action a step performs carries a key made of the step key, the action and a hash of its canonical parameters, written on the audit row under a unique index per tenant, so a replayed write hits the duplicate-key catch and returns the original row, the same mechanism the automation delivery index already proves out. For an agent step, the model's proposed change list is persisted as the step's output before the acting phase begins, so a retry of the acting phase replays that list rather than re-asking the model and the keys match; only when the planning phase itself failed is the model asked again, and by then nothing has been written. A landed write from a prior attempt that no longer matches the list is reversed through its undo descriptor before the new list is acted on.
 
 This last one needs saying plainly: **agent runs have none of these today.** There is no unique index, no in-flight check and no claim, so a double-click starts two runs on one task with two model bills. There is also a latent duplicate-execution bug where the job lock expires before the model timeout, so a slow call outlives its lock and the job is re-delivered while the first is still running.
 
@@ -363,7 +498,25 @@ This last one needs saying plainly: **agent runs have none of these today.** The
 
 ---
 
+## J. Infrastructure and deployment
+
+The brief scores infrastructure and scalability, and the sections above assert things against a deployment they never draw. This is the target, with the self-hosted default and the hosted option for every new component, on the same rule the Temporal argument uses: one image, one database, and nothing a small team cannot run from a compose file.
+
+**Topology.** One container image in three roles selected by an environment variable: `api`, which serves requests and owns the event bus; `worker`, which consumes the queue, runs the indexer subscription and the timer sweep that expires approvals and reaps stuck claims; and `all`, the self-host default that runs both in one process. The global database holds identity, billing and the queue; each tenant's database holds everything else, including its step records, checkpoints, memory and index. Object storage, or local disk through the existing storage abstraction, holds by-reference payloads and replay records under a per-tenant prefix carrying the run's retention, so tenant erasure is a prefix delete.
+
+**Queue.** The existing adapter, polling a collection on the global database today, delivering at least once under a lease, adequate to roughly fifty jobs a second across the instance. The second driver is Redis-backed, and the trigger to ship it is measured queue age, not tenant count.
+
+**Secrets, traces, vectors.** Each follows the same shape: an honest default that works everywhere, behind an interface with a hosted driver. Secrets default to the authenticated-encryption idiom already in the codebase on the global database, with a vault or cloud key-management driver for hosted deployments. Traces default to the OpenTelemetry SDK with an optional collector container, so a self-hoster gets correlated records even without a tracing backend. Vectors default to lexical on the tenant database, with the managed vector adapter for hosted deployments, per section E.
+
+**The scaling model.** The unit of scale is the worker process, and three things bound it. The event bus is process-local, so dispatch cannot ride it across processes; it stays the trigger source and dispatch is a queue job, which is what makes workers horizontally scalable at all. Each worker opens a pool of ten per tenant it touches, so effective per-tenant concurrency is workers times pool, and the per-tenant limit from section C is enforced as a claim count in the tenant's step collection, a compare-and-set counter, rather than per process. The polling queue on the global database is the shared chokepoint and the first thing to move; the vector index scales per tenant with its corpus and is built by a background job, never on the request path. Targets to design against: a hundred concurrent workflows per tenant, a thousand steps a minute across the instance, and a changed document searchable within a minute. The measured trigger for each next step: queue age for the Redis driver, pool wait time for read replicas, and migration wall-clock for sharding large tenants out.
+
+**Upgrades.** Rolling. A worker receiving the stop signal stops claiming steps, finishes the ones it holds inside their leases, and exits, which the per-step resume makes safe. The API role drains connections behind the existing health endpoint, which becomes readiness while a separate liveness probe answers only for the process.
+
+---
+
 ## Architecture decisions and trade-offs
+
+Nine calls, each with what was rejected and what would reverse it.
 
 **1. Database per tenant, kept.**
 *Alternative:* shared collections with a tenant key, which is the industry default and much cheaper per tenant.
@@ -371,11 +524,11 @@ This last one needs saying plainly: **agent runs have none of these today.** The
 *Trade-off accepted:* cross-tenant analytics require fan-out, per-tenant migrations are a loop, connection pools bound concurrency, and a shared vector index is not available.
 *Would change if:* tenant count reaches the thousands, where connection and migration cost dominates, and the answer becomes a hybrid with large tenants isolated.
 
-**2. Generalise the existing durable runner rather than adopt Temporal.**
-*Alternative:* Temporal, or a workflow service.
-*Why:* the durable primitives are already built and proven here, and a self-hosted product cannot casually require a cluster.
-*Trade-off accepted:* we own the scheduler, the timers and the recovery semantics, which is real ongoing cost and a genuine source of subtle bugs.
-*Would change if:* workflows exceed roughly a day, need human timers at scale, or the team spends more than about a fifth of its time on orchestration bugs.
+**2. Generalise the existing durable runner rather than adopt Temporal or promote LangGraph.**
+*Alternatives:* Temporal, or a managed workflow service; or promote the LangGraph graph on PR #552 to be the workflow engine and lift the runner's queue, unique-index idempotency and deterministic-versus-transient split into it.
+*Why:* the durable primitives are already built and proven here, a self-hosted product cannot casually require a cluster, and LangGraph has no admission control or per-tenant concurrency of its own. LangGraph stays as the executor inside an agent step, whose checkpoint granularity section C fixes at the node.
+*Trade-off accepted:* we own the scheduler, the timers and the recovery semantics, which is real ongoing cost and a source of subtle bugs; and the split leaves two stores per tenant, the agent checkpoints and the step records, with two resume paths that must agree on which is authoritative when a process dies inside an agent step.
+*Would change if:* a single run between waits exceeds roughly a day, human timers are needed at a scale the sweep cannot serve, the team spends more than about a fifth of its time on orchestration bugs, or the two stores diverge in practice, in which case collapse to one engine.
 
 **3. The action registry stays a closed allowlist.**
 *Alternative:* dynamic tool discovery, which is where the wider ecosystem is heading.
@@ -393,7 +546,7 @@ This last one needs saying plainly: **agent runs have none of these today.** The
 *Alternative:* adopt a vector database immediately.
 *Why:* every deployment must work, including a plain self-hosted server, and hybrid search is the destination anyway.
 *Trade-off accepted:* hosted and self-hosted tenants get materially different answer quality until the adapter ships.
-*Would change if:* corpora grow past the point where lexical recall is embarrassing, which comes quickly for long documents.
+*Would change if:* recall at ten on a retrieval slice of the golden set, per task class, falls below a stated floor for a tenant's corpus, or the ingestion indexer reports median document length or the share of long page bodies crossing a threshold, both of which are visible before anyone complains. When it fires, the vector adapter stops being hosted-only and ships with a self-host default, a local embedding model against the tenant database, because decision one forbids a shared index.
 
 **6. Agents communicate through the workflow engine, never directly.**
 *Alternative:* direct agent-to-agent calls, which is what most agent frameworks demonstrate.
@@ -401,29 +554,43 @@ This last one needs saying plainly: **agent runs have none of these today.** The
 *Trade-off accepted:* more moving parts for a two-step flow, and every handoff needs a typed contract.
 *Would change if:* a genuine sub-second negotiation loop appears, which a campaign workflow does not have.
 
-**7. Human approval is a workflow step, not a special case.**
-*Alternative:* keep it as the per-run interrupt it is today.
-*Why:* approvals need owners, deadlines, escalation and reassignment, and a workflow step already has all four.
-*Trade-off accepted:* the current interrupt is simpler and works.
-*Would change if:* approvals stay single-step and single-owner, in which case the interrupt is enough.
+**7. Immutable agent revisions pinned per run.**
+*Alternatives:* copy the whole agent document onto every run; event-source the agent and rebuild on read; keep definitions in version control.
+*Why:* reproducibility is the precondition for debugging, routing evaluation and defending an action to a client, and a pinned revision gives it at the cost of one join, while the alternatives are wrong at scale, expensive on every read, or hostile to the admins who author.
+*Trade-off accepted:* every edit writes a revision, so storage and the revision list grow with every prompt tweak; two revisions of one agent can be running at once and the run detail must say which; and a skill revision referenced by any pinned agent revision cannot be retired, which extends ADR 003's retire-never-delete rule.
+*Would change if:* revision churn from routine edits makes the list unusable or the join shows up on every run read, at which point event-sourced history becomes the cheaper representation.
+
+**8. An in-process model router rather than an LLM gateway.**
+*Alternative:* a gateway in front of the providers, which supplies failover, breakers and a maintained price list without us owning them.
+*Why:* ADR 003 already extracts the provider factory into the core, the provider differences are normalised there and nowhere else, and per-tenant budget reservation has to sit inside the tenant boundary decision one draws, which an external gateway cannot see.
+*Trade-off accepted:* we own the breaker, the quirk normalisation and the pricing table, and the pricing defect is what owning a pricing table costs when it falls behind.
+*Would change if:* a tenant brings its own key behind its own gateway, or the provider and model count grows past what one team can keep priced and tested, at which point the router becomes a thin policy layer over a gateway.
+
+**9. OpenTelemetry as the observability substrate.**
+*Alternatives:* an LLM-native tracer, which gives the replay record for free but adds a hosted or self-run service and pins the trace shape to one vendor; a direct application-monitoring SDK, which locks every self-hoster to that vendor; or structured logs and a metrics endpoint only.
+*Why:* the join key on run, step and audit rows is the design, and it works whether or not a backend is attached, so self-hosters choose theirs.
+*Trade-off accepted:* a collector and a backend become optional deployment components, and without them spans are dropped, which is why the replay record is persisted in the tenant database independently of the tracer rather than reconstructed from spans.
+*Would change if:* a tracing product ships a single-container self-hostable backend the compose file can carry, or task 019 selects an LLM-native tracer, in which case the standard remains the export format and the tracer becomes one sink.
+
+Human approval as a workflow step, which an earlier draft listed on its own, is part of decision two: approvals need owners, deadlines, escalation and reassignment, and a step already has all four.
 
 ---
 
 ## Failure and scale scenarios
 
-**A provider is unavailable for thirty minutes.** The breaker opens after sustained failures and the router selects the next candidate for the affected classes, degrading quality rather than availability. Steps whose class has no alternative are marked transient-failed and retried with backoff past the outage. Nothing is lost because a step is resumable. *Today: every run fails, no failover exists even with a second provider configured and keyed, and the error code that would drive the decision is discarded.*
+**A provider is unavailable for thirty minutes.** The breaker opens after sustained failures and the router selects the next candidate for the affected classes, degrading quality rather than availability. Steps whose class has no alternative are marked transient-failed and park: the retry budget is sized to the outage rather than the call, backoff climbs to a ceiling of a few minutes and the attempt cap is the deadline the envelope already carries, so a step does not exhaust three attempts in the first minute. While the breaker is open the scheduler does not dispatch to that provider at all, and the half-open probe that closes it is what re-dispatches parked steps, so recovery is event-driven rather than a retry that happens to land after minute thirty. A provider that hangs rather than errors is caught by the per-call timeout, and a timeout counts against the breaker like an error. Breaker state, queue age and parked steps per tenant are the alerts, and a tenant whose class has no priced alternative sees its workflows as blocked rather than failed. *Today: every run fails, no failover exists even with a second provider configured and keyed, and the error code that would drive the decision is discarded.*
 
-**A hundred thousand tasks in an hour.** Admission control per tenant at the queue, so one tenant's burst cannot starve another. Workers scale horizontally on the queue; per-tenant concurrency stays bounded by the connection pool. Cheap classification steps run on small models and fan out; expensive steps are the bottleneck by design, and the budget check refuses new work rather than letting spend run. Backpressure surfaces as queue age, which is alertable. *Today: user-started agent runs bypass the queue entirely, so this is unbounded parallelism against a small pool.*
+**A hundred thousand tasks in an hour.** Admission control per tenant at the queue, so one tenant's burst cannot starve another. Workers scale horizontally on the queue, which at that rate means the Redis-backed driver behind the existing adapter, since the polling queue on the global database tops out near fifty jobs a second; per-tenant concurrency stays bounded by the connection pool and is enforced with a distributed count in the tenant's step collection, not a per-process counter. Cheap classification steps run on small models and fan out; expensive steps are the bottleneck by design, and the budget check refuses new work rather than letting spend run. Backpressure surfaces as queue age, which is alertable. *Today: user-started agent runs bypass the queue entirely, so this is unbounded parallelism against a small pool.*
 
 **An agent loops on the same tool.** Four independent limits: per-step tool-call cap, per-workflow depth, an identical-call detector that refuses a repeated action with identical parameters within a step, and the budget. The event bus depth guard already exists and works for rules. *Today: the agent path resets that depth counter to zero on every write, so the guard cannot trip through an agent, and the practical backstop is running out of money.*
 
-**An agent attempts another client's data.** It cannot reach the connection, because the tenant identifier is the database name. The attempt is refused and audited. This is the one scenario the current architecture answers completely, with the caveat that the two verified holes are *within*-tenant scope escapes rather than cross-tenant, and both should still be closed.
+**An agent attempts another client's data.** Under the primary reading, where a client is a tenant, it cannot reach the connection, because the tenant identifier is the database name; the attempt is refused and audited, and this is the one scenario the current architecture answers completely. Under the agency reading, where clients are projects or portfolios inside one workspace, the control is the client identifier on every chunk and the step's granted scope from section G, and today that control has two verified holes, retrieval ignoring page visibility and the document-read tool ignoring project scope. For an agency deployment those are the cross-client control, which is why they are ranked first among the defects.
 
 **A workflow fails at step eleven.** Covered in section I: resume at eleven, idempotency key, capped backoff, deterministic failures not retried, compensation for the permanent case, and the trace identifier for the root cause.
 
 **A model sixty percent cheaper is slightly worse.** Not a judgement call, a measurement. Run it against the golden set for the affected classes, then online against approval rate, revert rate, edit distance and repair rate on a held-out slice. Adopt per class rather than globally, because the cheap model is usually right for extraction and wrong for planning. Cost per approved change is the deciding number, and a model that halves token cost while doubling reverts is more expensive.
 
-**A critical tool becomes unavailable.** A tool call is a step, so it retries with backoff and fails deterministically when the error says permanent. The workflow definition chooses: wait, route to a human step, or compensate and stop. Breaker state per tool is visible, and the workflow surfaces as blocked rather than silently stalling.
+**A critical tool becomes unavailable.** Unavailability is a transient error, so the step retries with backoff until its envelope deadline and then parks rather than failing. A breaker per tool, tracked in the same short window as a provider's, stops dispatch of every step that names that tool, so a hundred workflows blocked on one dead service cost nothing while they wait, and the half-open probe re-dispatches them. A call that hangs is bounded by the same per-call timeout and size cap the egress policy applies, and a timeout counts against the breaker. Only when the deadline passes does the definition's permanent-failure policy apply: route to a human step, compensate with the recorded undo descriptors, or stop, with the workflow visibly blocked and the blocked count alertable. *Today an agent run has no retry at all, so a tool failure is a hard-failed run after an unknown number of writes.*
 
 ---
 
