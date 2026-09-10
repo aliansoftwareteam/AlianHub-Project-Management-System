@@ -5,6 +5,8 @@ const audit = require('./agentAudit');
 const undo = require('./undo');
 const runs = require('./runs');
 const budget = require('./budget');
+const memory = require('./memory');
+const logger = require('../../Config/loggerConfig');
 
 // Whole-run revert: every audited action of a finished run, newest first,
 // through the same inverse a proposal undo uses, inside the company's undo
@@ -46,8 +48,10 @@ const revertRun = async (companyId, runId, { actor, isPrivileged, ip }) => {
     }
 
     const result = { reverted, alreadyUndone: rows.length - pending.length, failed, windowEndsAt };
-    await runs.patch(companyId, run._id, { revertedAt: new Date(), revertedBy: String(actor.userId), revert: { reverted, failed } });
+    await runs.patch(companyId, run._id, { revertedAt: new Date(), revertedBy: String(actor.userId), revert: { reverted, failed }, 'episode.reverted': true });
     await audit.recordRunReverted(companyId, actor, { runId: String(run._id), agentId: run.agentId, agentName: run.agentName, reverted, failed, ip });
+    try { await memory.recordEpisode({ companyId, projectId: String(run.projectId || ''), runId: String(run._id), patch: { reverted: true } }); }
+    catch (e) { logger.error(`[agent-revert] ${run._id}: episode not updated: ${e.message}`); }
     return result;
 };
 

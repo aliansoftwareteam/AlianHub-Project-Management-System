@@ -6,6 +6,9 @@ const registry = require('./registry');
 const actions = require('./actions');
 const undo = require('./undo');
 const audit = require('./agentAudit');
+const memory = require('./memory');
+const findingMemory = require('./engine/findingMemory');
+const logger = require('../../Config/loggerConfig');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
 // actions it would run. Approving applies them through perform() — so they are
@@ -21,7 +24,25 @@ const STATUS = Object.freeze({ PENDING: 'pending', APPLYING: 'applying', APPROVE
 const UNDO_WINDOW_MS = 15 * 60 * 1000;
 const PRIMARY_AGE_MS = 24 * 60 * 60 * 1000;
 const GATE_OWNER_ADMIN = 'owner_admin';
+// The canned decline reasons the Inbox offers; only these can grow into a user preference.
+const DECLINE_REASONS = Object.freeze(['too_many_changes', 'wrong_tone', 'needs_person', 'not_now']);
+const DECLINE_REASON_MAX = 200;
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
+
+const quietly = async (what, fn) => {
+    try { return await fn(); } catch (e) { logger.error(`[agent-proposal] ${what}: ${e.message}`); return null; }
+};
+
+/* The run that filed the proposal continues from its checkpoint with the
+ * decision; a run from before the graph, or one whose thread is gone, is
+ * closed directly as it always was. */
+const settleRun = async (companyId, p, { decision, applied, reason, outcome }) => {
+    if (!p.runId) return;
+    const runs = require('./runs');
+    const resumed = await quietly(`resume run ${p.runId}`, () => require('./engine/graph').resumeGraph({ companyId, runId: p.runId, resume: { decision, applied, reason } }));
+    if (resumed && resumed.resumed) return;
+    await runs.finish(companyId, p.runId, { status: runs.STATUS.DONE, outcome }).catch(() => {});
+};
 
 const emit = (companyId, proposal) => {
     socketEmitter.emit('update', { type: 'update', module: 'agent', companyId: String(companyId), data: { kind: 'proposal', proposal }, updatedFields: { kind: 'proposal' }, actor: { kind: 'agent' }, depth: 1 });
@@ -52,7 +73,7 @@ const create = async (companyId, { agent, runId, taskId, projectId, what, why, c
         data: {
             agentId: String(agent._id), agentName: agent.name, runId: runId || null, taskId: taskId || null, projectId: projectId || null,
             what: String(what).slice(0, 300), why: String(why || '').slice(0, 2000),
-            changes: changes.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null })),
+            changes: changes.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
         },
     }, 'save');
@@ -145,12 +166,16 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     const undoUntil = new Date(Date.now() + UNDO_WINDOW_MS);
     const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds });
     await audit.recordProposalDecision(companyId, decider, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });
+    await quietly(`remember approved changes of ${id}`, () => memory.rememberApprovedChanges({ companyId, projectId: p.projectId, proposal: p, applied }));
+    for (const [i, a] of applied.entries()) {
+        const c = changes[i];
+        // eslint-disable-next-line no-await-in-loop
+        if (a.ok && c && c.remember) await findingMemory.record(companyId, { ...c.remember, subtaskId: a.result && a.result.subtaskId });
+    }
     // The run was waiting on this decision; without closing it here it sat in
     // "waiting_approval" — and in every running count — after the work was done.
-    if (p.runId) {
-        const okCount = applied.filter((a) => a.ok).length;
-        await runs.finish(companyId, p.runId, { status: runs.STATUS.DONE, outcome: `${status} by a person — ${okCount} of ${applied.length} change(s) applied` }).catch(() => {});
-    }
+    const okCount = applied.filter((a) => a.ok).length;
+    await settleRun(companyId, p, { decision: status, applied, reason: null, outcome: `${status} by a person — ${okCount} of ${applied.length} change(s) applied` });
     return { proposal: updated, applied, undoToken: String(id), undoUntil };
 };
 
@@ -158,10 +183,14 @@ const decline = async (companyId, id, { decider, ip, reason }) => {
     const p = await get(companyId, id);
     if (!p) return { error: 'Proposal not found.', status: 404 };
     if (p.status !== STATUS.PENDING) return alreadyDecided(companyId, id);
-    const updated = await setStatus(companyId, id, { status: STATUS.DECLINED, decidedBy: decider.userId, decidedAt: new Date() }, { onlyIf: STATUS.PENDING });
+    const declineReason = String(reason || '').trim().slice(0, DECLINE_REASON_MAX);
+    const updated = await setStatus(companyId, id, { status: STATUS.DECLINED, decidedBy: decider.userId, decidedAt: new Date(), ...(declineReason ? { declineReason } : {}) }, { onlyIf: STATUS.PENDING });
     if (!updated) return alreadyDecided(companyId, id);
-    if (p.runId) { const runs = require('./runs'); await runs.finish(companyId, p.runId, { status: runs.STATUS.DONE, outcome: 'declined by a person' }).catch(() => {}); }
-    await audit.recordProposalDecision(companyId, decider, { proposalId: id, decision: `declined${reason ? `: ${String(reason).slice(0, 200)}` : ''}`, agentName: p.agentName, runId: p.runId, ip });
+    await audit.recordProposalDecision(companyId, decider, { proposalId: id, decision: `declined${declineReason ? `: ${declineReason}` : ''}`, agentName: p.agentName, runId: p.runId, ip });
+    if (DECLINE_REASONS.includes(declineReason)) {
+        await quietly(`preference candidate for ${decider.userId}`, () => memory.preferenceCandidate({ companyId, userId: decider.userId, reasonKey: declineReason }));
+    }
+    await settleRun(companyId, p, { decision: STATUS.DECLINED, applied: [], reason: declineReason || null, outcome: 'declined by a person' });
     return { proposal: updated };
 };
 
@@ -183,4 +212,4 @@ const undoApproval = async (companyId, id, { decider, ip }) => {
     return { proposal: updated, results };
 };
 
-module.exports = { STATUS, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, validateChanges, create, list, get, approve, decline, undoApproval, bucketOf };
+module.exports = { STATUS, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, undoApproval, bucketOf };

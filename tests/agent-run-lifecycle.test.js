@@ -2,7 +2,7 @@ const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
-jest.mock('../Modules/Agents/engine/orchestrator', () => ({ run: jest.fn() }));
+jest.mock('../Modules/Agents/engine/orchestrator', () => ({ gather: jest.fn(async () => ({ status: 'gathered', context: {} })), analyse: jest.fn() }));
 jest.mock('../Modules/Agents/engine/findingMemory', () => ({ load: jest.fn(async () => new Map()), decide: jest.fn(), record: jest.fn(), touch: jest.fn() }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
@@ -23,6 +23,8 @@ const deps = () => ({
 });
 
 const runRow = (id) => mockDb.store[SCHEMA_TYPE.AGENT_RUNS].find((r) => String(r._id) === String(id));
+
+beforeAll(() => require('../Modules/Agents/engine/persistence').useInMemory());
 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
@@ -58,7 +60,7 @@ describe('#8 rateLimitPerDay is enforced in canStart', () => {
 
 describe('#10 skipped is its own status', () => {
     it('a skill that declines its input ends the run skipped with the reason as the outcome', async () => {
-        orchestrator.run.mockResolvedValue({ status: 'skipped', reason: 'no pull request or branch link on this task', skill: 'pr.summary', usage: {} });
+        orchestrator.analyse.mockResolvedValue({ status: 'skipped', reason: 'no pull request or branch link on this task', skill: 'pr.summary', usage: {} });
         const run = await runs.create(C, { agent: agent(), taskId: TASK._id, projectId: 'p1', skill: 'pr.summary' });
         const out = await runs.executeSkill(C, run, agent(), TASK, deps());
         expect(out.status).toBe('skipped');
@@ -78,7 +80,7 @@ describe('#7 a stopped run is never resurrected', () => {
     it('does not overwrite stopped with done, and files no proposal, when stop() raced the skill', async () => {
         const d = deps();
         const run = await runs.create(C, { agent: agent({ autonomy: 1 }), taskId: TASK._id, projectId: 'p1', skill: 'qa-review' });
-        orchestrator.run.mockImplementation(async () => {
+        orchestrator.analyse.mockImplementation(async () => {
             await runs.stop(C, run._id, 'u2');
             return { status: 'success', skill: 'qa-review', findings: [{ factId: 'f1', title: 'Missing alt', severity: 'high', why: 'w' }], summary: 'one issue', usage: {} };
         });
@@ -90,7 +92,7 @@ describe('#7 a stopped run is never resurrected', () => {
 
     it('does not overwrite a pause-all stop with failed either', async () => {
         const run = await runs.create(C, { agent: agent(), taskId: TASK._id, projectId: 'p1', skill: 'qa-review' });
-        orchestrator.run.mockImplementation(async () => { await runs.pauseAll(C, 'pause all by u2'); throw new Error('boom'); });
+        orchestrator.analyse.mockImplementation(async () => { await runs.pauseAll(C, 'pause all by u2'); throw new Error('boom'); });
         const out = await runs.executeSkill(C, run, agent(), TASK, deps());
         expect(out.status).toBe('abandoned');
         expect(runRow(run._id)).toMatchObject({ status: 'stopped', outcome: 'pause all' });
@@ -114,7 +116,7 @@ describe('#9/#17 direct runs pass allowedActions and count refusals as a number'
             if (action === 'task.comment') { const e = new Error('task.comment is outside this agent\'s allowed actions'); e.name = 'RefusedError'; e.auditId = 'ref1'; throw e; }
             return { auditId: 'aud1', result: { subtaskId: 'st1' } };
         });
-        orchestrator.run.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [{ factId: 'f1', title: 'Missing alt', severity: 'high', why: 'w' }], summary: 's', usage: {} });
+        orchestrator.analyse.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [{ factId: 'f1', title: 'Missing alt', severity: 'high', why: 'w' }], summary: 's', usage: {} });
         const a = agent({ autonomy: 2, allowedActions: ['task.get', 'subtask.create'] });
         const run = await runs.create(C, { agent: a, taskId: TASK._id, projectId: 'p1', skill: 'qa-review' });
         const out = await runs.executeSkill(C, run, a, TASK, d);
@@ -129,7 +131,7 @@ describe('#9/#17 direct runs pass allowedActions and count refusals as a number'
 
     it('a review-mode agent files one proposal and the run waits', async () => {
         const d = deps();
-        orchestrator.run.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [{ factId: 'f1', title: 'Missing alt', severity: 'high', why: 'w' }], summary: 's', usage: {} });
+        orchestrator.analyse.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [{ factId: 'f1', title: 'Missing alt', severity: 'high', why: 'w' }], summary: 's', usage: {} });
         const run = await runs.create(C, { agent: agent({ autonomy: 1 }), taskId: TASK._id, projectId: 'p1', skill: 'qa-review' });
         const out = await runs.executeSkill(C, run, agent({ autonomy: 1 }), TASK, d);
         expect(out).toMatchObject({ status: 'waiting_approval', proposalId: 'prop1' });
@@ -139,7 +141,7 @@ describe('#9/#17 direct runs pass allowedActions and count refusals as a number'
     it('findings already tracked by memory are not filed again', async () => {
         const d = deps();
         memory.decide.mockResolvedValue([{ finding: { factId: 'f1', title: 'Missing alt', severity: 'high' }, action: 'skip', reason: 'already filed and still open', prior: { _id: 'm1' } }]);
-        orchestrator.run.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [{ factId: 'f1', title: 'Missing alt', severity: 'high' }], summary: 's', usage: {} });
+        orchestrator.analyse.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [{ factId: 'f1', title: 'Missing alt', severity: 'high' }], summary: 's', usage: {} });
         const run = await runs.create(C, { agent: agent(), taskId: TASK._id, projectId: 'p1', skill: 'qa-review' });
         const out = await runs.executeSkill(C, run, agent(), TASK, d);
         expect(d.actions.perform).not.toHaveBeenCalled();

@@ -2,7 +2,7 @@ const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
-jest.mock('../Modules/Agents/engine/orchestrator', () => ({ run: jest.fn() }));
+jest.mock('../Modules/Agents/engine/orchestrator', () => ({ gather: jest.fn(async () => ({ status: 'gathered', context: {} })), analyse: jest.fn() }));
 jest.mock('../Modules/Agents/engine/findingMemory', () => ({ load: jest.fn(async () => new Map()), decide: jest.fn(), record: jest.fn(), touch: jest.fn() }));
 jest.mock('../Modules/AIProjectGenerator/usage', () => ({ summarize: jest.fn(() => ({ costUsd: 0, totalTokens: 0, model: 'm' })) }));
 
@@ -37,9 +37,11 @@ const deps = () => ({
     actor,
 });
 
-const skillResult = (changes) => orchestrator.run.mockResolvedValue({ status: 'success', skill: 'plan', changes, summary: 'planned', usage: { totalTokens: 100 }, model: 'm' });
+const skillResult = (changes) => orchestrator.analyse.mockResolvedValue({ status: 'success', skill: 'plan', changes, summary: 'planned', usage: { totalTokens: 100 }, model: 'm' });
 const runRow = (id) => mockDb.store[SCHEMA_TYPE.AGENT_RUNS].find((r) => String(r._id) === String(id));
 const decisionsOf = (id) => runRow(id).decisions.map(({ action, decision, reason, rating: r }) => ({ action, decision, reason, rating: r }));
+
+beforeAll(() => require('../Modules/Agents/engine/persistence').useInMemory());
 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
@@ -159,7 +161,7 @@ describe('an L2 run is reviewed per change by the policy', () => {
 
     it('QA findings still file as subtasks through the policy and are remembered', async () => {
         const d = deps();
-        orchestrator.run.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [{ factId: 'f1', title: 'Missing alt', severity: 'high', why: 'w' }], summary: 's', usage: {} });
+        orchestrator.analyse.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [{ factId: 'f1', title: 'Missing alt', severity: 'high', why: 'w' }], summary: 's', usage: {} });
         const run = await runs.create(C, { agent: agent(), taskId: TASK._id, projectId: 'p1', skill: 'qa-review' });
         const out = await runs.executeSkill(C, run, agent(), TASK, d);
         expect(out).toMatchObject({ status: 'done', outcome: '2 change(s) applied' });
@@ -172,7 +174,7 @@ describe('lifecycle guarantees hold on the reviewed path', () => {
     it('a run stopped while the skill ran files no proposal for the held changes and is not resurrected', async () => {
         const d = deps();
         const run = await runs.create(C, { agent: agent(), taskId: TASK._id, projectId: 'p1', skill: 'plan' });
-        orchestrator.run.mockImplementation(async () => {
+        orchestrator.analyse.mockImplementation(async () => {
             await runs.stop(C, run._id, 'u2');
             return { status: 'success', skill: 'plan', changes: [newTask('Held')], summary: 's', usage: {}, model: 'm' };
         });
@@ -185,7 +187,7 @@ describe('lifecycle guarantees hold on the reviewed path', () => {
     it('a stopped run is not marked done by the applied changes either', async () => {
         const d = deps();
         const run = await runs.create(C, { agent: agent(), taskId: TASK._id, projectId: 'p1', skill: 'plan' });
-        orchestrator.run.mockImplementation(async () => {
+        orchestrator.analyse.mockImplementation(async () => {
             await runs.stop(C, run._id, 'u2');
             return { status: 'success', skill: 'plan', changes: [subtask('Safe')], summary: 's', usage: {}, model: 'm' };
         });
@@ -231,7 +233,7 @@ describe('L1 is unchanged, except that its proposal now carries a rating per cha
 
     it('QA findings at L1 keep the "File N QA finding(s)" wording', async () => {
         const d = deps();
-        orchestrator.run.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [{ factId: 'f1', title: 'Missing alt', severity: 'high', why: 'w' }], summary: 's', usage: {} });
+        orchestrator.analyse.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [{ factId: 'f1', title: 'Missing alt', severity: 'high', why: 'w' }], summary: 's', usage: {} });
         const a = agent({ autonomy: 1 });
         const run = await runs.create(C, { agent: a, taskId: TASK._id, projectId: 'p1', skill: 'qa-review' });
         await runs.executeSkill(C, run, a, TASK, d);

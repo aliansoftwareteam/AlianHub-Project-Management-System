@@ -4,8 +4,6 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
 const { summarize } = require('../AIProjectGenerator/usage');
-const policy = require('./policy');
-const { rating: ratingOf } = require('./actions');
 
 // Agent runs and spend. A run is the unit the rail footer counts ("2 running"),
 // the project header chip sums (elapsed, spend) and the audit log links to
@@ -92,11 +90,12 @@ const patch = async (companyId, runId, set, extra = {}, { onlyIf } = {}) => {
 
 const appendAction = (companyId, runId, entry) => patch(companyId, runId, {}, { $push: { actions: { ...entry, at: new Date() } } });
 
-const finish = async (companyId, runId, { status = STATUS.DONE, outcome, error, onlyIf } = {}) => {
+const finish = async (companyId, runId, { status = STATUS.DONE, outcome, error, episode, onlyIf } = {}) => {
     const run = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(runId) }] }, 'findOne');
     if (!run) return null;
     const startedAt = run.startedAt ? new Date(run.startedAt).getTime() : Date.now();
-    return patch(companyId, runId, { status, finishedAt: new Date(), elapsedMs: Date.now() - startedAt, outcome: outcome || null, error: error || null }, {}, { onlyIf });
+    const set = { status, finishedAt: new Date(), elapsedMs: Date.now() - startedAt, outcome: outcome || null, error: error || null, ...(episode ? { episode } : {}) };
+    return patch(companyId, runId, set, {}, { onlyIf });
 };
 
 const isRunning = async (companyId, runId) => {
@@ -257,88 +256,16 @@ const notifyStarter = async (companyId, run, task, { status, outcome, error }) =
     } catch (e) { logger.error(`[agent-run] ${run._id}: notify failed: ${e.message}`); }
 };
 
-/* Execute the run's skill. Below L2 every change becomes one proposal. From L2
- * the policy reviews each change: `act` performs it, `propose` holds it for one
- * proposal filed at the end, `refuse` is counted and the run carries on. Resolves
- * with the terminal state, or with { status: 'abandoned' } when stop/pause-all
- * took the run away mid-flight — then nothing more is written and no proposal
- * is filed. */
-const executeSkill = async (companyId, run, agent, task, { proposals, actions, actor }) => {
-    const orchestrator = require('./engine/orchestrator');
-    const memory = require('./engine/findingMemory');
-    const abandoned = { status: 'abandoned', outcome: 'stopped before it finished' };
-    const handOff = async (state) => { await notifyStarter(companyId, run, task, state); return state; };
-    const settle = async (status, outcome) => {
-        const saved = await finish(companyId, run._id, { status, outcome, onlyIf: STATUS.RUNNING });
-        return saved ? handOff({ status, outcome, refusals: Number(saved.refusals || 0) }) : abandoned;
-    };
-    try {
-        const result = await orchestrator.run({ skillSlug: run.skill || 'qa-review', task, companyId, budget: { maxTokens: 4000 } });
-        const spent = await recordSpend(companyId, run, result.usage, result.model);
-        if (result.status !== 'success') return settle(result.status === 'skipped' ? STATUS.SKIPPED : STATUS.FAILED, result.reason);
-        const runCap = Number(run.spendCapUsd) > 0 ? Number(run.spendCapUsd) : 0;
-        if (runCap && spent.usd >= runCap) return settle(STATUS.STOPPED, `Run spend cap reached ($${spent.usd.toFixed(2)} of $${runCap})`);
-
-        const { changes: found, alreadyTracked } = await changesFor(companyId, task, result);
-        if (!found.length) return settle(STATUS.DONE, `nothing new to file — ${alreadyTracked} finding(s) already tracked`);
-        const changes = found.map((c) => ({ ...c, rating: ratingOf(c.action) }));
-
-        const propose = async (toPropose, { what, outcome, refusals = 0 }) => {
-            if (!(await isRunning(companyId, run._id))) return abandoned;
-            const proposal = await proposals.create(companyId, {
-                agent, runId: String(run._id), taskId: String(task._id), projectId: String(task.ProjectID),
-                what,
-                // What the grounding check removed is part of the record a person reviews.
-                why: [result.summary, Array.isArray(result.dropped) && result.dropped.length ? `Dropped as unsupported by the data: ${result.dropped.map((d) => `"${String(d.text).slice(0, 80)}" (${d.reason})`).join('; ')}` : ''].filter(Boolean).join('\n\n'),
-                changes: toPropose,
-                cost: { tokens: result.usage && result.usage.totalTokens, model: result.model, usd: spent && spent.usd },
-            });
-            const waiting = await patch(companyId, run._id, { status: STATUS.WAITING, ...(outcome ? { outcome } : {}) }, { $push: { proposals: String(proposal._id) } }, { onlyIf: STATUS.RUNNING });
-            return waiting ? handOff({ status: STATUS.WAITING, proposalId: String(proposal._id), refusals, ...(outcome ? { outcome } : {}) }) : abandoned;
-        };
-
-        if (Number(agent.autonomy) < policy.REVIEW_LEVEL) {
-            return propose(changes, {
-                what: Array.isArray(result.changes) ? `${run.skill}: ${changes.length} change(s) on ${task.TaskKey || task.TaskName}` : `File ${result.findings.length - alreadyTracked} QA finding(s) on ${task.TaskKey || task.TaskName}`,
-            });
-        }
-
-        let applied = 0;
-        let refusals = 0;
-        const held = [];
-        for (const c of changes) {
-            const verdict = policy.decide({ agent, action: c.action, params: c.params, rating: c.rating, run, task });
-            const decision = { action: c.action, decision: verdict.decision, reason: verdict.reason, rating: verdict.rating, at: new Date() };
-            if (verdict.decision === policy.DECISION.PROPOSE) {
-                held.push(c);
-                // eslint-disable-next-line no-await-in-loop
-                await patch(companyId, run._id, {}, { $push: { decisions: decision } });
-                continue;
-            }
-            try {
-                // A refusal goes through perform() too, so it leaves the same audit row as a registry refusal.
-                // eslint-disable-next-line no-await-in-loop
-                const out = await actions.perform({ companyId, actor, action: c.action, params: c.params, reason: `${run.skill} finding`, allowedActions: agent.allowedActions, decision: verdict });
-                // eslint-disable-next-line no-await-in-loop
-                await patch(companyId, run._id, {}, { $push: { decisions: decision, actions: { action: c.action, auditId: out.auditId, ok: true, at: new Date() } } });
-                applied += 1;
-                // eslint-disable-next-line no-await-in-loop
-                if (c.remember) await memory.record(companyId, { ...c.remember, subtaskId: out.result && out.result.subtaskId });
-            } catch (e) {
-                if (e.name !== 'RefusedError') throw e;
-                refusals += 1;
-                // eslint-disable-next-line no-await-in-loop
-                await patch(companyId, run._id, {}, { $inc: { refusals: 1 }, $push: { decisions: decision, actions: { action: c.action, auditId: e.auditId || null, ok: false, refused: e.message, at: new Date() } } });
-            }
-        }
-        const outcome = [`${applied} change(s) applied`, held.length ? `${held.length} proposed` : '', refusals ? `${refusals} refused` : '', alreadyTracked ? `${alreadyTracked} already tracked` : ''].filter(Boolean).join(', ');
-        if (!held.length) return settle(applied ? STATUS.DONE : STATUS.FAILED, outcome);
-        return propose(held, { what: `${run.skill}: ${held.length} change(s) on ${task.TaskKey || task.TaskName}`, outcome, refusals });
-    } catch (e) {
-        logger.error(`[agent-run] ${run._id}: ${e.message}`);
-        const saved = await finish(companyId, run._id, { status: STATUS.FAILED, error: e.message, onlyIf: STATUS.RUNNING });
-        return saved ? handOff({ status: STATUS.FAILED, error: e.message }) : abandoned;
-    }
+/* Execute the run's skill as a graph thread (engine/graph.js). Below L2 every
+ * change becomes one proposal; from L2 the policy reviews each change. Resolves
+ * with the terminal state, with { status: 'waiting_approval', proposalId } while
+ * a proposal is open, or with { status: 'abandoned' } when stop/pause-all took
+ * the run away mid-flight — then nothing more is written and nobody is told. */
+const executeSkill = async (companyId, run, agent, task, deps) => {
+    const { runGraph } = require('./engine/graph');
+    const state = await runGraph({ companyId, run, agent, task, deps });
+    if (state.status !== 'abandoned') await notifyStarter(companyId, run, task, state);
+    return state;
 };
 /* Which skill a run executes. Agents store skills as objects ({ key, name, … });
  * an explicit slug wins, then the agent's first skill key, then the QA review. */
@@ -350,4 +277,4 @@ const skillSlugOf = (agent, explicit) => {
     return first.key || first.slug || first.name || 'qa-review';
 };
 
-module.exports = { STATUS, OPEN, TERMINAL, canStart, runsToday, skillSlugOf, create, patch, appendAction, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, getAgent, emitAgent, executeSkill, monthKey };
+module.exports = { STATUS, OPEN, TERMINAL, canStart, runsToday, skillSlugOf, create, patch, appendAction, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, getAgent, emitAgent, changesFor, executeSkill, monthKey };

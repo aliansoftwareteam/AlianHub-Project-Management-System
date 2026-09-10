@@ -2,23 +2,31 @@ const logger = require('../../../Config/loggerConfig');
 const { getProvider, isAnyProviderConfigured } = require('../../AIProjectGenerator/llmProvider');
 const { emptyUsage, usageFromResult, addUsage } = require('../../AIProjectGenerator/usage');
 const { audit, extractUrl } = require('./pageAudit');
-const qaReview = require('../skills/qaReview');
 const skillIndex = require('../skills');
 
-// A deterministic five-phase pipeline, not a free-roaming agent loop:
+// A deterministic pipeline, not a free-roaming agent loop:
 //
 //   gather → ground → analyse → verify → emit
 //
-// The model is invoked exactly once, in `analyse`, and only to prioritise and
-// phrase facts that `ground` already measured. Cost is therefore bounded and
-// predictable, the same input produces the same shape of output, and a
-// hallucinated finding has nowhere to enter — `verify` drops anything whose
-// factId was not measured.
+// `gather` and `analyse` are separately callable so the run graph can hold a
+// checkpoint between them; `run` is the two in sequence for callers that want
+// the whole pipeline. The model is invoked exactly once, in `analyse`, and only
+// to prioritise and phrase facts that `ground` already measured. Cost is
+// therefore bounded and predictable, the same input produces the same shape of
+// output, and a hallucinated finding has nowhere to enter — `verify` drops
+// anything whose factId was not measured.
 
 const LOG_PREFIX = '[agent]';
 const SKILLS = skillIndex.BY_SLUG;
+const GATHERED = 'gathered';
 
 const getSkill = (slug) => skillIndex.getSkill(slug);
+
+const requireSkill = (slug) => {
+    const skill = getSkill(slug);
+    if (!skill) throw Object.assign(new Error(`unknown skill "${slug}"`), { deterministic: true });
+    return skill;
+};
 
 const SEVERITY = ['high', 'medium', 'low'];
 const rank = (s) => { const i = SEVERITY.indexOf(String(s).toLowerCase()); return i === -1 ? 2 : i; };
@@ -81,28 +89,23 @@ function findingsWithoutModel(auditResult, skill) {
     }));
 }
 
-/* Skills other than the page audit: gather their own input, ask the model once,
- * and hand back a summary plus the changes the run should propose or apply. */
-async function runGeneric(skill, { task, companyId, budget = {} }) {
-    const started = Date.now();
+/* The one model call. `raw` stays null when the provider is missing, fails or
+ * answers with something that is not JSON; `degraded` says which. */
+async function askModel(skill, { prompt, budget }) {
     let usage = emptyUsage();
-    const context = await skill.gather({ task, companyId });
-    if (!context || context.skip) {
-        return { status: 'skipped', reason: (context && context.skip) || 'nothing to work on', skill: skill.slug, usage, durationMs: Date.now() - started };
-    }
-    let raw = null; let modelUsed = null; let degraded = null;
+    let raw = null; let model = null; let degraded = null;
     if (isAnyProviderConfigured() && budget.allowModel !== false) {
         try {
             const provider = getProvider();
             const result = await provider.chat({
                 systemPrompt: skill.systemPrompt,
-                messages: [{ role: 'user', content: skill.buildUserPrompt({ task, context }) }],
+                messages: [{ role: 'user', content: prompt }],
                 maxTokens: Math.min(skill.maxTokens, budget.maxTokens || skill.maxTokens),
                 temperature: 0.2,
                 jsonMode: true,
             });
             usage = addUsage(usage, usageFromResult(result));
-            modelUsed = result.model || null;
+            model = result.model || null;
             const parsed = parseModelJson(result.content);
             if (parsed.ok) raw = parsed.value; else degraded = parsed.error;
         } catch (error) {
@@ -112,88 +115,73 @@ async function runGeneric(skill, { task, companyId, budget = {} }) {
     } else {
         degraded = 'no LLM provider configured';
     }
-    if (!raw && !context.fallback) {
-        return { status: 'failed', reason: degraded || 'the model returned nothing usable', skill: skill.slug, usage, model: modelUsed, durationMs: Date.now() - started };
+    return { raw, model, degraded, usage };
+}
+
+const skipped = (skill, reason, started) => ({ status: 'skipped', reason, skill: skill.slug, findings: [], usage: emptyUsage(), durationMs: Date.now() - started });
+
+/* PHASE 1 — gather. A generic skill collects its own input; the page audit
+ * needs a public URL in the task. Either declines with `skipped`. */
+async function gather({ skillSlug = 'qa-review', task, companyId }) {
+    const skill = requireSkill(skillSlug);
+    const started = Date.now();
+    if (skill.kind === 'generic') {
+        const context = await skill.gather({ task, companyId });
+        if (!context || context.skip) return skipped(skill, (context && context.skip) || 'nothing to work on', started);
+        return { status: GATHERED, skill: skill.slug, context };
     }
+    const url = extractUrl(task?.TaskName) || extractUrl(task?.description) || extractUrl(task?.rawDescription);
+    if (url) return { status: GATHERED, skill: skill.slug, context: { url } };
+    const text = [task?.TaskName, task?.description, task?.rawDescription].join(' ');
+    const privateUrl = /https?:\/\/(localhost|127\.|10\.|192\.168\.|0\.0\.0\.0|\[?::1)/i.test(text);
+    return skipped(skill, privateUrl
+        ? 'the URL points at a private or local host, which agents do not fetch — use a public address'
+        : 'no reviewable URL found in the task title or description', started);
+}
+
+/* Skills other than the page audit: ask the model once about the gathered
+ * context and hand back a summary plus the changes the run should propose or apply. */
+async function analyseGeneric(skill, { task, context, budget }) {
+    const started = Date.now();
+    const { raw: answer, model, degraded, usage } = await askModel(skill, { prompt: skill.buildUserPrompt({ task, context }), budget });
+    if (!answer && !context.fallback) {
+        return { status: 'failed', reason: degraded || 'the model returned nothing usable', skill: skill.slug, usage, model, durationMs: Date.now() - started };
+    }
+    let raw = answer;
     let dropped = [];
     if (raw && typeof skill.verify === 'function') ({ raw, dropped } = skill.verify({ raw, context }));
     const { summary, changes } = skill.toChanges({ task, raw, context });
-    return { status: 'success', skill: skill.slug, model: modelUsed, degraded, summary, changes, dropped, findings: [], usage, durationMs: Date.now() - started };
+    return { status: 'success', skill: skill.slug, model, degraded, summary, changes, dropped, findings: [], usage, durationMs: Date.now() - started };
 }
 
-async function run({ skillSlug = 'qa-review', task, companyId, budget = {} }) {
-    const skill = getSkill(skillSlug);
-    if (!skill) throw Object.assign(new Error(`unknown skill "${skillSlug}"`), { deterministic: true });
-    if (skill.kind === 'generic') return runGeneric(skill, { task, companyId, budget });
-
+/* The page audit: ground → analyse → verify → emit. The caller writes; this
+ * only decides WHAT. */
+async function analyseAudit(skill, { task, context, budget }) {
     const started = Date.now();
-    let usage = emptyUsage();
-
-    // ── 1. gather ────────────────────────────────────────────────────────────
-    const url = extractUrl(task?.TaskName) || extractUrl(task?.description) || extractUrl(task?.rawDescription);
-    if (!url) {
-        const text = [task?.TaskName, task?.description, task?.rawDescription].join(' ');
-        const privateUrl = /https?:\/\/(localhost|127\.|10\.|192\.168\.|0\.0\.0\.0|\[?::1)/i.test(text);
-        return { status: 'skipped',
-                 reason: privateUrl
-                     ? 'the URL points at a private or local host, which agents do not fetch — use a public address'
-                     : 'no reviewable URL found in the task title or description',
-                 skill: skill.slug, findings: [], usage, durationMs: Date.now() - started };
-    }
-
-    // ── 2. ground ────────────────────────────────────────────────────────────
+    const { url } = context;
     let auditResult;
     try {
         auditResult = await audit(url);
     } catch (error) {
-        return { status: 'failed', reason: `could not fetch ${url}: ${error.message}`,
-                 skill: skill.slug, url, findings: [], usage, durationMs: Date.now() - started };
+        return { status: 'failed', reason: `could not fetch ${url}: ${error.message}`, skill: skill.slug, url, findings: [], usage: emptyUsage(), durationMs: Date.now() - started };
     }
     if (!auditResult.ok) {
-        return { status: 'failed', reason: auditResult.fatal, skill: skill.slug, url,
-                 findings: [], usage, durationMs: Date.now() - started };
+        return { status: 'failed', reason: auditResult.fatal, skill: skill.slug, url, findings: [], usage: emptyUsage(), durationMs: Date.now() - started };
     }
 
-    // ── 3. analyse ───────────────────────────────────────────────────────────
-    let raw = null;
-    let modelUsed = null;
-    let degraded = null;
-    if (isAnyProviderConfigured() && budget.allowModel !== false) {
-        try {
-            const provider = getProvider();
-            const result = await provider.chat({
-                systemPrompt: skill.systemPrompt,
-                messages: [{ role: 'user', content: skill.buildUserPrompt({ task, audit: auditResult }) }],
-                maxTokens: Math.min(skill.maxTokens, budget.maxTokens || skill.maxTokens),
-                temperature: 0.2,
-                jsonMode: true,
-            });
-            usage = addUsage(usage, usageFromResult(result));
-            modelUsed = result.model || null;
-            const parsed = parseModelJson(result.content);
-            if (parsed.ok) raw = parsed.value;
-            else degraded = parsed.error;
-        } catch (error) {
-            degraded = `model call failed: ${error.message}`;
-            logger.error(`${LOG_PREFIX} ${degraded}`);
-        }
-    } else {
-        degraded = 'no LLM provider configured';
-    }
+    const { raw, model, degraded, usage } = await askModel(skill, { prompt: skill.buildUserPrompt({ task, audit: auditResult }), budget });
 
-    // ── 4. verify ────────────────────────────────────────────────────────────
     const proposed = raw?.findings ?? findingsWithoutModel(auditResult, skill);
     const { findings, dropped } = raw
         ? verify(proposed, auditResult, skill)
         : { findings: proposed, dropped: [] };
 
-    // ── 5. emit (the caller writes; this only decides WHAT) ──────────────────
     const passing = auditResult.facts.filter((f) => f.ok).length;
     return {
         status: 'success',
         skill: skill.slug,
         url,
-        model: modelUsed,
+        model,
         degraded,
         summary: raw?.summary || `Audited ${url}: ${auditResult.facts.length - passing} issue(s) across ${auditResult.facts.length} checks.`,
         notes: raw?.notes || null,
@@ -207,4 +195,20 @@ async function run({ skillSlug = 'qa-review', task, companyId, budget = {} }) {
     };
 }
 
-module.exports = { run, runGeneric, verify, parseModelJson, findingsWithoutModel, getSkill, SKILLS };
+/* PHASES 2–5 on a gathered context. */
+async function analyse({ skillSlug = 'qa-review', task, context, budget = {} }) {
+    const skill = requireSkill(skillSlug);
+    return skill.kind === 'generic' ? analyseGeneric(skill, { task, context, budget }) : analyseAudit(skill, { task, context, budget });
+}
+
+async function run({ skillSlug = 'qa-review', task, companyId, budget = {} }) {
+    const started = Date.now();
+    const gathered = await gather({ skillSlug, task, companyId });
+    if (gathered.status !== GATHERED) return gathered;
+    const result = await analyse({ skillSlug, task, context: gathered.context, budget });
+    return { ...result, durationMs: Date.now() - started };
+}
+
+const runGeneric = (skill, args) => run({ ...args, skillSlug: skill.slug });
+
+module.exports = { GATHERED, gather, analyse, run, runGeneric, verify, parseModelJson, findingsWithoutModel, getSkill, SKILLS };
