@@ -3,6 +3,18 @@
         <div v-if="error" class="ah-field__error">{{ error }}</div>
         <div v-else-if="!run" class="ah-empty">{{ $t('Ai.loading') }}</div>
         <template v-else>
+            <div v-if="episode" class="run-episode" data-test="episode">
+                <span class="ah-label">{{ $t('Ai.episode_title') }}</span>
+                <ul class="run-episode__stats">
+                    <li>{{ $t('Ai.episode_proposed', { n: episode.proposed }) }}</li>
+                    <li>{{ $t('Ai.episode_acted', { n: episode.acted }) }}</li>
+                    <li>{{ $t('Ai.episode_approved', { n: episode.approved }) }}</li>
+                    <li data-test="episode-declined">{{ declinedLine }}</li>
+                    <li data-test="episode-reverted">{{ $t(episode.reverted ? 'Ai.episode_reverted_yes' : 'Ai.episode_reverted_no') }}</li>
+                </ul>
+            </div>
+            <p v-if="run.status === 'waiting_approval'" class="ah-small run-detail__waiting" data-test="waiting">{{ $t('Ai.episode_waiting') }}</p>
+
             <div class="run-detail__head">
                 <span class="ah-label">{{ $t('Ai.decisions_title') }}</span>
                 <span v-if="run.revertedAt" class="ah-chip ah-chip--dark">{{ $t('Ai.reverted_at', { at: when(run.revertedAt) }) }}</span>
@@ -63,6 +75,21 @@ const decisions = computed(() => (Array.isArray(run.value?.decisions) ? run.valu
 const windowOpen = computed(() => !run.value?.windowEndsAt || new Date(run.value.windowEndsAt).getTime() > Date.now());
 const revertable = computed(() => canRevertRun(run.value, { userId: userId?.value ?? userId, privileged: privileged.value }));
 
+const DECLINE_REASONS = ["too_many_changes", "wrong_tone", "needs_person", "not_now"];
+const count = (v) => Number(v || 0);
+const episode = computed(() => {
+    const e = run.value?.episode;
+    if (!e || typeof e !== "object") return null;
+    return { proposed: count(e.proposed), acted: count(e.acted), approved: count(e.approved), declined: count(e.declined), reverted: Boolean(e.reverted), reason: e.reason || e.declinedReason || "" };
+});
+const declinedLine = computed(() => {
+    const e = episode.value;
+    if (!e) return "";
+    if (!e.reason) return t("Ai.episode_declined", { n: e.declined });
+    const reason = DECLINE_REASONS.includes(e.reason) ? t(`Ai.decline_reason_${e.reason}`) : e.reason;
+    return t("Ai.episode_declined_reason", { n: e.declined, reason });
+});
+
 const when = (at) => (at ? new Date(at).toLocaleString() : "");
 const chip = (decision) => (decision === "act" ? "ah-chip--ok" : decision === "refuse" ? "ah-chip--danger" : "ah-chip--warn");
 
@@ -96,6 +123,9 @@ onMounted(load);
 <style>
 .run-detail { margin: 8px 0 4px 0; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 9px; background: var(--surface-2, transparent); }
 .run-detail__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.run-episode { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--hairline); }
+.run-episode__stats { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font: var(--text-small); color: var(--ink); }
+.run-detail__waiting { margin: 0 0 10px; }
 .run-detail__empty { margin: 8px 0 0; }
 .run-decisions { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .run-decisions__row { display: flex; align-items: center; gap: 10px; font: var(--text-small); flex-wrap: wrap; }
