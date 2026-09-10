@@ -2,6 +2,7 @@
 // generic integration_connections registry backs the marketplace (AUTO-05), the
 // Slack bot (AUTO-06) and custom iframe apps (AUTO-07). Unit-tested in
 // tests/integrations-rules.test.js.
+const secretField = require('../../../utils/secretField');
 
 // Static catalog of connectable integrations. `fields` are the config inputs;
 // `secret:true` fields are never returned to the client. `multiple:true` allows
@@ -42,16 +43,20 @@ const validateConnection = ({ type, config } = {}) => {
     return { valid: true, reason: '', value: { type: item.key, name, config: out } };
 };
 
+const secretKeys = (type) => { const item = byKey(type); return ((item && item.fields) || []).filter((f) => f.secret).map((f) => f.key); };
+
+// Secrets rest encrypted (utils/secretField); sealConfig on every write, openConfig only where the value is used.
+const sealConfig = (type, config) => secretField.sealFields(config, secretKeys(type));
+const openConfig = (type, config) => secretField.openFields(config, secretKeys(type));
+
 // Strip secret values for client display; expose which secrets are set.
 const redact = (conn) => {
     if (!conn) return conn;
     const o = conn.toObject ? conn.toObject() : { ...conn };
-    const item = byKey(o.type);
-    const secretKeys = ((item && item.fields) || []).filter((f) => f.secret).map((f) => f.key);
     const cfg = { ...(o.config || {}) };
     const secrets = {};
-    for (const k of secretKeys) { secrets[k] = !!cfg[k]; delete cfg[k]; }
+    for (const k of secretKeys(o.type)) { secrets[k] = !!cfg[k]; delete cfg[k]; }
     return { ...o, config: cfg, secrets };
 };
 
-module.exports = { CATALOG, byKey, getCatalog, validateConnection, redact, isEmbeddableUrl };
+module.exports = { CATALOG, SECRETS_VERSION: secretField.VERSION, byKey, getCatalog, validateConnection, redact, isEmbeddableUrl, secretKeys, sealConfig, openConfig };

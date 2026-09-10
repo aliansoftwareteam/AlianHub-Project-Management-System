@@ -11,6 +11,10 @@ function createMongoStore({ MongoDbCrudOpration, SCHEMA_TYPE, lockId }) {
         async put(doc) {
             await run([{ _id: doc._id }, { $set: doc }, { upsert: true, new: true }], 'findOneAndUpdate');
         },
+        async remove(id) {
+            if (id === lockId) return;
+            await run([{ _id: id }], 'deleteOne');
+        },
         /* One process migrates at a time. A stale lock (a crashed run) is taken over
          * once it expires; a live one makes the upsert collide on _id, which is the
          * "someone else has it" answer. */
@@ -41,6 +45,7 @@ function createMemoryStore({ lockId = '__lock' } = {}) {
         docs,
         async all() { return [...docs.values()].filter((d) => d._id !== lockId).map((d) => ({ ...d })); },
         async put(doc) { docs.set(doc._id, { ...(docs.get(doc._id) || {}), ...doc }); },
+        async remove(id) { if (id !== lockId) docs.delete(id); },
         async tryLock(owner, ttlMs) {
             const lock = docs.get(lockId);
             if (lock && lock.expiresAt > new Date()) return false;
