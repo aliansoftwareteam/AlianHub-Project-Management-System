@@ -13,6 +13,8 @@ const {
     parseDate,
     nextReviewDate,
     reviewState,
+    pageVisibleTo,
+    pageVisibilityFilter,
 } = require('./helpers/pageRules');
 const {
     emptyEditorData,
@@ -190,8 +192,7 @@ exports.listPages = async (req, res) => {
 
         // A private doc belongs to its author alone, so it never appears in anyone else's
         // list — including a task's linked docs, where it would otherwise leak by title.
-        const uid = callerId(req);
-        filter.$or = [{ visibility: { $ne: 'private' } }, { createdBy: uid }];
+        Object.assign(filter, pageVisibilityFilter(callerId(req)));
 
         const pages = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
@@ -221,7 +222,7 @@ exports.getPage = async (req, res) => {
         }
         // Same answer for "not yours" as for "does not exist": otherwise the difference
         // tells a caller that a private doc with this id is there.
-        if (String(page.visibility || '') === 'private' && String(page.createdBy || '') !== callerId(req)) {
+        if (!pageVisibleTo(page, callerId(req))) {
             return res.send({ status: false, statusText: 'Page not found.' });
         }
         const data = typeof page.toObject === 'function' ? page.toObject() : page;
@@ -279,7 +280,7 @@ exports.updatePage = async (req, res) => {
         }
 
         const userId = callerId(req);
-        if (String(existing.visibility || '') === 'private' && String(existing.createdBy || '') !== userId) {
+        if (!pageVisibleTo(existing, userId)) {
             return res.send({ status: false, statusText: 'Page not found.' });
         }
 
@@ -323,8 +324,7 @@ const findVisiblePage = async (companyId, id, uid, deletedStatusKey = 0) => {
         data: [{ _id: new mongoose.Types.ObjectId(id), deletedStatusKey }],
     }, 'findOne');
     if (!page) return null;
-    if (String(page.visibility || '') === 'private' && String(page.createdBy || '') !== uid) return null;
-    return page;
+    return pageVisibleTo(page, uid) ? page : null;
 };
 
 const patchPage = async (companyId, id, update) => MongoDbCrudOpration(companyId, {
@@ -493,7 +493,7 @@ exports.composeWithAi = async (req, res) => {
                 data: [{ _id: new mongoose.Types.ObjectId(pageId), deletedStatusKey: 0 }],
             }, 'findOne');
             if (page) {
-                if (String(page.visibility || '') === 'private' && String(page.createdBy || '') !== callerId(req)) {
+                if (!pageVisibleTo(page, callerId(req))) {
                     return res.send({ status: false, statusText: 'Page not found.' });
                 }
                 if (!pageTitle) pageTitle = page.title || '';

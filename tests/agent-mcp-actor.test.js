@@ -21,7 +21,7 @@ const req = (over = {}) => ({ headers: {}, query: {}, body: {}, uid: USER_ID, ..
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     jest.clearAllMocks();
-    mockDb.seed(dbCollections.USERS, { _id: USER_ID, Employee_Name: 'Mevil' });
+    mockDb.seed(dbCollections.USERS, { _id: USER_ID, Employee_Name: 'Mevil', AssignCompany: C });
 });
 
 describe('F2 — a plain personal token is an agent when it arrives over MCP', () => {

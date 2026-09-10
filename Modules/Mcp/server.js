@@ -1,5 +1,6 @@
 const apiTokens = require('../ApiTokens/controller');
 const { hasScope } = require('../ApiTokens/helpers/apiTokenRules');
+const { verifyCompanyMembership } = require('../../Config/jwt');
 const { resolveActor } = require('../Agents/actor');
 const { RefusedError } = require('../Agents/actions');
 const registry = require('../Agents/registry');
@@ -18,8 +19,21 @@ const contentResult = (payload) => ({ content: [{ type: 'text', text: JSON.strin
 
 const ipOf = (req) => String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim();
 
+const NOT_A_MEMBER = 'You are no longer a member of this company';
+
+const unauthorized = (res) => {
+    res.set('WWW-Authenticate', 'Bearer realm="alianhub-mcp"');
+    return res.status(401).json(rpcError(null, -32001, 'A valid bearer token and companyId are required.'));
+};
+
+const forbidden = (res) => res.status(403).json({
+    ...rpcError(null, -32003, NOT_A_MEMBER), status: false, error: NOT_A_MEMBER, statusText: 'Forbidden',
+});
+
 /* Authenticate the bearer PAT and build the calling context. The token narrows
- * the user's own permissions — it never widens them. */
+ * the user's own permissions — it never widens them. Returns null for a bad
+ * token and { forbidden: true } when the holder has left the company, so a
+ * removed member is cut off on the next request, not when the token expires. */
 const authenticate = async (req) => {
     const header = String(req.headers.authorization || '');
     const raw = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
@@ -28,6 +42,7 @@ const authenticate = async (req) => {
 
     const token = await apiTokens.verifyToken(companyId, raw);
     if (!token) return null;
+    if (!(await verifyCompanyMembership(String(token.userId || ''), companyId))) return { forbidden: true };
 
     req.apiToken = token;
     req.uid = String(token.userId || '');
@@ -111,10 +126,8 @@ const handleRpc = async (ctx, message) => {
 const post = async (req, res) => {
     try {
         const ctx = await authenticate(req);
-        if (!ctx) {
-            res.set('WWW-Authenticate', 'Bearer realm="alianhub-mcp"');
-            return res.status(401).json(rpcError(null, -32001, 'A valid bearer token and companyId are required.'));
-        }
+        if (!ctx) return unauthorized(res);
+        if (ctx.forbidden) return forbidden(res);
 
         const body = req.body;
         const batch = Array.isArray(body);
@@ -141,10 +154,8 @@ const post = async (req, res) => {
  * every request in the POST response, so there is no stream to open. */
 const get = async (req, res) => {
     const ctx = await authenticate(req);
-    if (!ctx) {
-        res.set('WWW-Authenticate', 'Bearer realm="alianhub-mcp"');
-        return res.status(401).json(rpcError(null, -32001, 'A valid bearer token and companyId are required.'));
-    }
+    if (!ctx) return unauthorized(res);
+    if (ctx.forbidden) return forbidden(res);
     return res.status(405).json(rpcError(null, -32000, 'This server replies on POST; no SSE stream is offered.'));
 };
 

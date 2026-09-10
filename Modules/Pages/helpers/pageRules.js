@@ -35,6 +35,14 @@ const htmlToRawText = (html, max = 5000) => String(html || '')
     .trim()
     .slice(0, max);
 
+/* A private page belongs to its author alone. Every read path — list, get,
+ * Ask retrieval, MCP — applies this one rule so a private doc never leaks by
+ * title or body to anyone else in the project. */
+const pageVisibleTo = (page, uid) => Boolean(page)
+    && (String(page.visibility || '') !== 'private' || String(page.createdBy || '') === String(uid || ''));
+
+const pageVisibilityFilter = (uid) => ({ $or: [{ visibility: { $ne: 'private' } }, { createdBy: String(uid || '') }] });
+
 const REVIEW_INTERVAL_MONTHS = 3;
 const STALE_AFTER_MONTHS = 6;
 const REVIEW_STATES = ['none', 'verified', 'due', 'stale'];
@@ -74,6 +82,8 @@ module.exports = {
     validatePageInput,
     contentTooLarge,
     htmlToRawText,
+    pageVisibleTo,
+    pageVisibilityFilter,
     parseDate,
     nextReviewDate,
     reviewState,

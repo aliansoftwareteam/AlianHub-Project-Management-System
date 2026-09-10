@@ -9,6 +9,7 @@ const read = (doc, key) => key.split('.').reduce((v, k) => (v == null ? undefine
 
 const matches = (doc, filter = {}) => Object.entries(filter).every(([key, cond]) => {
     if (key === '$or') return cond.some((f) => matches(doc, f));
+    if (key === '$and') return cond.every((f) => matches(doc, f));
     const raw = read(doc, key);
     const value = raw === undefined ? undefined : (raw instanceof Date ? raw.getTime() : (key === '_id' ? String(raw) : raw));
     if (cond instanceof RegExp) return cond.test(String(value));
@@ -20,6 +21,8 @@ const matches = (doc, filter = {}) => Object.entries(filter).every(([key, cond])
             if (op === '$ne') return value !== want;
             if (op === '$gte') return value >= want;
             if (op === '$exists') return (value !== undefined) === arg;
+            if (op === '$regex') return new RegExp(arg, cond.$options || '').test(String(value));
+            if (op === '$options') return true;
             throw new Error(`fakeMongo: unsupported operator ${op}`);
         });
     }

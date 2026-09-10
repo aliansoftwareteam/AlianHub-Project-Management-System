@@ -4,7 +4,7 @@ const registry = require('../Agents/registry');
 const actions = require('../Agents/actions');
 const { oid } = require('../Automations/engine/tools');
 const { buildBrief } = require('./brief');
-const { htmlToRawText } = require('../Pages/helpers/pageRules');
+const { htmlToRawText, pageVisibleTo } = require('../Pages/helpers/pageRules');
 const { blocksToRawText, contentToEditorData } = require('../Pages/helpers/pageContent');
 
 const PAGE_TEXT_MAX = 40000;
@@ -12,11 +12,12 @@ const PAGE_TEXT_MAX = 40000;
 const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).slice(0, max);
 const clampLimit = (v, def = 10, max = 50) => Math.min(Math.max(parseInt(v, 10) || def, 1), max);
 
-const scopeFilter = (ctx, extra = {}) => {
-    const filter = { CompanyId: String(ctx.companyId), deletedStatusKey: { $ne: 1 }, ...extra };
+const projectScope = (ctx, filter) => {
     if (ctx.projectIds && ctx.projectIds.length) filter.ProjectID = { $in: ctx.projectIds };
     return filter;
 };
+
+const scopeFilter = (ctx, extra = {}) => projectScope(ctx, { CompanyId: String(ctx.companyId), deletedStatusKey: { $ne: 1 }, ...extra });
 
 /* Stored rawText is a 5000-char search excerpt, so the full body comes from the html. */
 const pageText = (page) => {
@@ -152,9 +153,9 @@ const TOOLS = [
             const _id = oid(str(args.pageId, 40));
             if (!_id) return { error: 'invalid pageId' };
             const page = await MongoDbCrudOpration(ctx.companyId, {
-                type: SCHEMA_TYPE.PAGES, data: [{ _id, deletedStatusKey: { $ne: 1 } }],
+                type: SCHEMA_TYPE.PAGES, data: [projectScope(ctx, { _id, deletedStatusKey: { $ne: 1 } })],
             }, 'findOne');
-            if (!page) return { error: 'page not found' };
+            if (!pageVisibleTo(page, ctx.userId)) return { error: 'page not found' };
             return {
                 pageId: String(page._id),
                 title: page.title || '',
