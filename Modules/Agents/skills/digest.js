@@ -38,6 +38,7 @@ module.exports = {
     description: 'Reads the project’s open work and posts a short digest: what moved, what is stuck, what is at risk.',
     scopes: ['task.read', 'task.comment'],
     maxTokens: 1500,
+    usesMemory: false,
     buckets,
     deterministicDigest,
 

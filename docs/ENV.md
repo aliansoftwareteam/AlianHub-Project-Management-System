@@ -10,7 +10,7 @@ Backend variables: 130. Frontend build-time variables: 24.
 |---|---|---|---|---|
 | `APIURL` | yes |  | Public base URL of this API, with a trailing slash (used in emails, OAuth callbacks and share links). | `Config/config.js`, `Modules/ApiTokens/controller.js` +6 |
 | `APP_NAME` |  | `Alian Hub` | Product name shown in emails and page titles. | `Config/config.js`, `Modules/Template/forgotPassword.js` +5 |
-| `NODE_ENV` |  | `development` | development \| production | `Config/config.js`, `Modules/Auth/controller/loginSession.js` +2 |
+| `NODE_ENV` |  | `development` | development \| production | `Config/config.js`, `Modules/Agents/engine/persistence.js` +3 |
 | `PORT` | yes | `4000` | TCP port the HTTP server listens on. | `Config/config.js` |
 | `TRUST_PROXY` |  | `loopback` | Express trust proxy setting; loopback by default so X-Forwarded-For is honoured behind a local reverse proxy. | `index.js` |
 | `UNDER_MAINTENANCE` |  | `false` | true \| false | `Config/config.js` |

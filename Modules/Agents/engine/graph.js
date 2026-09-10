@@ -4,6 +4,7 @@ const persistence = require('./persistence');
 const orchestrator = require('./orchestrator');
 const findingMemory = require('./findingMemory');
 const memory = require('../memory');
+const skillIndex = require('../skills');
 const policy = require('../policy');
 const { rating: ratingOf } = require('../actions');
 const runs = require('../runs');
@@ -17,9 +18,13 @@ const runs = require('../runs');
 // nodes because a resumed node re-runs from its first line — filing the
 // proposal next to the interrupt would file it twice.
 //
-// Terminal writes are conditioned on the run still being `running`, so a stop
-// or pause-all that won the race is never overwritten: the node that notices
-// marks the state abandoned and the graph ends without writing more.
+// Terminal writes are conditioned on the run still being `running` (or
+// `waiting_approval` once resumed), so a stop or pause-all that won the race is
+// never overwritten: the node that notices marks the state abandoned and the
+// graph ends without writing more.
+//
+// A finished thread is deleted from the checkpointer by the caller, never by a
+// node: the checkpointer writes a node's own checkpoint after it returns.
 
 const { STATUS } = runs;
 const ABANDONED = Object.freeze({ status: 'abandoned', outcome: 'stopped before it finished' });
@@ -52,6 +57,7 @@ const State = Annotation.Root({
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
 const slugOf = (run) => run.skill || 'qa-review';
 const titleOf = (task) => task.TaskKey || task.TaskName;
+const wantsMemory = (slug) => { const skill = skillIndex.getSkill(slug); return !(skill && skill.usesMemory === false); };
 
 /* Memory is an optimisation: losing it costs context, failing the run over it costs the run. */
 const quietly = async (runId, what, fn) => {
@@ -61,7 +67,9 @@ const quietly = async (runId, what, fn) => {
 async function gather(state, config) {
     const { companyId } = config.context;
     const { run, task } = state;
-    const block = (await quietly(run._id, 'memory unavailable', () => memory.contextFor({ companyId, projectId: task.ProjectID, userId: run.startedBy }))) || '';
+    const block = wantsMemory(slugOf(run))
+        ? (await quietly(run._id, 'memory unavailable', () => memory.contextFor({ companyId, projectId: task.ProjectID, userId: run.startedBy }))) || ''
+        : '';
     const gathered = await orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block });
     if (gathered.status === 'skipped') return { result: gathered };
     return { context: { ...gathered.context, memory: block } };
@@ -109,6 +117,8 @@ async function act(state, config) {
     let applied = 0;
     let refusals = 0;
     for (const { change, verdict } of state.toAct) {
+        // eslint-disable-next-line no-await-in-loop
+        if (!(await runs.isRunning(companyId, run._id))) return { applied, refusals, abandoned: true };
         try {
             // eslint-disable-next-line no-await-in-loop
             const out = await deps.actions.perform({ companyId, actor: deps.actor, action: change.action, params: change.params, reason: `${run.skill} finding`, allowedActions: agent.allowedActions, decision: verdict });
@@ -181,7 +191,7 @@ async function remember(state, config) {
     const { run, task, decision } = state;
     const episode = episodeOf(state);
     const saved = decision
-        ? await runs.finish(companyId, run._id, { status: STATUS.DONE, outcome: decidedOutcome(decision), episode })
+        ? await runs.finish(companyId, run._id, { status: STATUS.DONE, outcome: decidedOutcome(decision), episode, onlyIf: STATUS.WAITING })
         : await runs.finish(companyId, run._id, { status: state.finalStatus, outcome: state.outcome, episode, onlyIf: STATUS.RUNNING });
     if (!saved) return { abandoned: true };
     await quietly(run._id, 'episode not remembered', () => memory.recordEpisode({ companyId, projectId: String(run.projectId || task.ProjectID || ''), runId: String(run._id), patch: episode }));
@@ -190,7 +200,7 @@ async function remember(state, config) {
 
 const afterAnalyse = (s) => (s.finalStatus ? 'remember' : 'review');
 const afterReview = (s) => { if (s.finalStatus) return 'remember'; return s.toAct.length ? 'act' : 'propose'; };
-const afterAct = (s) => (s.toPropose.length ? 'propose' : 'remember');
+const afterAct = (s) => { if (s.abandoned) return END; return s.toPropose.length ? 'propose' : 'remember'; };
 const afterPropose = (s) => (s.abandoned ? END : 'hold');
 
 const builder = new StateGraph(State)
@@ -205,7 +215,7 @@ const builder = new StateGraph(State)
     .addEdge('gather', 'analyse')
     .addConditionalEdges('analyse', afterAnalyse, ['review', 'remember'])
     .addConditionalEdges('review', afterReview, ['act', 'propose', 'remember'])
-    .addConditionalEdges('act', afterAct, ['propose', 'remember'])
+    .addConditionalEdges('act', afterAct, ['propose', 'remember', END])
     .addConditionalEdges('propose', afterPropose, ['hold', END])
     .addEdge('hold', 'remember')
     .addEdge('remember', END);
@@ -226,34 +236,56 @@ const graphFor = (companyId) => {
 
 const configFor = (companyId, runId, context) => ({ configurable: { thread_id: String(runId) }, context: { companyId, ...context }, durability: 'sync' });
 
+const interrupted = (out) => Array.isArray(out.__interrupt__) && out.__interrupt__.length > 0;
+
+const forget = (companyId, runId) => quietly(runId, 'thread not deleted', () => persistence.saverFor(companyId).deleteThread(String(runId)));
+
+/* What the row can still tell memory when the graph itself threw. */
+const episodeFromRow = (run, task, error) => ({
+    skill: run.skill || null, taskId: String(task._id), taskTitle: task.TaskName || null,
+    proposed: 0, acted: (Array.isArray(run.actions) ? run.actions : []).filter((a) => a.ok).length,
+    approved: 0, declined: 0, declinedReason: null, reverted: false,
+    spendUsd: Number((run.spend && run.spend.usd) || 0), outcome: error, at: new Date(),
+});
+
 const runGraph = async ({ companyId, run, agent, task, deps }) => {
     try {
+        await persistence.ready(companyId);
         const graph = graphFor(companyId);
         await runs.patch(companyId, run._id, { threadId: String(run._id) });
         const out = await graph.invoke({ run: plain(run), agent: plain(agent), task: plain(task) }, configFor(companyId, run._id, { deps }));
-        if (out.abandoned) return ABANDONED;
-        if (Array.isArray(out.__interrupt__) && out.__interrupt__.length) {
+        if (interrupted(out)) {
             return { status: STATUS.WAITING, proposalId: out.proposalId, refusals: out.refusals, ...(out.outcome ? { outcome: out.outcome } : {}) };
         }
+        await forget(companyId, run._id);
+        if (out.abandoned) return ABANDONED;
         return { status: out.finalStatus, outcome: out.outcome, refusals: out.refusals };
     } catch (e) {
         logger.error(`${LOG_PREFIX} ${run._id}: ${e.message}`);
-        const saved = await runs.finish(companyId, run._id, { status: STATUS.FAILED, error: e.message, onlyIf: STATUS.RUNNING });
-        return saved ? { status: STATUS.FAILED, error: e.message } : ABANDONED;
+        const row = (await quietly(run._id, 'run row unavailable', () => runs.get(companyId, run._id))) || plain(run);
+        const episode = episodeFromRow(row, task, e.message);
+        const saved = await runs.finish(companyId, run._id, { status: STATUS.FAILED, error: e.message, episode, onlyIf: STATUS.RUNNING });
+        if (!saved) return ABANDONED;
+        await quietly(run._id, 'episode not remembered', () => memory.recordEpisode({ companyId, projectId: String(row.projectId || task.ProjectID || ''), runId: String(run._id), patch: episode }));
+        return { status: STATUS.FAILED, error: e.message };
     }
 };
 
 /* Resolves { resumed: false } when the thread holds no interrupt — a run from
  * before the graph, or one that already finished — so the caller can close the
- * run the old way. */
+ * run the old way. A thread parked after the interrupt (remember threw last
+ * time) is driven on without a new decision. */
 const resumeGraph = async ({ companyId, runId, resume }) => {
+    await persistence.ready(companyId);
     const graph = graphFor(companyId);
     const config = configFor(companyId, runId, {});
     const snapshot = await graph.getState(config);
     const waiting = (snapshot.tasks || []).some((t) => Array.isArray(t.interrupts) && t.interrupts.length);
-    if (!waiting) return { resumed: false };
-    const out = await graph.invoke(new Command({ resume }), config);
-    return { resumed: true, status: out.finalStatus, outcome: out.outcome, episode: out.episode };
+    const parked = !waiting && Array.isArray(snapshot.next) && snapshot.next.length > 0;
+    if (!waiting && !parked) return { resumed: false };
+    const out = await graph.invoke(waiting ? new Command({ resume }) : null, config);
+    if (!interrupted(out)) await forget(companyId, runId);
+    return { resumed: true, status: out.finalStatus, outcome: out.outcome, episode: out.episode, ...(out.abandoned ? { abandoned: true } : {}) };
 };
 
 module.exports = { State, ABANDONED, builder, graphFor, runGraph, resumeGraph };

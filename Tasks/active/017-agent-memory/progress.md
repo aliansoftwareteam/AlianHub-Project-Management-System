@@ -43,3 +43,13 @@ Gates on the merged branch: `npm test` 140 suites / 1716 tests, lint 0 errors, v
 Deviations recorded by the workstreams: propose/hold are two nodes (a resumed node re-runs from its first line); preference rows carry a `counting` status before `candidate`; `PUT /memory/:id` bodies carry `scopeId`; `notify` mirrors `agentActivity` on notification settings; episodes are written for skipped/failed runs too.
 
 Open: adversarial review workflow running; in-process sweep against the real db and model; owner UI sweep once logged in on the Browser pane.
+
+## 2026-09-10 — Review fixes (F2: engine, persistence, skills)
+- `remember()` on a resumed thread finishes the run only while it is still `waiting_approval`; a run stopped meanwhile is abandoned, keeps its status and gets no episode. `resumeGraph` surfaces `abandoned: true`.
+- `act()` re-checks the run before every perform, so stop/pause-all mid-loop halts the remaining actions; `afterAct` routes an abandoned run to END.
+- `runGraph`/`resumeGraph` await `persistence.ready(companyId)`. The saver's `ttl` is a plain number of seconds — the `{ defaultTtl, refreshOnRead }` shape belongs to the store only; fixed and verified against the real MongoDB: TTL index (15552000 s) on `agent_checkpoints` and `agent_checkpoint_writes`, unique `(namespaceStr, key)` on `agent_memory`. A thread that ends without an interrupt is deleted from the checkpointer by the caller, never inside a node.
+- A skill that throws fails the run with an episode built from the run row (acted = ok actions, spend from the row, `outcome` = the error) and tells memory.
+- A thread parked after a failed `remember` (no interrupt, `next` non-empty) is driven on by the next resume with `invoke(null)`.
+- Memory is fetched only for skills that render it: `usesMemory: false` on `qa-review`, `pr.summary`, `digest.ceo`; `brief.parse` renders a `MEMORY:` block with a DATA rule in its system prompt.
+- Tests: `persistence.mongoClient()` throws under jest unless `useInMemory()` is active; `agent-revert` opts in; the reap test seeds a mid-node run and asserts `{ reaped: 1 }`; mongo-backed persistence cases (db per company, collections, one client, `close()` reset, `ready()` never rejects). `agent-proposal-atomic` seeds `runId: null`, so it never reaches persistence — left as is.
+- Gates: `npm test` 140 suites / 1728 tests, lint 0 errors, `docs/ENV.md` regenerated for the new `NODE_ENV` reference.

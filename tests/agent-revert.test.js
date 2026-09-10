@@ -16,6 +16,8 @@ jest.mock('../Modules/Agents/actor', () => {
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { dbCollections } = require('../Config/collections');
+
+beforeAll(() => require('../Modules/Agents/engine/persistence').useInMemory());
 const socketEmitter = require('../event/socketEventEmitter');
 const audit = require('../Modules/Agents/agentAudit');
 const revert = require('../Modules/Agents/revert');

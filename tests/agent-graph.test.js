@@ -49,6 +49,8 @@ const execute = (run, a = agent()) => runs.executeSkill(C, run, a, TASK, deps())
 const runRow = (id) => mockDb.store[SCHEMA_TYPE.AGENT_RUNS].find((r) => String(r._id) === String(id));
 const proposalRows = () => mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS] || [];
 const threadOf = (companyId, run) => graph.graphFor(companyId).getState({ configurable: { thread_id: String(run._id) } });
+const checkpointOf = (companyId, run) => persistence.saverFor(companyId).getTuple({ configurable: { thread_id: String(run._id) } });
+const resume = (run, decision = 'approved') => graph.resumeGraph({ companyId: C, runId: run._id, resume: { decision, applied: [], reason: null } });
 
 let mem;
 beforeEach(() => {
@@ -152,9 +154,75 @@ describe('a run is a LangGraph thread', () => {
         expect(proposalRows()).toHaveLength(0);
         expect(runRow(run._id).episode).toMatchObject({ proposed: 0, acted: 2, approved: 0, declined: 0, reverted: false });
         expect(memory.recordEpisode).toHaveBeenCalledTimes(1);
-        const thread = await threadOf(C, run);
-        expect(thread.next).toEqual([]);
-        expect(thread.values.finalStatus).toBe('done');
+        expect((await threadOf(C, run)).next).toEqual([]);
+        expect(await checkpointOf(C, run)).toBeUndefined();
+    });
+
+    it('a finished thread leaves no checkpoint behind, while a waiting one keeps its checkpoint until it is decided', async () => {
+        planned([newTask('Two')]);
+        const run = await start(agent());
+        await execute(run);
+        expect(await checkpointOf(C, run)).toBeTruthy();
+        expect(await resume(run)).toEqual({ resumed: true, status: 'done', outcome: 'approved by a person — 0 of 0 change(s) applied', episode: expect.objectContaining({ proposed: 1 }) });
+        expect(await checkpointOf(C, run)).toBeUndefined();
+    });
+
+    it('approving after the waiting run was stopped abandons it: the run stays stopped and no episode is written', async () => {
+        planned([newTask('Two')]);
+        const run = await start(agent());
+        await execute(run);
+        await runs.stop(C, run._id, 'u2');
+        expect(await resume(run)).toMatchObject({ resumed: true, abandoned: true });
+        expect(runRow(run._id)).toMatchObject({ status: 'stopped', outcome: 'stopped by u2' });
+        expect(runRow(run._id).episode).toBeUndefined();
+        expect(memory.recordEpisode).not.toHaveBeenCalled();
+    });
+
+    it('pause-all landing inside the first action stops the rest of the loop', async () => {
+        planned([subtask('One'), subtask('Two'), subtask('Three')]);
+        const a = agent({ autonomy: 2 });
+        const run = await start(a);
+        actions.perform.mockImplementationOnce(async () => { await runs.pauseAll(C, 'pause_all'); return { auditId: 'aud1', result: {} }; });
+        expect(await execute(run, a)).toEqual({ status: 'abandoned', outcome: 'stopped before it finished' });
+        expect(actions.perform).toHaveBeenCalledTimes(1);
+        expect(runRow(run._id)).toMatchObject({ status: 'stopped', outcome: 'pause all' });
+        expect(runRow(run._id).actions).toHaveLength(1);
+        expect(runRow(run._id).episode).toBeUndefined();
+        expect(memory.recordEpisode).not.toHaveBeenCalled();
+    });
+
+    it('a thread parked after a failed remember is driven on by the next resume without a new decision', async () => {
+        planned([newTask('Two')]);
+        const run = await start(agent());
+        await execute(run);
+        const base = mockDb.crud.getMockImplementation();
+        let blip = true;
+        mockDb.crud.mockImplementation(async (...a) => {
+            if (blip && a[1].type === SCHEMA_TYPE.AGENT_RUNS && a[2] === 'findOneAndUpdate') { blip = false; throw new Error('db blip'); }
+            return base(...a);
+        });
+        await expect(resume(run)).rejects.toThrow('db blip');
+        mockDb.crud.mockImplementation(base);
+        expect(runRow(run._id).status).toBe('waiting_approval');
+        expect((await threadOf(C, run)).next).toEqual(['remember']);
+
+        expect(await resume(run, 'declined')).toMatchObject({ resumed: true, status: 'done', outcome: 'approved by a person — 0 of 0 change(s) applied' });
+        expect(runRow(run._id)).toMatchObject({ status: 'done', episode: expect.objectContaining({ proposed: 1, approved: 0 }) });
+        expect(memory.recordEpisode).toHaveBeenCalledTimes(1);
+        expect(await checkpointOf(C, run)).toBeUndefined();
+    });
+
+    it('a skill that throws fails the run with an episode built from the run row', async () => {
+        orchestrator.analyse.mockRejectedValue(new Error('model down'));
+        const run = await start(agent());
+        expect(await execute(run)).toEqual({ status: 'failed', error: 'model down' });
+        const row = runRow(run._id);
+        expect(row).toMatchObject({ status: 'failed', error: 'model down' });
+        expect(row.episode).toEqual({
+            skill: 'plan', taskId: TASK._id, taskTitle: 'Plan the launch',
+            proposed: 0, acted: 0, approved: 0, declined: 0, declinedReason: null, reverted: false, spendUsd: 0, outcome: 'model down', at: expect.any(Date),
+        });
+        expect(memory.recordEpisode).toHaveBeenCalledWith({ companyId: C, projectId: 'p1', runId: String(run._id), patch: row.episode });
     });
 
     it('at L2 with a risky change it acts on the safe ones, interrupts on the risky one and finishes on approval', async () => {
@@ -196,13 +264,27 @@ describe('a run is a LangGraph thread', () => {
         expect((await threadOf(C, run)).next).toEqual([]);
     });
 
-    it('a run waiting at hold is never reaped at boot', async () => {
+    it('a run waiting at hold is never reaped at boot, a run mid-node is', async () => {
         planned([newTask('Two')]);
         const run = await start(agent());
         await execute(run);
-        expect(await runs.reapStale(C)).toEqual({ reaped: 0 });
+        const midNode = await start(agent());
+        expect(await runs.reapStale(C)).toEqual({ reaped: 1 });
         expect(runRow(run._id).status).toBe('waiting_approval');
         expect((await threadOf(C, run)).next).toEqual(['hold']);
+        expect(runRow(midNode._id)).toMatchObject({ status: 'failed', outcome: 'server restarted' });
+    });
+
+    it('fetches workspace memory only for skills that render it', async () => {
+        orchestrator.analyse.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [], summary: 's', usage: {} });
+        await execute(await start(agent(), { skill: 'qa-review' }));
+        expect(memory.contextFor).not.toHaveBeenCalled();
+        expect(orchestrator.analyse.mock.calls[0][0].context.memory).toBe('');
+
+        planned([subtask('One')]);
+        await execute(await start(agent(), { skill: 'brief.parse' }));
+        expect(memory.contextFor).toHaveBeenCalledTimes(1);
+        expect(orchestrator.analyse.mock.calls[1][0].context.memory).toContain('Budget is fixed');
     });
 
     it('memory failures never fail the run', async () => {
