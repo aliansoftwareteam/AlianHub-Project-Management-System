@@ -7,6 +7,7 @@ jest.mock('../Modules/Tasks/helpers/completionStore', () => ({
     forStatusChange: jest.fn(async () => null),
     recordWork: jest.fn(async () => null),
 }));
+jest.mock('../Modules/Agents/permissions', () => ({ holderMay: jest.fn(async () => ({ allowed: true, reason: '' })) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const actions = require('../Modules/Agents/actions');

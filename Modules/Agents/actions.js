@@ -5,6 +5,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const socketEmitter = require('../../event/socketEventEmitter');
 const tools = require('../Automations/engine/tools');
 const registry = require('./registry');
+const permissions = require('./permissions');
 const audit = require('./agentAudit');
 const { attribution, isAgent } = require('./actor');
 const completionStore = require('../Tasks/helpers/completionStore');
@@ -250,6 +251,8 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     if (decision && decision.decision === 'refuse') throw await refusal(companyId, actor, { action, params, reason: decision.reason, ip });
     const check = registry.evaluate(action, params, { allowedActions });
     if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip });
+    const holder = await permissions.holderMay(companyId, actor, action, params);
+    if (!holder.allowed) throw await refusal(companyId, actor, { action, params, reason: holder.reason, ip });
     if (!check.action.write) return { result: null, auditId: null, undo: null };
     const exec = executors[action];
     if (!exec) throw new tools.DeterministicError(`${action} has no executor`);
@@ -272,8 +275,10 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
 /* Reads still go through the registry so a refusal is logged the same way. */
 const authorizeRead = async ({ companyId, actor, action, params = {}, ip = '', allowedActions }) => {
     const check = registry.evaluate(action, params, { allowedActions });
-    if (check.allowed) return true;
-    throw await refusal(companyId, actor, { action, params, reason: check.reason, ip });
+    if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip });
+    const holder = await permissions.holderMay(companyId, actor, action, params);
+    if (!holder.allowed) throw await refusal(companyId, actor, { action, params, reason: holder.reason, ip });
+    return true;
 };
 
 module.exports = { perform, authorizeRead, RefusedError, executors, workEntry, SCOPE, RATING_KEYS, RATINGS, rating, ratings, unrated, isCompleteRating, manifest };
