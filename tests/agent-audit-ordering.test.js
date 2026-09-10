@@ -15,6 +15,7 @@ jest.mock('../Modules/Agents/memory', () => ({
     preferenceCandidate: jest.fn(async () => null),
     rememberApprovedChanges: jest.fn(async () => null),
 }));
+jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(async () => ['6a9954186dd786246031e47b']) }));
 jest.mock('../Modules/AIProjectGenerator/usage', () => ({ summarize: jest.fn(() => ({ costUsd: 0.01, totalTokens: 100, model: 'm' })) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
@@ -104,7 +105,7 @@ describe('the audit row is written before the action and gates it', () => {
         expect(comments()).toHaveLength(1);
         expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('audit_unmarked'));
         expect(auditRows()[0].meta).toMatchObject({ state: 'pending', undoable: false });
-        expect(await undo.undoAuditRow(CID, auditRows()[0], { kind: 'human', userId: 'u1' }, '')).toMatchObject({ ok: false, reason: expect.stringMatching(/never confirmed/) });
+        expect(await undo.undoAuditRow(CID, auditRows()[0], { kind: 'human', userId: 'u1' }, '')).toMatchObject({ ok: false, reason: 'action_pending', message: expect.stringMatching(/never confirmed/) });
     });
 
     it('an executor that throws closes its row as failed so a revert does not treat it as a change', async () => {
