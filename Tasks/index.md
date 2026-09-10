@@ -20,6 +20,6 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 014 | AI hub full test and fixes | active | high | 006, 010 | active/014-ai-hub-sweep |
 | 015 | Guided project start — complete brief, agent/human split | active | high | 014 | active/015-guided-project-brief |
 | 016 | Agent trust layer — risk-rated actions, policy L2, whole-run revert, budgets | active | high | 014 | active/016-agent-trust-layer |
-| 017 | Agent memory the product owns | backlog | medium | 015, 016 | backlog/017-agent-memory |
+| 017 | Agent memory the product owns | active | high | 015, 016 | active/017-agent-memory |
 | 018 | MCP both ways — OAuth, scopes, external agents as teammates | backlog | medium | 016 | backlog/018-agent-interop |
 | 019 | Evals and observability for agent runs | backlog | high | 016 | backlog/019-agent-evals-observability |
