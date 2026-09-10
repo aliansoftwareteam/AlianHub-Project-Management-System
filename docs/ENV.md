@@ -225,7 +225,7 @@ Backend variables: 130. Frontend build-time variables: 24.
 | `ERRORRECIVEREMAIL` |  | `admin@yourdomain.com` | Email to receive error alerts | `Config/config.js` |
 | `HEALTH_DB_TIMEOUT_MS` |  |  | How long /health waits for the database ping before reporting it down (default 2000). | `Modules/Instance/health.js` |
 | `MIGRATIONS_AUTO` |  |  | Apply pending migrations at boot (default true; false only reports them). | `Modules/Instance/controller.js` |
-| `MONGODB_URL` | yes |  | mongo connection string (no trailing slash) | `Config/config.js`, `Modules/Automations/engine/queue/agendaDriver.js` +5 |
+| `MONGODB_URL` | yes |  | mongo connection string (no trailing slash) | `Config/config.js`, `Modules/Agents/engine/persistence.js` +6 |
 | `NODEMAILER_EMAIL_PASSWORD` (secret) |  |  | Use app password for Gmail | `Config/config.js` |
 | `NODEMAILER_PORT` |  | `587` | 587 (STARTTLS) or 465 (SSL) | `Config/config.js` |
 | `NOOFPRESETCOMPANY` |  | `10` | Number of preset companies seeded at first run. | `Config/config.js` |
