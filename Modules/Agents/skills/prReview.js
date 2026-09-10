@@ -22,6 +22,7 @@ module.exports = {
     description: 'Fetches the pull request a task links to, summarises the change and flags risk.',
     scopes: ['task.read', 'task.comment'],
     maxTokens: 2500,
+    usesMemory: false,
 
     async gather({ task }) {
         const url = linkOf(task);

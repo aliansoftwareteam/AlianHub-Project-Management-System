@@ -15,6 +15,7 @@ module.exports = {
     scopes: ['task.read', 'task.subtask.create', 'task.comment'],
     maxFindings: 8,
     maxTokens: 4000,
+    usesMemory: false,
 
     systemPrompt: `You are a meticulous web QA reviewer working inside a project management tool.
 
