@@ -6,6 +6,7 @@ const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const logger = require('../../Config/loggerConfig');
 const { getProvider, isAnyProviderConfigured } = require('../AIProjectGenerator/llmProvider');
 const { visibleProjects } = require('../Agents/scope');
+const { pageVisibilityFilter } = require('../Pages/helpers/pageRules');
 
 // Ask (handoff 13i) — a question box over the workspace.
 //
@@ -53,9 +54,9 @@ const gather = async (companyId, uid, { question, projectId, limit = MAX_PER_TYP
     const textMatch = orRegex(terms, ['TaskName', 'TaskKey', 'rawDescription']);
     if (textMatch) Object.assign(taskMatch, textMatch);
 
-    const pageMatch = { deletedStatusKey: { $ne: 1 }, ProjectID: { $in: ids } };
+    const pageMatch = { deletedStatusKey: { $ne: 1 }, ProjectID: { $in: ids }, $and: [pageVisibilityFilter(uid)] };
     const pageText = orRegex(terms, ['title']);
-    if (pageText) Object.assign(pageMatch, pageText);
+    if (pageText) pageMatch.$and.push(pageText);
 
     const [tasks, pages] = await Promise.all([
         MongoDbCrudOpration(companyId, {
