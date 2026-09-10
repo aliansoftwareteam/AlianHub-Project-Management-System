@@ -43,3 +43,17 @@ Gates on the merged branch: `npm test` 140 suites / 1716 tests, lint 0 errors, v
 Deviations recorded by the workstreams: propose/hold are two nodes (a resumed node re-runs from its first line); preference rows carry a `counting` status before `candidate`; `PUT /memory/:id` bodies carry `scopeId`; `notify` mirrors `agentActivity` on notification settings; episodes are written for skipped/failed runs too.
 
 Open: adversarial review workflow running; in-process sweep against the real db and model; owner UI sweep once logged in on the Browser pane.
+
+## 2026-09-10 — Review fixes (F1: memory, prompts, proposals)
+Findings fixed, by the review's numbering: 1 (project memory reaches the plan, clarify, brief, guide and tasks-plan prompts; workspace-level constraints for a new project), 2 (guide `projectId` gated by project visibility), 3 (approvals remember the executed change list), 4 (slug hash on truncation), 5 (episodes on `agent_runs`), 6 (per-section budgets; one decision per proposal for subtasks), 7 (`notify` lives only on the notification settings), 8 (agent tokens cannot read memory over REST), 9 (`PUT /memory/:id` scope contract), 10 (decline reason validated), 11 (rewording re-keys), 12 (`instructionGuard` shared by the clarifier and memory), 13 (brief parsing), 14 (candidate counting), 15 (preference text is not editable), 16 (`settleRun` hardening), 17 (this note and `contract.md`).
+
+Deviations from the review's suggested fixes:
+- 6: only `subtask.create` changes collapse into one "Approved N subtasks under "<task>"" row per proposal; `task.create`, `page.draft` and `task.sprint.move` keep one row each because their labels are the decision.
+- 5: `recordEpisode` keeps its signature but `projectId` is only used for logging; the run row's `_id` is already company-scoped, and the graph passes `task.ProjectID` when the run has no project of its own, which a filter would have missed.
+- 1c: a retired project constraint also retires its workspace copy only when that project is the one that first stated it; a repeat from another project only bumps the counter.
+- 16: `approve` refuses with 409 "Run was stopped." only for a `stopped` run; a proposal on a `done`/`failed`/reaped run still approves (its changes are the person's decision) and the run is left as it is, with the parked thread dropped.
+- 7: `Modules/notification/defaults` is required lazily inside `setAgentActivity` — at module load it pulls `utils/data` → `Modules/Sprints/controller.js`, which Babel refuses to parse under jest.
+- The graph suite's `memory` mock gained `DECLINE_REASON_TEXT` (A-owned file) because `proposals.DECLINE_REASONS` is now derived from it.
+- `tests/fixtures/fakeMongo.js` learned `sort`/`limit` on `find` (the review assumed it already did).
+
+Follow-ups for other workstreams: the frontend `useProjectMemory.put()` matches rows by `id`, which now changes on a text edit (the finding at memory.js:160 noted it); `useAgentPreferences.settle` no longer needs to send `scopeId`.

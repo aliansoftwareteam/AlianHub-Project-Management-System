@@ -18,6 +18,7 @@ const sseEmitter = require('./sseEmitter');
 const orchestrator = require('./orchestrator');
 const clarifier = require('./clarifier');
 const memoryStore = require('../Agents/memory');
+const { resolveProjectId } = require('./projectAccess');
 const { resolveProjectSkills, getActiveSkillSlugs } = require('../settings/ProjectSkills/helper');
 const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require('../Project/helpers/projectSourceRules');
 const { normalizePlanColors } = orchestrator;
@@ -489,6 +490,8 @@ exports.clarify = async (req, res) => {
 
         const previousAnswers = sanitizeClarifications(req.body && req.body.previousAnswers);
         const round = Number(req.body && req.body.round) || undefined;
+        const project = await resolveProjectId({ companyId, uid, projectId: req.body && req.body.projectId });
+        if (project.hidden) return sendError(res, 404, 'Project not found');
 
         const result = await clarifier.generateClarifyingQuestions({
             description,
@@ -498,6 +501,7 @@ exports.clarify = async (req, res) => {
             round,
             companyId,
             userId: String(uid),
+            projectId: project.projectId,
         });
         const { understanding, questions, coverage, maxRounds, usage, model, provider } = result;
 
@@ -592,6 +596,8 @@ exports.brief = async (req, res) => {
             if (stash && stash.companyId === companyId) briefText = stash.text;
         }
         const answers = sanitizeClarifications(req.body && req.body.answers) || [];
+        const project = await resolveProjectId({ companyId, uid, projectId: req.body && req.body.projectId });
+        if (project.hidden) return sendError(res, 404, 'Project not found');
 
         const { brief, coverage, usage, model, provider } = await clarifier.draftBrief({
             description,
@@ -600,6 +606,7 @@ exports.brief = async (req, res) => {
             answers,
             companyId,
             userId: String(uid),
+            projectId: project.projectId,
         });
 
         return res.send({
@@ -752,10 +759,10 @@ function applyEdits(plan, edits) {
 // EXISTING project via orchestrator.executeTasksIntoProject. Mirrors
 // callLlmForPlan / generatePlanForJob / exports.plan / exports.execute.
 
-async function callLlmForTasksPlan({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features }) {
+async function callLlmForTasksPlan({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features, memory }) {
     const provider = getProvider();
     const systemPrompt = buildTasksSystemPrompt();
-    const userMessage = buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features });
+    const userMessage = buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features, memory });
     const ResponseSchema = tasksResponseSchemaForMode(mode);
     // Same generous ask as the plan stage — see the note there. This path needs
     // it more, not less: AI-Assist's sub-tasks option is the setting that
@@ -847,11 +854,12 @@ async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, addit
             sprintNames: Object.values(projectDoc.sprintsObj || {}).map((s) => s && s.name).filter(Boolean),
         };
         const members = await loadActiveMembers(companyId);
+        const memory = await memoryStore.contextFor({ companyId, userId: String(uid), projectId });
         emit({ event: 'progress', phase: 'plan', step: 'context', status: 'done' });
 
         emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
         const { result, usage, model, provider } = await callLlmForTasksPlan({
-            project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features,
+            project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features, memory,
         });
 
         let plan = result.plan;
