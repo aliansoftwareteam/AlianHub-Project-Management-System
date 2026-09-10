@@ -5,7 +5,7 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async () => 'owner'), isPrivileged: (r) => r === 'owner' || r === 'admin' }));
 jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async (req) => ({ kind: 'human', userId: req.uid })), isAgent: (a) => a.kind === 'agent' }));
 jest.mock('../Modules/Automations/engine/tools', () => ({ getTask: jest.fn() }));
-jest.mock('../Modules/Agents/engine/orchestrator', () => ({ run: jest.fn() }));
+jest.mock('../Modules/Agents/engine/orchestrator', () => ({ gather: jest.fn(async () => ({ status: 'gathered', context: {} })), analyse: jest.fn() }));
 jest.mock('../Modules/Agents/engine/findingMemory', () => ({ load: jest.fn(async () => new Map()), decide: jest.fn(), record: jest.fn(), touch: jest.fn() }));
 jest.mock('../Modules/AIProjectGenerator/usage', () => ({ summarize: jest.fn(() => ({ costUsd: 0, totalTokens: 0, model: 'm' })) }));
 jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({ handleNotificationtFun: jest.fn(async () => ({ status: true })) }));
@@ -33,7 +33,9 @@ const runRow = (id) => mockDb.store[SCHEMA_TYPE.AGENT_RUNS].find((r) => String(r
 const agentRow = () => mockDb.store[SCHEMA_TYPE.AGENTS].find((a) => String(a._id) === AGENT_ID);
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 const startRun = async (body) => { const r = res(); await ctrl.startRun(req({ agentId: AGENT_ID, taskId: TASK._id, ...body }), r); await flush(); return r; };
-const success = () => orchestrator.run.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [finding], summary: 'one issue', usage: { totalTokens: 500 }, model: 'm' });
+const success = () => orchestrator.analyse.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [finding], summary: 'one issue', usage: { totalTokens: 500 }, model: 'm' });
+
+beforeAll(() => require('../Modules/Agents/engine/persistence').useInMemory());
 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
@@ -105,7 +107,7 @@ describe('a run stops at its own spend cap', () => {
     it('does not resurrect a run that was stopped while the skill ran', async () => {
         summarize.mockReturnValue({ costUsd: 0.02, totalTokens: 500, model: 'm' });
         const run = await runs.create(C, { agent: agent(), taskId: TASK._id, projectId: 'p1', skill: 'qa-review', spendCapUsd: 0.01 });
-        orchestrator.run.mockImplementation(async () => {
+        orchestrator.analyse.mockImplementation(async () => {
             await runs.stop(C, run._id, 'u2');
             return { status: 'success', skill: 'qa-review', findings: [finding], summary: 's', usage: {}, model: 'm' };
         });
@@ -147,7 +149,7 @@ describe('notifyMe tells the starter once, when the run needs them or is over', 
         expect(handleNotificationtFun).not.toHaveBeenCalled();
 
         const raced = await runs.create(C, { agent: agent(), taskId: TASK._id, projectId: 'p1', skill: 'qa-review', startedBy: 'u1', notifyMe: true });
-        orchestrator.run.mockImplementation(async () => { await runs.stop(C, raced._id, 'u2'); return { status: 'success', skill: 'qa-review', findings: [finding], summary: 's', usage: {}, model: 'm' }; });
+        orchestrator.analyse.mockImplementation(async () => { await runs.stop(C, raced._id, 'u2'); return { status: 'success', skill: 'qa-review', findings: [finding], summary: 's', usage: {}, model: 'm' }; });
         expect((await runs.executeSkill(C, raced, agent(), TASK, deps())).status).toBe('abandoned');
         expect(handleNotificationtFun).not.toHaveBeenCalled();
     });

@@ -3,12 +3,17 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { ref } from 'vue';
 
-const { apiRequest, toast } = vi.hoisted(() => ({ apiRequest: vi.fn(), toast: { success: vi.fn(), error: vi.fn() } }));
+const { apiRequest, toast, echo } = vi.hoisted(() => ({
+    apiRequest: vi.fn(),
+    toast: { success: vi.fn(), error: vi.fn() },
+    echo: (key, params) => (params ? `${key} ${JSON.stringify(params)}` : key)
+}));
 
 vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('@/locales/main', () => ({ i18n: { global: { t: (key) => `t:${key}` } } }));
 vi.mock('@/components/organisms/Shell/shellState', () => ({ shellState: { agentsRunning: 0 } }));
 vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
+vi.mock('vue-i18n', async (importOriginal) => ({ ...(await importOriginal()), useI18n: () => ({ t: echo }) }));
 
 import AgentRunDetail from '@/views/Ai/AgentRunDetail.vue';
 
@@ -32,7 +37,7 @@ const mountDetail = async ({ roleType = 3, userId = 'u1', payload = { run, audit
         if (type === 'post' && url.endsWith('/revert')) return ok({ reverted: 2, failed: [{ action: 'task.sprint.move', reason: 'sprint closed' }], windowEndsAt: future });
         return ok(payload);
     });
-    const wrapper = mount(AgentRunDetail, { props: { runId: 'r1' }, global: { plugins: [storeFor(roleType)], provide: { $userId: ref(userId) } } });
+    const wrapper = mount(AgentRunDetail, { props: { runId: 'r1' }, global: { plugins: [storeFor(roleType)], provide: { $userId: ref(userId) }, mocks: { $t: echo } } });
     await flushPromises();
     return wrapper;
 };
@@ -61,7 +66,7 @@ describe('AgentRunDetail', () => {
     it('hides revert once the run is reverted and shows the reverted state', async () => {
         const wrapper = await mountDetail({ payload: { run: { ...run, revertedAt: '2026-09-05T10:00:00Z' }, audit: [] } });
         expect(wrapper.find('button').exists()).toBe(false);
-        expect(wrapper.find('.ah-chip--dark').text()).toBe('Ai.reverted_at');
+        expect(wrapper.find('.ah-chip--dark').text()).toContain('Ai.reverted_at');
     });
 
     it('reverts, reports the partial failure and reloads the run', async () => {
@@ -74,6 +79,52 @@ describe('AgentRunDetail', () => {
         expect(wrapper.find('.run-detail__result').text()).toContain('sprint closed');
         expect(wrapper.emitted('reverted')[0][0]).toEqual({ reverted: 2, failed: [{ action: 'task.sprint.move', reason: 'sprint closed' }] });
         expect(apiRequest.mock.calls.filter(([type]) => type === 'get')).toHaveLength(2);
+    });
+
+    it('shows the episode above the decisions with the decline reason spelled out', async () => {
+        const episode = { proposed: 3, acted: 1, approved: 2, declined: 1, reverted: false, declinedReason: 'too_many_changes' };
+        const wrapper = await mountDetail({ payload: { run: { ...run, episode }, audit: [] } });
+        const block = wrapper.find('[data-test="episode"]');
+        expect(block.exists()).toBe(true);
+        expect(block.element.compareDocumentPosition(wrapper.find('.run-decisions').element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(block.findAll('li').map((li) => li.text())).toEqual([
+            'Ai.episode_proposed {"n":3}',
+            'Ai.episode_acted {"n":1}',
+            'Ai.episode_approved {"n":2}',
+            'Ai.episode_declined_reason {"n":1,"reason":"Ai.decline_reason_too_many_changes"}',
+            'Ai.episode_reverted_no'
+        ]);
+        expect(wrapper.find('[data-test="waiting"]').exists()).toBe(false);
+
+        const free = await mountDetail({ payload: { run: { ...run, episode: { ...episode, declinedReason: 'sprint already locked', reverted: true } }, audit: [] } });
+        expect(free.find('[data-test="episode-reverted"]').text()).toBe('Ai.episode_reverted_yes');
+        expect(free.find('[data-test="episode-declined"]').text()).toBe('Ai.episode_declined_reason {"n":1,"reason":"sprint already locked"}');
+
+        const quiet = await mountDetail({ payload: { run: { ...run, episode: { ...episode, declined: 0, declinedReason: '' } }, audit: [] } });
+        expect(quiet.find('[data-test="episode-declined"]').text()).toBe('Ai.episode_declined {"n":0}');
+
+        const none = await mountDetail();
+        expect(none.find('[data-test="episode"]').exists()).toBe(false);
+    });
+
+    it('says the run ended before review instead of an all-zero outcome for failed, skipped and stopped runs', async () => {
+        const zero = { proposed: 0, acted: 0, approved: 0, declined: 0, reverted: false, declinedReason: '' };
+        for (const status of ['failed', 'skipped', 'stopped']) {
+            // eslint-disable-next-line no-await-in-loop
+            const wrapper = await mountDetail({ payload: { run: { ...run, status, episode: zero }, audit: [] } });
+            expect(wrapper.find('[data-test="episode"]').exists()).toBe(false);
+            expect(wrapper.find('[data-test="episode-not-reached"]').text()).toBe('Ai.episode_not_reached');
+        }
+
+        const done = await mountDetail({ payload: { run: { ...run, episode: zero }, audit: [] } });
+        expect(done.find('[data-test="episode"]').exists()).toBe(true);
+        expect(done.find('[data-test="episode-not-reached"]').exists()).toBe(false);
+    });
+
+    it('says the run continues when a person decides while it waits for approval', async () => {
+        const wrapper = await mountDetail({ payload: { run: { ...run, status: 'waiting_approval', windowEndsAt: undefined }, audit: [] } });
+        expect(wrapper.find('[data-test="waiting"]').text()).toBe('Ai.episode_waiting');
+        expect(wrapper.find('[data-test="episode"]').exists()).toBe(false);
     });
 
     it('puts the server refusal in the toast when the window has closed', async () => {

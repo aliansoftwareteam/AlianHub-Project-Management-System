@@ -830,6 +830,10 @@ const schema = {
         notifyMe: { type: Boolean, default: false, required: false },
         outcome: { type: String, required: false },
         error: { type: String, required: false },
+        // { skill, taskId, taskTitle, proposed, acted, approved, declined, declinedReason, reverted, spendUsd, at }
+        episode: { type: Object, required: false },
+        // LangGraph thread the run executes on (the run id); resumed by approve/decline
+        threadId: { type: String, required: false },
     },
     agentProposals: {
         agentId: { type: String, required: true },
@@ -850,6 +854,8 @@ const schema = {
         undoUntil: { type: Date, required: false },
         auditIds: { type: Array, default: [], required: false },
         cost: { type: Object, required: false },
+        // a canned Inbox key (too_many_changes | wrong_tone | needs_person | not_now) or free text, ≤ 200 chars
+        declineReason: { type: String, required: false },
     },
     automationRuns: {
         ruleId: { type: String, required: true },

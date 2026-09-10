@@ -10,7 +10,7 @@ Backend variables: 130. Frontend build-time variables: 24.
 |---|---|---|---|---|
 | `APIURL` | yes |  | Public base URL of this API, with a trailing slash (used in emails, OAuth callbacks and share links). | `Config/config.js`, `Modules/ApiTokens/controller.js` +6 |
 | `APP_NAME` |  | `Alian Hub` | Product name shown in emails and page titles. | `Config/config.js`, `Modules/Template/forgotPassword.js` +5 |
-| `NODE_ENV` |  | `development` | development \| production | `Config/config.js`, `Modules/Auth/controller/loginSession.js` +2 |
+| `NODE_ENV` |  | `development` | development \| production | `Config/config.js`, `Modules/Agents/engine/persistence.js` +3 |
 | `PORT` | yes | `4000` | TCP port the HTTP server listens on. | `Config/config.js` |
 | `TRUST_PROXY` |  | `loopback` | Express trust proxy setting; loopback by default so X-Forwarded-For is honoured behind a local reverse proxy. | `index.js` |
 | `UNDER_MAINTENANCE` |  | `false` | true \| false | `Config/config.js` |
@@ -225,7 +225,7 @@ Backend variables: 130. Frontend build-time variables: 24.
 | `ERRORRECIVEREMAIL` |  | `admin@yourdomain.com` | Email to receive error alerts | `Config/config.js` |
 | `HEALTH_DB_TIMEOUT_MS` |  |  | How long /health waits for the database ping before reporting it down (default 2000). | `Modules/Instance/health.js` |
 | `MIGRATIONS_AUTO` |  |  | Apply pending migrations at boot (default true; false only reports them). | `Modules/Instance/controller.js` |
-| `MONGODB_URL` | yes |  | mongo connection string (no trailing slash) | `Config/config.js`, `Modules/Automations/engine/queue/agendaDriver.js` +5 |
+| `MONGODB_URL` | yes |  | mongo connection string (no trailing slash) | `Config/config.js`, `Modules/Agents/engine/persistence.js` +6 |
 | `NODEMAILER_EMAIL_PASSWORD` (secret) |  |  | Use app password for Gmail | `Config/config.js` |
 | `NODEMAILER_PORT` |  | `587` | 587 (STARTTLS) or 465 (SSL) | `Config/config.js` |
 | `NOOFPRESETCOMPANY` |  | `10` | Number of preset companies seeded at first run. | `Config/config.js` |

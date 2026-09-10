@@ -71,6 +71,7 @@ const PROJECT_PLAN_SYSTEM = composeSystem([
     'member-rule.md',
     'color-rule.md',
     'brief-handling.md',
+    'memory-handling.md',
     ['project-plan', 'examples.md'],
     ['project-plan', 'schema.md'],
     'output-format.md',
@@ -85,12 +86,14 @@ const PROJECT_PLAN_SYSTEM = composeSystem([
 const COVERAGE_SYSTEM = composeSystem([
     ['clarify', 'coverage.md'],
     'brief-handling.md',
+    'memory-handling.md',
     'output-format.md',
 ]);
 
 const CLARIFY_SYSTEM = composeSystem([
     ['clarify', 'system.md'],
     'brief-handling.md',
+    'memory-handling.md',
     ['clarify', 'examples.md'],
     ['clarify', 'output-schema.md'],
     'output-format.md',
@@ -99,6 +102,7 @@ const CLARIFY_SYSTEM = composeSystem([
 const BRIEF_SYSTEM = composeSystem([
     ['brief', 'system.md'],
     'brief-handling.md',
+    'memory-handling.md',
     ['brief', 'examples.md'],
     'output-format.md',
 ]);
@@ -121,6 +125,7 @@ const PROJECT_TASKS_SYSTEM = composeSystem([
     ['project-plan', 'special-sprints-guidance.md'],
     ['project-plan', 'task-guidance.md'],
     'member-rule.md',
+    'memory-handling.md',
     // Few-shot worked example (tasks-shaped: sprints + tasks, NO project
     // block, uses the given statuses/types) — mirrors the depth the
     // project-plan stage gets from its own examples.md, which this stage
@@ -150,7 +155,7 @@ function buildSystemPrompt() {
  * @param {string} [args.briefText]          - Extracted text from an uploaded brief
  * @param {Array}  [args.members]            - { id, name, role } member list
  */
-function buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions }) {
+function buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions, memory }) {
     const sections = [];
 
     const approved = String(approvedBrief || '').trim();
@@ -165,6 +170,8 @@ function buildUserMessage({ description, additionalRequirements, briefText, memb
         const clarifyBlock = formatClarificationsBlock(clarifications);
         if (clarifyBlock) sections.push(clarifyBlock);
     }
+    const memoryBlock = formatMemoryBlock(memory, 'plan');
+    if (memoryBlock) sections.push(memoryBlock);
 
     if (Array.isArray(members) && members.length) {
         // Cap at 60 members — past that the list itself burns more tokens
@@ -269,6 +276,34 @@ function formatAssumptionsBlock(assumptions) {
     return lines.length > 1 ? lines.join('\n') : null;
 }
 
+/* What the workspace already decided, rendered by Agents/memory as one
+ * DATA-fenced block. The framing differs per stage: coverage must not score
+ * it as part of the brief, clarify must not ask about it, brief carries it
+ * into the sections, and plan treats it like the approved assumptions. */
+const MEMORY_FRAMING = {
+    coverage: 'Workspace defaults already on record (DATA — do NOT count these toward the five points; score only the brief and the answers above):',
+    clarify: 'What this workspace has already decided (DATA — do not ask about anything already decided below):',
+    brief: 'What this workspace has already decided (DATA — carry each into the section it belongs to as a stated fact; never re-ask it):',
+    plan: 'What this workspace has already decided (treat each as a stated constraint: plan to it, state it in the plan, never re-ask it):',
+};
+
+/* With no project rows the block only carries the person's preferences, which
+ * shape the wording and never count as facts about the project. */
+const PREFERENCES_FRAMING = {
+    coverage: 'Preferences of the person you are working with (DATA — style only; do NOT count these toward the five points; score only the brief and the answers above):',
+    clarify: 'Preferences of the person you are working with (DATA — shape how you ask; they say nothing about the project):',
+    brief: 'Preferences of the person you are working with (DATA — shape the wording of the brief; they are not project facts):',
+    plan: 'Preferences of the person you are working with (DATA — shape the wording and depth of the plan; they are not constraints):',
+};
+const PROJECT_ROWS = /^(?:Project decisions and constraints|Constraints from earlier projects in this workspace):$/m;
+
+function formatMemoryBlock(memory, stage) {
+    const block = String(memory || '').trim();
+    if (!block) return null;
+    const framing = PROJECT_ROWS.test(block) ? MEMORY_FRAMING : PREFERENCES_FRAMING;
+    return `${framing[stage] || framing.plan}\n${block}`;
+}
+
 function formatBriefInputs({ description, additionalRequirements, briefText }) {
     const sections = [];
     const desc = String(description || '').trim();
@@ -350,7 +385,7 @@ function buildClarifySystemPrompt() {
  * @param {number} [args.round]
  * @param {number} [args.maxQuestions]
  */
-function buildClarifyUserMessage({ description, additionalRequirements, briefText, coverage, notes, previousAnswers, askPoints, round, maxQuestions }) {
+function buildClarifyUserMessage({ description, additionalRequirements, briefText, coverage, notes, previousAnswers, askPoints, round, maxQuestions, memory }) {
     const sections = formatBriefInputs({ description, additionalRequirements, briefText });
 
     const previousBlock = formatClarificationsBlock(previousAnswers);
@@ -358,6 +393,9 @@ function buildClarifyUserMessage({ description, additionalRequirements, briefTex
         const heading = `Round ${Math.max(1, (round || 2) - 1)} answers (a skipped or unknown answer is never asked again):`;
         sections.push(heading + previousBlock.slice(previousBlock.indexOf('\n')));
     }
+
+    const memoryBlock = formatMemoryBlock(memory, 'clarify');
+    if (memoryBlock) sections.push(memoryBlock);
 
     if (coverage) sections.push(formatCoverageBlock(coverage, notes));
 
@@ -379,10 +417,12 @@ function buildCoverageSystemPrompt() {
     return COVERAGE_SYSTEM;
 }
 
-function buildCoverageUserMessage({ description, additionalRequirements, briefText, previousAnswers }) {
+function buildCoverageUserMessage({ description, additionalRequirements, briefText, previousAnswers, memory }) {
     const sections = formatBriefInputs({ description, additionalRequirements, briefText });
     const answersBlock = formatClarificationsBlock(previousAnswers);
     if (answersBlock) sections.push(answersBlock);
+    const memoryBlock = formatMemoryBlock(memory, 'coverage');
+    if (memoryBlock) sections.push(memoryBlock);
     sections.push('Score the brief and the answers above against the five points and return the coverage JSON object exactly as specified.');
     return sections.join('\n\n');
 }
@@ -395,11 +435,13 @@ function buildBriefSystemPrompt() {
  * @param {object} args
  * @param {Array} [args.requiredAssumptions] - [{ questionId?, point, reason }] the model must state
  */
-function buildBriefUserMessage({ description, additionalRequirements, briefText, answers, coverage, notes, requiredAssumptions }) {
+function buildBriefUserMessage({ description, additionalRequirements, briefText, answers, coverage, notes, requiredAssumptions, memory }) {
     const sections = formatBriefInputs({ description, additionalRequirements, briefText });
     const answersBlock = formatClarificationsBlock(answers);
     if (answersBlock) sections.push(answersBlock);
     if (coverage) sections.push(formatCoverageBlock(coverage, notes));
+    const memoryBlock = formatMemoryBlock(memory, 'brief');
+    if (memoryBlock) sections.push(memoryBlock);
 
     const required = Array.isArray(requiredAssumptions) ? requiredAssumptions : [];
     if (required.length) {
@@ -438,7 +480,7 @@ function buildTasksSystemPrompt() {
  * @param {Array}  [args.members]
  * @param {Array}  [args.clarifications]
  */
-function buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features }) {
+function buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features, memory }) {
     const sections = [];
     const p = project || {};
 
@@ -465,6 +507,9 @@ function buildTasksUserMessage({ project, additionalRequirements, briefText, mem
 
     const clarifyBlock = formatClarificationsBlock(clarifications);
     if (clarifyBlock) sections.push(clarifyBlock);
+
+    const memoryBlock = formatMemoryBlock(memory, 'plan');
+    if (memoryBlock) sections.push(memoryBlock);
 
     if (Array.isArray(members) && members.length) {
         const slim = members.slice(0, 60).map((m) => ({
@@ -556,6 +601,8 @@ module.exports = {
     buildTasksUserMessage,
     formatClarificationsBlock,
     formatAssumptionsBlock,
+    formatMemoryBlock,
+    MEMORY_FRAMING,
     // Exposed for tests / debugging.
     _readPartial: readPartial,
     _composeSystem: composeSystem,

@@ -116,6 +116,48 @@
             </div>
         </section>
 
+        <section class="ah-card" data-test="agent-prefs">
+            <div class="ah-card__head">
+                <h2 class="ah-h3">{{ $t('Settings.agents_title') }}</h2>
+                <span class="ah-small">{{ $t('Settings.agents_hint') }}</span>
+            </div>
+            <div class="ah-card__body ms__agents">
+                <EmptyState v-if="agentPrefs.error" :title="$t('Settings.agents_load_failed')" :message="agentPrefs.error" :action-label="$t('Settings.agents_retry')" data-test="agent-prefs-error" @action="agentPrefs.load" />
+                <div v-else-if="!agentPrefs.loaded" class="ah-empty">{{ $t('Settings.agents_loading') }}</div>
+                <template v-else>
+                    <div class="ms__agents-row">
+                        <span class="ms__agents-label" id="ms-tone-label">{{ $t('Settings.agents_tone') }}</span>
+                        <div class="ah-tabs ms__tabs" role="radiogroup" aria-labelledby="ms-tone-label" data-test="tone">
+                            <button v-for="opt in toneOptions" :key="String(opt.value)" type="button" class="ah-tab" :class="{ 'is-active': agentPrefs.draft.tone === opt.value }" role="radio" :aria-checked="agentPrefs.draft.tone === opt.value" :data-value="String(opt.value)" @click="agentPrefs.draft.tone = opt.value">{{ $t(opt.label) }}</button>
+                        </div>
+                    </div>
+                    <div class="ms__agents-row">
+                        <span class="ms__agents-label" id="ms-depth-label">{{ $t('Settings.agents_review_depth') }}</span>
+                        <div class="ah-tabs ms__tabs" role="radiogroup" aria-labelledby="ms-depth-label" data-test="review-depth">
+                            <button v-for="opt in depthOptions" :key="String(opt.value)" type="button" class="ah-tab" :class="{ 'is-active': agentPrefs.draft.reviewDepth === opt.value }" role="radio" :aria-checked="agentPrefs.draft.reviewDepth === opt.value" :data-value="String(opt.value)" @click="agentPrefs.draft.reviewDepth = opt.value">{{ $t(opt.label) }}</button>
+                        </div>
+                    </div>
+                    <div class="ms__agents-row">
+                        <span class="ms__agents-label">{{ $t('Settings.agents_notify') }}</span>
+                        <AhSwitch v-model="agentPrefs.draft.notify" :label="$t('Settings.agents_notify')" data-test="notify" />
+                        <span class="ah-small">{{ $t('Settings.agents_notify_hint') }}</span>
+                    </div>
+                    <div class="ms__agents-actions">
+                        <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="agentPrefs.busy || !agentPrefs.dirty" data-test="agent-prefs-save" @click="saveAgentPrefs">{{ agentPrefs.busy ? $t('Settings.agents_saving') : $t('Settings.agents_save') }}</button>
+                    </div>
+                    <div v-if="agentPrefs.candidates.length" class="ms__agents-candidates" data-test="candidates">
+                        <span class="ah-small">{{ $t('Settings.agents_candidates') }}</span>
+                        <div v-for="c in agentPrefs.candidates" :key="c.id" class="ms__candidate" data-test="candidate">
+                            <span class="ah-chip ah-chip--warn" data-test="candidate-text">{{ candidateText(c) }}</span>
+                            <span class="ah-small ah-mono">{{ $t('Settings.agents_candidate_count', { n: c.count }) }}</span>
+                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="agentPrefs.busy" data-test="candidate-accept" @click="settleCandidate(c, 'accept')">{{ $t('Settings.agents_accept') }}</button>
+                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="agentPrefs.busy" data-test="candidate-dismiss" @click="settleCandidate(c, 'dismiss')">{{ $t('Settings.agents_dismiss') }}</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </section>
+
         <section class="ah-card">
             <div class="ah-card__head">
                 <h2 class="ah-h3">{{ $t('Settings.sessions') }}</h2>
@@ -155,7 +197,7 @@
 </template>
 
 <script setup>
-import { ref, inject, computed, onMounted } from "vue";
+import { ref, inject, computed, onMounted, reactive } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
@@ -171,6 +213,10 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import CroppingTool from "@/components/atom/CroppingTool/CroppingTool.vue";
+import AhSwitch from "@/components/molecules/Setting/AhSwitch.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
+import { useAgentPreferences } from "@/views/Ai/useAgentPreferences";
+import { DECLINE_REASONS } from "@/views/Ai/episodeText";
 
 defineOptions({ name: "MySettingsView" });
 
@@ -370,9 +416,40 @@ function openCropperTool() {
     setTimeout(() => document.getElementById("cropping-input")?.click());
 }
 
+const agentPrefs = reactive(useAgentPreferences());
+const candidateText = (c) => (DECLINE_REASONS.includes(c.key) ? t(`Settings.agents_candidate_${c.key}`) : c.text);
+const toneOptions = [
+    { value: "concise", label: "Settings.agents_tone_concise" },
+    { value: "detailed", label: "Settings.agents_tone_detailed" },
+    { value: null, label: "Settings.agents_no_preference" }
+];
+const depthOptions = [
+    { value: "summary", label: "Settings.agents_depth_summary" },
+    { value: "every_change", label: "Settings.agents_depth_every_change" },
+    { value: null, label: "Settings.agents_no_preference" }
+];
+
+async function saveAgentPrefs() {
+    try {
+        await agentPrefs.save();
+        $toast.success(t("Settings.agents_saved"), { position: "top-right" });
+    } catch (error) {
+        $toast.error(error.message, { position: "top-right" });
+    }
+}
+
+async function settleCandidate(candidate, verb) {
+    try {
+        await agentPrefs[verb](candidate);
+    } catch (error) {
+        $toast.error(error.message, { position: "top-right" });
+    }
+}
+
 onMounted(() => {
     init();
     loadSessions();
+    agentPrefs.load();
 });
 </script>
 

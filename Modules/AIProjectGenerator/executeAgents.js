@@ -8,6 +8,7 @@ const logger = require('../../Config/loggerConfig');
 const planRules = require('./planRules');
 const { attachSplit, loadLiveAgents } = require('./planSplit');
 const { normaliseGuide } = require('./guideController');
+const memory = require('../Agents/memory');
 
 const EDITORJS_VERSION = '2.30.7';
 const SPRINT_DUE_WEEKDAY_OFFSET = 4;
@@ -161,7 +162,7 @@ const queueRuns = async ({ companyId, uid, projectId, pairs, agents }) => {
 
 /* Everything after the tasks exist. Never throws: the project is already
  * created, and a failure here must not roll it back. */
-const start = async ({ companyId, uid, projectId, projectName, pairs, agents, withGuide }) => {
+const start = async ({ companyId, uid, projectId, projectName, pairs, agents, withGuide, approvedBrief, assumptions }) => {
     const out = { guideAgentId: null, runsQueued: 0, runsRefused: [] };
     if (withGuide) {
         try {
@@ -169,6 +170,10 @@ const start = async ({ companyId, uid, projectId, projectName, pairs, agents, wi
             out.guideAgentId = String(agent._id);
         } catch (e) { logger.error(`[AIPG] guide agent not created: ${e && e.message ? e.message : e}`); }
     }
+    try {
+        const rows = await memory.fromBrief({ companyId, projectId, projectName, approvedBrief, assumptions });
+        if (rows.length) logger.info(`[AIPG] remembered ${rows.length} row(s) from the brief for project ${projectId}`);
+    } catch (e) { logger.error(`[AIPG] brief not remembered: ${e && e.message ? e.message : e}`); }
     try {
         Object.assign(out, await queueRuns({ companyId, uid, projectId, pairs, agents }));
     } catch (e) { logger.error(`[AIPG] agent runs not queued: ${e && e.message ? e.message : e}`); }

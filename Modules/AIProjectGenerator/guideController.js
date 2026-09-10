@@ -8,6 +8,8 @@ const { getProvider, isAnyProviderConfigured } = require('./llmProvider');
 const { tryParseJson } = require('./schemaValidator');
 const { _readPartial: readPartial } = require('./promptBuilder');
 const { usageFromResult, summarize } = require('./usage');
+const memoryStore = require('../Agents/memory');
+const { resolveProjectId } = require('./projectAccess');
 
 const MIN_BRIEF_CHARS = 20;
 const MAX_STAGES = 8;
@@ -61,22 +63,24 @@ const planOutline = (plan) => {
     }).join('\n');
 };
 
-const buildGuideUserMessage = ({ approvedBrief, assumptions, plan }) => [
+const buildGuideUserMessage = ({ approvedBrief, assumptions, plan, memory }) => [
     '## Approved brief',
     clip(approvedBrief, 12000),
     '',
     '## Assumptions the plan was built on',
     ...(assumptionLines(assumptions).length ? assumptionLines(assumptions) : ['- none']),
     '',
+    ...(String(memory || '').trim() ? ['## What this workspace has decided before', String(memory).trim(), ''] : []),
     '## Plan outline',
     planOutline(plan) || '(no plan yet)',
 ].join('\n');
 
-const generateGuide = async ({ approvedBrief, assumptions, plan }) => {
+const generateGuide = async ({ approvedBrief, assumptions, plan, companyId, userId, projectId }) => {
     const provider = getProvider();
+    const memory = await memoryStore.contextFor({ companyId, userId, projectId });
     const result = await provider.chat({
         systemPrompt: readPartial('guide', 'system.md'),
-        messages: [{ role: 'user', content: buildGuideUserMessage({ approvedBrief, assumptions, plan }) }],
+        messages: [{ role: 'user', content: buildGuideUserMessage({ approvedBrief, assumptions, plan, memory }) }],
         jsonMode: true,
         maxTokens: MAX_TOKENS,
         temperature: 0.3,
@@ -92,12 +96,14 @@ const sendError = (res, status, message) => res.status(status).send({ status: fa
 exports.guide = async (req, res) => {
     try {
         if (!req.uid) return sendError(res, 401, 'Unauthorized');
-        tenantOf(req);
+        const companyId = tenantOf(req);
         const body = req.body || {};
         const approvedBrief = clip(body.approvedBrief, 20000);
         if (approvedBrief.length < MIN_BRIEF_CHARS) return sendError(res, 400, `approvedBrief must be at least ${MIN_BRIEF_CHARS} characters`);
         if (!isAnyProviderConfigured()) return sendError(res, 503, 'No LLM provider is configured');
-        const out = await generateGuide({ approvedBrief, assumptions: body.assumptions, plan: body.plan });
+        const project = await resolveProjectId({ companyId, uid: req.uid, projectId: body.projectId });
+        if (project.hidden) return sendError(res, 404, 'Project not found');
+        const out = await generateGuide({ approvedBrief, assumptions: body.assumptions, plan: body.plan, companyId, userId: String(req.uid), projectId: project.projectId });
         return res.send({ status: true, data: { guide: out.guide }, usage: out.usage, model: out.model, provider: out.provider });
     } catch (error) {
         if (error instanceof TenantError) return sendError(res, error.statusCode, error.message);

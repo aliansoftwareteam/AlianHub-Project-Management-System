@@ -84,12 +84,25 @@
 
                     <div v-if="error" class="ah-field__error" style="margin-top:12px">{{ error }}</div>
 
-                    <div v-if="selected.status === 'pending' && canDecide" class="ai-actions">
+                    <div v-if="selected.status === 'pending' && canDecide && !declining" class="ai-actions">
                         <button type="button" class="ah-btn ah-btn--primary" :disabled="busy || !editable.length" @click="onApprove">{{ $t('Ai.approve') }}</button>
                         <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="editing = !editing">
                             {{ editing ? $t('Ai.done_editing') : $t('Ai.edit_then_approve') }}
                         </button>
-                        <button type="button" class="ah-btn ah-btn--ghost" :disabled="busy" @click="onDecline">{{ $t('Ai.decline') }}</button>
+                        <button type="button" class="ah-btn ah-btn--ghost" :disabled="busy" data-test="decline" @click="openDecline">{{ $t('Ai.decline') }}</button>
+                    </div>
+                    <div v-else-if="selected.status === 'pending' && canDecide" class="ai-decline" data-test="decline-reason">
+                        <div class="ah-label">{{ $t('Ai.decline_reason_title') }}</div>
+                        <p class="ah-small ai-decline__lead">{{ $t('Ai.decline_reason_lead') }}</p>
+                        <div class="ai-decline__chips" role="group" :aria-label="$t('Ai.decline_reason_title')">
+                            <button v-for="key in DECLINE_REASONS" :key="key" type="button" class="ah-chip ai-decline__chip" :class="{ 'is-on': declineReason === key }" :aria-pressed="declineReason === key" :data-reason="key" @click="pickReason(key)">{{ $t(`Ai.decline_reason_${key}`) }}</button>
+                        </div>
+                        <input v-model.trim="declineNote" type="text" class="ah-input ai-decline__note" maxlength="200" :placeholder="$t('Ai.decline_reason_placeholder')" :aria-label="$t('Ai.decline_reason_other')" data-test="decline-note" @input="declineReason = ''" />
+                        <div class="ai-actions ai-decline__actions">
+                            <button type="button" class="ah-btn ah-btn--primary" :disabled="busy || !declineReasonValue" data-test="decline-send" @click="onDecline(declineReasonValue)">{{ $t('Ai.decline') }}</button>
+                            <button type="button" class="ah-btn ah-btn--ghost" :disabled="busy" data-test="decline-cancel" @click="declining = false">{{ $t('Ai.cancel') }}</button>
+                            <button type="button" class="ai-decline__skip" :disabled="busy" data-test="decline-skip" @click="onDecline('')">{{ $t('Ai.decline_no_reason') }}</button>
+                        </div>
                     </div>
                     <p v-else-if="selected.status !== 'pending'" class="ah-small" style="margin-top:14px">{{ decidedLine }}</p>
 
@@ -110,6 +123,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import { useAgents, reasonOf } from "./useAgents";
+import { DECLINE_REASONS } from "./episodeText";
 
 defineOptions({ name: "AiInboxPage" });
 
@@ -129,6 +143,15 @@ const editable = ref([]);
 const busy = ref(false);
 const error = ref("");
 const undo = ref(null);
+const declining = ref(false);
+const declineReason = ref("");
+const declineNote = ref("");
+
+const pickReason = (key) => {
+    declineReason.value = declineReason.value === key ? "" : key;
+    declineNote.value = "";
+};
+const declineReasonValue = computed(() => declineReason.value || declineNote.value.slice(0, 200));
 
 const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
 const canDecide = computed(() => !selected.value || selected.value.gate !== GATE_OWNER_ADMIN || privileged.value);
@@ -165,6 +188,7 @@ const shortTime = (at) => {
 
 watch(selected, (p) => {
     editing.value = false;
+    declining.value = false;
     error.value = "";
     editable.value = p ? (p.changes || []).map((c) => ({ ...c })) : [];
 });
@@ -214,11 +238,19 @@ const onApprove = async () => {
     }
 };
 
-const onDecline = async () => {
+const openDecline = () => {
+    declineReason.value = "";
+    declineNote.value = "";
+    error.value = "";
+    declining.value = true;
+};
+
+const onDecline = async (reason = "") => {
     busy.value = true;
     error.value = "";
     try {
-        await decide(selected.value._id, "decline", {});
+        await decide(selected.value._id, "decline", reason ? { reason } : {});
+        declining.value = false;
         await afterDecision(t("Ai.declined_done"));
     } catch (e) {
         error.value = e.message;
@@ -247,4 +279,12 @@ onMounted(reload);
 @import "./style.css";
 .ai-back { display: none; }
 @media (max-width: 900px) { .ai-back { display: inline-flex; margin-bottom: 10px; } }
+.ai-decline { margin-top: 18px; padding: 12px 14px; border: 1px solid var(--hairline); border-radius: 9px; background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
+.ai-decline__lead { margin: 0; }
+.ai-decline__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-decline__chip { border: 1px solid transparent; cursor: pointer; }
+.ai-decline__chip.is-on { background: var(--brand-tint); color: var(--brand); border-color: var(--brand); }
+.ai-decline__note { max-width: 420px; height: 32px; }
+.ai-decline__actions { margin-top: 4px; align-items: center; }
+.ai-decline__skip { border: 0; background: transparent; color: var(--ink-2); font: var(--text-small); cursor: pointer; text-decoration: underline; padding: 0 4px; }
 </style>

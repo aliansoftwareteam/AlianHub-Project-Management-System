@@ -190,6 +190,7 @@ agentRunsSchema.index({ agentId: 1, startedAt: -1 });
 agentRunsSchema.index({ status: 1, startedAt: -1 });
 agentRunsSchema.index({ taskId: 1, startedAt: -1 });
 agentRunsSchema.index({ projectId: 1, status: 1 });
+agentRunsSchema.index({ projectId: 1, finishedAt: -1 });
 agentRunsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 15552000 });
 
 const agentProposalsSchema = new Schema(schema.agentProposals, {strict: true, timestamps: true});

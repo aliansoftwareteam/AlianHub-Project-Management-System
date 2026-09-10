@@ -1,4 +1,5 @@
 const ctrl = require('./controller');
+const memoryCtrl = require('./memoryController');
 const { agentPerimeter } = require('./guard');
 
 exports.init = (app) => {
@@ -18,6 +19,12 @@ exports.init = (app) => {
     app.get('/api/v2/agents/settings', ctrl.getSettings);
     app.put('/api/v2/agents/settings', ctrl.putSettings);
     app.get('/api/v2/agents/budget', ctrl.getBudget);
+
+    app.get('/api/v2/agents/memory/project/:projectId', memoryCtrl.getProjectMemory);
+    app.post('/api/v2/agents/memory/project/:projectId', memoryCtrl.addProjectMemory);
+    app.put('/api/v2/agents/memory/:id', memoryCtrl.updateMemory);
+    app.get('/api/v2/agents/preferences', memoryCtrl.getPreferences);
+    app.put('/api/v2/agents/preferences', memoryCtrl.putPreferences);
 
     app.get('/api/v2/agents/runs/summary', ctrl.runSummary);
     app.get('/api/v2/agents/runs', ctrl.listRuns);

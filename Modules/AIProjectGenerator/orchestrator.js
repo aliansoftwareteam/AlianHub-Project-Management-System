@@ -1131,7 +1131,7 @@ async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrie
 
         // 12. Guide agent and the runs for agent-labelled tasks (task 015).
         const agentWork = await executeAgents.start({
-            companyId, uid, projectId: tracker.project, projectName: projectDoc.ProjectName, pairs: taskPairs, agents, withGuide,
+            companyId, uid, projectId: tracker.project, projectName: projectDoc.ProjectName, pairs: taskPairs, agents, withGuide, approvedBrief, assumptions,
         });
 
         const totals = { sprints: tracker.sprints.length, tasks: tracker.tasks.length };

@@ -14,6 +14,8 @@
 'use strict';
 
 const logger = require('../../Config/loggerConfig');
+const memoryStore = require('../Agents/memory');
+const { detectIgnoredInstructions } = require('./instructionGuard');
 const { getProvider } = require('./llmProvider');
 const { usageFromResult, addUsage, summarize } = require('./usage');
 const { COVERAGE_POINTS, CoverageSchema, ClarifyQuestionsSchema, BriefDraftSchema, tryParseJson } = require('./schemaValidator');
@@ -42,19 +44,6 @@ const COVERAGE_MAX_TOKENS = 1200;
 // answer.
 const CLARIFY_MAX_TOKENS = 6000;
 const BRIEF_MAX_TOKENS = 4000;
-
-// Phrases that read as instructions to the model rather than facts about the
-// project. Deliberately short and generic: the prompt does the real work,
-// this only guarantees the user always sees a note when one slipped in.
-const INSTRUCTION_PATTERNS = [
-    /ignore (?:all |any |the |every )?(?:previous|prior|above|earlier|preceding) (?:instructions?|rules?|prompts?|guidance)/i,
-    /disregard (?:all |any |the |every )?(?:previous|prior|above|earlier|preceding) (?:instructions?|rules?|prompts?)/i,
-    /(?:do not|don't|never) follow (?:the |your |any )?(?:rules|instructions|system prompt)/i,
-    /\bsystem prompt\b/i,
-    /\byou are now\b/i,
-    /\bfrom now on,? (?:you|act|respond|answer)\b/i,
-    /reveal (?:your|the) (?:instructions|prompt|rules)/i,
-];
 
 async function callJson({ label, systemPrompt, userMessage, schema, check, maxTokens, temperature, truncatedMessage }) {
     const provider = getProvider();
@@ -138,11 +127,12 @@ async function callJson({ label, systemPrompt, userMessage, schema, check, maxTo
  *
  * @returns {Promise<{ coverage: object, notes: object, usage: object, model: string, provider: string }>}
  */
-async function scoreCoverage({ description, additionalRequirements, briefText, previousAnswers }) {
+async function scoreCoverage({ description, additionalRequirements, briefText, previousAnswers, companyId, userId, projectId, memory }) {
+    const block = memory !== undefined ? memory : await memoryStore.contextFor({ companyId, userId, projectId });
     const result = await callJson({
         label: 'coverage',
         systemPrompt: buildCoverageSystemPrompt(),
-        userMessage: buildCoverageUserMessage({ description, additionalRequirements, briefText, previousAnswers }),
+        userMessage: buildCoverageUserMessage({ description, additionalRequirements, briefText, previousAnswers, memory: block }),
         schema: CoverageSchema,
         maxTokens: COVERAGE_MAX_TOKENS,
         temperature: 0.0,
@@ -151,6 +141,7 @@ async function scoreCoverage({ description, additionalRequirements, briefText, p
     return {
         coverage: result.value.coverage,
         notes: result.value.notes || {},
+        memory: block,
         usage: result.usage,
         model: result.model,
         provider: result.provider,
@@ -196,8 +187,9 @@ function planRound({ coverage, previousAnswers, round }) {
  * @param {Array}  [args.previousAnswers] - [{ id, point, question, answer, skipped, unknown }]
  * @param {number} [args.round]
  */
-async function generateClarifyingQuestions({ description, additionalRequirements, briefText, previousAnswers, round }) {
-    const scored = await scoreCoverage({ description, additionalRequirements, briefText, previousAnswers });
+async function generateClarifyingQuestions({ description, additionalRequirements, briefText, previousAnswers, round, companyId, userId, projectId }) {
+    const memory = await memoryStore.contextFor({ companyId, userId, projectId });
+    const scored = await scoreCoverage({ description, additionalRequirements, briefText, previousAnswers, memory });
     const plan = planRound({ coverage: scored.coverage, previousAnswers, round });
     const base = {
         coverage: scored.coverage,
@@ -225,6 +217,7 @@ async function generateClarifyingQuestions({ description, additionalRequirements
             askPoints: plan.askPoints,
             round: plan.round,
             maxQuestions: plan.maxQuestions,
+            memory,
         }),
         schema: ClarifyQuestionsSchema,
         maxTokens: CLARIFY_MAX_TOKENS,
@@ -252,35 +245,6 @@ async function generateClarifyingQuestions({ description, additionalRequirements
         usage: summarize(addUsage(scored.usage, asked.usage), modelId),
         model: modelId,
     };
-}
-
-function excerpt(text, pattern) {
-    const match = pattern.exec(String(text || ''));
-    if (!match) return null;
-    const start = Math.max(0, match.index - 20);
-    return String(text).slice(start, match.index + match[0].length + 40).replace(/\s+/g, ' ').trim();
-}
-
-/**
- * Instruction-shaped text in the brief that the model was told to ignore.
- * Returned as assumption lines so the user sees it whatever the model did.
- */
-function detectIgnoredInstructions(...texts) {
-    const found = [];
-    for (const text of texts) {
-        if (!text) continue;
-        for (const pattern of INSTRUCTION_PATTERNS) {
-            const hit = excerpt(text, pattern);
-            if (hit) {
-                found.push(hit);
-                break;
-            }
-        }
-    }
-    return found.map((hit) => ({
-        point: 'other',
-        text: `The brief contained an instruction addressed to the AI ("${hit.slice(0, 80)}"); it was ignored.`,
-    }));
 }
 
 function requiredAssumptionsFor({ answers, coverage, notes }) {
@@ -353,8 +317,9 @@ function renderBriefMarkdown(sections, assumptions) {
  * Rewrite description + upload + answers into the five sections plus one
  * assumption per skipped/unknown answer and per point still missing.
  */
-async function draftBrief({ description, additionalRequirements, briefText, answers }) {
-    const scored = await scoreCoverage({ description, additionalRequirements, briefText, previousAnswers: answers });
+async function draftBrief({ description, additionalRequirements, briefText, answers, companyId, userId, projectId }) {
+    const memory = await memoryStore.contextFor({ companyId, userId, projectId });
+    const scored = await scoreCoverage({ description, additionalRequirements, briefText, previousAnswers: answers, memory });
     const required = requiredAssumptionsFor({ answers, coverage: scored.coverage, notes: scored.notes });
 
     const drafted = await callJson({
@@ -368,6 +333,7 @@ async function draftBrief({ description, additionalRequirements, briefText, answ
             coverage: scored.coverage,
             notes: scored.notes,
             requiredAssumptions: required,
+            memory,
         }),
         schema: BriefDraftSchema,
         check: (value) => {

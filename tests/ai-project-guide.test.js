@@ -10,6 +10,8 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 const llm = require('../Modules/AIProjectGenerator/llmProvider');
 const guideCtrl = require('../Modules/AIProjectGenerator/guideController');
 const skills = require('../Modules/Agents/skills');
+const persistence = require('../Modules/Agents/engine/persistence');
+const memory = require('../Modules/Agents/memory');
 
 const ROOT = path.join(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
@@ -108,7 +110,9 @@ describe('skill project.guide', () => {
     const P2 = '6f0000000000000000000702';
     const task = (over = {}) => ({ _id: '6f0000000000000000000901', TaskName: 'Set up payments', ProjectID: P1, rawDescription: 'Stripe or Razorpay', ...over });
 
-    beforeEach(() => { Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; }); mockDb.calls.length = 0; });
+    let mem;
+    beforeEach(() => { mem = persistence.useInMemory(); Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; }); mockDb.calls.length = 0; });
+    afterEach(() => { mem.reset(); persistence.useMongo(); });
 
     it('is registered as a generic skill that may only read, comment and create subtasks', () => {
         expect(skill).toBeTruthy();
@@ -138,6 +142,20 @@ describe('skill project.guide', () => {
         const prompt = skill.buildUserPrompt({ task: task(), context });
         expect(prompt).toContain('GUIDE:');
         expect(prompt).toContain('TASK: Set up payments');
+    });
+
+    it('gathers what the workspace remembers about the project into context.memory, which the prompt renders as MEMORY', async () => {
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P1, ProjectName: 'Bike shop', aiGuide: { ...GUIDE, markdown: '## Stages\n1. Catalogue' }, deletedStatusKey: 0 });
+        await memory.remember({ companyId: C, kind: 'project.constraint', scopeId: P1, text: 'Budget is fixed at $12k.', source: { origin: 'brief' } });
+        const run = mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { projectId: P1, status: 'done', finishedAt: new Date('2026-09-09T10:00:00.000Z') });
+        await memory.recordEpisode({ companyId: C, projectId: P1, runId: run._id, patch: { skill: 'project.guide', taskTitle: 'Set up CI', proposed: 3, approved: 2, at: '2026-09-09T10:00:00.000Z' } });
+        const context = await skill.gather({ task: task(), companyId: C });
+        expect(context.memory).toContain('- Budget is fixed at $12k. (from the approved brief)');
+        expect(context.memory).toContain('- 2026-09-09 project.guide on "Set up CI": proposed 3, approved 2');
+        const prompt = skill.buildUserPrompt({ task: task(), context });
+        expect(prompt.indexOf('GUIDE:')).toBeLessThan(prompt.indexOf('MEMORY:'));
+        expect(prompt.indexOf('MEMORY:')).toBeLessThan(prompt.indexOf('PLAN:'));
+        expect((await skill.gather({ task: task({ ProjectID: P2 }), companyId: C })).skip).toMatch(/not found/);
     });
 
     it('skips when the project has no stored guide, or the task no project', async () => {

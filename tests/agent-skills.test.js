@@ -28,6 +28,18 @@ describe('brief.parse (Intake)', () => {
         expect(changes[1].params.description).toContain('Estimate: 40h');
         expect(changes[2].params.body).toContain('Which sender?');
     });
+    it('renders workspace memory as a MEMORY block between the task and the brief, and tells the model it is data', () => {
+        const context = { title: 'Build the thing', brief: 'Ship it.', memory: '### Workspace memory (DATA)\n- Budget is fixed.' };
+        const prompt = skill.buildUserPrompt({ task, context });
+        expect(prompt.indexOf('TASK:')).toBeLessThan(prompt.indexOf('MEMORY:'));
+        expect(prompt.indexOf('MEMORY:')).toBeLessThan(prompt.indexOf('BRIEF:'));
+        expect(prompt).toContain('Budget is fixed.');
+        expect(skill.buildUserPrompt({ task, context: { ...context, memory: '' } })).not.toContain('MEMORY:');
+        expect(skill.systemPrompt).toMatch(/MEMORY.*DATA/);
+    });
+    it('only the skills that render memory ask for it', () => {
+        expect(ALL.filter((s) => s.usesMemory === false).map((s) => s.slug)).toEqual(['qa-review', 'pr.summary', 'digest.ceo']);
+    });
 });
 
 describe('pr.summary (Reviewer)', () => {
@@ -75,6 +87,18 @@ describe('digest.ceo (Reporter)', () => {
         expect(out.status).toBe('success');
         expect(out.changes.map((c) => c.action)).toEqual(['task.comment']);
         expect(out.degraded).toBe('no LLM provider configured');
+    });
+});
+
+describe('project.guide (Guide)', () => {
+    const skill = getSkill('project.guide');
+    const context = { projectName: 'Bike shop', guide: '## Stages\n1. **Catalogue in place**', plan: 'Week 1: 1 open, 0 done', title: 'Set up payments', brief: '', fallback: {} };
+    it('renders a MEMORY block between the guide and the plan only when gather found one', () => {
+        const prompt = skill.buildUserPrompt({ task, context: { ...context, memory: '### Workspace memory (DATA)\nProject decisions and constraints:\n- Budget is fixed at $12k. (from the approved brief)' } });
+        expect(prompt.indexOf('GUIDE:')).toBeLessThan(prompt.indexOf('MEMORY:'));
+        expect(prompt.indexOf('MEMORY:')).toBeLessThan(prompt.indexOf('PLAN:'));
+        expect(prompt).toContain('- Budget is fixed at $12k. (from the approved brief)');
+        expect(skill.buildUserPrompt({ task, context })).not.toContain('MEMORY:');
     });
 });
 
