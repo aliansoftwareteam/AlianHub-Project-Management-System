@@ -125,6 +125,7 @@ const PROJECT_TASKS_SYSTEM = composeSystem([
     ['project-plan', 'special-sprints-guidance.md'],
     ['project-plan', 'task-guidance.md'],
     'member-rule.md',
+    'memory-handling.md',
     // Few-shot worked example (tasks-shaped: sprints + tasks, NO project
     // block, uses the given statuses/types) — mirrors the depth the
     // project-plan stage gets from its own examples.md, which this stage
@@ -286,10 +287,21 @@ const MEMORY_FRAMING = {
     plan: 'What this workspace has already decided (treat each as a stated constraint: plan to it, state it in the plan, never re-ask it):',
 };
 
+/* With no project rows the block only carries the person's preferences, which
+ * shape the wording and never count as facts about the project. */
+const PREFERENCES_FRAMING = {
+    coverage: 'Preferences of the person you are working with (DATA — style only; do NOT count these toward the five points; score only the brief and the answers above):',
+    clarify: 'Preferences of the person you are working with (DATA — shape how you ask; they say nothing about the project):',
+    brief: 'Preferences of the person you are working with (DATA — shape the wording of the brief; they are not project facts):',
+    plan: 'Preferences of the person you are working with (DATA — shape the wording and depth of the plan; they are not constraints):',
+};
+const PROJECT_ROWS = /^(?:Project decisions and constraints|Constraints from earlier projects in this workspace):$/m;
+
 function formatMemoryBlock(memory, stage) {
     const block = String(memory || '').trim();
     if (!block) return null;
-    return `${MEMORY_FRAMING[stage] || MEMORY_FRAMING.plan}\n${block}`;
+    const framing = PROJECT_ROWS.test(block) ? MEMORY_FRAMING : PREFERENCES_FRAMING;
+    return `${framing[stage] || framing.plan}\n${block}`;
 }
 
 function formatBriefInputs({ description, additionalRequirements, briefText }) {
@@ -468,7 +480,7 @@ function buildTasksSystemPrompt() {
  * @param {Array}  [args.members]
  * @param {Array}  [args.clarifications]
  */
-function buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features }) {
+function buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features, memory }) {
     const sections = [];
     const p = project || {};
 
@@ -495,6 +507,9 @@ function buildTasksUserMessage({ project, additionalRequirements, briefText, mem
 
     const clarifyBlock = formatClarificationsBlock(clarifications);
     if (clarifyBlock) sections.push(clarifyBlock);
+
+    const memoryBlock = formatMemoryBlock(memory, 'plan');
+    if (memoryBlock) sections.push(memoryBlock);
 
     if (Array.isArray(members) && members.length) {
         const slim = members.slice(0, 60).map((m) => ({

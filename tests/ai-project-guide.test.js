@@ -147,7 +147,8 @@ describe('skill project.guide', () => {
     it('gathers what the workspace remembers about the project into context.memory, which the prompt renders as MEMORY', async () => {
         mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P1, ProjectName: 'Bike shop', aiGuide: { ...GUIDE, markdown: '## Stages\n1. Catalogue' }, deletedStatusKey: 0 });
         await memory.remember({ companyId: C, kind: 'project.constraint', scopeId: P1, text: 'Budget is fixed at $12k.', source: { origin: 'brief' } });
-        await memory.recordEpisode({ companyId: C, projectId: P1, runId: 'r1', patch: { skill: 'project.guide', taskTitle: 'Set up CI', proposed: 3, approved: 2, at: '2026-09-09T10:00:00.000Z' } });
+        const run = mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { projectId: P1, status: 'done', finishedAt: new Date('2026-09-09T10:00:00.000Z') });
+        await memory.recordEpisode({ companyId: C, projectId: P1, runId: run._id, patch: { skill: 'project.guide', taskTitle: 'Set up CI', proposed: 3, approved: 2, at: '2026-09-09T10:00:00.000Z' } });
         const context = await skill.gather({ task: task(), companyId: C });
         expect(context.memory).toContain('- Budget is fixed at $12k. (from the approved brief)');
         expect(context.memory).toContain('- 2026-09-09 project.guide on "Set up CI": proposed 3, approved 2');

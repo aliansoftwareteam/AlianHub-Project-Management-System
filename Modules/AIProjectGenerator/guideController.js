@@ -9,8 +9,8 @@ const { tryParseJson } = require('./schemaValidator');
 const { _readPartial: readPartial } = require('./promptBuilder');
 const { usageFromResult, summarize } = require('./usage');
 const memoryStore = require('../Agents/memory');
+const { resolveProjectId } = require('./projectAccess');
 
-const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const MIN_BRIEF_CHARS = 20;
 const MAX_STAGES = 8;
 const MIN_STAGES = 2;
@@ -101,8 +101,9 @@ exports.guide = async (req, res) => {
         const approvedBrief = clip(body.approvedBrief, 20000);
         if (approvedBrief.length < MIN_BRIEF_CHARS) return sendError(res, 400, `approvedBrief must be at least ${MIN_BRIEF_CHARS} characters`);
         if (!isAnyProviderConfigured()) return sendError(res, 503, 'No LLM provider is configured');
-        const projectId = OBJECT_ID.test(String(body.projectId || '')) ? String(body.projectId) : null;
-        const out = await generateGuide({ approvedBrief, assumptions: body.assumptions, plan: body.plan, companyId, userId: String(req.uid), projectId });
+        const project = await resolveProjectId({ companyId, uid: req.uid, projectId: body.projectId });
+        if (project.hidden) return sendError(res, 404, 'Project not found');
+        const out = await generateGuide({ approvedBrief, assumptions: body.assumptions, plan: body.plan, companyId, userId: String(req.uid), projectId: project.projectId });
         return res.send({ status: true, data: { guide: out.guide }, usage: out.usage, model: out.model, provider: out.provider });
     } catch (error) {
         if (error instanceof TenantError) return sendError(res, error.statusCode, error.message);

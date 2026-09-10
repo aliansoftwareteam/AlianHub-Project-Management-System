@@ -10,6 +10,8 @@ const memory = require('./memory');
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const ROW_STATUSES = [memory.STATUS.ACTIVE, memory.STATUS.RETIRED];
+const INSTRUCTION_TEXT = 'Memory text must not contain an instruction addressed to the AI.';
+const AGENTS_CANNOT_READ = 'Agents cannot read memory over REST — runs receive it in context.';
 const fail = (res, statusText, code) => res.status(code || 200).send({ status: false, statusText, message: statusText });
 
 /* Company, membership and role for the caller, or the error already sent. */
@@ -37,18 +39,18 @@ const agentActivityOf = async (companyId, uid) => {
     } catch (e) { return true; }
 };
 
-/* The notify preference is the same switch as "agent activity" on the
- * Notifications page, so a change here shows up there too. */
-const mirrorAgentActivity = async (companyId, uid, notify) => {
-    try {
-        await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.NOTIFICATIONS_SETTINGS, data: [{ userId: String(uid) }, { $set: { agentActivity: notify } }] }, 'updateOne');
-        removeCache(`notification:${uid}:${companyId}`);
-    } catch (e) { logger.error(`agent preferences: agentActivity not mirrored for ${uid}: ${e.message}`); }
+/* `notify` is the "agent activity" switch on the Notifications page and lives
+ * only there. The settings document has required sections, so it is created
+ * from the defaults rather than upserted bare. */
+const setAgentActivity = async (companyId, uid, notify) => {
+    const { ensureNotificationDefaults } = require('../notification/defaults');
+    await ensureNotificationDefaults(companyId, uid);
+    await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.NOTIFICATIONS_SETTINGS, data: [{ userId: String(uid) }, { $set: { agentActivity: notify } }] }, 'updateOne');
+    removeCache(`notification:${uid}:${companyId}`);
 };
 
 const preferencesPayload = async (companyId, uid) => {
-    const out = await memory.listUser({ companyId, userId: uid });
-    const notify = out.preferences.notify === null ? await agentActivityOf(companyId, uid) : out.preferences.notify === true;
+    const [out, notify] = await Promise.all([memory.listUser({ companyId, userId: uid }), agentActivityOf(companyId, uid)]);
     return { tone: out.preferences.tone, reviewDepth: out.preferences.reviewDepth, notify, candidates: out.candidates };
 };
 
@@ -57,6 +59,7 @@ exports.getProjectMemory = async (req, res) => {
     try {
         const auth = await authed(req, res);
         if (!auth) return;
+        if (!auth.human) return fail(res, AGENTS_CANNOT_READ, 403);
         const projectId = projectIdOf(req);
         if (!projectId) return fail(res, 'A valid projectId is required.', 400);
         if (!(await canSeeProject(auth.companyId, auth.uid, projectId))) return fail(res, 'Project not found.', 404);
@@ -79,6 +82,7 @@ exports.addProjectMemory = async (req, res) => {
         if (!memory.PROJECT_KINDS.includes(body.kind)) return fail(res, `kind must be one of ${memory.PROJECT_KINDS.join(', ')}.`, 400);
         const text = memory.sanitise(body.text);
         if (!text) return fail(res, 'text is required.', 400);
+        if (memory.hasInstruction(text)) return fail(res, INSTRUCTION_TEXT, 400);
         const existing = await memory.find({ companyId: auth.companyId, kind: body.kind, scopeId: projectId, key: memory.slug(text) });
         if (existing && existing.status === memory.STATUS.ACTIVE) return fail(res, 'This is already on record.', 409);
         const row = await memory.remember({ companyId: auth.companyId, kind: body.kind, scopeId: projectId, text, source: { origin: 'owner', userId: auth.uid } });
@@ -86,7 +90,7 @@ exports.addProjectMemory = async (req, res) => {
     } catch (e) { logger.error(`addProjectMemory: ${e.message}`); return fail(res, e.message, e.status); }
 };
 
-/* PUT /api/v2/agents/memory/:id  { scopeId, text?, status? } — :id is kind:key */
+/* PUT /api/v2/agents/memory/:id  { projectId (project rows), text?, status? } — :id is kind:key */
 exports.updateMemory = async (req, res) => {
     try {
         const auth = await authed(req, res);
@@ -97,18 +101,19 @@ exports.updateMemory = async (req, res) => {
         const parsed = memory.parseId(id);
         if (!parsed) return fail(res, 'A valid memory id (kind:key) is required.', 400);
         const body = req.body || {};
-        const scopeId = String(body.scopeId || '');
-        if (memory.PROJECT_KINDS.includes(parsed.kind)) {
-            if (!OBJECT_ID.test(scopeId)) return fail(res, 'scopeId must be the projectId.', 400);
+        const project = memory.PROJECT_KINDS.includes(parsed.kind);
+        const scopeId = project ? String(body.projectId || body.scopeId || '') : auth.uid;
+        if (project) {
+            if (!OBJECT_ID.test(scopeId)) return fail(res, 'projectId is required for a project row.', 400);
             if (!auth.privileged) return fail(res, 'Owner/admin only.', 403);
             if (!(await canSeeProject(auth.companyId, auth.uid, scopeId))) return fail(res, 'Memory row not found.', 404);
-        } else if (scopeId !== auth.uid) {
-            return fail(res, 'Memory row not found.', 404);
         }
         const patch = {};
         if (body.text !== undefined) {
+            if (!project) return fail(res, 'Only project rows can be reworded.', 400);
             patch.text = memory.sanitise(body.text);
             if (!patch.text) return fail(res, 'text must not be empty.', 400);
+            if (memory.hasInstruction(patch.text)) return fail(res, INSTRUCTION_TEXT, 400);
         }
         if (body.status !== undefined) {
             if (!ROW_STATUSES.includes(body.status)) return fail(res, `status must be one of ${ROW_STATUSES.join(', ')}.`, 400);
@@ -126,6 +131,7 @@ exports.getPreferences = async (req, res) => {
     try {
         const auth = await authed(req, res);
         if (!auth) return;
+        if (!auth.human) return fail(res, AGENTS_CANNOT_READ, 403);
         return res.send({ status: true, statusText: 'OK', data: await preferencesPayload(auth.companyId, auth.uid) });
     } catch (e) { logger.error(`getPreferences: ${e.message}`); return fail(res, e.message, e.status); }
 };
@@ -146,17 +152,13 @@ exports.putPreferences = async (req, res) => {
             if (body.reviewDepth !== null && !memory.REVIEW_DEPTHS.includes(body.reviewDepth)) return fail(res, `reviewDepth must be one of ${memory.REVIEW_DEPTHS.join(', ')} or null.`, 400);
             writes.push({ key: memory.PREFERENCE_KEY.REVIEW_DEPTH, value: body.reviewDepth });
         }
-        if (body.notify !== undefined) {
-            if (typeof body.notify !== 'boolean') return fail(res, 'notify must be true or false.', 400);
-            writes.push({ key: memory.PREFERENCE_KEY.NOTIFY, value: body.notify });
-        }
-        if (!writes.length) return fail(res, 'Nothing to update.', 400);
+        if (body.notify !== undefined && typeof body.notify !== 'boolean') return fail(res, 'notify must be true or false.', 400);
+        if (!writes.length && body.notify === undefined) return fail(res, 'Nothing to update.', 400);
         for (const w of writes) {
             // eslint-disable-next-line no-await-in-loop
             await memory.setPreference({ companyId: auth.companyId, userId: auth.uid, key: w.key, value: w.value });
-            // eslint-disable-next-line no-await-in-loop
-            if (w.key === memory.PREFERENCE_KEY.NOTIFY) await mirrorAgentActivity(auth.companyId, auth.uid, w.value);
         }
+        if (body.notify !== undefined) await setAgentActivity(auth.companyId, auth.uid, body.notify);
         return res.send({ status: true, statusText: 'Preferences updated.', data: await preferencesPayload(auth.companyId, auth.uid) });
     } catch (e) { logger.error(`putPreferences: ${e.message}`); return fail(res, e.message, e.status); }
 };

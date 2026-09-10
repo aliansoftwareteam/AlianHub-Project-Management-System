@@ -8,6 +8,7 @@ const undo = require('./undo');
 const audit = require('./agentAudit');
 const memory = require('./memory');
 const findingMemory = require('./engine/findingMemory');
+const persistence = require('./engine/persistence');
 const logger = require('../../Config/loggerConfig');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
@@ -25,7 +26,7 @@ const UNDO_WINDOW_MS = 15 * 60 * 1000;
 const PRIMARY_AGE_MS = 24 * 60 * 60 * 1000;
 const GATE_OWNER_ADMIN = 'owner_admin';
 // The canned decline reasons the Inbox offers; only these can grow into a user preference.
-const DECLINE_REASONS = Object.freeze(['too_many_changes', 'wrong_tone', 'needs_person', 'not_now']);
+const DECLINE_REASONS = Object.freeze(Object.keys(memory.DECLINE_REASON_TEXT));
 const DECLINE_REASON_MAX = 200;
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
@@ -33,15 +34,51 @@ const quietly = async (what, fn) => {
     try { return await fn(); } catch (e) { logger.error(`[agent-proposal] ${what}: ${e.message}`); return null; }
 };
 
+const runOf = (companyId, runId) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(runId) }] }, 'findOne');
+const dropThread = (companyId, runId) => quietly(`drop thread ${runId}`, () => persistence.saverFor(companyId).deleteThread(String(runId)));
+
+/* What the graph's remember node would have written, from what is in hand. */
+const episodeFrom = (run, p, { decision, applied, reason }) => {
+    const declined = decision === STATUS.DECLINED;
+    const changes = Array.isArray(p.changes) ? p.changes : [];
+    return {
+        skill: run.skill || null, taskId: p.taskId || run.taskId || null, taskTitle: null,
+        proposed: changes.length, acted: (run.actions || []).filter((a) => a && a.ok === true).length,
+        approved: declined ? 0 : (applied || []).filter((a) => a.ok).length,
+        declined: declined ? changes.length : 0, declinedReason: reason || null,
+        reverted: false, spendUsd: Number((run.spend && run.spend.usd) || 0), at: new Date(),
+    };
+};
+
 /* The run that filed the proposal continues from its checkpoint with the
- * decision; a run from before the graph, or one whose thread is gone, is
- * closed directly as it always was. */
+ * decision. Only a run still waiting is resumed: a stopped or reaped run keeps
+ * its status and its parked thread is dropped. When the resume itself fails
+ * twice, the run is closed with an episode built here; a run from before the
+ * graph, or one whose thread is gone, is closed directly as it always was. */
 const settleRun = async (companyId, p, { decision, applied, reason, outcome }) => {
     if (!p.runId) return;
     const runs = require('./runs');
-    const resumed = await quietly(`resume run ${p.runId}`, () => require('./engine/graph').resumeGraph({ companyId, runId: p.runId, resume: { decision, applied, reason } }));
+    const run = await quietly(`read run ${p.runId}`, () => runOf(companyId, p.runId));
+    if (!run) return;
+    if (run.status !== runs.STATUS.WAITING) { await dropThread(companyId, p.runId); return; }
+    const resume = () => require('./engine/graph').resumeGraph({ companyId, runId: p.runId, resume: { decision, applied, reason } });
+    let resumed;
+    try {
+        resumed = await resume();
+    } catch (first) {
+        logger.error(`[agent-proposal] resume run ${p.runId}: ${first.message}; retrying once`);
+        try {
+            resumed = await resume();
+        } catch (second) {
+            logger.error(`[agent-proposal] resume run ${p.runId} failed again: ${second.message}; closing the run directly`);
+            const episode = episodeFrom(run, p, { decision, applied, reason });
+            await runs.finish(companyId, p.runId, { status: runs.STATUS.DONE, outcome, episode, onlyIf: runs.STATUS.WAITING }).catch(() => {});
+            await dropThread(companyId, p.runId);
+            return;
+        }
+    }
     if (resumed && resumed.resumed) return;
-    await runs.finish(companyId, p.runId, { status: runs.STATUS.DONE, outcome }).catch(() => {});
+    await runs.finish(companyId, p.runId, { status: runs.STATUS.DONE, outcome, onlyIf: runs.STATUS.WAITING }).catch(() => {});
 };
 
 const emit = (companyId, proposal) => {
@@ -146,6 +183,10 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     const runs = require('./runs');
     const agent = await runs.getAgent(companyId, p.agentId);
     if (!agent) return { error: 'This agent was deleted — decline the proposal instead.', status: 409 };
+    if (p.runId) {
+        const run = await runOf(companyId, p.runId);
+        if (run && run.status === runs.STATUS.STOPPED) return { error: 'Run was stopped.', status: 409 };
+    }
 
     const claimed = await setStatus(companyId, id, { status: STATUS.APPLYING, decidedBy: decider.userId, decidedAt: new Date() }, { onlyIf: STATUS.PENDING });
     if (!claimed) return alreadyDecided(companyId, id);
@@ -166,7 +207,8 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     const undoUntil = new Date(Date.now() + UNDO_WINDOW_MS);
     const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds });
     await audit.recordProposalDecision(companyId, decider, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });
-    await quietly(`remember approved changes of ${id}`, () => memory.rememberApprovedChanges({ companyId, projectId: p.projectId, proposal: p, applied }));
+    const row = typeof p.toObject === 'function' ? p.toObject() : p;
+    await quietly(`remember approved changes of ${id}`, () => memory.rememberApprovedChanges({ companyId, projectId: p.projectId, proposal: { ...row, changes, decidedBy: decider.userId }, applied }));
     for (const [i, a] of applied.entries()) {
         const c = changes[i];
         // eslint-disable-next-line no-await-in-loop
@@ -183,7 +225,7 @@ const decline = async (companyId, id, { decider, ip, reason }) => {
     const p = await get(companyId, id);
     if (!p) return { error: 'Proposal not found.', status: 404 };
     if (p.status !== STATUS.PENDING) return alreadyDecided(companyId, id);
-    const declineReason = String(reason || '').trim().slice(0, DECLINE_REASON_MAX);
+    const declineReason = typeof reason === 'string' ? reason.trim().slice(0, DECLINE_REASON_MAX) : '';
     const updated = await setStatus(companyId, id, { status: STATUS.DECLINED, decidedBy: decider.userId, decidedAt: new Date(), ...(declineReason ? { declineReason } : {}) }, { onlyIf: STATUS.PENDING });
     if (!updated) return alreadyDecided(companyId, id);
     await audit.recordProposalDecision(companyId, decider, { proposalId: id, decision: `declined${declineReason ? `: ${declineReason}` : ''}`, agentName: p.agentName, runId: p.runId, ip });

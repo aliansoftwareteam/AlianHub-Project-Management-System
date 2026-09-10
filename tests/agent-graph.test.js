@@ -6,6 +6,7 @@ jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), 
 jest.mock('../Modules/Agents/engine/orchestrator', () => ({ gather: jest.fn(async () => ({ status: 'gathered', context: { projectName: 'Launch' } })), analyse: jest.fn() }));
 jest.mock('../Modules/Agents/engine/findingMemory', () => ({ load: jest.fn(async () => new Map()), decide: jest.fn(), record: jest.fn(), touch: jest.fn() }));
 jest.mock('../Modules/Agents/memory', () => ({
+    DECLINE_REASON_TEXT: { too_many_changes: 'x', wrong_tone: 'x', needs_person: 'x', not_now: 'x' },
     contextFor: jest.fn(async () => ''),
     recordEpisode: jest.fn(async () => null),
     preferenceCandidate: jest.fn(async () => null),

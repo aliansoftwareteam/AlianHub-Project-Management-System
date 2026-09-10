@@ -171,7 +171,7 @@ const start = async ({ companyId, uid, projectId, projectName, pairs, agents, wi
         } catch (e) { logger.error(`[AIPG] guide agent not created: ${e && e.message ? e.message : e}`); }
     }
     try {
-        const rows = await memory.fromBrief({ companyId, projectId, approvedBrief, assumptions });
+        const rows = await memory.fromBrief({ companyId, projectId, projectName, approvedBrief, assumptions });
         if (rows.length) logger.info(`[AIPG] remembered ${rows.length} row(s) from the brief for project ${projectId}`);
     } catch (e) { logger.error(`[AIPG] brief not remembered: ${e && e.message ? e.message : e}`); }
     try {

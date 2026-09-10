@@ -1,6 +1,6 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
-// language for the agent modules (equality, $in/$nin/$ne/$gte, $set/$inc/$push,
-// conditional findOneAndUpdate) so a test can assert on what was written.
+// language for the agent modules (equality, $in/$nin/$ne/$gte/$exists, $set/$inc/$push,
+// conditional findOneAndUpdate, sort/limit on find) so a test can assert on what was written.
 
 let seq = 1;
 const nextId = () => String(seq++).padStart(24, '0');
@@ -42,6 +42,24 @@ const apply = (doc, update = {}) => {
     return doc;
 };
 
+const sortable = (v) => (v instanceof Date ? v.getTime() : (v == null ? '' : v));
+const ordered = (list, options = {}) => {
+    let out = list;
+    if (options.sort) {
+        const entries = Object.entries(options.sort);
+        out = [...list].sort((a, b) => {
+            for (const [key, dir] of entries) {
+                const x = sortable(read(a, key));
+                const y = sortable(read(b, key));
+                if (x < y) return -dir;
+                if (x > y) return dir;
+            }
+            return 0;
+        });
+    }
+    return options.limit ? out.slice(0, options.limit) : out;
+};
+
 const create = () => {
     const store = {};
     const calls = [];
@@ -52,7 +70,7 @@ const create = () => {
         calls.push({ companyId, type, method, data });
         const list = rows(type);
         if (method === 'save') { const doc = { _id: data._id ? String(data._id) : nextId(), createdAt: new Date(), ...data }; list.push(doc); return clone(doc); }
-        if (method === 'find') return list.filter((d) => matches(d, data[0])).map(clone);
+        if (method === 'find') return ordered(list.filter((d) => matches(d, data[0])), data[2]).map(clone);
         if (method === 'findOne') return clone(list.find((d) => matches(d, data[0])) || null);
         if (method === 'countDocuments') return list.filter((d) => matches(d, data[0])).length;
         if (method === 'findOneAndUpdate') { const doc = list.find((d) => matches(d, data[0])); if (!doc) return null; apply(doc, data[1]); return clone(doc); }
