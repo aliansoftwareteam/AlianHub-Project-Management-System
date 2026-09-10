@@ -122,7 +122,7 @@
                 <span class="ah-small">{{ $t('Settings.agents_hint') }}</span>
             </div>
             <div class="ah-card__body ms__agents">
-                <div v-if="agentPrefs.error" class="ah-field__error">{{ agentPrefs.error }}</div>
+                <EmptyState v-if="agentPrefs.error" :title="$t('Settings.agents_load_failed')" :message="agentPrefs.error" :action-label="$t('Settings.agents_retry')" data-test="agent-prefs-error" @action="agentPrefs.load" />
                 <div v-else-if="!agentPrefs.loaded" class="ah-empty">{{ $t('Settings.agents_loading') }}</div>
                 <template v-else>
                     <div class="ms__agents-row">
@@ -148,7 +148,7 @@
                     <div v-if="agentPrefs.candidates.length" class="ms__agents-candidates" data-test="candidates">
                         <span class="ah-small">{{ $t('Settings.agents_candidates') }}</span>
                         <div v-for="c in agentPrefs.candidates" :key="c.id" class="ms__candidate" data-test="candidate">
-                            <span class="ah-chip ah-chip--warn">{{ c.text }}</span>
+                            <span class="ah-chip ah-chip--warn" data-test="candidate-text">{{ candidateText(c) }}</span>
                             <span class="ah-small ah-mono">{{ $t('Settings.agents_candidate_count', { n: c.count }) }}</span>
                             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="agentPrefs.busy" data-test="candidate-accept" @click="settleCandidate(c, 'accept')">{{ $t('Settings.agents_accept') }}</button>
                             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="agentPrefs.busy" data-test="candidate-dismiss" @click="settleCandidate(c, 'dismiss')">{{ $t('Settings.agents_dismiss') }}</button>
@@ -214,7 +214,9 @@ import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import CroppingTool from "@/components/atom/CroppingTool/CroppingTool.vue";
 import AhSwitch from "@/components/molecules/Setting/AhSwitch.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useAgentPreferences } from "@/views/Ai/useAgentPreferences";
+import { DECLINE_REASONS } from "@/views/Ai/episodeText";
 
 defineOptions({ name: "MySettingsView" });
 
@@ -414,7 +416,8 @@ function openCropperTool() {
     setTimeout(() => document.getElementById("cropping-input")?.click());
 }
 
-const agentPrefs = reactive(useAgentPreferences({ userId }));
+const agentPrefs = reactive(useAgentPreferences());
+const candidateText = (c) => (DECLINE_REASONS.includes(c.key) ? t(`Settings.agents_candidate_${c.key}`) : c.text);
 const toneOptions = [
     { value: "concise", label: "Settings.agents_tone_concise" },
     { value: "detailed", label: "Settings.agents_tone_detailed" },

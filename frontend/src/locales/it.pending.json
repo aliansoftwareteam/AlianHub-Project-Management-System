@@ -1,7 +1,7 @@
 {
   "locale": "it",
   "machineTranslated": false,
-  "updatedAt": "2026-09-10T04:32:41.235Z",
+  "updatedAt": "2026-09-10T07:34:29.436Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5174,6 +5174,12 @@
     "Settings.agents_candidates": "Suggested from your declines",
     "Settings.agents_candidate_count": "{n} declines",
     "Settings.agents_accept": "Accept",
-    "Settings.agents_dismiss": "Dismiss"
+    "Settings.agents_dismiss": "Dismiss",
+    "Ai.episode_not_reached": "Run ended before review",
+    "Settings.agents_retry": "Try again",
+    "Settings.agents_candidate_too_many_changes": "Prefers fewer changes per proposal",
+    "Settings.agents_candidate_wrong_tone": "Prefers a different tone — ask before rewriting",
+    "Settings.agents_candidate_needs_person": "Wants a person to handle this kind of work",
+    "Settings.agents_candidate_not_now": "Prefers proposals batched, not one at a time"
   }
 }

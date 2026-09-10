@@ -36,7 +36,7 @@ describe('useAgentPreferences', () => {
     beforeEach(() => { apiRequest.mockReset(); apiRequest.mockImplementation(answer); });
 
     it('seeds the draft from the server and is clean until something changes', async () => {
-        const p = useAgentPreferences({ userId: ref('u1') });
+        const p = useAgentPreferences();
         await p.load();
         expect(apiRequest).toHaveBeenCalledWith('get', '/api/v2/agents/preferences', undefined);
         expect(p.loaded.value).toBe(true);
@@ -54,38 +54,47 @@ describe('useAgentPreferences', () => {
 
     it('drops values the contract does not know', async () => {
         apiRequest.mockImplementation(() => ok({ tone: 'shouty', reviewDepth: 'every_change', notify: 'no' }));
-        const p = useAgentPreferences({ userId: 'u1' });
+        const p = useAgentPreferences();
         await p.load();
         expect(p.draft).toEqual({ tone: null, reviewDepth: 'every_change', notify: true });
     });
 
-    it('saves the three fields and resets the baseline to the answer', async () => {
-        const p = useAgentPreferences({ userId: 'u1' });
+    it('saves only the fields that changed and resets the baseline to the answer', async () => {
+        const p = useAgentPreferences();
         await p.load();
         p.draft.reviewDepth = 'every_change';
         p.draft.notify = false;
         await p.save();
-        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/preferences', { tone: 'concise', reviewDepth: 'every_change', notify: false });
+        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/preferences', { reviewDepth: 'every_change', notify: false });
         expect(p.dirty.value).toBe(false);
         expect(p.busy.value).toBe(false);
         expect(p.draft.reviewDepth).toBe('every_change');
     });
 
+    it('does not call the server when nothing changed', async () => {
+        const p = useAgentPreferences();
+        await p.load();
+        p.draft.tone = 'detailed';
+        p.draft.tone = 'concise';
+        await p.save();
+        expect(apiRequest.mock.calls.filter(([type]) => type === 'put')).toHaveLength(0);
+    });
+
     it('accepts a candidate as the user and drops it from the list; dismiss retires it', async () => {
-        const p = useAgentPreferences({ userId: ref('u1') });
+        const p = useAgentPreferences();
         await p.load();
         await p.accept(candidate);
-        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/memory/user.preference%3Atoo_many_changes', { scopeId: 'u1', status: 'active' });
+        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/memory/user.preference%3Atoo_many_changes', { status: 'active' });
         expect(p.candidates.value).toEqual([]);
 
         p.candidates.value = [candidate];
         await p.dismiss(candidate);
-        expect(apiRequest).toHaveBeenLastCalledWith('put', '/api/v2/agents/memory/user.preference%3Atoo_many_changes', { scopeId: 'u1', status: 'retired' });
+        expect(apiRequest).toHaveBeenLastCalledWith('put', '/api/v2/agents/memory/user.preference%3Atoo_many_changes', { status: 'retired' });
         expect(p.candidates.value).toEqual([]);
     });
 
     it('surfaces the refusal and keeps the candidate when the write fails', async () => {
-        const p = useAgentPreferences({ userId: 'u1' });
+        const p = useAgentPreferences();
         await p.load();
         apiRequest.mockImplementation((type, url) => (type === 'put' ? Promise.reject(httpError(403, 'Not your preference.')) : answer(type, url)));
         await expect(p.accept(candidate)).rejects.toThrow('Not your preference.');
@@ -95,6 +104,11 @@ describe('useAgentPreferences', () => {
         apiRequest.mockImplementation(() => Promise.reject(httpError(500, '')));
         await p.load();
         expect(p.error.value).toBe('t:Settings.agents_load_failed');
+
+        apiRequest.mockImplementation(answer);
+        await p.load();
+        expect(p.error.value).toBe('');
+        expect(p.loaded.value).toBe(true);
     });
 });
 
@@ -124,25 +138,55 @@ describe('MySettings AI agents card', () => {
         expect(card.find('[data-test="notify"]').attributes('aria-checked')).toBe('true');
         expect(card.find('[data-test="agent-prefs-save"]').attributes('disabled')).toBeDefined();
         expect(card.findAll('[data-test="candidate"]')).toHaveLength(1);
-        expect(card.find('[data-test="candidate"]').text()).toContain('Prefers fewer changes per proposal');
+        expect(card.find('[data-test="candidate-text"]').text()).toBe('Settings.agents_candidate_too_many_changes');
     });
 
-    it('enables save once dirty and puts the three fields', async () => {
+    it('shows the free text of a candidate that is not a canned reason', async () => {
+        apiRequest.mockImplementation((type, url) => (url.endsWith('/agents/preferences')
+            ? ok({ ...prefs, candidates: [{ id: 'user.preference:custom', key: 'custom', text: 'Prefers Friday releases', count: 3 }] })
+            : answer(type, url)));
+        apiRequestWithoutCompnay.mockImplementation(() => ok([]));
+        const wrapper = mount(MySettings, { global: { plugins: [store] } });
+        await flushPromises();
+        expect(wrapper.find('[data-test="candidate-text"]').text()).toBe('Prefers Friday releases');
+    });
+
+    it('offers a retry when the preferences fail to load', async () => {
+        let calls = 0;
+        apiRequest.mockImplementation((type, url) => {
+            if (!url.endsWith('/agents/preferences')) return answer(type, url);
+            calls += 1;
+            return calls === 1 ? Promise.reject(httpError(500, 'Memory is off.')) : answer(type, url);
+        });
+        apiRequestWithoutCompnay.mockImplementation(() => ok([]));
+        const wrapper = mount(MySettings, { global: { plugins: [store] } });
+        await flushPromises();
+        const card = wrapper.find('[data-test="agent-prefs"]');
+        expect(card.find('[data-test="agent-prefs-error"]').text()).toContain('Memory is off.');
+        expect(card.find('[data-test="tone"]').exists()).toBe(false);
+
+        await card.find('[data-test="agent-prefs-error"] button').trigger('click');
+        await flushPromises();
+        expect(card.find('[data-test="agent-prefs-error"]').exists()).toBe(false);
+        expect(card.find('[data-test="tone"] .is-active').attributes('data-value')).toBe('concise');
+    });
+
+    it('enables save once dirty and puts only the changed fields', async () => {
         const card = await mountPage();
         await card.find('[data-test="review-depth"] [data-value="every_change"]').trigger('click');
         await card.find('[data-test="notify"]').trigger('click');
         expect(card.find('[data-test="agent-prefs-save"]').attributes('disabled')).toBeUndefined();
         await card.find('[data-test="agent-prefs-save"]').trigger('click');
         await flushPromises();
-        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/preferences', { tone: 'concise', reviewDepth: 'every_change', notify: false });
+        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/preferences', { reviewDepth: 'every_change', notify: false });
         expect(card.find('[data-test="agent-prefs-save"]').attributes('disabled')).toBeDefined();
     });
 
-    it('accepts a candidate as the signed-in user and removes the chip', async () => {
+    it('accepts a candidate and removes the chip', async () => {
         const card = await mountPage();
         await card.find('[data-test="candidate-accept"]').trigger('click');
         await flushPromises();
-        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/memory/user.preference%3Atoo_many_changes', { scopeId: 'user-1', status: 'active' });
+        expect(apiRequest).toHaveBeenCalledWith('put', '/api/v2/agents/memory/user.preference%3Atoo_many_changes', { status: 'active' });
         expect(card.findAll('[data-test="candidate"]')).toHaveLength(0);
     });
 });

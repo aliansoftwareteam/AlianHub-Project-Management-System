@@ -95,9 +95,9 @@
                         <div class="ah-label">{{ $t('Ai.decline_reason_title') }}</div>
                         <p class="ah-small ai-decline__lead">{{ $t('Ai.decline_reason_lead') }}</p>
                         <div class="ai-decline__chips" role="group" :aria-label="$t('Ai.decline_reason_title')">
-                            <button v-for="key in DECLINE_REASONS" :key="key" type="button" class="ah-chip ai-decline__chip" :class="{ 'is-on': declineReason === key }" :aria-pressed="declineReason === key" :data-reason="key" @click="declineReason = declineReason === key ? '' : key">{{ $t(`Ai.decline_reason_${key}`) }}</button>
+                            <button v-for="key in DECLINE_REASONS" :key="key" type="button" class="ah-chip ai-decline__chip" :class="{ 'is-on': declineReason === key }" :aria-pressed="declineReason === key" :data-reason="key" @click="pickReason(key)">{{ $t(`Ai.decline_reason_${key}`) }}</button>
                         </div>
-                        <input v-model.trim="declineNote" type="text" class="ah-input ai-decline__note" maxlength="200" :placeholder="$t('Ai.decline_reason_placeholder')" :aria-label="$t('Ai.decline_reason_other')" data-test="decline-note" />
+                        <input v-model.trim="declineNote" type="text" class="ah-input ai-decline__note" maxlength="200" :placeholder="$t('Ai.decline_reason_placeholder')" :aria-label="$t('Ai.decline_reason_other')" data-test="decline-note" @input="declineReason = ''" />
                         <div class="ai-actions ai-decline__actions">
                             <button type="button" class="ah-btn ah-btn--primary" :disabled="busy || !declineReasonValue" data-test="decline-send" @click="onDecline(declineReasonValue)">{{ $t('Ai.decline') }}</button>
                             <button type="button" class="ah-btn ah-btn--ghost" :disabled="busy" data-test="decline-cancel" @click="declining = false">{{ $t('Ai.cancel') }}</button>
@@ -123,6 +123,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import { useAgents, reasonOf } from "./useAgents";
+import { DECLINE_REASONS } from "./episodeText";
 
 defineOptions({ name: "AiInboxPage" });
 
@@ -146,7 +147,10 @@ const declining = ref(false);
 const declineReason = ref("");
 const declineNote = ref("");
 
-const DECLINE_REASONS = Object.freeze(["too_many_changes", "wrong_tone", "needs_person", "not_now"]);
+const pickReason = (key) => {
+    declineReason.value = declineReason.value === key ? "" : key;
+    declineNote.value = "";
+};
 const declineReasonValue = computed(() => declineReason.value || declineNote.value.slice(0, 200));
 
 const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
