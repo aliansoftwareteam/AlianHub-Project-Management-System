@@ -13,8 +13,11 @@ const COLLECTIONS = Object.freeze({
     CHECKPOINT_WRITES: 'agent_checkpoint_writes',
 });
 
+const CHECKPOINT_TTL_SECONDS = 15552000;
+
 const stores = new Map();
 const savers = new Map();
+const readiness = new Map();
 let client = null;
 let override = null;
 
@@ -49,10 +52,27 @@ const saverFor = (companyId) => {
         savers.set(db, new MongoDBSaver({
             client: mongoClient(), dbName: db,
             checkpointCollectionName: COLLECTIONS.CHECKPOINTS, checkpointWritesCollectionName: COLLECTIONS.CHECKPOINT_WRITES,
-            enableTimestamps: true,
+            enableTimestamps: true, ttl: { defaultTtl: CHECKPOINT_TTL_SECONDS, refreshOnRead: false },
         }));
     }
     return savers.get(db);
+};
+
+/* Index creation once per company database, cached; never rejects, so a failed
+ * index build degrades to unindexed reads instead of blocking agents. */
+const ready = (companyId) => {
+    const db = dbName(companyId);
+    if (override) return Promise.resolve();
+    if (!readiness.has(db)) {
+        const store = storeFor(db);
+        const saver = saverFor(db);
+        const build = Promise.all([
+            store.start().catch((e) => logger.error(`[agent-persistence] ${db} store indexes: ${e.message}`)),
+            saver.setup().then((errors) => (errors || []).forEach((e) => logger.error(`[agent-persistence] ${db} checkpoint indexes: ${e && e.message}`))).catch((e) => logger.error(`[agent-persistence] ${db} checkpoint setup: ${e.message}`)),
+        ]).then(() => undefined);
+        readiness.set(db, build);
+    }
+    return readiness.get(db);
 };
 
 /* Tests and the fake-DB path swap the Mongo-backed instances for in-memory
@@ -73,7 +93,8 @@ const useMongo = () => { override = null; };
 const close = async () => {
     stores.clear();
     savers.clear();
+    readiness.clear();
     if (client) { await client.close().catch((e) => logger.error(`[agent-persistence] close: ${e.message}`)); client = null; }
 };
 
-module.exports = { COLLECTIONS, storeFor, saverFor, useInMemory, useMongo, close };
+module.exports = { COLLECTIONS, CHECKPOINT_TTL_SECONDS, storeFor, saverFor, ready, useInMemory, useMongo, close };
