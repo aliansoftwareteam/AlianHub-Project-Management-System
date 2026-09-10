@@ -7,7 +7,12 @@
 // has nothing to switch on. The guard, the MCP server and the proposal approver
 // all resolve actions through this one file.
 
+// `permission` names the Security & Permissions catalogue entry
+// (Config/permissionGuard) that governs the same operation for a person.
+// perform() evaluates it for the person behind the agent, so a token never
+// exceeds its holder's role. An action without one cannot be registered.
 const RISK = Object.freeze({ LOW: 'low', MEDIUM: 'medium', HIGH: 'high' });
+const PERMISSION_KEY = /^[a-z_]+\.[a-z_]+$/;
 const DONE_STATUS_TYPE = 'close';
 const DONE_STATUS_TYPES = Object.freeze(['close', 'done', 'default_close']);
 
@@ -17,29 +22,71 @@ const AGENT_STATUS_NAMES = Object.freeze(['in progress', 'in review']);
 const AGENT_STATUS_NAME_PATTERN = /progress|review|doing|testing|qa/;
 
 const ACTIONS = Object.freeze([
-    { key: 'tasks.next', label: 'Next assigned task', risk: RISK.LOW, undoable: false, write: false, cost: 'read' },
-    { key: 'tasks.search', label: 'Search own tasks', risk: RISK.LOW, undoable: false, write: false, cost: 'read' },
-    { key: 'task.get', label: 'Read a task brief', risk: RISK.LOW, undoable: false, write: false, cost: 'read+summary' },
-    { key: 'task.comment', label: 'Comment on a task', risk: RISK.LOW, undoable: true, write: true, cost: 'write' },
+    { key: 'tasks.next', label: 'Next assigned task', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
+    { key: 'tasks.search', label: 'Search own tasks', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
+    { key: 'task.get', label: 'Read a task brief', risk: RISK.LOW, undoable: false, write: false, cost: 'read+summary', permission: 'task.task_list' },
+    { key: 'task.comment', label: 'Comment on a task', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_comment' },
     { key: 'task.status.set', label: 'Set status (In progress / In review only)', risk: RISK.LOW, undoable: true, write: true, cost: 'write',
-      constraint: 'statusType must not be "close"; status name must be In progress or In review' },
-    { key: 'task.link', label: 'Attach a PR, branch or doc', risk: RISK.LOW, undoable: true, write: true, cost: 'write' },
-    { key: 'task.assign', label: 'Assign a task', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write' },
+      constraint: 'statusType must not be "close"; status name must be In progress or In review', permission: 'task.task_status' },
+    { key: 'task.link', label: 'Attach a PR, branch or doc', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_attachments' },
+    { key: 'task.assign', label: 'Assign a task', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'task.task_assignee' },
     { key: 'task.update', label: 'Update task fields', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
-      fields: ['TaskName', 'description', 'rawDescription', 'Task_Priority', 'DueDate', 'startDate', 'tagsArray', 'checklistArray', 'points', 'totalEstimatedTime'] },
-    { key: 'task.sprint.move', label: 'Move a task between sprints', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write' },
-    { key: 'subtask.create', label: 'Create a subtask', risk: RISK.LOW, undoable: true, write: true, cost: 'write' },
+      fields: ['TaskName', 'description', 'rawDescription', 'Task_Priority', 'DueDate', 'startDate', 'tagsArray', 'checklistArray', 'points', 'totalEstimatedTime'],
+      permission: { byField: {
+          TaskName: 'task.task_name_edit', description: 'task.task_description', rawDescription: 'task.task_description',
+          Task_Priority: 'task.task_priority', DueDate: 'task.task_due_date', startDate: 'task.task_start_date',
+          tagsArray: 'task.task_tag', checklistArray: 'task.task_checklist', points: 'task.task_estimated_hours', totalEstimatedTime: 'task.task_estimated_hours',
+      } } },
+    { key: 'task.sprint.move', label: 'Move a task between sprints', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'task.task_move' },
+    { key: 'subtask.create', label: 'Create a subtask', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.sub_task_create' },
     { key: 'task.create', label: 'File a task (opening status, unassigned)', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
-      constraint: 'always the project\'s opening status; never assigned; only in a project the token can see' },
-    { key: 'timelog.start', label: 'Start a timer', risk: RISK.LOW, undoable: true, write: true, cost: 'write' },
-    { key: 'timelog.stop', label: 'Stop a timer', risk: RISK.LOW, undoable: true, write: true, cost: 'write' },
-    { key: 'docs.read', label: 'Read a linked doc', risk: RISK.LOW, undoable: false, write: false, cost: 'read' },
-    { key: 'page.draft', label: 'Draft a page (stays a draft until approved)', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write' },
-    { key: 'chat.post', label: 'Post in a channel', risk: RISK.LOW, undoable: false, write: true, cost: 'write' },
-    { key: 'reminder.create', label: 'Create a reminder', risk: RISK.LOW, undoable: false, write: true, cost: 'write' },
+      constraint: 'always the project\'s opening status; never assigned; only in a project the token can see', permission: 'task.task_create' },
+    { key: 'timelog.start', label: 'Start a timer', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'sheet_settings.user_timesheet' },
+    { key: 'timelog.stop', label: 'Stop a timer', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'sheet_settings.user_timesheet' },
+    { key: 'docs.read', label: 'Read a linked doc', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
+    { key: 'page.draft', label: 'Draft a page (stays a draft until approved)', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'project.project_details' },
+    { key: 'chat.post', label: 'Post in a channel', risk: RISK.LOW, undoable: false, write: true, cost: 'write', permission: 'task.task_comment' },
+    { key: 'reminder.create', label: 'Create a reminder', risk: RISK.LOW, undoable: false, write: true, cost: 'write', permission: { key: 'task.task_list', write: false } },
     { key: 'deploy.staging', label: 'Propose a staging deploy', risk: RISK.HIGH, undoable: false, write: true, cost: 'write',
-      gate: 'owner_admin', proposeOnly: true },
+      gate: 'owner_admin', proposeOnly: true, permission: 'settings.settings_edit_company' },
 ]);
+
+/* A string maps the whole action at its own level (write for writes, read for
+ * reads); { key, write } pins the level; { byField } holds each task.update
+ * field to the entry a person editing that field is held to. */
+const permissionsFor = (key, params = {}) => {
+    const action = BY_KEY.get(String(key || ''));
+    if (!action) return [];
+    const p = action.permission;
+    if (typeof p === 'string') return [{ key: p, write: Boolean(action.write) }];
+    if (p && p.byField) {
+        const fields = Object.keys(params.fields || {});
+        const keys = [...new Set((fields.length ? fields : action.fields || []).map((f) => p.byField[f]).filter(Boolean))];
+        return keys.map((k) => ({ key: k, write: true }));
+    }
+    if (p && p.key) return [{ key: p.key, write: typeof p.write === 'boolean' ? p.write : Boolean(action.write) }];
+    return [];
+};
+
+const validate = (entries) => {
+    const bad = (a, why) => new Error(`agent registry: ${a.key || '(no key)'} ${why}`);
+    entries.forEach((a) => {
+        const p = a.permission;
+        if (typeof p === 'string') {
+            if (!PERMISSION_KEY.test(p)) throw bad(a, `has an invalid permission mapping "${p}"`);
+            return;
+        }
+        if (p && p.byField && typeof p.byField === 'object') {
+            const unmapped = (a.fields || []).filter((f) => !PERMISSION_KEY.test(String(p.byField[f] || '')));
+            if (!a.fields || !a.fields.length || unmapped.length) throw bad(a, `leaves fields without a permission mapping: ${unmapped.join(', ') || '(no fields)'}`);
+            return;
+        }
+        if (p && typeof p.key === 'string' && PERMISSION_KEY.test(p.key)) return;
+        throw bad(a, 'has no permission mapping; every action must name the catalogue entry that governs it for a person');
+    });
+    return entries;
+};
+
 
 // Named so a reviewer can confirm they are not reachable. A trailing `.*` covers
 // every key under that prefix.
@@ -59,7 +106,7 @@ const indexActions = (actions) => {
     return new Map(actions.map((a) => [a.key, a]));
 };
 
-const BY_KEY = indexActions(ACTIONS);
+const BY_KEY = indexActions(validate(ACTIONS));
 
 const get = (key) => BY_KEY.get(String(key || '')) || null;
 const has = (key) => BY_KEY.has(String(key || ''));
@@ -134,5 +181,5 @@ const manifest = () => ({
 
 module.exports = {
     ACTIONS, NEVER, RISK, AUTONOMY, DONE_STATUS_TYPE, DONE_STATUS_TYPES, AGENT_STATUS_NAMES,
-    get, has, keys, isNever, indexActions, evaluate, isAgentSettableStatus, mayActDirectly, manifest,
+    get, has, keys, isNever, indexActions, evaluate, isAgentSettableStatus, mayActDirectly, manifest, permissionsFor, validate,
 };

@@ -287,4 +287,6 @@ module.exports = {
     evaluateMany,
     MCP_PERMISSION_KEYS,
     invalidateRoleCache,
+    isWritable,
+    isReadable,
 };
