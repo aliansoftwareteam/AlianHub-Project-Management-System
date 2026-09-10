@@ -1,6 +1,7 @@
 // Reviewer: summarise a linked pull request and flag risk.
 
-const { PRIVATE_HOST, fetchPage } = require('../engine/pageAudit');
+const { fetchPage } = require('../engine/pageAudit');
+const { isBlockedHostname } = require('../engine/safeFetch');
 
 const MAX_DIFF_CHARS = 30000;
 const PR_URL = /https?:\/\/[^\s<>"')]+/g;
@@ -29,7 +30,7 @@ module.exports = {
         if (!url) return { skip: 'no pull request or branch link on this task — attach one with task.link or paste the PR URL in the description' };
         let host;
         try { host = new URL(url).hostname; } catch (e) { return { skip: `the link is not a valid URL: ${url}` }; }
-        if (PRIVATE_HOST.test(host)) return { skip: 'the link points at a private or local host, which agents do not fetch' };
+        if (isBlockedHostname(host)) return { skip: 'the link points at a private or local host, which agents do not fetch' };
         const target = /github\.com\/[^/]+\/[^/]+\/pull\/\d+/.test(url) ? `${url.replace(/\/files.*$/, '')}.diff` : url;
         const page = await fetchPage(target);
         if (page.status >= 400 || !page.html) return { skip: `could not fetch ${target} (HTTP ${page.status})` };

@@ -1,6 +1,6 @@
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
-jest.mock('../Modules/Agents/engine/pageAudit', () => ({ PRIVATE_HOST: /^(localhost$|127\.)/i, fetchPage: jest.fn() }));
+jest.mock('../Modules/Agents/engine/pageAudit', () => ({ fetchPage: jest.fn() }));
 
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { fetchPage } = require('../Modules/Agents/engine/pageAudit');

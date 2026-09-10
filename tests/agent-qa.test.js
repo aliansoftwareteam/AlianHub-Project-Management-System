@@ -1,4 +1,4 @@
-const { auditHtml, extractUrl, PRIVATE_HOST } = require('../Modules/Agents/engine/pageAudit');
+const { auditHtml, extractUrl } = require('../Modules/Agents/engine/pageAudit');
 const { verify, parseModelJson, findingsWithoutModel, getSkill } = require('../Modules/Agents/engine/orchestrator');
 
 const skill = getSkill('qa-review');
