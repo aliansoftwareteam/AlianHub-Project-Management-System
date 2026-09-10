@@ -9,7 +9,7 @@ const DECISION = Object.freeze({ ACT: 'act', PROPOSE: 'propose', REFUSE: 'refuse
 const SCOPES = Object.freeze(['task', 'project', 'workspace']);
 const REVIEW_LEVEL = 2;
 
-const isNever = (key) => registry.NEVER.some((n) => n === key || (n.endsWith('.*') && key.startsWith(n.slice(0, -1))));
+const { isNever } = registry;
 
 const isComplete = (r) => Boolean(r) && typeof r.write === 'boolean' && typeof r.reversible === 'boolean'
     && SCOPES.includes(r.scope) && typeof r.money === 'boolean';
