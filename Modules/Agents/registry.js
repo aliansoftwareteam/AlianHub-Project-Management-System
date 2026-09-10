@@ -41,13 +41,25 @@ const ACTIONS = Object.freeze([
       gate: 'owner_admin', proposeOnly: true },
 ]);
 
-const BY_KEY = new Map(ACTIONS.map((a) => [a.key, a]));
-
-// Named so a reviewer can confirm they are not reachable. Never added to ACTIONS.
+// Named so a reviewer can confirm they are not reachable. A trailing `.*` covers
+// every key under that prefix.
 const NEVER = Object.freeze([
     'project.delete', 'task.delete', 'billing.*', 'deploy.production', 'git.merge',
     'member.remove', 'permissions.edit', 'status.set("Done")',
 ]);
+
+const isNever = (key) => {
+    const k = String(key || '');
+    return NEVER.some((n) => n === k || (n.endsWith('.*') && k.startsWith(n.slice(0, -1))));
+};
+
+const indexActions = (actions) => {
+    const overlap = actions.map((a) => a.key).filter(isNever);
+    if (overlap.length) throw new Error(`never-listed action(s) cannot be registered: ${overlap.join(', ')}`);
+    return new Map(actions.map((a) => [a.key, a]));
+};
+
+const BY_KEY = indexActions(ACTIONS);
 
 const get = (key) => BY_KEY.get(String(key || '')) || null;
 const has = (key) => BY_KEY.has(String(key || ''));
@@ -70,6 +82,7 @@ const isAgentSettableStatus = ({ statusType, name } = {}) => {
 
 /* The one decision every agent call goes through. Returns { allowed, reason, action }. */
 const evaluate = (key, params = {}, { allowedActions } = {}) => {
+    if (isNever(key)) return { allowed: false, code: 'never_listed', reason: `Agents cannot perform ${key} (never_listed)`, action: null };
     const action = get(key);
     if (!action) return { allowed: false, reason: `Agents cannot perform ${key || '(unknown action)'}`, action: null };
     if (Array.isArray(allowedActions) && allowedActions.length && !allowedActions.includes(action.key)) {
@@ -121,5 +134,5 @@ const manifest = () => ({
 
 module.exports = {
     ACTIONS, NEVER, RISK, AUTONOMY, DONE_STATUS_TYPE, DONE_STATUS_TYPES, AGENT_STATUS_NAMES,
-    get, has, keys, evaluate, isAgentSettableStatus, mayActDirectly, manifest,
+    get, has, keys, isNever, indexActions, evaluate, isAgentSettableStatus, mayActDirectly, manifest,
 };

@@ -124,6 +124,6 @@ describe('perform() honours a policy refusal', () => {
         await expect(actions.perform({ companyId: 'c1', actor, action: 'task.comment', params: { taskId: 't1' }, allowedActions: ['task.get'], decision: { decision: 'act', reason: 'x' } }))
             .rejects.toMatchObject({ name: 'RefusedError', message: 'Agents cannot perform task.comment (not in this agent\'s skills)' });
         await expect(actions.perform({ companyId: 'c1', actor, action: 'project.delete', params: {}, decision: { decision: 'act', reason: 'x' } }))
-            .rejects.toMatchObject({ name: 'RefusedError', message: 'Agents cannot perform project.delete' });
+            .rejects.toMatchObject({ name: 'RefusedError', message: 'Agents cannot perform project.delete (never_listed)' });
     });
 });
