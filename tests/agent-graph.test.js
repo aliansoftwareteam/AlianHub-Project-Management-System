@@ -17,7 +17,8 @@ jest.mock('../Modules/Agents/actions', () => {
     return { rating: actual.rating, perform: jest.fn(async () => ({ auditId: 'aud1', result: { subtaskId: 'st1' } })) };
 });
 jest.mock('../Modules/Agents/agentAudit', () => ({ ACTION_DONE: 'agent.action', STATE: { PENDING: 'pending', APPLIED: 'applied', FAILED: 'failed' }, recordProposalDecision: jest.fn(async () => 'dec1'), recordRunReverted: jest.fn(async () => 'rev1'), findById: jest.fn() }));
-jest.mock('../Modules/Agents/undo', () => ({ undoAuditRow: jest.fn(async () => ({ ok: true })) }));
+jest.mock('../Modules/Agents/undo', () => ({ undoAuditRow: jest.fn(async () => ({ ok: true })), REASON: {} }));
+jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(async () => ['p1']) }));
 jest.mock('../Modules/AIProjectGenerator/usage', () => ({ checkConfiguredModelPriced: () => ({ ok: true, reason: '' }), unpricedMessage: (m) => `No price on file for ${m}`, UNPRICED_MODEL: 'unpriced_model', summarize: jest.fn(() => ({ costUsd: 0.01, totalTokens: 100, model: 'm' })) }));
 
 const { Command } = require('@langchain/langgraph');

@@ -16,6 +16,7 @@ const shipping = require('./shipping');
 const agentAudit = require('./agentAudit');
 const { inputsOf } = require('./taskInputs');
 const revert = require('./revert');
+const undo = require('./undo');
 const budget = require('./budget');
 
 const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId) || '';
@@ -24,7 +25,8 @@ const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.c
 const TRIGGERS = ['manual', 'mention', 'schedule', 'rule', 'assignment'];
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
-const fail = (res, statusText, code) => res.status(code || 200).send({ status: false, statusText, message: statusText });
+const fail = (res, statusText, code, extra) => res.status(code || 200).send({ status: false, statusText, message: statusText, ...(extra || {}) });
+const refusalOf = (out) => (out.reason ? { reason: out.reason, undoUntil: out.undoUntil || null } : undefined);
 const invalid = (statusText) => Object.assign(new Error(statusText), { status: 400 });
 const AUTONOMY_MAX = 3;
 const numberOf = (value) => (typeof value === 'number' ? value : (typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN));
@@ -237,11 +239,19 @@ exports.getRun = async (req, res) => {
         if (!run) return fail(res, 'Run not found.', 404);
         const auditRows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ 'meta.runId': String(run._id) }, {}, { sort: { createdAt: 1 }, limit: 200 }] }, 'find').catch(() => []);
         const plain = typeof run.toObject === 'function' ? run.toObject() : { ...run };
-        if (plain.finishedAt && !plain.revertedAt) {
-            const { undoHours } = await require('./budget').settings(companyId).catch(() => ({ undoHours: 24 }));
-            plain.windowEndsAt = new Date(new Date(plain.finishedAt).getTime() + undoHours * 3600000);
+        const { actor } = await humanActor(req);
+        const ctx = await undo.undoContext(companyId, actor, { run: plain });
+        const check = await revert.revertCheck(companyId, plain, { actor, isPrivileged: await privileged(companyId, actor.userId), ...ctx });
+        if (plain.finishedAt && !plain.revertedAt) plain.windowEndsAt = new Date(check.undoUntil);
+        Object.assign(plain, { undoUntil: check.undoUntil, undoable: Boolean(check.ok), undoReason: check.reason || '' });
+        const audit = [];
+        for (const row of auditRows || []) {
+            const o = typeof row.toObject === 'function' ? row.toObject() : { ...row };
+            // eslint-disable-next-line no-await-in-loop
+            const state = o.action === agentAudit.ACTION_DONE ? await undo.undoStateOf(companyId, o, actor, ctx) : null;
+            audit.push(state ? { ...o, undoUntil: state.undoUntil, undoable: state.undoable, undoReason: state.reason } : o);
         }
-        return res.send({ status: true, data: { run: plain, audit: auditRows || [] } });
+        return res.send({ status: true, data: { run: plain, audit } });
     } catch (e) { logger.error(`getRun: ${e.message}`); return fail(res, e.message); }
 };
 
@@ -298,7 +308,7 @@ exports.revertRun = async (req, res) => {
         if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid run id are required.');
         if (!human) return fail(res, 'Agents cannot revert runs.', 403);
         const out = await revert.revertRun(companyId, req.params.id, { actor, isPrivileged: await privileged(companyId, actor.userId), ip: req.ip || '' });
-        if (out.error) return fail(res, out.error, out.status || 200);
+        if (out.error) return fail(res, out.error, out.status || 200, refusalOf(out));
         return res.send({ status: true, statusText: 'Run reverted.', data: out });
     } catch (e) { logger.error(`revertRun: ${e.message}`); return fail(res, e.message); }
 };
@@ -366,7 +376,7 @@ const decide = (fn) => async (req, res) => {
         if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid proposal id are required.');
         if (!human) return fail(res, 'Agents cannot decide proposals — a person has to.', 403);
         const out = await fn(companyId, req.params.id, { decider: actor, isPrivileged: await privileged(companyId, actor.userId), changes: req.body && req.body.changes, reason: req.body && req.body.reason, ip: req.ip || '' });
-        if (out.error) return fail(res, out.error, out.status || 200);
+        if (out.error) return fail(res, out.error, out.status || 200, refusalOf(out));
         return res.send({ status: true, statusText: 'Done.', data: out });
     } catch (e) { logger.error(`proposal decision: ${e.message}`); return fail(res, e.message); }
 };

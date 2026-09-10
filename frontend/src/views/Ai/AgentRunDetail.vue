@@ -19,7 +19,7 @@
             <div class="run-detail__head">
                 <span class="ah-label">{{ $t('Ai.decisions_title') }}</span>
                 <span v-if="run.revertedAt" class="ah-chip ah-chip--dark">{{ $t('Ai.reverted_at', { at: when(run.revertedAt) }) }}</span>
-                <span v-else-if="run.windowEndsAt" class="ah-small">{{ windowOpen ? $t('Ai.revert_window_until', { at: when(run.windowEndsAt) }) : $t('Ai.revert_window_closed') }}</span>
+                <span v-else-if="deadline" class="ah-small" data-test="undo-deadline">{{ windowOpen ? $t('Ai.undo_until', { at: when(deadline) }) : $t('Ai.undo_window_closed_at', { at: when(deadline) }) }}</span>
             </div>
 
             <p v-if="!decisions.length" class="ah-empty run-detail__empty">{{ $t('Ai.no_decisions') }}</p>
@@ -41,8 +41,9 @@
                 </template>
             </div>
 
-            <div v-if="revertable" class="ai-actions run-detail__actions">
-                <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="busy" @click="revert">{{ busy ? $t('Ai.reverting') : $t('Ai.revert_run') }}</button>
+            <div v-if="control !== 'hidden'" class="ai-actions run-detail__actions">
+                <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="busy || control === 'closed'" :title="control === 'closed' ? $t('Ai.undo_window_passed') : ''" @click="revert">{{ busy ? $t('Ai.reverting') : $t('Ai.revert_run') }}</button>
+                <span v-if="control === 'closed'" class="ah-small" data-test="undo-reason">{{ $t('Ai.undo_window_passed') }}</span>
             </div>
         </template>
     </div>
@@ -53,7 +54,7 @@ import { computed, inject, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
-import { useAgents, canRevertRun } from "./useAgents";
+import { useAgents, revertControlState, undoDeadlineOf } from "./useAgents";
 import { normaliseEpisode, declinedLine as declinedText } from "./episodeText";
 
 defineOptions({ name: "AgentRunDetail" });
@@ -74,8 +75,9 @@ const result = ref(null);
 
 const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
 const decisions = computed(() => (Array.isArray(run.value?.decisions) ? run.value.decisions : []));
-const windowOpen = computed(() => !run.value?.windowEndsAt || new Date(run.value.windowEndsAt).getTime() > Date.now());
-const revertable = computed(() => canRevertRun(run.value, { userId: userId?.value ?? userId, privileged: privileged.value }));
+const deadline = computed(() => undoDeadlineOf(run.value));
+const windowOpen = computed(() => !deadline.value || new Date(deadline.value).getTime() > Date.now());
+const control = computed(() => revertControlState(run.value, { userId: userId?.value ?? userId, privileged: privileged.value }));
 
 const UNREACHED = ["failed", "skipped", "stopped"];
 const unreached = computed(() => UNREACHED.includes(run.value?.status));
@@ -125,5 +127,5 @@ onMounted(load);
 .run-decisions__reason { color: var(--ink-2); flex: 1; min-width: 160px; }
 .run-detail__result { margin-top: 10px; font: var(--text-small); color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; }
 .run-detail__failed { margin: 0; padding-left: 18px; }
-.run-detail__actions { margin-top: 10px; }
+.run-detail__actions { margin-top: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 </style>

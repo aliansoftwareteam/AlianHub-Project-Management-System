@@ -6,7 +6,7 @@ vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('@/locales/main', () => ({ i18n: { global: { t: (key) => `t:${key}` } } }));
 vi.mock('@/components/organisms/Shell/shellState', () => ({ shellState: { agentsRunning: 0 } }));
 
-import { NEW_AGENT_DEFAULTS, canRevertRun, reasonOf, refusalCount, runOf, useAgents } from '@/views/Ai/useAgents';
+import { NEW_AGENT_DEFAULTS, canRevertRun, reasonOf, refusalCount, revertControlState, runOf, useAgents } from '@/views/Ai/useAgents';
 import { useParity } from '@/views/Ai/useParity';
 
 const okResponse = (data, extra = {}) => Promise.resolve({ data: { status: true, data, ...extra } });
@@ -119,6 +119,16 @@ describe('canRevertRun', () => {
 
     it('leaves the window to the server when the payload carries none', () => {
         expect(canRevertRun({ status: 'failed', startedBy: 'u1' }, { userId: 'u1', now })).toBe(true);
+    });
+
+    it('follows the server verdict: open, closed on the window, hidden on visibility or permission', () => {
+        expect(revertControlState({ ...done, undoUntil: later, undoable: true, undoReason: '' }, { userId: 'u9', now })).toBe('open');
+        expect(revertControlState({ ...done, undoUntil: earlier, undoable: false, undoReason: 'undo_window_passed' }, { privileged: true, now })).toBe('closed');
+        expect(revertControlState({ ...done, undoUntil: later, undoable: false, undoReason: 'project_not_visible' }, { privileged: true, now })).toBe('hidden');
+        expect(revertControlState({ ...done, undoUntil: later, undoable: false, undoReason: 'not_permitted' }, { userId: 'u1', now })).toBe('hidden');
+        expect(revertControlState({ ...done, undoUntil: earlier, undoable: true }, { privileged: true, now })).toBe('closed');
+        expect(revertControlState({ ...done, windowEndsAt: earlier }, { privileged: true, now })).toBe('closed');
+        expect(revertControlState({ ...done, windowEndsAt: earlier }, { userId: 'u9', now })).toBe('hidden');
     });
 });
 

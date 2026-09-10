@@ -63,6 +63,34 @@ describe('AgentRunDetail', () => {
         expect((await mountDetail({ userId: 'u9' })).find('button').exists()).toBe(false);
     });
 
+    it('shows the undo deadline while the window is open', async () => {
+        const wrapper = await mountDetail({ payload: { run: { ...run, undoUntil: future, undoable: true, undoReason: '' }, audit: [] } });
+        expect(wrapper.find('[data-test="undo-deadline"]').text()).toBe(`Ai.undo_until {"at":"${new Date(future).toLocaleString()}"}`);
+        expect(wrapper.find('button').attributes('disabled')).toBeUndefined();
+        expect(wrapper.find('[data-test="undo-reason"]').exists()).toBe(false);
+    });
+
+    it('keeps the control but disables it with the reason once the window has passed', async () => {
+        const past = new Date(Date.now() - 3600e3).toISOString();
+        const wrapper = await mountDetail({ payload: { run: { ...run, windowEndsAt: past, undoUntil: past, undoable: false, undoReason: 'undo_window_passed' }, audit: [] } });
+        expect(wrapper.find('[data-test="undo-deadline"]').text()).toBe(`Ai.undo_window_closed_at {"at":"${new Date(past).toLocaleString()}"}`);
+        const button = wrapper.find('button');
+        expect(button.exists()).toBe(true);
+        expect(button.attributes('disabled')).toBeDefined();
+        expect(button.attributes('title')).toBe('Ai.undo_window_passed');
+        expect(wrapper.find('[data-test="undo-reason"]').text()).toBe('Ai.undo_window_passed');
+        await button.trigger('click');
+        expect(apiRequest.mock.calls.some(([type]) => type === 'post')).toBe(false);
+    });
+
+    it('hides the control entirely when the caller cannot see the project', async () => {
+        const wrapper = await mountDetail({ roleType: 1, payload: { run: { ...run, undoUntil: future, undoable: false, undoReason: 'project_not_visible' }, audit: [] } });
+        expect(wrapper.find('button').exists()).toBe(false);
+        expect(wrapper.find('[data-test="undo-reason"]').exists()).toBe(false);
+        const denied = await mountDetail({ payload: { run: { ...run, undoUntil: future, undoable: false, undoReason: 'not_permitted' }, audit: [] } });
+        expect(denied.find('button').exists()).toBe(false);
+    });
+
     it('hides revert once the run is reverted and shows the reverted state', async () => {
         const wrapper = await mountDetail({ payload: { run: { ...run, revertedAt: '2026-09-05T10:00:00Z' }, audit: [] } });
         expect(wrapper.find('button').exists()).toBe(false);

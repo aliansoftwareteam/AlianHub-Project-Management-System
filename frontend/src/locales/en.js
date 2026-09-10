@@ -1603,8 +1603,9 @@ export default {
         reverted_at: "Reverted {at}",
         reverted_n: "Reverted {n} action(s).",
         revert_partial: "{n} action(s) did not revert:",
-        revert_window_until: "Can be reverted until {at}",
-        revert_window_closed: "The revert window has closed.",
+        undo_until: "Undo until {at}",
+        undo_window_closed_at: "The undo window closed at {at}",
+        undo_window_passed: "The undo window has passed.",
         revert_failed: "The run was not reverted.",
         run_load_failed: "Could not load this run."
         ,no_actions_title: "No actions registered",
@@ -5454,6 +5455,8 @@ export default {
         undone_at: "undone {t}",
         undone_toast: "Reverted, and logged as you.",
         undo_failed: "That could not be undone.",
+        undo_until: "Undo until {t}",
+        undo_window_passed: "The undo window has passed.",
         export_failed: "The export did not download.",
         load_more: "Load more",
         retention: "Retained 400 days. Undo replays the inverse action and logs it as you."

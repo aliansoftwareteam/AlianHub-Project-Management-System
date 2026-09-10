@@ -5,6 +5,7 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 jest.mock('../Config/permissionGuard', () => ({ ROLE_OWNER: 1, ROLE_ADMIN: 2, getRoleType: jest.fn(async (c, uid) => (uid === 'owner1' ? 1 : 3)), isPrivileged: (r) => r === 1 || r === 2 }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
+jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(async () => ['p1']) }));
 jest.mock('../Modules/Agents/actor', () => {
     const isAgent = (a) => a && a.kind === 'agent';
     return {
@@ -121,7 +122,7 @@ describe('whole-run revert', () => {
     it('is refused while the run is still open, already reverted, or made no changes', async () => {
         const running = seedRun({ status: 'running', finishedAt: null });
         await seedActions(running);
-        expect(await revert.revertRun(C, running._id, as(owner, true))).toEqual({ error: 'Run is still running — stop it first.', status: 409 });
+        expect(await revert.revertRun(C, running._id, as(owner, true))).toMatchObject({ error: 'Run is still running — stop it first.', status: 409 });
         const waiting = seedRun({ status: 'waiting_approval' });
         expect((await revert.revertRun(C, waiting._id, as(owner, true))).error).toBe('Run is still waiting_approval — stop it first.');
 
@@ -166,7 +167,7 @@ describe('whole-run revert', () => {
     it('lets the starter revert but nobody else without owner/admin', async () => {
         const run = seedRun();
         await seedActions(run);
-        expect(await revert.revertRun(C, run._id, as(other))).toEqual({ error: 'Only an Owner, an Admin or the person who started the run can revert it.', status: 403 });
+        expect(await revert.revertRun(C, run._id, as(other))).toMatchObject({ error: 'Only an Owner, an Admin or the person who started the run can revert it.', status: 403 });
         expect(runRow(run._id).revertedAt).toBeUndefined();
         expect((await revert.revertRun(C, run._id, as(starter))).reverted).toBe(6);
         expect(runRow(run._id).revertedBy).toBe('u1');

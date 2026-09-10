@@ -66,14 +66,26 @@ export const runOf = (payload) => {
     return payload;
 };
 
-/* A run can be reverted by an owner/admin or by whoever started it, once it has
- * stopped touching things and only while the undo window is open. When the
- * payload carries no windowEndsAt the server is left to decide. */
-export const canRevertRun = (run, { userId, privileged, now = Date.now() } = {}) => {
-    if (!run || run.revertedAt || OPEN_RUN.includes(run.status)) return false;
-    if (run.windowEndsAt && new Date(run.windowEndsAt).getTime() <= now) return false;
-    return Boolean(privileged) || (Boolean(userId) && String(run.startedBy || "") === String(userId));
+export const undoDeadlineOf = (run) => (run && (run.undoUntil || run.windowEndsAt)) || null;
+
+/* What the revert control should do: "hidden" when the caller cannot see the
+ * project or may not revert, "closed" when only the undo window stands in the
+ * way, "open" otherwise. The server's verdict (undoable / undoReason) wins; a
+ * payload without one falls back to the owner-admin-or-starter rule. */
+export const revertControlState = (run, { userId, privileged, now = Date.now() } = {}) => {
+    if (!run || run.revertedAt || OPEN_RUN.includes(run.status)) return "hidden";
+    const until = undoDeadlineOf(run);
+    const windowOpen = !until || new Date(until).getTime() > now;
+    if (typeof run.undoable === "boolean") {
+        if (run.undoable) return windowOpen ? "open" : "closed";
+        return run.undoReason === "undo_window_passed" ? "closed" : "hidden";
+    }
+    const permitted = Boolean(privileged) || (Boolean(userId) && String(run.startedBy || "") === String(userId));
+    if (!permitted) return "hidden";
+    return windowOpen ? "open" : "closed";
 };
+
+export const canRevertRun = (run, options) => revertControlState(run, options) === "open";
 
 export function autonomyOf(level) {
     return AUTONOMY.find((a) => a.level === Number(level)) || AUTONOMY[0];

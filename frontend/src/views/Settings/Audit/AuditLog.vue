@@ -64,13 +64,17 @@
                             <div class="al__meta">
                                 <span v-if="row.meta && row.meta.runId" class="ah-mono al__run">{{ $t('Audit.run_n', { n: String(row.meta.runId).slice(-4) }) }}</span>
                                 <span v-if="row.meta && row.meta.undoneAt" class="ah-chip ah-chip--warn">{{ $t('Audit.undone_at', { t: time(row.meta.undoneAt) }) }}</span>
-                                <button
-                                    v-else-if="row.meta && row.meta.undoable"
-                                    type="button"
-                                    class="ah-btn ah-btn--ghost ah-btn--sm"
-                                    :disabled="undoingId === row._id"
-                                    @click="undo(row)"
-                                >{{ undoingId === row._id ? $t('Audit.undoing') : $t('Audit.undo') }}</button>
+                                <template v-else-if="row.meta && row.meta.undoable && row.undoReason !== 'project_not_visible'">
+                                    <button
+                                        type="button"
+                                        class="ah-btn ah-btn--ghost ah-btn--sm"
+                                        :disabled="undoingId === row._id || row.undoable === false"
+                                        :title="row.undoable === false ? $t('Audit.undo_window_passed') : ''"
+                                        @click="undo(row)"
+                                    >{{ undoingId === row._id ? $t('Audit.undoing') : $t('Audit.undo') }}</button>
+                                    <span v-if="row.undoable === false" class="ah-small">{{ $t('Audit.undo_window_passed') }}</span>
+                                    <span v-else-if="row.undoUntil" class="ah-small">{{ $t('Audit.undo_until', { t: deadline(row.undoUntil) }) }}</span>
+                                </template>
                                 <span v-else-if="row.action === 'agent.action_refused'" class="ah-small">{{ $t('Audit.nothing_ran') }}</span>
                             </div>
                         </td>
@@ -133,6 +137,7 @@ const actorName = (row) => (isAgent(row) ? row.meta.agentName || t("Audit.an_age
 const initial = (row) => actorName(row).charAt(0).toUpperCase();
 const eventAction = (row) => (row.meta && row.meta.action) || row.action;
 const time = (at) => (at ? moment(at).format("HH:mm") : "");
+const deadline = (at) => (at ? moment(at).format("D MMM HH:mm") : "");
 
 const query = (extra = {}) => {
     const q = { page: page.value, limit: 25, ...extra };
