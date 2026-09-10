@@ -1,6 +1,6 @@
 # 016 — Agent trust layer: risk-rated actions, policy-reviewed L2, whole-run revert, budgets
 
-Status: planned · runs in parallel with 015 · branch `feat/agent-trust-layer` (from `beta`)
+Status: merged 2026-09-05 (PR #545), member-role sweep open · ran in parallel with 015 · branch `feat/agent-trust-layer` (from `beta`)
 
 ## Goal
 An owner can leave an agent at L2 and trust it: every action is rated for risk, a policy decides per action whether to act or to propose, any run can be reverted as a whole inside a window the owner sets, and spend is capped and alerted per company.

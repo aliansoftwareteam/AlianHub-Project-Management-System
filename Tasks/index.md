@@ -23,8 +23,18 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 015 | Guided project start — complete brief, agent/human split | active | high | 014 | active/015-guided-project-brief |
 | 016 | Agent trust layer — risk-rated actions, policy L2, whole-run revert, budgets | active | high | 014 | active/016-agent-trust-layer |
 | 017 | Agent memory the product owns | active | high | 015, 016 | active/017-agent-memory |
-| 018 | MCP both ways — OAuth, scopes, external agents as teammates | backlog | medium | 016 | backlog/018-agent-interop |
-| 019 | Evals and observability for agent runs | backlog | high | 016 | backlog/019-agent-evals-observability |
+| 018 | Sprint 10 — external agents: OAuth, scopes, delegation | backlog | medium | 028, 031 | backlog/018-agent-interop |
+| 019 | Sprint 9 — evals and routing measurement | backlog | medium | 026, 027, 030 | backlog/019-agent-evals-observability |
 | 020 | Automation comments show as Ghost User | backlog | medium | — | backlog/020-automation-comment-author |
 | 021 | Maintainability leftovers verified 2026-09-10 | backlog | medium | — | backlog/021-maintainability-leftovers |
 | 022 | Pieces worth porting from the closed pre-redesign PRs | backlog | low | — | backlog/022-salvage-from-closed-prs |
+| 023 | Sprint 0 — stop the bleeding: exploitable findings and cost correctness | active | high | — | active/023-sprint-0-stop-the-bleeding |
+| 024 | Sprint 1 — shared AI core and run correctness | backlog | high | 023 | backlog/024-sprint-1-shared-core-run-correctness |
+| 025 | Sprint 2 — agent revisions and the skill record | backlog | high | 024 | backlog/025-sprint-2-revisions-and-skill-record |
+| 026 | Sprint 3 — observability foundation | backlog | high | 024 | backlog/026-sprint-3-observability-foundation |
+| 027 | Sprint 4 — the model router | backlog | high | 024, 026 | backlog/027-sprint-4-model-router |
+| 028 | Sprint 5 — the workflow engine | backlog | high | 024, 027 | backlog/028-sprint-5-workflow-engine |
+| 029 | Sprint 6 — skill authoring and migration | backlog | medium | 025, 028 | backlog/029-sprint-6-skill-authoring-migration |
+| 030 | Sprint 7 — knowledge and retrieval | backlog | medium | 024 | backlog/030-sprint-7-knowledge-and-retrieval |
+| 031 | Sprint 8 — security hardening | backlog | high | 024 | backlog/031-sprint-8-security-hardening |
+| 032 | Sprint 11 — data skills reach outside (ADR 003 phase 4) | backlog | medium | 029, 031 | backlog/032-sprint-11-data-skills-reach |

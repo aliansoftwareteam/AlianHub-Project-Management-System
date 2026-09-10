@@ -1,5 +1,7 @@
 # Agents roadmap — from the 2026-09-05 research
 
+> The table below was delivered through task 017 (PR #552). The programme that follows it is the sprint plan filed on 2026-09-10; see "Sprint programme" at the end.
+
 Source: `Tasks/active/015-guided-project-brief/research.md` (74 sources). Principle: every slice merges to `beta` behind the existing agents flag with the three gates (static review, API sweep, browser sweep) inside the task. One release from beta to main at the end of the programme (owner decision, 2026-09-05).
 
 | Order | Task | Slice delivers | Size | Bet from the research |
@@ -27,3 +29,24 @@ Why this order: 015 and 016 run in parallel (owner decision, 2026-09-05) — 015
 | Shared, integrator merges | `Modules/Agents/routes.js` (each adds its own lines), `frontend/src/locales/en.js` (separate namespaces), `frontend/src/views/Ai/agentFit.js` (015 only reads it; 016 does not touch it) |
 
 015's execute hook into `runs.create` uses the public functions of runs.js as they are on beta today; if 016 changes their signatures, 016 updates the call site at merge.
+
+## Sprint programme (owner decision 2026-09-10)
+
+Source: `docs/AI-PLATFORM-ARCHITECTURE.md`. One task per sprint, one pull request per step, everything on `beta` behind flags, one release to `main` at the end. Sprints 7 and 8 can run on a parallel track.
+
+| Sprint | Task | Delivers | Size | Needs | Status |
+|---|---|---|---|---|---|
+| 0 | 023 | stop the bleeding: exploitable findings and cost correctness | one week | — | active |
+| 1 | 024 | shared AI core and run correctness | two weeks | 023 | backlog |
+| 2 | 025 | agent revisions and the skill record | two weeks | 024 | backlog |
+| 3 | 026 | observability foundation | two weeks | 024 | backlog |
+| 4 | 027 | the model router | two weeks | 024, 026 | backlog |
+| 5 | 028 | the workflow engine | three weeks | 024, 027 | backlog |
+| 6 | 029 | skill authoring and migration | two weeks | 025, 028 | backlog |
+| 7 | 030 | knowledge and retrieval | three weeks | 024 | backlog |
+| 8 | 031 | security hardening | three weeks | 024 | backlog |
+| 9 | 019 | evals and routing measurement | two weeks | 026, 027, 030 | backlog |
+| 10 | 018 | external agents: OAuth, scopes, delegation | three weeks | 028, 031 | backlog |
+| 11 | 032 | data skills reach outside (ADR 003 phase 4) | two weeks | 029, 031 | backlog |
+
+Totals: 12 tasks, 55 steps, about 27 weeks of engineering; Sprint 0 is active, the rest backlog. Existing 018 and 019 were rewritten as Sprints 10 and 9; Sprint 11 (ADR 003 phase 4) was added because the document's plan had no home for it.
