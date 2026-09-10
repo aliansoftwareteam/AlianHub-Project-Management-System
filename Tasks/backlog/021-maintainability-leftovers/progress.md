@@ -4,6 +4,7 @@
 Tick each box with the commit that closed it.
 
 - [ ] Delete dead `Modules/notification/routes.js`
+- [ ] No `GET /api/v1/notifications/preferences` route exists: the path falls through to `GET /api/v1/notifications/:id` (`Modules/settings/settingNotifications/routes.js:7`) and answers with a document whose `userId` is the literal string `"preferences"`. Add the GET route or make the `:id` handler reject a non-ObjectId id (found during the 017 UI sweep, 2026-09-10)
 - [ ] `Modules/Sprints/controller.js:172/233` — "UserId required" from `HandleHistory` during the demo seed
 - [ ] `docker-compose.yml:24/61/102` — parameterise or document the `container_name` values
 - [ ] Instance restore orphans databases of companies created after the backup
