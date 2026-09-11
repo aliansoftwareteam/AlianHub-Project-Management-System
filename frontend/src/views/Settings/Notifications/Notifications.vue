@@ -67,6 +67,28 @@
             <AhSwitch v-model="prefs.agentActivity" :label="$t('Settings.agent_activity')" @update:modelValue="savePrefs()" />
         </section>
 
+        <section v-if="aiAlerts.eligible" class="ah-card" data-test="ai-alerts">
+            <div class="ah-card__body nt__quiet">
+                <div class="nt__quiet-head">
+                    <h3 class="ah-h3">{{ $t('AiAlerts.section_title') }}</h3>
+                    <router-link v-if="healthRoute" :to="healthRoute" class="ah-small nt__ai-link" data-test="ai-alerts-thresholds">{{ $t('AiAlerts.edit_thresholds') }}</router-link>
+                </div>
+                <div class="ah-small">{{ $t('AiAlerts.section_lead') }}</div>
+                <div v-if="alertSettings && !alertSettings.enabled" class="nt__ai-off ah-small" data-test="ai-alerts-off">
+                    <span class="ai-alerts__mark ai-alerts__mark--clear" aria-hidden="true"></span>{{ $t('AiAlerts.disabled_note') }}
+                </div>
+                <div v-for="type in ALERT_TYPES" :key="type" class="nt__ai-row" :class="{ 'is-off': !aiAlerts.values[type] }" :data-type="type" :data-state="aiAlerts.values[type] ? 'on' : 'off'">
+                    <span class="ai-alerts__mark nt__ai-mark" :class="`ai-alerts__mark--${ALERT_FORMS[type]}`" aria-hidden="true"></span>
+                    <div class="nt__switch-text">
+                        <strong>{{ $t(`AiAlerts.type_${type}`) }}</strong>
+                        <div class="ah-small" :data-explain="type">{{ explainAlert(type) }}</div>
+                    </div>
+                    <AhSwitch :model-value="!!aiAlerts.values[type]" :label="$t('AiAlerts.toggle_label', { name: $t(`AiAlerts.type_${type}`) })" @update:modelValue="saveAiAlert(type, $event)" />
+                </div>
+                <div v-if="aiAlertsError" class="ah-field__error" data-test="ai-alerts-error">{{ aiAlertsError }}</div>
+            </div>
+        </section>
+
         <section class="ah-card nt__switch-card">
             <div class="nt__switch-text">
                 <strong>{{ $t('Settings.daily_digest') }}</strong>
@@ -81,6 +103,7 @@
 <script setup>
 import { computed, inject, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import * as env from "@/config/env";
@@ -89,6 +112,7 @@ import AhSwitch from "@/components/molecules/Setting/AhSwitch.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
 import { markFirstRunStep, FIRST_RUN_STEPS } from "@/composable/firstRunProgress";
+import { ALERT_FORMS, ALERT_TYPES, explanationOf } from "@/views/Ai/rateAlerts";
 
 defineOptions({ name: "NotificationSettings" });
 
@@ -97,13 +121,14 @@ const $toast = useToast();
 const userId = inject("$userId");
 const companyId = inject("$companyId");
 const { getters, dispatch } = useStore();
+const router = useRouter();
 
 const HIDDEN_ITEMS = new Set([
     "project_description", "project_checklist", "project_checklist_remove", "project_checklist_assign",
     "task_description", "task_checklist", "task_checklist_assign", "task_checklist_remove",
     "after_3_hours_today_pending_hours", "logged_hours_notification"
 ]);
-const META_KEYS = new Set(["updatedAt", "createdAt", "_id", "userId", "__v", "quietHours", "agentActivity", "dailyDigest"]);
+const META_KEYS = new Set(["updatedAt", "createdAt", "_id", "userId", "__v", "quietHours", "agentActivity", "dailyDigest", "aiAlerts"]);
 const SECTION_ORDER = ["tasks", "project", "before", "chat"];
 
 const channels = [
@@ -120,6 +145,39 @@ const prefs = ref({ quietHours: { enabled: false, start: "19:00", end: "09:00", 
 const prefsError = ref("");
 
 const rulesGetter = computed(() => getters["settings/notificationSettings"]);
+const aiAlerts = ref({ eligible: false, values: {} });
+const alertSettings = ref(null);
+const aiAlertsError = ref("");
+
+const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
+const healthRoute = computed(() => (router?.hasRoute?.("AiHealth") ? { name: "AiHealth", params: { cid: companyId?.value } } : null));
+const explainAlert = (type) => {
+    const { key, params } = explanationOf(type, alertSettings.value);
+    return t(key, params);
+};
+
+async function loadAiAlerts() {
+    if (!privileged.value) return;
+    const [prefsRes, settingsRes] = await Promise.allSettled([
+        apiRequest("get", env.NOTIFICATION_PREFERENCES),
+        apiRequest("get", env.AGENT_SETTINGS)
+    ]);
+    const data = prefsRes.status === "fulfilled" ? prefsRes.value?.data?.data : null;
+    if (data?.aiAlertsEligible && data.aiAlerts) aiAlerts.value = { eligible: true, values: { ...data.aiAlerts } };
+    if (settingsRes.status === "fulfilled" && settingsRes.value?.data?.status === true) alertSettings.value = settingsRes.value.data.data?.alerts || null;
+}
+
+async function saveAiAlert(type, value) {
+    aiAlertsError.value = "";
+    const previous = aiAlerts.value.values[type];
+    aiAlerts.value.values[type] = value;
+    try {
+        await apiRequest("put", env.NOTIFICATION_PREFERENCES, { id: rulesGetter.value._id, aiAlerts: { [type]: value } });
+    } catch (error) {
+        aiAlerts.value.values[type] = previous;
+        aiAlertsError.value = error?.response?.data?.message || t("AiAlerts.save_failed");
+    }
+}
 
 function hydrate(doc) {
     if (!doc || !Object.keys(doc).length) return;
@@ -181,6 +239,7 @@ onMounted(async () => {
             await dispatch("settings/setNotificationRules", { userId: userId.value, cid: companyId.value });
         }
         hydrate(rulesGetter.value);
+        await loadAiAlerts();
     } catch (error) {
         $toast.error(t("Toast.something_went_wrong"), { position: "top-right" });
     } finally {
@@ -191,6 +250,18 @@ onMounted(async () => {
 watch(rulesGetter, (val) => hydrate(val));
 </script>
 
+<style>
+@import "../../Ai/rateAlerts.css";
+</style>
+
 <style scoped>
 @import "./style.css";
+.nt__ai-link { color: var(--brand); text-decoration: none; }
+.nt__ai-link:hover { text-decoration: underline; }
+.nt__ai-off { display: flex; align-items: center; color: var(--warn-ink); }
+.nt__ai-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--hairline); }
+.nt__ai-row.is-off .nt__switch-text { opacity: .6; }
+.nt__ai-row.is-off .nt__ai-mark { background: transparent; border: 1.5px solid currentColor; }
+.nt__ai-row.is-off .nt__ai-mark.ai-alerts__mark--triangle { border: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 9px solid var(--ink-2); }
+.nt__ai-mark { color: var(--brand); }
 </style>

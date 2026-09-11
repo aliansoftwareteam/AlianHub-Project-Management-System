@@ -95,6 +95,8 @@ const readNotifications = async (companyId, userId, { limit, read, sort, ids, ex
         type: String(r.type || ''),
         Key: r.Key,
         companyId: String(r.companyId || ''),
+        changeType: String(r.changeType || ''),
+        changeData: r.changeType === 'agent_alert' && r.changeData && typeof r.changeData === 'object' ? r.changeData : undefined,
         // Rows an agent wrote carry an agent type or key; a person never does.
         agent: String(r.type || '').toLowerCase() === 'agent' || /^agent[_-]/i.test(String(r.key || '')),
         // WHO did this, as an id — resolved to a name and picture on the client through

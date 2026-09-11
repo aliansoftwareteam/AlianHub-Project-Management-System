@@ -95,6 +95,7 @@ const dbCollections = {
     AGENT_REVISIONS: "agent_revisions",
     AI_USAGE: "ai_usage",
     AI_REPLAYS: "ai_replays",
+    AI_ALERTS: "ai_alerts",
     AGENT_PROPOSALS: "agent_proposals",
     AGENT_SKILLS: "agent_skills",
     CALLS: "calls",
