@@ -10,11 +10,17 @@ vi.mock('@/components/organisms/Shell/shellState', () => ({ shellState: { agents
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', render: () => null } }));
 
 import InstanceAgents from '@/views/Settings/Instance/InstanceAgents.vue';
-import { budgetView } from '@/views/Settings/Instance/agentBudget';
+import { budgetView, featureLabelKey } from '@/views/Settings/Instance/agentBudget';
 
 const settings = { undoHours: 24, monthlyBudgetUsd: 200, provider: { name: 'anthropic', hasKey: true, region: 'eu' } };
 const warnBudget = { month: '2026-09', usedUsd: 170, budgetUsd: 200, percent: 85, alerts: { 80: '2026-09-04T10:00:00Z', 100: null } };
 const overBudget = { month: '2026-09', usedUsd: 240, budgetUsd: 200, percent: 120, alerts: { 80: '2026-09-02T10:00:00Z', 100: '2026-09-04T18:00:00Z' } };
+const features = [
+    { feature: 'project_plan', usd: 102, calls: 3, tokens: 900000 },
+    { feature: 'agent_run', usd: 51, calls: 40, tokens: 400000 },
+    { feature: 'ask', usd: 17, calls: 120, tokens: 90000 },
+    { feature: 'mystery_feature', usd: 0, calls: 1, tokens: 10 },
+];
 
 const ok = (data) => Promise.resolve({ data: { status: true, data } });
 
@@ -37,6 +43,17 @@ describe('budgetView', () => {
         expect(budgetView(warnBudget)).toMatchObject({ used: 170, cap: 200, percent: 85, width: 85, level: 'warn' });
         expect(budgetView(overBudget)).toMatchObject({ percent: 120, width: 100, level: 'over' });
         expect(budgetView({ usedUsd: 10, budgetUsd: 200 })).toMatchObject({ percent: 5, level: 'ok' });
+    });
+
+    it('breaks spend down per feature with each feature\'s share of the month', () => {
+        const view = budgetView({ ...warnBudget, features });
+        expect(view.features.map((f) => [f.feature, f.usd, f.share, f.calls])).toEqual([
+            ['project_plan', 102, 60, 3], ['agent_run', 51, 30, 40], ['ask', 17, 10, 120], ['mystery_feature', 0, 0, 1],
+        ]);
+        expect(budgetView(warnBudget).features).toEqual([]);
+        expect(budgetView({ usedUsd: 0, features: [{ feature: 'ask', usd: 0 }] }).features[0]).toMatchObject({ share: 0, calls: 0 });
+        expect(featureLabelKey('project_plan')).toBe('Instance.feature_project_plan');
+        expect(featureLabelKey('mystery_feature')).toBe('Instance.feature_unknown');
     });
 
     it('never warns without a cap and lists both alert thresholds', () => {
@@ -74,6 +91,27 @@ describe('InstanceAgents', () => {
         expect(bar.find('.in-meter__fill').attributes('style')).toContain('width: 100%');
         expect(wrapper.find('[data-test="alert-100"]').attributes('data-state')).toBe('sent');
         expect(wrapper.find('[data-test="alert-100"]').classes()).toContain('ah-chip--danger');
+    });
+
+    it('shows every feature\'s spend against the budget next to the alerts, unknown tags included', async () => {
+        const wrapper = await mountPanel({ budget: { ...warnBudget, features } });
+        const rows = wrapper.findAll('[data-test="features"] li');
+        expect(rows).toHaveLength(4);
+        expect(rows[0].attributes('data-test')).toBe('feature-project_plan');
+        expect(rows[0].find('.in-features__name').text()).toBe('Instance.feature_project_plan');
+        expect(rows[0].find('.in-features__fill').attributes('style')).toContain('width: 60%');
+        expect(rows[0].find('.in-features__line').text()).toBe('Instance.agent_feature_line');
+        expect(rows[1].attributes('data-test')).toBe('feature-agent_run');
+        expect(rows[3].find('.in-features__name').text()).toBe('Instance.feature_unknown');
+        expect(wrapper.find('[data-test="features-empty"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="alert-80"]').attributes('data-state')).toBe('sent');
+        expect(wrapper.find('[data-test="usage-line"]').exists()).toBe(true);
+    });
+
+    it('says so when nothing has been booked this month', async () => {
+        const wrapper = await mountPanel({ budget: { ...warnBudget, usedUsd: 0, percent: 0, features: [] } });
+        expect(wrapper.find('[data-test="features"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="features-empty"]').text()).toBe('Instance.agent_features_none');
     });
 
     it('shows the provider with key presence and never a key field', async () => {

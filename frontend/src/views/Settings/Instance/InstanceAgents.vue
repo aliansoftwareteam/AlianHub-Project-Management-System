@@ -49,6 +49,23 @@
             </div>
 
             <div class="in-field">
+                <div>
+                    <span class="in-field__label">{{ $t('Instance.agent_features') }}</span>
+                    <div class="in-field__help">{{ $t('Instance.agent_features_help') }}</div>
+                </div>
+                <div class="in-field__control">
+                    <span v-if="!view.features.length" class="ah-small" data-test="features-empty">{{ $t('Instance.agent_features_none') }}</span>
+                    <ul v-else class="in-features" data-test="features">
+                        <li v-for="f in view.features" :key="f.feature" class="in-features__row" :data-test="`feature-${f.feature}`">
+                            <span class="in-features__name">{{ featureLabel(f.feature) }}</span>
+                            <span class="in-features__bar" aria-hidden="true"><span class="in-features__fill" :style="{ width: `${f.share}%` }"></span></span>
+                            <span class="ah-small ah-mono in-features__line">{{ $t('Instance.agent_feature_line', { usd: f.usd.toFixed(2), share: f.share, calls: f.calls }) }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="in-field">
                 <div><span class="in-field__label">{{ $t('Instance.agent_provider') }}</span></div>
                 <div class="in-field__control in-provider" data-test="provider">
                     <span v-if="!provider.name" class="ah-small">{{ $t('Instance.agent_provider_none') }}</span>
@@ -81,7 +98,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { reasonOf } from "@/views/Ai/useAgents";
-import { budgetView } from "./agentBudget";
+import { budgetView, featureLabelKey } from "./agentBudget";
 
 defineOptions({ name: "InstanceAgents" });
 
@@ -105,6 +122,7 @@ const usageLine = computed(() => (view.value.cap > 0
     : t("Instance.agent_usage_uncapped", { used: view.value.used.toFixed(2) })));
 
 const when = (at) => (at ? new Date(at).toLocaleString() : "");
+const featureLabel = (feature) => t(featureLabelKey(feature));
 const alertChip = (a) => (!a.at ? "ah-chip--mono" : a.threshold >= 100 ? "ah-chip--danger" : "ah-chip--warn");
 
 const unwrap = (res) => {
@@ -157,5 +175,10 @@ onMounted(load);
 .in-meter.is-warn .in-meter__fill { background: var(--warn-ink, #b54708); }
 .in-meter.is-over .in-meter__fill { background: var(--danger-ink, #b42318); }
 .in-alerts { display: flex; flex-wrap: wrap; gap: 6px; }
+.in-features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-width: 520px; }
+.in-features__row { display: grid; grid-template-columns: minmax(120px, 1fr) 2fr auto; align-items: center; gap: 10px; }
+.in-features__bar { position: relative; height: 6px; border-radius: 999px; background: var(--hairline); overflow: hidden; }
+.in-features__fill { display: block; height: 100%; border-radius: inherit; background: var(--accent, #3b5bdb); }
+.in-features__line { white-space: nowrap; }
 .in-provider { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 8px; }
 </style>
