@@ -1,13 +1,24 @@
 const { handleMulterStorage } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const ctrlV2 = require('./controllerV2');
 const multer = require("multer");
-const { DEFAULT_LIMITS, safeFileFilter } = require('../../utils/uploadConfig');
+const { DEFAULT_LIMITS } = require('../../utils/uploadConfig');
+const { USER_PROFILES_BUCKET, refuseBeforeWrite, refuseUpload, uploadRefusal } = require('../storage/bucketAccess');
+
+/* The storage engine writes to the bucket named in the body, while the middleware only verified the companyid header. */
+const captureRefusal = (req) => {
+    const { companyId, path } = req.body || {};
+    if (!companyId || companyId === USER_PROFILES_BUCKET || companyId !== req.headers.companyid) {
+        return { code: 403, statusText: 'You do not have access to this bucket' };
+    }
+    return uploadRefusal(req, companyId, path);
+};
 
 const upload = multer({
     ...handleMulterStorage(),
     limits: DEFAULT_LIMITS,
-    fileFilter: safeFileFilter,
+    fileFilter: refuseBeforeWrite(captureRefusal),
 });
+const captureGuard = refuseUpload(captureRefusal);
 
 exports.init = (app) => {
     // V2 VERSION START
@@ -477,9 +488,9 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v2/timetracker/capture',upload.single("file"), ctrlV2.captureTimetracker);
-    app.post('/api/v3/timetracker/capture',upload.single("file"), ctrlV2.captureTimetracker2);
-    app.post('/api/v4/timetracker/capture',upload.single("file"), ctrlV2.captureTimetracker3);
+    app.post('/api/v2/timetracker/capture', upload.single("file"), captureGuard, ctrlV2.captureTimetracker);
+    app.post('/api/v3/timetracker/capture', upload.single("file"), captureGuard, ctrlV2.captureTimetracker2);
+    app.post('/api/v4/timetracker/capture', upload.single("file"), captureGuard, ctrlV2.captureTimetracker3);
 
 
 /* TIME SHEET DETAILS GET */

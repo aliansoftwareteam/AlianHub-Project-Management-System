@@ -44,7 +44,7 @@
   "projectSetting/wipLimit.js": 1,
   "storage/server/controller.js": 6,
   "storage/server/helpers/bucket.helper.js": 1,
-  "storage/wasabi/controller.js": 10,
+  "storage/wasabi/controller.js": 9,
   "taskIndex/controller.js": 10,
   "trackerUserPermission/controller.js": 1
 }

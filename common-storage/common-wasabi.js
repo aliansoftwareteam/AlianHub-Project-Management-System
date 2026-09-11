@@ -148,9 +148,7 @@ exports.handleChargeebeCreditNotUpload = (companyId,localFilePath,filedata,id) =
     })
 }
 
-exports.handleBucketSizeUpdateCron = () => {
-    getBucketSize();
-}
+exports.handleBucketSizeUpdateCron = () => getBucketSize();
 exports.cleanUpTrackshot = async () => {
     cleanUpTrackshotStorage();
 }
