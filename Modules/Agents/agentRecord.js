@@ -4,6 +4,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const registry = require('./registry');
 const runs = require('./runs');
+const revisions = require('./revisions');
 
 const DEFAULTS = Object.freeze({ autonomy: 0, spendCapUsd: 30, paused: false, account: 'workspace', deletedStatusKey: 0 });
 
@@ -15,6 +16,7 @@ const createAgentRecord = async (companyId, fields, { ownerId } = {}) => {
         type: SCHEMA_TYPE.AGENTS,
         data: { ...DEFAULTS, ...fields, name, allowedActions, ownerId: ownerId ? String(ownerId) : undefined },
     }, 'save');
+    await revisions.recordCreate(companyId, saved, { actor: ownerId ? { userId: String(ownerId) } : undefined });
     runs.emitAgent(companyId, { agent: saved });
     return saved;
 };

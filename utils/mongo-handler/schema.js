@@ -843,6 +843,30 @@ const schema = {
         episode: { type: Object, required: false },
         // LangGraph thread the run executes on (the run id); resumed by approve/decline
         threadId: { type: String, required: false },
+        // agent_revisions.n pinned at start; absent on runs from before revisions (read as 0)
+        agentRevision: { type: Number, required: false },
+        // { key, hash, n } — the skill identity pinned at start; n is null until skills are data
+        skillRevision: { type: Object, required: false },
+    },
+    agentRevisions: {
+        agentId: { type: String, required: true },
+        n: { type: Number, required: true },
+        // draft | candidate | live | superseded — the only fields that change after creation are state and its timestamps
+        state: { type: String, required: true },
+        // every agent field that affects a run, frozen at creation
+        snapshot: { type: Object, required: true },
+        // skill keys the revision executes
+        serves: { type: Array, default: [], required: false },
+        // [{ key, hash, n }] — the identity of each skill when the revision was written
+        skillRefs: { type: Array, default: [], required: false },
+        // save | create | promote | rollback | migration | bootstrap
+        source: { type: String, required: false },
+        rollbackOf: { type: Number, required: false },
+        note: { type: String, required: false },
+        createdBy: { type: String, required: false },
+        promotedBy: { type: String, required: false },
+        promotedAt: { type: Date, required: false },
+        supersededAt: { type: Date, required: false },
     },
     aiUsage: {
         companyId: { type: String, required: false },

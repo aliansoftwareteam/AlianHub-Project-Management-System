@@ -20,6 +20,8 @@ const ACTION_UNDONE = 'agent.action_undone';
 const PROPOSAL_DECIDED = 'agent.proposal_decided';
 const AGENT_DELETED = 'agent.deleted';
 const RUN_REVERTED = 'agent.run_reverted';
+const REVISION_PROMOTED = 'agent.revision_promoted';
+const REVISION_ROLLED_BACK = 'agent.revision_rolled_back';
 
 const clip = (v, n = 2000) => {
     try { const s = JSON.stringify(v); return s.length > n ? JSON.parse(s.slice(0, n - 1) + '"') : v; } catch (e) { return String(v).slice(0, n); }
@@ -182,6 +184,18 @@ const recordRunReverted = async (companyId, actor, { runId, agentId, agentName, 
     });
 };
 
+/* One row per pointer move: which revision was live before, which is live now,
+ * and what moved it (a settings save, a promote, a rollback). */
+const recordRevisionChange = async (companyId, actor, { kind, agentId, agentName, from, to, ip }) => {
+    const a = attribution(actor);
+    return writeQuietly(companyId, {
+        actorId: a.actorId, actorName: a.label, ip,
+        action: kind === 'rollback' ? REVISION_ROLLED_BACK : REVISION_PROMOTED,
+        entityType: 'agent', entityId: String(agentId), entityName: agentName || '',
+        meta: { ...baseMeta(actor), agentId: String(agentId), agentName: agentName || null, kind: kind || 'promote', from: from == null ? null : Number(from), to: Number(to) },
+    });
+};
+
 const markUndone = async (companyId, auditId, byActorId) => {
     const filter = rowFilter(auditId);
     if (!filter) return;
@@ -198,7 +212,7 @@ const findById = async (companyId, auditId) => {
 };
 
 module.exports = {
-    ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED, AGENT_DELETED, RUN_REVERTED, STATE, AUDIT_UNAVAILABLE, AUDIT_UNMARKED,
+    ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED, AGENT_DELETED, RUN_REVERTED, REVISION_PROMOTED, REVISION_ROLLED_BACK, STATE, AUDIT_UNAVAILABLE, AUDIT_UNMARKED,
     AuditUnavailableError, AuditUnmarkedError,
-    openAction, applyAction, failAction, recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentDeleted, recordRunReverted, markUndone, findById,
+    openAction, applyAction, failAction, recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentDeleted, recordRunReverted, recordRevisionChange, markUndone, findById,
 };
