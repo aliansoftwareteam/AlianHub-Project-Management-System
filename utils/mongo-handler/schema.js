@@ -824,6 +824,8 @@ const schema = {
         elapsedMs: { type: Number, default: 0, required: false },
         // { tokens, usd, model, billedToWorkspace }
         spend: { type: Object, required: false },
+        // Estimated cost of the model calls in flight, held against the caps until each settles
+        reservedUsd: { type: Number, default: 0, required: false },
         actions: { type: Array, default: [], required: false },
         proposals: { type: Array, default: [], required: false },
         refusals: { type: Number, default: 0, required: false },

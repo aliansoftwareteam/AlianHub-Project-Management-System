@@ -78,7 +78,7 @@ describe('a run is a LangGraph thread', () => {
         expect(proposalRows()[0]).toMatchObject({ _id: out.proposalId, runId: String(run._id), what: 'plan: 2 change(s) on AR-1', why: 'planned', cost: { usd: 0.01, tokens: 100, model: 'm' } });
 
         expect(memory.contextFor).toHaveBeenCalledWith({ companyId: C, projectId: 'p1', userId: 'u1' });
-        expect(orchestrator.analyse).toHaveBeenCalledWith({ skillSlug: 'plan', task: TASK, context: { projectName: 'Launch', memory: expect.stringContaining('Budget is fixed') }, budget: { maxTokens: 4000 } });
+        expect(orchestrator.analyse).toHaveBeenCalledWith({ skillSlug: 'plan', task: TASK, context: { projectName: 'Launch', memory: expect.stringContaining('Budget is fixed') }, budget: { maxTokens: 4000, guard: expect.objectContaining({ reserve: expect.any(Function), reconcile: expect.any(Function), release: expect.any(Function) }) } });
 
         const thread = await threadOf(C, run);
         expect(thread.next).toEqual(['hold']);

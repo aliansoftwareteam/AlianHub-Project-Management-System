@@ -112,6 +112,7 @@ const start = async (companyId, { agent, taskId, projectId, skill, trigger, star
                 triggerDepth: clampDepth(triggerDepth), triggerEventId: triggerEventId ? String(triggerEventId) : null,
                 startedBy: startedBy ? String(startedBy) : null, startedAt: new Date(), elapsedMs: 0,
                 spend: { tokens: 0, usd: 0, model: null, billedToWorkspace: via === 'workspace' },
+                reservedUsd: 0,
                 actions: note ? [{ action: 'mention', note: String(note).slice(0, 2000), at: new Date() }] : [],
                 proposals: [], refusals: 0, decisions: [],
                 ...(Number(spendCapUsd) > 0 ? { spendCapUsd: Number(spendCapUsd) } : {}),

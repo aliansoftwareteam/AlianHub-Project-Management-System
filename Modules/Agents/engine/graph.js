@@ -8,6 +8,7 @@ const skillIndex = require('../skills');
 const policy = require('../policy');
 const { rating: ratingOf } = require('../actions');
 const runs = require('../runs');
+const spendGuard = require('../spendGuard');
 
 // The run engine as a LangGraph thread, one per run (thread_id = run id):
 //
@@ -83,15 +84,22 @@ async function gather(state, config) {
     return { context: { ...gathered.context, memory: block } };
 }
 
+const statusAfter = (result) => {
+    if (result.status === 'skipped') return STATUS.SKIPPED;
+    if (result.status === 'refused') return STATUS.STOPPED;
+    return STATUS.FAILED;
+};
+
+/* The guard prices the call before it is made; recordSpend books what it
+ * actually cost afterwards, so the cap check below still catches an under-estimate. */
 async function analyse(state, config) {
     await renewLock(state, config);
-    const { companyId } = config.context;
+    const { companyId, deps } = config.context;
     const { run, task } = state;
-    const result = state.result || await orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: MODEL_BUDGET });
+    const guard = spendGuard.forRun({ companyId, run, actor: deps && deps.actor });
+    const result = state.result || await orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: { ...MODEL_BUDGET, guard } });
     const spend = await runs.recordSpend(companyId, run, result.usage, result.model);
-    if (result.status !== 'success') {
-        return { result, spend, outcome: result.reason || null, finalStatus: result.status === 'skipped' ? STATUS.SKIPPED : STATUS.FAILED };
-    }
+    if (result.status !== 'success') return { result, spend, outcome: result.reason || null, finalStatus: statusAfter(result) };
     const cap = Number(run.spendCapUsd) > 0 ? Number(run.spendCapUsd) : 0;
     if (cap && spend.usd >= cap) return { result, spend, outcome: `Run spend cap reached ($${spend.usd.toFixed(2)} of $${cap})`, finalStatus: STATUS.STOPPED };
     return { result, spend };

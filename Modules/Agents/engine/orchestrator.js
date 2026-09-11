@@ -82,6 +82,10 @@ function findingsWithoutModel(auditResult, skill) {
 
 const skipped = (skill, reason, started) => ({ status: 'skipped', reason, skill: skill.slug, findings: [], usage: emptyUsage(), durationMs: Date.now() - started });
 
+/* The spend guard refused the call before the vendor saw it: no fallback, no
+ * findings, the run stops with the guard's reason. */
+const refused = (skill, { refused: ticket, model, usage }, started) => ({ status: 'refused', reason: ticket.reason, code: ticket.code, skill: skill.slug, findings: [], usage, model, durationMs: Date.now() - started });
+
 /* PHASE 1 — gather. A generic skill collects its own input; the page audit
  * needs a public URL in the task. Either declines with `skipped`. */
 async function gather({ skillSlug = 'qa-review', task, companyId, memory }) {
@@ -105,7 +109,9 @@ async function gather({ skillSlug = 'qa-review', task, companyId, memory }) {
  * context and hand back a summary plus the changes the run should propose or apply. */
 async function analyseGeneric(skill, { task, context, budget }) {
     const started = Date.now();
-    const { raw: answer, model, degraded, usage } = await askModel(skill, { prompt: skill.buildUserPrompt({ task, context }), budget });
+    const asked = await askModel(skill, { prompt: skill.buildUserPrompt({ task, context }), budget });
+    if (asked.refused) return refused(skill, asked, started);
+    const { raw: answer, model, degraded, usage } = asked;
     if (!answer && !context.fallback) {
         return { status: 'failed', reason: degraded || 'the model returned nothing usable', skill: skill.slug, usage, model, durationMs: Date.now() - started };
     }
@@ -131,7 +137,9 @@ async function analyseAudit(skill, { task, context, budget }) {
         return { status: 'failed', reason: auditResult.fatal, skill: skill.slug, url, findings: [], usage: emptyUsage(), durationMs: Date.now() - started };
     }
 
-    const { raw, model, degraded, usage } = await askModel(skill, { prompt: skill.buildUserPrompt({ task, audit: auditResult }), budget });
+    const asked = await askModel(skill, { prompt: skill.buildUserPrompt({ task, audit: auditResult }), budget });
+    if (asked.refused) return refused(skill, asked, started);
+    const { raw, model, degraded, usage } = asked;
 
     const proposed = raw?.findings ?? findingsWithoutModel(auditResult, skill);
     const { findings, dropped } = raw

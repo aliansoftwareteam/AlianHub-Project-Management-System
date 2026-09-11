@@ -1,0 +1,43 @@
+const usage = require('./usage');
+
+/**
+ * What a model call is about to cost, before it is made.
+ *
+ * No tokenizer ships with the app (neither tiktoken nor gpt-tokenizer is a
+ * dependency), so input is sized from characters. Four characters per token is
+ * the documented rule of thumb for English prose and JSON on the GPT and Claude
+ * tokenizers; code, URLs and non-Latin text tokenize denser, hence the safety
+ * factor. Output is taken at the configured maximum because nothing shorter is
+ * guaranteed. The number is a ceiling for a spend gate: erring high refuses a
+ * call that would have fit, erring low lets one through, and the second is the
+ * defect the gate exists to stop.
+ */
+const CHARS_PER_TOKEN = 4;
+const SAFETY_FACTOR = 1.25;
+const PER_MESSAGE_OVERHEAD_TOKENS = 4;
+
+const textOf = (value) => {
+    if (typeof value === 'string') return value;
+    if (value == null) return '';
+    try { return JSON.stringify(value); } catch (e) { return String(value); }
+};
+
+function estimateTokens(text) {
+    const chars = textOf(text).length;
+    return chars ? Math.ceil((chars / CHARS_PER_TOKEN) * SAFETY_FACTOR) : 0;
+}
+
+/**
+ * @returns {{inputTokens:number, outputTokens:number, totalTokens:number,
+ *            model:string, priced:boolean, costUsd:number|null}}
+ *          `costUsd` is null and `priced` false for a model with no price on file.
+ */
+function estimateCall({ systemPrompt, messages, prompt, maxTokens, model } = {}) {
+    const turns = Array.isArray(messages) ? messages : (prompt ? [{ role: 'user', content: prompt }] : []);
+    const inputTokens = estimateTokens(systemPrompt) + turns.reduce((n, m) => n + estimateTokens(m && m.content) + PER_MESSAGE_OVERHEAD_TOKENS, 0);
+    const outputTokens = Math.max(0, Math.ceil(Number(maxTokens) || 0));
+    const priced = usage.summarize({ inputTokens, outputTokens }, model || usage.configuredModel() || '');
+    return { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens, model: priced.model, priced: priced.priced, costUsd: priced.costUsd };
+}
+
+module.exports = { estimateTokens, estimateCall, CHARS_PER_TOKEN, SAFETY_FACTOR, PER_MESSAGE_OVERHEAD_TOKENS };
