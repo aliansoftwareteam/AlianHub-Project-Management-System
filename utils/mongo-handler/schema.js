@@ -900,6 +900,8 @@ const schema = {
         emit: { type: Array, default: [], required: false },
         // The distinct action keys of `emit`, kept for the manifest and the allowed-actions intersection.
         emits: { type: Array, default: [], required: false },
+        // Template for the run's summary over answer and emitted; absent means the answer's own summary.
+        summary: { type: String, required: false },
         risk: { type: String, required: false },
         retiredAt: { type: Date, required: false },
         createdBy: { type: String, required: false },

@@ -8,6 +8,14 @@ const { inputsOf, MIN_BRIEF_CHARS } = require('../taskInputs');
 const SKILL_VERSION = 1;
 const RISKS = Object.freeze(['low', 'medium', 'high']);
 
+const text = (value) => {
+    if (value === null || value === undefined) return '';
+    if (Array.isArray(value)) return value.map(text).filter(Boolean).join(', ');
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'object') return '';
+    return String(value);
+};
+
 const plain = (html) => String(html || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 const docLinkOf = (task) => (Array.isArray(task.links) ? task.links : []).find((l) => /^doc$/i.test(String(l.kind || '')) && l.url) || null;
 
@@ -129,8 +137,40 @@ const EMIT_REQUIRED = Object.freeze({
  * The view handed to the renderer holds these and nothing else of the task. */
 const TASK_FIELDS = Object.freeze(['_id', 'TaskKey', 'TaskName', 'description', 'Task_Priority', 'DueDate', 'startDate', 'ProjectID', 'statusType', 'status.text', 'tagsArray', 'points', 'totalEstimatedTime']);
 
-/* Roots a placeholder may start with besides a task field. */
-const TEMPLATE_ROOTS = Object.freeze({ input: 'input', gather: 'gather', memory: 'memory', answer: 'answer', item: 'item' });
+/* Roots a placeholder may start with besides a task field. `emitted` counts the
+ * changes kept so far by action ({{emitted.subtask.create}}), in mapping order. */
+const TEMPLATE_ROOTS = Object.freeze({ input: 'input', gather: 'gather', memory: 'memory', answer: 'answer', item: 'item', emitted: 'emitted' });
+
+/* Pure formatters a placeholder may pipe through ({{item.hours | int:1:40}}).
+ * Arguments are numbers only, so a template never hands a filter text to interpret. */
+const FILTERS = Object.freeze({
+    trim: Object.freeze({
+        label: 'Trim',
+        description: 'Strips the whitespace around a value.',
+        args: Object.freeze([]),
+        apply: (v) => text(v).trim(),
+    }),
+    clip: Object.freeze({
+        label: 'Clip',
+        description: 'Keeps at most this many characters.',
+        args: Object.freeze([Object.freeze({ name: 'length', min: 1, max: 20000 })]),
+        apply: (v, length) => text(v).slice(0, length),
+    }),
+    int: Object.freeze({
+        label: 'Whole number',
+        description: 'Rounds to a whole number held between min and max; a value that is not a number counts as 0.',
+        args: Object.freeze([Object.freeze({ name: 'min', min: -1000000, max: 1000000 }), Object.freeze({ name: 'max', min: -1000000, max: 1000000 })]),
+        check: (min, max) => min <= max,
+        checkMessage: 'min must not be above max',
+        apply: (v, min, max) => Math.min(max, Math.max(min, Math.round(Number(v) || 0))),
+    }),
+    bullets: Object.freeze({
+        label: 'Bullet list',
+        description: 'A list as one "• item" line per entry, empty entries skipped, at most this many.',
+        args: Object.freeze([Object.freeze({ name: 'limit', min: 1, max: 100 })]),
+        apply: (v, limit) => (Array.isArray(v) ? v.filter(Boolean).slice(0, limit).map((x) => `• ${text(x)}`).join('\n') : ''),
+    }),
+});
 
 const MAX_EMIT_EACH = 25;
 
@@ -141,7 +181,8 @@ const catalogues = () => ({
     partials: Object.entries(PROMPT_PARTIALS).map(([key, text]) => ({ key, text })),
     actions: EMIT_ACTIONS.map((key) => { const a = registry.get(key); return { key, label: a.label, risk: a.risk, undoable: a.undoable, required: [...(EMIT_REQUIRED[key] || [])] }; }),
     taskFields: [...TASK_FIELDS],
+    filters: Object.entries(FILTERS).map(([key, f]) => ({ key, label: f.label, description: f.description, args: f.args.map((a) => ({ ...a })) })),
     risks: [...RISKS],
 });
 
-module.exports = { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, MAX_EMIT_EACH, MIN_BRIEF_CHARS, catalogues, plain };
+module.exports = { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, FILTERS, MAX_EMIT_EACH, MIN_BRIEF_CHARS, catalogues, plain, text };

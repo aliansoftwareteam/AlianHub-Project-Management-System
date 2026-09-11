@@ -3,7 +3,7 @@
 // is the normalised document that gets written, and only that.
 
 const registry = require('../registry');
-const { placeholdersIn } = require('../../Automations/engine/template');
+const { tagsIn, structureErrors } = require('./skillTemplate');
 const { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, MAX_EMIT_EACH } = require('./catalogues');
 
 const KEY = /^[a-z0-9][a-z0-9._-]{1,79}$/;
@@ -38,6 +38,12 @@ const checkPlaceholder = (path, field, declared, roots, errors) => {
         else if (!declared.gather.has(second)) errors.push(error(field, 'undeclared_reader', `"{{${path}}}" reads "${second}", which no gather step provides`));
         return;
     }
+    if (root === TEMPLATE_ROOTS.emitted) {
+        const action = parts.slice(parts.indexOf(root) + 1).join('.');
+        if (!roots.includes(root)) errors.push(error(field, 'unknown_placeholder', `"{{${path}}}" is only available in emit mappings and the summary`));
+        else if (!EMIT_ACTIONS.includes(action)) errors.push(error(field, 'unknown_action', `"{{${path}}}" counts no action a skill can emit`));
+        return;
+    }
     if (root === TEMPLATE_ROOTS.answer || root === TEMPLATE_ROOTS.item) {
         if (!roots.includes(root)) errors.push(error(field, 'unknown_placeholder', `"{{${path}}}" is only available in emit mappings${root === TEMPLATE_ROOTS.item ? ' with "each"' : ''}`));
         return;
@@ -46,8 +52,9 @@ const checkPlaceholder = (path, field, declared, roots, errors) => {
     if (!TASK_FIELDS.includes(taskPath)) errors.push(error(field, 'unknown_placeholder', `"{{${path}}}" is not a task field a skill may read (have: ${TASK_FIELDS.join(', ')})`));
 };
 
-const checkTemplate = (text, field, declared, roots, errors) => {
-    placeholdersIn(text).forEach((path) => checkPlaceholder(path, field, declared, roots, errors));
+const checkTemplate = (value, field, declared, roots, errors) => {
+    structureErrors(value).forEach((e) => errors.push(error(field, e.code, e.message)));
+    tagsIn(value).filter((tag) => tag.sigil !== '/' && tag.path).forEach((tag) => checkPlaceholder(tag.path, field, declared, roots, errors));
 };
 
 const validateInputs = (input, errors) => {
@@ -145,20 +152,26 @@ const validateEmit = (input, declared, errors) => {
         }
         const params = isPlainObject(mapping.params) ? mapping.params : {};
         if (mapping.params !== undefined && !isPlainObject(mapping.params)) errors.push(error(`${at}.params`, 'invalid', 'must be an object'));
-        const roots = each ? [TEMPLATE_ROOTS.answer, TEMPLATE_ROOTS.item] : [TEMPLATE_ROOTS.answer];
+        const roots = each ? [TEMPLATE_ROOTS.answer, TEMPLATE_ROOTS.item, TEMPLATE_ROOTS.emitted] : [TEMPLATE_ROOTS.answer, TEMPLATE_ROOTS.emitted];
         (EMIT_REQUIRED[action] || []).forEach((name) => {
             if (params[name] === undefined || params[name] === null || params[name] === '') errors.push(error(`${at}.params.${name}`, 'required', `required by "${action}"`));
         });
-        Object.entries(params).forEach(([name, value]) => {
-            if (typeof value === 'string') checkTemplate(value, `${at}.params.${name}`, declared, roots, errors);
-            else if (isPlainObject(value) || Array.isArray(value)) placeholdersIn(value).forEach((path) => checkPlaceholder(path, `${at}.params.${name}`, declared, roots, errors));
-        });
+        Object.entries(params).forEach(([name, value]) => checkTemplate(value, `${at}.params.${name}`, declared, roots, errors));
         const label = asString(mapping.label);
         if (label.length > 200) errors.push(error(`${at}.label`, 'too_long', 'must be 200 characters or fewer'));
         checkTemplate(label, `${at}.label`, declared, roots, errors);
         out.push({ action, ...(each ? { each, max } : {}), ...(label ? { label } : {}), params });
     });
     return out;
+};
+
+/* How the run's summary reads; without one the answer's own summary is used. */
+const validateSummary = (input, declared, errors) => {
+    if (input.summary !== undefined && input.summary !== null && typeof input.summary !== 'string') { errors.push(error('summary', 'invalid', 'must be a template string')); return ''; }
+    const summary = asString(input.summary);
+    if (summary.length > MAX_TEMPLATE) errors.push(error('summary', 'too_long', `must be ${MAX_TEMPLATE} characters or fewer`));
+    checkTemplate(summary, 'summary', declared, [TEMPLATE_ROOTS.answer, TEMPLATE_ROOTS.emitted], errors);
+    return summary;
 };
 
 const validateSkill = (input = {}) => {
@@ -183,6 +196,7 @@ const validateSkill = (input = {}) => {
     const declared = { inputs: new Set(inputs), gather: new Set(gather.map((s) => s.as)) };
     const prompt = validatePrompt(doc, declared, errors);
     const emit = validateEmit(doc, declared, errors);
+    const summary = validateSummary(doc, declared, errors);
 
     if (doc.risk !== undefined && !RISKS.includes(doc.risk)) errors.push(error('risk', 'invalid', `must be one of ${RISKS.join(', ')}`));
 
@@ -198,6 +212,7 @@ const validateSkill = (input = {}) => {
             version: SKILL_VERSION,
             enabled: doc.enabled !== false,
             inputs, gather, prompt, emit, emits,
+            ...(summary ? { summary } : {}),
             risk: doc.risk && riskRank(doc.risk) > riskRank(computed) ? doc.risk : computed,
         },
     };
