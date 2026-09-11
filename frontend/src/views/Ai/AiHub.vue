@@ -5,7 +5,7 @@
             <div class="ah-toolbar">
                 <div class="ah-toolbar__title">{{ $t('Ai.agents') }}</div>
                 <div class="ah-toolbar__spacer"></div>
-                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="creating = true">
+                <button v-if="canManage" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="new-agent" @click="creating = true">
                     <ShellIcon name="plus" :size="14" />{{ $t('Ai.new_agent') }}
                 </button>
             </div>
@@ -19,7 +19,7 @@
                 <div v-else-if="!agents.length" class="ah-card ai-agent">
                     <h3 class="ah-h3">{{ $t('Ai.empty_title') }}</h3>
                     <p class="ai-lead" style="margin:6px 0 12px">{{ $t('Ai.empty_body') }}</p>
-                    <div class="ai-templates">
+                    <div v-if="canManage" class="ai-templates" data-test="templates">
                         <button v-for="tpl in templates" :key="tpl.slug" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="startFromTemplate(tpl)">
                             {{ tpl.name }}
                         </button>
@@ -50,8 +50,8 @@
                         <div class="ai-agent__foot">
                             <router-link class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'AiAgent', params: { cid: companyId, id: agent._id } }">{{ $t('Ai.open') }}</router-link>
                             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="agent.paused || busyId === agent._id" @click="picking = agent">{{ $t('Ai.run_now') }}</button>
-                            <button v-if="activeRuns[agent._id]" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busyId === agent._id" @click="onStop(agent)">{{ $t('Ai.stop') }}</button>
-                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="busyId === agent._id" @click="onPause(agent)">
+                            <button v-if="stoppableRuns(agent).length" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="stop" :disabled="busyId === agent._id" @click="onStop(agent)">{{ $t('Ai.stop') }}</button>
+                            <button v-if="canManage" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="pause" :disabled="busyId === agent._id" @click="onPause(agent)">
                                 {{ agent.paused ? $t('Ai.resume') : $t('Ai.pause') }}
                             </button>
                             <span class="ai-agent__trigger">{{ $t('Ai.manual_only') }}</span>
@@ -89,6 +89,7 @@ import RunTaskPicker from "./RunTaskPicker.vue";
 import { useAgents, autonomyOf } from "./useAgents";
 import { AGENT_TEMPLATES } from "./agentTemplates";
 import { requirementsOf } from "./skillInputs";
+import { useAgentAccess } from "./agentAccess";
 
 defineOptions({ name: "AiHubPage" });
 
@@ -96,6 +97,8 @@ const { t } = useI18n();
 const $toast = useToast();
 const companyId = inject("$companyId");
 const { agents, spend, registryManifest, loading, lastError, AUTONOMY, loadAll, setPaused, runNow, activeRuns, loadActiveRuns, stopActive } = useAgents();
+const { canManage, mayStop } = useAgentAccess();
+const stoppableRuns = (agent) => (activeRuns.value[agent._id] || []).filter(mayStop);
 
 const creating = ref(false);
 const wizardTemplate = ref(null);
@@ -114,7 +117,7 @@ const withAgent = async (agent, work) => {
     }
 };
 
-const onStop = (agent) => withAgent(agent, () => stopActive(agent._id));
+const onStop = (agent) => withAgent(agent, () => stopActive(agent._id, mayStop));
 const onPause = (agent) => withAgent(agent, async () => {
     await setPaused(agent._id, !agent.paused);
     $toast.success(t(agent.paused ? "Ai.resumed_toast" : "Ai.paused_toast", { name: agent.name }), { position: "top-right" });
