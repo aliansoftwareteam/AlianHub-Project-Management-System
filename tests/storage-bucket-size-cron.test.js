@@ -33,6 +33,10 @@ const bucketSizeUpdate = (size) => [
     'findOneAndUpdate',
     COMPANY,
 ];
+const outcome = (promise, waitMs = 1000) => Promise.race([
+    Promise.resolve(promise).then(() => 'fulfilled', () => 'rejected'),
+    new Promise((resolve) => { setTimeout(resolve, waitMs, 'pending'); }),
+]);
 
 beforeEach(() => {
     jest.restoreAllMocks();
@@ -60,11 +64,28 @@ describe('bucket size cron on server storage', () => {
         });
     });
 
-    it('stores every company\'s bucket size when the cron handler runs', async () => {
+    it('settles the cron handler only after every company\'s size is stored, each without error', async () => {
+        const helper = require('../Modules/storage/server/helpers/bucket.helper');
+        const perCompany = jest.spyOn(helper, 'getBucketSizeCompanyWiseStorage');
+        let finishUpdate;
+        updateCompanyFun.mockReturnValue(new Promise((resolve) => { finishUpdate = resolve; }));
         const { handleBucketSizeUpdateCron } = require('../common-storage/common-server');
-        await handleBucketSizeUpdateCron();
+
+        const run = handleBucketSizeUpdateCron();
+        expect(await outcome(run, 50)).toBe('pending');
+        finishUpdate({ _id: COMPANY });
+        expect(await outcome(run)).toBe('fulfilled');
+
         expect(getCompanyDataFun).toHaveBeenCalledWith([], true);
         expect(updateCompanyFun).toHaveBeenCalledWith(...bucketSizeUpdate('2'));
+        const perCompanyOutcomes = await Promise.all(perCompany.mock.results.map((result) => outcome(result.value)));
+        expect(perCompanyOutcomes).toEqual(['fulfilled']);
+    });
+
+    it('rejects when the company list cannot be read', async () => {
+        getCompanyDataFun.mockRejectedValue(new Error('mongo down'));
+        const { handleBucketSizeUpdateCron } = require('../common-storage/common-server');
+        expect(await outcome(handleBucketSizeUpdateCron())).toBe('rejected');
     });
 
     it('resolves the measured size after updating the company', async () => {
@@ -87,5 +108,12 @@ describe('bucket size cron on Wasabi storage', () => {
         await handleBucketSizeUpdateCron();
         expect(s3Send).toHaveBeenCalledWith(expect.objectContaining({ name: 'ListObjectsV2', input: expect.objectContaining({ Bucket: COMPANY }) }));
         expect(updateCompanyFun).toHaveBeenCalledWith(...bucketSizeUpdate('4'));
+    });
+
+    it('rejects when the company list cannot be read', async () => {
+        getCompanyDataFun.mockRejectedValue(new Error('mongo down'));
+        const { handleBucketSizeUpdateCron } = require('../common-storage/common-wasabi');
+        expect(await outcome(handleBucketSizeUpdateCron())).toBe('rejected');
+        expect(s3Send).not.toHaveBeenCalled();
     });
 });

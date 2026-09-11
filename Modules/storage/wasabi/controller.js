@@ -997,30 +997,10 @@ exports.getBucketSizeCompanyWise = async(companyId) => {
     }
 }
 
-exports.getBucketSize = () => {
-    return new Promise((resolve, reject) => {
-        try {
-            let promises = [];
-
-            getCompanyDataFun([],true)
-            .then((response) => {
-                response.forEach((cmp) => {
-                    promises.push(exports.getBucketSizeCompanyWise(cmp._id))
-                })
-                Promise.allSettled(promises).then(() => {
-                    logger.info("Completed");
-                    resolve();
-                }).catch((error) => {
-                    logger.error("promises error", error);
-                    reject();
-                    return;
-                })
-            })
-        } catch (error) {
-            reject(error);
-            logger.error(`Error while getting bucket size: ${error})`)
-        }
-    })
+exports.getBucketSize = async () => {
+    const companies = await getCompanyDataFun([], true);
+    await Promise.allSettled(companies.map((cmp) => exports.getBucketSizeCompanyWise(cmp._id)));
+    logger.info("Completed");
 }
 
 exports.copyWasabiImage = async(companyId,path,destinationKey) => {
