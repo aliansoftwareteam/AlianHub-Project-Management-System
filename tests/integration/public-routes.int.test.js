@@ -102,11 +102,11 @@ describe('the same routes with a session', () => {
     it('reads the member own company through mongoOpration', async () => {
         const { api } = await loginAs('member');
         const res = await api.post('/api/v1/mongoOpration', {
-            dbName: state.companyId, collection: 'tasks', methodName: 'find', dataObj: [{ ProjectID: state.projects.shared._id }],
+            dbName: state.companyId, collection: 'timesheets', methodName: 'aggregate', dataObj: [[{ $match: { TicketID: state.tasks[0]._id } }]],
         });
         expect(res.status).toBe(200);
         expect(res.body.status).toBe(true);
-        expect(Array.isArray(res.body.statusText)).toBe(true);
+        expect(Array.isArray(res.body.data)).toBe(true);
     });
 
     it.each([
@@ -119,10 +119,10 @@ describe('the same routes with a session', () => {
         expect(res.status).toBe(403);
     });
 
-    it('refuses anything but an update on PUT /api/v1/task', async () => {
+    it('refuses anything but the project cascade on PUT /api/v1/task', async () => {
         const { api } = await loginAs('member');
         const res = await api.put('/api/v1/task', { firstParameter: { _id: state.tasks[0]._id }, secondParameter: {}, key: 'deleteMany' });
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
     });
 
     it('imports notification settings only for the caller', async () => {

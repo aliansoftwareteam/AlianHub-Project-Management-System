@@ -2,13 +2,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createApiClient } = require('../../e2e/support/api');
 const { ROOT } = require('../../e2e/support/env');
-const { ROLE_NAMES, createProject, createTask, listSprints, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
+const { ROLE_NAMES, createProject, createTask, firstSprint, listSprints, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 
 const state = readState();
 const anonymous = createApiClient({ baseURL: state.baseURL });
 const anonymousWithCompany = createApiClient({ baseURL: state.baseURL, companyId: state.companyId });
 const OTHER_COMPANY = '0123456789abcdef01234567';
 const MISSING_ID = '0123456789abcdef01234567';
+const FINISHED_RUN = ['success', 'failed', 'stopped'];
 
 const refused = (res) => res.status >= 400 || (res.body && res.body.status === false);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -139,8 +140,9 @@ describe('automation rules (v2)', () => {
 
             const runs = await waitFor(async () => {
                 const res = await owner.api.get(`/api/v2/automations/${rule._id}/runs`);
-                return (res.body.data || []).length ? res.body.data : null;
-            });
+                const rows = res.body.data || [];
+                return rows.length && rows.every((run) => FINISHED_RUN.includes(run.status)) ? rows : null;
+            }, { timeout: 15000 });
             expect(runs).toHaveLength(1);
             expect(runs[0]).toMatchObject({ status: 'success', entity: { kind: 'task', id: task._id } });
         } finally {
@@ -379,6 +381,7 @@ describe('AI project generator', () => {
     it('adds sprints to a project the owner can open', async () => {
         const owner = await loginAs('owner');
         const project = await createProject(owner.api, { assigneeIds: [owner.uid], createdBy: owner.uid });
+        await firstSprint(owner.api, project._id);
         const before = (await listSprints(owner.api, project._id)).length;
         const res = await owner.api.post(`/api/v1/ai/project/${project._id}/tasks/execute`, { mode: 'sprints', plan: { sprints: [{ sprintName: 'E2E sprint' }] } });
         expect(res.body).toMatchObject({ status: true, jobId: expect.any(String) });
@@ -393,6 +396,7 @@ describe('AI project generator', () => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
         const project = await createProject(owner.api, { assigneeIds: [owner.uid], createdBy: owner.uid, isPrivate: true });
+        await firstSprint(owner.api, project._id);
         const before = (await listSprints(owner.api, project._id)).length;
         const res = await guest.api.post(`/api/v1/ai/project/${project._id}/tasks/execute`, { mode: 'sprints', plan: { sprints: [{ sprintName: 'E2E injected' }] } });
         const after = await waitFor(async () => {
