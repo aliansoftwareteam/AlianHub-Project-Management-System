@@ -123,6 +123,7 @@
     import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
     import MilestoneReportThead from '@/components/atom/MilestoneReportThead/MilestoneReportThead.vue'
     import MilestoneReportTbody from '@/components/atom/MilestoneReportTbody/MilestoneReportTbody.vue'
+    import { isOwnerOrAdmin } from "@/utils/roles";
     // getter and permission
     const { getters,dispatch} = useStore();
     const { checkPermission } = useCustomComposable();
@@ -172,7 +173,7 @@
                 let publicQuery = {
                     isPrivateSpace:false
                 }
-                if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2 && !getters["settings/rules"].toggle.showAllProjects) {
+                if(!isOwnerOrAdmin(companyUserDetail.value.roleType) && !getters["settings/rules"].toggle.showAllProjects) {
                     publicQuery.AssigneeUserId = {
                         $in:[uid]
                     }
@@ -183,7 +184,7 @@
                 let privateQuery = {
                     isPrivateSpace:true
                 }
-                if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
+                if(!isOwnerOrAdmin(companyUserDetail.value.roleType)) {
                     privateQuery.AssigneeUserId = {
                         $in:[uid]
                     }

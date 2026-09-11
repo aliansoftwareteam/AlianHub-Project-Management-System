@@ -698,7 +698,9 @@ const schema = {
     // Calendar feeds — managed by Modules/Calendar (AUTO-02). Token-keyed in the
     // GLOBAL db; an unauthenticated .ics URL resolves its company + scope.
     calendarFeeds: {
-        token: { type: String, required: true },
+        // Only 012-hash-calendar-feed-tokens reads it; it stays declared so that migration's $unset survives the strict schema.
+        token: { type: String, required: false },
+        tokenHash: { type: String, required: false },
         companyId: { type: String, required: true },
         userId: { type: String, required: false },
         scope: { type: String, default: 'my', required: false },

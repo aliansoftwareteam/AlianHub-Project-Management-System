@@ -1,6 +1,7 @@
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { fetchRules } = require('../settings/securityPermissions/controller');
+const { isPrivileged } = require('../../Config/roleTypes');
 
 // Which projects a given person may open.
 //
@@ -17,7 +18,7 @@ const visibleProjects = async (companyId, uid) => {
         fetchRules(companyId).catch(() => []),
     ]);
     const roleType = membership && membership.roleType;
-    const nonAdmin = roleType !== 1 && roleType !== 2;
+    const nonAdmin = !isPrivileged(roleType);
     const privateRule = (rules || []).find((r) => r && r.key === 'private_projects') || {};
     const privatePermission = ((privateRule.roles || []).find((r) => r.key === roleType) || {}).permission;
     const teamIds = (teams || []).map((t) => `tId_${t._id}`);

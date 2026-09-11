@@ -79,6 +79,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useGetterFunctions } from '@/composable';
 import { formatHm } from '@/composable/useTimer';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 /**
  * @typedef {Object} AgentProposal
@@ -101,7 +102,7 @@ const currentUserId = inject('$userId');
 
 const cid = computed(() => (companyId && companyId.value) || '');
 const uid = computed(() => (currentUserId && currentUserId.value) || localStorage.getItem('userId') || '');
-const isManager = computed(() => [1, 2].includes((getters['settings/companyUserDetail'] || {}).roleType));
+const isManager = computed(() => isOwnerOrAdmin((getters['settings/companyUserDetail'] || {}).roleType));
 
 const filters = [
     { key: 'all', label: 'Time.filter_all' },

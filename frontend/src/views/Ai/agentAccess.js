@@ -1,9 +1,8 @@
 import { computed, inject } from "vue";
 import { useStore } from "vuex";
+import { isOwnerOrAdmin } from "@/utils/roles";
 
-const MANAGER_ROLES = [1, 2];
-
-export const canManageAgents = (roleType) => MANAGER_ROLES.includes(Number(roleType));
+export const canManageAgents = (roleType) => isOwnerOrAdmin(Number(roleType));
 
 const isSelf = (ownerId, userId) => Boolean(userId) && Boolean(ownerId) && String(ownerId) === String(userId);
 

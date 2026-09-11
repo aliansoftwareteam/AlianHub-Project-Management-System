@@ -97,6 +97,7 @@ import { useConvertDate } from "@/composable";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useProjectMemory } from "@/views/Ai/useProjectMemory";
 import { episodeSummary } from "@/views/Ai/episodeText";
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 defineOptions({ name: "ProjectMemoryCard" });
 
@@ -118,7 +119,7 @@ const showRetired = ref(false);
 const draft = reactive({ kind: "project.decision", text: "" });
 
 const list = (v) => (Array.isArray(v) ? v : []);
-const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
+const privileged = computed(() => isOwnerOrAdmin(Number(getters["settings/companyUserDetail"]?.roleType)));
 const stages = computed(() => list(guide.value?.stages).filter((s) => s && s.name));
 const essentials = computed(() => list(guide.value?.essentials));
 const escalations = computed(() => list(guide.value?.escalations));

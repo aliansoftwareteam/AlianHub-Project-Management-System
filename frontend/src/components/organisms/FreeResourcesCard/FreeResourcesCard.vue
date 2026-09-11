@@ -29,6 +29,7 @@ import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
 import { resolveIsoRange, formatMinutes } from '@/composable/useResourceWorkload';
 import { ASSIGNEE_FIELD, resolveAssigneeFilter, passesAssigneeFilter, isFree } from '@/composable/freeResourceRules';
 import { useCardMeta } from '@/components/organisms/DashboardCard/useCardMeta';
+import { ROLE_GUEST, isOwnerOrAdmin } from "@/utils/roles";
 
 defineOptions({ name: 'FreeResourcesCard' });
 
@@ -97,7 +98,7 @@ const load = async () => {
     try {
         const { dateFrom, dateTo } = resolveIsoRange(1);
         const assignablePool = (getters['settings/companyUsers'] || [])
-            .filter((u) => u && u.isDelete === false && u.roleType !== 1 && u.roleType !== 2)
+            .filter((u) => u && u.isDelete === false && !isOwnerOrAdmin(u.roleType))
             .map((u) => String(u.userId));
         const selectedIds = teamIdToUserId(props.cardData?.AssigneeUserId || [], getters['settings/teams'] || []);
         const poolSet = new Set(assignablePool);
@@ -121,7 +122,7 @@ const load = async () => {
             dateTo,
             currentOnly: false,
             callerUserId: userId && userId.value ? String(userId.value) : '',
-            callerRoleType: props.companyUserDetail?.roleType || 3,
+            callerRoleType: props.companyUserDetail?.roleType ?? ROLE_GUEST,
             taskMatch: (() => {
                 const fd = filterRows().filter((r) => !isAssigneeRow(r));
                 return fd.length ? buildFilterQuery(fd, userId && userId.value ? String(userId.value) : '') : null;

@@ -68,6 +68,7 @@ import { useToast } from 'vue-toast-notification';
 import Swal from 'sweetalert2';
 
 import { apiRequest } from '@/services';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -80,7 +81,7 @@ const userId = inject('$userId');
 // renders nothing for non-owners (the <template v-if="isOwner"> above).
 const companyUser = computed(() => getters['settings/companyUserDetail'] || {});
 // Owner (1) or Admin (2) — both can manage this company setting.
-const isOwner = computed(() => [1, 2].includes(Number(companyUser.value && companyUser.value.roleType)));
+const isOwner = computed(() => isOwnerOrAdmin(Number(companyUser.value && companyUser.value.roleType)));
 
 const policy = ref({
     enabled: false,

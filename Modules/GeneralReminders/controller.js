@@ -1,7 +1,7 @@
 // General-purpose reminders — HTTP handlers. CRUD on a user's standalone
 // reminders plus a manual run-due / run-now so the firing path can be exercised
-// in dev. All reminders are company-scoped (companyId from the request header),
-// and every mutation is additionally scoped to the owning user.
+// in dev. The route sits behind verifyJWTTokenWithCRoute, so the acting user is
+// always req.uid and every mutation is scoped to the reminder's recipient.
 const mongoose = require('mongoose');
 const helper = require('./helper');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
@@ -12,9 +12,13 @@ const { normalizeNotifyBefore, computeNotifyAt, DONT_NOTIFY } = require('./gener
 const queue = require('./queue');
 
 const LOG_PREFIX = '[general-reminders]';
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+const ACTIVE_MEMBER_STATUS = 2;
 
-// Broadcast a reminder mutation to the owner's open tabs. Never throws — a
-// socket problem must not fail the HTTP request that already succeeded.
+const isObjectId = (value) => OBJECT_ID_PATTERN.test(String(value || ''));
+const fail = (res, code, statusText) => res.status(code).send({ status: false, statusText });
+
+// Never throws — a socket problem must not fail the HTTP request that already succeeded.
 function emitReminderChange(type, data) {
     try {
         if (!data || !data.userId) return;
@@ -24,18 +28,37 @@ function emitReminderChange(type, data) {
     }
 }
 
-// Resolve the acting user id. `req.uid` is set by the JWT middleware
-// (Config/setMiddleware.js lists this route under verifyJWTTokenWithCRoute), so
-// it is both authoritative and available on GET/DELETE where there is no body.
-// The body fallbacks only exist for parity with the other modules.
-function resolveUserId(req) {
-    const b = req.body || {};
-    return req.uid
-        || (req.user && (req.user.id || req.user._id))
-        || req.headers['userid']
-        || b.userId
-        || (b.userData && b.userData.id)
-        || '';
+async function isActiveMember(companyId, userId) {
+    if (!isObjectId(userId)) return false;
+    const member = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMPANY_USERS,
+        data: [{ userId: String(userId), status: ACTIVE_MEMBER_STATUS }],
+    }, 'findOne');
+    return Boolean(member);
+}
+
+// The author still sees a reminder raised for someone else under ?filter=assigned,
+// but the panel offers no actions there: only the recipient manages it.
+async function loadOwnReminder(req, res) {
+    const companyId = req.headers['companyid'];
+    const id = req.params.id;
+    if (!isObjectId(id)) {
+        fail(res, 400, 'Invalid reminder id');
+        return null;
+    }
+    const reminder = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.GENERAL_REMINDERS,
+        data: [{ _id: new mongoose.Types.ObjectId(id), deletedStatusKey: 0 }],
+    }, 'findOne');
+    if (!reminder) {
+        fail(res, 404, 'Reminder not found');
+        return null;
+    }
+    if (String(reminder.userId) !== String(req.uid)) {
+        fail(res, 403, 'Only the person this reminder is for can change it');
+        return null;
+    }
+    return reminder;
 }
 
 // Keep only the attachment fields we understand, so an arbitrary payload can't
@@ -54,30 +77,30 @@ exports.createReminder = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
         const b = req.body || {};
-        const userId = resolveUserId(req);
+        const userId = req.uid;
         const title = typeof b.title === 'string' ? b.title.trim() : '';
         if (!companyId || !userId) {
-            return res.send({ status: false, statusText: 'companyId and userId are required' });
+            return fail(res, 400, 'companyId and userId are required');
         }
         if (!title) {
-            return res.send({ status: false, statusText: 'Reminder name is required' });
+            return fail(res, 400, 'Reminder name is required');
         }
         if (!b.remindAt) {
-            return res.send({ status: false, statusText: 'remindAt is required' });
+            return fail(res, 400, 'remindAt is required');
         }
         const when = new Date(b.remindAt);
         if (Number.isNaN(when.getTime())) {
-            return res.send({ status: false, statusText: 'remindAt is not a valid date' });
+            return fail(res, 400, 'remindAt is not a valid date');
+        }
+        if (b.assignedTo && !(await isActiveMember(companyId, b.assignedTo))) {
+            return fail(res, 400, 'A reminder can only be assigned to an active member of this company');
         }
         const notifyBefore = normalizeNotifyBefore(b.notifyBefore);
-        // "For me" is the default; assignedTo raises the reminder for someone
-        // else while createdBy keeps the actual author.
-        const targetUserId = b.assignedTo ? String(b.assignedTo) : String(userId);
         const doc = {
             _id: new mongoose.Types.ObjectId(),
             title,
             description: typeof b.description === 'string' ? b.description : '',
-            userId: targetUserId,
+            userId: b.assignedTo ? String(b.assignedTo) : String(userId),
             createdBy: String(userId),
             companyId: String(companyId),
             remindAt: when,
@@ -89,8 +112,7 @@ exports.createReminder = async (req, res) => {
             deletedStatusKey: 0,
         };
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.GENERAL_REMINDERS, data: doc }, 'save');
-        // Point the global due-index at it so the scheduler can find it without
-        // sweeping every tenant. "Don't notify" never fires, so it stays out.
+        // The scheduler reads a global due-index instead of sweeping every tenant; "Don't notify" never fires.
         if (notifyBefore !== DONT_NOTIFY) {
             await queue.enqueue(companyId, doc._id, doc.notifyAt);
         }
@@ -98,23 +120,18 @@ exports.createReminder = async (req, res) => {
         res.send({ status: true, statusText: 'Reminder created', data: saved });
     } catch (error) {
         logger.error(`${LOG_PREFIX} create failed: ${error.message}`);
-        res.send({ status: false, statusText: error.message });
+        fail(res, 500, error.message);
     }
 };
 
-// List the caller's own reminders for the current company. `?filter=upcoming`
-// hides completed ones; default returns everything not soft-deleted.
 exports.listMine = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
-        const userId = resolveUserId(req);
+        const userId = req.uid;
         if (!companyId || !userId) {
-            return res.send({ status: false, statusText: 'companyId and userId are required' });
+            return fail(res, 400, 'companyId and userId are required');
         }
         const filter = (req.query && req.query.filter) || '';
-        // "assigned" = reminders this user raised FOR SOMEBODY ELSE. Without it
-        // a reminder created for a teammate disappears from the author's view
-        // entirely, with no way to confirm it was created or delivered.
         const query = filter === 'assigned'
             ? { createdBy: String(userId), userId: { $ne: String(userId) }, deletedStatusKey: 0 }
             : { userId: String(userId), deletedStatusKey: 0 };
@@ -127,41 +144,43 @@ exports.listMine = async (req, res) => {
         res.send({ status: true, data: reminders || [] });
     } catch (error) {
         logger.error(`${LOG_PREFIX} list failed: ${error.message}`);
-        res.send({ status: false, statusText: error.message });
+        fail(res, 500, error.message);
     }
 };
 
 exports.updateReminder = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
-        const userId = resolveUserId(req);
-        const id = req.params.id;
+        const userId = req.uid;
         const b = req.body || {};
         if (!companyId || !userId) {
-            return res.send({ status: false, statusText: 'companyId and userId are required' });
+            return fail(res, 400, 'companyId and userId are required');
         }
+        const existing = await loadOwnReminder(req, res);
+        if (!existing) return;
+        const id = String(existing._id);
         const patch = {};
         if (b.title !== undefined) {
             const title = String(b.title).trim();
-            if (!title) return res.send({ status: false, statusText: 'Reminder name is required' });
+            if (!title) return fail(res, 400, 'Reminder name is required');
             patch.title = title;
         }
         if (b.description !== undefined) patch.description = String(b.description);
         if (b.attachments !== undefined) patch.attachments = sanitizeAttachments(b.attachments);
-        if (b.assignedTo !== undefined && b.assignedTo) patch.userId = String(b.assignedTo);
+        if (b.assignedTo) {
+            if (!(await isActiveMember(companyId, b.assignedTo))) {
+                return fail(res, 400, 'A reminder can only be assigned to an active member of this company');
+            }
+            patch.userId = String(b.assignedTo);
+        }
         if (b.isDone !== undefined) {
             patch.isDone = b.isDone === true || b.isDone === 'true';
             patch.completedAt = patch.isDone ? new Date() : null;
         }
-        // Changing either the time or the lead time re-derives notifyAt and
-        // re-arms a reminder that has already fired.
-        const timeChanged = b.remindAt !== undefined || b.notifyBefore !== undefined;
-        if (timeChanged) {
-            const existing = await helper.findById(companyId, id, userId);
-            if (!existing) return res.send({ status: false, statusText: 'Reminder not found' });
+        if (b.remindAt !== undefined || b.notifyBefore !== undefined) {
             const when = b.remindAt !== undefined ? new Date(b.remindAt) : new Date(existing.remindAt);
             if (Number.isNaN(when.getTime())) {
-                return res.send({ status: false, statusText: 'remindAt is not a valid date' });
+                return fail(res, 400, 'remindAt is not a valid date');
             }
             const notifyBefore = b.notifyBefore !== undefined
                 ? normalizeNotifyBefore(b.notifyBefore)
@@ -171,22 +190,18 @@ exports.updateReminder = async (req, res) => {
             patch.notifyAt = computeNotifyAt(when, notifyBefore);
             patch.fired = false;
             patch.firedAt = null;
-            // Rescheduling (snooze or an edited time) re-opens a reminder that
-            // was auto-completed when it fired — unless the caller explicitly
-            // set isDone in the same request.
+            // Rescheduling re-opens a reminder that was auto-completed when it fired,
+            // unless the same request sets isDone explicitly.
             if (b.isDone === undefined) {
                 patch.isDone = false;
                 patch.completedAt = null;
             }
         }
         if (!Object.keys(patch).length) {
-            return res.send({ status: false, statusText: 'Nothing to update' });
+            return fail(res, 400, 'Nothing to update');
         }
         await helper.updateReminder(companyId, id, patch, userId);
-        // Re-read so subscribers get the full, current document.
-        const fresh = await helper.findById(companyId, id, userId);
-        // Keep the global due-index in step: a reminder is only queued while it
-        // is pending, un-fired and actually set to notify.
+        const fresh = await helper.findById(companyId, id, patch.userId || userId);
         const shouldQueue = fresh
             && !fresh.isDone
             && !fresh.fired
@@ -202,30 +217,30 @@ exports.updateReminder = async (req, res) => {
         res.send({ status: true, statusText: 'Updated', data: fresh });
     } catch (error) {
         logger.error(`${LOG_PREFIX} update failed: ${error.message}`);
-        res.send({ status: false, statusText: error.message });
+        fail(res, 500, error.message);
     }
 };
 
 exports.deleteReminder = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
-        const userId = resolveUserId(req);
-        const id = req.params.id;
+        const userId = req.uid;
         if (!companyId || !userId) {
-            return res.send({ status: false, statusText: 'companyId and userId are required' });
+            return fail(res, 400, 'companyId and userId are required');
         }
+        const existing = await loadOwnReminder(req, res);
+        if (!existing) return;
+        const id = String(existing._id);
         await helper.updateReminder(companyId, id, { deletedStatusKey: 1 }, userId);
         await queue.dequeue(id);
         emitReminderChange('delete', { _id: id, userId: String(userId), deletedStatusKey: 1 });
         res.send({ status: true, statusText: 'Deleted' });
     } catch (error) {
         logger.error(`${LOG_PREFIX} delete failed: ${error.message}`);
-        res.send({ status: false, statusText: error.message });
+        fail(res, 500, error.message);
     }
 };
 
-// Process all due reminders for the caller's company (manual trigger; the cron
-// does this for every company).
 exports.runDueForCompany = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
@@ -233,17 +248,15 @@ exports.runDueForCompany = async (req, res) => {
         res.send({ status: true, statusText: 'Processed due reminders', data: result });
     } catch (error) {
         logger.error(`${LOG_PREFIX} runDue failed: ${error.message}`);
-        res.send({ status: false, statusText: error.message });
+        fail(res, 500, error.message);
     }
 };
 
-// Fire one reminder right now from its id (testing / manual trigger).
 exports.runNow = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
-        const userId = resolveUserId(req);
-        const reminder = await helper.findById(companyId, req.params.id, userId);
-        if (!reminder) return res.send({ status: false, statusText: 'Reminder not found' });
+        const reminder = await loadOwnReminder(req, res);
+        if (!reminder) return;
         const out = await helper.fireOne(companyId, reminder);
         res.send({
             status: true,
@@ -252,9 +265,8 @@ exports.runNow = async (req, res) => {
         });
     } catch (error) {
         logger.error(`${LOG_PREFIX} runNow failed: ${error.message}`);
-        res.send({ status: false, statusText: error.message });
+        fail(res, 500, error.message);
     }
 };
 
-// Cron entry (all companies) — consumed by cron.js.
 exports.runGeneralRemindersForAllCompanies = helper.runGeneralRemindersForAllCompanies;

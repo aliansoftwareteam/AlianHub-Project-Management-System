@@ -65,6 +65,7 @@ import { defineComponent ,ref,inject,computed,onMounted,provide} from "vue";
 import DashboardSpinner from '@/components/atom/Dashboard/DashboardSpinner.vue'
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 const { getters,dispatch,commit } = useStore();
 const { checkPermission } = useCustomComposable();
@@ -243,7 +244,7 @@ const getData = () => {
             let publicQuery = {
                 isPrivateSpace:false
             }
-            if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2 && !getters["settings/rules"].toggle.showAllProjects) {
+            if(!isOwnerOrAdmin(companyUserDetail.value.roleType) && !getters["settings/rules"].toggle.showAllProjects) {
                 publicQuery.AssigneeUserId = {
                     $in:[uid]
                 }
@@ -254,7 +255,7 @@ const getData = () => {
             let privateQuery = {
                 isPrivateSpace:true
             }
-            if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
+            if(!isOwnerOrAdmin(companyUserDetail.value.roleType)) {
                 privateQuery.AssigneeUserId = {
                     $in:[uid]
                 }
@@ -274,7 +275,7 @@ const getData = () => {
                 }).then(()=>{
                     allProjectsArrayFilter.value = projectsGetter.value.data ? [...projectsGetter.value.data] : [];
                     if(allProjectsArrayFilter.value && allProjectsArrayFilter.value.length){
-                        allProjectsArrayFilter.value = [1,2].includes(roleType) === false ? allProjectsArrayFilter.value.filter((x) => x._id !== '6571e7195470e64b1203295c' && !x.isRestrict) : allProjectsArrayFilter.value.filter((x) => !x.isRestrict)
+                        allProjectsArrayFilter.value = isOwnerOrAdmin(roleType) === false ? allProjectsArrayFilter.value.filter((x) => x._id !== '6571e7195470e64b1203295c' && !x.isRestrict) : allProjectsArrayFilter.value.filter((x) => !x.isRestrict)
                     }
                     isSpinner.value = false;
                 })
@@ -292,7 +293,7 @@ const getData = () => {
         const roleType = companyUserDetail.value.roleType;
         allProjectsArrayFilter.value = [...projectsGetter.value.data.filter((x) => !x.isRestrict)];
         if(allProjectsArrayFilter.value && allProjectsArrayFilter.value.length){
-            allProjectsArrayFilter.value = [1,2].includes(roleType) === false ? allProjectsArrayFilter.value.filter((x) => x._id !== '6571e7195470e64b1203295c') : allProjectsArrayFilter.value
+            allProjectsArrayFilter.value = isOwnerOrAdmin(roleType) === false ? allProjectsArrayFilter.value.filter((x) => x._id !== '6571e7195470e64b1203295c') : allProjectsArrayFilter.value
         }
         isSpinner.value = false;
     }

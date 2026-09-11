@@ -6,6 +6,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const { recordAuditFromReq } = require('../../Audit/recorder');
 const { getRoleType } = require('../../../Config/permissionGuard');
+const { ROLE_GUEST } = require('../../../Config/roleTypes');
 const { resolveRate } = require('../../TimeSheet/helpers/billingRules');
 const math = require('../helpers/billingMath');
 
@@ -27,8 +28,6 @@ const actorId = (req) => String(
     req.uid || (req.body && req.body.userData && (req.body.userData.id || req.body.userData._id)) || '',
 );
 const isObjectIdString = (id) => OBJECT_ID.test(String(id || ''));
-
-const ROLE_GUEST = 4;
 
 /**
  * Everything under /api/v2/billing except the client view exposes internal

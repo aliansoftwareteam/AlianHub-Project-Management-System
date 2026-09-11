@@ -157,7 +157,7 @@ const emailInboxesSchema = new Schema(schema.emailInboxes, {strict: true, timest
 emailInboxesSchema.index({ token: 1 });
 emailInboxesSchema.index({ companyId: 1, deletedStatusKey: 1 });
 const calendarFeedsSchema = new Schema(schema.calendarFeeds, {strict: true, timestamps: true});
-calendarFeedsSchema.index({ token: 1 });
+calendarFeedsSchema.index({ tokenHash: 1 });
 calendarFeedsSchema.index({ companyId: 1, deletedStatusKey: 1 });
 const automationRulesSchema = new Schema(schema.automationRules, {strict: true, timestamps: true});
 automationRulesSchema.index({ deletedStatusKey: 1 });

@@ -1,14 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { defineComponent, ref } from 'vue';
 
-const { push, projects, routeParams, routeQuery, toast } = await vi.hoisted(async () => ({
+const { push, projects, routeParams, routeQuery, toast, setSprints, setFolders } = await vi.hoisted(async () => ({
     push: vi.fn(),
     projects: (await import('vue')).ref([]),
     routeParams: { id: '' },
     routeQuery: { tab: 'ProjectListView' },
-    toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() }
+    toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() },
+    setSprints: vi.fn(() => Promise.resolve([])),
+    setFolders: vi.fn(() => Promise.resolve([]))
 }));
 
 vi.mock('vue-router', () => ({
@@ -37,8 +39,8 @@ function mountTree() {
             'projectData/mutateProjects': () => {}
         },
         actions: {
-            'projectData/setSprints': () => Promise.resolve([]),
-            'projectData/setFolders': () => Promise.resolve([])
+            'projectData/setSprints': (context, payload) => setSprints(payload),
+            'projectData/setFolders': (context, payload) => setFolders(payload)
         }
     });
     const projectData = ref({});
@@ -49,7 +51,10 @@ function mountTree() {
 }
 
 const mounted = [];
-afterEach(() => { while (mounted.length) mounted.pop().unmount(); });
+afterEach(() => {
+    while (mounted.length) mounted.pop().unmount();
+    delete routeParams.folderId;
+});
 
 describe('useProjectTree', () => {
     it('opens the project the URL names and commits it as current', () => {
@@ -80,5 +85,24 @@ describe('useProjectTree', () => {
         routeQuery.tab = 'Gantt';
         wrapper.vm.selectProject({ _id: 'p1' }, true);
         expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ query: { tab: 'KanbanView' } }));
+    });
+
+    it('loads the sprint and folder tree when a folder deep link opens a global-permission project (PRJ-07)', async () => {
+        projects.value = [alpha, beta];
+        routeParams.id = 'p1';
+        routeParams.folderId = 'f1';
+        mountTree();
+        await flushPromises();
+        expect(setSprints).toHaveBeenCalledWith({ projectId: 'p1' });
+        expect(setFolders).toHaveBeenCalledWith({ projectId: 'p1' });
+    });
+
+    it('leaves the tree to the views for a global-permission project opened without a folder', async () => {
+        projects.value = [alpha, beta];
+        routeParams.id = 'p1';
+        mountTree();
+        await flushPromises();
+        expect(setSprints).not.toHaveBeenCalled();
+        expect(setFolders).not.toHaveBeenCalled();
     });
 });

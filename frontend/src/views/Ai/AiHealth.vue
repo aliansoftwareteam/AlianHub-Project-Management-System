@@ -155,6 +155,7 @@ import AiSidebar from "./AiSidebar.vue";
 import AiAlertThresholds from "./AiAlertThresholds.vue";
 import AiOpenAlerts from "./AiOpenAlerts.vue";
 import { reasonOf } from "./useAgents";
+import { isOwnerOrAdmin } from "@/utils/roles";
 import {
     AGENT_COLUMNS, DEFAULT_HEALTH_WINDOW, HEALTH_WINDOWS,
     costOf, durationParts, isEmptyMetrics, nextSort, percentOf, sortAgents, sparkPoints, warningsOf
@@ -176,7 +177,7 @@ const openAlerts = ref(null);
 
 const refreshAlerts = () => openAlerts.value?.load();
 
-const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
+const privileged = computed(() => isOwnerOrAdmin(Number(getters["settings/companyUserDetail"]?.roleType)));
 const canSee = computed(() => privileged.value && !forbidden.value);
 const empty = computed(() => isEmptyMetrics(metrics.value));
 const sortedAgents = computed(() => sortAgents(metrics.value?.agents, sort.value.key, sort.value.dir));
