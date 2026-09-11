@@ -4,9 +4,8 @@ const ctrl = require('./controller');
 /**
  * Error boundary for every handler in this module.
  *
- * index.js registers `process.on('unhandledRejection', … process.exit(1))`, and Express 4
- * does not catch async rejections — so one throw inside a handler takes the whole server
- * down. Every failure here has to end as a response, not an outage.
+ * Express 4 does not catch async rejections, so one throw inside a handler leaves the
+ * request unanswered. Every failure here has to end as a response.
  */
 const safe = (name, handler) => async (req, res, next) => {
     try {

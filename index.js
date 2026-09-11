@@ -1,3 +1,4 @@
+require('./Config/processGuards').install();
 const express = require("express");
 const fs = require("fs");
 var cors = require('cors');
@@ -5,19 +6,6 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
-// Global error handlers — catch crashes and log before Render kills the process
-process.on('uncaughtException', (err) => {
-    require('./Config/loggerConfig').error(`[FATAL] uncaughtException: ${err && err.stack ? err.stack : err}`);
-    console.error('[FATAL] uncaughtException:', err);
-    process.exit(1);
-});
-// Log and keep serving. Exiting here turned every handler that forgot to answer
-// (an unhandled rejection from a bad request body) into a process kill anyone
-// could trigger over HTTP. uncaughtException still exits: that is corrupted state.
-process.on('unhandledRejection', (reason) => {
-    require('./Config/loggerConfig').error(`[unhandledRejection] ${reason && reason.stack ? reason.stack : reason}`);
-    console.error('[unhandledRejection]', reason);
-});
 const bodyParser = require("body-parser");
 const config =  require('./Config/config.js');
 const { loadDotEnv, applyEnvMap } = require('./Config/applyEnv.js');
