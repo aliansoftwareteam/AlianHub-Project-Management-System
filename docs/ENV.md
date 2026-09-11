@@ -161,7 +161,7 @@ Backend variables: 150. Frontend build-time variables: 23.
 | `PRECOMPANYKEY` (secret) | yes | `your_preset_key` | Random key that identifies the preset company routes; generated at setup. | `Config/config.js` |
 | `SOCKETIO_ADMIN_PASSWORD_HASH` (secret) |  | `$2a$12$HHemhzmTrC8Dmf2Gd9v/Teo9oiCxfYJb.St3HKMBx1L3wJmZLeX5u` | bcrypt hash of the Socket.IO admin UI password; the UI stays off while unset. | `socket/socketinit.js` |
 | `SOCKETIO_ADMIN_USERNAME` |  | `alian` | Username for the Socket.IO admin UI; the UI stays off while unset. | `socket/socketinit.js` |
-| `WEBHOOK_ALLOWED_PRIVATE_HOSTS` |  |  | Private hosts webhooks may post to: exact hostnames or CIDR ranges, comma-separated (empty by default, so every private host is refused). Also editable under Instance > Settings > Security. Cloud metadata addresses stay blocked. | `Modules/Webhooks/helpers/privateHostAllowlist.js` |
+| `WEBHOOK_ALLOWED_PRIVATE_HOSTS` |  |  | Private hosts webhooks may post to: exact hostnames or CIDR ranges, comma-separated (empty by default, so every private host is refused). Also editable under Instance > Settings > Security. Link-local and cloud metadata addresses stay blocked, and a range can be no wider than /8 (IPv4) or /32 (IPv6). | `Modules/Webhooks/helpers/privateHostAllowlist.js` |
 
 ## Logging
 
