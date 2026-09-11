@@ -6,8 +6,14 @@ const { default: mongoose } = require("mongoose");
 const { replaceObjectKey } = require("../../Auth/helper");
 const socketEmitter = require("../../../event/socketEventEmitter");
 const { isInstanceOwner } = require("../../Instance/guard");
-const { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, companyUpdateKind } = require("../helpers/companyAccessRules");
-const { getRoleType, evaluatePermission, isPrivileged, isWritable, ROLE_OWNER } = require("../../../Config/permissionGuard");
+const { tenantOf, namedCompanyIds, TenantError } = require("../../../Config/tenant");
+const { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, companyUpdateKind, seatFilter } = require("../helpers/companyAccessRules");
+const { evaluatePermission, isPrivileged, isWritable, ROLE_OWNER } = require("../../../Config/permissionGuard");
+
+const findSeat = (companyId, uid, kind) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.COMPANY_USERS,
+    data: [seatFilter(uid, kind), { roleType: 1 }]
+}, 'findOne');
 
 const managesMembers = async (companyId, uid) => isWritable(await evaluatePermission(companyId, uid, 'settings.settings_member_list').catch(() => null));
 
@@ -46,11 +52,14 @@ const hasSession = (req) => OBJECT_ID_PATTERN.test(String(req.uid || ''));
 
 exports.updateCompany = async(req,res) => {
     try {
-
-        const companyId = req.headers['companyid'] || req.body.companyId;
-        if (!OBJECT_ID_PATTERN.test(String(companyId || ''))) {
+        const named = namedCompanyIds(req);
+        if (named.length > 1) {
+            return res.status(403).json({ status: false, message: 'The request names more than one company.' });
+        }
+        if (!OBJECT_ID_PATTERN.test(named[0] || '')) {
             return res.status(400).json({ status: false, message: 'A valid company id is required' });
         }
+        const companyId = tenantOf(req);
 
         if (!(req.body && req.body.updateObject)) {
             return res.status(400).json({message: 'Update Object is Required'});
@@ -61,8 +70,11 @@ exports.updateCompany = async(req,res) => {
             return res.status(403).json({ status: false, message: 'Only the company details can be changed here. Plan, billing, seat, storage and usage fields are managed by the server.' });
         }
 
-        const roleType = await getRoleType(companyId, req.uid);
-        if (roleType === null || !(await MAY_SEND[kind]({ roleType, companyId, req }))) {
+        const seat = await findSeat(companyId, req.uid, kind);
+        if (!seat) {
+            return res.status(403).json({ status: false, message: 'Only active members of this company can change it.' });
+        }
+        if (!(await MAY_SEND[kind]({ roleType: seat.roleType, companyId, req }))) {
             return res.status(403).json({ status: false, message: ROLE_REFUSAL[kind] || 'Only an owner or an admin can change the company.' });
         }
 
@@ -81,6 +93,9 @@ exports.updateCompany = async(req,res) => {
 
         return res.status(200).json(company);
     } catch (error) {
+        if (error instanceof TenantError) {
+            return res.status(403).json({ status: false, message: error.message });
+        }
         return res.status(500).json({ message: "An error occurred while updating the company",error:error });
     }
 }

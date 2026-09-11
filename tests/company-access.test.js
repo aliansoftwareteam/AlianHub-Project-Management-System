@@ -26,9 +26,20 @@ const GUEST = '6f0000000000000000000004';
 const OUTSIDER = '6f0000000000000000000005';
 const ROLE_OF = { [OWNER]: 1, [ADMIN]: 2, [MEMBER]: 3, [GUEST]: 0 };
 
+const ACTIVE = 2;
+const PENDING = 1;
+const CANCELLED = 3;
+
 const callsOf = (method) => MongoDbCrudOpration.mock.calls.filter((call) => call[2] === method);
 
+const matchesFilter = (row, filter) => Object.entries(filter).every(([field, expected]) => {
+    if (expected && typeof expected === 'object' && '$ne' in expected) return row[field] !== expected.$ne;
+    if (expected && typeof expected === 'object' && '$in' in expected) return expected.$in.includes(row[field]);
+    return row[field] === expected;
+});
+
 let app;
+let seats;
 
 beforeAll(async () => {
     app = await startApp((server) => {
@@ -45,8 +56,13 @@ afterAll(() => app.close());
 
 beforeEach(() => {
     myCache.flushAll();
+    seats = { [COMPANY]: Object.entries(ROLE_OF).map(([userId, roleType]) => ({ userId, roleType, status: ACTIVE, isDelete: false })) };
     getRoleType.mockReset();
-    getRoleType.mockImplementation(async (companyId, uid) => (companyId === COMPANY && uid in ROLE_OF ? ROLE_OF[uid] : null));
+    // The real lookup matches on userId alone, so removed and pending rows still report their role.
+    getRoleType.mockImplementation(async (companyId, uid) => {
+        const row = (seats[companyId] || []).find((seat) => seat.userId === uid);
+        return row ? row.roleType : null;
+    });
     evaluatePermission.mockReset();
     evaluatePermission.mockImplementation(async () => null);
     MongoDbCrudOpration.mockReset();
@@ -54,6 +70,7 @@ beforeEach(() => {
         const filter = (obj.data && obj.data[0]) || {};
         if (obj.type === SCHEMA_TYPE.USERS && obj.data[1] === 'isProductOwner') return { isProductOwner: String(filter._id) === OWNER };
         if (obj.type === SCHEMA_TYPE.USERS) return { AssignCompany: String(filter._id) === OWNER ? [COMPANY, OTHER_COMPANY] : [COMPANY] };
+        if (obj.type === SCHEMA_TYPE.COMPANY_USERS && method === 'findOne') return (seats[db] || []).find((seat) => matchesFilter(seat, filter)) || null;
         if (method === 'find') return filter._id ? filter._id.$in.map((id) => ({ _id: String(id) })) : [{ _id: COMPANY }, { _id: OTHER_COMPANY }];
         if (method === 'aggregate') return [];
         if (method === 'findOneAndUpdate') return { _id: COMPANY };
@@ -315,6 +332,80 @@ describe('PUT /api/v1/company-invitation owner claim', () => {
 
     it('refuses an owner recording someone else', async () => {
         const res = await put(OWNER, { ...OWNER_CLAIM, updateObject: { objId: { userId: ADMIN } } });
+        expect(res.status).toBe(403);
+        expect(callsOf('findOneAndUpdate')).toHaveLength(0);
+    });
+});
+
+describe('PUT company update needs a live seat in the company it writes', () => {
+    const REMOVED_ADMIN = '6f0000000000000000000006';
+    const PENDING_ADMIN = '6f0000000000000000000007';
+    const PENDING_OWNER = '6f0000000000000000000008';
+    const REMOVED_OWNER = '6f000000000000000000000a';
+    const CANCELLED_OWNER = '6f000000000000000000000b';
+    const EVERY_KIND = [['the details', RENAME], ['a seat release', SEAT_RELEASE], ['a tracker seat release', TRACKER_SEAT_RELEASE], ['a project type swap', SWAP_TO_PRIVATE]];
+    const put = (path, uid, { audience = [COMPANY], header = COMPANY, body }) => app.call('PUT', path, { token: signSession(uid, audience), companyId: header, body });
+    const claimFor = (uid) => ({ updateObject: { objId: { userId: uid } }, companyId: COMPANY });
+
+    beforeEach(() => {
+        seats[COMPANY].push(
+            { userId: REMOVED_ADMIN, roleType: 2, status: ACTIVE, isDelete: true },
+            { userId: PENDING_ADMIN, roleType: 2, status: PENDING, isDelete: false },
+            { userId: PENDING_OWNER, roleType: 1, status: PENDING, isDelete: false },
+            { userId: REMOVED_OWNER, roleType: 1, status: ACTIVE, isDelete: true },
+            { userId: CANCELLED_OWNER, roleType: 1, status: CANCELLED, isDelete: true },
+        );
+    });
+
+    it('refuses a removed admin signed into another company who names this one in the header', async () => {
+        const res = await put('/api/v1/admin/company', REMOVED_ADMIN, { audience: [OTHER_COMPANY], body: { companyId: OTHER_COMPANY, ...RENAME } });
+        expect(res.status).toBe(403);
+        expect(callsOf('findOneAndUpdate')).toHaveLength(0);
+    });
+
+    it.each(EVERY_KIND)('refuses a removed admin whose token still names the company sending %s', async (label, body) => {
+        const res = await put('/api/v1/admin/company', REMOVED_ADMIN, { body });
+        expect(res.status).toBe(403);
+        expect(callsOf('findOneAndUpdate')).toHaveLength(0);
+    });
+
+    it.each(EVERY_KIND)('refuses a pending invitee sending %s', async (label, body) => {
+        const res = await put('/api/v1/admin/company', PENDING_ADMIN, { body });
+        expect(res.status).toBe(403);
+        expect(callsOf('findOneAndUpdate')).toHaveLength(0);
+    });
+
+    it.each([
+        ['header and body companyId', '', { companyId: OTHER_COMPANY }],
+        ['header and body CompanyId', '', { CompanyId: OTHER_COMPANY }],
+        ['header and query', `?companyId=${OTHER_COMPANY}`, {}],
+    ])('refuses a request whose %s name different companies', async (label, query, named) => {
+        const res = await put(`/api/v1/admin/company${query}`, ADMIN, { audience: [COMPANY, OTHER_COMPANY], body: { ...named, ...RENAME } });
+        expect(res.status).toBe(403);
+        expect(res.body.status).toBe(false);
+        expect(callsOf('findOneAndUpdate')).toHaveLength(0);
+    });
+
+    it('accepts a header and body that name the same company', async () => {
+        const res = await put('/api/v1/admin/company', ADMIN, { body: { companyId: COMPANY, ...RENAME } });
+        expect(res.status).toBe(200);
+        expect(callsOf('findOneAndUpdate')[0][1].data[0]).toEqual({ _id: COMPANY });
+    });
+
+    it('lets an invited owner whose row is still pending record themselves', async () => {
+        const res = await app.call('PUT', '/api/v1/company-invitation', { token: signSession(PENDING_OWNER, [COMPANY]), body: claimFor(PENDING_OWNER) });
+        expect(res.status).toBe(200);
+        expect(callsOf('findOneAndUpdate')[0][1].data[1]).toEqual({ $set: { userId: new mongoose.Types.ObjectId(PENDING_OWNER) } });
+    });
+
+    it.each([['removed', REMOVED_OWNER], ['cancelled', CANCELLED_OWNER]])('refuses a %s owner recording themselves', async (label, uid) => {
+        const res = await app.call('PUT', '/api/v1/company-invitation', { token: signSession(uid, [COMPANY]), body: claimFor(uid) });
+        expect(res.status).toBe(403);
+        expect(callsOf('findOneAndUpdate')).toHaveLength(0);
+    });
+
+    it('refuses a pending invitee claiming the company for someone else', async () => {
+        const res = await app.call('PUT', '/api/v1/company-invitation', { token: signSession(PENDING_OWNER, [COMPANY]), body: claimFor(OWNER) });
         expect(res.status).toBe(403);
         expect(callsOf('findOneAndUpdate')).toHaveLength(0);
     });
