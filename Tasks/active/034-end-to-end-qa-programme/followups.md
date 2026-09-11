@@ -66,6 +66,8 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 38 | Profile images under `USER_PROFILES/` can be read by any signed-in user, including the credit-note PDFs stored in `USER_PROFILES/InvoiceAndCreditNotes/`. | #639 |
 | 39 | `PUT /api/v1/user` accepts any value for `Employee_profileImage`, so a user can point their profile at another user's image path. | #639 |
 | 40 | `Modules/LogTime/routes.js` uses the same upload storage without the early access check #639 added to `storage/uploadFile`. | #639 |
+| 41 | `POST /api/v2/generateToken` answers 400 with the raw `users` document (including `verificationToken`) when a refresh token belongs to an account that became unverified. | #644 |
+| 42 | `POST /api/v2/createUser` and the Google, GitHub and GitLab sign-up routes return the saved `users` document unfiltered to the registrant; no secret is in it today, but it should go through `toSelfView`. | #644 |
 
 ## Owner decisions recorded
 
