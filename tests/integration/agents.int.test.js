@@ -1,5 +1,8 @@
+const { MongoClient } = require('mongodb');
 const { createApiClient } = require('../../e2e/support/api');
+const { resolveMongoUrl } = require('../../e2e/support/env');
 const { ROLE_NAMES, createProject, createTask, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
+const { generateToken, hashToken, tokenPrefixOf } = require('../../Modules/ApiTokens/helpers/apiTokenRules');
 
 const state = readState();
 const MISSING_ID = '0123456789abcdef01234567';
@@ -27,7 +30,28 @@ async function createAgent(api, overrides = {}) {
     return res.body.data;
 }
 
-async function createProposal(api, agentId, { taskId = state.tasks[0]._id, projectId = state.projects.shared._id, what } = {}) {
+/* Only an agent files a proposal, and the API mints no token bound to a workspace agent
+ * (a run carries its identity in-process), so the test writes that token row itself. */
+const agentClients = {};
+async function asAgent(agentId) {
+    if (agentClients[agentId]) return agentClients[agentId];
+    const raw = generateToken();
+    const client = new MongoClient(resolveMongoUrl(), { serverSelectionTimeoutMS: 5000 });
+    try {
+        await client.connect();
+        await client.db(state.companyId).collection('apiTokens').insertOne({
+            name: `[QA agents] ${agentId}`, tokenHash: hashToken(raw), prefix: tokenPrefixOf(raw), scopes: ['read', 'write'],
+            userId: state.users.owner.userId, active: true, kind: 'agent', agentId: String(agentId), projectIds: [], createdAt: new Date(), updatedAt: new Date(),
+        });
+    } finally {
+        await client.close();
+    }
+    agentClients[agentId] = createApiClient({ baseURL: state.baseURL, accessToken: raw, companyId: state.companyId });
+    return agentClients[agentId];
+}
+
+async function createProposal(agentId, { taskId = state.tasks[0]._id, projectId = state.projects.shared._id, what } = {}) {
+    const api = await asAgent(agentId);
     const res = await api.post('/api/v2/agents/proposals', {
         agentId,
         taskId,
@@ -138,7 +162,7 @@ describe('agents: lifecycle', () => {
         await owner.api.delete(`/api/v2/agents/${agent._id}`);
     });
 
-    it.failing('AGT-01 refuses a member creating an agent', async () => {
+    it('AGT-01 refuses a member creating an agent', async () => {
         const owner = await as('owner');
         const member = await as('member');
         const res = await member.api.post('/api/v2/agents', { name: `[QA agents] member ${uniqueSuffix()}`, autonomy: 1, spendCapUsd: 1 });
@@ -146,7 +170,7 @@ describe('agents: lifecycle', () => {
         expect(res.status).toBe(403);
     });
 
-    it.failing('AGT-01 refuses a guest creating an agent', async () => {
+    it('AGT-01 refuses a guest creating an agent', async () => {
         const owner = await as('owner');
         const guest = await as('guest');
         const res = await guest.api.post('/api/v2/agents', { name: `[QA agents] guest ${uniqueSuffix()}`, autonomy: 1, spendCapUsd: 1 });
@@ -154,7 +178,7 @@ describe('agents: lifecycle', () => {
         expect(res.status).toBe(403);
     });
 
-    it.failing('AGT-02 refuses a member raising an agent to L3', async () => {
+    it('AGT-02 refuses a member raising an agent to L3', async () => {
         const owner = await as('owner');
         const member = await as('member');
         const agent = await createAgent(owner.api);
@@ -165,7 +189,7 @@ describe('agents: lifecycle', () => {
         expect(after.autonomy).toBe(1);
     });
 
-    it.failing('AGT-03 refuses a guest pausing an agent', async () => {
+    it('AGT-03 refuses a guest pausing an agent', async () => {
         const owner = await as('owner');
         const guest = await as('guest');
         const agent = await createAgent(owner.api);
@@ -174,7 +198,7 @@ describe('agents: lifecycle', () => {
         expect(res.status).toBe(403);
     });
 
-    it.failing('AGT-03 refuses a guest pausing every agent in the company', async () => {
+    it('AGT-03 refuses a guest pausing every agent in the company', async () => {
         const owner = await as('owner');
         const guest = await as('guest');
         const agent = await createAgent(owner.api);
@@ -186,13 +210,13 @@ describe('agents: lifecycle', () => {
         expect(after.paused).toBe(false);
     });
 
-    it.failing('AGT-08 answers a missing agent name with HTTP 400', async () => {
+    it('AGT-08 answers a missing agent name with HTTP 400', async () => {
         const { api } = await as('admin');
         const res = await api.post('/api/v2/agents', { name: '' });
         expect(res.status).toBe(400);
     });
 
-    it.failing('AGT-11 includes statusText on a successful list', async () => {
+    it('AGT-11 includes statusText on a successful list', async () => {
         const { api } = await as('admin');
         const res = await api.get('/api/v2/agents');
         expect(typeof res.body.statusText).toBe('string');
@@ -356,7 +380,7 @@ describe('agents: proposals', () => {
     it('lets an admin approve a proposal and undo it inside the window', async () => {
         const admin = await as('admin');
         const agent = await createAgent(admin.api);
-        const proposal = await createProposal(admin.api, agent._id);
+        const proposal = await createProposal(agent._id);
 
         const approved = await admin.api.post(`/api/v2/agents/proposals/${proposal._id}/approve`);
         expect(approved.body.data.proposal.status).toBe('approved');
@@ -372,16 +396,16 @@ describe('agents: proposals', () => {
     it('lets an admin decline with a reason and refuses a never-listed change', async () => {
         const admin = await as('admin');
         const agent = await createAgent(admin.api);
-        const proposal = await createProposal(admin.api, agent._id);
+        const proposal = await createProposal(agent._id);
         const declined = await admin.api.post(`/api/v2/agents/proposals/${proposal._id}/decline`, { reason: 'not_needed' });
         expect(declined.body.data.proposal).toMatchObject({ status: 'declined', declineReason: 'not_needed' });
 
-        const never = await admin.api.post('/api/v2/agents/proposals', { agentId: agent._id, what: 'x', changes: [{ action: 'project.delete', params: {} }] });
+        const never = await (await asAgent(agent._id)).post('/api/v2/agents/proposals', { agentId: agent._id, what: 'x', changes: [{ action: 'project.delete', params: {} }] });
         expect(never.status).toBe(400);
         await admin.api.delete(`/api/v2/agents/${agent._id}`);
     });
 
-    it.failing('AGT-05 refuses a member filing a proposal in an agent\'s name', async () => {
+    it('AGT-05 refuses a member filing a proposal in an agent\'s name', async () => {
         const owner = await as('owner');
         const member = await as('member');
         const agent = await createAgent(owner.api);
@@ -396,24 +420,24 @@ describe('agents: proposals', () => {
         expect(res.status).toBe(403);
     });
 
-    it.failing('AGT-06 refuses a guest undoing an approval someone else made', async () => {
+    it('AGT-06 refuses a guest undoing an approval someone else made', async () => {
         const admin = await as('admin');
         const guest = await as('guest');
         const agent = await createAgent(admin.api);
-        const proposal = await createProposal(admin.api, agent._id);
+        const proposal = await createProposal(agent._id);
         await admin.api.post(`/api/v2/agents/proposals/${proposal._id}/approve`);
         const res = await guest.api.post(`/api/v2/agents/proposals/${proposal._id}/undo`);
         await admin.api.delete(`/api/v2/agents/${agent._id}`);
         expect(res.status).toBe(403);
     });
 
-    it.failing('AGT-07 keeps proposals of a private project out of a member\'s inbox', async () => {
+    it('AGT-07 keeps proposals of a private project out of a member\'s inbox', async () => {
         const owner = await as('owner');
         const member = await as('member');
         const project = await createProject(owner.api, { assigneeIds: [owner.uid], createdBy: owner.uid, isPrivate: true });
         const task = await createTask(owner.api, { project, user: state.users.owner, companyOwnerId: owner.uid });
         const agent = await createAgent(owner.api, { projectIds: [String(project._id)] });
-        const proposal = await createProposal(owner.api, agent._id, { taskId: task._id, projectId: String(project._id) });
+        const proposal = await createProposal(agent._id, { taskId: task._id, projectId: String(project._id) });
 
         const inbox = await member.api.get('/api/v2/agents/proposals', { query: { status: 'all', limit: 500 } });
         await owner.api.post(`/api/v2/agents/proposals/${proposal._id}/decline`);
@@ -421,10 +445,10 @@ describe('agents: proposals', () => {
         expect(inbox.body.data.map((p) => p._id)).not.toContain(proposal._id);
     });
 
-    it.failing('AGT-10 refuses a proposal without a summary', async () => {
+    it('AGT-10 refuses a proposal without a summary', async () => {
         const admin = await as('admin');
         const agent = await createAgent(admin.api);
-        const res = await admin.api.post('/api/v2/agents/proposals', {
+        const res = await (await asAgent(agent._id)).post('/api/v2/agents/proposals', {
             agentId: agent._id,
             taskId: state.tasks[0]._id,
             changes: [{ action: 'task.comment', params: { taskId: state.tasks[0]._id, body: 'no summary' } }],
@@ -469,7 +493,7 @@ describe('agents: runs', () => {
         expect(res.body.reason).toBe('not_permitted');
     });
 
-    it.failing('AGT-04 refuses a guest stopping a run the owner started', async () => {
+    it('AGT-04 refuses a guest stopping a run the owner started', async () => {
         const owner = await as('owner');
         const guest = await as('guest');
         const agent = await createAgent(owner.api);
@@ -479,7 +503,7 @@ describe('agents: runs', () => {
         expect(res.status).toBe(403);
     });
 
-    it.failing('AGT-09 answers stopping a missing run with 404', async () => {
+    it('AGT-09 answers stopping a missing run with 404', async () => {
         const { api } = await as('admin');
         const res = await api.post(`/api/v2/agents/runs/${MISSING_ID}/stop`);
         expect(res.status).toBe(404);

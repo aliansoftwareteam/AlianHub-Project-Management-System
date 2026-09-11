@@ -20,7 +20,7 @@
                 <span>{{ running ? $t('Ai.agents_running', { n: running }) : $t('Ai.none_running') }}</span>
             </div>
             <div class="ai-side__spend ah-mono">{{ spendLabel }}</div>
-            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm ah-btn--block" :disabled="busy || !running" @click="onPauseAll">
+            <button v-if="canManage" type="button" class="ah-btn ah-btn--secondary ah-btn--sm ah-btn--block" data-test="pause-all" :disabled="busy || !running" @click="onPauseAll">
                 {{ $t('Ai.pause_all') }}
             </button>
         </div>
@@ -33,6 +33,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useAgents } from "./useAgents";
+import { useAgentAccess } from "./agentAccess";
 
 defineOptions({ name: "AiSidebar" });
 
@@ -40,6 +41,7 @@ const { t } = useI18n();
 const $toast = useToast();
 const companyId = inject("$companyId");
 const { waiting, running, spend, pauseAll } = useAgents();
+const { canManage } = useAgentAccess();
 const busy = ref(false);
 
 const items = computed(() => [

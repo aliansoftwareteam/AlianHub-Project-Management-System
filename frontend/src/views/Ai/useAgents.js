@@ -159,13 +159,13 @@ export function useAgents() {
         try {
             const res = await apiRequest("get", `${env.AGENT_RUNS}?status=open&limit=50`);
             const map = {};
-            rows(res).forEach((r) => { (map[r.agentId] = map[r.agentId] || []).push(r._id); });
+            rows(res).forEach((r) => { (map[r.agentId] = map[r.agentId] || []).push({ _id: r._id, startedBy: r.startedBy || "" }); });
             activeRuns.value = map;
         } catch (e) { activeRuns.value = {}; }
     };
 
-    const stopActive = async (agentId) => {
-        const ids = activeRuns.value[agentId] || [];
+    const stopActive = async (agentId, mayStop = () => true) => {
+        const ids = (activeRuns.value[agentId] || []).filter(mayStop).map((r) => r._id);
         for (const id of ids) {
             // eslint-disable-next-line no-await-in-loop
             await request("post", `${env.AGENT_RUNS}/${id}/stop`, {}, "Ai.stop_failed");

@@ -419,7 +419,7 @@ const fetchProjectData = async () => {
             !["gantt", "timeline", "embed"].includes(value)
         );
 
-        projectApps.value = appsResponse.data;
+        projectApps.value = appsResponse.data?.data || [];
     } catch (error) {
         console.error("ERROR in fetchProjectData:", error);
     }

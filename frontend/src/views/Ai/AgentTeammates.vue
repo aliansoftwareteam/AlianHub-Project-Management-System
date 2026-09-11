@@ -137,7 +137,7 @@
                     />
                 </section>
 
-                <AgentOutcomes v-if="!loading && !loadError" :runs="runs" :agents="agents" :declines="declines" :stopping="stopping" @stop="onStop" />
+                <AgentOutcomes v-if="!loading && !loadError" :runs="runs" :agents="agents" :declines="declines" :stopping="stopping" :can-stop="mayStop" @stop="onStop" />
             </div>
         </div>
     </div>
@@ -159,6 +159,7 @@ import AgentPicker from "./AgentPicker.vue";
 import AgentOutcomes from "./AgentOutcomes.vue";
 import { useParity } from "./useParity";
 import { reasonOf } from "./useAgents";
+import { useAgentAccess } from "./agentAccess";
 
 // Agents as teammates (13b): they appear in Members with an AGENT tag, they can
 // be @mentioned into a run, and assigning one states its scope and limits first.
@@ -171,6 +172,7 @@ const { getUser } = useGetterFunctions();
 const companyId = inject("$companyId");
 const userId = inject("$userId");
 const { agents, registryManifest, runs, loadAgents, loadRegistry, loadRuns, startRun, stopRun } = useParity();
+const { mayStop } = useAgentAccess();
 
 const ROLE_NAMES = { 1: "owner", 2: "admin" };
 const tabs = ["all", "people", "agents"];
