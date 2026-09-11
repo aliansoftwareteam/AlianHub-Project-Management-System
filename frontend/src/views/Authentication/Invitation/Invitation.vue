@@ -96,6 +96,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useCustomComposable } from "@/composable";
 import { apiRequest, apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth, useAuth } from "@/services";
 import * as env from "@/config/env";
+import { ROLE_OWNER } from "@/utils/roles";
 
 const { t } = useI18n();
 const route = useRoute();
@@ -193,7 +194,7 @@ const submit = async () => {
             companyId: companyIdRoute.value
         });
         if (!result.data.status) { logOut({ islogOut: true }); banner.value = t("Auth.server_error"); return; }
-        if (result.data.data?.roleType === 1) {
+        if (result.data.data?.roleType === ROLE_OWNER) {
             await apiRequestWithoutCompnay("put", env.COMPANYINVITATION, {
                 updateObject: { objId: { userId: response.data.data._id }, companyData: [{ users: 1 }] },
                 companyId: companyIdRoute.value

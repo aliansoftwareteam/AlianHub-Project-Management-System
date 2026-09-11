@@ -33,6 +33,7 @@ import { apiRequest } from "@/services";
 import env from '@/config/env';
 import { useGetterFunctions } from "@/composable";
 import { buildFilterQuery, teamIdToUserId } from "@/composable/commonFunction";
+import { isOwnerOrAdmin } from "@/utils/roles";
 const { getUser } = useGetterFunctions()
 const { getters } = useStore();
 const teamsArr = getters["settings/teams"];
@@ -119,7 +120,7 @@ const getQuery = (componentId) => {
                     $in:[0]
                 },
                 ...(filterQuery.value && { ...filterQuery.value }),
-                ...(![1, 2].includes(roleType) && { AssigneeUserId: { $in: [userId.value] } }),
+                ...(!isOwnerOrAdmin(roleType) && { AssigneeUserId: { $in: [userId.value] } }),
             };
 
             let taskAssigneefindQuery = [

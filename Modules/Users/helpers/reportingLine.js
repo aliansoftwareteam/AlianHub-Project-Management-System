@@ -8,7 +8,7 @@
  */
 
 const ACTIVE_STATUS = 2;
-const GUEST_ROLE = 0;
+const { ROLE_GUEST: GUEST_ROLE } = require('../../../Config/roleTypes');
 
 const REASON = Object.freeze({
     NO_SUBJECT: 'no_subject',

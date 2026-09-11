@@ -160,6 +160,7 @@ import { useCustomComposable } from "@/composable";
 import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 import { memberData } from "./helperMember.js";
+import { ROLE_GUEST, ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER } from "@/utils/roles";
 
 defineOptions({ name: "MembersSettings" });
 
@@ -222,7 +223,7 @@ const ssoOn = computed(() => !!(ssoConfig.value && ssoConfig.value.isEnabled && 
 const ssoName = computed(() => ssoConfig.value?.displayName || String(ssoConfig.value?.provider || "").toUpperCase());
 const gridStyle = computed(() => ({ gridTemplateColumns: ssoOn.value ? "1fr 132px 132px 92px 34px" : "1fr 132px 92px 34px" }));
 
-const roleMeaning = computed(() => ([0, 1, 2, 3].includes(role.value) ? t(`Members.role_desc.${role.value}`) : ""));
+const roleMeaning = computed(() => ([ROLE_GUEST, ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER].includes(role.value) ? t(`Members.role_desc.${role.value}`) : ""));
 
 function roleName(key) {
     const hit = rolesGetter.value.find((r) => r.key === key);
@@ -295,10 +296,10 @@ function removeEmail(mail) {
 
 async function onRolePicked() {
     errors.role = "";
-    if (role.value !== 0) return;
+    if (role.value !== ROLE_GUEST) return;
     const guestLimit = currentCompany.value?.planFeature?.guestUser;
     try {
-        const resp = await apiRequest("post", `${env.API_MEMBERS}/count`, { query: { roleType: 0 } });
+        const resp = await apiRequest("post", `${env.API_MEMBERS}/count`, { query: { roleType: ROLE_GUEST } });
         const used = resp.data?.[0]?.totalCount || 0;
         if (guestLimit !== undefined && guestLimit !== null && used >= guestLimit) {
             role.value = null;
@@ -373,11 +374,11 @@ async function resend(item) {
 }
 
 function canChangeRole(item) {
-    return canEditRoles.value && item.roleType !== 1 && item.status === 2 && !item.isDelete && !item.isCurrentUser;
+    return canEditRoles.value && item.roleType !== ROLE_OWNER && item.status === 2 && !item.isDelete && !item.isCurrentUser;
 }
 
 function canRemove(item) {
-    return item.roleType !== 1 && !item.isCurrentUser;
+    return item.roleType !== ROLE_OWNER && !item.isCurrentUser;
 }
 
 async function changeRole(item, roleKey) {

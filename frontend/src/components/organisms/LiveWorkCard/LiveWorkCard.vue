@@ -81,6 +81,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { formatMinutes } from '@/composable/useResourceWorkload';
 import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
+import { ROLE_GUEST } from "@/utils/roles";
 
 // AHE-3789 — Live Work card. Who has a tracker running RIGHT NOW
 // (startTimeTracker within the last 10 min), the task/project, and the tracker
@@ -120,7 +121,7 @@ const load = async () => {
         const resp = (await apiRequest('post', `${env.DASHBOARD}/project-metrics`, {
             metric: 'live_work',
             callerUserId: (userIdRef && userIdRef.value) || '',
-            callerRoleType: Number(props.companyUserDetail && props.companyUserDetail.roleType) || 3,
+            callerRoleType: Number(props.companyUserDetail?.roleType ?? ROLE_GUEST),
         }))?.data;
         data.value = (resp && resp.data) || {};
     } catch (e) {

@@ -18,7 +18,8 @@ const {defaultProjectTours} = require("../utils/Tempates/projectTours");
 const { addSprintFun } = require('../Modules/Sprints/controller');
 const { updateMainChat } = require('../Modules/MainChats/controller');
 const { toSlug } = require('../Modules/settings/ProjectSkills/skillRules');
-const { MEMBER_ROLE_TYPE, MEMBER_DEFAULT_PERMISSIONS } = require('../Modules/settings/securityPermissions/memberDefaults');
+const { MEMBER_DEFAULT_PERMISSIONS } = require('../Modules/settings/securityPermissions/memberDefaults');
+const { ROLE_GUEST, ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER } = require('../Config/roleTypes');
 
 //IMPORT CURRENCY
 exports.importCurrency = (companyName) => {
@@ -1121,8 +1122,8 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
 
                 const applyDefaultRoles = (rule) => {
                     let roles = rule.roles || []
-                    let guest = roles.find((y) => y.key === 0) || null
-                    let member = roles.find((y) => y.key === MEMBER_ROLE_TYPE) || null
+                    let guest = roles.find((y) => y.key === ROLE_GUEST) || null
+                    let member = roles.find((y) => y.key === ROLE_MEMBER) || null
                     const filterRole = globalRulesMap && Object?.keys(globalRulesMap)?.length ? globalRulesMap?.[rule?.key] || null : null;
                     if (filterRole && Object?.keys(filterRole)?.length) {
                         const globalRule = filterRole;
@@ -1144,13 +1145,13 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
                     } else if(!guest) {
                         if(roles.length) {
                             roles.push({
-                                key: 0,
+                                key: ROLE_GUEST,
                                 permission: selectionFieldRules.includes(rule.key) ? 1 : false,
                             })
                         } else {
                             roles = [
                                 {
-                                    key: 0,
+                                    key: ROLE_GUEST,
                                     permission: selectionFieldRules.includes(rule.key) ? 1 : false,
                                 }
                             ]
@@ -1160,7 +1161,7 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
                     // has a key-3 row here, so re-seeding can never overwrite what an owner chose.
                     if (!member && MEMBER_DEFAULT_PERMISSIONS[rule.key] !== undefined) {
                         roles.push({
-                            key: MEMBER_ROLE_TYPE,
+                            key: ROLE_MEMBER,
                             permission: MEMBER_DEFAULT_PERMISSIONS[rule.key],
                         })
                     }
@@ -1375,19 +1376,19 @@ exports.importCompanyRoles = (companyName) => {
     let roles = [
         {
             name: "Guest",
-            key: 0,
+            key: ROLE_GUEST,
         },
         {
             name: "Owner",
-            key: 1,
+            key: ROLE_OWNER,
         },
         {
             name: "Admin",
-            key: 2,
+            key: ROLE_ADMIN,
         },
         {
             name: "Member",
-            key: 3,
+            key: ROLE_MEMBER,
         }
     ];
     let dataObj = {

@@ -2,6 +2,7 @@ import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useCustomComposable } from "@/composable";
+import { isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
 
 const PROJECT_ROUTE_PREFIX = "Project";
 
@@ -14,7 +15,7 @@ export function useNavItems(companyId) {
     const rules = computed(() => getters["settings/rules"]);
     const ready = computed(() => !!(rules.value && Object.keys(rules.value).length));
     const companyUser = computed(() => getters["settings/companyUserDetail"] || {});
-    const isOwnerOrAdmin = computed(() => [1, 2].includes(companyUser.value?.roleType));
+    const isOwnerOrAdmin = computed(() => isOwnerOrAdminRole(companyUser.value?.roleType));
 
     const allowed = (key) => ready.value && checkPermission(key) !== null && checkPermission(key) !== undefined;
     const exists = (name) => router.hasRoute(name);

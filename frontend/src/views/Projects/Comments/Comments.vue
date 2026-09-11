@@ -243,6 +243,7 @@ import { useI18n } from "vue-i18n";
 import {generateFileName} from '@/utils/storageQueryBuild.js';
 import ImagesPreviewer from "@/components/organisms/ImagePreviewer/ImagesPreviewer.vue";
 import { storageHelper } from "@/composable/commonFunction";
+import { ROLE_ADMIN } from "@/utils/roles";
 
 const { t } = useI18n();
 
@@ -450,7 +451,7 @@ watch(countGetter, (val) => {
 const userCommentCount = computed(() => {
     return  getters["users/myCounts"]?.data || {}
 })
-const adminUsers = computed(() => getters["settings/companyUsers"].filter((x) => x.roleType === 2)?.map((x) => x.userId) )
+const adminUsers = computed(() => getters["settings/companyUsers"].filter((x) => x.roleType === ROLE_ADMIN)?.map((x) => x.userId) )
 const companyUser = ref(getters['settings/companyUserDetail']);
 const messageAllowed = computed(() => {
     if(props.mainChat && !projectData.value?.default && !props.sendMessageAllowed) {

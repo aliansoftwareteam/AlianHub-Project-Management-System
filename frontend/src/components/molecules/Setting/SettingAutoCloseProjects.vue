@@ -49,6 +49,7 @@ import { ref, computed, watch, inject } from 'vue';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 import { apiRequest } from '@/services';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 const $toast = useToast();
 const { getters } = useStore();
@@ -57,7 +58,7 @@ const userId = inject('$userId');
 // Owner gate — mirrors SettingScreenshotRetention. Renders nothing for non-owners.
 const companyUser = computed(() => getters['settings/companyUserDetail'] || {});
 // Owner (1) or Admin (2) — both can manage this company setting.
-const isOwner = computed(() => [1, 2].includes(Number(companyUser.value && companyUser.value.roleType)));
+const isOwner = computed(() => isOwnerOrAdmin(Number(companyUser.value && companyUser.value.roleType)));
 
 const policy = ref({ enabled: false, inactiveMonths: 1, lastRunAt: null, lastRunStats: null });
 const validInactiveMonths = ref([1, 2, 3, 6]);

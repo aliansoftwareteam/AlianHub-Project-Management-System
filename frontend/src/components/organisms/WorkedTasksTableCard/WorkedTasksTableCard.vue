@@ -45,6 +45,7 @@ import * as env from '@/config/env';
 import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
 import { resolveCardRange, bucketForStatus } from '@/composable/useResourceWorkload';
 import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
+import { ROLE_GUEST } from "@/utils/roles";
 
 // Resource Utilization card #11 — "Table of worked tasks, date-range wise".
 // Reuses employee-workload for the selected range; splits each user×project's
@@ -91,7 +92,7 @@ const load = async () => {
             dateTo,
             currentOnly: false,
             callerUserId: userId && userId.value ? String(userId.value) : '',
-            callerRoleType: props.companyUserDetail?.roleType || 3,
+            callerRoleType: props.companyUserDetail?.roleType ?? ROLE_GUEST,
             // Advanced "Add filter" builder → task-field match (buildFilterQuery).
             taskMatch: (() => {
                 const fd = Array.isArray(props.filterData) ? props.filterData : Object.values(props.filterData || {});

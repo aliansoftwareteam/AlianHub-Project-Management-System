@@ -1,3 +1,4 @@
+import { ROLE_OWNER } from "@/utils/roles";
 export const mutateRules = (state, payload) => {
     const {data, op} = payload;
 
@@ -135,7 +136,7 @@ export const mutateCompanyUsers = (state, payload) => {
     if(data.isCurrentUser) {
         state.companyUserDetail = data;
     }
-    if(data.roleType === 1) {
+    if(data.roleType === ROLE_OWNER) {
         state.companyOwnerDetail = data;
     }
 }
