@@ -26,9 +26,13 @@ test.describe('access screens as the owner', () => {
         await expect(page.getByText('Teams', { exact: true }).first()).toBeVisible();
     });
 
-    test('Two-factor and change-password screens render', async ({ page, state }) => {
+    test('Two-factor screen renders', async ({ page, state }) => {
         await page.goto(`/#/${state.companyId}/settings/two-factor-auth`);
         await expect(page).toHaveTitle(/Two-Factor/i);
+    });
+
+    // The router sets the title only after it fetches the user, so a second hash-only goto in one test can be checked before that lands.
+    test('Change-password screen renders', async ({ page, state }) => {
         await page.goto(`/#/${state.companyId}/settings/change-password`);
         await expect(page).toHaveTitle(/Change Password/i);
     });
