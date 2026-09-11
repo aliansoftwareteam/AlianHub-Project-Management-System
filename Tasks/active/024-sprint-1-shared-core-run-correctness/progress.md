@@ -3,7 +3,7 @@
 ## Checklist
 One pull request per step; tick with the merge commit.
 
-- [x] Step 1: `Modules/AICore/` (provider factory, usage, instruction guard, `modelCall`, persistence) with shims at every old path; ProjectTemplates onto the factory; boundary conventions test — #566 `db21784a`. Consumers still on the shim paths; repoint and shim deletion pending (1a–1n)
+- [x] Step 1: `Modules/AICore/` (provider factory, usage, instruction guard, `modelCall`, persistence) with shims at every old path; ProjectTemplates onto the factory; boundary conventions test — #566 `db21784a`; consumers repointed and the shims deleted in one PR, #575 `255be10d`, because jest mocks tie each test to its consumer
 - [x] Step 2: `idempotencyKey`, partial unique indexes, `runs.start` insert-and-catch, reaper `agent.reap-stuck-proposals` every 5 min — #570 `bacb9207`
 - [x] Step 3: `Modules/Agents/engine/timeouts.js`; Agenda `lockLifetime` 17 min with `job.touch()` between graph nodes; server, SSE and Mongo timeouts — #569 `0a13449c`
 - [x] Step 4: `triggerDepth`/`triggerEventId` on the run; `canStart` refuses `loop_depth_exceeded` at depth 3; actions emit depth + 1 — #568 `8b84214c`
@@ -24,4 +24,4 @@ One pull request per step; tick with the merge commit.
 | 2026-09-11 | Step 6 on `fix/s1-precall-spend-cap`: `Modules/AICore/estimate.js` prices a call before it is made; `Modules/Agents/spendGuard.js` reserves it on the run (`reservedUsd`, atomic `$inc`), refuses over the run cap or the company month as `spend_cap_exceeded` with an audit row, reconciles to the real cost after. Reproduced on beta first: the fake provider was called for a run capped under its estimate. Closes defect 15 and 006's "spend cap evaluated after the model call". |
 
 ## Last step
-All seven steps merged. Remaining: repoint the consumers off the shim paths one module per PR and delete the shims; run migration 008 on the dev database; the in-process sweep; the owner and member sweep of the Instance console spend card; then move 024 to `done/`.
+All seven steps merged. Remaining: run migration 008 on the dev database; the in-process sweep; the owner and member sweep of the Instance console spend card; then move 024 to `done/`.

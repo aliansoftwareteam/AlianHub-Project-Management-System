@@ -2,12 +2,14 @@
 
 Updated 2026-09-11. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (3dc9d97f)
+## State of `beta` (4d967052)
 
+- Sprint 2 (task 025) is **code-complete and merged**: PRs #576–#580. Agents have immutable revisions pinned per run, skills are data with a validator and manifest, and `brief.parse` runs as a data skill. Progress ticked in `Tasks/active/025-sprint-2-revisions-and-skill-record/progress.md`.
+- The AI-core shims are gone (#575); every consumer requires `Modules/AICore/` and a conventions test rejects the old paths.
 - Sprint 1 (task 024) is **code-complete and merged**: PRs #566–#572, one per step. `Modules/AICore/` exists with shims at the old paths; consumers are not yet repointed. Progress ticked in `Tasks/active/024-sprint-1-shared-core-run-correctness/progress.md`.
 - Sprint 0 (task 023) is **code-complete and merged**: PRs #555–#562, one per step, each with a test that reproduced its defect first. Progress ticked in `Tasks/active/023-sprint-0-stop-the-bleeding/progress.md`.
 - Task 017 (agent memory and the run engine on LangGraph JS) merged via #552. ADR 003 and `docs/AI-PLATFORM-ARCHITECTURE.md` merged via #554. The twelve sprint tasks (023–032, rewritten 018/019) merged via #553.
-- All gates green on merged beta: backend jest 155 suites / 1857 tests, `tests/conventions` 92, frontend vitest 129, `npm run i18n:check` exit 0, eslint 0 errors, `vue-cli-service build` done.
+- All gates green on merged beta: backend jest 1965 tests, `tests/conventions` 94, frontend vitest 142, `npm run i18n:check` exit 0, eslint 0 errors, `vue-cli-service build` done.
 - No open PRs. No unmerged branches with work on them.
 
 ## Still open on task 023 (needs the live environment, owner does these)
@@ -18,19 +20,30 @@ Updated 2026-09-11. Read this first, then `Tasks/index.md`. Overwrite this file 
 
 ## Still open on task 024 (Sprint 1)
 
-1. Repoint the thirteen consumers off the shim paths (`Modules/AIProjectGenerator/usage.js`, `llmProvider/`, `instructionGuard.js`, `Modules/Agents/engine/persistence.js`) onto `Modules/AICore/`, one module per PR, then delete the shims and the allowlist entries in `tests/conventions/ai-core-boundary.test.js`.
-2. `npm run migrate -- up` on the dev database (migration `008-agent-run-expiry`, after 007).
-3. In-process sweep with the real model; owner and member sweep of the Instance console → AI agents spend card; then move 024 to `done/`.
+1. Run the migrations on the dev database: `npm run migrate -- up` (007 and 008, then Sprint 2's 009 and 010).
+2. In-process sweep with the real model; owner and member sweep of Instance console → AI agents spend card; then move 024 to `done/`.
 
-## Next: Sprint 2 — task 025 (`Tasks/backlog/025-sprint-2-revisions-and-skill-record/`)
+## Still open on task 025 (Sprint 2)
 
-Move it to `active/` and work its four steps, one PR each, from `beta`:
-1. Immutable agent and skill revisions; a run pins both at start; promote and rollback endpoints; states draft, candidate, live, superseded.
-2. The `agent_skills` record, its validator, the frozen catalogues, the `GET /api/v2/agents/skills` manifest, hybrid `getSkill` honouring `enabled: false`.
-3. Save-time validation of emitted actions; effective actions = skill ∩ agent.allowedActions ∩ registry.
-4. `brief.parse` re-expressed as a data skill.
+1. Owner and member sweep of Agent settings → revision history and Run detail → pinned revision.
+2. In-process sweep: change an agent, promote and roll back a revision, start a run and confirm it names its revision; run `brief.parse` on a real task through the seeded data skill.
+3. Then move 025 to `done/`.
+
+## Next: Sprint 3 — task 026 (`Tasks/backlog/026-sprint-3-observability-foundation/`)
+
+Move it to `active/` and work its steps, one PR each, from `beta`:
+
+1. OpenTelemetry with the trace identifier on the run row, every step row, every audit row and every log line; logs move to structured records; the exporter is off unless an endpoint is configured.
+2. The replay record per model call: prompt hash and reference, retrieved chunk identifiers, raw response, model and parameters, agent and skill revisions, with a retention and redaction policy. (absorbs 019 "trace per run")
+3. A metrics endpoint behind admin auth: rate, errors and duration per workflow, step, agent and model; token and cost counters; approval, decline and revert rates. (absorbs 019 "dashboard in /ai", the health half)
+4. Provider error codes preserved end to end and grouped, so an error tracker has something to group.
+5. Alerts on rates: error rate per agent, approval rate falling, cost against forecast, queue age.
+6. (added) The two competing uncaught-exception handlers collapse into one path that reports, flushes and exits.
 
 ## Things learned today that affect the next session
+
+- Background agents can stop on the account usage limit mid-task. Check the remote branch and the worktree before relaunching; so far none had pushed partial work.
+- Use `grep -a` in this repo: some `.js` files are detected as binary and plain `grep` skips them silently.
 
 - Merging PRs needs the owner's say-so each session; the auto-mode classifier denies `gh pr merge` otherwise.
 - Agent worktrees have no `node_modules` and cannot source nvm; give agents `PATH="$HOME/.nvm/versions/node/v20.20.2/bin:<repo>/node_modules/.bin:$PATH"` and let them symlink the parent's `node_modules` (root and `frontend/`) without committing it. Husky's pre-push rejects a detached HEAD; rebase on a throwaway branch and push `HEAD:<branch>`.
