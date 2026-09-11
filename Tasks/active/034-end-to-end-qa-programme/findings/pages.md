@@ -110,6 +110,52 @@ Only Pages registers dedicated router entries (`frontend/src/router/pages/index.
 - **Actual:** the `/api/v1/export/*` prefix is in neither JWT list in `Config/setMiddleware.js`, so an anonymous caller gets a 200 and a rendered file. **No data leak:** these endpoints only format the table/params the client sends in the body — they never read the tenant DB — so an anonymous caller only gets their own posted data back. The concern is a small open abuse surface (each call runs pdfmake/xlsx), not confidentiality. Same class as the `fix/unauthenticated-v1-routes` work.
 - **Suspected file:** `Config/setMiddleware.js` (add `/api/v1/export` to `verifyJWTTokenWithCRoute`) / `Modules/Export/routes.js`.
 
+## PAG-08 — Anyone in the company can mint a public link to a sprint of a project they cannot access
+
+- **Severity:** critical
+- **Role:** guest (any company user)
+- **Request:** `POST /api/v2/public-shares {entityType:'sprint', entityId:<sprint of a private project>}`, then anonymous `GET /share/:token`
+- **Expected:** a share can only be created for an entity the caller can open; a sprint of a private project the caller is not in is refused.
+- **Actual:** `canShareEntity` only checks `entityType === 'page'`; sprints, reports and client views pass unchecked. Live sweep: guest created a link to the sprint of `[QA pages] private` (admin-only, private) and an unauthenticated visitor received HTTP 200 with the sprint name and its task board. `GET /api/v2/public-shares?entityId=` likewise hands an existing sprint token to any role.
+- **Reproduction:** admin creates a private project; guest `POST /api/v2/public-shares` with its sprint id → `Public link created.`; open `/share/<token>` logged out → board renders.
+- **Suspected file:** `Modules/PublicShares/controller.js` `canShareEntity` (~L34) and `getShare` (~L111). **Fix:** resolve the sprint/report/client view to its project and require the caller to see that project before creating or returning a token.
+
+## PAG-09 — Docs, forms and form submissions of a project the caller is not in are readable
+
+- **Severity:** high
+- **Role:** guest
+- **Request:** `GET /api/v2/pages?projectId=<private>`, `GET /api/v2/pages/:id`, `GET /api/v2/forms?projectId=<private>`, `GET /api/v2/forms/:id`, `GET /api/v2/forms/:id/submissions`
+- **Expected:** content of a project the caller is not a member of is hidden.
+- **Actual:** Pages apply only the private-doc rule and Forms apply no project check at all. Live sweep against `[QA pages] private` (admin-only): guest listed and opened the doc (1), listed and opened the form (1) and read its submissions (which carry public submitters' answers and emails).
+- **Suspected file:** `Modules/Pages/controller.js` `listPages`/`getPage`; `Modules/Forms/controller.js` `listForms`/`getForm`/`listSubmissions`/`updateForm`/`publishForm`/`deleteForm`. **Fix:** check project membership/visibility of `ProjectID` before serving or changing the row.
+
+## PAG-10 — Any user can delete another user's private doc (and its subtree)
+
+- **Severity:** high
+- **Role:** member
+- **Request:** `DELETE /api/v2/pages/:id` on someone else's private page
+- **Expected:** refused with the same "Page not found." every other handler returns.
+- **Actual:** `deletePage` never loads the page or applies `pageVisibleTo`; it soft-deletes the id and every descendant, including other users' private children. Live: member deleted the admin's private doc (`Page deleted.`); the admin had to restore it from trash. An unknown id also answers `Page deleted.` with `deleted: 1`.
+- **Suspected file:** `Modules/Pages/controller.js` `deletePage` (~L380). **Fix:** use `findVisiblePage` first and 404 otherwise; walk only visible descendants.
+
+## PAG-11 — Form submissions never record the key of the task they filed
+
+- **Severity:** medium
+- **Role:** anon submitter / anyone reading responses
+- **Request:** `POST /form/:token`, then `GET /api/v2/forms/:id/submissions`
+- **Expected:** each submission row carries the created task's key, so the response table links to it.
+- **Actual:** the task is created (`QAS-14` in the live sweep, verified in Mongo), but `taskKey` is always `''`. `taskMongo.create` resolves `{ status, id }` without `data`, so `result.data.TaskKey` is undefined and the fallback is an empty string.
+- **Suspected file:** `Modules/Forms/publicForm.js` ~L508-509. **Fix:** read the id from `result.id` and fetch or return the task key from the create path.
+
+## PAG-12 — `POST /api/v1/importSettingsNotification` runs without a token
+
+- **Severity:** critical
+- **Role:** anon
+- **Request:** `POST /api/v1/importSettingsNotification {companyId, userId}`
+- **Expected:** 401.
+- **Actual:** the route is in neither JWT list (the `/api/v1/importSettings` prefix does not match `/api/v1/importSettingsNotification`), so an anonymous caller reaches the handler, which upserts default notification settings for any `userId` in any `companyId` taken from the body, overwriting that user's preferences. Live sweep reached the handler anonymously (`User id is required.`). `POST /api/v1/importTemplate` is also absent from the lists; it answered anonymously in the live sweep and writes project templates into the company named in the body. Neither is covered by `fix/unauthenticated-v1-routes`, which only adds `/api/v1/removeCache`.
+- **Suspected file:** `Config/setMiddleware.js`. **Fix:** list both routes under `verifyJWTTokenWithCRoute` and take the company from the verified header.
+
 ---
 
 ## Checks that passed (no finding)
@@ -149,4 +195,4 @@ Only Pages registers dedicated router entries (`frontend/src/router/pages/index.
 
 ### Known issues that blocked role checks (not re-filed)
 
-Per the brief, these are already being fixed and are the reason many member/guest refusals did not fire — several area routes accept a guest/member action that should be an admin/owner one (guest published, edited and deleted the admin's form; guest disabled and revoked the admin's public share; guest approved an agent-drafted page; member/guest saw form submissions and intake submitter emails). All trace to `fix/member-permission-rules` (no member permission rules in Local360) and `fix/guest-role-id`, so they are noted here rather than filed as new `PAG-` findings. PAG-01..PAG-04 are independent of the permission-rules work (they are structural authorization gaps, not missing role rules) and are filed.
+Per the brief, these are already being fixed and are the reason many member/guest refusals did not fire — several area routes accept a guest/member action that should be an admin/owner one inside a project they belong to (guest published, edited and deleted the admin's form; guest disabled and revoked the admin's public share and read its intake submitters; guest approved an agent-drafted page). These trace to `fix/member-permission-rules` (no member permission rules in Local360) and `fix/guest-role-id`, so they are noted here rather than filed. Anything that crosses a project the caller is not in, another user's private data, or needs no token at all is independent of that work and is filed (PAG-01 to PAG-04 and PAG-07 to PAG-12).

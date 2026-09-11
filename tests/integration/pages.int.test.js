@@ -279,4 +279,54 @@ describe('pages findings (regressions)', () => {
         const res = await owner.api.get('/api/v1/projects-apps');
         expect(res.body && res.body.status).toBe(true);
     });
+
+    it.failing('PAG-08: a guest cannot mint a public link to a sprint of a project they are not in', async () => {
+        const owner = await loginAs('owner');
+        const guest = await loginAs('guest');
+        const priv = await createProject(owner.api, { name: `PAG Private ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid, isPrivate: true });
+        const sprintId = await sprintOf(owner.api, priv._id);
+        const res = await guest.api.post('/api/v2/public-shares', { entityType: 'sprint', entityId: sprintId });
+        expect(refused(res)).toBe(true);
+    });
+
+    it.failing('PAG-09: a guest cannot read docs of a project they are not in', async () => {
+        const owner = await loginAs('owner');
+        const guest = await loginAs('guest');
+        const priv = await createProject(owner.api, { name: `PAG Private ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid, isPrivate: true });
+        await owner.api.post('/api/v2/pages', { title: `[QA pages] hidden ${uniqueSuffix()}`, projectId: priv._id });
+        const list = await guest.api.get(`/api/v2/pages?projectId=${priv._id}`);
+        expect((list.body.data || []).length).toBe(0);
+    });
+
+    it.failing('PAG-09: a guest cannot read a form of a project they are not in', async () => {
+        const owner = await loginAs('owner');
+        const guest = await loginAs('guest');
+        const priv = await createProject(owner.api, { name: `PAG Private ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid, isPrivate: true });
+        const form = await owner.api.post('/api/v2/forms', { title: `[QA pages] hidden form ${uniqueSuffix()}`, projectId: priv._id });
+        const res = await guest.api.get(`/api/v2/forms/${form.body.data._id}/submissions`);
+        expect(refused(res)).toBe(true);
+    });
+
+    it.failing('PAG-10: a member cannot delete another user\'s private doc', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const project = await makeSharedProject(owner);
+        const priv = await owner.api.post('/api/v2/pages', { title: `[QA pages] mine ${uniqueSuffix()}`, projectId: project._id, visibility: 'private' });
+        const res = await member.api.delete(`/api/v2/pages/${priv.body.data._id}`);
+        expect(refused(res)).toBe(true);
+    });
+
+    it.failing('PAG-11: a form submission records the key of the task it filed', async () => {
+        const owner = await loginAs('owner');
+        const project = await makeSharedProject(owner);
+        const { formId, token } = await makeLiveForm(owner, project);
+        await urlencoded(`/form/${token}`, { qname: `[QA pages] keyed ${uniqueSuffix()}` });
+        const subs = await owner.api.get(`/api/v2/forms/${formId}/submissions`);
+        expect(subs.body.data.submissions[0].taskKey).toBeTruthy();
+    });
+
+    it.failing('PAG-12: importSettingsNotification refuses a request without a token', async () => {
+        const res = await anon.post('/api/v1/importSettingsNotification', { companyId: state.companyId, userId: '0123456789abcdef01234599' });
+        expect(res.status).toBe(401);
+    });
 });
