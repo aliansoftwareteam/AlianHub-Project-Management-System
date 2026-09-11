@@ -8,6 +8,7 @@ const { addSprintFun } = require("../Sprints/controller")
 const config = require("../../Config/config");
 const { getCachedGlobalTemplateData } = require("../../utils/enterpriseHelper");
 const { removeCache } = require('../../utils/commonFunctions');
+const { tenantOf } = require("../../Config/tenant");
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const projectTemplate = require("../../utils/projectTemplates.json");
 const { pickKnownApps } = require("./apps");
@@ -95,7 +96,30 @@ exports.checkProjectPlan = (req) => {
     })
 }
 
+const failureReason = (outcome) => {
+    const reason = outcome && outcome.statusText !== undefined ? outcome.statusText : outcome;
+    if (reason && reason.message) return reason.message;
+    return typeof reason === 'string' ? reason : JSON.stringify(reason);
+};
+
+const namesOtherCompany = (body, companyId) => [body.CompanyId, body.companyId]
+    .some((value) => value !== undefined && value !== null && value !== '' && String(value) !== companyId);
+
+// The HTTP entry pins the tenant here, not inside createProject: PersonalList, the setup demo
+// project and the demo seeder call createProject in-process with a body they built themselves.
 exports.createProjectFun = async(req, res) => {
+    let companyId;
+    try {
+        companyId = tenantOf(req);
+    } catch (error) {
+        return res.status(error.statusCode || 403).send({ status: false, statusText: error.message, message: error.message });
+    }
+    const body = req.body || {};
+    if (namesOtherCompany(body, companyId)) {
+        return res.status(403).send({ status: false, statusText: 'You do not have access to this company', message: 'Forbidden' });
+    }
+    req.body = { ...body, CompanyId: companyId };
+    const { isPrivateSpace } = req.body;
     try {
         exports.checkProjectPlan(req).then((data) => {
             if(data.status) {
@@ -104,18 +128,12 @@ exports.createProjectFun = async(req, res) => {
                     res.send(cData);
                 })
                 .catch((error) => {
-                    exports.removeProjectCount(req.body.CompanyId,req.body.isPrivateSpace);
+                    exports.removeProjectCount(companyId, isPrivateSpace);
                     res.send({status:false, statusText: error});
                 });
             } else {
-                // BUG-010 / #64 fix: previously this branch was missing, so
-                // when `checkProjectPlan` resolved with `{status: false}`
-                // (e.g. a future refactor moves a failure path from `reject`
-                // to `resolve`) the request would hang until the proxy timed
-                // out. `checkProjectPlan` increments the project count
-                // before validating limits, so we must also roll the count
-                // back here to mirror the .catch branch below.
-                exports.removeProjectCount(req.body.CompanyId, req.body.isPrivateSpace);
+                // checkProjectPlan has already incremented the count, so a failed check rolls it back too.
+                exports.removeProjectCount(companyId, isPrivateSpace);
                 res.status(400).send({
                     status: false,
                     statusText: (data && data.statusText) || 'Project plan check did not pass.',
@@ -126,16 +144,11 @@ exports.createProjectFun = async(req, res) => {
                 res.send({status:false, statusText: error});
             }
             else{
-                exports.removeProjectCount(req.body.CompanyId,req.body.isPrivateSpace);
+                exports.removeProjectCount(companyId, isPrivateSpace);
                 res.send({status:false, statusText: error});
             }
         })
     } catch (error) {
-        // BUG-009 / #63 fix: `createProjectFun` is `async (req, res)`, not a
-        // `new Promise` constructor body — `reject` is not defined in this
-        // scope. Reaching this branch previously threw a ReferenceError that
-        // masked the real error and left the request hanging until the
-        // client / proxy timed out. Respond with the actual error instead.
         logger.error(`createProjectFun error: ${error && error.message ? error.message : error}`);
         res.status(400).send({
             status: false,
@@ -611,10 +624,13 @@ exports.createProject = async (req) => {
                                 userData:{},
                                 projectName: createProjectObject.ProjectName
                             }
-                        }).catch((err) => {
-                            logger.error('Create Sprint Error', err);
-                            return null;
-                        });
+                        }).catch((err) => err || { status: false });
+                        if (!(sprintRes && sprintRes.status === true && sprintRes.data && sprintRes.data._id)) {
+                            logger.error(`Create Sprint Error: ${failureReason(sprintRes)}`);
+                            exports.deleteProject(respone, req.body.CompanyId);
+                            reject({status: false, statusText: 'error in creating project'});
+                            return;
+                        }
 
                         const result = {status: true, statusText: 'createProject added successfully', data: respone};
                         if(customFieldVal.length > 0) result.customFieldVal = customResponce;
