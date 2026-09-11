@@ -15,7 +15,7 @@ const { dbCollections } = require('../Config/collections');
 const { getProvider } = require('../Modules/AICore/llmProvider');
 const { validateSkill } = require('../Modules/Agents/skills/validateSkill');
 const { PROMPT_PARTIALS } = require('../Modules/Agents/skills/catalogues');
-const persistence = require('../Modules/Agents/engine/persistence');
+const persistence = require('../Modules/AICore/persistence');
 const orchestrator = require('../Modules/Agents/engine/orchestrator');
 const runs = require('../Modules/Agents/runs');
 
