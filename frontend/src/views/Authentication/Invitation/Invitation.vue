@@ -187,23 +187,23 @@ const submit = async () => {
         if (user.status !== 200) { logOut({ islogOut: true }); banner.value = t("Auth.server_error"); return; }
         await getAuth(user.data.uid, true);
         localStorage.setItem("selectedCompany", companyIdRoute.value);
-        const newUserId = response.data.statusText._id;
+        const signedInUserId = String(user.data.uid);
         const result = await apiRequestWithoutCompnay("put", env.API_ROOT_MEMBERS, {
             id: requestId.value,
-            data: { userId: newUserId, status: 2 },
+            data: { userId: signedInUserId, status: 2 },
             companyId: companyIdRoute.value
         });
         if (!result.data.status) { logOut({ islogOut: true }); banner.value = t("Auth.server_error"); return; }
         if (result.data.data?.roleType === ROLE_OWNER) {
             await apiRequestWithoutCompnay("put", env.COMPANYINVITATION, {
-                updateObject: { objId: { userId: response.data.data._id }, companyData: [{ users: 1 }] },
+                updateObject: { objId: { userId: signedInUserId } },
                 companyId: companyIdRoute.value
             }).catch((error) => console.error(error));
             try { addSubscription(companyIdRoute.value, response); } catch { /* optional plugin */ }
         }
-        apiRequest("post", env.IMPORT_NOTIFICATION_SETTING, { companyId: companyIdRoute.value, userId: newUserId })
+        apiRequest("post", env.IMPORT_NOTIFICATION_SETTING, { companyId: companyIdRoute.value, userId: signedInUserId })
             .catch((error) => console.error("ERROR in user notification settings: ", error.message));
-        apiRequest("post", env.REMOVE_USER_NOTIFICATION, { companyId: companyIdRoute.value, userId: newUserId, type: "Add" })
+        apiRequest("post", env.REMOVE_USER_NOTIFICATION, { companyId: companyIdRoute.value, userId: signedInUserId, type: "Add" })
             .catch((error) => console.error(error, "ERROR"));
         localStorage.setItem("isLogging", "false");
         $toast.success(t("Toast.User_has_been_registered_successfully"), { position: "top-right" });

@@ -39,10 +39,12 @@ const resetStore = () => {
     mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-2', LogTimeDuration: 99 });
 };
 
+const SESSION = '6f00000000000000000005e1';
+
 const signIn = () => {
-    const refreshToken = jsonwebtoken.sign({}, process.env.JWT_SECRET, { expiresIn: '1h' });
-    mockDb.seed(dbCollections.SESSIONS, { userId: USER, refreshToken });
-    return jsonwebtoken.sign({ uid: USER, refreshToken }, process.env.JWT_SECRET, { audience: COMPANY, expiresIn: '1h' });
+    mockDb.seed(dbCollections.SESSIONS, { _id: SESSION, userId: USER, refreshTokenJti: 'refresh-jti' });
+    const sexp = Math.floor(Date.now() / 1000) + 3600;
+    return jsonwebtoken.sign({ uid: USER, sid: SESSION, rti: 'refresh-jti', sexp }, process.env.JWT_SECRET, { audience: COMPANY, expiresIn: '1h' });
 };
 
 describe('POST /api/v1/mongoOpration', () => {

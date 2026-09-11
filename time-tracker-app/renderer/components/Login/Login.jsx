@@ -14,10 +14,10 @@ const Login = () => {
   const dispatch = useDispatch();
   const router = useRouter();
 
-  const loginAPI = (refreshToken, userId) => {
+  const loginAPI = (code, userId) => {
     return new Promise((resolve, reject) => {
       try {
-        apiRequestWithoutSecure("post", `/api/v1/auth/loginAuthTracker`, {refreshToken, userId}).then((ele) => {
+        apiRequestWithoutSecure("post", `/api/v1/auth/loginAuthTracker`, {code, userId}).then((ele) => {
           resolve(ele?.data)
         }).catch((error)=>{
           reject(error);
@@ -35,12 +35,11 @@ const Login = () => {
       if (isProcessing) return; // Prevent multiple executions
       isProcessing = true;
       
-      let refreshToken = url.url.split("?")[1].split("&")[1].split("=")[1]
-      let userId = url.url.split("?")[1].split("&")[0].split("=")[1]
-      loginAPI(refreshToken, userId).then((ele)=>{
+      const params = new URLSearchParams(url.url.split("?").slice(1).join("?"))
+      loginAPI(params.get("code"), params.get("client_id")).then((ele)=>{
         localStorage.setItem('refreshToken', ele.refreshToken)
         localStorage.setItem('token', ele.accessToken)
-        localStorage.setItem("userId", userId);
+        localStorage.setItem("userId", ele.uid);
         getUserData(dispatch).then(() => {
           dispatch(login());
           getAssignCompanyData().then(() => {

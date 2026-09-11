@@ -1,5 +1,5 @@
 const { createApiClient } = require('../../e2e/support/api');
-const { loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
+const { emailFor, inviteMember, login, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 
 const state = readState();
 const anon = createApiClient({ baseURL: state.baseURL });
@@ -292,6 +292,194 @@ describe('access — company reads are the caller\'s own companies', () => {
         const res = await owner.api.post('/api/v1/admin/company', { fetchAllCompany: true, companyIds: [] });
         expect(res.status).toBe(200);
         expect(res.body.some((company) => String(company._id) === state.companyId)).toBe(true);
+    });
+});
+
+describe('access — only owners and admins change the company', () => {
+    const readCompany = async (session) => (await session.api.post('/api/v1/admin/company', { companyIds: [state.companyId] })).body[0];
+
+    it.each([
+        ['member', '/api/v1/company'],
+        ['member', '/api/v1/admin/company'],
+        ['guest', '/api/v1/company-invitation'],
+    ])('refuses a %s renaming the company through %s', async (role, path) => {
+        const session = await loginAs(role);
+        const before = await readCompany(session);
+        const res = await session.api.put(path, { updateObject: { Cst_CompanyName: `Taken ${uniqueSuffix()}` }, companyId: state.companyId });
+        expect(res.status).toBe(403);
+        expect(res.body.status).toBe(false);
+        expect((await readCompany(session)).Cst_CompanyName).toBe(before.Cst_CompanyName);
+    });
+
+    it('lets an admin save the company details', async () => {
+        const admin = await loginAs('admin');
+        const before = await readCompany(admin);
+        const res = await admin.api.put('/api/v1/company', { updateObject: { Cst_CompanyName: before.Cst_CompanyName } });
+        expect(res.status).toBe(200);
+        expect(res.body.Cst_CompanyName).toBe(before.Cst_CompanyName);
+    });
+
+    it('lets a member switch a project between private and public', async () => {
+        const member = await loginAs('member');
+        const swap = (toPrivate) => member.api.put('/api/v1/company', {
+            key: '$inc',
+            updateObject: { 'projectCount.privateCount': toPrivate ? 1 : -1, 'projectCount.publicCount': toPrivate ? -1 : 1 },
+        });
+        expect((await swap(true)).status).toBe(200);
+        expect((await swap(false)).status).toBe(200);
+    });
+
+    it('refuses a guest releasing a seat', async () => {
+        const guest = await loginAs('guest');
+        const res = await guest.api.put('/api/v1/company', {
+            key: '$inc',
+            updateObject: { 'companyData.$[elementIndex].users': -1 },
+            arrayFilters: [{ 'elementIndex.users': { $exists: true } }],
+        });
+        expect(res.status).toBe(403);
+    });
+});
+
+describe('access — plan, billing and count fields stay with the server', () => {
+    const readCompany = async (session) => (await session.api.post('/api/v1/admin/company', { companyIds: [state.companyId] })).body[0];
+    const serverFields = (company) => ({
+        planFeature: company.planFeature,
+        subscriptionRenewalDate: company.subscriptionRenewalDate,
+        companyData: company.companyData,
+        trackerUsers: company.trackerUsers,
+        userId: company.userId,
+    });
+
+    it.each([
+        ['owner', '/api/v1/company', (company) => ({ updateObject: { 'planFeature.users': company.planFeature.users } })],
+        ['owner', '/api/v1/admin/company', () => ({ updateObject: { subscriptionRenewalDate: 4102444800 } })],
+        ['admin', '/api/v1/company', () => ({ key: '$inc', updateObject: { 'companyData.$[elementIndex].users': 0 }, arrayFilters: [{ 'elementIndex.users': { $exists: true } }] })],
+        ['admin', '/api/v1/admin/company', (company) => ({ updateObject: { trackerUsers: company.trackerUsers ?? 0 } })],
+        ['owner', '/api/v1/company-invitation', (company) => ({ updateObject: { objId: { userId: String(company.userId) }, companyData: company.companyData }, companyId: state.companyId })],
+    ])('refuses the %s writing server-controlled fields through %s', async (role, path, bodyFor) => {
+        const session = await loginAs(role);
+        const before = await readCompany(session);
+        const res = await session.api.put(path, bodyFor(before));
+        expect(res.status).toBe(403);
+        expect(res.body.status).toBe(false);
+        expect(serverFields(await readCompany(session))).toEqual(serverFields(before));
+    });
+
+    it('lets the owner save the whole company details form', async () => {
+        const owner = await loginAs('owner');
+        const before = await readCompany(owner);
+        const res = await owner.api.put('/api/v1/company', {
+            updateObject: {
+                Cst_profileImage: before.Cst_profileImage || '',
+                Cst_CompanyName: before.Cst_CompanyName,
+                Cst_Phone: before.Cst_Phone,
+                Cst_Country: before.Cst_Country,
+                Cst_DialCode: before.Cst_DialCode,
+                Cst_State: before.Cst_State || '',
+                Cst_City: before.Cst_City || '',
+                Cst_LogTimeDays: before.Cst_LogTimeDays,
+                trackerEstimateLimit: before.trackerEstimateLimit !== false,
+                Cst_countryCode: before.Cst_countryCode || '',
+                Cst_stateCode: before.Cst_stateCode || '',
+                updatedAt: new Date().toISOString(),
+            },
+        });
+        expect(res.status).toBe(200);
+        expect(res.body.Cst_CompanyName).toBe(before.Cst_CompanyName);
+    });
+
+    it('lets an owner record themselves as the company owner through the invitation route', async () => {
+        const owner = await loginAs('owner');
+        const res = await owner.api.put('/api/v1/company-invitation', { updateObject: { objId: { userId: owner.uid } }, companyId: state.companyId });
+        expect(res.status).toBe(200);
+        expect(String((await readCompany(owner)).userId)).toBe(owner.uid);
+    });
+
+    it('refuses an admin recording themselves as the company owner', async () => {
+        const admin = await loginAs('admin');
+        const before = await readCompany(admin);
+        const res = await admin.api.put('/api/v1/company-invitation', { updateObject: { objId: { userId: admin.uid } }, companyId: state.companyId });
+        expect(res.status).toBe(403);
+        expect(String((await readCompany(admin)).userId)).toBe(String(before.userId));
+    });
+});
+
+describe('access — company writes need a live seat in that company', () => {
+    const readCompany = async (session) => (await session.api.post('/api/v1/admin/company', { companyIds: [state.companyId] })).body[0];
+    const guarded = (company) => ({ Cst_CompanyName: company.Cst_CompanyName, companyData: company.companyData, trackerUsers: company.trackerUsers, userId: company.userId });
+    const WRITES = [
+        ['the company details', { updateObject: { Cst_CompanyName: 'Taken over' } }],
+        ['a seat release', { key: '$inc', updateObject: { 'companyData.$[elementIndex].users': -1 }, arrayFilters: [{ 'elementIndex.users': { $exists: true } }] }],
+    ];
+    const pullFromCompany = (ownerApi, userId) => ownerApi.put('/api/v1/user', { userId, updateObject: { $pull: { AssignCompany: state.companyId } }, newObj: { returnDocument: 'after' } });
+
+    // Signs in before the removal, the way a session opened earlier keeps the company in its audience.
+    async function removedAdmin() {
+        const owner = await loginAs('owner');
+        const suffix = uniqueSuffix();
+        const email = emailFor('admin', `seat${suffix}`);
+        const user = await inviteMember({ baseURL: state.baseURL, ownerApi: owner.api, companyId: state.companyId, role: 'admin', email, firstName: 'QA', lastName: `Seat ${suffix}` });
+        const session = await login(state.baseURL, email);
+        expect((await owner.api.put('/api/v1/members', { id: user.companyUserId, data: { isDelete: true, isTrackerUser: false } })).body.status).toBe(true);
+        expect((await pullFromCompany(owner.api, user.userId)).body.status).toBe(true);
+        return { ...user, api: createApiClient({ baseURL: state.baseURL, accessToken: session.accessToken, companyId: state.companyId }) };
+    }
+
+    async function pendingAdmin() {
+        const user = await removedAdmin();
+        const owner = await loginAs('owner');
+        const invite = await owner.api.post('/api/v2/sendInvitationEmail', { email: user.email, companyId: state.companyId, companyName: state.companyName, role: 2, designation: 0 });
+        expect(invite.status).toBe(200);
+        expect((await owner.api.get(`/api/v1/members/${user.userId}`)).body).toMatchObject({ userId: user.userId, roleType: 2, status: 1, isDelete: false });
+        return user;
+    }
+
+    it.each(WRITES)('refuses a removed admin changing %s', async (label, body) => {
+        const removed = await removedAdmin();
+        const owner = await loginAs('owner');
+        const before = await readCompany(owner);
+        const res = await removed.api.put('/api/v1/admin/company', body);
+        expect(res.status).toBe(403);
+        expect(res.body.status).toBe(false);
+        expect(guarded(await readCompany(owner))).toEqual(guarded(before));
+    });
+
+    it.each(WRITES)('refuses a pending invitee changing %s', async (label, body) => {
+        const pending = await pendingAdmin();
+        const owner = await loginAs('owner');
+        const before = await readCompany(owner);
+        const res = await pending.api.put('/api/v1/admin/company', body);
+        expect(res.status).toBe(403);
+        expect(res.body.status).toBe(false);
+        expect(guarded(await readCompany(owner))).toEqual(guarded(before));
+    });
+
+    it('refuses a request whose header and body name different companies', async () => {
+        const admin = await loginAs('admin');
+        const before = await readCompany(admin);
+        const res = await admin.api.withCompany(randomId()).put('/api/v1/admin/company', { companyId: state.companyId, updateObject: { Cst_CompanyName: 'Taken over' } });
+        expect(res.status).toBe(403);
+        expect(res.body).toMatchObject({ status: false, message: expect.stringMatching(/more than one company/) });
+        expect(guarded(await readCompany(admin))).toEqual(guarded(before));
+    });
+
+    it('lets a newly invited owner accept the invitation and record themselves as the company owner', async () => {
+        const owner = await loginAs('owner');
+        const suffix = uniqueSuffix();
+        const email = emailFor('owner', `claim${suffix}`);
+        const invited = await inviteMember({ baseURL: state.baseURL, ownerApi: owner.api, companyId: state.companyId, role: 'owner', email, firstName: 'QA', lastName: `Owner ${suffix}` });
+        const session = await login(state.baseURL, email);
+        const invitationPage = createApiClient({ baseURL: state.baseURL, accessToken: session.accessToken });
+        try {
+            const res = await invitationPage.put('/api/v1/company-invitation', { updateObject: { objId: { userId: session.uid } }, companyId: state.companyId });
+            expect(res.status).toBe(200);
+            expect(String((await readCompany(owner)).userId)).toBe(invited.userId);
+        } finally {
+            await owner.api.put('/api/v1/company-invitation', { updateObject: { objId: { userId: owner.uid } }, companyId: state.companyId });
+            await owner.api.put('/api/v1/members', { id: invited.companyUserId, data: { isDelete: true, isTrackerUser: false } });
+            await pullFromCompany(owner.api, invited.userId);
+        }
+        expect(String((await readCompany(owner)).userId)).toBe(owner.uid);
     });
 });
 

@@ -6,6 +6,7 @@ const logger = require("../../../Config/loggerConfig");
 const serviceCtr = require("../../serviceFunction.js")
 const sendMail = require("../../service.js");
 const { generateToken, verifyToken, generateJWTToken, removeCacheAndCookie } = require("../../../Config/jwt.js");
+const { accessClaimsFor } = require("../helpers/refreshTokenRules");
 const helperCtr = require("../helper.js");
 const sesstionCtr = require("../session.js");
 const mongoose = require("mongoose");
@@ -56,6 +57,15 @@ exports.addAndRemoveUserInMongodbNotificationCount = (companyId,userId,type) => 
 
 exports.generateTokenV2Fun = (uid, refreshToken, cb) => {
     try {
+        const sessionClaims = accessClaimsFor(refreshToken);
+        if (!sessionClaims) {
+            cb({
+                status: false,
+                isLogout: true,
+                message: 'Your session is expired',
+            });
+            return;
+        }
         let object = {
             type: dbCollections.USERS,
             data: [
@@ -84,7 +94,7 @@ exports.generateTokenV2Fun = (uid, refreshToken, cb) => {
                 return;
             }
             const companyIds = response.AssignCompany && response.AssignCompany.length ? response.AssignCompany : [];
-            const token = await generateJWTToken({uid: uid, companyIds: companyIds, refreshToken});
+            const token = await generateJWTToken({uid: uid, companyIds: companyIds, ...sessionClaims});
             cb({
                 status: true,
                 message: "Jwt token generate successfully.",

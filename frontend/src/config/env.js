@@ -69,6 +69,7 @@ module.exports.CALL_NOTES = '/api/v2/calls/notes';
 module.exports.FOLDER = '/api/v1/folder';
 module.exports.REMOVE_USER_NOTIFICATION = '/api/v1/removeUserNotification';
 module.exports.GENERATETOKEN_V2 = '/api/v2/generateToken';
+module.exports.TRACKER_CODE = '/api/v2/auth/tracker-code';
 module.exports.UPDATE_UNREADREAD_COMMENTS_COUNT = '/api/v1/updateunreadcommentscount';
 module.exports.UNSET_COMMENTS_COUNT = '/api/v1/unsetCommentCounts';
 module.exports.V2_TASKS = '/api/v2/tasks';

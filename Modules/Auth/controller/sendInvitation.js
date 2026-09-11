@@ -13,6 +13,7 @@ const { getUserByQueyFun } = require("../../Users/controller.js");
 const { updateMemberFunction } = require('../../settings/Members/controller.js');
 const logger = require("../../../Config/loggerConfig.js");
 const { emitListener } = require("../../Company/eventController.js");
+const { newLinkToken } = require("../helpers/linkToken");
 
 
 async function batchUpdate(arr, eventId) {
@@ -264,7 +265,7 @@ exports.sendInvitationEmailFun = (bodyData) => {
                                     let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${resp._id}`;
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                                 } else {
-                                    let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${resp._id}&linkId=${token}`)})}`;
+                                    let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${resp._id}&linkId=${token}`)}`;
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                                 }
                             }).catch((error)=>{
@@ -294,12 +295,7 @@ exports.sendInvitationEmailFun = (bodyData) => {
                 try {
                     if (resp.length > 0) {
                         const response = resp[0];
-                        let temp = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-                        let token = '';
-                        for ( let i = 0; i < 8; i++ ) {
-                            token += temp.charAt(Math.floor(Math.random() * temp.length));
-                        }
-        
+                        const token = newLinkToken();
                         let userId = response._id;
                         sendCheckRequest(email, userId, token)
                     } else {
@@ -439,7 +435,7 @@ exports.sendInvitationEmail = (req,res) => {
                             let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${re._id}`;
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                         } else {
-                            let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${re._id}&linkId=${token}`)})}`;
+                            let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${re._id}&linkId=${token}`)}`;
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                         }
                     }).catch((error) => {
@@ -481,7 +477,7 @@ exports.sendInvitationEmail = (req,res) => {
                             let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${resp._id}`;
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                         } else {
-                            let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${resp._id}&linkId=${token}`)})}`;
+                            let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${resp._id}&linkId=${token}`)}`;
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                         }
                     }).catch((error)=>{
@@ -504,12 +500,7 @@ exports.sendInvitationEmail = (req,res) => {
         getUserByQueyFun(query).then((resp)=>{
             if (resp.length > 0) {
                 const response = resp[0];
-                let temp = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-                let token = '';
-                for ( let i = 0; i < 8; i++ ) {
-                    token += temp.charAt(Math.floor(Math.random() * temp.length));
-                }
-
+                const token = newLinkToken();
                 let userId = response._id;
                 sendCheckRequest(email, userId, token)
             } else {

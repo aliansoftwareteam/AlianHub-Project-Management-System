@@ -21,13 +21,14 @@ const importSettings = (payload) => new Promise((resolve, reject) => {
 });
 
 async function createOwner({ firstName, lastName, email, password }) {
-    const created = await createUserRef.addUserMongodbV2({ firstName, lastName, email, password, isInvitation: false, isProductOwner: true });
+    const created = await createUserRef.addUserMongodbV2({ firstName, lastName, email, password, isInvitation: false });
     const ownerId = String(created.statusText._id);
     // The person running setup is the operator and mail is rarely configured yet, so the
     // verification gate in generateTokenV2Fun would lock them out of the account they just made.
+    // Instance ownership is granted only here; the shared signup insert never writes it.
     await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
         type: dbCollections.USERS,
-        data: [{ _id: ownerId }, { $set: { isEmailVerified: true, verificationToken: '' } }],
+        data: [{ _id: ownerId }, { $set: { isProductOwner: true, isEmailVerified: true, verificationToken: '' } }],
     }, 'findOneAndUpdate');
     return ownerId;
 }

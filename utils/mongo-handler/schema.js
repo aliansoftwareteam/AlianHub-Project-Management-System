@@ -3796,6 +3796,14 @@ const schema = {
             type: Date,
             required: false
         },
+        trackerCodeHash: {
+            type: String,
+            required: false
+        },
+        trackerCodeExpiresAt: {
+            type: Date,
+            required: false
+        },
         lastActive: {
             type: Date,
             default: new Date()
