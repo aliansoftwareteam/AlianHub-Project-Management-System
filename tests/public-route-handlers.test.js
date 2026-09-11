@@ -145,9 +145,9 @@ describe('a session acts only on its own account', () => {
         expect(MongoDbCrudOpration).not.toHaveBeenCalled();
     });
 
-    it("refuses ending another user's sessions", () => {
+    it("refuses ending another user's sessions", async () => {
         const res = response();
-        deleteUserSpecificSession(request({ params: { id: OTHER_USER } }), res);
+        await deleteUserSpecificSession(request({ params: { id: OTHER_USER } }), res);
         expect(res.statusCode).toBe(403);
         expect(MongoDbCrudOpration).not.toHaveBeenCalled();
     });
