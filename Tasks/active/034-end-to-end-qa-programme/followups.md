@@ -58,6 +58,7 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 30 | `getRoleType` ignores whether a member row is deleted or pending; removed members are still stopped by the login membership check. | #633 |
 | 31 | `Login.vue` and `VerifyEmail.vue` still send `email` in the resend-verification request, which the server now ignores. | #633 |
 | 32 | Creating a project filter with another user's id answers 200 and stores it under the caller, while the task-filter side answers 403. | #632 |
+| 33 | Settings → General logs `TypeError: Cannot read properties of undefined (reading 'isoCode')` in the test harness. | #634 |
 
 ## Owner decisions recorded
 
