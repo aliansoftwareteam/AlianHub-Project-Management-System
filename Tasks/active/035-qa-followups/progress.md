@@ -4,7 +4,7 @@
 One pull request per group; tick with the merge commit and build.
 
 - [ ] 1. Company updates and verification email (items 1, 12)
-- [ ] 2. Project filters and task read visibility (items 2, 3)
+- [x] 2. Project filters and task read visibility (items 2, 3) — #632 `25344f46`
 - [ ] 3. Subscription invoices and timesheet reads (items 16a, 16c, 16d)
 - [ ] 4. Storage uploads, profile images, bucket cron (items 5, 6, 7)
 - [ ] 5. Access token without the refresh token, tracker login (items 8, 9, 10)
