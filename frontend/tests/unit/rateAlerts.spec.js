@@ -111,7 +111,7 @@ describe('AiOpenAlerts', () => {
 describe('AiAlertThresholds', () => {
     beforeEach(() => apiRequest.mockReset());
 
-    const mountPanel = async (alerts = { errorRatePct: 25 }) => {
+    const mountPanel = async (alerts = { enabled: true, errorRatePct: 25 }) => {
         apiRequest.mockImplementation((method, url, body) => {
             if (method === 'get') return ok({ undoHours: 24, alerts: { ...ALERT_DEFAULTS, ...alerts } });
             return ok({ undoHours: 24, alerts: { ...ALERT_DEFAULTS, ...alerts, ...body.alerts } });

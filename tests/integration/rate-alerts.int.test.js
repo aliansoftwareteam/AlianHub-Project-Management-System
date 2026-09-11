@@ -37,6 +37,8 @@ beforeAll(async () => {
     client = new MongoClient(resolveMongoUrl(), { serverSelectionTimeoutMS: 5000 });
     await client.connect();
     [owner, admin, member] = await Promise.all([loginAs('owner'), loginAs('admin'), loginAs('member')]);
+    const enabled = await owner.api.put('/api/v2/agents/settings', { alerts: { enabled: true } });
+    expect(enabled.body.data.alerts.enabled).toBe(true);
     await seedFailingRuns();
 });
 

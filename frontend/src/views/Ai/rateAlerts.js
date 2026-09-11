@@ -1,7 +1,7 @@
 export const ALERT_TYPES = Object.freeze(["agent_error_rate", "approval_rate_falling", "cost_forecast", "queue_age"]);
 
 export const ALERT_DEFAULTS = Object.freeze({
-    enabled: true,
+    enabled: false,
     errorRatePct: 20,
     errorMinRuns: 5,
     approvalFloorPct: 50,
@@ -18,8 +18,6 @@ export const THRESHOLD_FIELDS = Object.freeze([
     { key: "costForecastPct", type: "cost_forecast", min: 1, max: 1000, integer: false, label: "AiAlerts.field_cost_forecast", help: "AiAlerts.field_cost_forecast_help" },
     { key: "queueAgeMinutes", type: "queue_age", min: 1, max: 1440, integer: true, label: "AiAlerts.field_queue_age", help: "AiAlerts.field_queue_age_help" }
 ]);
-
-const fieldOf = (key) => THRESHOLD_FIELDS.find((f) => f.key === key);
 
 const inRange = (field, n) => typeof n === "number" && Number.isFinite(n) && n >= field.min && n <= field.max && (!field.integer || Number.isInteger(n));
 
@@ -73,5 +71,3 @@ export const noticeTextOf = (changeData) => {
     const state = changeData.state === "resolved" ? "resolved" : "open";
     return { key: `AiAlerts.notice_${state}_${type}`, params: { agent: changeData.agentName || "", value: changeData.lastValue ?? "", threshold: changeData.threshold ?? "" } };
 };
-
-export const isKnownField = (key) => Boolean(fieldOf(key));

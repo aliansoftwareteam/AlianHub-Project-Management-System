@@ -53,7 +53,7 @@ beforeEach(() => {
     resetCalls();
     jest.clearAllMocks();
     myCache.flushAll();
-    mockDb.seed(dbCollections.COMPANIES, { _id: C, Cst_CompanyName: 'Acme' });
+    mockDb.seed(dbCollections.COMPANIES, { _id: C, Cst_CompanyName: 'Acme', agentAlerts: { enabled: true } });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: 'owner1', roleType: 1 });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: 'admin1', roleType: 2 });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: 'member1', roleType: 3 });
@@ -63,7 +63,7 @@ beforeEach(() => {
 
 describe('alert settings', () => {
     it('declares the defaults', () => {
-        expect(rules.settingsOf(undefined)).toEqual({ enabled: true, errorRatePct: 20, errorMinRuns: 5, approvalFloorPct: 50, approvalDropPts: 20, costForecastPct: 110, queueAgeMinutes: 15 });
+        expect(rules.settingsOf(undefined)).toEqual({ enabled: false, errorRatePct: 20, errorMinRuns: 5, approvalFloorPct: 50, approvalDropPts: 20, costForecastPct: 110, queueAgeMinutes: 15 });
     });
 
     it('merges a partial update over what is stored and refuses out-of-range values', () => {
@@ -238,12 +238,20 @@ describe('the evaluator', () => {
         expect(incidents()).toEqual([]);
     });
 
+    it('stays off for a workspace that never switched alerts on', async () => {
+        delete company().agentAlerts;
+        failingAgent();
+        const out = await evaluate();
+        expect(out.skipped).toBe(true);
+        expect(incidents()).toEqual([]);
+    });
+
     it('uses the thresholds stored in company settings', async () => {
-        company().agentAlerts = { errorRatePct: 50, errorMinRuns: 2 };
+        company().agentAlerts = { enabled: true, errorRatePct: 50, errorMinRuns: 2 };
         failingAgent({ failed: 1, done: 2 });
         await evaluate();
         expect(incidents()).toEqual([]);
-        company().agentAlerts = { errorRatePct: 30, errorMinRuns: 2 };
+        company().agentAlerts = { enabled: true, errorRatePct: 30, errorMinRuns: 2 };
         await evaluate();
         expect(openIncidents()).toEqual([expect.objectContaining({ type: 'agent_error_rate', threshold: 30 })]);
     });

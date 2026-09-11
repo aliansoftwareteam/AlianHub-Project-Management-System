@@ -3,7 +3,7 @@ const { ROLE_OWNER, ROLE_ADMIN } = require('../../Config/permissionGuard');
 const TYPES = Object.freeze(['agent_error_rate', 'approval_rate_falling', 'cost_forecast', 'queue_age']);
 
 const DEFAULTS = Object.freeze({
-    enabled: true,
+    enabled: false,
     errorRatePct: 20,
     errorMinRuns: 5,
     approvalFloorPct: 50,
