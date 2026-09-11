@@ -116,9 +116,20 @@ async function listSprints(api, projectId) {
     return Array.isArray(res.body) ? res.body : (res.body && res.body.data) || [];
 }
 
+/* POST /createproject answers before it adds the default "List" sprint, so a
+ * task created straight after a project can find no sprint yet. */
+async function firstSprint(api, projectId, { timeoutMs = 15000, intervalMs = 100 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+        const [sprint] = await listSprints(api, projectId);
+        if (sprint || Date.now() > deadline) return sprint;
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+}
+
 /* Same payload the create-task forms send (see ConvertNoteToTask.vue). */
 async function createTask(api, { project, name, user, companyOwnerId }) {
-    const [sprint] = await listSprints(api, project._id);
+    const sprint = await firstSprint(api, project._id);
     if (!sprint) throw new Error(`project ${project._id} has no sprint to hold a task`);
     const sprintId = String(sprint._id || sprint.id);
     const status = project.taskStatusData.find((x) => x.type === 'default_active');
@@ -225,6 +236,7 @@ module.exports = {
     createProject,
     createTask,
     emailFor,
+    firstSprint,
     inviteMember,
     listSprints,
     login,

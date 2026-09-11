@@ -128,7 +128,7 @@ describe('tasks & collaboration — auth refusals that work', () => {
 
 describe('tasks & collaboration — confirmed findings (regressions)', () => {
     // TSK-01
-    it.failing('TSK-01: refuses a client-supplied aggregation pipeline on POST /api/v1/task/find', async () => {
+    it('TSK-01: refuses a client-supplied aggregation pipeline on POST /api/v1/task/find', async () => {
         const member = await loginAs('member');
         const res = await member.api.post('/api/v1/task/find', {
             findQuery: [

@@ -6,6 +6,8 @@ const anon = createApiClient({ baseURL: state.baseURL });
 const anonWithCompany = createApiClient({ baseURL: state.baseURL, companyId: state.companyId });
 const refused = (res) => res.status === 401 || res.status === 403 || (res.body && res.body.status === false);
 const randomId = () => uniqueSuffix() + uniqueSuffix() + uniqueSuffix() + uniqueSuffix();
+const SECRET_FIELDS = ['webTokens', 'verificationToken', 'verificationTokenTime', 'forgotPasswordToken', 'forgotPasswordTokenTime', 'passwordHash'];
+const exposesSecret = (doc) => SECRET_FIELDS.some((field) => doc && Object.prototype.hasOwnProperty.call(doc, field));
 
 describe('access — authentication happy paths', () => {
     it('logs in every role', async () => {
@@ -101,19 +103,18 @@ describe('access — regression tests for confirmed findings (flip to it() once 
         expect(res.status).toBe(401);
     });
 
-    // ACC-02: POST /api/v1/generateToken mints a JWT for any uid with no password.
-    it.failing('ACC-02 refuses minting a token for an arbitrary user id', async () => {
+    it('ACC-02 refuses minting a token for an arbitrary user id', async () => {
         const owner = await loginAs('owner');
         const res = await anon.post('/api/v1/generateToken', { uid: owner.uid });
-        expect(refused(res)).toBe(true);
+        expect([401, 403, 404]).toContain(res.status);
         expect(res.body && res.body.token).toBeFalsy();
     });
 
-    // ACC-03: /api/v2/session/* is unauthenticated (forge a session; wipe sessions).
-    it.failing('ACC-03 refuses registering a session anonymously', async () => {
+    it('ACC-03 refuses registering a session anonymously', async () => {
         const owner = await loginAs('owner');
         const res = await anon.post('/api/v2/session/register', { userId: owner.uid });
-        expect(refused(res)).toBe(true);
+        expect([401, 403, 404]).toContain(res.status);
+        expect(res.body && res.body.data && res.body.data.refreshToken).toBeFalsy();
     });
 
     it('ACC-03 refuses deleting another user\'s sessions anonymously', async () => {
@@ -127,21 +128,23 @@ describe('access — regression tests for confirmed findings (flip to it() once 
         expect(res.status).toBe(401);
     });
 
-    // ACC-05: user routes are jwt-only, unscoped — any role reads/edits any user.
-    it.failing('ACC-05 refuses a guest reading another user by id', async () => {
+    // A teammate's public profile stays readable because the member list needs it;
+    // secrets and users of other companies do not.
+    it('ACC-05 gives a guest only the public profile of another user', async () => {
         const guest = await loginAs('guest');
         const res = await guest.api.get(`/api/v1/user/${state.users.owner.userId}`);
-        expect(refused(res)).toBe(true);
+        expect(res.status).toBe(200);
+        expect(exposesSecret(res.body)).toBe(false);
+        expect(res.body.isProductOwner).toBeUndefined();
     });
 
-    it.failing('ACC-05 refuses a guest updating an arbitrary user', async () => {
+    it('ACC-05 refuses a guest updating an arbitrary user', async () => {
         const guest = await loginAs('guest');
         const res = await guest.api.put('/api/v1/user', { userId: randomId(), updateObject: { isActive: true } });
         expect(refused(res)).toBe(true);
     });
 
-    // ACC-06: admin company routes let any member/guest enumerate companies.
-    it.failing('ACC-06 refuses a guest listing all companies via the admin route', async () => {
+    it('ACC-06 refuses a guest listing all companies via the admin route', async () => {
         const guest = await loginAs('guest');
         const res = await guest.api.post('/api/v1/admin/company', { fetchAllCompany: true, companyIds: [] });
         expect(refused(res)).toBe(true);
@@ -167,5 +170,135 @@ describe('access — regression tests for confirmed findings (flip to it() once 
             email: state.users.member.email, companyId: state.companyId,
         });
         expect(res.status).toBe(401);
+    });
+});
+
+describe('access — sessions are the caller\'s own', () => {
+    it('refuses deleting every session anonymously', async () => {
+        expect((await anon.delete('/api/v2/session/delete')).status).toBe(401);
+    });
+
+    it('refuses a member signing out the admin', async () => {
+        const member = await loginAs('member');
+        expect((await member.api.delete(`/api/v2/session/delete/${state.users.admin.userId}`)).status).toBe(403);
+    });
+
+    it('lets a user sign out their own sessions, as change-password does', async () => {
+        const guest = await loginAs('guest');
+        expect((await guest.api.delete(`/api/v2/session/delete/${guest.uid}`)).status).toBe(200);
+        expect((await guest.api.get('/api/v2/users/sessions')).status).toBe(401);
+    });
+});
+
+describe('access — OAuth settings mask secrets and accept only OAuth keys', () => {
+    it('refuses a company admin who is not the instance owner', async () => {
+        const admin = await loginAs('admin');
+        expect((await admin.api.get('/api/v1/settings/oauth')).status).toBe(403);
+    });
+
+    it('shows the instance owner whether secrets are set, never their values', async () => {
+        const owner = await loginAs('owner');
+        const res = await owner.api.get('/api/v1/settings/oauth');
+        expect(res.status).toBe(200);
+        expect(res.body.data).not.toHaveProperty('clientSecret');
+        expect(res.body.data).not.toHaveProperty('githubClientSecret');
+        expect(res.body.data).toHaveProperty('clientSecretSet');
+    });
+
+    it('refuses the instance owner writing a key outside the OAuth allowlist', async () => {
+        const owner = await loginAs('owner');
+        const res = await owner.api.post('/api/v1/settings/oauth', { pathType: 'root', variables: [{ variableName: 'JWT_SECRET', variableValue: 'x' }] });
+        expect(res.status).toBe(400);
+    });
+});
+
+describe('access — user routes are scoped to shared companies', () => {
+    it('returns the owner their own profile without secrets', async () => {
+        const owner = await loginAs('owner');
+        const res = await owner.api.get(`/api/v1/user/${owner.uid}`);
+        expect(res.status).toBe(200);
+        expect(res.body.isProductOwner).toBe(true);
+        expect(exposesSecret(res.body)).toBe(false);
+    });
+
+    it('does not reveal an unknown user id', async () => {
+        const guest = await loginAs('guest');
+        expect((await guest.api.get(`/api/v1/user/${randomId()}`)).status).toBe(404);
+    });
+
+    it('lists only the caller company members, without secrets', async () => {
+        const guest = await loginAs('guest');
+        const res = await guest.api.post('/api/v1/user/find', { query: { isActive: true }, companyId: state.companyId });
+        expect(res.status).toBe(200);
+        expect(res.body.length).toBeGreaterThanOrEqual(4);
+        expect(res.body.every((user) => user.AssignCompany.includes(state.companyId) && !exposesSecret(user))).toBe(true);
+    });
+
+    it('refuses listing users of another company', async () => {
+        const guest = await loginAs('guest');
+        expect((await guest.api.post('/api/v1/user/find', { query: {}, companyId: randomId() })).status).toBe(403);
+    });
+
+    it('refuses a filter that probes a secret field', async () => {
+        const guest = await loginAs('guest');
+        const res = await guest.api.post('/api/v1/user/find', { query: { forgotPasswordToken: { $exists: true } }, companyId: state.companyId });
+        expect(res.status).toBe(400);
+    });
+
+    it('refuses a guest deactivating the owner', async () => {
+        const guest = await loginAs('guest');
+        const res = await guest.api.put('/api/v1/user', { userId: state.users.owner.userId, updateObject: { $set: { isActive: false } } });
+        expect(res.status).toBe(403);
+    });
+
+    it('refuses a guest making themself instance owner', async () => {
+        const guest = await loginAs('guest');
+        const res = await guest.api.put('/api/v1/user', { userId: guest.uid, updateObject: { $set: { isProductOwner: true } } });
+        expect(res.status).toBe(403);
+    });
+
+    it('lets a user save their own profile preferences', async () => {
+        const member = await loginAs('member');
+        const res = await member.api.put('/api/v1/user', { userId: member.uid, updateObject: { $set: { Time_Format: '24' } }, newObj: { returnDocument: 'after' } });
+        expect(res.status).toBe(200);
+        expect(res.body.data.Time_Format).toBe('24');
+        expect(exposesSecret(res.body.data)).toBe(false);
+    });
+});
+
+describe('access — company reads are the caller\'s own companies', () => {
+    it('returns a guest only their own company', async () => {
+        const guest = await loginAs('guest');
+        const res = await guest.api.post('/api/v1/admin/company', { companyIds: [state.companyId, randomId()] });
+        expect(res.status).toBe(200);
+        expect(res.body.map((company) => String(company._id))).toEqual([state.companyId]);
+    });
+
+    it('scopes the aggregate route the desktop tracker uses', async () => {
+        const guest = await loginAs('guest');
+        const res = await guest.api.post('/api/v1/admin/company/find', { findQuery: [{ $match: {} }] });
+        expect(res.status).toBe(200);
+        expect(res.body.map((company) => String(company._id))).toEqual([state.companyId]);
+    });
+
+    it('refuses a guest joining another collection through the aggregate route', async () => {
+        const guest = await loginAs('guest');
+        const res = await guest.api.post('/api/v1/admin/company/find', { findQuery: [{ $lookup: { from: 'users', pipeline: [], as: 'users' } }] });
+        expect(res.status).toBe(403);
+    });
+
+    it('lets the instance owner list every company', async () => {
+        const owner = await loginAs('owner');
+        const res = await owner.api.post('/api/v1/admin/company', { fetchAllCompany: true, companyIds: [] });
+        expect(res.status).toBe(200);
+        expect(res.body.some((company) => String(company._id) === state.companyId)).toBe(true);
+    });
+});
+
+describe('access — the invitation check stays inside the signed-in company', () => {
+    it('refuses probing another company', async () => {
+        const admin = await loginAs('admin');
+        const res = await admin.api.post('/api/v1/checkSendInviatation', { email: state.users.member.email, companyId: randomId() });
+        expect(res.status).toBe(403);
     });
 });

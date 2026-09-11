@@ -2,6 +2,7 @@ const { handleProfileGetForUser, handleTaskTypeImageGet } = require(`../../../co
 const ctrl = require('./controller');
 const multer = require("multer");
 const { DEFAULT_LIMITS, safeFileFilter } = require('../../../utils/uploadConfig');
+const { requireOwnBucket, bodyField } = require('../bucketAccess');
 
 
 const upload = multer({
@@ -219,5 +220,5 @@ exports.init = (app) => {
      */
 	app.post("/api/v1/wasabi/deleteFile", ctrl.deleteFileWasabi);
     app.post("/api/v1/getUserProfile", handleProfileGetForUser);
-    app.post("/api/v1/getTaskTypeImage", handleTaskTypeImageGet);
+    app.post("/api/v1/getTaskTypeImage", requireOwnBucket(bodyField("companyId")), handleTaskTypeImageGet);
 }

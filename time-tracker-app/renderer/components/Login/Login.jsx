@@ -14,10 +14,10 @@ const Login = () => {
   const dispatch = useDispatch();
   const router = useRouter();
 
-  const loginAPI = (refreshToken) => {
+  const loginAPI = (refreshToken, userId) => {
     return new Promise((resolve, reject) => {
       try {
-        apiRequestWithoutSecure("post", `/api/v1/auth/loginAuthTracker`, {refreshToken}).then((ele) => {
+        apiRequestWithoutSecure("post", `/api/v1/auth/loginAuthTracker`, {refreshToken, userId}).then((ele) => {
           resolve(ele?.data)
         }).catch((error)=>{
           reject(error);
@@ -37,7 +37,7 @@ const Login = () => {
       
       let refreshToken = url.url.split("?")[1].split("&")[1].split("=")[1]
       let userId = url.url.split("?")[1].split("&")[0].split("=")[1]
-      loginAPI(refreshToken).then((ele)=>{
+      loginAPI(refreshToken, userId).then((ele)=>{
         localStorage.setItem('refreshToken', ele.refreshToken)
         localStorage.setItem('token', ele.accessToken)
         localStorage.setItem("userId", userId);
