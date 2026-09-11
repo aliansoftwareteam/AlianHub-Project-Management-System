@@ -74,24 +74,63 @@ const canStart = async (agent, { trigger, viaAccount, companyId, depth } = {}) =
     return { ok: true, reason: '' };
 };
 
-const create = async (companyId, { agent, taskId, projectId, skill, trigger, startedBy, viaAccount, note, spendCapUsd, notifyMe, triggerDepth, triggerEventId }) => {
-    const run = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.AGENT_RUNS,
-        data: {
-            agentId: String(agent._id), agentName: agent.name, taskId: taskId ? String(taskId) : null, projectId: projectId ? String(projectId) : null,
-            skill: skill || null, trigger: trigger || 'manual', status: STATUS.RUNNING, viaAccount: viaAccount || agent.account || 'workspace',
-            triggerDepth: clampDepth(triggerDepth), triggerEventId: triggerEventId ? String(triggerEventId) : null,
-            startedBy: startedBy ? String(startedBy) : null, startedAt: new Date(), elapsedMs: 0,
-            spend: { tokens: 0, usd: 0, model: null, billedToWorkspace: (viaAccount || agent.account || 'workspace') === 'workspace' },
-            actions: note ? [{ action: 'mention', note: String(note).slice(0, 2000), at: new Date() }] : [],
-            proposals: [], refusals: 0, decisions: [],
-            ...(Number(spendCapUsd) > 0 ? { spendCapUsd: Number(spendCapUsd) } : {}),
-            notifyMe: Boolean(notifyMe),
-        },
-    }, 'save');
-    emit(companyId, 'run', { run });
-    return run;
+const SCHEDULE_BUCKET_MS = 60 * 60 * 1000;
+const isDuplicateKey = (e) => Boolean(e && (e.code === 11000 || /duplicate key/i.test(e.message || '')));
+
+/* Same agent, task, trigger and reference → same key, so a redelivered job or a
+ * retried request lands on the run its first attempt made. A manual or mention
+ * start has no reference; for those the open-run index alone stops the double. */
+const idempotencyKeyFor = ({ agent, taskId, trigger, ref, now = new Date() }) => {
+    const kind = trigger || 'manual';
+    const parts = [String(agent._id), taskId ? String(taskId) : '-', kind];
+    if (ref) parts.push(String(ref));
+    else if (kind === 'schedule') parts.push(String(Math.floor(now.getTime() / SCHEDULE_BUCKET_MS)));
+    else return null;
+    return parts.join(':');
 };
+
+const existingRun = async (companyId, { agent, taskId, idempotencyKey }) => {
+    if (idempotencyKey) {
+        const byKey = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ idempotencyKey }] }, 'findOne');
+        if (byKey) return byKey;
+    }
+    if (!taskId) return null;
+    return MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ agentId: String(agent._id), taskId: String(taskId), status: { $in: OPEN } }] }, 'findOne');
+};
+
+/* Insert and let the unique indexes arbitrate: the loser of a race gets the
+ * winner's run back instead of a second model bill. */
+const start = async (companyId, { agent, taskId, projectId, skill, trigger, startedBy, viaAccount, note, spendCapUsd, notifyMe, triggerDepth, triggerEventId, idempotencyKey, ref }) => {
+    const key = idempotencyKey ? String(idempotencyKey) : idempotencyKeyFor({ agent, taskId, trigger, ref });
+    const via = viaAccount || agent.account || 'workspace';
+    try {
+        const run = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.AGENT_RUNS,
+            data: {
+                agentId: String(agent._id), agentName: agent.name, taskId: taskId ? String(taskId) : null, projectId: projectId ? String(projectId) : null,
+                skill: skill || null, trigger: trigger || 'manual', status: STATUS.RUNNING, viaAccount: via,
+                triggerDepth: clampDepth(triggerDepth), triggerEventId: triggerEventId ? String(triggerEventId) : null,
+                startedBy: startedBy ? String(startedBy) : null, startedAt: new Date(), elapsedMs: 0,
+                spend: { tokens: 0, usd: 0, model: null, billedToWorkspace: via === 'workspace' },
+                actions: note ? [{ action: 'mention', note: String(note).slice(0, 2000), at: new Date() }] : [],
+                proposals: [], refusals: 0, decisions: [],
+                ...(Number(spendCapUsd) > 0 ? { spendCapUsd: Number(spendCapUsd) } : {}),
+                notifyMe: Boolean(notifyMe),
+                ...(key ? { idempotencyKey: key } : {}),
+            },
+        }, 'save');
+        emit(companyId, 'run', { run });
+        return { run, deduplicated: false };
+    } catch (e) {
+        if (!isDuplicateKey(e)) throw e;
+        const run = await existingRun(companyId, { agent, taskId, idempotencyKey: key });
+        if (!run) throw e;
+        logger.debug(`[agent-run] ${run._id}: start deduplicated (${key || 'open run for the task'})`);
+        return { run, deduplicated: true };
+    }
+};
+
+const create = async (companyId, opts) => (await start(companyId, opts)).run;
 
 /* `onlyIf` makes the write conditional on the run's current status: a worker that
  * lost its run to stop/pause-all must not resurrect it with a terminal state. */
@@ -308,4 +347,4 @@ const skillSlugOf = (agent, explicit) => {
     return first.key || first.slug || first.name || 'qa-review';
 };
 
-module.exports = { STATUS, OPEN, TERMINAL, RETENTION_SECONDS, LOOP_DEPTH_EXCEEDED, originDepth, terminalUpdate, canStart, runsToday, skillSlugOf, create, get, patch, appendAction, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, getAgent, emitAgent, changesFor, executeSkill, monthKey };
+module.exports = { STATUS, OPEN, TERMINAL, RETENTION_SECONDS, LOOP_DEPTH_EXCEEDED, originDepth, terminalUpdate, canStart, runsToday, skillSlugOf, idempotencyKeyFor, start, create, get, patch, appendAction, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, getAgent, emitAgent, changesFor, executeSkill, monthKey };

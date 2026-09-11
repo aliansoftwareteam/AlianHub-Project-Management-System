@@ -146,10 +146,11 @@ const queueRuns = async ({ companyId, uid, projectId, pairs, agents }) => {
         const check = await runs.canStart(agent, { trigger: 'assignment', companyId });
         if (!check.ok) { runsRefused.push({ taskId, reason: check.reason }); continue; }
         // eslint-disable-next-line no-await-in-loop
-        const run = await runs.create(companyId, {
+        const { run, deduplicated } = await runs.start(companyId, {
             agent, taskId, projectId, skill: split.skill, trigger: 'assignment', startedBy: uid, viaAccount: agent.account,
-            note: `Queued from the AI project plan — ${split.reason}`,
+            note: `Queued from the AI project plan — ${split.reason}`, ref: `plan:${projectId}`,
         });
+        if (deduplicated) { logger.debug(`[AIPG] task ${taskId} already has agent run ${run._id}`); continue; }
         const actor = { kind: 'agent', userId: String(uid), agentId: String(agent._id), agentName: agent.name, runId: String(run._id), viaAccount: run.viaAccount, tokenId: null };
         setImmediate(() => {
             Promise.resolve(runs.executeSkill(companyId, run, agent, doc, { proposals, actions, actor }))

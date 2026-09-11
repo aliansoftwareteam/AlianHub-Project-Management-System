@@ -66,6 +66,11 @@ const createAgendaDriver = ({ mongoUrl, dbName = 'global', concurrency = DEFAULT
             if (opts.runAt) return agenda.schedule(opts.runAt, name, data);
             return agenda.now(name, data);
         },
+
+        async every(intervalMs, name) {
+            if (!agenda) throw new Error('agenda driver not started');
+            return agenda.every(intervalMs, name, {}, { skipImmediate: true });
+        },
     };
 };
 

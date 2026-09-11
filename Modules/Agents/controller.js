@@ -29,6 +29,7 @@ const fail = (res, statusText, code, extra) => res.status(code || 200).send({ st
 const refusalOf = (out) => (out.reason ? { reason: out.reason, undoUntil: out.undoUntil || null } : undefined);
 const invalid = (statusText) => Object.assign(new Error(statusText), { status: 400 });
 const AUTONOMY_MAX = 3;
+const IDEMPOTENCY_KEY_MAX = 200;
 const numberOf = (value) => (typeof value === 'number' ? value : (typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN));
 
 const autonomyOf = (value) => {
@@ -42,6 +43,13 @@ const runSpendCapOf = (value) => {
     const n = numberOf(value);
     if (!Number.isFinite(n) || n <= 0) throw invalid('spendCapUsd must be a number greater than 0');
     return n;
+};
+
+const idempotencyKeyOf = (req) => {
+    const raw = req.headers['idempotency-key'] || (req.body && req.body.idempotencyKey);
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    if (typeof raw !== 'string' || raw.length > IDEMPOTENCY_KEY_MAX) throw invalid(`idempotencyKey must be a string of at most ${IDEMPOTENCY_KEY_MAX} characters`);
+    return raw;
 };
 
 const humanActor = async (req) => {
@@ -255,7 +263,10 @@ exports.getRun = async (req, res) => {
     } catch (e) { logger.error(`getRun: ${e.message}`); return fail(res, e.message); }
 };
 
-/* POST /api/v2/agents/runs  body: { agentId, taskId, skill?, trigger?, note?, spendCapUsd?, notifyMe? } */
+/* POST /api/v2/agents/runs  body: { agentId, taskId, skill?, trigger?, note?, spendCapUsd?, notifyMe?, idempotencyKey? }
+ * An Idempotency-Key header (or body field) makes a retry return the run the
+ * first request started; without one, a second start while a run for the same
+ * agent and task is open returns that run. Either way data.deduplicated says so. */
 exports.startRun = async (req, res) => {
     try {
         const companyId = companyOf(req);
@@ -263,6 +274,7 @@ exports.startRun = async (req, res) => {
         const { agentId, taskId, skill, trigger, note, notifyMe } = req.body || {};
         if (!companyId || !OBJECT_ID.test(String(agentId || ''))) return fail(res, 'companyId and a valid agentId are required.');
         const spendCapUsd = runSpendCapOf((req.body || {}).spendCapUsd);
+        const idempotencyKey = idempotencyKeyOf(req);
         const agent = await runs.getAgent(companyId, agentId);
         const check = await runs.canStart(agent, { trigger: trigger || 'manual', viaAccount: isAgent(actor) ? actor.viaAccount : undefined, companyId });
         if (!check.ok) return fail(res, check.reason, 409);
@@ -278,12 +290,14 @@ exports.startRun = async (req, res) => {
             // never executed and never finished — "running" forever in every counter.
             return fail(res, 'This agent needs a task to run on. Start the run from a task, or mention the agent in a comment.');
         }
-        const run = await runs.create(companyId, { agent, taskId, projectId: task && task.ProjectID, skill: runs.skillSlugOf(agent, skill), trigger: TRIGGERS.includes(trigger) ? trigger : 'manual', startedBy: actor.userId, viaAccount: isAgent(actor) ? actor.viaAccount : agent.account, note, spendCapUsd, notifyMe: Boolean(notifyMe) });
+        const { run, deduplicated } = await runs.start(companyId, { agent, taskId, projectId: task && task.ProjectID, skill: runs.skillSlugOf(agent, skill), trigger: TRIGGERS.includes(trigger) ? trigger : 'manual', startedBy: actor.userId, viaAccount: isAgent(actor) ? actor.viaAccount : agent.account, note, spendCapUsd, notifyMe: Boolean(notifyMe), idempotencyKey });
+        const plain = typeof run.toObject === 'function' ? run.toObject() : { ...run };
+        if (deduplicated) return res.send({ status: true, statusText: 'Run already started.', data: { ...plain, deduplicated: true } });
         if (task && registry.has('subtask.create')) {
             const runActor = { kind: 'agent', userId: actor.userId, agentId: String(agent._id), agentName: agent.name, runId: String(run._id), viaAccount: run.viaAccount, tokenId: null };
             setImmediate(() => runs.executeSkill(companyId, run, agent, task, { proposals, actions, actor: runActor }));
         }
-        return res.send({ status: true, statusText: 'Run started.', data: run });
+        return res.send({ status: true, statusText: 'Run started.', data: { ...plain, deduplicated: false } });
     } catch (e) { logger.error(`startRun: ${e.message}`); return fail(res, e.message, e.status || 200); }
 };
 
