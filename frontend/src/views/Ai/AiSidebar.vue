@@ -51,6 +51,7 @@ const items = computed(() => [
     { name: "AiSkills", label: "Ai.skills", icon: "docs" },
     { name: "AiPipeline", label: "Pipeline.nav_pipeline", icon: "layout" },
     { name: "AiRelease", label: "Pipeline.nav_release", icon: "share" },
+    { name: "AiHealth", label: "AiHealth.nav", icon: "reports" },
     { name: "AiAccounts", label: "Accounts.nav", icon: "key" },
     { name: "AuditLog", label: "Ai.audit", icon: "audit" }
 ]);

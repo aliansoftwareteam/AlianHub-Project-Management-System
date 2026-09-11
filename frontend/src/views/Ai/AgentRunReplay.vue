@@ -1,12 +1,12 @@
 <template>
-    <section id="replay" class="run-replay" data-test="replay">
+    <section :id="REPLAY_SECTION_ID" class="run-replay" data-test="replay">
         <span class="ah-label">{{ $t('Ai.replay_title') }}</span>
         <p class="ah-small run-replay__policy" data-test="replay-policy">{{ $t('Ai.replay_policy') }}</p>
         <div v-if="error" class="ah-field__error" data-test="replay-error">{{ error }}</div>
         <p v-else-if="loading" class="ah-empty">{{ $t('Ai.replay_loading') }}</p>
         <p v-else-if="!calls.length" class="ah-empty run-replay__empty" data-test="replay-none">{{ $t('Ai.replay_none') }}</p>
         <ol v-else class="run-replay__calls">
-            <li v-for="(call, i) in calls" :key="call._id || i" class="run-replay__call" data-test="replay-call">
+            <li v-for="(call, i) in calls" :id="call._id ? replayAnchorId(call._id) : undefined" :key="call._id || i" class="run-replay__call" data-test="replay-call">
                 <button type="button" class="run-replay__row" :aria-expanded="String(open === i)" :aria-label="open === i ? $t('Ai.replay_hide') : $t('Ai.replay_show')" @click="toggle(i)">
                     <span class="ah-small">{{ $t('Ai.replay_call', { n: i + 1 }) }}</span>
                     <span class="ah-mono ah-small" data-test="replay-model">{{ call.model || $t('Ai.revision_value_empty') }}</span>
@@ -47,9 +47,10 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAgents } from "./useAgents";
+import { REPLAY_SECTION_ID, replayAnchorId, replayIdFromHash } from "./replayAnchor";
 
 defineOptions({ name: "AgentRunReplay" });
 
@@ -72,6 +73,29 @@ const messagesOf = (call) => (Array.isArray(call?.messages) ? call.messages : []
 const passagesOf = (call) => (Array.isArray(call?.retrievedChunkIds) ? call.retrievedChunkIds : []);
 const toggle = (i) => { open.value = open.value === i ? -1 : i; };
 
+const wanted = ref("");
+
+const reveal = async () => {
+    if (!wanted.value || loading.value) return;
+    const index = calls.value.findIndex((call) => String(call._id) === wanted.value);
+    if (index < 0) return;
+    const id = wanted.value;
+    wanted.value = "";
+    open.value = index;
+    await nextTick();
+    document.getElementById(replayAnchorId(id))?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+};
+
+const focus = (id) => {
+    wanted.value = String(id || "");
+    return reveal();
+};
+
+const onHashChange = () => {
+    const id = replayIdFromHash(window.location.hash);
+    if (id) focus(id);
+};
+
 const load = async () => {
     error.value = "";
     open.value = -1;
@@ -87,10 +111,18 @@ const load = async () => {
     } finally {
         loading.value = false;
     }
+    await reveal();
 };
 
-onMounted(load);
+onMounted(() => {
+    wanted.value = replayIdFromHash(window.location.hash);
+    window.addEventListener("hashchange", onHashChange);
+    load();
+});
+onBeforeUnmount(() => window.removeEventListener("hashchange", onHashChange));
 watch(() => [props.runId, props.replayId], load);
+
+defineExpose({ focus });
 </script>
 
 <style>

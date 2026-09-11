@@ -244,6 +244,10 @@ exports.deleteUserSpecificSession = (req, res) => {
             res.status(400).json({message: "User id is required"});
             return;
         }
+        if (String(req.params.id) !== String(req.uid)) {
+            res.status(403).json({message: "You can only end your own sessions."});
+            return;
+        }
         exports.deleteSessionFun(req.params.id, (resData) => {
             if (!(resData && resData.status)) {                
                 res.status(400).json({message: resData.message});

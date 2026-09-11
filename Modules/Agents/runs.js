@@ -5,6 +5,7 @@ const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
 const usage = require('../AICore/usage');
 const { MAX_DEPTH } = require('../../event/domainEventBus');
+const telemetry = require('../../Config/telemetry');
 
 // Agent runs and spend. A run is the unit the rail footer counts ("2 running"),
 // the project header chip sums (elapsed, spend) and the audit log links to
@@ -100,7 +101,7 @@ const existingRun = async (companyId, { agent, taskId, idempotencyKey }) => {
 
 /* Insert and let the unique indexes arbitrate: the loser of a race gets the
  * winner's run back instead of a second model bill. */
-const start = async (companyId, { agent, taskId, projectId, skill, trigger, startedBy, viaAccount, note, spendCapUsd, notifyMe, triggerDepth, triggerEventId, idempotencyKey, ref }) => {
+const start = async (companyId, { agent, taskId, projectId, skill, trigger, startedBy, viaAccount, note, spendCapUsd, notifyMe, triggerDepth, triggerEventId, idempotencyKey, ref, traceId }) => {
     const key = idempotencyKey ? String(idempotencyKey) : idempotencyKeyFor({ agent, taskId, trigger, ref });
     const via = viaAccount || agent.account || 'workspace';
     const pinned = await require('./revisions').pinFor(companyId, agent, skill);
@@ -120,6 +121,7 @@ const start = async (companyId, { agent, taskId, projectId, skill, trigger, star
                 notifyMe: Boolean(notifyMe),
                 ...(key ? { idempotencyKey: key } : {}),
                 agentRevision: pinned.agentRevision, skillRevision: pinned.skillRevision,
+                traceId: traceId || telemetry.traceIdNow() || telemetry.newTraceId(),
             },
         }, 'save');
         emit(companyId, 'run', { run });
@@ -147,6 +149,11 @@ const patch = async (companyId, runId, set, extra = {}, { onlyIf } = {}) => {
 };
 
 const appendAction = (companyId, runId, entry) => patch(companyId, runId, {}, { $push: { actions: { ...entry, at: new Date() } } });
+
+/* No socket event, unlike patch: a step lands after every node and nothing renders it live. */
+const recordStep = (companyId, runId, step) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(runId) }, { $push: { steps: step } }],
+}, 'updateOne').catch((e) => logger.error(`[agent-run] ${runId}: step ${step.node} not recorded: ${e.message}`));
 
 const get = (companyId, runId) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(runId) }] }, 'findOne');
 
@@ -353,4 +360,4 @@ const skillSlugOf = (agent, explicit) => {
     return first.key || first.slug || first.name || 'qa-review';
 };
 
-module.exports = { STATUS, OPEN, TERMINAL, RETENTION_SECONDS, LOOP_DEPTH_EXCEEDED, originDepth, terminalUpdate, canStart, runsToday, skillSlugOf, idempotencyKeyFor, start, create, get, patch, appendAction, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, getAgent, emitAgent, changesFor, executeSkill, monthKey };
+module.exports = { STATUS, OPEN, TERMINAL, RETENTION_SECONDS, LOOP_DEPTH_EXCEEDED, originDepth, terminalUpdate, canStart, runsToday, skillSlugOf, idempotencyKeyFor, start, create, get, patch, appendAction, recordStep, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, getAgent, emitAgent, changesFor, executeSkill, monthKey };

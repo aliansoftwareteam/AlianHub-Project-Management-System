@@ -1,3 +1,4 @@
+require('./Config/telemetry').boot();
 require('./Config/processGuards').install();
 const express = require("express");
 const fs = require("fs");

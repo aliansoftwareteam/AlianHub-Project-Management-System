@@ -66,6 +66,14 @@ const revisionOf = (value) => {
 
 const skillRevisionOf = (ref) => (ref && ref.key ? { key: String(ref.key), hash: orNull(ref.hash), n: orNull(ref.n) } : null);
 
+const currentTraceId = () => {
+    try {
+        return require('../../Config/telemetry').traceIdNow() || null;
+    } catch (e) {
+        return null;
+    }
+};
+
 const errorCodeOf = (error) => String(error.code || error.status || error.name || 'error');
 
 function rowFor({ context, opts, adapter, result, error, durationMs }) {
@@ -96,7 +104,7 @@ function rowFor({ context, opts, adapter, result, error, durationMs }) {
         durationMs: Number(durationMs) || 0,
         status: error ? 'error' : 'ok',
         errorCode: error ? errorCodeOf(error) : null,
-        traceId: null,
+        traceId: currentTraceId(),
         createdAt,
         expiresAt: new Date(createdAt.getTime() + retentionDays() * DAY_MS),
     };

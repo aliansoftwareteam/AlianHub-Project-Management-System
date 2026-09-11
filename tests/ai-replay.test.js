@@ -20,6 +20,7 @@ const { getProvider } = require('../Modules/AICore/llmProvider');
 const { metered } = require('../Modules/AICore/spend');
 const { FEATURES } = require('../Modules/AICore/features');
 const replay = require('../Modules/AICore/replay');
+const telemetry = require('../Config/telemetry');
 const pageAudit = require('../Modules/Agents/engine/pageAudit');
 const findingMemory = require('../Modules/Agents/engine/findingMemory');
 const persistence = require('../Modules/AICore/persistence');
@@ -86,7 +87,7 @@ describe('an agent run keeps one replay record per model call', () => {
             promptHash: sha256(JSON.stringify({ system: request.systemPrompt, messages: request.messages })),
             retrievedChunkIds: [], response: JSON.stringify(answer),
             usage: { inputTokens: 1000, outputTokens: 500 }, costUsd: 0.006,
-            status: 'ok', errorCode: null, traceId: null, truncated: false,
+            status: 'ok', errorCode: null, traceId: pinned.traceId, truncated: false,
         });
         expect(row.skillRevision).toMatchObject({ key: 'qa-review' });
         expect(row.system).toEqual(expect.any(String));
@@ -108,6 +109,52 @@ describe('an agent run keeps one replay record per model call', () => {
         await expect(metered(vendor).chat({ messages: MESSAGES, spend: { feature: FEATURES.AGENT_RUN, companyId: C, runId: 'run-1' } })).rejects.toThrow('rate limited');
         expect(replays()).toHaveLength(1);
         expect(replays()[0]).toMatchObject({ status: 'error', errorCode: 'rate_limit_exceeded', response: null, usage: { inputTokens: 0, outputTokens: 0 } });
+    });
+});
+
+describe('the replay record carries the trace id', () => {
+    const TRACE_ID = /^[0-9a-f]{32}$/;
+    const agentCall = () => metered(vendor).chat({ messages: MESSAGES, spend: { feature: FEATURES.AGENT_RUN, companyId: C, runId: 'run-1' } });
+
+    it('a record written inside a traced run carries the run trace id', async () => {
+        const run = await start();
+        await execute(run);
+        const { traceId } = runRow(run._id);
+        expect(traceId).toMatch(TRACE_ID);
+        expect(replays()).toHaveLength(1);
+        expect(replays()[0].traceId).toBe(traceId);
+    });
+
+    it('a call re-entering a trace records that trace id', async () => {
+        const traceId = telemetry.newTraceId();
+        await telemetry.withTrace(traceId, agentCall);
+        expect(replays()[0].traceId).toBe(traceId);
+    });
+
+    it('a call outside any trace records null', async () => {
+        await agentCall();
+        expect(replays()[0].traceId).toBeNull();
+    });
+
+    it('a throwing telemetry module leaves null and the record is still written', async () => {
+        const spy = jest.spyOn(telemetry, 'traceIdNow').mockImplementation(() => { throw new Error('tracer down'); });
+        try {
+            await telemetry.withTrace(telemetry.newTraceId(), agentCall);
+        } finally { spy.mockRestore(); }
+        expect(replays()).toHaveLength(1);
+        expect(replays()[0].traceId).toBeNull();
+    });
+
+    it('a missing telemetry module leaves null', async () => {
+        let isolated;
+        jest.isolateModules(() => {
+            jest.doMock('../Config/telemetry', () => { throw new Error("Cannot find module '../../Config/telemetry'"); });
+            isolated = require('../Modules/AICore/replay');
+        });
+        await isolated.record({ context: { feature: FEATURES.AGENT_RUN, companyId: C, runId: 'run-1' }, opts: { messages: MESSAGES }, adapter: vendor, result: reply(), durationMs: 5 });
+        jest.dontMock('../Config/telemetry');
+        expect(replays()).toHaveLength(1);
+        expect(replays()[0].traceId).toBeNull();
     });
 });
 
