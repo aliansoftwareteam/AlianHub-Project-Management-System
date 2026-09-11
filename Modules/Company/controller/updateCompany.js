@@ -6,7 +6,38 @@ const { default: mongoose } = require("mongoose");
 const { replaceObjectKey } = require("../../Auth/helper");
 const socketEmitter = require("../../../event/socketEventEmitter");
 const { isInstanceOwner } = require("../../Instance/guard");
-const { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline } = require("../helpers/companyAccessRules");
+const { tenantOf, namedCompanyIds, TenantError } = require("../../../Config/tenant");
+const { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, companyUpdateKind, seatFilter } = require("../helpers/companyAccessRules");
+const { evaluatePermission, isPrivileged, isWritable, ROLE_OWNER } = require("../../../Config/permissionGuard");
+
+const findSeat = (companyId, uid, kind) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.COMPANY_USERS,
+    data: [seatFilter(uid, kind), { roleType: 1 }]
+}, 'findOne');
+
+const managesMembers = async (companyId, uid) => isWritable(await evaluatePermission(companyId, uid, 'settings.settings_member_list').catch(() => null));
+
+const MAY_SEND = {
+    details: ({ roleType }) => isPrivileged(roleType),
+    projectType: () => true,
+    seatRelease: ({ roleType, companyId, req }) => isPrivileged(roleType) || managesMembers(companyId, req.uid),
+    ownerClaim: ({ roleType, req }) => roleType === ROLE_OWNER && req.body.updateObject.objId.userId === String(req.uid),
+};
+
+const ROLE_REFUSAL = {
+    ownerClaim: 'Only an owner can record themselves as the company owner.',
+};
+
+const companyWrite = (companyId, body, kind, uid) => {
+    if (kind === 'ownerClaim') {
+        return [{ _id: companyId }, { $set: { userId: new mongoose.Types.ObjectId(String(uid)) } }, { returnDocument: 'after' }];
+    }
+    const data = body.key
+        ? [{ _id: companyId }, { [body.key]: body.updateObject }]
+        : [{ _id: companyId }, { $set: body.updateObject }, { returnDocument: 'after' }];
+    if (body.arrayFilters?.length) data.push({ arrayFilters: body.arrayFilters });
+    return data;
+};
 
 const loadOwnCompanyIds = async (uid) => {
     const user = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
@@ -21,49 +52,36 @@ const hasSession = (req) => OBJECT_ID_PATTERN.test(String(req.uid || ''));
 
 exports.updateCompany = async(req,res) => {
     try {
-
-        const companyId = req.headers['companyid'] || req.body.companyId;
-        if (!OBJECT_ID_PATTERN.test(String(companyId || ''))) {
+        const named = namedCompanyIds(req);
+        if (named.length > 1) {
+            return res.status(403).json({ status: false, message: 'The request names more than one company.' });
+        }
+        if (!OBJECT_ID_PATTERN.test(named[0] || '')) {
             return res.status(400).json({ status: false, message: 'A valid company id is required' });
         }
+        const companyId = tenantOf(req);
 
         if (!(req.body && req.body.updateObject)) {
             return res.status(400).json({message: 'Update Object is Required'});
         }
 
-        let key;
-        let data;
-        if (req.body.key) {
-            key = req.body.key;
-            data =  [
-                { _id: companyId },
-                {   
-                    [key]: req.body.updateObject
-                },
-            ]
-        } else {
-            key = '$set'
-            data =  [
-                { _id: companyId }, 
-                {   
-                    [key]: req.body.updateObject
-                },
-                {
-                    returnDocument : 'after'
-                }
-            ]
+        const kind = companyUpdateKind(req.body);
+        if (!kind) {
+            return res.status(403).json({ status: false, message: 'Only the company details can be changed here. Plan, billing, seat, storage and usage fields are managed by the server.' });
         }
 
-        if (req.body.arrayFilters?.length) {
-            let arrObj = {arrayFilters: req.body.arrayFilters}
-            data.push(arrObj)
+        const seat = await findSeat(companyId, req.uid, kind);
+        if (!seat) {
+            return res.status(403).json({ status: false, message: 'Only active members of this company can change it.' });
+        }
+        if (!(await MAY_SEND[kind]({ roleType: seat.roleType, companyId, req }))) {
+            return res.status(403).json({ status: false, message: ROLE_REFUSAL[kind] || 'Only an owner or an admin can change the company.' });
         }
 
-        const dataConvert = replaceObjectKey(data,"objId")        
-        let mongoObj = {
+        const mongoObj = {
             type: SCHEMA_TYPE.COMPANIES,
-            data: dataConvert
-        }
+            data: companyWrite(companyId, req.body, kind, req.uid)
+        };
 
         const company = await MongoDbCrudOpration('global', mongoObj, 'findOneAndUpdate');
 
@@ -75,6 +93,9 @@ exports.updateCompany = async(req,res) => {
 
         return res.status(200).json(company);
     } catch (error) {
+        if (error instanceof TenantError) {
+            return res.status(403).json({ status: false, message: error.message });
+        }
         return res.status(500).json({ message: "An error occurred while updating the company",error:error });
     }
 }

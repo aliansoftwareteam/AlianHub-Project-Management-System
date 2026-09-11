@@ -64,6 +64,7 @@ exports.init = (app) => {
      */
     app.post("/api/v2/auth/login", ctrl.loginAuth, ctrl.manageAttempt)
     app.post("/api/v1/auth/loginAuthTracker", ctrl.loginAuthTracker)
+    app.post("/api/v2/auth/tracker-code", ctrl.issueTrackerCode)
 
     // Two-factor auth (TOTP) — Phase 1, password login only.
     // setup/verify/disable require a logged-in session (gated by

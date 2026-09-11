@@ -14,10 +14,11 @@ const issuedFields = ({ token, jti }) => ({
     tokenTail: rules.tokenTailOf(token),
 });
 
-const dropSessionCache = (userId) => {
-    const prefix = `session:${userId}:`;
+const dropCachedPrefix = (prefix) => {
     myCache.keys().filter((key) => key.startsWith(prefix)).forEach((key) => myCache.del(key));
 };
+
+const dropSessionCache = (userId) => dropCachedPrefix(`session:${userId}:`);
 
 const revokeSessions = async (filter, userIds) => {
     await sessionsCrud([filter], 'deleteMany');
@@ -82,7 +83,7 @@ const rotateRefreshSession = async ({ session, legacy, token, payload, hash }) =
     if (legacy) update.$unset = { refreshToken: '' };
     const updated = await sessionsCrud([filter, update, { new: true }], 'findOneAndUpdate');
     if (!updated) return refusal('rotated');
-    myCache.del(`session:${session.userId}:${token}`);
+    dropCachedPrefix(`session:${session.userId}:${session._id}:`);
     return { ok: true, userId: String(session.userId), refreshToken: issued.token, expiresAt: issued.exp };
 };
 

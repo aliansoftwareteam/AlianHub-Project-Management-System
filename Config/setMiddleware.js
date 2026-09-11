@@ -366,6 +366,7 @@ const verifyJWTToken = [
     "/api/v1/user",
     "/api/v2/users/sessions",
     "/api/v2/session/update",
+    "/api/v2/auth/tracker-code",
     "/api/v1/userAndCompanyCheck",
     "/api/v1/admin/wasabi/retriveObject",
     "/api/v1/admin/getInvoiceAndCreditNotes",

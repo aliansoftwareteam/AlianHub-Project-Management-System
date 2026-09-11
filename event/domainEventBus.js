@@ -109,27 +109,30 @@ const buildEnvelope = ({ companyId, type, doc, changedFields, previous, actor, d
     changedFields: Array.from(changedFields || []),
 });
 
+// Mongo rejects with strings, plain objects and sometimes nothing at all.
+const failureText = (error) => (error && error.message) || String(error);
+
+const eventLabel = (envelope) => {
+    const entity = (envelope && envelope.entity) || {};
+    return `${envelope && envelope.type} on ${entity.kind} ${entity.id} in company ${envelope && envelope.companyId}`;
+};
+
 async function record(envelope) {
     if (!recording) return;
-    try {
-        await MongoDbCrudOpration(envelope.companyId, {
-            type: SCHEMA_TYPE.AUTOMATION_EVENT_LOG,
-            data: {
-                eventId: envelope.id,
-                type: envelope.type,
-                occurredAt: envelope.occurredAt,
-                actor: envelope.actor,
-                depth: envelope.depth,
-                scope: envelope.scope,
-                entity: envelope.entity,
-                changedFields: envelope.changedFields,
-                hasPrevious: !!envelope.previous,
-            },
-        }, 'save');
-    } catch (error) {
-        // Recording is diagnostic. A failed write must never stop the envelope.
-        logger.error(`${LOG_PREFIX} could not record ${envelope.type}: ${error.message}`);
-    }
+    await MongoDbCrudOpration(envelope.companyId, {
+        type: SCHEMA_TYPE.AUTOMATION_EVENT_LOG,
+        data: {
+            eventId: envelope.id,
+            type: envelope.type,
+            occurredAt: envelope.occurredAt,
+            actor: envelope.actor,
+            depth: envelope.depth,
+            scope: envelope.scope,
+            entity: envelope.entity,
+            changedFields: envelope.changedFields,
+            hasPrevious: !!envelope.previous,
+        },
+    }, 'save');
 }
 
 function publish(envelope) {
@@ -139,7 +142,7 @@ function publish(envelope) {
     }
     bus.emit('domain.event', envelope);
     bus.emit(envelope.type, envelope);
-    record(envelope);
+    record(envelope).catch((error) => logger.error(`${LOG_PREFIX} could not record ${eventLabel(envelope)}: ${failureText(error)}`));
 }
 
 function flush(key) {
@@ -188,12 +191,12 @@ function onTaskEvent(emitType) {
                     try {
                         flush(key);
                     } catch (error) {
-                        logger.error(`${LOG_PREFIX} flush failed: ${error.message}`);
+                        logger.error(`${LOG_PREFIX} flush failed for ${emitType} on task ${doc._id} in company ${companyId}: ${failureText(error)}`);
                     }
                 }, DEBOUNCE_MS),
             });
         } catch (error) {
-            logger.error(`${LOG_PREFIX} event handling failed: ${error.message}`);
+            logger.error(`${LOG_PREFIX} event handling failed: ${failureText(error)}`);
         }
     };
 }
@@ -211,6 +214,8 @@ module.exports = {
     bus,
     isRecording,
     setRecording,
+    eventLabel,
+    failureText,
     MAX_DEPTH,
     ACTOR_KINDS,
     // Exported for unit tests — pure, no IO.

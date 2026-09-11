@@ -31,10 +31,24 @@ function tenantOf(req) {
     return candidate;
 }
 
+// Every company a request names, deduplicated. tenantOf and requireCompanyAud each pick one of these in a
+// different order, so a handler that must not be steered between two companies refuses more than one.
+function namedCompanyIds(req) {
+    const headers = req.headers || {};
+    const named = [
+        headers.companyid,
+        req.params && req.params.companyId,
+        req.query && req.query.companyId,
+        req.body && req.body.companyId,
+        req.body && req.body.CompanyId,
+    ].map((v) => String(v == null ? '' : v).trim()).filter(Boolean);
+    return [...new Set(named)];
+}
+
 function tenantDb(req) {
     const companyId = tenantOf(req);
     const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
     return (mongoObj, method) => MongoDbCrudOpration(companyId, mongoObj, method);
 }
 
-module.exports = { tenantOf, tenantDb, TenantError };
+module.exports = { tenantOf, tenantDb, namedCompanyIds, TenantError };

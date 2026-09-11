@@ -8,7 +8,6 @@
   "CapacityPlanning/controller.js": 1,
   "CloudStorage/controller.js": 2,
   "Company/controller.js": 8,
-  "Company/controller/updateCompany.js": 1,
   "CustomReports/controller.js": 2,
   "EmailIn/controller.js": 2,
   "Integrations/controller.js": 2,

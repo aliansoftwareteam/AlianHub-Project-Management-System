@@ -57,6 +57,28 @@ const sessionTokenQuery = (token) => ({
     $or: [{ refreshTokenHash: hashRefreshToken(token) }, { refreshToken: String(token) }],
 });
 
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+
+const accessClaimsFor = (refreshToken) => {
+    const read = readRefreshToken(refreshToken);
+    if (!read.valid || read.legacy) return null;
+    return { sid: read.payload.sid, rti: read.payload.jti, sexp: read.payload.exp };
+};
+
+// Access tokens minted before sessions were named carried the plaintext refresh token instead.
+const readAccessSession = (payload) => {
+    if (!payload || typeof payload !== 'object' || payload.typ === REFRESH_TOKEN_TYPE) return { kind: 'invalid' };
+    const { uid, sid, rti, sexp } = payload;
+    if (typeof uid !== 'string' || !uid) return { kind: 'invalid' };
+    if (typeof sid === 'string' && OBJECT_ID_PATTERN.test(sid) && typeof rti === 'string' && rti && Number.isFinite(sexp)) {
+        return { kind: 'session', uid, sid, rti, sexp };
+    }
+    if (typeof payload.refreshToken === 'string' && payload.refreshToken) return { kind: 'legacy', uid };
+    return { kind: 'invalid' };
+};
+
+const sessionCacheKey = (uid, sid, rti) => `session:${uid}:${sid}:${rti}`;
+
 module.exports = {
     REFRESH_TOKEN_TYPE,
     hashRefreshToken,
@@ -66,4 +88,7 @@ module.exports = {
     reuseGraceSeconds,
     sessionLifetimeSeconds,
     sessionTokenQuery,
+    accessClaimsFor,
+    readAccessSession,
+    sessionCacheKey,
 };

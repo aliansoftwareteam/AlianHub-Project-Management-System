@@ -48,6 +48,12 @@ async function createRule(api, rule) {
 
 const removeRule = (api, id) => (id ? api.delete(`/api/v2/automations/${id}`) : null);
 
+const finishedRuns = (api, ruleId) => waitFor(async () => {
+    const res = await api.get(`/api/v2/automations/${ruleId}/runs`);
+    const rows = res.body.data || [];
+    return rows.length && rows.every((run) => FINISHED_RUN.includes(run.status)) ? rows : null;
+}, { timeout: 15000 });
+
 async function mcpCall(pat, method, params = {}) {
     const client = createApiClient({ baseURL: state.baseURL, accessToken: pat, companyId: state.companyId });
     return client.post('/mcp', { jsonrpc: '2.0', id: 1, method, params });
@@ -138,16 +144,40 @@ describe('automation rules (v2)', () => {
             await owner.api.patch(`/api/v2/automations/${rule._id}/enabled`, { enabled: true });
             const task = await createTask(owner.api, { project, user: state.users.owner, companyOwnerId: owner.uid });
 
-            const runs = await waitFor(async () => {
-                const res = await owner.api.get(`/api/v2/automations/${rule._id}/runs`);
-                const rows = res.body.data || [];
-                return rows.length && rows.every((run) => FINISHED_RUN.includes(run.status)) ? rows : null;
-            }, { timeout: 15000 });
+            const runs = await finishedRuns(owner.api, rule._id);
             expect(runs).toHaveLength(1);
             expect(runs[0]).toMatchObject({ status: 'success', entity: { kind: 'task', id: task._id } });
         } finally {
             await owner.api.patch(`/api/v2/automations/${rule._id}/enabled`, { enabled: false });
             await removeRule(owner.api, rule._id);
+        }
+    });
+
+    it('runs every enabled rule a created task matches', async () => {
+        const owner = await loginAs('owner');
+        const project = await createProject(owner.api, { assigneeIds: [owner.uid], createdBy: owner.uid });
+        const rules = [];
+        try {
+            for (const body of ['E2E first rule comment', 'E2E second rule comment']) {
+                const rule = await createRule(owner.api, ruleFor(project._id, {
+                    trigger: { event: 'task.created' },
+                    steps: [{ id: 's1', type: 'action', action: 'add_comment', config: { body } }],
+                }));
+                rules.push(rule);
+                await owner.api.patch(`/api/v2/automations/${rule._id}/enabled`, { enabled: true });
+            }
+            const task = await createTask(owner.api, { project, user: state.users.owner, companyOwnerId: owner.uid });
+
+            for (const rule of rules) {
+                const runs = await finishedRuns(owner.api, rule._id);
+                expect(runs).toHaveLength(1);
+                expect(runs[0]).toMatchObject({ status: 'success', entity: { kind: 'task', id: task._id } });
+            }
+        } finally {
+            for (const rule of rules) {
+                await owner.api.patch(`/api/v2/automations/${rule._id}/enabled`, { enabled: false });
+                await removeRule(owner.api, rule._id);
+            }
         }
     });
 

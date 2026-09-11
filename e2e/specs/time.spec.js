@@ -5,7 +5,7 @@ test.describe('time screens as the owner', () => {
 
     test('the approvals screen renders the manager view', async ({ page, state }) => {
         const errors = [];
-        page.on('console', (m) => { if (m.type() === 'error' && !/ERR_CONNECTION_REFUSED|Failed to load resource|fetching the script/.test(m.text())) errors.push(m.text()); });
+        page.on('console', (m) => { if (m.type() === 'error' && !/ERR_CONNECTION_REFUSED|Failed to load resource/.test(m.text())) errors.push(m.text()); });
         await page.goto(`/#/${state.companyId}/approvals`);
         await expect(page.locator('.tv-title', { hasText: 'Approvals' })).toBeVisible();
         await expect(page.getByText('Only owners and admins review approvals.')).toHaveCount(0);
