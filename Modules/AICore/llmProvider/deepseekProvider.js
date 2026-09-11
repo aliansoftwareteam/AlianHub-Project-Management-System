@@ -1,5 +1,6 @@
 const axios = require('axios');
 const config = require('../../../Config/config');
+const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
 
 // DeepSeek exposes an OpenAI-compatible Chat Completions API, so this
 // provider mirrors openaiProvider.js almost exactly — same request body
@@ -94,11 +95,9 @@ const deepseekProvider = {
             body.response_format = { type: 'json_object' };
         }
 
-        // Reasoner (R1) spends extra wall-clock on hidden chain-of-thought
-        // before emitting visible output, so give it a longer default
-        // timeout. Both are overridable via DEEPSEEK_TIMEOUT_MS.
-        const defaultTimeout = reasoning ? 600000 : 240000;
-        const timeoutMs = Number(process.env.DEEPSEEK_TIMEOUT_MS) || defaultTimeout;
+        // Reasoner (R1) spends extra wall-clock on hidden chain-of-thought, so
+        // it gets the full model budget; DEEPSEEK_TIMEOUT_MS overrides both.
+        const timeoutMs = providerTimeoutMs('deepseek', { reasoning });
         const chatUrl = `${getBaseUrl()}/chat/completions`;
 
         let response;

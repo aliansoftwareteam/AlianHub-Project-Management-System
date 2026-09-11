@@ -25,7 +25,7 @@
   },
   "ANTHROPIC_TIMEOUT_MS": {
     "group": "ai",
-    "description": "optional: raise Anthropic SDK timeout (default 10 min)",
+    "description": "optional: override the Anthropic SDK timeout (default LLM_TIMEOUT_MS, 10 min); the agent job lock is derived from the largest provider timeout",
     "default": "600000"
   },
   "APIKEY": {
@@ -154,7 +154,7 @@
   },
   "DEEPSEEK_TIMEOUT_MS": {
     "group": "ai",
-    "description": "optional: raise DeepSeek axios timeout (default: 10 min for reasoner, 4 min for chat)",
+    "description": "optional: override the DeepSeek axios timeout (default: LLM_TIMEOUT_MS for reasoner, 4 min for chat); the agent job lock is derived from the largest provider timeout",
     "default": "600000"
   },
   "DEMO_EMAIL": {
@@ -460,7 +460,7 @@
   },
   "OPENAI_TIMEOUT_MS": {
     "group": "ai",
-    "description": "optional: raise OpenAI axios timeout (default: 10 min for reasoning/gpt-5, 4 min for others)",
+    "description": "optional: override the OpenAI axios timeout (default: LLM_TIMEOUT_MS for reasoning/gpt-5, 4 min for others); the agent job lock is derived from the largest provider timeout",
     "default": "600000"
   },
   "PAYMENTMETHOD": {
@@ -751,5 +751,45 @@
     "description": "Machine-translation key used by scripts/i18n-backfill.js; unset means English copies are written for review.",
     "secret": true,
     "required": false
+  },
+  "LLM_TIMEOUT_MS": {
+    "group": "ai",
+    "description": "Model call timeout every provider inherits unless overridden per provider (default 10 min). The agent job lock is model timeout + AGENT_ACT_BUDGET_MS + 2 min.",
+    "default": "600000"
+  },
+  "AGENT_ACT_BUDGET_MS": {
+    "group": "ai",
+    "description": "Wall-clock budget for the act phase of an agent run, added to the model timeout when sizing the job lock (default 5 min).",
+    "default": "300000"
+  },
+  "SERVER_KEEP_ALIVE_TIMEOUT_MS": {
+    "group": "server",
+    "description": "Idle keep-alive timeout of the HTTP server; keep it above the idle timeout of any proxy in front (default 65000).",
+    "default": "65000"
+  },
+  "SERVER_HEADERS_TIMEOUT_MS": {
+    "group": "server",
+    "description": "How long the HTTP server waits for a full request header block; always kept above the keep-alive timeout (default 66000).",
+    "default": "66000"
+  },
+  "SERVER_REQUEST_TIMEOUT_MS": {
+    "group": "server",
+    "description": "How long the HTTP server waits to receive a whole request (default 300000). Server-sent event streams are exempt.",
+    "default": "300000"
+  },
+  "MONGO_CONNECT_TIMEOUT_MS": {
+    "group": "database",
+    "description": "How long a new MongoDB connection may take to establish (default 60000).",
+    "default": "60000"
+  },
+  "MONGO_SERVER_SELECTION_TIMEOUT_MS": {
+    "group": "database",
+    "description": "How long the MongoDB driver waits to find a usable server before failing an operation (default 60000).",
+    "default": "60000"
+  },
+  "MONGO_SOCKET_TIMEOUT_MS": {
+    "group": "database",
+    "description": "Inactivity timeout on a MongoDB socket before it is closed (default 300000).",
+    "default": "300000"
   }
 }

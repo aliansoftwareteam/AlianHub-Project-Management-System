@@ -2,6 +2,7 @@ const { MongoClient } = require('mongodb');
 const { InMemoryStore, MemorySaver } = require('@langchain/langgraph');
 const { MongoDBStore, MongoDBSaver } = require('@langchain/langgraph-checkpoint-mongodb');
 const logger = require('../../Config/loggerConfig');
+const { mongoTimeoutOptions } = require('../Agents/engine/timeouts');
 
 // One LangGraph store and checkpointer per company. The company id is the
 // database name everywhere else in the app, so tenancy holds here by
@@ -35,7 +36,7 @@ const mongoClient = () => {
     const url = process.env.MONGODB_URL;
     if (!url) throw new Error('No database configured. Set MONGODB_URL.');
     const base = url.replace(/\/+$/, '');
-    client = new MongoClient(base.startsWith('mongodb+srv') ? base : `${base}/?authSource=admin`);
+    client = new MongoClient(base.startsWith('mongodb+srv') ? base : `${base}/?authSource=admin`, mongoTimeoutOptions());
     return client;
 };
 

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const logger = require('../../Config/loggerConfig');
 const sendMailRef = require('../../Modules/service.js');
 const config = require('../../Config/config.js');
+const { mongoTimeoutOptions } = require('../../Modules/Agents/engine/timeouts');
 process.on('uncaughtException', (err) => {
     if(err.name.includes("MongoNetworkError")) {
         logger.error(err);
@@ -54,8 +55,7 @@ exports.connect = (db) => {
                     waitQueueTimeoutMS: Number(process.env.MONGO_WAIT_QUEUE_TIMEOUT_MS) || 5000,
                     maxPoolSize: Number(process.env.MONGO_POOL_SIZE) || 10,
                     minPoolSize: Number(process.env.MONGO_MIN_POOL_SIZE) || 2,
-                    connectTimeoutMS: 60000, // CONNECT_TIMEOUT
-                    serverSelectionTimeoutMS: 60000 // SERVER_SELECTION_TIMEOUT
+                    ...mongoTimeoutOptions(),
                 }
             );
 

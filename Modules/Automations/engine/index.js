@@ -72,7 +72,8 @@ async function start() {
     driver = selectDriver();
     driver.define(JOB_NAME, async (job) => {
         const { companyId, runId, ruleId } = job.attrs.data || {};
-        await runner.execute({ companyId, runId, ruleId, enqueue: enqueueRun });
+        const keepAlive = typeof job.touch === 'function' ? () => job.touch() : null;
+        await runner.execute({ companyId, runId, ruleId, enqueue: enqueueRun, keepAlive });
     });
     await driver.start();
     domainEventBus.bus.on('domain.event', onEnvelope);

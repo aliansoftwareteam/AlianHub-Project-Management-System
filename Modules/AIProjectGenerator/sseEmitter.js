@@ -1,4 +1,5 @@
 const events = require('events');
+const { keepStreamOpen } = require('../Agents/engine/timeouts');
 
 const eventEmitter = new events.EventEmitter();
 // Allow more listeners — multiple SSE clients per node could subscribe to
@@ -49,6 +50,7 @@ function handleEvents(req, res) {
             res.status(400).send({ status: false, statusText: 'jobId required' });
             return;
         }
+        keepStreamOpen(req);
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');

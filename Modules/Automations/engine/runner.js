@@ -92,11 +92,11 @@ async function executeStep(step, { companyId, envelope, outputs, context }) {
     return { output };
 }
 
-async function runOnce(companyId, run, rule, envelope) {
+async function runOnce(companyId, run, rule, envelope, keepAlive = null) {
     const steps = Array.isArray(rule.steps) ? rule.steps.slice(0, MAX_STEPS) : [];
     const outputs = { ...(run.outputs || {}) };
     const recorded = Array.isArray(run.steps) ? run.steps.slice() : [];
-    const context = { runId: String(run._id), ruleId: String(rule._id), ruleName: rule.name, depth: envelope.depth, eventId: envelope.id };
+    const context = { runId: String(run._id), ruleId: String(rule._id), ruleName: rule.name, depth: envelope.depth, eventId: envelope.id, keepAlive };
 
     // Resume point. Everything before the cursor already ran and already mutated.
     for (let i = Number(run.cursor) || 0; i < steps.length; i++) {
@@ -133,7 +133,7 @@ async function runOnce(companyId, run, rule, envelope) {
  * timeout — are worth backing off and retrying. Deterministic ones (no such
  * status, no such task, unknown action) will fail identically forever, so
  * retrying them just multiplies the cost of a broken rule by three. */
-async function execute({ companyId, runId, ruleId, enqueue }) {
+async function execute({ companyId, runId, ruleId, enqueue, keepAlive }) {
     const run = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUTOMATION_RUNS, data: [{ _id: runId }] }, 'findOne');
     if (!run || !run._id) { logger.error(`${LOG_PREFIX} run ${runId} vanished`); return { status: 'missing' }; }
     if (run.status === 'success' || run.status === 'failed' || run.status === 'stopped') return { status: run.status };
@@ -148,7 +148,7 @@ async function execute({ companyId, runId, ruleId, enqueue }) {
     await patchRun(companyId, runId, { attempts, status: 'running' });
 
     try {
-        return await runOnce(companyId, run, rule, run.envelope || {});
+        return await runOnce(companyId, run, rule, run.envelope || {}, keepAlive);
     } catch (error) {
         const message = String(error.message || error).slice(0, 500);
         const permanent = isDeterministic(error) || attempts >= MAX_ATTEMPTS;
