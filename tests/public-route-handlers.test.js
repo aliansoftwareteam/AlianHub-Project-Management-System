@@ -1,7 +1,7 @@
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
 jest.mock('../utils/data', () => ({ importUserNotifications: jest.fn(async () => undefined) }));
-jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(), isPrivileged: (roleType) => roleType === 1 || roleType === 2 }));
+jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(), isPrivileged: (roleType) => roleType === 1 || roleType === 2, evaluatePermission: jest.fn(), isWritable: (permission) => permission === true }));
 jest.mock('../Modules/Company/controller/updateCompany', () => ({ updateCompanyFun: jest.fn() }));
 jest.mock('../Modules/settings/Members/controller', () => ({ updateMemberFunction: jest.fn() }));
 jest.mock('../Modules/Users/controller', () => ({ updateUserFun: jest.fn(), getUserByQueyFun: jest.fn() }));
@@ -12,7 +12,7 @@ jest.mock('../Modules/storage/server/helpers/bucket.helper.js', () => ({}));
 const path = require('path');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { importUserNotifications } = require('../utils/data');
-const { getRoleType } = require('../Config/permissionGuard');
+const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const { mongoOperation } = require('../Modules/Auth/controller/mongoOperation');
 const { updateTask } = require('../Modules/Tasks/helpers/getTasksData');
 const { resolveBucketFile } = require('../Modules/storage/server/controller');
@@ -41,6 +41,8 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 beforeEach(() => {
     jest.clearAllMocks();
+    getRoleType.mockReset();
+    evaluatePermission.mockReset();
     MongoDbCrudOpration.mockResolvedValue([]);
 });
 
@@ -81,19 +83,32 @@ describe('mongoOperation reads only the caller company', () => {
     });
 });
 
-describe('PUT /api/v1/task only updates', () => {
+describe('PUT /api/v1/task only runs the project lifecycle cascade', () => {
+    const PROJECT = '6f00000000000000000000b1';
     const body = (key) => ({ firstParameter: { _id: 't1' }, secondParameter: { $set: { a: 1 } }, key });
+    const closeProject = { firstParameter: { objId: { ProjectID: PROJECT }, deletedStatusKey: 0 }, secondParameter: { $set: { deletedStatusKey: 8 } }, key: 'updateMany' };
 
-    it.each(['deleteMany', 'find', 'aggregate', 'findOneAndDelete'])('refuses %s', async (key) => {
+    it.each(['deleteMany', 'find', 'aggregate', 'findOneAndDelete', 'updateOne'])('refuses %s', async (key) => {
         const res = response();
         await updateTask(request({ body: body(key) }), res);
-        expect(res.statusCode).toBe(400);
+        expect(res.statusCode).toBe(403);
         expect(MongoDbCrudOpration).not.toHaveBeenCalled();
     });
 
-    it('runs updateMany', async () => {
+    it('refuses an updateMany that is not a cascade', async () => {
         const res = response();
         await updateTask(request({ body: body('updateMany') }), res);
+        expect(res.statusCode).toBe(403);
+        expect(MongoDbCrudOpration).not.toHaveBeenCalled();
+    });
+
+    it('runs the cascade updateMany for a caller allowed to close the project', async () => {
+        getRoleType.mockResolvedValue(1);
+        evaluatePermission.mockResolvedValue(true);
+        MongoDbCrudOpration.mockResolvedValueOnce([{ _id: 't1', ProjectID: PROJECT }]);
+        const res = response();
+        await updateTask(request({ body: closeProject }), res);
+        expect(res.statusCode).toBe(200);
         expect(MongoDbCrudOpration).toHaveBeenCalledWith(COMPANY, expect.anything(), 'updateMany');
     });
 });
