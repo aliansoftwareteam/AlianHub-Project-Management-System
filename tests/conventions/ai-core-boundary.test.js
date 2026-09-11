@@ -12,6 +12,10 @@ const CORE = path.join('Modules', 'AICore') + path.sep;
 const VENDOR_SDK = /require\(\s*['"](openai|@anthropic-ai\/sdk|@google\/generative-ai)['"]\s*\)/;
 const VENDOR_HOST = /https:\/\/(api\.openai\.com|api\.anthropic\.com|api\.deepseek\.com|generativelanguage\.googleapis\.com)/;
 
+/* The pre-AICore homes of the shared pieces. They were re-export shims for a
+ * while; a require or jest.mock on one of them would resolve to nothing now. */
+const RETIRED_PATHS = /['"](?:[^'"]*\/)?(?:AIProjectGenerator\/(?:usage|instructionGuard|llmProvider)|engine\/persistence)(?:\/[^'"]*)?['"]|Modules\/AIProjectGenerator\/(?:usage|instructionGuard|llmProvider)|Modules\/Agents\/engine\/persistence/;
+
 /* Not chat completions, so the factory has nothing to offer them yet. Each
  * entry is a follow-up of task 024, not a permanent exception. */
 const ALLOWED_OUTSIDE_CORE = [
@@ -29,6 +33,22 @@ const glob = (dir, out = []) => {
     }
     return out;
 };
+
+describe('the retired AI-core paths are gone for good', () => {
+    const files = [...SCAN, 'tests', 'scripts'].flatMap((d) => glob(path.join(ROOT, d))).map((f) => path.relative(ROOT, f));
+
+    it('nothing requires or mocks them', () => {
+        const offenders = files.filter((rel) => rel !== path.relative(ROOT, __filename) && RETIRED_PATHS.test(fs.readFileSync(path.join(ROOT, rel), 'utf8')));
+        expect(offenders).toEqual([]);
+    });
+    it('the pattern matches a require and a jest.mock (the pattern works)', () => {
+        expect(RETIRED_PATHS.test("require('../AIProjectGenerator/usage')")).toBe(true);
+        expect(RETIRED_PATHS.test("jest.mock('../Modules/Agents/engine/persistence', () => ({}))")).toBe(true);
+        expect(RETIRED_PATHS.test("require('./engine/persistence')")).toBe(true);
+        expect(RETIRED_PATHS.test("require('../AIProjectGenerator/llmProvider/openaiProvider')")).toBe(true);
+        expect(RETIRED_PATHS.test("require('../AICore/usage')")).toBe(false);
+    });
+});
 
 describe('vendor LLM SDKs and hosts are only reached from Modules/AICore', () => {
     const files = SCAN.flatMap((d) => glob(path.join(ROOT, d))).map((f) => path.relative(ROOT, f));
