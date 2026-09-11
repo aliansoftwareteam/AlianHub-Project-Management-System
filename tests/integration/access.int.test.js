@@ -94,7 +94,7 @@ describe('access — API tokens', () => {
 
 describe('access — regression tests for confirmed findings (flip to it() once fixed)', () => {
     // ACC-01: POST /api/v1/mongoOpration runs arbitrary Mongo with no auth.
-    it.failing('ACC-01 refuses an anonymous arbitrary Mongo operation', async () => {
+    it('ACC-01 refuses an anonymous arbitrary Mongo operation', async () => {
         const res = await anon.post('/api/v1/mongoOpration', {
             dbName: 'global', collection: 'users', methodName: 'countDocuments', dataObj: [{}],
         });
@@ -116,13 +116,13 @@ describe('access — regression tests for confirmed findings (flip to it() once 
         expect(refused(res)).toBe(true);
     });
 
-    it.failing('ACC-03 refuses deleting another user\'s sessions anonymously', async () => {
+    it('ACC-03 refuses deleting another user\'s sessions anonymously', async () => {
         const res = await anon.delete(`/api/v2/session/delete/${randomId()}`);
         expect(res.status).toBe(401);
     });
 
     // ACC-04: /api/v1/settings/oauth reads secrets and rewrites .env with no auth.
-    it.failing('ACC-04 refuses reading OAuth credentials anonymously', async () => {
+    it('ACC-04 refuses reading OAuth credentials anonymously', async () => {
         const res = await anon.get('/api/v1/settings/oauth');
         expect(res.status).toBe(401);
     });
@@ -148,7 +148,7 @@ describe('access — regression tests for confirmed findings (flip to it() once 
     });
 
     // ACC-07: manageTrackerUserPermission is unauthenticated.
-    it.failing('ACC-07 refuses an anonymous tracker-permission change', async () => {
+    it('ACC-07 refuses an anonymous tracker-permission change', async () => {
         const res = await anon.post('/api/v1/manageTrackerUserPermission', {
             CompanyId: state.companyId, DataObj: { ops: true, data: { status: 2, userId: randomId() } },
         });
@@ -156,13 +156,13 @@ describe('access — regression tests for confirmed findings (flip to it() once 
     });
 
     // ACC-08: change-password requires no session (only the old password).
-    it.failing('ACC-08 refuses an anonymous change-password', async () => {
+    it('ACC-08 refuses an anonymous change-password', async () => {
         const res = await anon.patch(`/api/v2/auth/${randomId()}/change-password`, { oldPassword: 'x', newPassword: 'y' });
         expect(res.status).toBe(401);
     });
 
     // ACC-09: checkSendInviatation is an unauthenticated membership oracle.
-    it.failing('ACC-09 refuses an anonymous membership probe', async () => {
+    it('ACC-09 refuses an anonymous membership probe', async () => {
         const res = await anonWithCompany.post('/api/v1/checkSendInviatation', {
             email: state.users.member.email, companyId: state.companyId,
         });
