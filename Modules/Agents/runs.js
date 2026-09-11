@@ -341,10 +341,10 @@ const executeSkill = async (companyId, run, agent, task, deps) => {
     return state;
 };
 /* Which skill a run executes. Agents store skills as objects ({ key, name, … });
- * an explicit slug wins, then the agent's first skill key, then the QA review. */
+ * an explicit slug wins, then the agent's first enabled skill key, then the QA review. */
 const skillSlugOf = (agent, explicit) => {
     if (explicit && typeof explicit === 'string') return explicit;
-    const first = agent && Array.isArray(agent.skills) ? agent.skills[0] : null;
+    const first = agent && Array.isArray(agent.skills) ? agent.skills.find((s) => typeof s === 'string' || (s && s.enabled !== false)) : null;
     if (!first) return 'qa-review';
     if (typeof first === 'string') return first;
     return first.key || first.slug || first.name || 'qa-review';

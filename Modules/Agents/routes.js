@@ -1,5 +1,6 @@
 const ctrl = require('./controller');
 const memoryCtrl = require('./memoryController');
+const skillsCtrl = require('./skillsController');
 const { agentPerimeter } = require('./guard');
 
 exports.init = (app) => {
@@ -19,6 +20,13 @@ exports.init = (app) => {
     app.get('/api/v2/agents/settings', ctrl.getSettings);
     app.put('/api/v2/agents/settings', ctrl.putSettings);
     app.get('/api/v2/agents/budget', ctrl.getBudget);
+
+    app.get('/api/v2/agents/skills/catalogues', skillsCtrl.getCatalogues);
+    app.get('/api/v2/agents/skills', skillsCtrl.listSkills);
+    app.post('/api/v2/agents/skills', skillsCtrl.createSkill);
+    app.get('/api/v2/agents/skills/:key', skillsCtrl.getSkill);
+    app.put('/api/v2/agents/skills/:key', skillsCtrl.updateSkill);
+    app.delete('/api/v2/agents/skills/:key', skillsCtrl.retireSkill);
 
     app.get('/api/v2/agents/memory/project/:projectId', memoryCtrl.getProjectMemory);
     app.post('/api/v2/agents/memory/project/:projectId', memoryCtrl.addProjectMemory);

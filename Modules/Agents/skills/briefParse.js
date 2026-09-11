@@ -13,6 +13,9 @@ module.exports = {
     kind: 'generic',
     description: 'Reads a task brief and proposes the breakdown: subtasks with estimates, plus the open questions.',
     scopes: ['task.read', 'task.subtask.create', 'task.comment'],
+    inputs: ['brief'],
+    reads: ['task', 'memory'],
+    emits: ['subtask.create', 'task.comment'],
     maxTokens: 2500,
 
     async gather({ task }) {

@@ -860,6 +860,26 @@ const schema = {
         userId: { type: String, required: false },
         at: { type: Date, required: true },
     },
+    // A per-company skill in the closed vocabulary of Modules/Agents/skills/catalogues.js (ADR 003).
+    agentSkills: {
+        key: { type: String, required: true },
+        name: { type: String, required: true },
+        description: { type: String, required: false },
+        version: { type: Number, required: true },
+        enabled: { type: Boolean, default: true, required: false },
+        inputs: { type: Array, default: [], required: false },
+        // [{ reader, as, params }]
+        gather: { type: Array, default: [], required: false },
+        // { partials, instructions, template, output, maxTokens }
+        prompt: { type: Object, required: true },
+        // [{ action, each, max, label, params }]
+        emit: { type: Array, default: [], required: false },
+        // The distinct action keys of `emit`, kept for the manifest and the allowed-actions intersection.
+        emits: { type: Array, default: [], required: false },
+        risk: { type: String, required: false },
+        retiredAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+    },
     agentProposals: {
         agentId: { type: String, required: true },
         agentName: { type: String, required: false },

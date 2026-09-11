@@ -80,7 +80,7 @@ async function gather(state, config) {
     const block = wantsMemory(slugOf(run))
         ? (await quietly(run._id, 'memory unavailable', () => memory.contextFor({ companyId, projectId: task.ProjectID, userId: run.startedBy }))) || ''
         : '';
-    const gathered = await orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block });
+    const gathered = await orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block, startedBy: run.startedBy });
     if (gathered.status === 'skipped') return { result: gathered };
     return { context: { ...gathered.context, memory: block } };
 }
@@ -96,10 +96,10 @@ const statusAfter = (result) => {
 async function analyse(state, config) {
     await renewLock(state, config);
     const { companyId, deps } = config.context;
-    const { run, task } = state;
+    const { run, task, agent } = state;
     const guard = spendGuard.forRun({ companyId, run, actor: deps && deps.actor });
     const spendContext = { feature: FEATURES.AGENT_RUN, companyId, runId: String(run._id), userId: run.startedBy || null, account: run.viaAccount || 'workspace' };
-    const result = state.result || await orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: { ...MODEL_BUDGET, guard }, spend: spendContext });
+    const result = state.result || await orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: { ...MODEL_BUDGET, guard }, spend: spendContext, companyId, agent });
     const spend = await runs.recordSpend(companyId, run, result.usage, result.model);
     if (result.status !== 'success') return { result, spend, outcome: result.reason || null, finalStatus: statusAfter(result) };
     const cap = Number(run.spendCapUsd) > 0 ? Number(run.spendCapUsd) : 0;
