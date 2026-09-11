@@ -148,3 +148,6 @@ package-lock.json
 /e2e/.state/
 /e2e/report/
 /e2e/test-results/
+
+# Demo team passwords and manifest written by npm run demo:seed
+/.demo-accounts.local.json

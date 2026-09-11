@@ -10,7 +10,7 @@ Backend variables: 142. Frontend build-time variables: 24.
 |---|---|---|---|---|
 | `APIURL` | yes |  | Public base URL of this API, with a trailing slash (used in emails, OAuth callbacks and share links). | `Config/config.js`, `Modules/ApiTokens/controller.js` +6 |
 | `APP_NAME` |  | `Alian Hub` | Product name shown in emails and page titles. | `Config/config.js`, `Modules/Template/forgotPassword.js` +5 |
-| `NODE_ENV` |  | `development` | development \| production | `Config/config.js`, `Modules/AICore/persistence.js` +4 |
+| `NODE_ENV` |  | `development` | development \| production | `Config/config.js`, `Modules/AICore/persistence.js` +5 |
 | `PORT` | yes | `4000` | TCP port the HTTP server listens on. | `Config/config.js` |
 | `SERVER_HEADERS_TIMEOUT_MS` |  | `66000` | How long the HTTP server waits for a full request header block; always kept above the keep-alive timeout (default 66000). | `Modules/Agents/engine/timeouts.js` |
 | `SERVER_KEEP_ALIVE_TIMEOUT_MS` |  | `65000` | Idle keep-alive timeout of the HTTP server; keep it above the idle timeout of any proxy in front (default 65000). | `Modules/Agents/engine/timeouts.js` |
@@ -35,10 +35,10 @@ Backend variables: 142. Frontend build-time variables: 24.
 | Variable | Required | Default | Description | Read by |
 |---|---|---|---|---|
 | `JWT_ALGORITHM` |  | `HS256` | Algorithm used to sign JWTs. | `Config/jwt.js`, `Modules/storage/server/helpers/bucket.helper.js` |
-| `JWT_EXP` |  | `24h` | Access token lifetime (jsonwebtoken duration string). | `Config/jwt.js`, `Modules/Auth/controller/loginSession.js` +2 |
+| `JWT_EXP` |  | `24h` | Access token lifetime (jsonwebtoken duration string). | `Config/jwt.js`, `Modules/Auth/controller/loginSession.js` +3 |
 | `JWT_SECRET` (secret) | yes | `your_jwt_secret_here` | Secret used to sign JWTs and derive encryption keys. | `Config/instanceSettings.js`, `Config/jwt.js` +4 |
 | `MAGIC_LINK_ENABLED` |  | `true` | Set to false to disable passwordless magic-link sign-in. | `Modules/Auth/controller/magicLink.js` |
-| `SESSIONEXPIREDTIME` |  | `172800` | Idle time after which a login session expires. | `Modules/Auth/controller/loginSession.js`, `Modules/Auth/session.js` +2 |
+| `SESSIONEXPIREDTIME` |  | `172800` | Idle time after which a login session expires. | `Modules/Auth/controller/loginSession.js`, `Modules/Auth/session.js` +3 |
 | `TWO_FACTOR_ENC_KEY` (secret) |  |  | key material for encrypting TOTP secrets at rest | `Modules/Auth/helpers/twoFactorRules.js` |
 | `TWO_FACTOR_ISSUER` |  | `AlianHub` | label shown in the user's authenticator app | `Modules/Auth/helpers/twoFactorRules.js` |
 | `TWO_FACTOR_TEMP_SECRET` (secret) |  | `${process.env.JWT_SECRET || ''}::2fa-temp` | signs the short-lived login second-step (temp) token | `Modules/Auth/helpers/twoFactorRules.js` |
@@ -237,7 +237,7 @@ Backend variables: 142. Frontend build-time variables: 24.
 | `ERRORRECIVEREMAIL` |  | `admin@yourdomain.com` | Email to receive error alerts | `Config/config.js` |
 | `HEALTH_DB_TIMEOUT_MS` |  |  | How long /health waits for the database ping before reporting it down (default 2000). | `Modules/Instance/health.js` |
 | `MIGRATIONS_AUTO` |  |  | Apply pending migrations at boot (default true; false only reports them). | `Modules/Instance/controller.js` |
-| `MONGODB_URL` | yes |  | mongo connection string (no trailing slash) | `Config/config.js`, `Modules/AICore/persistence.js` +6 |
+| `MONGODB_URL` | yes |  | mongo connection string (no trailing slash) | `Config/config.js`, `Modules/AICore/persistence.js` +7 |
 | `NODEMAILER_EMAIL_PASSWORD` (secret) |  |  | Use app password for Gmail | `Config/config.js` |
 | `NODEMAILER_PORT` |  | `587` | 587 (STARTTLS) or 465 (SSL) | `Config/config.js` |
 | `NOOFPRESETCOMPANY` |  | `10` | Number of preset companies seeded at first run. | `Config/config.js` |
