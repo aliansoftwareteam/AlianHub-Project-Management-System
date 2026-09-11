@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
+import { ref } from 'vue';
 
 const { updateStatus, stub, projectPayload } = vi.hoisted(() => ({
     updateStatus: vi.fn(() => Promise.resolve()),
@@ -60,9 +61,10 @@ vi.mock('@/components/organisms/TaskDetailOverlay/TaskAgentStrip.vue', () => stu
 
 import TaskDetailPanel from '@/components/organisms/TaskDetailOverlay/TaskDetailPanel.vue';
 
-function mountPanel() {
+function mountPanel({ roleType = 1, userId = 'u1' } = {}) {
     const store = createStore({
         getters: {
+            'settings/companyUserDetail': () => ({ roleType }),
             'settings/companyOwnerDetail': () => ({}),
             'projectData/gettaskDetailData': () => null,
             'settings/companyUsers': () => [],
@@ -74,7 +76,7 @@ function mountPanel() {
     });
     return mount(TaskDetailPanel, {
         props: { companyId: 'company-1', projectId: 'proj-1', sprintId: 'sprint-1', taskId: 'task-1' },
-        global: { plugins: [store] }
+        global: { plugins: [store], provide: { $userId: ref(userId) } }
     });
 }
 
@@ -114,6 +116,17 @@ describe('TaskDetailPanel', () => {
         await flushPromises();
         expect(apiRequest).toHaveBeenCalledWith('post', '/api/v2/agents/runs/run-1/stop', {});
         expect(wrapper.findComponent({ name: 'TaskAgentStrip' }).exists()).toBe(false);
+    });
+
+    it('offers stop to the member who started the run but not to another member', async () => {
+        openRuns.rows = [{ _id: 'run-3', agentName: 'Reviewer', status: 'running', startedBy: 'u1', startedAt: '2026-09-04T10:00:00.000Z' }];
+        const starter = mountPanel({ roleType: 3, userId: 'u1' });
+        await flushPromises();
+        expect(typeof starter.findComponent({ name: 'TaskAgentStrip' }).vm.$attrs.run.onStop).toBe('function');
+
+        const other = mountPanel({ roleType: 3, userId: 'u2' });
+        await flushPromises();
+        expect(other.findComponent({ name: 'TaskAgentStrip' }).vm.$attrs.run.onStop).toBeNull();
     });
 
     it('maps a run waiting for approval to the review state', async () => {

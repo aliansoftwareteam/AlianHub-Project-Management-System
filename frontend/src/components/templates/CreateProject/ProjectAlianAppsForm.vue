@@ -100,7 +100,7 @@ const { t } = useI18n();
                 return
             }
 
-            let data = querySnapshot.data
+            let data = querySnapshot.data?.data || []
 
             const arr = [...projectAlianApp()];
             if(!currentCompany.value?.planFeature?.projectProjectApp){

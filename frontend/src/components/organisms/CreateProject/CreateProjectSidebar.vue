@@ -238,12 +238,12 @@ onMounted(async () => {
     try {
         const [globalRes, appsRes] = await Promise.all([
             apiRequest("post", env.GLOBAL_PROJECT_TEMPLATE, { teamFocus: teamFocus.value }),
-            apiRequest("get", env.PROJECTS_APPS).catch(() => ({ data: [] })),
+            apiRequest("get", env.PROJECTS_APPS).catch(() => ({ data: { data: [] } })),
             dispatch("projectData/setprojectTemplate", companyId.value).catch(() => {})
         ]);
         if (globalRes.data.status) globalTemplates.value = (globalRes.data.statusText || []).map((tpl) => ({ ...tpl, useTemplateProj: "category" }));
         customTemplates.value = (getters["projectData/projectTemplate"]?.data || []).map((tpl) => ({ ...tpl, useTemplateProj: "withoutcategory", focus: "other" }));
-        appCatalog.value = Array.isArray(appsRes?.data) ? appsRes.data : [];
+        appCatalog.value = Array.isArray(appsRes?.data?.data) ? appsRes.data.data : [];
         const first = shownGlobal.value[0];
         if (first) selected.value = first;
         form.apps = defaultAppsFor(selected.value);

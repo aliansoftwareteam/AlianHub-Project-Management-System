@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { isShareToken, validateIntakeSubmission, escapeHtml, sanitizeDocHtml } = require('./helpers/shareRules');
+const { shareStillAuthorised } = require('./helpers/shareAccess');
 const reportRules = require('../CustomReports/helpers/reportRules'); // REP-09 — share saved reports
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
@@ -291,6 +292,7 @@ async function resolveShare(token) {
     }, 'findOne');
     if (!share || share.enabled === false) return null;
     if (share.expiresAt && new Date(share.expiresAt).getTime() < Date.now()) return null;
+    if (!(await shareStillAuthorised(index.companyId, share))) return null;
     return { companyId: index.companyId, share };
 }
 
