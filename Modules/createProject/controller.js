@@ -564,122 +564,65 @@ exports.createProject = async (req) => {
                         type: dbCollections.PROJECTS,
                         data: createProjectObject
                     }
-                    MongoDbCrudOpration(req.body.CompanyId, finalObj, "save").then((respone) => {
-                        if(projectStatusArrayCheck && projectStatusArrayCheck.length > 0){
-                            let projectStatusObj = {
+                    MongoDbCrudOpration(req.body.CompanyId, finalObj, "save").then(async (respone) => {
+                        const newSettingsRows = [
+                            [settingsCollectionDocs.PROJECT_STATUS, projectStatusArrayCheck],
+                            [settingsCollectionDocs.TASK_STATUS, TaskStatusArrayCheck],
+                            [settingsCollectionDocs.TASK_TYPE, TaskTypeStatusArrayCheck],
+                        ].filter(([, rows]) => rows && rows.length > 0);
+                        try {
+                            await Promise.all(newSettingsRows.map(([name, rows]) => MongoDbCrudOpration(req.body.CompanyId, {
                                 type: dbCollections.SETTINGS,
                                 data: [
+                                    { name },
                                     {
-                                        name: settingsCollectionDocs.PROJECT_STATUS
-                                    },
-                                    {
-                                        $push: {
-                                            settings: { $each: projectStatusArrayCheck.map(setting => ({ ...setting })) }
-                                        },
-                                        $inc: {
-                                            totalStatus:projectStatusArrayCheck.length
-                                        }
+                                        $push: { settings: { $each: rows.map((setting) => ({ ...setting })) } },
+                                        $inc: { totalStatus: rows.length }
                                     }
                                 ]
-                            }
-                            MongoDbCrudOpration(req.body.CompanyId, projectStatusObj, "updateOne").catch((err)=>{
-                                logger.error(`add project status: ${err}`);
-                                reject({status: false, statusText: 'error in creating project'});
-                                exports.deleteProject(respone,req.body.CompanyId);
-                            });
+                            }, "updateOne")));
+                        } catch (err) {
+                            logger.error(`add template settings: ${err}`);
+                            exports.deleteProject(respone, req.body.CompanyId);
+                            reject({status: false, statusText: 'error in creating project'});
+                            return;
                         }
-                        if(TaskStatusArrayCheck && TaskStatusArrayCheck.length > 0){
-                            let taskStatusObj = {
-                                type: dbCollections.SETTINGS,
-                                data: [
-                                    {
-                                        name: settingsCollectionDocs.TASK_STATUS
-                                    },
-                                    {
-                                        $push: {
-                                            settings: { $each: TaskStatusArrayCheck.map(setting => ({ ...setting })) }
-                                        },
-                                        $inc: {
-                                            totalStatus:TaskStatusArrayCheck.length
-                                        }
-                                    }
-                                ]
-                            }
-                            MongoDbCrudOpration(req.body.CompanyId, taskStatusObj, "updateOne").catch((err)=>{
-                                logger.error(`add task status: ${err}`);
-                                exports.deleteProject(respone,req.body.CompanyId);
-                                reject({status: false, statusText: 'error in creating project'});
-                            });
-                        }
-                        if(TaskTypeStatusArrayCheck && TaskTypeStatusArrayCheck.length > 0){
-                            let taskTypeObj = {
-                                type: dbCollections.SETTINGS,
-                                data: [
-                                    {
-                                        name: settingsCollectionDocs.TASK_TYPE
-                                    },
-                                    {
-                                        $push: {
-                                            settings: { $each: TaskTypeStatusArrayCheck.map(setting => ({ ...setting })) }
-                                        },
-                                        $inc: {
-                                            totalStatus:TaskTypeStatusArrayCheck.length
-                                        }
-                                    },
-                                    
-                                ]
-                            }
-                            MongoDbCrudOpration(req.body.CompanyId, taskTypeObj, "updateOne").catch((err)=>{
-                                logger.error(`add task type: ${err}`);
-                                exports.deleteProject(respone,req.body.CompanyId);
-                                reject({status: false, statusText: 'error in creating project'});
-                            });
-                        }
+
+                        let customResponce;
                         if(customFieldVal.length > 0) {
-                            let finalCustonArray = customFieldVal.map((ele)=>{return {...ele,userId:createProjectObject?.projectCreatedBy || '',type:'task',global:false,projectId:[respone?._id?.toString()]}})
-                            let finalObjCostom = {
-                                type: dbCollections.CUSTOM_FIELDS,
-                                data: [finalCustonArray]
-                            }
-                            MongoDbCrudOpration(req.body.CompanyId,finalObjCostom,"insertMany").then((customResponce)=>{   
-                                removeCache(`customField:${req.body.CompanyId}`);
-                                resolve({status: true, statusText: 'createProject added successfully', data: respone,customFieldVal: customResponce})
-                                const addObj = {
-                                    body: {
-                                        companyId: req.body.CompanyId,
-                                        projectId: respone._id,
-                                        sprintName: 'List',
-                                        userData:{},
-                                        projectName: createProjectObject.ProjectName
-                                    }
-                                }
-                                addSprintFun(addObj)
-                                .then((sprintRes) => seedTemplateSamples(respone, { ...createProjectObject, includeSampleTasks }, sprintRes))
-                                .catch((err)=>{
-                                    logger.error('Create Sprint Error',err)
-                                });
-                            }).catch((e)=>{
+                            const finalCustonArray = customFieldVal.map((ele)=>{return {...ele,userId:createProjectObject?.projectCreatedBy || '',type:'task',global:false,projectId:[respone?._id?.toString()]}});
+                            try {
+                                customResponce = await MongoDbCrudOpration(req.body.CompanyId, { type: dbCollections.CUSTOM_FIELDS, data: [finalCustonArray] }, "insertMany");
+                            } catch (e) {
                                 logger.error(`error in add create project: ${e}`);
-                                exports.deleteProject(respone,req.body.CompanyId);
+                                exports.deleteProject(respone, req.body.CompanyId);
                                 reject({status: false, statusText: 'error in creating project'});
-                            })
-                        } else {
-                            resolve({status: true, statusText: 'createProject added successfully', data: respone});
-                            const addObj = {
-                                body: {
-                                    companyId: req.body.CompanyId,
-                                    projectId: respone._id,
-                                    sprintName: 'List',
-                                    userData:{},
-                                    projectName: createProjectObject.ProjectName
-                                }
+                                return;
                             }
-                            addSprintFun(addObj)
-                            .then((sprintRes) => seedTemplateSamples(respone, { ...createProjectObject, includeSampleTasks }, sprintRes))
-                            .catch((err)=>{
-                                logger.error('Create Sprint Error',err)
-                            });
+                            removeCache(`customField:${req.body.CompanyId}`);
                         }
+
+                        // Awaited because clients create their first task straight from this response and a task needs a sprint.
+                        const sprintRes = await addSprintFun({
+                            body: {
+                                companyId: req.body.CompanyId,
+                                projectId: respone._id,
+                                sprintName: 'List',
+                                userData:{},
+                                projectName: createProjectObject.ProjectName
+                            }
+                        }).catch((err) => {
+                            logger.error('Create Sprint Error', err);
+                            return null;
+                        });
+
+                        const result = {status: true, statusText: 'createProject added successfully', data: respone};
+                        if(customFieldVal.length > 0) result.customFieldVal = customResponce;
+                        resolve(result);
+
+                        Promise.resolve(seedTemplateSamples(respone, { ...createProjectObject, includeSampleTasks }, sprintRes)).catch((err) => {
+                            logger.error(`seedTemplateSamples: ${err && err.message ? err.message : err}`);
+                        });
                     }).catch((err)=>{
                         reject({status: false, statusText: err});
                         logger.error(`add create project: ${err}`);

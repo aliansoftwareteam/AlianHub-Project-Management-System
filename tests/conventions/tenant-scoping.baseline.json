@@ -38,7 +38,7 @@
   "TimesheetApproval/controller.js": 2,
   "Users/controller.js": 1,
   "VarianceReport/controller.js": 1,
-  "createProject/controller.js": 25,
+  "createProject/controller.js": 20,
   "notification-count/controller.js": 17,
   "notification/prepare-notification-data/controllerV2.js": 1,
   "projectSetting/controller.js": 9,
