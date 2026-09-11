@@ -103,7 +103,7 @@ const agentPatchFields = (body) => {
 };
 
 /* GET /api/v2/agents/registry */
-exports.getRegistry = (req, res) => res.send({ status: true, data: require('./actions').manifest() });
+exports.getRegistry = (req, res) => res.send({ status: true, statusText: 'Registry fetched.', data: require('./actions').manifest() });
 
 /* GET /api/v2/agents */
 exports.listAgents = async (req, res) => {
@@ -111,7 +111,7 @@ exports.listAgents = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
         const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { createdAt: 1 } }] }, 'find');
-        return res.send({ status: true, data: rows || [] });
+        return res.send({ status: true, statusText: 'Agents fetched.', data: rows || [] });
     } catch (e) { logger.error(`listAgents: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -215,7 +215,7 @@ exports.listRevisions = async (req, res) => {
         await revisions.liveFor(ctx.companyId, ctx.agent);
         const rows = await revisions.listFor(ctx.companyId, ctx.agent._id);
         const names = await userNames(rows || []);
-        return res.send({ status: true, data: (rows || []).map((r) => revisionRow(r, names)) });
+        return res.send({ status: true, statusText: 'Revisions fetched.', data: (rows || []).map((r) => revisionRow(r, names)) });
     } catch (e) { logger.error(`listRevisions: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -227,7 +227,7 @@ exports.getRevision = async (req, res) => {
         const n = revisionN(req.params.n);
         const row = n ? await revisions.getRevision(ctx.companyId, ctx.agent._id, n) : null;
         if (!row) return fail(res, 'Revision not found.', 404);
-        return res.send({ status: true, data: revisionRow(row) });
+        return res.send({ status: true, statusText: 'Revision fetched.', data: revisionRow(row) });
     } catch (e) { logger.error(`getRevision: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -323,7 +323,7 @@ exports.spend = async (req, res) => {
                      usd: Math.round(mine.reduce((s, g) => s + (g.usd || 0), 0) * 100) / 100, tokens: mine.reduce((s, g) => s + (g.tokens || 0), 0), runs: mine.reduce((s, g) => s + (g.runs || 0), 0) };
         });
         const cli = (byAgent || []).filter((g) => g._id.via === 'personal');
-        return res.send({ status: true, data: { month, agents: rows, totalUsd: Math.round(rows.reduce((s, r) => s + r.usd, 0) * 100) / 100,
+        return res.send({ status: true, statusText: 'Spend fetched.', data: { month, agents: rows, totalUsd: Math.round(rows.reduce((s, r) => s + r.usd, 0) * 100) / 100,
                                                 cliAgents: { runs: cli.reduce((s, g) => s + g.runs, 0), usdToWorkspace: 0 } } });
     } catch (e) { logger.error(`spend: ${e.message}`); return fail(res, e.message, 500); }
 };
@@ -337,7 +337,7 @@ exports.listRuns = async (req, res) => {
         if (q.errorType && !PROVIDER_ERROR_TYPES.includes(String(q.errorType))) return fail(res, `errorType must be one of: ${PROVIDER_ERROR_TYPES.join(', ')}.`, 400);
         const projectIds = await visibleProjectIdsFor(companyId, await callerOf(req, companyId));
         const [rows, summary] = await Promise.all([runs.list(companyId, { ...q, projectIds }), runs.summary(companyId, { projectId: q.projectId, projectIds })]);
-        return res.send({ status: true, data: rows || [], summary });
+        return res.send({ status: true, statusText: 'Runs fetched.', data: rows || [], summary });
     } catch (e) { logger.error(`listRuns: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -349,7 +349,7 @@ exports.runSummary = async (req, res) => {
         const q = req.query || {};
         const projectIds = await visibleProjectIdsFor(companyId, await callerOf(req, companyId));
         const [live, counts] = await Promise.all([runs.summary(companyId, { projectId: q.projectId, projectIds }), runs.countsByStatus(companyId, { projectId: q.projectId, agentId: q.agentId, projectIds })]);
-        return res.send({ status: true, data: { ...live, counts } });
+        return res.send({ status: true, statusText: 'Run summary fetched.', data: { ...live, counts } });
     } catch (e) { logger.error(`runSummary: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -385,7 +385,7 @@ exports.getRun = async (req, res) => {
         const revision = { n: Number(pinned.n), state: pinned.state, synthetic: Boolean(pinned.synthetic), missing: Boolean(pinned.missing), createdAt: pinned.createdAt || null, createdBy: pinned.createdBy || null, serves: pinned.serves || [], skillRefs: pinned.skillRefs || [] };
         const [firstReplay] = await replaysOf(companyId, run._id, { _id: 1 }, 1).catch(() => []);
         if (firstReplay) plain.replayId = String(firstReplay._id);
-        return res.send({ status: true, data: { run: plain, audit, revision, trace: buildTrace(plain, audit) } });
+        return res.send({ status: true, statusText: 'Run fetched.', data: { run: plain, audit, revision, trace: buildTrace(plain, audit) } });
     } catch (e) { logger.error(`getRun: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -401,7 +401,7 @@ exports.getRunReplay = async (req, res) => {
         if (!OBJECT_ID.test(req.params.id)) return fail(res, 'A valid run id is required.', 400);
         const run = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(req.params.id) }] }, 'findOne');
         if (!run) return fail(res, 'Run not found.', 404);
-        return res.send({ status: true, data: await replaysOf(companyId, run._id, {}, REPLAY_LIMIT) });
+        return res.send({ status: true, statusText: 'Replay fetched.', data: await replaysOf(companyId, run._id, {}, REPLAY_LIMIT) });
     } catch (e) { logger.error(`getRunReplay: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -478,7 +478,7 @@ exports.getSettings = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
-        return res.send({ status: true, data: { ...(await budget.settings(companyId)), provider: budget.provider() } });
+        return res.send({ status: true, statusText: 'Settings fetched.', data: { ...(await budget.settings(companyId)), provider: budget.provider() } });
     } catch (e) { logger.error(`getSettings: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -498,7 +498,7 @@ exports.getBudget = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
-        return res.send({ status: true, data: await budget.status(companyId) });
+        return res.send({ status: true, statusText: 'Budget fetched.', data: await budget.status(companyId) });
     } catch (e) { logger.error(`getBudget: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -510,7 +510,7 @@ exports.listProposals = async (req, res) => {
         const q = req.query || {};
         const projectIds = await visibleProjectIdsFor(companyId, await callerOf(req, companyId));
         const out = await proposals.list(companyId, { status: q.status === 'all' ? undefined : (q.status || 'pending'), bucket: q.bucket, agentId: q.agentId, limit: q.limit, projectIds });
-        return res.send({ status: true, data: out.proposals, counts: out.counts });
+        return res.send({ status: true, statusText: 'Proposals fetched.', data: out.proposals, counts: out.counts });
     } catch (e) { logger.error(`listProposals: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -554,7 +554,7 @@ exports.getAccount = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
         const [account, policy, summary] = await Promise.all([accounts.getAccount(req.uid), accounts.getPolicy(companyId), accounts.monthlySummary(companyId, req.uid, req.query && req.query.month)]);
-        return res.send({ status: true, data: { account, policy, summary } });
+        return res.send({ status: true, statusText: 'Account fetched.', data: { account, policy, summary } });
     } catch (e) { logger.error(`getAccount: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -585,7 +585,7 @@ exports.getPolicy = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
-        return res.send({ status: true, data: await accounts.getPolicy(companyId) });
+        return res.send({ status: true, statusText: 'Policy fetched.', data: await accounts.getPolicy(companyId) });
     } catch (e) { return fail(res, e.message, 500); }
 };
 
@@ -608,7 +608,7 @@ exports.teamBoard = async (req, res) => {
         if (!companyId) return fail(res, 'companyId is required.');
         const hoursPerWeek = Number(req.query && req.query.hoursPerWeek) > 0 ? Number(req.query.hoursPerWeek) : 40;
         const data = await team.board(companyId, { hoursPerWeek });
-        return res.send({ status: true, data: { ...data, standup: team.standup(data) } });
+        return res.send({ status: true, statusText: 'Team board fetched.', data: { ...data, standup: team.standup(data) } });
     } catch (e) { logger.error(`teamBoard: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -620,7 +620,7 @@ exports.routableTasks = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
         const ids = await scope.visibleProjectIds(companyId, req.uid);
-        if (!ids.length) return res.send({ status: true, data: [] });
+        if (!ids.length) return res.send({ status: true, statusText: 'Routable tasks fetched.', data: [] });
         const q = req.query || {};
         const wanted = q.projectId && ids.includes(String(q.projectId)) ? [String(q.projectId)] : ids;
         const limit = Math.min(100, Math.max(1, Number(q.limit) || 40));
@@ -638,7 +638,7 @@ exports.routableTasks = async (req, res) => {
             delete o.description; delete o.rawDescription; delete o.links;
             return { ...o, inputs };
         });
-        return res.send({ status: true, data });
+        return res.send({ status: true, statusText: 'Routable tasks fetched.', data });
     } catch (e) { logger.error(`routableTasks: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -648,7 +648,7 @@ exports.pipelineTasks = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
         const data = await shipping.pipelineTasks(companyId, req.uid, { limit: req.query && req.query.limit });
-        return res.send({ status: true, data });
+        return res.send({ status: true, statusText: 'Pipeline fetched.', data });
     } catch (e) { logger.error(`pipelineTasks: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -658,7 +658,7 @@ exports.releaseCandidate = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
         const data = await shipping.releaseCandidate(companyId, req.uid, { since: req.query && req.query.since });
-        return res.send({ status: true, data });
+        return res.send({ status: true, statusText: 'Release candidate fetched.', data });
     } catch (e) { logger.error(`releaseCandidate: ${e.message}`); return fail(res, e.message, 500); }
 };
 

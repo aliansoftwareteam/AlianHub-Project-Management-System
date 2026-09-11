@@ -216,7 +216,7 @@ describe('agents: lifecycle', () => {
         expect(res.status).toBe(400);
     });
 
-    it.failing('AGT-11 includes statusText on a successful list', async () => {
+    it('AGT-11 includes statusText on a successful list', async () => {
         const { api } = await as('admin');
         const res = await api.get('/api/v2/agents');
         expect(typeof res.body.statusText).toBe('string');
