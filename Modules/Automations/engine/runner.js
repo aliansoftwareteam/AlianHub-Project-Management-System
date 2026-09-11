@@ -37,8 +37,20 @@ const patchRun = (companyId, runId, set) => MongoDbCrudOpration(companyId, {
  * The unique index on { ruleId, eventId } is what makes double delivery safe: the
  * second insert fails, we return null, and nothing runs twice. Doing this with a
  * find-then-insert would leave exactly the race the index closes. */
+const PLACEHOLDER_KEY = /^-*$/;
+
+/* A task.created envelope is built from the insert, before the project key is
+ * assigned, so it can carry the '-' or '--' placeholder. */
+async function resolveEntity(companyId, entity) {
+    if (!entity || entity.kind !== 'task' || !PLACEHOLDER_KEY.test(String(entity.key || ''))) return entity;
+    const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: entity.id }, { TaskKey: 1 }] }, 'findOne').catch(() => null);
+    const key = task && task.TaskKey && !PLACEHOLDER_KEY.test(String(task.TaskKey)) ? String(task.TaskKey) : entity.key;
+    return { ...entity, key };
+}
+
 async function createRun(companyId, rule, envelope) {
     try {
+        const entity = await resolveEntity(companyId, envelope.entity);
         const run = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AUTOMATION_RUNS,
             data: {
@@ -46,8 +58,8 @@ async function createRun(companyId, rule, envelope) {
                 ruleName: rule.name || '',
                 eventId: envelope.id,
                 eventType: envelope.type,
-                entity: envelope.entity,
-                envelope,
+                entity,
+                envelope: { ...envelope, entity },
                 traceId: envelope.traceId || null,
                 status: 'queued',
                 cursor: 0,
@@ -170,4 +182,4 @@ async function execute({ companyId, runId, ruleId, enqueue, keepAlive }) {
     }
 }
 
-module.exports = { createRun, execute, runOnce, executeStep, MAX_ATTEMPTS, BACKOFF_MS, isDeterministic };
+module.exports = { createRun, resolveEntity, execute, runOnce, executeStep, MAX_ATTEMPTS, BACKOFF_MS, isDeterministic };
