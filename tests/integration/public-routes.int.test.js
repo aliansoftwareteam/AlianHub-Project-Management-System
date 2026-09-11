@@ -119,10 +119,10 @@ describe('the same routes with a session', () => {
         expect(res.status).toBe(403);
     });
 
-    it('refuses anything but an update on PUT /api/v1/task', async () => {
+    it('refuses anything but the project cascade on PUT /api/v1/task', async () => {
         const { api } = await loginAs('member');
         const res = await api.put('/api/v1/task', { firstParameter: { _id: state.tasks[0]._id }, secondParameter: {}, key: 'deleteMany' });
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
     });
 
     it('imports notification settings only for the caller', async () => {
