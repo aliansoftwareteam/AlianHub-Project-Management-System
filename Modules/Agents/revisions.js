@@ -202,6 +202,14 @@ const oidOf = (id) => {
     try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return String(id); }
 };
 
+const unrunnableSkills = async (companyId, snapshot) => {
+    const skills = (snapshot && snapshot.skills) || [];
+    // eslint-disable-next-line global-require
+    return skills.length ? require('./skillRecord').checkAgentSkills(companyId, skills) : [];
+};
+
+const refusedForSkills = (n, errors) => ({ error: `Revision ${n} names skills that cannot run.`, status: 400, errors });
+
 /* Pointer move: :n becomes live, the previous live is superseded, and the agent
  * record is written from the snapshot so everything that reads the record agrees. */
 const promote = async (companyId, agent, n, { actor, ip, kind } = {}) => {
@@ -210,6 +218,8 @@ const promote = async (companyId, agent, n, { actor, ip, kind } = {}) => {
     if (!target) return { error: 'Revision not found.', status: 404 };
     if (target.state === STATE.LIVE) return { revision: plain(target), from: Number(target.n), unchanged: true };
     if (!PROMOTABLE.includes(target.state)) return { error: `Revision ${target.n} is ${target.state}; roll back to it instead.`, status: 409 };
+    const skillErrors = await unrunnableSkills(companyId, target.snapshot);
+    if (skillErrors.length) return refusedForSkills(target.n, skillErrors);
     const from = await supersedeLive(companyId, a._id, n);
     await setState(companyId, target._id, { state: STATE.LIVE, promotedAt: new Date(), promotedBy: actor && actor.userId ? String(actor.userId) : null });
     const updatedAgent = await applyToAgent(companyId, oidOf(a._id), target.snapshot);
@@ -225,6 +235,8 @@ const rollback = async (companyId, agent, n, { actor, ip, note } = {}) => {
     const target = await getRevision(companyId, a._id, n);
     if (!target) return { error: 'Revision not found.', status: 404 };
     if (target.state === STATE.LIVE) return { error: `Revision ${target.n} is already live.`, status: 409 };
+    const skillErrors = await unrunnableSkills(companyId, target.snapshot);
+    if (skillErrors.length) return refusedForSkills(target.n, skillErrors);
     const copy = await createRevision(companyId, a._id, { snapshot: target.snapshot, state: STATE.DRAFT, createdBy: actor && actor.userId, source: SOURCE.ROLLBACK, rollbackOf: Number(target.n), note });
     const out = await promote(companyId, a, copy.n, { actor, ip, kind: SOURCE.ROLLBACK });
     return { ...out, rollbackOf: Number(target.n) };

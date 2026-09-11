@@ -217,3 +217,35 @@ describe('a run pins the live revision', () => {
         expect(revisions.applyRevision(baseAgent(), await revisions.forRun(C, old)).autonomy).toBe(1);
     });
 });
+
+describe('a revision cannot name a skill that cannot run', () => {
+    const gone = [{ key: 'no-such-skill', name: 'Gone', enabled: true }];
+
+    it('POST /revisions refuses an unknown skill key and writes no revision', async () => {
+        await revisions.liveFor(C, baseAgent());
+        const r = await call(ctrl.createRevision, { body: { state: 'draft', skills: ['qa-review', 'no-such-skill'] } });
+        expect(r.code).toBe(400);
+        expect(r.body).toMatchObject({ status: false, data: { errors: [{ field: 'skills[1].key', code: 'unknown_skill' }] } });
+        expect(rows().map((x) => x.state)).toEqual(['live']);
+    });
+
+    it('promote refuses a revision whose skills no longer resolve and changes nothing', async () => {
+        await revisions.liveFor(C, baseAgent());
+        const stale = await revisions.createDraft(C, baseAgent(), { fields: { skills: gone }, state: 'candidate', actor: { userId: 'owner1' } });
+        const r = await call(ctrl.promoteRevision, { params: { id: AGENT_ID, n: String(stale.n) } });
+        expect(r.code).toBe(400);
+        expect(r.body.data.errors).toEqual([expect.objectContaining({ field: 'skills[0].key', code: 'unknown_skill' })]);
+        expect(rows().map((x) => [x.n, x.state])).toEqual([[1, 'live'], [2, 'candidate']]);
+        expect(agentRow().skills).toEqual(baseAgent().skills);
+    });
+
+    it('rollback refuses before copying, so no orphan draft is left behind', async () => {
+        await revisions.liveFor(C, baseAgent());
+        const stale = await revisions.createDraft(C, baseAgent(), { fields: { skills: gone }, state: 'draft', actor: { userId: 'owner1' } });
+        const r = await call(ctrl.rollbackRevision, { params: { id: AGENT_ID, n: String(stale.n) } });
+        expect(r.code).toBe(400);
+        expect(r.body.data.errors).toEqual([expect.objectContaining({ code: 'unknown_skill' })]);
+        expect(rows()).toHaveLength(2);
+        expect(agentRow().skills).toEqual(baseAgent().skills);
+    });
+});
