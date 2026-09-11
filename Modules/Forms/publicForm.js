@@ -502,16 +502,18 @@ exports.submitForm = async (req, res) => {
             data: [{ _id: form._id }, { $inc: { submissionCount: 1 } }, {}],
         }, 'updateOne').catch(() => {});
 
-        // Linked back so the response table can show which task each answer made.
+        // taskMongo.create resolves only { status, id }; the key is assigned inside it.
+        const taskId = String(result.id || data._id);
+        const created = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{ _id: new mongoose.Types.ObjectId(taskId) }, { TaskKey: 1 }],
+        }, 'findOne').catch(() => null);
+        const taskKey = String((created && created.TaskKey) || '');
+
         if (stored && stored._id) {
             await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.FORM_SUBMISSIONS,
-                data: [{ _id: stored._id }, {
-                    $set: {
-                        taskId: String((result.data && result.data._id) || data._id),
-                        taskKey: String((result.data && result.data.TaskKey) || ''),
-                    },
-                }, {}],
+                data: [{ _id: stored._id }, { $set: { taskId, taskKey } }, {}],
             }, 'updateOne').catch(() => {});
         }
 
@@ -520,7 +522,7 @@ exports.submitForm = async (req, res) => {
             form,
             submissionId: stored && stored._id,
             answers: mapped.record,
-            task: (result.data && result.data._id) ? result.data : data,
+            task: { ...data, _id: taskId, TaskKey: taskKey || data.TaskKey },
             actor: { kind: 'system' },
         });
 

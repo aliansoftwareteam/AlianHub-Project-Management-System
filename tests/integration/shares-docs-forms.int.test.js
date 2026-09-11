@@ -90,4 +90,13 @@ describe('pages findings (regressions)', () => {
         expect((await owner.api.get(`/api/v2/pages/${priv.body.data._id}`)).body.status).toBe(true);
         expect((await owner.api.delete(`/api/v2/pages/${priv.body.data._id}`)).body.status).toBe(true);
     });
+
+    it('PAG-11: a form submission records the key of the task it filed', async () => {
+        const owner = await loginAs('owner');
+        const project = await sharedProject(owner);
+        const { formId, token } = await makeLiveForm(owner, project);
+        await urlencoded(`/form/${token}`, { qname: `[QA pages] keyed ${uniqueSuffix()}` });
+        const subs = await owner.api.get(`/api/v2/forms/${formId}/submissions`);
+        expect(subs.body.data.submissions[0].taskKey).toBeTruthy();
+    });
 });

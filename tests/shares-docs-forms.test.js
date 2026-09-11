@@ -268,3 +268,26 @@ describe('PAG-10 deleting a doc', () => {
         expect([grandchild, underSecret]).toHaveLength(2);
     });
 });
+
+describe('PAG-11 a submission records its task key', () => {
+    it('stores the key of the task the submission created', async () => {
+        const form = seedForm(PUBLIC, {
+            state: 'live',
+            settings: { createTask: true },
+            projectSnapshot: { _id: PUBLIC, CompanyId: COMPANY, ProjectCode: 'OPN' },
+            templateSnapshot: { TaskName: '', TaskKey: '-' },
+            CompanyId: COMPANY,
+        });
+        const share = seedShare({ entityType: 'form', entityId: form._id, createdBy: OWNER });
+        taskMongo.create.mockImplementation(async ({ data }) => {
+            const task = mockDb.seed(SCHEMA_TYPE.TASKS, { ...data, _id: String(data._id), TaskKey: 'OPN-14' });
+            return { status: true, id: task._id, message: 'Task created successfully.' };
+        });
+
+        const res = await call(publicForm.submitForm, { params: { token: share.token }, query: {}, body: { qname: 'Filed from a form' }, headers: {} });
+        expect(res.statusCode).toBe(303);
+        const [submission] = rows(SCHEMA_TYPE.FORM_SUBMISSIONS);
+        expect(submission.taskKey).toBe('OPN-14');
+        expect(submission.taskId).toBe(rows(SCHEMA_TYPE.TASKS)[0]._id);
+    });
+});
