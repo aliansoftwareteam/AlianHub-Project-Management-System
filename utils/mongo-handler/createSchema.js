@@ -315,6 +315,7 @@ companyUserSchema.index({ userId: 1 });
 
 // sessions: refresh-token lookup is what `Config/jwt.js` does.
 sessionsSchema.index({ refreshToken: 1 });
+sessionsSchema.index({ refreshTokenHash: 1 });
 sessionsSchema.index({ userId: 1 });
 
 // resetAttempt: keyed by IP.
