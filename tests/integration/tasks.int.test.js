@@ -157,7 +157,7 @@ describe('tasks & collaboration — confirmed findings (regressions)', () => {
     });
 
     // TSK-05
-    it.failing('TSK-05: global search excludes projects the caller is not a member of', async () => {
+    it('TSK-05: global search excludes projects the caller is not a member of', async () => {
         const owner = await loginAs('owner');
         const member = await loginAs('member');
         const marker = `Zsec${uniqueSuffix()}`;
@@ -169,7 +169,7 @@ describe('tasks & collaboration — confirmed findings (regressions)', () => {
     });
 
     // TSK-06
-    it.failing('TSK-06: activity log refuses a project the caller is not a member of', async () => {
+    it('TSK-06: activity log refuses a project the caller is not a member of', async () => {
         const owner = await loginAs('owner');
         const member = await loginAs('member');
         const { project } = await ownerOnlyTask(owner);
@@ -179,7 +179,7 @@ describe('tasks & collaboration — confirmed findings (regressions)', () => {
     });
 
     // TSK-08
-    it.failing('TSK-08: recent visits are not readable for another user', async () => {
+    it('TSK-08: recent visits are not readable for another user', async () => {
         const owner = await loginAs('owner');
         const member = await loginAs('member');
         const { task } = await ownerOnlyTask(owner);
