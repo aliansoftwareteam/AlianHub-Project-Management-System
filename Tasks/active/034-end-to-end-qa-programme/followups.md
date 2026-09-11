@@ -63,6 +63,9 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 35 | Auth cookies are readable by JavaScript (not `httpOnly`), tracked as P1-SEC-09. | #638 |
 | 36 | `/timesheet/timelog`, `/timesheet/logDetail`, `/timesheet/milestone` and `POST /api/v1/estimatedTime` still trust client filters or pipelines; #635 scoped the five main timesheet reads only. | #635 |
 | 37 | The `invoices` (subscription) collection has no company field and nothing in the repo writes it; `POST /api/v1/invoice/find` is limited to the instance owner until its producer is known. | #635 |
+| 38 | Profile images under `USER_PROFILES/` can be read by any signed-in user, including the credit-note PDFs stored in `USER_PROFILES/InvoiceAndCreditNotes/`. | #639 |
+| 39 | `PUT /api/v1/user` accepts any value for `Employee_profileImage`, so a user can point their profile at another user's image path. | #639 |
+| 40 | `Modules/LogTime/routes.js` uses the same upload storage without the early access check #639 added to `storage/uploadFile`. | #639 |
 
 ## Owner decisions recorded
 
