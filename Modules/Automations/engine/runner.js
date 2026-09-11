@@ -1,6 +1,7 @@
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const logger = require('../../../Config/loggerConfig');
+const telemetry = require('../../../Config/telemetry');
 const { getAction } = require('./registry');
 const { evaluate } = require('./expression');
 const { render } = require('./template');
@@ -47,6 +48,7 @@ async function createRun(companyId, rule, envelope) {
                 eventType: envelope.type,
                 entity: envelope.entity,
                 envelope,
+                traceId: envelope.traceId || null,
                 status: 'queued',
                 cursor: 0,
                 attempts: 0,
@@ -96,14 +98,15 @@ async function runOnce(companyId, run, rule, envelope, keepAlive = null) {
     const steps = Array.isArray(rule.steps) ? rule.steps.slice(0, MAX_STEPS) : [];
     const outputs = { ...(run.outputs || {}) };
     const recorded = Array.isArray(run.steps) ? run.steps.slice() : [];
-    const context = { runId: String(run._id), ruleId: String(rule._id), ruleName: rule.name, depth: envelope.depth, eventId: envelope.id, keepAlive };
+    const context = { runId: String(run._id), ruleId: String(rule._id), ruleName: rule.name, depth: envelope.depth, eventId: envelope.id, keepAlive, traceId: run.traceId || envelope.traceId || null };
 
     // Resume point. Everything before the cursor already ran and already mutated.
     for (let i = Number(run.cursor) || 0; i < steps.length; i++) {
         const step = steps[i];
         const startedAt = Date.now();
         try {
-            const { output, stop } = await executeStep(step, { companyId, envelope, outputs, context });
+            const attributes = { 'automation.run.id': context.runId, 'automation.rule.id': context.ruleId, 'automation.step.action': step.action || null, 'tenant.id': String(companyId) };
+            const { output, stop } = await telemetry.withTrace(context.traceId, () => telemetry.withSpan(`automation.step ${step.type}`, attributes, () => executeStep(step, { companyId, envelope, outputs, context })));
             if (step.id) outputs[step.id] = output;
             recorded[i] = { id: step.id || `s${i + 1}`, type: step.type, action: step.action || null, output, durationMs: Date.now() - startedAt };
 

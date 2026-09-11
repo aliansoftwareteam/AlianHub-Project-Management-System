@@ -48,6 +48,8 @@
                 <span v-if="skillIdentity" class="ah-mono ah-small" data-test="skill-identity">{{ skillIdentity }}</span>
             </div>
 
+            <AgentRunTrace :run="run" />
+
             <div class="run-detail__head">
                 <span class="ah-label">{{ $t('Ai.decisions_title') }}</span>
                 <span v-if="run.revertedAt" class="ah-chip ah-chip--dark">{{ $t('Ai.reverted_at', { at: when(run.revertedAt) }) }}</span>
@@ -91,6 +93,7 @@ import { useToast } from "vue-toast-notification";
 import { useAgents, revertControlState, undoDeadlineOf, pinnedRevisionOf } from "./useAgents";
 import { normaliseEpisode, declinedLine as declinedText } from "./episodeText";
 import AgentRunReplay from "./AgentRunReplay.vue";
+import AgentRunTrace from "./AgentRunTrace.vue";
 
 defineOptions({ name: "AgentRunDetail" });
 

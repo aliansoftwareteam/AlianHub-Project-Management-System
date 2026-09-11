@@ -1,6 +1,7 @@
 const { ulid } = require('ulid');
 const logger = require('../../../Config/loggerConfig');
 const domainEventBus = require('../../../event/domainEventBus');
+const telemetry = require('../../../Config/telemetry');
 
 // `form.submitted` envelopes.
 //
@@ -38,6 +39,7 @@ const buildFormEnvelope = ({ companyId, form, submissionId, answers, task, actor
         companyId: String(companyId),
         type: EVENT_TYPE,
         occurredAt: new Date().toISOString(),
+        traceId: telemetry.traceIdNow() || telemetry.newTraceId(),
         actor: {
             userId: actor && actor.userId ? String(actor.userId) : null,
             kind: actor && actor.kind ? actor.kind : 'system',

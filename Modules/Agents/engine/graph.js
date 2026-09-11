@@ -1,4 +1,4 @@
-const { StateGraph, Annotation, START, END, interrupt, Command } = require('@langchain/langgraph');
+const { StateGraph, Annotation, START, END, interrupt, Command, isGraphBubbleUp } = require('@langchain/langgraph');
 const logger = require('../../../Config/loggerConfig');
 const persistence = require('../../AICore/persistence');
 const orchestrator = require('./orchestrator');
@@ -12,6 +12,7 @@ const spendGuard = require('../spendGuard');
 const revisions = require('../revisions');
 const { FEATURES } = require('../../AICore/features');
 const { failureOf } = require('../../AICore/providerError');
+const telemetry = require('../../../Config/telemetry');
 
 // The run engine as a LangGraph thread, one per run (thread_id = run id):
 //
@@ -230,19 +231,56 @@ async function remember(state, config) {
     return { episode, outcome: saved.outcome || null, refusals: Number(saved.refusals || 0), finalStatus: saved.status };
 }
 
+const STEP = Object.freeze({ OK: 'ok', ERROR: 'error', INTERRUPTED: 'interrupted' });
+
+const stepSpend = (node, update) => {
+    const spend = node === 'analyse' && update ? update.spend : null;
+    return { tokens: Number((spend && spend.tokens) || 0), costUsd: Number((spend && spend.usd) || 0) };
+};
+
+/* An interrupt is how `hold` parks the thread, not a failure: its step is
+ * recorded as interrupted and it is rethrown outside the span so the span stays ok. */
+const traced = (node, fn) => async (state, config) => {
+    const { companyId } = config.context;
+    const runId = String(state.run._id);
+    let parked = null;
+    const attributes = { 'agent.run.id': runId, 'agent.id': state.run.agentId ? String(state.run.agentId) : null, 'agent.step.node': node, 'tenant.id': String(companyId) };
+    const update = await telemetry.withSpan(`agent.step ${node}`, attributes, async (span) => {
+        const startedAt = new Date();
+        let status = STEP.OK;
+        let out;
+        try {
+            out = await fn(state, config);
+            return out;
+        } catch (e) {
+            if (!isGraphBubbleUp(e)) { status = STEP.ERROR; throw e; }
+            status = STEP.INTERRUPTED;
+            parked = e;
+            return undefined;
+        } finally {
+            const endedAt = new Date();
+            const spend = stepSpend(node, out);
+            span.setAttributes({ 'agent.step.status': status, 'agent.step.tokens': spend.tokens, 'agent.step.cost_usd': spend.costUsd });
+            await runs.recordStep(companyId, runId, { node, startedAt, endedAt, durationMs: endedAt.getTime() - startedAt.getTime(), spanId: span.spanId, traceId: span.traceId, status, ...spend });
+        }
+    });
+    if (parked) throw parked;
+    return update;
+};
+
 const afterAnalyse = (s) => (s.finalStatus ? 'remember' : 'review');
 const afterReview = (s) => { if (s.finalStatus) return 'remember'; return s.toAct.length ? 'act' : 'propose'; };
 const afterAct = (s) => { if (s.abandoned) return END; return s.toPropose.length ? 'propose' : 'remember'; };
 const afterPropose = (s) => (s.abandoned ? END : 'hold');
 
 const builder = new StateGraph(State)
-    .addNode('gather', gather)
-    .addNode('analyse', analyse)
-    .addNode('review', review)
-    .addNode('act', act)
-    .addNode('propose', propose)
-    .addNode('hold', hold)
-    .addNode('remember', remember)
+    .addNode('gather', traced('gather', gather))
+    .addNode('analyse', traced('analyse', analyse))
+    .addNode('review', traced('review', review))
+    .addNode('act', traced('act', act))
+    .addNode('propose', traced('propose', propose))
+    .addNode('hold', traced('hold', hold))
+    .addNode('remember', traced('remember', remember))
     .addEdge(START, 'gather')
     .addEdge('gather', 'analyse')
     .addConditionalEdges('analyse', afterAnalyse, ['review', 'remember'])
@@ -280,11 +318,11 @@ const episodeFromRow = (run, task, error) => ({
     spendUsd: Number((run.spend && run.spend.usd) || 0), outcome: error, at: new Date(),
 });
 
-const runGraph = async ({ companyId, run, agent, task, deps }) => {
+const executeGraph = async ({ companyId, run, agent, task, deps }) => {
     try {
         await persistence.ready(companyId);
         const graph = graphFor(companyId);
-        await runs.patch(companyId, run._id, { threadId: String(run._id) });
+        await runs.patch(companyId, run._id, { threadId: String(run._id), traceId: run.traceId });
         const pinnedAgent = revisions.applyRevision(agent, await revisions.forRun(companyId, run));
         const out = await graph.invoke({ run: plain(run), agent: pinnedAgent, task: plain(task) }, configFor(companyId, run._id, { deps }));
         if (interrupted(out)) {
@@ -304,6 +342,12 @@ const runGraph = async ({ companyId, run, agent, task, deps }) => {
     }
 };
 
+/* Rows from before tracing get their trace id here, so every step of the run shares one. */
+const runGraph = ({ companyId, run, agent, task, deps }) => {
+    const traceId = run.traceId || telemetry.traceIdNow() || telemetry.newTraceId();
+    return telemetry.withTrace(traceId, () => executeGraph({ companyId, run: { ...plain(run), traceId }, agent, task, deps }));
+};
+
 /* Resolves { resumed: false } when the thread holds no interrupt — a run from
  * before the graph, or one that already finished — so the caller can close the
  * run the old way. A thread parked after the interrupt (remember threw last
@@ -316,7 +360,8 @@ const resumeGraph = async ({ companyId, runId, resume }) => {
     const waiting = (snapshot.tasks || []).some((t) => Array.isArray(t.interrupts) && t.interrupts.length);
     const parked = !waiting && Array.isArray(snapshot.next) && snapshot.next.length > 0;
     if (!waiting && !parked) return { resumed: false };
-    const out = await graph.invoke(waiting ? new Command({ resume }) : null, config);
+    const traceId = snapshot.values && snapshot.values.run ? snapshot.values.run.traceId : null;
+    const out = await telemetry.withTrace(traceId, () => graph.invoke(waiting ? new Command({ resume }) : null, config));
     if (!interrupted(out)) await forget(companyId, runId);
     return { resumed: true, status: out.finalStatus, outcome: out.outcome, episode: out.episode, ...(out.abandoned ? { abandoned: true } : {}) };
 };

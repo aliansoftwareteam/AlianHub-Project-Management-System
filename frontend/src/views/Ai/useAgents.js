@@ -62,7 +62,7 @@ const OPEN_RUN = ["queued", "running"];
 /* GET /runs/:id answers { run, audit }; older callers hand in the bare run. */
 export const runOf = (payload) => {
     if (!payload) return null;
-    if (payload.run && typeof payload.run === "object") return { ...payload.run, audit: payload.audit || [], revision: payload.revision || null };
+    if (payload.run && typeof payload.run === "object") return { ...payload.run, audit: payload.audit || [], revision: payload.revision || null, ...(payload.trace ? { trace: payload.trace } : {}), ...(payload.replayId ? { replayId: payload.replayId } : {}) };
     return payload;
 };
 

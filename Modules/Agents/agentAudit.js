@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { normalizeAuditEntry } = require('../Audit/helpers/auditRules');
 const logger = require('../../Config/loggerConfig');
 const { isAgent, attribution } = require('./actor');
+const { traceIdNow } = require('../../Config/telemetry');
 
 // One audit log for people and agents (11b). Agent rows carry
 // { actorType, agentId, runId, action, reason, params, cost, undo, viaAccount }
@@ -52,7 +53,8 @@ class AuditUnmarkedError extends Error {
 }
 
 const write = async (companyId, entry) => {
-    const n = normalizeAuditEntry(entry);
+    const meta = entry.meta || {};
+    const n = normalizeAuditEntry({ ...entry, meta: { ...meta, traceId: meta.traceId || traceIdNow() || null } });
     if (!n.valid) throw new Error(n.reason || 'invalid audit entry');
     if (!companyId) throw new Error('companyId is required');
     const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: n.entry }, 'save');
@@ -86,6 +88,7 @@ const baseMeta = (actor) => {
         viaAccount: isAgent(actor) ? actor.viaAccount : null,
         tokenId: actor.tokenId || null,
         onBehalfOf: isAgent(actor) && actor.userId ? actor.userId : null,
+        ...(actor.traceId ? { traceId: actor.traceId } : {}),
     };
 };
 
@@ -110,7 +113,7 @@ const openAction = async (companyId, actor, { action, reason, params, cost, enti
 /* `undo` is the inverse-action descriptor executed by undo.js. Throws
  * AuditUnmarkedError after logging: the mutation happened and the row needs reconciling. */
 const applyAction = async (companyId, auditId, { undo, entityType, entityId, entityName } = {}) => {
-    const $set = { 'meta.state': STATE.APPLIED, 'meta.undo': undo || null, 'meta.undoable': Boolean(undo) };
+    const $set = { 'meta.state': STATE.APPLIED, 'meta.undo': undo || null, 'meta.undoable': Boolean(undo), 'meta.settledAt': new Date() };
     if (entityType) $set.entityType = entityType;
     if (entityId) $set.entityId = String(entityId);
     if (entityName) $set.entityName = entityName;
@@ -122,7 +125,7 @@ const applyAction = async (companyId, auditId, { undo, entityType, entityId, ent
 
 /* The action threw before changing anything; the row records that and stays out of undo. */
 const failAction = async (companyId, auditId, detail) => {
-    try { await setRow(companyId, auditId, { 'meta.state': STATE.FAILED, 'meta.failed': String(detail || '').slice(0, 500), 'meta.undoable': false }); } catch (e) {
+    try { await setRow(companyId, auditId, { 'meta.state': STATE.FAILED, 'meta.failed': String(detail || '').slice(0, 500), 'meta.undoable': false, 'meta.settledAt': new Date() }); } catch (e) {
         logger.error(`agent audit: row ${auditId} could not be marked failed: ${e.message}`);
     }
 };

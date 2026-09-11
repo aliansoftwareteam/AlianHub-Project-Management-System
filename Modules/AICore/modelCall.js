@@ -3,6 +3,7 @@ const { getProvider, isAnyProviderConfigured } = require('./llmProvider');
 const { emptyUsage, usageFromResult, addUsage } = require('./usage');
 const { estimateCall } = require('./estimate');
 const { isProviderError } = require('./providerError');
+const telemetry = require('../../Config/telemetry');
 
 const LOG_PREFIX = '[agent]';
 
@@ -42,7 +43,16 @@ async function askModel(skill, { prompt, budget, spend }) {
                 ticket = await guard.reserve(estimateCall({ ...request, model: provider.model }));
                 if (!ticket.ok) return { raw, model: provider.model || null, degraded: ticket.reason, refused: ticket, usage };
             }
-            const result = await provider.chat(request);
+            const attributes = {
+                'gen_ai.operation.name': 'chat', 'gen_ai.system': provider.name || null, 'gen_ai.request.model': provider.model || null,
+                'gen_ai.request.max_tokens': request.maxTokens, 'gen_ai.request.temperature': request.temperature,
+            };
+            const result = await telemetry.withSpan(`chat ${provider.model || ''}`.trim(), attributes, async (span) => {
+                const answer = await provider.chat(request);
+                const counted = usageFromResult(answer);
+                span.setAttributes({ 'gen_ai.response.model': answer.model || null, 'gen_ai.usage.input_tokens': counted.inputTokens, 'gen_ai.usage.output_tokens': counted.outputTokens });
+                return answer;
+            });
             usage = addUsage(usage, usageFromResult(result));
             model = result.model || null;
             if (ticket) { const settled = ticket; ticket = null; await guard.reconcile(settled, usage, model); }
