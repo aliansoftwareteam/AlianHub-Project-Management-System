@@ -3744,6 +3744,26 @@ const schema = {
             type: String,
             required: false
         },
+        refreshTokenHash: {
+            type: String,
+            required: false
+        },
+        refreshTokenJti: {
+            type: String,
+            required: false
+        },
+        tokenTail: {
+            type: String,
+            required: false
+        },
+        previousRefreshTokenHash: {
+            type: String,
+            required: false
+        },
+        rotatedAt: {
+            type: Date,
+            required: false
+        },
         lastActive: {
             type: Date,
             default: new Date()

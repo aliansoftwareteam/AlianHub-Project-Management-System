@@ -509,6 +509,11 @@
     "group": "integrations",
     "description": "Firebase project id."
   },
+  "REFRESH_TOKEN_REUSE_GRACE_SECONDS": {
+    "group": "auth",
+    "description": "Seconds after a refresh token is rotated during which presenting the old one again is refused without revoking the session, so parallel requests or tabs do not log the user out. Past this window a reused token revokes the session.",
+    "default": "10"
+  },
   "RESEND_API_KEY": {
     "group": "general",
     "description": "Get from resend.com",
