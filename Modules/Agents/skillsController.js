@@ -1,22 +1,20 @@
 const { tenantOf } = require('../../Config/tenant');
-const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const logger = require('../../Config/loggerConfig');
-const { resolveActor, isAgent } = require('./actor');
+const { callerOf, canManageAgents } = require('./access');
 const skillRecord = require('./skillRecord');
 
-const fail = (res, message, code, extra) => res.status(code || 200).send({ status: false, statusText: message, message, ...(extra || {}) });
+const fail = (res, message, code, extra) => res.status(code || 400).send({ status: false, statusText: message, message, ...(extra || {}) });
 
 const failWith = (res, e) => {
     if (e && e.errors) return fail(res, e.message, 400, { data: { errors: e.errors } });
     if (e && e.statusCode === 403) return fail(res, e.message, 403);
     logger.error(`agent skills: ${e && e.message}`);
-    return fail(res, (e && e.message) || 'Something went wrong.');
+    return fail(res, (e && e.message) || 'Something went wrong.', 500);
 };
 
 const privilegedHuman = async (req, companyId) => {
-    const actor = req.agentActor || await resolveActor(req);
-    if (isAgent(actor) || !actor.userId) return null;
-    return isPrivileged(await getRoleType(companyId, actor.userId)) ? actor : null;
+    const caller = await callerOf(req, companyId);
+    return canManageAgents(caller) ? caller.actor : null;
 };
 
 /* GET /api/v2/agents/skills */

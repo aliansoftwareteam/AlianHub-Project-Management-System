@@ -2,7 +2,7 @@ const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
-jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async () => 'member'), isPrivileged: (r) => r === 'owner' || r === 'admin' }));
+jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async () => 'owner'), isPrivileged: (r) => r === 'owner' || r === 'admin' }));
 jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async (req) => ({ kind: req.agentToken ? 'agent' : 'human', userId: req.uid })), isAgent: (a) => a.kind === 'agent' }));
 jest.mock('../Modules/Agents/agentAudit', () => ({ recordAgentDeleted: jest.fn(async () => 'aud1'), AGENT_DELETED: 'agent.deleted' }));
 
@@ -22,7 +22,7 @@ const req = (over = {}) => ({ headers: { companyid: C }, params: { id: AGENT_ID 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     jest.clearAllMocks();
-    getRoleType.mockResolvedValue('member');
+    getRoleType.mockResolvedValue('owner');
     mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: AGENT_ID, name: 'Reviewer', ownerId: 'owner1', paused: false, deletedStatusKey: 0 });
 });
 
@@ -35,7 +35,7 @@ describe('#15 DELETE /api/v2/agents/:id', () => {
         expect(require('fs').readFileSync(require('path').join(__dirname, '../Config/setMiddleware.js'), 'utf8')).toMatch(/'\/api\/v2\/agents'/);
     });
 
-    it('lets the agent\'s owner soft-delete it, keeps the row, writes an audit row and emits', async () => {
+    it('lets an owner soft-delete it, keeps the row, writes an audit row and emits', async () => {
         const r = res();
         await ctrl.deleteAgent(req(), r);
         expect(r.body).toMatchObject({ status: true, data: { agentId: AGENT_ID } });
@@ -44,11 +44,12 @@ describe('#15 DELETE /api/v2/agents/:id', () => {
         expect(socket.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'agent', data: { kind: 'agent', agentId: AGENT_ID, deleted: true } }));
     });
 
-    it('lets an owner/admin who is not the agent owner delete it, but refuses a plain member', async () => {
+    it('lets an admin who is not the agent owner delete it, but refuses a member, even the agent\'s owner', async () => {
+        getRoleType.mockResolvedValue('member');
         const member = res();
-        await ctrl.deleteAgent(req({ uid: 'someone' }), member);
+        await ctrl.deleteAgent(req(), member);
         expect(member.code).toBe(403);
-        expect(member.body.statusText).toMatch(/Owner, an Admin or the agent's owner/);
+        expect(member.body.statusText).toBe('Only an Owner or an Admin can manage agents.');
         expect(mockDb.store[SCHEMA_TYPE.AGENTS][0].deletedStatusKey).toBe(0);
 
         getRoleType.mockResolvedValue('admin');
