@@ -41,6 +41,8 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 beforeEach(() => {
     jest.clearAllMocks();
+    getRoleType.mockReset();
+    evaluatePermission.mockReset();
     MongoDbCrudOpration.mockResolvedValue([]);
 });
 
