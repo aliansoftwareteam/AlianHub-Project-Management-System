@@ -10,7 +10,7 @@ One pull request per group; tick with the merge commit and build.
 - [ ] 5. Access token without the refresh token, tracker login (items 8, 9, 10)
 - [ ] 6a. Webhook private-host allowlist (item 15)
 - [ ] 6b. `createproject` default sprint (item 18)
-- [ ] 7. Harness and CI: e2e on beta pushes, lint-staged `--no-stash`, messaging worker, priority icons, testing docs (items 16e, 20, 21, 23, 24, 25)
+- [x] 7. Harness and CI: e2e on beta pushes, lint-staged `--no-stash`, messaging worker, priority icons, testing docs (items 16e, 20, 21, 23, 24, 25) — #634 `2f208fe5`; item 20 reproduced on companies seeded before 4202a796 and fixed in `SettingTaskPriority.vue`; the messaging worker is skipped when Firebase is not configured
 - [ ] `followups.md` updated and `docs/BETA-LOG.md` regenerated
 
 ## Log
