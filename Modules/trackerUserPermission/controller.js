@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const { updateMemberFunction } = require('../settings/Members/controller.js');
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 
 exports.handleTrackerUserPermission = (req,res) => {
     try {
@@ -19,8 +20,15 @@ exports.handleTrackerUserPermission = (req,res) => {
             res.send({status: false, message: 'DataObj is requried'});
             return;
         }
-        exports.updateTrackerUsersAndUser(req.body.DataObj,req.body.CompanyId).then((res1)=>{
-            res.send(res1);
+        const companyId = String(req.headers.companyid || '');
+        getRoleType(companyId, req.uid).then((roleType) => {
+            if (!isPrivileged(roleType)) {
+                res.status(403).send({status: false, message: 'Only an owner or admin can change tracker access'});
+                return undefined;
+            }
+            return exports.updateTrackerUsersAndUser(req.body.DataObj, companyId).then((res1)=>{
+                res.send(res1);
+            });
         })
         .catch((err)=>{
             logger.error(`ERROR in update handleTrackerUserPermission: ${err.message}`)

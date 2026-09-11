@@ -147,7 +147,6 @@ import TagChip from '@/components/atom/TagChip/TagChip.vue'
 import PromptSidebar from "@/components/molecules/PromptSidebar/PromptSidebar.vue";
 import { apiRequest, apiRequestWithoutCompnay } from '../../../services';
 import * as env from '@/config/env';
-import axios from 'axios';
 
 // UTILS
 import { useCustomComposable, useGetterFunctions } from '@/composable';
@@ -269,7 +268,7 @@ onMounted(() => {
         collection: data.type,
         methodName: "findOne",
     };
-    axios.post(env.API_URI + env.MONGO_OPRATION, axiosData).then((response) => {
+    apiRequest("post", env.MONGO_OPRATION, axiosData).then((response) => {
         selectedProject.value.push(response.data.statusText)
     });
     if(props.isSupport === true){

@@ -59,6 +59,7 @@ module.exports.WASABI_RETRIVE_OBJECT = "/api/v1/wasabi/retriveObject";
 module.exports.WASABI_DELETE_FILE = "/api/v1/wasabi/deleteFile";
 module.exports.CREATE_USER_V2 = '/api/v2/createUser';
 module.exports.MONGO_OPRATION = '/api/v1/mongoOpration';
+module.exports.INVITATION_PREVIEW = '/api/v2/auth/invitation-preview';
 module.exports.TASKTYPE = '/api/v1/projectSetting/taskType';
 module.exports.TASKSTATUS = '/api/v1/projectSetting/taskStatus';
 module.exports.SPRINT = '/api/v1/sprint';

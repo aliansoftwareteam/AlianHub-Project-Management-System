@@ -1,3 +1,4 @@
+const { requireInstanceAdmin } = require('../Instance/guard');
 const { DateTime } = require("luxon");
 const fs = require("fs");
 const config =  require('../../Config/config.js');
@@ -56,6 +57,6 @@ exports.init = (app) => {
     };
     exports.createDefaultFolder();
 
-    app.post('/api/v1/versionUpdateNotify',commonctrl.versionUpdateNotifyToClient)
+    app.post('/api/v1/versionUpdateNotify', requireInstanceAdmin, commonctrl.versionUpdateNotifyToClient)
 
 };

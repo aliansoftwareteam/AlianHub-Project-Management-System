@@ -12,6 +12,27 @@ const { addAndRemoveUserInMongodbNotificationCount } = require("../../Auth/contr
 
 exports.authenticateToken = "";
 
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+const PENDING_INVITATION = 1;
+
+/* The body's assignCompany used to be taken on trust, which let anyone sign up straight
+ * into any company. A company admits only an email it has a pending invitation row for. */
+exports.findPendingInvitation = async ({ companyId, email, companyUserId }) => {
+    if (!OBJECT_ID_PATTERN.test(String(companyId || '')) || !email) return null;
+    const filter = { userEmail: String(email).trim().toLowerCase(), status: PENDING_INVITATION, isDelete: { $ne: true } };
+    if (companyUserId !== undefined) {
+        if (!OBJECT_ID_PATTERN.test(String(companyUserId || ''))) return null;
+        filter._id = new mongoose.Types.ObjectId(String(companyUserId));
+    }
+    return mongoRef.MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.COMPANY_USERS, data: [filter] }, 'findOne').catch(() => null);
+};
+
+exports.admitInvitee = async (body) => {
+    if (!body.assignCompany && !body.isInvitation) return { ...body, isInvitation: false };
+    const invitation = await exports.findPendingInvitation({ companyId: body.assignCompany, email: body.email });
+    return invitation ? { ...body, isInvitation: true } : { ...body, assignCompany: '', isInvitation: false };
+};
+
 
 exports.addUserMongodbV2 = (data) => {
     return new Promise((resolve, reject) => {
@@ -91,8 +112,12 @@ exports.createUserV2 = (req,res) => {
             })
         }
         // CALL VALIDATE LICENCE FUNCTION HERE...............
-        exports.addUserMongodbV2(req.body).then((respo)=>{
-            if (!req.body.isInvitation) {
+        let admitted = req.body;
+        exports.admitInvitee(req.body).then((body) => {
+            admitted = body;
+            return exports.addUserMongodbV2(body);
+        }).then((respo)=>{
+            if (!admitted.isInvitation) {
                 sendMailRef.sendVerificationEmailPromise(respo.statusText._id,respo.statusText.Employee_Email).catch((error)=>{
                     logger.error(error.statusText);
                 })
@@ -210,6 +235,11 @@ exports.googleSignup = async (req, res) => {
             });
         }
 
+        const invitation = assignCompany
+            ? await exports.findPendingInvitation({ companyId: assignCompany, email, companyUserId: companyUserDocID })
+            : null;
+        const invitedCompany = invitation ? String(assignCompany) : '';
+
         // Check if user already exists
         const findObj = {
             type: dbCollections.USER_AUTH,
@@ -237,7 +267,7 @@ exports.googleSignup = async (req, res) => {
         const authRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, authObj, "save");
 
         // Update user status in company users
-        if (assignCompany) {
+        if (invitedCompany) {
             const query = {
                 type: SCHEMA_TYPE.COMPANY_USERS,
                 data: [
@@ -268,7 +298,7 @@ exports.googleSignup = async (req, res) => {
         // Create User Document
         const userDoc = {
             _id: authRes._id,
-            AssignCompany: assignCompany ? [assignCompany] : [],
+            AssignCompany: invitedCompany ? [invitedCompany] : [],
             Employee_FName: firstName,
             Employee_LName: lastName,
             Employee_Email: email,
@@ -315,6 +345,11 @@ exports.githubSignup = async (req, res) => {
             });
         }
 
+        const invitation = assignCompany
+            ? await exports.findPendingInvitation({ companyId: assignCompany, email, companyUserId: companyUserDocID })
+            : null;
+        const invitedCompany = invitation ? String(assignCompany) : '';
+
         // Check if user already exists
         const findObj = {
             type: dbCollections.USER_AUTH,
@@ -342,7 +377,7 @@ exports.githubSignup = async (req, res) => {
         const authRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, authObj, "save");
 
         // Update user status in company users
-        if (assignCompany) {
+        if (invitedCompany) {
             const query = {
                 type: SCHEMA_TYPE.COMPANY_USERS,
                 data: [
@@ -373,7 +408,7 @@ exports.githubSignup = async (req, res) => {
         // Create User Document
         const userDoc = {
             _id: authRes._id,
-            AssignCompany: assignCompany ? [assignCompany] : [],
+            AssignCompany: invitedCompany ? [invitedCompany] : [],
             Employee_FName: firstName,
             Employee_LName: lastName,
             Employee_Email: email,
@@ -420,6 +455,11 @@ exports.gitlabSignup = async (req, res) => {
             });
         }
 
+        const invitation = assignCompany
+            ? await exports.findPendingInvitation({ companyId: assignCompany, email, companyUserId: companyUserDocID })
+            : null;
+        const invitedCompany = invitation ? String(assignCompany) : '';
+
         // Check if user already exists
         const findObj = {
             type: dbCollections.USER_AUTH,
@@ -447,7 +487,7 @@ exports.gitlabSignup = async (req, res) => {
         const authRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, authObj, "save");
 
         // Update user status in company users
-        if (assignCompany) {
+        if (invitedCompany) {
             const query = {
                 type: SCHEMA_TYPE.COMPANY_USERS,
                 data: [
@@ -478,7 +518,7 @@ exports.gitlabSignup = async (req, res) => {
         // Create User Document
         const userDoc = {
             _id: authRes._id,
-            AssignCompany: assignCompany ? [assignCompany] : [],
+            AssignCompany: invitedCompany ? [invitedCompany] : [],
             Employee_FName: firstName,
             Employee_LName: lastName,
             Employee_Email: email,

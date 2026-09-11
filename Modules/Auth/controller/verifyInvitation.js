@@ -10,6 +10,7 @@ const { addAndRemoveUserInMongodbNotificationCount } = require("../controller");
 const atob = (input) => Buffer.from(input, 'base64').toString('binary');
 const { updateUserFun, getUserByQueyFun } = require("../../Users/controller");
 const { updateMemberFunction } = require('../../settings/Members/controller');
+const { importUserNotifications } = require("../../../utils/data");
 
 /**
  * BUG-011 / #65 fix: parse the base64 invitation blob into a *local*
@@ -211,6 +212,10 @@ exports.checkPermission = (req, res) => {
                     updateUserFun(SCHEMA_TYPE.GOLBAL, userUpdateQuery, "updateOne", invite.companyId, invite.userId)
                     .catch((error) => {
                         logger.error(`ERROR in update user: ${error.message}`);
+                    })
+
+                    importUserNotifications(invite.companyId, invite.userId).catch((error) => {
+                        logger.error(`ERROR in import notification settings: ${error}`);
                     })
 
                     addAndRemoveUserInMongodbNotificationCount(invite.companyId, invite.userId, "Add").catch((error)=>{

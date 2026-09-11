@@ -25,23 +25,6 @@ exports.init = (app) => {
      *           required: true
      *           description: The password of user.
      */
-    /**
-     * @swagger
-     *  /api/v2/auth/register:
-     *    post: 
-     *      description: This API is used for register auth.
-     *      tags: [Auth APIs]
-     *      requestBody:
-     *        required: true
-     *        content:
-     *          application/json:
-     *            schema:
-     *              $ref: '#/components/schemas/registerAuth'
-     *      responses:
-     *          "200":
-     *              description: status:true, message:message
-     */
-    app.post("/api/v2/auth/register", ctrl.registerAuth);
 
 
     /**
@@ -266,23 +249,6 @@ exports.init = (app) => {
      *           required: true
      *           description: The User Id.
      */
-    /**
-     * @swagger
-     *  /api/v2/session/register:
-     *    post: 
-     *      description: This API is used for register a session.
-     *      tags: [Session APIs]
-     *      requestBody:
-     *        required: true
-     *        content:
-     *          application/json:
-     *            schema:
-     *              $ref: '#/components/schemas/registerSession'
-     *      responses:
-     *          "200":
-     *              description: status:true, message:message
-     */
-    app.post('/api/v2/session/register', sessionCtr.registerSesstion);
 
 
     /**
@@ -295,7 +261,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true, message:message
      */
-    app.delete('/api/v2/session/delete', sessionCtr.deleteAllSession);
+    app.delete('/api/v2/session/delete', requireInstanceAdmin, sessionCtr.deleteAllSession);
 
 
     /**
@@ -366,13 +332,12 @@ const createUserCtrl = require("./controller/createUser");
 const sendVerifcationCtrl = require("./controller/sendVerificationMail");
 const verifyEmailCtrl = require("./controller/verifyEmail");
 const sendForgotPasswordCtrl = require("./controller/sendForgotPasswordMail");
-const mongoRef = require('../../utils/mongo-handler/mongoQueries');
 const sendInvitationCtrl = require("./controller/sendInvitation");
 const verifyInvitationCtrl = require("./controller/verifyInvitation");
-const { replaceObjectKey } = require("./helper");
-const {myCache} = require('../../Config/config');
-const logger = require('../../Config/loggerConfig');
-const {removeCache} = require('../../utils/commonFunctions');
+const { removeCacheHandler } = require('./controller/removeCache');
+const { mongoOperation } = require('./controller/mongoOperation');
+const { invitationPreview } = require('./controller/invitationPreview');
+const { requireInstanceAdmin } = require('../Instance/guard');
 const { handleEvents } = require('../Company/eventController');
 function initSignup(app) {
     app.post("/api/v2/createUser", createUserCtrl.createUserV2);
@@ -603,6 +568,7 @@ function initSignup(app) {
      *              description: status:true/false,statusText:message,key
      */
      app.post('/api/v2/checkPermission', verifyInvitationCtrl.checkPermission);
+    app.post('/api/v2/auth/invitation-preview', invitationPreview);
 
 
     
@@ -647,72 +613,11 @@ function initSignup(app) {
      *              description: status:true/false,statusText:message
      */
 
-    /**
-     * Mongo db curd operation API
-     */
-    app.post("/api/v1/mongoOpration", (req,res)=>{
-        if (!(req.body && req.body.dataObj)) {
-            res.send({
-                status: false,
-                statusText: `DataObject is missing`
-            })
-            return;
-        }
-        if (!(req.body && req.body.dbName)) {
-            res.send({
-                status: false,
-                statusText: `dbName is missing`
-            })
-            return;
-        }
-        if (!(req.body && req.body.methodName)) {
-            res.send({
-                status: false,
-                statusText: `methodName is missing`
-            })
-            return;
-        }
-        if (!(req.body && req.body.collection)) {
-            res.send({
-                status: false,
-                statusText: `collection is missing`
-            })
-            return;
-        }
+    app.post("/api/v1/mongoOpration", mongoOperation);
 
-        mongoRef.MongoDbCrudOpration(req.body.dbName,{type: req.body.collection , data: replaceObjectKey(req.body.dataObj, ["objId"])},req.body.methodName).then((response)=>{
-            res.send({
-                status: true, 
-                statusText: response
-            })
-            }).catch((error)=>{
-            logger.error(`ERR: in request ${req.body.collection} ${req.body.methodName} > ${error?.message ? error.message : error}`);
-            res.send({
-                status: false,
-                statusText: error
-            })
-        })
-    })
-
-    app.post("/api/v1/generateToken", createUserCtrl.generateToken);
     app.post('/api/v1/verifyToken', createUserCtrl.verifyToken);
 
-    app.post('/api/v1/removeCache',(req,res)=>{
-        try {
-            if (req.body.global) {
-                myCache.flushAll();
-                return res.status(200).json({ message: 'Global cache cleared successfully' });
-            } else {
-                if (!(req.body && req.body.cacheKey)) {
-                    return res.status(400).json({ message: 'cacheKey is required' });
-                }
-                removeCache(req.body.cacheKey, req.body.isPrefix ? true : false);
-                return res.status(200).json({ message: 'Cache cleared successfully' });
-            }
-        } catch (error) {
-            return res.status(500).json({message: error.message});
-        }
-    })
+    app.post('/api/v1/removeCache', removeCacheHandler);
 
     app.post("/api/v2/google-signup", createUserCtrl.googleSignup);
     app.post("/api/v2/github-signup", createUserCtrl.githubSignup);

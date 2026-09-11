@@ -22,6 +22,10 @@ exports.changePassword = async (req, res) => {
             res.status(400).json({message: "user id is require"});
             return;
         }
+        if (String(req.params.id) !== String(req.uid)) {
+            res.status(403).json({message: "You can only change your own password."});
+            return;
+        }
         if (!(reqData && reqData.oldPassword)) {
             res.status(400).json({message: "Old Password is require"});
             return;
