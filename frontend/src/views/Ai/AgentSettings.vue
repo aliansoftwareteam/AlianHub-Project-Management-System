@@ -11,19 +11,20 @@
                     <span>{{ agent.name || $t('Ai.agent') }}</span>
                 </div>
                 <div class="ah-toolbar__spacer"></div>
-                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="stop">{{ $t('Ai.stop_agent') }}</button>
+                <button v-if="canManage" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="stop-agent" :disabled="busy" @click="stop">{{ $t('Ai.stop_agent') }}</button>
             </div>
 
             <div class="ai-page__body ah-scroll">
                 <div v-if="loadingAgent" class="ah-empty">{{ $t('Ai.loading') }}</div>
                 <template v-else>
+                    <p v-if="!canManage" class="ah-chip ah-chip--warn" data-test="read-only">{{ $t('Ai.settings_read_only') }}</p>
                     <section class="ah-card ai-agent">
                         <div class="ah-label">{{ $t('Ai.skills_actions') }}</div>
                         <p class="ai-lead" style="margin:6px 0 12px">{{ $t('Ai.skills_lead') }}</p>
 
                         <div v-for="skill in skills" :key="skill.key" class="ai-skill">
                             <div class="ai-skill__head">
-                                <input :id="`sk-${skill.key}`" v-model="skill.enabled" type="checkbox" class="ah-check" />
+                                <input :id="`sk-${skill.key}`" v-model="skill.enabled" type="checkbox" class="ah-check" :disabled="!canManage" />
                                 <label :for="`sk-${skill.key}`" class="ai-skill__name">{{ skill.name }}</label>
                                 <span v-if="!skill.enabled" class="ah-chip">{{ $t('Ai.off') }}</span>
                             </div>
@@ -43,7 +44,7 @@
                         <div class="ah-label">{{ $t('Ai.autonomy') }}</div>
                         <div class="ai-radios">
                             <label v-for="step in AUTONOMY.slice(0, 4)" :key="step.level" class="ai-radio" :class="{ 'is-on': form.autonomy === step.level }">
-                                <input v-model.number="form.autonomy" type="radio" :value="step.level" class="ah-check" />
+                                <input v-model.number="form.autonomy" type="radio" :value="step.level" class="ah-check" :disabled="!canManage" />
                                 <span><strong>{{ step.key }}</strong> · {{ $t(`Ai.autonomy_${step.level}`) }}</span>
                             </label>
                         </div>
@@ -77,11 +78,11 @@
                         <div class="ai-fields">
                             <div class="ah-field">
                                 <label class="ah-field__label" for="rate">{{ $t('Ai.rate_limit') }}</label>
-                                <input id="rate" v-model.number="form.rateLimitPerDay" type="number" min="1" max="500" class="ah-input" />
+                                <input id="rate" v-model.number="form.rateLimitPerDay" type="number" min="1" max="500" class="ah-input" :disabled="!canManage" />
                             </div>
                             <div class="ah-field">
                                 <label class="ah-field__label" for="cap">{{ $t('Ai.spend_cap') }}</label>
-                                <input id="cap" v-model.number="form.spendCapUsd" type="number" min="0" step="1" class="ah-input" />
+                                <input id="cap" v-model.number="form.spendCapUsd" type="number" min="0" step="1" class="ah-input" :disabled="!canManage" />
                                 <span class="ah-field__hint">{{ $t('Ai.cap_hint') }}</span>
                             </div>
                         </div>
@@ -108,13 +109,13 @@
 
                     <div v-if="error" class="ah-field__error">{{ error }}</div>
                     <div class="ai-actions">
-                        <button type="button" class="ah-btn ah-btn--primary" :disabled="busy" @click="save">{{ busy ? $t('Ai.saving') : $t('Ai.save') }}</button>
+                        <button v-if="canManage" type="button" class="ah-btn ah-btn--primary" data-test="save" :disabled="busy" @click="save">{{ busy ? $t('Ai.saving') : $t('Ai.save') }}</button>
                         <router-link class="ah-btn ah-btn--secondary" :to="{ name: 'AiHub', params: { cid: companyId } }">{{ $t('Ai.cancel') }}</router-link>
                     </div>
 
-                    <AgentRevisionHistory :key="revisionsKey" :agent-id="String(route.params.id)" :highlight="highlightRevision" @changed="load" />
+                    <AgentRevisionHistory v-if="canManage" :key="revisionsKey" :agent-id="String(route.params.id)" :highlight="highlightRevision" @changed="load" />
 
-                    <section class="ah-card ai-agent ai-danger">
+                    <section v-if="canManage" class="ah-card ai-agent ai-danger" data-test="danger">
                         <div class="ah-label">{{ $t('Ai.delete_agent') }}</div>
                         <p class="ai-lead" style="margin:6px 0 10px">{{ openRunCount ? $t('Ai.delete_blocked_running', { n: openRunCount }) : $t('Ai.delete_body') }}</p>
                         <div v-if="!openRunCount" class="ai-fields">
@@ -145,6 +146,7 @@ import AgentRunDetail from "./AgentRunDetail.vue";
 import AgentRevisionHistory from "./AgentRevisionHistory.vue";
 import { useAgents, refusalCount } from "./useAgents";
 import { splitPreview } from "./policyPreview";
+import { useAgentAccess } from "./agentAccess";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 
@@ -156,6 +158,7 @@ const route = useRoute();
 const router = useRouter();
 const companyId = inject("$companyId");
 const { agents, spend, registryManifest, loadAgents, loadSpend, loadRegistry, saveAgent, setPaused, deleteAgent, activeRuns, loadActiveRuns } = useAgents();
+const { canManage } = useAgentAccess();
 
 const loadingAgent = ref(true);
 const busy = ref(false);

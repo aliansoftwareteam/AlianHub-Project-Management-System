@@ -76,7 +76,7 @@ describe('budget.status', () => {
         seedSpend(17, { feature: 'ask' });
         const r = { code: 200, body: null }; r.status = (c) => { r.code = c; return r; }; r.send = (b) => { r.body = b; return r; };
         await ctrl.getBudget({ headers: { companyid: C }, query: {}, uid: 'owner1' }, r);
-        expect(r.body).toEqual({ status: true, data: { month: runs.monthKey(), usedUsd: 17, budgetUsd: 20, percent: 85, alerts: { 80: '2026-09-01T10:00:00.000Z', 100: null }, features: [{ feature: 'ask', usd: 17, calls: 1, tokens: 10 }] } });
+        expect(r.body).toEqual({ status: true, statusText: 'Budget fetched.', data: { month: runs.monthKey(), usedUsd: 17, budgetUsd: 20, percent: 85, alerts: { 80: '2026-09-01T10:00:00.000Z', 100: null }, features: [{ feature: 'ask', usd: 17, calls: 1, tokens: 10 }] } });
     });
 
     it('forgets last month\'s alert stamps', async () => {

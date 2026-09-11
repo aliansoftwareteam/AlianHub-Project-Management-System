@@ -116,14 +116,14 @@ async function listSprints(api, projectId) {
     return Array.isArray(res.body) ? res.body : (res.body && res.body.data) || [];
 }
 
-/* createproject answers before it writes the project's default sprint, so a task created
- * straight after it can find no sprint yet. */
-async function firstSprint(api, projectId, { timeout = 10000, interval = 100 } = {}) {
-    const deadline = Date.now() + timeout;
+/* POST /createproject answers before it adds the default "List" sprint, so a
+ * task created straight after a project can find no sprint yet. */
+async function firstSprint(api, projectId, { timeoutMs = 15000, intervalMs = 100 } = {}) {
+    const deadline = Date.now() + timeoutMs;
     for (;;) {
         const [sprint] = await listSprints(api, projectId);
-        if (sprint || Date.now() >= deadline) return sprint;
-        await new Promise((resolve) => setTimeout(resolve, interval));
+        if (sprint || Date.now() > deadline) return sprint;
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
 }
 

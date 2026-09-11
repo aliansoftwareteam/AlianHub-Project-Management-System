@@ -18,13 +18,18 @@ exports.projectAlltaskUpdate = async (req,res) => {
         if (!validateObjectId(projectId)) {
             return res.status(400).json({ message: "Invalid project ID" });
         }
-        
+
+        const findProjectId = req.body.findObject.ProjectID;
+        if (findProjectId !== undefined && String(findProjectId) !== String(projectId)) {
+            return res.status(400).json({ status: false, statusText: 'findObject.ProjectID must match the project in the URL.' });
+        }
+
         let mongoObj = {
             type: SCHEMA_TYPE.TASKS,
             data: [
                 {
+                    ...req.body.findObject,
                     ProjectID: new mongoose.Types.ObjectId(projectId),
-                    ...req.body.findObject
                 },
                 {$set: req.body.updateObject}
             ]

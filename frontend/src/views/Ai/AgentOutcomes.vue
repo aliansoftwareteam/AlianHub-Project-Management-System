@@ -57,7 +57,7 @@
                     <span class="ah-mono"> · {{ minutes(run) }} · {{ money(run) }}{{ capOf(run) }}</span>
                     <span v-if="run.skill"> · {{ run.skill }}</span>
                 </span>
-                <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="stopping === run._id" @click="$emit('stop', run)">
+                <button v-if="canStop(run)" type="button" class="ah-btn ah-btn--danger ah-btn--sm" data-test="stop-run" :disabled="stopping === run._id" @click="$emit('stop', run)">
                     {{ stopping === run._id ? $t('Parity.stopping') : $t('Parity.stop') }}
                 </button>
             </div>
@@ -83,7 +83,8 @@ const props = defineProps({
     runs: { type: Array, default: () => [] },
     agents: { type: Array, default: () => [] },
     declines: { type: Array, default: () => [] },
-    stopping: { type: String, default: "" }
+    stopping: { type: String, default: "" },
+    canStop: { type: Function, default: () => false }
 });
 
 defineEmits(["stop", "reverted"]);

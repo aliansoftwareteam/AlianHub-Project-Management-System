@@ -67,7 +67,7 @@ test.describe('ai agents as a member', () => {
 test.describe('ai agents as a guest', () => {
     test.use(asRole('guest'));
 
-    test.fail('AGT-01 the hub does not offer New agent to a guest', async ({ page, state }) => {
+    test('AGT-01 the hub does not offer New agent to a guest', async ({ page, state }) => {
         await page.goto(`/#/${state.companyId}/ai`);
         await expect(page.locator('.ah-toolbar__title')).toHaveText('AI Agents');
         await expect(page.getByRole('button', { name: 'New agent' })).toHaveCount(0, { timeout: 5000 });

@@ -1,5 +1,7 @@
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { keepVisibleProjectIds } = require('../../Config/projectAccess');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { removeCache } = require('../../utils/commonFunctions');
 const { myCache } = require('../../Config/config');
@@ -79,12 +81,12 @@ exports.deletePortfolio = async (req, res) => {
 // milestones + portfolio totals, from real data. Shared by the rollup endpoint
 // and the summary endpoint so the paragraph can never describe different
 // numbers from the ones on screen.
-const buildRollup = async (companyId, portfolioId) => {
+const buildRollup = async (companyId, portfolioId, uid) => {
     const portfolio = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PORTFOLIOS, data: [{ _id: oid(portfolioId) }],
     }, 'findOne');
     if (!portfolio || portfolio.deletedStatusKey === 1) return null;
-    const projectIds = Array.isArray(portfolio.projectIds) ? portfolio.projectIds : [];
+    const projectIds = await keepVisibleProjectIds(companyId, uid, Array.isArray(portfolio.projectIds) ? portfolio.projectIds : []);
     const nowMs = Date.now();
 
     const projectDocs = projectIds.length
@@ -132,7 +134,7 @@ exports.getRollup = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
-        const data = await buildRollup(companyId, req.params.id);
+        const data = await buildRollup(companyId, req.params.id, req.uid);
         if (!data) return res.status(404).json({ status: false, statusText: 'Not found.' });
         return res.json({ status: true, data });
     } catch (e) { logger.error(`getRollup: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
@@ -175,15 +177,17 @@ exports.getPortfolioSummary = async (req, res) => {
             return res.json({ status: true, data: { summary: null, reason: 'no-provider' } });
         }
 
-        const cacheKey = `portfolio_summary:${companyId}:${portfolioId}:${dayStamp()}`;
-        const cached = myCache.get(cacheKey);
-        if (cached) return res.json({ status: true, data: { ...cached, cached: true } });
-
-        const rollup = await buildRollup(companyId, portfolioId);
+        const rollup = await buildRollup(companyId, portfolioId, req.uid);
         if (!rollup) return res.status(404).json({ status: false, statusText: 'Not found.' });
         if (!rollup.projects.length) {
             return res.json({ status: true, data: { summary: null, reason: 'no-projects' } });
         }
+
+        // Callers see different project sets, so one caller's paragraph must never be served to another.
+        const projectSet = crypto.createHash('sha1').update(rollup.projects.map((p) => p.projectId).sort().join(',')).digest('hex').slice(0, 16);
+        const cacheKey = `portfolio_summary:${companyId}:${portfolioId}:${dayStamp()}:${projectSet}`;
+        const cached = myCache.get(cacheKey);
+        if (cached) return res.json({ status: true, data: { ...cached, cached: true } });
 
         let result;
         try {

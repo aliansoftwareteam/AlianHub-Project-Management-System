@@ -10,6 +10,7 @@ const memory = require('./memory');
 const findingMemory = require('./engine/findingMemory');
 const persistence = require('../AICore/persistence');
 const logger = require('../../Config/loggerConfig');
+const access = require('./access');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
 // actions it would run. Approving applies them through perform() — so they are
@@ -107,14 +108,23 @@ const gateOf = (changes, explicit) => {
     return gated ? registry.get(gated.action).gate : null;
 };
 
+/* The AI Inbox is scoped by projectId, so a proposal filed with only a task still needs one. */
+const projectOfTask = async (companyId, taskId) => {
+    if (!/^[0-9a-fA-F]{24}$/.test(String(taskId || ''))) return null;
+    const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(taskId) }, { ProjectID: 1 }] }, 'findOne').catch(() => null);
+    return task && task.ProjectID ? String(task.ProjectID) : null;
+};
+
 const create = async (companyId, { agent, runId, taskId, projectId, what, why, changes, gate, priority, cost }) => {
+    if (typeof what !== 'string' || !what.trim()) throw Object.assign(new Error('what is required: say in one sentence what the proposal does.'), { status: 400 });
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
+    const scopedProjectId = projectId || await projectOfTask(companyId, taskId);
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS,
         data: {
-            agentId: String(agent._id), agentName: agent.name, runId: runId || null, taskId: taskId || null, projectId: projectId || null,
-            what: String(what).slice(0, 300), why: String(why || '').slice(0, 2000),
+            agentId: String(agent._id), agentName: agent.name, runId: runId || null, taskId: taskId || null, projectId: scopedProjectId || null,
+            what: what.trim().slice(0, 300), why: String(why || '').slice(0, 2000),
             changes: changes.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
         },
@@ -129,8 +139,10 @@ const bucketOf = (p, now = Date.now()) => {
     return now - new Date(p.createdAt || now).getTime() < PRIMARY_AGE_MS ? 'primary' : 'later';
 };
 
-const list = async (companyId, { status, bucket, agentId, limit = 100 } = {}) => {
-    const match = {};
+/* projectIds, when given, is the caller's visible set; the counts follow the same scope. */
+const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds } = {}) => {
+    const scoped = Array.isArray(projectIds) ? { projectId: { $in: projectIds.map(String) } } : {};
+    const match = { ...scoped };
     if (status) match.status = String(status);
     if (agentId) match.agentId = String(agentId);
     const rows = await MongoDbCrudOpration(companyId, {
@@ -139,7 +151,7 @@ const list = async (companyId, { status, bucket, agentId, limit = 100 } = {}) =>
     const shaped = (rows || []).map((p) => { const o = typeof p.toObject === 'function' ? p.toObject() : p; return { ...o, bucket: bucketOf(o), undoAvailable: o.undoUntil ? new Date(o.undoUntil).getTime() > Date.now() : false }; });
     const filtered = bucket ? shaped.filter((p) => p.bucket === bucket) : shaped;
     const counts = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [[{ $group: { _id: '$status', n: { $sum: 1 } } }]],
+        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [[{ $match: scoped }, { $group: { _id: '$status', n: { $sum: 1 } } }]],
     }, 'aggregate').catch(() => []);
     const byStatus = {};
     (counts || []).forEach((c) => { byStatus[c._id] = c.n; });
@@ -243,9 +255,10 @@ const decline = async (companyId, id, { decider, ip, reason }) => {
 };
 
 /* Undo within the window: every audited action, newest first. */
-const undoApproval = async (companyId, id, { decider, ip }) => {
+const undoApproval = async (companyId, id, { decider, isPrivileged, ip }) => {
     const p = await get(companyId, id);
     if (!p) return { error: 'Proposal not found.', status: 404 };
+    if (!access.canUndoDecision({ actor: decider, human: true, privileged: Boolean(isPrivileged) }, p)) return { error: access.REFUSAL.UNDO_DECISION, status: 403, reason: 'not_permitted' };
     if (![STATUS.APPROVED, STATUS.EDITED].includes(p.status)) return { error: `Nothing to undo — proposal is ${p.status}.`, status: 409 };
     const undoUntil = p.undoUntil ? new Date(p.undoUntil).toISOString() : null;
     if (!undoUntil || new Date(undoUntil).getTime() < Date.now()) return { error: 'The undo window has closed. Use the audit log to undo individual actions.', status: 410, reason: undo.REASON.WINDOW_PASSED, undoUntil };

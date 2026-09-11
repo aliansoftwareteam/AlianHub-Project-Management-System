@@ -2,7 +2,8 @@ const ctrl = require('./controller');
 const burndown = require('./burndown');
 const hours = require('./hours');
 const scrum = require('./scrum');
-const { requirePermission } = require('../../Config/permissionGuard');
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { READ, WRITE, requireProjectAccess, projectIdsFrom } = require('../../Config/projectAccess');
 
 // Whitelist of functions allowed to be called via PATCH /sprint/:id
 const ALLOWED_SPRINT_TYPES = ['editSprintName', 'updateSprint', 'deleteChannel'];
@@ -10,31 +11,53 @@ const ALLOWED_SPRINT_TYPES = ['editSprintName', 'updateSprint', 'deleteChannel']
 // Whitelist of functions allowed to be called via PATCH /folder/:id
 const ALLOWED_FOLDER_TYPES = ['editFolderName', 'updateFolder'];
 
-exports.init = (app) => {
-    // Read-only burndown series for a sprint (count + estimate based).
-    app.post('/api/v2/sprints/burndown', burndown.getSprintBurndown);
+// Gated on project_sprint_create rather than a new project_sprint_manage key: the
+// permission catalogue in utils/data.js is seeded at COMPANY IMPORT, so a brand-new key
+// exists for new companies only and would deny every existing one.
+const SPRINT_CREATE = 'project.project_sprint_create';
+const SPRINT_EDIT = ['project.project_sprint_name_edit', 'project.sprint_type_change', SPRINT_CREATE];
+const SPRINT_STATUS = { 0: 'project.sprint_restore', 1: 'project.sprint_delete', 2: 'project.sprint_archive' };
+const FOLDER_RENAME = 'project.project_folder_name_edit';
+const FOLDER_STATUS = { 0: 'project.folder_restore', 1: 'project.folder_delete', 2: 'project.folder_archive' };
 
-    // Read-only Planned / Logged / Overdue totals for a whole sprint.
-    app.post('/api/v2/sprints/hours', hours.getSprintHours);
+const bodyOf = (req) => req.body || {};
+
+const sprintProject = (pick, direct) => projectIdsFrom({ records: [[SCHEMA_TYPE.SPRINTS, pick]], direct });
+
+// Chat channels share the sprint and folder collections, and their container is not a project.
+const guard = (mode, projectIds, permissions = () => []) => requireProjectAccess({ mode, projectIds, permissions, passMissing: () => true });
+
+const sprintPatchPermissions = (req) => {
+    const { type, updatedValueDeleteStatusKey } = bodyOf(req);
+    if (type === 'editSprintName') return ['project.project_sprint_name_edit'];
+    if (type === 'deleteChannel') return [SPRINT_STATUS[1]];
+    return [SPRINT_STATUS[updatedValueDeleteStatusKey] || SPRINT_EDIT];
+};
+
+const folderPatchPermissions = (req) => {
+    const { type, updatedValueDeleteStatusKey } = bodyOf(req);
+    if (type === 'editFolderName') return [FOLDER_RENAME];
+    return [FOLDER_STATUS[updatedValueDeleteStatusKey] || FOLDER_RENAME];
+};
+
+exports.init = (app) => {
+    app.post('/api/v2/sprints/burndown', guard(READ, sprintProject((req) => bodyOf(req).sprintId || (req.query && req.query.sprintId))), burndown.getSprintBurndown);
+    app.post('/api/v2/sprints/hours', guard(READ, sprintProject((req) => bodyOf(req).sprintId)), hours.getSprintHours);
 
     // Scrum lifecycle. Deliberately under /api/v2/sprints: setMiddleware.js
     // registers that as a PREFIX, so these are behind a token by default.
     // /api/v1/sprints (plural) is NOT registered anywhere and would be open.
-    //
-    // Gated on project_sprint_create rather than a new project_sprint_manage
-    // key: the permission catalogue in utils/data.js is seeded at COMPANY
-    // IMPORT, so a brand-new key exists for new companies only and would deny
-    // every existing one. Whoever may create a sprint may run its lifecycle.
-    const canManageSprint = requirePermission('project.project_sprint_create');
-    app.post('/api/v2/sprints/scrum', canManageSprint, scrum.setScrum);
-    app.post('/api/v2/sprints/start', canManageSprint, scrum.startSprint);
-    app.post('/api/v2/sprints/complete', canManageSprint, scrum.completeSprint);
-    app.get('/api/v2/sprints/complete-preview', requirePermission('project.project_sprint_create', { write: false }), scrum.completePreview);
-    app.post('/api/v2/sprints/backlog', canManageSprint, scrum.getBacklog);
-    app.get('/api/v2/sprints/report', requirePermission('project.project_sprint_create', { write: false }), scrum.sprintReport);
+    const managesSprint = guard(WRITE, sprintProject((req) => [bodyOf(req).sprintId, bodyOf(req).incompleteDestination]), () => [SPRINT_CREATE]);
+    app.post('/api/v2/sprints/scrum', managesSprint, scrum.setScrum);
+    app.post('/api/v2/sprints/start', managesSprint, scrum.startSprint);
+    app.post('/api/v2/sprints/complete', managesSprint, scrum.completeSprint);
+    app.get('/api/v2/sprints/complete-preview', guard(READ, sprintProject((req) => req.query && req.query.sprintId)), scrum.completePreview);
+    app.post('/api/v2/sprints/backlog', guard(READ, (req) => bodyOf(req).projectId), scrum.getBacklog);
+    app.get('/api/v2/sprints/report', guard(READ, sprintProject((req) => req.query && req.query.sprintId)), scrum.sprintReport);
 
-    app.post('/api/v1/sprint', requirePermission('project.project_sprint_create'), ctrl.addSprint);
-    app.patch('/api/v1/sprint/:id', (req, res) => {
+    const addsSprint = projectIdsFrom({ records: [[SCHEMA_TYPE.FOLDERS, (req) => bodyOf(req).folder && bodyOf(req).folder.folderId]], direct: (req) => bodyOf(req).projectId });
+    app.post('/api/v1/sprint', guard(WRITE, addsSprint, () => [SPRINT_CREATE]), ctrl.addSprint);
+    app.patch('/api/v1/sprint/:id', guard(WRITE, sprintProject((req) => [req.params.id, bodyOf(req).prevData], (req) => bodyOf(req).projectId), sprintPatchPermissions), (req, res) => {
         if(!req?.body?.type) {
             res.send({status: false, statusText: "type not found"});
             return;
@@ -43,7 +66,6 @@ exports.init = (app) => {
             res.send({status: false, statusText: "id is required"});
             return;
         }
-        // Security: only allow whitelisted handler names to prevent arbitrary function invocation
         if(!ALLOWED_SPRINT_TYPES.includes(req.body.type)) {
             res.status(400).send({status: false, statusText: "Invalid type"});
             return;
@@ -51,8 +73,9 @@ exports.init = (app) => {
         ctrl[req.body.type](req,res);
     });
 
-    app.post('/api/v1/folder', ctrl.addFolder);
-    app.patch('/api/v1/folder/:id', (req, res) => {
+    app.post('/api/v1/folder', guard(WRITE, (req) => bodyOf(req).projectId, () => ['project.project_folder_create']), ctrl.addFolder);
+    const folderProject = projectIdsFrom({ records: [[SCHEMA_TYPE.FOLDERS, (req) => req.params.id]], direct: (req) => [bodyOf(req).projectId, bodyOf(req).projectData] });
+    app.patch('/api/v1/folder/:id', guard(WRITE, folderProject, folderPatchPermissions), (req, res) => {
         if(!req?.body?.type) {
             res.send({status: false, statusText: "type not found"});
             return;
@@ -61,7 +84,6 @@ exports.init = (app) => {
             res.send({status: false, statusText: "id is required"});
             return;
         }
-        // Security: only allow whitelisted handler names to prevent arbitrary function invocation
         if(!ALLOWED_FOLDER_TYPES.includes(req.body.type)) {
             res.status(400).send({status: false, statusText: "Invalid type"});
             return;
