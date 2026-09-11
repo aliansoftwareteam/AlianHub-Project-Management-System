@@ -291,3 +291,29 @@ describe('PAG-11 a submission records its task key', () => {
         expect(submission.taskId).toBe(rows(SCHEMA_TYPE.TASKS)[0]._id);
     });
 });
+
+describe('PAG-12 imports act on the session', () => {
+    it('imports notification settings for the session user and company when the body names none', async () => {
+        const res = await call(importSettings.importSettingsNotification, request({ uid: MEMBER, body: {} }));
+        expect(importData.importUserNotifications).toHaveBeenCalledWith(COMPANY, MEMBER);
+        expect(res.body.status).toBe(true);
+    });
+
+    it("refuses importing another user's notification settings", async () => {
+        const res = await call(importSettings.importSettingsNotification, request({ uid: MEMBER, body: { companyId: COMPANY, userId: OWNER } }));
+        expect(refused(res)).toBe(true);
+        expect(importData.importUserNotifications).not.toHaveBeenCalled();
+    });
+
+    it('refuses a template import from a member', async () => {
+        const res = await call(importSettings.importTemplate, request({ uid: MEMBER, body: { templates: [{ TemplateId: 't1' }] } }));
+        expect(res.statusCode).toBe(403);
+        expect(importData.importSettingTemplate).not.toHaveBeenCalled();
+    });
+
+    it("imports an owner's templates into the session company, whatever the body names", async () => {
+        const res = await call(importSettings.importTemplate, request({ uid: OWNER, body: { companyId: OTHER_COMPANY, templates: [{ TemplateId: 't1' }] } }));
+        expect(importData.importSettingTemplate).toHaveBeenCalledWith(COMPANY, [{ TemplateId: 't1' }], expect.any(Function));
+        expect(res.body.status).toBe(true);
+    });
+});
