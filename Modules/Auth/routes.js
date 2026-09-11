@@ -333,6 +333,7 @@ const sendVerifcationCtrl = require("./controller/sendVerificationMail");
 const verifyEmailCtrl = require("./controller/verifyEmail");
 const sendForgotPasswordCtrl = require("./controller/sendForgotPasswordMail");
 const sendInvitationCtrl = require("./controller/sendInvitation");
+const { guardInvitation, guardUserImport } = require("../settings/Members/membershipGuard");
 const verifyInvitationCtrl = require("./controller/verifyInvitation");
 const { removeCacheHandler } = require('./controller/removeCache');
 const { mongoOperation } = require('./controller/mongoOperation');
@@ -525,10 +526,10 @@ function initSignup(app) {
     /**
      * Send Invitation Mail API
      */
-    app.post('/api/v2/sendInvitationEmail', sendInvitationCtrl.sendInvitationEmail);
+    app.post('/api/v2/sendInvitationEmail', guardInvitation, sendInvitationCtrl.sendInvitationEmail);
     app.post('/api/v1/checkSendInviatation', sendInvitationCtrl.checkSendInviatation);
     app.post('/api/v1/admin/checkSendInviatation', sendInvitationCtrl.checkSendInviatation);
-    app.post('/api/v1/importUser', sendInvitationCtrl.importUser);
+    app.post('/api/v1/importUser', guardUserImport, sendInvitationCtrl.importUser);
     app.get('/importUser/events/:id', (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
