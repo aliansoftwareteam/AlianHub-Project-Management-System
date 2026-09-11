@@ -418,6 +418,7 @@ import AccountAttribution from "./AccountAttribution.vue";
 import { useAccounts, MODES, PROVIDERS } from "./useAccounts";
 import { reasonOf } from "./useAgents";
 import { mcpUrlFor } from "./mcpUrl";
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 // Coding-agent accounts (27a-d) and the CLI setup panel (26a). Every claim on
 // this page is one the backend actually makes: the modes and the policy come
@@ -467,7 +468,7 @@ const form = reactive({ mode: "personal", provider: "claude-code", label: "", em
 const tokenForm = reactive({ name: "", mode: "personal", provider: "claude-code", projectId: "" });
 
 const companyUser = computed(() => getters["settings/companyUserDetail"] || {});
-const privileged = computed(() => [1, 2].includes(companyUser.value.roleType));
+const privileged = computed(() => isOwnerOrAdmin(companyUser.value.roleType));
 const projects = computed(() => (getters["projectData/projects"]?.data || []).filter((p) => !p.deletedStatusKey));
 
 const policyDirty = computed(() => draftModes.value.slice().sort().join() !== (policy.value.allowedModes || []).slice().sort().join());

@@ -84,6 +84,7 @@ import chargebeeRouter from "@/plugins/chargebee/router";
 import paddleRouter from "@/plugins/paddle/router.js";
 import { apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
+import { ROLE_OWNER, isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
 
 defineOptions({ name: "SettingsShell" });
 
@@ -108,8 +109,8 @@ const companyUser = computed(() => getters["settings/companyUserDetail"] || {});
 const company = computed(() => companies.value.find((c) => c._id === companyId.value) || {});
 const companyName = computed(() => company.value.Cst_CompanyName || "");
 const companyInitial = computed(() => companyName.value.charAt(0).toUpperCase());
-const isOwner = computed(() => companyUser.value.roleType === 1);
-const isOwnerOrAdmin = computed(() => [1, 2].includes(companyUser.value.roleType));
+const isOwner = computed(() => companyUser.value.roleType === ROLE_OWNER);
+const isOwnerOrAdmin = computed(() => isOwnerOrAdminRole(companyUser.value.roleType));
 
 const canCreateTeam = computed(() => checkPermission("settings.settings_create_team") === true && !!currentCompany.value?.planFeature?.team);
 const canCreateProject = computed(() => checkPermission("project.project_list") === true && checkPermission("project.project_create") === true);

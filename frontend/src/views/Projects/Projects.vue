@@ -497,6 +497,7 @@ import { useProjectSearch } from './composables/useProjectSearch';
 import { useProjectTree } from './composables/useProjectTree';
 
 import { useProjectsHelper } from './helper';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 // UTILS
 const { checkErrors } = useValidation();
@@ -1100,7 +1101,7 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
         } else if (route.name.includes('ProjectSprint')) {
             const sprintsArray = Object.values(project?.sprintsObj || {});
             const sprintIndex = sprintsArray.findIndex((x) => x.id === route.params.sprintId && (!showArchived.value ? (x?.deletedStatusKey === 0 || x?.deletedStatusKey === undefined) : true));
-            if ((companyUserDetail.value.roleType === 1 || companyUserDetail.value.roleType === 2) || (sprintIndex !== -1 && (!sprintsArray[sprintIndex]?.private || sprintsArray[sprintIndex]?.AssigneeUserId?.includes(userId.value)))) {
+            if (isOwnerOrAdmin(companyUserDetail.value.roleType) || (sprintIndex !== -1 && (!sprintsArray[sprintIndex]?.private || sprintsArray[sprintIndex]?.AssigneeUserId?.includes(userId.value)))) {
                 tmp = sprintIndex !== -1 ? [sprintsArray[sprintIndex]] : [];
             } else {
                 tmp = [];
@@ -1110,7 +1111,7 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
         console.error(error, 'Error');
     }
 
-    if (companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
+    if (!isOwnerOrAdmin(companyUserDetail.value.roleType)) {
         tmp = tmp.filter((x) => !x?.private || x?.AssigneeUserId?.includes(userId.value));
     }
 

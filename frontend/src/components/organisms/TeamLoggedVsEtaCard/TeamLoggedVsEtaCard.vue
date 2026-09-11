@@ -67,6 +67,7 @@ import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
 import { resolveCardRange } from '@/composable/useResourceWorkload';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { useCardMeta } from '@/components/organisms/DashboardCard/useCardMeta';
+import { ROLE_GUEST } from "@/utils/roles";
 
 defineOptions({ name: 'TeamLoggedVsEtaCard' });
 
@@ -141,7 +142,7 @@ const load = async () => {
             dateFrom,
             dateTo,
             callerUserId: userId && userId.value ? String(userId.value) : '',
-            callerRoleType: props.companyUserDetail?.roleType || 3,
+            callerRoleType: props.companyUserDetail?.roleType ?? ROLE_GUEST,
             taskMatch: fd.length ? buildFilterQuery(fd, userId && userId.value ? String(userId.value) : '') : null,
         });
         const d = res && res.data && res.data.status ? (res.data.data || {}) : {};

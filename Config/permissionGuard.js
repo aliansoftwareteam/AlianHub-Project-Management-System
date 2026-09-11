@@ -10,7 +10,8 @@
  *
  * Model (mirrors the frontend exactly):
  *   - roleType 1 (owner) and 2 (admin) bypass all permission checks.
- *   - roleType >= 3 is evaluated against the company RULES document.
+ *   - Every other role, guest (0) included, is evaluated against the company
+ *     RULES document.
  *   - The RULES collection is a flat array of rule docs:
  *       { _id, key, name, isParent, parentId, roles: [{ key: roleType,
  *         permission: null | false | true }] }
@@ -25,9 +26,8 @@ const { SCHEMA_TYPE } = require("./schemaType");
 const { MongoDbCrudOpration } = require("../utils/mongo-handler/mongoQueries");
 const { fetchRules } = require("../Modules/settings/securityPermissions/controller");
 const logger = require("./loggerConfig");
+const { ROLE_GUEST, ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER, isPrivileged } = require("./roleTypes");
 
-const ROLE_OWNER = 1;
-const ROLE_ADMIN = 2;
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const ROLE_CACHE_TTL_SECONDS = 60;
 
@@ -85,8 +85,6 @@ const getRoleType = async (companyId, uid) => {
         return null;
     }
 };
-
-const isPrivileged = (roleType) => roleType === ROLE_OWNER || roleType === ROLE_ADMIN;
 
 /** Arrange the flat RULES array into the nested object the frontend uses. */
 const arrangeRules = (rawRules) => {
@@ -275,8 +273,10 @@ const invalidateRoleCache = (companyId, uid) => {
 };
 
 module.exports = {
+    ROLE_GUEST,
     ROLE_OWNER,
     ROLE_ADMIN,
+    ROLE_MEMBER,
     getRoleType,
     isPrivileged,
     arrangeRules,

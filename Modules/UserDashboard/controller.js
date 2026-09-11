@@ -17,6 +17,7 @@ const {
     applyTaskMatch,
     projectScopeClause,
 } = require("./helpers/resourceHelpers");
+const { ROLE_GUEST, isPrivileged } = require('../../Config/roleTypes');
 
 // Parse a client-built advanced-filter match from the request body.
 function bodyTaskMatch(body) {
@@ -37,8 +38,8 @@ function projectStatusMeta(p) {
 // getEmployeeWorkloadReport: roleType 1/2 → all users (null = no
 // restriction); everyone else → only themselves.
 function resolveVisibleUserIds(payload = {}) {
-    const roleType = Number(payload.callerRoleType || 3);
-    if (roleType === 1 || roleType === 2) return null;
+    const roleType = Number(payload.callerRoleType ?? ROLE_GUEST);
+    if (isPrivileged(roleType)) return null;
     const self = String(payload.callerUserId || "");
     return self ? [self] : [];
 }
@@ -47,22 +48,23 @@ function resolveVisibleUserIds(payload = {}) {
 // from the request body. These routes are JWT-protected (req.uid is the
 // verified user; the companyid header is checked against the token audience),
 // but roleType isn't in the token — so look it up in company_users. Fails
-// closed to the most-restricted role (3) when absent, so a forged
+// closed to the guest role, the most restricted, when absent, so a forged
 // callerRoleType in the body can never widen the visibility scope.
 async function resolveCallerRoleType(companyId, uid) {
-    if (!uid) return 3;
+    if (!uid) return ROLE_GUEST;
     try {
         const row = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [{ userId: String(uid), isDelete: { $ne: true } }, { roleType: 1 }],
         }, "findOne");
-        const rt = Number(row && row.roleType);
-        return Number.isFinite(rt) && rt > 0 ? rt : 3;
+        const rt = row ? Number(row.roleType) : NaN;
+        return Number.isInteger(rt) && rt >= ROLE_GUEST ? rt : ROLE_GUEST;
     } catch (e) {
         logger.error(`resolveCallerRoleType error (company=${companyId}, uid=${uid}): ${e.message || e}`);
-        return 3;
+        return ROLE_GUEST;
     }
 }
+exports.resolveCallerRoleType = resolveCallerRoleType;
 
 // SECURITY: project-level visibility for the company-wide project cards. Mirrors
 // the project-list scoping (Modules/Project/controller/getProjectFilterData.js):
@@ -83,7 +85,7 @@ async function resolveVisibleProjectFilter(companyId, uid) {
             fetchRules(companyId).catch(() => []),
             resolveCallerRoleType(companyId, uid),
         ]);
-        if (roleType === 1 || roleType === 2) return null; // admin/owner → all projects
+        if (isPrivileged(roleType)) return null; // admin/owner → all projects
         const teamIds = (teams || []).map((t) => "tId_" + t._id);
         const member = { $in: [String(uid), ...teamIds] };
         const rule = Array.isArray(rules) ? rules.find((x) => x && x.key === "public_projects") : null;
@@ -140,7 +142,7 @@ exports.getDashboard = async (req, res) => {
             // "management" template, everyone else the "member" template. Falls
             // back to the isDefault template when no audience match exists.
             const ownerRoleType = await resolveCallerRoleType(req.headers['companyid'], id);
-            const wantedAudience = (ownerRoleType === 1 || ownerRoleType === 2) ? 'management' : 'member';
+            const wantedAudience = isPrivileged(ownerRoleType) ? 'management' : 'member';
             const defaultDashboard =
                 lanData.find(e => !e.isDeleted && e.audience === wantedAudience)
                 || lanData.find(e => e.isDefault && !e.isDeleted);
@@ -336,7 +338,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
             overloadCapacityMinutesPerDay: Number(payload.overloadCapacityMinutesPerDay) || null,
             // No per-employee task limit — return all relevant tasks.
             callerUserId: String(payload.callerUserId || ""),
-            callerRoleType: Number(payload.callerRoleType || 3),
+            callerRoleType: Number(payload.callerRoleType ?? ROLE_GUEST),
         };
 
         // ─── Role-based visibility — narrow the employee pool first ──
@@ -347,7 +349,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
         // non-admins (roleType not in [1, 2]) are restricted to
         // themselves. null = no restriction.
         let visibleUserIds = null;
-        if (cfg.callerRoleType === 1 || cfg.callerRoleType === 2) {
+        if (isPrivileged(cfg.callerRoleType)) {
             // Admin / Owner / Manager tier — no user-level restriction.
             visibleUserIds = null;
         } else {
@@ -921,7 +923,7 @@ exports.getMilestoneSummary = async (req, res) => {
         // Owner/Admin only — resolve the caller's real role from the DB
         // (never from the body). Non-management callers get an empty payload.
         const callerRoleType = await resolveCallerRoleType(companyId, req.uid);
-        if (!(callerRoleType === 1 || callerRoleType === 2)) {
+        if (!isPrivileged(callerRoleType)) {
             return res.status(200).json({ status: true, data: { ...emptyData, restricted: true } });
         }
 
@@ -1446,8 +1448,8 @@ exports.getProjectProgressMetric = async (req, res) => {
 
         // Role-based visibility — non-admins are scoped to their own logs.
         const callerUserId = String(payload.callerUserId || "");
-        const callerRoleType = Number(payload.callerRoleType || 3);
-        const restrictToSelf = !(callerRoleType === 1 || callerRoleType === 2);
+        const callerRoleType = Number(payload.callerRoleType ?? ROLE_GUEST);
+        const restrictToSelf = !isPrivileged(callerRoleType);
         const userScope = () => (restrictToSelf && callerUserId ? { Loggeduser: callerUserId } : {});
         const objIds = (arr) => [...new Set((arr || []).filter(Boolean).map(String))]
             .filter((id) => mongoose.Types.ObjectId.isValid(id))
@@ -2454,7 +2456,7 @@ exports.getTasksByStatus = async (req, res) => {
         const { dateFrom, dateTo, fromSec, toSec } = getDayOrRangeBounds(body);
 
         const callerRoleType = await resolveCallerRoleType(companyId, uid);
-        const isManagement = callerRoleType === 1 || callerRoleType === 2;
+        const isManagement = isPrivileged(callerRoleType);
 
         // Which statuses the card is showing. Empty means every status, so a freshly
         // added card is useful before anyone opens its settings.

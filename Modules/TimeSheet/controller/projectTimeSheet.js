@@ -1,6 +1,7 @@
 
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
+const { isPrivileged } = require('../../../Config/roleTypes');
 
 
 exports.getProjectTimeSheet = async(req,res) => {
@@ -26,7 +27,7 @@ exports.getProjectTimeSheet = async(req,res) => {
                     $lte: endNumber/1000
                 }
             }];
-            if (filterProjectIds.length === 0 && (companyUserDetail.roleType === 1 || companyUserDetail.roleType === 2)) {
+            if (filterProjectIds.length === 0 && isPrivileged(companyUserDetail.roleType)) {
                 timeQuery = [{
                     LogStartTime: {
                         $gte: startNumber/1000,
@@ -47,7 +48,7 @@ exports.getProjectTimeSheet = async(req,res) => {
                         $lte: endNumber/1000
                     }
                 }];
-                if (filterProjectIds.length === 0 && (companyUserDetail.roleType === 1 || companyUserDetail.roleType === 2)) {
+                if (filterProjectIds.length === 0 && isPrivileged(companyUserDetail.roleType)) {
                     timeQuery = [{
                         Loggeduser: {
                             $in: filterUserIds

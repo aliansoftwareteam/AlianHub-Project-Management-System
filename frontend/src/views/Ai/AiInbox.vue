@@ -124,6 +124,7 @@ import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import { useAgents, reasonOf } from "./useAgents";
 import { DECLINE_REASONS } from "./episodeText";
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 defineOptions({ name: "AiInboxPage" });
 
@@ -153,7 +154,7 @@ const pickReason = (key) => {
 };
 const declineReasonValue = computed(() => declineReason.value || declineNote.value.slice(0, 200));
 
-const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
+const privileged = computed(() => isOwnerOrAdmin(Number(getters["settings/companyUserDetail"]?.roleType)));
 const canDecide = computed(() => !selected.value || selected.value.gate !== GATE_OWNER_ADMIN || privileged.value);
 
 const tabs = computed(() => [

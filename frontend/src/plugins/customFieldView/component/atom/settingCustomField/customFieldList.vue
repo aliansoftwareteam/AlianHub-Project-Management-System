@@ -177,6 +177,7 @@
     import { useI18n } from "vue-i18n";
     import { useToast } from 'vue-toast-notification';
     import { ref, watch,computed,onMounted } from 'vue';
+    import { isOwnerOrAdmin } from "@/utils/roles";
 
     const { t } = useI18n();
 
@@ -238,7 +239,7 @@
                     let publicQuery = {
                         isPrivateSpace:false
                     }
-                    if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2 && !getters["settings/rules"].toggle.showAllProjects) {
+                    if(!isOwnerOrAdmin(companyUserDetail.value.roleType) && !getters["settings/rules"].toggle.showAllProjects) {
                         publicQuery.AssigneeUserId = {
                             $in:[uid]
                         }
@@ -249,7 +250,7 @@
                     let privateQuery = {
                         isPrivateSpace:true
                     }
-                    if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
+                    if(!isOwnerOrAdmin(companyUserDetail.value.roleType)) {
                         privateQuery.AssigneeUserId = {
                             $in:[uid]
                         }

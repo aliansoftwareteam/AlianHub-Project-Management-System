@@ -50,6 +50,7 @@ import * as env from '@/config/env';
 import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
 import { resolveIsoRange, formatMinutes } from '@/composable/useResourceWorkload';
 import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
+import { ROLE_GUEST } from "@/utils/roles";
 
 // Resource Utilization card #4 — the "Live Work Table". Reuses the
 // employee-workload resolver in `currentOnly` mode (employees with a tracker
@@ -86,7 +87,7 @@ const load = async () => {
             dateTo,
             currentOnly: true,
             callerUserId: userId && userId.value ? String(userId.value) : '',
-            callerRoleType: props.companyUserDetail?.roleType || 3,
+            callerRoleType: props.companyUserDetail?.roleType ?? ROLE_GUEST,
             // Advanced "Add filter" builder → task-field match (buildFilterQuery).
             taskMatch: (() => {
                 const fd = Array.isArray(props.filterData) ? props.filterData : Object.values(props.filterData || {});

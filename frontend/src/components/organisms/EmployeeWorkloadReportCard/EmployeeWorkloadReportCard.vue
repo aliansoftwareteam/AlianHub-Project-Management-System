@@ -230,6 +230,7 @@ import { teamIdToUserId } from '@/composable/commonFunction';
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import TaskDetail from '@/views/TaskDetail/TaskDetail.vue';
+import { ROLE_GUEST } from "@/utils/roles";
 const subTaskIcon = require('@/assets/images/svg/sub_task_image.svg');
 
 const props = defineProps({
@@ -521,7 +522,7 @@ async function fetchReport() {
             // running tracker right now (who's working on what live).
             currentOnly: timerange.value === CURRENT_TIMERANGE_ID,
             callerUserId: userId && userId.value ? String(userId.value) : '',
-            callerRoleType: props.companyUserDetail?.roleType || 3,
+            callerRoleType: props.companyUserDetail?.roleType ?? ROLE_GUEST,
         };
         const response = await apiRequest('post', '/api/v1/dashboard/employee-workload', payload);
         if (response && response.data && response.data.status) {

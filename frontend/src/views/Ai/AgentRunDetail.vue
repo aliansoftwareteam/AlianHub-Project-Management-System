@@ -91,6 +91,7 @@ import { useToast } from "vue-toast-notification";
 import { useAgents, revertControlState, undoDeadlineOf, pinnedRevisionOf } from "./useAgents";
 import { normaliseEpisode, declinedLine as declinedText } from "./episodeText";
 import AgentRunReplay from "./AgentRunReplay.vue";
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 defineOptions({ name: "AgentRunDetail" });
 
@@ -118,7 +119,7 @@ const skillIdentity = computed(() => {
     return s.hash ? t("Ai.run_skill_identity", { key: s.key, hash: s.hash }) : t("Ai.run_skill_identity_nohash", { key: s.key });
 });
 
-const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
+const privileged = computed(() => isOwnerOrAdmin(Number(getters["settings/companyUserDetail"]?.roleType)));
 const decisions = computed(() => (Array.isArray(run.value?.decisions) ? run.value.decisions : []));
 const deadline = computed(() => undoDeadlineOf(run.value));
 const windowOpen = computed(() => !deadline.value || new Date(deadline.value).getTime() > Date.now());

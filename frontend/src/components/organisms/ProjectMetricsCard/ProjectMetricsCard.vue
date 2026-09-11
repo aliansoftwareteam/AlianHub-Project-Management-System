@@ -49,6 +49,7 @@ import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ProjectListModal from '@/components/molecules/ProjectListModal/ProjectListModal.vue';
+import { ROLE_GUEST } from "@/utils/roles";
 
 // AHE-3789 — company-wide project-progress cards. Both fetch a server-side,
 // companyId-scoped count from POST /dashboard/project-metrics, so the totals
@@ -100,7 +101,7 @@ const userIdRef = inject('$userId', ref(''));
 const basePayload = () => ({
     metric: cfg.value.metric,
     callerUserId: (userIdRef && userIdRef.value) || '',
-    callerRoleType: Number(props.companyUserDetail && props.companyUserDetail.roleType) || 3,
+    callerRoleType: Number(props.companyUserDetail?.roleType ?? ROLE_GUEST),
 });
 const load = async () => {
     loading.value = true;

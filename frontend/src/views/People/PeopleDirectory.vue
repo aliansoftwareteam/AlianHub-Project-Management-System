@@ -158,6 +158,7 @@ import { useCustomComposable } from "@/composable";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { memberData } from "@/views/Settings/Members/helperMember.js";
+import { ROLE_GUEST, isOwnerOrAdmin } from "@/utils/roles";
 
 defineOptions({ name: "PeopleDirectory" });
 
@@ -171,8 +172,6 @@ const userId = inject("$userId");
 
 const HOURS_PER_DAY = 8;
 const WINDOW_DAYS = 14;
-const OWNER_ROLE = 1;
-const ADMIN_ROLE = 2;
 const MAX_DEPTH = 6;
 
 const search = ref("");
@@ -222,7 +221,7 @@ function roleName(key) {
 
 // Guests are deliberately absent, as are pending invites and removed people.
 const people = computed(() => listing.value
-    .filter((u) => u.status === 2 && !u.isDelete && u.roleType !== 0 && !u.ghostUser)
+    .filter((u) => u.status === 2 && !u.isDelete && u.roleType !== ROLE_GUEST && !u.ghostUser)
     .map((u) => {
         const id = String(u.userId || "");
         const pto = ptoByUser.value[id];
@@ -275,7 +274,7 @@ const myRoleType = computed(() => {
     const me = listing.value.find((u) => String(u.userId || "") === String(userId.value || ""));
     return me ? Number(me.roleType) : null;
 });
-const canEditManager = computed(() => myRoleType.value === OWNER_ROLE || myRoleType.value === ADMIN_ROLE);
+const canEditManager = computed(() => isOwnerOrAdmin(myRoleType.value));
 
 // A manager cannot be someone already below the person, or the person themselves.
 const managerOptions = computed(() => {

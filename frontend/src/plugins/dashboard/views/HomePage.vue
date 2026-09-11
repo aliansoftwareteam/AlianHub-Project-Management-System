@@ -237,6 +237,7 @@
     import { useCustomComposable } from '@/composable';
     import { onBeforeRouteLeave } from 'vue-router';
     import { abortAllRequests } from "@/services";
+    import { isOwnerOrAdmin } from "@/utils/roles";
 
     const { t } = useI18n();
     const $toast = useToast();
@@ -248,7 +249,7 @@
     const companyUserDetail = computed(() => getters["settings/companyUserDetail"]);
     const projectsGetter = computed(() => {
         const projects = getters["projectData/onlyActiveProjects"];
-        if ([1, 2].includes(companyUserDetail.value?.roleType) === false) {
+        if (isOwnerOrAdmin(companyUserDetail.value?.roleType) === false) {
             return projects?.data?.filter((e) => e._id !== '6571e7195470e64b1203295c') || [];
         }
         return projects?.data || [];
@@ -324,7 +325,7 @@
     // Owner/Admin (roleType 1/2). Hidden from the "Add card" catalog AND from
     // an already-saved layout for anyone below that.
     const MANAGEMENT_ONLY_CARDS = ['MilestoneReportCard', 'ActiveProjectsCard', 'ProjectsByTypeCard', 'RunningProjectsCard'];
-    const isManagementUser = () => [1, 2].includes(companyUserDetail.value?.roleType);
+    const isManagementUser = () => isOwnerOrAdmin(companyUserDetail.value?.roleType);
 
     const getUserDashboard = async() => {
         try {
