@@ -5,6 +5,7 @@ const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const logger = require('../../Config/loggerConfig');
 const registry = require('./registry');
 const runs = require('./runs');
+const { TYPE_LIST: PROVIDER_ERROR_TYPES } = require('../AICore/providerError');
 const proposals = require('./proposals');
 const accounts = require('./accounts');
 const actions = require('./actions');
@@ -324,12 +325,13 @@ exports.spend = async (req, res) => {
     } catch (e) { logger.error(`spend: ${e.message}`); return fail(res, e.message); }
 };
 
-/* GET /api/v2/agents/runs?status=open|running|…&projectId=&agentId=&taskId=&limit= */
+/* GET /api/v2/agents/runs?status=open|running|…&projectId=&agentId=&taskId=&errorType=&limit= */
 exports.listRuns = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
         const q = req.query || {};
+        if (q.errorType && !PROVIDER_ERROR_TYPES.includes(String(q.errorType))) return fail(res, `errorType must be one of: ${PROVIDER_ERROR_TYPES.join(', ')}.`, 400);
         const [rows, summary] = await Promise.all([runs.list(companyId, q), runs.summary(companyId, { projectId: q.projectId })]);
         return res.send({ status: true, data: rows || [], summary });
     } catch (e) { logger.error(`listRuns: ${e.message}`); return fail(res, e.message); }

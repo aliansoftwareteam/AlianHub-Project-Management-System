@@ -18,9 +18,52 @@ try {
 // ANTHROPIC_TIMEOUT_MS overrides the shared model timeout; the job lock is
 // derived from the same module, so raising it here raises the lock too.
 const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
+const { AIProviderError, TYPES, isProviderError, requestIdOf, retryAfterMsOf, vendorRaw, typeOfStatus, fromTransport, CONTEXT_LENGTH, QUOTA_MESSAGE } = require('../providerError');
 
-function isClaudeOpus(modelId) {
-    return typeof modelId === 'string' && modelId.toLowerCase().includes('opus');
+const PROVIDER = 'anthropic';
+
+/* The `error.type` values of the SDK's ErrorType (resources/shared.d.ts). */
+const VENDOR_TYPES = {
+    invalid_request_error: TYPES.INVALID_REQUEST,
+    authentication_error: TYPES.AUTH,
+    permission_error: TYPES.PERMISSION,
+    not_found_error: TYPES.NOT_FOUND,
+    rate_limit_error: TYPES.RATE_LIMIT,
+    billing_error: TYPES.QUOTA,
+    timeout_error: TYPES.TIMEOUT,
+    overloaded_error: TYPES.OVERLOADED,
+    api_error: TYPES.SERVER,
+};
+
+const sdkClass = (name) => (AnthropicSdk && typeof AnthropicSdk[name] === 'function' ? AnthropicSdk[name] : null);
+const isSdk = (err, name) => { const Cls = sdkClass(name); return Boolean(Cls && err instanceof Cls); };
+
+/* APIError carries { type: 'error', error: { type, message }, request_id } as `error`,
+ * with status undefined when the failure arrived as an SSE error event mid-stream. */
+function toProviderError(err, model = process.env.ANTHROPIC_MODEL || null) {
+    if (isProviderError(err)) return err;
+    if (isSdk(err, 'APIConnectionTimeoutError')) return new AIProviderError({ provider: PROVIDER, model, type: TYPES.TIMEOUT, code: 'timeout' });
+    if (isSdk(err, 'APIUserAbortError')) return new AIProviderError({ provider: PROVIDER, model, type: TYPES.UNKNOWN, code: 'aborted', message: 'Anthropic: request aborted' });
+    if (isSdk(err, 'APIConnectionError')) {
+        const typed = fromTransport(PROVIDER, model, err.cause || err);
+        return typed.type === TYPES.UNKNOWN ? new AIProviderError({ provider: PROVIDER, model, type: TYPES.NETWORK, code: 'connection_error' }) : typed;
+    }
+    const body = err && err.error;
+    const errorObject = body && body.error && typeof body.error === 'object' ? body.error : null;
+    const status = err && Number.isFinite(err.status) ? err.status : null;
+    if (!status && !errorObject) return fromTransport(PROVIDER, model, err);
+    const vendorType = (err.type) || (errorObject && errorObject.type) || null;
+    const message = String((errorObject && errorObject.message) || '');
+    let type = VENDOR_TYPES[vendorType] || typeOfStatus(status);
+    if (type === TYPES.INVALID_REQUEST && CONTEXT_LENGTH.test(message)) type = TYPES.CONTEXT_LENGTH;
+    else if ((type === TYPES.INVALID_REQUEST || type === TYPES.RATE_LIMIT) && QUOTA_MESSAGE.test(message)) type = TYPES.QUOTA;
+    return new AIProviderError({
+        provider: PROVIDER, model, status, type,
+        code: vendorType || (status ? `http_${status}` : null),
+        requestId: err.requestID || requestIdOf(err.headers, body),
+        retryAfterMs: retryAfterMsOf(err.headers),
+        raw: vendorRaw(errorObject),
+    });
 }
 
 const anthropicProvider = {
@@ -85,52 +128,7 @@ const anthropicProvider = {
             const stream = client.messages.stream(params);
             response = await stream.finalMessage();
         } catch (err) {
-            const httpStatus = err && err.status;
-            const detail = err && err.error && err.error.error && err.error.error.message;
-
-            // Map known HTTP status codes to friendly messages with error codes
-            // so the controller can respond with the right HTTP status.
-            if (httpStatus === 429) {
-                // Anthropic returns 429 for both rate limits AND credit balance
-                // issues. Sniff the detail message to decide which one. Credit
-                // issues need a different fix (add balance) than rate limits.
-                const isCreditIssue = typeof detail === 'string'
-                    && /credit|quota|billing|balance/i.test(detail);
-                if (isCreditIssue) {
-                    const e = new Error(
-                        'Your Anthropic account is out of credits. Please add balance to your Anthropic '
-                        + 'account (https://console.anthropic.com/settings/billing) and try again.',
-                    );
-                    e.code = 'LLM_QUOTA_EXCEEDED';
-                    throw e;
-                }
-                const e = new Error('The AI service is rate-limited (too many requests). Please wait about a minute and try again.');
-                e.code = 'LLM_RATE_LIMITED';
-                throw e;
-            }
-            if (httpStatus === 401 || httpStatus === 403) {
-                const e = new Error('Invalid or unauthorized Anthropic API key. Check your ANTHROPIC_API_KEY configuration.');
-                e.code = 'LLM_AUTH_FAILED';
-                throw e;
-            }
-            if (httpStatus === 503 || httpStatus === 502) {
-                const e = new Error('The AI service is temporarily unavailable. Please try again in a moment.');
-                e.code = 'LLM_UNAVAILABLE';
-                throw e;
-            }
-
-            // Generic fallback — surface Anthropic's own error message.
-            const message = detail || (err && err.message) || 'Anthropic request failed';
-            const wrapped = new Error(`Anthropic: ${message}`);
-            wrapped.cause = err;
-            wrapped.code = 'LLM_ERROR';
-            wrapped.status = httpStatus;
-            // Opus has a smaller default max_tokens budget than Sonnet; flag
-            // the most common config mistake so operators don't chase ghosts.
-            if (isClaudeOpus(process.env.ANTHROPIC_MODEL) && maxTokens > 4096) {
-                wrapped.hint = 'Claude Opus has a smaller default max_tokens. Try lowering LLM_MAX_TOKENS_PLAN to 4096.';
-            }
-            throw wrapped;
+            throw toProviderError(err);
         }
 
         let text = '';
@@ -156,5 +154,7 @@ const anthropicProvider = {
         };
     },
 };
+
+anthropicProvider.toProviderError = toProviderError;
 
 module.exports = anthropicProvider;

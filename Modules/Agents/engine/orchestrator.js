@@ -117,7 +117,7 @@ async function analyseGeneric(skill, { task, context, budget, spend, agent }) {
     if (asked.refused) return refused(skill, asked, started);
     const { raw: answer, model, degraded, usage } = asked;
     if (!answer && !context.fallback) {
-        return { status: 'failed', reason: degraded || 'the model returned nothing usable', skill: skill.slug, usage, model, durationMs: Date.now() - started };
+        return { status: 'failed', reason: degraded || 'the model returned nothing usable', error: asked.error || null, skill: skill.slug, usage, model, durationMs: Date.now() - started };
     }
     let raw = answer;
     let dropped = [];

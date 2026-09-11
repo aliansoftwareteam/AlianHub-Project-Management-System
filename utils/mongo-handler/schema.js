@@ -839,6 +839,8 @@ const schema = {
         notifyMe: { type: Boolean, default: false, required: false },
         outcome: { type: String, required: false },
         error: { type: String, required: false },
+        // { type, code, provider, model, status, requestId, groupKey, message } — only when a provider error failed the run
+        failure: { type: Object, required: false },
         // { skill, taskId, taskTitle, proposed, acted, approved, declined, declinedReason, reverted, spendUsd, at }
         episode: { type: Object, required: false },
         // LangGraph thread the run executes on (the run id); resumed by approve/decline

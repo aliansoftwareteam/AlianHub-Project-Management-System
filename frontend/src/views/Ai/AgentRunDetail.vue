@@ -16,6 +16,31 @@
             </div>
             <p v-if="run.status === 'waiting_approval'" class="ah-small run-detail__waiting" data-test="waiting">{{ $t('Ai.episode_waiting') }}</p>
 
+            <div v-if="failure" class="run-failure" data-test="failure">
+                <span class="ah-label">{{ $t('Ai.failure_title') }}</span>
+                <span class="ah-chip ah-chip--danger" data-test="failure-type">{{ $t(`Ai.failure_type_${failure.type}`) }}</span>
+                <dl class="run-failure__meta">
+                    <template v-if="failure.code">
+                        <dt>{{ $t('Ai.failure_code') }}</dt>
+                        <dd class="ah-mono" data-test="failure-code">{{ failure.code }}</dd>
+                    </template>
+                    <template v-if="failure.provider">
+                        <dt>{{ $t('Ai.failure_provider') }}</dt>
+                        <dd data-test="failure-provider">
+                            <span>{{ failure.provider }}</span>
+                            <span v-if="failure.model" class="ah-mono" data-test="failure-model">{{ failure.model }}</span>
+                        </dd>
+                    </template>
+                    <template v-if="failure.requestId">
+                        <dt>{{ $t('Ai.failure_request_id') }}</dt>
+                        <dd>
+                            <span class="ah-mono" data-test="failure-request-id">{{ failure.requestId }}</span>
+                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="copy-request-id" :title="$t('Ai.failure_copy_request_id')" :aria-label="$t('Ai.failure_copy_request_id')" @click="copyRequestId">{{ $t('Ai.failure_copy_request_id') }}</button>
+                        </dd>
+                    </template>
+                </dl>
+            </div>
+
             <div class="run-detail__pin" data-test="pinned-revision">
                 <span class="ah-label">{{ $t('Ai.run_pinned_title') }}</span>
                 <router-link v-if="pinnedN > 0" class="ah-chip ah-chip--brand run-detail__revision" :to="revisionLink" data-test="revision-link">{{ $t('Ai.run_revision', { n: pinnedN }) }}</router-link>
@@ -101,6 +126,22 @@ const unreached = computed(() => UNREACHED.includes(run.value?.status));
 const episode = computed(() => (unreached.value ? null : normaliseEpisode(run.value?.episode)));
 const declinedLine = computed(() => (episode.value ? declinedText(episode.value, t) : ""));
 
+const FAILURE_TYPES = ["rate_limit", "quota", "auth", "permission", "invalid_request", "context_length", "content_filter", "not_found", "overloaded", "server", "timeout", "network", "unknown"];
+const failure = computed(() => {
+    const f = run.value?.failure;
+    if (!f || typeof f !== "object") return null;
+    return { ...f, type: FAILURE_TYPES.includes(f.type) ? f.type : "unknown" };
+});
+
+const copyRequestId = async () => {
+    try {
+        await navigator.clipboard.writeText(failure.value.requestId);
+        $toast.success(t("Ai.failure_request_id_copied"), { position: "top-right" });
+    } catch (e) {
+        $toast.error(e.message, { position: "top-right" });
+    }
+};
+
 const when = (at) => (at ? new Date(at).toLocaleString() : "");
 const chip = (decision) => (decision === "act" ? "ah-chip--ok" : decision === "refuse" ? "ah-chip--danger" : "ah-chip--warn");
 
@@ -134,6 +175,10 @@ onMounted(load);
 <style>
 .run-detail { margin: 8px 0 4px 0; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 9px; background: var(--surface-2, transparent); }
 .run-detail__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.run-failure { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--hairline); }
+.run-failure__meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font: var(--text-small); }
+.run-failure__meta dt { color: var(--ink-2); }
+.run-failure__meta dd { margin: 0; color: var(--ink); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .run-detail__pin { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .run-detail__revision { text-decoration: none; }
 .run-episode { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--hairline); }

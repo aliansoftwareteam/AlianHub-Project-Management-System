@@ -11,6 +11,7 @@ const runs = require('../runs');
 const spendGuard = require('../spendGuard');
 const revisions = require('../revisions');
 const { FEATURES } = require('../../AICore/features');
+const { failureOf } = require('../../AICore/providerError');
 
 // The run engine as a LangGraph thread, one per run (thread_id = run id):
 //
@@ -55,6 +56,7 @@ const State = Annotation.Root({
     finalStatus: field(() => null),
     episode: field(() => null),
     abandoned: field(() => false),
+    failure: field(() => null),
 });
 
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
@@ -102,7 +104,10 @@ async function analyse(state, config) {
     const spendContext = { feature: FEATURES.AGENT_RUN, companyId, runId: String(run._id), userId: run.startedBy || null, account: run.viaAccount || 'workspace' };
     const result = state.result || await orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: { ...MODEL_BUDGET, guard }, spend: spendContext, companyId, agent });
     const spend = await runs.recordSpend(companyId, run, result.usage, result.model);
-    if (result.status !== 'success') return { result, spend, outcome: result.reason || null, finalStatus: statusAfter(result) };
+    if (result.status !== 'success') {
+        const { error, ...kept } = result;
+        return { result: kept, spend, outcome: result.reason || null, finalStatus: statusAfter(result), failure: failureOf(error) };
+    }
     const cap = Number(run.spendCapUsd) > 0 ? Number(run.spendCapUsd) : 0;
     if (cap && spend.usd >= cap) return { result, spend, outcome: `Run spend cap reached ($${spend.usd.toFixed(2)} of $${cap})`, finalStatus: STATUS.STOPPED };
     return { result, spend };
@@ -219,7 +224,7 @@ async function remember(state, config) {
     const episode = episodeOf(state);
     const saved = decision
         ? await runs.finish(companyId, run._id, { status: STATUS.DONE, outcome: decidedOutcome(decision), episode, onlyIf: STATUS.WAITING })
-        : await runs.finish(companyId, run._id, { status: state.finalStatus, outcome: state.outcome, episode, onlyIf: STATUS.RUNNING });
+        : await runs.finish(companyId, run._id, { status: state.finalStatus, outcome: state.outcome, failure: state.failure, episode, onlyIf: STATUS.RUNNING });
     if (!saved) return { abandoned: true };
     await quietly(run._id, 'episode not remembered', () => memory.recordEpisode({ companyId, projectId: String(run.projectId || task.ProjectID || ''), runId: String(run._id), patch: episode }));
     return { episode, outcome: saved.outcome || null, refusals: Number(saved.refusals || 0), finalStatus: saved.status };
@@ -292,7 +297,7 @@ const runGraph = async ({ companyId, run, agent, task, deps }) => {
         logger.error(`${LOG_PREFIX} ${run._id}: ${e.message}`);
         const row = (await quietly(run._id, 'run row unavailable', () => runs.get(companyId, run._id))) || plain(run);
         const episode = episodeFromRow(row, task, e.message);
-        const saved = await runs.finish(companyId, run._id, { status: STATUS.FAILED, error: e.message, episode, onlyIf: STATUS.RUNNING });
+        const saved = await runs.finish(companyId, run._id, { status: STATUS.FAILED, error: e.message, failure: failureOf(e), episode, onlyIf: STATUS.RUNNING });
         if (!saved) return ABANDONED;
         await quietly(run._id, 'episode not remembered', () => memory.recordEpisode({ companyId, projectId: String(row.projectId || task.ProjectID || ''), runId: String(run._id), patch: episode }));
         return { status: STATUS.FAILED, error: e.message };
