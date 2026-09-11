@@ -33,9 +33,7 @@ describe('projects', () => {
         expect(res.body.map((project) => project._id)).toContain(state.projects.shared._id);
     });
 
-    // Known gap: PUT /api/v1/project/:id checks no project membership for a web session,
-    // so today the member's edit lands. Flip to it() once the route enforces it.
-    it.failing('refuses a member editing a project they are not in', async () => {
+    it('refuses a member editing a project they are not in', async () => {
         const owner = await loginAs('owner');
         const member = await loginAs('member');
         const project = await createProject(owner.api, { assigneeIds: [owner.uid], createdBy: owner.uid, isPrivate: true });

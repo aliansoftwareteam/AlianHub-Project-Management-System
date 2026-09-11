@@ -1,5 +1,6 @@
 require('./Config/telemetry').boot();
 require('./Config/processGuards').install();
+require('./Config/buildInfo').start();
 const express = require("express");
 const fs = require("fs");
 var cors = require('cors');

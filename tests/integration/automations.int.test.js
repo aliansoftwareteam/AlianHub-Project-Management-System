@@ -9,10 +9,10 @@ const anonymous = createApiClient({ baseURL: state.baseURL });
 const anonymousWithCompany = createApiClient({ baseURL: state.baseURL, companyId: state.companyId });
 const OTHER_COMPANY = '0123456789abcdef01234567';
 const MISSING_ID = '0123456789abcdef01234567';
+const FINISHED_RUN = ['success', 'failed', 'stopped'];
 
 const refused = (res) => res.status >= 400 || (res.body && res.body.status === false);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const FINISHED_RUN = ['success', 'failed', 'stopped'];
 
 async function waitFor(check, { timeout = 10000, interval = 250 } = {}) {
     const deadline = Date.now() + timeout;
