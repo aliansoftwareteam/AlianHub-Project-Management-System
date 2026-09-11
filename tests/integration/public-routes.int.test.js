@@ -179,18 +179,34 @@ describe('invitations', () => {
 });
 
 describe('verification email', () => {
+    const password = 'Str0ng!pass';
     const newAccount = async () => {
         const email = `verify-${uniqueSuffix()}@e2e.alianhub.test`;
-        const created = await anonymous.post('/api/v2/createUser', { firstName: 'Verify', lastName: 'Me', email, password: 'Str0ng!pass' });
+        const created = await anonymous.post('/api/v2/createUser', { firstName: 'Verify', lastName: 'Me', email, password });
         expect(created.body.status).toBe(true);
-        return String(created.body.statusText._id);
+        return { email, uid: String(created.body.statusText._id) };
     };
 
-    it('resends to the account address without taking one from the request', async () => {
-        const uid = await newAccount();
-        const res = await anonymous.post('/api/v2/sendVerificationEmail', { uid });
+    // The harness points mail at a closed port, so a resend the server accepts fails at delivery, after every refusal check.
+    const expectDeliveryAttempted = (res) => {
         expect(res.status).toBe(200);
-        expect(res.body.statusText).not.toBe('email is required.');
+        expect(res.body.statusText).toMatch(/ECONNREFUSED/);
+    };
+
+    it('resends with only the account id the login screen gets from an unverified login', async () => {
+        const { email, uid } = await newAccount();
+        const login = await anonymous.post('/api/v2/auth/login', { email, password, isLoginType: 'frontend' });
+        expect(login.status).toBe(400);
+        expect(login.body.isEmailVerified).toBe(false);
+        expect(String(login.body.userData._id)).toBe(uid);
+        expectDeliveryAttempted(await anonymous.post('/api/v2/sendVerificationEmail', { uid: login.body.userData._id }));
+    });
+
+    it('resends with only the account id the verify-email screen reads from the link', async () => {
+        const { uid } = await newAccount();
+        const verify = await anonymous.post('/api/v2/verifyEmail', { uid, token: 'f'.repeat(64) });
+        expect(verify.body.showResendVerification).toBe(true);
+        expectDeliveryAttempted(await anonymous.post('/api/v2/sendVerificationEmail', { uid }));
     });
 
     it('refuses an account id that does not exist', async () => {

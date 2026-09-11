@@ -96,7 +96,7 @@ const resend = async () => {
     busy.value = true;
     resendError.value = "";
     try {
-        const result = await axios.post(env.API_URI + env.SEND_VARIFICATION_EMAIL, { uid: route.params.id, email: email.value });
+        const result = await axios.post(env.API_URI + env.SEND_VARIFICATION_EMAIL, { uid: route.params.id });
         if (result.data.status === true) stage.value = "resent";
         else resendError.value = result.data.statusText || t("Auth.server_error");
     } catch {
