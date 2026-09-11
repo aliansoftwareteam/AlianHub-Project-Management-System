@@ -1,5 +1,5 @@
 const { createApiClient } = require('../../e2e/support/api');
-const { createProject, createTask, listSprints, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
+const { createProject, createTask, firstSprint, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 
 const state = readState();
 const anon = createApiClient({ baseURL: state.baseURL });
@@ -117,7 +117,7 @@ describe('projects and planning — refusals that hold', () => {
     it('rejects an unknown sprint patch type', async () => {
         const owner = await loginAs('owner');
         const project = await createProject(owner.api, { assigneeIds: [owner.uid], createdBy: owner.uid });
-        const [sprint] = await listSprints(owner.api, project._id);
+        const sprint = await firstSprint(owner.api, project._id);
         const res = await owner.api.patch(`/api/v1/sprint/${sprint._id}`, { type: 'constructor', companyId: owner.companyId });
         expect(res.status).toBe(400);
         expect(res.body.status).toBe(false);
