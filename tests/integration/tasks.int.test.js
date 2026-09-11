@@ -142,7 +142,7 @@ describe('tasks & collaboration — confirmed findings (regressions)', () => {
     });
 
     // TSK-02
-    it.failing('TSK-02: refuses an arbitrary Mongoose operation key on PUT /api/v1/task', async () => {
+    it('TSK-02: refuses an arbitrary Mongoose operation key on PUT /api/v1/task', async () => {
         const member = await loginAs('member');
         const res = await member.api.put('/api/v1/task', {
             firstParameter: {}, secondParameter: { _id: 1 }, key: 'estimatedDocumentCount', isConvertFirstParameter: false,
@@ -151,7 +151,7 @@ describe('tasks & collaboration — confirmed findings (regressions)', () => {
     });
 
     // TSK-04
-    it.failing('TSK-04: requires auth for POST /api/v1/getTaskTypeImage', async () => {
+    it('TSK-04: requires auth for POST /api/v1/getTaskTypeImage', async () => {
         const res = await anon.post('/api/v1/getTaskTypeImage', { companyId: state.companyId, path: 'setting/task_type/task.png' });
         expect(res.status).toBe(401);
     });

@@ -343,7 +343,7 @@ describe('AI features', () => {
     });
 
     // The handler rewrites <repo>/.env, so the probe only runs where no .env exists (CI, a fresh worktree).
-    (fs.existsSync(path.join(ROOT, '.env')) ? it.skip : it.failing)('AUT-01 refuses an anonymous AI model update', async () => {
+    (fs.existsSync(path.join(ROOT, '.env')) ? it.skip : it)('AUT-01 refuses an anonymous AI model update', async () => {
         const res = await anonymous.post('/api/v1/updateAiModel', { key: 'E2E_PROBE', value: 'x' });
         expect(res.status).toBe(401);
     });
