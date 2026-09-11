@@ -7290,6 +7290,7 @@ export default {
         "import_success": "Dashboard imported successfully.",
         "import_success_dropped": "Dashboard imported ({n} unsupported cards skipped).",
         "import_merge_success": "{n} cards added to your dashboard.",
+        "dashboard_updated": "Dashboard updated successfully",
         "employee_workload_report_title": "Employee Workload & Activity Report",
         "employee_workload_report_description": "See who is working on what, with workload distribution, overdue flags, and learning vs actual breakdown.",
         "active_within_minutes": "Active within (minutes)",

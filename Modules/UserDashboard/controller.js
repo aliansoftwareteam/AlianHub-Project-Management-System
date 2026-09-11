@@ -114,6 +114,9 @@ exports.getDashboard = async (req, res) => {
         if (!id) {
             return res.status(400).json({ status: false, message: "'id' parameter is required." });
         }
+        if (String(id) !== String(req.uid || "")) {
+            return res.status(403).json({ status: false, message: "You can only open your own home dashboard." });
+        }
 
         const cacheKey = `dashboard_${id}`;
         const cachedDashboard = myCache.get(cacheKey);
@@ -202,54 +205,77 @@ exports.getCardComponent = async (req, res) => {
 };
 
 
+const LEGACY_DASHBOARD_OPS = ["addCard", "updateCard", "removeCard", "setCards"];
+
+const isPlainObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+function applyLegacyDashboardOp(cards, body) {
+    const refuse = (code, message) => ({ code, message });
+    const cardUid = String(body.cardUid || "");
+    switch (body.op) {
+    case "setCards":
+        if (!Array.isArray(body.cards)) return refuse(400, "'cards' must be an array.");
+        return { cards: sanitizeDashboardCards(body.cards) };
+    case "addCard": {
+        const [card] = sanitizeDashboardCards([body.card]);
+        if (!card) return refuse(400, "A card needs a componentId and a uid.");
+        if (cards.some((c) => String(c && c.uid) === card.uid)) return refuse(400, "A card with that uid is already on the dashboard.");
+        if (cards.length >= MAX_DASHBOARD_CARDS) return refuse(400, `A dashboard holds at most ${MAX_DASHBOARD_CARDS} cards.`);
+        return { cards: [...cards, card] };
+    }
+    case "updateCard": {
+        const index = cardUid ? cards.findIndex((c) => String(c && c.uid) === cardUid) : -1;
+        if (index < 0) return refuse(404, "Card not found on this dashboard.");
+        if (!isPlainObject(body.cardData)) return refuse(400, "'cardData' must be an object.");
+        if (body.filterData !== undefined && !Array.isArray(body.filterData)) return refuse(400, "'filterData' must be an array.");
+        const current = cards[index];
+        const config = { ...(current.config || {}), cardData: body.cardData };
+        if (body.filterData !== undefined) config.filterData = body.filterData;
+        return { cards: cards.map((c, i) => (i === index ? { ...current, config } : c)) };
+    }
+    case "removeCard":
+        if (!cardUid) return refuse(400, "'cardUid' is required.");
+        return { cards: cards.filter((c) => String(c && c.uid) !== cardUid) };
+    default:
+        return refuse(400, `'op' must be one of: ${LEGACY_DASHBOARD_OPS.join(", ")}.`);
+    }
+}
+
+// The home dashboard (per-user document keyed by userId + templateId). Only a
+// fixed set of card operations is accepted, always on the caller's own document.
 exports.updateDashboard = async (req, res) => {
     try {
-        const { queryObject, method, userId } = req.body;
-
-        if (!queryObject || !method) {
-            return res.status(400).json({
-                status: false, 
-                message: "'queryObject' and 'method' parameters are required." 
-            });
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        const body = req.body || {};
+        if (!companyId || !uid) {
+            return res.status(400).json({ status: false, message: "companyId header and an authenticated user are required." });
         }
+        if (!LEGACY_DASHBOARD_OPS.includes(body.op)) {
+            return res.status(400).json({ status: false, message: `'op' must be one of: ${LEGACY_DASHBOARD_OPS.join(", ")}.` });
+        }
+        const match = { userId: uid, isDeleted: { $ne: true } };
+        if (typeof body.templateId === "string" && body.templateId) match.templateId = body.templateId;
+        const doc = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.USERDASHBOARD, data: [match] }, "findOne");
+        if (!doc) return res.status(404).json({ status: false, message: "Dashboard not found." });
 
-        let updateQuery = {
+        const change = applyLegacyDashboardOp(Array.isArray(doc.cards) ? doc.cards : [], body);
+        if (!change.cards) return res.status(change.code).json({ status: false, message: change.message });
+
+        const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.USERDASHBOARD,
-            data: queryObject
-        };
-
-        MongoDbCrudOpration(req.headers['companyid'], updateQuery, method)
-            .then((result) => {
-                if (result) {
-                    if(userId) {
-                        const cacheKey = `dashboard_${userId}`;
-                        myCache.del(cacheKey);
-                    }
-                    return res.status(200).json({
-                        status: true,
-                        message: "Dashboard updated successfully.", 
-                        data: result 
-                    });
-                } else {
-                    return res.status(404).json({ status: false, message: "Dashboard not found." });
-                }
-            })
-            .catch((error) => {
-                logger.error(`Error while updating the user dashboard: ${error}`);
-                return res.status(400).json({ 
-                    status: false, 
-                    message: "Error while updating dashboard.", 
-                    error: error 
-                });
-            });
-
-    } catch (error) {
-        logger.error(`Error while updating the user dashboard: ${error}`);
-        return res.status(400).json({
-            status: false,
-            message: "An error occurred while updating the user dashboard.",
-            error
+            data: [{ _id: doc._id }, { $set: { cards: change.cards, updatedBy: uid, updatedAt: new Date() } }, { new: true, useFindAndModify: false }],
+        }, "findOneAndUpdate");
+        dropDashboardCaches(uid);
+        return res.status(200).json({
+            status: true,
+            statusText: "Dashboard updated.",
+            message: "Dashboard updated successfully.",
+            data: updated || { ...doc, cards: change.cards },
         });
+    } catch (error) {
+        logger.error(`updateDashboard error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while updating the user dashboard." });
     }
 };
 

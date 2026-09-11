@@ -501,31 +501,19 @@
             delete updateObject?.filter;
             filterData = filterData.filter((e) => e.comparisonsData.length > 0);
             if(isEditCard.value) {
-                let bodyData = {
-                    queryObject:[
-                        {
-                            userId: userId.value,
-                            templateId: currentLayout.value.templateId,
-                            "cards.uid": editCardId.value
-                        },
-                        {
-                            $set: { 
-                                "cards.$.config.cardData": updateObject,
-                                "cards.$.config.filterData": filterData
-                            }
-                        },
-                        { new: true, useFindAndModify: false }
-                    ],
-                    method:"findOneAndUpdate",
-                    userId: userId.value
-                }
-                const response = await apiRequest("post", `${env.DASHBOARD}`,bodyData);
+                const response = await apiRequest("post", `${env.DASHBOARD}`, {
+                    op: 'updateCard',
+                    templateId: currentLayout.value.templateId,
+                    cardUid: editCardId.value,
+                    cardData: updateObject || {},
+                    filterData,
+                });
                 if(response) {
                     let findIndex = layout.value.findIndex((e)=>e.i === editCardId.value);
                     if(findIndex > -1) {
                         layout.value[findIndex] = {...layout.value[findIndex],cardData:{...(layout.value[findIndex]?.cardData ?? {}),...updateObject},filterData: filterData};
                     }
-                    $toast.success("Dashboard Updated Successfully",{position: 'top-right'});
+                    $toast.success(t('dashboardCard.dashboard_updated'),{position: 'top-right'});
                     currentLayout.value = response.data?.data;
                     isShowModal.value = false;
                     fieldArray.value = {};
@@ -558,31 +546,17 @@
                     }
                 }
         
-                let bodyData = {
-                    queryObject:[
-                        {
-                            userId: userId.value,
-                            templateId: currentLayout.value.templateId,
-                        },
-                        {
-                            $push: {
-                                cards: {
-                                    ...object
-                                }
-                            }
-                        },
-                        { new: true, useFindAndModify: false }
-                    ],
-                    method:"findOneAndUpdate",
-                    userId: userId.value
-                }
-                const response = await apiRequest("post", `${env.DASHBOARD}`,bodyData);
+                const response = await apiRequest("post", `${env.DASHBOARD}`, {
+                    op: 'addCard',
+                    templateId: currentLayout.value.templateId,
+                    card: object,
+                });
                 if(response) {
                     currentLayout.value = response.data?.data;
                     layout.value.push({...posi,i:makeUid,componentId:fieldArray.value.key, cardData: updateObject, filterData: filterData});
                     isShowModal.value = false;
                     fieldArray.value = {};
-                    $toast.success("Dashboard Updated Successfully",{position: 'top-right'});
+                    $toast.success(t('dashboardCard.dashboard_updated'),{position: 'top-right'});
                     scrollToCard(makeUid);
                 }
             }
@@ -613,23 +587,11 @@
     }
     const updatePosition = async(card) => {
         try {
-            let bodyData = {
-                queryObject:[
-                    {
-                        userId: userId.value,
-                        templateId: currentLayout.value.templateId
-                    },
-                    {
-                        $set: {
-                            cards: card
-                        }
-                    },
-                    { new: true, useFindAndModify: false }
-                ],
-                method:"findOneAndUpdate",
-                userId: userId.value
-            }
-            const response = await apiRequest("post", `${env.DASHBOARD}`,bodyData);
+            const response = await apiRequest("post", `${env.DASHBOARD}`, {
+                op: 'setCards',
+                templateId: currentLayout.value.templateId,
+                cards: card,
+            });
             currentLayout.value = response.data?.data;
         } catch (error) {
             console.error(error)
@@ -673,26 +635,13 @@
         let cardIndex = layout.value.findIndex((e) => e.i == cardId);
         layout.value.splice(cardIndex, 1);
         try {
-            let bodyData = {
-                queryObject:[
-                    {
-                        userId: userId.value,
-                        templateId: currentLayout.value.templateId,
-                        "cards.uid": cardId
-                    },
-                    {
-                        $pull: {
-                            cards: { uid: cardId }
-                        }
-                    },
-                    { new: true, useFindAndModify: false }
-                ],
-                method:"findOneAndUpdate",
-                userId: userId.value
-            }
-            const response = await apiRequest("post", `${env.DASHBOARD}`,bodyData);
-            $toast.success("Dashboard Updated Successfully",{position: 'top-right'});
-            currentLayout.value = response.data;
+            const response = await apiRequest("post", `${env.DASHBOARD}`, {
+                op: 'removeCard',
+                templateId: currentLayout.value.templateId,
+                cardUid: cardId,
+            });
+            $toast.success(t('dashboardCard.dashboard_updated'),{position: 'top-right'});
+            currentLayout.value = response.data?.data;
         } catch (error) {
             console.error(error)
         }
@@ -815,30 +764,18 @@
     };
     const handleUpdateFromCard = async(data) => {
         let {id:editCardId,updateObject} = data;
-        let bodyData = {
-            queryObject:[
-                {
-                    userId: userId.value,
-                    templateId: currentLayout.value.templateId,
-                    "cards.uid": editCardId
-                },
-                {
-                    $set: { 
-                        "cards.$.config.cardData": updateObject
-                    }
-                },
-                { new: true, useFindAndModify: false }
-            ],
-            method:"findOneAndUpdate",
-            userId: userId.value
-        }
-        const response = await apiRequest("post", `${env.DASHBOARD}`,bodyData);
+        const response = await apiRequest("post", `${env.DASHBOARD}`, {
+            op: 'updateCard',
+            templateId: currentLayout.value.templateId,
+            cardUid: editCardId,
+            cardData: updateObject || {},
+        });
         if(response) {
             let findIndex = layout.value.findIndex((e)=>e.i === editCardId)
             if(findIndex > -1) {
                 layout.value[findIndex] = {...layout.value[findIndex],cardData:{...(layout.value[findIndex]?.cardData ?? {}),...updateObject}};
             }
-            $toast.success("Dashboard Updated Successfully",{position: 'top-right'});
+            $toast.success(t('dashboardCard.dashboard_updated'),{position: 'top-right'});
             currentLayout.value = response.data?.data;
         }
     }
@@ -928,13 +865,10 @@
         layout.value[idx] = { ...layout.value[idx], cardData: updateObject };
         try {
             await apiRequest('post', `${env.DASHBOARD}`, {
-                queryObject: [
-                    { userId: userId.value, templateId: currentLayout.value.templateId, 'cards.uid': item.i },
-                    { $set: { 'cards.$.config.cardData': updateObject } },
-                    { new: true, useFindAndModify: false },
-                ],
-                method: 'findOneAndUpdate',
-                userId: userId.value,
+                op: 'updateCard',
+                templateId: currentLayout.value.templateId,
+                cardUid: item.i,
+                cardData: updateObject,
             });
         } catch (e) {
             console.error('Failed to persist card period change', e);
@@ -944,8 +878,7 @@
     // ── Export / Import dashboard (gear menu in the Home header) ──────
     // File-based sharing: export the current cards + layout to a .json the
     // user can hand to a teammate, who imports it onto their OWN dashboard
-    // (replace, with confirmation). Reuses the existing updateDashboard
-    // passthrough — no backend change.
+    // (replace, with confirmation).
     const importFileInput = ref(null);
     const showImportConfirm = ref(false);
     const pendingImport = ref(null); // { cards, dropped }
@@ -1081,13 +1014,9 @@
         }
         try {
             const response = await apiRequest('post', `${env.DASHBOARD}`, {
-                queryObject: [
-                    { userId: userId.value, templateId: currentLayout.value.templateId },
-                    { $set: { cards } },
-                    { new: true, useFindAndModify: false },
-                ],
-                method: 'findOneAndUpdate',
-                userId: userId.value,
+                op: 'setCards',
+                templateId: currentLayout.value.templateId,
+                cards,
             });
             if (response) {
                 currentLayout.value = response.data?.data || currentLayout.value;
