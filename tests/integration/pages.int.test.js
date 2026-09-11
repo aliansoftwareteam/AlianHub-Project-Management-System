@@ -325,7 +325,7 @@ describe('pages findings (regressions)', () => {
         expect(subs.body.data.submissions[0].taskKey).toBeTruthy();
     });
 
-    it.failing('PAG-12: importSettingsNotification refuses a request without a token', async () => {
+    it('PAG-12: importSettingsNotification refuses a request without a token', async () => {
         const res = await anon.post('/api/v1/importSettingsNotification', { companyId: state.companyId, userId: '0123456789abcdef01234599' });
         expect(res.status).toBe(401);
     });
