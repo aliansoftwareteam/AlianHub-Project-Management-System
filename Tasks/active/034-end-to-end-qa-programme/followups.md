@@ -61,13 +61,15 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 33 | Settings → General logs `TypeError: Cannot read properties of undefined (reading 'isoCode')` in the test harness. | #634 |
 | 34 | Socket handshakes check only the JWT signature, not that the session is still live, so a logged-out access token can still open a socket until it expires. | #638 |
 | 35 | Auth cookies are readable by JavaScript (not `httpOnly`), tracked as P1-SEC-09. | #638 |
-| 36 | `/timesheet/timelog`, `/timesheet/logDetail`, `/timesheet/milestone` and `POST /api/v1/estimatedTime` still trust client filters or pipelines; #635 scoped the five main timesheet reads only. | #635 |
+| 36 | `/timesheet/timelog`, `/timesheet/logDetail`, `/timesheet/milestone` and `POST /api/v1/estimatedTime` still trust client filters or pipelines; #635 scoped the five main timesheet reads only. | #635; being fixed in #635 after review (critical: `estimatedTime` pipeline `$merge`) |
 | 37 | The `invoices` (subscription) collection has no company field and nothing in the repo writes it; `POST /api/v1/invoice/find` is limited to the instance owner until its producer is known. | #635 |
 | 38 | Profile images under `USER_PROFILES/` can be read by any signed-in user, including the credit-note PDFs stored in `USER_PROFILES/InvoiceAndCreditNotes/`. | #639 |
 | 39 | `PUT /api/v1/user` accepts any value for `Employee_profileImage`, so a user can point their profile at another user's image path. | #639 |
-| 40 | `Modules/LogTime/routes.js` uses the same upload storage without the early access check #639 added to `storage/uploadFile`. | #639 |
+| 40 | `Modules/LogTime/routes.js` uses the same upload storage without the early access check #639 added to `storage/uploadFile`. | #639; being fixed in #639 after review |
 | 41 | `POST /api/v2/generateToken` answers 400 with the raw `users` document (including `verificationToken`) when a refresh token belongs to an account that became unverified. | #644 |
 | 42 | `POST /api/v2/createUser` and the Google, GitHub and GitLab sign-up routes return the saved `users` document unfiltered to the registrant; no secret is in it today, but it should go through `toSelfView`. | #644 |
+| 43 | The tracker sign-in code from #638 is not bound to the tracker that asked for it (no PKCE or state): an app that claims the `myapp://` scheme can redeem an intercepted code, and a crafted link can sign a signed-out tracker into another account. | review of #638 |
+| 44 | No test proves the access-token session lookup is bound to the token's `uid`; removing the `userId` filter in `Config/jwt.js` leaves every suite green. | review of #638 |
 
 ## Owner decisions recorded
 
