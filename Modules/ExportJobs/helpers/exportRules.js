@@ -1,6 +1,7 @@
 // Export-job rules. Pure — no I/O — shared by controller, worker and tests.
 
 const { neutraliseFormula } = require('../../../utils/csvSafe');
+const { csvCell: csvEscape } = require('../../../utils/csv');
 
 const FORMATS = Object.freeze(['csv', 'xlsx']);
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
@@ -51,11 +52,6 @@ const taskToRow = (task) => {
         UpdatedAt: task.updatedAt ? new Date(task.updatedAt).toISOString() : '',
     };
     return Object.fromEntries(Object.entries(row).map(([key, value]) => [key, neutraliseFormula(value)]));
-};
-
-const csvEscape = (value) => {
-    const text = String(value === null || value === undefined ? '' : neutraliseFormula(value));
-    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
 const rowsToCsv = (rows) => {

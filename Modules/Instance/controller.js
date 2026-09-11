@@ -15,6 +15,7 @@ const { checkDb, withTimeout } = require('./health');
 const logs = require('./logsPath');
 const backups = require('./backups');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { csvCell: formulaSafeCell } = require('../../utils/csv');
 
 const PUBLIC_CONFIG_KEY = 'instance:public-config';
 const LATEST_RELEASE_KEY = 'instance:latest-release';
@@ -290,10 +291,7 @@ exports.companies = async (req, res) => {
     }
 };
 
-const csvCell = (value) => {
-    const text = String(value === null || value === undefined ? '' : value).replace(/<[^>]+>/g, '');
-    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-};
+const csvCell = (value) => formulaSafeCell(String(value === null || value === undefined ? '' : value).replace(/<[^>]+>/g, ''));
 
 exports.auditExport = async (req, res) => {
     try {
