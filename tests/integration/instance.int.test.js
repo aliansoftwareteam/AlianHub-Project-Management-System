@@ -386,7 +386,7 @@ describe('company settings reads', () => {
         expect(res.status).toBe(401);
     });
 
-    it.failing.each([
+    it.each([
         ['/api/v1/milestoneRange'],
         ['/api/v1/setting/skills'],
         [`/api/v1/notifications/${state.users.member.userId}`],
@@ -513,7 +513,7 @@ describe('company settings role enforcement', () => {
         expect(refused(res)).toBe(true);
     });
 
-    it.failing('INS-03 refuses an anonymous change to someone else notification settings', async () => {
+    it('INS-03 refuses an anonymous change to someone else notification settings', async () => {
         const user = await freshUser('member');
         const doc = (await user.api.get(`/api/v1/notifications/${user.userId}`)).body;
         const item = doc.chat.items[0];
@@ -525,12 +525,12 @@ describe('company settings role enforcement', () => {
         expect(after.chat.items[0].email).toBe(item.email);
     });
 
-    it.failing('INS-04 refuses an anonymous project skill write', async () => {
+    it('INS-04 refuses an anonymous project skill write', async () => {
         const res = await anonymousWithCompany.put('/api/v1/setting/skills', { operation: 'add', name: `QA Anonymous ${uniqueSuffix()}` });
         expect(res.status).toBe(401);
     });
 
-    it.failing('INS-11 refuses an anonymous version update flag', async () => {
+    it('INS-11 refuses an anonymous version update flag', async () => {
         const res = await anonymous.post('/api/v1/versionUpdateNotify', { flag: false });
         expect(res.status).toBe(401);
     });

@@ -46,10 +46,12 @@ Screens (from `frontend/src/router/settings/index.js`): 16 in the area — Insta
 
 | Severity | Count | Ids |
 |---|---|---|
-| Critical | 5 | INS-01, INS-02, INS-03, INS-04, INS-05 |
+| Critical | 5 | INS-01, INS-02, INS-03 (fixed), INS-04 (fixed), INS-05 |
 | High | 2 | INS-06, INS-07 |
-| Medium | 4 | INS-08, INS-09, INS-10, INS-11 |
+| Medium | 4 | INS-08, INS-09, INS-10, INS-11 (fixed) |
 | Low | 1 | INS-12 |
+
+INS-03, INS-04 and INS-11 were closed on `beta` by 2954eb91 ("guard the routes that answered without a session") while this sweep ran; their regression tests are now plain `it` and guard against a return.
 
 ### INS-01 — A member can promote themselves to owner through `PUT /api/v1/members`
 
@@ -76,6 +78,7 @@ Screens (from `frontend/src/router/settings/index.js`): 16 in the area — Insta
 
 ### INS-03 — Notification settings are readable and writable without a session
 
+- **Status:** fixed on `beta` by 2954eb91 (the prefixes now carry their leading slash). Whether a signed-in member can still change another user's settings through `PUT /api/v1/notifications` was not re-checked.
 - **Severity:** critical (authentication bypass)
 - **Role:** no session
 - **Requests:** `GET /api/v1/notifications/:userId` and `PUT /api/v1/notifications`, with only a `companyid` header.
@@ -90,6 +93,7 @@ Screens (from `frontend/src/router/settings/index.js`): 16 in the area — Insta
 
 ### INS-04 — Project skills can be changed without a session; milestone range readable without one
 
+- **Status:** fixed on `beta` by 2954eb91 (both prefixes added to `Config/setMiddleware.js`).
 - **Severity:** critical (authentication bypass on a company setting write)
 - **Role:** no session
 - **Requests:** `PUT /api/v1/setting/skills` `{ operation: 'add', name }`; `GET /api/v1/setting/skills`; `GET /api/v1/milestoneRange`; each with only a `companyid` header.
@@ -174,6 +178,7 @@ Screens (from `frontend/src/router/settings/index.js`): 16 in the area — Insta
 
 ### INS-11 — `POST /api/v1/versionUpdateNotify` works without a session
 
+- **Status:** fixed on `beta` by 2954eb91 (the route now requires the instance owner).
 - **Severity:** medium (unauthenticated write, limited to one flag)
 - **Role:** no session
 - **Request:** `POST /api/v1/versionUpdateNotify` `{ flag: true|false }`
