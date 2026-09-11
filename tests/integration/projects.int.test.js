@@ -180,11 +180,36 @@ describe('projects and planning — regressions (fail until the bug is fixed)', 
         await owner.api.delete(`/api/v1/project/filter/delete/${owner.companyId}/${filterId}`);
     });
 
-    it.failing('PRJ-06: get-remaining-projects with no dataIds is a clean 4xx, not a 500', async () => {
+    it('PRJ-06: get-remaining-projects with no dataIds is a clean 4xx, not a 500', async () => {
         const owner = await loginAs('owner');
         const res = await owner.api.post('/api/v1/get-remaining-projects', {});
         expect(res.status).toBeGreaterThanOrEqual(400);
         expect(res.status).toBeLessThan(500);
         expect(res.body.status).toBe(false);
+    });
+});
+
+describe('projects and planning — input errors (PRJ-06)', () => {
+    it('refuses a saved filter without a name with a 400 that leaks no schema detail', async () => {
+        const owner = await loginAs('owner');
+        const res = await owner.api.post('/api/v1/project/filter/create', { filter: 'projectFilter', typeFilter: 'projects' });
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual(expect.objectContaining({ status: false, field: 'name' }));
+        expect(JSON.stringify(res.body)).not.toMatch(/ValidatorError|validation failed|Path `/);
+    });
+
+    it('refuses a partial custom template with a 400 that leaks no schema field names', async () => {
+        const owner = await loginAs('owner');
+        const res = await owner.api.post('/api/v1/project/template/custom', { data: { TemplateName: `Partial ${uniqueSuffix()}` } });
+        expect(res.status).toBe(400);
+        expect(res.body.status).toBe(false);
+        expect(JSON.stringify(res.body)).not.toMatch(/ProjectCurrency|ProjectRequiredDefaultComponent|TemplateRequiredComponent|validation failed|Path `/);
+    });
+
+    it('refuses get-remaining-projects ids that are not project ids with a 400', async () => {
+        const owner = await loginAs('owner');
+        const res = await owner.api.post('/api/v1/get-remaining-projects', { dataIds: ['not-a-project-id'] });
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual(expect.objectContaining({ status: false, field: 'dataIds' }));
     });
 });
