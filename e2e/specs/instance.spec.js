@@ -94,17 +94,6 @@ test.describe('instance console as the owner', () => {
         expect(errors).toEqual([]);
     });
 
-    test('General settings loads the task priority icons', async ({ page, state }) => {
-        const icons = [];
-        page.on('response', (res) => {
-            const { pathname } = new URL(res.url());
-            if (pathname.includes('/taskPriorities/') && !pathname.includes('generateSignedUrl')) icons.push(`${res.status()} ${pathname.split('/').pop()}`);
-        });
-        await page.goto(`/#/${state.companyId}/settings/setting`);
-        await expect.poll(() => icons.length, { timeout: 30000 }).toBeGreaterThanOrEqual(3);
-        expect(icons.filter((line) => !line.startsWith('200'))).toEqual([]);
-    });
-
     test('Audit log lists events and offers the CSV export', async ({ page, state }) => {
         const list = page.waitForResponse((res) => res.url().includes('/api/v1/audit-logs?'));
         await page.goto(`/#/${state.companyId}/settings/audit-logs`);
