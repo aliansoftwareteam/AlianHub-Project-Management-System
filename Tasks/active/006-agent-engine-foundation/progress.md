@@ -9,12 +9,12 @@
 - [x] Toolbelt scoping on top of task 005's tool layer
 - [x] 5-phase orchestrator
 - [x] Verifier: evidence gate, dedup, volume cap (confidence floor not built — severity is used instead)
-- [ ] Budgets enforced pre-call + usage accounting
+- [x] Budgets enforced pre-call + usage accounting — done in 024 (#571, #572)
 - [x] `run_agent` action (synchronous, so `waitForResult` is implicit)
 - [ ] Review inbox + `AGENT_REVIEW_ITEMS`
 - [ ] Two-week trial on a real sprint — folds into 019 (evals)
 - [ ] Prompt-injection regression test on the agent run path
-- [ ] Evaluate `run.spendCapUsd` before the model call
+- [x] Evaluate `run.spendCapUsd` before the model call — done in 024 (#571)
 - [ ] Confidence floor in `verify()`
 
 ## Last step
