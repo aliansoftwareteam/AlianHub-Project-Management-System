@@ -177,14 +177,14 @@ describe('time — money endpoints are read-only and scoped', () => {
 describe('time — regressions for confirmed findings', () => {
     // TIM-01: /api/v2/timesheet-approval/* is in no auth middleware list, so an
     // unauthenticated caller can read any user's submission history by query params.
-    it.failing('TIM-01 refuses an unauthenticated read of a user\'s approvals', async () => {
+    it('TIM-01 refuses an unauthenticated read of a user\'s approvals', async () => {
         const res = await anon.get('/api/v2/timesheet-approval/mine', { query: { userId: state.users.member.userId, companyId: state.companyId } });
         expect(refused(res)).toBe(true);
     });
 
     // TIM-02: same missing middleware leaves req.uid empty, so an owner/admin is
     // refused the review queue — the whole approval workflow is unusable.
-    it.failing('TIM-02 lets an admin list the pending approval queue', async () => {
+    it('TIM-02 lets an admin list the pending approval queue', async () => {
         const admin = await loginAs('admin');
         const res = await admin.api.get('/api/v2/timesheet-approval/pending');
         expect(res.body.status).toBe(true);
@@ -192,7 +192,7 @@ describe('time — regressions for confirmed findings', () => {
 
     // TIM-03: tracker mutation routes are unauthenticated — a create with no token
     // should be rejected as unauthenticated (401), not reach the controller (400).
-    it.failing('TIM-03 refuses an unauthenticated tracker create', async () => {
+    it('TIM-03 refuses an unauthenticated tracker create', async () => {
         const res = await anon.post('/api/v1/tracker/create', {});
         expect(res.status).toBe(401);
     });
