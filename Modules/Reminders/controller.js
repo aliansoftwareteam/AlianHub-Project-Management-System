@@ -1,35 +1,57 @@
 // Personal reminders (COLLAB-03) — HTTP handlers. CRUD on a user's reminders
 // plus a manual run-due / run-now (the scheduled job in cron.js runs
-// production-only, so these let the firing path be exercised in dev). All
-// reminders are company-scoped (companyId from the request header), matching
-// Modules/RecurringTasks/controller.js.
+// production-only, so these let the firing path be exercised in dev).
 const mongoose = require('mongoose');
 const helper = require('./helper');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const logger = require('../../Config/loggerConfig');
 
-// Resolve the acting user id from the request (auth context first, then body).
-function resolveUserId(req) {
-    const b = req.body || {};
-    return (req.user && (req.user.id || req.user._id))
-        || req.headers['userid']
-        || b.userId
-        || (b.userData && b.userData.id)
-        || '';
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+const isObjectId = (value) => OBJECT_ID_PATTERN.test(String(value || ''));
+
+const fail = (res, code, statusText) => res.status(code).send({ status: false, statusText });
+
+// Only the author, the assignee, or a company owner/admin may touch a reminder.
+async function loadManageableReminder(req, res) {
+    const companyId = req.headers['companyid'];
+    const id = req.params.id;
+    if (!isObjectId(id)) {
+        fail(res, 400, 'Invalid reminder id');
+        return null;
+    }
+    const reminder = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.REMINDERS,
+        data: [{ _id: new mongoose.Types.ObjectId(id), deletedStatusKey: 0 }],
+    }, 'findOne');
+    if (!reminder) {
+        fail(res, 404, 'Reminder not found');
+        return null;
+    }
+    const uid = String(req.uid);
+    const involved = String(reminder.userId) === uid || String(reminder.createdBy) === uid;
+    if (!involved && !isPrivileged(await getRoleType(companyId, uid))) {
+        fail(res, 403, 'You cannot manage this reminder');
+        return null;
+    }
+    return reminder;
 }
 
 exports.createReminder = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
         const b = req.body || {};
-        const userId = resolveUserId(req);
+        const userId = req.uid;
         if (!companyId || !userId || !b.reminderAt) {
-            return res.send({ status: false, statusText: 'Missing required fields (userId, reminderAt)' });
+            return fail(res, 400, 'Missing required fields (reminderAt)');
         }
         const when = new Date(b.reminderAt);
         if (Number.isNaN(when.getTime())) {
-            return res.send({ status: false, statusText: 'reminderAt is not a valid date' });
+            return fail(res, 400, 'reminderAt is not a valid date');
+        }
+        if ((b.taskId && !isObjectId(b.taskId)) || (b.projectId && !isObjectId(b.projectId))) {
+            return fail(res, 400, 'Invalid task or project id');
         }
         const doc = {
             _id: new mongoose.Types.ObjectId(),
@@ -47,17 +69,16 @@ exports.createReminder = async (req, res) => {
         res.send({ status: true, statusText: 'Reminder created', data: saved });
     } catch (error) {
         logger.error(`[reminders] create failed: ${error.message}`);
-        res.send({ status: false, statusText: error.message });
+        fail(res, 500, error.message);
     }
 };
 
-// List the caller's own reminders for the current company (newest scheduled first).
 exports.listMine = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
-        const userId = resolveUserId(req);
+        const userId = req.uid;
         if (!companyId || !userId) {
-            return res.send({ status: false, statusText: 'companyId and userId are required' });
+            return fail(res, 400, 'companyId and userId are required');
         }
         const reminders = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.REMINDERS,
@@ -66,70 +87,71 @@ exports.listMine = async (req, res) => {
         res.send({ status: true, data: reminders || [] });
     } catch (error) {
         logger.error(`[reminders] list failed: ${error.message}`);
-        res.send({ status: false, statusText: error.message });
+        fail(res, 500, error.message);
     }
 };
 
 exports.updateReminder = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
-        const id = req.params.id;
         const b = req.body || {};
         const patch = {};
         if (b.reminderText !== undefined) patch.reminderText = b.reminderText;
         if (b.reminderAt !== undefined) {
             const when = new Date(b.reminderAt);
             if (Number.isNaN(when.getTime())) {
-                return res.send({ status: false, statusText: 'reminderAt is not a valid date' });
+                return fail(res, 400, 'reminderAt is not a valid date');
             }
             patch.reminderAt = when;
-            // Editing the time re-arms a reminder that has already fired.
             patch.fired = false;
             patch.firedAt = null;
         }
-        await helper.updateReminder(companyId, id, patch);
+        const reminder = await loadManageableReminder(req, res);
+        if (!reminder) return;
+        if (!Object.keys(patch).length) {
+            return fail(res, 400, 'Nothing to update');
+        }
+        await helper.updateReminder(companyId, reminder._id, patch);
         res.send({ status: true, statusText: 'Updated' });
     } catch (error) {
         logger.error(`[reminders] update failed: ${error.message}`);
-        res.send({ status: false, statusText: error.message });
+        fail(res, 500, error.message);
     }
 };
 
 exports.deleteReminder = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
-        const id = req.params.id;
-        await helper.updateReminder(companyId, id, { deletedStatusKey: 1 });
+        const reminder = await loadManageableReminder(req, res);
+        if (!reminder) return;
+        await helper.updateReminder(companyId, reminder._id, { deletedStatusKey: 1 });
         res.send({ status: true, statusText: 'Deleted' });
     } catch (error) {
         logger.error(`[reminders] delete failed: ${error.message}`);
-        res.send({ status: false, statusText: error.message });
+        fail(res, 500, error.message);
     }
 };
 
-// Process all due reminders for the caller's company (manual trigger; the cron
-// does this for every company in production).
+// Fires every due reminder in the company, so it is limited to owners and admins.
 exports.runDueForCompany = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
+        if (!isPrivileged(await getRoleType(companyId, req.uid))) {
+            return fail(res, 403, 'Only an owner or admin can run due reminders');
+        }
         const result = await helper.processDueForCompany(companyId);
         res.send({ status: true, statusText: 'Processed due reminders', data: result });
     } catch (error) {
         logger.error(`[reminders] runDue failed: ${error.message}`);
-        res.send({ status: false, statusText: error.message });
+        fail(res, 500, error.message);
     }
 };
 
-// Fire one reminder right now from its id (testing / manual trigger).
 exports.runNow = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
-        const id = req.params.id;
-        const reminder = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.REMINDERS,
-            data: [{ _id: new mongoose.Types.ObjectId(id) }],
-        }, 'findOne');
-        if (!reminder) return res.send({ status: false, statusText: 'Reminder not found' });
+        const reminder = await loadManageableReminder(req, res);
+        if (!reminder) return;
         const out = await helper.fireOne(companyId, reminder);
         res.send({
             status: true,
@@ -138,9 +160,8 @@ exports.runNow = async (req, res) => {
         });
     } catch (error) {
         logger.error(`[reminders] runNow failed: ${error.message}`);
-        res.send({ status: false, statusText: error.message });
+        fail(res, 500, error.message);
     }
 };
 
-// Cron entry (all companies) — consumed by cron.js.
 exports.runRemindersForAllCompanies = helper.runRemindersForAllCompanies;

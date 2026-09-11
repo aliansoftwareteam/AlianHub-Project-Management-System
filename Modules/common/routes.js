@@ -10,13 +10,16 @@ const commonctrl = require('./controller.js');
  * @param {Object} app 
  */
 exports.init = (app) => {
-    // Get Time
     app.get("/api/v1/getTime", (req, res) => {
-        if(!req.query?.zone) {
-            res.send("No zone specified");
-        } else {
-            res.send(DateTime.now().setZone(req.query.zone));
+        const zone = String(req.query?.zone || '');
+        if (!zone) {
+            return res.status(400).json({ status: false, statusText: 'zone is required', message: 'zone is required' });
         }
+        const now = DateTime.now().setZone(zone);
+        if (!now.isValid) {
+            return res.status(400).json({ status: false, statusText: 'zone is not a known time zone', message: now.invalidExplanation || 'invalid zone' });
+        }
+        return res.json({ status: true, statusText: 'Current time.', data: now.toISO() });
     });
 
     // Get Email Templates

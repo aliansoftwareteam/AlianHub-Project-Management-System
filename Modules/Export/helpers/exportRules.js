@@ -1,9 +1,5 @@
 const { neutraliseFormula } = require('../../../utils/csvSafe');
-
-const csvEscape = (v) => {
-    const s = (v === null || v === undefined) ? '' : String(neutraliseFormula(v));
-    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
+const { csvCell: csvEscape } = require('../../../utils/csv');
 
 const toCsv = (head = [], rows = [], totalRow = null) => {
     const lines = [];

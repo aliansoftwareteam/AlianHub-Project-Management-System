@@ -5,6 +5,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const { replaceObjectKey } = require("../Auth/helper");
 const { escapeRegex } = require("../../utils/escapeRegex");
 const { isPrivileged } = require('../../Config/roleTypes');
+const savedFilters = require("./helpers/savedFilters");
 
 /**
  * Helper functions
@@ -51,154 +52,10 @@ const extractCommentData = () => ({
     mediaURL: { $arrayElemAt: ["$commentData.mediaURL", "$$index"] },
 })
 
-/**
- * This is the endopint which is return all the fatch all the saved global advance filters.
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
-exports.getFilter = async (req, res) => {
-    try {
-        const { userId, filterType } = req.params;
-
-        let params = {
-            type: SCHEMA_TYPE.GLOBALFILTER,
-            data: [
-                {
-                    userId: userId,
-                    filter: 'advancedFilter',
-                    typeFilter: filterType
-                }
-            ]
-        }
-
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'find');
-
-        if (response) {
-            return res.status(200).json({
-                status: true,
-                data: response
-            });
-        } else {
-            return res.status(404).json({
-                status: false,
-            });
-        }
-
-    } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while get the task global filter",
-            error: error 
-        });
-    }
-}
-
-/**
- * This endpoint is used to save task advance filter
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
-exports.saveFilter = async (req, res) => {
-    try {
-        const companyId = req.body.companyId;
-
-        const params = {
-            type: SCHEMA_TYPE.GLOBALFILTER,
-            data: { ...req.body }
-        };
-
-        const response = await MongoDbCrudOpration(companyId, params, "save");
-
-        if(response) {
-            return res.status(200).json({
-                status: true,
-                data: response
-            });
-        } else {
-            return res.status(404).json({
-                status: false,
-            });
-        }
-
-    } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while saving the task global filter",
-            error: error 
-        });
-    }
-}
-
-/**
- * This endpoint is used to update global advance filter
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
-exports.updateFilter = async (req, res) => {
-    try {
-        const params = {
-            type: SCHEMA_TYPE.GLOBALFILTER,
-            data: req.body
-        }
-
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'findOneAndUpdate');
-
-        if(response) {
-            return res.status(200).json({
-                status: true,
-            });
-        } else {
-            return res.status(404).json({
-                status: false,
-            });
-        }
-
-    } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while update the project global filter",
-            error: error 
-        });
-    }
-}
-
-/**
- * This endpoint is used to delete task advance filter
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
-exports.deleteFilter = async (req, res) => {
-    try {
-        const { id, cid } = req.params;
-        const params = {
-            type: SCHEMA_TYPE.GLOBALFILTER,
-            data: [
-                {
-                    _id: new mongoose.Types.ObjectId(id)
-                }
-            ]
-        }
-
-        const response = await MongoDbCrudOpration(cid, params, "deleteOne")
-
-        if (response) {
-            return res.status(200).json({
-                status: true,
-            });
-        } else {
-            return res.status(404).json({
-                status: false,
-            });
-        }
-
-    } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while delete the project global filter",
-            error: error 
-        });
-    }
-}
+exports.getFilter = savedFilters.listFilters((req) => ({ filter: 'advancedFilter', typeFilter: String(req.params.filterType || '') }));
+exports.saveFilter = savedFilters.saveFilter;
+exports.updateFilter = savedFilters.updateFilter;
+exports.deleteFilter = savedFilters.deleteFilter;
 
 /**
  * This endpoint is used to filter tasks in global advance filter

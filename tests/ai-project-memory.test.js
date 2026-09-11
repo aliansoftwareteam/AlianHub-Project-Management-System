@@ -10,6 +10,7 @@ jest.mock('../Modules/AIProjectGenerator/sseEmitter', () => ({ emit: jest.fn(), 
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(async () => ['6f0000000000000000000701']) }));
+jest.mock('../Config/permissionGuard', () => ({ ...jest.requireActual('../Config/permissionGuard'), evaluatePermission: jest.fn(async () => true) }));
 
 const persistence = require('../Modules/AICore/persistence');
 const memory = require('../Modules/Agents/memory');

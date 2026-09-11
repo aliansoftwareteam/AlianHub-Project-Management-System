@@ -69,7 +69,7 @@ test.describe('instance console as the owner', () => {
         }
     });
 
-    test.fail('INS-07 saves a changed setting from Instance > Settings', async ({ page, state, loginAs }) => {
+    test('INS-07 saves a changed setting from Instance > Settings', async ({ page, state, loginAs }) => {
         const owner = await loginAs('owner');
         const name = `[QA instance] ${Date.now()}`;
         try {
