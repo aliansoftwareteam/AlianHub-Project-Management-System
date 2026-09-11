@@ -216,6 +216,10 @@ aiReplaysSchema.index({ runId: 1, createdAt: 1 });
 aiReplaysSchema.index({ feature: 1, createdAt: -1 });
 aiReplaysSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+const aiAlertsSchema = new Schema(schema.aiAlerts, {strict: true, timestamps: true});
+aiAlertsSchema.index({ type: 1, key: 1 }, { unique: true, partialFilterExpression: { status: 'open' } });
+aiAlertsSchema.index({ status: 1, openedAt: -1 });
+
 const agentSkillsSchema = new Schema(schema.agentSkills, {strict: true, timestamps: true});
 agentSkillsSchema.index({ key: 1 }, { unique: true });
 agentSkillsSchema.index({ enabled: 1, retiredAt: 1 });
@@ -361,6 +365,7 @@ module.exports = {
     agentRevisionsSchema,
     aiUsageSchema,
     aiReplaysSchema,
+    aiAlertsSchema,
     agentProposalsSchema,
     agentSkillsSchema,
     callsSchema,
