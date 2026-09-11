@@ -92,7 +92,8 @@ describe('NEW_AGENT_DEFAULTS', () => {
 
 describe('runOf', () => {
     it('unwraps the { run, audit } answer of GET /runs/:id and passes a bare run through', () => {
-        expect(runOf({ run: { _id: 'r1', decisions: [] }, audit: [{ id: 'a' }] })).toEqual({ _id: 'r1', decisions: [], audit: [{ id: 'a' }] });
+        expect(runOf({ run: { _id: 'r1', decisions: [] }, audit: [{ id: 'a' }] })).toEqual({ _id: 'r1', decisions: [], audit: [{ id: 'a' }], revision: null });
+        expect(runOf({ run: { _id: 'r1', agentRevision: 2 }, audit: [], revision: { n: 2, state: 'live' } }).revision).toEqual({ n: 2, state: 'live' });
         expect(runOf({ _id: 'r2' })).toEqual({ _id: 'r2' });
         expect(runOf(null)).toBeNull();
     });

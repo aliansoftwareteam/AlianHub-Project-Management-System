@@ -16,6 +16,13 @@
             </div>
             <p v-if="run.status === 'waiting_approval'" class="ah-small run-detail__waiting" data-test="waiting">{{ $t('Ai.episode_waiting') }}</p>
 
+            <div class="run-detail__pin" data-test="pinned-revision">
+                <span class="ah-label">{{ $t('Ai.run_pinned_title') }}</span>
+                <router-link v-if="pinnedN > 0" class="ah-chip ah-chip--brand run-detail__revision" :to="revisionLink" data-test="revision-link">{{ $t('Ai.run_revision', { n: pinnedN }) }}</router-link>
+                <span v-else class="ah-chip ah-chip--dark" data-test="revision-zero">{{ $t('Ai.run_revision_zero') }}</span>
+                <span v-if="skillIdentity" class="ah-mono ah-small" data-test="skill-identity">{{ skillIdentity }}</span>
+            </div>
+
             <div class="run-detail__head">
                 <span class="ah-label">{{ $t('Ai.decisions_title') }}</span>
                 <span v-if="run.revertedAt" class="ah-chip ah-chip--dark">{{ $t('Ai.reverted_at', { at: when(run.revertedAt) }) }}</span>
@@ -54,7 +61,7 @@ import { computed, inject, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
-import { useAgents, revertControlState, undoDeadlineOf } from "./useAgents";
+import { useAgents, revertControlState, undoDeadlineOf, pinnedRevisionOf } from "./useAgents";
 import { normaliseEpisode, declinedLine as declinedText } from "./episodeText";
 
 defineOptions({ name: "AgentRunDetail" });
@@ -66,12 +73,22 @@ const { t } = useI18n();
 const $toast = useToast();
 const { getters } = useStore();
 const userId = inject("$userId", null);
+const companyId = inject("$companyId", null);
 const { loadRun, revertRun } = useAgents();
 
 const run = ref(null);
 const error = ref("");
 const busy = ref(false);
 const result = ref(null);
+
+const pinnedN = computed(() => pinnedRevisionOf(run.value));
+const revisionLink = computed(() => ({ name: "AiAgent", params: { cid: companyId?.value ?? companyId, id: String(run.value?.agentId || "") }, query: { rev: pinnedN.value }, hash: "#revisions" }));
+const skillIdentity = computed(() => {
+    const s = run.value?.skillRevision;
+    if (!s || !s.key) return run.value?.skill ? t("Ai.run_skill_identity_nohash", { key: run.value.skill }) : "";
+    if (Number.isInteger(s.n) && s.n > 0) return t("Ai.run_skill_identity_n", { key: s.key, n: s.n });
+    return s.hash ? t("Ai.run_skill_identity", { key: s.key, hash: s.hash }) : t("Ai.run_skill_identity_nohash", { key: s.key });
+});
 
 const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
 const decisions = computed(() => (Array.isArray(run.value?.decisions) ? run.value.decisions : []));
@@ -117,6 +134,8 @@ onMounted(load);
 <style>
 .run-detail { margin: 8px 0 4px 0; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 9px; background: var(--surface-2, transparent); }
 .run-detail__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.run-detail__pin { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.run-detail__revision { text-decoration: none; }
 .run-episode { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--hairline); }
 .run-episode__stats { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font: var(--text-small); color: var(--ink); }
 .run-detail__waiting { margin: 0 0 10px; }

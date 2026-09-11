@@ -163,9 +163,22 @@ exports.setPaused = (paused) => async (req, res) => {
     } catch (e) { logger.error(`setPaused: ${e.message}`); return fail(res, e.message); }
 };
 
-const revisionRow = (r) => {
+const revisionRow = (r, names = {}) => {
     const o = typeof r.toObject === 'function' ? r.toObject() : { ...r };
-    return { _id: String(o._id), agentId: o.agentId, n: o.n, state: o.state, snapshot: o.snapshot, serves: o.serves || [], skillRefs: o.skillRefs || [], source: o.source || null, rollbackOf: o.rollbackOf || null, note: o.note || null, createdBy: o.createdBy || null, createdAt: o.createdAt, promotedBy: o.promotedBy || null, promotedAt: o.promotedAt || null, supersededAt: o.supersededAt || null };
+    return {
+        _id: String(o._id), agentId: o.agentId, n: o.n, state: o.state, snapshot: o.snapshot, serves: o.serves || [], skillRefs: o.skillRefs || [],
+        source: o.source || null, rollbackOf: o.rollbackOf || null, note: o.note || null,
+        createdBy: o.createdBy || null, createdByName: names[String(o.createdBy)] || null, createdAt: o.createdAt,
+        promotedBy: o.promotedBy || null, promotedByName: names[String(o.promotedBy)] || null, promotedAt: o.promotedAt || null, supersededAt: o.supersededAt || null,
+    };
+};
+
+const userNames = async (rows) => {
+    const ids = [...new Set(rows.flatMap((r) => [r.createdBy, r.promotedBy]).filter(Boolean).map(String))].map(oid).filter(Boolean);
+    if (!ids.length) return {};
+    const { dbCollections } = require('../../Config/collections');
+    const users = await MongoDbCrudOpration(dbCollections.GLOBAL, { type: SCHEMA_TYPE.USERS, data: [{ _id: { $in: ids } }, { Employee_Name: 1, Employee_FName: 1, Employee_LName: 1 }] }, 'find').catch(() => []);
+    return Object.fromEntries((users || []).map((u) => [String(u._id), u.Employee_Name || [u.Employee_FName, u.Employee_LName].filter(Boolean).join(' ') || null]));
 };
 
 /* Revisions are owner/admin ground, like the agent settings page. */
@@ -188,7 +201,8 @@ exports.listRevisions = async (req, res) => {
         if (!ctx) return undefined;
         await revisions.liveFor(ctx.companyId, ctx.agent);
         const rows = await revisions.listFor(ctx.companyId, ctx.agent._id);
-        return res.send({ status: true, data: (rows || []).map(revisionRow) });
+        const names = await userNames(rows || []);
+        return res.send({ status: true, data: (rows || []).map((r) => revisionRow(r, names)) });
     } catch (e) { logger.error(`listRevisions: ${e.message}`); return fail(res, e.message); }
 };
 
