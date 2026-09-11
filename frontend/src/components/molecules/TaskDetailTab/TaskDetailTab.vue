@@ -134,7 +134,6 @@ import { useToast } from 'vue-toast-notification';
 import { computed, defineProps, inject, ref, nextTick,onMounted, watch } from 'vue';
 
 // COMPONENTS
-import { dbCollections } from '@/utils/Collections';
 import Description from '@/components/atom/Description/Description.vue'
 import Attachments from '@/components/atom/Attachments/Attachments.vue'
 import CheckListComponent from '@/components/molecules/CheckList/CheckList.vue'
@@ -147,7 +146,6 @@ import TagChip from '@/components/atom/TagChip/TagChip.vue'
 import PromptSidebar from "@/components/molecules/PromptSidebar/PromptSidebar.vue";
 import { apiRequest, apiRequestWithoutCompnay } from '../../../services';
 import * as env from '@/config/env';
-import axios from 'axios';
 
 // UTILS
 import { useCustomComposable, useGetterFunctions } from '@/composable';
@@ -229,7 +227,6 @@ const customFieldObject = ref({});
 const isCustomField = ref(false);
 const allProjectsArrayFilter = ref([]);
 const CustomFieldData = ref(JSON.parse(JSON.stringify(getters["settings/customFields"])));
-const selectedProject = ref([])
 const isOpenPromptDeatil = ref(false);
 const selectedPrompt = ref({})
 const isSpinnerAi = ref(false);
@@ -259,24 +256,7 @@ const projectData = inject("selectedProject");
 const user = getUser(userId.value);
 
 onMounted(() => {
-    let data = {
-        type: dbCollections.PROJECTS,
-        data: [{ _id: process.env.VUE_APP_SUPPORT_PROJECTID}],
-    };
-    const axiosData = {
-        dataObj: data.data,
-        dbName: process.env.VUE_APP_SUPPORT_COMPANYID,
-        collection: data.type,
-        methodName: "findOne",
-    };
-    axios.post(env.API_URI + env.MONGO_OPRATION, axiosData).then((response) => {
-        selectedProject.value.push(response.data.statusText)
-    });
-    if(props.isSupport === true){
-        allProjectsArrayFilter.value = selectedProject.value;
-    }else{
-        allProjectsArrayFilter.value = JSON.parse(JSON.stringify(projectsGetter.value.data))
-    }
+    allProjectsArrayFilter.value = props.isSupport ? [] : JSON.parse(JSON.stringify(projectsGetter.value.data));
 })
 
 const scrollToBottom = () => {

@@ -4,13 +4,11 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
+const { visibleProjectIds } = require('../Agents/scope');
 const { validateExportInput, buildFileName, taskToRow, rowsToCsv } = require('./helpers/exportRules');
 
-// Async task exports. Jobs are persisted (queued → processing → done|failed)
-// and processed in-process right after creation; files land under
-// wasabiUploadsLocal/exports and stream back through the download endpoint
-// (auth headers apply — the file path never leaves the server).
-
+// Files stay on the server and only stream back through the download endpoint,
+// so a job's path is never handed to the client.
 const EXPORT_DIR = path.join(process.cwd(), 'wasabiUploadsLocal', 'exports');
 
 async function processJob(companyId, jobId) {
@@ -64,15 +62,21 @@ async function processJob(companyId, jobId) {
     }
 }
 
-/* POST /api/v2/exports  body: { format, projectId, sprintId?, projectName?, userData } */
+const sessionUid = (req) => (req.uid ? String(req.uid) : '');
+const asksForAnotherUser = (req) => Boolean(req.query && req.query.uid) && String(req.query.uid) !== sessionUid(req);
+
 exports.createExport = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
-        const { format, projectId, sprintId, projectName, userData } = req.body || {};
-        const userId = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
+        const userId = sessionUid(req);
+        const { format, projectId, sprintId, projectName } = req.body || {};
         const check = validateExportInput({ companyId, format, projectId, sprintId, userId });
         if (!check.valid) {
             return res.send({ status: false, statusText: check.reason });
+        }
+        const visible = await visibleProjectIds(companyId, userId);
+        if (!visible.includes(String(projectId))) {
+            return res.status(404).send({ status: false, statusText: 'Project not found.' });
         }
 
         const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
@@ -98,13 +102,15 @@ exports.createExport = async (req, res) => {
     }
 };
 
-/* GET /api/v2/exports?uid= — caller's jobs, newest first. */
 exports.listExports = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
-        const userId = String(req.query?.uid || '');
+        const userId = sessionUid(req);
         if (!companyId || !userId) {
-            return res.send({ status: false, statusText: 'companyId and uid are required.' });
+            return res.send({ status: false, statusText: 'companyId and a session are required.' });
+        }
+        if (asksForAnotherUser(req)) {
+            return res.status(403).send({ status: false, statusText: 'You can only list your own exports.' });
         }
         const jobs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.EXPORT_JOBS,
@@ -117,14 +123,13 @@ exports.listExports = async (req, res) => {
     }
 };
 
-/* GET /api/v2/exports/:id/download?uid= */
 exports.downloadExport = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
-        const userId = String(req.query?.uid || '');
+        const userId = sessionUid(req);
         const { id } = req.params;
         if (!companyId || !userId || !/^[0-9a-fA-F]{24}$/.test(String(id))) {
-            return res.status(400).send({ status: false, statusText: 'companyId, uid and a valid job id are required.' });
+            return res.status(400).send({ status: false, statusText: 'companyId, a session and a valid job id are required.' });
         }
         const job = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.EXPORT_JOBS,

@@ -282,6 +282,7 @@ import TaskSummaryBlock from "./TaskSummaryBlock.vue";
 import TaskSubtaskList from "./TaskSubtaskList.vue";
 import TaskTimerChip from "./TaskTimerChip.vue";
 import TaskAgentStrip from "./TaskAgentStrip.vue";
+import { canControlRun } from "@/views/Ai/agentAccess";
 
 import taskClass from "@/utils/TaskOperations";
 import { apiRequest } from "@/services";
@@ -628,7 +629,7 @@ function refreshLogged() {
         methodName: "aggregate",
         dataObj: [[{ $match: { TicketID: task.value._id } }, { $group: { _id: null, total: { $sum: "$LogTimeDuration" } } }]]
     }).then((response) => {
-        const rows = response?.data?.statusText;
+        const rows = response?.data?.data;
         loggedMinutes.value = Array.isArray(rows) && rows[0] ? Number(rows[0].total) || 0 : 0;
     }).catch((error) => {
         console.error("ERROR in logged time: ", error);
@@ -802,6 +803,7 @@ const AGENT_RUN_POLL_MS = 15000;
 const liveRun = ref(null);
 let agentRunPoll = null;
 const stripRun = computed(() => props.agentRun || liveRun.value);
+const mayStopRun = (run) => canControlRun(run, { userId: currentUserId?.value ?? currentUserId, roleType: getters["settings/companyUserDetail"]?.roleType });
 
 async function stopAgentRun(runId) {
     try {
@@ -819,7 +821,7 @@ async function loadAgentRun() {
         const res = await apiRequest("get", `${env.AGENT_RUNS}?status=open&taskId=${encodeURIComponent(props.taskId)}&limit=5`);
         const run = (res?.data?.status ? res.data.data || [] : [])[0];
         liveRun.value = run
-            ? { agentName: run.agentName, status: STRIP_STATUS[run.status] || "running", startedAt: run.startedAt, onStop: run.status === "running" ? () => stopAgentRun(run._id) : null }
+            ? { agentName: run.agentName, status: STRIP_STATUS[run.status] || "running", startedAt: run.startedAt, onStop: run.status === "running" && mayStopRun(run) ? () => stopAgentRun(run._id) : null }
             : null;
     } catch (error) {
         liveRun.value = null;

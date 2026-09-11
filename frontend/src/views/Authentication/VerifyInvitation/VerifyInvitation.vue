@@ -29,7 +29,6 @@ import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 
 const { t } = useI18n();
@@ -51,8 +50,6 @@ onMounted(async () => {
             return;
         }
         localStorage.setItem("selectedCompany", result.data.companyId);
-        apiRequest("post", env.IMPORT_NOTIFICATION_SETTING, { companyId: result.data.companyId, userId: result.data.userId })
-            .catch((error) => console.error("ERROR in import settings: ", error.message));
         stage.value = "accepted";
         setTimeout(() => {
             router.replace({ name: "Log-in" }).then(() => { if (userId.value !== "") window.location.reload(); });

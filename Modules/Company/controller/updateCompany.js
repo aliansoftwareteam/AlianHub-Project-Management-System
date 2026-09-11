@@ -5,11 +5,27 @@ const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueri
 const { default: mongoose } = require("mongoose");
 const { replaceObjectKey } = require("../../Auth/helper");
 const socketEmitter = require("../../../event/socketEventEmitter");
+const { isInstanceOwner } = require("../../Instance/guard");
+const { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline } = require("../helpers/companyAccessRules");
+
+const loadOwnCompanyIds = async (uid) => {
+    const user = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+        type: SCHEMA_TYPE.USERS,
+        data: [{ _id: new mongoose.Types.ObjectId(String(uid)) }, { AssignCompany: 1 }]
+    }, 'findOne');
+    return ownCompanyIds(user);
+};
+
+const isInstanceAdminRequest = async (req) => !req.apiToken && isInstanceOwner(req.uid);
+const hasSession = (req) => OBJECT_ID_PATTERN.test(String(req.uid || ''));
 
 exports.updateCompany = async(req,res) => {
     try {
 
         const companyId = req.headers['companyid'] || req.body.companyId;
+        if (!OBJECT_ID_PATTERN.test(String(companyId || ''))) {
+            return res.status(400).json({ status: false, message: 'A valid company id is required' });
+        }
 
         if (!(req.body && req.body.updateObject)) {
             return res.status(400).json({message: 'Update Object is Required'});
@@ -63,12 +79,20 @@ exports.updateCompany = async(req,res) => {
     }
 }
 
-exports.getCompany = (req,res) => {
-    exports.getCompanyDataFun(req.body.companyIds,req.body.fetchAllCompany,req.body.condition).then((data) => {
-        res.json(data);
-    }).catch((error) => {
-        res.json(error);
-    })
+exports.getCompany = async (req,res) => {
+    try {
+        if (!hasSession(req)) return res.status(401).json({ status: false, message: 'Unauthorized' });
+        if (await isInstanceAdminRequest(req)) {
+            return res.json(await exports.getCompanyDataFun(req.body.companyIds, req.body.fetchAllCompany));
+        }
+        if (req.body.fetchAllCompany) {
+            return res.status(403).json({ status: false, message: 'Only the instance owner can list every company.' });
+        }
+        const allowed = allowedCompanyIds(req.body.companyIds, await loadOwnCompanyIds(req.uid));
+        return res.json(await exports.getCompanyDataFun(allowed));
+    } catch (error) {
+        return res.status(500).json({ status: false, message: "An error occurred while getting the company" });
+    }
 }
 
 exports.getCompanyDataFun = async(companyIds,fetchAllCompany = false) => {
@@ -153,26 +177,34 @@ exports.updateCompanyFun = (type,companyObj,method,companyId = "",isSocketUpdate
 
 exports.getCompanyByAggregate = async(req,res) => {
     try {
+        if (!hasSession(req)) return res.status(401).json({ status: false, message: 'Unauthorized' });
         const { findQuery } = req.body;
 
         if (!findQuery) {
             return res.status(400).json({
+                status: false,
                 message: "An error occurred while getting the task.",
                 error: "Query is required."
             });
         }
         const query = replaceObjectKey(findQuery, ["objId"])
-        const cQuery = [query];
+        let pipeline = [query];
+        if (!(await isInstanceAdminRequest(req))) {
+            const own = (await loadOwnCompanyIds(req.uid)).map((id) => new mongoose.Types.ObjectId(id));
+            const scoped = scopeCompanyPipeline(query, own);
+            if (!scoped.ok) return res.status(403).json({ status: false, message: scoped.error });
+            pipeline = scoped.pipeline;
+        }
         const companyObj = {
             type: SCHEMA_TYPE.COMPANIES,
-            data: [cQuery]
+            data: [pipeline]
         };
 
         const response = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL,companyObj, 'aggregate');
 
         return res.status(200).json(response);
     } catch (error) {
-        return res.status(500).json({ message: "An error occurred while fetching the company",error:error });
+        return res.status(500).json({ status: false, message: "An error occurred while fetching the company" });
     }
 }
 

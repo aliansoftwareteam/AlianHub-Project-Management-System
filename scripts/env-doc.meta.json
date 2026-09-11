@@ -128,6 +128,11 @@
     "description": "Maximum JSON/urlencoded/raw request body (body-parser size string).",
     "default": "2mb"
   },
+  "BUILD_INFO_GIT_TIMEOUT_MS": {
+    "group": "server",
+    "description": "Per-command timeout, in ms, for the git calls that resolve the running version. On timeout the server reports channel unknown and retries in the background.",
+    "default": "10000"
+  },
   "CLOUD_STORAGE_ENC_KEY": {
     "group": "storage",
     "description": "Key used to encrypt cloud-storage provider credentials at rest.",
@@ -509,6 +514,11 @@
     "group": "integrations",
     "description": "Firebase project id."
   },
+  "REFRESH_TOKEN_REUSE_GRACE_SECONDS": {
+    "group": "auth",
+    "description": "Seconds after a refresh token is rotated during which presenting the old one again is refused without revoking the session, so parallel requests or tabs do not log the user out. Past this window a reused token revokes the session.",
+    "default": "10"
+  },
   "RESEND_API_KEY": {
     "group": "general",
     "description": "Get from resend.com",
@@ -689,10 +699,6 @@
   "VUE_APP_STORAGE_TYPE": {
     "group": "frontend",
     "description": "Storage backend the web app assumes (server or wasabi); mirror STORAGE_TYPE."
-  },
-  "VUE_APP_SUPPORT_COMPANYID": {
-    "group": "frontend",
-    "description": "Company id that receives support tickets raised from the app."
   },
   "VUE_APP_SUPPORT_MAIL": {
     "group": "frontend",

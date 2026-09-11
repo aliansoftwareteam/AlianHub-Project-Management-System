@@ -1,7 +1,11 @@
+const { requireInstanceAdmin } = require('../Instance/guard');
 const ctrl = require('./controller');
 const autoArchive = require('./autoArchive');
 const estimationScale = require('./estimationScale');
 const wipLimit = require('./wipLimit');
+const { requireProjectAccess, DETAILS } = require('../../Config/projectAccess');
+
+const editsProjectSettings = requireProjectAccess({ projectIds: (req) => req.body && req.body.projectId, permissions: () => [DETAILS] });
 
 exports.init = (app) => {
      /**
@@ -50,7 +54,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v1/projectSetting/taskType', ctrl.changeTaskType);
+    app.post('/api/v1/projectSetting/taskType', editsProjectSettings, ctrl.changeTaskType);
 
     /**
      * @swagger
@@ -98,18 +102,18 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v1/projectSetting/taskStatus', ctrl.changeTaskStatus);
+    app.post('/api/v1/projectSetting/taskStatus', editsProjectSettings, ctrl.changeTaskStatus);
     // Under the /taskStatus prefix on purpose: setMiddleware guards that prefix,
     // so this write is behind the same JWT + company audience check as every
     // other task-status change rather than needing a new entry in that list.
-    app.post('/api/v1/projectSetting/taskStatus/wipLimit', wipLimit.setWipLimit);
-    app.post('/api/v1/projectSetting/migrateSprintsFun', ctrl.migrateSprintsFun);
+    app.post('/api/v1/projectSetting/taskStatus/wipLimit', editsProjectSettings, wipLimit.setWipLimit);
+    app.post('/api/v1/projectSetting/migrateSprintsFun', requireInstanceAdmin, ctrl.migrateSprintsFun);
 
     // Per-project auto-archive rule (completed tasks archive after N days —
     // applied by the nightly cron in cron.js).
     app.get('/api/v1/projectSetting/autoArchive/:pid', autoArchive.getAutoArchive);
-    app.post('/api/v1/projectSetting/autoArchive', autoArchive.setAutoArchive);
+    app.post('/api/v1/projectSetting/autoArchive', editsProjectSettings, autoArchive.setAutoArchive);
 
     // Per-project story-point estimation scale (drives the points picker).
-    app.post('/api/v1/projectSetting/estimationScale', estimationScale.setEstimationScale);
+    app.post('/api/v1/projectSetting/estimationScale', editsProjectSettings, estimationScale.setEstimationScale);
 }

@@ -1,7 +1,7 @@
 {
   "locale": "it",
   "machineTranslated": false,
-  "updatedAt": "2026-09-11T08:41:53.244Z",
+  "updatedAt": "2026-09-11T09:38:28.426Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5370,6 +5370,8 @@
     "AiHealth.owner_only_body": "Ask an owner or admin of this workspace for the AI health figures.",
     "AiHealth.load_failed": "The health figures could not be loaded.",
     "AiHealth.retry": "Retry",
+    "Ai.settings_read_only": "Read only. An owner or admin changes this agent's settings.",
+    "Instance.channel_unknown": "version unresolved",
     "AiHealth.thresholds_button": "Alert thresholds",
     "AiAlerts.section_title": "AI alerts",
     "AiAlerts.section_lead": "Rate alerts reach your inbox when an agent or the AI budget crosses a workspace threshold, and again when it clears.",

@@ -146,8 +146,8 @@ describe('GET /agents/runs/:id exposes the deadline', () => {
 
         const hidden = res();
         await agentCtrl.getRun(req(run._id, 'outsider'), hidden);
-        expect(hidden.body.data.run).toMatchObject({ undoable: false, undoReason: 'project_not_visible' });
-        expect(hidden.body.data.audit[0]).toMatchObject({ undoable: false, undoReason: 'project_not_visible' });
+        expect(hidden.code).toBe(404);
+        expect(hidden.body).toMatchObject({ status: false, statusText: 'Run not found.' });
 
         const closed = seedRun({ finishedAt: new Date(Date.now() - 25 * HOUR) });
         await seedStatusAction(closed);

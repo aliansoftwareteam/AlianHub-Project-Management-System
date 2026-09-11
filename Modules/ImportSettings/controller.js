@@ -2,6 +2,12 @@ const logger = require("../../Config/loggerConfig");
 const importData = require('../../utils/data');
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { removeCache } = require('../../utils/commonFunctions');
+const { tenantOf } = require('../../Config/tenant');
+const { ROLE_OWNER, getRoleType, isPrivileged, evaluatePermission, isWritable } = require('../../Config/permissionGuard');
+
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const forbidden = (res, statusText) => res.status(403).send({ status: false, statusText });
+const failed = (res, error) => res.status(error.statusCode || 500).send({ status: false, statusText: error.message });
 
 async function batchUpdate(arr) {
     return new Promise((resolve, reject) => {
@@ -301,70 +307,63 @@ exports.importSettingsV2Function = (req, cb) => {
     }
 };
 
-exports.importSettingsProjectFunction = (req, res) => {
+// The company-wide path wipes and re-inserts the rules collection; the project
+// path only adds rules for one project, which is what the project permission
+// sidebar (gated on settings_security_permissions) applies.
+exports.importSettingsProjectFunction = async (req, res) => {
     try {
-
-        //Request variables
-        const { companyId, type, projectId } = req.body;
-
-        //Validations
-        if(!companyId || companyId === '') {
-            res.send({
-                status: false,
-                statusText: "Company id is required."
-            });
-            return;
+        const companyId = tenantOf(req);
+        const { type, projectId } = req.body || {};
+        const roleType = await getRoleType(companyId, req.uid);
+        if (type === 'project') {
+            if (!OBJECT_ID.test(String(projectId || ''))) {
+                return res.status(400).send({ status: false, statusText: 'A valid project id is required.' });
+            }
+            const allowed = isPrivileged(roleType) || isWritable(await evaluatePermission(companyId, req.uid, 'settings.settings_security_permissions'));
+            if (!allowed) return forbidden(res, 'You do not have permission to change project permissions.');
+        } else if (!isPrivileged(roleType)) {
+            return forbidden(res, 'Only an owner or admin can re-import company rules.');
         }
-        importData.importCompanyRules(companyId,type,projectId).then((response) => {
-            res.send({
-                status: true,
-                statusText: "Settings has been imported successfully",
-                data: response
-            });
-        }).catch((err) => {
-            logger.error(`Error in import project rules: ${err.messge}`);
-        })
+        const response = await importData.importCompanyRules(companyId, type, projectId);
+        return res.send({ status: true, statusText: 'Settings has been imported successfully', data: response });
     } catch (error) {
-        logger.error(`Import Default Settings Catch Error: ${error.messge}`);
-        res.send({
-            status: false,
-            statusText: "Settings has been imported successfully"
-        });
+        logger.error(`Error in import project rules: ${error.message}`);
+        return failed(res, error);
     }
 };
 
-/**
- * Import default comapny settings when new conmpany created
- * @param {Objcet} req
- * @param {Object} res
- * @returns
- */
-exports.importSettings = (req, res) => {
-    exports.importSettingsFunction(req, (cData) => {
-        res.send(cData);
-    });
-};
-
-exports.importTemplate = (req, res) => {
-    if (!(req.body && req.body.templates && req.body.templates.length)) {
-        res.json({
-            status: false,
-            statusText: "template is required."
-        })
-        return;
-    }
+// Owner only: the full import upserts an owner company_users row for the caller,
+// so letting an admin run it would promote them.
+exports.importSettings = async (req, res) => {
     try {
-        importData.importSettingTemplate(req.body.companyId, req.body.templates, (data) => {
-            res.json(data)
-        });
+        const companyId = tenantOf(req);
+        if (await getRoleType(companyId, req.uid) !== ROLE_OWNER) {
+            return forbidden(res, 'Only the company owner can re-import company settings.');
+        }
+        const { email, rules } = req.body || {};
+        exports.importSettingsFunction({ body: { companyId, uid: String(req.uid), email, rules } }, (cData) => res.send(cData));
     } catch (error) {
-        res.json({
-            status: false,
-            error: error
-        });
+        logger.error(`Import Default Settings Catch Error: ${error.message}`);
+        return failed(res, error);
     }
+};
 
-}
+exports.importTemplate = async (req, res) => {
+    try {
+        const companyId = tenantOf(req);
+        if (!isPrivileged(await getRoleType(companyId, req.uid))) {
+            return forbidden(res, 'Only an owner or admin can import templates.');
+        }
+        const templates = req.body && req.body.templates;
+        if (!(Array.isArray(templates) && templates.length)) {
+            return res.json({ status: false, statusText: 'template is required.' });
+        }
+        importData.importSettingTemplate(companyId, templates, (data) => res.json(data));
+    } catch (error) {
+        logger.error(`Import template error: ${error.message}`);
+        return failed(res, error);
+    }
+};
 
 exports.importSettingsNotification = (req, res) => {
     try {
@@ -384,6 +383,13 @@ exports.importSettingsNotification = (req, res) => {
             res.send({
                 status: false,
                 statusText: "User id is required."
+            });
+            return;
+        }
+        if (String(userId) !== String(req.uid) || String(companyId) !== String(req.headers.companyid)) {
+            res.status(403).send({
+                status: false,
+                statusText: "You can only import your own notification settings."
             });
             return;
         }

@@ -87,10 +87,10 @@
 
 <script setup>
 import { computed, inject, onMounted, ref } from "vue";
-import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import { useAgents, revertControlState, undoDeadlineOf, pinnedRevisionOf } from "./useAgents";
+import { useAgentAccess } from "./agentAccess";
 import { normaliseEpisode, declinedLine as declinedText } from "./episodeText";
 import AgentRunReplay from "./AgentRunReplay.vue";
 import AgentRunTrace from "./AgentRunTrace.vue";
@@ -102,8 +102,7 @@ const emit = defineEmits(["reverted"]);
 
 const { t } = useI18n();
 const $toast = useToast();
-const { getters } = useStore();
-const userId = inject("$userId", null);
+const { canManage: privileged, userId } = useAgentAccess();
 const companyId = inject("$companyId", null);
 const { loadRun, revertRun } = useAgents();
 
@@ -123,11 +122,10 @@ const skillIdentity = computed(() => {
 
 const replayPanel = ref(null);
 const viewReplay = (id) => replayPanel.value?.focus(id);
-const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
 const decisions = computed(() => (Array.isArray(run.value?.decisions) ? run.value.decisions : []));
 const deadline = computed(() => undoDeadlineOf(run.value));
 const windowOpen = computed(() => !deadline.value || new Date(deadline.value).getTime() > Date.now());
-const control = computed(() => revertControlState(run.value, { userId: userId?.value ?? userId, privileged: privileged.value }));
+const control = computed(() => revertControlState(run.value, { userId: userId.value, privileged: privileged.value }));
 
 const UNREACHED = ["failed", "skipped", "stopped"];
 const unreached = computed(() => UNREACHED.includes(run.value?.status));
