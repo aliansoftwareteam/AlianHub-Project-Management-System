@@ -59,6 +59,8 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 31 | `Login.vue` and `VerifyEmail.vue` still send `email` in the resend-verification request, which the server now ignores. | #633 |
 | 32 | Creating a project filter with another user's id answers 200 and stores it under the caller, while the task-filter side answers 403. | #632 |
 | 33 | Settings → General logs `TypeError: Cannot read properties of undefined (reading 'isoCode')` in the test harness. | #634 |
+| 34 | Socket handshakes check only the JWT signature, not that the session is still live, so a logged-out access token can still open a socket until it expires. | #638 |
+| 35 | Auth cookies are readable by JavaScript (not `httpOnly`), tracked as P1-SEC-09. | #638 |
 
 ## Owner decisions recorded
 
