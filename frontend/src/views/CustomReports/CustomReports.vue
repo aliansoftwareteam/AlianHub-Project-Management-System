@@ -163,6 +163,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useStore } from 'vuex';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ReportsTabs from '@/views/Projects/Reports/ReportsTabs.vue';
@@ -170,6 +171,10 @@ import ReportsTabs from '@/views/Projects/Reports/ReportsTabs.vue';
 defineOptions({ name: 'CustomReportBuilder' });
 
 const { t } = useI18n();
+const { getters } = useStore();
+
+// The server refuses billable amounts below owner/admin; offering the metric would only produce an error.
+const canSeeRevenue = computed(() => [1, 2].includes(Number(getters['settings/companyUserDetail']?.roleType)));
 
 const CHARTS = ['table', 'bar', 'line', 'pie'];
 const DIMENSIONS = {
@@ -205,7 +210,9 @@ const projectLabel = (id) => {
 };
 
 const dimensions = computed(() => DIMENSIONS[cfg.source].map((key) => ({ key, label: t(`Reports.dim_${key}`) })));
-const metrics = computed(() => METRICS[cfg.source].map((key) => ({ key, label: t(`Reports.metric_${key}`) })));
+const metrics = computed(() => METRICS[cfg.source]
+    .filter((key) => key !== 'revenue' || canSeeRevenue.value)
+    .map((key) => ({ key, label: t(`Reports.metric_${key}`) })));
 const dimensionLabel = computed(() => t(`Reports.dim_${cfg.dimension}`));
 const metricLabel = computed(() => t(`Reports.metric_${cfg.metric}`));
 const sourceLabel = computed(() => t(`Reports.src_${cfg.source}`));
