@@ -33,11 +33,18 @@ exports.updateNotifications = async (req, res) => {
             });
         }
 
-        // MongoDB query
+        if (String(userId) !== String(req.uid || '')) {
+            return res.status(403).json({
+                status: false,
+                statusText: "You can only change your own notification settings.",
+                message: "Forbidden"
+            });
+        }
+
         const query = {
             type: dbCollections.NOTIFICATIONS_SETTINGS,
             data: [
-                { _id: new mongoose.Types.ObjectId(id) },
+                { _id: new mongoose.Types.ObjectId(id), userId: String(userId) },
                 { $set: { [`${key}.items.$[element].${fieldToUpdate}`]: valueToUpdate } },
                 { arrayFilters: [{ "element.key": elementKey }] }
             ]

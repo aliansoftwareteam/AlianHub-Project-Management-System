@@ -876,7 +876,8 @@ export default {
         "value": "value",
         "cancel": "Cancel",
         "save_draft": "Save as draft",
-        "save_on": "Save and turn on"
+        "save_on": "Save and turn on",
+        "manage_owner_admin": "Only owners and admins can create, change or switch on automations."
     },
     "IntegrationsHub": {
         "title": "Integrations & Automation",
@@ -1523,6 +1524,7 @@ export default {
         "run": "run",
         "refused_n": "{n} refused",
         "stop_agent": "Stop this agent",
+        "settings_read_only": "Read only. An owner or admin changes this agent's settings.",
         "stopped": "Agent stopped.",
         "delete_agent": "Delete agent",
         "delete_body": "Removes the agent and its settings. Past runs, proposals and audit rows stay.",

@@ -5,6 +5,12 @@ const { myCache } = require('../../../Config/config');
 const { removeCache } = require('../../../utils/commonFunctions');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const reportingLine = require('../../Users/helpers/reportingLine');
+const { getRoleType, isPrivileged, invalidateRoleCache, ROLE_OWNER } = require('../../../Config/permissionGuard');
+const { judgeMemberUpdate, judgeInvitationAcceptance } = require('./membershipGuard');
+
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+const ACTIVE = 2;
+const MEMBERSHIP_FIELDS = ['roleType', 'status', 'isDelete'];
 
 const MANAGER_ERROR = Object.freeze({
     [reportingLine.REASON.NO_SUBJECT]: 'That member is not part of this workspace.',
@@ -16,6 +22,9 @@ const MANAGER_ERROR = Object.freeze({
     [reportingLine.REASON.CYCLE]: 'That would make the reporting line loop back on itself.'
 });
 
+const refuse = (res, code, statusText) => res.status(code).json({ status: false, statusText, message: statusText });
+const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
 const listCompanyMembers = (companyId) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.COMPANY_USERS,
     data: [{}]
@@ -26,11 +35,30 @@ const setMemberFields = (companyId, docId, set) => MongoDbCrudOpration(companyId
     data: [{ _id: new mongoose.Types.ObjectId(docId) }, { $set: set }]
 }, 'updateOne');
 
+const findMemberRow = (companyId, id) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.COMPANY_USERS,
+    data: [{ _id: new mongoose.Types.ObjectId(id) }]
+}, 'findOne');
+
+/* A changed role or seat must take effect now, not when the 60-second role and membership caches expire. */
+const forgetMembership = (companyId, userId) => {
+    if (!userId) return;
+    invalidateRoleCache(companyId, userId);
+    require('../../../Config/jwt').invalidateMembershipCache(String(userId), companyId);
+};
+
+const clearMemberCaches = (companyId, userId) => {
+    removeCache(`company_users:${companyId}`);
+    removeCache("UserProjectData:", true);
+    removeCache(`UserData:${userId}`, false);
+    removeCache(`UserAllData:${companyId}`);
+};
+
 /**
  * This endpoint is used to get member users of company
- * @param {*} req 
- * @param {*} res 
- * @returns 
+ * @param {*} req
+ * @param {*} res
+ * @returns
  */
 exports.getMembers = async (req, res) => {
     try {
@@ -62,7 +90,7 @@ exports.getMembers = async (req, res) => {
     } catch (error) {
         return res.status(500).json({
             message: "An error occurred while get the company users",
-            error: error 
+            error: error
         });
     }
 }
@@ -70,9 +98,9 @@ exports.getMembers = async (req, res) => {
 
 /**
  * This endpoint is used to get member user of company by its id
- * @param {*} req 
- * @param {*} res 
- * @returns 
+ * @param {*} req
+ * @param {*} res
+ * @returns
  */
 exports.getMembersById = async (req,res) => {
     const companyId = req.headers['companyid'];
@@ -82,7 +110,7 @@ exports.getMembersById = async (req,res) => {
     if (hasCache) {
         let CompanyUsers = JSON.parse(hasCache);
         let member = CompanyUsers.find((x)=> x.userId === id);
-        if (member) {        
+        if (member) {
             res.set({
                 'FromCache': 'true',
                 'cacheExpireTime': myCache.getTtl(cacheKey)
@@ -106,9 +134,9 @@ exports.getMembersById = async (req,res) => {
 
 /**
  * This endpoint is used to check either role or designation is assigned with any company user or not
- * @param {*} req 
- * @param {*} res 
- * @returns 
+ * @param {*} req
+ * @param {*} res
+ * @returns
  */
 exports.checkRoleOrDesignationAssignedWithUsers = async (req, res) => {
     try {
@@ -142,26 +170,22 @@ exports.checkRoleOrDesignationAssignedWithUsers = async (req, res) => {
     } catch (error) {
         return res.status(500).json({
             message: "An error occurred while check role or designation is assigned with any company users",
-            error: error 
+            error: error
         });
     }
 }
 
-/**
- * This endpoint is used for handle all the CRUD operations for the user specific private views
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
+/* Private views live on the caller's own membership row; nobody else, the owner included, may change them. */
 exports.handlePrivateView = async (req, res) => {
     try {
         const { id, data, operation, key } = req.body;
+        const companyId = req.headers['companyid'];
 
-        if (!id) {
-            return res.status(400).json({
-                status: false,
-                message: `Document 'id' parameter is required`
-            })
+        if (!id || !OBJECT_ID_PATTERN.test(String(id))) {
+            return refuse(res, 400, `Document 'id' parameter is required`);
+        }
+        if (!isPlainObject(data)) {
+            return refuse(res, 400, `'data' parameter is required.`);
         }
 
         let update = {};
@@ -171,23 +195,25 @@ exports.handlePrivateView = async (req, res) => {
             }
         } else if (operation === 'update') {
             if(!data.id && ["name"].includes(key)) {
-                return res.status(400).json({
-                    status: false,
-                    message: `Element 'id' parameter is required.`
-                });
+                return refuse(res, 400, `Element 'id' parameter is required.`);
             }
             update = {
-                $set: { "ProjectRequiredComponent.$[elem].name": data.name } 
+                $set: { "ProjectRequiredComponent.$[elem].name": data.name }
             }
         } else if (operation === 'delete') {
             update = {
                 $pull: { ProjectRequiredComponent: { id: data.id } }
             }
         } else {
-            return res.status(400).json({
-                status: false,
-                message: 'Invalid operation type. Supported operations: push, update, delete'
-            });
+            return refuse(res, 400, 'Invalid operation type. Supported operations: push, update, delete');
+        }
+
+        const row = await findMemberRow(companyId, id);
+        if (!row) {
+            return refuse(res, 404, 'That member is not part of this workspace.');
+        }
+        if (!req.uid || String(row.userId || '') !== String(req.uid)) {
+            return refuse(res, 403, 'You can only change your own private views.');
         }
 
         const options = (operation === 'update' && (["name"].includes(key))) ? { arrayFilters: [{ "elem.id": data.id }] } : undefined;
@@ -196,89 +222,75 @@ exports.handlePrivateView = async (req, res) => {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [
                 {
-                    _id: new mongoose.Types.ObjectId(id)
+                    _id: new mongoose.Types.ObjectId(id),
+                    userId: String(req.uid)
                 },
                 update,
                 options
             ]
         }
 
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'updateOne');
+        const response = await MongoDbCrudOpration(companyId, params, 'updateOne');
 
-        removeCache("UserProjectData:", true);
-        removeCache(`company_users:${req.headers['companyid']}`);
-        removeCache(`UserData:${data.id}`, false);
-        removeCache(`UserAllData:${req.headers['companyid']}`);
+        clearMemberCaches(companyId, req.uid);
+        socketEmitter.emit('update', {
+            type: 'update',
+            data: { data: { _id: String(id), userId: String(req.uid) } },
+            updatedFields: { ProjectRequiredComponent: operation },
+            module: 'companyUsers'
+        });
 
         if (response) {
-            return res.status(200).json({ status: true });
+            return res.status(200).json({ status: true, statusText: 'Private view saved.' });
         } else {
-            return res.status(404).json({ status: false });
+            return res.status(404).json({ status: false, statusText: 'Private view not saved.' });
         }
 
     } catch (error) {
         return res.status(500).json({
-            message: "An error occurred while update the user specific private view",
-            error: error
+            status: false,
+            statusText: "An error occurred while update the user specific private view",
+            message: error.message || error
         });
     }
 }
 
-/**
- * This endpoint is used to update company member user
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
 exports.updateMember = async (req, res) => {
     try {
         const { id, data } = req.body;
-
-        if(!id) {
-            return res.status(400).json({
-                status: false,
-                message: `'id' parameter is required.`
-            });
-        }
-
-        // Defense in depth: granting owner/admin (roleType 1/2) is OWNER-only.
-        // SCOPED TO PAT/MCP REQUESTS ONLY (req.apiToken) so the web app's role
-        // management behaves exactly as before — MCP changes must never affect
-        // existing frontend/backend behavior (2026-06-15).
-        if (req.apiToken && data && data.roleType !== undefined) {
-            const { getRoleType, ROLE_OWNER, ROLE_ADMIN } = require('../../../Config/permissionGuard');
-            const callerRole = await getRoleType(req.headers['companyid'] || '', req.uid);
-            const targetRole = Number(data.roleType);
-            if ((targetRole === ROLE_OWNER || targetRole === ROLE_ADMIN) && callerRole !== ROLE_OWNER) {
-                return res.status(403).json({
-                    status: false,
-                    statusText: 'Only the owner can grant owner or admin roles.',
-                    error: 'Forbidden',
-                });
-            }
-        }
-
         const companyId = req.headers['companyid'];
-        const changesManager = Boolean(data) && Object.prototype.hasOwnProperty.call(data, 'managerId');
-        // Losing the seat, the invite or the member role all strand whoever reports here.
-        const becomesGuest = Boolean(data) && data.roleType !== undefined && data.roleType !== null && Number(data.roleType) === reportingLine.GUEST_ROLE;
-        const departing = Boolean(data) && (data.isDelete === true || Number(data.status) === 3 || becomesGuest);
 
-        const members = (changesManager || departing) ? await listCompanyMembers(companyId) : [];
+        if (!id || !OBJECT_ID_PATTERN.test(String(id))) {
+            return refuse(res, 400, `'id' parameter is required.`);
+        }
+        if (!isPlainObject(data)) {
+            return refuse(res, 400, `'data' parameter is required.`);
+        }
+
+        const members = await listCompanyMembers(companyId);
         const subject = members.find((member) => String(member._id) === String(id));
+        if (!subject) {
+            return refuse(res, 404, MANAGER_ERROR[reportingLine.REASON.NO_SUBJECT]);
+        }
+
+        const callerRole = await getRoleType(companyId || '', req.uid);
+        const changesManager = Object.prototype.hasOwnProperty.call(data, 'managerId');
+        if (changesManager && !isPrivileged(callerRole)) {
+            return refuse(res, 403, 'Only an owner or an admin can change who someone reports to.');
+        }
+
+        const activeOwners = members.filter((member) => member.roleType === ROLE_OWNER && member.status === ACTIVE && member.isDelete !== true).length;
+        const verdict = judgeMemberUpdate({ callerId: req.uid, callerRole, target: subject, data, activeOwners });
+        if (!verdict.ok) {
+            return refuse(res, verdict.code, verdict.statusText);
+        }
+
+        // Losing the seat, the invite or the member role all strand whoever reports here.
+        const becomesGuest = data.roleType !== undefined && data.roleType !== null && Number(data.roleType) === reportingLine.GUEST_ROLE;
+        const departing = data.isDelete === true || Number(data.status) === 3 || becomesGuest;
 
         if (changesManager) {
-            const { getRoleType, ROLE_OWNER, ROLE_ADMIN } = require('../../../Config/permissionGuard');
-            const callerRole = await getRoleType(companyId || '', req.uid);
-            if (callerRole !== ROLE_OWNER && callerRole !== ROLE_ADMIN) {
-                return res.status(403).json({
-                    status: false,
-                    statusText: 'Only an owner or an admin can change who someone reports to.',
-                    message: 'Forbidden'
-                });
-            }
-
-            const check = reportingLine.validateManagerAssignment(members, subject && subject.userId, data.managerId);
+            const check = reportingLine.validateManagerAssignment(members, subject.userId, data.managerId);
             if (!check.ok) {
                 return res.status(400).json({
                     status: false,
@@ -303,55 +315,51 @@ exports.updateMember = async (req, res) => {
         }
 
         const response = await MongoDbCrudOpration(companyId, params, 'findOneAndUpdate');
+        if (!response) {
+            return refuse(res, 404, MANAGER_ERROR[reportingLine.REASON.NO_SUBJECT]);
+        }
 
-        if (departing && subject) {
+        if (departing) {
             const moves = reportingLine.reassignReports(members, subject.userId);
             for (const move of moves) {
                 if (move.docId) await setMemberFields(companyId, move.docId, { managerId: move.managerId });
             }
         }
 
-        if (changesManager) {
-            socketEmitter.emit('update', {
-                type: 'update',
-                data: { data: response },
-                updatedFields: { managerId: data.managerId },
-                module: 'companyUsers'
-            });
+        clearMemberCaches(companyId, response.userId);
+        if (MEMBERSHIP_FIELDS.some((field) => Object.prototype.hasOwnProperty.call(data, field))) {
+            forgetMembership(companyId, subject.userId);
         }
+        socketEmitter.emit('update', {
+            type: 'update',
+            data: { data: response },
+            updatedFields: { ...data },
+            module: 'companyUsers'
+        });
 
-        removeCache(`company_users:${req.headers['companyid']}`);
-        removeCache("UserProjectData:", true);
-        removeCache(`UserData:${response.userId}`, false);
-        removeCache(`UserAllData:${req.headers['companyid']}`);
-        // SEC-04: audit member updates (role / guest-projects / status changes).
         try {
             require('../../Audit/recorder').recordAuditFromReq(req, {
                 action: 'member.update', entityType: 'member', entityId: String(id),
-                meta: { fields: Object.keys(data || {}) },
+                meta: { fields: Object.keys(data) },
             });
         } catch (e) { /* audit is best-effort */ }
 
-        if(response) {
-            return res.status(200).json({ status: true, data: response });
-        } else {
-            return res.status(404).json({ status: false });
-        }
-
+        return res.status(200).json({ status: true, statusText: 'Member updated.', data: response });
     } catch (error) {
         return res.status(500).json({
-            message: "An error occurred while update company member user",
-            error: error 
+            status: false,
+            statusText: "An error occurred while update company member user",
+            message: error.message || error
         });
     }
 }
 
 /**
  * This is common function for update member user
- * @param {*} method 
- * @param {*} queryObject 
- * @param {*} companyId 
- * @returns 
+ * @param {*} method
+ * @param {*} queryObject
+ * @param {*} companyId
+ * @returns
  */
 exports.updateMemberFunction = (companyId, queryObject, method) => {
     return new Promise(async (resolve, reject) => {
@@ -374,51 +382,64 @@ exports.updateMemberFunction = (companyId, queryObject, method) => {
         }
     })
 }
+
+/* The invitation-accept call (Invitation.vue): the invitee links their own account to the pending row. */
 exports.rootUpdateMember = async (req, res) => {
     try {
         const { id, data, companyId } = req.body;
 
-        if(!id) {
-            return res.status(400).json({
-                status: false,
-                message: `'id' parameter is required.`
-            });
+        if (!id || !OBJECT_ID_PATTERN.test(String(id))) {
+            return refuse(res, 400, `'id' parameter is required.`);
+        }
+        if (!companyId || !OBJECT_ID_PATTERN.test(String(companyId))) {
+            return refuse(res, 400, `'companyId' parameter is required.`);
+        }
+        if (!isPlainObject(data)) {
+            return refuse(res, 400, `'data' parameter is required.`);
+        }
+        if (!req.uid || !OBJECT_ID_PATTERN.test(String(req.uid))) {
+            return refuse(res, 401, 'Sign in to accept an invitation.');
         }
 
-        // Reporting lines are only writable where the cycle and eligibility rules run.
-        if (data && Object.prototype.hasOwnProperty.call(data, 'managerId')) {
-            return res.status(400).json({
-                status: false,
-                statusText: 'Set a reporting line through the members endpoint, where it is validated.',
-                message: 'managerId is not writable here'
-            });
+        const invite = await findMemberRow(companyId, id);
+        if (!invite) {
+            return refuse(res, 404, 'That invitation does not exist.');
+        }
+        const caller = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+            type: SCHEMA_TYPE.USERS,
+            data: [{ _id: String(req.uid) }, { Employee_Email: 1 }]
+        }, 'findOne');
+
+        const verdict = judgeInvitationAcceptance({ callerId: req.uid, callerEmail: caller && caller.Employee_Email, invite, data });
+        if (!verdict.ok) {
+            return refuse(res, verdict.code, verdict.statusText);
         }
 
-        const params = {
+        const accepted = { userId: String(req.uid), status: ACTIVE };
+        const response = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [
-                {
-                    _id: new mongoose.Types.ObjectId(id)
-                },
-                {
-                    $set: { ...data }
-                },
-                { returnNewDocument: true }
+                { _id: new mongoose.Types.ObjectId(id) },
+                { $set: accepted },
+                { returnDocument: 'after' }
             ]
-        }
+        }, 'findOneAndUpdate');
 
-        const response = await MongoDbCrudOpration(companyId, params, 'findOneAndUpdate');
+        clearMemberCaches(companyId, req.uid);
+        forgetMembership(companyId, req.uid);
+        socketEmitter.emit('update', {
+            type: 'update',
+            data: { data: response },
+            updatedFields: accepted,
+            module: 'companyUsers'
+        });
 
-        removeCache(`company_users:${companyId}`);
-        removeCache(`UserData:${data.userId}`, false);
-        removeCache(`UserAllData:${companyId}`);
-
-        return res.status(200).json({ status: true, data: response || {} });
-
+        return res.status(200).json({ status: true, statusText: 'Invitation accepted.', data: response || {} });
     } catch (error) {
         return res.status(500).json({
-            message: "An error occurred while update company member user",
-            error: error 
+            status: false,
+            statusText: "An error occurred while update company member user",
+            message: error.message || error
         });
     }
 }

@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { isShareToken, escapeHtml } = require('../PublicShares/helpers/shareRules');
+const { shareStillAuthorised } = require('../PublicShares/helpers/shareAccess');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo'); // canonical task create
 const { mapSubmission, buildDescription, buildDescriptionBlock } = require('./helpers/submissionRules');
 const { normalizeSettings, hydrateStored } = require('./helpers/formRules');
@@ -180,6 +181,8 @@ async function resolveForm(token) {
     }, 'findOne');
     if (!share || share.entityType !== 'form' || share.enabled === false) return null;
     if (share.expiresAt && new Date(share.expiresAt).getTime() < Date.now()) return null;
+    // Tasks are filed as the publisher, so the link dies with the publisher's access.
+    if (!(await shareStillAuthorised(index.companyId, share))) return null;
 
     const form = await MongoDbCrudOpration(index.companyId, {
         type: SCHEMA_TYPE.FORMS, data: [{ _id: share.entityId, deletedStatusKey: 0 }],
@@ -499,16 +502,18 @@ exports.submitForm = async (req, res) => {
             data: [{ _id: form._id }, { $inc: { submissionCount: 1 } }, {}],
         }, 'updateOne').catch(() => {});
 
-        // Linked back so the response table can show which task each answer made.
+        // taskMongo.create resolves only { status, id }; the key is assigned inside it.
+        const taskId = String(result.id || data._id);
+        const created = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{ _id: new mongoose.Types.ObjectId(taskId) }, { TaskKey: 1 }],
+        }, 'findOne').catch(() => null);
+        const taskKey = String((created && created.TaskKey) || '');
+
         if (stored && stored._id) {
             await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.FORM_SUBMISSIONS,
-                data: [{ _id: stored._id }, {
-                    $set: {
-                        taskId: String((result.data && result.data._id) || data._id),
-                        taskKey: String((result.data && result.data.TaskKey) || ''),
-                    },
-                }, {}],
+                data: [{ _id: stored._id }, { $set: { taskId, taskKey } }, {}],
             }, 'updateOne').catch(() => {});
         }
 
@@ -517,7 +522,7 @@ exports.submitForm = async (req, res) => {
             form,
             submissionId: stored && stored._id,
             answers: mapped.record,
-            task: (result.data && result.data._id) ? result.data : data,
+            task: { ...data, _id: taskId, TaskKey: taskKey || data.TaskKey },
             actor: { kind: 'system' },
         });
 

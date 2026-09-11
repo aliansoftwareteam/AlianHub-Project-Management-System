@@ -41,6 +41,8 @@ const NEEDS_SESSION_AND_COMPANY = [
     ['post', '/api/v1/findOnePrompts'],
     ['post', '/api/v1/getAiCategory'],
     ['post', '/api/v1/ai/description'],
+    ['post', '/api/v1/getAiModels'],
+    ['post', '/api/v1/findOneAiModel'],
     ['put', '/api/v1/push-mark-read'],
     ['get', '/api/v1/setting/skills'],
     ['put', '/api/v1/setting/skills'],

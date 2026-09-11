@@ -79,7 +79,7 @@ const gather = async (companyId, uid, { question, projectId, limit = MAX_PER_TYP
         title: clip(t.TaskName, 160),
         project: nameById[String(t.ProjectID)] || '',
         projectId: String(t.ProjectID || ''),
-        detail: clip(`${t.status || t.statusType || ''} ${t.Task_Priority ? `· ${t.Task_Priority}` : ''} ${t.rawDescription ? `· ${clip(t.rawDescription, 240)}` : ''}`, 300),
+        detail: clip(`${statusName(t)} ${t.Task_Priority ? `· ${t.Task_Priority}` : ''} ${t.rawDescription ? `· ${clip(t.rawDescription, 240)}` : ''}`, 300),
         updatedAt: t.updatedAt,
     }));
     (pages || []).forEach((p) => sources.push({
@@ -94,6 +94,8 @@ const gather = async (companyId, uid, { question, projectId, limit = MAX_PER_TYP
     }));
     return { sources, projects, scopedProjectIds: ids };
 };
+
+const statusName = (t) => ((t.status && typeof t.status === 'object') ? t.status.text : t.status) || t.statusType || '';
 
 const SYSTEM = `You answer questions about a project workspace.
 
