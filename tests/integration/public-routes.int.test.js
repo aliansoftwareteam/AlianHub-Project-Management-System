@@ -167,4 +167,34 @@ describe('invitations', () => {
         expect(res.body.statusText.AssignCompany).toEqual([]);
         expect(res.body.statusText.isEmailVerified).toBe(false);
     });
+
+    it('gives an existing account a 256-bit invitation link token', async () => {
+        const email = `link-token-${uniqueSuffix()}@e2e.alianhub.test`;
+        const created = await anonymous.post('/api/v2/createUser', { firstName: 'Link', lastName: 'Token', email, password: 'Str0ng!pass' });
+        expect(created.body.status).toBe(true);
+        const { api } = await loginAs('owner');
+        const invite = await api.post('/api/v2/sendInvitationEmail', { email, companyId: state.companyId, companyName: 'E2E', role: 3, designation: 0 });
+        expect(invite.body.data.linkId).toMatch(/^[0-9a-f]{64}$/);
+    });
+});
+
+describe('verification email', () => {
+    const newAccount = async () => {
+        const email = `verify-${uniqueSuffix()}@e2e.alianhub.test`;
+        const created = await anonymous.post('/api/v2/createUser', { firstName: 'Verify', lastName: 'Me', email, password: 'Str0ng!pass' });
+        expect(created.body.status).toBe(true);
+        return String(created.body.statusText._id);
+    };
+
+    it('resends to the account address without taking one from the request', async () => {
+        const uid = await newAccount();
+        const res = await anonymous.post('/api/v2/sendVerificationEmail', { uid });
+        expect(res.status).toBe(200);
+        expect(res.body.statusText).not.toBe('email is required.');
+    });
+
+    it('refuses an account id that does not exist', async () => {
+        const res = await anonymous.post('/api/v2/sendVerificationEmail', { uid: '000000000000000000000000', email: `someone-${uniqueSuffix()}@e2e.alianhub.test` });
+        expect(res.body.status).toBe(false);
+    });
 });
