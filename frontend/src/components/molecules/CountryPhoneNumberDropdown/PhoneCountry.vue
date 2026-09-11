@@ -1,10 +1,10 @@
 <template>
     <DropDown :id="uniqueId" :bodyClass="{'countrycode__dropdown' : true}" @isVisible="checkDropdown">
         <template #button>
-            <div class="dropdown">
+            <div class="dropdown" ref="dropdownButton">
                 <span class="imageCountry text-ellipsis">
                 <div class="vti__flag" :class="activeCountry?.isoCode.toLowerCase()"></div>
-                <span :ref="uniqueId" v-if="enabledCountryCode" class="black activeCountrydialCode">+{{ activeCountry?.dialCode }}</span>
+                <span v-if="enabledCountryCode" class="black activeCountrydialCode">+{{ activeCountry?.dialCode }}</span>
                 </span>
                 <img v-if="enabledArrowIcon" :src="arrow" alt="dropdown-arrow" class="dropdown-arrow">
             </div>
@@ -26,7 +26,7 @@
             <DropDownOption
                 v-for="(country, index) in sortedCountries"
                 :key="'phone'+index"
-                @click="$emit('onSelect', activeCountry),selectedComapany(country),$refs[uniqueId].click(),search = ''"
+                @click="chooseCountry(country)"
                 :highlight="index === highlightIndex"
                 :id="'item'+index"
             >
@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-    import { defineComponent, onMounted, ref,defineEmits ,defineProps , computed , inject, nextTick, watch} from "vue";
+    import { defineComponent, onMounted, onBeforeUnmount, ref,defineEmits ,defineProps , computed , inject, nextTick, watch} from "vue";
     import DropDown from '@/components/molecules/DropDown/DropDown.vue'
     import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
     import InputText from '@/components/atom/InputText/InputText.vue';
@@ -125,6 +125,20 @@
         emit("onSelect", activeCountry.value);
     }
 
+    const dropdownButton = ref(null);
+
+    const chooseCountry = (country) => {
+        if (!country) return;
+        selectedComapany(country);
+        dropdownButton.value?.click();
+        search.value = '';
+        highlightIndex.value = 0;
+    }
+
+    watch(search, () => {
+        highlightIndex.value = 0;
+    })
+
     function startListener() {
         document.addEventListener("keydown", keyListener)
     }
@@ -133,21 +147,18 @@
         document.removeEventListener("keydown", keyListener)
     }
 
+    onBeforeUnmount(stopListener)
+
     function keyListener(event) {
         if(event.keyCode === 13) { // Enter
-            emit('onSelect', activeCountry.value),
-            selectedComapany(sortedCountries.value[highlightIndex.value])
-            let timeZoneInput = document.getElementById('item'+highlightIndex.value)
-            timeZoneInput?.click();
-            search.value= ''
-            highlightIndex.value = 0;
+            chooseCountry(sortedCountries.value[highlightIndex.value]);
         } else if(event.keyCode === 38){ // UP
             highlightIndex.value = highlightIndex.value > 0 ? highlightIndex.value-1 : 0;
             nextTick(() => {
                 document.getElementById('item'+highlightIndex.value)?.scrollIntoView({behavior: "smooth", block: 'end'})
             })
         } else if (event.keyCode === 40){ // DOWN
-            highlightIndex.value = highlightIndex.value < sortedCountries.value.length-1 ? highlightIndex.value+1 : sortedCountries.value.length-1;
+            highlightIndex.value = Math.max(0, Math.min(highlightIndex.value + 1, sortedCountries.value.length - 1));
             nextTick(() => {
                 document.getElementById('item'+highlightIndex.value)?.scrollIntoView({behavior: "smooth", block: 'nearest', inline: 'start'})
             })

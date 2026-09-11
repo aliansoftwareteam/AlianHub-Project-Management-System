@@ -17,6 +17,7 @@ vi.mock('@/components/atom/CroppingTool/CroppingTool.vue', () => stub('CroppingT
 vi.mock('@/components/molecules/Sidebar/Sidebar.vue', () => stub('Sidebar'));
 
 import SettingCompanyDetails from '@/components/molecules/Setting/SettingCompanyDetails.vue';
+import allCountries from '@/components/molecules/CountryPhoneNumberDropdown/allCountry.js';
 
 const COMPANY_ID = 'company-1';
 
@@ -73,6 +74,37 @@ describe('Settings > General company details on a fresh company', () => {
         expect(method).toBe('put');
         expect(body.updateObject.Cst_Phone).toBe('4155552671');
         expect(body.updateObject.Cst_DialCode).toMatchObject({ isoCode: 'US', dialCode: '1' });
+        wrapper.unmount();
+    });
+
+    it('keeps a real dial code country when Enter is pressed after a search shrinks the list below the highlight', async () => {
+        Element.prototype.scrollIntoView = vi.fn();
+        if (!document.getElementById('my-dropdown')) {
+            const target = document.createElement('div');
+            target.id = 'my-dropdown';
+            document.body.appendChild(target);
+        }
+        const press = (keyCode) => {
+            const event = new KeyboardEvent('keydown', { bubbles: true });
+            Object.defineProperty(event, 'keyCode', { value: keyCode });
+            document.dispatchEvent(event);
+            return flushPromises();
+        };
+        const { wrapper, errors } = await open(fromSetupWizard);
+        apiRequest.mockResolvedValue({ status: 200, data: { _id: COMPANY_ID } });
+
+        await wrapper.find('.phone .dropdown').trigger('click');
+        await flushPromises();
+        for (let i = 0; i < 5; i++) await press(40);
+        const search = document.querySelector('.countrycode__dropdown input');
+        search.value = 'ind';
+        search.dispatchEvent(new Event('input'));
+        await flushPromises();
+        await press(13);
+
+        const [firstMatch] = allCountries.filter((country) => country.name.toLowerCase().includes('ind'));
+        expect(errors.map(String)).toEqual([]);
+        expect(wrapper.find('.phone .activeCountrydialCode').text()).toBe(`+${firstMatch.dialCode}`);
         wrapper.unmount();
     });
 });
