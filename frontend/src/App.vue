@@ -794,7 +794,7 @@ const handleSocketsConnection = async () => {
                         sessionStorage.setItem('joinedRooms', JSON.stringify(rooms));
                     });
                     const timeStamp = await apiRequestWithoutCompnay("get", `/api/v1/getTime?zone=${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
-                    sessionStorage.setItem('tableaveTime',new Date(timeStamp.data).getTime());
+                    sessionStorage.setItem('tableaveTime',new Date(timeStamp.data.data).getTime());
                     socket.value.emit('disconnectNameSpace',socket.value.id);
                 } else {
                     if (userId.value !== null && companyId.value) {
