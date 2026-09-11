@@ -30,7 +30,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 022 | Pieces worth porting from the closed pre-redesign PRs | backlog | low | — | backlog/022-salvage-from-closed-prs |
 | 023 | Sprint 0 — stop the bleeding: exploitable findings and cost correctness | active | high | — | active/023-sprint-0-stop-the-bleeding |
 | 024 | Sprint 1 — shared AI core and run correctness | active | high | 023 | active/024-sprint-1-shared-core-run-correctness |
-| 025 | Sprint 2 — agent revisions and the skill record | backlog | high | 024 | backlog/025-sprint-2-revisions-and-skill-record |
+| 025 | Sprint 2 — agent revisions and the skill record | active | high | 024 | active/025-sprint-2-revisions-and-skill-record |
 | 026 | Sprint 3 — observability foundation | backlog | high | 024 | backlog/026-sprint-3-observability-foundation |
 | 027 | Sprint 4 — the model router | backlog | high | 024, 026 | backlog/027-sprint-4-model-router |
 | 028 | Sprint 5 — the workflow engine | backlog | high | 024, 027 | backlog/028-sprint-5-workflow-engine |

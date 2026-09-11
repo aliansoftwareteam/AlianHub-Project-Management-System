@@ -1,7 +1,7 @@
 ---
 id: 025
 title: Sprint 2 — agent revisions and the skill record
-status: backlog
+status: active
 priority: high
 depends_on: [024]
 created: 2026-09-10
@@ -9,7 +9,7 @@ created: 2026-09-10
 
 # 025 — Sprint 2 — agent revisions and the skill record
 
-Status: backlog · depends on 024 · sprint 2 · two weeks · branch `feat/sprint-2-revisions-and-skill-record` (from `beta`)
+Status: active · depends on 024 · sprint 2 · two weeks · branch `feat/sprint-2-revisions-and-skill-record` (from `beta`)
 
 Source: `docs/AI-PLATFORM-ARCHITECTURE.md`, "Development and integration plan", Sprint 2. Filed 2026-09-10.
 
