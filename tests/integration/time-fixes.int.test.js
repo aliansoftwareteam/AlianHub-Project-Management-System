@@ -45,19 +45,6 @@ async function logHour(member, { project, task }) {
 }
 
 describe('time — regressions for confirmed findings', () => {
-    it('TIM-04 refuses a guest reading company-wide hours-by-source', async () => {
-        const owner = await loginAs('owner');
-        const member = await loginAs('member');
-        await logHour(member, await projectWithTask(owner, member));
-
-        const guest = await loginAs('guest');
-        const res = await guest.api.get('/api/v1/timesheet/hours-by-source', { query: { start: 1, end: 9999999999 } });
-        const admin = await loginAs('admin');
-        const companyWide = await admin.api.get('/api/v1/timesheet/hours-by-source', { query: { start: 1, end: 9999999999 } });
-        expect(companyWide.body.data.entryCount).toBeGreaterThan(0);
-        expect(refused(res) || (res.body.data.scope === 'self' && res.body.data.entryCount === 0)).toBe(true);
-    });
-
     it('TIM-04 limits a member\'s variance summary to their own time', async () => {
         const owner = await loginAs('owner');
         const member = await loginAs('member');
@@ -86,12 +73,6 @@ describe('time — regressions for confirmed findings', () => {
         expect(list.body.data).toEqual([]);
         const set = await member.api.post('/api/v1/timesheet/rates', { scope: 'default', rate: 1, currency: 'USD' });
         expect(set.status).toBe(403);
-    });
-
-    it('TIM-05 rejects a malformed invoice/find body with 400', async () => {
-        const admin = await loginAs('admin');
-        const res = await admin.api.post('/api/v1/invoice/find', { findQuery: { companyId: state.companyId } });
-        expect(res.status).toBe(400);
     });
 
     it('TIM-06 refuses draft-from-month on a project with no billing contract', async () => {

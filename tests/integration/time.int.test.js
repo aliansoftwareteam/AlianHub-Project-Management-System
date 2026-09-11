@@ -198,14 +198,14 @@ describe('time — regressions for confirmed findings', () => {
     });
 
     // TIM-04: a guest can read company-wide time data with no role scoping.
-    it.failing('TIM-04 refuses a guest reading company-wide hours-by-source', async () => {
+    it('TIM-04 refuses a guest reading company-wide hours-by-source', async () => {
         const guest = await loginAs('guest');
         const res = await guest.api.get('/api/v1/timesheet/hours-by-source', { query: { start: 1, end: 9999999999 } });
         expect(refused(res)).toBe(true);
     });
 
     // TIM-05: a non-pipeline findQuery should be a 400, not an unhandled 500.
-    it.failing('TIM-05 rejects a malformed invoice/find body with 400', async () => {
+    it('TIM-05 rejects a malformed invoice/find body with 400', async () => {
         const admin = await loginAs('admin');
         const res = await admin.api.post('/api/v1/invoice/find', { findQuery: { companyId: state.companyId } });
         expect(res.status).toBe(400);
