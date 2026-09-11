@@ -1,71 +1,57 @@
 # Handoff — where to start next session
 
-Updated 2026-09-11. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
+Updated 2026-09-11 (evening). Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (4d967052)
+## State of `beta` (7f423ea2, `14.36.0-beta.105`)
 
-- Sprint 2 (task 025) is **code-complete and merged**: PRs #576–#580. Agents have immutable revisions pinned per run, skills are data with a validator and manifest, and `brief.parse` runs as a data skill. Progress ticked in `Tasks/active/025-sprint-2-revisions-and-skill-record/progress.md`.
-- The AI-core shims are gone (#575); every consumer requires `Modules/AICore/` and a conventions test rejects the old paths.
-- Sprint 1 (task 024) is **code-complete and merged**: PRs #566–#572, one per step. `Modules/AICore/` exists with shims at the old paths; consumers are not yet repointed. Progress ticked in `Tasks/active/024-sprint-1-shared-core-run-correctness/progress.md`.
-- Sprint 0 (task 023) is **code-complete and merged**: PRs #555–#562, one per step, each with a test that reproduced its defect first. Progress ticked in `Tasks/active/023-sprint-0-stop-the-bleeding/progress.md`.
-- Task 017 (agent memory and the run engine on LangGraph JS) merged via #552. ADR 003 and `docs/AI-PLATFORM-ARCHITECTURE.md` merged via #554. The twelve sprint tasks (023–032, rewritten 018/019) merged via #553.
-- All gates green on merged beta: backend jest 1965 tests, `tests/conventions` 94, frontend vitest 142, `npm run i18n:check` exit 0, eslint 0 errors, `vue-cli-service build` done.
-- No open PRs. No unmerged branches with work on them.
+- **QA programme (task 034):** all ten area sweeps and their regression suites merged, and every fix PR merged (builds 72–105). The area-by-area PR list is in `Tasks/active/034-end-to-end-qa-programme/progress.md`; everything the fixes left out is in `followups.md` next to it.
+- **Sprint 3 (task 026):** all six steps merged. Step 5, rate alerts, is #629 (build 103) and ships off by default.
+- **Beta versioning (task 033):** merged and verified; #617 (build 87) keeps the version honest when git is slow. `npm run version:show` prints the running build; `docs/BETA-LOG.md` is regenerated in every docs PR (CLAUDE.md Rule 4).
+- Sprints 0–2 (tasks 023–025) are code-complete; their live-environment checks are still open below.
+- Open PRs: only #613, which duplicates the merged #612. The owner decides whether to close it.
 
-## Still open on task 023 (needs the live environment, owner does these)
+## Owner decisions recorded today
 
-1. `npm run migrate -- up` on the dev database (migration `007-encrypt-integration-secrets`).
-2. The in-process sweep with the real model: confirm every configured provider books a non-zero cost, and that an unpriced model is refused with the named reason.
-3. Owner and member browser sweep of the undo deadline: run detail page and Settings → Audit log; record it in 023's progress.md, then move 023 to `done/`.
+- Only owners and admins delete agents; an agent's creator does not keep delete rights (#620).
+- `REFRESH_TOKEN_REUSE_GRACE_SECONDS` defaults to 10; set it to 0 for strict refresh-token revocation (#609).
+- Webhooks to private or internal hosts are refused with no opt-out (#625). The planned instance-owner allowlist is waiting on the owner.
 
-## In flight (2026-09-11, evening)
+## Next up
 
-- **Beta is `14.36.0-beta.71`.** Check with `npm run version:show`; the build log is `docs/BETA-LOG.md` (CLAUDE.md Rule 4).
-- **Sprint 3 (task 026):** steps 1–4 and 6 merged (#587–#591). Step 5, rate alerts with the Notification settings row, is being built on `feat/s3-rate-alerts`.
-- **QA programme (task 034):** the demo team seed (#593) and the E2E harness with its CI job (#592) are merged. Ten area agents are sweeping and writing specs, each on `test/qa-<area>` with findings in `Tasks/active/034-end-to-end-qa-programme/findings/<area>.md`. Fix branches in progress: `fix/project-edit-membership`, `fix/refresh-token-uniqueness`, `fix/unauthenticated-v1-routes`, `fix/guest-role-id`. Member rules fixed in #595.
-- **Demo team:** credentials in `.demo-accounts.local.json` at the repo root (gitignored, mode 600). Session tokens come from `npm run demo:token -- --email <demo email>`; see `docs/QA-DEMO-TEAM.md`.
+1. Owner and member browser sweeps still to record: task 026 (run trace, replay, AI Health, Notification settings alerts), task 033 (Stats and Upgrade), task 025 (revision history, pinned revision), task 023 (undo deadline).
+2. A live OTLP collector check for task 026, then move 026 to `done/` once its exit gate is met.
+3. Schedule the items in `Tasks/active/034-end-to-end-qa-programme/followups.md`. The security ones first: `PUT` company open to any member, project filter IDOR, `GET /api/v1/task/:id` without a visibility check, `invoice/find` across companies, refresh token embedded in the access token.
+4. Sprint 4 (task 027, the model router) is next in the programme.
 
-## Still open on task 024 (Sprint 1)
+## Still open on tasks 023–025 (needs the live environment, owner does these)
 
-1. Run the migrations on the dev database: `npm run migrate -- up` (007 and 008, then Sprint 2's 009 and 010).
-2. In-process sweep with the real model; owner and member sweep of Instance console → AI agents spend card; then move 024 to `done/`.
+1. `npm run migrate -- up` on the dev database (007 and 008, Sprint 2's 009 and 010, then 011 and 012; the server also runs them at start unless `MIGRATIONS_AUTO=false`).
+2. The in-process sweep with the real model: every configured provider books a non-zero cost, and an unpriced model is refused with the named reason.
+3. The browser sweeps listed under Next up, then move 023, 024 and 025 to `done/`.
 
-## Still open on task 025 (Sprint 2)
+## Things learned that affect the next session
 
-1. Owner and member sweep of Agent settings → revision history and Run detail → pinned revision.
-2. In-process sweep: change an agent, promote and roll back a revision, start a run and confirm it names its revision; run `brief.parse` on a real task through the seeded data skill.
-3. Then move 025 to `done/`.
-
-## Sprint 3 — task 026 (in progress; see In flight) (`Tasks/backlog/026-sprint-3-observability-foundation/`)
-
-Move it to `active/` and work its steps, one PR each, from `beta`:
-
-1. OpenTelemetry with the trace identifier on the run row, every step row, every audit row and every log line; logs move to structured records; the exporter is off unless an endpoint is configured.
-2. The replay record per model call: prompt hash and reference, retrieved chunk identifiers, raw response, model and parameters, agent and skill revisions, with a retention and redaction policy. (absorbs 019 "trace per run")
-3. A metrics endpoint behind admin auth: rate, errors and duration per workflow, step, agent and model; token and cost counters; approval, decline and revert rates. (absorbs 019 "dashboard in /ai", the health half)
-4. Provider error codes preserved end to end and grouped, so an error tracker has something to group.
-5. Alerts on rates: error rate per agent, approval rate falling, cost against forecast, queue age.
-6. (added) The two competing uncaught-exception handlers collapse into one path that reports, flushes and exits.
-
-## Things learned today that affect the next session
-
-- Background agents can stop on the account usage limit mid-task. Check the remote branch and the worktree before relaunching; so far none had pushed partial work.
+- **Parallel agents:** keep to 6–8 heavy agents with `jest --maxWorkers=2`; about twenty at once pushed load past 118 on 8 CPUs and caused false timeouts. Check `uptime` first.
+- **Never `git stash` in a worktree.** The stash stack is shared by every worktree, and one agent popped another's stash. Set work aside with a WIP commit. The lint-staged pre-commit hook makes its own stash, so agents commit with `git -c core.hooksPath=/dev/null commit` and run eslint themselves.
+- **Known-failing tests flip with the fix.** A regression test marked `it.failing` or `test.fail` turns CI red once its bug is fixed. Every fix PR flips its own finding's tests by exact title; when a QA PR and a fix PR overlap, whichever merges second flips.
+- **Merge churn:** every PR adds keys to the ten `frontend/src/locales/*.pending.json` files, so open PRs conflict after each merge. Resolve by parsing both sides as JSON and keeping every key. Merge a PR that touches shared role or permission code first, or it loses the race repeatedly.
+- **Merge commits and commitlint:** keep git's default "Merge remote-tracking branch ..." subject; a custom `merge:` subject fails the commit-message check.
+- **Integration runs:** `instance.int.test.js` turns maintenance mode on, so local runs need `--runInBand`. An integration test can depend on file order when two suites share a user's data; reproduce by running the suspect files together.
+- **Flaky e2e:** `access.spec.js` "Two-factor and change-password screens render" sometimes keeps the old title after a hash-only navigation (follow-up 27).
+- Agent worktrees have no `node_modules` and cannot source nvm; give agents `PATH="$HOME/.nvm/versions/node/v20.20.2/bin:<repo>/node_modules/.bin:$PATH"` or symlink the parent's `node_modules`. Husky's pre-push rejects a detached HEAD and branch names outside `<type>/<kebab>`.
 - Use `grep -a` in this repo: some `.js` files are detected as binary and plain `grep` skips them silently.
-
-- Merging PRs needs the owner's say-so each session; the auto-mode classifier denies `gh pr merge` otherwise.
-- Agent worktrees have no `node_modules` and cannot source nvm; give agents `PATH="$HOME/.nvm/versions/node/v20.20.2/bin:<repo>/node_modules/.bin:$PATH"` and let them symlink the parent's `node_modules` (root and `frontend/`) without committing it. Husky's pre-push rejects a detached HEAD; rebase on a throwaway branch and push `HEAD:<branch>`.
-- Every Sprint 1 step touched `agent_runs`, so parallel branches conflicted in turn; when several PRs share a schema file, merge them in order and rebase each on the freshly merged beta (an agent per rebase works well).
 - The frontend builds with `vue-cli-service build`, not vite. The "magic comment" warnings in that build are pre-existing.
-- Approximate permission mappings in `Modules/Agents/registry.js` (reminder.create, page.draft, docs.read, chat.post, task.link, deploy.staging) are documented in PR #560 and worth a reviewer's eye during Sprint 8.
-- `markUndone` in `Modules/Agents/undo.js` still swallows its own failure; scheduled for Sprint 8 (task 031), not a Sprint 0 gap.
+- **Demo team:** credentials in `.demo-accounts.local.json` at the repo root (gitignored, mode 600). Session tokens come from `npm run demo:token -- --email <demo email>`; see `docs/QA-DEMO-TEAM.md`.
 
 ## Handy commands
 
 ```bash
 npm run nodemon             # backend on :4000 (Node 20: source ~/.nvm/nvm.sh && nvm use 20)
 cd frontend && npm run serve
+npm run version:show
 npm run migrate -- status
-npx jest --selectProjects unit && npx jest tests/conventions
+npx jest --selectProjects unit --maxWorkers=2 && npx jest tests/conventions
+E2E_MONGODB_URL=mongodb://127.0.0.1:27018 npm run test:integration
 cd frontend && npx vitest run
 npm run i18n:check
 ```
