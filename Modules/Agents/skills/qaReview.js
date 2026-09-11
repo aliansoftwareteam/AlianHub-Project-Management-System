@@ -13,6 +13,10 @@ module.exports = {
     // Tool scopes. The toolbelt is filtered to exactly this list, whatever the
     // model asks for — a skill cannot widen its own permissions.
     scopes: ['task.read', 'task.subtask.create', 'task.comment'],
+    inputs: ['public_url'],
+    // The page audit measures fourteen facts in engine/pageAudit.js; that evidence layer is not in the vocabulary, so it stays code.
+    reads: ['page'],
+    emits: ['subtask.create', 'task.comment'],
     maxFindings: 8,
     maxTokens: 4000,
     usesMemory: false,

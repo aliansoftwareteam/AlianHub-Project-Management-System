@@ -31,7 +31,7 @@ describe('#15 DELETE /api/v2/agents/:id', () => {
         const app = { use: jest.fn(), get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() };
         routes.init(app);
         expect(app.delete).toHaveBeenCalledWith('/api/v2/agents/:id', ctrl.deleteAgent);
-        expect(app.delete.mock.calls.map(([p]) => p)).toEqual(['/api/v2/agents/account', '/api/v2/agents/:id']);
+        expect(app.delete.mock.calls.map(([p]) => p)).toEqual(['/api/v2/agents/skills/:key', '/api/v2/agents/account', '/api/v2/agents/:id']);
         expect(require('fs').readFileSync(require('path').join(__dirname, '../Config/setMiddleware.js'), 'utf8')).toMatch(/'\/api\/v2\/agents'/);
     });
 

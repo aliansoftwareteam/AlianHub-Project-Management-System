@@ -4,6 +4,7 @@ const { FEATURES } = require('../../AICore/features');
 const { audit, extractUrl } = require('./pageAudit');
 const { isBlockedHostname } = require('./safeFetch');
 const skillIndex = require('../skills');
+const skillRecord = require('../skillRecord');
 
 // A deterministic pipeline, not a free-roaming agent loop:
 //
@@ -22,8 +23,9 @@ const GATHERED = 'gathered';
 
 const getSkill = (slug) => skillIndex.getSkill(slug);
 
-const requireSkill = (slug) => {
-    const skill = getSkill(slug);
+/* A company's data skill first, the built-in code skill second. */
+const requireSkill = async (companyId, slug) => {
+    const skill = companyId ? await skillRecord.getSkill(companyId, slug) : getSkill(slug);
     if (!skill) throw Object.assign(new Error(`unknown skill "${slug}"`), { deterministic: true });
     return skill;
 };
@@ -89,11 +91,11 @@ const refused = (skill, { refused: ticket, model, usage }, started) => ({ status
 
 /* PHASE 1 — gather. A generic skill collects its own input; the page audit
  * needs a public URL in the task. Either declines with `skipped`. */
-async function gather({ skillSlug = 'qa-review', task, companyId, memory }) {
-    const skill = requireSkill(skillSlug);
+async function gather({ skillSlug = 'qa-review', task, companyId, memory, startedBy }) {
+    const skill = await requireSkill(companyId, skillSlug);
     const started = Date.now();
     if (skill.kind === 'generic') {
-        const context = await skill.gather({ task, companyId, memory });
+        const context = await skill.gather({ task, companyId, memory, startedBy });
         if (!context || context.skip) return skipped(skill, (context && context.skip) || 'nothing to work on', started);
         return { status: GATHERED, skill: skill.slug, context };
     }
@@ -108,7 +110,7 @@ async function gather({ skillSlug = 'qa-review', task, companyId, memory }) {
 
 /* Skills other than the page audit: ask the model once about the gathered
  * context and hand back a summary plus the changes the run should propose or apply. */
-async function analyseGeneric(skill, { task, context, budget, spend }) {
+async function analyseGeneric(skill, { task, context, budget, spend, agent }) {
     const started = Date.now();
     const asked = await askModel(skill, { prompt: skill.buildUserPrompt({ task, context }), budget, spend });
     if (asked.refused) return refused(skill, asked, started);
@@ -119,8 +121,9 @@ async function analyseGeneric(skill, { task, context, budget, spend }) {
     let raw = answer;
     let dropped = [];
     if (raw && typeof skill.verify === 'function') ({ raw, dropped } = skill.verify({ raw, context }));
-    const { summary, changes } = skill.toChanges({ task, raw, context });
-    return { status: 'success', skill: skill.slug, model, degraded, summary, changes, dropped, findings: [], usage, durationMs: Date.now() - started };
+    const emitted = skill.toChanges({ task, raw, context, agent });
+    dropped = dropped.concat(Array.isArray(emitted.dropped) ? emitted.dropped : []);
+    return { status: 'success', skill: skill.slug, model, degraded, summary: emitted.summary, changes: emitted.changes, dropped, findings: [], usage, durationMs: Date.now() - started };
 }
 
 /* The page audit: ground → analyse → verify → emit. The caller writes; this
@@ -167,16 +170,16 @@ async function analyseAudit(skill, { task, context, budget, spend }) {
 }
 
 /* PHASES 2–5 on a gathered context. */
-async function analyse({ skillSlug = 'qa-review', task, context, budget = {}, spend }) {
-    const skill = requireSkill(skillSlug);
-    return skill.kind === 'generic' ? analyseGeneric(skill, { task, context, budget, spend }) : analyseAudit(skill, { task, context, budget, spend });
+async function analyse({ skillSlug = 'qa-review', task, context, budget = {}, spend, companyId, agent }) {
+    const skill = await requireSkill(companyId || (spend && spend.companyId), skillSlug);
+    return skill.kind === 'generic' ? analyseGeneric(skill, { task, context, budget, spend, agent }) : analyseAudit(skill, { task, context, budget, spend });
 }
 
-async function run({ skillSlug = 'qa-review', task, companyId, budget = {}, spend }) {
+async function run({ skillSlug = 'qa-review', task, companyId, budget = {}, spend, agent }) {
     const started = Date.now();
     const gathered = await gather({ skillSlug, task, companyId });
     if (gathered.status !== GATHERED) return gathered;
-    const result = await analyse({ skillSlug, task, context: gathered.context, budget, spend: spend || { feature: FEATURES.AGENT_RUN, companyId } });
+    const result = await analyse({ skillSlug, task, context: gathered.context, budget, spend: spend || { feature: FEATURES.AGENT_RUN, companyId }, companyId, agent });
     return { ...result, durationMs: Date.now() - started };
 }
 

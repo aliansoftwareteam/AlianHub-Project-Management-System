@@ -94,6 +94,7 @@ const {
     agentRunsSchema,
     aiUsageSchema,
     agentProposalsSchema,
+    agentSkillsSchema,
     callsSchema,
     integrationConnectionsSchema,
     cloudStorageConnectionsSchema,
@@ -292,6 +293,8 @@ exports.checkType = (type) => {
             return aiUsageSchema
         case SCHEMA_TYPE.AGENT_PROPOSALS:
             return agentProposalsSchema
+        case SCHEMA_TYPE.AGENT_SKILLS:
+            return agentSkillsSchema
         case SCHEMA_TYPE.CALLS:
             return callsSchema
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
@@ -500,6 +503,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AI_USAGE}`
         case SCHEMA_TYPE.AGENT_PROPOSALS:
                 return `${dbCollections.AGENT_PROPOSALS}`
+        case SCHEMA_TYPE.AGENT_SKILLS:
+                return `${dbCollections.AGENT_SKILLS}`
         case SCHEMA_TYPE.CALLS:
                 return `${dbCollections.CALLS}`
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:

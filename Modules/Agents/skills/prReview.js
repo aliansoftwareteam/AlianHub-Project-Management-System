@@ -22,6 +22,10 @@ module.exports = {
     kind: 'generic',
     description: 'Fetches the pull request a task links to, summarises the change and flags risk.',
     scopes: ['task.read', 'task.comment'],
+    inputs: ['pr_link'],
+    // pr_diff is an external read, which the data vocabulary does not carry before ADR 003 phase 4.
+    reads: ['pr_diff'],
+    emits: ['task.comment'],
     maxTokens: 2500,
     usesMemory: false,
 

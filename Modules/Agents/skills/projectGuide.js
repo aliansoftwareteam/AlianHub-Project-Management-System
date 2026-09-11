@@ -39,6 +39,9 @@ module.exports = {
     kind: 'generic',
     description: 'Answers "what next" on a task from the project\'s stored guide and its plan, and proposes the next tasks.',
     scopes: ['task.read', 'task.comment', 'task.subtask.create'],
+    inputs: ['project_task'],
+    reads: ['project', 'project.tasks', 'memory', 'task'],
+    emits: ['task.comment', 'subtask.create'],
     maxTokens: 1800,
 
     async gather({ task, companyId, startedBy, memory }) {
