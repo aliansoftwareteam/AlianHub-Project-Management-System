@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 
 const { apiRequest, echo } = vi.hoisted(() => ({
@@ -28,13 +28,20 @@ const calls = [
 
 const mountReplay = async ({ replayId = 'rp1', rows = calls } = {}) => {
     apiRequest.mockImplementation(() => ok(rows));
-    const wrapper = mount(AgentRunReplay, { props: { runId: 'r1', replayId }, global: { mocks: { $t: echo } } });
+    const wrapper = mount(AgentRunReplay, { props: { runId: 'r1', replayId }, attachTo: document.body, global: { mocks: { $t: echo } } });
     await flushPromises();
     return wrapper;
 };
 
 describe('AgentRunReplay', () => {
-    beforeEach(() => { apiRequest.mockReset(); });
+    beforeEach(() => {
+        apiRequest.mockReset();
+        Element.prototype.scrollIntoView = vi.fn();
+    });
+    afterEach(() => {
+        window.location.hash = '';
+        document.body.innerHTML = '';
+    });
 
     it('carries the #replay anchor and the redaction line', async () => {
         const wrapper = await mountReplay();
@@ -88,6 +95,49 @@ describe('AgentRunReplay', () => {
         expect(row.find('[data-test="replay-error-code"]').text()).toBe('Ai.replay_error_code {"code":"rate_limit_exceeded"}');
         expect(row.find('[data-test="replay-truncated"]').exists()).toBe(true);
         expect(row.find('[data-test="replay-response"]').exists()).toBe(false);
+    });
+
+    it('gives every call the #replay-<recordId> anchor', async () => {
+        const wrapper = await mountReplay();
+        expect(wrapper.findAll('[data-test="replay-call"]').map((row) => row.attributes('id'))).toEqual(['replay-rp1', 'replay-rp2']);
+    });
+
+    it('focus expands the named call and scrolls to it', async () => {
+        const wrapper = await mountReplay();
+        await wrapper.vm.focus('rp2');
+        const rows = wrapper.findAll('[data-test="replay-call"]');
+        expect(rows[0].find('[data-test="replay-body"]').exists()).toBe(false);
+        expect(rows[1].find('[data-test="replay-body"]').exists()).toBe(true);
+        expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
+        expect(Element.prototype.scrollIntoView.mock.contexts[0]).toBe(rows[1].element);
+    });
+
+    it('focus on an unknown record leaves every call collapsed', async () => {
+        const wrapper = await mountReplay();
+        await wrapper.vm.focus('missing');
+        expect(wrapper.find('[data-test="replay-body"]').exists()).toBe(false);
+        expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it('a focus asked before the calls load is applied once they arrive', async () => {
+        let resolve;
+        apiRequest.mockImplementation(() => new Promise((r) => { resolve = r; }));
+        const wrapper = mount(AgentRunReplay, { props: { runId: 'r1', replayId: 'rp1' }, attachTo: document.body, global: { mocks: { $t: echo } } });
+        await wrapper.vm.focus('rp2');
+        resolve({ data: { status: true, data: calls } });
+        await flushPromises();
+        expect(wrapper.findAll('[data-test="replay-call"]')[1].find('[data-test="replay-body"]').exists()).toBe(true);
+    });
+
+    it('opens the call named by the page hash on arrival and when the hash changes', async () => {
+        window.location.hash = '#replay-rp2';
+        const wrapper = await mountReplay();
+        expect(wrapper.findAll('[data-test="replay-call"]')[1].find('[data-test="replay-body"]').exists()).toBe(true);
+
+        window.location.hash = '#replay-rp1';
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+        await flushPromises();
+        expect(wrapper.findAll('[data-test="replay-call"]')[0].find('[data-test="replay-body"]').exists()).toBe(true);
     });
 
     it('shows the server refusal when the replay cannot be loaded', async () => {

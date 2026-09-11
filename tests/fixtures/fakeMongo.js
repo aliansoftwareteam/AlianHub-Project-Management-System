@@ -1,6 +1,6 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
 // language for the agent modules (equality, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type, $set/$inc/$push,
-// conditional findOneAndUpdate, sort/limit on find, declared unique indexes that
+// conditional findOneAndUpdate, deleteMany, sort/limit on find, $match/$group aggregate, declared unique indexes that
 // reject a duplicate save with E11000) so a test can assert on what was written.
 
 let seq = 1;
@@ -68,6 +68,32 @@ const ordered = (list, options = {}) => {
     return options.limit ? out.slice(0, options.limit) : out;
 };
 
+const fieldOf = (doc, ref) => (typeof ref === 'string' && ref.startsWith('$') ? read(doc, ref.slice(1)) : ref);
+const groupKeyOf = (doc, id) => (id && typeof id === 'object' ? Object.fromEntries(Object.entries(id).map(([k, ref]) => [k, fieldOf(doc, ref)])) : fieldOf(doc, id));
+const ACCUMULATORS = {
+    $sum: (prev, v) => (prev || 0) + (typeof v === 'number' ? v : 0),
+    $max: (prev, v) => (v == null || (prev != null && sortable(prev) >= sortable(v)) ? prev : v),
+};
+
+/* $group with a field or compound _id and $sum / $max; a group naming no accumulator counts into `n`. */
+const group = (docs, spec) => {
+    const fields = Object.entries(spec).filter(([name]) => name !== '_id');
+    const out = new Map();
+    docs.forEach((d) => {
+        const id = groupKeyOf(d, spec._id);
+        const key = JSON.stringify(id);
+        const acc = out.get(key) || { _id: id };
+        if (!fields.length) acc.n = (acc.n || 0) + 1;
+        fields.forEach(([name, op]) => {
+            const [kind, ref] = Object.entries(op)[0];
+            if (!ACCUMULATORS[kind]) throw new Error(`fakeMongo: unsupported accumulator ${kind}`);
+            acc[name] = ACCUMULATORS[kind](acc[name], fieldOf(d, ref));
+        });
+        out.set(key, acc);
+    });
+    return [...out.values()];
+};
+
 const duplicateKey = (fields) => Object.assign(new Error(`E11000 duplicate key error collection: fake index: ${fields.join('_1_')}_1`), { code: 11000 });
 
 const create = () => {
@@ -93,19 +119,17 @@ const create = () => {
         if (method === 'find') return ordered(list.filter((d) => matches(d, data[0])), data[2]).map(clone);
         if (method === 'findOne') return clone(list.find((d) => matches(d, data[0])) || null);
         if (method === 'countDocuments') return list.filter((d) => matches(d, data[0])).length;
+        if (method === 'deleteMany') { const kept = list.filter((d) => !matches(d, data[0])); store[type] = kept; return { deletedCount: list.length - kept.length }; }
         if (method === 'findOneAndUpdate') { const doc = list.find((d) => matches(d, data[0])); if (!doc) return null; apply(doc, data[1]); return clone(doc); }
         if (method === 'updateOne') { const doc = list.find((d) => matches(d, data[0])); if (doc) apply(doc, data[1]); return { modifiedCount: doc ? 1 : 0 }; }
         if (method === 'updateMany') { const hit = list.filter((d) => matches(d, data[0])); hit.forEach((d) => apply(d, data[1])); return { modifiedCount: hit.length }; }
         if (method === 'aggregate') {
             const [pipeline] = data;
-            const match = pipeline.find((s) => s.$match);
-            const group = pipeline.find((s) => s.$group);
-            const subset = list.filter((d) => matches(d, (match && match.$match) || {}));
-            if (!group) return subset.map(clone);
-            const key = String(group.$group._id).replace(/^\$/, '');
-            const out = new Map();
-            subset.forEach((d) => { const k = d[key]; out.set(k, { _id: k, n: (out.get(k) ? out.get(k).n : 0) + 1 }); });
-            return [...out.values()];
+            return pipeline.reduce((docs, stage) => {
+                if (stage.$match) return docs.filter((d) => matches(d, stage.$match));
+                if (stage.$group) return group(docs, stage.$group);
+                return docs;
+            }, list).map(clone);
         }
         throw new Error(`fakeMongo: unsupported method ${method}`);
     });

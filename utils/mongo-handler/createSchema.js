@@ -187,6 +187,7 @@ agentsSchema.index({ ownerId: 1 });
 
 const agentRunsSchema = new Schema(schema.agentRuns, {strict: true, timestamps: true});
 agentRunsSchema.index({ agentId: 1, startedAt: -1 });
+agentRunsSchema.index({ startedAt: -1 });
 agentRunsSchema.index({ status: 1, startedAt: -1 });
 agentRunsSchema.index({ taskId: 1, startedAt: -1 });
 agentRunsSchema.index({ projectId: 1, status: 1 });
@@ -221,6 +222,7 @@ agentSkillsSchema.index({ enabled: 1, retiredAt: 1 });
 
 const agentProposalsSchema = new Schema(schema.agentProposals, {strict: true, timestamps: true});
 agentProposalsSchema.index({ status: 1, createdAt: -1 });
+agentProposalsSchema.index({ createdAt: -1 });
 agentProposalsSchema.index({ agentId: 1, createdAt: -1 });
 agentProposalsSchema.index({ taskId: 1 });
 const callsSchema = new Schema(schema.calls, {strict: true, timestamps: true});
@@ -313,6 +315,7 @@ companyUserSchema.index({ userId: 1 });
 
 // sessions: refresh-token lookup is what `Config/jwt.js` does.
 sessionsSchema.index({ refreshToken: 1 });
+sessionsSchema.index({ refreshTokenHash: 1 });
 sessionsSchema.index({ userId: 1 });
 
 // resetAttempt: keyed by IP.

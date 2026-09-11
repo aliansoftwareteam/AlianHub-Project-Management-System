@@ -21,6 +21,7 @@ const undo = require('./undo');
 const budget = require('./budget');
 const revisions = require('./revisions');
 const skillRecord = require('./skillRecord');
+const { buildTrace } = require('./runTrace');
 
 const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId) || '';
 // 'mention' is a run started by @naming the agent in a comment (13b); it is
@@ -360,6 +361,8 @@ exports.getRun = async (req, res) => {
         const pinned = await revisions.forRun(companyId, plain);
         plain.agentRevision = Number(pinned.n);
         plain.skillRevision = plain.skillRevision || null;
+        plain.traceId = plain.traceId || null;
+        plain.steps = Array.isArray(plain.steps) ? plain.steps : [];
         const { actor } = await humanActor(req);
         const ctx = await undo.undoContext(companyId, actor, { run: plain });
         const check = await revert.revertCheck(companyId, plain, { actor, isPrivileged: await privileged(companyId, actor.userId), ...ctx });
@@ -375,7 +378,7 @@ exports.getRun = async (req, res) => {
         const revision = { n: Number(pinned.n), state: pinned.state, synthetic: Boolean(pinned.synthetic), missing: Boolean(pinned.missing), createdAt: pinned.createdAt || null, createdBy: pinned.createdBy || null, serves: pinned.serves || [], skillRefs: pinned.skillRefs || [] };
         const [firstReplay] = await replaysOf(companyId, run._id, { _id: 1 }, 1).catch(() => []);
         if (firstReplay) plain.replayId = String(firstReplay._id);
-        return res.send({ status: true, data: { run: plain, audit, revision } });
+        return res.send({ status: true, data: { run: plain, audit, revision, trace: buildTrace(plain, audit) } });
     } catch (e) { logger.error(`getRun: ${e.message}`); return fail(res, e.message); }
 };
 

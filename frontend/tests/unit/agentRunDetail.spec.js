@@ -32,8 +32,9 @@ const run = {
 
 const storeFor = (roleType) => createStore({ modules: { settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType }) } } } });
 
-const mountDetail = async ({ roleType = 3, userId = 'u1', payload = { run, audit: [] } } = {}) => {
+const mountDetail = async ({ roleType = 3, userId = 'u1', payload = { run, audit: [] }, replay } = {}) => {
     apiRequest.mockImplementation((type, url) => {
+        if (replay && url.endsWith('/replay')) return ok(replay);
         if (type === 'post' && url.endsWith('/revert')) return ok({ reverted: 2, failed: [{ action: 'task.sprint.move', reason: 'sprint closed' }], windowEndsAt: future });
         return ok(payload);
     });
@@ -191,6 +192,19 @@ describe('AgentRunDetail', () => {
         const member = await mountDetail({ roleType: 3, payload });
         expect(member.find('#replay').exists()).toBe(false);
         expect(apiRequest.mock.calls.some(([, url]) => url.endsWith('/replay'))).toBe(false);
+    });
+
+    it('the trace links an owner to the replay call and hides the link from a member', async () => {
+        Element.prototype.scrollIntoView = vi.fn();
+        const payload = { run: { ...run, replayId: 'rp1' }, audit: [] };
+        const replay = [{ _id: 'rp1', model: 'gpt-4.1', usage: {}, status: 'ok', messages: [] }];
+        expect((await mountDetail({ roleType: 3, payload, replay })).find('[data-test="view-replay"]').exists()).toBe(false);
+
+        const owner = await mountDetail({ roleType: 1, payload, replay });
+        expect(owner.find('[data-test="replay-body"]').exists()).toBe(false);
+        await owner.find('[data-test="view-replay"]').trigger('click');
+        await flushPromises();
+        expect(owner.find('#replay-rp1 [data-test="replay-body"]').exists()).toBe(true);
     });
 
     it('reads a data-skill revision number once one is pinned', async () => {

@@ -85,11 +85,13 @@ exports.init = (app) => {
                 return res.status(404).send("companyId is required")
             } else if(!projectId && !searchKey) {
                 return res.status(404).send("projectId is required")
+            } else if (String(companyId) !== String(req.headers.companyid)) {
+                return res.status(403).send("companyId does not match your session")
             }
 
             ctrl.unsetAllCounts(companyId, projectId, sprintId, {searchKey})
-            .then((res) => {
-                res.send(res.statusText)
+            .then((result) => {
+                res.send(result.statusText)
             })
             .catch((error) => {
                 res.status(404).send(error)

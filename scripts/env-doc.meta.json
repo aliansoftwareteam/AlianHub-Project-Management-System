@@ -128,6 +128,11 @@
     "description": "Maximum JSON/urlencoded/raw request body (body-parser size string).",
     "default": "2mb"
   },
+  "BUILD_INFO_GIT_TIMEOUT_MS": {
+    "group": "server",
+    "description": "Per-command timeout, in ms, for the git calls that resolve the running version. On timeout the server reports channel unknown and retries in the background.",
+    "default": "10000"
+  },
   "CLOUD_STORAGE_ENC_KEY": {
     "group": "storage",
     "description": "Key used to encrypt cloud-storage provider credentials at rest.",
@@ -367,6 +372,11 @@
     "description": "Directory that receives the rotated log files.",
     "default": "log"
   },
+  "LOG_FORMAT": {
+    "group": "logging",
+    "description": "Log file record format: text (one formatted line) or json (one { ts, level, label, requestId, traceId, message } record per line).",
+    "default": "text"
+  },
   "LOG_MAX_FILES": {
     "group": "logging",
     "description": "Retention window for rotated log files (winston-daily-rotate-file).",
@@ -473,6 +483,16 @@
     "description": "optional: override the OpenAI axios timeout (default: LLM_TIMEOUT_MS for reasoning/gpt-5, 4 min for others); the agent job lock is derived from the largest provider timeout",
     "default": "600000"
   },
+  "OTEL_EXPORTER_OTLP_ENDPOINT": {
+    "group": "logging",
+    "description": "OTLP/HTTP collector base URL (traces go to <endpoint>/v1/traces). Unset keeps the OpenTelemetry SDK and exporter off; trace ids are still recorded.",
+    "default": ""
+  },
+  "OTEL_SERVICE_NAME": {
+    "group": "logging",
+    "description": "service.name reported on exported spans.",
+    "default": "alianhub"
+  },
   "PAYMENTMETHOD": {
     "group": "billing",
     "description": "Payment provider used at sign-up (chargebee or paddle)."
@@ -493,6 +513,11 @@
   "PROJECTID": {
     "group": "integrations",
     "description": "Firebase project id."
+  },
+  "REFRESH_TOKEN_REUSE_GRACE_SECONDS": {
+    "group": "auth",
+    "description": "Seconds after a refresh token is rotated during which presenting the old one again is refused without revoking the session, so parallel requests or tabs do not log the user out. Past this window a reused token revokes the session.",
+    "default": "10"
   },
   "RESEND_API_KEY": {
     "group": "general",
@@ -674,10 +699,6 @@
   "VUE_APP_STORAGE_TYPE": {
     "group": "frontend",
     "description": "Storage backend the web app assumes (server or wasabi); mirror STORAGE_TYPE."
-  },
-  "VUE_APP_SUPPORT_COMPANYID": {
-    "group": "frontend",
-    "description": "Company id that receives support tickets raised from the app."
   },
   "VUE_APP_SUPPORT_MAIL": {
     "group": "frontend",

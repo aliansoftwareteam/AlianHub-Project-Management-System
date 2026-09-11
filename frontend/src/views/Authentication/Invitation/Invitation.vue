@@ -128,9 +128,6 @@ const nameInput = ref(null);
 const form = reactive({ name: "", password: "" });
 const errors = reactive({ name: "", password: "" });
 
-const mongoFind = (dbName, collection, _id) =>
-    axios.post(env.API_URI + env.MONGO_OPRATION, { dataObj: [{ _id }], dbName, collection, methodName: "findOne" });
-
 onMounted(async () => {
     const parts = String(route.query.companyId || "").split("-");
     if (parts.length < 2 || !parts[0] || !parts[1]) { stage.value = "invalid"; return; }
@@ -138,18 +135,16 @@ onMounted(async () => {
     localStorage.setItem("companyId", companyIdRoute.value);
     localStorage.setItem("companyUserDocID", requestId.value);
     try {
-        const company = await mongoFind("global", "companies", companyIdRoute.value);
-        if (!company.data.status || company.data.statusText === null) { stage.value = "invalid"; return; }
-        workspaceName.value = company.data.statusText?.Cst_CompanyName || "";
-        const member = await mongoFind(companyIdRoute.value, "company_users", requestId.value);
-        if (!member.data.status) { stage.value = "invalid"; return; }
-        const user = member.data.statusText || {};
-        if (user.status === 1) {
-            email.value = user.userEmail;
+        const preview = await axios.post(env.API_URI + env.INVITATION_PREVIEW, { companyId: companyIdRoute.value, memberId: requestId.value });
+        if (!preview.data.status) { stage.value = "invalid"; return; }
+        const invite = preview.data.data || {};
+        workspaceName.value = invite.workspaceName || "";
+        if (invite.status === 1) {
+            email.value = invite.email;
             stage.value = "form";
             setTimeout(() => nameInput.value?.focus(), 50);
         } else {
-            invalidMessage.value = user.status === 3 ? t("Auth.invite_cancelled") : t("Auth.invite_used");
+            invalidMessage.value = invite.status === 3 ? t("Auth.invite_cancelled") : t("Auth.invite_used");
             stage.value = "invalid";
         }
     } catch (error) {

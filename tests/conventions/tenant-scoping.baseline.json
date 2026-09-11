@@ -6,7 +6,7 @@
   "Audit/controller.js": 1,
   "Audit/recorder.js": 1,
   "Auth/controller/loginSession.js": 2,
-  "Auth/controller/sendInvitation.js": 3,
+  "Auth/controller/sendInvitation.js": 2,
   "Automations/controller.js": 2,
   "Calendar/controller.js": 2,
   "CapacityPlanning/controller.js": 1,
@@ -54,5 +54,5 @@
   "storage/server/helpers/bucket.helper.js": 1,
   "storage/wasabi/controller.js": 10,
   "taskIndex/controller.js": 10,
-  "trackerUserPermission/controller.js": 2
+  "trackerUserPermission/controller.js": 1
 }

@@ -303,7 +303,7 @@
                         isSpinner.value = false;
                         if (count > 0) {
                             try {
-                                apiRequest("post",env.CACHECLEAR,{cacheKey: 'rule:',isPrefix:true});
+                                apiRequest("post",env.CACHECLEAR,{cacheKey: 'rules:',isPrefix:true});
                                 apiRequest("post",env.CACHECLEAR,{cacheKey: `UserProjectData:`,isPrefix:true});
                             } catch (error) {
                                 console.error("Error in cacheClear",error);

@@ -628,7 +628,7 @@ function refreshLogged() {
         methodName: "aggregate",
         dataObj: [[{ $match: { TicketID: task.value._id } }, { $group: { _id: null, total: { $sum: "$LogTimeDuration" } } }]]
     }).then((response) => {
-        const rows = response?.data?.statusText;
+        const rows = response?.data?.data;
         loggedMinutes.value = Array.isArray(rows) && rows[0] ? Number(rows[0].total) || 0 : 0;
     }).catch((error) => {
         console.error("ERROR in logged time: ", error);

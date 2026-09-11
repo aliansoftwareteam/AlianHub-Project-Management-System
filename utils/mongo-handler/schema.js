@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const schema = {
     tasks: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -776,6 +778,8 @@ const schema = {
     },
     // Agents as teammates — managed by Modules/Agents.
     agents: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         name: { type: String, required: true },
         slug: { type: String, required: false },
         description: { type: String, required: false },
@@ -849,6 +853,10 @@ const schema = {
         agentRevision: { type: Number, required: false },
         // { key, hash, n } — the skill identity pinned at start: a data skill's version as n, a code skill's module hash with n null
         skillRevision: { type: Object, required: false },
+        // W3C trace id shared by the run's steps, audit rows, log lines and spans
+        traceId: { type: String, required: false },
+        // [{ node, startedAt, endedAt, durationMs, spanId, traceId, status: ok | error | interrupted, tokens, costUsd }], one per node execution
+        steps: { type: Array, default: [], required: false },
     },
     agentRevisions: {
         agentId: { type: String, required: true },
@@ -975,6 +983,7 @@ const schema = {
         eventType: { type: String, required: false },
         entity: { type: Object, default: {}, required: false },
         envelope: { type: Object, default: {}, required: false },
+        traceId: { type: String, required: false },
         status: { type: String, default: 'queued', required: true },
         cursor: { type: Number, default: 0, required: false },
         attempts: { type: Number, default: 0, required: false },
@@ -1300,6 +1309,8 @@ const schema = {
         },
     },
     users: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -1941,6 +1952,8 @@ const schema = {
         }
     },
     companyUsers: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -2144,6 +2157,8 @@ const schema = {
         }
     },
     projects: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -3388,6 +3403,8 @@ const schema = {
         }
     },
     sprints: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         sendMessage: {
             type: Boolean,
             required: false,
@@ -3725,6 +3742,26 @@ const schema = {
         },
         refreshToken: {
             type: String,
+            required: false
+        },
+        refreshTokenHash: {
+            type: String,
+            required: false
+        },
+        refreshTokenJti: {
+            type: String,
+            required: false
+        },
+        tokenTail: {
+            type: String,
+            required: false
+        },
+        previousRefreshTokenHash: {
+            type: String,
+            required: false
+        },
+        rotatedAt: {
+            type: Date,
             required: false
         },
         lastActive: {

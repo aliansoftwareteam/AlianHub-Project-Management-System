@@ -387,6 +387,13 @@ exports.importSettingsNotification = (req, res) => {
             });
             return;
         }
+        if (String(userId) !== String(req.uid) || String(companyId) !== String(req.headers.companyid)) {
+            res.status(403).send({
+                status: false,
+                statusText: "You can only import your own notification settings."
+            });
+            return;
+        }
         importData.importUserNotifications(companyId,userId).then(() => {
             res.send({
                 status: true,
