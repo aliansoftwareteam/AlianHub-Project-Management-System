@@ -8,6 +8,7 @@ const {myCache} = require('./config');
 // circular dependency risk. The controller is lazy-required inside
 // verifyApiTokenRequest below.
 const { looksLikeToken, hasScope } = require('../Modules/ApiTokens/helpers/apiTokenRules');
+const { sessionTokenQuery, hashRefreshToken } = require('../Modules/Auth/helpers/refreshTokenRules');
 
 // Mongo ObjectId pattern — used to reject regex/control characters in the
 // `companyid` request header before any token-membership check.
@@ -203,12 +204,10 @@ const removeCacheAndCookie = (key, cacheKey, res, refreshToken) => {
     myCache.del(cacheKey);
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
-    if (refreshToken) {
+    if (typeof refreshToken === 'string' && refreshToken) {
         let obj = {
             type: dbCollections.SESSIONS,
-            data: [{
-                refreshToken: refreshToken,
-            }]
+            data: [sessionTokenQuery(refreshToken)]
         }
         mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "deleteMany").then((resData)=>{
             if (!(resData && resData.deletedCount)) {
@@ -221,12 +220,34 @@ const removeCacheAndCookie = (key, cacheKey, res, refreshToken) => {
     }
 }
 
+// An access token minted just before its session's refresh token was rotated:
+// the client already holds the new pair, so it is sent to refresh instead of
+// being logged out (and its fresh cookies are left alone).
+const isRotatedAway = async (uid, refreshToken) => {
+    const rotated = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, {
+        type: dbCollections.SESSIONS,
+        data: [{ userId: uid, previousRefreshTokenHash: hashRefreshToken(refreshToken) }]
+    }, "findOne");
+    return Boolean(rotated && rotated._id);
+};
+
 const checkToken = (isValid, req, res, next) => {
     if (isValid) {
         const { uid, refreshToken,aud } = isValid;
         req.uid = uid;
         req.aud = aud;
         req.refreshToken = refreshToken;
+        if (typeof refreshToken !== 'string' || !refreshToken) {
+            res.clearCookie('accessToken');
+            return res.status(401).json({
+                status: false,
+                error: "Your session is expired",
+                statusText: 'Unauthorized',
+                isJwtError: true,
+                isRefreshTokenError: true,
+                isLogout: true
+            });
+        }
         const cacheKey = `session:${uid}:${refreshToken}`;
         const value = myCache.get(cacheKey);
         try {
@@ -252,11 +273,19 @@ const checkToken = (isValid, req, res, next) => {
                     type: dbCollections.SESSIONS,
                     data: [{
                         userId: uid,
-                        refreshToken: refreshToken,
+                        ...sessionTokenQuery(refreshToken),
                     }]
                 }
-                mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "findOne").then((resData)=>{
+                mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "findOne").then(async (resData)=>{
                     if (!(resData && resData._id)) {
+                        if (await isRotatedAway(uid, refreshToken)) {
+                            return res.status(401).json({
+                                status: false,
+                                error: 'Token has expired',
+                                statusText: 'Token has expired',
+                                isJwtError: true
+                            });
+                        }
                         removeCacheAndCookie("", cacheKey, res, refreshToken);
                         return res.status(401).json({
                             status: false,
