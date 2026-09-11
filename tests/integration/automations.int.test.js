@@ -149,7 +149,7 @@ describe('automation rules (v2)', () => {
         }
     });
 
-    it.failing('AUT-04 refuses a guest creating a rule', async () => {
+    it('AUT-04 refuses a guest creating a rule', async () => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
         const res = await guest.api.post('/api/v2/automations', ruleFor(state.projects.shared._id));
@@ -160,7 +160,7 @@ describe('automation rules (v2)', () => {
         }
     });
 
-    it.failing('AUT-04 refuses a member editing a rule someone else created', async () => {
+    it('AUT-04 refuses a member editing a rule someone else created', async () => {
         const owner = await loginAs('owner');
         const member = await loginAs('member');
         const rule = await createRule(owner.api, ruleFor(state.projects.shared._id));
@@ -174,7 +174,7 @@ describe('automation rules (v2)', () => {
         }
     });
 
-    it.failing('AUT-04 refuses a guest switching a rule on', async () => {
+    it('AUT-04 refuses a guest switching a rule on', async () => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
         const rule = await createRule(owner.api, ruleFor(state.projects.shared._id));
@@ -189,7 +189,7 @@ describe('automation rules (v2)', () => {
         }
     });
 
-    it.failing('AUT-09 reports a missing rule instead of claiming it was updated', async () => {
+    it('AUT-09 reports a missing rule instead of claiming it was updated', async () => {
         const { api } = await loginAs('owner');
         const put = await api.put(`/api/v2/automations/${MISSING_ID}`, ruleFor(state.projects.shared._id));
         const patch = await api.patch(`/api/v2/automations/${MISSING_ID}/enabled`, { enabled: true });
@@ -197,7 +197,7 @@ describe('automation rules (v2)', () => {
         expect(patch.body.status).toBe(false);
     });
 
-    it.failing('AUT-03 keeps private-project tasks out of a guest backtest', async () => {
+    it('AUT-03 keeps private-project tasks out of a guest backtest', async () => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
         const { project, task } = await privateProjectWithTask(owner);
@@ -246,7 +246,7 @@ describe('automation rules (v1)', () => {
         }
     });
 
-    it.failing('AUT-05 saves a new v1 rule switched off', async () => {
+    it('AUT-05 saves a new v1 rule switched off', async () => {
         const { api } = await loginAs('owner');
         const created = await api.post('/api/v1/automations', { name: `E2E v1 ${uniqueSuffix()}`, actions: [{ type: 'set_priority', value: 'LOW' }] });
         try {
@@ -256,7 +256,7 @@ describe('automation rules (v1)', () => {
         }
     });
 
-    it.failing('AUT-05 refuses a guest bulk-changing priorities in a private project', async () => {
+    it('AUT-05 refuses a guest bulk-changing priorities in a private project', async () => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
         const { project, task } = await privateProjectWithTask(owner);
@@ -272,7 +272,7 @@ describe('automation rules (v1)', () => {
         }
     });
 
-    it.failing('AUT-03 keeps private-project tasks out of a guest v1 preview', async () => {
+    it('AUT-03 keeps private-project tasks out of a guest v1 preview', async () => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
         const { project, task } = await privateProjectWithTask(owner);
@@ -327,7 +327,7 @@ describe('AI features', () => {
         expect(transcribe.status).toBe(503);
     });
 
-    it.failing('AUT-02 refuses anonymous callers on the AI-Assist and description routes', async () => {
+    it('AUT-02 refuses anonymous callers on the AI-Assist and description routes', async () => {
         const probes = [
             ['/api/v1/ai/description', { title: 'E2E' }],
             ['/api/v1/generatePrompt', { prompt: '' }],
@@ -389,7 +389,7 @@ describe('AI project generator', () => {
         expect(after).toBe(before + 1);
     });
 
-    it.failing('AUT-07 refuses a guest adding sprints to a private project they cannot open', async () => {
+    it('AUT-07 refuses a guest adding sprints to a private project they cannot open', async () => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
         const project = await createProject(owner.api, { assigneeIds: [owner.uid], createdBy: owner.uid, isPrivate: true });
@@ -445,7 +445,7 @@ describe('MCP', () => {
         expect((await mcpCall(token, 'tools/list')).status).toBe(401);
     });
 
-    it.failing('AUT-08 keeps task.get inside the projects a token is scoped to', async () => {
+    it('AUT-08 keeps task.get inside the projects a token is scoped to', async () => {
         const owner = await loginAs('owner');
         const inScope = await createProject(owner.api, { assigneeIds: [owner.uid], createdBy: owner.uid });
         const outOfScope = await createProject(owner.api, { assigneeIds: [owner.uid], createdBy: owner.uid });
