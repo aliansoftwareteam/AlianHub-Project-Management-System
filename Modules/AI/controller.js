@@ -26,6 +26,11 @@ const { categoriseTask } = require('./taskCategory');
 // down at load time.
 const { FEATURES } = require('../AICore/features');
 
+const companyOf = (req) => req.headers['companyid'];
+/* In-memory chats are keyed by the session user, so a caller can only read, reset
+ * or delete their own conversation, whatever id the client sends. */
+const chatIdOf = (req, clientId) => `${req.uid}:${String(clientId || '')}`;
+
 let providerFactory = null;
 try {
     providerFactory = require('../AICore/llmProvider');
@@ -99,8 +104,9 @@ exports.generatePrompt = (req,res) => {
             return;
         }
 
+        const chatId = chatIdOf(req, req.body.uniqueUserId);
         if(req.body.isRegenerate){
-            deleteChat(req.body.uniqueUserId);
+            deleteChat(chatId);
         }
         if(isAiConfigured()){
                 const promptData = aiPrompts.find((e) => e._id === req.body.prompt.id);
@@ -115,13 +121,13 @@ exports.generatePrompt = (req,res) => {
                             promptsText = promptsText + promptRes.outputFormat
                         }
                     })
-                    addChat(req.body.uniqueUserId,{role: "user",content: promptsText });
+                    addChat(chatId,{role: "user",content: promptsText });
                     // Kept verbatim, including the JSON.stringify: it wraps the prompt in
                     // quotes and escapes it, which is part of what these prompts have been
                     // tuned against. Sending the bare text would be a different prompt.
                     const messages = [{"role": "user", "content": `${JSON.stringify(promptsText)}`}];
                     if(stream === true){
-                        exports.generateWithStream(messages,req.body.userId,req.body.companyId,req.body.uniqueUserId,req.body.eventId).then((response) => {
+                        exports.generateWithStream(messages,req.uid,companyOf(req),chatId,req.body.eventId).then((response) => {
                             res.send({status: true, statusText: response});
                         }).catch((error) => {
                             res.send({status: false, statusText: (error && error.message) || String(error)});
@@ -131,8 +137,8 @@ exports.generatePrompt = (req,res) => {
                         try {
                             // No jsonMode here, matching the old direct call: only the
                             // streamed prompts ever asked for JSON-only output.
-                            askProvider(messages, { spend: { feature: FEATURES.ASSIST, companyId: req.headers['companyid'], userId: req.body.userId } }).then(async(result) => {
-                                const userUpdate = await exports.limitCountUpdate(req.body.userId,req.body.companyId,(result && result.totalTokens) || 0);
+                            askProvider(messages, { spend: { feature: FEATURES.ASSIST, companyId: companyOf(req), userId: req.uid } }).then(async(result) => {
+                                const userUpdate = await exports.limitCountUpdate(req.uid,companyOf(req),(result && result.totalTokens) || 0);
                                 res.send({status: true, statusText: (result && result.content) || '',userUpdate:userUpdate});
                             }).catch((error) => {
                                 res.send({status: false, statusText: (error && error.message) || String(error)});
@@ -160,15 +166,16 @@ exports.generatePrompt = (req,res) => {
 exports.generatePromptChat = (req,res) => {
     try {
         if(isAiConfigured()){
+            const chatId = chatIdOf(req, req.body.uniqueUserId);
             if(!req.body.isRegenerate){
-                pushChat(req.body.uniqueUserId,{role: "user",content: req.body.message});
+                pushChat(chatId,{role: "user",content: req.body.message});
             }else{
-                removeChat(req.body.uniqueUserId)
+                removeChat(chatId)
             }
-            if(getChat(req.body.uniqueUserId) && getChat(req.body.uniqueUserId).length>0){
+            if(getChat(chatId).length>0){
                 // The stored chat is already a role/content list, which is exactly what
                 // every provider takes.
-                exports.generateWithStream(getChat(req.body.uniqueUserId),req.body.userId,req.body.companyId,req.body.uniqueUserId,req.body.eventId).then((response) => {
+                exports.generateWithStream(getChat(chatId),req.uid,companyOf(req),chatId,req.body.eventId).then((response) => {
                     res.send({status: true, statusText: response});
                 }).catch((error) => {
                     res.send({status: false, statusText: (error && error.message) || String(error)});
@@ -189,7 +196,7 @@ exports.generatePromptChat = (req,res) => {
 // DELETE USER CHAT
 exports.deleteUserChat = (req,res) => {
     try {
-        deleteChat(req.body.userId);
+        deleteChat(chatIdOf(req, req.body.userId));
         res.send({status: true, statusText: 'Done'});
     } catch (error) {
         res.send({status: false, statusText: error});
@@ -563,7 +570,8 @@ exports.summarizeTask = async (req, res) => {
             return res.status(400).send({ status: false, statusText: 'companyId header required' });
         }
         const { taskId = '', force = false } = req.body || {};
-        const result = await summarizeTask({ companyId, taskId: String(taskId), force: force === true });
+        const result = await summarizeTask({ companyId, uid: req.uid, taskId: String(taskId), force: force === true });
+        if (result.notFound) return res.status(404).send({ status: false, statusText: result.reason });
         if (!result.status) {
             return res.send({ status: false, statusText: result.reason || 'Could not summarise this task.' });
         }
@@ -581,7 +589,8 @@ exports.categoriseTask = async (req, res) => {
             return res.status(400).send({ status: false, statusText: 'companyId header required' });
         }
         const { taskId = '', force = false } = req.body || {};
-        const result = await categoriseTask({ companyId, taskId: String(taskId), force: force === true });
+        const result = await categoriseTask({ companyId, uid: req.uid, taskId: String(taskId), force: force === true });
+        if (result.notFound) return res.status(404).send({ status: false, statusText: result.reason });
         if (!result.status) {
             return res.send({ status: false, statusText: result.reason || 'Could not categorise this task.' });
         }

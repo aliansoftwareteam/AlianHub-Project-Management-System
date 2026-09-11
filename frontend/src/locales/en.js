@@ -900,6 +900,7 @@ export default {
         cancel: "Cancel",
         save_draft: "Save as draft",
         save_on: "Save and turn on",
+        manage_owner_admin: "Only owners and admins can create, change or switch on automations.",
     },
     IntegrationsHub: {
         title: "Integrations & Automation",

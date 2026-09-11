@@ -1,4 +1,5 @@
 const scope = require('../Agents/scope');
+const { evaluatePermission, isWritable } = require('../../Config/permissionGuard');
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 
@@ -13,4 +14,22 @@ const resolveProjectId = async ({ companyId, uid, projectId }) => {
     return visible.map(String).includes(id) ? { projectId: id } : { hidden: true };
 };
 
-module.exports = { resolveProjectId };
+/* A project the caller may write into: visible to them, and every catalogue key
+ * in `permissions` writable for that project. `{ hidden: true }` answers 404,
+ * `{ forbidden: key }` answers 403. */
+const canEditProject = async ({ companyId, uid, projectId, permissions = [] }) => {
+    const resolved = await resolveProjectId({ companyId, uid, projectId });
+    if (!resolved.projectId) return { hidden: true };
+    for (const key of permissions) {
+        let value = null;
+        try {
+            value = await evaluatePermission(companyId, String(uid), key, { projectId: resolved.projectId });
+        } catch (_e) {
+            value = null;
+        }
+        if (!isWritable(value)) return { forbidden: key };
+    }
+    return { projectId: resolved.projectId };
+};
+
+module.exports = { resolveProjectId, canEditProject };

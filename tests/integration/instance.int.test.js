@@ -123,7 +123,7 @@ describe('instance console as the owner', () => {
         expect(res.body).toEqual({ status: true, statusText: expect.any(String), data: { allowed: true, via: 'owner' } });
     });
 
-    it.failing('INS-07 saves a setting from the owner session, shows it in the public config and restores it', async () => {
+    it('INS-07 saves a setting from the owner session, shows it in the public config and restores it', async () => {
         const { api } = await as('owner');
         const before = await api.get('/api/v2/instance/settings');
         expect(before.body.data.groups).toEqual(expect.arrayContaining(['general', 'mail', 'storage']));
@@ -305,7 +305,7 @@ describe('audit log', () => {
         expect(res.status).toBe(404);
     });
 
-    it.failing('INS-08 exports every row of the filter, not only the first 100', async () => {
+    it('INS-08 exports every row of the filter, not only the first 100', async () => {
         const owner = await as('owner');
         const user = await freshUser('member');
         for (let i = 0; i < 101; i += 1) {
@@ -321,7 +321,7 @@ describe('audit log', () => {
         expect(String(csv.body).split('\n').length - 1).toBe(total);
     }, 120000);
 
-    it.failing('INS-09 records the signed-in actor, not a name from the request body', async () => {
+    it('INS-09 records the signed-in actor, not a name from the request body', async () => {
         const owner = await as('owner');
         const user = await freshUser('member');
         await owner.api.put('/api/v1/members', { id: user.companyUserId, data: { designation: 0 }, userData: { name: '=HYPERLINK("http://example.invalid","Rahul")' } });
@@ -334,7 +334,7 @@ describe('audit log', () => {
         expect(row.actorName).not.toContain('HYPERLINK');
 
         const csv = await owner.api.get('/api/v1/audit-logs/export', { query: { entityId: user.companyUserId } });
-        expect(String(csv.body)).not.toMatch(/(^|,)=HYPERLINK/m);
+        expect(String(csv.body)).not.toMatch(/(^|,)"?=HYPERLINK/m);
     });
 });
 
@@ -468,14 +468,14 @@ describe('company settings writes as the owner', () => {
 });
 
 describe('company settings role enforcement', () => {
-    it.failing('INS-01 refuses a member promoting themselves to owner through PUT /api/v1/members', async () => {
+    it('INS-01 refuses a member promoting themselves to owner through PUT /api/v1/members', async () => {
         const user = await freshUser('member');
         const res = await user.api.put('/api/v1/members', { id: user.companyUserId, data: { roleType: 1 } });
         expect(refused(res)).toBe(true);
         expect(await roleTypeOf(user.userId)).toBe(user.roleType);
     });
 
-    it.failing('INS-02 refuses a guest promoting themselves to admin through PUT /api/v1/root-members', async () => {
+    it('INS-02 refuses a guest promoting themselves to admin through PUT /api/v1/root-members', async () => {
         const user = await freshUser('guest');
         const res = await user.api.put('/api/v1/root-members', { id: user.companyUserId, data: { roleType: 2 }, companyId: state.companyId });
         expect(refused(res)).toBe(true);
@@ -483,7 +483,7 @@ describe('company settings role enforcement', () => {
     });
 
     const marker = () => `qa-instance-${uniqueSuffix()}`;
-    it.failing.each([
+    it.each([
         ['PUT /api/v1/setting/roles/update', 'put', '/api/v1/setting/roles/update', () => ({ queryFilter: { name: marker() }, queryObj: { $set: { qaMarker: true } } })],
         ['PUT /api/v1/setting/designation/update', 'put', '/api/v1/setting/designation/update', () => ({ queryFilter: { name: marker() }, queryObj: { $set: { qaMarker: true } } })],
         ['PUT /api/v1/commonDateFormate', 'put', '/api/v1/commonDateFormate', () => ({ key: '$set', updateObject: { qaMarker: marker() } })],
@@ -497,7 +497,7 @@ describe('company settings role enforcement', () => {
         expect(refused(res)).toBe(true);
     });
 
-    it.failing('INS-06 refuses a guest editing a security permission rule', async () => {
+    it('INS-06 refuses a guest editing a security permission rule', async () => {
         const { api } = await as('guest');
         const rules = await api.get('/api/v1/securityPermissions');
         const rule = rules.body.find((r) => !r.isParent);
@@ -505,7 +505,7 @@ describe('company settings role enforcement', () => {
         expect(refused(res)).toBe(true);
     });
 
-    it.failing('INS-05 refuses a currency write aimed at another company', async () => {
+    it('INS-05 refuses a currency write aimed at another company', async () => {
         const { api } = await as('admin');
         const currencies = await api.get('/api/v1/currency');
         const [currency] = currencies.body;
@@ -535,7 +535,7 @@ describe('company settings role enforcement', () => {
         expect(res.status).toBe(401);
     });
 
-    it.failing('INS-10 refuses a member editing another member private views', async () => {
+    it('INS-10 refuses a member editing another member private views', async () => {
         const user = await freshUser('member');
         const other = await freshUser('member');
         const res = await user.api.post('/api/v1/members/private-view', { id: other.companyUserId, operation: 'push', data: { id: `qa-${uniqueSuffix()}`, name: '[QA instance] view' } });
@@ -547,7 +547,7 @@ describe('common, admin and api docs', () => {
     it('serves the time, email templates, logo and brand settings', async () => {
         const time = await anonymous.get('/api/v1/getTime', { query: { zone: 'UTC' } });
         expect(time.status).toBe(200);
-        expect(String(time.body)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+        expect(time.body).toMatchObject({ status: true, data: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) });
 
         const templates = await anonymous.get('/api/v1/getEmailTemplates');
         expect(Object.keys(templates.body)).toEqual(expect.arrayContaining(['verifyEmail', 'resetEmail']));
@@ -571,7 +571,7 @@ describe('common, admin and api docs', () => {
         expect(String(res.body)).toContain('swagger');
     });
 
-    it.failing('INS-12 answers getTime without a zone with the standard error shape', async () => {
+    it('INS-12 answers getTime without a zone with the standard error shape', async () => {
         const res = await anonymous.get('/api/v1/getTime');
         expect(res.body).toMatchObject({ status: false });
     });

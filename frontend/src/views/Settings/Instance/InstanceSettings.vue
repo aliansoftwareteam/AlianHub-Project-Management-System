@@ -130,7 +130,7 @@ async function save() {
     } catch (e) {
         const fieldErrors = e?.response?.data?.data?.errors;
         if (fieldErrors) Object.assign(errors, fieldErrors);
-        else $toast.error(message(e));
+        if (!fieldErrors || Object.keys(fieldErrors).some((key) => !rows.value.some((row) => row.key === key))) $toast.error(message(e));
     } finally {
         busy.value = false;
     }

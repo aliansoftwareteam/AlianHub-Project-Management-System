@@ -20,7 +20,7 @@ const sseEmitter = require('./sseEmitter');
 const orchestrator = require('./orchestrator');
 const clarifier = require('./clarifier');
 const memoryStore = require('../Agents/memory');
-const { resolveProjectId } = require('./projectAccess');
+const { resolveProjectId, canEditProject } = require('./projectAccess');
 const { resolveProjectSkills, getActiveSkillSlugs } = require('../settings/ProjectSkills/helper');
 const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require('../Project/helpers/projectSourceRules');
 const { normalizePlanColors } = orchestrator;
@@ -35,6 +35,21 @@ const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 //   'sprints' — sprint names only, no tasks
 function normalizeTasksMode(raw) {
     return (raw === 'tasks' || raw === 'sprints') ? raw : 'full';
+}
+const MODE_PERMISSIONS = {
+    sprints: ['project.project_sprint_create'],
+    tasks: ['task.task_create'],
+    full: ['project.project_sprint_create', 'task.task_create'],
+};
+
+/* Answers the response and returns false when the caller may not add this mode's
+ * work to the project. A project they cannot open is 404, so its existence is not
+ * confirmed. */
+async function guardTaskTarget(res, { companyId, uid, projectId, mode }) {
+    const access = await canEditProject({ companyId, uid, projectId, permissions: MODE_PERMISSIONS[mode] });
+    if (access.hidden) { sendError(res, 404, 'Project not found'); return false; }
+    if (access.forbidden) { sendError(res, 403, 'You do not have permission to add work to this project'); return false; }
+    return true;
 }
 function tasksPlanSchemaForMode(mode) {
     if (mode === 'tasks') return TasksOnlyPlanSchema;
@@ -921,6 +936,9 @@ exports.tasksPlan = async (req, res) => {
         const projectId = String((req.params && req.params.projectId) || '').trim();
         if (!OBJECT_ID_PATTERN.test(projectId)) return sendError(res, 400, 'Valid projectId required');
 
+        const mode = normalizeTasksMode(req.body && req.body.mode);
+        if (!(await guardTaskTarget(res, { companyId, uid, projectId, mode }))) return;
+
         const additionalRequirements = String((req.body && req.body.additionalRequirements) || '').trim().slice(0, 2000);
         let briefText = '';
         if (req.body && req.body.briefId) {
@@ -928,7 +946,6 @@ exports.tasksPlan = async (req, res) => {
             if (stash && stash.companyId === companyId) briefText = stash.text;
         }
         const clarifications = sanitizeClarifications(req.body && req.body.clarifications);
-        const mode = normalizeTasksMode(req.body && req.body.mode);
         const targetSprintName = String((req.body && req.body.targetSprintName) || '').trim().slice(0, 80);
         const features = (req.body && typeof req.body.features === 'object' && req.body.features) || {};
 
@@ -983,6 +1000,7 @@ exports.tasksExecute = async (req, res) => {
             return sendError(res, 400, `Plan failed validation: ${issues}`);
         }
         plan = reCheck.data;
+        if (!(await guardTaskTarget(res, { companyId, uid, projectId, mode }))) return;
 
         let currentUserName = '';
         try {

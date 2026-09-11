@@ -6,29 +6,60 @@ const logger = require('../../Config/loggerConfig');
 const R = require('./helpers/automationRules');
 const registry = require('./engine/registry');
 const matcher = require('./engine/matcher');
+const { updateTask } = require('./engine/tools');
 const V2 = require('./helpers/ruleSchemaV2');
 const { escapeRegex } = require('../../utils/escapeRegex');
 const sentences = require('./helpers/sentenceRules');
+const access = require('./helpers/ruleAccess');
+const { canEditProject } = require('../AIProjectGenerator/projectAccess');
 
-// AUTO-03 — automation rules. companyId-scoped. Apply is on-demand (a safe bulk
-// update of matching tasks); event-triggered execution is stored on the rule but
-// not wired into core task-event flows (documented extension) so automations can
-// never disrupt live task mutations.
+const NOT_FOUND = 'Not found.';
+const APPLY_REFUSED = 'You cannot edit every task this automation targets.';
 
-const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
-const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
+const companyOf = (req) => req.headers['companyid'];
+const oid = (id) => (/^[0-9a-fA-F]{24}$/.test(String(id || '')) ? new mongoose.Types.ObjectId(String(id)) : null);
+const refuse = (res, code, statusText) => res.status(code).send({ status: false, statusText });
+
+const rulesChanged = (companyId) => {
+    removeCache(`automation_rules:${companyId}`);
+    matcher.invalidate(companyId);
+};
+
+const findLiveRule = (companyId, id) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ _id: id, deletedStatusKey: { $ne: 1 } }],
+}, 'findOne');
+
+/* Loads the rule and runs the management check on it. Answers the response itself
+ * and returns null when the caller may not touch it. */
+const ruleForWrite = async (req, res, companyId, extraRule) => {
+    const id = oid(req.params.id);
+    if (!id) { refuse(res, 404, NOT_FOUND); return null; }
+    if (!(await access.canManageRules(companyId, req.uid))) { refuse(res, 403, access.MANAGE_REFUSED); return null; }
+    const rule = await findLiveRule(companyId, id);
+    if (!rule) { refuse(res, 404, NOT_FOUND); return null; }
+    for (const candidate of [rule, extraRule].filter(Boolean)) {
+        const denied = await access.refuseRuleWrite({ companyId, uid: req.uid, rule: candidate });
+        if (denied) { refuse(res, denied.code, denied.statusText); return null; }
+    }
+    return { id, rule };
+};
+
+const visibleOnly = async (companyId, uid, match) => ({
+    $and: [match, { ProjectID: { $in: await access.visibleProjectIds(companyId, uid) } }],
+});
 
 // POST /api/v1/automations
 exports.createRule = async (req, res) => {
     try {
         const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        if (!companyId) return refuse(res, 400, 'companyId is required.');
         const check = R.validateRule(req.body || {});
         if (!check.valid) return res.send({ status: false, statusText: check.errors.join('; ') });
-        const data = { _id: new mongoose.Types.ObjectId(), ...check.value, enabled: true, lastRunCount: 0, createdBy: String(req.uid || ''), deletedStatusKey: 0 };
+        const denied = await access.refuseRuleWrite({ companyId, uid: req.uid, rule: check.value });
+        if (denied) return refuse(res, denied.code, denied.statusText);
+        const data = { _id: new mongoose.Types.ObjectId(), ...check.value, enabled: req.body.enabled === true, lastRunCount: 0, createdBy: String(req.uid || ''), deletedStatusKey: 0 };
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUTOMATION_RULES, data }, 'save');
-        removeCache(`automation_rules:${companyId}`);
-        matcher.invalidate(companyId);
+        rulesChanged(companyId);
         return res.send({ status: true, statusText: 'Automation created.', data: saved });
     } catch (e) { logger.error(`createRule: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
@@ -37,7 +68,7 @@ exports.createRule = async (req, res) => {
 exports.listRules = async (req, res) => {
     try {
         const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        if (!companyId) return refuse(res, 400, 'companyId is required.');
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { updatedAt: -1 } }],
         }, 'find');
@@ -49,7 +80,7 @@ exports.listRules = async (req, res) => {
 exports.updateRule = async (req, res) => {
     try {
         const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        if (!companyId) return refuse(res, 400, 'companyId is required.');
         const set = {};
         if (req.body.enabled !== undefined) set.enabled = !!req.body.enabled;
         if (['name', 'conditions', 'actions', 'trigger'].some((k) => req.body[k] !== undefined)) {
@@ -58,37 +89,39 @@ exports.updateRule = async (req, res) => {
             Object.assign(set, check.value);
         }
         if (!Object.keys(set).length) return res.send({ status: false, statusText: 'Nothing to update.' });
+        const target = await ruleForWrite(req, res, companyId, set.conditions ? set : null);
+        if (!target) return undefined;
         const updated = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ _id: oid(req.params.id) }, { $set: set }, { returnDocument: 'after' }],
+            type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ _id: target.id, deletedStatusKey: { $ne: 1 } }, { $set: set }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
-        if (!updated) return res.send({ status: false, statusText: 'Not found.' });
-        removeCache(`automation_rules:${companyId}`);
-        matcher.invalidate(companyId);
+        if (!updated) return refuse(res, 404, NOT_FOUND);
+        rulesChanged(companyId);
         return res.send({ status: true, statusText: 'Automation updated.', data: updated });
     } catch (e) { logger.error(`updateRule: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
-// DELETE /api/v1/automations/:id
+// DELETE /api/v1/automations/:id and /api/v2/automations/:id
 exports.deleteRule = async (req, res) => {
     try {
         const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        if (!companyId) return refuse(res, 400, 'companyId is required.');
+        const target = await ruleForWrite(req, res, companyId);
+        if (!target) return undefined;
         await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ _id: oid(req.params.id) }, { $set: { deletedStatusKey: 1, enabled: false } }],
+            type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ _id: target.id }, { $set: { deletedStatusKey: 1, enabled: false } }],
         }, 'updateOne');
-        removeCache(`automation_rules:${companyId}`);
-        matcher.invalidate(companyId);
+        rulesChanged(companyId);
         return res.send({ status: true, statusText: 'Automation removed.' });
     } catch (e) { logger.error(`deleteRule: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
-// POST /api/v1/automations/preview  { conditions } — count + sample matching tasks (no mutation).
+// POST /api/v1/automations/preview  { conditions }
 exports.preview = async (req, res) => {
     try {
         const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        if (!companyId) return refuse(res, 400, 'companyId is required.');
         const conditions = (req.body && req.body.conditions) || {};
-        const match = R.buildMatch(conditions, oid);
+        const match = await visibleOnly(companyId, req.uid, R.buildMatch(conditions, oid));
         const tasks = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [match, 'TaskName TaskKey Task_Priority', { limit: 10 }] }, 'find');
         const count = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [match] }, 'countDocuments').catch(() => null);
         return res.send({
@@ -101,33 +134,39 @@ exports.preview = async (req, res) => {
     } catch (e) { logger.error(`preview: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
-// POST /api/v1/automations/:id/apply — apply the rule's actions to matching tasks now.
+/* POST /api/v1/automations/:id/apply
+ * All or nothing: one target the caller may not edit refuses the whole batch, so a
+ * rule cannot be used to reach into a project through the tasks it happens to match. */
 exports.applyRule = async (req, res) => {
     try {
         const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
-        const rule = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ _id: oid(req.params.id) }] }, 'findOne');
-        if (!rule || rule.deletedStatusKey === 1) return res.send({ status: false, statusText: 'Not found.' });
-        const match = R.buildMatch(rule.conditions || {}, oid);
+        if (!companyId) return refuse(res, 400, 'companyId is required.');
+        const target = await ruleForWrite(req, res, companyId);
+        if (!target) return undefined;
+        const { id, rule } = target;
         const pr = (rule.actions || []).find((a) => a.type === 'set_priority');
+        const tasks = pr
+            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [R.buildMatch(rule.conditions || {}, oid), 'ProjectID Task_Priority'] }, 'find')
+            : [];
+        const projectIds = [...new Set((tasks || []).map((t) => String(t.ProjectID)))];
+        for (const projectId of projectIds) {
+            const allowed = await canEditProject({ companyId, uid: req.uid, projectId, permissions: ['task.task_priority'] });
+            if (!allowed.projectId) return refuse(res, 403, APPLY_REFUSED);
+        }
         let modified = 0;
-        if (pr) {
-            const r = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [match, { $set: { Task_Priority: pr.value } }] }, 'updateMany');
-            modified = (r && (r.modifiedCount != null ? r.modifiedCount : r.nModified)) || 0;
+        for (const task of (tasks || []).filter((t) => t.Task_Priority !== pr.value)) {
+            await updateTask(companyId, task._id, { Task_Priority: pr.value }, { action: 'automation.rule.apply', ruleId: String(id), ruleName: rule.name || '' });
+            modified += 1;
         }
         await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ _id: oid(req.params.id) }, { $set: { lastRunAt: new Date(), lastRunCount: modified } }],
+            type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ _id: id }, { $set: { lastRunAt: new Date(), lastRunCount: modified } }],
         }, 'updateOne').catch(() => {});
+        rulesChanged(companyId);
         return res.send({ status: true, statusText: `Applied to ${modified} task(s).`, data: { modified } });
     } catch (e) { logger.error(`applyRule: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
 // GET /api/v2/automations/registry
-//
-// The builder UI renders itself from this. Shipping a new action must stay "one
-// file in engine/actions + one line in the registry, zero frontend changes" —
-// the moment an action needs a hand-written Vue form, the action library stops
-// growing.
 exports.getRegistry = async (req, res) => {
     try {
         return res.send({ status: true, data: registry.manifest() });
@@ -136,12 +175,6 @@ exports.getRegistry = async (req, res) => {
         return res.send({ status: false, statusText: e.message });
     }
 };
-
-// ---------------------------------------------------------------------------
-// v2 rules — event-triggered, multi-step. The v1 endpoints stay exactly as they
-// are: they still serve rules created before this existed, and the on-demand
-// bulk `apply` has no v2 equivalent.
-// ---------------------------------------------------------------------------
 
 const v2Summary = (r) => {
     const raw = r.toObject ? r.toObject() : r;
@@ -152,13 +185,11 @@ const v2Summary = (r) => {
 exports.listRulesV2 = async (req, res) => {
     try {
         const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        if (!companyId) return refuse(res, 400, 'companyId is required.');
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AUTOMATION_RULES,
             data: [{ deletedStatusKey: { $ne: 1 }, version: 2 }, {}, { sort: { updatedAt: -1 } }],
         }, 'find');
-        // The list shows how often each rule actually fired; a rule with a run
-        // count is one the reader can trust without opening it.
         const fired = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AUTOMATION_RUNS,
             data: [[{ $group: { _id: '$ruleId', runs: { $sum: 1 }, lastAt: { $max: '$startedAt' } } }]],
@@ -179,19 +210,20 @@ exports.listRulesV2 = async (req, res) => {
 exports.createRuleV2 = async (req, res) => {
     try {
         const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        if (!companyId) return refuse(res, 400, 'companyId is required.');
         const check = V2.validateRuleV2(req.body || {});
         if (!check.valid) return res.send({ status: false, statusText: check.errors[0], errors: check.errors });
+        const denied = await access.refuseRuleWrite({ companyId, uid: req.uid, rule: check.value });
+        if (denied) return refuse(res, denied.code, denied.statusText);
 
-        // New rules start disabled. A rule that begins mutating tasks the instant
-        // it is saved gives the author no chance to look at it first.
+        // A rule that mutates tasks the instant it is saved gives the author no chance to look at it first.
         const data = {
             _id: new mongoose.Types.ObjectId(), ...check.value,
             enabled: req.body.enabled === true,
             createdBy: String(req.uid || ''), lastRunCount: 0, deletedStatusKey: 0,
         };
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUTOMATION_RULES, data }, 'save');
-        matcher.invalidate(companyId);
+        rulesChanged(companyId);
         return res.send({ status: true, statusText: 'Automation created.', data: v2Summary(saved) });
     } catch (e) { logger.error(`createRuleV2: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
@@ -200,37 +232,38 @@ exports.createRuleV2 = async (req, res) => {
 exports.updateRuleV2 = async (req, res) => {
     try {
         const companyId = companyOf(req);
-        const id = oid(req.params.id);
-        if (!companyId || !id) return res.send({ status: false, statusText: 'companyId and a valid id are required.' });
+        if (!companyId) return refuse(res, 400, 'companyId is required.');
         const check = V2.validateRuleV2(req.body || {});
         if (!check.valid) return res.send({ status: false, statusText: check.errors[0], errors: check.errors });
-
+        const target = await ruleForWrite(req, res, companyId, check.value);
+        if (!target) return undefined;
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AUTOMATION_RULES,
-            data: [{ _id: id }, { $set: check.value }, { returnDocument: 'after' }],
+            data: [{ _id: target.id, deletedStatusKey: { $ne: 1 } }, { $set: check.value }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
-        matcher.invalidate(companyId);
-        return res.send({ status: true, statusText: 'Automation updated.', data: updated ? v2Summary(updated) : null });
+        if (!updated) return refuse(res, 404, NOT_FOUND);
+        rulesChanged(companyId);
+        return res.send({ status: true, statusText: 'Automation updated.', data: v2Summary(updated) });
     } catch (e) { logger.error(`updateRuleV2: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
-// PATCH /api/v2/automations/:id/enabled
-//
-// Its own endpoint rather than a full save: the list screen toggles rules, and
-// making that round-trip the whole document means a stale list can silently
-// revert an edit made in another tab.
+/* PATCH /api/v2/automations/:id/enabled
+ * Its own endpoint rather than a full save: a stale list toggling a rule must not
+ * silently revert an edit made in another tab. */
 exports.setRuleEnabled = async (req, res) => {
     try {
         const companyId = companyOf(req);
-        const id = oid(req.params.id);
-        if (!companyId || !id) return res.send({ status: false, statusText: 'companyId and a valid id are required.' });
+        if (!companyId) return refuse(res, 400, 'companyId is required.');
+        const target = await ruleForWrite(req, res, companyId);
+        if (!target) return undefined;
         const enabled = req.body && req.body.enabled === true;
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AUTOMATION_RULES,
-            data: [{ _id: id }, { $set: { enabled } }, { returnDocument: 'after' }],
+            data: [{ _id: target.id, deletedStatusKey: { $ne: 1 } }, { $set: { enabled } }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
-        matcher.invalidate(companyId);
-        return res.send({ status: true, statusText: enabled ? 'Automation on.' : 'Automation off.', data: updated ? v2Summary(updated) : null });
+        if (!updated) return refuse(res, 404, NOT_FOUND);
+        rulesChanged(companyId);
+        return res.send({ status: true, statusText: enabled ? 'Automation on.' : 'Automation off.', data: v2Summary(updated) });
     } catch (e) { logger.error(`setRuleEnabled: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
@@ -248,13 +281,8 @@ exports.listRuns = async (req, res) => {
     } catch (e) { logger.error(`listRuns: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
-// POST /api/v2/automations/compile  body: { sentence?, rule?, name? }
-//
-// The sentence field on the builder (handoff 13d) and the compiled rule beside
-// it are the same object viewed twice, so one endpoint answers in both
-// directions: a sentence compiles to a rule and a rule renders back to the
-// sentence that produced it. Deterministic — no model call, so what the user
-// reads is what the engine will run.
+/* POST /api/v2/automations/compile  body: { sentence?, rule?, name? }
+ * Deterministic, no model call: what the user reads is what the engine will run. */
 exports.compileSentence = async (req, res) => {
     try {
         const { sentence, rule, name } = req.body || {};
@@ -283,10 +311,9 @@ exports.compileSentence = async (req, res) => {
 
 const WINDOW_DAYS = 30;
 
-/* Everything a condition tree can be checked against server-side without
- * replaying the event log. Change operators are skipped deliberately: a
- * "changed to" clause needs a before/after that no longer exists on the task, and
- * counting it as matched would overstate the number. */
+/* Change operators are skipped deliberately: a "changed to" clause needs a
+ * before/after that no longer exists on the task, and counting it as matched would
+ * overstate the number. */
 const backtestMatch = (node) => {
     if (!node || !node.op) return {};
     if (node.op === 'and') return { $and: (node.args || []).map(backtestMatch).filter((m) => Object.keys(m).length) };
@@ -305,27 +332,28 @@ const backtestMatch = (node) => {
     }
 };
 
-// POST /api/v2/automations/backtest  body: { rule }
-//
-// "Test on last 30 days" (handoff 13d). It counts the tasks in the window that
-// this rule's conditions match today — it does not replay the event stream, and
-// says so in `basis`, because a number labelled "would fire" that is actually
-// something else is worse than no number.
+/* POST /api/v2/automations/backtest  body: { rule }
+ * Counts tasks touched in the window that the conditions match today. It does not
+ * replay the event stream, and says so in `basis`. Only projects the caller can
+ * open are searched, whatever scope the rule names. */
 exports.backtest = async (req, res) => {
     try {
         const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        if (!companyId) return refuse(res, 400, 'companyId is required.');
         const rule = (req.body && req.body.rule) || {};
         const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
         const conditionMatch = backtestMatch(rule.conditions);
         const match = { deletedStatusKey: { $ne: 1 }, updatedAt: { $gte: since } };
         if (Object.keys(conditionMatch).length) Object.assign(match, conditionMatch);
+        let projectIds = await access.visibleProjectIds(companyId, req.uid);
         if (rule.scope && rule.scope.allProjects === false && (rule.scope.projectIds || []).length) {
-            match.ProjectID = { $in: rule.scope.projectIds.map(String) };
+            const wanted = new Set(rule.scope.projectIds.map(String));
+            projectIds = projectIds.filter((id) => wanted.has(String(id)));
         }
+        const scoped = { $and: [match, { ProjectID: { $in: projectIds } }] };
         const [count, sample] = await Promise.all([
-            MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [match] }, 'countDocuments').catch(() => 0),
-            MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [match, 'TaskName TaskKey', { limit: 5, sort: { updatedAt: -1 } }] }, 'find').catch(() => []),
+            MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [scoped] }, 'countDocuments').catch(() => 0),
+            MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [scoped, 'TaskName TaskKey', { limit: 5, sort: { updatedAt: -1 } }] }, 'find').catch(() => []),
         ]);
         return res.send({
             status: true,

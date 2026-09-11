@@ -3,6 +3,8 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const logger = require("../../Config/loggerConfig");
 const { normalizeAuditEntry, retentionCutoff } = require("./helpers/auditRules");
 
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+
 // SEC-04 — record an audit row. Fire-and-forget: NEVER throws to the caller, so
 // a logging hiccup can never break the mutation it's recording.
 const recordAudit = (companyId, entry) => {
@@ -17,17 +19,24 @@ const recordAudit = (companyId, entry) => {
     }
 };
 
-// Convenience: pull actor + ip from an Express req.
+const sessionActorName = async (uid) => {
+    if (!OBJECT_ID_PATTERN.test(uid)) return '';
+    const user = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.USERS, data: [{ _id: uid }, { Employee_Name: 1 }] }, 'findOne');
+    return (user && user.Employee_Name) || '';
+};
+
+/* The actor is whoever the session says; a name or id in the request body is only the client's claim. */
 const recordAuditFromReq = (req, entry) => {
     const companyId = req.headers['companyid'] || (req.body && req.body.companyId);
-    const userData = (req.body && req.body.userData) || {};
+    const actorId = req.uid ? String(req.uid) : '';
     const forwarded = req.headers['x-forwarded-for'] || req.ip;
-    recordAudit(companyId, {
-        actorId: req.uid || userData.id || userData._id || '',
-        actorName: userData.name || userData.Employee_Name || '',
-        ip: forwarded ? String(forwarded).split(',')[0] : '',
-        ...entry,
-    });
+    const ip = forwarded ? String(forwarded).split(',')[0] : '';
+    sessionActorName(actorId)
+        .catch((e) => {
+            logger.error(`audit actor lookup ${actorId}: ${e.message || e}`);
+            return '';
+        })
+        .then((actorName) => recordAudit(companyId, { actorId, actorName, ip, ...entry }));
 };
 
 // Cron: prune rows older than the retention window, across every company.

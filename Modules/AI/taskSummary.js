@@ -1,6 +1,7 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const { visibleTask, TASK_NOT_FOUND } = require('./taskAccess');
 const logger = require('../../Config/loggerConfig');
 const { myCache } = require('../../Config/config');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
@@ -145,19 +146,16 @@ async function askModel(userMessage, spend) {
  *
  * @returns {Promise<{status:boolean, data?:{summary:string, commentCount:number, updatedAt:string, cached:boolean}, reason?:string}>}
  */
-async function summarizeTask({ companyId, taskId, force = false }) {
+async function summarizeTask({ companyId, uid, taskId, force = false }) {
     if (!companyId || !taskId || !mongoose.Types.ObjectId.isValid(taskId)) {
         return { status: false, reason: 'taskId is required' };
     }
-    if (!providerFactory || typeof providerFactory.isAnyProviderConfigured !== 'function' || !providerFactory.isAnyProviderConfigured()) {
-        return { status: false, reason: 'no LLM provider configured' };
-    }
     try {
-        const task = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS,
-            data: [{ _id: new mongoose.Types.ObjectId(taskId) }, { TaskName: 1, status: 1 }],
-        }, 'findOne');
-        if (!task) return { status: false, reason: 'task not found' };
+        const task = await visibleTask({ companyId, uid, taskId, projection: { TaskName: 1, status: 1 } });
+        if (!task) return { status: false, notFound: true, reason: TASK_NOT_FOUND };
+        if (!providerFactory || typeof providerFactory.isAnyProviderConfigured !== 'function' || !providerFactory.isAnyProviderConfigured()) {
+            return { status: false, reason: 'no LLM provider configured' };
+        }
 
         const { total, comments } = await loadComments(companyId, taskId);
         if (!total) {
