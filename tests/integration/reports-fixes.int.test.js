@@ -49,7 +49,7 @@ describe('REP-01 legacy /api/v1/dashboard', () => {
         const card = { componentId: 'TotalTasksCard', cardId: '', uid: cardUid, config: { cardData: {}, filterData: [], position: { x: 0, y: 99, w: 3, h: 5 } } };
 
         const added = await member.api.post('/api/v1/dashboard', { op: 'addCard', templateId, card });
-        expect(added.body.status).toBe(true);
+        expect(added.body).toMatchObject({ status: true });
         expect(added.body.data.cards.some((c) => c.uid === cardUid)).toBe(true);
 
         const removed = await member.api.post('/api/v1/dashboard', { op: 'removeCard', templateId, cardUid });

@@ -129,7 +129,7 @@ exports.getDashboard = async (req, res) => {
             return res.status(200).json(cachedDashboard);
         }
 
-        const params = { type: SCHEMA_TYPE.USERDASHBOARD, data: [{ userId: id }] };
+        const params = { type: SCHEMA_TYPE.USERDASHBOARD, data: [homeDashboardMatch(id)] };
         const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'find');
 
         if (response?.length) {
@@ -207,6 +207,11 @@ exports.getCardComponent = async (req, res) => {
 
 const LEGACY_DASHBOARD_OPS = ["addCard", "updateCard", "removeCard", "setCards"];
 
+// Hub dashboards share this collection and carry the creator's userId, so without the
+// templateId and isDeleted guards a user's first hub dashboard (even a deleted one)
+// would be served as their home and no home dashboard would ever be created.
+const homeDashboardMatch = (uid) => ({ userId: uid, templateId: { $exists: true, $ne: "" }, isDeleted: { $ne: true } });
+
 const isPlainObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 function applyLegacyDashboardOp(cards, body) {
@@ -241,8 +246,6 @@ function applyLegacyDashboardOp(cards, body) {
     }
 }
 
-// The home dashboard (per-user document keyed by userId + templateId). Only a
-// fixed set of card operations is accepted, always on the caller's own document.
 exports.updateDashboard = async (req, res) => {
     try {
         const companyId = req.headers["companyid"];
@@ -254,7 +257,7 @@ exports.updateDashboard = async (req, res) => {
         if (!LEGACY_DASHBOARD_OPS.includes(body.op)) {
             return res.status(400).json({ status: false, message: `'op' must be one of: ${LEGACY_DASHBOARD_OPS.join(", ")}.` });
         }
-        const match = { userId: uid, isDeleted: { $ne: true } };
+        const match = homeDashboardMatch(uid);
         if (typeof body.templateId === "string" && body.templateId) match.templateId = body.templateId;
         const doc = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.USERDASHBOARD, data: [match] }, "findOne");
         if (!doc) return res.status(404).json({ status: false, message: "Dashboard not found." });

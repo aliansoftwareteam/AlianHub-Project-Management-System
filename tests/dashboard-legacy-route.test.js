@@ -153,4 +153,27 @@ describe('REP-01 legacy GET /api/v1/dashboard/:id', () => {
         expect(r.code).toBe(200);
         expect(r.body[0].title).toBe('Owner private');
     });
+
+    it('creates a home dashboard for a user whose only dashboards are hub dashboards', async () => {
+        const MEMBER = 'dddddddddddddddddddddddd';
+        mockDb.seed(T, { userId: MEMBER, ownerId: MEMBER, visibility: 'private', title: 'Deleted hub board', cards: [], isDeleted: true });
+        mockDb.seed(T, { userId: MEMBER, ownerId: MEMBER, visibility: 'private', title: 'Hub board', cards: [] });
+
+        const r = await call(ctrl.getDashboard, { uid: MEMBER, params: { id: MEMBER } });
+        expect(r.code).toBe(200);
+        expect(r.body).toHaveLength(1);
+        expect(r.body[0].templateId).toBeTruthy();
+
+        const added = await call(ctrl.updateDashboard, { uid: MEMBER, body: { op: 'addCard', templateId: String(r.body[0].templateId), card: card('444') } });
+        expect(added.code).toBe(200);
+        expect(mockDb.store[T].find((d) => d.title === 'Hub board').cards).toHaveLength(0);
+    });
+
+    it('never applies a card operation to a hub dashboard', async () => {
+        mockDb.store[T] = [];
+        const hub = mockDb.seed(T, { userId: OWNER, ownerId: OWNER, visibility: 'private', title: 'Hub board', cards: [] });
+        const r = await call(ctrl.updateDashboard, { uid: OWNER, body: { op: 'addCard', card: card('555') } });
+        expect(r.code).toBe(404);
+        expect(doc(hub._id).cards).toHaveLength(0);
+    });
 });
