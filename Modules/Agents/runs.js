@@ -15,6 +15,9 @@ const OPEN = [STATUS.QUEUED, STATUS.RUNNING, STATUS.WAITING];
 // A skip is the skill declining its input (no URL, no PR link, brief too short):
 // neither a success to count as clean nor a failure to fix, so it is its own status.
 const TERMINAL = [STATUS.DONE, STATUS.SKIPPED, STATUS.FAILED, STATUS.STOPPED];
+// How long a finished run is kept. Open runs never expire: a run waiting on a
+// person must outlive its proposal, however long that person takes.
+const RETENTION_SECONDS = 15552000;
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const monthKey = (d = new Date()) => d.toISOString().slice(0, 7);
 const startOfDayUtc = (d = new Date()) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -96,11 +99,17 @@ const appendAction = (companyId, runId, entry) => patch(companyId, runId, {}, { 
 
 const get = (companyId, runId) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(runId) }] }, 'findOne');
 
+const terminalUpdate = (status, at = new Date()) => {
+    if (!TERMINAL.includes(status)) throw new Error(`${status} is not a terminal run status`);
+    return { status, finishedAt: at, expiresAt: new Date(at.getTime() + RETENTION_SECONDS * 1000) };
+};
+
 const finish = async (companyId, runId, { status = STATUS.DONE, outcome, error, episode, onlyIf } = {}) => {
     const run = await get(companyId, runId);
     if (!run) return null;
-    const startedAt = run.startedAt ? new Date(run.startedAt).getTime() : Date.now();
-    const set = { status, finishedAt: new Date(), elapsedMs: Date.now() - startedAt, outcome: outcome || null, error: error || null, ...(episode ? { episode } : {}) };
+    const now = new Date();
+    const startedAt = run.startedAt ? new Date(run.startedAt).getTime() : now.getTime();
+    const set = { ...terminalUpdate(status, now), elapsedMs: now.getTime() - startedAt, outcome: outcome || null, error: error || null, ...(episode ? { episode } : {}) };
     return patch(companyId, runId, set, {}, { onlyIf });
 };
 
@@ -290,4 +299,4 @@ const skillSlugOf = (agent, explicit) => {
     return first.key || first.slug || first.name || 'qa-review';
 };
 
-module.exports = { STATUS, OPEN, TERMINAL, canStart, runsToday, skillSlugOf, create, get, patch, appendAction, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, getAgent, emitAgent, changesFor, executeSkill, monthKey };
+module.exports = { STATUS, OPEN, TERMINAL, RETENTION_SECONDS, terminalUpdate, canStart, runsToday, skillSlugOf, create, get, patch, appendAction, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, getAgent, emitAgent, changesFor, executeSkill, monthKey };

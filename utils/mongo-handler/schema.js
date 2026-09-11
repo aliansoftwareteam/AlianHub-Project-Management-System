@@ -814,6 +814,8 @@ const schema = {
         startedBy: { type: String, required: false },
         startedAt: { type: Date, required: false },
         finishedAt: { type: Date, required: false },
+        // set with the terminal status; the TTL index deletes the run once it passes
+        expiresAt: { type: Date, required: false },
         elapsedMs: { type: Number, default: 0, required: false },
         // { tokens, usd, model, billedToWorkspace }
         spend: { type: Object, required: false },
