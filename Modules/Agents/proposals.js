@@ -28,6 +28,7 @@ const GATE_OWNER_ADMIN = 'owner_admin';
 // The canned decline reasons the Inbox offers; only these can grow into a user preference.
 const DECLINE_REASONS = Object.freeze(Object.keys(memory.DECLINE_REASON_TEXT));
 const DECLINE_REASON_MAX = 200;
+const REASON = Object.freeze({ RUN_MISSING: 'run_missing' });
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
 const quietly = async (what, fn) => {
@@ -185,7 +186,8 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     if (!agent) return { error: 'This agent was deleted — decline the proposal instead.', status: 409 };
     if (p.runId) {
         const run = await runOf(companyId, p.runId);
-        if (run && run.status === runs.STATUS.STOPPED) return { error: 'Run was stopped.', status: 409 };
+        if (!run) return { error: 'The run behind this proposal no longer exists — decline it instead.', status: 409, reason: REASON.RUN_MISSING };
+        if (run.status === runs.STATUS.STOPPED) return { error: 'Run was stopped.', status: 409 };
     }
 
     const claimed = await setStatus(companyId, id, { status: STATUS.APPLYING, decidedBy: decider.userId, decidedAt: new Date() }, { onlyIf: STATUS.PENDING });
@@ -257,4 +259,4 @@ const undoApproval = async (companyId, id, { decider, ip }) => {
     return { proposal: updated, results };
 };
 
-module.exports = { STATUS, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, undoApproval, bucketOf };
+module.exports = { STATUS, REASON, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, undoApproval, bucketOf };
