@@ -18,11 +18,12 @@ Updated 2026-09-11. Read this first, then `Tasks/index.md`. Overwrite this file 
 2. The in-process sweep with the real model: confirm every configured provider books a non-zero cost, and that an unpriced model is refused with the named reason.
 3. Owner and member browser sweep of the undo deadline: run detail page and Settings → Audit log; record it in 023's progress.md, then move 023 to `done/`.
 
-## In flight (2026-09-11, afternoon)
+## In flight (2026-09-11, evening)
 
-- **Sprint 3 (task 026) is active.** Five agents build steps 1, 2, 3, 4 and 6 in parallel: OpenTelemetry and trace ids with the run trace view, the replay record and replay view, the metrics endpoint and AI hub health, provider error codes, and the single exception path. Step 5 (rate alerts) starts once metrics merge.
-- **QA programme (task 034) is active.** Wave 1: the demo IT team seed for the local database and the Playwright plus real-database harness with a CI job. Area waves (ten areas, sweep plus suite) start when both merge.
-- **Versioning (task 033) is merged.** Every merge to beta is a numbered build (`npm run version:show`). After merges, run `npm run version:log` and commit `docs/BETA-LOG.md` in the follow-up docs PR (CLAUDE.md Rule 4).
+- **Beta is `14.36.0-beta.71`.** Check with `npm run version:show`; the build log is `docs/BETA-LOG.md` (CLAUDE.md Rule 4).
+- **Sprint 3 (task 026):** steps 1–4 and 6 merged (#587–#591). Step 5, rate alerts with the Notification settings row, is being built on `feat/s3-rate-alerts`.
+- **QA programme (task 034):** the demo team seed (#593) and the E2E harness with its CI job (#592) are merged. Ten area agents are sweeping and writing specs, each on `test/qa-<area>` with findings in `Tasks/active/034-end-to-end-qa-programme/findings/<area>.md`. Fix branches in progress: `fix/project-edit-membership`, `fix/refresh-token-uniqueness`, `fix/unauthenticated-v1-routes`, `fix/guest-role-id`. Member rules fixed in #595.
+- **Demo team:** credentials in `.demo-accounts.local.json` at the repo root (gitignored, mode 600). Session tokens come from `npm run demo:token -- --email <demo email>`; see `docs/QA-DEMO-TEAM.md`.
 
 ## Still open on task 024 (Sprint 1)
 
@@ -35,7 +36,7 @@ Updated 2026-09-11. Read this first, then `Tasks/index.md`. Overwrite this file 
 2. In-process sweep: change an agent, promote and roll back a revision, start a run and confirm it names its revision; run `brief.parse` on a real task through the seeded data skill.
 3. Then move 025 to `done/`.
 
-## Next: Sprint 3 — task 026 (`Tasks/backlog/026-sprint-3-observability-foundation/`)
+## Sprint 3 — task 026 (in progress; see In flight) (`Tasks/backlog/026-sprint-3-observability-foundation/`)
 
 Move it to `active/` and work its steps, one PR each, from `beta`:
 
