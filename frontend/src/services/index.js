@@ -343,10 +343,7 @@ export function useAuth() {
     
             if (userId && refreshToken && data?.islogOut === true) {
                 try {
-                    await apiRequestWithoutCompnay("post", env.LOGOUT, {
-                        id: userId,
-                        refreshToken: refreshToken,
-                    });                    
+                    await apiRequestWithoutCompnay("post", env.LOGOUT, { id: userId });
                 } catch (error) {
                     console.error('Error in logout', error);
                     cleanup(data);
