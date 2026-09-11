@@ -75,7 +75,7 @@
             <div class="position-re" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/mic_icon.svg" class="cursor-pointer" id="talk_to_text_driver" :title="$t('TalkToText.title')" @click="talkToTextVisible = true">
             </div>
-            <div class="position-re" v-if="rules && Object.keys(rules).length && (companyUser.roleType === 1 || companyUser.roleType === 2)">
+            <div class="position-re" v-if="rules && Object.keys(rules).length && isOwnerOrAdmin(companyUser.roleType)">
                 <img src="@/assets/images/svg/tour_image.svg" class="cursor-pointer" id="tour_icon" @click="getTourDetails(),tourVisible = true">
             </div>
             <div>
@@ -102,7 +102,7 @@
                     <div>
                         <DropDownRouterOption v-if="rules && Object.keys(rules).length" :item="{image: profileIcon, to: {name: 'My Profile', params: {cid: companyId}}, label: $t('Header.my_profile')}" @click="$refs.profile_menu_dd.click()"/>
                         <DropDownRouterOption v-if="rules && Object.keys(rules).length" :item="{image: settingsIcon, to: {name: 'Setting', params: {cid: companyId}}, label: $t('settingslider.Settings')}" @click="$refs.profile_menu_dd.click()"/>
-                        <BillingHistoryTab v-if="rules && Object.keys(rules).length && companyUser.roleType === 1" :companyId="companyId" :refs="$refs" />
+                        <BillingHistoryTab v-if="rules && Object.keys(rules).length && companyUser.roleType === ROLE_OWNER" :companyId="companyId" :refs="$refs" />
                         <DropDownOption :item="{image: logoutIcon, label: $t('Header.Logout')}" @click="logout()" />
                     </div>
                 </template>
@@ -164,7 +164,7 @@
                             <WasabiIamgeCompp v-else :userImage="true" :thumbnail="'35x35'" :data="{title:getUser(userId).Employee_Name, url: getUser(userId).Employee_profileImageURL}" class="profile-lg-square"/>
                             <div class="d-flex flex-column cursor-pointer mobile-degignation-wrapper" :class="{'pl-1': clientWidth > 1200, 'pt-20': clientWidth <= 1200 }">
                                 <span class="font-weight-500 text-ellipsis font-size-20 mw-75 color90 pb-4px">{{getUser(userId).Employee_Name}}</span>
-                                <span class="text-ellipsis mw-65">{{designations && designations.find((x) => x.key === getUser(userId)?.designation)?.name ? designations.find((x) => x.key === getUser(userId)?.designation)?.name : companyUser.roleType === 1 ? "Owner" : "N/A"}}</span>
+                                <span class="text-ellipsis mw-65">{{designations && designations.find((x) => x.key === getUser(userId)?.designation)?.name ? designations.find((x) => x.key === getUser(userId)?.designation)?.name : companyUser.roleType === ROLE_OWNER ? "Owner" : "N/A"}}</span>
                             </div>
                             </div>
 
@@ -228,7 +228,7 @@
                         <router-link v-if="rules && Object.keys(rules).length" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="visible = false" :to="{name: 'inbox', params: {cid: companyId}}">
                             {{$t('Inbox.title')}}
                         </router-link>
-                        <div v-if="rules && Object.keys(rules).length && (companyUser.roleType === 1 || companyUser.roleType === 2)" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="getTourDetails(),tourVisible = true,visible = false">
+                        <div v-if="rules && Object.keys(rules).length && isOwnerOrAdmin(companyUser.roleType)" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="getTourDetails(),tourVisible = true,visible = false">
                             {{$t('Header.Tours')}}
                         </div>
                         <div v-if="rules && Object.keys(rules).length" class="p-1 cursor-pointer border-radius-7-px mobile-menu-list" @click="$router.push({name: 'Setting', params: {cid: companyId}}), visible = false">
@@ -313,6 +313,7 @@ import DropDownRouterOption from "@/components/molecules/DropDownRouterOption/Dr
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue"
 import * as env from '@/config/env';
 import { apiRequest, apiRequestWithoutCompnay,useAuth } from "@/services";
+import { ROLE_OWNER, isOwnerOrAdmin } from "@/utils/roles";
 
 // INTERFACES
 const companyId = inject("$companyId");

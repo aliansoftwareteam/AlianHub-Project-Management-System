@@ -488,6 +488,7 @@ import ProjectBottomModals from './components/ProjectBottomModals.vue';
 import ProjectEmptyState from './components/ProjectEmptyState.vue';
 import { useProjectCalendar } from './composables/useProjectCalendar';
 import { useProjectRules } from './composables/useProjectRules';
+import { folderSprintList } from './folderSprints';
 import { useProjectNameEdit } from './composables/useProjectNameEdit';
 import { useProjectAssignee } from './composables/useProjectAssignee';
 import { useEmbedViews } from './composables/useEmbedViews';
@@ -497,6 +498,7 @@ import { useProjectSearch } from './composables/useProjectSearch';
 import { useProjectTree } from './composables/useProjectTree';
 
 import { useProjectsHelper } from './helper';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 // UTILS
 const { checkErrors } = useValidation();
@@ -1070,37 +1072,17 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
                 }
             });
         } else if (route.name.includes('ProjectFolder')) {
-            if (route.params.sprintId && !project?.sprintsfolders?.[route.params.folderId]?.deletedStatusKey) {
-                const sprintIndex = Object.values(project?.sprintsfolders?.[route.params.folderId]?.sprintsObj || {})?.findIndex((x) => x.id === route.params.sprintId);
-                if (sprintIndex !== -1) {
-                    tmp = [Object.values(project.sprintsfolders[route.params.folderId].sprintsObj)[sprintIndex]];
-                } else {
-                    tmp = [];
-                }
-            } else {
-                if (project.sprintsfolders?.[route.params.folderId]?.deletedStatusKey === 2) {
-                    if (showArchived.value) {
-                        const val = project.sprintsfolders?.[route.params.folderId];
-                        tmp = [{
-                            name: val.name,
-                            id: val.folderId,
-                            isExpanded: false,
-                            archivedSprintList: project?.sprintsfolders?.[route.params.folderId]?.sprintsObj || {},
-                            items: [],
-                            deletedStatusKey: 2,
-                            isFolder: true,
-                        }];
-                    } else {
-                        tmp = [];
-                    }
-                } else {
-                    tmp = Object.values(project.sprintsfolders[route.params.folderId]?.sprintsObj || {})?.length ? Object.values(project.sprintsfolders[route.params.folderId].sprintsObj).filter((x) => checkSprint(x)) : [];
-                }
-            }
+            tmp = folderSprintList({
+                folders: project.sprintsfolders,
+                folderId: route.params.folderId,
+                sprintId: route.params.sprintId,
+                showArchived: showArchived.value,
+                includeSprint: checkSprint,
+            });
         } else if (route.name.includes('ProjectSprint')) {
             const sprintsArray = Object.values(project?.sprintsObj || {});
             const sprintIndex = sprintsArray.findIndex((x) => x.id === route.params.sprintId && (!showArchived.value ? (x?.deletedStatusKey === 0 || x?.deletedStatusKey === undefined) : true));
-            if ((companyUserDetail.value.roleType === 1 || companyUserDetail.value.roleType === 2) || (sprintIndex !== -1 && (!sprintsArray[sprintIndex]?.private || sprintsArray[sprintIndex]?.AssigneeUserId?.includes(userId.value)))) {
+            if (isOwnerOrAdmin(companyUserDetail.value.roleType) || (sprintIndex !== -1 && (!sprintsArray[sprintIndex]?.private || sprintsArray[sprintIndex]?.AssigneeUserId?.includes(userId.value)))) {
                 tmp = sprintIndex !== -1 ? [sprintsArray[sprintIndex]] : [];
             } else {
                 tmp = [];
@@ -1110,7 +1092,7 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
         console.error(error, 'Error');
     }
 
-    if (companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
+    if (!isOwnerOrAdmin(companyUserDetail.value.roleType)) {
         tmp = tmp.filter((x) => !x?.private || x?.AssigneeUserId?.includes(userId.value));
     }
 

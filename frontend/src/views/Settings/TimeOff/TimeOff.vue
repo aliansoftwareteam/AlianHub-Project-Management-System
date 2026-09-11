@@ -107,6 +107,7 @@ import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useMoment } from '@/composable';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 // SEC-08 — time-off / PTO. Members request + see their own; owner/admin see the
 // team and approve/reject. Approved PTO reduces available capacity server-side
@@ -114,7 +115,7 @@ import { useMoment } from '@/composable';
 const { getters } = useStore();
 const { t } = useI18n();
 const roleType = computed(() => getters['settings/companyUserDetail'] && getters['settings/companyUserDetail'].roleType);
-const isAdmin = computed(() => roleType.value === 1 || roleType.value === 2);
+const isAdmin = computed(() => isOwnerOrAdmin(roleType.value));
 
 const types = ['casual', 'privilege', 'sick'];
 const busy = ref(false);

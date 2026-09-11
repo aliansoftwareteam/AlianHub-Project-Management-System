@@ -189,6 +189,7 @@
     import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
     import { apiRequest } from '../../../services';
     import * as env from '@/config/env';
+    import { isOwnerOrAdmin } from "@/utils/roles";
     const {getUser} = useGetterFunctions();
     defineComponent({
         name: "UserTimesheet",
@@ -281,7 +282,7 @@
                     let publicQuery = {
                         isPrivateSpace:false
                     }
-                    if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2 && !getters["settings/rules"].toggle.showAllProjects) {
+                    if(!isOwnerOrAdmin(companyUserDetail.value.roleType) && !getters["settings/rules"].toggle.showAllProjects) {
                         publicQuery.AssigneeUserId = {
                             $in:[uid]
                         }
@@ -292,7 +293,7 @@
                     let privateQuery = {
                         isPrivateSpace:true
                     }
-                    if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
+                    if(!isOwnerOrAdmin(companyUserDetail.value.roleType)) {
                         privateQuery.AssigneeUserId = {
                             $in:[uid]
                         }

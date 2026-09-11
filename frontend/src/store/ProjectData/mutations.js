@@ -1,5 +1,6 @@
 import Cookies from 'js-cookie';
 import { useCustomComposable } from '@/composable/index.js';
+import { isOwnerOrAdmin } from "@/utils/roles";
 const { checkPermission } = useCustomComposable();
 
 export const mutateMongoUpdatedTask = (state, payload) => {
@@ -64,7 +65,7 @@ export const mutateProjects = (state, payload) => {
                 if (!data.sprintsfolders) {
                     data.sprintsfolders = {};
                 }
-                if(([1, 2].includes(roleType)) || checkPermission('project.private_projects') === 2) {
+                if(isOwnerOrAdmin(roleType) || checkPermission('project.private_projects') === 2) {
                     data.sprintsObj = sortObject({...state.allProjects.data[index].sprintsObj, ...data.sprintsObj});
                     let object = {...state.allProjects.data[index].sprintsfolders, ...data.sprintsfolders};
                     if(object && Object.keys(object || {}).length) {

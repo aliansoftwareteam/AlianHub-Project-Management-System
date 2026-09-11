@@ -8,6 +8,7 @@ import { useGetterFunctions } from '@/composable';
 import { inject,computed } from 'vue';
 import { i18n } from "@/locales/main";
 import { useProjectsHelper } from '@/views/Projects/helper';
+import { isOwnerOrAdmin } from "@/utils/roles";
 const t = i18n.global.t;
 
 export function tourHepler() {
@@ -211,7 +212,7 @@ export function tourHepler() {
         }
     }
     const startProjectTour = (key) => {
-        if(companyUserDetail.value && (companyUserDetail.value.roleType === 1 || companyUserDetail.value.roleType === 2)) {
+        if(companyUserDetail.value && isOwnerOrAdmin(companyUserDetail.value.roleType)) {
             if(clientWidth.value > 1300) {
                 let tours = handleTours(key)
                 
@@ -224,7 +225,7 @@ export function tourHepler() {
     }
     
     const hanldeProjectTour = (key) => {
-        if(companyUserDetail.value && (companyUserDetail.value.roleType === 1 || companyUserDetail.value.roleType === 2)) {
+        if(companyUserDetail.value && isOwnerOrAdmin(companyUserDetail.value.roleType)) {
             if(getUser(userId.value)?.tourStatus?.[key] == undefined || getUser(userId.value)?.tourStatus?.[key] === false || (getUser(userId.value)?.tourStatus == undefined || Object.keys(getUser(userId.value)?.tourStatus).length == 0)) {
                 if(clientWidth.value > 1300) {
                     if(key === 'isTaskTour') {

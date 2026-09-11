@@ -8,6 +8,7 @@ import { i18n } from "@/locales/main";
 const t = i18n.global.t;
 import * as env from '@/config/env';
 import { apiRequest } from '../../services';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 const projectsList = ref([]);
 const filterdProjects = ref([]);
@@ -106,7 +107,7 @@ export function useProjectsHelper() {
 
         if(object.sprintsObj && Object.keys(object.sprintsObj).length) {
             Object.values(object.sprintsObj).forEach((sprint) => {
-                if(sprint.deletedStatusKey !== 1 && (companyUserDetail.value.roleType === 1 || companyUserDetail.value.roleType === 2) || (!sprint?.private || sprint?.AssigneeUserId?.includes(userId.value))) {
+                if(sprint.deletedStatusKey !== 1 && isOwnerOrAdmin(companyUserDetail.value.roleType) || (!sprint?.private || sprint?.AssigneeUserId?.includes(userId.value))) {
                     if(!showArchived) {
                         if(!sprint.deletedStatusKey && sprint._id) {
                             sprints[sprint.id] = sprint;
@@ -380,7 +381,7 @@ export function useProjectsHelper() {
                         let publicQuery = {
                             isPrivateSpace:false
                         }
-                        if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2 && !getters["settings/rules"].toggle?.showAllProjects) {
+                        if(!isOwnerOrAdmin(companyUserDetail.value.roleType) && !getters["settings/rules"].toggle?.showAllProjects) {
                             publicQuery.AssigneeUserId = {
                                 $in:[uid]
                             }
@@ -394,7 +395,7 @@ export function useProjectsHelper() {
                         let privateQuery = {
                             isPrivateSpace:true
                         }
-                        if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
+                        if(!isOwnerOrAdmin(companyUserDetail.value.roleType)) {
                             if (privatePermission === 1) { 
                                     privateQuery.AssigneeUserId = {
                                     $in: [uid]

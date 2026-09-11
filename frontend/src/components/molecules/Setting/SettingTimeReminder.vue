@@ -101,6 +101,7 @@ import { useToast } from 'vue-toast-notification';
 
 import { apiRequest } from '@/services';
 import { memberData } from '@/views/Settings/Members/helperMember';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -110,7 +111,7 @@ const { getCompanyUsers } = memberData();
 // Owner gate — mirrors SettingScreenshotRetention. Renders nothing otherwise.
 const companyUser = computed(() => getters['settings/companyUserDetail'] || {});
 // Owner (1) or Admin (2) — both can manage this company setting.
-const isOwner = computed(() => [1, 2].includes(Number(companyUser.value && companyUser.value.roleType)));
+const isOwner = computed(() => isOwnerOrAdmin(Number(companyUser.value && companyUser.value.roleType)));
 
 const settings = ref({ enabled: false, userIds: [] });
 const selectedIds = ref([]);        // working copy of recipient ids (userId)

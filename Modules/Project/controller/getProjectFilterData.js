@@ -1033,14 +1033,12 @@ const buildArchivedProjectQuery = () => {
 
 exports.getRemainingProject = async (req, res) => {
     try {
-        const { dataIds } = req.body;
+        const { dataIds } = req.body || {};
 
-        // if (!dataIds || dataIds.length === 0) {
-        //     return res.status(400).json({
-        //         status: false,
-        //         message: `'dataIds' parameter is required`
-        //     })
-        // }
+        if (!Array.isArray(dataIds) || !dataIds.length || !dataIds.every((id) => /^[a-f0-9]{24}$/i.test(String(id)))) {
+            const statusText = "'dataIds' must be a non-empty list of project ids.";
+            return res.status(400).json({ status: false, statusText, message: statusText, field: 'dataIds' });
+        }
 
         const convertIds = dataIds.map(x => new mongoose.Types.ObjectId(x))
         const query = {
@@ -1057,9 +1055,7 @@ exports.getRemainingProject = async (req, res) => {
         return res.status(200).json({ status: true, data: response || [] });
 
     } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while get the remaining projects",
-            error: error 
-        });
+        const statusText = "An error occurred while get the remaining projects";
+        return res.status(500).json({ status: false, statusText, message: statusText });
     }
 }

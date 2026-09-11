@@ -4,6 +4,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { replaceObjectKey } = require("../Auth/helper");
 const { escapeRegex } = require("../../utils/escapeRegex");
+const { isPrivileged } = require('../../Config/roleTypes');
 const savedFilters = require("./helpers/savedFilters");
 
 /**
@@ -123,7 +124,7 @@ exports.searchTasks = async (req, res) => {
         const sprintUnwind = { $unwind: '$sprintArray' };
 
         let sprintPrivacyFilter = null;
-        if (roleType !== 1 && roleType !== 2) {
+        if (!isPrivileged(roleType)) {
             sprintPrivacyFilter = currentUserId
                 ? {
                     $match: {

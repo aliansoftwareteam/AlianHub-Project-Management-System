@@ -5,6 +5,7 @@ import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 import { useGetterFunctions } from "@/composable";
 import { FIRST_RUN_STEPS, isFirstRunStepDone } from "@/composable/firstRunProgress";
+import { isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
 
 const SAMPLE_CODE = "WELCOME";
 
@@ -30,7 +31,7 @@ export function useOnboardingChecklist({ openCreateProject = () => {}, startTour
     const projects = computed(() => getters["projectData/projects"]?.data || []);
     const companyUsers = computed(() => getters["settings/companyUsers"] || []);
     const companyUser = computed(() => getters["settings/companyUserDetail"] || {});
-    const isOwnerOrAdmin = computed(() => [1, 2].includes(companyUser.value.roleType));
+    const isOwnerOrAdmin = computed(() => isOwnerOrAdminRole(companyUser.value.roleType));
     const me = computed(() => getUser(userId.value, "all") || {});
     const tourStatus = computed(() => me.value.tourStatus || {});
     const sampleProject = computed(() => projects.value.find((p) => p.ProjectCode === SAMPLE_CODE && p.deletedStatusKey !== 1) || null);

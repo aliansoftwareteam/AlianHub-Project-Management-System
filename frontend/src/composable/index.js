@@ -8,6 +8,7 @@ import Store from '@/store/index'
 import { storageQueryBuilder } from "@/utils/storageQueryBuild";
 import { i18n } from "@/locales/main";
 import { isBundledPriorityImage } from "@/composable/commonFunction";
+import { isOwnerOrAdmin } from "@/utils/roles";
 const t = i18n.global.t;
 const urlRegex = ref(/(https?|ftp):\/\/[^\s/$.?#].[^\s]*/g)
 
@@ -66,7 +67,7 @@ export function useCustomComposable() {
                 return null;
             }
     
-            if(user.value.roleType === 1 || user.value.roleType === 2) {
+            if(isOwnerOrAdmin(user.value.roleType)) {
                 return true;
             } else if(user.value.roleType === null) {
                 console.error("2nd parameter is required");

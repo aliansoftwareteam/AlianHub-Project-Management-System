@@ -6,43 +6,39 @@ const { myCache } = require('../../Config/config');
 const { getProvider } = require('../AICore/llmProvider');
 const { FEATURES } = require('../AICore/features');
 const { removeCache } = require('../../utils/commonFunctions');
+const logger = require('../../Config/loggerConfig');
 const { status } = require('migrate-mongo');
 
-/**
- * This endpoint is used to create project template
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
+const TEMPLATE_NAME_MAX_LENGTH = 250;
+
+const rejectTemplate = (res, statusCode, statusText, field) => res.status(statusCode).json({ status: false, statusText, message: statusText, ...(field ? { field } : {}) });
+
+const validateTemplate = (data) => {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return { field: 'data', message: 'Template details are required.' };
+    if (typeof data.TemplateName !== 'string' || !data.TemplateName.trim()) return { field: 'TemplateName', message: 'A template name is required.' };
+    if (data.TemplateName.trim().length > TEMPLATE_NAME_MAX_LENGTH) return { field: 'TemplateName', message: `A template name can be at most ${TEMPLATE_NAME_MAX_LENGTH} characters.` };
+    return null;
+};
+
 exports.createTemplate = async (req, res) => {
     try {
-        const { data } = req.body
+        const { data } = req.body || {};
+        const invalid = validateTemplate(data);
+        if (invalid) return rejectTemplate(res, 400, invalid.message, invalid.field);
 
-        const params = {
-            type: SCHEMA_TYPE.PROJECT_TEMPLATES,
-            data: data 
-        };
+        const companyId = req.headers['companyid'];
+        const response = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECT_TEMPLATES, data }, "save");
 
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, "save");
-
-        const cacheKey = `project_template_${req.headers['companyid']}`;
-        removeCache(cacheKey);
-
-        if(data.customFiedlsValue && data.customFiedlsValue.length > 0) {
-            removeCache(`customField:${req.headers['companyid']}`);
+        removeCache(`project_template_${companyId}`);
+        if (Array.isArray(data.customFiedlsValue) && data.customFiedlsValue.length > 0) {
+            removeCache(`customField:${companyId}`);
         }
 
-        if(response) {
-            return res.status(200).json({ status: true, data: response });
-        } else {
-            return res.status(404).json({ status: false });
-        }
-
+        return res.status(200).json({ status: true, statusText: 'Template saved.', data: response });
     } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while saving the project template",
-            error: error 
-        });
+        if (error && error.name === 'ValidationError') return rejectTemplate(res, 400, 'The template is missing required details.', 'data');
+        logger.error(`createTemplate: ${error && error.message}`);
+        return rejectTemplate(res, 500, 'An error occurred while saving the project template');
     }
 }
 

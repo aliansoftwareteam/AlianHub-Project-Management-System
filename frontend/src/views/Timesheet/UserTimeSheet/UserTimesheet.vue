@@ -131,6 +131,7 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import NotFound from '@/views/NotFound.vue';
 import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
 import LogTimeSheet from '@/views/TimeLog/LogTimeSheet.vue';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 defineOptions({ name: 'UserTimesheet' });
 
@@ -149,7 +150,7 @@ const cid = computed(() => (companyId && companyId.value) || '');
 const uid = computed(() => (currentUserId && currentUserId.value) || localStorage.getItem('userId') || '');
 const currentCompany = computed(() => getters['settings/selectedCompany']);
 const companyUserDetail = computed(() => getters['settings/companyUserDetail'] || {});
-const isPrivileged = computed(() => [1, 2].includes(companyUserDetail.value.roleType));
+const isPrivileged = computed(() => isOwnerOrAdmin(companyUserDetail.value.roleType));
 const permission = computed(() => checkPermission('sheet_settings.user_timesheet'));
 const allowed = computed(() => permission.value !== null && permission.value !== undefined);
 const isEveryone = computed(() => permission.value === true || permission.value === 2);
