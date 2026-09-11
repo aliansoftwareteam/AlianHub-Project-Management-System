@@ -12,4 +12,5 @@ exports.init = (app) => {
     app.put('/api/v2/invoices/:id', projectInvoices.updateInvoice);
     app.post('/api/v2/invoices/:id/send', projectInvoices.sendInvoice);
     app.post('/api/v2/invoices/:id/paid', projectInvoices.markInvoicePaid);
+    app.delete('/api/v2/invoices/:id', projectInvoices.deleteInvoice);
 }

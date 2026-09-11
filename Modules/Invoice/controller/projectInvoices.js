@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const logger = require('../../../Config/loggerConfig');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
+const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { removeCache } = require('../../../utils/commonFunctions');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const { recordAuditFromReq } = require('../../Audit/recorder');
@@ -70,6 +71,13 @@ const nextInvoiceNumber = async (companyId, projectId, contract) => {
     const prefix = (contract && contract.invoicePrefix) || 'INV';
     return `${prefix}-${new Date().getUTCFullYear()}-${String(seq).padStart(3, '0')}`;
 };
+
+/* nextInvoiceNumber upserts a bare contract row to hold the counter, so "a contract
+ * exists" only counts once someone has saved the terms. */
+const hasSavedContract = async (companyId, projectId) => Boolean(await MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.PROJECT_CONTRACTS,
+    data: [{ ProjectID: String(projectId), deletedStatusKey: 0, updatedBy: { $exists: true } }, { _id: 1 }],
+}, 'findOne'));
 
 const addDays = (date, days) => new Date(date.getTime() + (Number(days) || 0) * 86400000);
 
@@ -241,6 +249,12 @@ exports.draftFromMonth = async (req, res) => {
         if (await refuseGuest(req, res)) return undefined;
         const ctx = await billing.buildBillingContext(companyId, projectId);
         if (!ctx) return res.send({ status: false, statusText: 'Project not found.' });
+        if (!(await hasSavedContract(companyId, projectId))) {
+            return res.status(400).json({
+                status: false,
+                statusText: 'This project has no billing contract. Set up the contract before drafting an invoice from logged time.',
+            });
+        }
 
         const { start, end, label } = billing.monthWindow(req.body && req.body.month);
         const startSec = Math.floor(start.getTime() / 1000);
@@ -404,6 +418,52 @@ const transition = async (req, res, target) => {
         },
     });
     return res.send({ status: true, statusText: target === 'sent' ? 'Invoice sent.' : 'Invoice marked paid.', data: saved });
+};
+
+/* DELETE /api/v2/invoices/:id?projectId= — soft-deletes a draft. An issued invoice is
+ * a document the client already holds, so it can only be superseded, never removed. */
+exports.deleteInvoice = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        const id = String(req.params.id || '');
+        const projectId = String((req.query && req.query.projectId) || (req.body && req.body.projectId) || '');
+        if (!companyId || !isObjectIdString(id) || !isObjectIdString(projectId)) {
+            return res.status(400).json({ status: false, statusText: 'companyId, a valid invoice id and projectId are required.' });
+        }
+        const uid = String(req.uid || '');
+        if (!isPrivileged(await getRoleType(companyId, uid))) {
+            return res.status(403).json({ status: false, statusText: 'Only an owner or admin can delete an invoice.' });
+        }
+        const invoice = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECT_INVOICES,
+            data: [{ _id: id, deletedStatusKey: 0 }],
+        }, 'findOne');
+        if (!invoice || String(invoice.ProjectID) !== projectId) {
+            return res.status(404).json({ status: false, statusText: 'Invoice not found.' });
+        }
+        const notDraft = { status: false, statusText: 'Only a draft invoice can be deleted. This one has already been issued.' };
+        if (invoice.status !== 'draft') return res.status(409).json(notDraft);
+
+        const deleted = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECT_INVOICES,
+            data: [{ _id: id, status: 'draft', deletedStatusKey: 0 }, { $set: { deletedStatusKey: 1, updatedBy: uid } }, { returnDocument: 'after' }],
+        }, 'findOneAndUpdate');
+        if (!deleted) return res.status(409).json(notDraft);
+
+        removeCache(cacheKeyFor(projectId, companyId));
+        socketEmitter.emit('update', { type: 'delete', data: { _id: id, ProjectID: projectId }, module: 'projectInvoice' });
+        recordAuditFromReq(req, {
+            action: 'billing.invoice.delete',
+            entityType: 'project_invoice',
+            entityId: id,
+            entityName: invoice.number,
+            meta: { projectId, totalMinor: Number(invoice.totalMinor) || 0, currency: invoice.currency },
+        });
+        return res.json({ status: true, statusText: 'Draft invoice deleted.', data: { _id: id } });
+    } catch (error) {
+        logger.error(`ERROR in delete invoice: ${error.message}`);
+        return res.status(500).json({ status: false, statusText: 'The invoice was not deleted.', message: error.message });
+    }
 };
 
 /* POST /api/v2/invoices/:id/send */
