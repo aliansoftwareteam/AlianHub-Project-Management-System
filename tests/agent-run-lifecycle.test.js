@@ -24,7 +24,7 @@ const deps = () => ({
 
 const runRow = (id) => mockDb.store[SCHEMA_TYPE.AGENT_RUNS].find((r) => String(r._id) === String(id));
 
-beforeAll(() => require('../Modules/Agents/engine/persistence').useInMemory());
+beforeAll(() => require('../Modules/AICore/persistence').useInMemory());
 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });

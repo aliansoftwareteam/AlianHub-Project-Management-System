@@ -5,7 +5,7 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Modules/Agents/actions', () => ({ perform: jest.fn(async () => ({ auditId: 'aud1', result: {} })) }));
 jest.mock('../Modules/Agents/agentAudit', () => ({ recordProposalDecision: jest.fn(async () => 'dec1'), findById: jest.fn() }));
 jest.mock('../Modules/Agents/engine/graph', () => ({ resumeGraph: jest.fn(async () => ({ resumed: false })) }));
-jest.mock('../Modules/Agents/engine/persistence', () => {
+jest.mock('../Modules/AICore/persistence', () => {
     const deleteThread = jest.fn(async () => {});
     return { deleteThread, saverFor: jest.fn(() => ({ deleteThread })), storeFor: jest.fn(() => { throw new Error('no store in this suite'); }), ready: jest.fn(async () => {}) };
 });
@@ -14,7 +14,7 @@ jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const actions = require('../Modules/Agents/actions');
 const graph = require('../Modules/Agents/engine/graph');
-const persistence = require('../Modules/Agents/engine/persistence');
+const persistence = require('../Modules/AICore/persistence');
 const memory = require('../Modules/Agents/memory');
 const proposals = require('../Modules/Agents/proposals');
 

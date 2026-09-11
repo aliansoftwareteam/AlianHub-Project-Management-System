@@ -1,6 +1,6 @@
 const { StateGraph, Annotation, START, END, interrupt, Command } = require('@langchain/langgraph');
 const logger = require('../../../Config/loggerConfig');
-const persistence = require('./persistence');
+const persistence = require('../../AICore/persistence');
 const orchestrator = require('./orchestrator');
 const findingMemory = require('./findingMemory');
 const memory = require('../memory');

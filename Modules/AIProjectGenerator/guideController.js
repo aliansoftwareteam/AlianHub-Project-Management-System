@@ -4,11 +4,11 @@
 
 const logger = require('../../Config/loggerConfig');
 const { tenantOf, TenantError } = require('../../Config/tenant');
-const { getProvider, isAnyProviderConfigured } = require('./llmProvider');
+const { getProvider, isAnyProviderConfigured } = require('../AICore/llmProvider');
 const { FEATURES } = require('../AICore/features');
 const { tryParseJson } = require('./schemaValidator');
 const { _readPartial: readPartial } = require('./promptBuilder');
-const { usageFromResult, summarize } = require('./usage');
+const { usageFromResult, summarize } = require('../AICore/usage');
 const memoryStore = require('../Agents/memory');
 const { resolveProjectId } = require('./projectAccess');
 

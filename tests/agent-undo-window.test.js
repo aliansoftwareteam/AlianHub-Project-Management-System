@@ -17,7 +17,7 @@ jest.mock('../Modules/Agents/actor', () => {
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 
-beforeAll(() => require('../Modules/Agents/engine/persistence').useInMemory());
+beforeAll(() => require('../Modules/AICore/persistence').useInMemory());
 const audit = require('../Modules/Agents/agentAudit');
 const undo = require('../Modules/Agents/undo');
 const revert = require('../Modules/Agents/revert');

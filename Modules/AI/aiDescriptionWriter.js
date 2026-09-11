@@ -4,7 +4,7 @@
  * Provider-agnostic helper for the dedicated "Write with AI" popover on the
  * task/project description editor. Mirrors the AI time-estimator pattern
  * (Modules/EstimatedTime/aiTaskEstimator.js): it reuses the
- * AIProjectGenerator/llmProvider factory (Anthropic / OpenAI / DeepSeek),
+ * AICore/llmProvider factory (Anthropic / OpenAI / DeepSeek),
  * loads a file-based system prompt once at module load, and parses a single
  * JSON object out of the model response.
  *
@@ -30,7 +30,7 @@ const { FEATURES } = require('../AICore/features');
 
 let providerFactory = null;
 try {
-    providerFactory = require('../AIProjectGenerator/llmProvider');
+    providerFactory = require('../AICore/llmProvider');
 } catch (_e) {
     providerFactory = null;
 }

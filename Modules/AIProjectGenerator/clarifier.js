@@ -15,10 +15,10 @@
 
 const logger = require('../../Config/loggerConfig');
 const memoryStore = require('../Agents/memory');
-const { detectIgnoredInstructions } = require('./instructionGuard');
-const { getProvider } = require('./llmProvider');
+const { detectIgnoredInstructions } = require('../AICore/instructionGuard');
+const { getProvider } = require('../AICore/llmProvider');
 const { FEATURES } = require('../AICore/features');
-const { usageFromResult, addUsage, summarize } = require('./usage');
+const { usageFromResult, addUsage, summarize } = require('../AICore/usage');
 const { COVERAGE_POINTS, CoverageSchema, ClarifyQuestionsSchema, BriefDraftSchema, tryParseJson } = require('./schemaValidator');
 const {
     COVERAGE_POINT_LABELS,

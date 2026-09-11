@@ -4,13 +4,13 @@ const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
-jest.mock('../Modules/AIProjectGenerator/llmProvider', () => ({ getProvider: jest.fn(), isAnyProviderConfigured: jest.fn(() => true) }));
+jest.mock('../Modules/AICore/llmProvider', () => ({ getProvider: jest.fn(), isAnyProviderConfigured: jest.fn(() => true) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
-const llm = require('../Modules/AIProjectGenerator/llmProvider');
+const llm = require('../Modules/AICore/llmProvider');
 const guideCtrl = require('../Modules/AIProjectGenerator/guideController');
 const skills = require('../Modules/Agents/skills');
-const persistence = require('../Modules/Agents/engine/persistence');
+const persistence = require('../Modules/AICore/persistence');
 const memory = require('../Modules/Agents/memory');
 
 const ROOT = path.join(__dirname, '..');

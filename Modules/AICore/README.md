@@ -31,10 +31,3 @@ feature tag fails under test and is booked as `unknown` with a warning in produc
 a call without a tenant is booked against the global database the same way.
 Agent runs pass `runId`: the row is booked once here, and `runs.recordSpend` only
 keeps the run's own `spend` fields, the agent's monthly cap and the run-context alert.
-
-## Old paths
-
-`Modules/AIProjectGenerator/{llmProvider,usage,instructionGuard}` and
-`Modules/Agents/engine/persistence` are one-line re-export shims so existing consumers
-and their `jest.mock` calls keep working. Consumers are repointed one module per pull
-request in the follow-ups to task 024 step 1, after which the shims are deleted.

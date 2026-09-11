@@ -2,7 +2,7 @@ const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjects: jest.fn() }));
-jest.mock('../Modules/AIProjectGenerator/llmProvider', () => ({ getProvider: jest.fn(), isAnyProviderConfigured: () => false }));
+jest.mock('../Modules/AICore/llmProvider', () => ({ getProvider: jest.fn(), isAnyProviderConfigured: () => false }));
 jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async () => 3), isPrivileged: () => false }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn() }));
 

@@ -1,4 +1,4 @@
-const { emptyUsage } = require('../../AIProjectGenerator/usage');
+const { emptyUsage } = require('../../AICore/usage');
 const { askModel, parseModelJson } = require('../../AICore/modelCall');
 const { FEATURES } = require('../../AICore/features');
 const { audit, extractUrl } = require('./pageAudit');

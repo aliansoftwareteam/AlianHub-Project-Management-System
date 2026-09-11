@@ -38,7 +38,7 @@ const CATALOG = [
     field('LLM_PRICING', 'ai', 'text', {
         label: 'Model prices (USD per 1M tokens)',
         help: 'JSON keyed by model id, e.g. {"gpt-4.1":{"input":2,"output":8}}. Overrides the built-in list; a model with no price refuses to run. Use 0/0 for a free or self-hosted model.',
-        validate: (value) => (require('../AIProjectGenerator/usage').parsePricing(value).errors.length ? 'json' : null),
+        validate: (value) => (require('../AICore/usage').parsePricing(value).errors.length ? 'json' : null),
     }),
 
     field('GOOGLE_LOGIN_ENABLED', 'auth', 'boolean', { default: 'false', label: 'Google sign-in' }),

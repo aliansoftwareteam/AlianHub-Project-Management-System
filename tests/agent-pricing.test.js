@@ -10,13 +10,12 @@ jest.mock('../Modules/Automations/engine/tools', () => ({ getTask: jest.fn(async
 jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({ handleNotificationtFun: jest.fn(async () => ({ status: true })) }));
 jest.mock('../Modules/Agents/proposals', () => ({ create: jest.fn() }));
 jest.mock('../Modules/Agents/actions', () => ({ perform: jest.fn() }));
-jest.mock('../Modules/AIProjectGenerator/llmProvider', () => ({ getProvider: jest.fn(() => { throw new Error('not configured'); }), isAnyProviderConfigured: jest.fn(() => false) }));
-jest.mock('../Modules/AICore/llmProvider', () => require('../Modules/AIProjectGenerator/llmProvider'));
+jest.mock('../Modules/AICore/llmProvider', () => ({ getProvider: jest.fn(() => { throw new Error('not configured'); }), isAnyProviderConfigured: jest.fn(() => false) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const logger = require('../Config/loggerConfig');
-const { getProvider } = require('../Modules/AIProjectGenerator/llmProvider');
-const usage = require('../Modules/AIProjectGenerator/usage');
+const { getProvider } = require('../Modules/AICore/llmProvider');
+const usage = require('../Modules/AICore/usage');
 const { byKey, validateSettings } = require('../Modules/Instance/settingsCatalog');
 const runs = require('../Modules/Agents/runs');
 const budget = require('../Modules/Agents/budget');
@@ -94,9 +93,9 @@ describe('every configurable vendor ships priced defaults', () => {
     it('each provider adapter exposes the model id it will send', () => {
         jest.isolateModules(() => {
             process.env.AI_MODEL = 'gpt-4.1'; process.env.ANTHROPIC_MODEL = 'claude-sonnet-4-5-20250929'; process.env.DEEPSEEK_MODEL = 'deepseek-v4-flash';
-            expect(require('../Modules/AIProjectGenerator/llmProvider/openaiProvider').model).toBe('gpt-4.1');
-            expect(require('../Modules/AIProjectGenerator/llmProvider/anthropicProvider').model).toBe('claude-sonnet-4-5-20250929');
-            expect(require('../Modules/AIProjectGenerator/llmProvider/deepseekProvider').model).toBe('deepseek-v4-flash');
+            expect(require('../Modules/AICore/llmProvider/openaiProvider').model).toBe('gpt-4.1');
+            expect(require('../Modules/AICore/llmProvider/anthropicProvider').model).toBe('claude-sonnet-4-5-20250929');
+            expect(require('../Modules/AICore/llmProvider/deepseekProvider').model).toBe('deepseek-v4-flash');
         });
         delete process.env.AI_MODEL; delete process.env.ANTHROPIC_MODEL; delete process.env.DEEPSEEK_MODEL;
     });

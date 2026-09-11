@@ -23,7 +23,7 @@ jest.mock('../Modules/notification/defaults', () => ({
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { removeCache } = require('../utils/commonFunctions');
 const { ensureNotificationDefaults } = require('../Modules/notification/defaults');
-const persistence = require('../Modules/Agents/engine/persistence');
+const persistence = require('../Modules/AICore/persistence');
 const memory = require('../Modules/Agents/memory');
 const ctrl = require('../Modules/Agents/memoryController');
 

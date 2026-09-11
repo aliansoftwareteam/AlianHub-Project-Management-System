@@ -1,5 +1,5 @@
 const mockChat = jest.fn();
-jest.mock('../Modules/AIProjectGenerator/llmProvider', () => ({
+jest.mock('../Modules/AICore/llmProvider', () => ({
     getProvider: () => ({ name: 'fake', chat: (...a) => mockChat(...a) }),
     isAnyProviderConfigured: () => true,
 }));
@@ -11,7 +11,7 @@ jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), 
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(async () => ['6f0000000000000000000701']) }));
 
-const persistence = require('../Modules/Agents/engine/persistence');
+const persistence = require('../Modules/AICore/persistence');
 const memory = require('../Modules/Agents/memory');
 const ctrl = require('../Modules/AIProjectGenerator/controller');
 const guideCtrl = require('../Modules/AIProjectGenerator/guideController');

@@ -3,7 +3,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
-const usage = require('../AIProjectGenerator/usage');
+const usage = require('../AICore/usage');
 const { MAX_DEPTH } = require('../../event/domainEventBus');
 
 // Agent runs and spend. A run is the unit the rail footer counts ("2 running"),

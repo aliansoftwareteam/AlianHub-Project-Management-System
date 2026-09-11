@@ -17,7 +17,7 @@ const { getProvider } = require('../Modules/AICore/llmProvider');
 const { estimateCall } = require('../Modules/AICore/estimate');
 const pageAudit = require('../Modules/Agents/engine/pageAudit');
 const findingMemory = require('../Modules/Agents/engine/findingMemory');
-const persistence = require('../Modules/Agents/engine/persistence');
+const persistence = require('../Modules/AICore/persistence');
 const runs = require('../Modules/Agents/runs');
 const spendGuard = require('../Modules/Agents/spendGuard');
 
