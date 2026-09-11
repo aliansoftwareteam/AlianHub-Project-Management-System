@@ -54,3 +54,34 @@ describe('TSK-05 global search follows project visibility', () => {
         expect(res.body.data.tasks.some((t) => sameId(t._id, task._id))).toBe(true);
     });
 });
+
+describe('TSK-06 the activity log follows project visibility', () => {
+    it('answers 404 to a member for a private project they are not on, and serves the owner', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const { project, task } = await ownerOnlyTask(owner);
+        const query = { fromProject: 'true', projectId: project._id, skip: '0', limit: '5' };
+
+        const hidden = await member.api.get('/api/v1/activity-log', { query });
+        expect(hidden.status).toBe(404);
+        expect(hidden.body.status).toBe(false);
+        const hiddenTask = await member.api.get('/api/v1/activity-log', { query: { ...query, fromProject: 'false', taskId: task._id } });
+        expect(hiddenTask.status).toBe(404);
+
+        const own = await owner.api.get('/api/v1/activity-log', { query });
+        expect(own.status).toBe(200);
+        expect(Array.isArray(own.body)).toBe(true);
+    });
+
+    it('answers 403 for a task log in a visible project while the member\'s Task Activity Log is off', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const { project, task } = await sharedTask(owner, member);
+        const query = { fromProject: 'false', projectId: project._id, taskId: task._id, skip: '0', limit: '5' };
+
+        const res = await member.api.get('/api/v1/activity-log', { query });
+        expect(res.status).toBe(403);
+        expect((await member.api.get('/api/v1/activity-log', { query: { ...query, fromProject: 'true' } })).status).toBe(200);
+        expect((await owner.api.get('/api/v1/activity-log', { query })).status).toBe(200);
+    });
+});
