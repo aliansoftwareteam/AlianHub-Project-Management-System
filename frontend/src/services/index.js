@@ -93,36 +93,53 @@ axiosInstanceWithoutSecureWithFormData.interceptors.request.use((req) => {
 
 
 
-export const getAuth = async (id,isFirst) => {
-    return new Promise((resolve, reject) => {
-        let data = {
-            uid: id
-        };
-        const refreshToken = Cookies.get('refreshToken') || '';
+let pendingAuth = null;
 
-        if(refreshToken){
-            let headers = {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'refresh-token': refreshToken
-            };
-            let url = env.GENERATETOKEN_V2;
-            axios.post(apiHost + url, data, { headers }).then((result) => {
-                if (isFirst) {
-                    localStorage.setItem('updateToken', result.data.token)
-                }
-                resolve(result.data);
-            }).catch((error) => {
-                console.error('error', error.response.data);
-                reject(error.response.data);
-                if (error?.response?.data?.isLogout) {
-                    logOut();
-                }
-            });
-        } else {
+const adoptRefreshCookie = (refreshToken) => {
+    if (!refreshToken || Cookies.get('refreshToken') === refreshToken) return;
+    // A host-only cookie written client-side (setup wizard) shadows the domain cookie the server just replaced.
+    Cookies.remove('refreshToken');
+    if (Cookies.get('refreshToken') !== refreshToken) Cookies.set('refreshToken', refreshToken);
+};
+
+const requestAuth = (id, retried = false) => new Promise((resolve, reject) => {
+    const refreshToken = Cookies.get('refreshToken') || '';
+    if (!refreshToken) {
+        logOut();
+        return;
+    }
+    const headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'refresh-token': refreshToken
+    };
+    axios.post(apiHost + env.GENERATETOKEN_V2, { uid: id }, { headers }).then((result) => {
+        adoptRefreshCookie(result.data.refreshToken);
+        resolve(result.data);
+    }).catch((error) => {
+        const data = error?.response?.data;
+        // Another tab exchanged this token first and its reply already updated the shared cookie.
+        if (data?.isRotated && !retried && (Cookies.get('refreshToken') || '') !== refreshToken) {
+            requestAuth(id, true).then(resolve, reject);
+            return;
+        }
+        console.error('error', data);
+        reject(data);
+        if (data?.isLogout) {
             logOut();
         }
-    })
+    });
+});
+
+export const getAuth = async (id, isFirst) => {
+    if (!pendingAuth) {
+        pendingAuth = requestAuth(id).finally(() => { pendingAuth = null; });
+    }
+    const data = await pendingAuth;
+    if (isFirst) {
+        localStorage.setItem('updateToken', data.token);
+    }
+    return data;
 };
 const abortControllers={};
 
