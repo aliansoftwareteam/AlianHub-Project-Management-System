@@ -1,8 +1,10 @@
 const ctrl = require('./controller');
 const projectInvoices = require('./controller/projectInvoices');
+const { requireInstanceAdmin } = require('../Instance/guard');
 
 exports.init = (app) => {
-    app.post('/api/v1/invoice/find', ctrl.getInvoice);
+    // No code records which company a subscription invoice belongs to, so the collection cannot be tenant-scoped.
+    app.post('/api/v1/invoice/find', requireInstanceAdmin, ctrl.getInvoice);
 
     // Client invoices raised against a project (handoff 19c).
     app.get('/api/v2/invoices', projectInvoices.listInvoices);

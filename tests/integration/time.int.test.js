@@ -206,8 +206,8 @@ describe('time — regressions for confirmed findings', () => {
 
     // TIM-05: a non-pipeline findQuery should be a 400, not an unhandled 500.
     it('TIM-05 rejects a malformed invoice/find body with 400', async () => {
-        const admin = await loginAs('admin');
-        const res = await admin.api.post('/api/v1/invoice/find', { findQuery: { companyId: state.companyId } });
+        const owner = await loginAs('owner');
+        const res = await owner.api.post('/api/v1/invoice/find', { findQuery: { companyId: state.companyId } });
         expect(res.status).toBe(400);
     });
 });

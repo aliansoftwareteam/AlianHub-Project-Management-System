@@ -1,42 +1,29 @@
-
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
-
+const { resolveSheetScope, scopedTimeMatch, asList, filtersOfType, SHEET_PERMISSION } = require("../helpers/timeScope");
 
 exports.getTrackerTimeSheet = async(req,res) => {
     try {
-        const { selectedFilter, userArray, isEveryOne,start, end } = req.body;   
-        let timeQuery =  {
+        const { selectedFilter, userArray, start, end } = req.body;
+        const scope = await resolveSheetScope(req.headers['companyid'], req.uid, SHEET_PERMISSION.tracker);
+        const peopleFiltered = filtersOfType(selectedFilter, 'Users').length || filtersOfType(selectedFilter, 'Teams').length;
+        const projectFilter = filtersOfType(selectedFilter, 'Projects').map((element) => element.id);
+        const timeQuery = {
             LogEndTime: {
                 $gte: start,
             },
             LogStartTime: {
                 $lte: end
             },
-            logAddType: 1
+            logAddType: 1,
+            ...scopedTimeMatch(scope, {
+                userIds: (scope.everyone && !peopleFiltered) || !asList(userArray).length ? null : userArray,
+                projectIds: projectFilter.length ? projectFilter : null,
+            }),
         };
-        let filterProject = selectedFilter?.filter((x) => { return x.type == "Projects" });
-        let teamsIds = selectedFilter?.filter((x) => { return x.type == 'Teams' });
-        let filterIds = selectedFilter?.filter((x) => { return x.type == 'Users' });
-
-        if (userArray.length) {
-            timeQuery.Loggeduser = { $in: userArray };
-        }
-
-        if (filterProject.length) {
-            let projectArray = filterProject.map(element => element.id);
-            timeQuery.ProjectId = { $in: projectArray };
-        }
-
-        if (isEveryOne && filterIds.length === 0 && teamsIds.length === 0) {
-            delete timeQuery.Loggeduser;
-        }
-
         const query = [
             {
-                $match: {
-                    $and: [timeQuery]
-                }
+                $match: timeQuery
             },
             {
                 $group: {

@@ -313,7 +313,8 @@ function validate() {
 
 async function uploadPhotoIfChanged() {
     if (!previewUrl.value) return;
-    const filePath = generateFileName(fileName.value || "profile.png", env.STORAGE_TYPE);
+    // The server only lets a user write profile images whose name starts with their own id.
+    const filePath = `${userId.value}_${generateFileName(fileName.value || "profile.png", env.STORAGE_TYPE)}`;
     const isServer = env.STORAGE_TYPE === "server";
     if (isServer && oldFileValue.value && !oldFileValue.value.startsWith("data:")) {
         await apiRequestWithoutCompnay("delete", `${env.REMOVE_FILE}/USER_PROFILES?filepath=${oldFileValue.value}&thubmkey=userProfile`).catch(() => {});

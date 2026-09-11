@@ -11,6 +11,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { default: mongoose } = require('mongoose');
 const {myCache, requestHandler} = require('../../../Config/config');
 const { updateCompanyFun, getCompanyDataFun } = require('../../Company/controller/updateCompany.js');
+const { isProfileUpload } = require('../bucketAccess');
 /**
  * S3 client configuration for create bucket
  */
@@ -880,22 +881,11 @@ exports.uploadFileWasabi = async (req,res) => {
         });
         return;
     }
-    let isUserProfile = false;
-    if (req.body && (req.body.isUserProfile == true || req.body.isUserProfile == 'true')) {
-        isUserProfile = true;
-    } else {
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: 'Company id is required'
-            });
-            return;
-        }
-    }
-    if (!req.aud.split(",").includes(req.body.companyId)) {
+    const isUserProfile = isProfileUpload(req.body);
+    if (!isUserProfile && !req.body.companyId) {
         res.send({
             status: false,
-            statusText: `You don't have access to requested bucket`
+            statusText: 'Company id is required'
         });
         return;
     }
@@ -1007,30 +997,10 @@ exports.getBucketSizeCompanyWise = async(companyId) => {
     }
 }
 
-exports.getBucketSize = () => {
-    return new Promise((resolve, reject) => {
-        try {
-            let promises = [];
-
-            getCompanyDataFun([],true)
-            .then((response) => {
-                response.forEach((cmp) => {
-                    promises.push(exports.getBucketSizeCompanyWise(cmp._id))
-                })
-                Promise.allSettled(promises).then(() => {
-                    logger.info("Completed");
-                    resolve();
-                }).catch((error) => {
-                    logger.error("promises error", error);
-                    reject();
-                    return;
-                })
-            })
-        } catch (error) {
-            reject(error);
-            logger.error(`Error while getting bucket size: ${error})`)
-        }
-    })
+exports.getBucketSize = async () => {
+    const companies = await getCompanyDataFun([], true);
+    await Promise.allSettled(companies.map((cmp) => exports.getBucketSizeCompanyWise(cmp._id)));
+    logger.info("Completed");
 }
 
 exports.copyWasabiImage = async(companyId,path,destinationKey) => {

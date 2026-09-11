@@ -110,4 +110,52 @@ describe('time — regressions for confirmed findings', () => {
         expect((await owner.api.post(`/api/v2/invoices/${second}/send`, {})).body.status).toBe(true);
         expect((await owner.api.delete(`/api/v2/invoices/${second}`, { query: { projectId } })).status).toBe(409);
     });
+
+    it('16a keeps subscription invoices to the instance owner', async () => {
+        const body = { findQuery: [{ $match: {} }, { $limit: 1 }] };
+        expect((await (await loginAs('admin')).api.post('/api/v1/invoice/find', body)).status).toBe(403);
+        expect((await (await loginAs('member')).api.post('/api/v1/invoice/find', body)).status).toBe(403);
+        expect((await (await loginAs('owner')).api.post('/api/v1/invoice/find', body)).status).toBe(200);
+    });
+
+    it('16c limits a member\'s timesheet reads to their own time whatever the body claims', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const admin = await loginAs('admin');
+        const target = await projectWithTask(owner, member);
+        await logHour(owner, target);
+        await logHour(member, target);
+
+        const forged = { companyUserDetail: { roleType: 1 }, timeZone: 'UTC' };
+        const reads = [
+            ['/api/v1/timesheet/user', { selectedFilter: [], userArray: [owner.uid], projectArray: [], start: 0, end: 9999999999, ...forged }],
+            ['/api/v1/timesheet/workload', { selectedFilter: [], userArray: [owner.uid], projectArray: [], start: 0, end: 9999999999, ...forged }],
+            ['/api/v1/timesheet/project', { filterProjectIds: [], filterUserIds: [owner.uid], projectIds: [target.project._id], startNumber: 0, endNumber: 9999999999000, projectTimesheetPermission: true, userId: owner.uid, ...forged }],
+            ['/api/v1/timesheet', { queryeta: [{ $match: { ProjectId: target.project._id } }, { $group: { _id: '$Loggeduser', total: { $sum: '$LogTimeDuration' } } }] }],
+        ];
+        const loggers = (rows) => rows.flatMap((row) => [
+            row.user,
+            typeof row._id === 'string' ? row._id : null,
+            ...(row.data || []).map((entry) => entry.userId),
+        ]).filter(Boolean);
+
+        for (const [path, body] of reads) {
+            const mine = await member.api.post(path, body);
+            expect([path, mine.status]).toEqual([path, 200]);
+            expect([path, loggers(mine.body).length > 0 && loggers(mine.body).every((uid) => uid === member.uid)]).toEqual([path, true]);
+            const all = await admin.api.post(path, body);
+            expect([path, loggers(all.body).includes(owner.uid)]).toEqual([path, true]);
+        }
+
+        const join = await member.api.post('/api/v1/timesheet', { queryeta: [{ $lookup: { from: 'users', localField: 'Loggeduser', foreignField: '_id', as: 'u' } }] });
+        expect(join.status).toBe(400);
+    });
+
+    it('16d refuses draft-from-milestone on a project with no billing contract', async () => {
+        const owner = await loginAs('owner');
+        const project = await createProject(owner.api, { assigneeIds: [owner.uid], createdBy: owner.uid });
+        const res = await owner.api.post('/api/v2/invoices/draft-from-milestone', { projectId: project._id, milestoneId: '6f0000000000000000000e01' });
+        expect(res.status).toBe(400);
+        expect(res.body.statusText).toMatch(/billing contract/);
+    });
 });

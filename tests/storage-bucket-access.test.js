@@ -1,4 +1,5 @@
 jest.mock('../Config/jwt', () => ({ verifyCompanyMembership: jest.fn() }));
+jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn(async () => ({ _id: '64b1f0c2a1b2c3d4e5f607bb' })) }));
 
 const { verifyCompanyMembership } = require('../Config/jwt');
 const { requireOwnBucket, requireSafeObjectPath, bucketIdParam, bodyField, queryField } = require('../Modules/storage/bucketAccess');

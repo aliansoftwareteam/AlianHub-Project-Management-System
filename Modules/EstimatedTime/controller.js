@@ -5,12 +5,9 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require("../../event/socketEventEmitter");
 const { estimateAndPersist: estimateTaskTimeWithAI, _internal: aiEstimatorInternal } = require("./aiTaskEstimator");
-// BUG fix (found via MCP integration 2026-06-12): updateEstimatedTime called
-// `exports.updateRemainingTime`, which was never defined in this module —
-// every Task Planning save threw "not a function" AFTER persisting the row,
-// returning a 500 for a write that had actually succeeded. The real helper
-// lives in the LogTime module.
 const { updateRemainingTime } = require("../LogTime/controllerV2/helpers");
+const { resolveSheetScope, SHEET_PERMISSION } = require("../TimeSheet/helpers/timeScope");
+const { scopeEstimatePipeline, TimesheetQueryRefused } = require("../TimeSheet/helpers/timesheetQueryScope");
 
 exports.getEstimatedTime = async(req,res) => {
     try {
@@ -216,13 +213,18 @@ exports.generateAiEstimate = async (req, res) => {
 
 exports.getEstimateByAggregate = async (req,res) => {
     try {
-        const query = replaceObjectKey(req.body.queryeta, ["dbDate"])
+        const companyId = req.headers['companyid'];
+        const scope = await resolveSheetScope(companyId, req.uid, [SHEET_PERMISSION.workload, SHEET_PERMISSION.project]);
+        let pipeline;
+        try {
+            /* replaceObjectKey rebuilds every object, so it runs before the guard adds ObjectIds. */
+            pipeline = scopeEstimatePipeline(replaceObjectKey(req.body && req.body.queryeta, ["dbDate"]), scope);
+        } catch (error) {
+            if (!(error instanceof TimesheetQueryRefused)) throw error;
+            return res.status(400).json({ status: false, statusText: "Bad Request", message: error.message });
+        }
 
-        const estObj = {
-            type: SCHEMA_TYPE.ESTIMATES_TIME,
-            data: [query]
-        };
-        const estimateData = await MongoDbCrudOpration(req.headers['companyid'], estObj, 'aggregate');
+        const estimateData = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.ESTIMATES_TIME, data: [pipeline] }, 'aggregate');
 
         if (!estimateData) {
             return res.status(404).json({ message: "Estimated time not found" });

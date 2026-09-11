@@ -356,20 +356,14 @@ exports.getBucketSizeCompanyWiseStorage = (bucketId,unit,isUpdate=false) => {
                             ]
                         }
                         await updateCompanyFun(SCHEMA_TYPE.GOLBAL,mongoObj,"findOneAndUpdate",bucketId)
-                        then(()=>{
-                            resolve({
-                                size: size,
-                                unit: unit
-                            })
-                        }).catch((error) => {
+                        .catch((error) => {
                             loggerConfig.error(`Error updating company : ${error}`);
                         })
-                    } else {
-                        resolve({
-                            size: size,
-                            unit: unit
-                        })
                     }
+                    resolve({
+                        size: size,
+                        unit: unit
+                    })
                 } else {
                     resolve({
                         size: 0,
@@ -403,6 +397,7 @@ exports.getBucketSizeStorage = () => {
                     return;
                 })
             })
+            .catch(reject)
         } catch (error) {
             reject(error);
             loggerConfig.error(`Error while getting bucket size: ${error})`)
@@ -410,12 +405,12 @@ exports.getBucketSizeStorage = () => {
     })
 }
 
-// FILE
 const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const sharp = require('sharp');
 const { updateCompanyFun, getCompanyDataFun } = require('../../../Company/controller/updateCompany');
-const { DEFAULT_LIMITS, safeFileFilter, safeRelativePath } = require('../../../../utils/uploadConfig');
+const { DEFAULT_LIMITS, safeRelativePath } = require('../../../../utils/uploadConfig');
+const { USER_PROFILES_BUCKET, refuseBeforeWrite, refuseUpload, uploadRefusal } = require('../../bucketAccess');
 
 const storage = multer.diskStorage({
     destination: function (req, _, cb) {
@@ -445,45 +440,22 @@ const storage = multer.diskStorage({
     }
 });
 exports.storageRef = storage;
+
+const serverUploadRefusal = async (req) => {
+    const bucketId = req.body && req.body.companyId;
+    const found = await uploadRefusal(req, bucketId, req.body && req.body.path);
+    if (found || bucketId === USER_PROFILES_BUCKET) return found;
+    const bucket = await exports.checkBucketInDB(bucketId);
+    return bucket && Object.keys(bucket).length ? null : { code: 400, statusText: 'Invalid bucketId' };
+};
+
 exports.upload = multer({
     storage,
     limits: DEFAULT_LIMITS,
-    fileFilter: safeFileFilter,
+    fileFilter: refuseBeforeWrite(serverUploadRefusal),
 });
 
-exports.validatePath = async(req, res, next) => {
-    const { path: filepath, companyId: bucketId } = req.body;
-    if (!req.aud.split(",").includes(req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: `You don't have access to requested bucket`
-        });
-        return;
-    }
-    
-    if (!filepath || filepath.includes('..') || filepath.includes('./') || filepath.includes('//') || filepath.startsWith('/')) {
-
-        const dir = path.join(__dirname, '../../../../storage', bucketId ,filepath);
-        if (fs.existsSync(dir)) {
-            fs.unlinkSync(dir);
-        }
-        return res.status(400).send({status: false, statusText: 'Invalid path'});
-    }
-
-    if(bucketId !== "USER_PROFILES") {
-        const bucketValid = await this.checkBucketInDB(bucketId);
-
-        if (bucketValid && Object.keys(bucketValid).length == 0) {
-            const dir = path.join(__dirname, '../../../../storage', bucketId);
-            if (fs.existsSync(dir)) {
-                fs.rmdirSync(dir,{ recursive: true, force: true });
-            }
-            return res.status(400).send({status: false, statusText: 'Invalid bucketId'});
-        }
-    }
-
-    next();
-}
+exports.validatePath = refuseUpload(serverUploadRefusal);
 
 exports.generateSignedUrl = (bucketId, filepath,domainUrl) => {
     const token = jwt.sign({ bucketId, filepath }, process.env.JWT_SECRET, { algorithm: process.env.JWT_ALGORITHM,

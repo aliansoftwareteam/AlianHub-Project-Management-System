@@ -1,14 +1,18 @@
 const { handleProfileGetForUser, handleTaskTypeImageGet } = require(`../../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const ctrl = require('./controller');
 const multer = require("multer");
-const { DEFAULT_LIMITS, safeFileFilter } = require('../../../utils/uploadConfig');
-const { requireOwnBucket, bodyField } = require('../bucketAccess');
+const { DEFAULT_LIMITS } = require('../../../utils/uploadConfig');
+const { USER_PROFILES_BUCKET, isProfileUpload, refuseBeforeWrite, refuseUpload, requireOwnBucket, uploadRefusal, bodyField } = require('../bucketAccess');
 
+const wasabiUploadRefusal = (req) => {
+    const body = req.body || {};
+    return uploadRefusal(req, isProfileUpload(body) ? USER_PROFILES_BUCKET : body.companyId, body.path);
+};
 
 const upload = multer({
     dest: "wasabiUploads/",
     limits: DEFAULT_LIMITS,
-    fileFilter: safeFileFilter,
+    fileFilter: refuseBeforeWrite(wasabiUploadRefusal),
 });
 exports.init = (app) => {
 
@@ -151,14 +155,11 @@ exports.init = (app) => {
     /**
      * upload file in wasabi.
      */
-	app.post("/api/v1/wasabi/uploadFile",upload.single("file"), ctrl.uploadFileWasabi);
-	app.post("/api/v1/wasabi/uploadFile_64", (req, res) => {
+	app.post("/api/v1/wasabi/uploadFile", upload.single("file"), refuseUpload(wasabiUploadRefusal), ctrl.uploadFileWasabi);
+	app.post("/api/v1/wasabi/uploadFile_64", refuseUpload(wasabiUploadRefusal), (req, res) => {
         try {
-            const values = [];
-            const keys = ["companyId","path","base64String","replaceFile","key", "isUserProfile"];
-            keys.forEach(x => {
-                values.push(req.body[x])
-            })
+            const values = ["companyId", "path", "base64String", "replaceFile", "key"].map((key) => req.body[key]);
+            values.push(isProfileUpload(req.body));
             if(!values.length) {
                 return res.status(400).json("Req data missing")
             }
