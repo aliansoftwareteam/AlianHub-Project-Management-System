@@ -1,6 +1,5 @@
 {
   "AIProjectGenerator/controller.js": 2,
-  "AdvancedGlobalFilter/controller.js": 1,
   "Agents/controller.js": 1,
   "Audit/controller.js": 1,
   "Audit/recorder.js": 1,
@@ -31,7 +30,6 @@
   "SSO/oidc.js": 1,
   "SSO/saml.js": 4,
   "ScheduledReports/controller.js": 2,
-  "Tasks/helpers/manageGlobalFilter.js": 1,
   "TimeSheet/controller/billableSummary.js": 1,
   "TimeSheet/controller/billing.js": 1,
   "TimeSheet/controller/hoursBySource.js": 1,
