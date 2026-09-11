@@ -76,9 +76,7 @@ exports.handleChargeebeCreditNotUpload = (companyId,_,fileData,id) => {
     })
 }
 
-exports.handleBucketSizeUpdateCron = () => {
-    getBucketSizeStorage();
-}
+exports.handleBucketSizeUpdateCron = () => getBucketSizeStorage();
 
 exports.cleanUpTrackshot = async () => {
     cleanUpTrackshotStorage();

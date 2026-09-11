@@ -2,7 +2,7 @@ const { handleProfileGetForUser, handleTaskTypeImageGet } = require(`../../../co
 const ctrl = require('./controller');
 const { upload, validatePath } = require('./helpers/bucket.helper');
 const { requireInstanceAdmin } = require('../../Instance/guard');
-const { requireOwnBucket, requireSafeObjectPath, bucketIdParam, bodyField, queryField } = require('../bucketAccess');
+const { requireOwnBucket, requireBucketWrite, requireBucketRemoval, requireSafeObjectPath, bucketIdParam, bodyField, queryField } = require('../bucketAccess');
 
 exports.init = (app) => {
     const ownBucket = requireOwnBucket(bucketIdParam);
@@ -18,9 +18,9 @@ exports.init = (app) => {
     app.post('/api/v1/storage/uploadFile', upload.single("file"), validatePath, ctrl.uploadFileOnStorage);
     app.get('/api/v1/generateSignedUrl/:bucketId', ownOrProfileBucket, requireSafeObjectPath(queryField('filepath')), ctrl.getSignedUrlFile);
     app.get('/api/v1/download/:bucketId/*', ctrl.handleFileRequest);
-    app.delete('/api/v1/storage/removeFile/:bucketId', ownOrProfileBucket, requireSafeObjectPath(queryField('filepath')), ctrl.removeFileFromStorage);
+    app.delete('/api/v1/storage/removeFile/:bucketId', requireBucketRemoval(bucketIdParam, queryField('filepath')), requireSafeObjectPath(queryField('filepath')), ctrl.removeFileFromStorage);
 
     app.post("/api/v1/getUserProfile", requireSafeObjectPath(bodyField('path')), handleProfileGetForUser);
     app.post("/api/v1/getTaskTypeImage", requireOwnBucket(bodyField('companyId')), requireSafeObjectPath(bodyField('path')), handleTaskTypeImageGet);
-    app.post('/api/v1/storage/uploadFileBase64', requireOwnBucket(bodyField('companyId'), { allowUserProfiles: true }), requireSafeObjectPath(bodyField('path')), ctrl.uploadBase64FileOnServerStorage);
+    app.post('/api/v1/storage/uploadFileBase64', requireBucketWrite(bodyField('companyId'), bodyField('path')), requireSafeObjectPath(bodyField('path')), ctrl.uploadBase64FileOnServerStorage);
 }

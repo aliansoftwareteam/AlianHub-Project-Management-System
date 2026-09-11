@@ -11,6 +11,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { default: mongoose } = require('mongoose');
 const {myCache, requestHandler} = require('../../../Config/config');
 const { updateCompanyFun, getCompanyDataFun } = require('../../Company/controller/updateCompany.js');
+const { isProfileUpload } = require('../bucketAccess');
 /**
  * S3 client configuration for create bucket
  */
@@ -880,22 +881,11 @@ exports.uploadFileWasabi = async (req,res) => {
         });
         return;
     }
-    let isUserProfile = false;
-    if (req.body && (req.body.isUserProfile == true || req.body.isUserProfile == 'true')) {
-        isUserProfile = true;
-    } else {
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: 'Company id is required'
-            });
-            return;
-        }
-    }
-    if (!req.aud.split(",").includes(req.body.companyId)) {
+    const isUserProfile = isProfileUpload(req.body);
+    if (!isUserProfile && !req.body.companyId) {
         res.send({
             status: false,
-            statusText: `You don't have access to requested bucket`
+            statusText: 'Company id is required'
         });
         return;
     }
