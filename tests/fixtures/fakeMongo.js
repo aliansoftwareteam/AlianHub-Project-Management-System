@@ -121,6 +121,7 @@ const create = () => {
         if (method === 'find') return ordered(list.filter((d) => matches(d, data[0])), data[2]).map(clone);
         if (method === 'findOne') return clone(list.find((d) => matches(d, data[0])) || null);
         if (method === 'countDocuments') return list.filter((d) => matches(d, data[0])).length;
+        if (method === 'deleteOne') { const index = list.findIndex((d) => matches(d, data[0])); if (index !== -1) list.splice(index, 1); return { deletedCount: index === -1 ? 0 : 1 }; }
         if (method === 'deleteMany') { const kept = list.filter((d) => !matches(d, data[0])); store[type] = kept; return { deletedCount: list.length - kept.length }; }
         if (method === 'findOneAndUpdate') { const doc = list.find((d) => matches(d, data[0])); if (!doc) return null; apply(doc, data[1]); return clone(doc); }
         if (method === 'updateOne') { const doc = list.find((d) => matches(d, data[0])); if (doc) apply(doc, data[1]); return { modifiedCount: doc ? 1 : 0 }; }
@@ -132,6 +133,9 @@ const create = () => {
             return pipeline.reduce((docs, stage) => {
                 if (stage.$match) return docs.filter((d) => matches(d, stage.$match));
                 if (stage.$group) return group(docs, stage.$group);
+                if (stage.$sort) return ordered(docs, { sort: stage.$sort });
+                if (stage.$skip) return docs.slice(stage.$skip);
+                if (stage.$limit) return docs.slice(0, stage.$limit);
                 return docs;
             }, list).map(clone);
         }

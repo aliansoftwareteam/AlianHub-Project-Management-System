@@ -3,6 +3,7 @@ const { settingsCollectionDocs } = require("../../../Config/collections");
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { removeCache } = require("../../../utils/commonFunctions");
+const { settingsDocUpdateProblem } = require("../settingsDocUpdate");
 
 exports.getDesignations = async (req,res) => {
     try {
@@ -42,16 +43,9 @@ exports.updateDesignation = async(req,res) => {
         const companyId = req.headers['companyid']
         const { queryFilter, queryObj } = req.body;
 
-        if (!queryFilter) {
-            return res.status(400).json({
-                message: "queryFilter is required.",
-            });
-        }
-
-        if (!queryObj) {
-            return res.status(400).json({
-                message: "queryObj is required.",
-            });
+        const problem = settingsDocUpdateProblem(settingsCollectionDocs.DESIGNATIONS, queryFilter, queryObj);
+        if (problem) {
+            return res.status(400).json({ status: false, statusText: problem, message: problem });
         }
 
         let mongoObj = {

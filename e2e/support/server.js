@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { ROOT } = require('./env');
 
-const HEALTH_TIMEOUT_MS = 120000;
+const HEALTH_TIMEOUT_MS = Number(process.env.E2E_HEALTH_TIMEOUT_MS) || 120000;
 const STOP_TIMEOUT_MS = 10000;
 
 function freePort() {

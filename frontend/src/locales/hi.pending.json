@@ -5373,6 +5373,7 @@
     "AiHealth.retry": "Retry",
     "Ai.settings_read_only": "Read only. An owner or admin changes this agent's settings.",
     "Instance.channel_unknown": "version unresolved",
+    "Automations.manage_owner_admin": "Only owners and admins can create, change or switch on automations.",
     "AiHealth.thresholds_button": "Alert thresholds",
     "AiAlerts.section_title": "AI alerts",
     "AiAlerts.section_lead": "Rate alerts reach your inbox when an agent or the AI budget crosses a workspace threshold, and again when it clears.",

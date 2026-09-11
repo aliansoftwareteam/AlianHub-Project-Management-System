@@ -3,7 +3,7 @@ const ctrl = require('./controller');
 const autoArchive = require('./autoArchive');
 const estimationScale = require('./estimationScale');
 const wipLimit = require('./wipLimit');
-const { requireProjectAccess, DETAILS } = require('../../Config/projectAccess');
+const { READ, requireProjectAccess, DETAILS } = require('../../Config/projectAccess');
 
 const editsProjectSettings = requireProjectAccess({ projectIds: (req) => req.body && req.body.projectId, permissions: () => [DETAILS] });
 
@@ -111,7 +111,7 @@ exports.init = (app) => {
 
     // Per-project auto-archive rule (completed tasks archive after N days —
     // applied by the nightly cron in cron.js).
-    app.get('/api/v1/projectSetting/autoArchive/:pid', autoArchive.getAutoArchive);
+    app.get('/api/v1/projectSetting/autoArchive/:pid', requireProjectAccess({ mode: READ, projectIds: (req) => req.params.pid }), autoArchive.getAutoArchive);
     app.post('/api/v1/projectSetting/autoArchive', editsProjectSettings, autoArchive.setAutoArchive);
 
     // Per-project story-point estimation scale (drives the points picker).

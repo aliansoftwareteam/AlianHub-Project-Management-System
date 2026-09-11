@@ -236,7 +236,7 @@ const checkToken = (isValid, req, res, next) => {
         const { uid, refreshToken,aud } = isValid;
         req.uid = uid;
         req.aud = aud;
-        req.body.refreshToken = refreshToken;
+        req.refreshToken = refreshToken;
         if (typeof refreshToken !== 'string' || !refreshToken) {
             res.clearCookie('accessToken');
             return res.status(401).json({

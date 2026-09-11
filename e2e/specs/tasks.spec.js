@@ -29,7 +29,7 @@ test.describe('tasks & collaboration as a guest', () => {
     test.use(asRole('guest'));
 
     // TSK-05 (UI): global search must not surface a project the guest is not a member of.
-    test.fail('TSK-05: search does not leak an owner-only project to a guest', async ({ page, state, loginAs }) => {
+    test('TSK-05: search does not leak an owner-only project to a guest', async ({ page, state, loginAs }) => {
         const owner = await loginAs('owner');
         const { createProject, createTask, uniqueSuffix } = require('../support/fixtures');
         const marker = `Zleak${uniqueSuffix()}`;

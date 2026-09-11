@@ -146,6 +146,7 @@ Backend variables: 148. Frontend build-time variables: 23.
 
 | Variable | Required | Default | Description | Read by |
 |---|---|---|---|---|
+| `AUDIT_EXPORT_MAX_ROWS` |  | `100000` | Most rows one audit-log CSV export streams; a last row says when the filter held more. Can only lower the hard cap. | `Modules/Audit/controller.js` |
 | `AUDIT_RETENTION_DAYS` |  |  | Days to keep audit-log entries before the recorder prunes them. | `Modules/Audit/recorder.js` |
 | `AUTH_RATE_LIMIT_BLOCK_MS` |  | `1800000` | How long an IP stays blocked after too many failed logins. | `Modules/Auth/helper.js` |
 | `AUTH_RATE_LIMIT_MAX_ATTEMPTS` |  | `5` | Failed login attempts allowed per window before blocking. | `Modules/Auth/helper.js` |
