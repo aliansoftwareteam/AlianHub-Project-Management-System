@@ -82,6 +82,7 @@ const verifyJWTTokenWithCRoute = [
     // they record comes from req.uid, which this is what sets. The PUBLIC submission
     // endpoint is deliberately not under this prefix.
     "/api/v2/forms",
+    "/api/v1/removeCache",
     "/api/v1/importTasks",
     "/api/v1/wasabi/retriveObject",
     "/api/v1/wasabi/deleteFile",

@@ -603,7 +603,7 @@ async function changeCompany(cid) {
             router.replace(routeObj)
             .then(async() => {
                 try {
-                    await apiRequest("post",env.CACHECLEAR,{cacheKey: `UserProjectData:${uid}`});
+                    await apiRequest("post",env.CACHECLEAR,{cacheKey: `UserProjectData:${cid}:${uid}`});
                     await apiRequest("post",env.CACHECLEAR,{cacheKey: `dashboard_${uid}`});
                 } catch (error) {
                     console.error("Error in cacheClear",error);

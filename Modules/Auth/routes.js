@@ -370,9 +370,8 @@ const mongoRef = require('../../utils/mongo-handler/mongoQueries');
 const sendInvitationCtrl = require("./controller/sendInvitation");
 const verifyInvitationCtrl = require("./controller/verifyInvitation");
 const { replaceObjectKey } = require("./helper");
-const {myCache} = require('../../Config/config');
 const logger = require('../../Config/loggerConfig');
-const {removeCache} = require('../../utils/commonFunctions');
+const { removeCacheHandler } = require('./controller/removeCache');
 const { handleEvents } = require('../Company/eventController');
 function initSignup(app) {
     app.post("/api/v2/createUser", createUserCtrl.createUserV2);
@@ -697,22 +696,7 @@ function initSignup(app) {
     app.post("/api/v1/generateToken", createUserCtrl.generateToken);
     app.post('/api/v1/verifyToken', createUserCtrl.verifyToken);
 
-    app.post('/api/v1/removeCache',(req,res)=>{
-        try {
-            if (req.body.global) {
-                myCache.flushAll();
-                return res.status(200).json({ message: 'Global cache cleared successfully' });
-            } else {
-                if (!(req.body && req.body.cacheKey)) {
-                    return res.status(400).json({ message: 'cacheKey is required' });
-                }
-                removeCache(req.body.cacheKey, req.body.isPrefix ? true : false);
-                return res.status(200).json({ message: 'Cache cleared successfully' });
-            }
-        } catch (error) {
-            return res.status(500).json({message: error.message});
-        }
-    })
+    app.post('/api/v1/removeCache', removeCacheHandler);
 
     app.post("/api/v2/google-signup", createUserCtrl.googleSignup);
     app.post("/api/v2/github-signup", createUserCtrl.githubSignup);
