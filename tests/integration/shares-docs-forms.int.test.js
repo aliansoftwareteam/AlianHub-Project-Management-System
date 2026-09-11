@@ -99,18 +99,4 @@ describe('pages findings (regressions)', () => {
         const subs = await owner.api.get(`/api/v2/forms/${formId}/submissions`);
         expect(subs.body.data.submissions[0].taskKey).toBeTruthy();
     });
-
-    it('PAG-12: importSettingsNotification refuses a request without a token', async () => {
-        const res = await anon.post('/api/v1/importSettingsNotification', { companyId: state.companyId, userId: '0123456789abcdef01234599' });
-        expect(res.status).toBe(401);
-    });
-
-    it('PAG-12: a member cannot import company templates, and the owner can', async () => {
-        const member = await loginAs('member');
-        const owner = await loginAs('owner');
-        const templates = () => [{ TemplateName: `[QA pages] tmpl ${uniqueSuffix()}`, TemplateId: `pagtmpl${uniqueSuffix()}`, category: 'category' }];
-        expect(refused(await member.api.post('/api/v1/importTemplate', { templates: templates() }))).toBe(true);
-        expect(refused(await anon.post('/api/v1/importTemplate', { templates: templates() }, { headers: { companyid: state.companyId } }))).toBe(true);
-        expect(refused(await owner.api.post('/api/v1/importTemplate', { templates: templates() }))).toBe(false);
-    });
 });

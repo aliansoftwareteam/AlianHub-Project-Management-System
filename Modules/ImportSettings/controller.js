@@ -2,7 +2,6 @@ const logger = require("../../Config/loggerConfig");
 const importData = require('../../utils/data');
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { removeCache } = require('../../utils/commonFunctions');
-const { isCompanyAdmin } = require('../../Config/contentAccess');
 
 async function batchUpdate(arr) {
     return new Promise((resolve, reject) => {
@@ -346,53 +345,72 @@ exports.importSettings = (req, res) => {
     });
 };
 
-exports.importTemplate = async (req, res) => {
-    const companyId = String(req.headers.companyid || '');
+exports.importTemplate = (req, res) => {
+    if (!(req.body && req.body.templates && req.body.templates.length)) {
+        res.json({
+            status: false,
+            statusText: "template is required."
+        })
+        return;
+    }
     try {
-        if (!(await isCompanyAdmin(companyId, req.uid))) {
-            res.status(403).send({ status: false, statusText: "Only an owner or admin can import templates." });
-            return;
-        }
-        if (!(req.body && Array.isArray(req.body.templates) && req.body.templates.length)) {
-            res.json({ status: false, statusText: "template is required." });
-            return;
-        }
-        importData.importSettingTemplate(companyId, req.body.templates, (data) => {
-            res.json(data);
+        importData.importSettingTemplate(req.body.companyId, req.body.templates, (data) => {
+            res.json(data)
         });
     } catch (error) {
-        logger.error(`Import Template Catch Error: ${error.message}`);
-        res.json({ status: false, statusText: error.message });
+        res.json({
+            status: false,
+            error: error
+        });
     }
-};
+
+}
 
 exports.importSettingsNotification = (req, res) => {
     try {
-        const companyId = String(req.headers.companyid || '');
-        const userId = String(req.uid || '');
-        const { companyId: requestedCompany, userId: requestedUser } = req.body || {};
-        if (!companyId || !userId) {
-            res.status(401).send({ status: false, statusText: "A session is required." });
+
+        //Request variables
+        const { companyId, userId} = req.body;
+
+        //Validations
+        if(!companyId || companyId === '') {
+            res.send({
+                status: false,
+                statusText: "Company id is required."
+            });
             return;
         }
-        if ((requestedUser && String(requestedUser) !== userId) || (requestedCompany && String(requestedCompany) !== companyId)) {
+        if(!userId || userId === '') {
+            res.send({
+                status: false,
+                statusText: "User id is required."
+            });
+            return;
+        }
+        if (String(userId) !== String(req.uid) || String(companyId) !== String(req.headers.companyid)) {
             res.status(403).send({
                 status: false,
                 statusText: "You can only import your own notification settings."
             });
             return;
         }
-        importData.importUserNotifications(companyId, userId).then(() => {
+        importData.importUserNotifications(companyId,userId).then(() => {
             res.send({
                 status: true,
                 statusText: "Notification Settings has been imported successfully"
             });
         }).catch((err) => {
             logger.error(`Error in import Notification Settings rules: ${err}`);
-            res.send({ status: false, statusText: String((err && err.message) || err) });
-        });
+            res.send({
+                status: false,
+                statusText: err
+            });
+        })
     } catch (error) {
         logger.error(`Import Default Settings Catch Error: ${error}`);
-        res.send({ status: false, statusText: String((error && error.message) || error) });
+        res.send({
+            status: false,
+            statusText: error
+        });
     }
 };

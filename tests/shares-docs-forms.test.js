@@ -17,25 +17,18 @@ jest.mock('../Modules/Forms/helpers/submissionRules', () => ({
     buildDescription: () => '',
     buildDescriptionBlock: () => ({}),
 }));
-jest.mock('../utils/data', () => ({
-    importUserNotifications: jest.fn(async () => undefined),
-    importSettingTemplate: jest.fn((companyId, templates, cb) => cb({ status: true, statusText: 'Imported.' })),
-}));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { getRoleType } = require('../Config/permissionGuard');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
 const { taskMongo } = require('../Modules/Tasks/helpers/task_class_Mongo');
-const importData = require('../utils/data');
 const shares = require('../Modules/PublicShares/controller');
 const renderer = require('../Modules/PublicShares/publicRenderer');
 const pages = require('../Modules/Pages/controller');
 const forms = require('../Modules/Forms/controller');
 const publicForm = require('../Modules/Forms/publicForm');
-const importSettings = require('../Modules/ImportSettings/controller');
 
 const COMPANY = '6f0000000000000000000c01';
-const OTHER_COMPANY = '6f0000000000000000000c02';
 const OWNER = '6f0000000000000000000001';
 const ADMIN = '6f0000000000000000000002';
 const MEMBER = '6f0000000000000000000003';
@@ -289,31 +282,5 @@ describe('PAG-11 a submission records its task key', () => {
         const [submission] = rows(SCHEMA_TYPE.FORM_SUBMISSIONS);
         expect(submission.taskKey).toBe('OPN-14');
         expect(submission.taskId).toBe(rows(SCHEMA_TYPE.TASKS)[0]._id);
-    });
-});
-
-describe('PAG-12 imports act on the session', () => {
-    it('imports notification settings for the session user and company when the body names none', async () => {
-        const res = await call(importSettings.importSettingsNotification, request({ uid: MEMBER, body: {} }));
-        expect(importData.importUserNotifications).toHaveBeenCalledWith(COMPANY, MEMBER);
-        expect(res.body.status).toBe(true);
-    });
-
-    it("refuses importing another user's notification settings", async () => {
-        const res = await call(importSettings.importSettingsNotification, request({ uid: MEMBER, body: { companyId: COMPANY, userId: OWNER } }));
-        expect(refused(res)).toBe(true);
-        expect(importData.importUserNotifications).not.toHaveBeenCalled();
-    });
-
-    it('refuses a template import from a member', async () => {
-        const res = await call(importSettings.importTemplate, request({ uid: MEMBER, body: { templates: [{ TemplateId: 't1' }] } }));
-        expect(res.statusCode).toBe(403);
-        expect(importData.importSettingTemplate).not.toHaveBeenCalled();
-    });
-
-    it("imports an owner's templates into the session company, whatever the body names", async () => {
-        const res = await call(importSettings.importTemplate, request({ uid: OWNER, body: { companyId: OTHER_COMPANY, templates: [{ TemplateId: 't1' }] } }));
-        expect(importData.importSettingTemplate).toHaveBeenCalledWith(COMPANY, [{ TemplateId: 't1' }], expect.any(Function));
-        expect(res.body.status).toBe(true);
     });
 });

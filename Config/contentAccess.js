@@ -23,7 +23,7 @@ const isAssigned = async (companyId, project, uid) => {
 
 /*
  * Seeing a project follows Modules/Agents/scope (the project list's own rule). Editing it
- * mirrors the membership half of PR #612's canEditProject: a public space belongs to every
+ * mirrors the membership half of canEditProject in Config/projectAccess.js: a public space belongs to every
  * member, a private one only to its assignees, and owner and admin reach everything. Role
  * keys are deliberately not consulted: Member is seeded with read-only project_details, so
  * requiring it would lock members out of their own projects' docs, forms and links.
