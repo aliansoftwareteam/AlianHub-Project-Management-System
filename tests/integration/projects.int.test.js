@@ -189,7 +189,7 @@ describe('projects and planning — regressions (fail until the bug is fixed)', 
     });
 });
 
-describe('projects and planning — input errors (PRJ-06)', () => {
+describe('projects and planning — input errors and saved filters (PRJ-06, PRJ-08)', () => {
     it('refuses a saved filter without a name with a 400 that leaks no schema detail', async () => {
         const owner = await loginAs('owner');
         const res = await owner.api.post('/api/v1/project/filter/create', { filter: 'projectFilter', typeFilter: 'projects' });
@@ -211,5 +211,25 @@ describe('projects and planning — input errors (PRJ-06)', () => {
         const res = await owner.api.post('/api/v1/get-remaining-projects', { dataIds: ['not-a-project-id'] });
         expect(res.status).toBe(400);
         expect(res.body).toEqual(expect.objectContaining({ status: false, field: 'dataIds' }));
+    });
+
+    it('updates a saved filter the caller owns and reports success, but not someone else\'s', async () => {
+        const owner = await loginAs('owner');
+        const created = await owner.api.post('/api/v1/project/filter/create', { name: `Filter ${uniqueSuffix()}`, filter: 'projectFilter', typeFilter: 'projects' });
+        expect(created.body.status).toBe(true);
+        const id = created.body.data._id;
+        try {
+            const res = await owner.api.put('/api/v1/project/filter/update', { id, name: 'Renamed filter' });
+            expect(res.status).toBe(200);
+            expect(res.body.status).toBe(true);
+            expect(res.body.data.name).toBe('Renamed filter');
+
+            const member = await loginAs('member');
+            const hijack = await member.api.put('/api/v1/project/filter/update', { id, name: 'Hijacked' });
+            expect(hijack.status).toBe(404);
+            expect(hijack.body.status).toBe(false);
+        } finally {
+            await owner.api.delete(`/api/v1/project/filter/delete/${owner.companyId}/${id}`);
+        }
     });
 });

@@ -4,6 +4,8 @@ const logger = require("../../../Config/loggerConfig");
 const mongoose = require("mongoose")
 
 const NAME_MAX_LENGTH = 200;
+const EDITABLE_FIELDS = ['name', 'filters', 'sortByField', 'sortByOrder'];
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 const isText = (value) => typeof value === 'string' && value.trim().length > 0;
 const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -31,7 +33,14 @@ const validateCreateFilter = (body = {}) => {
     return null;
 };
 
+const validateUpdateFilter = (body = {}) => {
+    if (!OBJECT_ID.test(String(body.id || body._id || ''))) return { field: 'id', message: 'A valid filter id is required.' };
+    if (!EDITABLE_FIELDS.some((field) => body[field] !== undefined)) return { field: 'name', message: 'Nothing to update.' };
+    return checkEditableFields(body, { requireName: false });
+};
+
 exports.validateCreateFilter = validateCreateFilter;
+exports.validateUpdateFilter = validateUpdateFilter;
 
 exports.saveFilter = async (req, res) => {
     try {
@@ -101,28 +110,30 @@ exports.getFilter = async (req, res) => {
 
 exports.updateFilter = async (req, res) => {
     try {
+        const body = req.body || {};
+        const invalid = validateUpdateFilter(body);
+        if (invalid) return reject(res, 400, invalid.message, invalid.field);
+
+        const update = {};
+        EDITABLE_FIELDS.forEach((field) => {
+            if (body[field] !== undefined) update[field] = field === 'name' ? body.name.trim() : body[field];
+        });
+
         const params = {
             type: SCHEMA_TYPE.GLOBALFILTER,
-            data: req.body
+            data: [
+                { _id: new mongoose.Types.ObjectId(String(body.id || body._id)), userId: String(req.uid) },
+                { $set: update },
+                { new: true }
+            ]
         }
 
         const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'findOneAndUpdate');
-
-        if(response) {
-            return res.status(200).json({
-                status: true,
-            });
-        } else {
-            return res.status(404).json({
-                status: false,
-            });
-        }
-
+        if (!response) return reject(res, 404, 'Filter not found.');
+        return res.status(200).json({ status: true, statusText: 'Filter updated.', data: response });
     } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while update the project global filter",
-            error: error 
-        });
+        logger.error(`updateFilter: ${error && error.message}`);
+        return reject(res, 500, 'An error occurred while update the project global filter');
     }
 }
 
