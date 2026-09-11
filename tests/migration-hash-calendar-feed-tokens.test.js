@@ -56,8 +56,6 @@ describe('012-hash-calendar-feed-tokens', () => {
     });
 
     test('an already subscribed feed URL keeps working once its token is replaced by a hash', async () => {
-        expect((await fetchIcs(LEGACY_TOKEN)).statusCode).toBe(404);
-
         expect(await migration.up(context())).toEqual({ hashed: 1 });
 
         const legacy = feeds().find((feed) => feed.name === 'Legacy');
@@ -66,6 +64,25 @@ describe('012-hash-calendar-feed-tokens', () => {
         const res = await fetchIcs(LEGACY_TOKEN);
         expect(res.statusCode).toBe(200);
         expect(res.body).toContain('Legacy feed task');
+    });
+
+    test('a feed the migration has not reached still answers, and is hashed on first use', async () => {
+        const res = await fetchIcs(LEGACY_TOKEN);
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toContain('Legacy feed task');
+
+        const legacy = feeds().find((feed) => feed.name === 'Legacy');
+        expect(legacy.token).toBeUndefined();
+        expect(legacy.tokenHash).toBe(hashFeedToken(LEGACY_TOKEN));
+        expect(await migration.up(context())).toEqual({ hashed: 0 });
+        expect((await fetchIcs(LEGACY_TOKEN)).statusCode).toBe(200);
+    });
+
+    test('a deleted or disabled legacy feed is not revived by its clear token', async () => {
+        const legacy = feeds().find((feed) => feed.name === 'Legacy');
+        legacy.deletedStatusKey = 1;
+        expect((await fetchIcs(LEGACY_TOKEN)).statusCode).toBe(404);
+        expect(legacy.tokenHash).toBeUndefined();
     });
 
     test('is idempotent and leaves a feed that already holds only a hash alone', async () => {

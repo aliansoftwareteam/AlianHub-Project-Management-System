@@ -149,14 +149,26 @@ const readableProjectIds = async (feed) => {
     return visible;
 };
 
+const LIVE_FEED = { deletedStatusKey: { $ne: 1 }, enabled: { $ne: false } };
+
+/* A feed stored before 012-hash-calendar-feed-tokens ran (MIGRATIONS_AUTO=false, or a failed boot
+ * migration) still holds its token in clear. It is hashed on first use so the subscribed URL keeps
+ * working and the clear token does not stay behind. */
+const findFeedByToken = async (token) => {
+    const tokenHash = R.hashFeedToken(token);
+    const feed = await MongoDbCrudOpration(GLOBAL, { type: FEEDS, data: [{ tokenHash, ...LIVE_FEED }] }, 'findOne');
+    if (feed) return feed;
+    return MongoDbCrudOpration(GLOBAL, {
+        type: FEEDS,
+        data: [{ token, ...LIVE_FEED }, { $set: { tokenHash }, $unset: { token: '' } }, { new: true }],
+    }, 'findOneAndUpdate');
+};
+
 exports.getIcs = async (req, res) => {
     try {
         const token = String(req.params.token || '').toLowerCase().replace(/\.ics$/, '');
         if (!R.isFeedToken(token)) return res.status(400).send('Invalid feed token.');
-        const feed = await MongoDbCrudOpration(GLOBAL, {
-            type: FEEDS,
-            data: [{ tokenHash: R.hashFeedToken(token), deletedStatusKey: { $ne: 1 }, enabled: { $ne: false } }],
-        }, 'findOne');
+        const feed = await findFeedByToken(token);
         const projectIds = feed ? await readableProjectIds(feed) : null;
         if (!projectIds) return res.status(404).send(FEED_NOT_FOUND);
         const match = { DueDate: { $ne: null }, deletedStatusKey: 0, ProjectID: { $in: projectIds.map(oid).filter(Boolean) } };
