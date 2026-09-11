@@ -5,9 +5,10 @@ const config = require("../../../Config/config");
 const logger = require("../../../Config/loggerConfig");
 const serviceCtr = require("../../serviceFunction.js")
 const sendMail = require("../../service.js");
-const { generateToken, verifyToken, generateJWTToken, removeCacheAndCookie } = require("../../../Config/jwt.js");
+const { removeCacheAndCookie } = require("../../../Config/jwt.js");
 const helperCtr = require("../helper.js");
 const sesstionCtr = require("../session.js");
+const refreshSession = require("../helpers/refreshSession");
 const mongoose = require("mongoose");
 const { removeCache } = require("../../../utils/commonFunctions.js");
 const { updateUserFun } = require("../../Users/controller.js");
@@ -164,41 +165,28 @@ exports.loginAuth = (req, res, next) => {
  * @param {Object} res 
  */
 
-exports.loginAuthTracker = (req,res) => {
+exports.loginAuthTracker = async (req, res) => {
+    const invalid = () => res.status(400).json({message: 'Invalid Refresh Token'});
     try {
-        let obj = {
-            type: dbCollections.SESSIONS,
-            data: [{
-                refreshToken: req.body.refreshToken
-            }]
-        }
-        
-        mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "findOne").then(async (sessionData)=>{
-            if (sessionData) {
-                const forwarded = req?.headers['x-forwarded-for'] || req.ip;
-                const clientIp = forwarded ? forwarded?.split(',')[0] : req?.connection?.remoteAddress;
-                sesstionCtr.insertSessionFun({userId: sessionData.userId}, req.headers['user-agent'] || "", clientIp, (sData) => {
-                    if (!(sData && sData.status)) {
-                        res.status(400).json({message: 'Invalid Refresh Token'})
-                        return;
-                    }
-                    generateTokenV2Fun(sessionData.userId, sData.data.refreshToken, (gData) => {
-                        if (!(gData && gData.status)) {
-                            res.status(400).json({message: 'Invalid Refresh Token'})
-                            return;
-                        }
-                        res.status(200).json({
-                            uid: sessionData.userId,
-                            refreshToken: sData.data.refreshToken,
-                            accessToken: gData.token
-                        });
-                    });
+        const { refreshToken, userId } = req.body || {};
+        const resolved = await refreshSession.resolveRefreshSession(refreshToken, userId);
+        if (!resolved.ok) return invalid();
+        const sessionUserId = String(resolved.session.userId);
+        if (userId && String(userId) !== sessionUserId) return invalid();
+
+        const forwarded = req?.headers['x-forwarded-for'] || req.ip;
+        const clientIp = forwarded ? forwarded?.split(',')[0] : req?.connection?.remoteAddress;
+        sesstionCtr.insertSessionFun({userId: sessionUserId}, req.headers['user-agent'] || "", clientIp, (sData) => {
+            if (!(sData && sData.status)) return invalid();
+            generateTokenV2Fun(sessionUserId, sData.data.refreshToken, (gData) => {
+                if (!(gData && gData.status)) return invalid();
+                res.status(200).json({
+                    uid: sessionUserId,
+                    refreshToken: sData.data.refreshToken,
+                    accessToken: gData.token
                 });
-                return;
-            } else {
-                res.status(400).json({message: 'Invalid Refresh Token'})
-            }
-        })
+            });
+        });
     } catch (error) {
         res.status(400).json({message: error.message ? error.message : error});
     }
@@ -252,15 +240,24 @@ exports.testV2 = (req, res) => {
     res.json(req.body);
 }
 
+const refuseRefresh = (res, reason) => {
+    if (reason === 'userRequired') {
+        return res.status(400).json({ status: false, statusText: "The user id is required." });
+    }
+    if (reason === 'rotated') {
+        return res.status(409).json({
+            status: false,
+            statusText: "This refresh token was just exchanged. Retry with the current one.",
+            isRotated: true
+        });
+    }
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+    return res.status(400).json({ message: "Your session is expired", isLogout: true });
+};
+
 exports.generateTokenV2 = async (req, res) => {
     const refreshToken = req.headers['refresh-token'] || "";
-    if (!(req.body && req.body.uid)) {
-        res.status(400).json({
-            status: false,
-            statusText: "The user id is required."
-        });
-        return;
-    }
     if (!refreshToken) {
         res.status(400).json({
             status: false,
@@ -268,40 +265,32 @@ exports.generateTokenV2 = async (req, res) => {
         });
         return;
     }
-    const cacheKey = `session:${req.body.uid}:${refreshToken}`;
-    try {   
-        const validRefreshToken = verifyToken(refreshToken);
-        if (!(validRefreshToken && validRefreshToken.status)) {
-            removeCacheAndCookie("", cacheKey, res, refreshToken);
-            res.status(400).json({message: "Your session is expired", isLogout: true});
-            return;
-        }
-        generateTokenV2Fun(req.body.uid, refreshToken, (gData) => {
+    try {
+        const resolved = await refreshSession.resolveRefreshSession(refreshToken, req.body && req.body.uid);
+        if (!resolved.ok) return refuseRefresh(res, resolved.reason);
+        const rotated = await refreshSession.rotateRefreshSession(resolved);
+        if (!rotated.ok) return refuseRefresh(res, rotated.reason);
+
+        generateTokenV2Fun(rotated.userId, rotated.refreshToken, (gData) => {
             if (!(gData && gData.status)) {
-                removeCacheAndCookie("", cacheKey, res, refreshToken);
+                removeCacheAndCookie("", `session:${rotated.userId}:${rotated.refreshToken}`, res, rotated.refreshToken);
                 res.status(400).json(gData);
                 return;
             }
-            // TODO(P1-SEC-09): set httpOnly: true once the frontend stops
-            // reading these cookies directly. Currently App.vue,
-            // socketHelper.js, CreateCompany.vue, services/index.js, etc.
-            // call Cookies.get('accessToken' | 'refreshToken'), so flipping
-            // httpOnly here breaks socket auth and the refresh flow until
-            // the frontend stores tokens in memory/localStorage (or the
-            // backend switches to reading req.cookies via cookie-parser).
+            // Not httpOnly: the frontend still reads both cookies with js-cookie (P1-SEC-09).
             const setCookie = {
-                maxAge: serviceCtr.convertToSeconds(process.env.JWT_EXP)*1000,
                 httpOnly: false,
                 secure: config.NODE_ENV === "production",
                 sameSite: config.NODE_ENV === "production" ? "Strict" : "Lax",
                 domain: process.env.NODE_ENV === "production" ? req.hostname : undefined
             };
-            res.cookie("accessToken", gData.token, { ...setCookie });
-            res.json(gData);
+            res.cookie("refreshToken", rotated.refreshToken, { ...setCookie, maxAge: Math.max(0, rotated.expiresAt * 1000 - Date.now()) });
+            res.cookie("accessToken", gData.token, { ...setCookie, maxAge: serviceCtr.convertToSeconds(process.env.JWT_EXP)*1000 });
+            res.json({ ...gData, refreshToken: rotated.refreshToken });
         });
     } catch (error) {
         logger.error(`Generate Jwt Token Error: ${error}`);
-        removeCacheAndCookie("", cacheKey, res, refreshToken);
+        removeCacheAndCookie("", "", res, refreshToken);
         res.status(400).json({
             status: false,
             isLogout: true,
