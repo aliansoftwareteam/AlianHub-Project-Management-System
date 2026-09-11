@@ -380,7 +380,6 @@ const verifyJWTToken = [
     '/api/v1/subscriptions/:id',
     '/api/v1/admin/plan-feature',
     '/api/v1/admin/plan-feature-display',
-    '/api/v1/invoice',
     '/api/v1/admin/company',
     '/api/v1/admin/company/find',
     '/api/v1/customer-update',
