@@ -173,3 +173,98 @@ describe('PAG-08 public links need edit rights on the linked project', () => {
         expect(String(res.body)).toContain('Roadmap');
     });
 });
+
+describe('PAG-09 docs and forms are limited to visible projects', () => {
+    it('lists no docs of a project the guest cannot see, and none in the workspace index', async () => {
+        seedPage({ title: 'Hidden plan', ProjectID: PRIVATE });
+        seedPage({ title: 'Open plan', ProjectID: PUBLIC });
+        seedPage({ title: 'Handbook' });
+
+        const byProject = await call(pages.listPages, request({ uid: GUEST, query: { projectId: PRIVATE } }));
+        expect(byProject.body.data || []).toHaveLength(0);
+
+        const all = await call(pages.listPages, request({ uid: GUEST, query: { scope: 'all' } }));
+        expect(all.body.data.map((p) => p.title).sort()).toEqual(['Handbook', 'Open plan']);
+    });
+
+    it('does not open a doc of a hidden project, but the owner still can', async () => {
+        const hidden = seedPage({ title: 'Hidden plan', ProjectID: PRIVATE });
+        expect(refused(await call(pages.getPage, request({ uid: GUEST, params: { id: hidden._id } })))).toBe(true);
+        expect((await call(pages.getPage, request({ uid: OWNER, params: { id: hidden._id } }))).body.data.title).toBe('Hidden plan');
+    });
+
+    it('does not list or open a form of a hidden project', async () => {
+        const form = seedForm(PRIVATE);
+        const list = await call(forms.listForms, request({ uid: GUEST, query: { projectId: PRIVATE } }));
+        expect(list.body.data || []).toHaveLength(0);
+        expect(refused(await call(forms.getForm, request({ uid: GUEST, params: { id: form._id } })))).toBe(true);
+        expect(refused(await call(forms.updateForm, request({ uid: GUEST, params: { id: form._id }, body: { title: 'Mine now' } })))).toBe(true);
+        expect(rows(SCHEMA_TYPE.FORMS)[0].title).toBe('Intake');
+    });
+
+    it('keeps submissions from anyone who cannot edit the form project', async () => {
+        const form = seedForm(PRIVATE);
+        mockDb.seed(SCHEMA_TYPE.FORM_SUBMISSIONS, { formId: form._id, answers: [{ questionId: 'email', label: 'Email', value: 'someone@example.com' }], deletedStatusKey: 0 });
+
+        const guest = await call(forms.listSubmissions, request({ uid: GUEST, params: { id: form._id } }));
+        expect(refused(guest)).toBe(true);
+        expect(JSON.stringify(guest.body)).not.toContain('someone@example.com');
+
+        const viewer = await call(forms.listSubmissions, request({ uid: VIEWER, params: { id: form._id }, query: { all: '1' } }));
+        expect(viewer.statusCode).toBe(403);
+        expect(JSON.stringify(viewer.body)).not.toContain('someone@example.com');
+    });
+
+    it('lets the owner and a member of a public project read submissions', async () => {
+        const privateForm = seedForm(PRIVATE);
+        const publicForm = seedForm(PUBLIC);
+        mockDb.seed(SCHEMA_TYPE.FORM_SUBMISSIONS, { formId: privateForm._id, answers: [], deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.FORM_SUBMISSIONS, { formId: publicForm._id, answers: [], deletedStatusKey: 0 });
+        expect((await call(forms.listSubmissions, request({ uid: OWNER, params: { id: privateForm._id } }))).body.data.total).toBe(1);
+        expect((await call(forms.listSubmissions, request({ uid: MEMBER, params: { id: publicForm._id } }))).body.data.total).toBe(1);
+    });
+});
+
+describe('PAG-10 deleting a doc', () => {
+    it("refuses a member deleting someone else's private doc and deletes nothing", async () => {
+        const doc = seedPage({ title: 'Salary notes', ProjectID: PUBLIC, visibility: 'private', createdBy: OWNER });
+        seedPage({ title: 'Child', ProjectID: PUBLIC, parentPageId: doc._id, createdBy: OWNER });
+        const res = await call(pages.deletePage, request({ uid: MEMBER, params: { id: doc._id } }));
+        expect(refused(res)).toBe(true);
+        expect(rows(SCHEMA_TYPE.PAGES).every((p) => p.deletedStatusKey === 0)).toBe(true);
+    });
+
+    it('answers an unknown id as not found', async () => {
+        const res = await call(pages.deletePage, request({ uid: OWNER, params: { id: '6f00000000000000000000ff' } }));
+        expect(refused(res)).toBe(true);
+    });
+
+    it('refuses a guest deleting a shared doc of a project they cannot edit', async () => {
+        const doc = seedPage({ title: 'Plan', ProjectID: PRIVATE });
+        expect(refused(await call(pages.deletePage, request({ uid: GUEST, params: { id: doc._id } })))).toBe(true);
+        expect(refused(await call(pages.deletePage, request({ uid: VIEWER, params: { id: doc._id } })))).toBe(true);
+        expect(rows(SCHEMA_TYPE.PAGES)[0].deletedStatusKey).toBe(0);
+    });
+
+    it('lets the author, and an admin, delete a private doc', async () => {
+        const mine = seedPage({ title: 'Mine', ProjectID: PUBLIC, visibility: 'private', createdBy: MEMBER });
+        const theirs = seedPage({ title: 'Theirs', ProjectID: PUBLIC, visibility: 'private', createdBy: MEMBER });
+        expect((await call(pages.deletePage, request({ uid: MEMBER, params: { id: mine._id } }))).body.status).toBe(true);
+        expect((await call(pages.deletePage, request({ uid: ADMIN, params: { id: theirs._id } }))).body.status).toBe(true);
+        expect(rows(SCHEMA_TYPE.PAGES).every((p) => p.deletedStatusKey === 1)).toBe(true);
+    });
+
+    it("deletes a shared doc's visible subtree but not a child the caller cannot see", async () => {
+        const parent = seedPage({ title: 'Parent', ProjectID: PUBLIC, createdBy: OWNER });
+        const child = seedPage({ title: 'Child', ProjectID: PUBLIC, parentPageId: parent._id, createdBy: OWNER });
+        const grandchild = seedPage({ title: 'Grandchild', ProjectID: PUBLIC, parentPageId: child._id, createdBy: OWNER });
+        const secret = seedPage({ title: 'Secret', ProjectID: PUBLIC, parentPageId: parent._id, visibility: 'private', createdBy: OWNER });
+        const underSecret = seedPage({ title: 'Under secret', ProjectID: PUBLIC, parentPageId: secret._id, createdBy: OWNER });
+
+        const res = await call(pages.deletePage, request({ uid: MEMBER, params: { id: parent._id } }));
+        expect(res.body.data.deleted).toBe(3);
+        const state = Object.fromEntries(rows(SCHEMA_TYPE.PAGES).map((p) => [p.title, p.deletedStatusKey]));
+        expect(state).toEqual({ Parent: 1, Child: 1, Grandchild: 1, Secret: 0, 'Under secret': 0 });
+        expect([grandchild, underSecret]).toHaveLength(2);
+    });
+});

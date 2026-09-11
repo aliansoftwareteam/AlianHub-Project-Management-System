@@ -57,4 +57,37 @@ describe('pages findings (regressions)', () => {
         await owner.api.delete(`/api/v2/public-shares/${share.body.data._id}`);
         expect((await anon.get(`/share/${token}`)).status).toBe(404);
     });
+
+    it('PAG-09: a guest cannot read docs of a project they are not in', async () => {
+        const owner = await loginAs('owner');
+        const guest = await loginAs('guest');
+        const priv = await privateProject(owner);
+        const page = await owner.api.post('/api/v2/pages', { title: `[QA pages] hidden ${uniqueSuffix()}`, projectId: priv._id });
+        const list = await guest.api.get(`/api/v2/pages?projectId=${priv._id}`);
+        expect((list.body.data || []).length).toBe(0);
+        expect(refused(await guest.api.get(`/api/v2/pages/${page.body.data._id}`))).toBe(true);
+        expect((await owner.api.get(`/api/v2/pages/${page.body.data._id}`)).body.status).toBe(true);
+    });
+
+    it('PAG-09: a guest cannot read a form of a project they are not in', async () => {
+        const owner = await loginAs('owner');
+        const guest = await loginAs('guest');
+        const priv = await privateProject(owner);
+        const form = await owner.api.post('/api/v2/forms', { title: `[QA pages] hidden form ${uniqueSuffix()}`, projectId: priv._id });
+        const res = await guest.api.get(`/api/v2/forms/${form.body.data._id}/submissions`);
+        expect(refused(res)).toBe(true);
+        expect(refused(await guest.api.get(`/api/v2/forms/${form.body.data._id}`))).toBe(true);
+        expect((await owner.api.get(`/api/v2/forms/${form.body.data._id}/submissions`)).body.status).toBe(true);
+    });
+
+    it('PAG-10: a member cannot delete another user\'s private doc', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const project = await sharedProject(owner);
+        const priv = await owner.api.post('/api/v2/pages', { title: `[QA pages] mine ${uniqueSuffix()}`, projectId: project._id, visibility: 'private' });
+        const res = await member.api.delete(`/api/v2/pages/${priv.body.data._id}`);
+        expect(refused(res)).toBe(true);
+        expect((await owner.api.get(`/api/v2/pages/${priv.body.data._id}`)).body.status).toBe(true);
+        expect((await owner.api.delete(`/api/v2/pages/${priv.body.data._id}`)).body.status).toBe(true);
+    });
 });
