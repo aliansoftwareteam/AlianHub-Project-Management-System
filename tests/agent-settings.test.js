@@ -102,7 +102,7 @@ describe('PUT /agents/settings', () => {
     it('stores valid values, clears the company cache and answers the settings shape', async () => {
         const r = await put({ undoHours: '48', monthlyBudgetUsd: 25.5 });
         expect(r.code).toBe(200);
-        expect(r.body).toEqual({ status: true, statusText: 'Settings updated.', data: { undoHours: 48, monthlyBudgetUsd: 25.5, provider: { name: null, hasKey: false, region: null, model: null, priced: null } } });
+        expect(r.body).toEqual({ status: true, statusText: 'Settings updated.', data: { undoHours: 48, monthlyBudgetUsd: 25.5, alerts: { enabled: false, errorRatePct: 20, errorMinRuns: 5, approvalFloorPct: 50, approvalDropPts: 20, costForecastPct: 110, queueAgeMinutes: 15 }, provider: { name: null, hasKey: false, region: null, model: null, priced: null } } });
         expect(company()).toMatchObject({ agentUndoHours: 48, agentMonthlyBudgetUsd: 25.5 });
         expect(removeCache).toHaveBeenCalledWith(`companyData_${C}`);
         expect((await get()).body.data).toMatchObject({ undoHours: 48, monthlyBudgetUsd: 25.5 });

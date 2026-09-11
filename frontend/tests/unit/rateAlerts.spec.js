@@ -49,7 +49,7 @@ describe('rateAlerts helpers', () => {
         expect(Object.keys(thresholdErrors(draft))).toEqual(['errorRatePct', 'errorMinRuns']);
         expect(thresholdErrors(draft).errorMinRuns).toEqual({ key: 'AiAlerts.error_whole_range', params: { min: 1, max: 1000 } });
         expect(thresholdErrors({ ...ALERT_DEFAULTS, queueAgeMinutes: '' }).queueAgeMinutes).toBeTruthy();
-        expect(changedSettings({ ...ALERT_DEFAULTS, costForecastPct: 125, enabled: false }, ALERT_DEFAULTS)).toEqual({ enabled: false, costForecastPct: 125 });
+        expect(changedSettings({ ...ALERT_DEFAULTS, costForecastPct: 125, enabled: true }, ALERT_DEFAULTS)).toEqual({ enabled: true, costForecastPct: 125 });
     });
 
     it('explains each type with its current threshold', () => {
@@ -70,7 +70,7 @@ describe('rateAlerts helpers', () => {
 });
 
 describe('AiOpenAlerts', () => {
-    beforeEach(() => apiRequest.mockReset());
+    beforeEach(() => { apiRequest.mockReset(); });
 
     it('lists open incidents with a chip and a form per type', async () => {
         apiRequest.mockImplementation(() => ok({
@@ -109,7 +109,7 @@ describe('AiOpenAlerts', () => {
 });
 
 describe('AiAlertThresholds', () => {
-    beforeEach(() => apiRequest.mockReset());
+    beforeEach(() => { apiRequest.mockReset(); });
 
     const mountPanel = async (alerts = { enabled: true, errorRatePct: 25 }) => {
         apiRequest.mockImplementation((method, url, body) => {
@@ -159,7 +159,7 @@ describe('AiAlertThresholds', () => {
 });
 
 describe('AiHealth alert thresholds', () => {
-    beforeEach(() => apiRequest.mockReset());
+    beforeEach(() => { apiRequest.mockReset(); });
 
     it('opens the thresholds panel from the header and lists open alerts for an owner', async () => {
         apiRequest.mockImplementation((method, url) => {

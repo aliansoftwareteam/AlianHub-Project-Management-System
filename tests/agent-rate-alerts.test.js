@@ -19,6 +19,7 @@ const { aiAlertsSchema } = require('../utils/mongo-handler/createSchema');
 const alerts = require('../Modules/Agents/alerts');
 const rules = require('../Modules/Agents/alertRules');
 const metricsCtrl = require('../Modules/Agents/metricsController');
+const spend = require('../Modules/AICore/spend');
 
 const C = '6f0000000000000000000c01';
 const NOW = new Date('2026-09-11T12:00:00.000Z');
@@ -198,9 +199,11 @@ describe('cost_forecast', () => {
 
     it('never alerts without a budget', async () => {
         usage(5000);
+        const monthly = jest.spyOn(spend, 'monthly');
         await evaluate();
         expect(incidents()).toEqual([]);
-        expect(mockDb.calls.some((c) => c.type === SCHEMA_TYPE.AI_USAGE)).toBe(false);
+        expect(monthly).not.toHaveBeenCalled();
+        monthly.mockRestore();
     });
 });
 
@@ -299,7 +302,7 @@ describe('the evaluator', () => {
     });
 
     it('runs every company and survives one that fails', async () => {
-        mockDb.seed(dbCollections.COMPANIES, { _id: '6f0000000000000000000c02' });
+        mockDb.seed(dbCollections.COMPANIES, { _id: '6f0000000000000000000c02', agentAlerts: { enabled: true } });
         failingAgent();
         const real = mockDb.crud.getMockImplementation();
         mockDb.crud.mockImplementation(async (companyId, query, method) => {
@@ -319,7 +322,10 @@ describe('GET /agents/alerts and POST /agents/alerts/evaluate', () => {
     const res = () => { const r = { code: 200, body: null }; r.status = (c) => { r.code = c; return r; }; r.send = (b) => { r.body = b; return r; }; return r; };
     const req = (uid) => ({ headers: { companyid: C }, params: {}, query: {}, uid });
 
+    afterEach(() => jest.useRealTimers());
+
     it('lets an owner run the evaluator and list the open incidents', async () => {
+        jest.useFakeTimers({ now: NOW, doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
         failingAgent();
         const ran = res();
         await metricsCtrl.evaluateAlerts(req('owner1'), ran);

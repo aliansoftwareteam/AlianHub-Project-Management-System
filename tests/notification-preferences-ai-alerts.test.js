@@ -30,6 +30,7 @@ const stored = (who) => mockDb.store[SCHEMA_TYPE.NOTIFICATIONS_SETTINGS].find((d
 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
+    mockDb.calls.length = 0;
     jest.clearAllMocks();
     Object.keys(mockIds).forEach((who) => { docs[who] = mockDb.seed(SCHEMA_TYPE.NOTIFICATIONS_SETTINGS, { _id: `6f0000000000000000000d${who === 'owner' ? '01' : who === 'admin' ? '02' : '03'}`, userId: mockIds[who], tasks: { items: [] }, agentActivity: true }); });
 });
