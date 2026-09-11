@@ -158,6 +158,19 @@ For urgent production bugs that can't wait for the next `staging → main` promo
 
 ---
 
+## Beta build numbers
+
+`package.json` only moves when release-please cuts a release, so between releases the running version is derived from git instead.
+
+- **Label:** `<next>-beta.<build>`, e.g. `14.36.0-beta.59`. A checkout sitting on a release tag reports the plain release (`14.35.0`).
+- **Build:** the first-parent commits on the branch since the latest `vX.Y.Z` tag. Every PR merged (or squashed) into `beta` is one build, and its number never changes once merged.
+- **Next:** that tag bumped by the Conventional Commits since it — a breaking change → major, `feat` → minor, otherwise patch — the same rule release-please applies.
+- **Where it shows:** Instance console → Stats and Upgrade, `/health`, `GET /version`, the setup status, the MCP server info, backup names and manifests, and the app version recorded on migrations. `npm run version:show` prints it and `npm run version:log` regenerates [`docs/BETA-LOG.md`](docs/BETA-LOG.md).
+- **Images:** a Docker image has no `.git`, so `docker.yml` stamps `build-info.json` before the build and the server reads that.
+- **Promotion to `main` is unchanged:** release-please still bumps `package.json`, writes `CHANGELOG.md` and cuts the tag, and update checks compare against that release version.
+
+---
+
 ## Release workflow (`staging` → `main`)
 
 Releases happen **on demand** when `staging` is stable and ready to ship. There is no fixed cadence — release when there is meaningful value to ship (typically every 1–4 weeks).

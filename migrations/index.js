@@ -1,7 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { version: appVersion } = require('../package.json');
+const buildInfo = require('../Config/buildInfo');
 
 const LOCK_ID = '__lock';
 const LOCK_TTL_MS = 10 * 60 * 1000;
@@ -80,11 +80,11 @@ async function runMigrations({ store, migrations, makeContext, logger = console,
             logger.info(`[migrations] running ${migration.id} (${migration.scope})`);
             try {
                 await migration.up(ctx);
-                await store.put({ _id: migration.id, appliedAt: new Date(), durationMs: Date.now() - startedAt, appVersion, ok: true, error: null, companies: ctx.companies });
+                await store.put({ _id: migration.id, appliedAt: new Date(), durationMs: Date.now() - startedAt, appVersion: buildInfo.get().version, ok: true, error: null, companies: ctx.companies });
                 applied.push(migration.id);
             } catch (error) {
                 const message = String(error?.message || error);
-                await store.put({ _id: migration.id, appliedAt: new Date(), durationMs: Date.now() - startedAt, appVersion, ok: false, error: message, companies: ctx.companies });
+                await store.put({ _id: migration.id, appliedAt: new Date(), durationMs: Date.now() - startedAt, appVersion: buildInfo.get().version, ok: false, error: message, companies: ctx.companies });
                 logger.error(`[migrations] ${migration.id} failed: ${message}`);
                 failed = { id: migration.id, error: message };
                 break;

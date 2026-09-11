@@ -1,6 +1,6 @@
 const { computeSetupStatus, validateSetupPayload, MIN_PASSWORD } = require('../Modules/Setup/helpers');
 const { TEAM_FOCUS_OPTIONS } = require('../utils/sampleTasks');
-const { version } = require('../package.json');
+const { version } = require('../Config/buildInfo').get();
 
 describe('setup status — what the wizard learns from the server', () => {
     it('is installed only when the database answers and a user exists', () => {

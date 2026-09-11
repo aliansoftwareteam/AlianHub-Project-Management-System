@@ -94,7 +94,7 @@ const describe = () => describeSettings({ saved, env: process.env, locked: locke
 function publicConfig() {
     const env = (key) => process.env[key] || '';
     const on = (key) => env(key) === 'true';
-    const { version } = require('../package.json');
+    const { version } = require('./buildInfo').get();
     return {
         version,
         appName: env('APP_NAME') || 'AlianHub',

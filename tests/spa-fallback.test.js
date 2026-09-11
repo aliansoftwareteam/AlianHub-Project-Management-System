@@ -10,7 +10,7 @@ describe('SPA fallback — deep links and hard refreshes', () => {
     });
 
     it('never swallows the API, MCP, SCIM, sockets or the health check', () => {
-        for (const p of ['/api/v2/tasks', '/api/v1/project/x', '/mcp', '/mcp/manifest', '/scim/v2/Users', '/socket.io/?EIO=4', '/health']) {
+        for (const p of ['/api/v2/tasks', '/api/v1/project/x', '/mcp', '/mcp/manifest', '/scim/v2/Users', '/socket.io/?EIO=4', '/health', '/version']) {
             expect(wantsSpa(req(p))).toBe(false);
         }
     });

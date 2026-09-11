@@ -113,6 +113,9 @@
     "lint:commits": "commitlint --from ${BASE_BRANCH:-origin/staging} --to HEAD --verbose",
     "i18n:check": "node scripts/i18n-check.js",
     "i18n:backfill": "node scripts/i18n-backfill.js",
+    "version:show": "node scripts/build-info.js",
+    "version:stamp": "node scripts/build-info.js --write",
+    "version:log": "node scripts/build-info.js --log --ref origin/beta",
     "prepare": "node .husky/install.mjs || true"
   },
   "author": "Alian Software <https://alianhub.com>",

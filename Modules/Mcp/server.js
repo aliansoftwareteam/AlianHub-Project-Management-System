@@ -8,7 +8,7 @@ const tools = require('./tools');
 const logger = require('../../Config/loggerConfig');
 
 const PROTOCOL_VERSION = '2025-06-18';
-const SERVER_INFO = { name: 'alianhub', version: require('../../package.json').version };
+const SERVER_INFO = { name: 'alianhub', version: require('../../Config/buildInfo').get().version };
 
 const rpcError = (id, code, message, data) => ({
     jsonrpc: '2.0', id: id === undefined ? null : id,

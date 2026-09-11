@@ -3,7 +3,7 @@ const path = require('path');
 const logger = require('./loggerConfig');
 const requestContext = require('./requestContext');
 
-const SKIP = /^\/(socket\.io\/|health$)/;
+const SKIP = /^\/(socket\.io\/|health$|version$)/;
 const HEADER = 'X-Request-Id';
 const SAFE_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
 

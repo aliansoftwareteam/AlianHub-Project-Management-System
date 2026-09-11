@@ -73,7 +73,7 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Copy backend source — order matters for layer caching, but at this
 # stage we're only running, not installing.
-COPY package.json CHANGELOG.md ./
+COPY package.json CHANGELOG.md build-info.jso[n] ./
 COPY brandSettings.json thumbnail.json ./
 COPY index.js server.js cron.js ./
 COPY Config/ ./Config/

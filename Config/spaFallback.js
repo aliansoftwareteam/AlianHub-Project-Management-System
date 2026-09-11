@@ -4,7 +4,7 @@ const path = require('path');
  * a client route, so a hard refresh or a shared link gets the SPA instead of
  * "Cannot GET". Server-rendered pages (share, form, connections) are registered
  * earlier, so Express never reaches this for them; only unmatched paths arrive. */
-const RESERVED = /^\/(api\/|mcp(\/|$)|scim\/|socket\.io\/|health$)/;
+const RESERVED = /^\/(api\/|mcp(\/|$)|scim\/|socket\.io\/|health$|version$)/;
 
 const wantsSpa = (req) => req.method === 'GET'
     && !RESERVED.test(req.path)
