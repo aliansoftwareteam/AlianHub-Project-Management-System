@@ -98,10 +98,14 @@
     "@authenio/samlify-xsd-schema-validator": "^1.0.5"
   },
   "scripts": {
-    "test": "jest",
+    "test": "jest --selectProjects unit conventions",
     "test:unit": "jest --selectProjects unit",
     "test:conventions": "jest --selectProjects conventions",
-    "test:watch": "jest --watch",
+    "test:integration": "jest --selectProjects integration --runInBand",
+    "e2e": "playwright test --config e2e/playwright.config.js",
+    "e2e:db": "node e2e/support/start-db.js",
+    "e2e:db:stop": "docker stop alianhub-e2e-mongo",
+    "test:watch": "jest --selectProjects unit conventions --watch",
     "lint": "eslint .",
     "start": "node server.js",
     "nodemon": "nodemon index.js",
@@ -123,6 +127,7 @@
   "devDependencies": {
     "@commitlint/cli": "^19.5.0",
     "@commitlint/config-conventional": "^19.5.0",
+    "@playwright/test": "1.63.0",
     "eslint": "^8.57.1",
     "husky": "^9.1.7",
     "jest": "^30.4.2",

@@ -143,3 +143,8 @@ package-lock.json
 
 # Build stamp written by npm run version:stamp
 /build-info.json
+
+# End-to-end suite output
+/e2e/.state/
+/e2e/report/
+/e2e/test-results/
