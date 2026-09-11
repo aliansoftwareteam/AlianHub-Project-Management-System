@@ -17,6 +17,7 @@ const logger = require('../../Config/loggerConfig');
 const memoryStore = require('../Agents/memory');
 const { detectIgnoredInstructions } = require('./instructionGuard');
 const { getProvider } = require('./llmProvider');
+const { FEATURES } = require('../AICore/features');
 const { usageFromResult, addUsage, summarize } = require('./usage');
 const { COVERAGE_POINTS, CoverageSchema, ClarifyQuestionsSchema, BriefDraftSchema, tryParseJson } = require('./schemaValidator');
 const {
@@ -45,8 +46,9 @@ const COVERAGE_MAX_TOKENS = 1200;
 const CLARIFY_MAX_TOKENS = 6000;
 const BRIEF_MAX_TOKENS = 4000;
 
-async function callJson({ label, systemPrompt, userMessage, schema, check, maxTokens, temperature, truncatedMessage }) {
+async function callJson({ label, systemPrompt, userMessage, schema, check, maxTokens, temperature, truncatedMessage, companyId, userId }) {
     const provider = getProvider();
+    const spend = { feature: FEATURES.CLARIFIER, companyId, userId };
 
     const tryValidate = (raw) => {
         const parsed = tryParseJson(raw);
@@ -73,6 +75,7 @@ async function callJson({ label, systemPrompt, userMessage, schema, check, maxTo
         jsonMode: true,
         maxTokens,
         temperature,
+        spend,
     });
     if (firstAttempt.truncated) throw truncatedError();
 
@@ -94,6 +97,7 @@ async function callJson({ label, systemPrompt, userMessage, schema, check, maxTo
             jsonMode: true,
             maxTokens,
             temperature: 0.0,
+            spend,
         });
         // Counted before the guards below: a failed repair still burned tokens.
         usage = addUsage(usage, usageFromResult(repairAttempt));
@@ -130,7 +134,7 @@ async function callJson({ label, systemPrompt, userMessage, schema, check, maxTo
 async function scoreCoverage({ description, additionalRequirements, briefText, previousAnswers, companyId, userId, projectId, memory }) {
     const block = memory !== undefined ? memory : await memoryStore.contextFor({ companyId, userId, projectId });
     const result = await callJson({
-        label: 'coverage',
+        label: 'coverage', companyId, userId,
         systemPrompt: buildCoverageSystemPrompt(),
         userMessage: buildCoverageUserMessage({ description, additionalRequirements, briefText, previousAnswers, memory: block }),
         schema: CoverageSchema,
@@ -205,7 +209,7 @@ async function generateClarifyingQuestions({ description, additionalRequirements
     }
 
     const asked = await callJson({
-        label: 'clarify',
+        label: 'clarify', companyId, userId,
         systemPrompt: buildClarifySystemPrompt(),
         userMessage: buildClarifyUserMessage({
             description,
@@ -323,7 +327,7 @@ async function draftBrief({ description, additionalRequirements, briefText, answ
     const required = requiredAssumptionsFor({ answers, coverage: scored.coverage, notes: scored.notes });
 
     const drafted = await callJson({
-        label: 'brief',
+        label: 'brief', companyId, userId,
         systemPrompt: buildBriefSystemPrompt(),
         userMessage: buildBriefUserMessage({
             description,

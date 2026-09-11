@@ -1,5 +1,6 @@
 const { emptyUsage } = require('../../AIProjectGenerator/usage');
 const { askModel, parseModelJson } = require('../../AICore/modelCall');
+const { FEATURES } = require('../../AICore/features');
 const { audit, extractUrl } = require('./pageAudit');
 const { isBlockedHostname } = require('./safeFetch');
 const skillIndex = require('../skills');
@@ -107,9 +108,9 @@ async function gather({ skillSlug = 'qa-review', task, companyId, memory }) {
 
 /* Skills other than the page audit: ask the model once about the gathered
  * context and hand back a summary plus the changes the run should propose or apply. */
-async function analyseGeneric(skill, { task, context, budget }) {
+async function analyseGeneric(skill, { task, context, budget, spend }) {
     const started = Date.now();
-    const asked = await askModel(skill, { prompt: skill.buildUserPrompt({ task, context }), budget });
+    const asked = await askModel(skill, { prompt: skill.buildUserPrompt({ task, context }), budget, spend });
     if (asked.refused) return refused(skill, asked, started);
     const { raw: answer, model, degraded, usage } = asked;
     if (!answer && !context.fallback) {
@@ -124,7 +125,7 @@ async function analyseGeneric(skill, { task, context, budget }) {
 
 /* The page audit: ground → analyse → verify → emit. The caller writes; this
  * only decides WHAT. */
-async function analyseAudit(skill, { task, context, budget }) {
+async function analyseAudit(skill, { task, context, budget, spend }) {
     const started = Date.now();
     const { url } = context;
     let auditResult;
@@ -137,7 +138,7 @@ async function analyseAudit(skill, { task, context, budget }) {
         return { status: 'failed', reason: auditResult.fatal, skill: skill.slug, url, findings: [], usage: emptyUsage(), durationMs: Date.now() - started };
     }
 
-    const asked = await askModel(skill, { prompt: skill.buildUserPrompt({ task, audit: auditResult }), budget });
+    const asked = await askModel(skill, { prompt: skill.buildUserPrompt({ task, audit: auditResult }), budget, spend });
     if (asked.refused) return refused(skill, asked, started);
     const { raw, model, degraded, usage } = asked;
 
@@ -166,16 +167,16 @@ async function analyseAudit(skill, { task, context, budget }) {
 }
 
 /* PHASES 2–5 on a gathered context. */
-async function analyse({ skillSlug = 'qa-review', task, context, budget = {} }) {
+async function analyse({ skillSlug = 'qa-review', task, context, budget = {}, spend }) {
     const skill = requireSkill(skillSlug);
-    return skill.kind === 'generic' ? analyseGeneric(skill, { task, context, budget }) : analyseAudit(skill, { task, context, budget });
+    return skill.kind === 'generic' ? analyseGeneric(skill, { task, context, budget, spend }) : analyseAudit(skill, { task, context, budget, spend });
 }
 
-async function run({ skillSlug = 'qa-review', task, companyId, budget = {} }) {
+async function run({ skillSlug = 'qa-review', task, companyId, budget = {}, spend }) {
     const started = Date.now();
     const gathered = await gather({ skillSlug, task, companyId });
     if (gathered.status !== GATHERED) return gathered;
-    const result = await analyse({ skillSlug, task, context: gathered.context, budget });
+    const result = await analyse({ skillSlug, task, context: gathered.context, budget, spend: spend || { feature: FEATURES.AGENT_RUN, companyId } });
     return { ...result, durationMs: Date.now() - started };
 }
 

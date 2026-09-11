@@ -21,6 +21,8 @@ const crypto = require('crypto');
 const { myCache } = require('../../Config/config');
 const logger = require('../../Config/loggerConfig');
 
+const { FEATURES } = require('../AICore/features');
+
 let providerFactory = null;
 try {
     providerFactory = require('../AIProjectGenerator/llmProvider');
@@ -98,7 +100,7 @@ function configHash(companyId, callerUserId, snapshot) {
     return h.digest('hex').slice(0, 16);
 }
 
-async function callProvider(snapshot) {
+async function callProvider(snapshot, spend) {
     if (!providerFactory || typeof providerFactory.getProvider !== 'function') return null;
     if (typeof providerFactory.isAnyProviderConfigured === 'function'
         && !providerFactory.isAnyProviderConfigured()) {
@@ -121,6 +123,7 @@ async function callProvider(snapshot) {
         messages: [{ role: 'user', content: userMessage }],
         temperature: 0.3,
         maxTokens: 256,
+        spend,
     });
     const result = await Promise.race([
         chatPromise,
@@ -161,7 +164,7 @@ async function summarise({ companyId, callerUserId, report } = {}) {
             return null;
         }
 
-        const text = await callProvider(snapshot);
+        const text = await callProvider(snapshot, { feature: FEATURES.WORKLOAD_SUMMARY, companyId, userId: callerUserId });
         if (!text) return null;
         myCache.set(cacheKey, text, CACHE_TTL_SECONDS);
         return text;

@@ -844,6 +844,22 @@ const schema = {
         // LangGraph thread the run executes on (the run id); resumed by approve/decline
         threadId: { type: String, required: false },
     },
+    aiUsage: {
+        companyId: { type: String, required: false },
+        feature: { type: String, required: true },
+        model: { type: String, required: false },
+        provider: { type: String, required: false },
+        inputTokens: { type: Number, default: 0, required: false },
+        outputTokens: { type: Number, default: 0, required: false },
+        totalTokens: { type: Number, default: 0, required: false },
+        // null when the model had no price on file; never a silent 0
+        costUsd: { type: Number, required: false },
+        priced: { type: Boolean, default: false, required: false },
+        billedToWorkspace: { type: Boolean, default: true, required: false },
+        runId: { type: String, required: false },
+        userId: { type: String, required: false },
+        at: { type: Date, required: true },
+    },
     agentProposals: {
         agentId: { type: String, required: true },
         agentName: { type: String, required: false },

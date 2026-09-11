@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose")
 const { myCache } = require('../../Config/config');
 const { getProvider } = require('../AICore/llmProvider');
+const { FEATURES } = require('../AICore/features');
 const { removeCache } = require('../../utils/commonFunctions');
 const { status } = require('migrate-mongo');
 
@@ -290,6 +291,7 @@ exports.createTemplateWithAI = async (req, res) => {
             messages: [{ role: 'user', content: userPrompt }],
             temperature: 0.7,
             jsonMode: true,
+            spend: { feature: FEATURES.PROJECT_TEMPLATE, companyId, userId: req.uid },
         });
 
         let content = response.content;

@@ -5,6 +5,7 @@ const { escapeRegex } = require('../../utils/escapeRegex');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const logger = require('../../Config/loggerConfig');
 const { getProvider, isAnyProviderConfigured } = require('../AIProjectGenerator/llmProvider');
+const { FEATURES } = require('../AICore/features');
 const { visibleProjects } = require('../Agents/scope');
 const { pageVisibilityFilter } = require('../Pages/helpers/pageRules');
 
@@ -166,6 +167,7 @@ const ask = async (req, res) => {
             messages: [{ role: 'user', content: promptFor(question, gathered.sources) }],
             maxTokens: research ? RESEARCH_TOKENS : ASK_TOKENS,
             temperature: 0.2,
+            spend: { feature: FEATURES.ASK, companyId, userId: uid },
         });
 
         const answer = String(result.content || '').trim();

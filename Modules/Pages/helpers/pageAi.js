@@ -9,6 +9,8 @@ const {
     blocksToRawText,
 } = require('./pageContent');
 
+const { FEATURES } = require('../../AICore/features');
+
 let providerFactory = null;
 try {
     providerFactory = require('../../AIProjectGenerator/llmProvider');
@@ -91,7 +93,7 @@ function buildUserPrompt({ action, title, instruction, currentText }) {
     return parts.join('\n\n');
 }
 
-async function composePage({ action, title, instruction, currentText }) {
+async function composePage({ action, title, instruction, currentText, companyId, userId }) {
     const resolvedAction = String(action || 'draft').toLowerCase();
     if (!isAiAction(resolvedAction)) {
         return { status: false, reason: `action must be one of: ${AI_ACTIONS.join(', ')}.` };
@@ -122,6 +124,7 @@ async function composePage({ action, title, instruction, currentText }) {
                 systemPrompt: SYSTEM_PROMPT,
                 jsonMode: true,
                 temperature: 0.6,
+                spend: { feature: FEATURES.PAGE_COMPOSE, companyId, userId },
             }),
             new Promise((_, reject) => setTimeout(() => reject(new Error('AI request timed out.')), REQUEST_TIMEOUT_MS)),
         ]);

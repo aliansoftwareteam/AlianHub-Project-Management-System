@@ -33,6 +33,8 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const socketEmitter = require('../../event/socketEventEmitter');
 
+const { FEATURES } = require('../AICore/features');
+
 let providerFactory = null;
 try {
     providerFactory = require('../AIProjectGenerator/llmProvider');
@@ -504,7 +506,7 @@ function resolveProvider() {
 }
 
 /** One model call → one parsed sample (or null). Never throws. */
-async function callOnce(provider, userMessage) {
+async function callOnce(provider, userMessage, spend) {
     try {
         const chatPromise = provider.chat({
             systemPrompt: SYSTEM_PROMPT,
@@ -520,6 +522,7 @@ async function callOnce(provider, userMessage) {
             // 8192 gives the reasoning ample room while non-thinking models
             // (GPT-4.1, Claude, deepseek-chat) self-terminate well under it.
             maxTokens: 8192,
+            spend,
         });
         const result = await Promise.race([
             chatPromise,
@@ -581,7 +584,7 @@ async function runEstimate(companyId, task) {
     const samples = [];
     for (let i = 0; i < ESTIMATE_SAMPLES; i += 1) {
         // eslint-disable-next-line no-await-in-loop
-        const sample = await callOnce(provider, userMessage);
+        const sample = await callOnce(provider, userMessage, { feature: FEATURES.TASK_ESTIMATE, companyId });
         if (sample) samples.push(sample);
     }
     if (!samples.length) return null;

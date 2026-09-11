@@ -28,13 +28,15 @@ const DAY = 24 * 60 * 60 * 1000;
 const agent = (over = {}) => ({ _id: AGENT_ID, name: 'Reviewer', autonomy: 1, allowedActions: [], account: 'workspace', spendCapUsd: 0, paused: false, deletedStatusKey: 0, ...over });
 const company = () => mockDb.store[dbCollections.COMPANIES][0];
 const seedCompany = (over = {}) => mockDb.seed(dbCollections.COMPANIES, { _id: C, ...over });
-const seedRun = (usd, over = {}) => mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { agentId: AGENT_ID, status: 'done', startedAt: new Date(), viaAccount: 'workspace', spend: { usd, tokens: 10, billedToWorkspace: true }, ...over });
+const seedSpend = (usd, over = {}) => mockDb.seed(SCHEMA_TYPE.AI_USAGE, { feature: 'agent_run', costUsd: usd, totalTokens: 10, priced: true, billedToWorkspace: true, at: new Date(), ...over });
 const lastMonth = () => { const d = new Date(); d.setUTCDate(1); d.setUTCHours(12); return new Date(d.getTime() - 3 * DAY); };
 
-/* A billed run whose recorded spend is `usd`. */
+/* A billed run whose model call booked `usd` to the ledger (what the core
+ * does around the vendor call) before the run path records its own spend. */
 const spend = async (usd, over = {}) => {
     summarize.mockReturnValueOnce({ costUsd: usd, totalTokens: 100, model: 'm' });
     const run = await runs.create(C, { agent: agent(), taskId: TASK_ID, projectId: 'p1', skill: 'qa-review', ...over });
+    if (run.viaAccount === 'workspace') seedSpend(usd, { runId: String(run._id) });
     return runs.recordSpend(C, run, { totalTokens: 100 }, 'm');
 };
 
@@ -50,28 +52,31 @@ beforeEach(() => {
 });
 
 describe('budget.status', () => {
-    it('sums this month\'s run spend against the company budget', async () => {
+    it('sums this month\'s spend from every feature against the company budget', async () => {
         seedCompany({ agentMonthlyBudgetUsd: 10 });
-        seedRun(2.5);
-        seedRun(3);
-        seedRun(4, { startedAt: lastMonth() });
-        seedRun(0, { viaAccount: 'personal', spend: { usd: 0, personalUsd: 9, billedToWorkspace: false } });
-        mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { agentId: AGENT_ID, status: 'running', startedAt: new Date() });
-        expect(await budget.status(C)).toEqual({ month: runs.monthKey(), usedUsd: 5.5, budgetUsd: 10, percent: 55, alerts: { 80: null, 100: null } });
+        seedSpend(2.5);
+        seedSpend(3, { feature: 'project_plan' });
+        seedSpend(4, { at: lastMonth() });
+        seedSpend(9, { billedToWorkspace: false });
+        mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { agentId: AGENT_ID, status: 'running', startedAt: new Date(), spend: { usd: 99 } });
+        expect(await budget.status(C)).toEqual({
+            month: runs.monthKey(), usedUsd: 5.5, budgetUsd: 10, percent: 55, alerts: { 80: null, 100: null },
+            features: [{ feature: 'project_plan', usd: 3, calls: 1, tokens: 10 }, { feature: 'agent_run', usd: 2.5, calls: 1, tokens: 10 }],
+        });
     });
 
     it('reports no budget as 0 and a missing company row as defaults', async () => {
-        seedRun(7);
+        seedSpend(7);
         expect(await budget.status(C)).toMatchObject({ usedUsd: 7, budgetUsd: 0, percent: 0 });
         expect(await budget.check(C)).toEqual({ ok: true, reason: '' });
     });
 
     it('GET /agents/budget returns the status', async () => {
         seedCompany({ agentMonthlyBudgetUsd: 20, agentBudgetAlerts: { month: runs.monthKey(), 80: new Date('2026-09-01T10:00:00.000Z'), 100: null } });
-        seedRun(17);
+        seedSpend(17, { feature: 'ask' });
         const r = { code: 200, body: null }; r.status = (c) => { r.code = c; return r; }; r.send = (b) => { r.body = b; return r; };
         await ctrl.getBudget({ headers: { companyid: C }, query: {}, uid: 'owner1' }, r);
-        expect(r.body).toEqual({ status: true, data: { month: runs.monthKey(), usedUsd: 17, budgetUsd: 20, percent: 85, alerts: { 80: '2026-09-01T10:00:00.000Z', 100: null } } });
+        expect(r.body).toEqual({ status: true, data: { month: runs.monthKey(), usedUsd: 17, budgetUsd: 20, percent: 85, alerts: { 80: '2026-09-01T10:00:00.000Z', 100: null }, features: [{ feature: 'ask', usd: 17, calls: 1, tokens: 10 }] } });
     });
 
     it('forgets last month\'s alert stamps', async () => {
@@ -83,9 +88,9 @@ describe('budget.status', () => {
 describe('runs are refused at 100%', () => {
     it('canStart returns the reason once the month\'s spend reaches the budget, after every existing check', async () => {
         seedCompany({ agentMonthlyBudgetUsd: 5 });
-        seedRun(4.99);
+        seedSpend(4.99, { feature: 'meeting_notes' });
         expect(await runs.canStart(agent(), { companyId: C })).toEqual({ ok: true, reason: '' });
-        seedRun(0.01);
+        seedSpend(0.01, { feature: 'description' });
         expect(await runs.canStart(agent(), { companyId: C })).toEqual({ ok: false, reason: 'Company agent budget reached ($5.00 of $5 this month).' });
         expect((await runs.canStart(agent({ paused: true, pausedReason: 'manual' }), { companyId: C })).reason).toBe('Agent is paused (manual).');
         expect((await runs.canStart(agent(), {})).ok).toBe(true);
@@ -93,20 +98,20 @@ describe('runs are refused at 100%', () => {
 
     it('POST /agents/runs answers 409 with the reason', async () => {
         seedCompany({ agentMonthlyBudgetUsd: 1 });
-        seedRun(1);
+        seedSpend(1, { feature: 'task_summary' });
         const r = { code: 200, body: null }; r.status = (c) => { r.code = c; return r; }; r.send = (b) => { r.body = b; return r; };
         await ctrl.startRun({ headers: { companyid: C }, body: { agentId: AGENT_ID, taskId: TASK_ID }, query: {}, uid: 'owner1' }, r);
         expect(r.code).toBe(409);
         expect(r.body.statusText).toBe('Company agent budget reached ($1.00 of $1 this month).');
-        expect(mockDb.store[SCHEMA_TYPE.AGENT_RUNS]).toHaveLength(1);
+        expect(mockDb.store[SCHEMA_TYPE.AGENT_RUNS] || []).toHaveLength(0);
     });
 
     it('a rule-triggered run is refused the same way', async () => {
         seedCompany({ agentMonthlyBudgetUsd: 1 });
-        seedRun(1.5);
+        seedSpend(1.5, { feature: 'project_plan' });
         const args = { companyId: C, entity: { kind: 'task', id: TASK_ID }, config: { agent: 'Reviewer', skill: 'qa-review' }, context: { ruleId: '6f0000000000000000000b01', task: { _id: TASK_ID, ProjectID: 'p1' } } };
         await expect(runAgent.run(args)).rejects.toThrow('Reviewer cannot run: Company agent budget reached ($1.50 of $1 this month).');
-        expect(mockDb.store[SCHEMA_TYPE.AGENT_RUNS]).toHaveLength(1);
+        expect(mockDb.store[SCHEMA_TYPE.AGENT_RUNS] || []).toHaveLength(0);
     });
 });
 
@@ -119,8 +124,8 @@ describe('80% and 100% alerts fire once each', () => {
         expect(first).toMatchObject({
             key: 'task_notification', type: 'tasks', changeType: 'agent_budget', companyId: C, projectId: 'p1', taskId: TASK_ID,
             userId: AGENT_ID, assigneeUsers: ['owner1', 'admin1'], notSeen: ['owner1', 'admin1'],
-            message: 'Agent budget at 85%: $8.50 of $10 used this month.',
-            changeData: { month: runs.monthKey(), level: '80', usedUsd: 8.5, budgetUsd: 10, percent: 85 },
+            message: 'AI budget at 85%: $8.50 of $10 used this month.',
+            changeData: { month: runs.monthKey(), level: '80', usedUsd: 8.5, budgetUsd: 10, percent: 85, feature: 'agent_run', runId: expect.any(String) },
         });
         expect(company().agentBudgetAlerts).toEqual({ month: runs.monthKey(), 80: expect.any(Date), 100: null });
 
@@ -131,7 +136,7 @@ describe('80% and 100% alerts fire once each', () => {
         expect(handleNotificationtFun).toHaveBeenCalledTimes(2);
         const second = handleNotificationtFun.mock.calls[1][0].body;
         expect(second.changeData).toMatchObject({ level: '100', usedUsd: 11, percent: 110 });
-        expect(second.message).toMatch(/^Agent budget reached: \$11\.00 of \$10 used this month/);
+        expect(second.message).toMatch(/^AI budget reached: \$11\.00 of \$10 used this month/);
         expect(company().agentBudgetAlerts[100]).toEqual(expect.any(Date));
 
         await spend(1);

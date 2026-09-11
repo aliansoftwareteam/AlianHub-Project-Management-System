@@ -46,6 +46,7 @@ exports.createNotes = async (req, res) => {
         let aiError = '';
         if (transcript) {
             const generated = await generateMeetingNotes({
+                companyId, userId: req.uid,
                 transcript,
                 title: body.title,
                 participants: Array.isArray(body.participantNames) ? body.participantNames : [],

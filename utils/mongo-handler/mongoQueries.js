@@ -92,6 +92,7 @@ const {
     agentFindingsSchema,
     agentsSchema,
     agentRunsSchema,
+    aiUsageSchema,
     agentProposalsSchema,
     callsSchema,
     integrationConnectionsSchema,
@@ -287,6 +288,8 @@ exports.checkType = (type) => {
             return agentsSchema
         case SCHEMA_TYPE.AGENT_RUNS:
             return agentRunsSchema
+        case SCHEMA_TYPE.AI_USAGE:
+            return aiUsageSchema
         case SCHEMA_TYPE.AGENT_PROPOSALS:
             return agentProposalsSchema
         case SCHEMA_TYPE.CALLS:
@@ -493,6 +496,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AGENTS}`
         case SCHEMA_TYPE.AGENT_RUNS:
                 return `${dbCollections.AGENT_RUNS}`
+        case SCHEMA_TYPE.AI_USAGE:
+                return `${dbCollections.AI_USAGE}`
         case SCHEMA_TYPE.AGENT_PROPOSALS:
                 return `${dbCollections.AGENT_PROPOSALS}`
         case SCHEMA_TYPE.CALLS:

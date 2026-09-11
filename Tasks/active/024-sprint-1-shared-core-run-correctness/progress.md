@@ -18,7 +18,8 @@ One pull request per step; tick with the merge commit.
 | Date | Entry |
 |---|---|
 | 2026-09-10 | Filed from `docs/AI-PLATFORM-ARCHITECTURE.md` (sprint 1) |
+| 2026-09-11 | Step 5 on `feat/s1-spend-at-core`: `Modules/AICore/spend.js` meters every `chat()` into a new `ai_usage` collection keyed by feature (`Modules/AICore/features.js`); `budget.js` sums the ledger; Instance console card shows spend per feature. Closes defect #18. |
 | 2026-09-11 | Step 6 on `fix/s1-precall-spend-cap`: `Modules/AICore/estimate.js` prices a call before it is made; `Modules/Agents/spendGuard.js` reserves it on the run (`reservedUsd`, atomic `$inc`), refuses over the run cap or the company month as `spend_cap_exceeded` with an audit row, reconciles to the real cost after. Reproduced on beta first: the fake provider was called for a run capped under its estimate. Closes defect 15 and 006's "spend cap evaluated after the model call". |
 
 ## Last step
-Not started.
+Step 5 implemented, awaiting review (PR from `feat/s1-spend-at-core`).

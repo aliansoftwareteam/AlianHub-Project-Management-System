@@ -125,14 +125,14 @@ describe('a run on an unpriced model is refused before it starts', () => {
         await ctrl.startRun({ headers: { companyid: C }, body: { agentId: AGENT_ID, taskId: TASK_ID }, query: {}, uid: 'owner1' }, r);
         expect(r.code).toBe(409);
         expect(r.body).toEqual({ status: false, statusText: usage.unpricedMessage(MYSTERY), message: usage.unpricedMessage(MYSTERY) });
-        expect(mockDb.store[SCHEMA_TYPE.AGENT_RUNS]).toHaveLength(0);
+        expect(mockDb.store[SCHEMA_TYPE.AGENT_RUNS] || []).toHaveLength(0);
     });
 
     it('a rule-triggered run is refused the same way', async () => {
         configure(MYSTERY);
         const args = { companyId: C, entity: { kind: 'task', id: TASK_ID }, config: { agent: 'Reviewer', skill: 'qa-review' }, context: { ruleId: '6f0000000000000000000b01', task: { _id: TASK_ID, ProjectID: 'p1' } } };
         await expect(runAgent.run(args)).rejects.toThrow(`Reviewer cannot run: ${usage.unpricedMessage(MYSTERY)}`);
-        expect(mockDb.store[SCHEMA_TYPE.AGENT_RUNS]).toHaveLength(0);
+        expect(mockDb.store[SCHEMA_TYPE.AGENT_RUNS] || []).toHaveLength(0);
     });
 
     it('the instance console learns the configured model and whether it is priced', () => {

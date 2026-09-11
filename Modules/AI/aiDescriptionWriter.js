@@ -26,6 +26,8 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../../Config/loggerConfig');
 
+const { FEATURES } = require('../AICore/features');
+
 let providerFactory = null;
 try {
     providerFactory = require('../AIProjectGenerator/llmProvider');
@@ -211,6 +213,7 @@ async function callProvider(input) {
         // ADD mode reproduces the whole description plus the addition, so allow
         // room for a long description to come back in full.
         maxTokens: 8192,
+        spend: { feature: FEATURES.DESCRIPTION, companyId: input.companyId, userId: input.userId },
     });
     const result = await Promise.race([
         chatPromise,
@@ -233,6 +236,8 @@ async function callProvider(input) {
  * @param {string} [params.existingDescription] Current description text.
  * @param {string} [params.intent]              Free-text "what to cover".
  * @param {Array<{question:string,answer:string}>} [params.answers]
+ * @param {string} params.companyId
+ * @param {string} [params.userId]
  * @returns {Promise<{status:boolean, data?:{questions?:string[], description?:string}, reason?:string}>}
  */
 async function generateDescription(params = {}) {

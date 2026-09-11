@@ -11,6 +11,8 @@
  * @property {boolean} [jsonMode]              - Force JSON-only output if the provider supports it.
  * @property {number} [maxTokens]              - Max output tokens.
  * @property {number} [temperature]            - 0..1.
+ * @property {{feature:string, companyId:string, userId?:string, runId?:string, account?:string}} spend
+ *                                             - Ledger context: which feature is spending, for which tenant.
  *
  * @typedef {Object} ChatResult
  * @property {string} content                  - Raw text content of the assistant turn.

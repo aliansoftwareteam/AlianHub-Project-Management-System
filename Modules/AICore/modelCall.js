@@ -19,8 +19,9 @@ function parseModelJson(raw) {
  * `budget.guard` ({ reserve, reconcile, release }) sees the estimated cost
  * before the vendor request: a refusal comes back as `refused` and nothing is
  * bought; a reservation is settled to the real cost after the call, or
- * released when the call throws. */
-async function askModel(skill, { prompt, budget }) {
+ * released when the call throws. `spend` ({ feature, companyId, runId, userId,
+ * account }) is the ledger context the core meter books the actual row under. */
+async function askModel(skill, { prompt, budget, spend }) {
     let usage = emptyUsage();
     let raw = null; let model = null; let degraded = null; let refused = null;
     if (isAnyProviderConfigured() && budget.allowModel !== false) {
@@ -34,6 +35,7 @@ async function askModel(skill, { prompt, budget }) {
                 maxTokens: Math.min(skill.maxTokens, budget.maxTokens || skill.maxTokens),
                 temperature: 0.2,
                 jsonMode: true,
+                spend,
             };
             if (guard) {
                 ticket = await guard.reserve(estimateCall({ ...request, model: provider.model }));
