@@ -1,79 +1,30 @@
-
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
-const { isPrivileged } = require('../../../Config/roleTypes');
-
+const { resolveSheetScope, scopedTimeMatch, asList, SHEET_PERMISSION } = require("../helpers/timeScope");
 
 exports.getProjectTimeSheet = async(req,res) => {
     try {
-        const { filterProjectIds,filterUserIds, projectIds, startNumber, endNumber, companyUserDetail,timeZone, projectTimesheetPermission,userId } = req.body;
-        let timeQuery = [{
-            Loggeduser: userId,
-            ProjectId: {
-                $in: projectIds
-            },
+        const { filterProjectIds, filterUserIds, projectIds, startNumber, endNumber, timeZone } = req.body;
+        const scope = await resolveSheetScope(req.headers['companyid'], req.uid, SHEET_PERMISSION.project);
+        const timeQuery = {
+            ...scopedTimeMatch(scope, {
+                userIds: asList(filterUserIds).length ? filterUserIds : null,
+                projectIds: scope.companyWide && !asList(filterProjectIds).length ? null : asList(projectIds),
+            }),
             LogStartTime: {
                 $gte: startNumber/1000,
                 $lte: endNumber/1000
             }
-        }]
-        if (projectTimesheetPermission) {
-            timeQuery = [{
-                ProjectId: {
-                    $in: projectIds
-                },
-                LogStartTime: {
-                    $gte: startNumber/1000,
-                    $lte: endNumber/1000
-                }
-            }];
-            if (filterProjectIds.length === 0 && isPrivileged(companyUserDetail.roleType)) {
-                timeQuery = [{
-                    LogStartTime: {
-                        $gte: startNumber/1000,
-                        $lte: endNumber/1000
-                    }
-                }];
-            }
-            if (filterUserIds && filterUserIds.length) {
-                timeQuery = [{
-                    ProjectId: {
-                        $in: projectIds
-                    },
-                    Loggeduser: {
-                        $in: filterUserIds
-                    },
-                    LogStartTime: {
-                        $gte: startNumber/1000,
-                        $lte: endNumber/1000
-                    }
-                }];
-                if (filterProjectIds.length === 0 && isPrivileged(companyUserDetail.roleType)) {
-                    timeQuery = [{
-                        Loggeduser: {
-                            $in: filterUserIds
-                        },
-                        LogStartTime: {
-                            $gte: startNumber/1000,
-                            $lte: endNumber/1000
-                        }
-                    }];
-                }
-            }
-        }
-
+        };
         const query = [
             {
-                $match: {
-                    $and: timeQuery
-                }
+                $match: timeQuery
             },
             {
                 $addFields: {
                     convertedToDate: {
                         $dateToString: {
                             date: {
-                                // GET UNIX DATE FROM THE SECONDS
                                 $dateFromString: {
                                     dateString: {
                                         $toString: {
@@ -84,8 +35,8 @@ exports.getProjectTimeSheet = async(req,res) => {
                                     }
                                 }
                             },
-                            format: "%Y-%m-%dT00:00:00.000Z", // Adjusted format (removed %z for UTC)
-                            timezone: timeZone // Timezone for conversion
+                            format: "%Y-%m-%dT00:00:00.000Z",
+                            timezone: timeZone
                         }
                     }
                 }
@@ -94,7 +45,6 @@ exports.getProjectTimeSheet = async(req,res) => {
                 $group: {
                     _id: {
                         date: "$convertedToDate",
-                        // user: "$Loggeduser",
                         projectId: "$ProjectId",
                         logType: "$logAddType"
                     },
@@ -109,10 +59,10 @@ exports.getProjectTimeSheet = async(req,res) => {
                         }
                     },
                     user: {
-                        $first: "$Loggeduser" // Getting the first user in each group
+                        $first: "$Loggeduser"
                     },
                     totalCount: {
-                        $sum: "$LogTimeDuration" // Calculate sum of all LogTimeDuration for each group
+                        $sum: "$LogTimeDuration"
                     }
                 }
             }

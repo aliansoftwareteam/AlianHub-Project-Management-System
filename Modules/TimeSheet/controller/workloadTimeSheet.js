@@ -1,85 +1,32 @@
-
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
-const { isPrivileged } = require('../../../Config/roleTypes');
-
+const { resolveSheetScope, scopedTimeMatch, asList, filtersOfType, SHEET_PERMISSION } = require("../helpers/timeScope");
 
 exports.getWorkloadTimeSheet = async(req,res) => {
     try {
-        const { selectedFilter, userArray, projectArray, start, end, companyUserDetail,timeZone, isFrom = '' } = req.body;   
-        let timeQuery = [];
-        let filterProject = selectedFilter?.filter((x) => { return x.type == "Projects" });
-        let teamsIds = selectedFilter?.filter((x) => { return x.type == 'Teams' });
-        let filterIds = selectedFilter?.filter((x) => { return x.type == 'Users' });
-        if (filterProject?.length || isFrom === 'workloadview') {
-            timeQuery = [{
-                ...(userArray?.length ?
-                    {
-                        Loggeduser: { 
-                            $in: userArray 
-                        }
-                    }
-                    :
-                    {}
-                ),
-                ProjectId: {
-                    $in: projectArray
-                },
-                LogStartTime: {
-                    $gte: start,
-                    $lte: end
-                }
-            }]
-            if (filterIds?.length === 0 && teamsIds?.length === 0 && isPrivileged(companyUserDetail.roleType)) {
-                timeQuery = [{
-                    ProjectId: {
-                        $in: projectArray
-                    },
-                    LogStartTime: {
-                        $gte: start,
-                        $lte: end
-                    }
-                }]
+        const { selectedFilter, userArray, projectArray, start, end, timeZone, isFrom = '' } = req.body;
+        const scope = await resolveSheetScope(req.headers['companyid'], req.uid, SHEET_PERMISSION.workload);
+        const peopleFiltered = filtersOfType(selectedFilter, 'Users').length || filtersOfType(selectedFilter, 'Teams').length;
+        const byProject = filtersOfType(selectedFilter, 'Projects').length || isFrom === 'workloadview';
+        const timeQuery = {
+            ...scopedTimeMatch(scope, {
+                userIds: (scope.companyWide && !peopleFiltered) || !asList(userArray).length ? null : userArray,
+                projectIds: byProject ? asList(projectArray) : null,
+            }),
+            LogStartTime: {
+                $gte: start,
+                $lte: end
             }
-        }
-        else {
-            timeQuery = [{
-                ...(userArray?.length ?
-                    {
-                        Loggeduser: { 
-                            $in: userArray 
-                        }
-                    }
-                    :
-                    {}
-                ),
-                LogStartTime: {
-                    $gte: start,
-                    $lte: end
-                }
-            }]
-            if (filterIds?.length === 0 && teamsIds?.length === 0 && isPrivileged(companyUserDetail.roleType)) {
-                timeQuery = [{
-                    LogStartTime: {
-                        $gte: start,
-                        $lte: end
-                    }
-                }]
-            }
-        }
-
+        };
         const query = [
             {
-                $match: {
-                    $and: timeQuery
-                }
+                $match: timeQuery
             },
             {
                 $addFields: {
                     convertedToDate: {
                         $dateToString: {
                             date: {
-                                // GET UNIX DATE FROM THE SECONDS
                                 $dateFromString: {
                                     dateString: {
                                         $toString: {
@@ -90,8 +37,8 @@ exports.getWorkloadTimeSheet = async(req,res) => {
                                     }
                                 }
                             },
-                            format: "%Y-%m-%dT00:00:00.000Z", // Adjusted format (removed %z for UTC)
-                            timezone: timeZone // Timezone for conversion
+                            format: "%Y-%m-%dT00:00:00.000Z",
+                            timezone: timeZone
                         }
                     }
                 }
@@ -114,10 +61,10 @@ exports.getWorkloadTimeSheet = async(req,res) => {
                         }
                     },
                     user: {
-                        $first: "$Loggeduser" // Getting the first user in each group
+                        $first: "$Loggeduser"
                     },
                     totalCount: {
-                        $sum: "$LogTimeDuration" // Calculate sum of all LogTimeDuration for each group
+                        $sum: "$LogTimeDuration"
                     }
                 }
             }
