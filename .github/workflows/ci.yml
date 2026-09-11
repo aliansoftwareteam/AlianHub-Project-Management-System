@@ -56,3 +56,62 @@ jobs:
           VUE_APP_IS_GOOGLE_LOGIN: "false"
           VUE_APP_IS_GITHUB_LOGIN: "false"
           VUE_APP_IS_GITLAB_LOGIN: "false"
+
+  e2e:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      E2E_MONGODB_URL: mongodb://127.0.0.1:27017
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          VUE_APP_ENVIRONMENT: ci
+          VUE_APP_APIKEY: placeholder
+          VUE_APP_AUTHDOMAIN: placeholder
+          VUE_APP_PROJECTID: placeholder
+          VUE_APP_STORAGEBUCKET: placeholder
+          VUE_APP_MESSAGINGSENDERID: placeholder
+          VUE_APP_APPID: placeholder
+          VUE_APP_MEASUREMENTID: placeholder
+          VUE_APP_STORAGE_TYPE: server
+          VUE_APP_AFFILIATEON: "false"
+          VUE_APP_IS_GOOGLE_LOGIN: "false"
+          VUE_APP_IS_GITHUB_LOGIN: "false"
+          VUE_APP_IS_GITLAB_LOGIN: "false"
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:integration
+      - run: npm run e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            e2e/report
+            e2e/test-results
+            e2e/.state/*.log
+          retention-days: 7
+          if-no-files-found: ignore

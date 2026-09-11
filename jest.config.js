@@ -7,7 +7,15 @@ const base = {
 module.exports = {
     projects: [
         { ...base, displayName: 'unit', testMatch: ['<rootDir>/tests/*.test.js'] },
-        { ...base, displayName: 'conventions', testMatch: ['<rootDir>/tests/conventions/*.test.js'] }
+        { ...base, displayName: 'conventions', testMatch: ['<rootDir>/tests/conventions/*.test.js'] },
+        {
+            ...base,
+            displayName: 'integration',
+            testMatch: ['<rootDir>/tests/integration/*.int.test.js'],
+            globalSetup: '<rootDir>/tests/integration/globalSetup.js',
+            globalTeardown: '<rootDir>/tests/integration/globalTeardown.js',
+            testTimeout: 60000
+        }
     ],
     maxWorkers: '50%',
     verbose: true
