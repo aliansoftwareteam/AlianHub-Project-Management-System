@@ -40,3 +40,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 032 | Sprint 11 — data skills reach outside (ADR 003 phase 4) | backlog | medium | 029, 031 | backlog/032-sprint-11-data-skills-reach |
 | 033 | Beta build version and log — every merge is a numbered build | active | high | — | active/033-beta-build-version-and-log |
 | 034 | End-to-end QA programme — sweep every function, keep it covered in CI | active | high | — | active/034-end-to-end-qa-programme |
+| 035 | QA follow-ups — fix what the QA fix PRs left out | active | high | 034 | active/035-qa-followups |
