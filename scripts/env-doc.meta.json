@@ -367,6 +367,11 @@
     "description": "Directory that receives the rotated log files.",
     "default": "log"
   },
+  "LOG_FORMAT": {
+    "group": "logging",
+    "description": "Log file record format: text (one formatted line) or json (one { ts, level, label, requestId, traceId, message } record per line).",
+    "default": "text"
+  },
   "LOG_MAX_FILES": {
     "group": "logging",
     "description": "Retention window for rotated log files (winston-daily-rotate-file).",
@@ -472,6 +477,16 @@
     "group": "ai",
     "description": "optional: override the OpenAI axios timeout (default: LLM_TIMEOUT_MS for reasoning/gpt-5, 4 min for others); the agent job lock is derived from the largest provider timeout",
     "default": "600000"
+  },
+  "OTEL_EXPORTER_OTLP_ENDPOINT": {
+    "group": "logging",
+    "description": "OTLP/HTTP collector base URL (traces go to <endpoint>/v1/traces). Unset keeps the OpenTelemetry SDK and exporter off; trace ids are still recorded.",
+    "default": ""
+  },
+  "OTEL_SERVICE_NAME": {
+    "group": "logging",
+    "description": "service.name reported on exported spans.",
+    "default": "alianhub"
   },
   "PAYMENTMETHOD": {
     "group": "billing",

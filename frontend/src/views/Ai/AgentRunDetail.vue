@@ -48,6 +48,8 @@
                 <span v-if="skillIdentity" class="ah-mono ah-small" data-test="skill-identity">{{ skillIdentity }}</span>
             </div>
 
+            <AgentRunTrace :run="run" :can-view-replay="privileged" @view-replay="viewReplay" />
+
             <div class="run-detail__head">
                 <span class="ah-label">{{ $t('Ai.decisions_title') }}</span>
                 <span v-if="run.revertedAt" class="ah-chip ah-chip--dark">{{ $t('Ai.reverted_at', { at: when(run.revertedAt) }) }}</span>
@@ -78,7 +80,7 @@
                 <span v-if="control === 'closed'" class="ah-small" data-test="undo-reason">{{ $t('Ai.undo_window_passed') }}</span>
             </div>
 
-            <AgentRunReplay v-if="privileged" :run-id="runId" :replay-id="run.replayId || ''" />
+            <AgentRunReplay v-if="privileged" ref="replayPanel" :run-id="runId" :replay-id="run.replayId || ''" />
         </template>
     </div>
 </template>
@@ -91,6 +93,7 @@ import { useToast } from "vue-toast-notification";
 import { useAgents, revertControlState, undoDeadlineOf, pinnedRevisionOf } from "./useAgents";
 import { normaliseEpisode, declinedLine as declinedText } from "./episodeText";
 import AgentRunReplay from "./AgentRunReplay.vue";
+import AgentRunTrace from "./AgentRunTrace.vue";
 
 defineOptions({ name: "AgentRunDetail" });
 
@@ -118,6 +121,8 @@ const skillIdentity = computed(() => {
     return s.hash ? t("Ai.run_skill_identity", { key: s.key, hash: s.hash }) : t("Ai.run_skill_identity_nohash", { key: s.key });
 });
 
+const replayPanel = ref(null);
+const viewReplay = (id) => replayPanel.value?.focus(id);
 const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
 const decisions = computed(() => (Array.isArray(run.value?.decisions) ? run.value.decisions : []));
 const deadline = computed(() => undoDeadlineOf(run.value));

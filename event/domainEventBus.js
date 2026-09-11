@@ -3,6 +3,7 @@ const { ulid } = require('ulid');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const logger = require('../Config/loggerConfig');
+const telemetry = require('../Config/telemetry');
 const socketEmitter = require('./socketEventEmitter');
 const { normalizeChangedFields, createSnapshotStore } = require('../utils/entityEvents');
 
@@ -95,6 +96,7 @@ const buildEnvelope = ({ companyId, type, doc, changedFields, previous, actor, d
     companyId: String(companyId),
     type,
     occurredAt: new Date().toISOString(),
+    traceId: telemetry.traceIdNow() || telemetry.newTraceId(),
     actor,
     depth: Number(depth) || 0,
     scope: {

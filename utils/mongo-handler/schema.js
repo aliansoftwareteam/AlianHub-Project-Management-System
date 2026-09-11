@@ -853,6 +853,10 @@ const schema = {
         agentRevision: { type: Number, required: false },
         // { key, hash, n } — the skill identity pinned at start: a data skill's version as n, a code skill's module hash with n null
         skillRevision: { type: Object, required: false },
+        // W3C trace id shared by the run's steps, audit rows, log lines and spans
+        traceId: { type: String, required: false },
+        // [{ node, startedAt, endedAt, durationMs, spanId, traceId, status: ok | error | interrupted, tokens, costUsd }], one per node execution
+        steps: { type: Array, default: [], required: false },
     },
     agentRevisions: {
         agentId: { type: String, required: true },
@@ -979,6 +983,7 @@ const schema = {
         eventType: { type: String, required: false },
         entity: { type: Object, default: {}, required: false },
         envelope: { type: Object, default: {}, required: false },
+        traceId: { type: String, required: false },
         status: { type: String, default: 'queued', required: true },
         cursor: { type: Number, default: 0, required: false },
         attempts: { type: Number, default: 0, required: false },

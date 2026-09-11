@@ -70,7 +70,7 @@ module.exports = {
         const { run, deduplicated } = await runs.start(companyId, {
             agent, taskId: entity.id, projectId: task.ProjectID, skill: runs.skillSlugOf(agent, config.skill), trigger: 'rule',
             startedBy, viaAccount: agent.account, note: context.ruleName ? `rule "${context.ruleName}"` : null, ref: context.runId,
-            triggerDepth: context.depth, triggerEventId: context.eventId,
+            triggerDepth: context.depth, triggerEventId: context.eventId, traceId: context.traceId,
         });
         const base = { runId: String(run._id), agent: agent.name, skill: run.skill, status: run.status };
         if (deduplicated) {

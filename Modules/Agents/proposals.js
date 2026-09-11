@@ -195,7 +195,8 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     const claimed = await setStatus(companyId, id, { status: STATUS.APPLYING, decidedBy: decider.userId, decidedAt: new Date() }, { onlyIf: STATUS.PENDING });
     if (!claimed) return alreadyDecided(companyId, id);
 
-    const agentActor = { kind: 'agent', userId: decider.userId, agentId: p.agentId, agentName: p.agentName, runId: p.runId, viaAccount: 'workspace', tokenId: null };
+    const runTrace = run && run.traceId ? { traceId: run.traceId } : {};
+    const agentActor = { kind: 'agent', userId: decider.userId, agentId: p.agentId, agentName: p.agentName, runId: p.runId, viaAccount: 'workspace', tokenId: null, ...runTrace };
     const auditIds = [];
     const applied = [];
     for (const c of changes) {
@@ -210,7 +211,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     }
     const undoUntil = new Date(Date.now() + UNDO_WINDOW_MS);
     const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds });
-    await audit.recordProposalDecision(companyId, decider, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });
+    await audit.recordProposalDecision(companyId, { ...decider, ...runTrace }, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });
     const row = typeof p.toObject === 'function' ? p.toObject() : p;
     await quietly(`remember approved changes of ${id}`, () => memory.rememberApprovedChanges({ companyId, projectId: p.projectId, proposal: { ...row, changes, decidedBy: decider.userId }, applied }));
     for (const [i, a] of applied.entries()) {
