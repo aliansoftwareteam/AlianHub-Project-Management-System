@@ -17,6 +17,7 @@ One pull request per group; tick with the merge commit and build.
 | Date | Entry |
 |---|---|
 | 2026-09-11 | Filed from `followups.md` after the owner said to proceed. Seven agents started in parallel, one branch per group. Follow-up 27 (flaky access e2e test) is already fixed by #631 (build 107). |
+| 2026-09-11 | All seven groups have green PRs: #632 and #633 and #634 merged; #635, #636, #637, #638, #639 held for a multi-agent adversarial review before merge. Beta's first push run with the `e2e` job (after #634) passed. #640 fixes follow-up 28 (stray characters in invite links). Wave 2 started on the follow-ups that don't touch the held PRs: 29 (server-controlled company fields), 31 and 33 (verification resend request shape, Settings General `isoCode` error), 19 (unawaited automation event dispatch), each with its own PR reviewed by two independent reviewers. Follow-ups 34–40 wait for the held PRs. |
 
 ## Last step
 Seven fix branches in progress.
