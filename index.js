@@ -24,7 +24,7 @@ const { loadDotEnv, applyEnvMap } = require('./Config/applyEnv.js');
 loadDotEnv();
 const { makeDefaultBrandSettings } = require("./Modules/Admin/common/controller.js");
 const { corsOriginDelegate } = require('./utils/cors.js');
-const { getHealth } = require('./Modules/Instance/health.js');
+const { getHealth, versionBody } = require('./Modules/Instance/health.js');
 
 const app = express();
 // Honour X-Forwarded-For from the reverse proxy in front of the process, so rate
@@ -258,6 +258,7 @@ async function applySavedSettings() {
         const { httpStatus, body } = await getHealth();
         res.status(httpStatus).json(body);
     });
+    app.get("/version", (req, res) => res.json(versionBody()));
 
     fs.watch(__dirname + "/Modules/Template/", (event_type, file_name) => {
         try {

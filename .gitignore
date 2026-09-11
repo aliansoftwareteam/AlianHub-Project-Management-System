@@ -140,3 +140,6 @@ package-lock.json
 /backups
 
 .claude/worktrees/
+
+# Build stamp written by npm run version:stamp
+/build-info.json

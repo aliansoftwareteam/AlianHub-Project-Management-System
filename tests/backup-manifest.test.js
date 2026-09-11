@@ -27,7 +27,7 @@ describe('the manifest', () => {
 describe('archive names and entries', () => {
     it('names archives after the app version and time, and only accepts that shape back', () => {
         const name = backupName('alianhub', new Date('2026-09-04T10:11:12Z'));
-        expect(name).toMatch(/^alianhub-\d+\.\d+\.\d+-20260904-101112\.tar\.gz$/);
+        expect(name).toMatch(/^alianhub-\d+\.\d+\.\d+(-[a-z0-9.]+)?-20260904-101112\.tar\.gz$/);
         expect(isValidName(name)).toBe(true);
         for (const bad of ['../etc/passwd', 'x.tar.gz', 'alianhub-1.0.0-20260904-101112.tar', 'alianhub-1.0.0-20260904-101112.tar.gz/../x']) expect(isValidName(bad)).toBe(false);
     });

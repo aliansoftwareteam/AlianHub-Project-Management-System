@@ -1,4 +1,4 @@
-const { version } = require('../../package.json');
+const buildInfo = require('../../Config/buildInfo');
 const { state } = require('../../Config/instanceState');
 
 const DB_TIMEOUT_MS = Number(process.env.HEALTH_DB_TIMEOUT_MS) || 3000;
@@ -24,7 +24,7 @@ async function checkDb() {
 /* Pure: turns the probe results into the answer the process reports. Only a
  * dead database is a failure for a load balancer; everything else is a warning
  * the Instance console shows, because a restart would not fix it. */
-function summarizeHealth({ db, migrationsPending = 0, migrationError = null, maintenance = false, appVersion = version }) {
+function summarizeHealth({ db, migrationsPending = 0, migrationError = null, maintenance = false, appVersion = buildInfo.get().version }) {
     const status = db?.ok ? 'ok' : 'degraded';
     return {
         httpStatus: db?.ok ? 200 : 503,
@@ -40,6 +40,11 @@ function summarizeHealth({ db, migrationsPending = 0, migrationError = null, mai
     };
 }
 
+const versionBody = () => {
+    const { version, release, channel, build, commit } = buildInfo.summary();
+    return { status: true, data: { version, release, channel, build, commit } };
+};
+
 const getHealth = async () => summarizeHealth({
     db: await checkDb(),
     migrationsPending: state.migrationsPending,
@@ -47,4 +52,4 @@ const getHealth = async () => summarizeHealth({
     maintenance: state.maintenance,
 });
 
-module.exports = { checkDb, summarizeHealth, getHealth, withTimeout };
+module.exports = { checkDb, summarizeHealth, getHealth, versionBody, withTimeout };

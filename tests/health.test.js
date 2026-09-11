@@ -1,5 +1,5 @@
 const { summarizeHealth, checkDb, withTimeout } = require('../Modules/Instance/health');
-const { version } = require('../package.json');
+const { version } = require('../Config/buildInfo').get();
 
 describe('/health — what a load balancer and an operator read from it', () => {
     it('is 200 ok when the database answers', () => {

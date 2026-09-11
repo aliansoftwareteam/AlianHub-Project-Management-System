@@ -1,11 +1,11 @@
-const { version } = require('../../package.json');
+const buildInfo = require('../../Config/buildInfo');
 const { TEAM_FOCUS_OPTIONS } = require('../../utils/sampleTasks');
 
 const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
 
 /* Pure: what the wizard learns from the two facts the server can check. */
-function computeSetupStatus({ db, userCount, appVersion = version }) {
+function computeSetupStatus({ db, userCount, appVersion = buildInfo.get().version }) {
     return {
         installed: Boolean(db?.ok) && Number(userCount) > 0,
         dbOk: Boolean(db?.ok),

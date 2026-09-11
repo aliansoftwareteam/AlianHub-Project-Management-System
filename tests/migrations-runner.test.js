@@ -43,7 +43,7 @@ describe('running', () => {
         expect(result).toMatchObject({ skipped: false, applied: ['001-a', '002-b'], failed: null, pending: [] });
         const status = await migrationStatus({ store, migrations });
         expect(status.applied.map((m) => m.id)).toEqual(['001-a', '002-b']);
-        expect(status.applied[0].appVersion).toBe(require('../package.json').version);
+        expect(status.applied[0].appVersion).toBe(require('../Config/buildInfo').get().version);
         expect(store.docs.has(LOCK_ID)).toBe(false);
     });
 

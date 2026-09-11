@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const logger = require("../../Config/loggerConfig");
-const { version: appVersion } = require("../../package.json");
+const buildInfo = require("../../Config/buildInfo");
 
 // Serves the repo-root CHANGELOG.md (maintained by release-please) as
 // structured JSON for the in-app "What's New" page. The parsed result is
@@ -195,7 +195,7 @@ exports.getChangelog = async (req, res) => {
             return res.send({
                 status: true,
                 statusText: "Changelog file not found.",
-                data: { currentVersion: appVersion, repoUrl: "", releases: [] },
+                data: { currentVersion: buildInfo.get().version, repoUrl: "", releases: [] },
             });
         }
 
@@ -205,8 +205,8 @@ exports.getChangelog = async (req, res) => {
             cache = {
                 mtimeMs: stats.mtimeMs,
                 payload: {
-                    currentVersion: appVersion,
-                    latestVersion: releases.length ? releases[0].version : appVersion,
+                    currentVersion: buildInfo.get().version,
+                    latestVersion: releases.length ? releases[0].version : buildInfo.get().release,
                     repoUrl: deriveRepoUrl(releases),
                     releases,
                 },

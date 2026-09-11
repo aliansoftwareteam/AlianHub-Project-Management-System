@@ -6,7 +6,8 @@ const { myCache } = require('../../Config/config');
 const { state } = require('../../Config/instanceState');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
-const { version: appVersion, repository } = require('../../package.json');
+const { repository } = require('../../package.json');
+const buildInfo = require('../../Config/buildInfo');
 const settings = require('../../Config/instanceSettings');
 const { GROUPS, validateSettings } = require('./settingsCatalog');
 const { PROBES, STORAGE_ROOT } = require('./probes');
@@ -17,6 +18,7 @@ const socketEmitter = require('../../event/socketEventEmitter');
 
 const PUBLIC_CONFIG_KEY = 'instance:public-config';
 const LATEST_RELEASE_KEY = 'instance:latest-release';
+const BUILD_LOG_LIMIT = 200;
 const ok = (res, statusText, data) => res.send({ status: true, statusText, data });
 const fail = (res, code, statusText, data) => res.status(code).send({ status: false, statusText, ...(data ? { data } : {}) });
 
@@ -109,7 +111,7 @@ exports.health = async (req, res) => {
     };
     return ok(res, 'Instance health.', {
         status: db.ok ? 'ok' : 'degraded',
-        version: appVersion,
+        version: buildInfo.get().version,
         nodeVersion: process.version,
         uptimeSeconds: Math.round(process.uptime()),
         bootedAt: state.bootedAt,
@@ -168,10 +170,15 @@ exports.upgrade = async (req, res) => {
         latestRelease(),
         migrations.migrationStatus(migrations.liveDeps()).catch((error) => ({ error: error.message, applied: [], pending: [], failed: [] })),
     ]);
-    const releases = changelogNewerThan(appVersion);
-    const updateAvailable = Boolean(latest && latest.version && newerThan(latest.version, appVersion));
+    const build = buildInfo.summary();
+    const { release } = build;
+    const releases = changelogNewerThan(release);
+    const updateAvailable = Boolean(latest && latest.version && newerThan(latest.version, release));
     return ok(res, 'Upgrade status.', {
-        currentVersion: appVersion,
+        currentVersion: build.version,
+        release,
+        build,
+        buildLog: buildInfo.get().entries.slice(0, BUILD_LOG_LIMIT),
         latest,
         updateAvailable,
         releases,
@@ -265,7 +272,8 @@ exports.stats = async (req, res) => {
             MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: [{}] }, 'countDocuments'),
             MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.USERS, data: [{}] }, 'countDocuments'),
         ]);
-        return ok(res, 'Instance stats.', { version: appVersion, nodeVersion: process.version, uptimeSeconds: Math.round(process.uptime()), companies: companies || 0, users: users || 0 });
+        const { version, release, commit, channel, build } = buildInfo.summary();
+        return ok(res, 'Instance stats.', { version, release, commit, channel, build, nodeVersion: process.version, uptimeSeconds: Math.round(process.uptime()), companies: companies || 0, users: users || 0 });
     } catch (error) {
         return fail(res, 500, error.message);
     }

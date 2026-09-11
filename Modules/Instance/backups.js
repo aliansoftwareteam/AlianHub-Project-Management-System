@@ -5,7 +5,7 @@ const { Readable } = require('stream');
 const archiver = require('archiver');
 const tar = require('tar-stream');
 const { EJSON } = require('bson');
-const { version: appVersion } = require('../../package.json');
+const buildInfo = require('../../Config/buildInfo');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { handleConnection } = require('../../middlewares/mongoConnector/mongoConnection');
@@ -24,11 +24,11 @@ const ENTRY_RX = /^(global|[a-f0-9]{24})\/([A-Za-z0-9_.-]+)\.jsonl$/;
 const INSERT_BATCH = 500;
 
 const stamp = (date = new Date()) => { const iso = date.toISOString(); return `${iso.slice(0, 10).replace(/-/g, '')}-${iso.slice(11, 19).replace(/:/g, '')}`; };
-const backupName = (prefix = 'alianhub', date = new Date()) => `${prefix}-${appVersion}-${stamp(date)}.tar.gz`.toLowerCase().replace(/[^a-z0-9.-]/g, '-');
+const backupName = (prefix = 'alianhub', date = new Date()) => `${prefix}-${buildInfo.get().version}-${stamp(date)}.tar.gz`.toLowerCase().replace(/[^a-z0-9.-]/g, '-');
 
 /* Pure: what an archive says about itself, written first so a restore can read
  * it without unpacking the rest. */
-function buildManifest({ includeFiles = false, databases = {}, companies = [], createdAt = new Date(), version = appVersion } = {}) {
+function buildManifest({ includeFiles = false, databases = {}, companies = [], createdAt = new Date(), version = buildInfo.get().version } = {}) {
     return {
         format: FORMAT,
         formatVersion: FORMAT_VERSION,
