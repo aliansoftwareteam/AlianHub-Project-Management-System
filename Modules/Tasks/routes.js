@@ -159,7 +159,7 @@ exports.init = (app) => {
 
     app.post('/api/v1/task/find', getTaskCtrl.getTaskByQyery);
 
-    app.put('/api/v1/task',getTaskCtrl.updateTask);
+    app.put('/api/v1/task', getTaskCtrl.updateTask);
 
     app.get('/task-import/events/:id', (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');

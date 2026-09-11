@@ -116,7 +116,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
@@ -124,13 +123,14 @@ import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
 import { useAgents, reasonOf } from "./useAgents";
 import { DECLINE_REASONS } from "./episodeText";
+import { useAgentAccess } from "./agentAccess";
 
 defineOptions({ name: "AiInboxPage" });
 
 const GATE_OWNER_ADMIN = "owner_admin";
 
 const { t } = useI18n();
-const { getters } = useStore();
+const { canManage, userId, mayUndo } = useAgentAccess();
 const $toast = useToast();
 const { proposals, counts, loadProposals, loadSummary, decide } = useAgents();
 
@@ -153,8 +153,7 @@ const pickReason = (key) => {
 };
 const declineReasonValue = computed(() => declineReason.value || declineNote.value.slice(0, 200));
 
-const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
-const canDecide = computed(() => !selected.value || selected.value.gate !== GATE_OWNER_ADMIN || privileged.value);
+const canDecide = computed(() => !selected.value || selected.value.gate !== GATE_OWNER_ADMIN || canManage.value);
 
 const tabs = computed(() => [
     { key: "pending", label: "Ai.waiting", count: counts.value.waiting || 0 },
@@ -227,7 +226,7 @@ const onApprove = async () => {
         const changed = editable.value.length !== original.length;
         const out = await decide(selected.value._id, "approve", changed ? { changes: editable.value } : {});
         const id = await afterDecision(t("Ai.applied"));
-        if (out?.undoUntil) {
+        if (out?.undoUntil && mayUndo({ decidedBy: out.decidedBy || userId.value })) {
             undo.value = { id, until: new Date(out.undoUntil).getTime() };
             setTimeout(() => { if (undo.value && undo.value.id === id) undo.value = null; }, Math.max(0, new Date(out.undoUntil).getTime() - Date.now()));
         }

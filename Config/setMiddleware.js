@@ -343,7 +343,7 @@ const verifyJWTToken = [
     "/api/v1/getUserProfile",
     "/api/v1/getTaskTypeImage",
     "/api/v2/auth/:id/change-password",
-    "/api/v2/session/delete/:id",
+    "/api/v2/session/delete",
     "/api/v1/wasabi/retriveUserProfile/:companyId/:path",
     "/api/v1/wasabi/uploadFile",
     "/api/v1/createPaymentPlan",

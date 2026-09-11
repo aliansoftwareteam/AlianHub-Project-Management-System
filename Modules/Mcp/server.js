@@ -8,7 +8,7 @@ const tools = require('./tools');
 const logger = require('../../Config/loggerConfig');
 
 const PROTOCOL_VERSION = '2025-06-18';
-const SERVER_INFO = { name: 'alianhub', version: require('../../Config/buildInfo').get().version };
+const buildInfo = require('../../Config/buildInfo');
 
 const rpcError = (id, code, message, data) => ({
     jsonrpc: '2.0', id: id === undefined ? null : id,
@@ -68,7 +68,7 @@ const handleRpc = async (ctx, message) => {
             return rpcResult(id, {
                 protocolVersion: PROTOCOL_VERSION,
                 capabilities: { tools: { listChanged: false } },
-                serverInfo: SERVER_INFO,
+                serverInfo: { name: 'alianhub', version: buildInfo.get().version },
                 instructions: [
                     'Start with tasks.next, then task.get for the brief before writing code.',
                     'Report findings with task.comment and attach the PR with task.link.',

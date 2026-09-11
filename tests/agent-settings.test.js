@@ -37,7 +37,7 @@ afterEach(() => { ENV.forEach((k) => { if (saved[k] === undefined) delete proces
 describe('GET /agents/settings', () => {
     it('answers the defaults when the company has nothing stored', async () => {
         const r = await get();
-        expect(r.body).toEqual({ status: true, data: { undoHours: 24, monthlyBudgetUsd: 0, provider: { name: null, hasKey: false, region: null, model: null, priced: null } } });
+        expect(r.body).toEqual({ status: true, statusText: 'Settings fetched.', data: { undoHours: 24, monthlyBudgetUsd: 0, provider: { name: null, hasKey: false, region: null, model: null, priced: null } } });
     });
 
     it('falls back to the defaults when the stored values are out of range', async () => {
