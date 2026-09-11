@@ -70,6 +70,9 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 42 | `POST /api/v2/createUser` and the Google, GitHub and GitLab sign-up routes return the saved `users` document unfiltered to the registrant; no secret is in it today, but it should go through `toSelfView`. | #644 |
 | 43 | The tracker sign-in code from #638 is not bound to the tracker that asked for it (no PKCE or state): an app that claims the `myapp://` scheme can redeem an intercepted code, and a crafted link can sign a signed-out tracker into another account. | review of #638 |
 | 44 | No test proves the access-token session lookup is bound to the token's `uid`; removing the `userId` filter in `Config/jwt.js` leaves every suite green. | review of #638 |
+| 45 | `getRoleType` in `Config/permissionGuard.js` matches deleted and pending `company_users` rows; #643 checks the active seat itself in `updateCompany`, but other callers still trust the stale role. | #643 |
+| 46 | `PUT /api/v1/admin/company` and `/api/v1/company-invitation` skip the live membership re-check, and `requireCompanyAud` in `Config/jwt.js` checks the body company before the header. | #643 |
+| 47 | An invited owner who accepts through `/verify-invitation` or an OAuth sign-up is never recorded as the company owner. | #643 |
 
 ## Owner decisions recorded
 
