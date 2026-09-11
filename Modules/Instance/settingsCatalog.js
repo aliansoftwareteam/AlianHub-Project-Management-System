@@ -2,6 +2,8 @@
  * module load (storage driver, security middleware, cron zone); everything else
  * takes effect on save. Labels and help are English on purpose: the page
  * translates group and field names through InstanceV2.*, these are the fallback. */
+const { allowlistError } = require('../Webhooks/helpers/privateHostAllowlist');
+
 const GROUPS = ['general', 'mail', 'storage', 'ai', 'auth', 'calling', 'security'];
 
 const field = (key, group, type, extra = {}) => ({ key, group, type, secret: type === 'secret', default: '', ...extra });
@@ -62,6 +64,11 @@ const CATALOG = [
 
     field('TRUST_PROXY', 'security', 'text', { default: 'loopback', label: 'Trusted proxies', help: '"loopback", a hop count such as "1", or "true" behind any proxy.', restart: true }),
     field('GLOBAL_RATE_LIMIT_PER_MIN', 'security', 'number', { default: '1000', label: 'API requests per minute per IP', help: '0 turns the limit off.', restart: true }),
+    field('WEBHOOK_ALLOWED_PRIVATE_HOSTS', 'security', 'list', {
+        label: 'Private webhook hosts',
+        help: 'Webhooks refuse loopback, private and internal hosts. List the exact hostnames or CIDR ranges on your network they may post to, separated by commas or new lines, e.g. hooks.lan, 192.168.10.0/24. Link-local and cloud metadata addresses stay blocked, and a range can be no wider than /8 (IPv4) or /32 (IPv6).',
+        validate: allowlistError,
+    }),
     field('HELMET_ENABLED', 'security', 'boolean', { default: 'true', label: 'Security response headers', restart: true }),
 ];
 

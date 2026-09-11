@@ -5,6 +5,7 @@ const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { createSnapshotStore } = require('../../utils/entityEvents');
 const { safeFetch } = require('../Agents/engine/safeFetch');
+const { webhookAllowlist } = require('./helpers/privateHostAllowlist');
 const { subscribesTo, classifyTaskEvent, shouldDeliverTask, normalizeChangedFields, trimTaskForDelivery, signPayload, formatForTarget } = require('./helpers/webhookRules');
 
 // Webhook dispatcher. Piggybacks on the namespaced socketEmitter events that
@@ -78,9 +79,10 @@ async function deliverToHook(companyId, hook, body, attempt) {
     const bodyString = JSON.stringify(formatForTarget(hook.format, body));
     const startedAt = Date.now();
     try {
-        // A stored url was checked at save time, but DNS can change since: safeFetch
-        // resolves again, refuses private addresses and revalidates every redirect.
+        // A stored url was checked at save time, but DNS and the owner's allowlist can
+        // change since: safeFetch resolves again and revalidates every redirect.
         const response = await safeFetch(hook.url, {
+            allowlist: webhookAllowlist(),
             method: 'post',
             data: bodyString,
             timeoutMs: DELIVERY_TIMEOUT_MS,

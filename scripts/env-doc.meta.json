@@ -776,6 +776,12 @@
     "secret": false,
     "required": false
   },
+  "WEBHOOK_ALLOWED_PRIVATE_HOSTS": {
+    "group": "security",
+    "description": "Private hosts webhooks may post to: exact hostnames or CIDR ranges, comma-separated (empty by default, so every private host is refused). Also editable under Instance > Settings > Security. Link-local and cloud metadata addresses stay blocked, and a range can be no wider than /8 (IPv4) or /32 (IPv6).",
+    "secret": false,
+    "required": false
+  },
   "MIGRATIONS_AUTO": {
     "group": "general",
     "description": "Apply pending migrations at boot (default true; false only reports them).",

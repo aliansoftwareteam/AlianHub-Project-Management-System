@@ -97,6 +97,21 @@ Push notifications (Firebase) are the one exception: the browser service worker 
 ### Security
 `TRUST_PROXY` (`loopback` by default; a hop count or `true` behind a hosted proxy), `GLOBAL_RATE_LIMIT_PER_MIN` (1000 API requests per minute per IP; `0` turns it off), `HELMET_ENABLED` (security response headers, on). All three are read at boot.
 
+`WEBHOOK_ALLOWED_PRIVATE_HOSTS` (Private webhook hosts) is empty by default, so webhooks refuse loopback, private, link-local and `.local`/`.internal` hosts. To post to a receiver on your own network, list its exact hostname (`hooks.lan`) or a CIDR range (`192.168.10.0/24`, `fd12:3456::/32`), separated by commas or new lines. It applies on save: a webhook is checked against it when it is saved and again before every delivery, so removing an entry stops deliveries to that host. Hostnames are still resolved and the connection is pinned to the checked address.
+
+These addresses can never be allowed. An entry that is or overlaps one is refused on save, is ignored if it arrives through the environment, and a listed hostname that resolves to one is still refused:
+
+| Range | Why |
+|-------|-----|
+| `169.254.0.0/16` | IPv4 link-local: the metadata service at `169.254.169.254` (AWS, Azure, GCP, Oracle and others), the ECS and EKS credential agents at `169.254.170.2` and `169.254.170.23`, Tencent Cloud at `169.254.0.23` |
+| `fe80::/10` | IPv6 link-local; a URL cannot carry a zone id, so no receiver is reachable there |
+| `fd00:ec2::/64` | AWS metadata and EKS Pod Identity over IPv6 |
+| `100.100.100.200` | Alibaba Cloud metadata (inside the `100.64.0.0/10` shared range, so list a narrower range such as `100.64.0.0/11`) |
+| `fd20:ce::254` | GCP metadata over IPv6 |
+| `fd00:c1::a9fe:a9fe` | Oracle Cloud metadata over IPv6 |
+
+A range must also be `/8` or narrower for IPv4 and `/32` or narrower for IPv6, and may hold `0.0.0.0/8`, `127.0.0.0/8` or `::` only as exactly that block: `127.0.0.0/8` and `127.0.0.1` are accepted, `::/32` is not. Write IPv4 addresses as dotted quads; hex, octal and shorthand spellings such as `0x7f000001` or `127.1` are rejected. The settings page names which rule an entry broke.
+
 ### Keys that only live in the environment
 `JWT_SECRET`, `MONGODB_URL`, `PORT`, `CRON_ENABLED`, `MIGRATIONS_AUTO`, `BACKUP_DIR`, `INSTANCE_ADMIN_KEY`, `LOG_DIR` and the other `LOG_*` knobs, the body and image size limits. `.env.example` documents each one.
 
@@ -255,6 +270,7 @@ answers `200 {"status":"ok", "db":{"ok":true,...}}` or `503 {"status":"degraded"
 | `INSTANCE_ADMIN_KEY` | unset | enables the `adminkey` header for scripts |
 | `GLOBAL_RATE_LIMIT_PER_MIN` | `1000` | API requests per minute per IP; `0` disables |
 | `TRUST_PROXY` | `loopback` | which proxies' `X-Forwarded-For` to believe |
+| `WEBHOOK_ALLOWED_PRIVATE_HOSTS` | empty | hostnames or CIDR ranges on your network that webhooks may post to |
 | `HEALTH_DB_TIMEOUT_MS` | `3000` | how long `/health` waits for the database |
 
 ### Files and directories

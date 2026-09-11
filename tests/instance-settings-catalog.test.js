@@ -6,7 +6,7 @@ describe('the settings catalog', () => {
         expect(new Set(keys).size).toBe(keys.length);
         for (const f of CATALOG) {
             expect(GROUPS).toContain(f.group);
-            expect(['text', 'secret', 'number', 'boolean', 'select']).toContain(f.type);
+            expect(['text', 'secret', 'number', 'boolean', 'select', 'list']).toContain(f.type);
             expect(f.secret).toBe(f.type === 'secret');
             if (f.type === 'select') expect(f.options.length).toBeGreaterThan(1);
         }

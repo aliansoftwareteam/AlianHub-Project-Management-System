@@ -24,7 +24,7 @@
                             <span v-if="row.locked" class="ah-chip ah-chip--mono" :title="$t('Instance.locked_help')">{{ $t('Instance.locked') }}</span>
                             <span v-if="row.restart" class="ah-chip ah-chip--warn">{{ $t('Instance.restart') }}</span>
                         </label>
-                        <div class="in-field__help">{{ row.help }} <code class="ah-mono">{{ row.key }}</code></div>
+                        <div class="in-field__help">{{ help(row) }} <code class="ah-mono">{{ row.key }}</code></div>
                     </div>
                     <div class="in-field__control">
                         <select v-if="row.type === 'select'" :id="`f-${row.key}`" v-model="draft[row.key]" class="ah-input" :disabled="row.locked">
@@ -38,6 +38,7 @@
                             <input :id="`f-${row.key}`" v-model="draft[row.key]" type="password" autocomplete="new-password" class="ah-input" :disabled="row.locked" :placeholder="row.value.set ? $t('Instance.secret_set') : $t('Instance.secret_unset')" />
                             <label v-if="row.value.set && !row.locked" class="ah-small in-clear"><input v-model="clear[row.key]" type="checkbox" class="ah-check" /> {{ $t('Instance.clear_secret') }}</label>
                         </template>
+                        <textarea v-else-if="row.type === 'list'" :id="`f-${row.key}`" v-model="draft[row.key]" rows="4" class="ah-input in-list" :class="{ 'ah-input--error': errors[row.key] }" :disabled="row.locked" :placeholder="$t('Instance.allowlist_placeholder')" :data-test="`instance-setting-${row.key}`"></textarea>
                         <input v-else :id="`f-${row.key}`" v-model="draft[row.key]" :type="row.type === 'number' ? 'number' : 'text'" class="ah-input" :class="{ 'ah-input--error': errors[row.key] }" :disabled="row.locked" :placeholder="row.default || ''" />
                         <span v-if="errors[row.key]" class="ah-field__error">{{ $t(`Instance.err_${errors[row.key]}`) }}</span>
                         <span v-else-if="row.source === 'default' && !row.secret" class="ah-small">{{ $t('Instance.using_default') }}</span>
@@ -84,6 +85,7 @@ const visible = computed(() => rows.value.filter((r) => r.group === group.value)
 const testable = computed(() => TESTABLE.includes(group.value));
 const dirty = computed(() => Object.keys(draft).some((k) => draft[k] !== baseline[k]) || Object.values(clear).some(Boolean));
 const label = (row) => (te(`Instance.f_${row.key}`) ? t(`Instance.f_${row.key}`) : row.label);
+const help = (row) => (te(`Instance.h_${row.key}`) ? t(`Instance.h_${row.key}`) : row.help);
 
 function seed(list) {
     rows.value = list;
@@ -156,4 +158,5 @@ onMounted(load);
 <style scoped>
 .in-toggle { display: inline-flex; align-items: center; gap: 8px; font: var(--text-small); color: var(--ink); cursor: pointer; }
 .in-clear { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.in-list { height: auto; min-height: 88px; resize: vertical; font-family: var(--font-mono, monospace); }
 </style>
