@@ -54,5 +54,5 @@
   "storage/server/helpers/bucket.helper.js": 1,
   "storage/wasabi/controller.js": 10,
   "taskIndex/controller.js": 10,
-  "trackerUserPermission/controller.js": 2
+  "trackerUserPermission/controller.js": 1
 }

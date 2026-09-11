@@ -363,7 +363,7 @@ exports.handleFileRequest = async(req, res) => {
         if(!token) {
             const bucketValid = await checkBucketInDB(bucketId);
             if(bucketValid && Object.keys(bucketValid).length && bucketValid.rule.isPrivate == false) {
-                const filePath = path.join(__dirname, '../../../storage', bucketId, filepath);
+                const filePath = exports.resolveBucketFile(bucketId, filepath);
                 if (fs.existsSync(filePath)) {
                     res.sendFile(filePath, (err) => {
                         if (err) {
@@ -386,7 +386,7 @@ exports.handleFileRequest = async(req, res) => {
                 res.status(404).send({status: false,statusText:'Resorce Not Found on bucket'});
                 return;
             }
-            const filePath = path.join(__dirname, '../../../storage', bucketId, filepath);
+            const filePath = exports.resolveBucketFile(bucketId, filepath);
     
             if (fs.existsSync(filePath)) {
                 if(req.query.download) {
@@ -460,7 +460,7 @@ exports.removeFileFromStorage = (req,res) => {
                 }
             });
             Promise.allSettled(promises).then(()=>{
-                const filePath = path.join(__dirname, '../../../storage', bucketId, filepath);
+                const filePath = exports.resolveBucketFile(bucketId, filepath);
                 // fs.chmodSync(filePath, 0o666);
                 if (fs.existsSync(filePath)) {
                     fs.unlinkSync(filePath);
@@ -482,7 +482,7 @@ exports.removeFileFromStorage = (req,res) => {
             }) 
         }
     } else {
-        const filePath = path.join(__dirname, '../../../storage', bucketId, filepath);
+        const filePath = exports.resolveBucketFile(bucketId, filepath);
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
             res.status(200).send({
@@ -561,3 +561,12 @@ exports.uploadBase64FileOnServerStorage = (req,res) => {
         })
     }
 }
+const STORAGE_ROOT = path.resolve(__dirname, '../../../storage');
+
+/* req.params[0] arrives URL-decoded, so "..%2f" is a real "../" by the time it is joined. */
+exports.resolveBucketFile = (bucketId, filepath) => {
+    const bucketRoot = path.resolve(STORAGE_ROOT, String(bucketId || ''));
+    if (path.dirname(bucketRoot) !== STORAGE_ROOT) return '';
+    const target = path.resolve(bucketRoot, String(filepath || ''));
+    return target.startsWith(bucketRoot + path.sep) ? target : '';
+};

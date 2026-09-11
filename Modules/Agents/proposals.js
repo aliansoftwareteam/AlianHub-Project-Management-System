@@ -19,6 +19,7 @@ const logger = require('../../Config/loggerConfig');
 // 'applying' is the claim a decider holds while the changes run, so a second
 // approve or decline racing the first finds the proposal already taken. A claim
 // nobody released is reaped to 'failed' (reapStuck) rather than re-applied.
+const REAPED_PREFIX = 'applying for more than ';
 const STATUS = Object.freeze({ PENDING: 'pending', APPLYING: 'applying', APPROVED: 'approved', EDITED: 'edited', DECLINED: 'declined', UNDONE: 'undone', FAILED: 'failed' });
 const STUCK_DEFAULT_MINUTES = 10;
 const REAPER = Object.freeze({ kind: 'human', userId: 'system', personName: 'System' });
@@ -281,7 +282,7 @@ const failWaitingRun = async (companyId, p, reason) => {
  * run that was waiting on it is closed instead of counting as live forever. */
 const reapStuck = async (companyId, { olderThanMs = stuckThresholdMs(), now = new Date() } = {}) => {
     const cutoff = new Date(now.getTime() - olderThanMs);
-    const failedReason = `applying for more than ${Math.round(olderThanMs / 60000)} minutes — the decider never finished, so the changes were not re-applied`;
+    const failedReason = `${REAPED_PREFIX}${Math.round(olderThanMs / 60000)} minutes — the decider never finished, so the changes were not re-applied`;
     const stuck = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ status: STATUS.APPLYING, decidedAt: { $lt: cutoff } }] }, 'find');
     let reaped = 0;
     for (const p of stuck || []) {
@@ -298,4 +299,4 @@ const reapStuck = async (companyId, { olderThanMs = stuckThresholdMs(), now = ne
     return { reaped };
 };
 
-module.exports = { STATUS, REASON, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, undoApproval, bucketOf, reapStuck, stuckThresholdMs };
+module.exports = { STATUS, REASON, REAPED_PREFIX, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, undoApproval, bucketOf, reapStuck, stuckThresholdMs };

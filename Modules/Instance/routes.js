@@ -1,5 +1,6 @@
 const ctrl = require('./controller');
 const { requireInstanceAdmin } = require('./guard');
+const agentMetrics = require('../Agents/metricsController');
 
 exports.init = (app) => {
     app.get('/api/v2/instance/public-config', ctrl.publicConfig);
@@ -11,6 +12,7 @@ exports.init = (app) => {
     app.put(`${admin}/settings`, ctrl.putSettings);
     app.post(`${admin}/settings/test`, ctrl.testSettings);
     app.get(`${admin}/health`, ctrl.health);
+    app.get(`${admin}/metrics`, agentMetrics.instanceMetrics);
     app.post(`${admin}/maintenance`, ctrl.setMaintenance);
     app.get(`${admin}/upgrade`, ctrl.upgrade);
     app.post(`${admin}/migrations/run`, ctrl.runMigrations);
