@@ -6,8 +6,9 @@ The shared AI core: what every AI feature needs and no feature owns (ADR 003, ph
 |-------|------|------|
 | Provider factory | `llmProvider/` | `getProvider()` / `isAnyProviderConfigured()` plus the OpenAI, Anthropic and DeepSeek adapters behind one `chat()` interface |
 | Usage and pricing | `usage.js` | token accounting, cost estimation, the unpriced-model gate |
+| Pre-call estimate | `estimate.js` | `estimateCall()` — what a call will cost before it is made (chars/4 with a safety factor, plus the max output), for spend gates |
 | Instruction guard | `instructionGuard.js` | detects prompt-injection phrasing in user-supplied text before it reaches a prompt or memory |
-| Model call | `modelCall.js` | `askModel()` — the single "call the model and parse JSON" helper — and `parseModelJson()` |
+| Model call | `modelCall.js` | `askModel()` — the single "call the model and parse JSON" helper, with an optional `budget.guard` that reserves the estimate before the call and reconciles after — and `parseModelJson()` |
 | Persistence | `persistence.js` | per-company LangGraph checkpointer and store (Mongo, or in-memory under tests) |
 
 ## The rule

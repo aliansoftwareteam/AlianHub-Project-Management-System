@@ -18,6 +18,7 @@ One pull request per step; tick with the merge commit.
 | Date | Entry |
 |---|---|
 | 2026-09-10 | Filed from `docs/AI-PLATFORM-ARCHITECTURE.md` (sprint 1) |
+| 2026-09-11 | Step 6 on `fix/s1-precall-spend-cap`: `Modules/AICore/estimate.js` prices a call before it is made; `Modules/Agents/spendGuard.js` reserves it on the run (`reservedUsd`, atomic `$inc`), refuses over the run cap or the company month as `spend_cap_exceeded` with an audit row, reconciles to the real cost after. Reproduced on beta first: the fake provider was called for a run capped under its estimate. Closes defect 15 and 006's "spend cap evaluated after the model call". |
 
 ## Last step
 Not started.

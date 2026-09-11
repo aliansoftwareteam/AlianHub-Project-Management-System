@@ -79,12 +79,20 @@ const provider = () => {
     };
 };
 
-const spentThisMonth = async (companyId, month) => {
+/* Booked spend, plus what open runs hold for calls in flight. A reservation left
+ * on a finished run is a leftover, never spend, so only open runs count. */
+const ledgerThisMonth = async (companyId, month) => {
     const from = new Date(`${month}-01T00:00:00.000Z`);
     const to = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1));
-    const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ startedAt: { $gte: from } }, 'startedAt spend'] }, 'find').catch(() => []);
-    return money((rows || []).filter((r) => new Date(r.startedAt).getTime() < to.getTime()).reduce((s, r) => s + Number((r.spend && r.spend.usd) || 0), 0));
+    const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ startedAt: { $gte: from } }, 'startedAt status spend reservedUsd'] }, 'find').catch(() => []);
+    const inMonth = (rows || []).filter((r) => new Date(r.startedAt).getTime() < to.getTime());
+    return {
+        usedUsd: money(inMonth.reduce((s, r) => s + Number((r.spend && r.spend.usd) || 0), 0)),
+        reservedUsd: money(inMonth.filter((r) => runs.OPEN.includes(r.status)).reduce((s, r) => s + Number(r.reservedUsd || 0), 0)),
+    };
 };
+
+const spentThisMonth = async (companyId, month) => (await ledgerThisMonth(companyId, month)).usedUsd;
 
 const alertsOf = (company, month) => {
     const a = (company && company.agentBudgetAlerts) || {};
@@ -102,6 +110,13 @@ const status = async (companyId) => {
         percent: monthlyBudgetUsd > 0 ? Math.round((usedUsd / monthlyBudgetUsd) * 100) : 0,
         alerts: alertsOf(company, month),
     };
+};
+
+/* What the month can still absorb, for the pre-call gate. `budgetUsd` 0 means no budget. */
+const headroom = async (companyId) => {
+    const { monthlyBudgetUsd } = await settings(companyId);
+    const ledger = await ledgerThisMonth(companyId, runs.monthKey());
+    return { budgetUsd: monthlyBudgetUsd, ...ledger, remainingUsd: money(monthlyBudgetUsd - ledger.usedUsd - ledger.reservedUsd) };
 };
 
 const check = async (companyId) => {
@@ -154,4 +169,4 @@ const alertIfCrossed = async (companyId, run) => {
     return { level, at };
 };
 
-module.exports = { DEFAULTS, UNDO_HOURS_MIN, UNDO_HOURS_MAX, settings, validate, updateSettings, provider, status, check, alertIfCrossed };
+module.exports = { DEFAULTS, UNDO_HOURS_MIN, UNDO_HOURS_MAX, settings, validate, updateSettings, provider, status, headroom, check, alertIfCrossed };
