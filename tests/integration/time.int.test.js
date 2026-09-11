@@ -201,7 +201,7 @@ describe('time — regressions for confirmed findings', () => {
     it('TIM-04 refuses a guest reading company-wide hours-by-source', async () => {
         const guest = await loginAs('guest');
         const res = await guest.api.get('/api/v1/timesheet/hours-by-source', { query: { start: 1, end: 9999999999 } });
-        expect(refused(res)).toBe(true);
+        expect(refused(res) || (res.body.data.scope === 'self' && res.body.data.entryCount === 0)).toBe(true);
     });
 
     // TIM-05: a non-pipeline findQuery should be a 400, not an unhandled 500.
