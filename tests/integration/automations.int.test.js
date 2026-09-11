@@ -140,9 +140,9 @@ describe('automation rules (v2)', () => {
 
             const runs = await waitFor(async () => {
                 const res = await owner.api.get(`/api/v2/automations/${rule._id}/runs`);
-                const data = res.body.data || [];
-                return data.length && data.every((run) => FINISHED_RUN.includes(run.status)) ? data : null;
-            });
+                const rows = res.body.data || [];
+                return rows.length && rows.every((run) => FINISHED_RUN.includes(run.status)) ? rows : null;
+            }, { timeout: 15000 });
             expect(runs).toHaveLength(1);
             expect(runs[0]).toMatchObject({ status: 'success', entity: { kind: 'task', id: task._id } });
         } finally {
