@@ -4,7 +4,7 @@ import router from './router'
 import { initTheme } from '@/components/organisms/Shell/shellState'
 initTheme()
 import store from './store'
-import '@/config/firebaseInit';
+import { firebaseConfigured } from '@/config/firebaseInit';
 import ToastPlugin from 'vue-toast-notification';
 import 'vue-toast-notification/dist/theme-sugar.css';
 import '@formkit/themes/genesis'
@@ -91,7 +91,8 @@ element = document.createElement('div');
 element.id="my-image-slider"
 document.getElementById("app")?.appendChild(element)
 
-if ('serviceWorker' in navigator) {
+// firebase-messaging-sw.js only exists once frontend/config.sh has copied it into public/.
+if (firebaseConfigured && 'serviceWorker' in navigator) {
   navigator.serviceWorker.register('/firebase-messaging-sw.js')
     .then(() => {
       console.info('Service worker registered:');
