@@ -1,6 +1,19 @@
 const { HandleBothNotification } = require('../Tasks/helpers/handleNotification');
 const { HandleHistory } = require('../Tasks/helpers/helper');
 
+const NOTIFICATION_TYPES = ['project', 'tasks', 'task', 'chat'];
+const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+function notificationBodyError(body) {
+    if (!NOTIFICATION_TYPES.includes(body.type)) return `type must be one of ${NOTIFICATION_TYPES.join(', ')}`;
+    if (!isPlainObject(body.object) || !body.object.key) return 'object with a key is required';
+    if (!isPlainObject(body.userData)) return 'userData is required';
+    if (body.type === 'project' && !body.projectId) return 'projectId is required';
+    if (['tasks', 'task'].includes(body.type) && !body.taskId) return 'taskId is required';
+    if (body.type === 'chat' && !(body.isGroupChat === true ? body.sprintId : body.taskId)) return 'taskId or sprintId is required';
+    return '';
+}
+
 exports.init = (app) => {
     /**
      * @swagger
@@ -202,12 +215,21 @@ exports.init = (app) => {
      * Send Notification Mail API
      */
     app.post('/api/v1/handleNotification', (req, res) => {
-        HandleBothNotification(req.body)
-        .then(() => {
-            res.send({status: false, statusText: "notification sent successfully."});
-        })
-        .catch((error) => {
-            res.send({status: false, statusText: error.message})
-        })
+        const body = isPlainObject(req.body) ? req.body : {};
+        const sessionCompanyId = String(req.headers.companyid || '');
+        if (body.companyId && String(body.companyId) !== sessionCompanyId) {
+            return res.status(403).send({ status: false, statusText: 'companyId does not match your session' });
+        }
+        const invalid = notificationBodyError(body);
+        if (invalid) {
+            return res.status(400).send({ status: false, statusText: invalid });
+        }
+        return HandleBothNotification({ ...body, companyId: sessionCompanyId })
+            .then(() => {
+                res.send({ status: true, statusText: 'Notification sent successfully.' });
+            })
+            .catch((error) => {
+                res.send({ status: false, statusText: (error && error.message) || 'Notification was not sent.' });
+            });
     })
 };
