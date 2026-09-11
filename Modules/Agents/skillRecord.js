@@ -9,6 +9,7 @@ const registry = require('./registry');
 const codeSkills = require('./skills');
 const readers = require('./skills/readers');
 const { validateSkill, riskOf } = require('./skills/validateSkill');
+const { effectiveActions } = require('./skills/effectiveActions');
 const { INPUT_CATALOGUE, PROMPT_PARTIALS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, catalogues, plain } = require('./skills/catalogues');
 const { render, renderString, placeholdersIn } = require('../Automations/engine/template');
 const { readField } = require('../Automations/engine/expression');
@@ -44,13 +45,6 @@ const usesMemory = (doc) => [doc.prompt.template, doc.prompt.instructions].some(
 
 const scopeOf = (action) => { const rating = require('./actions').rating(action); return rating ? rating.scope : 'task'; };
 
-/* Effective actions narrow, never widen: the skill's emits, cut to the agent's
- * allowed actions when it has any, cut to the registry. */
-const effectiveActions = (emits, agent) => {
-    const allowed = agent && Array.isArray(agent.allowedActions) && agent.allowedActions.length ? new Set(agent.allowedActions.map(String)) : null;
-    return emits.filter((key) => registry.has(key) && !registry.isNever(key) && (!allowed || allowed.has(key)));
-};
-
 const fillIds = (action, params, task) => {
     const out = { ...params };
     const scope = scopeOf(action);
@@ -70,12 +64,10 @@ const changeOf = (mapping, ctx, task) => {
     return { change: { action: mapping.action, label: label.slice(0, 200), reversible: Boolean(entry.undoable), params } };
 };
 
-const changesOf = (doc, { task, answer, gathered, agent }) => {
-    const allowed = new Set(effectiveActions(doc.emits, agent));
+const changesOf = (doc, { task, answer, gathered }) => {
     const changes = [];
     const dropped = [];
     doc.emit.forEach((mapping) => {
-        if (!allowed.has(mapping.action)) { dropped.push({ reason: `${mapping.action} is outside this agent's allowed actions`, text: mapping.label || mapping.action }); return; }
         const base = { ...gathered, answer };
         if (!mapping.each) {
             const out = changeOf(mapping, contextOf(task, base), task);
@@ -131,10 +123,10 @@ const compile = (doc) => ({
         return renderString(doc.prompt.template, contextOf(task, { input: context.input || {}, gather: context.gather || {}, memory: context.memory || '' }));
     },
 
-    toChanges({ task, raw, context, agent }) {
+    toChanges({ task, raw, context }) {
         const answer = raw && typeof raw === 'object' ? raw : {};
         const gathered = { input: context.input || {}, gather: context.gather || {}, memory: context.memory || '' };
-        const { changes, dropped } = changesOf(doc, { task, answer, gathered, agent });
+        const { changes, dropped } = changesOf(doc, { task, answer, gathered });
         const summary = String(answer.summary || answer.digest || answer.nextStep || `Proposed ${changes.length} change(s).`).slice(0, MAX_SUMMARY);
         return { summary, changes, dropped };
     },
@@ -220,6 +212,52 @@ const updateSkill = async (companyId, key, patch = {}) => {
     return plainOf(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_SKILLS, data: [{ _id: existing._id }, { $set: checked.value }, { returnDocument: 'after' }] }, 'findOneAndUpdate'));
 };
 
+const skillKeyOf = (entry) => (typeof entry === 'string' ? entry : String((entry && (entry.key || entry.slug || entry.name)) || ''));
+
+/* A key that resolves to nothing is unknown unless a disabled or retired data
+ * skill still holds it, which asks a different fix of the person saving. */
+const checkAgentSkills = async (companyId, skills = []) => {
+    const errors = [];
+    for (const [i, entry] of skills.entries()) {
+        const key = skillKeyOf(entry);
+        const field = `skills[${i}].key`;
+        // eslint-disable-next-line no-await-in-loop
+        if (key && await getSkill(companyId, key)) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const stored = key ? await findData(companyId, key) : null;
+        errors.push(stored
+            ? { field, code: 'skill_disabled', message: `skill "${key}" is ${stored.retiredAt ? 'retired' : 'disabled'}` }
+            : { field, code: 'unknown_skill', message: `unknown skill "${key}"` });
+    }
+    return errors;
+};
+
+const manifestSkill = async (agent, entry, resolve) => {
+    const key = skillKeyOf(entry);
+    const skill = key ? await resolve(key) : null;
+    const own = entry && typeof entry === 'object' ? entry : {};
+    const base = { key, name: String(own.name || (skill && skill.name) || key), enabled: own.enabled !== false };
+    if (!skill) return { ...base, resolved: false, source: null, version: null, emits: [], effectiveActions: [] };
+    const source = skill.source || SOURCE.CODE;
+    return { ...base, resolved: true, source, version: source === SOURCE.DATA ? skill.version : null, emits: [...(skill.emits || [])], effectiveActions: effectiveActions(agent, skill) };
+};
+
+const agentManifest = async (companyId) => {
+    const agents = (await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENTS,
+        data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { createdAt: 1 } }],
+    }, 'find')) || [];
+    const resolved = new Map();
+    const resolve = (key) => { if (!resolved.has(key)) resolved.set(key, getSkill(companyId, key)); return resolved.get(key); };
+    return Promise.all(agents.map(plainOf).map(async (agent) => ({
+        id: String(agent._id),
+        name: agent.name,
+        paused: Boolean(agent.paused),
+        allowedActions: [...(agent.allowedActions || [])],
+        skills: await Promise.all((Array.isArray(agent.skills) ? agent.skills : []).map((entry) => manifestSkill(agent, entry, resolve))),
+    })));
+};
+
 /* Retired, never deleted: agents and saved rules still hold the key. */
 const retireSkill = async (companyId, key) => {
     const existing = await findData(companyId, key);
@@ -227,4 +265,4 @@ const retireSkill = async (companyId, key) => {
     return plainOf(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_SKILLS, data: [{ _id: existing._id }, { $set: { enabled: false, retiredAt: new Date() } }, { returnDocument: 'after' }] }, 'findOneAndUpdate'));
 };
 
-module.exports = { SOURCE, compile, taskView, contextOf, effectiveActions, getSkill, listSkills, findData, createSkill, updateSkill, retireSkill, validateSkill, catalogues };
+module.exports = { SOURCE, compile, taskView, contextOf, getSkill, listSkills, findData, createSkill, updateSkill, retireSkill, checkAgentSkills, agentManifest, validateSkill, catalogues };

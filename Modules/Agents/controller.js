@@ -19,6 +19,7 @@ const revert = require('./revert');
 const undo = require('./undo');
 const budget = require('./budget');
 const revisions = require('./revisions');
+const skillRecord = require('./skillRecord');
 
 const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId) || '';
 // 'mention' is a run started by @naming the agent in a comment (13b); it is
@@ -75,6 +76,11 @@ const normaliseSkill = (skill) => {
     };
 };
 
+const refuseSkills = async (res, companyId, set) => {
+    const errors = set.skills ? await skillRecord.checkAgentSkills(companyId, set.skills) : [];
+    return errors.length ? fail(res, 'The agent names skills that cannot run.', 400, { data: { errors } }) : null;
+};
+
 const agentPatchFields = (body) => {
     const set = {};
     if (body.name !== undefined) set.name = String(body.name).trim().slice(0, 80);
@@ -115,6 +121,7 @@ exports.createAgent = async (req, res) => {
         if (!human) return fail(res, 'Agents cannot create agents.', 403);
         const set = agentPatchFields(req.body || {});
         if (!set.name) return fail(res, 'name is required.');
+        if (await refuseSkills(res, companyId, set)) return undefined;
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENTS,
             data: { autonomy: 1, spendCapUsd: 30, paused: false, account: 'workspace', deletedStatusKey: 0, ...set, ownerId: actor.userId },
@@ -133,6 +140,7 @@ exports.updateAgent = async (req, res) => {
         if (!human) return fail(res, 'Agents cannot edit agents.', 403);
         const set = agentPatchFields(req.body || {});
         if (!Object.keys(set).length) return fail(res, 'Nothing to update.');
+        if (await refuseSkills(res, companyId, set)) return undefined;
         const before = await runs.getAgent(companyId, req.params.id);
         if (!before) return fail(res, 'Agent not found.', 404);
         const updated = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ _id: oid(req.params.id) }, { $set: set }, { returnDocument: 'after' }] }, 'findOneAndUpdate');
