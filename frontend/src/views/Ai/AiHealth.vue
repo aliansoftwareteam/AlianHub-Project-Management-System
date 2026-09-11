@@ -5,6 +5,16 @@
             <div class="ah-toolbar">
                 <div class="ah-toolbar__title">{{ $t('AiHealth.title') }}</div>
                 <div class="ah-toolbar__spacer"></div>
+                <button
+                    v-if="canSee"
+                    type="button"
+                    class="ah-btn ah-btn--sm ai-health__thresholds-btn"
+                    :class="showThresholds ? 'ah-btn--secondary' : 'ah-btn--ghost'"
+                    :aria-expanded="showThresholds ? 'true' : 'false'"
+                    aria-controls="alert-thresholds"
+                    data-test="thresholds-toggle"
+                    @click="showThresholds = !showThresholds"
+                >{{ $t('AiHealth.thresholds_button') }}</button>
                 <div v-if="canSee" class="ah-tabs" role="tablist" :aria-label="$t('AiHealth.window_label')">
                     <button
                         v-for="w in HEALTH_WINDOWS"
@@ -22,6 +32,9 @@
 
             <div class="ai-page__body ah-scroll">
                 <p class="ai-lead">{{ $t('AiHealth.lead') }}</p>
+
+                <AiAlertThresholds v-if="canSee && showThresholds" @close="showThresholds = false" @saved="refreshAlerts" />
+                <AiOpenAlerts v-if="canSee" ref="openAlerts" />
 
                 <div v-if="!canSee" data-test="owner-only">
                     <EmptyState :title="$t('AiHealth.owner_only_title')" :message="$t('AiHealth.owner_only_body')" />
@@ -139,6 +152,8 @@ import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import AiSidebar from "./AiSidebar.vue";
+import AiAlertThresholds from "./AiAlertThresholds.vue";
+import AiOpenAlerts from "./AiOpenAlerts.vue";
 import { reasonOf } from "./useAgents";
 import {
     AGENT_COLUMNS, DEFAULT_HEALTH_WINDOW, HEALTH_WINDOWS,
@@ -156,6 +171,10 @@ const loading = ref(false);
 const loadError = ref("");
 const forbidden = ref(false);
 const sort = ref({ key: "runs", dir: "desc" });
+const showThresholds = ref(false);
+const openAlerts = ref(null);
+
+const refreshAlerts = () => openAlerts.value?.load();
 
 const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
 const canSee = computed(() => privileged.value && !forbidden.value);
@@ -206,6 +225,7 @@ onMounted(load);
 
 <style scoped>
 .ai-health__card { padding: 14px 16px; margin-bottom: 14px; }
+.ai-health__thresholds-btn { margin-right: 8px; }
 .ai-health__scroll { overflow-x: auto; }
 .ai-health__table { width: 100%; border-collapse: collapse; margin-top: 10px; font: var(--text-small); }
 .ai-health__table th { text-align: left; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 6px 10px; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
