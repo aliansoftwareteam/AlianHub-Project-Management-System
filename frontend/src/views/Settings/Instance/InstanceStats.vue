@@ -6,7 +6,7 @@
             <div class="in-grid">
                 <section class="ah-card in-card"><span class="ah-label">{{ $t('Instance.companies') }}</span><strong class="in-big">{{ stats.companies }}</strong></section>
                 <section class="ah-card in-card"><span class="ah-label">{{ $t('Instance.users') }}</span><strong class="in-big">{{ stats.users }}</strong></section>
-                <section class="ah-card in-card"><span class="ah-label">{{ $t('Instance.version_short') }}</span><strong class="in-big ah-mono">v{{ stats.version }}</strong><span class="ah-small">{{ stats.nodeVersion }}</span></section>
+                <section class="ah-card in-card"><span class="ah-label">{{ $t('Instance.version_short') }}</span><strong class="in-big ah-mono" data-test="version-label">{{ stats.version ? `v${stats.version}` : '—' }}</strong><span v-if="buildLine" class="ah-small ah-mono" data-test="version-line">{{ buildLine }}</span></section>
             </div>
             <section class="ah-card in-card">
                 <div class="in-card__head"><span class="in-card__title">{{ $t('Instance.companies') }}</span></div>
@@ -26,16 +26,26 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useInstanceApi, formatWhen } from "./useInstanceApi";
 
 defineOptions({ name: "InstanceStats" });
 
+const CHANNEL_KEYS = { beta: "Instance.channel_beta", release: "Instance.channel_release", dev: "Instance.channel_dev" };
+
+const { t } = useI18n();
 const { get, download, message, env } = useInstanceApi();
 const stats = ref(null);
 const companies = ref([]);
 const error = ref("");
+
+const buildLine = computed(() => {
+    const s = stats.value || {};
+    const channel = CHANNEL_KEYS[s.channel] ? t(CHANNEL_KEYS[s.channel]) : "";
+    return [s.commit ? String(s.commit).slice(0, 8) : "", channel, s.nodeVersion || ""].filter(Boolean).join(" · ");
+});
 
 onMounted(async () => {
     try {

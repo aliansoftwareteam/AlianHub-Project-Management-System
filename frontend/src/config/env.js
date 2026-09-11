@@ -359,6 +359,8 @@ module.exports.INSTANCE_LOG_FILES = '/api/v2/instance/logs/files';
 module.exports.INSTANCE_LOG_DOWNLOAD = '/api/v2/instance/logs/download';
 module.exports.INSTANCE_BACKUPS = '/api/v2/instance/backups';
 module.exports.INSTANCE_STATS = '/api/v2/instance/stats';
+module.exports.APP_VERSION = '/version';
+module.exports.REPO_URL = 'https://github.com/aliansoftwareteam/AlianHub-Project-Management-System';
 module.exports.INSTANCE_COMPANIES = '/api/v2/instance/companies';
 module.exports.INSTANCE_AUDIT_EXPORT = '/api/v2/instance/audit-export';
 
