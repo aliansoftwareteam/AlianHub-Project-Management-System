@@ -1,3 +1,4 @@
+const { requireInstanceAdmin } = require('../Instance/guard');
 const ctrl = require('./controller');
 const { handleEvents } = require('./eventController');
 const transcribe = require('./transcribe');
@@ -12,7 +13,7 @@ exports.init = (app) => {
     app.post('/api/v1/findOnePrompts', ctrl.findOnePrompts);
     app.post('/api/v1/getAiCategory', ctrl.getAiCategory);
     app.post('/api/v1/getAiModels', ctrl.getAiModels);
-    app.post('/api/v1/updateAiModel', ctrl.updateAiModel);
+    app.post('/api/v1/updateAiModel', requireInstanceAdmin, ctrl.updateAiModel);
     app.post('/api/v1/findOneAiModel', ctrl.findOneAiModel);
     // "Write with AI" for the task/project description editor. Provider-
     // agnostic (Anthropic / OpenAI / DeepSeek via the AIProjectGenerator

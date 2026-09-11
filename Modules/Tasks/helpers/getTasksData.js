@@ -68,6 +68,8 @@ exports.getTask = async(req,res) => {
     }
 }
 
+const UPDATE_TASK_METHODS = ["updateOne", "updateMany"];
+
 exports.updateTask = async (req, res) => {
     try {
         const companyId = req.headers["companyid"];
@@ -84,6 +86,10 @@ exports.updateTask = async (req, res) => {
         const missingField = Object.keys(requiredFields).find(key => !requiredFields[key]);
         if (missingField) {
             return res.status(400).json({ message: `${missingField} is required.` });
+        }
+
+        if (!UPDATE_TASK_METHODS.includes(key)) {
+            return res.status(400).json({ message: `key must be one of: ${UPDATE_TASK_METHODS.join(", ")}.` });
         }
 
         const allowedKeys = ["firstParameter","secondParameter","key","isConvertFirstParameter","isConvertSecondParameter","refreshToken"];

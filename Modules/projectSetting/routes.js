@@ -1,3 +1,4 @@
+const { requireInstanceAdmin } = require('../Instance/guard');
 const ctrl = require('./controller');
 const autoArchive = require('./autoArchive');
 const estimationScale = require('./estimationScale');
@@ -103,7 +104,7 @@ exports.init = (app) => {
     // so this write is behind the same JWT + company audience check as every
     // other task-status change rather than needing a new entry in that list.
     app.post('/api/v1/projectSetting/taskStatus/wipLimit', wipLimit.setWipLimit);
-    app.post('/api/v1/projectSetting/migrateSprintsFun', ctrl.migrateSprintsFun);
+    app.post('/api/v1/projectSetting/migrateSprintsFun', requireInstanceAdmin, ctrl.migrateSprintsFun);
 
     // Per-project auto-archive rule (completed tasks archive after N days —
     // applied by the nightly cron in cron.js).
