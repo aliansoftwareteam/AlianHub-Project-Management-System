@@ -23,6 +23,7 @@ const {
     blocksToRawText,
 } = require('./helpers/pageContent');
 const { composePage, isAiConfigured } = require('./helpers/pageAi');
+const { projectAccess, isCompanyAdmin, isCompanyMember, visibleProjectIds } = require('../../Config/contentAccess');
 
 const emitPageChange = (type, data) => {
     try {
@@ -85,6 +86,32 @@ const readPageMeta = ({ visibility, isWiki, ownerId, reviewDate, agentStatus }) 
  */
 const callerId = (req) => String((req && req.uid) || '');
 
+const inVisibleProjects = (visibleIds) => ({
+    $or: [
+        { ProjectID: { $in: visibleIds.map((id) => new mongoose.Types.ObjectId(id)) } },
+        { ProjectID: { $in: [null, undefined] } },
+    ],
+});
+
+/* A doc is readable when the private-doc rule allows it and its project is visible;
+ * changing it also needs edit rights on that project. A doc with no project is the
+ * company's. */
+const canUsePage = async (companyId, page, uid, { edit = false } = {}) => {
+    if (!page || !pageVisibleTo(page, uid)) return false;
+    if (!page.ProjectID) return isCompanyMember(companyId, uid);
+    const access = await projectAccess(companyId, uid, page.ProjectID);
+    return edit ? access.canEdit : access.visible;
+};
+
+/* A non-deleted (or trashed) page the caller may act on, or null. */
+const findPage = async (companyId, id, uid, { deletedStatusKey = 0, edit = false } = {}) => {
+    const page = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PAGES,
+        data: [{ _id: new mongoose.Types.ObjectId(id), deletedStatusKey }],
+    }, 'findOne');
+    return (await canUsePage(companyId, page, uid, { edit })) ? page : null;
+};
+
 /* POST /api/v2/pages  body: { title, projectId?, parentPageId?, visibility?, linkedTasks?,
  *   contentBlocks?, isWiki?, ownerId?, reviewDate?, createdByAgent?, agentName? } */
 exports.createPage = async (req, res) => {
@@ -114,6 +141,12 @@ exports.createPage = async (req, res) => {
             return res.send({ status: false, statusText: meta.reason });
         }
         const userId = callerId(req);
+        if (projectId && !(await projectAccess(companyId, userId, projectId)).canEdit) {
+            return fail(res, 'Project not found.', 404);
+        }
+        if (parentPageId && !(await findPage(companyId, parentPageId, userId))) {
+            return fail(res, 'Page not found.', 404);
+        }
         const blocks = contentBlocks !== undefined ? contentToEditorData({ blocks: contentBlocks }) : emptyEditorData();
         if (contentBlocks !== undefined && contentTooLarge({ blocks })) {
             return res.send({ status: false, statusText: 'Page content is too large.' });
@@ -190,9 +223,10 @@ exports.listPages = async (req, res) => {
             filter.ProjectID = { $in: [null, undefined] };
         }
 
-        // A private doc belongs to its author alone, so it never appears in anyone else's
-        // list — including a task's linked docs, where it would otherwise leak by title.
-        Object.assign(filter, pageVisibilityFilter(callerId(req)));
+        // A private doc belongs to its author alone, and a project's docs to those who can
+        // see the project — including a task's linked docs, where they would leak by title.
+        const userId = callerId(req);
+        filter.$and = [pageVisibilityFilter(userId), inVisibleProjects(await visibleProjectIds(companyId, userId))];
 
         const pages = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
@@ -213,16 +247,10 @@ exports.getPage = async (req, res) => {
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
         }
-        const page = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.PAGES,
-            data: [{ _id: new mongoose.Types.ObjectId(id), deletedStatusKey: 0 }],
-        }, 'findOne');
-        if (!page) {
-            return res.send({ status: false, statusText: 'Page not found.' });
-        }
         // Same answer for "not yours" as for "does not exist": otherwise the difference
         // tells a caller that a private doc with this id is there.
-        if (!pageVisibleTo(page, callerId(req))) {
+        const page = await findPage(companyId, id, callerId(req));
+        if (!page) {
             return res.send({ status: false, statusText: 'Page not found.' });
         }
         const data = typeof page.toObject === 'function' ? page.toObject() : page;
@@ -271,16 +299,9 @@ exports.updatePage = async (req, res) => {
         }
 
         const pageObjId = new mongoose.Types.ObjectId(id);
-        const existing = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.PAGES,
-            data: [{ _id: pageObjId, deletedStatusKey: 0 }],
-        }, 'findOne');
-        if (!existing) {
-            return res.send({ status: false, statusText: 'Page not found.' });
-        }
-
         const userId = callerId(req);
-        if (!pageVisibleTo(existing, userId)) {
+        const existing = await findPage(companyId, id, userId, { edit: true });
+        if (!existing) {
             return res.send({ status: false, statusText: 'Page not found.' });
         }
 
@@ -317,16 +338,6 @@ exports.updatePage = async (req, res) => {
     }
 };
 
-/* A visible, non-deleted page the caller may act on, or null. */
-const findVisiblePage = async (companyId, id, uid, deletedStatusKey = 0) => {
-    const page = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.PAGES,
-        data: [{ _id: new mongoose.Types.ObjectId(id), deletedStatusKey }],
-    }, 'findOne');
-    if (!page) return null;
-    return pageVisibleTo(page, uid) ? page : null;
-};
-
 const patchPage = async (companyId, id, update) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.PAGES,
     data: [{ _id: new mongoose.Types.ObjectId(id) }, { $set: update }, { returnDocument: 'after' }],
@@ -342,7 +353,7 @@ exports.markReviewed = async (req, res) => {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
         }
         const userId = callerId(req);
-        const existing = await findVisiblePage(companyId, id, userId);
+        const existing = await findPage(companyId, id, userId, { edit: true });
         if (!existing) {
             return res.send({ status: false, statusText: 'Page not found.' });
         }
@@ -379,7 +390,7 @@ exports.approvePage = async (req, res) => {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
         }
         const userId = callerId(req);
-        const existing = await findVisiblePage(companyId, id, userId);
+        const existing = await findPage(companyId, id, userId, { edit: true });
         if (!existing) {
             return res.send({ status: false, statusText: 'Page not found.' });
         }
@@ -405,7 +416,7 @@ exports.restorePage = async (req, res) => {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
         }
         const userId = callerId(req);
-        const existing = await findVisiblePage(companyId, id, userId, 1);
+        const existing = await findPage(companyId, id, userId, { deletedStatusKey: 1, edit: true });
         if (!existing) {
             return res.send({ status: false, statusText: 'Page not found in trash.' });
         }
@@ -418,7 +429,9 @@ exports.restorePage = async (req, res) => {
     }
 };
 
-/* DELETE /api/v2/pages/:id — soft delete, together with everything nested under it. */
+/* DELETE /api/v2/pages/:id — soft delete, together with everything nested under it
+ * that the caller can see. A private doc goes only by its author or an owner/admin;
+ * any other doc needs edit rights on its project. */
 exports.deletePage = async (req, res) => {
     try {
         const companyId = tenantOf(req);
@@ -426,28 +439,51 @@ exports.deletePage = async (req, res) => {
         if (!companyId || !isObjectIdString(id)) {
             return res.send({ status: false, statusText: 'companyId and a valid page id are required.' });
         }
-
-        // The whole subtree, not just this page. Deleting a parent on its own would leave
-        // its children pointing at a page that no longer exists — they would either vanish
-        // from the tree or reappear at the root, and there would be no way to reach or
-        // remove them. Walked breadth-first over the live pages; the set is small.
-        const all = await MongoDbCrudOpration(companyId, {
+        const userId = callerId(req);
+        const page = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
-            data: [{ deletedStatusKey: 0 }, '_id parentPageId'],
-        }, 'find').catch(() => []);
+            data: [{ _id: new mongoose.Types.ObjectId(id), deletedStatusKey: 0 }],
+        }, 'findOne');
+        if (!page) {
+            return fail(res, 'Page not found.', 404);
+        }
+        if (String(page.visibility || '') === 'private') {
+            if (String(page.createdBy || '') !== userId && !(await isCompanyAdmin(companyId, userId))) {
+                return fail(res, 'Page not found.', 404);
+            }
+        } else if (page.ProjectID) {
+            const access = await projectAccess(companyId, userId, page.ProjectID);
+            if (!access.canEdit) {
+                return access.visible
+                    ? fail(res, 'You do not have permission to delete this page.', 403)
+                    : fail(res, 'Page not found.', 404);
+            }
+        } else if (!(await isCompanyMember(companyId, userId))) {
+            return fail(res, 'Page not found.', 404);
+        }
 
+        // The subtree goes too, or its children would point at a page that no longer
+        // exists. A child the caller cannot see stays, and so does everything under it.
+        const [all, visibleIds] = await Promise.all([
+            MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.PAGES,
+                data: [{ deletedStatusKey: 0, parentPageId: { $exists: true } }, '_id parentPageId visibility createdBy ProjectID'],
+            }, 'find').catch(() => []),
+            visibleProjectIds(companyId, userId),
+        ]);
+        const visibleProjects = new Set(visibleIds);
         const childrenOf = new Map();
         (all || []).forEach((p) => {
             const parent = p.parentPageId ? String(p.parentPageId) : '';
             if (!parent) return;
+            if (!pageVisibleTo(p, userId) || (p.ProjectID && !visibleProjects.has(String(p.ProjectID)))) return;
             if (!childrenOf.has(parent)) childrenOf.set(parent, []);
             childrenOf.get(parent).push(String(p._id));
         });
 
         const doomed = [];
         const queue = [String(id)];
-        // `seen` guards against a cycle in the data — a page that is somehow its own
-        // ancestor would otherwise loop here forever.
+        // Guards against a page that is somehow its own ancestor.
         const seen = new Set();
         while (queue.length) {
             const next = queue.shift();
@@ -493,7 +529,7 @@ exports.composeWithAi = async (req, res) => {
                 data: [{ _id: new mongoose.Types.ObjectId(pageId), deletedStatusKey: 0 }],
             }, 'findOne');
             if (page) {
-                if (!pageVisibleTo(page, callerId(req))) {
+                if (!(await canUsePage(companyId, page, callerId(req)))) {
                     return res.send({ status: false, statusText: 'Page not found.' });
                 }
                 if (!pageTitle) pageTitle = page.title || '';

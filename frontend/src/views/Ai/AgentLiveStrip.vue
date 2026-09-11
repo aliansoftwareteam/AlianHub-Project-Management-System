@@ -11,7 +11,7 @@
             <span>{{ item.what }}</span>
         </span>
 
-        <button v-if="running" type="button" class="live__pause" :disabled="pausing" @click="onPauseAll">
+        <button v-if="running && canManage" type="button" class="live__pause" data-test="pause-all" :disabled="pausing" @click="onPauseAll">
             {{ $t('Pipeline.pause_all') }}
         </button>
     </div>
@@ -53,6 +53,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { shellState } from "@/components/organisms/Shell/shellState";
 import { useAgentFinishToast } from "./useAgentFinishToast";
 import { reasonOf } from "./useAgents";
+import { useAgentAccess } from "./agentAccess";
 
 // 28b surface 4 — one 40px line mixing people and agents. It is the only place
 // both are read from the same request, so the strip and the rail footer can
@@ -66,6 +67,7 @@ const { t } = useI18n();
 const $toast = useToast();
 const companyId = inject("$companyId", localStorage.getItem("selectedCompany") || "");
 const { toast, observe, dismiss, reset } = useAgentFinishToast();
+const { canManage } = useAgentAccess();
 
 const people = ref([]);
 const agents = ref([]);

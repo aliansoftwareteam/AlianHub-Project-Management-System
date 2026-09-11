@@ -40,13 +40,15 @@ exports.importFromJira = async (req, res) => {
     }
 };
 
-/* GET /api/v2/imports?uid= — caller's import history. */
 exports.listImports = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
-        const userId = String(req.query?.uid || '');
+        const userId = req.uid ? String(req.uid) : '';
         if (!companyId || !userId) {
-            return res.send({ status: false, statusText: 'companyId and uid are required.' });
+            return res.send({ status: false, statusText: 'companyId and a session are required.' });
+        }
+        if (req.query && req.query.uid && String(req.query.uid) !== userId) {
+            return res.status(403).send({ status: false, statusText: 'You can only list your own imports.' });
         }
         const jobs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.IMPORT_JOBS,

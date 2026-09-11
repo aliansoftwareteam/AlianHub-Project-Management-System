@@ -1,5 +1,7 @@
 // Export-job rules. Pure — no I/O — shared by controller, worker and tests.
 
+const { neutraliseFormula } = require('../../../utils/csvSafe');
+
 const FORMATS = Object.freeze(['csv', 'xlsx']);
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 
@@ -35,27 +37,27 @@ const buildFileName = ({ projectName, format, stamp }) => {
     return `${safe}-tasks-${stamp}.${format}`;
 };
 
-/* Flatten a task document into an export row (stable column order). */
-const taskToRow = (task) => ({
-    TaskKey: task.TaskKey || '',
-    TaskName: task.TaskName || '',
-    Status: (task.status && task.status.text) || '',
-    StatusType: task.statusType || '',
-    Priority: task.Task_Priority || '',
-    Assignees: Array.isArray(task.AssigneeUserId) ? task.AssigneeUserId.join('; ') : '',
-    DueDate: task.DueDate ? new Date(task.DueDate).toISOString().slice(0, 10) : '',
-    EstimatedMinutes: task.totalEstimatedTime || '',
-    CreatedAt: task.createdAt ? new Date(task.createdAt).toISOString() : '',
-    UpdatedAt: task.updatedAt ? new Date(task.updatedAt).toISOString() : '',
-});
+const taskToRow = (task) => {
+    const row = {
+        TaskKey: task.TaskKey || '',
+        TaskName: task.TaskName || '',
+        Status: (task.status && task.status.text) || '',
+        StatusType: task.statusType || '',
+        Priority: task.Task_Priority || '',
+        Assignees: Array.isArray(task.AssigneeUserId) ? task.AssigneeUserId.join('; ') : '',
+        DueDate: task.DueDate ? new Date(task.DueDate).toISOString().slice(0, 10) : '',
+        EstimatedMinutes: task.totalEstimatedTime || '',
+        CreatedAt: task.createdAt ? new Date(task.createdAt).toISOString() : '',
+        UpdatedAt: task.updatedAt ? new Date(task.updatedAt).toISOString() : '',
+    };
+    return Object.fromEntries(Object.entries(row).map(([key, value]) => [key, neutraliseFormula(value)]));
+};
 
-/* RFC-4180-ish CSV escaping. */
 const csvEscape = (value) => {
-    const text = String(value === null || value === undefined ? '' : value);
+    const text = String(value === null || value === undefined ? '' : neutraliseFormula(value));
     return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
-/* Rows (uniform objects) -> CSV string with header. */
 const rowsToCsv = (rows) => {
     if (!rows.length) return '';
     const headers = Object.keys(rows[0]);
