@@ -886,6 +886,42 @@ const schema = {
         userId: { type: String, required: false },
         at: { type: Date, required: true },
     },
+    // One per model call (Modules/AICore/replay.js); system, messages and response are redacted and capped
+    aiReplays: {
+        feature: { type: String, required: true },
+        runId: { type: String, required: false },
+        agentId: { type: String, required: false },
+        agentRevision: { type: Number, required: false },
+        // { key, hash, n }
+        skillRevision: { type: Object, required: false },
+        model: { type: String, required: false },
+        provider: { type: String, required: false },
+        params: {
+            temperature: { type: Number, required: false },
+            maxTokens: { type: Number, required: false },
+            jsonMode: { type: Boolean, required: false },
+        },
+        // sha256 of the unredacted { system, messages }
+        promptHash: { type: String, required: true },
+        system: { type: String, required: false },
+        // [{ role, content }]
+        messages: { type: Array, default: [], required: false },
+        retrievedChunkIds: { type: [String], default: [], required: false },
+        response: { type: String, required: false },
+        truncated: { type: Boolean, default: false, required: false },
+        usage: {
+            inputTokens: { type: Number, default: 0, required: false },
+            outputTokens: { type: Number, default: 0, required: false },
+        },
+        costUsd: { type: Number, required: false },
+        durationMs: { type: Number, default: 0, required: false },
+        // ok | error
+        status: { type: String, required: true },
+        errorCode: { type: String, required: false },
+        traceId: { type: String, required: false },
+        createdAt: { type: Date, required: true },
+        expiresAt: { type: Date, required: true },
+    },
     // A per-company skill in the closed vocabulary of Modules/Agents/skills/catalogues.js (ADR 003).
     agentSkills: {
         key: { type: String, required: true },

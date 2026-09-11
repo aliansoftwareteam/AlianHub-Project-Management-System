@@ -93,6 +93,7 @@ const SCHEMA_TYPE = {
     AGENT_RUNS: "agent_runs",
     AGENT_REVISIONS: "agent_revisions",
     AI_USAGE: "ai_usage",
+    AI_REPLAYS: "ai_replays",
     AGENT_PROPOSALS: "agent_proposals",
     AGENT_SKILLS: "agent_skills",
     CALLS: "calls",

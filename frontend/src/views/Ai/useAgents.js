@@ -198,6 +198,11 @@ export function useAgents() {
 
     const revertRun = async (runId) => (await request("post", `${env.AGENT_RUNS}/${runId}/revert`, {}, "Ai.revert_failed")).data;
 
+    const loadRunReplay = async (runId) => {
+        const records = (await request("get", `${env.AGENT_RUNS}/${runId}/replay`, undefined, "Ai.replay_load_failed")).data;
+        return Array.isArray(records) ? records : [];
+    };
+
     const loadRevisions = async (agentId) => (await request("get", `${env.AGENTS}/${agentId}/revisions`, undefined, "Ai.revisions_load_failed")).data || [];
 
     const promoteRevision = async (agentId, n) => (await request("post", `${env.AGENTS}/${agentId}/revisions/${n}/promote`, {}, "Ai.revision_promote_failed")).data;
@@ -209,6 +214,6 @@ export function useAgents() {
         running, waiting, AUTONOMY,
         loadAll, loadAgents, loadProposals, loadSummary, loadSpend, loadRegistry,
         decide, setPaused, pauseAll, runNow, saveAgent, deleteAgent, activeRuns, loadActiveRuns, stopActive,
-        loadRun, revertRun, loadRevisions, promoteRevision, rollbackRevision
+        loadRun, revertRun, loadRunReplay, loadRevisions, promoteRevision, rollbackRevision
     };
 }

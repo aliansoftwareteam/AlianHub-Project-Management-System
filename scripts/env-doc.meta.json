@@ -13,6 +13,16 @@
     "description": "recommended: gpt-4o or gpt-4.1 for best instruction-following on complex plans",
     "default": "gpt-4.1"
   },
+  "AI_REPLAY": {
+    "group": "ai",
+    "description": "Which model calls keep a replay record (prompt, raw response, model, revisions; redacted): off, agent (agent runs only) or all.",
+    "default": "agent"
+  },
+  "AI_REPLAY_RETENTION_DAYS": {
+    "group": "ai",
+    "description": "Days a replay record is kept before the TTL index deletes it.",
+    "default": "30"
+  },
   "ANTHROPIC_API_KEY": {
     "group": "ai",
     "description": "Anthropic API key, used when LLM_PROVIDER is anthropic.",
