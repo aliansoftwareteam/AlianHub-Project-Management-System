@@ -145,19 +145,19 @@ describe('projects and planning — regressions (fail until the bug is fixed)', 
         }
     });
 
-    it.failing('PRJ-02: a member cannot read a private project by id when not a member of it', async () => {
+    it('PRJ-02: a member cannot read a private project by id when not a member of it', async () => {
         const member = await loginAs('member');
         const res = await member.api.get(`/api/v1/project/${restrictedId()}`);
         expect(refused(res)).toBe(true);
     });
 
-    it.failing('PRJ-03: a guest cannot create an epic in a private project they are not in', async () => {
+    it('PRJ-03: a guest cannot create an epic in a private project they are not in', async () => {
         const guest = await loginAs('guest');
         const res = await guest.api.post('/api/v2/epics', { name: 'Guest epic', projectId: restrictedId(), userData: { id: guest.uid } });
         expect(refused(res)).toBe(true);
     });
 
-    it.failing('PRJ-04: allTask/:id cannot mutate tasks in a different project via findObject', async () => {
+    it('PRJ-04: allTask/:id cannot mutate tasks in a different project via findObject', async () => {
         const owner = await loginAs('owner');
         const projectA = await createProject(owner.api, { name: `A ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid });
         const projectB = await createProject(owner.api, { name: `B ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid, isPrivate: true });
@@ -169,7 +169,7 @@ describe('projects and planning — regressions (fail until the bug is fixed)', 
         expect(row.tasks[0].TaskName).toBe('Original B name');
     });
 
-    it.failing('PRJ-05: deleting a saved filter rejects a company id outside the token', async () => {
+    it('PRJ-05: deleting a saved filter rejects a company id outside the token', async () => {
         const owner = await loginAs('owner');
         const created = await owner.api.post('/api/v1/project/filter/create', {
             companyId: owner.companyId, userId: owner.uid, name: `Filter ${uniqueSuffix()}`, filter: 'projectFilter', typeFilter: 'projects',

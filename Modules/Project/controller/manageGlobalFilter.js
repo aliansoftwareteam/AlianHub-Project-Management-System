@@ -140,6 +140,10 @@ exports.updateFilter = async (req, res) => {
 exports.deleteFilter = async (req, res) => {
     try {
         const { id, cid } = req.params;
+        const companyId = String(req.headers['companyid'] || '');
+        if (String(cid) !== companyId) {
+            return res.status(403).json({ status: false, statusText: 'You do not have access to this company' });
+        }
         const params = {
             type: SCHEMA_TYPE.GLOBALFILTER,
             data: [
@@ -149,7 +153,7 @@ exports.deleteFilter = async (req, res) => {
             ]
         }
 
-        const response = await MongoDbCrudOpration(cid, params, "deleteOne")
+        const response = await MongoDbCrudOpration(companyId, params, "deleteOne")
 
         if (response) {
             return res.status(200).json({
