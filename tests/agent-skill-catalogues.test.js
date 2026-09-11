@@ -10,7 +10,8 @@ const EVIDENCE_LAYER = ['qa-review', 'pr.summary'];
 
 describe('the skill vocabulary is closed', () => {
     it('every catalogue is frozen', () => {
-        [C.INPUT_CATALOGUE, C.READER_CATALOGUE, C.PROMPT_PARTIALS, C.EMIT_ACTIONS, C.EMIT_REQUIRED, C.TASK_FIELDS].forEach((c) => expect(Object.isFrozen(c)).toBe(true));
+        [C.INPUT_CATALOGUE, C.READER_CATALOGUE, C.PROMPT_PARTIALS, C.EMIT_ACTIONS, C.EMIT_REQUIRED, C.TASK_FIELDS, C.FILTERS].forEach((c) => expect(Object.isFrozen(c)).toBe(true));
+        Object.values(C.FILTERS).forEach((f) => { expect(Object.isFrozen(f)).toBe(true); expect(Object.isFrozen(f.args)).toBe(true); });
         expect(() => { C.EMIT_ACTIONS.push('task.delete'); }).toThrow();
     });
 
@@ -60,6 +61,8 @@ describe('the skill vocabulary is closed', () => {
         expect(m.readers.map((r) => r.key)).toEqual(Object.keys(C.READER_CATALOGUE));
         expect(m.partials.map((p) => p.key)).toEqual(Object.keys(C.PROMPT_PARTIALS));
         expect(m.actions.map((a) => a.key)).toEqual([...C.EMIT_ACTIONS]);
+        expect(m.filters.map((f) => f.key)).toEqual(Object.keys(C.FILTERS));
+        m.filters.forEach((f) => expect(f.apply).toBeUndefined());
         expect(m.version).toBe(C.SKILL_VERSION);
     });
 

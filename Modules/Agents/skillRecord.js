@@ -10,8 +10,8 @@ const codeSkills = require('./skills');
 const readers = require('./skills/readers');
 const { validateSkill, riskOf } = require('./skills/validateSkill');
 const { effectiveActions } = require('./skills/effectiveActions');
-const { INPUT_CATALOGUE, PROMPT_PARTIALS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, catalogues, plain } = require('./skills/catalogues');
-const { render, renderString, placeholdersIn } = require('../Automations/engine/template');
+const { INPUT_CATALOGUE, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, catalogues, plain } = require('./skills/catalogues');
+const { render, renderString, tagsIn } = require('./skills/skillTemplate');
 const { readField } = require('../Automations/engine/expression');
 
 const SOURCE = Object.freeze({ DATA: 'data', CODE: 'code' });
@@ -40,7 +40,7 @@ const systemPromptOf = (doc) => [
     `Return ONLY JSON:\n${doc.prompt.output}`,
 ].filter(Boolean).join('\n\n');
 
-const usesMemory = (doc) => [doc.prompt.template, doc.prompt.instructions].some((text) => [...placeholdersIn(text)].some((p) => p.replace(/^task\./, '') === TEMPLATE_ROOTS.memory))
+const usesMemory = (doc) => [doc.prompt.template, doc.prompt.instructions].some((text) => tagsIn(text).some((tag) => tag.path.replace(/^task\./, '') === TEMPLATE_ROOTS.memory))
     || doc.gather.some((step) => step.reader === 'memory');
 
 const scopeOf = (action) => { const rating = require('./actions').rating(action); return rating ? rating.scope : 'task'; };
@@ -64,23 +64,32 @@ const changeOf = (mapping, ctx, task) => {
     return { change: { action: mapping.action, label: label.slice(0, 200), reversible: Boolean(entry.undoable), params } };
 };
 
+const zeroCounts = () => {
+    const counts = {};
+    EMIT_ACTIONS.forEach((key) => { const parts = key.split('.'); const last = parts.pop(); parts.reduce((node, k) => { node[k] = node[k] || {}; return node[k]; }, counts)[last] = 0; });
+    return counts;
+};
+
+const countOf = (counts, action) => { const parts = action.split('.'); const last = parts.pop(); parts.reduce((node, k) => node[k], counts)[last] += 1; };
+
 const changesOf = (doc, { task, answer, gathered }) => {
     const changes = [];
     const dropped = [];
+    const emitted = zeroCounts();
+    const keep = (out) => {
+        if (!out.change) { dropped.push(out.dropped); return; }
+        changes.push(out.change);
+        countOf(emitted, out.change.action);
+    };
     doc.emit.forEach((mapping) => {
-        const base = { ...gathered, answer };
-        if (!mapping.each) {
-            const out = changeOf(mapping, contextOf(task, base), task);
-            if (out.change) changes.push(out.change); else dropped.push(out.dropped);
-            return;
-        }
+        const base = { ...gathered, answer, emitted };
+        if (!mapping.each) { keep(changeOf(mapping, contextOf(task, base), task)); return; }
         const items = readField(mapping.each, contextOf(task, base));
         (Array.isArray(items) ? items : []).slice(0, mapping.max).forEach((item) => {
-            const out = changeOf(mapping, contextOf(task, { ...base, item: item && typeof item === 'object' ? item : { value: item } }), task);
-            if (out.change) changes.push(out.change); else dropped.push(out.dropped);
+            keep(changeOf(mapping, contextOf(task, { ...base, item: item && typeof item === 'object' ? item : { value: item } }), task));
         });
     });
-    return { changes, dropped };
+    return { changes, dropped, emitted };
 };
 
 /* A stored document as the orchestrator's generic-skill contract:
@@ -126,8 +135,10 @@ const compile = (doc) => ({
     toChanges({ task, raw, context }) {
         const answer = raw && typeof raw === 'object' ? raw : {};
         const gathered = { input: context.input || {}, gather: context.gather || {}, memory: context.memory || '' };
-        const { changes, dropped } = changesOf(doc, { task, answer, gathered });
-        const summary = String(answer.summary || answer.digest || answer.nextStep || `Proposed ${changes.length} change(s).`).slice(0, MAX_SUMMARY);
+        const { changes, dropped, emitted } = changesOf(doc, { task, answer, gathered });
+        const summary = (doc.summary
+            ? renderString(doc.summary, contextOf(task, { ...gathered, answer, emitted }))
+            : String(answer.summary || answer.digest || answer.nextStep || `Proposed ${changes.length} change(s).`)).slice(0, MAX_SUMMARY);
         return { summary, changes, dropped };
     },
 });
@@ -201,7 +212,7 @@ const createSkill = async (companyId, input, { createdBy } = {}) => {
     return plainOf(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_SKILLS, data: { ...checked.value, createdBy: createdBy || null } }, 'save'));
 };
 
-const EDITABLE = Object.freeze(['name', 'description', 'enabled', 'inputs', 'gather', 'prompt', 'emit', 'risk']);
+const EDITABLE = Object.freeze(['name', 'description', 'enabled', 'inputs', 'gather', 'prompt', 'emit', 'summary', 'risk']);
 
 const updateSkill = async (companyId, key, patch = {}) => {
     const existing = await findData(companyId, key);
