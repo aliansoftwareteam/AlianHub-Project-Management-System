@@ -7,6 +7,7 @@ const { ROLE_OWNER, ROLE_ADMIN } = require('../../Config/permissionGuard');
 const logger = require('../../Config/loggerConfig');
 const runs = require('./runs');
 const spend = require('../AICore/spend');
+const alertRules = require('./alertRules');
 
 // Company-level agent settings (undo window, monthly budget) and this month's
 // AI spend, read from the ledger every model call books into (AICore/spend),
@@ -23,7 +24,7 @@ const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } ca
 const money = (n) => Math.round(Number(n || 0) * 10000) / 10000;
 
 const readCompany = (companyId) => MongoDbCrudOpration(dbCollections.GLOBAL, {
-    type: dbCollections.COMPANIES, data: [{ _id: oid(companyId) }, 'agentUndoHours agentMonthlyBudgetUsd agentBudgetAlerts'],
+    type: dbCollections.COMPANIES, data: [{ _id: oid(companyId) }, 'agentUndoHours agentMonthlyBudgetUsd agentBudgetAlerts agentAlerts'],
 }, 'findOne').catch(() => null);
 
 const writeCompany = async (companyId, set) => {
@@ -38,12 +39,13 @@ const settingsOf = (company) => {
     return {
         undoHours: Number.isInteger(hours) && hours >= UNDO_HOURS_MIN && hours <= UNDO_HOURS_MAX ? hours : DEFAULTS.undoHours,
         monthlyBudgetUsd: Number.isFinite(usd) && usd >= 0 ? usd : DEFAULTS.monthlyBudgetUsd,
+        alerts: alertRules.settingsOf(c.agentAlerts),
     };
 };
 
 const settings = async (companyId) => settingsOf(await readCompany(companyId));
 
-const validate = ({ undoHours, monthlyBudgetUsd } = {}) => {
+const validate = ({ undoHours, monthlyBudgetUsd, alerts } = {}, company = null) => {
     const set = {};
     if (undoHours !== undefined) {
         const n = typeof undoHours === 'number' ? undoHours : (typeof undoHours === 'string' && undoHours.trim() !== '' ? Number(undoHours) : NaN);
@@ -55,12 +57,17 @@ const validate = ({ undoHours, monthlyBudgetUsd } = {}) => {
         if (!Number.isFinite(n) || n < 0) return { error: 'monthlyBudgetUsd must be a number of 0 or more (0 means no budget).' };
         set.agentMonthlyBudgetUsd = n;
     }
+    if (alerts !== undefined) {
+        const merged = alertRules.validate(alerts, company && company.agentAlerts);
+        if (merged.error) return { error: merged.error };
+        set.agentAlerts = merged.value;
+    }
     if (!Object.keys(set).length) return { error: 'Nothing to update.' };
     return { set };
 };
 
 const updateSettings = async (companyId, body) => {
-    const check = validate(body);
+    const check = validate(body, (body && body.alerts !== undefined) ? await readCompany(companyId) : null);
     if (check.error) return { error: check.error, status: 400 };
     await writeCompany(companyId, check.set);
     return { settings: await settings(companyId) };

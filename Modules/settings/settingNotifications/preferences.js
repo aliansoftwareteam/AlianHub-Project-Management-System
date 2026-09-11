@@ -2,6 +2,9 @@ const mongoose = require("mongoose");
 const { removeCache } = require("../../../utils/commonFunctions");
 const { dbCollections } = require("../../../Config/collections");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
+const { getRoleType } = require("../../../Config/permissionGuard");
+const { ensureNotificationDefaults } = require("../../notification/defaults");
+const alertRules = require("../../Agents/alertRules");
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -15,16 +18,41 @@ const cleanQuietHours = (q) => {
     };
 };
 
-// Top-level per-user switches (quiet hours, agent noise, digest) sit beside the
+/* The caller's own settings document, with AI alert choices resolved against their role's defaults. */
+exports.getPreferences = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        if (!companyId || !req.uid) return res.status(400).json({ status: false, message: "Company ID and a signed-in user are required." });
+        const doc = await ensureNotificationDefaults(companyId, req.uid);
+        const plain = doc && typeof doc.toObject === "function" ? doc.toObject() : { ...(doc || {}) };
+        const roleType = await getRoleType(companyId, req.uid);
+        return res.status(200).json({
+            status: true,
+            data: { ...plain, aiAlerts: alertRules.preferencesOf(roleType, plain.aiAlerts), aiAlertsEligible: alertRules.isEligibleRole(roleType) }
+        });
+    } catch (error) {
+        return res.status(500).json({ status: false, message: error.message || error });
+    }
+};
+
+// Top-level per-user switches (quiet hours, agent noise, digest, AI alerts) sit beside the
 // per-event grid; they are written by the owner of the document only.
 exports.updatePreferences = async (req, res) => {
     try {
         const companyId = req.headers["companyid"];
-        const { id, quietHours, agentActivity, dailyDigest } = req.body || {};
+        const { id, quietHours, agentActivity, dailyDigest, aiAlerts } = req.body || {};
         if (!companyId || !id || !mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).json({ status: false, message: "Company ID and a valid settings id are required." });
         }
         const $set = {};
+        if (aiAlerts !== undefined) {
+            if (!alertRules.isEligibleRole(await getRoleType(companyId, req.uid))) {
+                return res.status(403).json({ status: false, message: "AI alerts are for owners and admins only." });
+            }
+            const checked = alertRules.validatePreferences(aiAlerts);
+            if (checked.error) return res.status(400).json({ status: false, message: checked.error });
+            Object.assign($set, checked.set);
+        }
         const qh = cleanQuietHours(quietHours);
         if (qh) $set.quietHours = qh;
         if (typeof agentActivity === "boolean") $set.agentActivity = agentActivity;

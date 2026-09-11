@@ -216,6 +216,7 @@ import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useHelper } from '@/components/organisms/Header/helper';
 import { openPanel } from '@/components/organisms/Shell/shellState';
+import { noticeTextOf } from '@/views/Ai/rateAlerts';
 
 defineOptions({ name: 'InboxPage' });
 
@@ -279,12 +280,18 @@ const tabCount = (name) => {
 const actorOf = (it) => (it.actorId ? getUser(it.actorId) : null);
 const actorImage = (it) => actorOf(it)?.Employee_profileImageURL || '';
 const actorName = (it) => actorOf(it)?.Employee_Name || '';
-const render = (it) => changeText(String(it.message || ''));
+const alertNotice = (it) => (it.changeType === 'agent_alert' ? noticeTextOf(it.changeData) : null);
+const render = (it) => {
+    const notice = alertNotice(it);
+    if (!notice) return changeText(String(it.message || ''));
+    return escapeHtml(t(notice.key, { ...notice.params, agent: notice.params.agent || t('AiAlerts.unnamed_agent') }));
+};
 const isExpanded = (it) => expanded.value === rowKey(it);
 const canReply = (it) => !!(it.taskId && it.projectId && it.sprintId && !it.mainChat);
 
 const glyphIcon = (it) => {
     if (it.kind === 'mention') return 'at';
+    if (it.changeType === 'agent_alert') return 'alert';
     if (/milestone/i.test(it.key || '')) return 'alert';
     if (/status/i.test(it.key || '')) return 'refresh';
     if (/comment/i.test(it.key || '')) return 'chat';
@@ -534,6 +541,10 @@ const sendReply = async (it) => {
 
 const open = (it) => {
     if (it.unread && it.kind !== 'approval') setRead(it, true).then(() => removeRowSoft(it));
+    if (alertNotice(it) && router.hasRoute('AiHealth')) {
+        router.push({ name: 'AiHealth', params: { cid: companyId?.value } }).catch(() => {});
+        return;
+    }
     openRoute(it, it.sourceType === 'notification' ? 'notifications' : 'mentions', { gettersVal: getters });
 };
 const removeRowSoft = (it) => {

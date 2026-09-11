@@ -832,5 +832,10 @@
     "group": "logging",
     "description": "Upper bound, in milliseconds, that a fatal crash waits for flushers (log files, telemetry exporter, crash report mail) before the process exits with 1.",
     "default": "3000"
+  },
+  "AGENT_ALERTS_INTERVAL_MINUTES": {
+    "group": "jobs",
+    "description": "Minutes between runs of the agent rate-alert evaluator (error rate, approval rate, cost forecast, queue age).",
+    "default": "15"
   }
 }
