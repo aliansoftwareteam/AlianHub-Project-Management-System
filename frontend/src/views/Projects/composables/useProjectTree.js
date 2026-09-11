@@ -73,6 +73,9 @@ export function useProjectTree(projectData) {
         }
     }
 
+    // Folder routes read the folder tree straight from the project, and nothing else loads it for a global-permission project.
+    const needsSprintTree = (project) => project.isGlobalPermission === false || Boolean(route.params?.folderId);
+
     function selectProject(data, updateRoute = false) {
         const project = byId(projects.value, data?._id) || data;
         if (!project?._id) return;
@@ -81,7 +84,7 @@ export function useProjectTree(projectData) {
         }
         commit('projectData/mutateCurrentProjectDetails', project);
         projectData.value = project;
-        if (project.isGlobalPermission === false) loadSprintFolderData(project._id);
+        if (needsSprintTree(project)) loadSprintFolderData(project._id);
     }
 
     // A project created seconds ago is in the store before it reaches the list.
