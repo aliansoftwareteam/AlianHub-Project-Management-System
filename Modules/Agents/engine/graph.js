@@ -9,6 +9,7 @@ const policy = require('../policy');
 const { rating: ratingOf } = require('../actions');
 const runs = require('../runs');
 const spendGuard = require('../spendGuard');
+const revisions = require('../revisions');
 const { FEATURES } = require('../../AICore/features');
 
 // The run engine as a LangGraph thread, one per run (thread_id = run id):
@@ -279,7 +280,8 @@ const runGraph = async ({ companyId, run, agent, task, deps }) => {
         await persistence.ready(companyId);
         const graph = graphFor(companyId);
         await runs.patch(companyId, run._id, { threadId: String(run._id) });
-        const out = await graph.invoke({ run: plain(run), agent: plain(agent), task: plain(task) }, configFor(companyId, run._id, { deps }));
+        const pinnedAgent = revisions.applyRevision(agent, await revisions.forRun(companyId, run));
+        const out = await graph.invoke({ run: plain(run), agent: pinnedAgent, task: plain(task) }, configFor(companyId, run._id, { deps }));
         if (interrupted(out)) {
             return { status: STATUS.WAITING, proposalId: out.proposalId, refusals: out.refusals, ...(out.outcome ? { outcome: out.outcome } : {}) };
         }

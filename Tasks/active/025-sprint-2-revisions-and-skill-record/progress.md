@@ -15,7 +15,8 @@ One pull request per step; tick with the merge commit.
 | Date | Entry |
 |---|---|
 | 2026-09-10 | Filed from `docs/AI-PLATFORM-ARCHITECTURE.md` (sprint 2) |
+| 2026-09-11 | Step 1 on `feat/s2-agent-revisions`: `agent_revisions` collection, `Modules/Agents/revisions.js`, revision endpoints, run pin (`agentRevision`, `skillRevision`), migration 009, revision history panel and run-detail pin. Deviation: a settings save creates n+1 and promotes it live in one operation (today's behaviour); draft/candidate only through `POST /agents/:id/revisions`. Skill revisions pin key + module hash until step 2 makes skills data. Gates green: jest unit 1875, conventions 92, vitest 142, i18n:check, eslint. Owner API and browser sweeps still to record. |
 | 2026-09-11 | Step 2 on `feat/s2-skill-record`: `agent_skills` record and validator, frozen catalogues (5 inputs, 5 readers, 9 partials, 14 emit actions), `GET /api/v2/agents/skills` + `/catalogues`, owner/admin create, update and retire, hybrid `getSkill` (data first, code second, `enabled: false` skipped), `skillSlugOf` skips disabled skills; a data skill runs end to end through the graph with the fake provider |
 
 ## Last step
-Not started.
+Step 1 implemented and under review (PR from `feat/s2-agent-revisions`); the owner's sweeps against the real database and browser are outstanding.

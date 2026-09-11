@@ -18,6 +18,7 @@ const { inputsOf } = require('./taskInputs');
 const revert = require('./revert');
 const undo = require('./undo');
 const budget = require('./budget');
+const revisions = require('./revisions');
 
 const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId) || '';
 // 'mention' is a run started by @naming the agent in a comment (13b); it is
@@ -118,6 +119,7 @@ exports.createAgent = async (req, res) => {
             type: SCHEMA_TYPE.AGENTS,
             data: { autonomy: 1, spendCapUsd: 30, paused: false, account: 'workspace', deletedStatusKey: 0, ...set, ownerId: actor.userId },
         }, 'save');
+        await revisions.recordCreate(companyId, saved, { actor });
         return res.send({ status: true, statusText: 'Agent created.', data: saved });
     } catch (e) { logger.error(`createAgent: ${e.message}`); return fail(res, e.message, e.status || 200); }
 };
@@ -126,14 +128,17 @@ exports.createAgent = async (req, res) => {
 exports.updateAgent = async (req, res) => {
     try {
         const companyId = companyOf(req);
-        const { human } = await humanActor(req);
+        const { human, actor } = await humanActor(req);
         if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid agent id are required.');
         if (!human) return fail(res, 'Agents cannot edit agents.', 403);
         const set = agentPatchFields(req.body || {});
         if (!Object.keys(set).length) return fail(res, 'Nothing to update.');
+        const before = await runs.getAgent(companyId, req.params.id);
+        if (!before) return fail(res, 'Agent not found.', 404);
         const updated = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ _id: oid(req.params.id) }, { $set: set }, { returnDocument: 'after' }] }, 'findOneAndUpdate');
         if (!updated) return fail(res, 'Agent not found.', 404);
-        return res.send({ status: true, statusText: 'Agent updated.', data: updated });
+        const { revision } = await revisions.recordSave(companyId, before, updated, { actor, ip: req.ip || '' });
+        return res.send({ status: true, statusText: 'Agent updated.', data: updated, revision: revision ? Number(revision.n) : null });
     } catch (e) { logger.error(`updateAgent: ${e.message}`); return fail(res, e.message, e.status || 200); }
 };
 
@@ -156,6 +161,99 @@ exports.setPaused = (paused) => async (req, res) => {
         }
         return res.send({ status: true, statusText: paused ? 'Agent paused.' : 'Agent resumed.', data: updated });
     } catch (e) { logger.error(`setPaused: ${e.message}`); return fail(res, e.message); }
+};
+
+const revisionRow = (r, names = {}) => {
+    const o = typeof r.toObject === 'function' ? r.toObject() : { ...r };
+    return {
+        _id: String(o._id), agentId: o.agentId, n: o.n, state: o.state, snapshot: o.snapshot, serves: o.serves || [], skillRefs: o.skillRefs || [],
+        source: o.source || null, rollbackOf: o.rollbackOf || null, note: o.note || null,
+        createdBy: o.createdBy || null, createdByName: names[String(o.createdBy)] || null, createdAt: o.createdAt,
+        promotedBy: o.promotedBy || null, promotedByName: names[String(o.promotedBy)] || null, promotedAt: o.promotedAt || null, supersededAt: o.supersededAt || null,
+    };
+};
+
+const userNames = async (rows) => {
+    const ids = [...new Set(rows.flatMap((r) => [r.createdBy, r.promotedBy]).filter(Boolean).map(String))].map(oid).filter(Boolean);
+    if (!ids.length) return {};
+    const { dbCollections } = require('../../Config/collections');
+    const users = await MongoDbCrudOpration(dbCollections.GLOBAL, { type: SCHEMA_TYPE.USERS, data: [{ _id: { $in: ids } }, { Employee_Name: 1, Employee_FName: 1, Employee_LName: 1 }] }, 'find').catch(() => []);
+    return Object.fromEntries((users || []).map((u) => [String(u._id), u.Employee_Name || [u.Employee_FName, u.Employee_LName].filter(Boolean).join(' ') || null]));
+};
+
+/* Revisions are owner/admin ground, like the agent settings page. */
+const revisionAccess = async (req, res) => {
+    const companyId = companyOf(req);
+    const { human, actor } = await humanActor(req);
+    if (!companyId || !OBJECT_ID.test(req.params.id)) { fail(res, 'companyId and a valid agent id are required.'); return null; }
+    if (!human || !(await privileged(companyId, actor.userId))) { fail(res, 'Owner/admin only.', 403); return null; }
+    const agent = await runs.getAgent(companyId, req.params.id);
+    if (!agent) { fail(res, 'Agent not found.', 404); return null; }
+    return { companyId, actor, agent };
+};
+
+const revisionN = (raw) => { const n = Number(raw); return Number.isInteger(n) && n > 0 ? n : null; };
+
+/* GET /api/v2/agents/:id/revisions */
+exports.listRevisions = async (req, res) => {
+    try {
+        const ctx = await revisionAccess(req, res);
+        if (!ctx) return undefined;
+        await revisions.liveFor(ctx.companyId, ctx.agent);
+        const rows = await revisions.listFor(ctx.companyId, ctx.agent._id);
+        const names = await userNames(rows || []);
+        return res.send({ status: true, data: (rows || []).map((r) => revisionRow(r, names)) });
+    } catch (e) { logger.error(`listRevisions: ${e.message}`); return fail(res, e.message); }
+};
+
+/* GET /api/v2/agents/:id/revisions/:n */
+exports.getRevision = async (req, res) => {
+    try {
+        const ctx = await revisionAccess(req, res);
+        if (!ctx) return undefined;
+        const n = revisionN(req.params.n);
+        const row = n ? await revisions.getRevision(ctx.companyId, ctx.agent._id, n) : null;
+        if (!row) return fail(res, 'Revision not found.', 404);
+        return res.send({ status: true, data: revisionRow(row) });
+    } catch (e) { logger.error(`getRevision: ${e.message}`); return fail(res, e.message); }
+};
+
+/* POST /api/v2/agents/:id/revisions  body: { state?: draft|candidate, note?, ...agent fields }
+ * The only way to a draft or candidate: the plain save always goes live. */
+exports.createRevision = async (req, res) => {
+    try {
+        const ctx = await revisionAccess(req, res);
+        if (!ctx) return undefined;
+        const body = req.body || {};
+        const row = await revisions.createDraft(ctx.companyId, ctx.agent, { fields: agentPatchFields(body), state: body.state, note: body.note, actor: ctx.actor });
+        return res.send({ status: true, statusText: `Revision ${row.n} saved as ${row.state}.`, data: revisionRow(row) });
+    } catch (e) { logger.error(`createRevision: ${e.message}`); return fail(res, e.message, e.status || 200); }
+};
+
+/* POST /api/v2/agents/:id/revisions/:n/promote */
+exports.promoteRevision = async (req, res) => {
+    try {
+        const ctx = await revisionAccess(req, res);
+        if (!ctx) return undefined;
+        const n = revisionN(req.params.n);
+        if (!n) return fail(res, 'Revision not found.', 404);
+        const out = await revisions.promote(ctx.companyId, ctx.agent, n, { actor: ctx.actor, ip: req.ip || '' });
+        if (out.error) return fail(res, out.error, out.status || 200);
+        return res.send({ status: true, statusText: out.unchanged ? `Revision ${n} is already live.` : `Revision ${n} is live.`, data: { revision: revisionRow(out.revision), from: out.from, agent: out.agent || null } });
+    } catch (e) { logger.error(`promoteRevision: ${e.message}`); return fail(res, e.message); }
+};
+
+/* POST /api/v2/agents/:id/revisions/:n/rollback — copies :n forward and makes the copy live */
+exports.rollbackRevision = async (req, res) => {
+    try {
+        const ctx = await revisionAccess(req, res);
+        if (!ctx) return undefined;
+        const n = revisionN(req.params.n);
+        if (!n) return fail(res, 'Revision not found.', 404);
+        const out = await revisions.rollback(ctx.companyId, ctx.agent, n, { actor: ctx.actor, ip: req.ip || '', note: (req.body || {}).note });
+        if (out.error) return fail(res, out.error, out.status || 200);
+        return res.send({ status: true, statusText: `Rolled back to revision ${n} as revision ${out.revision.n}.`, data: { revision: revisionRow(out.revision), from: out.from, rollbackOf: out.rollbackOf, agent: out.agent || null } });
+    } catch (e) { logger.error(`rollbackRevision: ${e.message}`); return fail(res, e.message); }
 };
 
 /* DELETE /api/v2/agents/:id — owner/admin or the agent's owner. A soft delete:
@@ -247,6 +345,9 @@ exports.getRun = async (req, res) => {
         if (!run) return fail(res, 'Run not found.', 404);
         const auditRows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ 'meta.runId': String(run._id) }, {}, { sort: { createdAt: 1 }, limit: 200 }] }, 'find').catch(() => []);
         const plain = typeof run.toObject === 'function' ? run.toObject() : { ...run };
+        const pinned = await revisions.forRun(companyId, plain);
+        plain.agentRevision = Number(pinned.n);
+        plain.skillRevision = plain.skillRevision || null;
         const { actor } = await humanActor(req);
         const ctx = await undo.undoContext(companyId, actor, { run: plain });
         const check = await revert.revertCheck(companyId, plain, { actor, isPrivileged: await privileged(companyId, actor.userId), ...ctx });
@@ -259,7 +360,8 @@ exports.getRun = async (req, res) => {
             const state = o.action === agentAudit.ACTION_DONE ? await undo.undoStateOf(companyId, o, actor, ctx) : null;
             audit.push(state ? { ...o, undoUntil: state.undoUntil, undoable: state.undoable, undoReason: state.reason } : o);
         }
-        return res.send({ status: true, data: { run: plain, audit } });
+        const revision = { n: Number(pinned.n), state: pinned.state, synthetic: Boolean(pinned.synthetic), missing: Boolean(pinned.missing), createdAt: pinned.createdAt || null, createdBy: pinned.createdBy || null, serves: pinned.serves || [], skillRefs: pinned.skillRefs || [] };
+        return res.send({ status: true, data: { run: plain, audit, revision } });
     } catch (e) { logger.error(`getRun: ${e.message}`); return fail(res, e.message); }
 };
 

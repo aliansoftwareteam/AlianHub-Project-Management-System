@@ -120,7 +120,7 @@ describe('#9/#17 direct runs pass allowedActions and count refusals as a number'
         const a = agent({ autonomy: 2, allowedActions: ['task.get', 'subtask.create'] });
         const run = await runs.create(C, { agent: a, taskId: TASK._id, projectId: 'p1', skill: 'qa-review' });
         const out = await runs.executeSkill(C, run, a, TASK, d);
-        expect(d.actions.perform.mock.calls.every(([args]) => args.allowedActions === a.allowedActions)).toBe(true);
+        d.actions.perform.mock.calls.forEach(([args]) => expect(args.allowedActions).toEqual(a.allowedActions));
         expect(out).toMatchObject({ status: 'done', refusals: 1, outcome: '1 change(s) applied, 1 refused' });
         const row = runRow(run._id);
         expect(row.refusals).toBe(1);

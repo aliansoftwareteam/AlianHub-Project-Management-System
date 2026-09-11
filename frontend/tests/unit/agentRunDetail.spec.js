@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { ref } from 'vue';
 
@@ -37,7 +37,7 @@ const mountDetail = async ({ roleType = 3, userId = 'u1', payload = { run, audit
         if (type === 'post' && url.endsWith('/revert')) return ok({ reverted: 2, failed: [{ action: 'task.sprint.move', reason: 'sprint closed' }], windowEndsAt: future });
         return ok(payload);
     });
-    const wrapper = mount(AgentRunDetail, { props: { runId: 'r1' }, global: { plugins: [storeFor(roleType)], provide: { $userId: ref(userId) }, mocks: { $t: echo } } });
+    const wrapper = mount(AgentRunDetail, { props: { runId: 'r1' }, global: { plugins: [storeFor(roleType)], provide: { $userId: ref(userId), $companyId: ref('company-1') }, mocks: { $t: echo }, stubs: { RouterLink: RouterLinkStub } } });
     await flushPromises();
     return wrapper;
 };
@@ -94,7 +94,7 @@ describe('AgentRunDetail', () => {
     it('hides revert once the run is reverted and shows the reverted state', async () => {
         const wrapper = await mountDetail({ payload: { run: { ...run, revertedAt: '2026-09-05T10:00:00Z' }, audit: [] } });
         expect(wrapper.find('button').exists()).toBe(false);
-        expect(wrapper.find('.ah-chip--dark').text()).toContain('Ai.reverted_at');
+        expect(wrapper.find('.run-detail__head .ah-chip--dark').text()).toContain('Ai.reverted_at');
     });
 
     it('reverts, reports the partial failure and reloads the run', async () => {
@@ -161,5 +161,28 @@ describe('AgentRunDetail', () => {
         await wrapper.find('button').trigger('click');
         await flushPromises();
         expect(toast.error).toHaveBeenCalledWith('The undo window closed 3 hours ago.', { position: 'top-right' });
+    });
+
+    it('shows the pinned agent revision linked to the history panel, with the skill identity', async () => {
+        const pinned = { ...run, agentId: 'a1', agentRevision: 2, skill: 'qa-review', skillRevision: { key: 'qa-review', hash: 'abc123def4567890', n: null } };
+        const wrapper = await mountDetail({ payload: { run: pinned, audit: [], revision: { n: 2, state: 'superseded', synthetic: false } } });
+        const link = wrapper.find('[data-test="revision-link"]');
+        expect(link.text()).toBe('Ai.run_revision {"n":2}');
+        expect(wrapper.findComponent(RouterLinkStub).props('to')).toEqual({ name: 'AiAgent', params: { cid: 'company-1', id: 'a1' }, query: { rev: 2 }, hash: '#revisions' });
+        expect(wrapper.find('[data-test="skill-identity"]').text()).toBe('Ai.run_skill_identity {"key":"qa-review","hash":"abc123def4567890"}');
+        expect(wrapper.find('[data-test="revision-zero"]').exists()).toBe(false);
+    });
+
+    it('names revision 0 for a run from before revisions and falls back to the skill slug', async () => {
+        const wrapper = await mountDetail({ payload: { run: { ...run, skill: 'qa-review' }, audit: [], revision: { n: 0, state: 'live', synthetic: true } } });
+        expect(wrapper.find('[data-test="revision-zero"]').text()).toBe('Ai.run_revision_zero');
+        expect(wrapper.find('[data-test="revision-link"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="skill-identity"]').text()).toBe('Ai.run_skill_identity_nohash {"key":"qa-review"}');
+    });
+
+    it('reads a data-skill revision number once one is pinned', async () => {
+        const wrapper = await mountDetail({ payload: { run: { ...run, agentId: 'a1', agentRevision: 5, skillRevision: { key: 'brief.parse', hash: null, n: 3 } }, audit: [] } });
+        expect(wrapper.find('[data-test="revision-link"]').text()).toBe('Ai.run_revision {"n":5}');
+        expect(wrapper.find('[data-test="skill-identity"]').text()).toBe('Ai.run_skill_identity_n {"key":"brief.parse","n":3}');
     });
 });

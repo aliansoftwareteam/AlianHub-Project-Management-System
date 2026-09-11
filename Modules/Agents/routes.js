@@ -59,4 +59,9 @@ exports.init = (app) => {
     app.delete('/api/v2/agents/:id', ctrl.deleteAgent);
     app.post('/api/v2/agents/:id/pause', ctrl.setPaused(true));
     app.post('/api/v2/agents/:id/resume', ctrl.setPaused(false));
+    app.get('/api/v2/agents/:id/revisions', ctrl.listRevisions);
+    app.post('/api/v2/agents/:id/revisions', ctrl.createRevision);
+    app.get('/api/v2/agents/:id/revisions/:n', ctrl.getRevision);
+    app.post('/api/v2/agents/:id/revisions/:n/promote', ctrl.promoteRevision);
+    app.post('/api/v2/agents/:id/revisions/:n/rollback', ctrl.rollbackRevision);
 };

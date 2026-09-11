@@ -103,6 +103,7 @@ const existingRun = async (companyId, { agent, taskId, idempotencyKey }) => {
 const start = async (companyId, { agent, taskId, projectId, skill, trigger, startedBy, viaAccount, note, spendCapUsd, notifyMe, triggerDepth, triggerEventId, idempotencyKey, ref }) => {
     const key = idempotencyKey ? String(idempotencyKey) : idempotencyKeyFor({ agent, taskId, trigger, ref });
     const via = viaAccount || agent.account || 'workspace';
+    const pinned = await require('./revisions').pinFor(companyId, agent, skill);
     try {
         const run = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENT_RUNS,
@@ -118,6 +119,7 @@ const start = async (companyId, { agent, taskId, projectId, skill, trigger, star
                 ...(Number(spendCapUsd) > 0 ? { spendCapUsd: Number(spendCapUsd) } : {}),
                 notifyMe: Boolean(notifyMe),
                 ...(key ? { idempotencyKey: key } : {}),
+                agentRevision: pinned.agentRevision, skillRevision: pinned.skillRevision,
             },
         }, 'save');
         emit(companyId, 'run', { run });

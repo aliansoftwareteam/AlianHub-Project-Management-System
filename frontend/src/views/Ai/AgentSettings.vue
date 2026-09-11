@@ -112,6 +112,8 @@
                         <router-link class="ah-btn ah-btn--secondary" :to="{ name: 'AiHub', params: { cid: companyId } }">{{ $t('Ai.cancel') }}</router-link>
                     </div>
 
+                    <AgentRevisionHistory :key="revisionsKey" :agent-id="String(route.params.id)" :highlight="highlightRevision" @changed="load" />
+
                     <section class="ah-card ai-agent ai-danger">
                         <div class="ah-label">{{ $t('Ai.delete_agent') }}</div>
                         <p class="ai-lead" style="margin:6px 0 10px">{{ openRunCount ? $t('Ai.delete_blocked_running', { n: openRunCount }) : $t('Ai.delete_body') }}</p>
@@ -140,6 +142,7 @@ import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "./AiSidebar.vue";
 import AgentRunDetail from "./AgentRunDetail.vue";
+import AgentRevisionHistory from "./AgentRevisionHistory.vue";
 import { useAgents, refusalCount } from "./useAgents";
 import { splitPreview } from "./policyPreview";
 import { apiRequest } from "@/services";
@@ -168,6 +171,8 @@ const AUTONOMY = computed(() => (registryManifest.value.autonomy || []).map((a) 
 const never = computed(() => (registryManifest.value.never || []).join(" · "));
 const spendRow = computed(() => (spend.value.agents || []).find((a) => a.agentId === String(route.params.id)));
 const expandedRun = ref("");
+const revisionsKey = ref(0);
+const highlightRevision = computed(() => { const n = Number(route.query.rev); return Number.isInteger(n) && n > 0 ? n : null; });
 
 const allowedKeys = computed(() => {
     const keys = new Set();
@@ -220,6 +225,7 @@ const save = async () => {
             skills: skills.value.map((s) => ({ key: s.key, name: s.name, actions: s.actions, enabled: s.enabled }))
         });
         $toast.success(t("Ai.saved"), { position: "top-right" });
+        revisionsKey.value += 1;
     } catch (e) {
         error.value = e.message;
     } finally {

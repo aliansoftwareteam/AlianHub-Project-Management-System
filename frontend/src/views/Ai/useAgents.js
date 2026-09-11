@@ -62,8 +62,14 @@ const OPEN_RUN = ["queued", "running"];
 /* GET /runs/:id answers { run, audit }; older callers hand in the bare run. */
 export const runOf = (payload) => {
     if (!payload) return null;
-    if (payload.run && typeof payload.run === "object") return { ...payload.run, audit: payload.audit || [] };
+    if (payload.run && typeof payload.run === "object") return { ...payload.run, audit: payload.audit || [], revision: payload.revision || null };
     return payload;
+};
+
+/* Runs from before revisions carry no number: the server reads them as revision 0. */
+export const pinnedRevisionOf = (run) => {
+    const n = Number(run?.revision?.n ?? run?.agentRevision);
+    return Number.isInteger(n) && n > 0 ? n : 0;
 };
 
 export const undoDeadlineOf = (run) => (run && (run.undoUntil || run.windowEndsAt)) || null;
@@ -192,11 +198,17 @@ export function useAgents() {
 
     const revertRun = async (runId) => (await request("post", `${env.AGENT_RUNS}/${runId}/revert`, {}, "Ai.revert_failed")).data;
 
+    const loadRevisions = async (agentId) => (await request("get", `${env.AGENTS}/${agentId}/revisions`, undefined, "Ai.revisions_load_failed")).data || [];
+
+    const promoteRevision = async (agentId, n) => (await request("post", `${env.AGENTS}/${agentId}/revisions/${n}/promote`, {}, "Ai.revision_promote_failed")).data;
+
+    const rollbackRevision = async (agentId, n) => (await request("post", `${env.AGENTS}/${agentId}/revisions/${n}/rollback`, {}, "Ai.revision_rollback_failed")).data;
+
     return {
         agents, proposals, counts, runSummary, spend, registryManifest, loading, lastError,
         running, waiting, AUTONOMY,
         loadAll, loadAgents, loadProposals, loadSummary, loadSpend, loadRegistry,
         decide, setPaused, pauseAll, runNow, saveAgent, deleteAgent, activeRuns, loadActiveRuns, stopActive,
-        loadRun, revertRun
+        loadRun, revertRun, loadRevisions, promoteRevision, rollbackRevision
     };
 }

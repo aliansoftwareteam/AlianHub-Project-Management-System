@@ -198,6 +198,10 @@ agentRunsSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 agentRunsSchema.index({ agentId: 1, taskId: 1, status: 1 }, { unique: true, partialFilterExpression: { taskId: { $type: 'string' }, status: { $in: ['queued', 'running', 'waiting_approval'] } } });
 agentRunsSchema.index({ idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } });
 
+const agentRevisionsSchema = new Schema(schema.agentRevisions, {strict: true, timestamps: true});
+agentRevisionsSchema.index({ agentId: 1, n: 1 }, { unique: true });
+agentRevisionsSchema.index({ agentId: 1, state: 1 });
+
 const aiUsageSchema = new Schema(schema.aiUsage, {strict: true, timestamps: true});
 aiUsageSchema.index({ at: -1 });
 aiUsageSchema.index({ feature: 1, at: -1 });
@@ -345,6 +349,7 @@ module.exports = {
     agentFindingsSchema,
     agentsSchema,
     agentRunsSchema,
+    agentRevisionsSchema,
     aiUsageSchema,
     agentProposalsSchema,
     agentSkillsSchema,

@@ -65,7 +65,7 @@ describe('an L2 run is reviewed per change by the policy', () => {
         expect(d.actions.perform).toHaveBeenCalledTimes(3);
         expect(d.actions.perform.mock.calls.map(([args]) => args.action)).toEqual(['subtask.create', 'task.comment', 'subtask.create']);
         d.actions.perform.mock.calls.forEach(([args]) => {
-            expect(args.allowedActions).toBe(a.allowedActions);
+            expect(args.allowedActions).toEqual(a.allowedActions);
             expect(args.decision).toMatchObject({ decision: 'act' });
         });
 
