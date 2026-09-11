@@ -4,16 +4,17 @@
             <div class="ah-toolbar__title">{{ $t('Automations.title') }}</div>
             <span class="parity-count">{{ $t('Parity.n_active', { n: activeCount }) }}</span>
             <div class="ah-toolbar__spacer"></div>
-            <button v-if="!building" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="startNew">
+            <button v-if="!building && canManage" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="startNew">
                 <ShellIcon name="plus" :size="14" />{{ $t('Automations.new') }}
             </button>
-            <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="cancel">{{ $t('Automations.cancel') }}</button>
+            <button v-else-if="building" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="cancel">{{ $t('Automations.cancel') }}</button>
         </div>
 
         <div class="au__body ah-scroll">
             <p v-if="loadError" class="ah-field__error">{{ loadError }}</p>
+            <p v-if="!canManage" class="ah-small au__readonly">{{ $t('Automations.manage_owner_admin') }}</p>
 
-            <template v-if="building">
+            <template v-if="building && canManage">
                 <div class="au__sentence">
                     <ShellIcon name="ai" :size="14" class="au__spark" />
                     <input
@@ -113,7 +114,7 @@
                 <div v-else-if="!rules.length" class="ah-empty au__empty">
                     <h2 class="ah-h2">{{ $t('Automations.empty_title') }}</h2>
                     <p>{{ $t('Automations.empty_sub') }}</p>
-                    <button type="button" class="ah-btn ah-btn--primary" @click="startNew">{{ $t('Automations.new') }}</button>
+                    <button v-if="canManage" type="button" class="ah-btn ah-btn--primary" @click="startNew">{{ $t('Automations.new') }}</button>
                 </div>
 
                 <div v-for="r in rules" :key="r._id" class="au__rule" :class="{ 'au__rule--off': !r.enabled }">
@@ -121,13 +122,14 @@
                         type="button"
                         class="au__toggle"
                         :class="{ 'is-on': r.enabled }"
+                        :disabled="!canManage"
                         :aria-label="r.enabled ? $t('Automations.turn_off') : $t('Automations.turn_on')"
                         @click="toggle(r)"
                     ><span class="au__knob"></span></button>
                     <span class="au__rule-text">{{ r.sentence || r.summary }}</span>
                     <span class="au__rule-count ah-mono">{{ $t('Parity.fired_n', { n: r.firedCount || 0 }) }}</span>
-                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="edit(r)">{{ $t('Automations.edit') }}</button>
-                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm au__delete" @click="remove(r)">{{ $t('Automations.delete') }}</button>
+                    <button v-if="canManage" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="edit(r)">{{ $t('Automations.edit') }}</button>
+                    <button v-if="canManage" type="button" class="ah-btn ah-btn--ghost ah-btn--sm au__delete" @click="remove(r)">{{ $t('Automations.delete') }}</button>
                 </div>
             </template>
         </div>
@@ -136,6 +138,7 @@
 
 <script setup>
 import { ref, reactive, computed, nextTick, onMounted } from 'vue';
+import { useStore } from 'vuex';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
@@ -185,6 +188,8 @@ const OP_LABELS = {
 };
 const opLabel = (op) => OP_LABELS[op] || op;
 
+const { getters } = useStore();
+const canManage = computed(() => [1, 2].includes(Number(getters['settings/companyUserDetail']?.roleType)));
 const activeCount = computed(() => rules.value.filter((r) => r.enabled).length);
 const triggerDef = computed(() => manifest.triggers.find((t) => t.key === draft.trigger.event) || null);
 
@@ -360,6 +365,7 @@ const save = async (enabled) => {
 };
 
 const toggle = async (rule) => {
+    if (!canManage.value) return;
     try {
         await apiRequest('patch', `${env.AUTOMATIONS_V2}/${rule._id}/enabled`, { enabled: !rule.enabled });
         await loadRules();

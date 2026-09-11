@@ -31,7 +31,6 @@ import { useRouter } from "vue-router";
 import { apiRequest } from '@/services';
 
 const router = useRouter();
-const userId = inject('$userId');
 const companyId = inject('$companyId');
 
 const props = defineProps({
@@ -52,7 +51,7 @@ watch(() => props.modelValue, (open) => {
 
 function fetchRecent() {
     isLoading.value = true;
-    apiRequest('get', `/api/v2/recent-visits?uid=${encodeURIComponent(userId.value)}`)
+    apiRequest('get', '/api/v2/recent-visits')
     .then((response) => {
         items.value = response.data?.status ? (response.data.data || []) : [];
     })

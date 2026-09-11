@@ -1,4 +1,18 @@
 const ctrl = require('./controller');
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { READ, requireProjectAccess, keepVisibleProjects, projectIdsFrom } = require('../../Config/projectAccess');
+
+const MILESTONE = ['project.project_milestone'];
+const MILESTONE_STATUS = [['project.project_milestone_status_change', 'project.project_milestone']];
+
+const bodyMilestone = (req) => req.body && req.body.milestoneObject;
+const queryProject = (req) => req.query && req.query.projectId;
+const readsProject = (projectIds) => requireProjectAccess({ mode: READ, projectIds });
+const changesMilestone = (milestoneId, permissions) => requireProjectAccess({
+    projectIds: projectIdsFrom({ records: [[SCHEMA_TYPE.MILESTONE, milestoneId]], direct: (req) => req.body && req.body.projectId }),
+    permissions: () => permissions,
+    passMissing: () => true,
+});
 
 exports.init = (app) => {
     /**
@@ -60,7 +74,7 @@ exports.init = (app) => {
     /**
      * add milestone API
     */
-    app.post('/api/v1/addmilestone', ctrl.addMilestone);
+    app.post('/api/v1/addmilestone', changesMilestone(() => null, MILESTONE), ctrl.addMilestone);
 
 
     /**
@@ -135,7 +149,7 @@ exports.init = (app) => {
     /**
      * update milestone API
     */
-    app.post('/api/v1/updatemilestone', ctrl.updateMilestone);
+    app.post('/api/v1/updatemilestone', changesMilestone(bodyMilestone, MILESTONE), ctrl.updateMilestone);
     
     
     /**
@@ -197,7 +211,7 @@ exports.init = (app) => {
     /**
      * delete milestone API
     */
-    app.post('/api/v1/deletemilestone', ctrl.deleteMilestone);
+    app.post('/api/v1/deletemilestone', changesMilestone((req) => req.body && req.body.milestoneObjForDelete, MILESTONE), ctrl.deleteMilestone);
     
     
     /**
@@ -255,7 +269,7 @@ exports.init = (app) => {
     /**
      * clear milestone API
     */
-    app.post('/api/v1/clearmilestonestatus', ctrl.clearMilestoneStatus);
+    app.post('/api/v1/clearmilestonestatus', changesMilestone(bodyMilestone, MILESTONE_STATUS), ctrl.clearMilestoneStatus);
     
     
     /**
@@ -321,7 +335,7 @@ exports.init = (app) => {
     /**
      * cancel milestone status API
     */
-    app.post('/api/v1/cancelmilestonestatus', ctrl.cancelMilestoneStatus);
+    app.post('/api/v1/cancelmilestonestatus', changesMilestone(bodyMilestone, MILESTONE_STATUS), ctrl.cancelMilestoneStatus);
     
     
     /**
@@ -373,7 +387,7 @@ exports.init = (app) => {
     /**
      * refundAmount API
     */
-    app.post('/api/v1/refundamount', ctrl.refundAmount);
+    app.post('/api/v1/refundamount', changesMilestone(bodyMilestone, MILESTONE_STATUS), ctrl.refundAmount);
     
     
     /**
@@ -421,20 +435,20 @@ exports.init = (app) => {
     /**
      * draggableMilestone API
     */
-    app.post('/api/v1/draggablemilestone', ctrl.draggableMilestone);
+    app.post('/api/v1/draggablemilestone', changesMilestone(bodyMilestone, MILESTONE), ctrl.draggableMilestone);
 
-    app.get('/api/v1/milestone/project/:pid', ctrl.getMilestoneByProject);
-    app.get('/api/v1/milestone/:id', ctrl.getMilestone);
+    app.get('/api/v1/milestone/project/:pid', readsProject((req) => req.params.pid), ctrl.getMilestoneByProject);
+    app.get('/api/v1/milestone/:id', readsProject(projectIdsFrom({ records: [[SCHEMA_TYPE.MILESTONE, (req) => req.params.id]] })), ctrl.getMilestone);
     app.post('/api/v1/milestone', ctrl.updateWeeklyRangeMilestone);
-    app.post('/api/v1/milestoneReport', ctrl.getMilestoneReport);
+    app.post('/api/v1/milestoneReport', keepVisibleProjects({ get: (req) => req.body && req.body.element, set: (req, ids) => { req.body.element = ids; } }), ctrl.getMilestoneReport);
 
     // Billing (handoff 19a / 19b / 19d). `billing.*` is deliberately absent from
     // Modules/Agents/registry.js — no agent path may reach these.
-    app.get('/api/v2/billing/contract', ctrl.getBillingContract);
-    app.put('/api/v2/billing/contract', ctrl.updateBillingContract);
-    app.post('/api/v2/billing/milestone', ctrl.createBillingMilestone);
-    app.patch('/api/v2/billing/milestone/:id', ctrl.updateBillingMilestone);
-    app.get('/api/v2/billing/hourly', ctrl.getHourlyBilling);
-    app.get('/api/v2/billing/client-view', ctrl.getClientView);
-    app.post('/api/v2/billing/client-view/message', ctrl.postClientMessage);
+    app.get('/api/v2/billing/contract', readsProject(queryProject), ctrl.getBillingContract);
+    app.put('/api/v2/billing/contract', changesMilestone(() => null, []), ctrl.updateBillingContract);
+    app.post('/api/v2/billing/milestone', changesMilestone(() => null, MILESTONE), ctrl.createBillingMilestone);
+    app.patch('/api/v2/billing/milestone/:id', changesMilestone((req) => req.params.id, MILESTONE), ctrl.updateBillingMilestone);
+    app.get('/api/v2/billing/hourly', readsProject(queryProject), ctrl.getHourlyBilling);
+    app.get('/api/v2/billing/client-view', readsProject(queryProject), ctrl.getClientView);
+    app.post('/api/v2/billing/client-view/message', changesMilestone(() => null, []), ctrl.postClientMessage);
 };

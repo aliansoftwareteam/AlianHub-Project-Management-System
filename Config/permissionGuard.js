@@ -185,6 +185,23 @@ const requireRole = (allowed = [ROLE_OWNER, ROLE_ADMIN]) => async (req, res, nex
     }
 };
 
+/**
+ * Hard gate for company settings and permission-rule writes, for web sessions and API tokens alike.
+ * `permission` names the matching catalogue key; admins pass whatever the matrix says, exactly as
+ * the frontend checkPermission() treats them, and every other role is refused.
+ */
+const requireCompanyAdmin = ({ permission = null } = {}) => async (req, res, next) => {
+    const refuse = (statusText) => res.status(403).json({ status: false, statusText, message: 'Forbidden', ...(permission ? { permission } : {}) });
+    try {
+        const roleType = await getRoleType(req.headers["companyid"] || "", req.uid);
+        if (isPrivileged(roleType)) return next();
+        return refuse("Only an owner or an admin can change company settings.");
+    } catch (error) {
+        logger.error(`requireCompanyAdmin error (${permission || 'settings'}): ${error.message || error}`);
+        return refuse("Permission check failed.");
+    }
+};
+
 const isWritable = (permission) => permission === true || permission === 1 || permission === 2;
 const isReadable = (permission) => permission !== null && permission !== undefined && permission !== 0;
 
@@ -285,6 +302,7 @@ module.exports = {
     arrangeRules,
     evaluatePermission,
     requireRole,
+    requireCompanyAdmin,
     requirePermission,
     requireTaskActionPermission,
     evaluateMany,
