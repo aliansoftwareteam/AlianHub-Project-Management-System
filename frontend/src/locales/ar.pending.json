@@ -7514,6 +7514,10 @@
     "AiHealth.retry": "Retry",
     "Ai.settings_read_only": "Read only. An owner or admin changes this agent's settings.",
     "Instance.channel_unknown": "version unresolved",
-    "Automations.manage_owner_admin": "Only owners and admins can create, change or switch on automations."
+    "Automations.manage_owner_admin": "Only owners and admins can create, change or switch on automations.",
+    "IntegrationsHub.cal_url_once": "Copy this link now. For your security it is shown only once.",
+    "IntegrationsHub.cal_url_hidden": "The subscription link is hidden. Regenerate it to get a new one.",
+    "IntegrationsHub.cal_regenerate": "Regenerate link",
+    "IntegrationsHub.cal_regenerate_confirm": "Regenerate this link? Calendars subscribed to the current link will stop updating."
   }
 }

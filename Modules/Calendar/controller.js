@@ -2,89 +2,177 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { removeCache } = require('../../utils/commonFunctions');
+const { tenantOf } = require('../../Config/tenant');
 const logger = require('../../Config/loggerConfig');
 const config = require('../../Config/config');
+const { visibleProjectIds } = require('../Agents/scope');
 const R = require('./helpers/icalRules');
 
-// AUTO-02 — calendar. Credential-free core: a tokenized, read-only .ics feed of
-// task due-dates, subscribable in any calendar app. Feed config lives in the
-// GLOBAL db (token-keyed) so the unauthenticated feed URL resolves its company.
-// 2-way Google/Microsoft OAuth is the documented config-gated extension.
-
 const GLOBAL = SCHEMA_TYPE.GOLBAL;
+const FEEDS = SCHEMA_TYPE.CALENDAR_FEEDS;
 const SCOPES = ['my', 'project'];
-const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
-const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
+const NAME_MAX_LENGTH = 120;
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const FEED_NOT_FOUND = 'Feed not found.';
+
+const oid = (id) => (OBJECT_ID.test(String(id || '')) ? new mongoose.Types.ObjectId(String(id)) : null);
+const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
+
+const reject = (res, statusCode, statusText) => res.status(statusCode).json({ status: false, statusText, message: statusText });
+
+const fail = (res, where, error) => {
+    if (error && error.name === 'TenantError') return reject(res, error.statusCode, error.message);
+    logger.error(`${where}: ${error && error.message}`);
+    return reject(res, 500, 'The calendar feed request could not be completed.');
+};
+
+const callerOf = (req) => String(req.uid || '');
 
 const feedUrl = (req, token) => {
     const base = (config && config.WEBURL) ? String(config.WEBURL) : `${req.protocol}://${req.get('host')}`;
     return `${base.replace(/\/$/, '')}/api/v1/calendar/ics/${token}`;
 };
-const withUrl = (req) => (doc) => {
-    if (!doc) return doc;
-    const o = doc.toObject ? doc.toObject() : { ...doc };
-    o.url = feedUrl(req, o.token);
-    return o;
+
+const describeFeed = (doc) => {
+    const { _id, name, scope, projectId, userId, enabled, createdAt, updatedAt } = plain(doc);
+    return { _id, name, scope, projectId, userId, enabled, createdAt, updatedAt };
 };
 
-// POST /api/v1/calendar/feeds  { scope:'my'|'project', projectId?, name?, userData }
+const withLink = (req, doc, token) => ({ ...describeFeed(doc), token, url: feedUrl(req, token) });
+
+const ownFeed = (companyId, userId, id) => ({ _id: oid(id), companyId: String(companyId), userId, deletedStatusKey: { $ne: 1 } });
+
+const clearFeedCache = (companyId) => removeCache(`calendar_feeds:${companyId}`);
+
 exports.createFeed = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        const b = req.body || {};
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
-        const scope = SCOPES.includes(b.scope) ? b.scope : 'my';
-        const userId = String((b.userData && b.userData.id) || req.uid || '');
-        if (scope === 'my' && !userId) return res.send({ status: false, statusText: 'A user is required for a personal feed.' });
-        if (scope === 'project' && !oid(b.projectId)) return res.send({ status: false, statusText: 'A valid projectId is required for a project feed.' });
+        const companyId = tenantOf(req);
+        const userId = callerOf(req);
+        const body = req.body || {};
+        if (!userId) return reject(res, 401, 'Sign in to manage calendar feeds.');
+        const scope = SCOPES.includes(body.scope) ? body.scope : 'my';
+        if (body.name !== undefined && body.name !== null && (typeof body.name !== 'string' || body.name.trim().length > NAME_MAX_LENGTH)) {
+            return reject(res, 400, `A feed name must be text of at most ${NAME_MAX_LENGTH} characters.`);
+        }
+        if (scope === 'project') {
+            if (!oid(body.projectId)) return reject(res, 400, 'A valid projectId is required for a project feed.');
+            const visible = await visibleProjectIds(companyId, userId);
+            if (!visible.includes(String(body.projectId))) return reject(res, 404, 'Project not found.');
+        }
         const token = R.generateFeedToken();
-        const doc = {
-            _id: new mongoose.Types.ObjectId(), token, companyId: String(companyId), scope, userId,
-            projectId: scope === 'project' ? String(b.projectId) : '',
-            name: b.name || (scope === 'my' ? 'My tasks' : 'Project tasks'),
-            enabled: true, createdBy: userId, deletedStatusKey: 0,
-        };
-        const saved = await MongoDbCrudOpration(GLOBAL, { type: SCHEMA_TYPE.CALENDAR_FEEDS, data: doc }, 'save');
-        removeCache(`calendar_feeds:${companyId}`);
-        return res.send({ status: true, statusText: 'Feed created.', data: withUrl(req)(saved) });
-    } catch (e) { logger.error(`createFeed: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
+        const saved = await MongoDbCrudOpration(GLOBAL, {
+            type: FEEDS,
+            data: {
+                _id: new mongoose.Types.ObjectId(),
+                tokenHash: R.hashFeedToken(token),
+                companyId,
+                scope,
+                userId,
+                projectId: scope === 'project' ? String(body.projectId) : '',
+                name: (typeof body.name === 'string' && body.name.trim()) || (scope === 'my' ? 'My tasks' : 'Project tasks'),
+                enabled: true,
+                createdBy: userId,
+                deletedStatusKey: 0,
+            },
+        }, 'save');
+        clearFeedCache(companyId);
+        return res.status(200).json({ status: true, statusText: 'Feed created.', data: withLink(req, saved, token) });
+    } catch (error) {
+        return fail(res, 'createFeed', error);
+    }
 };
 
-// GET /api/v1/calendar/feeds — feeds in this company.
 exports.listFeeds = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = tenantOf(req);
+        const userId = callerOf(req);
+        if (!userId) return reject(res, 401, 'Sign in to manage calendar feeds.');
         const rows = await MongoDbCrudOpration(GLOBAL, {
-            type: SCHEMA_TYPE.CALENDAR_FEEDS, data: [{ companyId: String(companyId), deletedStatusKey: { $ne: 1 } }, {}, { sort: { createdAt: -1 } }],
+            type: FEEDS,
+            data: [{ companyId, userId, deletedStatusKey: { $ne: 1 } }, { token: 0, tokenHash: 0 }, { sort: { createdAt: -1 } }],
         }, 'find');
-        return res.send({ status: true, data: (rows || []).map(withUrl(req)) });
-    } catch (e) { logger.error(`listFeeds: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
+        return res.status(200).json({ status: true, statusText: 'Feeds loaded.', data: (rows || []).map(describeFeed) });
+    } catch (error) {
+        return fail(res, 'listFeeds', error);
+    }
 };
 
-// DELETE /api/v1/calendar/feeds/:id
+exports.regenerateFeed = async (req, res) => {
+    try {
+        const companyId = tenantOf(req);
+        const userId = callerOf(req);
+        if (!userId) return reject(res, 401, 'Sign in to manage calendar feeds.');
+        if (!oid(req.params.id)) return reject(res, 400, 'A valid feed id is required.');
+        const token = R.generateFeedToken();
+        const updated = await MongoDbCrudOpration(GLOBAL, {
+            type: FEEDS,
+            data: [ownFeed(companyId, userId, req.params.id), { $set: { tokenHash: R.hashFeedToken(token) }, $unset: { token: '' } }, { new: true }],
+        }, 'findOneAndUpdate');
+        if (!updated) return reject(res, 404, FEED_NOT_FOUND);
+        clearFeedCache(companyId);
+        return res.status(200).json({ status: true, statusText: 'Feed link regenerated.', data: withLink(req, updated, token) });
+    } catch (error) {
+        return fail(res, 'regenerateFeed', error);
+    }
+};
+
 exports.deleteFeed = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
-        await MongoDbCrudOpration(GLOBAL, {
-            type: SCHEMA_TYPE.CALENDAR_FEEDS, data: [{ _id: oid(req.params.id), companyId: String(companyId) }, { $set: { deletedStatusKey: 1, enabled: false } }],
+        const companyId = tenantOf(req);
+        const userId = callerOf(req);
+        if (!userId) return reject(res, 401, 'Sign in to manage calendar feeds.');
+        if (!oid(req.params.id)) return reject(res, 400, 'A valid feed id is required.');
+        const result = await MongoDbCrudOpration(GLOBAL, {
+            type: FEEDS,
+            data: [ownFeed(companyId, userId, req.params.id), { $set: { deletedStatusKey: 1, enabled: false }, $unset: { token: '', tokenHash: '' } }],
         }, 'updateOne');
-        removeCache(`calendar_feeds:${companyId}`);
-        return res.send({ status: true, statusText: 'Feed removed.' });
-    } catch (e) { logger.error(`deleteFeed: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
+        if (!result || !(result.matchedCount || result.modifiedCount)) return reject(res, 404, FEED_NOT_FOUND);
+        clearFeedCache(companyId);
+        return res.status(200).json({ status: true, statusText: 'Feed removed.' });
+    } catch (error) {
+        return fail(res, 'deleteFeed', error);
+    }
 };
 
-// GET /api/v1/calendar/ics/:token — PUBLIC read-only .ics feed of task due-dates.
+/* The token only proves which feed was asked for. What it may show is decided now, from the
+ * owner's current membership and project visibility, so a removed member or a lost project
+ * stops leaking through a link that was handed out earlier. */
+const readableProjectIds = async (feed) => {
+    if (!feed.userId || !OBJECT_ID.test(String(feed.companyId || ''))) return null;
+    const member = await MongoDbCrudOpration(feed.companyId, {
+        type: SCHEMA_TYPE.COMPANY_USERS,
+        data: [{ userId: String(feed.userId), isDelete: { $ne: true }, status: { $nin: [3] } }, { _id: 1 }],
+    }, 'findOne');
+    if (!member) return null;
+    const visible = await visibleProjectIds(feed.companyId, feed.userId);
+    if (feed.scope === 'project') return visible.includes(String(feed.projectId)) ? [String(feed.projectId)] : null;
+    return visible;
+};
+
+const LIVE_FEED = { deletedStatusKey: { $ne: 1 }, enabled: { $ne: false } };
+
+/* A feed stored before 012-hash-calendar-feed-tokens ran (MIGRATIONS_AUTO=false, or a failed boot
+ * migration) still holds its token in clear. It is hashed on first use so the subscribed URL keeps
+ * working and the clear token does not stay behind. */
+const findFeedByToken = async (token) => {
+    const tokenHash = R.hashFeedToken(token);
+    const feed = await MongoDbCrudOpration(GLOBAL, { type: FEEDS, data: [{ tokenHash, ...LIVE_FEED }] }, 'findOne');
+    if (feed) return feed;
+    return MongoDbCrudOpration(GLOBAL, {
+        type: FEEDS,
+        data: [{ token, ...LIVE_FEED }, { $set: { tokenHash }, $unset: { token: '' } }, { new: true }],
+    }, 'findOneAndUpdate');
+};
+
 exports.getIcs = async (req, res) => {
     try {
         const token = String(req.params.token || '').toLowerCase().replace(/\.ics$/, '');
         if (!R.isFeedToken(token)) return res.status(400).send('Invalid feed token.');
-        const feed = await MongoDbCrudOpration(GLOBAL, { type: SCHEMA_TYPE.CALENDAR_FEEDS, data: [{ token }] }, 'findOne');
-        if (!feed || feed.deletedStatusKey === 1 || feed.enabled === false) return res.status(404).send('Feed not found.');
-        const match = { DueDate: { $ne: null }, deletedStatusKey: 0 };
-        if (feed.scope === 'project' && oid(feed.projectId)) match.ProjectID = oid(feed.projectId);
-        if (feed.scope === 'my' && feed.userId) match.AssigneeUserId = feed.userId; // array-contains
+        const feed = await findFeedByToken(token);
+        const projectIds = feed ? await readableProjectIds(feed) : null;
+        if (!projectIds) return res.status(404).send(FEED_NOT_FOUND);
+        const match = { DueDate: { $ne: null }, deletedStatusKey: 0, ProjectID: { $in: projectIds.map(oid).filter(Boolean) } };
+        if (feed.scope === 'my') match.AssigneeUserId = { $in: [String(feed.userId)] };
         const tasks = await MongoDbCrudOpration(feed.companyId, {
             type: SCHEMA_TYPE.TASKS, data: [match, 'TaskName TaskKey DueDate ProjectID statusType', { limit: 1000 }],
         }, 'find');
@@ -96,7 +184,10 @@ exports.getIcs = async (req, res) => {
         }));
         const ics = R.buildIcs({ calName: feed.name || 'AlianHub', events, stamp: R.fmtStamp(new Date()) });
         res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-        res.setHeader('Content-Disposition', `inline; filename="alianhub-${token.slice(0, 8)}.ics"`);
+        res.setHeader('Content-Disposition', `inline; filename="alianhub-${String(feed._id)}.ics"`);
         return res.send(ics);
-    } catch (e) { logger.error(`getIcs: ${e.message}`); return res.status(500).send('Error generating calendar.'); }
+    } catch (error) {
+        logger.error(`getIcs: ${error && error.message}`);
+        return res.status(500).send('Error generating calendar.');
+    }
 };
