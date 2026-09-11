@@ -845,7 +845,7 @@ const schema = {
         threadId: { type: String, required: false },
         // agent_revisions.n pinned at start; absent on runs from before revisions (read as 0)
         agentRevision: { type: Number, required: false },
-        // { key, hash, n } — the skill identity pinned at start; n is null until skills are data
+        // { key, hash, n } — the skill identity pinned at start: a data skill's version as n, a code skill's module hash with n null
         skillRevision: { type: Object, required: false },
     },
     agentRevisions: {

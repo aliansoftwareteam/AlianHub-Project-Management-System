@@ -6,7 +6,7 @@ jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), 
 jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async (c, uid) => (uid === 'member1' ? 'member' : 'owner')), isPrivileged: (r) => r === 'owner' || r === 'admin' }));
 jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async (req) => ({ kind: req.agentToken ? 'agent' : 'human', userId: req.uid })), isAgent: (a) => a.kind === 'agent', attribution: (a) => ({ actorType: a.kind, actorId: a.userId, label: a.userId }) }));
 jest.mock('../Modules/Automations/engine/tools', () => ({ getTask: jest.fn(async () => ({ _id: '6f0000000000000000000701', TaskName: 'Review', ProjectID: 'p1' })) }));
-jest.mock('../Modules/AIProjectGenerator/usage', () => ({ checkConfiguredModelPriced: () => ({ ok: true, reason: '' }), unpricedMessage: (m) => m, UNPRICED_MODEL: 'unpriced_model', summarize: jest.fn(() => ({ costUsd: 0, totalTokens: 0, model: 'm' })) }));
+jest.mock('../Modules/AICore/usage', () => ({ checkConfiguredModelPriced: () => ({ ok: true, reason: '' }), unpricedMessage: (m) => m, UNPRICED_MODEL: 'unpriced_model', summarize: jest.fn(() => ({ costUsd: 0, totalTokens: 0, model: 'm' })) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { agentRevisionsSchema } = require('../utils/mongo-handler/createSchema');
@@ -188,6 +188,16 @@ describe('a run pins the live revision', () => {
         expect(r.body.data.revision).toMatchObject({ n: 1, state: 'superseded', synthetic: false });
         const pinned = revisions.applyRevision({ ...baseAgent(), autonomy: 3 }, await revisions.forRun(C, run));
         expect(pinned.autonomy).toBe(1);
+    });
+
+    it('pins a data skill by its version and a code skill by its module hash', async () => {
+        await revisions.liveFor(C, baseAgent());
+        mockDb.seed(SCHEMA_TYPE.AGENT_SKILLS, { key: 'qa-review', name: 'QA (data)', version: 3, enabled: true, inputs: [], gather: [], prompt: { partials: [], instructions: 'Review.', template: 'Review {{ task.name }}', output: {} }, emit: [], emits: [] });
+        const data = await revisions.pinFor(C, baseAgent(), 'qa-review');
+        expect(data.skillRevision).toEqual({ key: 'qa-review', hash: null, n: 3 });
+        mockDb.store[SCHEMA_TYPE.AGENT_SKILLS].length = 0;
+        const code = await revisions.pinFor(C, baseAgent(), 'qa-review');
+        expect(code.skillRevision).toEqual({ key: 'qa-review', hash: expect.any(String), n: null });
     });
 
     it('the engine reads the agent from the pinned snapshot, not the mutable record', async () => {

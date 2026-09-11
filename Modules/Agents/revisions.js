@@ -40,9 +40,8 @@ const skillKeyOf = (skill) => {
 
 const skillKeysOf = (snapshot) => [...new Set(((snapshot && snapshot.skills) || []).map(skillKeyOf).filter(Boolean))];
 
-/* Code skills have no revision number yet: their identity is the slug plus a
- * hash of the module file, which changes with the prompt. Data skills (step 2)
- * fill `n` instead. */
+/* A code skill has no revision number: its identity is the slug plus a hash of
+ * the module file, which changes with the prompt. A data skill pins its version as `n`. */
 let skillHashes = null;
 const SKILLS_DIR = path.join(__dirname, 'skills');
 const loadSkillHashes = () => {
@@ -128,11 +127,20 @@ const liveFor = async (companyId, agent) => {
     return createRevision(companyId, a._id, { snapshot: snapshotOf(a), state: STATE.LIVE, createdBy: a.ownerId || null, source: SOURCE.BOOTSTRAP });
 };
 
+const pinnedSkillRef = async (companyId, key) => {
+    try {
+        // eslint-disable-next-line global-require
+        const skill = await require('./skillRecord').getSkill(companyId, key);
+        if (skill && skill.source === 'data') return { key: String(key), hash: null, n: Number(skill.version) };
+    } catch (e) { logger.error(`[agent-revisions] skill ${key} not resolved: ${e.message}`); }
+    return skillRefOf(key);
+};
+
 /* What a run pins at start. */
 const pinFor = async (companyId, agent, skillKey) => {
     const live = await liveFor(companyId, agent);
     const key = skillKey || skillKeysOf(live && live.snapshot)[0] || null;
-    return { agentRevision: live ? Number(live.n) : 0, skillRevision: key ? skillRefOf(key) : null };
+    return { agentRevision: live ? Number(live.n) : 0, skillRevision: key ? await pinnedSkillRef(companyId, key) : null };
 };
 
 /* Runs from before revisions carry no number and resolve to a synthetic zero. */
