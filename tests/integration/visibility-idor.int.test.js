@@ -85,3 +85,46 @@ describe('TSK-06 the activity log follows project visibility', () => {
         expect((await owner.api.get('/api/v1/activity-log', { query })).status).toBe(200);
     });
 });
+
+describe('TSK-07 saved filters belong to their owner', () => {
+    async function ownerFilter(owner) {
+        const res = await owner.api.post('/api/v1/task/filter/create', {
+            name: `VIS Filter ${uniqueSuffix()}`, filters: [{ key: 'status' }], userId: owner.uid, companyId: state.companyId, typeFilter: 'projectTask', filter: 'taskFilter',
+        });
+        expect(res.body.status).toBe(true);
+        return res.body.data;
+    }
+    const listFor = async (session) => (await session.api.get(`/api/v1/task/filter/${session.uid}`)).body.data;
+
+    it('refuses to list another user\'s task and advanced filters', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        await ownerFilter(owner);
+        expect(refused(await member.api.get(`/api/v1/task/filter/${owner.uid}`))).toBe(true);
+        expect(refused(await member.api.get(`/api/v1/advance/filter/${owner.uid}/tasks`))).toBe(true);
+    });
+
+    it('refuses to change or delete another user\'s filter, while the owner still can', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const filter = await ownerFilter(owner);
+
+        expect(refused(await member.api.put('/api/v1/task/filter/update', [{ _id: filter._id }, { $set: { name: 'Hijacked' } }]))).toBe(true);
+        expect(refused(await member.api.delete(`/api/v1/task/filter/delete/${state.companyId}/${filter._id}`))).toBe(true);
+        expect((await listFor(owner)).find((f) => sameId(f._id, filter._id))).toMatchObject({ name: filter.name });
+
+        expect((await owner.api.put('/api/v1/task/filter/update', [{ _id: filter._id }, { $set: { name: 'Renamed' } }])).status).toBe(200);
+        expect((await listFor(owner)).find((f) => sameId(f._id, filter._id)).name).toBe('Renamed');
+        expect((await owner.api.delete(`/api/v1/task/filter/delete/${state.companyId}/${filter._id}`)).status).toBe(200);
+        expect((await listFor(owner)).some((f) => sameId(f._id, filter._id))).toBe(false);
+    });
+
+    it('refuses to save a filter for someone else', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const res = await member.api.post('/api/v1/task/filter/create', {
+            name: `VIS Planted ${uniqueSuffix()}`, filters: [], userId: owner.uid, companyId: state.companyId, typeFilter: 'projectTask', filter: 'taskFilter',
+        });
+        expect(refused(res)).toBe(true);
+    });
+});

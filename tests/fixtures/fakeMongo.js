@@ -1,6 +1,6 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
 // language for the agent modules (equality, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type, $set/$inc/$push,
-// conditional findOneAndUpdate, deleteMany, sort/limit on find, $match/$group aggregate, declared unique indexes that
+// conditional findOneAndUpdate, deleteOne/deleteMany, sort/limit on find, $match/$group aggregate, declared unique indexes that
 // reject a duplicate save with E11000) so a test can assert on what was written.
 
 let seq = 1;
@@ -119,6 +119,7 @@ const create = () => {
         if (method === 'find') return ordered(list.filter((d) => matches(d, data[0])), data[2]).map(clone);
         if (method === 'findOne') return clone(list.find((d) => matches(d, data[0])) || null);
         if (method === 'countDocuments') return list.filter((d) => matches(d, data[0])).length;
+        if (method === 'deleteOne') { const index = list.findIndex((d) => matches(d, data[0])); if (index !== -1) list.splice(index, 1); return { deletedCount: index === -1 ? 0 : 1 }; }
         if (method === 'deleteMany') { const kept = list.filter((d) => !matches(d, data[0])); store[type] = kept; return { deletedCount: list.length - kept.length }; }
         if (method === 'findOneAndUpdate') { const doc = list.find((d) => matches(d, data[0])); if (!doc) return null; apply(doc, data[1]); return clone(doc); }
         if (method === 'updateOne') { const doc = list.find((d) => matches(d, data[0])); if (doc) apply(doc, data[1]); return { modifiedCount: doc ? 1 : 0 }; }
