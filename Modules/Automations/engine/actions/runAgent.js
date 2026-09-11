@@ -32,6 +32,10 @@ const ruleOwner = async (companyId, ruleId) => {
     return rule && rule.createdBy ? String(rule.createdBy) : null;
 };
 
+const recordLoopRefusal = (companyId, agent, { taskId, context, check }) => require('../../../Agents/agentAudit').recordRefusal(companyId,
+    { kind: 'agent', userId: null, agentId: String(agent._id), agentName: agent.name, runId: null, viaAccount: agent.account, tokenId: null },
+    { action: 'run.start', reason: check.reason, entityId: taskId, params: { ruleId: context.ruleId, ruleName: context.ruleName, eventId: context.eventId || null, depth: check.depth, maxDepth: check.maxDepth } });
+
 module.exports = {
     key: 'run_agent',
     label: 'Run an AI agent',
@@ -50,8 +54,11 @@ module.exports = {
         if (!String(config.agent || '').trim()) throw refuse('This rule does not name an agent — pick one so its pause switch, spend cap and allowed actions apply.');
         const agent = await findAgent(companyId, config.agent);
         if (!agent) throw refuse(`No agent named "${config.agent}" in this workspace.`);
-        const check = await runs.canStart(agent, { trigger: 'rule', companyId });
-        if (!check.ok) throw refuse(`${agent.name} cannot run: ${check.reason}`);
+        const check = await runs.canStart(agent, { trigger: 'rule', companyId, depth: context.depth });
+        if (!check.ok) {
+            if (check.code === runs.LOOP_DEPTH_EXCEEDED) await recordLoopRefusal(companyId, agent, { taskId: entity.id, context, check });
+            throw refuse(`${agent.name} cannot run: ${check.reason}`);
+        }
         if (agent.projectIds && agent.projectIds.length && !agent.projectIds.map(String).includes(String(task.ProjectID))) {
             throw refuse(`${agent.name} is not scoped to this project.`);
         }
@@ -60,6 +67,7 @@ module.exports = {
         const run = await runs.create(companyId, {
             agent, taskId: entity.id, projectId: task.ProjectID, skill: runs.skillSlugOf(agent, config.skill), trigger: 'rule',
             startedBy, viaAccount: agent.account, note: context.ruleName ? `rule "${context.ruleName}"` : null,
+            triggerDepth: context.depth, triggerEventId: context.eventId,
         });
         const actor = { kind: 'agent', userId: startedBy, agentId: String(agent._id), agentName: agent.name, runId: String(run._id), viaAccount: run.viaAccount, tokenId: null };
         const out = await runs.executeSkill(companyId, run, agent, task, { proposals, actions, actor });

@@ -184,11 +184,10 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     const runs = require('./runs');
     const agent = await runs.getAgent(companyId, p.agentId);
     if (!agent) return { error: 'This agent was deleted — decline the proposal instead.', status: 409 };
-    if (p.runId) {
-        const run = await runOf(companyId, p.runId);
-        if (!run) return { error: 'The run behind this proposal no longer exists — decline it instead.', status: 409, reason: REASON.RUN_MISSING };
-        if (run.status === runs.STATUS.STOPPED) return { error: 'Run was stopped.', status: 409 };
-    }
+    const run = p.runId ? await runOf(companyId, p.runId) : null;
+    if (p.runId && !run) return { error: 'The run behind this proposal no longer exists — decline it instead.', status: 409, reason: REASON.RUN_MISSING };
+    if (run && run.status === runs.STATUS.STOPPED) return { error: 'Run was stopped.', status: 409 };
+    const depth = runs.originDepth(run);
 
     const claimed = await setStatus(companyId, id, { status: STATUS.APPLYING, decidedBy: decider.userId, decidedAt: new Date() }, { onlyIf: STATUS.PENDING });
     if (!claimed) return alreadyDecided(companyId, id);
@@ -199,7 +198,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     for (const c of changes) {
         try {
             // eslint-disable-next-line no-await-in-loop
-            const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions });
+            const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth });
             if (out.auditId) auditIds.push(out.auditId);
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {
