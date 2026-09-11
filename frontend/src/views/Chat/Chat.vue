@@ -96,6 +96,7 @@ import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import ChatSidebar from './ChatSidebar.vue';
 import { useMainChat } from './helper';
 import { useChatDirectory } from './useChatDirectory';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 defineOptions({ name: 'ChatView' });
 
@@ -228,7 +229,7 @@ const sendMessageAllowed = computed(() => {
     if (isDirect.value) return canSendDirectMessages.value;
     if (!selectedChat.value || selectedChat.value.sendMessage !== false) return true;
     const roleType = (getters['settings/companyUserDetail'] || {}).roleType;
-    return roleType === 1 || roleType === 2;
+    return isOwnerOrAdmin(roleType);
 });
 
 const showList = computed(() => !isMobile.value || !route.params.sid);

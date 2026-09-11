@@ -10,7 +10,7 @@
                 :message="$t('Upgrades.the_feature_not_available')"
             />
         </div>
-        <template v-if="(companyUser && (companyUser.roleType === 1 || companyUser.roleType === 2)) || checkPermission('settings.settings_security_permissions') !== null">
+        <template v-if="(companyUser && isOwnerOrAdmin(companyUser.roleType)) || checkPermission('settings.settings_security_permissions') !== null">
             <div class="sp__body" :class="{ 'sp__body--locked': !planAllowed }">
                 <div class="sp__head">
                     <div>
@@ -24,7 +24,7 @@
                 </div>
 
                 <div v-if="!props.from" class="sp__roles">
-                    <div v-for="card in roleCards" :key="card.key" class="ah-card sp__role" :class="{ 'is-highlight': card.key === 3 }">
+                    <div v-for="card in roleCards" :key="card.key" class="ah-card sp__role" :class="{ 'is-highlight': card.key === ROLE_MEMBER }">
                         <div class="sp__role-name">{{ card.name }}</div>
                         <div class="ah-small sp__role-desc">{{ card.desc }} {{ $t('Settings.people_count', { n: card.count }) }}</div>
                     </div>
@@ -67,6 +67,7 @@
     const { t } = useI18n();
     import { apiRequest } from "../../../services/index";
     import * as env from '@/config/env';
+    import { ROLE_MEMBER, isOwnerOrAdmin } from "@/utils/roles";
     defineOptions({ name: "SecurityPermissionsView" });
     const SIMPLE_KEYS = ["project_list", "public_projects", "project_create", "task_create", "task_status", "task_assignee", "task_comment", "task_delete", "project_delete", "user_timesheet", "settings_invite_member"];
     const mode = ref("simple");

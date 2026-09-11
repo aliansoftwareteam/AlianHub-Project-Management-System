@@ -111,6 +111,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { teamIdToUserId } from '@/composable/commonFunction';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
+import { ROLE_GUEST } from "@/utils/roles";
 
 // AHE-3789 — "Work by Category" card. Buckets each user's logged hours into a
 // category → task-type template and shows a team-split summary bar + a sortable
@@ -258,7 +259,7 @@ async function load() {
             dateFrom,
             dateTo,
             callerUserId: (userIdRef && userIdRef.value) ? String(userIdRef.value) : '',
-            callerRoleType: Number(props.companyUserDetail?.roleType) || 3,
+            callerRoleType: Number(props.companyUserDetail?.roleType ?? ROLE_GUEST),
         };
         const resp = (await apiRequest('post', `${env.DASHBOARD}/project-metrics`, payload))?.data;
         report.value = (resp && resp.status && resp.data) ? { ...emptyReport(), ...resp.data } : emptyReport();

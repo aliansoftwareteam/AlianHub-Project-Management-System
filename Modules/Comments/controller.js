@@ -340,6 +340,7 @@ exports.searchComments = async (req, res) => {
             batchSize = 20,
             sortBy = 'createdAt',
         } = req.body;
+        const privileged = isPrivileged(await getRoleType(req.headers['companyid'], req.uid));
 
         // Parse inputs and prepare default values
         const searchStr = searchText.toString();
@@ -389,7 +390,7 @@ exports.searchComments = async (req, res) => {
                 ]
             }
         }
-        if (req.body?.roleType === 1 || req.body?.roleType === 2) {
+        if (privileged) {
             sprintLookup.$lookup.pipeline.push({
                 $project: {
                     name: 1,
@@ -467,7 +468,7 @@ exports.searchComments = async (req, res) => {
             searchResultMatch,
             sprintLookup,
             sprintUnwind,
-            ...(req.body?.roleType !== 1 && req.body?.roleType !== 2 ? [checkIsSprint] : []),
+            ...(privileged ? [] : [checkIsSprint]),
             folderLookup,
             folderUnwind,
             sortOption,

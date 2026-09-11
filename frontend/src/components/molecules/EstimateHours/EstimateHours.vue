@@ -144,6 +144,7 @@ import * as env from '@/config/env';
 import { estimatedTimeAdded, estimatedTimeAssignAdded, estimatedTimeAssignUpdated, estimatedTimeUpdated } from '@/utils/NotificationTemplate';
 import { apiRequest } from '../../../services';
 import { useI18n } from "vue-i18n";
+import { isOwnerOrAdmin } from "@/utils/roles";
 const { t } = useI18n();
 
 const {getUser} = useGetterFunctions()
@@ -218,8 +219,7 @@ function getETASnapshot() {
 const getTotalMinutes = () => {
   return estimatedHours.value.reduce((sum, item) => {
     const canSeeAll =
-      companyUser.value.roleType === 1 ||
-      companyUser.value.roleType === 2 ||
+      isOwnerOrAdmin(companyUser.value.roleType) ||
       props.permission === 2;
 
     if (canSeeAll || item.UserId === userId.value) {
@@ -246,7 +246,7 @@ function showEtaSidebar() {
         $toast.error(t(`Toast.Access_Denied`), {position: 'top-right'})
         return;
     }
-    let assigneePermissionCheck = companyUser.value.roleType !== 1 && companyUser.value.roleType !== 2 && props.permission !== 2 ? props.task?.AssigneeUserId?.length && props.task.AssigneeUserId.includes(userId.value) : props.task?.AssigneeUserId?.length;
+    let assigneePermissionCheck = !isOwnerOrAdmin(companyUser.value.roleType) && props.permission !== 2 ? props.task?.AssigneeUserId?.length && props.task.AssigneeUserId.includes(userId.value) : props.task?.AssigneeUserId?.length;
     if(assigneePermissionCheck && props.task?.DueDate) {
         if(props.permission) {
             isVisible.value = true
@@ -256,7 +256,7 @@ function showEtaSidebar() {
             $toast.error(t(`Toast.No_assignee_found`), {position: 'top-right'})
         } else if(!props.task?.DueDate) {
             $toast.error(t(`Toast.No_due_date_found`), {position: 'top-right'})
-        } else if(companyUser.value.roleType !== 1 && companyUser.value.roleType !== 2 && props.permission !== 2 && !props.task.AssigneeUserId.includes(userId.value)){
+        } else if(!isOwnerOrAdmin(companyUser.value.roleType) && props.permission !== 2 && !props.task.AssigneeUserId.includes(userId.value)){
             $toast.error(t(`Toast.No_self_assignee_found`), {position: 'top-right'})
         }
     }

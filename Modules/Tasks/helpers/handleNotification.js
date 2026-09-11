@@ -7,7 +7,7 @@ const mongoose = require("mongoose");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { myCache } = require("../../../Config/config");
 
-exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId, sprintId, object, userData, changeType = '', changeData = {},comments_id = "", mentionUserId = [],isGroupChat}) => {
+exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId, sprintId, object, userData, changeType = '', changeData = {},comments_id = "", mentionUserId = [],isGroupChat} = {}) => {
     return new Promise(async (resolve, reject) => {
         try {
             let projectPath = `${companyId}/${companyId}/${dbCollections.PROJECTS}/${projectId}`
@@ -261,6 +261,8 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                     logger.error(`ERROR in Notification API info::${error.message}`);
                     reject({ status: false, message: error.message });
                 });
+            } else {
+                reject({ status: false, message: "Nothing to notify: the project or task was not found" });
             }
         } catch (error) {
 

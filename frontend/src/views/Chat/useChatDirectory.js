@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue';
 import { useStore } from 'vuex';
 import { useGetterFunctions, useCustomComposable } from '@/composable';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 const ACTIVE = (row) => Number((row && row.deletedStatusKey) || 0) === 0;
 
@@ -19,7 +20,7 @@ export function useChatDirectory({ projects, userId, canStartDirect }) {
 
     const myCounts = computed(() => (getters['users/myCounts'] && getters['users/myCounts'].data) || {});
     const roleType = computed(() => (getters['settings/companyUserDetail'] || {}).roleType);
-    const isAdmin = computed(() => roleType.value === 1 || roleType.value === 2);
+    const isAdmin = computed(() => isOwnerOrAdmin(roleType.value));
     const usersLoaded = computed(() => (getters['users/users'] || []).length > 0);
 
     function isActiveUser(id) {

@@ -1,7 +1,8 @@
-// Safe to hardcode here and nowhere else: importCompanyRoles in utils/data.js is what creates role
-// key 3 as "Member", so at seed time the number and the role are the same thing. Runtime code must
-// never assume it — a company can rename or add roles afterwards.
-const MEMBER_ROLE_TYPE = 3;
+const { ROLE_MEMBER } = require('../../../Config/roleTypes');
+
+// Seed-time only: importCompanyRoles creates this key as "Member", but a company can rename or add
+// roles afterwards, so runtime code must never assume it.
+const MEMBER_ROLE_TYPE = ROLE_MEMBER;
 
 // What a brand-new company gives the Member role. Before this existed the rules were seeded with
 // empty role lists, so an invited teammate saw a product with almost everything hidden and the

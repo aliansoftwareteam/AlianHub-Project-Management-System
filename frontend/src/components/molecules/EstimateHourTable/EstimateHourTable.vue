@@ -107,6 +107,7 @@ const { addZero } = useCustomComposable();
 const { getters } = useStore();
 
 import { useI18n } from "vue-i18n";
+import { isOwnerOrAdmin } from "@/utils/roles";
 const { t } = useI18n();
 
 const emits = defineEmits(['update:updatedETA', 'rangeUpdated'])
@@ -304,7 +305,7 @@ function handleUpdate(e, data, uid) {
 }
 
 props.AssigneeUserId.forEach((element) => {
-    if(companyUser.value.roleType !== 1 && companyUser.value.roleType !== 2 && props.permission !== 2) {
+    if(!isOwnerOrAdmin(companyUser.value.roleType) && props.permission !== 2) {
         if(element === userId.value){
             totalUsers.value.push(getUser(element));
         }

@@ -99,6 +99,7 @@ import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { reasonOf } from "@/views/Ai/useAgents";
 import { budgetView, featureLabelKey } from "./agentBudget";
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 defineOptions({ name: "InstanceAgents" });
 
@@ -114,7 +115,7 @@ const provider = ref({ name: "", hasKey: false, region: "", model: "", priced: n
 const draft = reactive({ undoHours: 24, monthlyBudgetUsd: 0 });
 let baseline = { ...draft };
 
-const privileged = computed(() => [1, 2].includes(Number(getters["settings/companyUserDetail"]?.roleType)));
+const privileged = computed(() => isOwnerOrAdmin(Number(getters["settings/companyUserDetail"]?.roleType)));
 const view = computed(() => budgetView(budget.value));
 const dirty = computed(() => draft.undoHours !== baseline.undoHours || draft.monthlyBudgetUsd !== baseline.monthlyBudgetUsd);
 const usageLine = computed(() => (view.value.cap > 0

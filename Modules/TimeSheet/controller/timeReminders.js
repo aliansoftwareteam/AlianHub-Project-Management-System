@@ -4,6 +4,7 @@ const { SendEmail } = require("../../service");
 const { usersNeedingReminder, reminderSubject, reminderHtml } = require("../helpers/reminderRules");
 const reminderSettings = require("../helpers/reminderSettings");
 const logger = require("../../../Config/loggerConfig");
+const { isPrivileged } = require('../../../Config/roleTypes');
 
 // TIME-06 — time-entry reminders. A daily nudge (prod cron) to members who
 // haven't logged time today; the /send-reminders endpoint runs the same path
@@ -93,7 +94,7 @@ const isCompanyOwner = async (companyId, userId) => {
             data: [{ userId: String(userId) }, { _id: 1, roleType: 1 }],
         }, 'findOne');
         // Owner (1) or Admin (2) may manage this setting.
-        return !!record && [1, 2].includes(Number(record.roleType));
+        return !!record && isPrivileged(Number(record.roleType));
     } catch (err) {
         logger.error(`[timeReminders] role check failed companyId=${companyId} userId=${userId} ${err && err.message}`);
         return false;

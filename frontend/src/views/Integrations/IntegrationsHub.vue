@@ -205,12 +205,17 @@
                             <span class="ig-inbox-name">{{ f.name }}</span>
                             <span class="ig-pill on">{{ f.scope === 'my' ? $t('IntegrationsHub.cal_my') : $t('IntegrationsHub.cal_project') }}</span>
                         </div>
-                        <label class="ig-lbl">{{ $t('IntegrationsHub.cal_url') }}</label>
-                        <div class="ig-row">
-                            <input class="form-control ig-mono" :value="f.url" readonly @focus="$event.target.select()" />
-                            <button class="ig-mini" @click="copy(f.url)">{{ $t('IntegrationsHub.copy') }}</button>
-                        </div>
+                        <template v-if="feedLinks[f._id]">
+                            <label class="ig-lbl">{{ $t('IntegrationsHub.cal_url') }}</label>
+                            <div class="ig-row">
+                                <input class="form-control ig-mono" :value="feedLinks[f._id]" readonly @focus="$event.target.select()" />
+                                <button class="ig-mini" @click="copy(feedLinks[f._id])">{{ $t('IntegrationsHub.copy') }}</button>
+                            </div>
+                            <p class="ig-note">{{ $t('IntegrationsHub.cal_url_once') }}</p>
+                        </template>
+                        <p v-else class="ig-note">{{ $t('IntegrationsHub.cal_url_hidden') }}</p>
                         <div class="ig-inbox-actions">
+                            <button class="ig-mini" :disabled="busy" @click="regenerateFeed(f)">{{ $t('IntegrationsHub.cal_regenerate') }}</button>
                             <button class="ig-mini del" @click="removeFeed(f)">{{ $t('IntegrationsHub.delete') }}</button>
                         </div>
                     </div>
@@ -279,6 +284,7 @@ export default { name: 'IntegrationsHub' };
 
 <script setup>
 import { ref, reactive, computed, onMounted, inject } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import { useGetterFunctions } from '@/composable';
 import * as env from '@/config/env';
@@ -288,6 +294,7 @@ import * as env from '@/config/env';
 const companyIdRef = inject('$companyId');
 const userId = inject('$userId');
 const { getUser } = useGetterFunctions();
+const { t } = useI18n();
 const cid = computed(() => (companyIdRef && companyIdRef.value) || companyIdRef || '');
 
 const cats = [
@@ -305,6 +312,7 @@ const projects = ref([]);
 const inboxes = ref([]);
 const newProjectId = ref('');
 const feeds = ref([]);
+const feedLinks = reactive({});
 const calScope = ref('my');
 const calProjectId = ref('');
 const rules = ref([]);
@@ -366,7 +374,6 @@ const remove = async (ib) => {
 };
 const copy = (text) => { if (text) navigator.clipboard.writeText(text); };
 
-// AUTO-02 — calendar feeds.
 const loadFeeds = async () => {
     try { const body = (await apiRequest('get', `${env.CALENDAR_FEED}/feeds`))?.data; feeds.value = (body && body.data) || []; } catch (e) { feeds.value = []; }
 };
@@ -374,17 +381,22 @@ const createFeed = async () => {
     if (busy.value || (calScope.value === 'project' && !calProjectId.value)) return;
     busy.value = true;
     try {
-        const u = (getUser && getUser(userId && userId.value)) || {};
-        await apiRequest('post', `${env.CALENDAR_FEED}/feeds`, {
-            scope: calScope.value, projectId: calProjectId.value,
-            userData: { id: u.id || (userId && userId.value), Employee_Name: u.Employee_Name || '' },
-        });
+        const body = (await apiRequest('post', `${env.CALENDAR_FEED}/feeds`, { scope: calScope.value, projectId: calProjectId.value }))?.data;
+        if (body?.status && body.data) feedLinks[body.data._id] = body.data.url;
         calProjectId.value = '';
         await loadFeeds();
     } catch (e) { /* noop */ } finally { busy.value = false; }
 };
+const regenerateFeed = async (f) => {
+    if (busy.value || !window.confirm(t('IntegrationsHub.cal_regenerate_confirm'))) return;
+    busy.value = true;
+    try {
+        const body = (await apiRequest('post', `${env.CALENDAR_FEED}/feeds/${f._id}/regenerate`))?.data;
+        if (body?.status && body.data) feedLinks[f._id] = body.data.url;
+    } catch (e) { /* noop */ } finally { busy.value = false; }
+};
 const removeFeed = async (f) => {
-    try { await apiRequest('delete', `${env.CALENDAR_FEED}/feeds/${f._id}`); await loadFeeds(); } catch (e) { /* noop */ }
+    try { await apiRequest('delete', `${env.CALENDAR_FEED}/feeds/${f._id}`); delete feedLinks[f._id]; await loadFeeds(); } catch (e) { /* noop */ }
 };
 
 // AUTO-03 — automation rules.

@@ -54,6 +54,7 @@ import { useI18n } from "vue-i18n";
 import { showAlertModal } from "@/components/atom/AlertBox/helper";
 import { apiRequest } from "@/services";
 import * as env from '@/config/env';
+import { ROLE_GUEST } from "@/utils/roles";
 
 const { getters } = useStore();
 const dropDownSvg = require("@/assets/images/svg/dropdown_strong.svg");
@@ -95,7 +96,7 @@ const checkRolePermission = async () => {
     }
 
     let obj = {
-        roleType: 0, // 0 for guest user
+        roleType: ROLE_GUEST,
     };
 
     try {

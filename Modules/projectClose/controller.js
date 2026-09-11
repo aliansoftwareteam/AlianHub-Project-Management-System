@@ -14,6 +14,7 @@ const helper = require('./helper');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const logger = require('../../Config/loggerConfig');
+const { isPrivileged } = require('../../Config/roleTypes');
 
 function getCallerContext(req) {
     const companyId = req.headers && (req.headers.companyid || req.headers.companyId);
@@ -29,7 +30,7 @@ async function isCompanyOwner(companyId, userId) {
             data: [{ userId: String(userId) }, { _id: 1, roleType: 1 }],
         }, 'findOne');
         // Owner (1) or Admin (2) may manage this setting.
-        return !!record && [1, 2].includes(Number(record.roleType));
+        return !!record && isPrivileged(Number(record.roleType));
     } catch (err) {
         logger.error(`[autoCloseProjects] role check failed companyId=${companyId} userId=${userId} ${err && err.message}`);
         return false;

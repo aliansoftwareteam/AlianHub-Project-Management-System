@@ -158,6 +158,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { resolveCardRange } from '@/composable/useResourceWorkload';
 import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 // Company-wide billing-milestone report for the management dashboard.
 // Self-fetching from POST /api/v1/dashboard/milestone-summary. Owner/Admin
@@ -188,7 +189,7 @@ const data = ref({
 const loading = ref(false);
 const selectedStatus = ref(''); // active status drill-down ('' = all)
 
-const isManagement = computed(() => [1, 2].includes(props.companyUserDetail?.roleType));
+const isManagement = computed(() => isOwnerOrAdmin(props.companyUserDetail?.roleType));
 
 // Shared card period: 0 = Auto → follow the dashboard's global range. The
 // period dropdown lives in the card header (HomePage PROJECT_PERIOD_CARDS);

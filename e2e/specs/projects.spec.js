@@ -63,7 +63,7 @@ test.describe('projects and planning as a member', () => {
 test.describe('projects and planning — folder deep link (PRJ-07)', () => {
     test.use(asRole('owner'));
 
-    test.fail('a folder deep link opens the folder view instead of redirecting to the list', async ({ page, state, loginAs }) => {
+    test('a folder deep link opens the folder view instead of redirecting to the list', async ({ page, state, loginAs }) => {
         const owner = await loginAs('owner');
         const folderName = `Folder ${Date.now()}`;
         const folder = await owner.api.post('/api/v1/folder', {
