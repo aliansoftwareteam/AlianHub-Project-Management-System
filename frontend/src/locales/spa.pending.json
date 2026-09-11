@@ -5369,6 +5369,7 @@
     "AiHealth.owner_only_body": "Ask an owner or admin of this workspace for the AI health figures.",
     "AiHealth.load_failed": "The health figures could not be loaded.",
     "AiHealth.retry": "Retry",
+    "Ai.settings_read_only": "Read only. An owner or admin changes this agent's settings.",
     "Instance.channel_unknown": "version unresolved"
   }
 }
