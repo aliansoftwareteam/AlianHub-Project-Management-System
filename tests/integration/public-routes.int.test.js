@@ -102,11 +102,11 @@ describe('the same routes with a session', () => {
     it('reads the member own company through mongoOpration', async () => {
         const { api } = await loginAs('member');
         const res = await api.post('/api/v1/mongoOpration', {
-            dbName: state.companyId, collection: 'tasks', methodName: 'find', dataObj: [{ ProjectID: state.projects.shared._id }],
+            dbName: state.companyId, collection: 'timesheets', methodName: 'aggregate', dataObj: [[{ $match: { TicketID: state.tasks[0]._id } }]],
         });
         expect(res.status).toBe(200);
         expect(res.body.status).toBe(true);
-        expect(Array.isArray(res.body.statusText)).toBe(true);
+        expect(Array.isArray(res.body.data)).toBe(true);
     });
 
     it.each([

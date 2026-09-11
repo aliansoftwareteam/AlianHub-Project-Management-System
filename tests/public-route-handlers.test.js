@@ -45,7 +45,7 @@ beforeEach(() => {
 });
 
 describe('mongoOperation reads only the caller company', () => {
-    const body = (overrides) => ({ dbName: COMPANY, collection: 'tasks', methodName: 'find', dataObj: [{}], ...overrides });
+    const body = (overrides) => ({ dbName: COMPANY, collection: 'timesheets', methodName: 'aggregate', dataObj: [[{ $match: {} }]], ...overrides });
 
     it('refuses another database', async () => {
         const res = response();
@@ -75,9 +75,9 @@ describe('mongoOperation reads only the caller company', () => {
 
     it('runs a read on the caller company', async () => {
         const res = response();
-        await mongoOperation(request({ body: body({ methodName: 'aggregate', dataObj: [[{ $match: { TicketID: 't1' } }]] }) }), res);
-        expect(MongoDbCrudOpration).toHaveBeenCalledWith(COMPANY, expect.objectContaining({ type: 'tasks' }), 'aggregate');
-        expect(res.body).toEqual({ status: true, statusText: [] });
+        await mongoOperation(request({ body: body({ dataObj: [[{ $match: { TicketID: 't1' } }]] }) }), res);
+        expect(MongoDbCrudOpration).toHaveBeenCalledWith(COMPANY, expect.objectContaining({ type: 'timesheets' }), 'aggregate');
+        expect(res.body).toEqual({ status: true, statusText: 'OK', data: [] });
     });
 });
 
