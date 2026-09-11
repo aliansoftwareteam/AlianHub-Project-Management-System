@@ -54,6 +54,12 @@ export default [
         meta: { title: 'Release & deploy', requiresAuth: true }
     },
     {
+        path: '/:cid/ai/health',
+        name: 'AiHealth',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiHealth.vue'),
+        meta: { title: 'AI health', requiresAuth: true }
+    },
+    {
         path: '/:cid/ai/accounts',
         name: 'AiAccounts',
         component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiAccounts.vue'),
