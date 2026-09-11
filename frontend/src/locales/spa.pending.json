@@ -5433,6 +5433,7 @@
     "AiAlerts.notice_resolved_agent_error_rate": "Resolved: {agent} is back under its error-rate threshold.",
     "AiAlerts.notice_resolved_approval_rate_falling": "Resolved: approval of agent proposals is back within its threshold.",
     "AiAlerts.notice_resolved_cost_forecast": "Resolved: spend is back under its forecast threshold.",
-    "AiAlerts.notice_resolved_queue_age": "Resolved: the run queue is moving again."
+    "AiAlerts.notice_resolved_queue_age": "Resolved: the run queue is moving again.",
+    "dashboardCard.dashboard_updated": "Dashboard updated successfully"
   }
 }

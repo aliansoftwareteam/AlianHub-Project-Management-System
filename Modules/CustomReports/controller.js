@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
@@ -7,13 +6,19 @@ const logger = require('../../Config/loggerConfig');
 const { resolveRate } = require('../TimeSheet/helpers/billingRules');
 const R = require('./helpers/reportRules');
 const T = require('./helpers/reportTemplates');
+const access = require('./helpers/reportAccess');
+
+const { oidOrNull } = access;
 
 const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
-const oid = (id) => new mongoose.Types.ObjectId(String(id));
-
-const oidOrNull = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
 const ID_DIMENSIONS = { project: 'project', sprint: 'sprint', person: 'person' };
+
+const reply = (res, code, statusText, extra = {}) => res.status(code).json({ status: false, statusText, message: statusText, ...extra });
+const serverError = (res, where, e) => {
+    logger.error(`${where}: ${e && e.message}`);
+    return reply(res, 500, 'Something went wrong while handling the report.');
+};
 
 // A group key is an id for project / sprint / person dimensions; a chart that
 // shows raw ObjectIds is not a report anyone can read.
@@ -58,7 +63,6 @@ const foldRevenue = async (companyId, raw) => {
 
 const UNITS = { hours: 'hours', revenue: 'currency', points: 'points', count: 'count', entries: 'count' };
 
-// Execute a validated config → { rows: [{ key, label, value }], unit }.
 const runConfig = async (companyId, cfg) => {
     const isLogs = cfg.source === 'timelogs';
     const pipeline = R.buildPipeline(cfg);
@@ -88,133 +92,155 @@ const runConfig = async (companyId, cfg) => {
 // same query as the one on screen.
 exports.runConfig = runConfig;
 
-// POST /api/v1/reports/custom/run — live preview, no save.
+const callerFor = async (req, res) => {
+    const companyId = companyOf(req);
+    if (!companyId) { reply(res, 400, 'companyId is required.'); return null; }
+    if (!req.uid) { reply(res, 401, 'An authenticated user is required.'); return null; }
+    return access.callerOf(companyId, req.uid);
+};
+
+const loadManagedReport = async (caller, id, res) => {
+    const _id = oidOrNull(id);
+    if (!_id) { reply(res, 400, 'A valid report id is required.'); return null; }
+    const report = await MongoDbCrudOpration(caller.companyId, {
+        type: SCHEMA_TYPE.SAVED_REPORTS, data: [{ _id }],
+    }, 'findOne');
+    if (!report || report.deletedStatusKey === 1) { reply(res, 404, 'Not found.'); return null; }
+    if (!access.canManage(caller, report)) { reply(res, 403, 'Only the report\'s creator, an owner or an admin can use this report.'); return null; }
+    return report;
+};
+
+const refusesFinancial = (caller, cfg, res) => {
+    if (!access.isFinancialConfig(cfg) || caller.privileged) return false;
+    res.status(403).json(access.RESTRICTED_BODY);
+    return true;
+};
+
+const saveReport = async (caller, name, cfg) => {
+    const data = { name, ...cfg, createdBy: caller.uid, deletedStatusKey: 0 };
+    const saved = await MongoDbCrudOpration(caller.companyId, { type: SCHEMA_TYPE.SAVED_REPORTS, data }, 'save');
+    removeCache(`saved_reports:${caller.companyId}`);
+    return saved;
+};
+
 exports.runReport = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const caller = await callerFor(req, res);
+        if (!caller) return undefined;
         const check = R.validateConfig(req.body || {});
-        if (!check.valid) return res.status(400).json({ status: false, statusText: check.errors.join('; ') });
-        const out = await runConfig(companyId, check.value);
+        if (!check.valid) return reply(res, 400, check.errors.join('; '));
+        if (refusesFinancial(caller, check.value, res)) return undefined;
+        const out = await runConfig(caller.companyId, check.value);
         return res.json({ status: true, data: { config: check.value, result: out.rows, unit: out.unit } });
-    } catch (e) { logger.error(`runReport: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return serverError(res, 'runReport', e); }
 };
 
-// POST /api/v1/reports/custom — save a report.
 exports.createReport = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const caller = await callerFor(req, res);
+        if (!caller) return undefined;
         const name = String(req.body.name || '').trim();
-        if (!name) return res.status(400).json({ status: false, statusText: 'name is required.' });
+        if (!name) return reply(res, 400, 'name is required.');
         const check = R.validateConfig(req.body || {});
-        if (!check.valid) return res.status(400).json({ status: false, statusText: check.errors.join('; ') });
-        const data = { name, ...check.value, createdBy: String(req.uid || ''), deletedStatusKey: 0 };
-        const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SAVED_REPORTS, data }, 'save');
-        removeCache(`saved_reports:${companyId}`);
+        if (!check.valid) return reply(res, 400, check.errors.join('; '));
+        if (refusesFinancial(caller, check.value, res)) return undefined;
+        const saved = await saveReport(caller, name, check.value);
         return res.status(201).json({ status: true, statusText: 'Report saved.', data: saved });
-    } catch (e) { logger.error(`createReport: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return serverError(res, 'createReport', e); }
 };
 
-// GET /api/v1/reports/custom — list saved reports.
 exports.listReports = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
-        const rows = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.SAVED_REPORTS, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { updatedAt: -1 } }],
+        const caller = await callerFor(req, res);
+        if (!caller) return undefined;
+        const rows = await MongoDbCrudOpration(caller.companyId, {
+            type: SCHEMA_TYPE.SAVED_REPORTS,
+            data: [{ deletedStatusKey: { $ne: 1 }, ...access.ownedScope(caller) }, {}, { sort: { updatedAt: -1 } }],
         }, 'find');
         return res.json({ status: true, data: rows || [] });
-    } catch (e) { logger.error(`listReports: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return serverError(res, 'listReports', e); }
 };
 
-// GET /api/v1/reports/custom/:id/run — load a saved report + execute it (reload).
 exports.getReportResult = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
-        const rep = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.SAVED_REPORTS, data: [{ _id: oid(req.params.id) }],
-        }, 'findOne');
-        if (!rep || rep.deletedStatusKey === 1) return res.status(404).json({ status: false, statusText: 'Not found.' });
+        const caller = await callerFor(req, res);
+        if (!caller) return undefined;
+        const rep = await loadManagedReport(caller, req.params.id, res);
+        if (!rep) return undefined;
+        if (refusesFinancial(caller, rep, res)) return undefined;
         const check = R.validateConfig(rep);
-        const out = check.valid ? await runConfig(companyId, check.value) : { rows: [], unit: 'count' };
+        const out = check.valid ? await runConfig(caller.companyId, check.value) : { rows: [], unit: 'count' };
         return res.json({ status: true, data: { report: rep, config: check.value, result: out.rows, unit: out.unit } });
-    } catch (e) { logger.error(`getReportResult: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return serverError(res, 'getReportResult', e); }
 };
 
-// PUT /api/v1/reports/custom/:id
 exports.updateReport = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const caller = await callerFor(req, res);
+        if (!caller) return undefined;
+        const rep = await loadManagedReport(caller, req.params.id, res);
+        if (!rep) return undefined;
         const check = R.validateConfig(req.body || {});
-        if (!check.valid) return res.status(400).json({ status: false, statusText: check.errors.join('; ') });
-        const set = { ...check.value, updatedBy: String(req.uid || '') };
+        if (!check.valid) return reply(res, 400, check.errors.join('; '));
+        if (refusesFinancial(caller, check.value, res)) return undefined;
+        const set = { ...check.value, updatedBy: caller.uid };
         if (req.body.name !== undefined) set.name = String(req.body.name).trim();
-        const updated = await MongoDbCrudOpration(companyId, {
+        const updated = await MongoDbCrudOpration(caller.companyId, {
             type: SCHEMA_TYPE.SAVED_REPORTS,
-            data: [{ _id: oid(req.params.id) }, { $set: set }, { returnDocument: 'after' }],
+            data: [{ _id: rep._id }, { $set: set }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
-        if (!updated) return res.status(404).json({ status: false, statusText: 'Not found.' });
-        removeCache(`saved_reports:${companyId}`);
+        if (!updated) return reply(res, 404, 'Not found.');
+        removeCache(`saved_reports:${caller.companyId}`);
         return res.json({ status: true, statusText: 'Report updated.', data: updated });
-    } catch (e) { logger.error(`updateReport: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return serverError(res, 'updateReport', e); }
 };
 
-// DELETE /api/v1/reports/custom/:id
 exports.deleteReport = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
-        await MongoDbCrudOpration(companyId, {
+        const caller = await callerFor(req, res);
+        if (!caller) return undefined;
+        const rep = await loadManagedReport(caller, req.params.id, res);
+        if (!rep) return undefined;
+        await MongoDbCrudOpration(caller.companyId, {
             type: SCHEMA_TYPE.SAVED_REPORTS,
-            data: [{ _id: oid(req.params.id) }, { $set: { deletedStatusKey: 1 } }],
+            data: [{ _id: rep._id }, { $set: { deletedStatusKey: 1, updatedBy: caller.uid } }],
         }, 'updateOne');
-        removeCache(`saved_reports:${companyId}`);
+        removeCache(`saved_reports:${caller.companyId}`);
         return res.json({ status: true, statusText: 'Report removed.' });
-    } catch (e) { logger.error(`deleteReport: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return serverError(res, 'deleteReport', e); }
 };
 
-// GET /api/v1/reports/custom/templates — built-in reusable templates (REP-07, static).
 exports.listTemplates = async (req, res) => {
     try {
         return res.json({ status: true, data: T.listTemplates() });
-    } catch (e) { logger.error(`listTemplates: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return serverError(res, 'listTemplates', e); }
 };
 
-// POST /api/v1/reports/custom/from-template { templateKey, name? } — create a new
-// saved report seeded from a built-in template (REP-07).
 exports.createFromTemplate = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const caller = await callerFor(req, res);
+        if (!caller) return undefined;
         const tpl = T.getTemplate(req.body && req.body.templateKey);
-        if (!tpl) return res.status(404).json({ status: false, statusText: 'Unknown template.' });
+        if (!tpl) return reply(res, 404, 'Unknown template.');
         const check = R.validateConfig(tpl.config);
-        if (!check.valid) return res.status(400).json({ status: false, statusText: check.errors.join('; ') });
+        if (!check.valid) return reply(res, 400, check.errors.join('; '));
+        if (refusesFinancial(caller, check.value, res)) return undefined;
         const name = String((req.body && req.body.name) || tpl.name).trim() || tpl.name;
-        const data = { name, ...check.value, createdBy: String(req.uid || ''), deletedStatusKey: 0 };
-        const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SAVED_REPORTS, data }, 'save');
-        removeCache(`saved_reports:${companyId}`);
+        const saved = await saveReport(caller, name, check.value);
         return res.status(201).json({ status: true, statusText: 'Report created from template.', data: saved });
-    } catch (e) { logger.error(`createFromTemplate: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return serverError(res, 'createFromTemplate', e); }
 };
 
-// POST /api/v1/reports/custom/:id/duplicate — clone an existing saved report (REP-07).
 exports.duplicateReport = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
-        const src = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.SAVED_REPORTS, data: [{ _id: oid(req.params.id) }],
-        }, 'findOne');
-        if (!src || src.deletedStatusKey === 1) return res.status(404).json({ status: false, statusText: 'Not found.' });
+        const caller = await callerFor(req, res);
+        if (!caller) return undefined;
+        const src = await loadManagedReport(caller, req.params.id, res);
+        if (!src) return undefined;
         const check = R.validateConfig(src);
-        if (!check.valid) return res.status(400).json({ status: false, statusText: check.errors.join('; ') });
-        const data = { name: `${src.name} (copy)`, ...check.value, createdBy: String(req.uid || ''), deletedStatusKey: 0 };
-        const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SAVED_REPORTS, data }, 'save');
-        removeCache(`saved_reports:${companyId}`);
+        if (!check.valid) return reply(res, 400, check.errors.join('; '));
+        if (refusesFinancial(caller, check.value, res)) return undefined;
+        const saved = await saveReport(caller, `${src.name} (copy)`, check.value);
         return res.status(201).json({ status: true, statusText: 'Report duplicated.', data: saved });
-    } catch (e) { logger.error(`duplicateReport: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return serverError(res, 'duplicateReport', e); }
 };

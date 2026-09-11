@@ -61,7 +61,7 @@ describe('reports — user dashboards', () => {
 
     // REP-01 — legacy POST /api/v1/dashboard runs an arbitrary Mongo method with a
     // body-supplied query, letting any role read/overwrite another user's dashboard.
-    it.failing('REP-01 refuses the legacy /dashboard endpoint editing another user\'s dashboard', async () => {
+    it('REP-01 refuses the legacy /dashboard endpoint editing another user\'s dashboard', async () => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
         const priv = await owner.api.post('/api/v1/dashboards', { title: `[int] rep01 ${uniqueSuffix()}`, visibility: 'private' });
@@ -108,7 +108,7 @@ describe('reports — custom reports', () => {
 
     // REP-02 — saved reports carry a createdBy but no route scopes to it, so a
     // guest can rewrite another user's saved report.
-    it.failing('REP-02 refuses a guest editing an admin\'s saved report', async () => {
+    it('REP-02 refuses a guest editing an admin\'s saved report', async () => {
         const admin = await loginAs('admin');
         const guest = await loginAs('guest');
         const rep = await savedReport(admin.api, `[int] rep02 ${uniqueSuffix()}`);
@@ -120,7 +120,7 @@ describe('reports — custom reports', () => {
 
     // REP-06 — the revenue metric exposes company billing figures to every role,
     // while the dedicated milestone financial card is owner/admin only.
-    it.failing('REP-06 does not expose company revenue to a guest through the report engine', async () => {
+    it('REP-06 does not expose company revenue to a guest through the report engine', async () => {
         const guest = await loginAs('guest');
         const res = await guest.api.post('/api/v1/reports/custom/run', { source: 'timelogs', dimension: 'person', metric: 'revenue', filters: { range: 'all' } });
         // Correct behaviour: financial data is gated the same way milestone-summary is.
@@ -129,13 +129,13 @@ describe('reports — custom reports', () => {
 
     // REP-07 — a malformed id 500s with a raw driver message; an unknown id "deletes"
     // successfully.
-    it.failing('REP-07 answers a malformed report id with 400, not 500', async () => {
+    it('REP-07 answers a malformed report id with 400, not 500', async () => {
         const owner = await loginAs('owner');
         const res = await owner.api.get('/api/v1/reports/custom/not-an-id/run');
         expect(res.status).toBe(400);
     });
 
-    it.failing('REP-07 answers a delete of an unknown report id with 404', async () => {
+    it('REP-07 answers a delete of an unknown report id with 404', async () => {
         const owner = await loginAs('owner');
         const res = await owner.api.delete(`/api/v1/reports/custom/${'a'.repeat(24)}`);
         expect(res.status).toBe(404);
@@ -242,7 +242,7 @@ describe('reports — webhooks', () => {
 
     // REP-04 — webhook URL validation only checks the protocol, so loopback and the
     // cloud metadata address are accepted (blind SSRF via the dispatcher).
-    it.failing('REP-04 refuses a webhook aimed at a private / link-local host', async () => {
+    it('REP-04 refuses a webhook aimed at a private / link-local host', async () => {
         const owner = await loginAs('owner');
         const results = [];
         for (const url of ['http://127.0.0.1:9/int-sink', 'http://169.254.169.254/latest/meta-data']) {
@@ -291,7 +291,7 @@ describe('reports — integrations', () => {
 
     // REP-03 — connection management has no role gate, so a guest can configure /
     // disconnect company-wide integrations.
-    it.failing('REP-03 refuses a guest managing company integration connections', async () => {
+    it('REP-03 refuses a guest managing company integration connections', async () => {
         const guest = await loginAs('guest');
         const res = await guest.api.post('/api/v1/integrations/connections', { type: 'zapier', config: { hook_url: 'https://hooks.zapier.com/int' } });
         if (res.body && res.body.data && res.body.data._id) {
@@ -302,7 +302,7 @@ describe('reports — integrations', () => {
 
     // REP-05 — non-iframe integration types skip per-field validation, so obviously
     // invalid config is stored and reported "Connected".
-    it.failing('REP-05 refuses an integration with an invalid config value', async () => {
+    it('REP-05 refuses an integration with an invalid config value', async () => {
         const owner = await loginAs('owner');
         const res = await owner.api.post('/api/v1/integrations/connections', { type: 'zapier', config: { hook_url: 'not a url' } });
         if (res.body && res.body.data && res.body.data._id) {
