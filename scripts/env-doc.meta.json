@@ -695,10 +695,6 @@
     "group": "frontend",
     "description": "Storage backend the web app assumes (server or wasabi); mirror STORAGE_TYPE."
   },
-  "VUE_APP_SUPPORT_COMPANYID": {
-    "group": "frontend",
-    "description": "Company id that receives support tickets raised from the app."
-  },
   "VUE_APP_SUPPORT_MAIL": {
     "group": "frontend",
     "description": "Mailbox shown for support requests."
