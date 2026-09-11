@@ -38,3 +38,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 030 | Sprint 7 — knowledge and retrieval | backlog | medium | 024 | backlog/030-sprint-7-knowledge-and-retrieval |
 | 031 | Sprint 8 — security hardening | backlog | high | 024 | backlog/031-sprint-8-security-hardening |
 | 032 | Sprint 11 — data skills reach outside (ADR 003 phase 4) | backlog | medium | 029, 031 | backlog/032-sprint-11-data-skills-reach |
+| 033 | Beta build version and log — every merge is a numbered build | active | high | — | active/033-beta-build-version-and-log |
