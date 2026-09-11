@@ -236,6 +236,7 @@ module.exports = {
     createProject,
     createTask,
     emailFor,
+    firstSprint,
     inviteMember,
     listSprints,
     login,
