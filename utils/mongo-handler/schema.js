@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const schema = {
     tasks: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -776,6 +778,8 @@ const schema = {
     },
     // Agents as teammates — managed by Modules/Agents.
     agents: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         name: { type: String, required: true },
         slug: { type: String, required: false },
         description: { type: String, required: false },
@@ -1300,6 +1304,8 @@ const schema = {
         },
     },
     users: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -1941,6 +1947,8 @@ const schema = {
         }
     },
     companyUsers: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -2144,6 +2152,8 @@ const schema = {
         }
     },
     projects: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -3388,6 +3398,8 @@ const schema = {
         }
     },
     sprints: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         sendMessage: {
             type: Boolean,
             required: false,
