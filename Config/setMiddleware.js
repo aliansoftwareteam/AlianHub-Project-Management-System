@@ -109,6 +109,8 @@ const verifyJWTTokenWithCRoute = [
     "/api/v1/findOnePrompts",
     "/api/v1/getAiCategory",
     "/api/v1/ai/description",
+    "/api/v1/getAiModels",
+    "/api/v1/findOneAiModel",
     "/api/v1/push-mark-read",
     "/api/v1/setting/skills",
     "/api/v1/milestoneRange",

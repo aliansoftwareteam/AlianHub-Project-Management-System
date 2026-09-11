@@ -57,7 +57,7 @@ test.describe('ask as a guest', () => {
 test.describe('automations as a guest', () => {
     test.use(asRole('guest'));
 
-    test.fail('AUT-04 does not offer a guest the rule builder', async ({ page, state }) => {
+    test('AUT-04 does not offer a guest the rule builder', async ({ page, state }) => {
         await page.goto(`/#/${state.companyId}/automations`);
         await expect(page.locator('.ah-toolbar__title')).toHaveText('Automations');
         await expect(page.getByRole('button', { name: 'New automation' })).toHaveCount(0, { timeout: 3000 });

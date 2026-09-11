@@ -1,6 +1,7 @@
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
-const { getTask, oid } = require('../Automations/engine/tools');
+const { oid } = require('../Automations/engine/tools');
+const scope = require('../Agents/scope');
 const logger = require('../../Config/loggerConfig');
 
 const ACCEPTANCE_HEADING = /^\s*(acceptance|acceptance criteria|done when|definition of done|ac)\s*[:\-–]?\s*$/i;
@@ -71,8 +72,18 @@ const threadDigest = (comments) => {
 
 /* task.get returns this, never a row: enough for an agent to do the right work
  * without asking, and to know what it must not decide alone. */
+const TASK_NOT_FOUND = { error: 'task not found' };
+
+const inScope = async (ctx, projectId) => {
+    const id = String(projectId || '');
+    if (ctx.projectIds && ctx.projectIds.length && !ctx.projectIds.map(String).includes(id)) return false;
+    return (await scope.visibleProjectIds(ctx.companyId, String(ctx.userId))).map(String).includes(id);
+};
+
 const buildBrief = async (ctx, taskId) => {
-    const task = await getTask(ctx.companyId, taskId);
+    if (!oid(taskId)) return TASK_NOT_FOUND;
+    const task = await MongoDbCrudOpration(ctx.companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(taskId), deletedStatusKey: { $ne: 1 } }] }, 'findOne');
+    if (!task || !(await inScope(ctx, task.ProjectID))) return TASK_NOT_FOUND;
     const description = plain(task.description || task.rawDescription || '');
 
     const [comments, project, sprint, relatedRows, pages] = await Promise.all([
