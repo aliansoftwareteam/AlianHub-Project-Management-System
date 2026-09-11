@@ -3,7 +3,6 @@ const { createProject, createTask, loginAs, readState } = require('../../e2e/sup
 const state = readState();
 
 jest.setTimeout(60000);
-const refused = (res) => res.status >= 400 || (res.body && typeof res.body === 'object' && res.body.status === false);
 const isoDay = (offsetDays = 0) => new Date(Date.now() + offsetDays * 86400000).toISOString().slice(0, 10);
 
 async function projectWithTask(owner, member) {
