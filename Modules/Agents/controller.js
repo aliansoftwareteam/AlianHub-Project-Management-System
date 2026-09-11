@@ -233,7 +233,9 @@ exports.createRevision = async (req, res) => {
         const ctx = await revisionAccess(req, res);
         if (!ctx) return undefined;
         const body = req.body || {};
-        const row = await revisions.createDraft(ctx.companyId, ctx.agent, { fields: agentPatchFields(body), state: body.state, note: body.note, actor: ctx.actor });
+        const fields = agentPatchFields(body);
+        if (await refuseSkills(res, ctx.companyId, fields)) return undefined;
+        const row = await revisions.createDraft(ctx.companyId, ctx.agent, { fields, state: body.state, note: body.note, actor: ctx.actor });
         return res.send({ status: true, statusText: `Revision ${row.n} saved as ${row.state}.`, data: revisionRow(row) });
     } catch (e) { logger.error(`createRevision: ${e.message}`); return fail(res, e.message, e.status || 200); }
 };
@@ -246,7 +248,7 @@ exports.promoteRevision = async (req, res) => {
         const n = revisionN(req.params.n);
         if (!n) return fail(res, 'Revision not found.', 404);
         const out = await revisions.promote(ctx.companyId, ctx.agent, n, { actor: ctx.actor, ip: req.ip || '' });
-        if (out.error) return fail(res, out.error, out.status || 200);
+        if (out.error) return fail(res, out.error, out.status || 200, out.errors ? { data: { errors: out.errors } } : undefined);
         return res.send({ status: true, statusText: out.unchanged ? `Revision ${n} is already live.` : `Revision ${n} is live.`, data: { revision: revisionRow(out.revision), from: out.from, agent: out.agent || null } });
     } catch (e) { logger.error(`promoteRevision: ${e.message}`); return fail(res, e.message); }
 };
@@ -259,7 +261,7 @@ exports.rollbackRevision = async (req, res) => {
         const n = revisionN(req.params.n);
         if (!n) return fail(res, 'Revision not found.', 404);
         const out = await revisions.rollback(ctx.companyId, ctx.agent, n, { actor: ctx.actor, ip: req.ip || '', note: (req.body || {}).note });
-        if (out.error) return fail(res, out.error, out.status || 200);
+        if (out.error) return fail(res, out.error, out.status || 200, out.errors ? { data: { errors: out.errors } } : undefined);
         return res.send({ status: true, statusText: `Rolled back to revision ${n} as revision ${out.revision.n}.`, data: { revision: revisionRow(out.revision), from: out.from, rollbackOf: out.rollbackOf, agent: out.agent || null } });
     } catch (e) { logger.error(`rollbackRevision: ${e.message}`); return fail(res, e.message); }
 };
