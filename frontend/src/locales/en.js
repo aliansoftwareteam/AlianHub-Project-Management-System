@@ -507,6 +507,7 @@ export default {
         tracker_title: "Authorize the desktop tracker",
         tracker_body: "Opening the desktop tracker on this computer. If nothing happens, click Continue.",
         tracker_continue: "Continue",
+        tracker_code_failed: "Couldn't start the tracker sign-in. Refresh this page and try again.",
         new_project: "New project",
         search_templates: "Search templates",
         for_focus: "For {focus}",

@@ -9,6 +9,7 @@ const { removeCacheAndCookie } = require("../../../Config/jwt.js");
 const helperCtr = require("../helper.js");
 const sesstionCtr = require("../session.js");
 const refreshSession = require("../helpers/refreshSession");
+const trackerCode = require("../helpers/trackerCode");
 const mongoose = require("mongoose");
 const { removeCache } = require("../../../utils/commonFunctions.js");
 const { updateUserFun } = require("../../Users/controller.js");
@@ -159,19 +160,26 @@ exports.loginAuth = (req, res, next) => {
     }
 };
 
-/**
- * Tracker login Auth
- * @param {Object} req 
- * @param {Object} res 
- */
+exports.issueTrackerCode = async (req, res) => {
+    const refuse = (statusCode, message) => res.status(statusCode).json({ status: false, statusText: message, message });
+    try {
+        if (!(req.uid && req.sessionId)) return refuse(401, 'Sign in to connect the desktop tracker.');
+        const issued = await trackerCode.issueTrackerCode({ userId: req.uid, sessionId: req.sessionId });
+        if (!issued) return refuse(401, 'Your session is expired');
+        return res.status(200).json({ status: true, statusText: 'OK', data: { code: issued.code, expiresAt: issued.expiresAt } });
+    } catch (error) {
+        logger.error(`issueTrackerCode: ${error.message || error}`);
+        return refuse(400, 'Could not create a tracker sign-in code.');
+    }
+};
 
 exports.loginAuthTracker = async (req, res) => {
-    const invalid = () => res.status(400).json({message: 'Invalid Refresh Token'});
+    const invalid = () => res.status(400).json({message: 'Invalid or expired tracker sign-in code'});
     try {
-        const { refreshToken, userId } = req.body || {};
-        const resolved = await refreshSession.resolveRefreshSession(refreshToken, userId);
-        if (!resolved.ok) return invalid();
-        const sessionUserId = String(resolved.session.userId);
+        const { code, refreshToken, userId } = req.body || {};
+        // Tracker builds released before one-time codes post the deep-link value as `refreshToken`.
+        const sessionUserId = await trackerCode.redeemTrackerCode(code || refreshToken);
+        if (!sessionUserId) return invalid();
         if (userId && String(userId) !== sessionUserId) return invalid();
 
         const forwarded = req?.headers['x-forwarded-for'] || req.ip;
@@ -273,7 +281,7 @@ exports.generateTokenV2 = async (req, res) => {
 
         generateTokenV2Fun(rotated.userId, rotated.refreshToken, (gData) => {
             if (!(gData && gData.status)) {
-                removeCacheAndCookie("", `session:${rotated.userId}:${rotated.refreshToken}`, res, rotated.refreshToken);
+                removeCacheAndCookie("", "", res, rotated.refreshToken);
                 res.status(400).json(gData);
                 return;
             }

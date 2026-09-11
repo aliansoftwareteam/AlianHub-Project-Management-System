@@ -182,13 +182,12 @@ describe('POST /api/v2/generateToken', () => {
 });
 
 describe('POST /api/v1/auth/loginAuthTracker', () => {
-    it("resolves A's token to A even when B's session was issued first in the same second", async () => {
-        await issueSession(USER_B);
+    it("no longer turns a user's refresh token into a second session", async () => {
         const tokenA = await issueSession(USER_A);
         const res = await trackerLogin({ refreshToken: tokenA, userId: USER_A });
-        expect(refused(res)).toBe(false);
-        expect(String(res.body.uid)).toBe(USER_A);
-        expect(jwt.decode(res.body.accessToken).uid).toBe(USER_A);
+        expect(refused(res)).toBe(true);
+        expect(res.body.accessToken).toBeUndefined();
+        expect(sessionsOf(USER_A)).toHaveLength(1);
     });
 
     it("refuses a token presented with another user's id", async () => {
