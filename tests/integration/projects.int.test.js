@@ -131,7 +131,7 @@ describe('projects and planning — refusals that hold', () => {
 });
 
 describe('projects and planning — regressions (fail until the bug is fixed)', () => {
-    it.failing('PRJ-01: another user\'s personal calendar feed token is not exposed', async () => {
+    it('PRJ-01: another user\'s personal calendar feed token is not exposed', async () => {
         const owner = await loginAs('owner');
         const member = await loginAs('member');
         const feed = await owner.api.post('/api/v1/calendar/feeds', { scope: 'my', name: `Owner feed ${uniqueSuffix()}` });

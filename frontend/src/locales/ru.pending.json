@@ -1,7 +1,7 @@
 {
   "locale": "ru",
   "machineTranslated": false,
-  "updatedAt": "2026-09-11T07:37:52.635Z",
+  "updatedAt": "2026-09-11T09:52:35.257Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5368,6 +5368,10 @@
     "AiHealth.owner_only_title": "Owners and admins only",
     "AiHealth.owner_only_body": "Ask an owner or admin of this workspace for the AI health figures.",
     "AiHealth.load_failed": "The health figures could not be loaded.",
-    "AiHealth.retry": "Retry"
+    "AiHealth.retry": "Retry",
+    "IntegrationsHub.cal_url_once": "Copy this link now. For your security it is shown only once.",
+    "IntegrationsHub.cal_url_hidden": "The subscription link is hidden. Regenerate it to get a new one.",
+    "IntegrationsHub.cal_regenerate": "Regenerate link",
+    "IntegrationsHub.cal_regenerate_confirm": "Regenerate this link? Calendars subscribed to the current link will stop updating."
   }
 }
