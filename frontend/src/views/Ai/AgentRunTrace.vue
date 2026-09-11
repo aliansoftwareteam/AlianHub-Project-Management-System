@@ -6,7 +6,7 @@
                 <span class="ah-mono ah-small run-trace__id" data-test="trace-id">{{ traceId }}</span>
                 <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('Ai.trace_copy_label')" data-test="copy-trace-id" @click="copy">{{ $t('Ai.trace_copy') }}</button>
             </template>
-            <a v-if="replayId" class="ah-small run-trace__replay" :href="`#replay-${replayId}`" data-test="view-replay" @click="emit('view-replay', replayId)">{{ $t('Ai.trace_view_replay') }}</a>
+            <a v-if="replayId && canViewReplay" class="ah-small run-trace__replay" :href="replayAnchor(replayId)" data-test="view-replay" @click.prevent="emit('view-replay', replayId)">{{ $t('Ai.trace_view_replay') }}</a>
         </div>
 
         <p v-if="!hasSteps" class="ah-small run-trace__empty" data-test="trace-empty">{{ $t('Ai.trace_empty') }}</p>
@@ -30,10 +30,14 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
+import { replayAnchor } from "./replayAnchor";
 
 defineOptions({ name: "AgentRunTrace" });
 
-const props = defineProps({ run: { type: Object, required: true } });
+const props = defineProps({
+    run: { type: Object, required: true },
+    canViewReplay: { type: Boolean, default: false }
+});
 const emit = defineEmits(["view-replay"]);
 
 const { t } = useI18n();

@@ -26,7 +26,7 @@ const run = {
     ]
 };
 
-const mountTrace = (props) => mount(AgentRunTrace, { props: { run: props }, global: { mocks: { $t: echo } } });
+const mountTrace = (props, extra = {}) => mount(AgentRunTrace, { props: { run: props, ...extra }, global: { mocks: { $t: echo } } });
 
 describe('AgentRunTrace', () => {
     beforeEach(() => {
@@ -66,12 +66,20 @@ describe('AgentRunTrace', () => {
         expect(toast.success).toHaveBeenCalledWith('Ai.trace_copied', { position: 'top-right' });
     });
 
-    it('offers the replay only when the payload carries a replay id', async () => {
-        expect(mountTrace(run).find('[data-test="view-replay"]').exists()).toBe(false);
-        const wrapper = mountTrace({ ...run, replayId: 'rp1' });
+    it('offers the replay only when the payload carries a replay id and the viewer may read it', () => {
+        expect(mountTrace(run, { canViewReplay: true }).find('[data-test="view-replay"]').exists()).toBe(false);
+        expect(mountTrace({ ...run, replayId: 'rp1' }).find('[data-test="view-replay"]').exists()).toBe(false);
+        expect(mountTrace({ ...run, replayId: 'rp1' }, { canViewReplay: false }).find('[data-test="view-replay"]').exists()).toBe(false);
+    });
+
+    it('links to the replay call anchor and asks the page to reveal it', async () => {
+        const wrapper = mountTrace({ ...run, replayId: 'rp1' }, { canViewReplay: true });
         const link = wrapper.find('[data-test="view-replay"]');
         expect(link.text()).toBe('Ai.trace_view_replay');
-        await link.trigger('click');
+        expect(link.attributes('href')).toBe('#replay-rp1');
+        const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+        link.element.dispatchEvent(click);
+        expect(click.defaultPrevented).toBe(true);
         expect(wrapper.emitted('view-replay')).toEqual([['rp1']]);
     });
 
