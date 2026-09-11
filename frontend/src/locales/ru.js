@@ -7669,6 +7669,7 @@ export default {
         "channel_beta": "beta",
         "channel_release": "release",
         "channel_dev": "development",
+        "channel_unknown": "version unresolved",
         "builds_since": "Builds since v{v}",
         "next_release": "Next release: v{v}",
         "builds_show_all": "Show all {n}",

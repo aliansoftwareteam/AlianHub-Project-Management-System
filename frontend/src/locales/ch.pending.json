@@ -5370,6 +5370,7 @@
     "AiHealth.owner_only_body": "Ask an owner or admin of this workspace for the AI health figures.",
     "AiHealth.load_failed": "The health figures could not be loaded.",
     "AiHealth.retry": "Retry",
+    "Instance.channel_unknown": "version unresolved",
     "IntegrationsHub.cal_url_once": "Copy this link now. For your security it is shown only once.",
     "IntegrationsHub.cal_url_hidden": "The subscription link is hidden. Regenerate it to get a new one.",
     "IntegrationsHub.cal_regenerate": "Regenerate link",

@@ -542,10 +542,15 @@ exports.checkSendInviatation = (req,res) => {
             res.send({ status: false, statusText: 'email is required' });
             return;
         }
-        if (!(req.body && req.body.companyId)) {
+        const bodyCompanyId = req.body.companyId;
+        const companyId = String(req.headers['companyid'] || bodyCompanyId || '');
+        if (!companyId) {
             res.send({ status: false, statusText: 'companyId is required' });
             return;
-        } 
+        }
+        if (req.headers['companyid'] && bodyCompanyId && String(bodyCompanyId) !== companyId) {
+            return res.status(403).send({ status: false, statusText: 'You do not have access to this company' });
+        }
         let obj = {
             type: dbCollections.COMPANY_USERS,
             data: [
@@ -554,7 +559,7 @@ exports.checkSendInviatation = (req,res) => {
                 },
             ]
         }
-        mongoRef.MongoDbCrudOpration(req.body.companyId, obj, "findOne").then((resp)=>{
+        mongoRef.MongoDbCrudOpration(companyId, obj, "findOne").then((resp)=>{
             if (resp === null || resp?.status === 3) {
                 res.send({
                     status: true,

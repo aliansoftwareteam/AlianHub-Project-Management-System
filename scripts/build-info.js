@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFile, execFileSync } = require('child_process');
+const { promisify } = require('util');
 
 const ROOT = path.resolve(__dirname, '..');
 const STAMP_FILE = 'build-info.json';
@@ -11,7 +12,12 @@ const US = '\x1f';
 const RS = '\x1e';
 const CONVENTIONAL = /^(\w+)(?:\([^)]*\))?(!)?:\s/;
 
-const git = (cwd, args) => execFileSync('git', args, { cwd, timeout: 3000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+const GIT_TIMEOUT_MS = Number(process.env.BUILD_INFO_GIT_TIMEOUT_MS || 10000);
+const execFileAsync = promisify(execFile);
+
+const git = (cwd, args) => execFileSync('git', args, { cwd, timeout: GIT_TIMEOUT_MS, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+
+const gitAsync = async (cwd, args) => (await execFileAsync('git', args, { cwd, timeout: GIT_TIMEOUT_MS, encoding: 'utf8' })).stdout.trim();
 
 function readPackage(cwd) {
     for (const dir of [cwd, ROOT]) {
@@ -63,35 +69,30 @@ function parseLog(output) {
     });
 }
 
-function headFacts(cwd, ref) {
-    const [sha, iso] = git(cwd, ['log', '-1', `--format=%H${US}%cI`, ref]).split(US);
-    return { sha, commit: sha.slice(0, 8), builtAt: new Date(iso).toISOString() };
-}
+const HEAD_ARGS = (ref) => ['log', '-1', `--format=%H${US}%cI`, ref];
+const TAG_ARGS = (ref) => ['describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*.[0-9]*.[0-9]*', '--exclude', '*-*', ref];
+const LOG_ARGS = (tag, ref) => ['log', `--format=%H${US}%P${US}%cs${US}%s${US}%b${RS}`, `${tag}..${ref}`];
 
-function baseTag(cwd, ref) {
-    try {
-        return git(cwd, ['describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*.[0-9]*.[0-9]*', '--exclude', '*-*', ref]);
-    } catch (error) {
-        if (/No names found|No tags can describe|cannot describe/i.test(String(error.stderr || error.message))) return null;
-        throw error;
-    }
+const isNoTag = (error) => /No names found|No tags can describe|cannot describe/i.test(String(error.stderr || error.message));
+
+function headFacts(output) {
+    const [sha, iso] = output.split(US);
+    return { sha, commit: sha.slice(0, 8), builtAt: new Date(iso).toISOString() };
 }
 
 /* A merge commit adds no bump of its own; the commits it brings in do. Each
  * build's label uses only the commits reachable from that build, so a number
  * already merged never changes its version. */
-function deriveBuildInfo({ cwd = ROOT, ref = 'HEAD' } = {}) {
-    const pkg = readPackage(cwd);
+function composeBuildInfo({ pkg, head, tag, log }) {
     const release = String(pkg.version || '0.0.0');
     const repoUrl = repoUrlOf(pkg);
-    const { sha: headSha, commit, builtAt } = headFacts(cwd, ref);
-    const tag = baseTag(cwd, ref);
+    const { sha: headSha, commit, builtAt } = headFacts(head);
     const common = { release, commit, builtAt, source: 'git', repoUrl };
 
     if (!tag) return { version: `${release}-dev`, base: null, next: release, channel: 'dev', build: 0, ...common, entries: [] };
 
     const base = tag.replace(/^v/, '');
-    const commits = parseLog(git(cwd, ['log', `--format=%H${US}%P${US}%cs${US}%s${US}%b${RS}`, `${tag}..${ref}`]));
+    const commits = parseLog(log);
     const bySha = new Map(commits.map((c) => [c.sha, c]));
 
     const chain = [];
@@ -116,6 +117,26 @@ function deriveBuildInfo({ cwd = ROOT, ref = 'HEAD' } = {}) {
     }).reverse();
 
     return { version: entries[0].version, base, next: bumpVersion(base, level), channel: 'beta', build: entries.length, ...common, entries };
+}
+
+function deriveBuildInfo({ cwd = ROOT, ref = 'HEAD' } = {}) {
+    const head = git(cwd, HEAD_ARGS(ref));
+    let tag = null;
+    try {
+        tag = git(cwd, TAG_ARGS(ref));
+    } catch (error) {
+        if (!isNoTag(error)) throw error;
+    }
+    return composeBuildInfo({ pkg: readPackage(cwd), head, tag, log: tag ? git(cwd, LOG_ARGS(tag, ref)) : '' });
+}
+
+async function deriveBuildInfoAsync({ cwd = ROOT, ref = 'HEAD', run = gitAsync } = {}) {
+    const head = await run(cwd, HEAD_ARGS(ref));
+    const tag = await run(cwd, TAG_ARGS(ref)).catch((error) => {
+        if (isNoTag(error)) return null;
+        throw error;
+    });
+    return composeBuildInfo({ pkg: readPackage(cwd), head, tag, log: tag ? await run(cwd, LOG_ARGS(tag, ref)) : '' });
 }
 
 const escapeCell = (text) => String(text).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
@@ -181,4 +202,4 @@ if (require.main === module) {
     }
 }
 
-module.exports = { deriveBuildInfo, renderLog, readPackage, repoUrlOf, STAMP_FILE };
+module.exports = { deriveBuildInfo, deriveBuildInfoAsync, GIT_TIMEOUT_MS, renderLog, readPackage, repoUrlOf, STAMP_FILE };
