@@ -18,7 +18,7 @@ const toPublicSession = (s) => ({
     device: label(s.info?.device),
     lastActive: s.lastActive || s.updatedAt || s.createdAt,
     createdAt: s.createdAt,
-    tokenTail: String(s.refreshToken || "").slice(-TOKEN_TAIL)
+    tokenTail: s.tokenTail || String(s.refreshToken || "").slice(-TOKEN_TAIL)
 });
 
 exports.listOwnSessions = async (req, res) => {

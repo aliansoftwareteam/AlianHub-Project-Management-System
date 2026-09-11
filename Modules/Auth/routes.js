@@ -261,7 +261,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true, message:message
      */
-    app.delete('/api/v2/session/delete', requireInstanceAdmin, sessionCtr.deleteAllSession);
+    app.delete('/api/v2/session/delete', sessionCtr.deleteAllSession);
 
 
     /**
@@ -337,7 +337,6 @@ const verifyInvitationCtrl = require("./controller/verifyInvitation");
 const { removeCacheHandler } = require('./controller/removeCache');
 const { mongoOperation } = require('./controller/mongoOperation');
 const { invitationPreview } = require('./controller/invitationPreview');
-const { requireInstanceAdmin } = require('../Instance/guard');
 const { handleEvents } = require('../Company/eventController');
 function initSignup(app) {
     app.post("/api/v2/createUser", createUserCtrl.createUserV2);
