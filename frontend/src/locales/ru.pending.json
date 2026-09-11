@@ -1,7 +1,7 @@
 {
   "locale": "ru",
   "machineTranslated": false,
-  "updatedAt": "2026-09-11T09:38:28.450Z",
+  "updatedAt": "2026-09-11T12:33:09.337Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5435,6 +5435,10 @@
     "AiAlerts.notice_resolved_cost_forecast": "Resolved: spend is back under its forecast threshold.",
     "AiAlerts.notice_resolved_queue_age": "Resolved: the run queue is moving again.",
     "dashboardCard.dashboard_updated": "Dashboard updated successfully",
-    "Time.variance_own_only": "Showing only the time you logged"
+    "Time.variance_own_only": "Showing only the time you logged",
+    "Instance.err_allowlist": "Use exact hostnames or CIDR ranges, such as hooks.lan or 192.168.10.0/24, separated by commas or new lines.",
+    "Instance.f_WEBHOOK_ALLOWED_PRIVATE_HOSTS": "Private webhook hosts",
+    "Instance.h_WEBHOOK_ALLOWED_PRIVATE_HOSTS": "Webhooks refuse loopback, private and internal hosts. List the exact hostnames or CIDR ranges on your network they may post to. Removing an entry stops deliveries to it. Cloud metadata addresses stay blocked.",
+    "Instance.allowlist_placeholder": "hooks.lan\n192.168.10.0/24"
   }
 }

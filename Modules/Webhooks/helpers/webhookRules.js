@@ -32,22 +32,22 @@ const EVENT_LABELS = Object.freeze({
 
 const isObjectIdString = (id) => OBJECT_ID_PATTERN.test(String(id || ''));
 
-const isValidUrl = (value) => {
+const isValidUrl = (value, allowlist) => {
     try {
         const url = new URL(String(value || ''));
-        return (url.protocol === 'http:' || url.protocol === 'https:') && !isBlockedHostname(url.hostname);
+        const allowed = !isBlockedHostname(url.hostname) || Boolean(allowlist && allowlist.allowsHost(url.hostname));
+        return (url.protocol === 'http:' || url.protocol === 'https:') && allowed;
     } catch (e) {
         return false;
     }
 };
 
-/* Validate create/update input. Returns { valid, reason }. */
-const validateWebhookInput = ({ name, url, events, format }) => {
+const validateWebhookInput = ({ name, url, events, format, allowlist }) => {
     if (!name || !String(name).trim() || String(name).length > MAX_NAME_LENGTH) {
         return { valid: false, reason: `A name up to ${MAX_NAME_LENGTH} characters is required.` };
     }
-    if (!isValidUrl(url)) {
-        return { valid: false, reason: 'A valid http or https url on a public host is required.' };
+    if (!isValidUrl(url, allowlist)) {
+        return { valid: false, reason: 'A valid http or https url on a public host, or on a private host the instance owner allows, is required.' };
     }
     if (!Array.isArray(events) || !events.length) {
         return { valid: false, reason: 'At least one event is required.' };

@@ -84,10 +84,12 @@ const parseHttpUrl = (url) => {
     return u;
 };
 
-async function resolvePublic(url) {
+/* `allowlist` (Webhooks/helpers/privateHostAllowlist) re-admits private hosts an
+ * instance owner chose; the resolved address is still checked and pinned. */
+async function resolvePublic(url, { allowlist } = {}) {
     const u = parseHttpUrl(url);
     const host = stripBrackets(u.hostname);
-    if (isBlockedHostname(host)) throw new Error(`${u.hostname} is a private, local or internal host — agents do not fetch it`);
+    if (isBlockedHostname(host) && !(allowlist && allowlist.allowsHost(host))) throw new Error(`${u.hostname} is a private, local or internal host — agents do not fetch it`);
     let answers;
     try {
         answers = await dns.promises.lookup(host, { all: true, verbatim: true });
@@ -95,7 +97,7 @@ async function resolvePublic(url) {
         throw new Error(`could not resolve ${u.hostname}: ${e.code || e.message}`);
     }
     if (!answers || !answers.length) throw new Error(`could not resolve ${u.hostname}`);
-    const bad = answers.find((a) => isPrivateAddress(a.address));
+    const bad = answers.find((a) => isPrivateAddress(a.address) && !(allowlist && allowlist.allowsAddress(host, a.address)));
     if (bad) throw new Error(`${u.hostname} resolves to a private or reserved address (${bad.address}) — agents do not fetch it`);
     return { url: u, address: answers[0].address, family: answers[0].family || net.isIP(answers[0].address) };
 }
@@ -127,7 +129,7 @@ const methodAfterRedirect = (status, method) => (status === 303 || ((status === 
  * exists for tests that need a "public" name to land on a local server. */
 async function safeFetch(url, opts = {}) {
     const { timeoutMs, maxBytes, maxRedirects } = { ...DEFAULTS, ...opts };
-    const resolve = opts.resolve || resolvePublic;
+    const resolve = opts.resolve || ((target) => resolvePublic(target, { allowlist: opts.allowlist }));
     const deadline = Date.now() + timeoutMs;
     const remaining = () => {
         const left = deadline - Date.now();

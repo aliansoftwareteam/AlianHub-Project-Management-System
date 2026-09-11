@@ -7,14 +7,15 @@ const logger = require("../../Config/loggerConfig");
 const { validateWebhookInput, isObjectIdString, generateSecret, EVENT_TYPES } = require('./helpers/webhookRules');
 const { invalidateCompanyCache } = require('./dispatcher');
 const { resolvePublic } = require('../Agents/engine/safeFetch');
+const { webhookAllowlist } = require('./helpers/privateHostAllowlist');
 
-const PRIVATE_DESTINATION = 'The webhook url must resolve to a public address.';
+const PRIVATE_DESTINATION = 'The webhook url must resolve to a public address, or to a private host the instance owner allows.';
 
 /* The literal check in validateWebhookInput cannot see what a hostname resolves to;
  * this closes that gap at save time. The dispatcher resolves again before each POST. */
-const resolvesPublicly = async (url) => {
+const resolvesPublicly = async (url, allowlist) => {
     try {
-        await resolvePublic(String(url).trim());
+        await resolvePublic(String(url).trim(), { allowlist });
         return true;
     } catch (error) {
         return false;
@@ -86,11 +87,12 @@ exports.createWebhook = async (req, res) => {
         if (!uid) {
             return res.send({ status: false, statusText: 'An authenticated user is required.' });
         }
-        const check = validateWebhookInput({ name, url, events, format });
+        const allowlist = webhookAllowlist();
+        const check = validateWebhookInput({ name, url, events, format, allowlist });
         if (!check.valid) {
             return res.send({ status: false, statusText: check.reason });
         }
-        if (!(await resolvesPublicly(url))) {
+        if (!(await resolvesPublicly(url, allowlist))) {
             return res.send({ status: false, statusText: PRIVATE_DESTINATION });
         }
 
@@ -146,16 +148,18 @@ exports.updateWebhook = async (req, res) => {
         const { name, url, events, active, format } = req.body || {};
         const update = {};
         if (name !== undefined || url !== undefined || events !== undefined || format !== undefined) {
+            const allowlist = webhookAllowlist();
             const check = validateWebhookInput({
                 name: name !== undefined ? name : 'placeholder',
                 url: url !== undefined ? url : 'https://placeholder.invalid',
                 events: events !== undefined ? events : ['*'],
                 format,
+                allowlist,
             });
             if (!check.valid) {
                 return res.send({ status: false, statusText: check.reason });
             }
-            if (url !== undefined && !(await resolvesPublicly(url))) {
+            if (url !== undefined && !(await resolvesPublicly(url, allowlist))) {
                 return res.send({ status: false, statusText: PRIVATE_DESTINATION });
             }
             if (name !== undefined) update.name = String(name).trim();

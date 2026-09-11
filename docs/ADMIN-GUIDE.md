@@ -97,6 +97,8 @@ Push notifications (Firebase) are the one exception: the browser service worker 
 ### Security
 `TRUST_PROXY` (`loopback` by default; a hop count or `true` behind a hosted proxy), `GLOBAL_RATE_LIMIT_PER_MIN` (1000 API requests per minute per IP; `0` turns it off), `HELMET_ENABLED` (security response headers, on). All three are read at boot.
 
+`WEBHOOK_ALLOWED_PRIVATE_HOSTS` (Private webhook hosts) is empty by default, so webhooks refuse loopback, private, link-local and `.local`/`.internal` hosts. To post to a receiver on your own network, list its exact hostname (`hooks.lan`) or a CIDR range (`192.168.10.0/24`, `fd12:3456::/32`), separated by commas or new lines. It applies on save: a webhook is checked against it when it is saved and again before every delivery, so removing an entry stops deliveries to that host. Hostnames are still resolved and the connection is pinned to the checked address, and the cloud metadata addresses (`169.254.169.254`, `fd00:ec2::254`) stay blocked whatever the list says.
+
 ### Keys that only live in the environment
 `JWT_SECRET`, `MONGODB_URL`, `PORT`, `CRON_ENABLED`, `MIGRATIONS_AUTO`, `BACKUP_DIR`, `INSTANCE_ADMIN_KEY`, `LOG_DIR` and the other `LOG_*` knobs, the body and image size limits. `.env.example` documents each one.
 
@@ -255,6 +257,7 @@ answers `200 {"status":"ok", "db":{"ok":true,...}}` or `503 {"status":"degraded"
 | `INSTANCE_ADMIN_KEY` | unset | enables the `adminkey` header for scripts |
 | `GLOBAL_RATE_LIMIT_PER_MIN` | `1000` | API requests per minute per IP; `0` disables |
 | `TRUST_PROXY` | `loopback` | which proxies' `X-Forwarded-For` to believe |
+| `WEBHOOK_ALLOWED_PRIVATE_HOSTS` | empty | hostnames or CIDR ranges on your network that webhooks may post to |
 | `HEALTH_DB_TIMEOUT_MS` | `3000` | how long `/health` waits for the database |
 
 ### Files and directories
