@@ -90,7 +90,7 @@ describe('messages/inbox — general reminders', () => {
 
 describe('messages/inbox — task reminders (MSG-01)', () => {
     // MSG-01 — the /api/v1/reminders prefix is in neither JWT list, so it runs with no session.
-    it.failing('MSG-01 refuses an unauthenticated task-reminder write', async () => {
+    it('MSG-01 refuses an unauthenticated task-reminder write', async () => {
         const res = await anonymous.post('/api/v1/reminders',
             { reminderAt: futureISO(), reminderText: 'x' },
             { headers: { companyid: state.companyId, userid: state.users.member.userId } });
