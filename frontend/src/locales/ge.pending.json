@@ -1,7 +1,7 @@
 {
   "locale": "ge",
   "machineTranslated": false,
-  "updatedAt": "2026-09-11T09:52:30.904Z",
+  "updatedAt": "2026-09-11T09:38:28.328Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5451,6 +5451,7 @@
     "AiHealth.owner_only_body": "Ask an owner or admin of this workspace for the AI health figures.",
     "AiHealth.load_failed": "The health figures could not be loaded.",
     "AiHealth.retry": "Retry",
+    "Ai.settings_read_only": "Read only. An owner or admin changes this agent's settings.",
     "Instance.channel_unknown": "version unresolved",
     "IntegrationsHub.cal_url_once": "Copy this link now. For your security it is shown only once.",
     "IntegrationsHub.cal_url_hidden": "The subscription link is hidden. Regenerate it to get a new one.",

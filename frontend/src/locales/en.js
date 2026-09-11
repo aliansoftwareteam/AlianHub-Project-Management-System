@@ -1549,6 +1549,7 @@ export default {
         run: "run",
         refused_n: "{n} refused",
         stop_agent: "Stop this agent",
+        settings_read_only: "Read only. An owner or admin changes this agent's settings.",
         stopped: "Agent stopped.",
         delete_agent: "Delete agent",
         delete_body: "Removes the agent and its settings. Past runs, proposals and audit rows stay.",

@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-11T09:52:28.612Z",
+  "updatedAt": "2026-09-11T09:38:28.255Z",
   "keys": {
     "Scrum.stranded_head": "These {count} will stay in this sprint",
     "Scrum.stranded_hint": "They are unfinished, but their parent task is done — and a subtask moves with its parent. Finish them, or reopen the parent task, before completing the sprint.",
@@ -7512,6 +7512,7 @@
     "AiHealth.owner_only_body": "Ask an owner or admin of this workspace for the AI health figures.",
     "AiHealth.load_failed": "The health figures could not be loaded.",
     "AiHealth.retry": "Retry",
+    "Ai.settings_read_only": "Read only. An owner or admin changes this agent's settings.",
     "Instance.channel_unknown": "version unresolved",
     "IntegrationsHub.cal_url_once": "Copy this link now. For your security it is shown only once.",
     "IntegrationsHub.cal_url_hidden": "The subscription link is hidden. Regenerate it to get a new one.",
