@@ -4,12 +4,13 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { dbCollections } = require('../../Config/collections');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { safeFileFilter, safeRelativePath } = require('../../utils/uploadConfig');
+const { escapeRegex } = require('../../utils/escapeRegex');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const USER_PROFILES_BUCKET = 'USER_PROFILES';
 const ACTIVE_SEAT = 2;
 const OWNED_PROFILE_IMAGE = /^[a-f0-9]{24}_/i;
-const THUMBNAIL_SUFFIX = /-\d+x\d+(\.[^./]+)$/;
+const THUMBNAIL_SUFFIX = /-\d+x\d+(\.[^./]+)$/i;
 
 const refuse = (res, code, statusText) => res.status(code).json({ status: false, statusText, message: statusText });
 const refusal = (code, statusText) => ({ code, statusText });
@@ -46,15 +47,19 @@ function mayWriteProfileImage(uid, filePath) {
 
 const findUser = (query) => MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.USERS, data: [query, { _id: 1 }] }, 'findOne');
 
+const sameNameIgnoringCase = (name) => ({ $regex: `^${escapeRegex(name)}$`, $options: 'i' });
+
 /* Images uploaded before names carried the owner's id have no owner except the user record that
  * points at them, and a user can point their own record at any name. So a legacy name is only
- * removable while no other user points at it or at the image it is a thumbnail of. */
+ * removable while no other user points at it or at the image it is a thumbnail of. Other users'
+ * names are matched ignoring case because the disk under storage/ may ignore it too. */
 async function isOwnLegacyProfileImage(uid, name) {
     if (!OBJECT_ID.test(uid) || name.includes('/') || OWNED_PROFILE_IMAGE.test(name) || safeRelativePath(name) !== name) return false;
     const self = new mongoose.Types.ObjectId(uid);
     if (!(await findUser({ _id: self, Employee_profileImage: name }))) return false;
     for (const candidate of new Set([name, name.replace(THUMBNAIL_SUFFIX, '$1')])) {
-        const other = await findUser({ _id: { $ne: self }, $or: [{ Employee_profileImage: candidate }, { Employee_profileImageURL: candidate }] });
+        const sameName = sameNameIgnoringCase(candidate);
+        const other = await findUser({ _id: { $ne: self }, $or: [{ Employee_profileImage: sameName }, { Employee_profileImageURL: sameName }] });
         if (other) return false;
     }
     return true;

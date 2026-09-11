@@ -23,6 +23,10 @@ let assignCompany;
 let activeSeats;
 let users;
 
+const mongoMatches = (value, condition) => (condition && condition.$regex !== undefined
+    ? typeof value === 'string' && new RegExp(condition.$regex, condition.$options).test(value)
+    : value === condition);
+
 beforeEach(() => {
     assignCompany = { [USER]: [COMPANY_A] };
     activeSeats = { [COMPANY_A]: [USER] };
@@ -38,10 +42,11 @@ beforeEach(() => {
         }
         if (type === 'buckets') return { id: query.id, rule: { isPrivate: true } };
         if (type === 'users') {
-            const image = query.$or ? query.$or[0].Employee_profileImage : query.Employee_profileImage;
+            const alternatives = query.$or || [{ Employee_profileImage: query.Employee_profileImage }];
             const excluded = query._id && query._id.$ne ? String(query._id.$ne) : null;
             const wanted = query._id && !query._id.$ne ? String(query._id) : null;
-            const hit = Object.entries(users).find(([id, record]) => record.Employee_profileImage === image && id !== excluded && (!wanted || id === wanted));
+            const hit = Object.entries(users).find(([id, record]) => id !== excluded && (!wanted || id === wanted)
+                && alternatives.some((fields) => Object.entries(fields).every(([field, condition]) => mongoMatches(record[field], condition))));
             return hit ? { _id: hit[0] } : null;
         }
         return null;
@@ -97,6 +102,21 @@ describe('profile image ownership', () => {
 
         users[USER] = { Employee_profileImage: '171_old-64x64.png' };
         expect(await bucketAccess.mayRemoveProfileImage(USER, '171_old-64x64.png')).toBe(false);
+    });
+
+    it('refuses a legacy image another user holds under different letter case, since the disk may ignore case', async () => {
+        users[OTHER_USER] = { Employee_profileImage: '171_photo.png' };
+        users[USER] = { Employee_profileImage: '171_PHOTO.png' };
+        expect(await bucketAccess.mayRemoveProfileImage(USER, '171_PHOTO.png')).toBe(false);
+
+        users[USER] = { Employee_profileImage: '171_PHOTO-64X64.PNG' };
+        expect(await bucketAccess.mayRemoveProfileImage(USER, '171_PHOTO-64X64.PNG')).toBe(false);
+    });
+
+    it('matches other users\' images literally, not as a pattern', async () => {
+        users[OTHER_USER] = { Employee_profileImage: '171_photoXpng' };
+        users[USER] = { Employee_profileImage: '171_photo.png' };
+        expect(await bucketAccess.mayRemoveProfileImage(USER, '171_photo.png')).toBe(true);
     });
 
     it('refuses another user\'s image and anything in a sub folder', async () => {
