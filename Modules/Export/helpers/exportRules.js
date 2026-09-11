@@ -1,12 +1,7 @@
 // REP-05 — pure tabular-export helpers (CSV string + array-of-arrays for xlsx).
 // No I/O. Unit-tested in tests/export-rules.test.js.
 
-// RFC-4180-style escaping: wrap in quotes when the value has a comma, quote, CR
-// or LF; double any embedded quotes.
-const csvEscape = (v) => {
-    const s = (v === null || v === undefined) ? '' : String(v);
-    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
+const { csvCell: csvEscape } = require('../../../utils/csv');
 
 // head: string[], rows: any[][], totalRow?: any[] → CSV text.
 const toCsv = (head = [], rows = [], totalRow = null) => {

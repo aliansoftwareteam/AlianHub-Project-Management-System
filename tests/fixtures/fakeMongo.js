@@ -128,6 +128,9 @@ const create = () => {
             return pipeline.reduce((docs, stage) => {
                 if (stage.$match) return docs.filter((d) => matches(d, stage.$match));
                 if (stage.$group) return group(docs, stage.$group);
+                if (stage.$sort) return ordered(docs, { sort: stage.$sort });
+                if (stage.$skip) return docs.slice(stage.$skip);
+                if (stage.$limit) return docs.slice(0, stage.$limit);
                 return docs;
             }, list).map(clone);
         }

@@ -49,11 +49,7 @@ const taskToRow = (task) => ({
     UpdatedAt: task.updatedAt ? new Date(task.updatedAt).toISOString() : '',
 });
 
-/* RFC-4180-ish CSV escaping. */
-const csvEscape = (value) => {
-    const text = String(value === null || value === undefined ? '' : value);
-    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-};
+const { csvCell: csvEscape } = require('../../../utils/csv');
 
 /* Rows (uniform objects) -> CSV string with header. */
 const rowsToCsv = (rows) => {
