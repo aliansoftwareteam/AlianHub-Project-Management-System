@@ -79,6 +79,11 @@ const hasSavedContract = async (companyId, projectId) => Boolean(await MongoDbCr
     data: [{ ProjectID: String(projectId), deletedStatusKey: 0, updatedBy: { $exists: true } }, { _id: 1 }],
 }, 'findOne'));
 
+const refuseWithoutContract = (res, source) => res.status(400).json({
+    status: false,
+    statusText: `This project has no billing contract. Set up the contract before drafting an invoice from ${source}.`,
+});
+
 const addDays = (date, days) => new Date(date.getTime() + (Number(days) || 0) * 86400000);
 
 const saveDraft = async ({ companyId, req, projectId, ctx, source, lines, periodStart, periodEnd }) => {
@@ -208,6 +213,7 @@ exports.draftFromMilestone = async (req, res) => {
         if (await refuseGuest(req, res)) return undefined;
         const ctx = await billing.buildBillingContext(companyId, projectId);
         if (!ctx) return res.send({ status: false, statusText: 'Project not found.' });
+        if (!(await hasSavedContract(companyId, projectId))) return refuseWithoutContract(res, 'a milestone');
         const milestone = ctx.milestones.find((m) => m.id === milestoneId);
         if (!milestone) return res.send({ status: false, statusText: 'Milestone not found on this project.' });
         if (milestone.cancelled) return res.send({ status: false, statusText: 'A cancelled milestone cannot be invoiced.' });
@@ -249,12 +255,7 @@ exports.draftFromMonth = async (req, res) => {
         if (await refuseGuest(req, res)) return undefined;
         const ctx = await billing.buildBillingContext(companyId, projectId);
         if (!ctx) return res.send({ status: false, statusText: 'Project not found.' });
-        if (!(await hasSavedContract(companyId, projectId))) {
-            return res.status(400).json({
-                status: false,
-                statusText: 'This project has no billing contract. Set up the contract before drafting an invoice from logged time.',
-            });
-        }
+        if (!(await hasSavedContract(companyId, projectId))) return refuseWithoutContract(res, 'logged time');
 
         const { start, end, label } = billing.monthWindow(req.body && req.body.month);
         const startSec = Math.floor(start.getTime() / 1000);
