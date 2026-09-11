@@ -930,6 +930,26 @@ const schema = {
         createdAt: { type: Date, required: true },
         expiresAt: { type: Date, required: true },
     },
+    // One rate-alert incident (Modules/Agents/alerts.js); at most one open row per { type, key }
+    aiAlerts: {
+        // agent_error_rate | approval_rate_falling | cost_forecast | queue_age
+        type: { type: String, required: true },
+        // the agentId for agent_error_rate, "company" otherwise
+        key: { type: String, required: true },
+        agentName: { type: String, required: false },
+        // open | resolved
+        status: { type: String, default: 'open', required: true },
+        openedAt: { type: Date, required: true },
+        resolvedAt: { type: Date, required: false },
+        lastValue: { type: Number, required: false },
+        threshold: { type: Number, required: false },
+        window: { type: String, required: false },
+        // condition-specific context, e.g. { baselinePct } or { source, runId }
+        detail: { type: Object, required: false },
+        lastEvaluatedAt: { type: Date, required: false },
+        notifiedUserIds: { type: [String], default: [], required: false },
+        traceId: { type: String, required: false },
+    },
     // A per-company skill in the closed vocabulary of Modules/Agents/skills/catalogues.js (ADR 003).
     agentSkills: {
         key: { type: String, required: true },
@@ -1571,6 +1591,11 @@ const schema = {
         },
         // { month: 'YYYY-MM', '80': Date|null, '100': Date|null }
         agentBudgetAlerts: {
+            type: Object,
+            required: false
+        },
+        // { enabled, errorRatePct, errorMinRuns, approvalFloorPct, approvalDropPts, costForecastPct, queueAgeMinutes }
+        agentAlerts: {
             type: Object,
             required: false
         },
@@ -2863,6 +2888,11 @@ const schema = {
             type: Boolean,
             required: false,
             default: false
+        },
+        // { agent_error_rate, approval_rate_falling, cost_forecast, queue_age } booleans; an absent type takes the role default (Modules/Agents/alertRules.js)
+        aiAlerts: {
+            type: Object,
+            required: false
         }
     },
     mentions: {
