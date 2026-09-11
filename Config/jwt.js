@@ -8,7 +8,7 @@ const {myCache} = require('./config');
 // circular dependency risk. The controller is lazy-required inside
 // verifyApiTokenRequest below.
 const { looksLikeToken, hasScope } = require('../Modules/ApiTokens/helpers/apiTokenRules');
-const { sessionTokenQuery, hashRefreshToken } = require('../Modules/Auth/helpers/refreshTokenRules');
+const { sessionTokenQuery, readAccessSession, sessionCacheKey } = require('../Modules/Auth/helpers/refreshTokenRules');
 
 // Mongo ObjectId pattern — used to reject regex/control characters in the
 // `companyid` request header before any token-membership check.
@@ -220,132 +220,76 @@ const removeCacheAndCookie = (key, cacheKey, res, refreshToken) => {
     }
 }
 
-// An access token minted just before its session's refresh token was rotated:
-// the client already holds the new pair, so it is sent to refresh instead of
-// being logged out (and its fresh cookies are left alone).
-const isRotatedAway = async (uid, refreshToken) => {
-    const rotated = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, {
-        type: dbCollections.SESSIONS,
-        data: [{ userId: uid, previousRefreshTokenHash: hashRefreshToken(refreshToken) }]
-    }, "findOne");
-    return Boolean(rotated && rotated._id);
+const SESSION_CACHE_SECONDS = 600;
+
+// The client still holds a usable refresh token (its session was rotated elsewhere, or the
+// access token predates named sessions), so it is sent to refresh instead of being logged out.
+const refuseForRefresh = (res) => res.status(401).json({
+    status: false,
+    error: 'Token has expired',
+    statusText: 'Token has expired',
+    isJwtError: true
+});
+
+const refuseSession = (res, error, statusText = 'Unauthorized') => {
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+    return res.status(401).json({
+        status: false,
+        error,
+        statusText,
+        isJwtError: true,
+        isRefreshTokenError: true,
+        isLogout: true
+    });
 };
 
-const checkToken = (isValid, req, res, next) => {
-    if (isValid) {
-        const { uid, refreshToken,aud } = isValid;
-        req.uid = uid;
-        req.aud = aud;
-        req.refreshToken = refreshToken;
-        if (typeof refreshToken !== 'string' || !refreshToken) {
-            res.clearCookie('accessToken');
-            return res.status(401).json({
-                status: false,
-                error: "Your session is expired",
-                statusText: 'Unauthorized',
-                isJwtError: true,
-                isRefreshTokenError: true,
-                isLogout: true
-            });
-        }
-        const cacheKey = `session:${uid}:${refreshToken}`;
-        const value = myCache.get(cacheKey);
-        try {
-            if (value) {
-                const isRefreshTokenValid = jwt.verify(refreshToken, process.env.JWT_SECRET);
-                if (isRefreshTokenValid) {
-                    req.uid = uid;
-                    next();
-                } else {
-                    removeCacheAndCookie("", cacheKey, res, refreshToken);
-                    // Access Denied
-                    return res.status(401).json({
-                        status: false,
-                        error: 'Refresh Token has expired',
-                        statusText: 'Refresh Token has expired',
-                        isRefreshTokenError: true,
-                        isJwtError: true,
-                        isLogout: true
-                    });
-                }
-            } else {
-                let obj = {
-                    type: dbCollections.SESSIONS,
-                    data: [{
-                        userId: uid,
-                        ...sessionTokenQuery(refreshToken),
-                    }]
-                }
-                mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "findOne").then(async (resData)=>{
-                    if (!(resData && resData._id)) {
-                        if (await isRotatedAway(uid, refreshToken)) {
-                            return res.status(401).json({
-                                status: false,
-                                error: 'Token has expired',
-                                statusText: 'Token has expired',
-                                isJwtError: true
-                            });
-                        }
-                        removeCacheAndCookie("", cacheKey, res, refreshToken);
-                        return res.status(401).json({
-                            status: false,
-                            error: "Your session is expired",
-                            statusText: 'Unauthorized',
-                            isJwtError: true,
-                            isRefreshTokenError: true,
-                            isLogout: true
-                        });
-                    }
-                    const isRefreshTokenValid = jwt.verify(refreshToken, process.env.JWT_SECRET);
-                    if (isRefreshTokenValid) {
-                        myCache.set(cacheKey, JSON.stringify({_id: resData._id, userId: uid, refreshToken: refreshToken}), 600);
-                        req.uid = uid;
-                        next();
-                    } else {
-                        removeCacheAndCookie("", cacheKey, res, refreshToken);
-                        // Access Denied
-                        return res.status(401).json({
-                            status: false,
-                            error: 'Refresh Token has expired',
-                            statusText: 'Refresh Token has expired',
-                            isRefreshTokenError: true,
-                            isJwtError: true,
-                            isLogout: true
-                        });
-                    }
-                }).catch((error)=>{
-                    removeCacheAndCookie("", cacheKey, res, refreshToken);
-                    return res.status(401).json({
-                        status: false,
-                        error: error.message,
-                        statusText: 'Unauthorized',
-                        isJwtError: true,
-                        isRefreshTokenError: true,
-                        isLogout: true
-                    });
-                })
-            }
-        } catch (error) {
-            removeCacheAndCookie("", cacheKey, res, refreshToken);
-            return res.status(401).json({
-                status: false,
-                error: error.message,
-                statusText: 'Unauthorized',
-                isJwtError: true,
-                isRefreshTokenError: true,
-                isLogout: true
-            });
-        }
-    } else {
+const sessionsQuery = (uid, sid, method) => mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, {
+    type: dbCollections.SESSIONS,
+    data: [{ _id: new mongoose.Types.ObjectId(sid), userId: uid }]
+}, method);
+
+const checkToken = async (isValid, req, res, next) => {
+    if (!isValid) {
         removeCacheAndCookie("accessToken", "", res);
-        // Access Denied
+        return refuseForRefresh(res);
+    }
+    req.uid = isValid.uid;
+    req.aud = isValid.aud;
+    const access = readAccessSession(isValid);
+    if (access.kind === 'legacy') return refuseForRefresh(res);
+    if (access.kind !== 'session') {
+        res.clearCookie('accessToken');
         return res.status(401).json({
             status: false,
-            error: 'Token has expired',
-            statusText: 'Token has expired',
-            isJwtError: true
+            error: "Your session is expired",
+            statusText: 'Unauthorized',
+            isJwtError: true,
+            isRefreshTokenError: true,
+            isLogout: true
         });
     }
+    const { uid, sid, rti, sexp } = access;
+    req.sessionId = sid;
+    const cacheKey = sessionCacheKey(uid, sid, rti);
+    if (sexp * 1000 <= Date.now()) {
+        myCache.del(cacheKey);
+        sessionsQuery(uid, sid, "deleteMany").catch((error) => logger.error(`Expired session remove error ${error.message || error}`));
+        return refuseSession(res, 'Refresh Token has expired', 'Refresh Token has expired');
+    }
+    if (!myCache.get(cacheKey)) {
+        let session;
+        try {
+            session = await sessionsQuery(uid, sid, "findOne");
+        } catch (error) {
+            logger.error(`Session lookup error ${error.message || error}`);
+            return refuseSession(res, "Your session is expired");
+        }
+        if (!(session && session._id)) return refuseSession(res, "Your session is expired");
+        if (session.refreshTokenJti !== rti) return refuseForRefresh(res);
+        myCache.set(cacheKey, JSON.stringify({ _id: session._id, userId: uid }), SESSION_CACHE_SECONDS);
+    }
+    return next();
 }
 
 /**

@@ -7,13 +7,16 @@ AlianHub has two end-to-end layers on top of the unit and convention tests. Both
 | API integration | Jest project `integration` | `tests/integration/<area>.int.test.js` | `npm run test:integration` |
 | UI | Playwright (Chromium) | `e2e/specs/<area>.spec.js` | `npm run e2e` |
 
-Neither layer runs in `npm test`, which stays unit + conventions only. CI runs both in the `e2e` job on every pull request to `beta`, `staging` and `main`.
+Neither layer runs in `npm test`, which stays unit + conventions only. CI runs both in the `e2e` job on every pull request to `beta`, `staging` and `main`, and on every push to `beta`. A newer push to the same branch cancels the run still in progress.
 
 ## Running locally
 
 Requirements: Node 20, Docker, and a frontend build (the server serves `frontend/dist`).
 
+A fresh checkout has neither `@playwright/test` nor Chromium: run `npm install` (root and `frontend/`) and `npx playwright install chromium` before the first Playwright run.
+
 ```bash
+npm install && (cd frontend && npm install)   # once per checkout
 cd frontend && npm run build && cd ..   # once, and again after frontend changes
 npm run e2e:db                          # starts alianhub-e2e-mongo on port 27018 (safe to re-run)
 export E2E_MONGODB_URL=mongodb://127.0.0.1:27018
@@ -22,6 +25,12 @@ npm run test:integration
 npm run e2e
 npm run e2e:db:stop                     # when you are done
 ```
+
+### Integration runs are serial
+
+Always run the Jest integration layer with `--runInBand`, as `npm run test:integration` and CI do. Every suite shares one server, and `tests/integration/instance.int.test.js` turns maintenance mode on for it while its tests run, so with `--maxWorkers` above 1 the suites running beside it get maintenance responses and fail for no reason of their own. For a single file, `npx jest --selectProjects integration --runInBand <file>`.
+
+Integration suites can also depend on file order when two of them touch the same user's data (for example one changes a fixture user's settings or sessions and another reads them). A test that passes alone and fails in the full run is usually that: run the suspect files together in the same order, `npx jest --selectProjects integration --runInBand <first> <second>`, to reproduce it, then make the tests create their own data.
 
 The Playwright HTML report lands in `e2e/report` (`npx playwright show-report e2e/report`). Server output for each run is in `e2e/.state/integration-server.log` and `e2e/.state/e2e-server.log`.
 

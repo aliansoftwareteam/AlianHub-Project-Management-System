@@ -317,9 +317,10 @@ userAuthSchema.index({ email: 1 });
 // companyUsers: lookup by userId + invitation status.
 companyUserSchema.index({ userId: 1 });
 
-// sessions: refresh-token lookup is what `Config/jwt.js` does.
+// sessions: the refresh endpoint finds a session by token hash, tracker sign-in by code hash.
 sessionsSchema.index({ refreshToken: 1 });
 sessionsSchema.index({ refreshTokenHash: 1 });
+sessionsSchema.index({ trackerCodeHash: 1 }, { sparse: true });
 sessionsSchema.index({ userId: 1 });
 
 // resetAttempt: keyed by IP.

@@ -1,9 +1,11 @@
 const mongoRef = require('../../../utils/mongo-handler/mongoQueries');
-const senVerificationMailTemplate = require("../../Template/sendEmailVerification.js")
+const verificationMailTemplate = require("../../Template/sendEmailVerification.js");
 const sendMail = require("../../service.js");
 const config = require("../../../Config/config");
 const { dbCollections } = require('../../../Config/collections');
+const { newLinkToken } = require('../helpers/linkToken');
 
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
 /**
  * Send Verification Email
@@ -13,30 +15,27 @@ const { dbCollections } = require('../../../Config/collections');
  */
 exports.sendVerificationEmailPromise = (userId,email) => {
     return new Promise((resolve, reject) => {
+        const failed = (error) => reject({
+            status: false,
+            statusText: `Error sending verification email for user ${userId} : ${error && error.message ? error.message : error}`
+        });
         try {
-            let temp = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-            let token = '';
-            for ( let i = 0; i < 8; i++ ) {
-                token += temp.charAt(Math.floor(Math.random() * temp.length));
-            }
-            let uid = userId;
-            let userEmail = (email).toLowerCase();
-            let obj = {
+            const token = newLinkToken();
+            const userEmail = String(email).toLowerCase();
+            const obj = {
                 type: dbCollections.USERS,
                 data: [
+                    { _id: userId },
                     {
-                        _id: userId
-                    },
-                    { 
                         verificationToken: token,
                         verificationTokenTime: new Date(),
                     }
                 ]
-            }
+            };
             mongoRef.MongoDbCrudOpration('global', obj, "updateOne").then(()=>{
-                let verificationLink = `${config.WEBURL}/#/verify-email/${uid}/${token}`
-                let mail = require("../../Template/sendEmailVerification.js")(verificationLink,config.WEBURL);
-                sendMail.SendEmail(mail.subject,mail.mail, userEmail, true, (result) => {
+                const verificationLink = `${config.WEBURL}/#/verify-email/${userId}/${token}`;
+                const mail = verificationMailTemplate(verificationLink, config.WEBURL);
+                sendMail.SendEmail(mail.subject, mail.mail, userEmail, true, (result) => {
                     if(result.status) {
                         resolve({
                             status: true,
@@ -49,76 +48,37 @@ exports.sendVerificationEmailPromise = (userId,email) => {
                         });
                     }
                 });
-            }).catch((error)=>{
-                reject({
-                    status: false, 
-                    statusText:`Error sending verification email for user ${email} : ${error.message ? error.message : error}`
-                })
-            })
-    
+            }).catch(failed);
         } catch (error) {
-            reject({
-                status: false, 
-                statusText:`Error sending verification email for user ${email} : ${error.message ? error.message : error}`
-            })
+            failed(error);
         }
-    })
-}
-
+    });
+};
 
 /**
- * Send Verification Mail
+ * Resend the verification link. The address always comes from the account, never from the request.
  * @param {Objcet} req
  * @param {Object} res
  * @returns
  */
-exports.sendVerificationEmail = (req,res) => {
-    try {
-        if(!req.body.uid || req.body.uid === '') {
-            res.send({
-                status: false,
-                statusText: "Userid is required."
-            });
-            return;
-        }
-        if (!req.body.email || req.body.email === '') {
-            res.send({
-                status: false,
-                statusText: "email is required."
-            })
-        }
-        let obj = {
-            type: dbCollections.USERS,
-            data: [
-                {
-                    _id: req.body.uid
-                },
-            ]
-        }
-        mongoRef.MongoDbCrudOpration("global",obj,"findOne").then((response)=>{
-            if (response.isEmailVerified === true) {
-                res.send({
-                    status: false,
-                    statusText: `Your Email is already verified`
-                })
-                return;
-            } else {
-                exports.sendVerificationEmailPromise(req.body.uid,req.body.email).then((response)=>{
-                    res.send(response)
-                }).catch((error)=>{
-                    res.send(error)
-                })
-            }
-        }).catch((error)=>{
-            res.send({
-                status: false,
-                statusText: error
-            })
-        })
-    } catch (error) {
-        res.send({
-            status: false,
-            statusText: `Error: ${error}`
-        })
+exports.sendVerificationEmail = async (req,res) => {
+    const uid = String((req.body && req.body.uid) || '');
+    if (!OBJECT_ID_PATTERN.test(uid)) {
+        return res.send({ status: false, statusText: "Userid is required." });
     }
-}
+    try {
+        const account = await mongoRef.MongoDbCrudOpration("global", {
+            type: dbCollections.USERS,
+            data: [{ _id: uid }, { Employee_Email: 1, isEmailVerified: 1 }]
+        }, "findOne");
+        if (!account || !account.Employee_Email) {
+            return res.send({ status: false, statusText: "Couldn’t find your Account" });
+        }
+        if (account.isEmailVerified === true) {
+            return res.send({ status: false, statusText: "Your Email is already verified" });
+        }
+        return res.send(await exports.sendVerificationEmailPromise(uid, account.Employee_Email));
+    } catch (error) {
+        return res.send({ status: false, statusText: (error && error.statusText) || "Could not send the verification email." });
+    }
+};

@@ -16,6 +16,7 @@ const ADMIN = '6f0000000000000000000002';
 const MEMBER = '6f0000000000000000000003';
 const GUEST = '6f0000000000000000000004';
 const STRANGER = '6f0000000000000000000005';
+const UNVERIFIED = '6f0000000000000000000006';
 
 const SECRETS = { webTokens: ['push-token'], verificationToken: 'verify-secret', forgotPasswordToken: 'reset-secret', forgotPasswordTokenTime: 1 };
 const USERS = {
@@ -24,6 +25,7 @@ const USERS = {
     [MEMBER]: { _id: MEMBER, Employee_Name: 'Member', AssignCompany: [COMPANY], ...SECRETS },
     [GUEST]: { _id: GUEST, Employee_Name: 'Guest', AssignCompany: [COMPANY], ...SECRETS },
     [STRANGER]: { _id: STRANGER, Employee_Name: 'Stranger', AssignCompany: [OTHER_COMPANY], ...SECRETS },
+    [UNVERIFIED]: { _id: UNVERIFIED, Employee_Email: 'new@example.test', AssignCompany: [], isEmailVerified: false, ...SECRETS },
 };
 const ROLES = { [OWNER]: 1, [ADMIN]: 2, [MEMBER]: 3, [GUEST]: 0 };
 
@@ -38,6 +40,7 @@ beforeAll(async () => {
         server.put('/api/v1/user', ctrl.updateUserStatus);
         server.get('/api/v1/user/:id', ctrl.getUserById);
         server.post('/api/v1/user/find', ctrl.getUserByQuey);
+        server.post('/api/v1/userAndCompanyCheck', ctrl.checkUserAndCompany);
     });
 });
 afterAll(() => app.close());
@@ -48,6 +51,7 @@ beforeEach(() => {
     MongoDbCrudOpration.mockImplementation(async (db, obj, method) => {
         const filter = (obj.data && obj.data[0]) || {};
         if (obj.type === SCHEMA_TYPE.COMPANY_USERS) return db === COMPANY && ROLES[filter.userId] !== undefined ? { roleType: ROLES[filter.userId] } : null;
+        if (obj.type === SCHEMA_TYPE.COMPANIES) return method === 'find' ? [{ _id: COMPANY, Cst_CompanyName: 'Acme' }] : { _id: COMPANY };
         if (method === 'findOne') return USERS[String(filter._id)] || null;
         if (method === 'aggregate') return [USERS[OWNER], USERS[GUEST]];
         if (method === 'findOneAndUpdate') return { ...USERS[String(filter._id)], ...((obj.data[1] && obj.data[1].$set) || {}) };
@@ -212,5 +216,54 @@ describe('ACC-05 PUT /api/v1/user', () => {
     it('refuses an admin removing a member from a company they do not administer', async () => {
         const res = await put(ADMIN, { userId: STRANGER, updateObject: { $pull: { AssignCompany: OTHER_COMPANY } } });
         expect(res.status).toBe(403);
+    });
+});
+
+describe('POST /api/v1/userAndCompanyCheck', () => {
+    const check = (uid, body) => app.call('POST', '/api/v1/userAndCompanyCheck', { token: signSession(uid, uid === UNVERIFIED ? [] : [COMPANY]), body });
+    const userLookups = () => MongoDbCrudOpration.mock.calls.filter((call) => call[1].type === SCHEMA_TYPE.USERS);
+
+    it('refuses an anonymous caller', async () => {
+        const res = await app.call('POST', '/api/v1/userAndCompanyCheck', { body: { userId: OWNER } });
+        expect(res.status).toBe(401);
+    });
+
+    it('refuses asking about another user without reading them', async () => {
+        const res = await check(GUEST, { userId: STRANGER });
+        expect(res.status).toBe(403);
+        expect(res.body.data).toBeUndefined();
+        expect(userLookups()).toHaveLength(0);
+    });
+
+    it('answers the caller with their workspace and no secrets', async () => {
+        const res = await check(GUEST, { userId: GUEST });
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({ status: true, data: { isCompanyFind: true, companyId: COMPANY, userData: { _id: GUEST, AssignCompany: [COMPANY] } } });
+        expect(res.body.data.companies).toEqual([{ _id: COMPANY, Cst_CompanyName: 'Acme', Cst_profileImage: '', isDisable: false }]);
+        expect(leaksSecret(res.body)).toBe(false);
+    });
+
+    it('answers the caller when no userId is sent', async () => {
+        const res = await check(OWNER, {});
+        expect(res.status).toBe(200);
+        expect(res.body.data.userData).toMatchObject({ _id: OWNER, isProductOwner: true });
+        expect(leaksSecret(res.body)).toBe(false);
+    });
+
+    it('keeps the verification token out of the unverified answer', async () => {
+        const res = await check(UNVERIFIED, { userId: UNVERIFIED });
+        expect(res.body).toMatchObject({ status: false, statusText: 'Email Not Verified', data: { userData: { _id: UNVERIFIED, isEmailVerified: false, Employee_Email: 'new@example.test' } } });
+        expect(leaksSecret(res.body)).toBe(false);
+    });
+
+    it('keeps secrets out when the company lookup fails', async () => {
+        const base = MongoDbCrudOpration.getMockImplementation();
+        MongoDbCrudOpration.mockImplementation(async (db, obj, method) => {
+            if (obj.type === SCHEMA_TYPE.COMPANIES && method === 'findOne') throw new Error('down');
+            return base(db, obj, method);
+        });
+        const res = await check(GUEST, { userId: GUEST });
+        expect(res.body).toMatchObject({ status: false, data: { isCompanyFind: false, userData: { _id: GUEST } } });
+        expect(leaksSecret(res.body)).toBe(false);
     });
 });

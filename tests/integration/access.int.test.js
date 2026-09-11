@@ -295,6 +295,51 @@ describe('access — company reads are the caller\'s own companies', () => {
     });
 });
 
+describe('access — only owners and admins change the company', () => {
+    const readCompany = async (session) => (await session.api.post('/api/v1/admin/company', { companyIds: [state.companyId] })).body[0];
+
+    it.each([
+        ['member', '/api/v1/company'],
+        ['member', '/api/v1/admin/company'],
+        ['guest', '/api/v1/company-invitation'],
+    ])('refuses a %s renaming the company through %s', async (role, path) => {
+        const session = await loginAs(role);
+        const before = await readCompany(session);
+        const res = await session.api.put(path, { updateObject: { Cst_CompanyName: `Taken ${uniqueSuffix()}` }, companyId: state.companyId });
+        expect(res.status).toBe(403);
+        expect(res.body.status).toBe(false);
+        expect((await readCompany(session)).Cst_CompanyName).toBe(before.Cst_CompanyName);
+    });
+
+    it('lets an admin save the company details', async () => {
+        const admin = await loginAs('admin');
+        const before = await readCompany(admin);
+        const res = await admin.api.put('/api/v1/company', { updateObject: { Cst_CompanyName: before.Cst_CompanyName } });
+        expect(res.status).toBe(200);
+        expect(res.body.Cst_CompanyName).toBe(before.Cst_CompanyName);
+    });
+
+    it('lets a member switch a project between private and public', async () => {
+        const member = await loginAs('member');
+        const swap = (toPrivate) => member.api.put('/api/v1/company', {
+            key: '$inc',
+            updateObject: { 'projectCount.privateCount': toPrivate ? 1 : -1, 'projectCount.publicCount': toPrivate ? -1 : 1 },
+        });
+        expect((await swap(true)).status).toBe(200);
+        expect((await swap(false)).status).toBe(200);
+    });
+
+    it('refuses a guest releasing a seat', async () => {
+        const guest = await loginAs('guest');
+        const res = await guest.api.put('/api/v1/company', {
+            key: '$inc',
+            updateObject: { 'companyData.$[elementIndex].users': -1 },
+            arrayFilters: [{ 'elementIndex.users': { $exists: true } }],
+        });
+        expect(res.status).toBe(403);
+    });
+});
+
 describe('access — the invitation check stays inside the signed-in company', () => {
     it('refuses probing another company', async () => {
         const admin = await loginAs('admin');

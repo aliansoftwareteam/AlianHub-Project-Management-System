@@ -132,6 +132,8 @@ const decideProjectAccess = async (companyId, uid, projectId, { mode = WRITE, pe
 
 const canEditProject = (companyId, uid, projectId, permissions = []) => decideProjectAccess(companyId, uid, projectId, { mode: WRITE, permissions });
 
+const canReadProject = (companyId, uid, projectId) => decideProjectAccess(companyId, uid, projectId, { mode: READ });
+
 const keepVisibleProjectIds = async (companyId, uid, projectIds) => {
     const visible = new Set(await visibleProjectIds(companyId, uid));
     return [...new Set((projectIds || []).map(String))].filter((id) => visible.has(id));
@@ -240,6 +242,7 @@ module.exports = {
     fieldsOf,
     permissionsForProjectUpdate,
     canEditProject,
+    canReadProject,
     keepVisibleProjectIds,
     projectIdsFrom,
     requireProjectAccess,

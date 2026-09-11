@@ -8,6 +8,7 @@ const socketEmitter = require("../../../event/socketEventEmitter");
 const logger = require("../../../Config/loggerConfig");
 const { QueryRefused, validatePipeline, visibilityStage } = require("./taskQueryGuard");
 const { WriteRefused, parseCascade, assertCanCascade, cascadeFilter } = require("./taskWriteGuard");
+const { canReadProject } = require("../../../Config/projectAccess");
 
 const refuse = (res, statusCode, statusText, message, extra = {}) => res.status(statusCode).json({ status: false, statusText, message, ...extra });
 
@@ -38,36 +39,31 @@ exports.getTaskByQyery = async (req, res) => {
     }
 };
 
-exports.getTask = async(req,res) => {
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+
+// A task the caller may not see answers exactly like one that does not exist, so the
+// response never confirms that a task id is real.
+const taskNotFound = (res) => refuse(res, 404, "Task not found.", "Task not found.");
+
+exports.getTask = async (req, res) => {
     try {
-        const companyId = req.headers["companyid"];
-        const { id } = req.params;
-        if (!companyId || !id) {
-            return res.status(400).json({
-                message: "An error occurred while getting the task.",
-                error: "Company ID and Task ID is required."
-            });
+        const companyId = String(req.headers["companyid"] || "");
+        const id = String(req.params.id || "");
+        if (!companyId || !OBJECT_ID.test(id)) {
+            return refuse(res, 400, "A valid task id is required.", "An error occurred while getting the task.");
         }
 
-        const query = {
-            type: SCHEMA_TYPE.TASKS,
-            data: [
-                {
-                    _id: new mongoose.Types.ObjectId(id)
-                }
-            ]
-        };
+        const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(id) }] }, "findOne");
+        if (!task) return taskNotFound(res);
 
-        const response = await MongoDbCrudOpration(companyId, query, "findOne");
-        return res.status(200).json(response);
+        const access = await canReadProject(companyId, req.uid, task.ProjectID);
+        if (!access.allowed && !access.missing) return taskNotFound(res);
+        return res.status(200).json(task);
     } catch (error) {
-        console.error("Error getting task:", error);
-        return res.status(500).json({
-            message: "An error occurred while getting the task.",
-            error: error.message || error
-        });
+        logger.error(`getTask error: ${error.message || error}`);
+        return refuse(res, 500, "An error occurred while getting the task.", "An error occurred while getting the task.");
     }
-}
+};
 
 const ALLOWED_BODY_KEYS = ["firstParameter", "secondParameter", "key", "isConvertFirstParameter", "isConvertSecondParameter", "refreshToken"];
 const SOCKET_FIELDS = { _id: 1, ProjectID: 1, sprintId: 1, ParentTaskId: 1, AssigneeUserId: 1 };

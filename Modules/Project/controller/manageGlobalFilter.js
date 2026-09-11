@@ -2,6 +2,7 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const logger = require("../../../Config/loggerConfig");
 const mongoose = require("mongoose")
+const savedFilters = require("../../AdvancedGlobalFilter/helpers/savedFilters");
 
 const NAME_MAX_LENGTH = 200;
 const EDITABLE_FIELDS = ['name', 'filters', 'sortByField', 'sortByOrder'];
@@ -72,41 +73,7 @@ exports.saveFilter = async (req, res) => {
     }
 }
 
-exports.getFilter = async (req, res) => {
-    try {
-        const { userId } = req.params;
-
-        let params = {
-            type: SCHEMA_TYPE.GLOBALFILTER,
-            data: [
-                {
-                    userId: userId,
-                    filter: 'projectFilter',
-                    typeFilter: 'projects'
-                }
-            ]
-        }
-
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'find');
-
-        if (response) {
-            return res.status(200).json({
-                status: true,
-                data: response
-            });
-        } else {
-            return res.status(404).json({
-                status: false,
-            });
-        }
-
-    } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while get the project global filter",
-            error: error
-        });
-    }
-}
+exports.getFilter = savedFilters.listFilters(() => ({ filter: 'projectFilter', typeFilter: 'projects' }));
 
 exports.updateFilter = async (req, res) => {
     try {
@@ -137,38 +104,4 @@ exports.updateFilter = async (req, res) => {
     }
 }
 
-exports.deleteFilter = async (req, res) => {
-    try {
-        const { id, cid } = req.params;
-        const companyId = String(req.headers['companyid'] || '');
-        if (String(cid) !== companyId) {
-            return res.status(403).json({ status: false, statusText: 'You do not have access to this company' });
-        }
-        const params = {
-            type: SCHEMA_TYPE.GLOBALFILTER,
-            data: [
-                {
-                    _id: new mongoose.Types.ObjectId(id)
-                }
-            ]
-        }
-
-        const response = await MongoDbCrudOpration(companyId, params, "deleteOne")
-
-        if (response) {
-            return res.status(200).json({
-                status: true,
-            });
-        } else {
-            return res.status(404).json({
-                status: false,
-            });
-        }
-
-    } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while delete the project global filter",
-            error: error
-        });
-    }
-}
+exports.deleteFilter = savedFilters.deleteFilter;
