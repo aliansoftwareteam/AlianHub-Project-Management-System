@@ -3,7 +3,8 @@ const { myCache } = require('../../Config/config');
 const serviceCtr = require("../serviceFunction.js")
 const { removeCache } = require('../../utils/commonFunctions');
 const { dbCollections } = require("../../Config/collections.js");
-const { generateToken } = require("../../Config/jwt.js");
+const { newSessionCredentials } = require("./helpers/refreshSession");
+const { sessionTokenQuery } = require("./helpers/refreshTokenRules");
 
 
 /**
@@ -22,21 +23,22 @@ exports.insertSessionFun = async (reqData, userAgent, ip, cb) => {
             return;
         }
         const userAgentObj = serviceCtr.getBrowersInfo(userAgent) || {};
+        const credentials = newSessionCredentials(reqData.userId);
         let obj = {
             type: dbCollections.SESSIONS,
             data: {
+                ...credentials.fields,
                 userId: reqData.userId,
                 ip: ip,
-                refreshToken: generateToken(Number(process.env.SESSIONEXPIREDTIME || 172800)),
                 info: userAgentObj
             }
         }
         mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "save").then((res)=>{
-            const cacheKey = `session:${reqData.userId}:${obj.data.refreshToken}`;
-            myCache.set(cacheKey, JSON.stringify({_id: res._id, userId: reqData.userId, refreshToken: obj.data.refreshToken}), 600);
+            const cacheKey = `session:${reqData.userId}:${credentials.refreshToken}`;
+            myCache.set(cacheKey, JSON.stringify({_id: res._id, userId: reqData.userId}), 600);
             cb({
                 status: true,
-                data: {userId: reqData.userId, refreshToken: obj.data.refreshToken, _id: res._id},
+                data: {userId: reqData.userId, refreshToken: credentials.refreshToken, _id: res._id},
             })
         }).catch((error)=>{
             cb({
@@ -78,7 +80,7 @@ exports.updateSessionFun = async (reqData, cb) => {
         let obj = {
             type: dbCollections.SESSIONS,
             data: [
-                { refreshToken: reqData.refreshToken, userId: reqData.userId },
+                { userId: reqData.userId, ...sessionTokenQuery(reqData.refreshToken) },
                 reqData.updateObject
             ]
         }
@@ -269,7 +271,7 @@ exports.removeSession = (req, cb) => {
             type: dbCollections.SESSIONS,
             data: [{
                 userId: bodyData.id,
-                refreshToken: bodyData.refreshToken
+                ...sessionTokenQuery(bodyData.refreshToken)
             }]
         }
         mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "deleteMany").then((resData)=>{
