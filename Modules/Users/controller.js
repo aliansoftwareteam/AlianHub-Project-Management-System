@@ -71,121 +71,57 @@ exports.updateUserStatus = async (req, res) => {
     }
 }
 
-exports.checkUserAndCompany = (req, res) => {
-    if(!req.body.userId) {
-        res.send({status: false, message: 'userId is required'});
-        return;
-    }
-    let obj = {
-        type: dbCollections.USERS,
-        data: [
-            {
-                _id : new mongoose.Types.ObjectId(req.body.userId)
-            }
-        ]
+const noCompany = (userData) => ({ isCompanyFind: false, companyId: '', userData });
+
+exports.checkUserAndCompany = async (req, res) => {
+    if (!req.uid) return refuse(res, 401, 'Unauthorized');
+    const { userId } = req.body || {};
+    if (userId !== undefined && String(userId) !== String(req.uid)) {
+        return refuse(res, 403, 'You can only check your own account.');
     }
 
-    // BUG-027 / #81 fix: this handler has six different res.send sites
-    // across nested .then / .catch chains. Pre-fix, a sync throw in
-    // res.send (e.g. ERR_HTTP_HEADERS_SENT triggered by middleware) on
-    // the inner .then could land in the inner .catch which would also
-    // try to res.send — and the outer .catch would do it a third time.
-    // Wrap every res.send through a `sendOnce` so duplicate writes are
-    // suppressed instead of throwing.
-    let responded = false;
-    const sendOnce = (payload) => {
-        if (responded) {
-            logger.warn('checkUserAndCompany suppressed a duplicate res.send');
-            return;
-        }
-        responded = true;
-        res.send(payload);
-    };
+    let user;
+    try {
+        user = await loadGlobalUser(req.uid);
+    } catch (error) {
+        logger.error(`checkUserAndCompany: ${error.message || error}`);
+        return res.send({ status: false, statusText: "User Not Found", data: noCompany(null) });
+    }
+    const userData = user ? toSelfView(user) : null;
+
+    if (user && user.isEmailVerified === false) {
+        return res.send({ status: false, statusText: "Email Not Verified", data: { userData } });
+    }
+    const assigned = (user && user.AssignCompany) || [];
+    if (!assigned.length) {
+        return res.send({ status: true, statusText: "Comapny Not Found", data: noCompany(userData) });
+    }
 
     try {
-        MongoDbCrudOpration('global', obj, "findOne").then((response)=>{
-            if(response && response.isEmailVerified === false) {
-                sendOnce({
-                    status: false,
-                    statusText: "Email Not Verified",
-                    data: {userData:response}
-                });
-                return;
-            }
-            if(response && response.AssignCompany && response.AssignCompany.length > 0) {
-                const exists = response?.AssignCompany?.includes(response?.lastSelectedCompany);
-                let cObj = {
-                    type: dbCollections.COMPANIES,
-                    data: [
-                        {
-                            _id: { $in: exists ? [new mongoose.Types.ObjectId(response?.lastSelectedCompany)] : [...response.AssignCompany.map((x) => new mongoose.Types.ObjectId(x))] },
-                            isDisable: { $in : [false,undefined]}
-                        }
-                    ]
-                }
-
-                const allObj = {
-                    type: dbCollections.COMPANIES,
-                    data: [
-                        { _id: { $in: response.AssignCompany.map((x) => new mongoose.Types.ObjectId(x)) } },
-                        { Cst_CompanyName: 1, Cst_profileImage: 1, isDisable: 1 }
-                    ]
-                }
-                // The workspace switcher on the login screen needs every workspace, not only the last one.
-                const companiesPromise = MongoDbCrudOpration('global', allObj, "find")
-                    .then((list) => (list || []).map((c) => ({ _id: c._id, Cst_CompanyName: c.Cst_CompanyName, Cst_profileImage: c.Cst_profileImage || '', isDisable: c.isDisable === true })))
-                    .catch(() => []);
-
-                Promise.all([MongoDbCrudOpration('global', cObj, "findOne"), companiesPromise]).then(([company, companies])=>{
-                    if(company) {
-                        sendOnce({
-                            status: true,
-                            statusText: "Comapny Found",
-                            data: {isCompanyFind: true,companyId: company._id,userData:response, companies}
-                        });
-                        return;
-                    } else {
-                        sendOnce({
-                            status: true,
-                            statusText: "Comapny Not Found",
-                            data: {isCompanyFind: false,companyId: '',userData:response}
-                        });
-                        return;
-                    }
-                }).catch((error)=>{
-                    sendOnce({
-                        status: false,
-                        statusText: "Comapny Not Found",
-                        data: {isCompanyFind: false,companyId: '',userData:response}
-                    });
-                    logger.error('USER STATUS UPDATE ERROR checkUserAndCompany: ',error);
-                })
-
-            } else {
-                sendOnce({
-                    status: true,
-                    statusText: "Comapny Not Found",
-                    data: {isCompanyFind: false,companyId: '',userData:response}
-                });
-                return;
-            }
-        }).catch((error)=>{
-            sendOnce({
-                status: false,
-                statusText: "User Not Found",
-                data: {isCompanyFind: false,companyId: '',userData: null}
-            });
-            logger.error('USER STATUS UPDATE ERROR checkUserAndCompany: ',error);
-        })
+        const toObjectId = (id) => new mongoose.Types.ObjectId(String(id));
+        const preferred = assigned.includes(user.lastSelectedCompany) ? [user.lastSelectedCompany] : assigned;
+        const [company, companies] = await Promise.all([
+            MongoDbCrudOpration('global', {
+                type: dbCollections.COMPANIES,
+                data: [{ _id: { $in: preferred.map(toObjectId) }, isDisable: { $in: [false, undefined] } }]
+            }, "findOne"),
+            // The workspace switcher on the login screen needs every workspace, not only the last one.
+            MongoDbCrudOpration('global', {
+                type: dbCollections.COMPANIES,
+                data: [{ _id: { $in: assigned.map(toObjectId) } }, { Cst_CompanyName: 1, Cst_profileImage: 1, isDisable: 1 }]
+            }, "find")
+                .then((list) => (list || []).map((c) => ({ _id: c._id, Cst_CompanyName: c.Cst_CompanyName, Cst_profileImage: c.Cst_profileImage || '', isDisable: c.isDisable === true })))
+                .catch(() => []),
+        ]);
+        if (!company) {
+            return res.send({ status: true, statusText: "Comapny Not Found", data: noCompany(userData) });
+        }
+        return res.send({ status: true, statusText: "Comapny Found", data: { isCompanyFind: true, companyId: company._id, userData, companies } });
     } catch (error) {
-        sendOnce({
-            status: false,
-            statusText: "User Not Found",
-            data: {}
-        });
-        logger.error('USER STATUS UPDATE ERROR checkUserAndCompany: ',error);
+        logger.error(`checkUserAndCompany: ${error.message || error}`);
+        return res.send({ status: false, statusText: "Comapny Not Found", data: noCompany(userData) });
     }
-}
+};
 
 exports.getUserById = async(req, res) => {
     try {

@@ -1,10 +1,11 @@
+const mongoose = require("mongoose");
 const mongoC = require("../../utils/mongo-handler/mongoQueries")
 const { myCache } = require('../../Config/config');
 const serviceCtr = require("../serviceFunction.js")
 const { removeCache } = require('../../utils/commonFunctions');
 const { dbCollections } = require("../../Config/collections.js");
 const { newSessionCredentials } = require("./helpers/refreshSession");
-const { sessionTokenQuery } = require("./helpers/refreshTokenRules");
+const { sessionCacheKey } = require("./helpers/refreshTokenRules");
 
 
 /**
@@ -34,7 +35,7 @@ exports.insertSessionFun = async (reqData, userAgent, ip, cb) => {
             }
         }
         mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "save").then((res)=>{
-            const cacheKey = `session:${reqData.userId}:${credentials.refreshToken}`;
+            const cacheKey = sessionCacheKey(String(reqData.userId), String(res._id), credentials.fields.refreshTokenJti);
             myCache.set(cacheKey, JSON.stringify({_id: res._id, userId: reqData.userId}), 600);
             cb({
                 status: true,
@@ -55,12 +56,21 @@ exports.insertSessionFun = async (reqData, userAgent, ip, cb) => {
 };
 
 
-/**
- * Update Session Function
- * @param {Object} reqData 
- * @param {*} cb 
- * @returns 
- */
+const SESSION_UPDATABLE_FIELDS = {
+    webToken: (value) => typeof value === 'string',
+    lastActive: (value) => (typeof value === 'string' || typeof value === 'number') && !Number.isNaN(new Date(value).getTime()),
+};
+
+// The body used to be handed to Mongo as the update itself, which let a caller rewrite
+// the owner or token fields of their own session row.
+const sessionUpdateOf = (updateObject) => {
+    if (!updateObject || typeof updateObject !== 'object' || Array.isArray(updateObject)) return null;
+    const entries = Object.entries(updateObject);
+    const allowed = entries.length && entries.every(([field, value]) => Object.hasOwn(SESSION_UPDATABLE_FIELDS, field) && SESSION_UPDATABLE_FIELDS[field](value));
+    if (!allowed) return null;
+    return { $set: Object.fromEntries(entries.map(([field, value]) => [field, field === 'lastActive' ? new Date(value) : value])) };
+};
+
 exports.updateSessionFun = async (reqData, cb) => {
     try {
         if (!(reqData && reqData.userId)) {
@@ -70,27 +80,33 @@ exports.updateSessionFun = async (reqData, cb) => {
             });
             return;
         }
-        if (!(reqData && reqData.refreshToken)) {
+        if (!(reqData.sessionId && mongoose.Types.ObjectId.isValid(reqData.sessionId))) {
             cb({
                 status: false,
-                message: "Refresh Token is require"
+                message: "Session id is required"
+            });
+            return;
+        }
+        const update = sessionUpdateOf(reqData.updateObject);
+        if (!update) {
+            cb({
+                status: false,
+                message: "Only webToken and lastActive can be updated"
             });
             return;
         }
         let obj = {
             type: dbCollections.SESSIONS,
             data: [
-                { userId: reqData.userId, ...sessionTokenQuery(reqData.refreshToken) },
-                reqData.updateObject
+                { _id: new mongoose.Types.ObjectId(reqData.sessionId), userId: String(reqData.userId) },
+                update
             ]
         }
 
-        mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "findOneAndUpdate").then((res)=>{
-            const cacheKey = `session:${reqData.userId}:${reqData.refreshToken}`;
-            removeCache(cacheKey, true);
+        mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "findOneAndUpdate").then(()=>{
             cb({
                 status: true,
-                data: {userId: reqData.userId, refreshToken: reqData.refreshToken}
+                data: {userId: reqData.userId, _id: reqData.sessionId}
             })
         }).catch((error)=>{
             cb({
@@ -109,7 +125,7 @@ exports.updateSessionFun = async (reqData, cb) => {
 
 exports.updateSession = (req, res) => {
     try {
-        exports.updateSessionFun({ ...req.body, refreshToken: req.refreshToken || req.body.refreshToken }, (resData) => {
+        exports.updateSessionFun({ userId: req.uid, sessionId: req.sessionId, updateObject: req.body && req.body.updateObject }, (resData) => {
             if (!(resData && resData.status)) {
                 res.status(400).json({message: resData.message});
                 return;
@@ -247,17 +263,21 @@ exports.deleteUserSpecificSession = async (req, res) => {
 
 exports.removeSession = (req, cb) => {
     try {
-        const bodyData = req.body;
+        // Treat "no session found" as success — the user is already logged out.
+        // Only propagate failures if the DB operation itself throws (handled in .catch).
+        if (!(req.uid && req.sessionId && mongoose.Types.ObjectId.isValid(req.sessionId))) {
+            cb({ status: true, data: { deletedCount: 0 } });
+            return;
+        }
         let obj = {
             type: dbCollections.SESSIONS,
             data: [{
-                userId: bodyData.id,
-                ...sessionTokenQuery(req.refreshToken || bodyData.refreshToken)
+                _id: new mongoose.Types.ObjectId(req.sessionId),
+                userId: String(req.uid)
             }]
         }
         mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "deleteMany").then((resData)=>{
-            // Treat "no session found" as success — the user is already logged out.
-            // Only propagate failures if the DB operation itself throws (handled in .catch).
+            removeCache(`session:${req.uid}:${req.sessionId}:`, true);
             cb({
                 status: true,
                 data: resData,

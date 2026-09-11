@@ -6,7 +6,18 @@ const { default: mongoose } = require("mongoose");
 const { replaceObjectKey } = require("../../Auth/helper");
 const socketEmitter = require("../../../event/socketEventEmitter");
 const { isInstanceOwner } = require("../../Instance/guard");
-const { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline } = require("../helpers/companyAccessRules");
+const { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, memberCompanyUpdate } = require("../helpers/companyAccessRules");
+const { getRoleType, evaluatePermission, isPrivileged, isWritable } = require("../../../Config/permissionGuard");
+
+const mayUpdateCompany = async (companyId, req) => {
+    const roleType = await getRoleType(companyId, req.uid);
+    if (roleType === null) return false;
+    if (isPrivileged(roleType)) return true;
+    const kind = memberCompanyUpdate(req.body);
+    if (kind === 'projectType') return true;
+    if (kind !== 'seatRelease') return false;
+    return isWritable(await evaluatePermission(companyId, req.uid, 'settings.settings_member_list').catch(() => null));
+};
 
 const loadOwnCompanyIds = async (uid) => {
     const user = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
@@ -29,6 +40,10 @@ exports.updateCompany = async(req,res) => {
 
         if (!(req.body && req.body.updateObject)) {
             return res.status(400).json({message: 'Update Object is Required'});
+        }
+
+        if (!(await mayUpdateCompany(companyId, req))) {
+            return res.status(403).json({ status: false, message: 'Only an owner or an admin can change the company.' });
         }
 
         let key;
