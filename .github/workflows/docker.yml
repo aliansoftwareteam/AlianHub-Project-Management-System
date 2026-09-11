@@ -75,7 +75,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0   # the build number is derived from the history since the last release tag
           persist-credentials: false   # don't bake GITHUB_TOKEN into .git/config (build context is `.`)
+
+      - name: Stamp the build version
+        run: node scripts/build-info.js --write
 
       # `linux/amd64` → `linux-amd64` for use in the per-arch artifact name.
       # matrix.platform is read via env (not string-interpolated into the
