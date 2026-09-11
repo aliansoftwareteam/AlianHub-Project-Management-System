@@ -266,7 +266,7 @@ describe('pages findings (regressions)', () => {
         expect(refused(res)).toBe(true);
     });
 
-    it.failing('PAG-05: CSV export neutralises a leading formula character', async () => {
+    it('PAG-05: CSV export neutralises a leading formula character', async () => {
         const owner = await loginAs('owner');
         const res = await owner.api.post('/api/v1/export/csv', { filename: 'x', tableHead: ['A'], tableRows: [['=HYPERLINK("http://x","y")']] });
         const cells = String(res.body).split(/\r?\n/);
