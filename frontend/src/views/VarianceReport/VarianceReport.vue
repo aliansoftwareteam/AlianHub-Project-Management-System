@@ -8,7 +8,8 @@
                 <button type="button" :aria-label="$t('Time.next_month')" @click="shift(1)">›</button>
             </span>
             <div class="tv-actions">
-                <select v-model="groupBy" class="tv-select">
+                <span v-if="ownTimeOnly" class="ah-small">{{ $t('Time.variance_own_only') }}</span>
+                <select v-else v-model="groupBy" class="tv-select">
                     <option value="project">{{ $t('Time.by_project') }}</option>
                     <option value="person">{{ $t('Time.by_person') }}</option>
                 </select>
@@ -113,6 +114,7 @@ const headline = computed(() => t('Time.head_range', {
     act: Math.round(totals.value.totalActual / 60),
     pct: `${totals.value.totalVariancePct > 0 ? '+' : ''}${totals.value.totalVariancePct}%`,
 }));
+const ownTimeOnly = computed(() => Boolean(data.value && data.value.scope === 'self'));
 const groups = computed(() => (data.value ? (groupBy.value === 'project' ? data.value.byProject : data.value.byPerson) || [] : []));
 const sortedGroups = computed(() => {
     const list = [...groups.value];
@@ -181,6 +183,7 @@ const exportReport = () => {
 
 watch(month, load);
 watch(groupBy, () => { drill.value = null; });
+watch(ownTimeOnly, (own) => { if (own) groupBy.value = 'project'; });
 onMounted(load);
 </script>
 

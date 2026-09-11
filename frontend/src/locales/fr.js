@@ -1339,6 +1339,7 @@ export default {
         "takeaway": "✦ {project}'s {pct} is one task: \"{task}\", logged {actual} against a {estimate} estimate. Split it or make it a recurring overhead line.",
         "takeaway_none": "✦ Nothing ran over its estimate in this window.",
         "variance_empty": "No time logged in this window.",
+        "variance_own_only": "Showing only the time you logged",
         "unknown_project": "No project",
         "prev_month": "Previous month",
         "next_month": "Next month",

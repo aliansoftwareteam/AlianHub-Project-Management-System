@@ -2,22 +2,26 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { validateRateInput, buildInvoice } = require("../helpers/billingRules");
 const logger = require("../../../Config/loggerConfig");
+const { resolveTimeScope } = require("../helpers/timeScope");
 
 // TIME-07 — billing rates + invoicing. Rates live in the per-company
 // billing_rates collection (one per scope+refId). Invoices are generated from
 // billable time entries at the resolved rates (user > project > default).
 const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId);
+const MONEY_RESTRICTED = 'Only an owner or admin can see billing amounts.';
 
 /* POST /api/v1/timesheet/rates — upsert a rate. body { scope, refId?, rate, currency?, userData } */
 exports.setRate = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const caller = await resolveTimeScope(companyId, req.uid);
+        if (!caller.canSeeMoney) return res.status(403).json({ status: false, statusText: 'Only an owner or admin can set billing rates.' });
         const { scope, refId = '', rate, currency = 'USD', userData } = req.body || {};
         const check = validateRateInput({ scope, refId, rate });
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
         const ref = scope === 'default' ? '' : String(refId);
-        const createdBy = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
+        const createdBy = caller.uid || (userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '');
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.BILLING_RATES,
             data: [
@@ -41,6 +45,9 @@ exports.listRates = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        if (!(await resolveTimeScope(companyId, req.uid)).canSeeMoney) {
+            return res.send({ status: true, statusText: MONEY_RESTRICTED, data: [], restricted: true });
+        }
         const rates = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.BILLING_RATES,
             data: [{ deletedStatusKey: 0 }],
@@ -58,6 +65,9 @@ exports.generateInvoice = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        if (!(await resolveTimeScope(companyId, req.uid)).canSeeMoney) {
+            return res.send({ status: true, statusText: MONEY_RESTRICTED, data: null, restricted: true });
+        }
         const { start, end, userArray = [], projectArray = [], currency = 'USD', defaultRate = 0 } = req.body || {};
         const match = { billable: { $ne: false } };
         if (start && end) match.LogStartTime = { $gte: Number(start), $lte: Number(end) };
