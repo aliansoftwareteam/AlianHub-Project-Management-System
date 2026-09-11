@@ -11,15 +11,15 @@ Updated 2026-09-11 (night). Read this first, then `Tasks/index.md`. Overwrite th
 
 ## Resume here first
 
-Five pieces of work are in flight. Fix agents were pushing to these branches when the session ended; they may not have finished. For each, check the branch head and CI, read the PR's "Review fixes" section, and finish any review finding still open. The owner's local notes hold the full review data.
+Four PRs are in flight. Fix agents were pushing to these branches when the session ended; they may not have finished. For each, check the branch head and CI, read the PR's "Review fixes" section, and finish any review finding still open. The owner's local notes hold the full review data.
 
-1. **Signup authorization fix** (`fix/signup-product-owner-mass-assignment`, critical). A PR may not exist yet. Merge it first once green, then run the audit script it adds on every deployed instance and review the accounts it lists.
+1. **Signup authorization fix: merged as #645 (`87917dfa`).** Upgrade step for every deployed instance: `node scripts/audit-product-owners.js`, then review each account it marks REVIEW.
 2. **#639** storage uploads and profile images: a Wasabi upload regression, capture uploads, the Wasabi bucket-size cron.
 3. **#637** default sprint: tenant pinning at the HTTP entry and a failed sprint reported as success.
 4. **#636** webhook private-host allowlist: wider never-allowed ranges, a prefix floor, hex entries, a redirect test.
 5. **#635** timesheet and invoice scoping: member regressions (task joins, the desktop tracker's Today list) and the remaining time reads.
 
-Merge in that order and merge `origin/beta` into the rest after each merge. `frontend/src/locales/*.pending.json` conflicts resolve by keeping every key from both sides.
+Merge #639, #637, #636, #635 in that order and merge `origin/beta` into the rest after each merge. `frontend/src/locales/*.pending.json` conflicts resolve by keeping every key from both sides.
 
 A separate local session was changing the unverified-login response. It must keep returning `userData._id`, which the login page's resend button needs.
 
