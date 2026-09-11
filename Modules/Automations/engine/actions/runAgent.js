@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../../utils/mongo-handler/mongoQueries');
 const skillIndex = require('../../../Agents/skills');
+const logger = require('../../../../Config/loggerConfig');
 
 // The bridge between the two engines (ADR 002): an agent is one more automation
 // action, not a second system. A rule-triggered run goes through the same
@@ -64,15 +65,21 @@ module.exports = {
         }
 
         const startedBy = await ruleOwner(companyId, context.ruleId);
-        const run = await runs.create(companyId, {
+        // The automation run id is stable across redeliveries of the same job,
+        // so a retried job finds the agent run its first delivery started.
+        const { run, deduplicated } = await runs.start(companyId, {
             agent, taskId: entity.id, projectId: task.ProjectID, skill: runs.skillSlugOf(agent, config.skill), trigger: 'rule',
-            startedBy, viaAccount: agent.account, note: context.ruleName ? `rule "${context.ruleName}"` : null,
+            startedBy, viaAccount: agent.account, note: context.ruleName ? `rule "${context.ruleName}"` : null, ref: context.runId,
             triggerDepth: context.depth, triggerEventId: context.eventId,
         });
+        const base = { runId: String(run._id), agent: agent.name, skill: run.skill, status: run.status };
+        if (deduplicated) {
+            logger.debug(`[automation-engine] run_agent: automation run ${context.runId} already started agent run ${run._id} (${run.status})`);
+            return { ...base, changed: false, verdict: 'deduplicated', reason: 'A run for this agent and task is already in progress.' };
+        }
         const actor = { kind: 'agent', userId: startedBy, agentId: String(agent._id), agentName: agent.name, runId: String(run._id), viaAccount: run.viaAccount, tokenId: null };
         const out = await runs.executeSkill(companyId, run, agent, task, { proposals, actions, actor });
-
-        const base = { runId: String(run._id), agent: agent.name, skill: run.skill, status: out.status };
+        base.status = out.status;
         if (out.status === runs.STATUS.SKIPPED) return { ...base, changed: false, verdict: 'skipped', reason: out.outcome };
         if (out.status === runs.STATUS.FAILED) throw refuse(out.error || out.outcome || 'agent run failed');
         if (out.status === 'abandoned') return { ...base, changed: false, verdict: 'stopped', reason: out.outcome };

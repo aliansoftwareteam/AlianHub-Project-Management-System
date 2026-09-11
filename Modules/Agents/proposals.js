@@ -17,8 +17,11 @@ const logger = require('../../Config/loggerConfig');
 // token that is honoured for 30 seconds.
 
 // 'applying' is the claim a decider holds while the changes run, so a second
-// approve or decline racing the first finds the proposal already taken.
-const STATUS = Object.freeze({ PENDING: 'pending', APPLYING: 'applying', APPROVED: 'approved', EDITED: 'edited', DECLINED: 'declined', UNDONE: 'undone' });
+// approve or decline racing the first finds the proposal already taken. A claim
+// nobody released is reaped to 'failed' (reapStuck) rather than re-applied.
+const STATUS = Object.freeze({ PENDING: 'pending', APPLYING: 'applying', APPROVED: 'approved', EDITED: 'edited', DECLINED: 'declined', UNDONE: 'undone', FAILED: 'failed' });
+const STUCK_DEFAULT_MINUTES = 10;
+const REAPER = Object.freeze({ kind: 'human', userId: 'system', personName: 'System' });
 // 30s was a reflex window, not a review window: by the time a person opened the
 // Inbox to look at what an agent did, it had closed. The audit row keeps the undo
 // descriptor either way, so a longer window costs nothing.
@@ -141,7 +144,7 @@ const list = async (companyId, { status, bucket, agentId, limit = 100 } = {}) =>
     (counts || []).forEach((c) => { byStatus[c._id] = c.n; });
     return {
         proposals: filtered,
-        counts: { waiting: byStatus.pending || 0, doneByAi: (byStatus.approved || 0) + (byStatus.edited || 0), declined: byStatus.declined || 0, undone: byStatus.undone || 0,
+        counts: { waiting: byStatus.pending || 0, doneByAi: (byStatus.approved || 0) + (byStatus.edited || 0), declined: byStatus.declined || 0, undone: byStatus.undone || 0, failed: byStatus.failed || 0,
                   primary: shaped.filter((p) => p.bucket === 'primary').length, later: shaped.filter((p) => p.bucket === 'later').length },
     };
 };
@@ -258,4 +261,40 @@ const undoApproval = async (companyId, id, { decider, ip }) => {
     return { proposal: updated, results };
 };
 
-module.exports = { STATUS, REASON, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, undoApproval, bucketOf };
+const stuckThresholdMs = () => {
+    const minutes = Number(process.env.AGENT_PROPOSAL_STUCK_MINUTES);
+    return (Number.isFinite(minutes) && minutes > 0 ? minutes : STUCK_DEFAULT_MINUTES) * 60 * 1000;
+};
+
+const failWaitingRun = async (companyId, p, reason) => {
+    if (!p.runId) return;
+    const runs = require('./runs');
+    const run = await quietly(`read run ${p.runId}`, () => runOf(companyId, p.runId));
+    if (!run || run.status !== runs.STATUS.WAITING) return;
+    await quietly(`fail run ${p.runId}`, () => runs.finish(companyId, p.runId, { status: runs.STATUS.FAILED, outcome: `proposal ${p._id} stalled while applying`, error: reason, onlyIf: runs.STATUS.WAITING }));
+    await dropThread(companyId, p.runId);
+};
+
+/* A decider that died mid-apply leaves its claim behind. Nobody can tell which
+ * of its changes ran, so the proposal is failed — never re-applied — and the
+ * run that was waiting on it is closed instead of counting as live forever. */
+const reapStuck = async (companyId, { olderThanMs = stuckThresholdMs(), now = new Date() } = {}) => {
+    const cutoff = new Date(now.getTime() - olderThanMs);
+    const failedReason = `applying for more than ${Math.round(olderThanMs / 60000)} minutes — the decider never finished, so the changes were not re-applied`;
+    const stuck = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ status: STATUS.APPLYING, decidedAt: { $lt: cutoff } }] }, 'find');
+    let reaped = 0;
+    for (const p of stuck || []) {
+        // eslint-disable-next-line no-await-in-loop
+        const failed = await setStatus(companyId, p._id, { status: STATUS.FAILED, failedReason, failedAt: now }, { onlyIf: STATUS.APPLYING });
+        if (!failed) continue;
+        reaped += 1;
+        // eslint-disable-next-line no-await-in-loop
+        await audit.recordProposalDecision(companyId, REAPER, { proposalId: String(p._id), decision: `failed: ${failedReason}`, agentName: p.agentName, runId: p.runId, ip: '' });
+        // eslint-disable-next-line no-await-in-loop
+        await failWaitingRun(companyId, p, failedReason);
+    }
+    if (reaped) logger.info(`[agent-proposal] reaped ${reaped} proposal(s) stuck in applying`);
+    return { reaped };
+};
+
+module.exports = { STATUS, REASON, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, undoApproval, bucketOf, reapStuck, stuckThresholdMs };

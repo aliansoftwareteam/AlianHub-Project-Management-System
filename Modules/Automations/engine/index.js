@@ -15,6 +15,7 @@ const JOB_NAME = 'automation.run';
 
 let driver = null;
 let started = false;
+const recurring = new Map();
 
 const enabled = () => String(process.env.AUTOMATION_ENGINE || 'true').toLowerCase() !== 'false';
 
@@ -25,6 +26,22 @@ const selectDriver = () => {
 };
 
 const enqueueRun = (data, opts) => driver.enqueue(JOB_NAME, data, opts);
+
+const scheduleRecurring = async (name, intervalMs, handler) => {
+    driver.define(name, async (job) => {
+        try { await handler(job); } catch (error) { logger.error(`${LOG_PREFIX} ${name} failed: ${error.message}`); }
+    });
+    await driver.every(intervalMs, name);
+    logger.info(`${LOG_PREFIX} ${name} every ${Math.round(intervalMs / 1000)}s`);
+};
+
+/* Other modules hang their periodic jobs on the same queue; registered before
+ * start() they are defined and scheduled once the driver is up. */
+const defineRecurring = (name, intervalMs, handler) => {
+    recurring.set(name, { intervalMs, handler });
+    if (started) return scheduleRecurring(name, intervalMs, handler);
+    return Promise.resolve();
+};
 
 async function onEnvelope(envelope) {
     try {
@@ -61,6 +78,10 @@ async function start() {
     domainEventBus.bus.on('domain.event', onEnvelope);
     started = true;
     logger.info(`${LOG_PREFIX} started (queue=${driver.name})`);
+    for (const [name, { intervalMs, handler }] of recurring) {
+        // eslint-disable-next-line no-await-in-loop
+        await scheduleRecurring(name, intervalMs, handler).catch((error) => logger.error(`${LOG_PREFIX} could not schedule ${name}: ${error.message}`));
+    }
 }
 
 async function stop() {
@@ -70,4 +91,4 @@ async function stop() {
     started = false;
 }
 
-module.exports = { start, stop, onEnvelope, enabled, JOB_NAME, _setDriver: (d) => { driver = d; }, _isStarted: () => started };
+module.exports = { start, stop, onEnvelope, enabled, defineRecurring, JOB_NAME, _setDriver: (d) => { driver = d; }, _isStarted: () => started };

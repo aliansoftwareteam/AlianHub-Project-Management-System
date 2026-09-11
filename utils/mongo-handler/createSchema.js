@@ -192,6 +192,11 @@ agentRunsSchema.index({ taskId: 1, startedAt: -1 });
 agentRunsSchema.index({ projectId: 1, status: 1 });
 agentRunsSchema.index({ projectId: 1, finishedAt: -1 });
 agentRunsSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// One open run per agent and task (the open set mirrors runs.OPEN) and one run
+// per idempotency key: a double-click, a retried request or a redelivered job
+// hits the index instead of starting a second run.
+agentRunsSchema.index({ agentId: 1, taskId: 1, status: 1 }, { unique: true, partialFilterExpression: { taskId: { $type: 'string' }, status: { $in: ['queued', 'running', 'waiting_approval'] } } });
+agentRunsSchema.index({ idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } });
 
 const agentProposalsSchema = new Schema(schema.agentProposals, {strict: true, timestamps: true});
 agentProposalsSchema.index({ status: 1, createdAt: -1 });

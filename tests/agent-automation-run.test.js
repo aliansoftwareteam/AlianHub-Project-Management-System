@@ -5,7 +5,7 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Modules/Agents/runs', () => ({
     STATUS: { RUNNING: 'running', WAITING: 'waiting_approval', DONE: 'done', SKIPPED: 'skipped', FAILED: 'failed', STOPPED: 'stopped' },
     canStart: jest.fn(async () => ({ ok: true, reason: '' })),
-    create: jest.fn(async (companyId, { agent, skill }) => ({ _id: 'run1', agentId: String(agent._id), skill, viaAccount: 'workspace' })),
+    start: jest.fn(async (companyId, { agent, skill }) => ({ run: { _id: 'run1', agentId: String(agent._id), skill, viaAccount: 'workspace', status: 'running' }, deduplicated: false })),
     skillSlugOf: jest.fn((agent, explicit) => explicit || 'qa-review'),
     executeSkill: jest.fn(async () => ({ status: 'done', outcome: '2 change(s) applied', refusals: 0 })),
 }));
@@ -34,7 +34,7 @@ beforeEach(() => {
 describe('#1 rule-triggered agent runs go through the run engine', () => {
     it('refuses, deterministically, when the rule names no agent', async () => {
         await expect(runAgent.run(args({ skill: 'qa-review' }))).rejects.toMatchObject({ deterministic: true, message: expect.stringMatching(/does not name an agent/) });
-        expect(runs.create).not.toHaveBeenCalled();
+        expect(runs.start).not.toHaveBeenCalled();
     });
 
     it('refuses when the named agent does not exist (or was deleted)', async () => {
@@ -47,7 +47,7 @@ describe('#1 rule-triggered agent runs go through the run engine', () => {
         runs.canStart.mockResolvedValueOnce({ ok: false, reason: 'Agent is paused (pause_all).' });
         await expect(runAgent.run(args({ skill: 'qa-review', agent: 'code reviewer' }))).rejects.toMatchObject({ deterministic: true, message: 'Code Reviewer cannot run: Agent is paused (pause_all).' });
         expect(runs.canStart).toHaveBeenCalledWith(expect.objectContaining({ name: 'Code Reviewer' }), { trigger: 'rule', companyId: C, depth: 0 });
-        expect(runs.create).not.toHaveBeenCalled();
+        expect(runs.start).not.toHaveBeenCalled();
     });
 
     it('refuses when the agent is scoped to other projects', async () => {
@@ -57,13 +57,21 @@ describe('#1 rule-triggered agent runs go through the run engine', () => {
 
     it('creates a rule-triggered run for the named agent and executes it as that agent, on behalf of the rule\'s author', async () => {
         const out = await runAgent.run(args({ skill: 'pr.summary', agent: 'Code Reviewer' }));
-        expect(runs.create).toHaveBeenCalledWith(C, expect.objectContaining({ taskId: TASK_ID, projectId: 'p1', skill: 'pr.summary', trigger: 'rule', startedBy: 'u1', note: 'rule "QA on done"', triggerDepth: 0 }));
+        expect(runs.start).toHaveBeenCalledWith(C, expect.objectContaining({ taskId: TASK_ID, projectId: 'p1', skill: 'pr.summary', trigger: 'rule', startedBy: 'u1', note: 'rule "QA on done"', triggerDepth: 0 }));
         const [, run, agent, t, deps] = runs.executeSkill.mock.calls[0];
         expect(run._id).toBe('run1');
         expect(agent.name).toBe('Code Reviewer');
         expect(t).toBe(task);
         expect(deps.actor).toMatchObject({ kind: 'agent', userId: 'u1', agentId: AGENT_ID, runId: 'run1', viaAccount: 'workspace' });
         expect(out).toMatchObject({ changed: true, verdict: 'applied', runId: 'run1', agent: 'Code Reviewer', status: 'done' });
+    });
+
+    it('passes the automation run id as the idempotency reference and returns the existing run when redelivered', async () => {
+        runs.start.mockResolvedValueOnce({ run: { _id: 'run1', skill: 'qa-review', status: 'running', viaAccount: 'workspace' }, deduplicated: true });
+        const out = await runAgent.run(args({ skill: 'qa-review', agent: 'Code Reviewer' }));
+        expect(runs.start).toHaveBeenCalledWith(C, expect.objectContaining({ trigger: 'rule', ref: 'auto1' }));
+        expect(runs.executeSkill).not.toHaveBeenCalled();
+        expect(out).toMatchObject({ changed: false, verdict: 'deduplicated', runId: 'run1', status: 'running' });
     });
 
     it('reports a proposal as not-changed, a skip as skipped, and a failure as a deterministic error', async () => {

@@ -71,6 +71,11 @@
     "group": "integrations",
     "description": "Firebase auth domain."
   },
+  "AGENT_PROPOSAL_STUCK_MINUTES": {
+    "group": "jobs",
+    "description": "Minutes an agent proposal may sit in 'applying' before the reaper fails it.",
+    "default": "10"
+  },
   "AUTOMATION_CONCURRENCY": {
     "group": "jobs",
     "description": "Automation runs processed in parallel.",

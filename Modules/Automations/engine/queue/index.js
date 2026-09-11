@@ -12,6 +12,7 @@
  *   stop()                        — drain and disconnect
  *   define(name, handler)         — register a job handler
  *   enqueue(name, data, opts)     — schedule work; opts.runAt for delays
+ *   every(intervalMs, name)       — run a defined job on a fixed interval
  *   isRunning()
  */
 
@@ -22,13 +23,21 @@ const INLINE = 'inline';
  * scheduling, because nothing survives a restart. */
 const createInlineDriver = () => {
     const handlers = new Map();
+    const timers = [];
     let running = false;
     return {
         name: INLINE,
         async start() { running = true; },
-        async stop() { running = false; handlers.clear(); },
+        async stop() { running = false; handlers.clear(); timers.splice(0).forEach(clearInterval); },
         isRunning: () => running,
         define(name, handler) { handlers.set(name, handler); },
+        async every(intervalMs, name) {
+            const handler = handlers.get(name);
+            if (!handler) throw new Error(`no handler defined for job "${name}"`);
+            const timer = setInterval(() => { handler({ attrs: { data: {} } }).catch(() => {}); }, intervalMs);
+            if (timer.unref) timer.unref();
+            timers.push(timer);
+        },
         async enqueue(name, data, opts = {}) {
             const handler = handlers.get(name);
             if (!handler) throw new Error(`no handler defined for job "${name}"`);

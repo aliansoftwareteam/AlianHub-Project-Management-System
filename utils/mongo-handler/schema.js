@@ -811,8 +811,10 @@ const schema = {
         // Depth of the domain event that started a rule-triggered run; its actions emit at depth + 1
         triggerDepth: { type: Number, default: 0, required: false },
         triggerEventId: { type: String, required: false },
-        // queued | running | waiting_approval | done | failed | stopped
+        // queued | running | waiting_approval | done | skipped | failed | stopped
         status: { type: String, default: 'queued', required: true },
+        // caller-supplied (Idempotency-Key) or derived from agent:task:trigger:ref; unique where present
+        idempotencyKey: { type: String, required: false },
         viaAccount: { type: String, required: false },
         startedBy: { type: String, required: false },
         startedAt: { type: Date, required: false },
@@ -850,12 +852,14 @@ const schema = {
         why: { type: String, required: false },
         // [{ action, params, label, reversible }] — every action a registry key
         changes: { type: Array, default: [], required: false },
-        // pending | approved | edited | declined | undone
+        // pending | applying | approved | edited | declined | undone | failed
         status: { type: String, default: 'pending', required: true },
         gate: { type: String, required: false },
         priority: { type: String, required: false },
         decidedBy: { type: String, required: false },
         decidedAt: { type: Date, required: false },
+        failedAt: { type: Date, required: false },
+        failedReason: { type: String, required: false },
         undoUntil: { type: Date, required: false },
         auditIds: { type: Array, default: [], required: false },
         cost: { type: Object, required: false },
