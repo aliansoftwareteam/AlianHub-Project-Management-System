@@ -14,10 +14,11 @@ describe('catalog', () => {
 
 describe('validateConnection', () => {
     test('known type, filters to allowed fields', () => {
-        const v = R.validateConnection({ type: 'slack', config: { verification_token: 's3cr3t', default_channel: '#dev', hacker: 'x' } });
+        const token = 'Q2hvb3NlQVZlcmlmaWNhdGlv';
+        const v = R.validateConnection({ type: 'slack', config: { verification_token: token, default_channel: '#dev', hacker: 'x' } });
         expect(v.valid).toBe(true);
         expect(v.value).toMatchObject({ type: 'slack', name: 'Slack' });
-        expect(v.value.config).toEqual({ verification_token: 's3cr3t', default_channel: '#dev' });
+        expect(v.value.config).toEqual({ verification_token: token, default_channel: '#dev' });
     });
     test('unknown type rejected', () => {
         expect(R.validateConnection({ type: 'nope' }).valid).toBe(false);
