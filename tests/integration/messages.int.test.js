@@ -78,18 +78,35 @@ describe('messages/inbox — general reminders', () => {
         expect(res.status).toBe(401);
     });
 
-    // MSG-07 — assignedTo is not validated against the company's members.
-    it.failing('MSG-07 refuses a reminder assigned to a non-member id', async () => {
+    it('MSG-07 refuses a reminder assigned to a non-member id', async () => {
         const member = await loginAs('member');
         const res = await member.api.post('/api/v1/general-reminders', {
             title: `stranger ${uniqueSuffix()}`, remindAt: futureISO(), notifyBefore: -1, assignedTo: '000000000000000000000000',
         });
+        expect(res.status).toBe(400);
         expect(res.body.status).toBe(false);
+    });
+
+    it('MSG-04 refuses an author managing a reminder raised for someone else, without a false success', async () => {
+        const member = await loginAs('member');
+        const admin = await loginAs('admin');
+        const title = `for admin ${uniqueSuffix()}`;
+        const created = await member.api.post('/api/v1/general-reminders', { title, remindAt: futureISO(), notifyBefore: -1, assignedTo: admin.uid });
+        expect(created.body.status).toBe(true);
+        const id = created.body.data._id;
+
+        const edit = await member.api.patch(`/api/v1/general-reminders/${id}`, { title: 'changed' });
+        expect([edit.status, edit.body.status]).toEqual([403, false]);
+        const remove = await member.api.delete(`/api/v1/general-reminders/${id}`);
+        expect([remove.status, remove.body.status]).toEqual([403, false]);
+
+        const theirs = (await admin.api.get('/api/v1/general-reminders')).body.data.find((r) => r._id === id);
+        expect(theirs.title).toBe(title);
+        expect((await admin.api.delete(`/api/v1/general-reminders/${id}`)).body.status).toBe(true);
     });
 });
 
 describe('messages/inbox — task reminders (MSG-01)', () => {
-    // MSG-01 — the /api/v1/reminders prefix is in neither JWT list, so it runs with no session.
     it('MSG-01 refuses an unauthenticated task-reminder write', async () => {
         const res = await anonymous.post('/api/v1/reminders',
             { reminderAt: futureISO(), reminderText: 'x' },
@@ -97,41 +114,72 @@ describe('messages/inbox — task reminders (MSG-01)', () => {
         expect(res.status).toBe(401);
     });
 
-    // MSG-01 — no ownership scoping: any caller edits any reminder by id.
-    it.failing('MSG-01 does not let one user edit another user\'s task reminder', async () => {
-        const created = await anonymous.post('/api/v1/reminders',
-            { reminderAt: futureISO(), reminderText: 'owner-owned' },
-            { headers: { companyid: state.companyId, userid: state.users.owner.userId } });
-        const id = created.body.data._id;
+    it('MSG-01 does not let one user edit another user\'s task reminder', async () => {
+        const owner = await loginAs('owner');
         const guest = await loginAs('guest');
+        const created = await owner.api.post('/api/v1/reminders', { reminderAt: futureISO(), reminderText: 'owner-owned' });
+        expect(created.body.status).toBe(true);
+        const id = created.body.data._id;
+
         const edit = await guest.api.patch(`/api/v1/reminders/${id}`, { reminderText: 'hijacked' });
-        expect(edit.body.status).toBe(false);
-        await anonymous.delete(`/api/v1/reminders/${id}`, { headers: { companyid: state.companyId } });
+        expect([edit.status, edit.body.status]).toEqual([403, false]);
+        expect((await guest.api.delete(`/api/v1/reminders/${id}`)).body.status).toBe(false);
+        expect((await guest.api.post(`/api/v1/reminders/${id}/run-now`, {})).body.status).toBe(false);
+
+        const mine = (await owner.api.get('/api/v1/reminders')).body.data.find((r) => r._id === id);
+        expect(mine.reminderText).toBe('owner-owned');
+        expect(mine.fired).toBe(false);
+        expect((await owner.api.delete(`/api/v1/reminders/${id}`)).body.status).toBe(true);
+    });
+
+    it('MSG-01 takes the user from the session, not the userid header', async () => {
+        const member = await loginAs('member');
+        const owner = await loginAs('owner');
+        const created = await member.api.post('/api/v1/reminders',
+            { reminderAt: futureISO(), reminderText: `spoof ${uniqueSuffix()}`, userId: owner.uid },
+            { headers: { userid: owner.uid } });
+        const id = created.body.data._id;
+        expect(created.body.data.userId).toBe(member.uid);
+        expect((await owner.api.get('/api/v1/reminders')).body.data.some((r) => r._id === id)).toBe(false);
+        await member.api.delete(`/api/v1/reminders/${id}`);
+    });
+
+    it('MSG-01 keeps the company-wide run-due to owners and admins', async () => {
+        const member = await loginAs('member');
+        expect((await member.api.post('/api/v1/reminders/run-due', {})).status).toBe(403);
     });
 });
 
 describe('messages/inbox — legacy notification API (MSG-02, MSG-03)', () => {
-    // MSG-02 — a user must not be able to read another user's notification feed.
-    it.failing('MSG-02 does not leak another user\'s notifications', async () => {
+    it('MSG-02 does not leak another user\'s notifications', async () => {
         const member = await loginAs('member');
         const guest = await loginAs('guest');
         const created = await member.api.post('/api/v1/general-reminders', { title: `fire ${uniqueSuffix()}`, remindAt: futureISO(), notifyBefore: -1 });
         const id = created.body.data._id;
         await member.api.post(`/api/v1/general-reminders/${id}/run-now`, {});
 
-        const mine = await member.api.get('/api/v1/app-notification/notification', { query: { userId: member.uid, filter: 'unread' } });
-        expect(mine.body.data.length).toBeGreaterThan(0); // setup sanity: the reminder produced a notification for the member
+        const mine = await member.api.get('/api/v1/app-notification/notification', { query: { filter: 'unread' } });
+        expect(mine.body.data.length).toBeGreaterThan(0);
 
         const leaked = await guest.api.get('/api/v1/app-notification/notification', { query: { userId: member.uid, filter: 'unread' } });
+        expect(leaked.status).toBe(403);
         expect((leaked.body.data || []).length).toBe(0);
+
+        const row = mine.body.data[0];
+        expect((await guest.api.put('/api/v1/app-notification/mark-read', { key: 'notifications', id: row._id, userId: member.uid })).status).toBe(403);
+        expect((await guest.api.put('/api/v1/app-notification/mark-all-read', { key: 'notifications', userId: member.uid })).status).toBe(403);
+        await guest.api.put('/api/v1/app-notification/mark-all-read', { key: 'notifications' });
+
+        const after = await member.api.get('/api/v1/app-notification/notification', { query: { filter: 'unread' } });
+        expect(after.body.data.some((n) => n._id === row._id)).toBe(true);
         await member.api.delete(`/api/v1/general-reminders/${id}`);
     });
 
-    // MSG-03 — a malformed id must not surface a raw 500.
-    it.failing('MSG-03 answers a malformed mark-read id cleanly, not 500', async () => {
+    it('MSG-03 answers a malformed mark-read id cleanly, not 500', async () => {
         const member = await loginAs('member');
         const res = await member.api.put('/api/v1/app-notification/mark-read', { key: 'mentions', id: 'not-an-id', userId: member.uid });
-        expect(res.status).not.toBe(500);
+        expect(res.status).toBe(400);
+        expect(res.body.status).toBe(false);
     });
 });
 
@@ -143,23 +191,28 @@ describe('messages/inbox — unread comment counts (MSG-05)', () => {
         expect(String(res.body.statusText)).toMatch(/mismatch/i);
     });
 
-    // MSG-05 — the handler shadows the Express `res`, so it never returns the standard envelope on success.
-    it.failing('MSG-05 answers unsetCommentCounts with the standard envelope', async () => {
+    it('MSG-05 answers unsetCommentCounts with the standard envelope', async () => {
         const member = await loginAs('member');
         const res = await member.api.post('/api/v1/unsetCommentCounts', { companyId: member.companyId, projectId: '000000000000000000000000' });
         expect(res.status).toBe(200);
-        expect(res.body && typeof res.body.status).toBe('boolean');
+        expect(res.body && res.body.status).toBe(true);
+    });
+
+    it('MSG-05 answers a missing project with 400', async () => {
+        const member = await loginAs('member');
+        const res = await member.api.post('/api/v1/unsetCommentCounts', { companyId: member.companyId });
+        expect([res.status, res.body && res.body.status]).toEqual([400, false]);
     });
 });
 
 describe('messages/inbox — handleNotification (MSG-06)', () => {
-    // MSG-06 — a partial body must not hang the request forever.
-    it.failing('MSG-06 responds promptly to a partial body', async () => {
+    it('MSG-06 responds promptly to a partial body', async () => {
         const member = await loginAs('member');
-        const responded = member.api.post('/api/v1/handleNotification', {}).then(() => true);
-        const timedOut = new Promise((resolve) => setTimeout(() => resolve(false), 4000));
-        const won = await Promise.race([responded, timedOut]);
-        expect(won).toBe(true);
+        const responded = member.api.post('/api/v1/handleNotification', {});
+        const timedOut = new Promise((resolve) => setTimeout(() => resolve(null), 4000));
+        const res = await Promise.race([responded, timedOut]);
+        expect(res).not.toBeNull();
+        expect([res.status, res.body.status]).toEqual([400, false]);
     }, 10000);
 });
 
