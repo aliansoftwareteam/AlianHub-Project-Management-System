@@ -1,7 +1,7 @@
 {
   "locale": "ge",
   "machineTranslated": false,
-  "updatedAt": "2026-09-11T07:37:52.521Z",
+  "updatedAt": "2026-09-11T09:34:02.637Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5450,6 +5450,7 @@
     "AiHealth.owner_only_title": "Owners and admins only",
     "AiHealth.owner_only_body": "Ask an owner or admin of this workspace for the AI health figures.",
     "AiHealth.load_failed": "The health figures could not be loaded.",
-    "AiHealth.retry": "Retry"
+    "AiHealth.retry": "Retry",
+    "Automations.manage_owner_admin": "Only owners and admins can create, change or switch on automations."
   }
 }
