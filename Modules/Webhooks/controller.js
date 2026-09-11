@@ -6,6 +6,20 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { validateWebhookInput, isObjectIdString, generateSecret, EVENT_TYPES } = require('./helpers/webhookRules');
 const { invalidateCompanyCache } = require('./dispatcher');
+const { resolvePublic } = require('../Agents/engine/safeFetch');
+
+const PRIVATE_DESTINATION = 'The webhook url must resolve to a public address.';
+
+/* The literal check in validateWebhookInput cannot see what a hostname resolves to;
+ * this closes that gap at save time. The dispatcher resolves again before each POST. */
+const resolvesPublicly = async (url) => {
+    try {
+        await resolvePublic(String(url).trim());
+        return true;
+    } catch (error) {
+        return false;
+    }
+};
 
 // Outgoing-webhook management. The HMAC secret is generated server-side and
 // returned ONCE on create; list/update responses always mask it.
@@ -76,6 +90,9 @@ exports.createWebhook = async (req, res) => {
         if (!check.valid) {
             return res.send({ status: false, statusText: check.reason });
         }
+        if (!(await resolvesPublicly(url))) {
+            return res.send({ status: false, statusText: PRIVATE_DESTINATION });
+        }
 
         const secret = generateSecret();
         const created = await MongoDbCrudOpration(companyId, {
@@ -137,6 +154,9 @@ exports.updateWebhook = async (req, res) => {
             });
             if (!check.valid) {
                 return res.send({ status: false, statusText: check.reason });
+            }
+            if (url !== undefined && !(await resolvesPublicly(url))) {
+                return res.send({ status: false, statusText: PRIVATE_DESTINATION });
             }
             if (name !== undefined) update.name = String(name).trim();
             if (url !== undefined) update.url = String(url).trim();

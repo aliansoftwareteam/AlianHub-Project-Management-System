@@ -119,6 +119,10 @@ async function readCapped(stream, { maxBytes, remainingMs }) {
     });
 }
 
+/* Redirect method rules follow the Fetch spec: 303 always becomes GET, and so do
+ * 301/302 for anything but GET/HEAD; 307/308 replay the original method and body. */
+const methodAfterRedirect = (status, method) => (status === 303 || ((status === 301 || status === 302) && method !== 'get' && method !== 'head') ? 'get' : method);
+
 /* Follows redirects by hand so every hop is validated and pinned. `opts.resolve`
  * exists for tests that need a "public" name to land on a local server. */
 async function safeFetch(url, opts = {}) {
@@ -132,13 +136,18 @@ async function safeFetch(url, opts = {}) {
     };
 
     let current = String(url);
+    let method = String(opts.method || 'get').toLowerCase();
+    let data = opts.data;
     for (let hop = 0; ; hop += 1) {
         const target = await resolve(current);
         const controller = new AbortController();
         const abortTimer = setTimeout(() => controller.abort(), remaining());
         let res;
         try {
-            res = await axios.get(target.url.toString(), {
+            res = await axios.request({
+                url: target.url.toString(),
+                method,
+                data,
                 headers: opts.headers,
                 timeout: remaining(),
                 signal: controller.signal,
@@ -159,6 +168,9 @@ async function safeFetch(url, opts = {}) {
         if (res.status >= 300 && res.status < 400 && location) {
             res.data.destroy();
             if (hop >= maxRedirects) throw new Error(`too many redirects (more than ${maxRedirects})`);
+            const next = methodAfterRedirect(res.status, method);
+            if (next !== method) data = undefined;
+            method = next;
             current = new URL(String(location), target.url).toString();
             continue;
         }

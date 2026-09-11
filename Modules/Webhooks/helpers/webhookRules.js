@@ -1,8 +1,9 @@
-// Outgoing-webhook rules. Pure (crypto only) — no DB or network — shared by
-// the controller, the dispatcher, and the unit tests.
+// Outgoing-webhook rules. No DB or network calls — shared by the controller,
+// the dispatcher, and the unit tests.
 
 const crypto = require('crypto');
 const { normalizeChangedFields } = require('../../../utils/entityEvents');
+const { isBlockedHostname } = require('../../Agents/engine/safeFetch');
 
 // Task lifecycle events a webhook can subscribe to. '*' subscribes to all.
 const EVENT_TYPES = Object.freeze([
@@ -34,7 +35,7 @@ const isObjectIdString = (id) => OBJECT_ID_PATTERN.test(String(id || ''));
 const isValidUrl = (value) => {
     try {
         const url = new URL(String(value || ''));
-        return url.protocol === 'http:' || url.protocol === 'https:';
+        return (url.protocol === 'http:' || url.protocol === 'https:') && !isBlockedHostname(url.hostname);
     } catch (e) {
         return false;
     }
@@ -46,7 +47,7 @@ const validateWebhookInput = ({ name, url, events, format }) => {
         return { valid: false, reason: `A name up to ${MAX_NAME_LENGTH} characters is required.` };
     }
     if (!isValidUrl(url)) {
-        return { valid: false, reason: 'A valid http or https url is required.' };
+        return { valid: false, reason: 'A valid http or https url on a public host is required.' };
     }
     if (!Array.isArray(events) || !events.length) {
         return { valid: false, reason: 'At least one event is required.' };
