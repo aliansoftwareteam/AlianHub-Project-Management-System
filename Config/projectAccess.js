@@ -3,6 +3,7 @@ const { SCHEMA_TYPE } = require('./schemaType');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { getRoleType, isPrivileged, evaluatePermission, isWritable, fineGrainedEnforced } = require('./permissionGuard');
 const logger = require('./loggerConfig');
+const { visibleProjectIds } = require('../Modules/Agents/scope');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const TEAM_PREFIX = 'tId_';
@@ -130,14 +131,10 @@ const decideProjectAccess = async (companyId, uid, projectId, { mode = WRITE, pe
 };
 
 const canEditProject = (companyId, uid, projectId, permissions = []) => decideProjectAccess(companyId, uid, projectId, { mode: WRITE, permissions });
-const canReadProject = (companyId, uid, projectId) => decideProjectAccess(companyId, uid, projectId, { mode: READ });
 
-const visibleProjectIds = async (companyId, uid, projectIds) => {
-    const visible = [];
-    for (const id of [...new Set((projectIds || []).map(String))]) {
-        if ((await canReadProject(companyId, uid, id)).allowed) visible.push(id);
-    }
-    return visible;
+const keepVisibleProjectIds = async (companyId, uid, projectIds) => {
+    const visible = new Set(await visibleProjectIds(companyId, uid));
+    return [...new Set((projectIds || []).map(String))].filter((id) => visible.has(id));
 };
 
 const refuse = (res, decision) => {
@@ -224,7 +221,7 @@ const keepVisibleProjects = ({ get, set }) => async (req, res, next) => {
     try {
         const ids = get(req);
         if (!Array.isArray(ids)) return next();
-        set(req, await visibleProjectIds(String(req.headers['companyid'] || ''), req.uid, ids));
+        set(req, await keepVisibleProjectIds(String(req.headers['companyid'] || ''), req.uid, ids));
         return next();
     } catch (error) {
         logger.error(`keepVisibleProjects error: ${error.message || error}`);
@@ -243,8 +240,7 @@ module.exports = {
     fieldsOf,
     permissionsForProjectUpdate,
     canEditProject,
-    canReadProject,
-    visibleProjectIds,
+    keepVisibleProjectIds,
     projectIdsFrom,
     requireProjectAccess,
     keepVisibleProjects,

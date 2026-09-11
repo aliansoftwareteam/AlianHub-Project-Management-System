@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
-const { visibleProjectIds } = require('../../Config/projectAccess');
+const { keepVisibleProjectIds } = require('../../Config/projectAccess');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { removeCache } = require('../../utils/commonFunctions');
 const { myCache } = require('../../Config/config');
@@ -86,7 +86,7 @@ const buildRollup = async (companyId, portfolioId, uid) => {
         type: SCHEMA_TYPE.PORTFOLIOS, data: [{ _id: oid(portfolioId) }],
     }, 'findOne');
     if (!portfolio || portfolio.deletedStatusKey === 1) return null;
-    const projectIds = await visibleProjectIds(companyId, uid, Array.isArray(portfolio.projectIds) ? portfolio.projectIds : []);
+    const projectIds = await keepVisibleProjectIds(companyId, uid, Array.isArray(portfolio.projectIds) ? portfolio.projectIds : []);
     const nowMs = Date.now();
 
     const projectDocs = projectIds.length
