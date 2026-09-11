@@ -7,20 +7,17 @@ const { scopeTimesheetPipeline, TimesheetQueryRefused } = require("../helpers/ti
 exports.getTimeSheetByAggregate = async (req,res) => {
     try {
         const companyId = req.headers['companyid'];
-        const scope = await resolveSheetScope(companyId, req.uid, SHEET_PERMISSION.workload);
+        const scope = await resolveSheetScope(companyId, req.uid, [SHEET_PERMISSION.tracker, SHEET_PERMISSION.workload]);
         let pipeline;
         try {
-            pipeline = scopeTimesheetPipeline(req.body && req.body.queryeta, scope);
+            /* replaceObjectKey rebuilds every object, so it runs before the guard adds ObjectIds. */
+            pipeline = scopeTimesheetPipeline(replaceObjectKey(req.body && req.body.queryeta, ["dbDate"]), scope);
         } catch (error) {
             if (!(error instanceof TimesheetQueryRefused)) throw error;
             return res.status(400).json({ status: false, statusText: "Bad Request", message: error.message });
         }
 
-        const estObj = {
-            type: SCHEMA_TYPE.TIMESHEET,
-            data: [replaceObjectKey(pipeline, ["dbDate"])]
-        };
-        const timeSheetData = await MongoDbCrudOpration(companyId, estObj, 'aggregate');
+        const timeSheetData = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [pipeline] }, 'aggregate');
 
         if (!timeSheetData) {
             return res.status(404).json({ message: "Time sheet data not found" });

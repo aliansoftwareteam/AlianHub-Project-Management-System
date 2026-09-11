@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { matches } = require('./fixtures/fakeMongo');
 
 const mockCrud = jest.fn(async () => []);
@@ -49,7 +50,7 @@ const ROUTES = [
         { filterProjectIds: [], filterUserIds: [OTHER], projectIds: [P1, P2], startNumber: 0, endNumber: 999000, timeZone: 'UTC', projectTimesheetPermission: true, userId: OTHER, ...forgedPrivilege }],
     ['/timesheet/tracker', trackerSheet.getTrackerTimeSheet, 'sheet_settings.tracker_timesheet',
         { selectedFilter: [], userArray: [OTHER], isEveryOne: true, start: 0, end: 999 }],
-    ['/timesheet', aggregateSheet.getTimeSheetByAggregate, 'sheet_settings.workload_timesheet',
+    ['/timesheet', aggregateSheet.getTimeSheetByAggregate, 'sheet_settings.tracker_timesheet',
         { queryeta: [{ $match: {} }, { $group: { _id: '$Loggeduser', totalCount: { $sum: '$LogTimeDuration' } } }] }],
 ];
 
@@ -121,7 +122,7 @@ describe('16c /timesheet query guard', () => {
         const r = await call(aggregateSheet.getTimeSheetByAggregate, lookup(tasksLookup));
         expect(r.code).toBe(200);
         const joined = mockCrud.mock.calls[0][1].data[0].find((stage) => stage.$lookup).$lookup;
-        expect(joined.pipeline[0]).toEqual({ $match: { ProjectID: { $in: [P1] } } });
+        expect(joined.pipeline[0]).toEqual({ $match: { ProjectID: { $in: [new mongoose.Types.ObjectId(P1), P1] } } });
         expect(joined.pipeline.slice(1)).toEqual(tasksLookup.pipeline);
     });
 

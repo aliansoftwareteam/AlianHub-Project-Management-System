@@ -1,6 +1,6 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
-const { resolveSheetScope, scopedTimeMatch, asList, filtersOfType, SHEET_PERMISSION } = require("../helpers/timeScope");
+const { resolveSheetScope, scopedTimeMatch, asList, filtersOfType, safeTimeZone, SHEET_PERMISSION } = require("../helpers/timeScope");
 
 exports.getUserTimeSheet = async(req,res) => {
     try {
@@ -37,7 +37,7 @@ exports.getUserTimeSheet = async(req,res) => {
                                 }
                             },
                             format: "%Y-%m-%dT00:00:00.000Z",
-                            timezone: timeZone
+                            timezone: safeTimeZone(timeZone)
                         }
                     }
                 }

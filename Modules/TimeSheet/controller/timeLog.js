@@ -1,54 +1,44 @@
-
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
+const { resolveSheetScope, scopedTimeMatch, asList, SHEET_PERMISSION } = require("../helpers/timeScope");
+const { checkStages, isPlainObject, TimesheetQueryRefused } = require("../helpers/timesheetQueryScope");
 
+const STAGE_OF_PARAMETER = Object.freeze([['sort', '$sort'], ['group', '$group'], ['addFields', '$addFields'], ['facet', '$facet']]);
+
+const namedStages = (body) => STAGE_OF_PARAMETER.filter(([parameter]) => body[parameter]).map(([parameter, stage]) => {
+    const value = body[parameter];
+    if (!isPlainObject(value) || Object.keys(value).length !== 1 || !Object.prototype.hasOwnProperty.call(value, stage)) {
+        throw new TimesheetQueryRefused(`${parameter} must be a single ${stage} stage.`);
+    }
+    return value;
+});
 
 exports.getTimeLogTimeSheet = async(req,res) => {
     try {
-        const { taskIds, startDate,endDate,usersFilterIDsArray, facet, addFields, group, sort } = req.body;
-        let timeQuery = {TicketID: {$in: taskIds.map(task => task.TicketID)}};
+        const body = req.body || {};
+        const { taskIds, startDate, endDate, usersFilterIDsArray } = body;
+        const scope = await resolveSheetScope(req.headers['companyid'], req.uid, [SHEET_PERMISSION.tracker, SHEET_PERMISSION.workload]);
 
-        if(startDate && endDate){
+        const timeQuery = {
+            ...scopedTimeMatch(scope, { userIds: asList(usersFilterIDsArray).length ? usersFilterIDsArray : null }),
+            TicketID: { $in: asList(taskIds).map((task) => task && task.TicketID).filter((id) => typeof id === 'string') },
+        };
+        if (startDate && endDate) {
             timeQuery.LogStartTime = {
                 $gte: new Date(startDate).getTime() / 1000,
                 $lte: new Date(endDate).getTime() / 1000
-            }
+            };
         }
 
-        if(usersFilterIDsArray && usersFilterIDsArray.length){
-            timeQuery.Loggeduser = {
-                $in: usersFilterIDsArray
-            }
+        let query;
+        try {
+            query = [{ $match: timeQuery }, ...checkStages(namedStages(body), scope)];
+        } catch (error) {
+            if (!(error instanceof TimesheetQueryRefused)) throw error;
+            return res.status(400).json({ status: false, statusText: "Bad Request", message: error.message });
         }
 
-        const query = [
-            {
-                $match: {
-                    $and: [timeQuery]
-                }
-            },
-        ];
-
-        if(sort){
-            query.push(sort);
-        }
-
-        if(group){
-            query.push(group);
-        }
-
-        if(addFields){
-            query.push(addFields);
-        }
-
-        if(facet){
-            query.push(facet);
-        }
-        const timesheetObj = {
-            type: SCHEMA_TYPE.TIMESHEET,
-            data: [query]
-        };
-        const timesheetData = await MongoDbCrudOpration(req.headers['companyid'], timesheetObj, 'aggregate');
+        const timesheetData = await MongoDbCrudOpration(req.headers['companyid'], { type: SCHEMA_TYPE.TIMESHEET, data: [query] }, 'aggregate');
 
         if (!timesheetData) {
             return res.status(404).json({ message: "TimeSheet Data not found" });
