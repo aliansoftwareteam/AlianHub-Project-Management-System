@@ -163,3 +163,34 @@ describe('TSK-08 recent visits belong to the signed-in user', () => {
         expect(list.body.data.some((row) => sameId(row.task._id, task._id))).toBe(true);
     });
 });
+
+describe('TSK-09 a clip belongs to the signed-in user', () => {
+    it('records the caller as the author whatever user id the body names', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const res = await member.api.post('/api/v1/clips', { title: `VIS Clip ${uniqueSuffix()}`, url: 'clips/x.webm', mediaType: 'video', userId: owner.uid, userData: { id: owner.uid } });
+        expect(res.body.status).toBe(true);
+        expect(res.body.data.userId).toBe(member.uid);
+
+        const ownerList = await owner.api.get('/api/v1/clips', { query: { userId: member.uid } });
+        expect(ownerList.body.data.some((clip) => sameId(clip._id, res.body.data._id))).toBe(false);
+    });
+
+    it('refuses to rename or delete another user\'s clip', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const title = `VIS Owner Clip ${uniqueSuffix()}`;
+        const created = await owner.api.post('/api/v1/clips', { title, url: 'clips/y.webm', mediaType: 'video' });
+        const id = created.body.data._id;
+
+        expect(refused(await member.api.patch(`/api/v1/clips/${id}`, { title: 'Hijacked' }))).toBe(true);
+        expect(refused(await member.api.delete(`/api/v1/clips/${id}`))).toBe(true);
+        const list = await owner.api.get('/api/v1/clips');
+        expect(list.body.data.find((clip) => sameId(clip._id, id))).toMatchObject({ title });
+    });
+
+    it('requires a session', async () => {
+        const res = await anon.post('/api/v1/clips', { title: 'Anon', url: 'clips/z.webm', userId: state.users.owner.userId });
+        expect(res.status).toBe(401);
+    });
+});
