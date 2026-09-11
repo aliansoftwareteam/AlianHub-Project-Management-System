@@ -108,7 +108,7 @@ test.describe('reports screens as the guest', () => {
 test.describe('reports regressions', () => {
     // REP-01 — legacy POST /api/v1/dashboard runs a body-supplied Mongo method,
     // letting any role overwrite another user's dashboard.
-    test.fail('REP-01 legacy /dashboard cannot overwrite another user\'s dashboard', async ({ loginAs }) => {
+    test('REP-01 legacy /dashboard cannot overwrite another user\'s dashboard', async ({ loginAs }) => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
         const priv = await owner.api.post('/api/v1/dashboards', { title: `[e2e] rep01 ${uniqueSuffix()}`, visibility: 'private' });
@@ -124,7 +124,7 @@ test.describe('reports regressions', () => {
 
     // REP-04 — webhook URL validation only checks the protocol, so an internal host
     // is accepted (blind SSRF via the dispatcher).
-    test.fail('REP-04 a webhook aimed at the cloud metadata address is refused', async ({ loginAs }) => {
+    test('REP-04 a webhook aimed at the cloud metadata address is refused', async ({ loginAs }) => {
         const owner = await loginAs('owner');
         const res = await owner.api.post('/api/v2/webhooks', { name: `[e2e] ssrf ${uniqueSuffix()}`, url: 'http://169.254.169.254/latest/meta-data', events: ['task.created'] });
         if (res.body && res.body.data && res.body.data._id) {

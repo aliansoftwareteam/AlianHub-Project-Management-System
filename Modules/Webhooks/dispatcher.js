@@ -1,10 +1,10 @@
-const axios = require('axios');
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { createSnapshotStore } = require('../../utils/entityEvents');
+const { safeFetch } = require('../Agents/engine/safeFetch');
 const { subscribesTo, classifyTaskEvent, shouldDeliverTask, normalizeChangedFields, trimTaskForDelivery, signPayload, formatForTarget } = require('./helpers/webhookRules');
 
 // Webhook dispatcher. Piggybacks on the namespaced socketEmitter events that
@@ -23,6 +23,7 @@ const LOG_PREFIX = '[webhooks]';
 const DEBOUNCE_MS = 2000;
 const RETRY_DELAY_MS = 30000;
 const DELIVERY_TIMEOUT_MS = 8000;
+const RESPONSE_CAP_BYTES = 256 * 1024;
 const CACHE_TTL_MS = 60000;
 
 // companyId -> { at, hooks } — tiny cache so a burst of task updates doesn't
@@ -77,8 +78,13 @@ async function deliverToHook(companyId, hook, body, attempt) {
     const bodyString = JSON.stringify(formatForTarget(hook.format, body));
     const startedAt = Date.now();
     try {
-        const response = await axios.post(hook.url, bodyString, {
-            timeout: DELIVERY_TIMEOUT_MS,
+        // A stored url was checked at save time, but DNS can change since: safeFetch
+        // resolves again, refuses private addresses and revalidates every redirect.
+        const response = await safeFetch(hook.url, {
+            method: 'post',
+            data: bodyString,
+            timeoutMs: DELIVERY_TIMEOUT_MS,
+            maxBytes: RESPONSE_CAP_BYTES,
             headers: {
                 'Content-Type': 'application/json',
                 'User-Agent': 'AlianHub-Webhooks/1.0',
@@ -86,8 +92,6 @@ async function deliverToHook(companyId, hook, body, attempt) {
                 'X-AlianHub-Delivery-Attempt': String(attempt),
                 'X-AlianHub-Signature': signPayload(hook.secret, bodyString),
             },
-            // Treat any HTTP response as a response — classify below.
-            validateStatus: () => true,
         });
         const success = response.status >= 200 && response.status < 300;
         await logDelivery(companyId, hook._id, {
@@ -251,4 +255,5 @@ function start() {
 module.exports = {
     start,
     invalidateCompanyCache,
+    deliverToHook,
 };
