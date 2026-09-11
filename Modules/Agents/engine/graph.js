@@ -64,6 +64,14 @@ const quietly = async (runId, what, fn) => {
     try { return await fn(); } catch (e) { logger.error(`${LOG_PREFIX} ${runId}: ${what}: ${e.message}`); return null; }
 };
 
+/* Renews the queue lock between nodes when the run executes inside a job, so a
+ * run that is slow in every phase still holds its lock (see engine/timeouts). */
+const renewLock = (state, config) => {
+    const keepAlive = config.context.deps && config.context.deps.keepAlive;
+    if (typeof keepAlive !== 'function') return Promise.resolve();
+    return quietly(state.run._id, 'job lock not renewed', keepAlive);
+};
+
 async function gather(state, config) {
     const { companyId } = config.context;
     const { run, task } = state;
@@ -76,6 +84,7 @@ async function gather(state, config) {
 }
 
 async function analyse(state, config) {
+    await renewLock(state, config);
     const { companyId } = config.context;
     const { run, task } = state;
     const result = state.result || await orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: MODEL_BUDGET });
@@ -92,6 +101,7 @@ async function analyse(state, config) {
  * as before; from it, the policy reviews each change and a refusal still goes
  * through perform() so it leaves the same audit row as a registry refusal. */
 async function review(state, config) {
+    await renewLock(state, config);
     const { companyId } = config.context;
     const { run, agent, task, result } = state;
     const { changes: found, alreadyTracked } = await runs.changesFor(companyId, task, result);
@@ -112,6 +122,7 @@ async function review(state, config) {
 }
 
 async function act(state, config) {
+    await renewLock(state, config);
     const { companyId, deps } = config.context;
     const { run, agent } = state;
     let applied = 0;
@@ -144,6 +155,7 @@ async function act(state, config) {
 }
 
 async function propose(state, config) {
+    await renewLock(state, config);
     const { companyId, deps } = config.context;
     const { run, agent, task, result, spend, toPropose } = state;
     if (!(await runs.isRunning(companyId, run._id))) return { abandoned: true };

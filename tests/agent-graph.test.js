@@ -354,3 +354,28 @@ describe('tenancy and the runs from before the graph', () => {
         expect(runRow(declinedRun._id)).toMatchObject({ status: 'done', outcome: 'declined by a person' });
     });
 });
+
+describe('the queue lock is renewed between nodes', () => {
+    it('calls keepAlive before analyse, review and act when the run executes inside a job', async () => {
+        planned([subtask('One'), subtask('Two')]);
+        const a = agent({ autonomy: 2 });
+        const run = await start(a);
+        const keepAlive = jest.fn(async () => {});
+        const out = await runs.executeSkill(C, run, a, TASK, { ...deps(), keepAlive });
+        expect(out).toEqual({ status: 'done', outcome: '2 change(s) applied', refusals: 0 });
+        expect(keepAlive.mock.calls.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('a keepAlive that throws does not fail the run, and a run without one is unaffected', async () => {
+        planned([subtask('One')]);
+        const a = agent({ autonomy: 2 });
+        const failing = await start(a);
+        const keepAlive = jest.fn(async () => { throw new Error('job got canceled'); });
+        expect((await runs.executeSkill(C, failing, a, TASK, { ...deps(), keepAlive })).status).toBe('done');
+        expect(keepAlive).toHaveBeenCalled();
+
+        planned([subtask('One')]);
+        const plain = await start(a);
+        expect((await execute(plain, a)).status).toBe('done');
+    });
+});

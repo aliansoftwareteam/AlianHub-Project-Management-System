@@ -15,10 +15,9 @@ try {
 //
 // Reference: https://docs.anthropic.com/en/api/messages-streaming
 //
-// The SDK has a default 10-minute network timeout; we surface it as
-// ANTHROPIC_TIMEOUT_MS so operators can raise it for very long plans.
-
-const DEFAULT_ANTHROPIC_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+// ANTHROPIC_TIMEOUT_MS overrides the shared model timeout; the job lock is
+// derived from the same module, so raising it here raises the lock too.
+const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
 
 function isClaudeOpus(modelId) {
     return typeof modelId === 'string' && modelId.toLowerCase().includes('opus');
@@ -42,7 +41,7 @@ const anthropicProvider = {
             throw new Error('Anthropic provider not configured: install @anthropic-ai/sdk and set ANTHROPIC_API_KEY + ANTHROPIC_MODEL');
         }
         const Anthropic = AnthropicSdk.default || AnthropicSdk.Anthropic || AnthropicSdk;
-        const timeoutMs = Number(process.env.ANTHROPIC_TIMEOUT_MS) || DEFAULT_ANTHROPIC_TIMEOUT_MS;
+        const timeoutMs = providerTimeoutMs('anthropic');
         const client = new Anthropic({
             apiKey: process.env.ANTHROPIC_API_KEY,
             timeout: timeoutMs,

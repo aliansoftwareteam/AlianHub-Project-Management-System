@@ -78,7 +78,7 @@ module.exports = {
             return { ...base, changed: false, verdict: 'deduplicated', reason: 'A run for this agent and task is already in progress.' };
         }
         const actor = { kind: 'agent', userId: startedBy, agentId: String(agent._id), agentName: agent.name, runId: String(run._id), viaAccount: run.viaAccount, tokenId: null };
-        const out = await runs.executeSkill(companyId, run, agent, task, { proposals, actions, actor });
+        const out = await runs.executeSkill(companyId, run, agent, task, { proposals, actions, actor, keepAlive: context.keepAlive });
         base.status = out.status;
         if (out.status === runs.STATUS.SKIPPED) return { ...base, changed: false, verdict: 'skipped', reason: out.outcome };
         if (out.status === runs.STATUS.FAILED) throw refuse(out.error || out.outcome || 'agent run failed');

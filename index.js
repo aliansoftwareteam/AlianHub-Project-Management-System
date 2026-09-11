@@ -276,5 +276,6 @@ async function applySavedSettings() {
     const server = app.listen(config.PORT, () => {
         console.log("Server ready on " + config.PORT);
     });
+    require('./Modules/Agents/engine/timeouts').applyServerTimeouts(server);
     initSocket(server);
 })();

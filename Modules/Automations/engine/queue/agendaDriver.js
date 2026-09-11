@@ -1,5 +1,6 @@
 const { Agenda } = require('@hokify/agenda');
 const logger = require('../../../../Config/loggerConfig');
+const { RUN_LOCK_MS } = require('../../../Agents/engine/timeouts');
 
 // Agenda driver — ONE instance, on the global database.
 //
@@ -37,19 +38,19 @@ const createAgendaDriver = ({ mongoUrl, dbName = 'global', concurrency = DEFAULT
 
         define(name, handler) {
             pendingDefinitions.set(name, handler);
-            if (agenda) agenda.define(name, handler, { concurrency });
+            if (agenda) agenda.define(name, handler, { concurrency, lockLifetime: RUN_LOCK_MS });
         },
 
         async start() {
             if (running) return;
             agenda = new Agenda({
                 db: { address: address(), collection: JOB_COLLECTION },
-                // Long enough that a slow action does not get its lock stolen and
-                // run twice; short enough that a crashed worker frees work.
-                defaultLockLifetime: 5 * 60 * 1000,
+                // Derived from the model timeout plus the act budget, so a slow model
+                // call cannot outlive its lock and be delivered twice (defect 13).
+                defaultLockLifetime: RUN_LOCK_MS,
                 maxConcurrency: concurrency * 4,
             });
-            pendingDefinitions.forEach((handler, name) => agenda.define(name, handler, { concurrency }));
+            pendingDefinitions.forEach((handler, name) => agenda.define(name, handler, { concurrency, lockLifetime: RUN_LOCK_MS }));
             await agenda.start();
             running = true;
             logger.info(`[automation-queue] agenda started on ${dbName}.${JOB_COLLECTION} (concurrency=${concurrency})`);
@@ -74,4 +75,4 @@ const createAgendaDriver = ({ mongoUrl, dbName = 'global', concurrency = DEFAULT
     };
 };
 
-module.exports = { createAgendaDriver, JOB_COLLECTION };
+module.exports = { createAgendaDriver, JOB_COLLECTION, LOCK_LIFETIME_MS: RUN_LOCK_MS };

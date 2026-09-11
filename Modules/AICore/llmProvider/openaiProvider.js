@@ -1,5 +1,6 @@
 const axios = require('axios');
 const config = require('../../../Config/config');
+const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
 
 const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -92,14 +93,10 @@ const openaiProvider = {
             body.response_format = { type: 'json_object' };
         }
 
-        // Allow timeout overrides via env so operators can tune without a
-        // code change. Reasoning / gpt-5 models need generous headroom because
-        // they burn hidden reasoning tokens before producing visible output,
-        // and a richer system prompt (more rules, more example tasks) directly
-        // increases generation time. Default: 10 min for reasoning, 4 min for
-        // classic chat models.
-        const defaultTimeout = reasoning ? 600000 : 240000;
-        const timeoutMs = Number(process.env.OPENAI_TIMEOUT_MS) || defaultTimeout;
+        // Reasoning / gpt-5 models burn hidden reasoning tokens before any
+        // visible output, so they get the full model budget; OPENAI_TIMEOUT_MS
+        // overrides both (see Agents/engine/timeouts for the job lock it feeds).
+        const timeoutMs = providerTimeoutMs('openai', { reasoning });
 
         let response;
         try {
