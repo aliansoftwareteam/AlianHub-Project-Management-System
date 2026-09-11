@@ -42,7 +42,7 @@ exports.updateProjectRules = async(req,res) => {
         let key = req.body.key;
         const projectId = req.body.projectId;
         let data =  [
-            { _id: ruleId }, 
+            { _id: ruleId, projectId: String(projectId) },
             {
                 [key]: req.body.updateObject
             },

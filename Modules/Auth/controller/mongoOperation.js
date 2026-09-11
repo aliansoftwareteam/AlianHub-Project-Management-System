@@ -1,32 +1,27 @@
 const logger = require('../../../Config/loggerConfig');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { replaceObjectKey } = require('../helper');
+const { checkGatewayRequest, toPlainResult } = require('./mongoGatewayRules');
 
-const READ_METHODS = ['find', 'findOne', 'aggregate', 'countDocuments'];
-const WRITING_STAGE = /"\$(out|merge)"/;
+const STATUS_TEXT = { 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden' };
 
-const refuse = (res, statusText) => res.status(403).send({ status: false, statusText });
-
-/* A generic read for the few screens that still build their own queries. It used to take
- * any database and any model method from the body with no session; now it reads only the
- * caller's company and never writes. */
-exports.mongoOperation = (req, res) => {
-    const { dataObj, dbName, methodName, collection } = req.body || {};
-    if (!dataObj) return res.send({ status: false, statusText: 'DataObject is missing' });
-    if (!dbName) return res.send({ status: false, statusText: 'dbName is missing' });
-    if (!methodName) return res.send({ status: false, statusText: 'methodName is missing' });
-    if (!collection) return res.send({ status: false, statusText: 'collection is missing' });
-
-    if (String(dbName) !== String(req.headers.companyid || '')) return refuse(res, 'dbName must be your company.');
-    if (!READ_METHODS.includes(methodName)) return refuse(res, `methodName must be one of: ${READ_METHODS.join(', ')}.`);
-    if (WRITING_STAGE.test(JSON.stringify(dataObj))) return refuse(res, 'A pipeline cannot use $out or $merge.');
-
-    return MongoDbCrudOpration(dbName, { type: collection, data: replaceObjectKey(dataObj, ['objId']) }, methodName)
-        .then((response) => res.send({ status: true, statusText: response }))
-        .catch((error) => {
-            logger.error(`ERR: in request ${collection} ${methodName} > ${error?.message ? error.message : error}`);
-            res.send({ status: false, statusText: error?.message || error });
-        });
+exports.mongoOperation = async (req, res) => {
+    if (!req.uid) {
+        return res.status(401).json({ status: false, statusText: 'Unauthorized', message: 'A session is required.' });
+    }
+    const checked = checkGatewayRequest(req.body, { companyId: req.headers && req.headers.companyid });
+    if (!checked.ok) {
+        return res.status(checked.statusCode).json({ status: false, statusText: STATUS_TEXT[checked.statusCode], message: checked.message });
+    }
+    try {
+        const result = await MongoDbCrudOpration(
+            checked.dbName,
+            { type: checked.collection, data: replaceObjectKey(checked.dataObj, ['objId']) },
+            checked.methodName,
+        );
+        return res.status(200).json({ status: true, statusText: 'OK', data: toPlainResult(result) });
+    } catch (error) {
+        logger.error(`ERR: mongo gateway ${checked.collection} ${checked.methodName} > ${error && error.message ? error.message : error}`);
+        return res.status(500).json({ status: false, statusText: 'Internal Server Error', message: 'The query could not be run.' });
+    }
 };
-
-exports.READ_METHODS = READ_METHODS;

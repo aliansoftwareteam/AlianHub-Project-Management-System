@@ -68,7 +68,6 @@ module.exports.CALL_ICE_CONFIG = '/api/v2/calls/ice-config';
 module.exports.CALL_NOTES = '/api/v2/calls/notes';
 module.exports.FOLDER = '/api/v1/folder';
 module.exports.REMOVE_USER_NOTIFICATION = '/api/v1/removeUserNotification';
-module.exports.GENERATETOKEN = '/api/v1/generateToken';
 module.exports.GENERATETOKEN_V2 = '/api/v2/generateToken';
 module.exports.UPDATE_UNREADREAD_COMMENTS_COUNT = '/api/v1/updateunreadcommentscount';
 module.exports.UNSET_COMMENTS_COUNT = '/api/v1/unsetCommentCounts';
