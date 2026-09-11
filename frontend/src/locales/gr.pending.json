@@ -1,7 +1,7 @@
 {
   "locale": "gr",
   "machineTranslated": false,
-  "updatedAt": "2026-09-11T06:17:58.634Z",
+  "updatedAt": "2026-09-11T07:27:38.146Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5262,6 +5262,25 @@
     "Instance.builds_since": "Builds since v{v}",
     "Instance.next_release": "Next release: v{v}",
     "Instance.builds_show_all": "Show all {n}",
-    "Instance.builds_show_fewer": "Show fewer"
+    "Instance.builds_show_fewer": "Show fewer",
+    "Ai.failure_title": "Why it failed",
+    "Ai.failure_code": "Code",
+    "Ai.failure_provider": "Provider",
+    "Ai.failure_request_id": "Request ID",
+    "Ai.failure_copy_request_id": "Copy request ID",
+    "Ai.failure_request_id_copied": "Request ID copied",
+    "Ai.failure_type_rate_limit": "Rate limited",
+    "Ai.failure_type_quota": "Out of credits",
+    "Ai.failure_type_auth": "Invalid API key",
+    "Ai.failure_type_permission": "Access denied",
+    "Ai.failure_type_invalid_request": "Invalid request",
+    "Ai.failure_type_context_length": "Prompt too long",
+    "Ai.failure_type_content_filter": "Blocked by content filter",
+    "Ai.failure_type_not_found": "Model not found",
+    "Ai.failure_type_overloaded": "Provider overloaded",
+    "Ai.failure_type_server": "Provider error",
+    "Ai.failure_type_timeout": "Timed out",
+    "Ai.failure_type_network": "Network error",
+    "Ai.failure_type_unknown": "Unknown error"
   }
 }
