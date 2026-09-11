@@ -7651,6 +7651,8 @@ export default {
         "err_boolean": "Use on or off.",
         "err_option": "Pick one of the listed options.",
         "err_allowlist": "Use exact hostnames or CIDR ranges, such as hooks.lan or 192.168.10.0/24, separated by commas or new lines.",
+        "err_allowlist_reserved": "Cloud metadata and link-local addresses can never be allowed: 169.254.0.0/16, fe80::/10, fd00:ec2::/64, 100.100.100.200, fd20:ce::254 and fd00:c1::a9fe:a9fe. Remove the entry that is or includes one of them, or list a narrower range.",
+        "err_allowlist_broad": "That range is too wide. Use /8 or narrower for IPv4 and /32 or narrower for IPv6, and list 0.0.0.0/8, 127.0.0.0/8 or :: only as exactly that block.",
         "f_WEBHOOK_ALLOWED_PRIVATE_HOSTS": "Private webhook hosts",
         "h_WEBHOOK_ALLOWED_PRIVATE_HOSTS": "Webhooks refuse loopback, private and internal hosts. List the exact hostnames or CIDR ranges on your network they may post to. Removing an entry stops deliveries to it. Cloud metadata addresses stay blocked.",
         "allowlist_placeholder": "hooks.lan\n192.168.10.0/24",

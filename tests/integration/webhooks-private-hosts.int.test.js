@@ -123,9 +123,31 @@ describe('private webhook hosts', () => {
         expect(received.filter((r) => r.path === path)).toHaveLength(0);
     });
 
-    it('keeps the metadata address blocked even when it is listed', async () => {
-        await setAllowlist('169.254.169.254, 169.254.0.0/16');
-        const body = await saveWebhook('http://169.254.169.254/latest/meta-data');
-        expect(body.status).toBe(false);
+    it('refuses metadata, link-local, overly broad and numeric-spelling entries with their own errors', async () => {
+        const owner = await as('owner');
+        const cases = [
+            ['169.254.169.254', 'allowlist_reserved'],
+            ['127.0.0.1, 169.254.0.0/16', 'allowlist_reserved'],
+            ['100.64.0.0/10', 'allowlist_reserved'],
+            ['fd00:ec2::23', 'allowlist_reserved'],
+            ['0.0.0.0/0', 'allowlist_broad'],
+            ['10.0.0.5/0', 'allowlist_broad'],
+            ['::/32', 'allowlist_broad'],
+            ['0x7f000001', 'allowlist'],
+        ];
+        for (const [value, error] of cases) {
+            const res = await owner.api.put('/api/v2/instance/settings', { [KEY]: value });
+            expect([value, res.status, res.body.data.errors]).toEqual([value, 400, { [KEY]: error }]);
+        }
+        const after = await owner.api.get('/api/v2/instance/settings');
+        expect(after.body.data.settings.find((s) => s.key === KEY).value).toBe('');
+    });
+
+    it('keeps the metadata and credential addresses blocked under an allowed range', async () => {
+        await setAllowlist('127.0.0.0/8, 100.64.0.0/11');
+        for (const url of ['http://169.254.169.254/latest/meta-data', 'http://169.254.170.2/v2/credentials/x', 'http://100.100.100.200/latest/meta-data/', 'http://0x7f000001:27017/']) {
+            const body = await saveWebhook(url);
+            expect([url, body.status]).toEqual([url, url.startsWith('http://0x7f000001') ? true : false]);
+        }
     });
 });
