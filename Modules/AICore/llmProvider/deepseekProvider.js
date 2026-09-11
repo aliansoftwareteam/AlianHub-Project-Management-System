@@ -1,6 +1,7 @@
 const axios = require('axios');
 const config = require('../../../Config/config');
 const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
+const { fromOpenAiCompatible } = require('../providerError');
 
 // DeepSeek exposes an OpenAI-compatible Chat Completions API, so this
 // provider mirrors openaiProvider.js almost exactly — same request body
@@ -109,66 +110,8 @@ const deepseekProvider = {
                 },
                 timeout: timeoutMs,
             });
-        } catch (axiosErr) {
-            const status = axiosErr.response && axiosErr.response.status;
-            const errBody = axiosErr.response && axiosErr.response.data && axiosErr.response.data.error;
-            const apiMsg = errBody && errBody.message;
-            const apiCode = errBody && errBody.code;
-
-            // DeepSeek uses 402 Payment Required for an exhausted balance and
-            // 429 for genuine rate limits — cleaner than OpenAI's overloaded
-            // 429. Map each to the right user-facing message + error code.
-            if (status === 402) {
-                const err = new Error(
-                    'Your DeepSeek account is out of credits. Please add balance to your DeepSeek '
-                    + 'account (https://platform.deepseek.com/top_up) and try again.',
-                );
-                err.code = 'LLM_QUOTA_EXCEEDED';
-                throw err;
-            }
-            if (status === 429) {
-                const isQuotaIssue = apiCode === 'insufficient_quota'
-                    || (typeof apiMsg === 'string' && /quota|billing|credit|balance/i.test(apiMsg));
-                if (isQuotaIssue) {
-                    const err = new Error(
-                        'Your DeepSeek account is out of credits. Please add balance to your DeepSeek '
-                        + 'account (https://platform.deepseek.com/top_up) and try again.',
-                    );
-                    err.code = 'LLM_QUOTA_EXCEEDED';
-                    throw err;
-                }
-                const err = new Error('The AI service is rate-limited (too many requests). Please wait about a minute and try again.');
-                err.code = 'LLM_RATE_LIMITED';
-                throw err;
-            }
-            if (status === 401) {
-                const err = new Error('Invalid DeepSeek API key. Please check your DEEPSEEK_API_KEY configuration.');
-                err.code = 'LLM_AUTH_FAILED';
-                throw err;
-            }
-            if (status === 403) {
-                const err = new Error('DeepSeek API access denied. Check your API key permissions.');
-                err.code = 'LLM_AUTH_FAILED';
-                throw err;
-            }
-            if (status === 400) {
-                const err = new Error(apiMsg || 'Invalid request to DeepSeek API. Check your model configuration.');
-                err.code = 'LLM_BAD_REQUEST';
-                throw err;
-            }
-            if (status === 503 || status === 502) {
-                const err = new Error('The AI service is temporarily unavailable. Please try again in a moment.');
-                err.code = 'LLM_UNAVAILABLE';
-                throw err;
-            }
-            if (axiosErr.code === 'ECONNABORTED' || axiosErr.code === 'ETIMEDOUT') {
-                const err = new Error('The AI request timed out. Please try again.');
-                err.code = 'LLM_TIMEOUT';
-                throw err;
-            }
-            const fallback = new Error(apiMsg || axiosErr.message || 'DeepSeek request failed');
-            fallback.code = 'LLM_ERROR';
-            throw fallback;
+        } catch (error) {
+            throw fromOpenAiCompatible('deepseek', config.DEEPSEEK_MODEL || null, error);
         }
 
         const choice = response.data && response.data.choices && response.data.choices[0];

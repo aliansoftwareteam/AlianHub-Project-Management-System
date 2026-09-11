@@ -192,6 +192,7 @@ agentRunsSchema.index({ taskId: 1, startedAt: -1 });
 agentRunsSchema.index({ projectId: 1, status: 1 });
 agentRunsSchema.index({ projectId: 1, finishedAt: -1 });
 agentRunsSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+agentRunsSchema.index({ 'failure.type': 1, startedAt: -1 }, { partialFilterExpression: { 'failure.type': { $type: 'string' } } });
 // One open run per agent and task (the open set mirrors runs.OPEN) and one run
 // per idempotency key: a double-click, a retried request or a redelivered job
 // hits the index instead of starting a second run.

@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const usage = require('./usage');
 const { isFeature, UNKNOWN_FEATURE } = require('./features');
+const { isProviderError } = require('./providerError');
 
 /* The spend ledger: one row per model call, written here and nowhere else, so
  * a feature cannot spend without the budget seeing it. Callers name the
@@ -86,7 +87,13 @@ function metered(adapter) {
         async chat(opts) {
             const context = contextOf(opts);
             ensurePriced(adapter.model, context);
-            const result = await adapter.chat(opts);
+            let result;
+            try {
+                result = await adapter.chat(opts);
+            } catch (error) {
+                if (isProviderError(error)) logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} failed [${error.groupKey()}]${error.requestId ? ` request ${error.requestId}` : ''}: ${error.message}`);
+                throw error;
+            }
             try {
                 await record(context, result, adapter);
             } catch (e) {

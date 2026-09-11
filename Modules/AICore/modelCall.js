@@ -2,6 +2,7 @@ const logger = require('../../Config/loggerConfig');
 const { getProvider, isAnyProviderConfigured } = require('./llmProvider');
 const { emptyUsage, usageFromResult, addUsage } = require('./usage');
 const { estimateCall } = require('./estimate');
+const { isProviderError } = require('./providerError');
 
 const LOG_PREFIX = '[agent]';
 
@@ -23,7 +24,7 @@ function parseModelJson(raw) {
  * account }) is the ledger context the core meter books the actual row under. */
 async function askModel(skill, { prompt, budget, spend }) {
     let usage = emptyUsage();
-    let raw = null; let model = null; let degraded = null; let refused = null;
+    let raw = null; let model = null; let degraded = null; let refused = null; let error = null;
     if (isAnyProviderConfigured() && budget.allowModel !== false) {
         const guard = budget.guard || null;
         let ticket = null;
@@ -47,15 +48,16 @@ async function askModel(skill, { prompt, budget, spend }) {
             if (ticket) { const settled = ticket; ticket = null; await guard.reconcile(settled, usage, model); }
             const parsed = parseModelJson(result.content);
             if (parsed.ok) raw = parsed.value; else degraded = parsed.error;
-        } catch (error) {
-            degraded = `model call failed: ${error.message}`;
-            logger.error(`${LOG_PREFIX} ${degraded}`);
+        } catch (thrown) {
+            degraded = `model call failed: ${thrown.message}`;
+            if (isProviderError(thrown)) error = thrown;
+            logger.error(`${LOG_PREFIX} ${degraded}${error ? ` [${error.groupKey()}]` : ''}`);
             if (ticket) await guard.release(ticket).catch((e) => logger.error(`${LOG_PREFIX} reservation not released: ${e.message}`));
         }
     } else {
         degraded = 'no LLM provider configured';
     }
-    return { raw, model, degraded, refused, usage };
+    return { raw, model, degraded, refused, usage, error };
 }
 
 module.exports = { askModel, parseModelJson };

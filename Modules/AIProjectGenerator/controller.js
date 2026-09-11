@@ -8,6 +8,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const multer = require('multer');
 
 const { getProvider, isAnyProviderConfigured } = require('../AICore/llmProvider');
+const { isProviderError } = require('../AICore/providerError');
 const { FEATURES } = require('../AICore/features');
 const { COVERAGE_POINTS, PlanSchema, ClarifyResponseSchema, TasksPlanSchema, TasksResponseSchema, TasksOnlyPlanSchema, TasksOnlyResponseSchema, SprintsOnlyPlanSchema, SprintsOnlyResponseSchema, sanitizeMemberIds, sanitizeTaskPlanMemberIds, tryParseJson } = require('./schemaValidator');
 const { buildSystemPrompt, buildUserMessage, buildRepairPrompt, buildTasksSystemPrompt, buildTasksUserMessage } = require('./promptBuilder');
@@ -64,30 +65,16 @@ function sendError(res, status, message) {
     return res.status(status).send({ status: false, statusText: message });
 }
 
-/**
- * Maps LLM provider error codes to appropriate HTTP status codes so the
- * client receives a meaningful status rather than a generic 500.
- *
- * LLM_RATE_LIMITED   → 429  (client should back off and retry — resolves in ~60s)
- * LLM_QUOTA_EXCEEDED → 402  (account out of credits — owner must add balance)
- * LLM_AUTH_FAILED    → 503  (server config issue, not a client mistake)
- * LLM_UNAVAILABLE    → 503  (upstream temporarily down)
- * LLM_TIMEOUT        → 504  (gateway timeout)
- * LLM_BAD_REQUEST    → 400  (bad model config / invalid params)
- * LLM_INVALID_OUTPUT → 502  (model returned unparseable output)
- * anything else      → 500
- */
+/* A provider's auth failure is the server's configuration, never the caller's
+ * credentials, so it must not surface as a 401 the client would log out on. */
+const PROVIDER_ERROR_HTTP = {
+    rate_limit: 429, quota: 402, auth: 503, permission: 503, overloaded: 503, server: 503, network: 503,
+    timeout: 504, invalid_request: 400, context_length: 400, content_filter: 400, not_found: 400,
+};
+
 function llmErrorToHttpStatus(error) {
-    const map = {
-        LLM_RATE_LIMITED: 429,
-        LLM_QUOTA_EXCEEDED: 402,
-        LLM_AUTH_FAILED: 503,
-        LLM_UNAVAILABLE: 503,
-        LLM_TIMEOUT: 504,
-        LLM_BAD_REQUEST: 400,
-        LLM_INVALID_OUTPUT: 502,
-    };
-    return (error && error.code && map[error.code]) || 500;
+    if (isProviderError(error)) return PROVIDER_ERROR_HTTP[error.type] || 500;
+    return error && error.code === 'LLM_INVALID_OUTPUT' ? 502 : 500;
 }
 
 function resolveCompanyId(req) {

@@ -155,12 +155,12 @@ const terminalUpdate = (status, at = new Date()) => {
     return { status, finishedAt: at, expiresAt: new Date(at.getTime() + RETENTION_SECONDS * 1000) };
 };
 
-const finish = async (companyId, runId, { status = STATUS.DONE, outcome, error, episode, onlyIf } = {}) => {
+const finish = async (companyId, runId, { status = STATUS.DONE, outcome, error, failure, episode, onlyIf } = {}) => {
     const run = await get(companyId, runId);
     if (!run) return null;
     const now = new Date();
     const startedAt = run.startedAt ? new Date(run.startedAt).getTime() : now.getTime();
-    const set = { ...terminalUpdate(status, now), elapsedMs: now.getTime() - startedAt, outcome: outcome || null, error: error || null, ...(episode ? { episode } : {}) };
+    const set = { ...terminalUpdate(status, now), elapsedMs: now.getTime() - startedAt, outcome: outcome || null, error: error || null, ...(failure ? { failure } : {}), ...(episode ? { episode } : {}) };
     return patch(companyId, runId, set, {}, { onlyIf });
 };
 
@@ -220,13 +220,14 @@ const recordSpend = async (companyId, run, tokens, model) => {
     return { usd, tokens: priced.totalTokens, capReached };
 };
 
-const list = async (companyId, { status, projectId, agentId, taskId, limit = 50 } = {}) => {
+const list = async (companyId, { status, projectId, agentId, taskId, errorType, limit = 50 } = {}) => {
     const match = {};
     if (status === 'open') match.status = { $in: OPEN };
     else if (status) match.status = String(status);
     if (projectId) match.projectId = String(projectId);
     if (agentId) match.agentId = String(agentId);
     if (taskId) match.taskId = String(taskId);
+    if (errorType) match['failure.type'] = String(errorType);
     return MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_RUNS, data: [match, {}, { sort: { startedAt: -1 }, limit: Math.min(200, Math.max(1, Number(limit) || 50)) }],
     }, 'find');
