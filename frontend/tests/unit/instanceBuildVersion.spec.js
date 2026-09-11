@@ -53,6 +53,15 @@ describe('InstanceStats version card', () => {
         expect(wrapper.find('[data-test="version-line"]').text()).toBe('v20.20.2');
         expect(wrapper.text()).not.toContain('undefined');
     });
+
+    it('labels a version the server could not resolve from git', async () => {
+        const wrapper = await mountWith(InstanceStats, {
+            stats: { version: '14.35.0', release: '14.35.0', commit: null, channel: 'unknown', build: null, nodeVersion: 'v20.20.2', companies: 1, users: 1 },
+            companies: [],
+        });
+        expect(wrapper.find('[data-test="version-line"]').text()).toBe('Instance.channel_unknown · v20.20.2');
+        expect(wrapper.text()).not.toMatch(/undefined|null/);
+    });
 });
 
 describe('InstanceUpgrade builds since the release', () => {
@@ -100,5 +109,13 @@ describe('InstanceUpgrade builds since the release', () => {
 
         const empty = await mountWith(InstanceUpgrade, { upgrade: upgradeInfo({ release: '14.35.0', build, buildLog: [] }) });
         expect(empty.find('[data-test="builds"]').exists()).toBe(false);
+    });
+
+    it('renders an unresolved build without a build card or stray nulls', async () => {
+        const unresolved = { version: '14.35.0', release: '14.35.0', base: null, next: null, channel: 'unknown', build: null, commit: null, builtAt: null, source: 'git-unavailable', repoUrl: REPO };
+        const wrapper = await mountWith(InstanceUpgrade, { upgrade: upgradeInfo({ currentVersion: '14.35.0', release: '14.35.0', build: unresolved, buildLog: [] }) });
+        expect(wrapper.find('.ah-chip--mono').text()).toBe('v14.35.0');
+        expect(wrapper.find('[data-test="builds"]').exists()).toBe(false);
+        expect(wrapper.text()).not.toMatch(/undefined|null/);
     });
 });

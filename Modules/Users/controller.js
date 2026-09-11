@@ -5,53 +5,69 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType.js");
 const { removeCache } = require("../../utils/commonFunctions.js");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
 const mongoose = require("mongoose")
+const {
+    isObjectId, toSelfView, toMemberView, sharedCompanies, sanitizeUserQuery, scopeQueryToCompany,
+    sanitizeSelfUpdate, companyRemovalOf, sanitizeUpdateOptions,
+} = require("./helpers/userAccessRules.js");
 
-exports.updateUserStatus = (req,res) => {
-    const { userId, updateObject,newObj} = req.body;
+const refuse = (res, code, message) => res.status(code).json({ status: false, statusText: message, message });
 
-    if(!userId) {
-        res.send({status: false, message: 'userId is required'});
-        return;
-    }
-    if(!updateObject) {
-        res.send({status: false, message: 'userId is required'});
-        return;
-    }
+const loadGlobalUser = (id) => MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+    type: SCHEMA_TYPE.USERS,
+    data: [{ _id: new mongoose.Types.ObjectId(String(id)) }]
+}, 'findOne');
 
-    let data =  [
-        { _id: new mongoose.Types.ObjectId(req.body.userId) }, 
-        updateObject,
-        newObj
-    ]
-
-    let obj = {
-        type: dbCollections.USERS,
-        data: data
-    }
+exports.updateUserStatus = async (req, res) => {
+    const { userId, updateObject, newObj } = req.body || {};
+    if (!req.uid) return refuse(res, 401, 'Unauthorized');
+    if (!isObjectId(userId)) return refuse(res, 400, 'userId is required');
+    if (!updateObject) return refuse(res, 400, 'updateObject is required');
 
     try {
-        const cacheKey = `UserData:${req.body.userId}`;
-        MongoDbCrudOpration('global', obj, "findOneAndUpdate").then((response)=>{
-            removeCache(cacheKey)
-            removeCache('UserAllData:',true)
-            res.send({
-                status: true,
-                statusText: "User Status Updated",
-                data:response
-            });
-        }).catch((error)=>{
-            res.send({
-                status: false,
-                statusText: "User Status Not Updated"
-            });
-            logger.error('USER STATUS UPDATE ERROR updateUserStatus: ',error);
-        })
-    } catch (error) {
-        res.send({
-            status: false,
-            statusText: "User Status Not Updated"
+        let update;
+        let view;
+        let afterUpdate = () => {};
+        if (String(userId) === String(req.uid)) {
+            const checked = sanitizeSelfUpdate(updateObject);
+            if (!checked.ok) return refuse(res, 403, checked.error);
+            const selected = checked.update.$set.lastSelectedCompany;
+            if (selected !== undefined) {
+                const me = await loadGlobalUser(req.uid);
+                if (!sharedCompanies(me, { AssignCompany: [selected] }).length) return refuse(res, 403, 'You are not a member of that company.');
+            }
+            update = checked.update;
+            view = toSelfView;
+        } else {
+            const companyId = companyRemovalOf(updateObject);
+            if (!companyId || req.apiToken) return refuse(res, 403, 'You can only update your own profile.');
+            const { getRoleType, isPrivileged, ROLE_OWNER } = require("../../Config/permissionGuard.js");
+            const callerRole = await getRoleType(companyId, req.uid);
+            const targetRole = await getRoleType(companyId, userId);
+            if (!isPrivileged(callerRole) || targetRole === null || targetRole === ROLE_OWNER) {
+                return refuse(res, 403, 'Only an owner or admin of that company can remove this member.');
+            }
+            const me = await loadGlobalUser(req.uid);
+            update = { $pull: { AssignCompany: companyId } };
+            view = (doc) => toMemberView(doc, (me && me.AssignCompany) || []);
+            afterUpdate = () => require("../../Config/jwt.js").invalidateMembershipCache(String(userId), companyId);
+        }
+
+        const obj = {
+            type: dbCollections.USERS,
+            data: [{ _id: new mongoose.Types.ObjectId(String(userId)) }, update, sanitizeUpdateOptions(newObj)]
+        };
+        const response = await MongoDbCrudOpration('global', obj, "findOneAndUpdate");
+        removeCache(`UserData:${userId}`);
+        removeCache('UserAllData:', true);
+        afterUpdate();
+        return res.send({
+            status: true,
+            statusText: "User Status Updated",
+            data: response ? view(response) : response
         });
-        logger.error('USER STATUS UPDATE ERROR updateUserStatus: ',error);
+    } catch (error) {
+        logger.error(`USER STATUS UPDATE ERROR updateUserStatus: ${error.message || error}`);
+        return refuse(res, 400, "User Status Not Updated");
     }
 }
 
@@ -173,9 +189,10 @@ exports.checkUserAndCompany = (req, res) => {
 
 exports.getUserById = async(req, res) => {
     try {
+        if (!req.uid) return refuse(res, 401, 'Unauthorized');
         let { id } = req.params;
         const { query } = req.query;
-        
+
         if(!id) {
             return res.status(400).json({
                 status: false,
@@ -185,69 +202,82 @@ exports.getUserById = async(req, res) => {
 
         const customerCacheKey = `customerId:${id}`;
         let key = '_id';
-        
+
         if (query === 'customerId') {
             const cachedCustomerId = myCache.get(customerCacheKey);
-            if (cachedCustomerId) {                
+            if (cachedCustomerId) {
                 id = cachedCustomerId;
             } else {
                 key = 'customerId';
             }
         }
-        const cacheKey = `UserData:${id}`;
-
-        const value = myCache.get(cacheKey);
-        
-        if (value) {
-            res.set({
-                'FromCache': 'true',
-                'cacheExpireTime': myCache.getTtl(cacheKey)
-            });
-            return res.status(200).json(JSON.parse(value));
+        if (key === '_id' && !isObjectId(id)) {
+            return res.status(404).json({ status: false, message: "user not found" });
         }
-        
-        const userObj = {
-            type: SCHEMA_TYPE.USERS,
-            data: [
-                {[key] : id}
-            ]
-        };
-        const users = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, userObj, 'findOne');
 
-        if (!users) {
-            return res.status(404).json({ message: "user not found" });
-        }
-        const userId = users._id;
-        const userData = JSON.stringify(users);
+        const cached = myCache.get(`UserData:${id}`);
+        let user = cached ? JSON.parse(cached) : null;
 
-        if (query === 'customerId') {
-            myCache.set(customerCacheKey, userId);
-            myCache.set(`UserData:${userId}`, userData, 604800);
-        } else {
-            if (users?.customerIds && users?.customerIds?.length) {
-                for (let i = 0; i < users?.customerIds?.length; i += 1) {
-                    myCache.set(`customerId:${users?.customerIds[i]}`, userId);
-                }
+        if (!user) {
+            const userObj = {
+                type: SCHEMA_TYPE.USERS,
+                data: [
+                    {[key] : id}
+                ]
+            };
+            user = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, userObj, 'findOne');
+            if (!user) {
+                return res.status(404).json({ status: false, message: "user not found" });
             }
-
-            // if (users?.customerId) {
-            //     myCache.set(`customerId:${users.customerId}`, userId);
-            // }
-            myCache.set(cacheKey, userData, 604800);
+            const userId = user._id;
+            const userData = JSON.stringify(user);
+            if (query === 'customerId') {
+                myCache.set(customerCacheKey, userId);
+                myCache.set(`UserData:${userId}`, userData, 604800);
+            } else {
+                (user?.customerIds || []).forEach((customerId) => myCache.set(`customerId:${customerId}`, userId));
+                myCache.set(`UserData:${id}`, userData, 604800);
+            }
         }
-        return res.status(200).json(users);
+
+        if (String(user._id) === String(req.uid)) {
+            return res.status(200).json(toSelfView(user));
+        }
+        const shared = sharedCompanies(await loadGlobalUser(req.uid), user);
+        if (!shared.length) {
+            return res.status(404).json({ status: false, message: "user not found" });
+        }
+        return res.status(200).json(toMemberView(user, shared));
     } catch (error) {
-        res.status(500).json({ message: "An error occurred while getting the user",error: error });
+        logger.error(`getUserById: ${error.message || error}`);
+        res.status(500).json({ status: false, message: "An error occurred while getting the user" });
     }
 }
 
 exports.getUserByQuey = async(req, res) => {
-    exports.getUserByQueyFun(req.body.query,req.body.companyId,req.body.fetchFromCache).then((data) => {
-        res.json(data);
-    }).
-    catch((error) => {
-        res.json(error);
-    })
+    try {
+        if (!req.uid) return refuse(res, 401, 'Unauthorized');
+        const headerCompany = req.headers['companyid'];
+        const bodyCompany = req.body.companyId;
+        const companyId = String(headerCompany || bodyCompany || '');
+        if (!isObjectId(companyId)) return refuse(res, 400, 'companyId is required');
+        if (headerCompany && bodyCompany && String(bodyCompany) !== companyId) {
+            return refuse(res, 403, 'You do not have access to this company');
+        }
+        const { verifyCompanyMembership } = require("../../Config/jwt.js");
+        if (!(await verifyCompanyMembership(String(req.uid), companyId))) {
+            return refuse(res, 403, 'You do not have access to this company');
+        }
+        const checked = sanitizeUserQuery(req.body.query);
+        if (!checked.ok) return refuse(res, 400, checked.error);
+
+        const users = await exports.getUserByQueyFun(scopeQueryToCompany(checked.query, companyId), companyId, false);
+        const list = Array.isArray(users) ? users : [];
+        return res.json(list.map((user) => (String(user._id) === String(req.uid) ? toSelfView(user) : toMemberView(user, [companyId]))));
+    } catch (error) {
+        logger.error(`getUserByQuey: ${error.message || error}`);
+        return refuse(res, 400, 'An error occurred while getting the users');
+    }
 }
 
 exports.getUserByQueyFun = async(query = {},companyId = '',fetchFromCache = false, preAggregate = false) => {

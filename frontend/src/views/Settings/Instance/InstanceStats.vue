@@ -33,7 +33,7 @@ import { useInstanceApi, formatWhen } from "./useInstanceApi";
 
 defineOptions({ name: "InstanceStats" });
 
-const CHANNEL_KEYS = { beta: "Instance.channel_beta", release: "Instance.channel_release", dev: "Instance.channel_dev" };
+const CHANNEL_KEYS = { beta: "Instance.channel_beta", release: "Instance.channel_release", dev: "Instance.channel_dev", unknown: "Instance.channel_unknown" };
 
 const { t } = useI18n();
 const { get, download, message, env } = useInstanceApi();

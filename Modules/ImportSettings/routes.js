@@ -1,4 +1,5 @@
 const ctrl = require('./controller');
+const { requireProjectAccess, SECURITY_SETTINGS } = require('../../Config/projectAccess');
 
 exports.init = (app) => {
 
@@ -92,7 +93,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v1/importSettingsProjectFunction', ctrl.importSettingsProjectFunction);
+    app.post('/api/v1/importSettingsProjectFunction', requireProjectAccess({ projectIds: (req) => (req.body && req.body.type === 'project' ? req.body.projectId : []), permissions: () => [SECURITY_SETTINGS] }), ctrl.importSettingsProjectFunction);
 
     /**
      * @swagger
