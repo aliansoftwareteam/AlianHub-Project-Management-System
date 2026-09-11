@@ -11,6 +11,7 @@ jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () =
 jest.mock('../Modules/Agents/proposals', () => ({ create: jest.fn() }));
 jest.mock('../Modules/Agents/actions', () => ({ perform: jest.fn() }));
 jest.mock('../Modules/AIProjectGenerator/llmProvider', () => ({ getProvider: jest.fn(() => { throw new Error('not configured'); }), isAnyProviderConfigured: jest.fn(() => false) }));
+jest.mock('../Modules/AICore/llmProvider', () => require('../Modules/AIProjectGenerator/llmProvider'));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const logger = require('../Config/loggerConfig');

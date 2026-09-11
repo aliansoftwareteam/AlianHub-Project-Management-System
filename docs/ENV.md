@@ -10,7 +10,7 @@ Backend variables: 130. Frontend build-time variables: 24.
 |---|---|---|---|---|
 | `APIURL` | yes |  | Public base URL of this API, with a trailing slash (used in emails, OAuth callbacks and share links). | `Config/config.js`, `Modules/ApiTokens/controller.js` +6 |
 | `APP_NAME` |  | `Alian Hub` | Product name shown in emails and page titles. | `Config/config.js`, `Modules/Template/forgotPassword.js` +5 |
-| `NODE_ENV` |  | `development` | development \| production | `Config/config.js`, `Modules/Agents/engine/persistence.js` +3 |
+| `NODE_ENV` |  | `development` | development \| production | `Config/config.js`, `Modules/AICore/persistence.js` +3 |
 | `PORT` | yes | `4000` | TCP port the HTTP server listens on. | `Config/config.js` |
 | `TRUST_PROXY` |  | `loopback` | Express trust proxy setting; loopback by default so X-Forwarded-For is honoured behind a local reverse proxy. | `index.js` |
 | `UNDER_MAINTENANCE` |  | `false` | true \| false | `Config/config.js` |
@@ -74,20 +74,20 @@ Backend variables: 130. Frontend build-time variables: 24.
 | `AI_API_KEY` (secret) |  |  | API key for the configured LLM provider (LLM_PROVIDER). | `Config/config.js` |
 | `AI_MAX_TASK_MINUTES` |  |  | Upper bound, in minutes, for a task the AI project generator may plan. | `Modules/AIProjectGenerator/planRules.js` |
 | `AI_MODEL` |  | `gpt-4.1` | recommended: gpt-4o or gpt-4.1 for best instruction-following on complex plans | `Config/config.js` |
-| `ANTHROPIC_API_KEY` (secret) |  |  | Anthropic API key, used when LLM_PROVIDER is anthropic. | `Modules/AIProjectGenerator/llmProvider/anthropicProvider.js` |
-| `ANTHROPIC_MODEL` |  | `claude-sonnet-4-5-20250929` | current Sonnet 4.5 model id | `Modules/AIProjectGenerator/llmProvider/anthropicProvider.js` |
-| `ANTHROPIC_TIMEOUT_MS` |  | `600000` | optional: raise Anthropic SDK timeout (default 10 min) | `Modules/AIProjectGenerator/llmProvider/anthropicProvider.js` |
+| `ANTHROPIC_API_KEY` (secret) |  |  | Anthropic API key, used when LLM_PROVIDER is anthropic. | `Modules/AICore/llmProvider/anthropicProvider.js` |
+| `ANTHROPIC_MODEL` |  | `claude-sonnet-4-5-20250929` | current Sonnet 4.5 model id | `Modules/AICore/llmProvider/anthropicProvider.js` |
+| `ANTHROPIC_TIMEOUT_MS` |  | `600000` | optional: raise Anthropic SDK timeout (default 10 min) | `Modules/AICore/llmProvider/anthropicProvider.js` |
 | `DEEPSEEK_API_KEY` (secret) |  |  | DeepSeek API key, used when LLM_PROVIDER is deepseek. | `Config/config.js` |
-| `DEEPSEEK_BASE_URL` |  | `https://api.deepseek.com` | optional: override DeepSeek base URL (e.g. for a compatible proxy) | `Modules/AIProjectGenerator/llmProvider/deepseekProvider.js` |
+| `DEEPSEEK_BASE_URL` |  | `https://api.deepseek.com` | optional: override DeepSeek base URL (e.g. for a compatible proxy) | `Modules/AICore/llmProvider/deepseekProvider.js` |
 | `DEEPSEEK_MODEL` |  | `deepseek-v4-flash` | deepseek-chat / deepseek-reasoner / deepseek-v4-flash / deepseek-v4-pro (all V4: 1M ctx, up to 384K output) | `Config/config.js` |
-| `DEEPSEEK_TIMEOUT_MS` |  | `600000` | optional: raise DeepSeek axios timeout (default: 10 min for reasoner, 4 min for chat) | `Modules/AIProjectGenerator/llmProvider/deepseekProvider.js` |
+| `DEEPSEEK_TIMEOUT_MS` |  | `600000` | optional: raise DeepSeek axios timeout (default: 10 min for reasoner, 4 min for chat) | `Modules/AICore/llmProvider/deepseekProvider.js` |
 | `ESTIMATE_SAMPLES` |  |  | Number of historical tasks sampled when the AI estimates effort. | `Modules/EstimatedTime/aiTaskEstimator.js` |
 | `ESTIMATE_TARGET` |  |  | Target accuracy band the AI estimator calibrates against. | `Modules/EstimatedTime/aiTaskEstimator.js` |
 | `LLM_MAX_TOKENS_PLAN` (secret) |  | `32000` | cap for the planning call (raise if you see "ran out of output token budget") | `Modules/AIProjectGenerator/controller.js` |
-| `LLM_PRICING` |  |  | JSON map of model name to per-token prices used to report AI spend. | `Modules/AIProjectGenerator/usage.js` |
-| `LLM_PROVIDER` |  |  | openai \| anthropic \| deepseek | `Modules/AIProjectGenerator/llmProvider/index.js`, `Modules/Agents/budget.js` |
+| `LLM_PRICING` |  |  | JSON map of model name to per-token prices used to report AI spend. | `Modules/AICore/usage.js` |
+| `LLM_PROVIDER` |  |  | openai \| anthropic \| deepseek | `Modules/AICore/llmProvider/index.js`, `Modules/Agents/budget.js` |
 | `LLM_REGION` |  |  | optional: the inference region the provider is pinned to; shown read-only in the agent settings (GET /api/v2/agents/settings) | `Modules/Agents/budget.js` |
-| `OPENAI_TIMEOUT_MS` |  | `600000` | optional: raise OpenAI axios timeout (default: 10 min for reasoning/gpt-5, 4 min for others) | `Modules/AIProjectGenerator/llmProvider/openaiProvider.js` |
+| `OPENAI_TIMEOUT_MS` |  | `600000` | optional: raise OpenAI axios timeout (default: 10 min for reasoning/gpt-5, 4 min for others) | `Modules/AICore/llmProvider/openaiProvider.js` |
 
 ## Calling
 
@@ -225,7 +225,7 @@ Backend variables: 130. Frontend build-time variables: 24.
 | `ERRORRECIVEREMAIL` |  | `admin@yourdomain.com` | Email to receive error alerts | `Config/config.js` |
 | `HEALTH_DB_TIMEOUT_MS` |  |  | How long /health waits for the database ping before reporting it down (default 2000). | `Modules/Instance/health.js` |
 | `MIGRATIONS_AUTO` |  |  | Apply pending migrations at boot (default true; false only reports them). | `Modules/Instance/controller.js` |
-| `MONGODB_URL` | yes |  | mongo connection string (no trailing slash) | `Config/config.js`, `Modules/Agents/engine/persistence.js` +6 |
+| `MONGODB_URL` | yes |  | mongo connection string (no trailing slash) | `Config/config.js`, `Modules/AICore/persistence.js` +6 |
 | `NODEMAILER_EMAIL_PASSWORD` (secret) |  |  | Use app password for Gmail | `Config/config.js` |
 | `NODEMAILER_PORT` |  | `587` | 587 (STARTTLS) or 465 (SSL) | `Config/config.js` |
 | `NOOFPRESETCOMPANY` |  | `10` | Number of preset companies seeded at first run. | `Config/config.js` |

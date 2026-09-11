@@ -1,9 +1,9 @@
-const axios = require('axios');
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { settingsCollectionDocs } = require("../../Config/collections");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose")
-const { myCache, AI_API_KEY, AI_MODEL } = require('../../Config/config');
+const { myCache } = require('../../Config/config');
+const { getProvider } = require('../AICore/llmProvider');
 const { removeCache } = require('../../utils/commonFunctions');
 const { status } = require('migrate-mongo');
 
@@ -285,21 +285,14 @@ exports.createTemplateWithAI = async (req, res) => {
             Return only a valid JSON object.
         `;
 
-        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-            model: AI_MODEL,
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt }
-            ],
-            temperature: 0.7
-        }, {
-            headers: {
-                'Authorization': `Bearer ${AI_API_KEY}`,
-                'Content-Type': 'application/json'
-            }
+        const response = await getProvider().chat({
+            systemPrompt,
+            messages: [{ role: 'user', content: userPrompt }],
+            temperature: 0.7,
+            jsonMode: true,
         });
 
-        let content = response.data.choices[0].message.content;
+        let content = response.content;
         content = content.replace(/```(?:json)?\s*([\s\S]*?)\s*```/, '$1');
         const AIContent = JSON.parse(content);
 
