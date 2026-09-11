@@ -18,6 +18,12 @@ Updated 2026-09-11. Read this first, then `Tasks/index.md`. Overwrite this file 
 2. The in-process sweep with the real model: confirm every configured provider books a non-zero cost, and that an unpriced model is refused with the named reason.
 3. Owner and member browser sweep of the undo deadline: run detail page and Settings → Audit log; record it in 023's progress.md, then move 023 to `done/`.
 
+## In flight (2026-09-11, afternoon)
+
+- **Sprint 3 (task 026) is active.** Five agents build steps 1, 2, 3, 4 and 6 in parallel: OpenTelemetry and trace ids with the run trace view, the replay record and replay view, the metrics endpoint and AI hub health, provider error codes, and the single exception path. Step 5 (rate alerts) starts once metrics merge.
+- **QA programme (task 034) is active.** Wave 1: the demo IT team seed for the local database and the Playwright plus real-database harness with a CI job. Area waves (ten areas, sweep plus suite) start when both merge.
+- **Versioning (task 033) is merged.** Every merge to beta is a numbered build (`npm run version:show`). After merges, run `npm run version:log` and commit `docs/BETA-LOG.md` in the follow-up docs PR (CLAUDE.md Rule 4).
+
 ## Still open on task 024 (Sprint 1)
 
 1. Run the migrations on the dev database: `npm run migrate -- up` (007 and 008, then Sprint 2's 009 and 010).
