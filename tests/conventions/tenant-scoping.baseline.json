@@ -14,7 +14,6 @@
   "Company/controller/updateCompany.js": 1,
   "CustomReports/controller.js": 2,
   "EmailIn/controller.js": 2,
-  "ImportSettings/controller.js": 1,
   "Integrations/controller.js": 2,
   "LogTime/controllerV2/capture.js": 20,
   "LogTime/controllerV2/manualLogtime.js": 20,

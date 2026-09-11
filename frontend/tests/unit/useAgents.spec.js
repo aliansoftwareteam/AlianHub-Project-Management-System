@@ -47,6 +47,17 @@ describe('useAgents', () => {
         await expect(decide('p1', 'approve')).rejects.toThrow('Spend cap reached ($30.00 of $30).');
     });
 
+    it('keeps who started each open run and stops only the runs the predicate allows', async () => {
+        const { loadActiveRuns, activeRuns, stopActive } = useAgents();
+        const open = [{ _id: 'r1', agentId: 'a1', startedBy: 'u1' }, { _id: 'r2', agentId: 'a1', startedBy: 'u2' }, { _id: 'r3', agentId: 'a2' }];
+        apiRequest.mockImplementation((type, url) => (type === 'post' ? okResponse({}) : okResponse(url.includes('summary') ? {} : open)));
+        await loadActiveRuns();
+        expect(activeRuns.value).toEqual({ a1: [{ _id: 'r1', startedBy: 'u1' }, { _id: 'r2', startedBy: 'u2' }], a2: [{ _id: 'r3', startedBy: '' }] });
+
+        await stopActive('a1', (run) => run.startedBy === 'u1');
+        expect(apiRequest.mock.calls.filter(([type]) => type === 'post').map(([, url]) => url)).toEqual(['/api/v2/agents/runs/r1/stop']);
+    });
+
     it('starts a manual run on the chosen task', async () => {
         const { runNow } = useAgents();
         apiRequest.mockImplementation((type, url) => (type === 'post' ? okResponse({ _id: 'r1' }) : okResponse(url.includes('summary') ? { running: 1 } : [])));
