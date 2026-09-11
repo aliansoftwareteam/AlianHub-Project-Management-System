@@ -1,12 +1,12 @@
 # Progress: Beta build version and log
 
 ## Checklist
-- [ ] Step 1–2: `scripts/build-info.js`, `version:stamp`, `version:log`, `version:show`
-- [ ] Step 3–4: runtime resolver and every version consumer
-- [ ] Step 5: Docker image stamped in `docker.yml`
-- [x] Interface: Instance console → Stats → Version (extend)
-- [x] Interface: Instance console → Upgrade → builds since release (extend)
-- [ ] Step 7: `CLAUDE.md` rule, `BRANCHING.md` section, first `docs/BETA-LOG.md`
+- [x] Step 1–2: `scripts/build-info.js`, `version:stamp`, `version:log`, `version:show`
+- [x] Step 3–4: runtime resolver and every version consumer
+- [x] Step 5: Docker image stamped in `docker.yml`
+- [x] Interface: Instance console → Stats → Version (extend) — owner and member sweep still to record
+- [x] Interface: Instance console → Upgrade → builds since release (extend) — owner and member sweep still to record
+- [x] Step 7: `CLAUDE.md` rule, `BRANCHING.md` section, first `docs/BETA-LOG.md`
 - [ ] Exit gate met and gates green
 
 ## Log
@@ -14,6 +14,7 @@
 |---|---|
 | 2026-09-11 | Filed after the owner saw Stats report v14.35.0 on a build 58 merges past it; owner chose derived beta build numbers over release-please prerelease or per-PR bumps. |
 | 2026-09-11 | Frontend on `feat/033-build-version-ui`: Stats shows the build label with commit · channel · Node beneath; Upgrade shows the label on the chip and a "Builds since vX.Y.Z" card (newest 20, show all, PR and commit links); the rail and login read the label from public `GET /version` once per page load, falling back to `package.json`. Falls back cleanly against a backend without the new fields. vitest, i18n check, eslint and the frontend build green; owner and member sweep still to record. |
+| 2026-09-11 | Backend on `feat/033-build-version`: `scripts/build-info.js` and the `version:*` scripts, `Config/buildInfo.js` resolver behind Instance stats and upgrade, `/health`, new `GET /version`, setup status, MCP server info, backups, migrations, changelog and public config; `docker.yml` stamps `build-info.json`; `CLAUDE.md` Rule 4, `BRANCHING.md` "Beta build numbers", first `docs/BETA-LOG.md` (59 builds, `14.36.0-beta.59` at 5716ca60). |
 
 ## Last step
-Interface rows built against the shared contract; waiting on the backend PR on `feat/033-build-version`, then the owner and member sweep.
+Frontend (#583) and backend merged. Remaining: the owner and member sweep of Stats and Upgrade, and a Docker image built by `docker.yml` confirming it reports the stamped label.

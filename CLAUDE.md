@@ -41,6 +41,12 @@ The `task-manager` skill in [.claude/skills/task-manager/](.claude/skills/task-m
 - After adding keys to `en.js`, run `npm run i18n:backfill` — it fills every other locale (machine-translated when `TRANSLATE_API_KEY` is set, English copy otherwise) and records the keys in `<locale>.pending.json` for review.
 - `npm run i18n:check` (also `tests/conventions/i18n-check.test.js`) fails when a locale lacks a key or a `.vue` file grows past its baseline in `scripts/i18n-allowlist.json`; the baseline may only shrink.
 
+### Rule 4 — Every merge to beta is a numbered build
+
+- The running version is derived from git, never hand-edited: `npm run version:show` prints it (`<next>-beta.<build>`, e.g. `14.36.0-beta.59`), and release-please alone edits `package.json` and `CHANGELOG.md`.
+- After merging PRs into `beta`, run `npm run version:log` and commit `docs/BETA-LOG.md` in the follow-up docs PR that ticks task progress, naming the build numbers those merges became.
+- Commit and PR titles stay Conventional Commits, because the next version is computed from them (`feat` → minor, `!` or `BREAKING CHANGE` → major, anything else → patch).
+
 ---
 
 ## What is AlianHub?
