@@ -49,6 +49,16 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 26 | Agents share one scratchpad and overwrote each other's `pr-body.md`. Future prompts should require a unique file prefix. | several agents |
 | 27 | `e2e/specs/access.spec.js` "Two-factor and change-password screens render" is flaky: the second hash-only `page.goto` keeps the Two-Factor title for 15 s. It failed on #608 (flaky) and on #626 (both attempts), neither of which touches settings or the router. | CI on #608, #626 |
 
+## Found while fixing (task 035)
+
+| # | Item | Source |
+|---|---|---|
+| 28 | Invite links in three of the four places in `Modules/Auth/controller/sendInvitation.js` end with a stray `)}`. | #633 |
+| 29 | Owners and admins can write any company field through the company update routes, including plan and subscription fields. | #633 |
+| 30 | `getRoleType` ignores whether a member row is deleted or pending; removed members are still stopped by the login membership check. | #633 |
+| 31 | `Login.vue` and `VerifyEmail.vue` still send `email` in the resend-verification request, which the server now ignores. | #633 |
+| 32 | Creating a project filter with another user's id answers 200 and stores it under the caller, while the task-filter side answers 403. | #632 |
+
 ## Owner decisions recorded
 
 - Refresh-token reuse grace window: `REFRESH_TOKEN_REUSE_GRACE_SECONDS`, default 10. The owner may set it to 0 for strict revocation.
