@@ -65,11 +65,13 @@ const manifest = () => {
     return { ...m, actions: m.actions.map((a) => ({ ...a, rating: rating(a.key) })), ratingKeys: [...RATING_KEYS], scopes: Object.values(SCOPE) };
 };
 
-const emitTask = (doc, updatedFields, actor) => {
+const clampDepth = (depth) => Math.max(0, Number(depth) || 0);
+
+const emitTask = (doc, updatedFields, actor, depth) => {
     socketEmitter.emit('update', {
         type: 'update', module: 'task', data: doc, updatedFields,
         actor: { kind: 'agent', userId: actor.userId || null, agentId: actor.agentId || null },
-        depth: 1,
+        depth: clampDepth(depth) + 1,
     });
 };
 
@@ -79,11 +81,13 @@ const workEntry = (actor, hours = 0) => {
 };
 
 // perform() writes the agent.action row (undo descriptor, attribution), so the
-// tool layer must not add its automation.task.* row for the same change.
-const context = (actor, action) => {
+// tool layer must not add its automation.task.* row for the same change. `depth`
+// is the originating event's; the tool layer emits at depth + 1 so the bus's
+// loop guard keeps counting through an agent hop.
+const context = (actor, action, depth) => {
     const a = attribution(actor);
     return {
-        ruleId: null, ruleName: a.label, runId: actor.runId || null, action: `agent.${action}`, depth: 0,
+        ruleId: null, ruleName: a.label, runId: actor.runId || null, action: `agent.${action}`, depth: clampDepth(depth),
         userId: String(actor.userId || a.actorId || ''), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null,
         auditedByCaller: true,
     };
@@ -97,8 +101,8 @@ const findRunningTimer = (companyId, taskId, userId) => MongoDbCrudOpration(comp
 /* ── the executors ─────────────────────────────────────────────────────────── */
 
 const executors = {
-    async 'task.comment'({ companyId, actor, params }) {
-        const r = await tools.addComment(companyId, params.taskId, params.body, context(actor, 'task.comment'));
+    async 'task.comment'({ companyId, actor, params, depth }) {
+        const r = await tools.addComment(companyId, params.taskId, params.body, context(actor, 'task.comment', depth));
         const a = attribution(actor);
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMMENTS,
@@ -107,7 +111,7 @@ const executors = {
         return { result: { commentId: r.commentId }, undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId };
     },
 
-    async 'task.status.set'({ companyId, actor, params }) {
+    async 'task.status.set'({ companyId, actor, params, depth }) {
         const task = await tools.getTask(companyId, params.taskId);
         const patch = await tools.resolveStatus(companyId, task.ProjectID, params.status.name || params.status.text);
         const check = registry.evaluate('task.status.set', { status: { statusType: patch.statusType, name: patch.status.text } });
@@ -117,11 +121,11 @@ const executors = {
             toStatus: { statusType: patch.statusType, name: patch.status.text }, actor: workEntry(actor),
         });
         const set = completion && !completion.error ? { ...patch, completion: completion.completion } : patch;
-        const r = await tools.updateTask(companyId, task._id, set, context(actor, 'task.status.set'));
+        const r = await tools.updateTask(companyId, task._id, set, context(actor, 'task.status.set', depth));
         return { result: { status: patch.status.text, statusType: patch.statusType }, undo: { kind: 'status', taskId: String(task._id), previous }, entityId: task._id, entityName: task.TaskName, task: r.task };
     },
 
-    async 'task.link'({ companyId, actor, params }) {
+    async 'task.link'({ companyId, actor, params, depth }) {
         const task = await tools.getTask(companyId, params.taskId);
         const url = String(params.url || '').trim();
         if (!/^https?:\/\//i.test(url) || url.length > 2000) throw new tools.DeterministicError('a valid http(s) url is required');
@@ -134,50 +138,50 @@ const executors = {
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS, data: [{ _id: task._id }, { $push: { links: link } }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
-        emitTask(updated, { links: updated.links }, actor);
+        emitTask(updated, { links: updated.links }, actor, depth);
         return { result: { linkId: String(link._id), kind: link.kind }, undo: { kind: 'link', taskId: String(task._id), linkId: String(link._id) }, entityId: task._id, entityName: task.TaskName };
     },
 
-    async 'task.assign'({ companyId, actor, params }) {
+    async 'task.assign'({ companyId, actor, params, depth }) {
         const task = await tools.getTask(companyId, params.taskId);
         const ids = (Array.isArray(params.assigneeIds) ? params.assigneeIds : [params.assigneeId]).filter((v) => OBJECT_ID.test(String(v || ''))).map(String);
         if (!ids.length) throw new tools.DeterministicError('assigneeIds is required');
         const previous = (task.AssigneeUserId || []).map(String);
         const next = params.replace ? ids : [...new Set([...previous, ...ids])];
-        const r = await tools.updateTask(companyId, task._id, { AssigneeUserId: next }, context(actor, 'task.assign'));
+        const r = await tools.updateTask(companyId, task._id, { AssigneeUserId: next }, context(actor, 'task.assign', depth));
         return { result: { assignees: next }, undo: { kind: 'assign', taskId: String(task._id), previous }, entityId: task._id, entityName: task.TaskName, task: r.task };
     },
 
-    async 'task.update'({ companyId, actor, params }) {
+    async 'task.update'({ companyId, actor, params, depth }) {
         const task = await tools.getTask(companyId, params.taskId);
         const fields = params.fields || {};
         const previous = {};
         Object.keys(fields).forEach((k) => { previous[k] = task[k] === undefined ? null : task[k]; });
-        const r = await tools.updateTask(companyId, task._id, fields, context(actor, 'task.update'));
+        const r = await tools.updateTask(companyId, task._id, fields, context(actor, 'task.update', depth));
         return { result: { fields: Object.keys(fields) }, undo: { kind: 'update', taskId: String(task._id), previous }, entityId: task._id, entityName: task.TaskName, task: r.task };
     },
 
-    async 'task.sprint.move'({ companyId, actor, params }) {
+    async 'task.sprint.move'({ companyId, actor, params, depth }) {
         const task = await tools.getTask(companyId, params.taskId);
         const target = oid(params.sprintId);
         if (!target) throw new tools.DeterministicError('a valid sprintId is required');
         const sprint = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: target, projectId: task.ProjectID }] }, 'findOne');
         if (!sprint) throw new tools.DeterministicError('sprint not found in this project');
         const previous = { sprintId: task.sprintId, sprintArray: task.sprintArray };
-        const r = await tools.updateTask(companyId, task._id, { sprintId: target, sprintArray: { _id: target, name: sprint.name } }, context(actor, 'task.sprint.move'));
+        const r = await tools.updateTask(companyId, task._id, { sprintId: target, sprintArray: { _id: target, name: sprint.name } }, context(actor, 'task.sprint.move', depth));
         return { result: { sprintId: String(target), name: sprint.name }, undo: { kind: 'sprint', taskId: String(task._id), previous }, entityId: task._id, entityName: task.TaskName, task: r.task };
     },
 
-    async 'subtask.create'({ companyId, actor, params }) {
-        const r = await tools.createSubtask(companyId, params.taskId, { title: params.title, description: params.description || '' }, context(actor, 'subtask.create'));
+    async 'subtask.create'({ companyId, actor, params, depth }) {
+        const r = await tools.createSubtask(companyId, params.taskId, { title: params.title, description: params.description || '' }, context(actor, 'subtask.create', depth));
         return { result: { subtaskId: r.subtaskId, title: r.title }, undo: { kind: 'subtask', subtaskId: r.subtaskId, parentTaskId: String(params.taskId) }, entityId: params.taskId };
     },
 
-    async 'task.create'({ companyId, actor, params }) {
+    async 'task.create'({ companyId, actor, params, depth }) {
         const r = await tools.createTask(companyId, params.projectId, {
             title: params.title, description: params.description || '', sprintId: params.sprintId || '', priority: params.priority || 'MEDIUM',
             leaderId: actor.userId || '',
-        }, context(actor, 'task.create'));
+        }, context(actor, 'task.create', depth));
         return { result: { taskId: r.taskId, key: r.key, title: r.title }, undo: { kind: 'task', taskId: r.taskId, projectId: String(params.projectId) }, entityId: r.taskId, entityName: r.title };
     },
 
@@ -233,8 +237,8 @@ const executors = {
         return { result: { pageId: String(saved._id) }, undo: { kind: 'page', pageId: String(saved._id) }, entityType: 'page', entityId: saved._id, entityName: title };
     },
 
-    async 'chat.post'({ companyId, actor, params }) {
-        const r = await tools.addComment(companyId, params.taskId, params.body, context(actor, 'chat.post'));
+    async 'chat.post'({ companyId, actor, params, depth }) {
+        const r = await tools.addComment(companyId, params.taskId, params.body, context(actor, 'chat.post', depth));
         return { result: { commentId: r.commentId }, undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId };
     },
 };
@@ -247,7 +251,7 @@ const refusal = async (companyId, actor, { action, params, reason, ip }) => {
 /* Run one action for an actor. Refusals are audited and thrown as RefusedError.
  * A policy `decision` of refuse is honoured before the registry check, so a
  * policy refusal leaves the same audit row as a registry one. */
-const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null }) => {
+const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0 }) => {
     if (decision && decision.decision === 'refuse') throw await refusal(companyId, actor, { action, params, reason: decision.reason, ip });
     const check = registry.evaluate(action, params, { allowedActions });
     if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip });
@@ -260,7 +264,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     const auditId = await audit.openAction(companyId, actor, { action, reason, params, cost, ip, entityId: params.taskId });
     let out;
     try {
-        out = await exec({ companyId, actor, params });
+        out = await exec({ companyId, actor, params, depth: clampDepth(depth) });
     } catch (e) {
         await audit.failAction(companyId, auditId, e.message);
         throw e;

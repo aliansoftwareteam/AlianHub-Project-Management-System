@@ -160,6 +160,17 @@ describe('a run is a LangGraph thread', () => {
         expect(await checkpointOf(C, run)).toBeUndefined();
     });
 
+    it('act hands perform the depth the run was triggered at, so its events land one deeper', async () => {
+        planned([subtask('One')]);
+        const a = agent({ autonomy: 2 });
+        const run = await start(a, { trigger: 'rule', triggerDepth: 2, triggerEventId: 'evt_1' });
+        await execute(run, a);
+        expect(actions.perform).toHaveBeenCalledWith(expect.objectContaining({ action: 'subtask.create', depth: 2 }));
+        const manual = await start(a);
+        await execute(manual, a);
+        expect(actions.perform).toHaveBeenLastCalledWith(expect.objectContaining({ depth: 0 }));
+    });
+
     it('a finished thread leaves no checkpoint behind, while a waiting one keeps its checkpoint until it is decided', async () => {
         planned([newTask('Two')]);
         const run = await start(agent());

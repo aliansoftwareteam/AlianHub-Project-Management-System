@@ -121,7 +121,7 @@ async function act(state, config) {
         if (!(await runs.isRunning(companyId, run._id))) return { applied, refusals, abandoned: true };
         try {
             // eslint-disable-next-line no-await-in-loop
-            const out = await deps.actions.perform({ companyId, actor: deps.actor, action: change.action, params: change.params, reason: `${run.skill} finding`, allowedActions: agent.allowedActions, decision: verdict });
+            const out = await deps.actions.perform({ companyId, actor: deps.actor, action: change.action, params: change.params, reason: `${run.skill} finding`, allowedActions: agent.allowedActions, decision: verdict, depth: runs.originDepth(run) });
             // eslint-disable-next-line no-await-in-loop
             await runs.patch(companyId, run._id, {}, { $push: { actions: { action: change.action, auditId: out.auditId, ok: true, at: new Date() } } });
             applied += 1;

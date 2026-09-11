@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
 const usage = require('../AIProjectGenerator/usage');
+const { MAX_DEPTH } = require('../../event/domainEventBus');
 
 // Agent runs and spend. A run is the unit the rail footer counts ("2 running"),
 // the project header chip sums (elapsed, spend) and the audit log links to
@@ -20,6 +21,8 @@ const TERMINAL = [STATUS.DONE, STATUS.SKIPPED, STATUS.FAILED, STATUS.STOPPED];
 const RETENTION_SECONDS = 15552000;
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const monthKey = (d = new Date()) => d.toISOString().slice(0, 7);
+const clampDepth = (depth) => Math.max(0, Number(depth) || 0);
+const originDepth = (run) => clampDepth(run && run.triggerDepth);
 const startOfDayUtc = (d = new Date()) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 
 const emit = (companyId, type, data) => {
@@ -36,9 +39,14 @@ const runsToday = (companyId, agentId) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.AGENT_RUNS, data: [{ agentId: String(agentId), startedAt: { $gte: startOfDayUtc() } }],
 }, 'countDocuments');
 
+// The bus drops any envelope deeper than MAX_DEPTH, so a run whose actions would
+// emit past it is refused up front instead of running and losing its events.
+const LOOP_DEPTH_EXCEEDED = 'loop_depth_exceeded';
+
 /* Can this agent start a run right now? Returns { ok, reason }. */
-const canStart = async (agent, { trigger, viaAccount, companyId } = {}) => {
+const canStart = async (agent, { trigger, viaAccount, companyId, depth } = {}) => {
     if (!agent) return { ok: false, reason: 'Agent not found.' };
+    if (clampDepth(depth) >= MAX_DEPTH) return { ok: false, reason: LOOP_DEPTH_EXCEEDED, code: LOOP_DEPTH_EXCEEDED, depth: clampDepth(depth), maxDepth: MAX_DEPTH };
     if (agent.paused) return { ok: false, reason: `Agent is paused${agent.pausedReason ? ` (${agent.pausedReason})` : ''}.` };
     const via = viaAccount || agent.account || 'workspace';
     if (via !== 'local') {
@@ -66,12 +74,13 @@ const canStart = async (agent, { trigger, viaAccount, companyId } = {}) => {
     return { ok: true, reason: '' };
 };
 
-const create = async (companyId, { agent, taskId, projectId, skill, trigger, startedBy, viaAccount, note, spendCapUsd, notifyMe }) => {
+const create = async (companyId, { agent, taskId, projectId, skill, trigger, startedBy, viaAccount, note, spendCapUsd, notifyMe, triggerDepth, triggerEventId }) => {
     const run = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_RUNS,
         data: {
             agentId: String(agent._id), agentName: agent.name, taskId: taskId ? String(taskId) : null, projectId: projectId ? String(projectId) : null,
             skill: skill || null, trigger: trigger || 'manual', status: STATUS.RUNNING, viaAccount: viaAccount || agent.account || 'workspace',
+            triggerDepth: clampDepth(triggerDepth), triggerEventId: triggerEventId ? String(triggerEventId) : null,
             startedBy: startedBy ? String(startedBy) : null, startedAt: new Date(), elapsedMs: 0,
             spend: { tokens: 0, usd: 0, model: null, billedToWorkspace: (viaAccount || agent.account || 'workspace') === 'workspace' },
             actions: note ? [{ action: 'mention', note: String(note).slice(0, 2000), at: new Date() }] : [],
@@ -299,4 +308,4 @@ const skillSlugOf = (agent, explicit) => {
     return first.key || first.slug || first.name || 'qa-review';
 };
 
-module.exports = { STATUS, OPEN, TERMINAL, RETENTION_SECONDS, terminalUpdate, canStart, runsToday, skillSlugOf, create, get, patch, appendAction, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, getAgent, emitAgent, changesFor, executeSkill, monthKey };
+module.exports = { STATUS, OPEN, TERMINAL, RETENTION_SECONDS, LOOP_DEPTH_EXCEEDED, originDepth, terminalUpdate, canStart, runsToday, skillSlugOf, create, get, patch, appendAction, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, getAgent, emitAgent, changesFor, executeSkill, monthKey };

@@ -808,6 +808,9 @@ const schema = {
         projectId: { type: String, required: false },
         skill: { type: String, required: false },
         trigger: { type: String, required: false },
+        // Depth of the domain event that started a rule-triggered run; its actions emit at depth + 1
+        triggerDepth: { type: Number, default: 0, required: false },
+        triggerEventId: { type: String, required: false },
         // queued | running | waiting_approval | done | failed | stopped
         status: { type: String, default: 'queued', required: true },
         viaAccount: { type: String, required: false },

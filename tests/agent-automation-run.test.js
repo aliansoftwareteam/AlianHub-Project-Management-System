@@ -46,7 +46,7 @@ describe('#1 rule-triggered agent runs go through the run engine', () => {
     it('refuses with canStart\'s reason — paused, pause-all, spend cap and the daily limit all apply', async () => {
         runs.canStart.mockResolvedValueOnce({ ok: false, reason: 'Agent is paused (pause_all).' });
         await expect(runAgent.run(args({ skill: 'qa-review', agent: 'code reviewer' }))).rejects.toMatchObject({ deterministic: true, message: 'Code Reviewer cannot run: Agent is paused (pause_all).' });
-        expect(runs.canStart).toHaveBeenCalledWith(expect.objectContaining({ name: 'Code Reviewer' }), { trigger: 'rule', companyId: C });
+        expect(runs.canStart).toHaveBeenCalledWith(expect.objectContaining({ name: 'Code Reviewer' }), { trigger: 'rule', companyId: C, depth: 0 });
         expect(runs.create).not.toHaveBeenCalled();
     });
 
@@ -57,7 +57,7 @@ describe('#1 rule-triggered agent runs go through the run engine', () => {
 
     it('creates a rule-triggered run for the named agent and executes it as that agent, on behalf of the rule\'s author', async () => {
         const out = await runAgent.run(args({ skill: 'pr.summary', agent: 'Code Reviewer' }));
-        expect(runs.create).toHaveBeenCalledWith(C, expect.objectContaining({ taskId: TASK_ID, projectId: 'p1', skill: 'pr.summary', trigger: 'rule', startedBy: 'u1', note: 'rule "QA on done"' }));
+        expect(runs.create).toHaveBeenCalledWith(C, expect.objectContaining({ taskId: TASK_ID, projectId: 'p1', skill: 'pr.summary', trigger: 'rule', startedBy: 'u1', note: 'rule "QA on done"', triggerDepth: 0 }));
         const [, run, agent, t, deps] = runs.executeSkill.mock.calls[0];
         expect(run._id).toBe('run1');
         expect(agent.name).toBe('Code Reviewer');
