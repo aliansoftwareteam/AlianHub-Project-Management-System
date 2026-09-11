@@ -89,8 +89,8 @@
     onMounted(() => {
         uniqueId.value = `phoneCountry-${makeUniqueId()}`
         setTimeout(() => {
-            activeCountry.value = findCountry(props.preferredCountries[0])
-            emit("onSelect", activeCountry.value);
+            const [initialCountry] = getCountries(props.preferredCountries);
+            if (initialCountry) selectedComapany(initialCountry);
         }, 10);
     })      
 
