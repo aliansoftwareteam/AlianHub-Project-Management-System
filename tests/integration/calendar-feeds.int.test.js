@@ -85,17 +85,19 @@ describe('calendar feeds (PRJ-01)', () => {
         }
     });
 
-    it('a feed URL handed out before tokens were hashed keeps working after the migration', async () => {
+    const insertLegacyFeed = async (token) => {
         const owner = await loginAs('owner');
-        const token = crypto.randomBytes(18).toString('hex');
         const now = new Date();
-        const { insertedId } = await feeds.insertOne({
+        return feeds.insertOne({
             token, companyId: state.companyId, userId: owner.uid, scope: 'my', projectId: '', name: 'Legacy feed',
             enabled: true, createdBy: owner.uid, deletedStatusKey: 0, createdAt: now, updatedAt: now,
         });
-        try {
-            expect(await icsStatus(token)).toBe(404);
+    };
 
+    it('a feed URL handed out before tokens were hashed keeps working after the migration', async () => {
+        const token = crypto.randomBytes(18).toString('hex');
+        const { insertedId } = await insertLegacyFeed(token);
+        try {
             const first = await migration.up(migrationContext(feeds));
             expect(first.hashed).toBeGreaterThanOrEqual(1);
             const migrated = await feeds.findOne({ _id: insertedId });
@@ -104,6 +106,20 @@ describe('calendar feeds (PRJ-01)', () => {
             expect(await icsStatus(token)).toBe(200);
 
             expect(await migration.up(migrationContext(feeds))).toEqual({ hashed: 0 });
+            expect(await icsStatus(token)).toBe(200);
+        } finally {
+            await feeds.deleteOne({ _id: insertedId });
+        }
+    });
+
+    it('a feed URL the migration has not reached yet still answers and is hashed on first use', async () => {
+        const token = crypto.randomBytes(18).toString('hex');
+        const { insertedId } = await insertLegacyFeed(token);
+        try {
+            expect(await icsStatus(token)).toBe(200);
+            const upgraded = await feeds.findOne({ _id: insertedId });
+            expect(upgraded.token).toBeUndefined();
+            expect(upgraded.tokenHash).toBe(crypto.createHash('sha256').update(token).digest('hex'));
             expect(await icsStatus(token)).toBe(200);
         } finally {
             await feeds.deleteOne({ _id: insertedId });
