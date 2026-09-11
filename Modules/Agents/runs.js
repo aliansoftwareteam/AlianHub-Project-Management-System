@@ -189,8 +189,8 @@ const reapStale = async (companyId) => {
 
 const stop = async (companyId, runId, byUserId) => {
     const run = await get(companyId, runId);
-    if (!run) return { error: 'Run not found.' };
-    if (!OPEN.includes(run.status)) return { error: `Run is already ${run.status}.` };
+    if (!run) return { error: 'Run not found.', status: 404 };
+    if (!OPEN.includes(run.status)) return { error: `Run is already ${run.status}.`, status: 409 };
     const stopped = await finish(companyId, runId, { status: STATUS.STOPPED, outcome: `stopped by ${byUserId || 'a person'}` });
     return { run: stopped };
 };
@@ -227,8 +227,11 @@ const recordSpend = async (companyId, run, tokens, model) => {
     return { usd, tokens: priced.totalTokens, capReached };
 };
 
-const list = async (companyId, { status, projectId, agentId, taskId, errorType, limit = 50 } = {}) => {
-    const match = {};
+/* projectIds, when given, is the caller's visible set: a projectId outside it matches nothing. */
+const inProjects = (projectIds) => (Array.isArray(projectIds) ? { projectId: { $in: projectIds.map(String) } } : {});
+
+const list = async (companyId, { status, projectId, agentId, taskId, errorType, limit = 50, projectIds } = {}) => {
+    const match = { ...inProjects(projectIds) };
     if (status === 'open') match.status = { $in: OPEN };
     else if (status) match.status = String(status);
     if (projectId) match.projectId = String(projectId);
@@ -241,8 +244,8 @@ const list = async (companyId, { status, projectId, agentId, taskId, errorType, 
 };
 
 /* What the rail footer and the project header chip show. */
-const summary = async (companyId, { projectId } = {}) => {
-    const match = { status: { $in: OPEN } };
+const summary = async (companyId, { projectId, projectIds } = {}) => {
+    const match = { status: { $in: OPEN }, ...inProjects(projectIds) };
     if (projectId) match.projectId = String(projectId);
     const open = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [match, 'agentId agentName status startedAt spend taskId'] }, 'find');
     const now = Date.now();
@@ -258,8 +261,8 @@ const summary = async (companyId, { projectId } = {}) => {
 };
 
 /* Runs by status, for the counts a page shows next to the live summary. */
-const countsByStatus = async (companyId, { projectId, agentId } = {}) => {
-    const match = {};
+const countsByStatus = async (companyId, { projectId, agentId, projectIds } = {}) => {
+    const match = { ...inProjects(projectIds) };
     if (projectId) match.projectId = String(projectId);
     if (agentId) match.agentId = String(agentId);
     const rows = await MongoDbCrudOpration(companyId, {

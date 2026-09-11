@@ -360,7 +360,7 @@ async function updateApp (item,appObj) {
 const appref = ref([]);
 const data = async () => {
     const response = await apiRequest("get", env.PROJECTS_APPS);
-    appref.value = response.data;
+    appref.value = response.data?.data || [];
 };
 
 onMounted(()=>{

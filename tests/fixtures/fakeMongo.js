@@ -1,10 +1,12 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
 // language for the agent modules (equality, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type, $set/$inc/$push,
-// conditional findOneAndUpdate, deleteMany, sort/limit on find, $match/$group aggregate, declared unique indexes that
+// conditional findOneAndUpdate, findOneAndDelete, deleteOne, deleteMany, sort/limit on find, $match/$group aggregate, declared unique indexes that
 // reject a duplicate save with E11000) so a test can assert on what was written.
 
 let seq = 1;
 const nextId = () => String(seq++).padStart(24, '0');
+
+const hex = (v) => (v && typeof v.toHexString === 'function' ? v.toHexString() : v);
 
 const read = (doc, key) => key.split('.').reduce((v, k) => (v == null ? undefined : v[k]), doc);
 
@@ -12,11 +14,11 @@ const matches = (doc, filter = {}) => Object.entries(filter).every(([key, cond])
     if (key === '$or') return cond.some((f) => matches(doc, f));
     if (key === '$and') return cond.every((f) => matches(doc, f));
     const raw = read(doc, key);
-    const value = raw === undefined ? undefined : (raw instanceof Date ? raw.getTime() : (key === '_id' ? String(raw) : raw));
+    const value = raw === undefined ? undefined : (raw instanceof Date ? raw.getTime() : (key === '_id' ? String(raw) : hex(raw)));
     if (cond instanceof RegExp) return cond.test(String(value));
     if (cond && typeof cond === 'object' && !(cond instanceof Date) && !Array.isArray(cond) && Object.keys(cond).some((k) => k.startsWith('$'))) {
         return Object.entries(cond).every(([op, arg]) => {
-            const want = arg instanceof Date ? arg.getTime() : arg;
+            const want = arg instanceof Date ? arg.getTime() : hex(arg);
             if (op === '$in') return arg.map(String).includes(String(value));
             if (op === '$nin') return !arg.map(String).includes(String(value));
             if (op === '$ne') return value !== want;
@@ -31,7 +33,7 @@ const matches = (doc, filter = {}) => Object.entries(filter).every(([key, cond])
             throw new Error(`fakeMongo: unsupported operator ${op}`);
         });
     }
-    const want = cond instanceof Date ? cond.getTime() : (key === '_id' ? String(cond) : cond);
+    const want = cond instanceof Date ? cond.getTime() : (key === '_id' ? String(cond) : hex(cond));
     return value === want;
 });
 
@@ -123,6 +125,8 @@ const create = () => {
         if (method === 'findOneAndUpdate') { const doc = list.find((d) => matches(d, data[0])); if (!doc) return null; apply(doc, data[1]); return clone(doc); }
         if (method === 'updateOne') { const doc = list.find((d) => matches(d, data[0])); if (doc) apply(doc, data[1]); return { modifiedCount: doc ? 1 : 0 }; }
         if (method === 'updateMany') { const hit = list.filter((d) => matches(d, data[0])); hit.forEach((d) => apply(d, data[1])); return { modifiedCount: hit.length }; }
+        if (method === 'findOneAndDelete') { const at = list.findIndex((d) => matches(d, data[0])); return at === -1 ? null : clone(list.splice(at, 1)[0]); }
+        if (method === 'deleteOne') { const at = list.findIndex((d) => matches(d, data[0])); if (at !== -1) list.splice(at, 1); return { deletedCount: at === -1 ? 0 : 1 }; }
         if (method === 'aggregate') {
             const [pipeline] = data;
             return pipeline.reduce((docs, stage) => {
