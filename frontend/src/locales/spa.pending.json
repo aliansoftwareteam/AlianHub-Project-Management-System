@@ -5369,6 +5369,7 @@
     "AiHealth.owner_only_body": "Ask an owner or admin of this workspace for the AI health figures.",
     "AiHealth.load_failed": "The health figures could not be loaded.",
     "AiHealth.retry": "Retry",
+    "Instance.channel_unknown": "version unresolved",
     "dashboardCard.dashboard_updated": "Dashboard updated successfully"
   }
 }
