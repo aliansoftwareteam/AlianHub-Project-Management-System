@@ -221,7 +221,7 @@ describe('export and import', () => {
 /* Regression tests for confirmed findings. `it.failing` passes while the bug is
  * present and turns red once the fix lands — the reminder to flip it to it(). */
 describe('pages findings (regressions)', () => {
-    it.failing('PAG-01: a user cannot download another user\'s export job', async () => {
+    it('PAG-01: a user cannot download another user\'s export job', async () => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
         const project = await makeSharedProject(owner);
@@ -232,7 +232,7 @@ describe('pages findings (regressions)', () => {
         expect(refused(steal)).toBe(true);
     });
 
-    it.failing('PAG-01: a user cannot list another user\'s export jobs', async () => {
+    it('PAG-01: a user cannot list another user\'s export jobs', async () => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
         await owner.api.post('/api/v2/exports', { format: 'csv', projectId: state.projects.shared._id, projectName: 'x', userData: { id: owner.uid } });
@@ -240,7 +240,7 @@ describe('pages findings (regressions)', () => {
         expect((list.body.data || []).length).toBe(0);
     });
 
-    it.failing('PAG-02: a non-member cannot export a private project', async () => {
+    it('PAG-02: a non-member cannot export a private project', async () => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
         const priv = await createProject(owner.api, { name: `PAG Private ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid, isPrivate: true });
@@ -248,7 +248,7 @@ describe('pages findings (regressions)', () => {
         expect(refused(res)).toBe(true);
     });
 
-    it.failing('PAG-03: a user cannot read another user\'s import history', async () => {
+    it('PAG-03: a user cannot read another user\'s import history', async () => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
         const sprintId = await sprintOf(owner.api, state.projects.shared._id);
@@ -257,7 +257,7 @@ describe('pages findings (regressions)', () => {
         expect((list.body.data || []).length).toBe(0);
     });
 
-    it.failing('PAG-04: a guest cannot import company templates', async () => {
+    it('PAG-04: a guest cannot import company templates', async () => {
         const guest = await loginAs('guest');
         const res = await guest.api.post('/api/v1/importTemplate', {
             companyId: state.companyId,
@@ -266,7 +266,7 @@ describe('pages findings (regressions)', () => {
         expect(refused(res)).toBe(true);
     });
 
-    it.failing('PAG-05: CSV export neutralises a leading formula character', async () => {
+    it('PAG-05: CSV export neutralises a leading formula character', async () => {
         const owner = await loginAs('owner');
         const res = await owner.api.post('/api/v1/export/csv', { filename: 'x', tableHead: ['A'], tableRows: [['=HYPERLINK("http://x","y")']] });
         const cells = String(res.body).split(/\r?\n/);
@@ -274,7 +274,7 @@ describe('pages findings (regressions)', () => {
         expect(/^["']?[=+\-@]/.test(dataCell)).toBe(false);
     });
 
-    it.failing('PAG-06: projects-apps uses the standard response envelope', async () => {
+    it('PAG-06: projects-apps uses the standard response envelope', async () => {
         const owner = await loginAs('owner');
         const res = await owner.api.get('/api/v1/projects-apps');
         expect(res.body && res.body.status).toBe(true);
