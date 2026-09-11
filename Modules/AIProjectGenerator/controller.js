@@ -8,6 +8,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const multer = require('multer');
 
 const { getProvider, isAnyProviderConfigured } = require('./llmProvider');
+const { FEATURES } = require('../AICore/features');
 const { COVERAGE_POINTS, PlanSchema, ClarifyResponseSchema, TasksPlanSchema, TasksResponseSchema, TasksOnlyPlanSchema, TasksOnlyResponseSchema, SprintsOnlyPlanSchema, SprintsOnlyResponseSchema, sanitizeMemberIds, sanitizeTaskPlanMemberIds, tryParseJson } = require('./schemaValidator');
 const { buildSystemPrompt, buildUserMessage, buildRepairPrompt, buildTasksSystemPrompt, buildTasksUserMessage } = require('./promptBuilder');
 const { briefUpload, extractFromFile, safeUnlink, MAX_BRIEF_BYTES } = require('./briefExtractor');
@@ -124,6 +125,7 @@ async function loadActiveMembers(companyId) {
 
 async function callLlmForPlan({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions, companyId, userId }) {
     const provider = getProvider();
+    const spend = { feature: FEATURES.PROJECT_PLAN, companyId, userId };
     const systemPrompt = buildSystemPrompt();
     const memory = await memoryStore.contextFor({ companyId, userId });
     const userMessage = buildUserMessage({ description, additionalRequirements, briefText, members, clarifications, availableSkills, selectedSkills, approvedBrief, assumptions, memory });
@@ -140,6 +142,7 @@ async function callLlmForPlan({ description, additionalRequirements, briefText, 
         jsonMode: true,
         maxTokens,
         temperature: 0.4,
+        spend,
     });
 
     // Truncation short-circuit: if the model hit max_tokens, the JSON is
@@ -185,6 +188,7 @@ async function callLlmForPlan({ description, additionalRequirements, briefText, 
             jsonMode: true,
             maxTokens,
             temperature: 0.2,
+            spend,
         });
         // Counted before the guards below: a repair pass that then fails still
         // consumed tokens, and the user is still billed for them.
@@ -759,8 +763,9 @@ function applyEdits(plan, edits) {
 // EXISTING project via orchestrator.executeTasksIntoProject. Mirrors
 // callLlmForPlan / generatePlanForJob / exports.plan / exports.execute.
 
-async function callLlmForTasksPlan({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features, memory }) {
+async function callLlmForTasksPlan({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features, memory, companyId, userId }) {
     const provider = getProvider();
+    const spend = { feature: FEATURES.PROJECT_TASKS, companyId, userId };
     const systemPrompt = buildTasksSystemPrompt();
     const userMessage = buildTasksUserMessage({ project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features, memory });
     const ResponseSchema = tasksResponseSchemaForMode(mode);
@@ -775,6 +780,7 @@ async function callLlmForTasksPlan({ project, additionalRequirements, briefText,
         jsonMode: true,
         maxTokens,
         temperature: 0.4,
+        spend,
     });
     if (firstAttempt.truncated) {
         const err = new Error(
@@ -811,6 +817,7 @@ async function callLlmForTasksPlan({ project, additionalRequirements, briefText,
             jsonMode: true,
             maxTokens,
             temperature: 0.2,
+            spend,
         });
         usage = addUsage(usage, usageFromResult(repairAttempt));
         if (repairAttempt.truncated) {
@@ -859,7 +866,7 @@ async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, addit
 
         emit({ event: 'progress', phase: 'plan', step: 'ai', status: 'started' });
         const { result, usage, model, provider } = await callLlmForTasksPlan({
-            project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features, memory,
+            project, additionalRequirements, briefText, members, clarifications, mode, targetSprintName, features, memory, companyId, userId: String(uid),
         });
 
         let plan = result.plan;

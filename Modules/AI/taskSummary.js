@@ -7,6 +7,8 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 
+const { FEATURES } = require('../AICore/features');
+
 let providerFactory = null;
 try {
     providerFactory = require('../AIProjectGenerator/llmProvider');
@@ -121,7 +123,7 @@ function parseSummary(content) {
     return text.replace(/^["{}\s]+|["{}\s]+$/g, '');
 }
 
-async function askModel(userMessage) {
+async function askModel(userMessage, spend) {
     const provider = providerFactory.getProvider();
     const result = await Promise.race([
         provider.chat({
@@ -130,6 +132,7 @@ async function askModel(userMessage) {
             jsonMode: true,
             temperature: 0.3,
             maxTokens: 600,
+            spend,
         }),
         new Promise((_, reject) => setTimeout(() => reject(new Error('AI summary request timed out')), REQUEST_TIMEOUT_MS)),
     ]);
@@ -166,7 +169,7 @@ async function summarizeTask({ companyId, taskId, force = false }) {
         if (hit) return { status: true, data: { ...hit, cached: true } };
 
         const names = await resolveNames(comments.map((c) => c.userId));
-        const summary = await askModel(buildThread({ task, comments, names }));
+        const summary = await askModel(buildThread({ task, comments, names }), { feature: FEATURES.TASK_SUMMARY, companyId });
         if (!summary) return { status: false, reason: 'no summary returned' };
 
         const data = { summary, commentCount: total, updatedAt: new Date().toISOString() };

@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../../Config/loggerConfig');
 
+const { FEATURES } = require('../AICore/features');
+
 let providerFactory = null;
 try {
     providerFactory = require('../AIProjectGenerator/llmProvider');
@@ -64,7 +66,7 @@ function isConfigured() {
 }
 
 /**
- * @param {{ transcript: string, title?: string, participants?: string[], kind?: 'call'|'chat' }} input
+ * @param {{ transcript: string, title?: string, participants?: string[], kind?: 'call'|'chat', companyId: string, userId?: string }} input
  * @returns {Promise<{status:boolean, data?:{summary:string, actionItems:object[]}, reason?:string}>}
  */
 async function generateMeetingNotes(input = {}) {
@@ -97,6 +99,7 @@ async function generateMeetingNotes(input = {}) {
                 jsonMode: true,
                 temperature: 0.2,
                 maxTokens: 4096,
+                spend: { feature: FEATURES.MEETING_NOTES, companyId: input.companyId, userId: input.userId },
             }),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Meeting notes request timed out')), REQUEST_TIMEOUT_MS)),
         ]);
@@ -115,7 +118,7 @@ async function meetingNotesHandler(req, res) {
         if (!req.headers['companyid']) {
             return res.status(400).send({ status: false, statusText: 'companyId header required' });
         }
-        const result = await generateMeetingNotes(req.body || {});
+        const result = await generateMeetingNotes({ ...(req.body || {}), companyId: req.headers['companyid'], userId: req.uid });
         if (!result.status) return res.send({ status: false, statusText: result.reason });
         return res.send({ status: true, data: result.data });
     } catch (error) {

@@ -88,7 +88,7 @@ describe('the run spend cap is checked before the model call (defect 15)', () =>
 
     it('a call estimated over the company\'s remaining monthly budget is refused naming the company cap', async () => {
         mockDb.store[dbCollections.COMPANIES][0].agentMonthlyBudgetUsd = 0.05;
-        mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { agentId: AGENT_ID, status: 'done', startedAt: new Date(), viaAccount: 'workspace', spend: { usd: 0.03, tokens: 10, billedToWorkspace: true } });
+        mockDb.seed(SCHEMA_TYPE.AI_USAGE, { feature: 'agent_run', costUsd: 0.03, totalTokens: 10, priced: true, billedToWorkspace: true, at: new Date() });
         const run = await start();
         const out = await execute(run);
 

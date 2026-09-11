@@ -1,7 +1,7 @@
 {
   "locale": "gr",
   "machineTranslated": false,
-  "updatedAt": "2026-09-10T12:54:12.743Z",
+  "updatedAt": "2026-09-11T03:48:07.352Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5192,6 +5192,28 @@
     "Ai.undo_window_closed_at": "The undo window closed at {at}",
     "Ai.undo_window_passed": "The undo window has passed.",
     "Audit.undo_until": "Undo until {t}",
-    "Audit.undo_window_passed": "The undo window has passed."
+    "Audit.undo_window_passed": "The undo window has passed.",
+    "Instance.agent_features": "By feature",
+    "Instance.agent_features_help": "Where this month's spend went, largest first.",
+    "Instance.agent_features_none": "No AI spend booked yet this month.",
+    "Instance.agent_feature_line": "${usd} · {share}% · {calls} calls",
+    "Instance.feature_agent_run": "Agent runs",
+    "Instance.feature_project_plan": "Project plan",
+    "Instance.feature_project_tasks": "Tasks into a project",
+    "Instance.feature_clarifier": "Brief and clarifying questions",
+    "Instance.feature_meeting_notes": "Meeting notes",
+    "Instance.feature_task_summary": "Task summary",
+    "Instance.feature_description": "Description writer",
+    "Instance.feature_task_category": "Task category",
+    "Instance.feature_task_estimate": "Task estimate",
+    "Instance.feature_workload_summary": "Workload summary",
+    "Instance.feature_ask": "Ask",
+    "Instance.feature_assist": "AI assist",
+    "Instance.feature_project_template": "Project templates",
+    "Instance.feature_portfolio_summary": "Portfolio summary",
+    "Instance.feature_page_compose": "Pages",
+    "Instance.feature_guide": "Project guide",
+    "Instance.feature_mcp_brief": "MCP brief",
+    "Instance.feature_unknown": "Untagged"
   }
 }

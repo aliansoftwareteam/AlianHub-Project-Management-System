@@ -9,6 +9,7 @@ const policy = require('../policy');
 const { rating: ratingOf } = require('../actions');
 const runs = require('../runs');
 const spendGuard = require('../spendGuard');
+const { FEATURES } = require('../../AICore/features');
 
 // The run engine as a LangGraph thread, one per run (thread_id = run id):
 //
@@ -97,7 +98,8 @@ async function analyse(state, config) {
     const { companyId, deps } = config.context;
     const { run, task } = state;
     const guard = spendGuard.forRun({ companyId, run, actor: deps && deps.actor });
-    const result = state.result || await orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: { ...MODEL_BUDGET, guard } });
+    const spendContext = { feature: FEATURES.AGENT_RUN, companyId, runId: String(run._id), userId: run.startedBy || null, account: run.viaAccount || 'workspace' };
+    const result = state.result || await orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: { ...MODEL_BUDGET, guard }, spend: spendContext });
     const spend = await runs.recordSpend(companyId, run, result.usage, result.model);
     if (result.status !== 'success') return { result, spend, outcome: result.reason || null, finalStatus: statusAfter(result) };
     const cap = Number(run.spendCapUsd) > 0 ? Number(run.spendCapUsd) : 0;

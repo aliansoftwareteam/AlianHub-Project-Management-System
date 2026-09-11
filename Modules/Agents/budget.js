@@ -6,11 +6,13 @@ const { removeCache } = require('../../utils/commonFunctions');
 const { ROLE_OWNER, ROLE_ADMIN } = require('../../Config/permissionGuard');
 const logger = require('../../Config/loggerConfig');
 const runs = require('./runs');
+const spend = require('../AICore/spend');
 
-// Company-level agent settings (undo window, monthly budget) and the budget
-// ledger over this month's runs. The company row is the store, as agentPolicy
-// already is; the provider block is read from the instance env and never
-// includes the key.
+// Company-level agent settings (undo window, monthly budget) and this month's
+// AI spend, read from the ledger every model call books into (AICore/spend),
+// so every feature counts, not only agent runs. The company row is the store,
+// as agentPolicy already is; the provider block is read from the instance env
+// and never includes the key.
 
 const DEFAULTS = Object.freeze({ undoHours: 24, monthlyBudgetUsd: 0 });
 const UNDO_HOURS_MIN = 1;
@@ -79,20 +81,19 @@ const provider = () => {
     };
 };
 
-/* Booked spend, plus what open runs hold for calls in flight. A reservation left
- * on a finished run is a leftover, never spend, so only open runs count. */
+/* Booked spend from the ledger, plus what open runs hold for calls in flight.
+ * A reservation left on a finished run is a leftover, never spend, so only
+ * open runs count. */
 const ledgerThisMonth = async (companyId, month) => {
     const from = new Date(`${month}-01T00:00:00.000Z`);
     const to = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1));
-    const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ startedAt: { $gte: from } }, 'startedAt status spend reservedUsd'] }, 'find').catch(() => []);
-    const inMonth = (rows || []).filter((r) => new Date(r.startedAt).getTime() < to.getTime());
-    return {
-        usedUsd: money(inMonth.reduce((s, r) => s + Number((r.spend && r.spend.usd) || 0), 0)),
-        reservedUsd: money(inMonth.filter((r) => runs.OPEN.includes(r.status)).reduce((s, r) => s + Number(r.reservedUsd || 0), 0)),
-    };
+    const [booked, open] = await Promise.all([
+        spend.monthly(companyId, month),
+        MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ startedAt: { $gte: from }, status: { $in: runs.OPEN } }, 'startedAt reservedUsd'] }, 'find').catch(() => []),
+    ]);
+    const inMonth = (open || []).filter((r) => new Date(r.startedAt).getTime() < to.getTime());
+    return { usedUsd: money(booked.usedUsd), reservedUsd: money(inMonth.reduce((s, r) => s + Number(r.reservedUsd || 0), 0)) };
 };
-
-const spentThisMonth = async (companyId, month) => (await ledgerThisMonth(companyId, month)).usedUsd;
 
 const alertsOf = (company, month) => {
     const a = (company && company.agentBudgetAlerts) || {};
@@ -104,11 +105,12 @@ const status = async (companyId) => {
     const month = runs.monthKey();
     const company = await readCompany(companyId);
     const { monthlyBudgetUsd } = settingsOf(company);
-    const usedUsd = await spentThisMonth(companyId, month);
+    const { usedUsd, features } = await spend.monthly(companyId, month);
     return {
-        month, usedUsd, budgetUsd: monthlyBudgetUsd,
+        month, usedUsd: money(usedUsd), budgetUsd: monthlyBudgetUsd,
         percent: monthlyBudgetUsd > 0 ? Math.round((usedUsd / monthlyBudgetUsd) * 100) : 0,
         alerts: alertsOf(company, month),
+        features,
     };
 };
 
@@ -134,29 +136,35 @@ const ownersAndAdmins = async (companyId) => {
     return [...new Set((rows || []).map((r) => String(r.userId)).filter(Boolean))];
 };
 
-const notify = async (companyId, run, s, level) => {
+/* `source` is the agent run that crossed the line, or `{ feature, userId }`
+ * for any other feature; the notification links what it has. */
+const notify = async (companyId, source, s, level) => {
     const recipients = await ownersAndAdmins(companyId);
     if (!recipients.length) return;
     const { handleNotificationtFun } = require('../notification/prepare-notification-data/controllerV2');
     const { Notification_key } = require('../../Config/notificationKey');
+    const src = source || {};
     const message = level === '100'
-        ? `Agent budget reached: $${s.usedUsd.toFixed(2)} of $${s.budgetUsd} used this month — new runs are refused until the budget is raised or the month ends.`
-        : `Agent budget at ${s.percent}%: $${s.usedUsd.toFixed(2)} of $${s.budgetUsd} used this month.`;
+        ? `AI budget reached: $${s.usedUsd.toFixed(2)} of $${s.budgetUsd} used this month — new agent runs are refused until the budget is raised or the month ends.`
+        : `AI budget at ${s.percent}%: $${s.usedUsd.toFixed(2)} of $${s.budgetUsd} used this month.`;
     await handleNotificationtFun({ body: {
         createdAt: new Date(), updatedAt: new Date(),
         key: Notification_key.TASK_NOTIFICATION, type: 'tasks', changeType: 'agent_budget',
-        changeData: { month: s.month, level, usedUsd: s.usedUsd, budgetUsd: s.budgetUsd, percent: s.percent, runId: String(run._id) },
+        changeData: {
+            month: s.month, level, usedUsd: s.usedUsd, budgetUsd: s.budgetUsd, percent: s.percent,
+            ...(src._id ? { runId: String(src._id) } : {}), feature: src.feature || 'agent_run',
+        },
         message,
-        companyId: String(companyId), projectId: String(run.projectId || ''), taskId: String(run.taskId || ''),
-        userId: String(run.agentId), assigneeUsers: recipients, notSeen: recipients,
+        companyId: String(companyId), projectId: String(src.projectId || ''), taskId: String(src.taskId || ''),
+        userId: String(src.agentId || src.userId || ''), assigneeUsers: recipients, notSeen: recipients,
         isSelected: false, folderId: '', sprintId: '', comments_id: '',
     } });
 };
 
-/* Called after a billed run's spend is written. The highest newly crossed
- * level is announced once; every crossed level is stamped so a month that
- * jumps straight past 100% does not announce 80% afterwards. */
-const alertIfCrossed = async (companyId, run) => {
+/* Called after a billed row is written. The highest newly crossed level is
+ * announced once; every crossed level is stamped so a month that jumps
+ * straight past 100% does not announce 80% afterwards. */
+const alertIfCrossed = async (companyId, source) => {
     const s = await status(companyId);
     if (!s.budgetUsd) return null;
     const crossed = LEVELS.filter((l) => s.percent >= Number(l) && !s.alerts[l]);
@@ -165,7 +173,7 @@ const alertIfCrossed = async (companyId, run) => {
     const next = { month: s.month, ...Object.fromEntries(LEVELS.map((l) => [l, s.alerts[l] ? new Date(s.alerts[l]) : (crossed.includes(l) ? at : null)])) };
     await writeCompany(companyId, { agentBudgetAlerts: next });
     const level = crossed[crossed.length - 1];
-    try { await notify(companyId, run, s, level); } catch (e) { logger.error(`[agent-budget] ${companyId}: alert at ${level}% failed: ${e.message}`); }
+    try { await notify(companyId, source, s, level); } catch (e) { logger.error(`[agent-budget] ${companyId}: alert at ${level}% failed: ${e.message}`); }
     return { level, at };
 };
 

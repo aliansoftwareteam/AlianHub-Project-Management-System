@@ -6,6 +6,7 @@ const { myCache } = require('../../Config/config');
 const logger = require('../../Config/loggerConfig');
 const R = require('./helpers/portfolioRules');
 const { getProvider, isAnyProviderConfigured } = require('../AIProjectGenerator/llmProvider');
+const { FEATURES } = require('../AICore/features');
 
 const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
@@ -192,6 +193,7 @@ exports.getPortfolioSummary = async (req, res) => {
                 messages: [{ role: 'user', content: JSON.stringify(summaryFacts(rollup)) }],
                 maxTokens: 400,
                 temperature: 0.2,
+                spend: { feature: FEATURES.PORTFOLIO_SUMMARY, companyId, userId: req.uid },
             });
         } catch (llmError) {
             logger.error(`getPortfolioSummary llm: ${llmError.message}`);

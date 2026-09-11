@@ -92,6 +92,7 @@ const dbCollections = {
     AGENT_FINDINGS: "agent_findings",
     AGENTS: "agents",
     AGENT_RUNS: "agent_runs",
+    AI_USAGE: "ai_usage",
     AGENT_PROPOSALS: "agent_proposals",
     CALLS: "calls",
     INTEGRATION_CONNECTIONS: "integration_connections",

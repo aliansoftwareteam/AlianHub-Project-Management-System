@@ -5,6 +5,7 @@
 const logger = require('../../Config/loggerConfig');
 const { tenantOf, TenantError } = require('../../Config/tenant');
 const { getProvider, isAnyProviderConfigured } = require('./llmProvider');
+const { FEATURES } = require('../AICore/features');
 const { tryParseJson } = require('./schemaValidator');
 const { _readPartial: readPartial } = require('./promptBuilder');
 const { usageFromResult, summarize } = require('./usage');
@@ -84,6 +85,7 @@ const generateGuide = async ({ approvedBrief, assumptions, plan, companyId, user
         jsonMode: true,
         maxTokens: MAX_TOKENS,
         temperature: 0.3,
+        spend: { feature: FEATURES.GUIDE, companyId, userId },
     });
     const parsed = tryParseJson(result.content);
     const guide = normaliseGuide(parsed.ok ? parsed.value : null);

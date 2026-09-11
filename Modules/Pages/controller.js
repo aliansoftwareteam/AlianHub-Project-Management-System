@@ -505,6 +505,8 @@ exports.composeWithAi = async (req, res) => {
         }
 
         const result = await composePage({
+            companyId,
+            userId: callerId(req),
             action,
             title: pageTitle,
             instruction,

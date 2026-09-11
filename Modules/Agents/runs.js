@@ -186,8 +186,10 @@ const stop = async (companyId, runId, byUserId) => {
     return { run: stopped };
 };
 
-/* Record tokens/cost on the run and the agent's month. Personal-account spend is
- * the developer's own and never billed to the workspace (27a). */
+/* Record tokens/cost on the run and the agent's month. The ledger row the budget
+ * reads was already booked by the core meter (AICore/spend) with this run's id;
+ * this only keeps the run's own figures, the agent's cap and the run-context alert.
+ * Personal-account spend is the developer's own and never billed to the workspace (27a). */
 const recordSpend = async (companyId, run, tokens, model) => {
     const priced = usage.summarize(tokens || {}, model);
     const billed = run.viaAccount !== 'personal' && run.viaAccount !== 'local';

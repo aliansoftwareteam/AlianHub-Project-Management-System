@@ -24,6 +24,8 @@ const { categoriseTask } = require('./taskCategory');
 // reason the description writer does it: a missing or broken provider module
 // should degrade to "AI is not integrated" rather than take this controller
 // down at load time.
+const { FEATURES } = require('../AICore/features');
+
 let providerFactory = null;
 try {
     providerFactory = require('../AIProjectGenerator/llmProvider');
@@ -57,7 +59,7 @@ function isAiConfigured() {
  * (Providers that reject an explicit temperature, such as OpenAI's reasoning
  * models, already drop it inside their own implementation.)
  */
-function askProvider(messages, { jsonMode = false } = {}) {
+function askProvider(messages, { jsonMode = false, spend } = {}) {
     if (!providerFactory || typeof providerFactory.getProvider !== 'function') {
         return Promise.reject(new Error('No LLM provider is available.'));
     }
@@ -69,7 +71,7 @@ function askProvider(messages, { jsonMode = false } = {}) {
     } catch (error) {
         return Promise.reject(error);
     }
-    return provider.chat({ messages, jsonMode, temperature: 1 });
+    return provider.chat({ messages, jsonMode, temperature: 1, spend });
 }
 
 /**
@@ -129,7 +131,7 @@ exports.generatePrompt = (req,res) => {
                         try {
                             // No jsonMode here, matching the old direct call: only the
                             // streamed prompts ever asked for JSON-only output.
-                            askProvider(messages).then(async(result) => {
+                            askProvider(messages, { spend: { feature: FEATURES.ASSIST, companyId: req.headers['companyid'], userId: req.body.userId } }).then(async(result) => {
                                 const userUpdate = await exports.limitCountUpdate(req.body.userId,req.body.companyId,(result && result.totalTokens) || 0);
                                 res.send({status: true, statusText: (result && result.content) || '',userUpdate:userUpdate});
                             }).catch((error) => {
@@ -444,6 +446,8 @@ exports.writeDescription = async (req, res) => {
         } = req.body || {};
 
         const result = await generateDescription({
+            companyId,
+            userId: req.uid,
             title,
             taskType,
             existingDescription,
@@ -494,7 +498,7 @@ exports.generateWithStream = (messages,userId,companyId,uniqueUserId,eventId) =>
             // part of the contract with the frontend. The factory holds that
             // guarantee on every provider — natively where one exists, by
             // instruction where it does not.
-            askProvider(messages, { jsonMode: true })
+            askProvider(messages, { jsonMode: true, spend: { feature: FEATURES.ASSIST, companyId, userId } })
             .then(async(result) => {
                 const fullText = (result && result.content) || '';
 
