@@ -340,6 +340,70 @@ describe('access — only owners and admins change the company', () => {
     });
 });
 
+describe('access — plan, billing and count fields stay with the server', () => {
+    const readCompany = async (session) => (await session.api.post('/api/v1/admin/company', { companyIds: [state.companyId] })).body[0];
+    const serverFields = (company) => ({
+        planFeature: company.planFeature,
+        subscriptionRenewalDate: company.subscriptionRenewalDate,
+        companyData: company.companyData,
+        trackerUsers: company.trackerUsers,
+        userId: company.userId,
+    });
+
+    it.each([
+        ['owner', '/api/v1/company', (company) => ({ updateObject: { 'planFeature.users': company.planFeature.users } })],
+        ['owner', '/api/v1/admin/company', () => ({ updateObject: { subscriptionRenewalDate: 4102444800 } })],
+        ['admin', '/api/v1/company', () => ({ key: '$inc', updateObject: { 'companyData.$[elementIndex].users': 0 }, arrayFilters: [{ 'elementIndex.users': { $exists: true } }] })],
+        ['admin', '/api/v1/admin/company', (company) => ({ updateObject: { trackerUsers: company.trackerUsers ?? 0 } })],
+        ['owner', '/api/v1/company-invitation', (company) => ({ updateObject: { objId: { userId: String(company.userId) }, companyData: company.companyData }, companyId: state.companyId })],
+    ])('refuses the %s writing server-controlled fields through %s', async (role, path, bodyFor) => {
+        const session = await loginAs(role);
+        const before = await readCompany(session);
+        const res = await session.api.put(path, bodyFor(before));
+        expect(res.status).toBe(403);
+        expect(res.body.status).toBe(false);
+        expect(serverFields(await readCompany(session))).toEqual(serverFields(before));
+    });
+
+    it('lets the owner save the whole company details form', async () => {
+        const owner = await loginAs('owner');
+        const before = await readCompany(owner);
+        const res = await owner.api.put('/api/v1/company', {
+            updateObject: {
+                Cst_profileImage: before.Cst_profileImage || '',
+                Cst_CompanyName: before.Cst_CompanyName,
+                Cst_Phone: before.Cst_Phone,
+                Cst_Country: before.Cst_Country,
+                Cst_DialCode: before.Cst_DialCode,
+                Cst_State: before.Cst_State || '',
+                Cst_City: before.Cst_City || '',
+                Cst_LogTimeDays: before.Cst_LogTimeDays,
+                trackerEstimateLimit: before.trackerEstimateLimit !== false,
+                Cst_countryCode: before.Cst_countryCode || '',
+                Cst_stateCode: before.Cst_stateCode || '',
+                updatedAt: new Date().toISOString(),
+            },
+        });
+        expect(res.status).toBe(200);
+        expect(res.body.Cst_CompanyName).toBe(before.Cst_CompanyName);
+    });
+
+    it('lets an owner record themselves as the company owner through the invitation route', async () => {
+        const owner = await loginAs('owner');
+        const res = await owner.api.put('/api/v1/company-invitation', { updateObject: { objId: { userId: owner.uid } }, companyId: state.companyId });
+        expect(res.status).toBe(200);
+        expect(String((await readCompany(owner)).userId)).toBe(owner.uid);
+    });
+
+    it('refuses an admin recording themselves as the company owner', async () => {
+        const admin = await loginAs('admin');
+        const before = await readCompany(admin);
+        const res = await admin.api.put('/api/v1/company-invitation', { updateObject: { objId: { userId: admin.uid } }, companyId: state.companyId });
+        expect(res.status).toBe(403);
+        expect(String((await readCompany(admin)).userId)).toBe(String(before.userId));
+    });
+});
+
 describe('access — the invitation check stays inside the signed-in company', () => {
     it('refuses probing another company', async () => {
         const admin = await loginAs('admin');

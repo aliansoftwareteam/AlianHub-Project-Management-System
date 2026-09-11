@@ -36,23 +36,47 @@ const scopeCompanyPipeline = (findQuery, own) => {
 const PROJECT_TYPE_FIELDS = ['projectCount.privateCount', 'projectCount.publicCount'];
 const SEAT_FIELD = 'companyData.$[elementIndex].users';
 const SEAT_ARRAY_FILTERS = JSON.stringify([{ 'elementIndex.users': { $exists: true } }]);
+const COMPANY_DETAIL_FIELDS = ['Cst_profileImage', 'Cst_CompanyName', 'Cst_Phone', 'Cst_Country', 'Cst_DialCode', 'Cst_State', 'Cst_City',
+    'Cst_LogTimeDays', 'Cst_countryCode', 'Cst_stateCode', 'trackerEstimateLimit', 'updatedAt'];
 
-// The only company writes the app sends for someone who is not an owner or admin: moving a
-// project between the private and public counts, and releasing a seat after removing a member.
-const memberCompanyUpdate = (body) => {
-    const { key, updateObject, arrayFilters } = body || {};
-    if (key !== '$inc' || !isPlainContainer(updateObject) || Array.isArray(updateObject)) return null;
+const isPlainObject = (value) => isPlainContainer(value) && !Array.isArray(value);
+const hasNoArrayFilters = (arrayFilters) => arrayFilters === undefined || arrayFilters === null || (Array.isArray(arrayFilters) && arrayFilters.length === 0);
+
+const isDetailsUpdate = ({ key, updateObject, arrayFilters }) => {
+    const fields = Object.keys(updateObject);
+    return (!key || key === '$set') && hasNoArrayFilters(arrayFilters) && fields.length > 0
+        && fields.every((field) => COMPANY_DETAIL_FIELDS.includes(field));
+};
+
+const isOwnerClaim = ({ key, updateObject, arrayFilters }) => {
+    const claim = updateObject.objId;
+    return !key && hasNoArrayFilters(arrayFilters) && Object.keys(updateObject).join() === 'objId'
+        && isPlainObject(claim) && Object.keys(claim).join() === 'userId'
+        && typeof claim.userId === 'string' && OBJECT_ID_PATTERN.test(claim.userId);
+};
+
+const countUpdateKind = ({ key, updateObject, arrayFilters }) => {
+    if (key !== '$inc') return null;
     const entries = Object.entries(updateObject);
-    const hasArrayFilters = Array.isArray(arrayFilters) && arrayFilters.length > 0;
     const fields = entries.map(([field]) => field).sort();
-    if (!hasArrayFilters && entries.length === 2 && fields.join() === [...PROJECT_TYPE_FIELDS].sort().join()
+    if (hasNoArrayFilters(arrayFilters) && entries.length === 2 && fields.join() === [...PROJECT_TYPE_FIELDS].sort().join()
         && entries.every(([, step]) => step === 1 || step === -1) && entries[0][1] + entries[1][1] === 0) {
         return 'projectType';
     }
     if (entries.length !== 1 || entries[0][1] !== -1) return null;
-    if (fields[0] === 'trackerUsers' && !hasArrayFilters) return 'seatRelease';
+    if (fields[0] === 'trackerUsers' && hasNoArrayFilters(arrayFilters)) return 'seatRelease';
     if (fields[0] === SEAT_FIELD && JSON.stringify(arrayFilters) === SEAT_ARRAY_FILTERS) return 'seatRelease';
     return null;
 };
 
-module.exports = { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, memberCompanyUpdate };
+// Every company write a client may send, whatever its role: the Settings > Company form, the
+// private/public project count swap, a seat release after removing a member, and an invited owner
+// recording themselves. Plan, billing, seat, storage, usage and ownership fields stay server-side.
+const companyUpdateKind = (body) => {
+    if (!body || !isPlainObject(body.updateObject)) return null;
+    if (isDetailsUpdate(body)) return 'details';
+    if (isOwnerClaim(body)) return 'ownerClaim';
+    return countUpdateKind(body);
+};
+
+module.exports = { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, companyUpdateKind };

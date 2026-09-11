@@ -6,17 +6,31 @@ const { default: mongoose } = require("mongoose");
 const { replaceObjectKey } = require("../../Auth/helper");
 const socketEmitter = require("../../../event/socketEventEmitter");
 const { isInstanceOwner } = require("../../Instance/guard");
-const { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, memberCompanyUpdate } = require("../helpers/companyAccessRules");
-const { getRoleType, evaluatePermission, isPrivileged, isWritable } = require("../../../Config/permissionGuard");
+const { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, companyUpdateKind } = require("../helpers/companyAccessRules");
+const { getRoleType, evaluatePermission, isPrivileged, isWritable, ROLE_OWNER } = require("../../../Config/permissionGuard");
 
-const mayUpdateCompany = async (companyId, req) => {
-    const roleType = await getRoleType(companyId, req.uid);
-    if (roleType === null) return false;
-    if (isPrivileged(roleType)) return true;
-    const kind = memberCompanyUpdate(req.body);
-    if (kind === 'projectType') return true;
-    if (kind !== 'seatRelease') return false;
-    return isWritable(await evaluatePermission(companyId, req.uid, 'settings.settings_member_list').catch(() => null));
+const managesMembers = async (companyId, uid) => isWritable(await evaluatePermission(companyId, uid, 'settings.settings_member_list').catch(() => null));
+
+const MAY_SEND = {
+    details: ({ roleType }) => isPrivileged(roleType),
+    projectType: () => true,
+    seatRelease: ({ roleType, companyId, req }) => isPrivileged(roleType) || managesMembers(companyId, req.uid),
+    ownerClaim: ({ roleType, req }) => roleType === ROLE_OWNER && req.body.updateObject.objId.userId === String(req.uid),
+};
+
+const ROLE_REFUSAL = {
+    ownerClaim: 'Only an owner can record themselves as the company owner.',
+};
+
+const companyWrite = (companyId, body, kind, uid) => {
+    if (kind === 'ownerClaim') {
+        return [{ _id: companyId }, { $set: { userId: new mongoose.Types.ObjectId(String(uid)) } }, { returnDocument: 'after' }];
+    }
+    const data = body.key
+        ? [{ _id: companyId }, { [body.key]: body.updateObject }]
+        : [{ _id: companyId }, { $set: body.updateObject }, { returnDocument: 'after' }];
+    if (body.arrayFilters?.length) data.push({ arrayFilters: body.arrayFilters });
+    return data;
 };
 
 const loadOwnCompanyIds = async (uid) => {
@@ -42,43 +56,20 @@ exports.updateCompany = async(req,res) => {
             return res.status(400).json({message: 'Update Object is Required'});
         }
 
-        if (!(await mayUpdateCompany(companyId, req))) {
-            return res.status(403).json({ status: false, message: 'Only an owner or an admin can change the company.' });
+        const kind = companyUpdateKind(req.body);
+        if (!kind) {
+            return res.status(403).json({ status: false, message: 'Only the company details can be changed here. Plan, billing, seat, storage and usage fields are managed by the server.' });
         }
 
-        let key;
-        let data;
-        if (req.body.key) {
-            key = req.body.key;
-            data =  [
-                { _id: companyId },
-                {   
-                    [key]: req.body.updateObject
-                },
-            ]
-        } else {
-            key = '$set'
-            data =  [
-                { _id: companyId }, 
-                {   
-                    [key]: req.body.updateObject
-                },
-                {
-                    returnDocument : 'after'
-                }
-            ]
+        const roleType = await getRoleType(companyId, req.uid);
+        if (roleType === null || !(await MAY_SEND[kind]({ roleType, companyId, req }))) {
+            return res.status(403).json({ status: false, message: ROLE_REFUSAL[kind] || 'Only an owner or an admin can change the company.' });
         }
 
-        if (req.body.arrayFilters?.length) {
-            let arrObj = {arrayFilters: req.body.arrayFilters}
-            data.push(arrObj)
-        }
-
-        const dataConvert = replaceObjectKey(data,"objId")        
-        let mongoObj = {
+        const mongoObj = {
             type: SCHEMA_TYPE.COMPANIES,
-            data: dataConvert
-        }
+            data: companyWrite(companyId, req.body, kind, req.uid)
+        };
 
         const company = await MongoDbCrudOpration('global', mongoObj, 'findOneAndUpdate');
 

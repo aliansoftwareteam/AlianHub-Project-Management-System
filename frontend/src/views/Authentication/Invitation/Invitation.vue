@@ -196,7 +196,7 @@ const submit = async () => {
         if (!result.data.status) { logOut({ islogOut: true }); banner.value = t("Auth.server_error"); return; }
         if (result.data.data?.roleType === ROLE_OWNER) {
             await apiRequestWithoutCompnay("put", env.COMPANYINVITATION, {
-                updateObject: { objId: { userId: response.data.data._id }, companyData: [{ users: 1 }] },
+                updateObject: { objId: { userId: response.data.data._id } },
                 companyId: companyIdRoute.value
             }).catch((error) => console.error(error));
             try { addSubscription(companyIdRoute.value, response); } catch { /* optional plugin */ }

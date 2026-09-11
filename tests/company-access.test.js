@@ -11,10 +11,10 @@ const mongoose = require('mongoose');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
-const { setMiddlewareV2 } = require('../Config/setMiddleware');
+const { setMiddlewareV2, setMiddlewareWithCV2 } = require('../Config/setMiddleware');
 const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const { signSession, startApp } = require('./fixtures/sessionApp');
-const { scopeCompanyPipeline, allowedCompanyIds, memberCompanyUpdate } = require('../Modules/Company/helpers/companyAccessRules');
+const { scopeCompanyPipeline, allowedCompanyIds, companyUpdateKind } = require('../Modules/Company/helpers/companyAccessRules');
 const ctrl = require('../Modules/Company/controller/updateCompany');
 
 const COMPANY = '6f0000000000000000000c01';
@@ -32,9 +32,11 @@ let app;
 
 beforeAll(async () => {
     app = await startApp((server) => {
+        setMiddlewareWithCV2(server);
         setMiddlewareV2(server);
         server.post('/api/v1/admin/company', ctrl.getCompany);
         server.post('/api/v1/admin/company/find', ctrl.getCompanyByAggregate);
+        server.put('/api/v1/company', ctrl.updateCompany);
         server.put('/api/v1/admin/company', ctrl.updateCompany);
         server.put('/api/v1/company-invitation', ctrl.updateCompany);
     });
@@ -138,19 +140,18 @@ const SEAT_RELEASE = { key: '$inc', updateObject: { 'companyData.$[elementIndex]
 const TRACKER_SEAT_RELEASE = { key: '$inc', updateObject: { trackerUsers: -1 } };
 const RENAME = { updateObject: { Cst_CompanyName: 'Taken over' } };
 
-describe('memberCompanyUpdate', () => {
+describe('companyUpdateKind', () => {
     it('recognises the project type swap in both directions', () => {
-        expect(memberCompanyUpdate(SWAP_TO_PRIVATE)).toBe('projectType');
-        expect(memberCompanyUpdate({ key: '$inc', updateObject: { 'projectCount.publicCount': 1, 'projectCount.privateCount': -1 } })).toBe('projectType');
+        expect(companyUpdateKind(SWAP_TO_PRIVATE)).toBe('projectType');
+        expect(companyUpdateKind({ key: '$inc', updateObject: { 'projectCount.publicCount': 1, 'projectCount.privateCount': -1 } })).toBe('projectType');
     });
 
     it('recognises the seat releases the members page sends', () => {
-        expect(memberCompanyUpdate(SEAT_RELEASE)).toBe('seatRelease');
-        expect(memberCompanyUpdate(TRACKER_SEAT_RELEASE)).toBe('seatRelease');
+        expect(companyUpdateKind(SEAT_RELEASE)).toBe('seatRelease');
+        expect(companyUpdateKind(TRACKER_SEAT_RELEASE)).toBe('seatRelease');
     });
 
     it.each([
-        [RENAME],
         [{ key: '$set', updateObject: SWAP_TO_PRIVATE.updateObject }],
         [{ key: '$inc', updateObject: { 'projectCount.privateCount': 5, 'projectCount.publicCount': -5 } }],
         [{ key: '$inc', updateObject: { 'projectCount.privateCount': 1, 'projectCount.publicCount': 1 } }],
@@ -162,7 +163,7 @@ describe('memberCompanyUpdate', () => {
         [{ key: '$inc', updateObject: { trackerUsers: -10 } }],
         [{ key: '$inc', updateObject: { 'projectCount.privateCount': '1', 'projectCount.publicCount': '-1' } }],
     ])('rejects %j', (body) => {
-        expect(memberCompanyUpdate(body)).toBe(null);
+        expect(companyUpdateKind(body)).toBe(null);
     });
 });
 
@@ -204,6 +205,116 @@ describe('PUT company update is for owners and admins', () => {
     it('refuses a seat release from a member without member-list write access', async () => {
         evaluatePermission.mockImplementation(async () => false);
         const res = await put('/api/v1/admin/company', MEMBER, SEAT_RELEASE);
+        expect(res.status).toBe(403);
+        expect(callsOf('findOneAndUpdate')).toHaveLength(0);
+    });
+});
+
+const OWNER_CLAIM = { updateObject: { objId: { userId: OWNER } }, companyId: COMPANY };
+const COMPANY_DETAILS_FORM = {
+    updateObject: {
+        Cst_profileImage: 'companyIcon/logo.png',
+        Cst_CompanyName: 'Acme',
+        Cst_Phone: '5550100',
+        Cst_Country: 'India',
+        Cst_DialCode: { name: 'India', dialCode: '+91', code: 'IN' },
+        Cst_State: 'Gujarat',
+        Cst_City: 'Surat',
+        Cst_LogTimeDays: '8',
+        trackerEstimateLimit: true,
+        Cst_countryCode: 'IN',
+        Cst_stateCode: 'GJ',
+        updatedAt: '2026-09-11T00:00:00.000Z',
+    },
+};
+const REFUSED_WRITES = [
+    ['the plan', { updateObject: { planFeature: { planName: 'enterPrise', users: null } } }],
+    ['a plan limit', { updateObject: { 'planFeature.users': 1000 } }],
+    ['the subscription', { updateObject: { isFree: false, subscriptionData: { users: 500 }, SubcriptionId: 'sub_1' } }],
+    ['the billing customer', { updateObject: { customerId: 'cus_1', billingDetails: { email: 'billing@example.test' } } }],
+    ['the payment state', { updateObject: { isPaymentFailed: false, paymentFailed_error_text: '' } }],
+    ['the renewal date', { updateObject: { subscriptionRenewalDate: 4102444800, isPlanShchedule: false } }],
+    ['the disabled flags', { updateObject: { isDisable: false, isInactive: false } }],
+    ['the seat allowance', { updateObject: { availableUser: 999, totalData: { users: 999 } } }],
+    ['the storage size', { updateObject: { bucketSize: 0 } }],
+    ['the seat count', { updateObject: { companyData: [{ users: 1 }] } }],
+    ['a seat count jump', { key: '$inc', updateObject: { 'companyData.$[elementIndex].users': -50 }, arrayFilters: SEAT_RELEASE.arrayFilters }],
+    ['the tracker seats', { updateObject: { trackerUsers: 0 } }],
+    ['the project counts', { updateObject: { projectCount: { projectCount: 0, privateCount: 0, publicCount: 0 } } }],
+    ['the AI usage', { key: '$inc', updateObject: { aiTotalRequestedCount: -100000 } }],
+    ['the company owner as a plain field', { updateObject: { userId: OWNER } }],
+    ['a plan field removal', { key: '$unset', updateObject: { planFeature: '' } }],
+    ['a detail next to a plan field', { updateObject: { Cst_CompanyName: 'Acme', availableUser: 999 } }],
+    ['a detail with array filters', { ...COMPANY_DETAILS_FORM, arrayFilters: [{ 'x.y': 1 }] }],
+    ['a nested detail path', { updateObject: { 'Cst_DialCode.code': 'US' } }],
+    ['the owner claim with a seat reset', { updateObject: { objId: { userId: OWNER }, companyData: [{ users: 1 }] } }],
+];
+
+describe('companyUpdateKind for owners and admins', () => {
+    it('recognises the company details form, with or without an explicit $set', () => {
+        expect(companyUpdateKind(COMPANY_DETAILS_FORM)).toBe('details');
+        expect(companyUpdateKind({ key: '$set', updateObject: { Cst_CompanyName: 'Acme' } })).toBe('details');
+    });
+
+    it('recognises the owner claim the invitation page sends', () => {
+        expect(companyUpdateKind(OWNER_CLAIM)).toBe('ownerClaim');
+    });
+
+    it.each(REFUSED_WRITES)('does not recognise a write to %s', (label, body) => {
+        expect(companyUpdateKind(body)).toBe(null);
+    });
+});
+
+describe('PUT company update never takes server-controlled fields', () => {
+    const put = (path, uid, body) => app.call('PUT', path, { token: signSession(uid, [COMPANY]), companyId: COMPANY, body });
+
+    describe.each([['owner', OWNER], ['admin', ADMIN]])('as the %s', (role, uid) => {
+        it.each(REFUSED_WRITES)('refuses writing %s', async (label, body) => {
+            const res = await put('/api/v1/company', uid, body);
+            expect(res.status).toBe(403);
+            expect(res.body).toEqual({ status: false, message: expect.any(String) });
+            expect(callsOf('findOneAndUpdate')).toHaveLength(0);
+        });
+
+        it('saves the company details form', async () => {
+            const res = await put('/api/v1/company', uid, COMPANY_DETAILS_FORM);
+            expect(res.status).toBe(200);
+            expect(callsOf('findOneAndUpdate')[0][1].data[1]).toEqual({ $set: COMPANY_DETAILS_FORM.updateObject });
+        });
+
+        it('releases a seat and switches a project between private and public', async () => {
+            expect((await put('/api/v1/company', uid, SEAT_RELEASE)).status).toBe(200);
+            expect((await put('/api/v1/company', uid, TRACKER_SEAT_RELEASE)).status).toBe(200);
+            expect((await put('/api/v1/company', uid, SWAP_TO_PRIVATE)).status).toBe(200);
+        });
+    });
+
+    it.each(['/api/v1/company', '/api/v1/admin/company', '/api/v1/company-invitation'])('refuses the owner changing the plan through %s', async (path) => {
+        const res = await put(path, OWNER, { updateObject: { planFeature: { users: null } } });
+        expect(res.status).toBe(403);
+        expect(callsOf('findOneAndUpdate')).toHaveLength(0);
+    });
+});
+
+describe('PUT /api/v1/company-invitation owner claim', () => {
+    const put = (uid, body) => app.call('PUT', '/api/v1/company-invitation', { token: signSession(uid, [COMPANY]), body });
+
+    it('records the invited owner on the company without touching the seat count', async () => {
+        const res = await put(OWNER, OWNER_CLAIM);
+        expect(res.status).toBe(200);
+        const [filter, update] = callsOf('findOneAndUpdate')[0][1].data;
+        expect(filter).toEqual({ _id: COMPANY });
+        expect(update).toEqual({ $set: { userId: new mongoose.Types.ObjectId(OWNER) } });
+    });
+
+    it('refuses an admin claiming the company', async () => {
+        const res = await put(ADMIN, { ...OWNER_CLAIM, updateObject: { objId: { userId: ADMIN } } });
+        expect(res.status).toBe(403);
+        expect(callsOf('findOneAndUpdate')).toHaveLength(0);
+    });
+
+    it('refuses an owner recording someone else', async () => {
+        const res = await put(OWNER, { ...OWNER_CLAIM, updateObject: { objId: { userId: ADMIN } } });
         expect(res.status).toBe(403);
         expect(callsOf('findOneAndUpdate')).toHaveLength(0);
     });
