@@ -4,12 +4,12 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Modules/Agents/engine/orchestrator', () => ({ gather: jest.fn(async () => ({ status: 'gathered', context: {} })), analyse: jest.fn() }));
 jest.mock('../Modules/Agents/engine/findingMemory', () => ({ load: jest.fn(async () => new Map()), decide: jest.fn(), record: jest.fn(), touch: jest.fn() }));
-jest.mock('../Modules/AIProjectGenerator/usage', () => ({ checkConfiguredModelPriced: () => ({ ok: true, reason: '' }), unpricedMessage: (m) => `No price on file for ${m}`, UNPRICED_MODEL: 'unpriced_model', summarize: jest.fn(() => ({ costUsd: 0, totalTokens: 0, model: 'm' })) }));
+jest.mock('../Modules/AICore/usage', () => ({ checkConfiguredModelPriced: () => ({ ok: true, reason: '' }), unpricedMessage: (m) => `No price on file for ${m}`, UNPRICED_MODEL: 'unpriced_model', summarize: jest.fn(() => ({ costUsd: 0, totalTokens: 0, model: 'm' })) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const orchestrator = require('../Modules/Agents/engine/orchestrator');
 const memory = require('../Modules/Agents/engine/findingMemory');
-const { summarize } = require('../Modules/AIProjectGenerator/usage');
+const { summarize } = require('../Modules/AICore/usage');
 const runs = require('../Modules/Agents/runs');
 const { rating } = require('../Modules/Agents/actions');
 
@@ -41,7 +41,7 @@ const skillResult = (changes) => orchestrator.analyse.mockResolvedValue({ status
 const runRow = (id) => mockDb.store[SCHEMA_TYPE.AGENT_RUNS].find((r) => String(r._id) === String(id));
 const decisionsOf = (id) => runRow(id).decisions.map(({ action, decision, reason, rating: r }) => ({ action, decision, reason, rating: r }));
 
-beforeAll(() => require('../Modules/Agents/engine/persistence').useInMemory());
+beforeAll(() => require('../Modules/AICore/persistence').useInMemory());
 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });

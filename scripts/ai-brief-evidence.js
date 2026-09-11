@@ -24,7 +24,7 @@ const flag = (name) => {
 
 require('dotenv').config({ path: flag('--env') || path.join(ROOT, '.env') });
 
-const { isAnyProviderConfigured } = require(path.join(ROOT, 'Modules/AIProjectGenerator/llmProvider'));
+const { isAnyProviderConfigured } = require(path.join(ROOT, 'Modules/AICore/llmProvider'));
 const clarifier = require(path.join(ROOT, 'Modules/AIProjectGenerator/clarifier'));
 const { COVERAGE_POINTS } = require(path.join(ROOT, 'Modules/AIProjectGenerator/schemaValidator'));
 

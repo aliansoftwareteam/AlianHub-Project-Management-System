@@ -1,5 +1,5 @@
 const mockChat = jest.fn();
-jest.mock('../Modules/AIProjectGenerator/llmProvider', () => ({
+jest.mock('../Modules/AICore/llmProvider', () => ({
     getProvider: () => ({ name: 'fake', chat: (...a) => mockChat(...a) }),
     isAnyProviderConfigured: () => true,
 }));

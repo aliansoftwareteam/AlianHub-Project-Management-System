@@ -1,7 +1,7 @@
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 
 const logger = require('../Config/loggerConfig');
-const persistence = require('../Modules/Agents/engine/persistence');
+const persistence = require('../Modules/AICore/persistence');
 
 const C1 = '6f0000000000000000000c01';
 const C2 = '6f0000000000000000000c02';

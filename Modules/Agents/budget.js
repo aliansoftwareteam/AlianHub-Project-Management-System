@@ -67,13 +67,13 @@ const updateSettings = async (companyId, body) => {
 };
 
 const configuredProviderName = () => {
-    try { return require('../AIProjectGenerator/llmProvider').getProvider().name; } catch (e) { return null; }
+    try { return require('../AICore/llmProvider').getProvider().name; } catch (e) { return null; }
 };
 
 const provider = () => {
     const selected = (process.env.LLM_PROVIDER || '').trim().toLowerCase();
     const name = configuredProviderName() || (PROVIDER_KEYS[selected] ? selected : null);
-    const usage = require('../AIProjectGenerator/usage');
+    const usage = require('../AICore/usage');
     const model = usage.configuredModel();
     return {
         name, hasKey: Boolean(name && process.env[PROVIDER_KEYS[name]]), region: (process.env.LLM_REGION || '').trim() || null,

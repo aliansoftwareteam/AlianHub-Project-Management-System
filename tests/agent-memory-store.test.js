@@ -5,7 +5,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const logger = require('../Config/loggerConfig');
-const persistence = require('../Modules/Agents/engine/persistence');
+const persistence = require('../Modules/AICore/persistence');
 const memory = require('../Modules/Agents/memory');
 
 const C1 = '6f0000000000000000000c01';

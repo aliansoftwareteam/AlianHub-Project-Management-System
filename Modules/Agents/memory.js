@@ -1,11 +1,11 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
-const persistence = require('./engine/persistence');
+const persistence = require('../AICore/persistence');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const { COVERAGE_POINT_LABELS } = require('../AIProjectGenerator/promptBuilder');
-const { hasInstruction } = require('../AIProjectGenerator/instructionGuard');
+const { hasInstruction } = require('../AICore/instructionGuard');
 
 // What the workspace already decided and what each person prefers, on the
 // LangGraph store, one instance per company database. Rows are keyed for

@@ -17,11 +17,11 @@ jest.mock('../Modules/Agents/memory', () => ({
     rememberApprovedChanges: jest.fn(async () => null),
 }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(async () => ['6a9954186dd786246031e47b']) }));
-jest.mock('../Modules/AIProjectGenerator/usage', () => ({ summarize: jest.fn(() => ({ costUsd: 0.01, totalTokens: 100, model: 'm' })) }));
+jest.mock('../Modules/AICore/usage', () => ({ summarize: jest.fn(() => ({ costUsd: 0.01, totalTokens: 100, model: 'm' })) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const logger = require('../Config/loggerConfig');
-const persistence = require('../Modules/Agents/engine/persistence');
+const persistence = require('../Modules/AICore/persistence');
 const orchestrator = require('../Modules/Agents/engine/orchestrator');
 const findingMemory = require('../Modules/Agents/engine/findingMemory');
 const actions = require('../Modules/Agents/actions');

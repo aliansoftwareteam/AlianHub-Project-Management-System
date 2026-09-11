@@ -7,13 +7,13 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 
 const multer = require('multer');
 
-const { getProvider, isAnyProviderConfigured } = require('./llmProvider');
+const { getProvider, isAnyProviderConfigured } = require('../AICore/llmProvider');
 const { FEATURES } = require('../AICore/features');
 const { COVERAGE_POINTS, PlanSchema, ClarifyResponseSchema, TasksPlanSchema, TasksResponseSchema, TasksOnlyPlanSchema, TasksOnlyResponseSchema, SprintsOnlyPlanSchema, SprintsOnlyResponseSchema, sanitizeMemberIds, sanitizeTaskPlanMemberIds, tryParseJson } = require('./schemaValidator');
 const { buildSystemPrompt, buildUserMessage, buildRepairPrompt, buildTasksSystemPrompt, buildTasksUserMessage } = require('./promptBuilder');
 const { briefUpload, extractFromFile, safeUnlink, MAX_BRIEF_BYTES } = require('./briefExtractor');
 const { attachSplit } = require('./planSplit');
-const { usageFromResult, addUsage, summarize } = require('./usage');
+const { usageFromResult, addUsage, summarize } = require('../AICore/usage');
 const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
 const orchestrator = require('./orchestrator');

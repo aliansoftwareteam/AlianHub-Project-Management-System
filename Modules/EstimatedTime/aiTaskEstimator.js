@@ -2,7 +2,7 @@
  * AI-powered task time estimator.
  *
  * Given a task, asks the configured LLM (Anthropic preferred, OpenAI/DeepSeek
- * fallback — reuses the AIProjectGenerator/llmProvider factory) for an
+ * fallback — reuses the AICore/llmProvider factory) for an
  * estimated completion time. By default the target is a human DEVELOPER's
  * effort (configurable via ESTIMATE_TARGET=human|agent). The point estimate
  * is persisted to `tasks.totalEstimatedTime` (minutes) and broadcast over
@@ -37,7 +37,7 @@ const { FEATURES } = require('../AICore/features');
 
 let providerFactory = null;
 try {
-    providerFactory = require('../AIProjectGenerator/llmProvider');
+    providerFactory = require('../AICore/llmProvider');
 } catch (_e) {
     providerFactory = null;
 }

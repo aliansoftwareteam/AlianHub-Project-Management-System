@@ -6,12 +6,12 @@ jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), 
 jest.mock('../Config/permissionGuard', () => ({ ROLE_OWNER: 1, ROLE_ADMIN: 2, getRoleType: jest.fn(async (c, uid) => (uid === 'member1' ? 3 : 1)), isPrivileged: (r) => r === 1 || r === 2 }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async (req) => (req.agent ? { kind: 'agent', userId: req.uid, agentId: 'a1' } : { kind: 'human', userId: req.uid })), isAgent: (a) => a.kind === 'agent' }));
-jest.mock('../Modules/AIProjectGenerator/llmProvider', () => ({ getProvider: jest.fn(() => { throw new Error('not configured'); }) }));
+jest.mock('../Modules/AICore/llmProvider', () => ({ getProvider: jest.fn(() => { throw new Error('not configured'); }) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { dbCollections } = require('../Config/collections');
 const { removeCache } = require('../utils/commonFunctions');
-const { getProvider } = require('../Modules/AIProjectGenerator/llmProvider');
+const { getProvider } = require('../Modules/AICore/llmProvider');
 const budget = require('../Modules/Agents/budget');
 const ctrl = require('../Modules/Agents/controller');
 

@@ -7,14 +7,14 @@ jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async (req) 
 jest.mock('../Modules/Automations/engine/tools', () => ({ getTask: jest.fn() }));
 jest.mock('../Modules/Agents/engine/orchestrator', () => ({ gather: jest.fn(async () => ({ status: 'gathered', context: {} })), analyse: jest.fn() }));
 jest.mock('../Modules/Agents/engine/findingMemory', () => ({ load: jest.fn(async () => new Map()), decide: jest.fn(), record: jest.fn(), touch: jest.fn() }));
-jest.mock('../Modules/AIProjectGenerator/usage', () => ({ checkConfiguredModelPriced: () => ({ ok: true, reason: '' }), unpricedMessage: (m) => `No price on file for ${m}`, UNPRICED_MODEL: 'unpriced_model', summarize: jest.fn(() => ({ costUsd: 0, totalTokens: 0, model: 'm' })) }));
+jest.mock('../Modules/AICore/usage', () => ({ checkConfiguredModelPriced: () => ({ ok: true, reason: '' }), unpricedMessage: (m) => `No price on file for ${m}`, UNPRICED_MODEL: 'unpriced_model', summarize: jest.fn(() => ({ costUsd: 0, totalTokens: 0, model: 'm' })) }));
 jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({ handleNotificationtFun: jest.fn(async () => ({ status: true })) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const tools = require('../Modules/Automations/engine/tools');
 const orchestrator = require('../Modules/Agents/engine/orchestrator');
 const memory = require('../Modules/Agents/engine/findingMemory');
-const { summarize } = require('../Modules/AIProjectGenerator/usage');
+const { summarize } = require('../Modules/AICore/usage');
 const { handleNotificationtFun } = require('../Modules/notification/prepare-notification-data/controllerV2');
 const runs = require('../Modules/Agents/runs');
 const ctrl = require('../Modules/Agents/controller');
@@ -35,7 +35,7 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
 const startRun = async (body) => { const r = res(); await ctrl.startRun(req({ agentId: AGENT_ID, taskId: TASK._id, ...body }), r); await flush(); return r; };
 const success = () => orchestrator.analyse.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [finding], summary: 'one issue', usage: { totalTokens: 500 }, model: 'm' });
 
-beforeAll(() => require('../Modules/Agents/engine/persistence').useInMemory());
+beforeAll(() => require('../Modules/AICore/persistence').useInMemory());
 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });

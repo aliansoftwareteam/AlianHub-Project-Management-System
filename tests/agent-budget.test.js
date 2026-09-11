@@ -7,14 +7,14 @@ jest.mock('../Config/permissionGuard', () => ({ ROLE_OWNER: 1, ROLE_ADMIN: 2, ge
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async (req) => ({ kind: 'human', userId: req.uid })), isAgent: (a) => a.kind === 'agent' }));
 jest.mock('../Modules/Automations/engine/tools', () => ({ getTask: jest.fn(async () => ({ _id: '6f0000000000000000000701', ProjectID: 'p1', TaskKey: 'AR-1' })) }));
-jest.mock('../Modules/AIProjectGenerator/usage', () => ({ checkConfiguredModelPriced: () => ({ ok: true, reason: '' }), unpricedMessage: (m) => `No price on file for ${m}`, UNPRICED_MODEL: 'unpriced_model', summarize: jest.fn(() => ({ costUsd: 0, totalTokens: 0, model: 'm' })) }));
+jest.mock('../Modules/AICore/usage', () => ({ checkConfiguredModelPriced: () => ({ ok: true, reason: '' }), unpricedMessage: (m) => `No price on file for ${m}`, UNPRICED_MODEL: 'unpriced_model', summarize: jest.fn(() => ({ costUsd: 0, totalTokens: 0, model: 'm' })) }));
 jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({ handleNotificationtFun: jest.fn(async () => ({ status: true })) }));
 jest.mock('../Modules/Agents/proposals', () => ({ create: jest.fn() }));
 jest.mock('../Modules/Agents/actions', () => ({ perform: jest.fn() }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { dbCollections } = require('../Config/collections');
-const { summarize } = require('../Modules/AIProjectGenerator/usage');
+const { summarize } = require('../Modules/AICore/usage');
 const { handleNotificationtFun } = require('../Modules/notification/prepare-notification-data/controllerV2');
 const runs = require('../Modules/Agents/runs');
 const budget = require('../Modules/Agents/budget');

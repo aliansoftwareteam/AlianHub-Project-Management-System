@@ -5,7 +5,7 @@ const { removeCache } = require('../../utils/commonFunctions');
 const { myCache } = require('../../Config/config');
 const logger = require('../../Config/loggerConfig');
 const R = require('./helpers/portfolioRules');
-const { getProvider, isAnyProviderConfigured } = require('../AIProjectGenerator/llmProvider');
+const { getProvider, isAnyProviderConfigured } = require('../AICore/llmProvider');
 const { FEATURES } = require('../AICore/features');
 
 const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);

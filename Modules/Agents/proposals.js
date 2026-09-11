@@ -8,7 +8,7 @@ const undo = require('./undo');
 const audit = require('./agentAudit');
 const memory = require('./memory');
 const findingMemory = require('./engine/findingMemory');
-const persistence = require('./engine/persistence');
+const persistence = require('../AICore/persistence');
 const logger = require('../../Config/loggerConfig');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
