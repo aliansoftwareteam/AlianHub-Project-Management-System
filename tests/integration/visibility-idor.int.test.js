@@ -128,3 +128,38 @@ describe('TSK-07 saved filters belong to their owner', () => {
         expect(refused(res)).toBe(true);
     });
 });
+
+describe('TSK-08 recent visits belong to the signed-in user', () => {
+    it('refuses to read another user\'s visits', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const { task } = await ownerOnlyTask(owner);
+        await owner.api.post('/api/v2/recent-visits', { entityType: 'task', entityId: task._id });
+
+        const res = await member.api.get('/api/v2/recent-visits', { query: { uid: owner.uid } });
+        expect(refused(res)).toBe(true);
+        expect((res.body.data || []).some((row) => sameId(row.task._id, task._id))).toBe(false);
+    });
+
+    it('refuses to record a visit as someone else', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const { task } = await sharedTask(owner, member);
+
+        const res = await member.api.post('/api/v2/recent-visits', { entityType: 'task', entityId: task._id, userData: { id: owner.uid } });
+        expect(refused(res)).toBe(true);
+        const ownerList = await owner.api.get('/api/v2/recent-visits');
+        expect(ownerList.body.data.some((row) => sameId(row.task._id, task._id))).toBe(false);
+    });
+
+    it('records and lists the caller\'s own visits without any user id', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const { task } = await sharedTask(owner, member);
+
+        expect((await member.api.post('/api/v2/recent-visits', { entityType: 'task', entityId: task._id })).body.status).toBe(true);
+        const list = await member.api.get('/api/v2/recent-visits');
+        expect(list.body.status).toBe(true);
+        expect(list.body.data.some((row) => sameId(row.task._id, task._id))).toBe(true);
+    });
+});
