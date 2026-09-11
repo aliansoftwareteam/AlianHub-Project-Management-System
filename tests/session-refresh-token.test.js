@@ -9,6 +9,7 @@ const jsonwebtoken = require('jsonwebtoken');
 const { verifyJWTTokenV2 } = require('../Config/jwt');
 const { validateSettings } = require('../Modules/Instance/settingsCatalog');
 const session = require('../Modules/Auth/session');
+const { sessionTokenQuery } = require('../Modules/Auth/helpers/refreshTokenRules');
 
 const UID = '6f0000000000000000000001';
 
@@ -45,7 +46,7 @@ describe('INS-07 the session middleware and the request body', () => {
         session.updateSession(req, out);
         await new Promise(setImmediate);
         const [, query] = mockCrud.mock.calls.find(([, q, method]) => q.type === 'sessions' && method === 'findOneAndUpdate');
-        expect(query.data[0]).toEqual({ refreshToken, userId: UID });
+        expect(query.data[0]).toEqual({ userId: UID, ...sessionTokenQuery(refreshToken) });
         expect(out.code).toBe(200);
     });
 
@@ -56,7 +57,7 @@ describe('INS-07 the session middleware and the request body', () => {
         session.removeSession(req, done);
         await new Promise(setImmediate);
         const [, query] = mockCrud.mock.calls.find(([, q, method]) => q.type === 'sessions' && method === 'deleteMany');
-        expect(query.data[0]).toEqual({ userId: UID, refreshToken });
+        expect(query.data[0]).toEqual({ userId: UID, ...sessionTokenQuery(refreshToken) });
         expect(done).toHaveBeenCalledWith(expect.objectContaining({ status: true }));
     });
 });
