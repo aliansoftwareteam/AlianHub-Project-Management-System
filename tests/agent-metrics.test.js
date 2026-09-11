@@ -212,6 +212,17 @@ describe('the window excludes rows outside it', () => {
     });
 });
 
+describe('per-model errors read provider failures', () => {
+    it('attributes a failed run to the failing model and counts its failure type', async () => {
+        run(mockDb, 'a2', 'Digest', 'failed', ago(30 * MIN), 1000, { model: 'gpt-y' }, { failure: { type: 'rate_limit', provider: 'deepseek', model: 'deepseek-z' } });
+        run(mockDb, 'a2', 'Digest', 'failed', ago(40 * MIN), 1000, { model: 'gpt-y' }, { failure: { type: 'quota', provider: 'openai' } });
+        const data = await metrics.companyMetrics(C, '24h', { now: NOW });
+        expect(data.models.find((m) => m.model === 'deepseek-z')).toMatchObject({ provider: 'deepseek', finishedRuns: 1, failedRuns: 1, errorRate: 1, errorTypes: { rate_limit: 1 } });
+        expect(data.models.find((m) => m.model === 'gpt-y')).toMatchObject({ provider: 'openai', finishedRuns: 3, failedRuns: 1, errorTypes: { quota: 1 } });
+        expect(data.models.find((m) => m.model === 'claude-x').errorTypes).toEqual({ unknown: 1 });
+    });
+});
+
 describe('GET /api/v2/agents/metrics', () => {
     const get = async (over) => { const r = res(); await ctrl.getMetrics(req(over), r); return r; };
 

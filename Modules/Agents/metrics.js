@@ -136,7 +136,7 @@ const summariseModels = ({ usage = [], runs = [] }) => {
     const byModel = new Map();
     const entry = (model) => {
         const key = String(model || UNKNOWN);
-        if (!byModel.has(key)) byModel.set(key, { model: key, provider: null, calls: 0, inputTokens: 0, outputTokens: 0, tokens: 0, costUsd: 0, unpricedCalls: 0, finishedRuns: 0, failedRuns: 0 });
+        if (!byModel.has(key)) byModel.set(key, { model: key, provider: null, calls: 0, inputTokens: 0, outputTokens: 0, tokens: 0, costUsd: 0, unpricedCalls: 0, finishedRuns: 0, failedRuns: 0, errorTypes: {} });
         return byModel.get(key);
     };
     usage.forEach((u) => {
@@ -150,11 +150,17 @@ const summariseModels = ({ usage = [], runs = [] }) => {
         else m.unpricedCalls += 1;
     });
     runs.forEach((run) => {
-        const model = run.spend && run.spend.model;
+        const failure = run.status === RUN_FAILED && run.failure && typeof run.failure === 'object' ? run.failure : null;
+        const model = (failure && failure.model) || (run.spend && run.spend.model);
         if (!model || !TERMINAL.includes(run.status)) return;
         const m = entry(model);
         m.finishedRuns += 1;
-        if (run.status === RUN_FAILED) m.failedRuns += 1;
+        if (run.status !== RUN_FAILED) return;
+        m.failedRuns += 1;
+        // Runs stored before provider error codes carry no failure, so they still count as untyped model errors.
+        const type = (failure && failure.type) || UNKNOWN;
+        m.errorTypes[type] = (m.errorTypes[type] || 0) + 1;
+        if (failure && failure.provider && !m.provider) m.provider = failure.provider;
     });
     return [...byModel.values()]
         .map((m) => ({ ...m, costUsd: money(m.costUsd), errorRate: ratio(m.failedRuns, m.finishedRuns) }))
@@ -259,7 +265,7 @@ const undoneOriginals = async (companyId, undoRows) => {
 
 const fetchWindow = async (companyId, w) => {
     const [runs, proposals, usage, revertRows, undoRows, automations] = await Promise.all([
-        aggregate(companyId, SCHEMA_TYPE.AGENT_RUNS, windowed(since('startedAt', w), ['agentId', 'agentName', 'status', 'skill', 'startedAt', 'createdAt', 'finishedAt', 'spend', 'steps'])),
+        aggregate(companyId, SCHEMA_TYPE.AGENT_RUNS, windowed(since('startedAt', w), ['agentId', 'agentName', 'status', 'skill', 'startedAt', 'createdAt', 'finishedAt', 'spend', 'steps', 'failure'])),
         aggregate(companyId, SCHEMA_TYPE.AGENT_PROPOSALS, windowed(since('createdAt', w), ['agentId', 'agentName', 'status', 'failedReason', 'runId'])),
         aggregate(companyId, SCHEMA_TYPE.AI_USAGE, windowed(since('at', w), ['model', 'provider', 'feature', 'inputTokens', 'outputTokens', 'totalTokens', 'costUsd'])),
         aggregate(companyId, SCHEMA_TYPE.AUDIT_LOGS, windowed({ action: agentAudit.RUN_REVERTED, ...since('createdAt', w) }, ['meta.agentId', 'meta.runId'])),
