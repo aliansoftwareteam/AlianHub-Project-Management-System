@@ -3,6 +3,7 @@ const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-h
 const {removeCache} = require('../../../utils/commonFunctions');
 const { resolveProjectSkills } = require('../../settings/ProjectSkills/helper');
 const { PROJECT_SOURCES, normaliseSource, sourceOrDefault, cleanProposalId, numericProposalId, validateProposalId } = require('../helpers/projectSourceRules');
+const { canUpdateProject } = require('../helpers/projectUpdateAccess');
 
 exports.updateProjectInternal = async (companyId, projectId, updateObject, key, arrayFilters) => {
     return new Promise((resolve, reject) => {
@@ -133,6 +134,9 @@ exports.updateProject = async (req, res) => {
         }
         if(!companyId){
             return res.status(400).json({ message: "CompanyId is Required" });
+        }
+        if (!(await canUpdateProject({ companyId, uid: req.uid, projectId, updateObject, key }))) {
+            return res.status(403).json({ status: false, statusText: "You do not have permission to update this project." });
         }
         // Single write path for every client, so `skills` is validated here.
         // $addToSet/$push send a bare value that would land as a nested array
