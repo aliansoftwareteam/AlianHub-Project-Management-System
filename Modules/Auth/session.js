@@ -107,7 +107,7 @@ exports.updateSessionFun = async (reqData, cb) => {
 
 exports.updateSession = (req, res) => {
     try {
-        exports.updateSessionFun(req.body, (resData) => {
+        exports.updateSessionFun({ ...req.body, refreshToken: req.refreshToken || req.body.refreshToken }, (resData) => {
             if (!(resData && resData.status)) {
                 res.status(400).json({message: resData.message});
                 return;
@@ -269,7 +269,7 @@ exports.removeSession = (req, cb) => {
             type: dbCollections.SESSIONS,
             data: [{
                 userId: bodyData.id,
-                refreshToken: bodyData.refreshToken
+                refreshToken: req.refreshToken || bodyData.refreshToken
             }]
         }
         mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "deleteMany").then((resData)=>{

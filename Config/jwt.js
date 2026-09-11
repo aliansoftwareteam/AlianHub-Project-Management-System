@@ -226,7 +226,7 @@ const checkToken = (isValid, req, res, next) => {
         const { uid, refreshToken,aud } = isValid;
         req.uid = uid;
         req.aud = aud;
-        req.body.refreshToken = refreshToken; 
+        req.refreshToken = refreshToken;
         const cacheKey = `session:${uid}:${refreshToken}`;
         const value = myCache.get(cacheKey);
         try {
