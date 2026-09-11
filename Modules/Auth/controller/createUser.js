@@ -1,7 +1,6 @@
 const logger = require("../../../Config/loggerConfig");
 const mongoRef = require('../../../utils/mongo-handler/mongoQueries');
 const sendMailRef = require("./sendVerificationMail")
-const {generateJWTToken} = require('../../../Config/jwt');
 const { dbCollections } = require('../../../Config/collections');
 const ctr = require("../controller");
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
@@ -158,57 +157,6 @@ exports.createUserV2 = (req,res) => {
         })
     }
 }
-
-/**
- * Generate JWT Token Function
- * @param {Object} req 
- * @param {Object} res 
- */
-exports.generateToken = async (req, res) => {
-    try {
-
-        if (!(req.body && req.body.uid)) {
-            res.status(400).json({
-                status: false,
-                statusText: "The user id is required."
-            });
-            return;
-        }
-
-        const {uid} = req.body;
-        let object = {
-            type: dbCollections.USERS,
-            data: [
-                {
-                    _id: uid
-                }
-            ]
-        }
-        mongoRef.MongoDbCrudOpration('global', object, "findOne").then(async (response) => {
-            const companyIds = response.AssignCompany && response.AssignCompany.length ? response.AssignCompany : [];
-            const token = await generateJWTToken({uid: uid, companyIds: companyIds});
-            res.json({
-                status: true,
-                statusText: "Jwt token generate successfully.",
-                token: token
-            });
-        }).catch((error) => {
-            logger.error(`Generate Jwt Token Error: ${error}`);
-            res.status(400).json({
-                status: false, 
-                error,
-                statusText: 'User not found.',
-            });
-        })
-    } catch (error) {
-        logger.error(`Generate Jwt Token Error: ${error}`);
-        res.status(400).json({
-            status: false,
-            statusText: "Authentication failed!"
-        });
-    }
-};
-
 
 exports.verifyToken = (req, res) => {
     res.json({

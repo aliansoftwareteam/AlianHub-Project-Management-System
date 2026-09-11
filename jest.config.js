@@ -14,7 +14,7 @@ module.exports = {
             testMatch: ['<rootDir>/tests/integration/*.int.test.js'],
             globalSetup: '<rootDir>/tests/integration/globalSetup.js',
             globalTeardown: '<rootDir>/tests/integration/globalTeardown.js',
-            testTimeout: 60000
+            setupFilesAfterEnv: ['<rootDir>/tests/integration/testTimeout.js']
         }
     ],
     maxWorkers: '50%',
