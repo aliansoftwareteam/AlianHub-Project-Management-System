@@ -28,6 +28,14 @@ exports.listSkills = async (req, res) => {
     } catch (e) { return failWith(res, e); }
 };
 
+/* GET /api/v2/agents/manifest — what workflows and rules bind an agent by. */
+exports.agentManifest = async (req, res) => {
+    try {
+        const companyId = tenantOf(req);
+        return res.send({ status: true, data: await skillRecord.agentManifest(companyId) });
+    } catch (e) { return failWith(res, e); }
+};
+
 /* GET /api/v2/agents/skills/catalogues */
 exports.getCatalogues = (req, res) => {
     try {

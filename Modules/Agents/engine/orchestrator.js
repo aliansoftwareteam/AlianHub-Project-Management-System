@@ -5,6 +5,7 @@ const { audit, extractUrl } = require('./pageAudit');
 const { isBlockedHostname } = require('./safeFetch');
 const skillIndex = require('../skills');
 const skillRecord = require('../skillRecord');
+const { narrowChanges } = require('../skills/effectiveActions');
 
 // A deterministic pipeline, not a free-roaming agent loop:
 //
@@ -121,9 +122,10 @@ async function analyseGeneric(skill, { task, context, budget, spend, agent }) {
     let raw = answer;
     let dropped = [];
     if (raw && typeof skill.verify === 'function') ({ raw, dropped } = skill.verify({ raw, context }));
-    const emitted = skill.toChanges({ task, raw, context, agent });
-    dropped = dropped.concat(Array.isArray(emitted.dropped) ? emitted.dropped : []);
-    return { status: 'success', skill: skill.slug, model, degraded, summary: emitted.summary, changes: emitted.changes, dropped, findings: [], usage, durationMs: Date.now() - started };
+    const emitted = skill.toChanges({ task, raw, context });
+    const narrowed = narrowChanges(agent, skill, emitted.changes);
+    dropped = dropped.concat(Array.isArray(emitted.dropped) ? emitted.dropped : [], narrowed.dropped);
+    return { status: 'success', skill: skill.slug, model, degraded, summary: emitted.summary, changes: narrowed.changes, dropped, findings: [], usage, durationMs: Date.now() - started };
 }
 
 /* The page audit: ground → analyse → verify → emit. The caller writes; this

@@ -96,9 +96,10 @@ describe('the hybrid resolver', () => {
     });
 
     it('a data skill narrows the effective actions to the agent’s allowed set and the registry', () => {
-        expect(skillRecord.effectiveActions(['task.comment', 'subtask.create'], { allowedActions: ['task.comment'] })).toEqual(['task.comment']);
-        expect(skillRecord.effectiveActions(['task.comment', 'subtask.create'], { allowedActions: [] })).toEqual(['task.comment', 'subtask.create']);
-        expect(skillRecord.effectiveActions(['task.delete', 'task.comment', 'nope'], null)).toEqual(['task.comment']);
+        const { effectiveActions } = require('../Modules/Agents/skills/effectiveActions');
+        expect(effectiveActions({ allowedActions: ['task.comment'] }, { emits: ['task.comment', 'subtask.create'] })).toEqual(['task.comment']);
+        expect(effectiveActions({ allowedActions: [] }, { emits: ['task.comment', 'subtask.create'] })).toEqual(['task.comment', 'subtask.create']);
+        expect(effectiveActions(null, { emits: ['task.delete', 'task.comment', 'nope'] })).toEqual(['task.comment']);
     });
 });
 
