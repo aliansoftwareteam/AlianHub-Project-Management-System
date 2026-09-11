@@ -39,6 +39,24 @@
                 </section>
             </div>
 
+            <section v-if="builds.length" class="ah-card in-card" data-test="builds">
+                <div class="in-card__head"><span class="in-card__title">{{ $t('Instance.builds_since', { v: sinceVersion }) }}</span></div>
+                <span v-if="info.build?.next" class="ah-small" data-test="next-release">{{ $t('Instance.next_release', { v: info.build.next }) }}</span>
+                <div v-for="b in visibleBuilds" :key="`${b.build}-${b.commit}`" class="in-release in-build" data-test="build-row">
+                    <strong class="ah-mono">{{ b.build }}</strong>
+                    <span class="ah-mono">{{ b.version }}</span>
+                    <span class="ah-small">{{ b.date }}</span>
+                    <a v-if="b.pr" :href="`${repoUrl}/pull/${b.pr}`" target="_blank" rel="noopener" class="ah-small ah-mono" data-test="build-pr">#{{ b.pr }}</a><span v-else></span>
+                    <span class="in-build__title">{{ b.title }}</span>
+                    <a v-if="b.commit" :href="`${repoUrl}/commit/${b.commit}`" target="_blank" rel="noopener" class="ah-small ah-mono" data-test="build-commit">{{ String(b.commit).slice(0, 8) }}</a>
+                </div>
+                <div v-if="builds.length > BUILDS_SHOWN" class="in-actions">
+                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="builds-toggle" @click="showAllBuilds = !showAllBuilds">
+                        {{ showAllBuilds ? $t('Instance.builds_show_fewer') : $t('Instance.builds_show_all', { n: builds.length }) }}
+                    </button>
+                </div>
+            </section>
+
             <section v-if="info.releases.length" class="ah-card in-card">
                 <div class="in-card__head"><span class="in-card__title">{{ $t('Instance.newer_releases', { n: info.releases.length }) }}</span><span v-if="info.upgradeNeedsHands" class="ah-chip ah-chip--warn">{{ $t('Instance.needs_hands') }}</span></div>
                 <div v-for="r in info.releases" :key="r.version" class="in-release">
@@ -64,9 +82,17 @@ const { t } = useI18n();
 const $toast = useToast();
 const { get, post, message, guide, env } = useInstanceApi();
 
+const BUILDS_SHOWN = 20;
+
 const info = ref(null);
 const busy = ref(false);
 const error = ref("");
+const showAllBuilds = ref(false);
+
+const builds = computed(() => (Array.isArray(info.value?.buildLog) ? info.value.buildLog : []));
+const visibleBuilds = computed(() => (showAllBuilds.value ? builds.value : builds.value.slice(0, BUILDS_SHOWN)));
+const sinceVersion = computed(() => info.value?.release || info.value?.build?.release || info.value?.build?.base || "");
+const repoUrl = computed(() => (info.value?.build?.repoUrl || env.REPO_URL).replace(/\/+$/, ""));
 
 const steps = computed(() => (info.value?.docker
     ? [{ text: t("Instance.step_backup") }, { cmd: "docker compose pull" }, { cmd: "docker compose up -d" }, { text: t("Instance.step_verify") }]
@@ -97,5 +123,7 @@ onMounted(load);
 .in-steps { margin: 4px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font: var(--text-small); color: var(--ink); }
 .in-steps code { padding: 2px 6px; border-radius: 4px; background: var(--surface-hover); }
 .in-release { padding: 10px 0; border-top: 1px solid var(--hairline); display: flex; flex-direction: column; gap: 6px; }
+.in-build { display: grid; grid-template-columns: 3ch minmax(0, auto) auto 5ch minmax(0, 1fr) auto; align-items: baseline; column-gap: 10px; padding: 6px 0; }
+.in-build__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--text-small); color: var(--ink); }
 .in-notes { margin: 0; padding-left: 18px; font: var(--text-small); color: var(--ink); }
 </style>

@@ -54,11 +54,12 @@
 import { computed, defineProps, ref } from "vue";
 import { useStore } from "vuex";
 import moment from "moment";
-import { version } from "../../../../../package.json";
+import { useAppVersion } from "@/composable/useAppVersion";
 
 defineProps({ proof: { type: Boolean, default: true } });
 
 const { getters } = useStore();
+const { version } = useAppVersion();
 const brand = computed(() => getters["brandSettingTab/brandSettings"] || {});
 const productName = computed(() => brand.value.productName || "AlianHub");
 const initial = computed(() => productName.value.charAt(0).toUpperCase());

@@ -1,7 +1,7 @@
 {
   "locale": "hi",
   "machineTranslated": false,
-  "updatedAt": "2026-09-11T04:55:42.270Z",
+  "updatedAt": "2026-09-11T06:17:58.684Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5254,6 +5254,13 @@
     "Ai.run_revision_zero": "Before revisions (revision 0)",
     "Ai.run_skill_identity": "{key} @ {hash}",
     "Ai.run_skill_identity_n": "{key} revision {n}",
-    "Ai.run_skill_identity_nohash": "{key}"
+    "Ai.run_skill_identity_nohash": "{key}",
+    "Instance.channel_beta": "beta",
+    "Instance.channel_release": "release",
+    "Instance.channel_dev": "development",
+    "Instance.builds_since": "Builds since v{v}",
+    "Instance.next_release": "Next release: v{v}",
+    "Instance.builds_show_all": "Show all {n}",
+    "Instance.builds_show_fewer": "Show fewer"
   }
 }
