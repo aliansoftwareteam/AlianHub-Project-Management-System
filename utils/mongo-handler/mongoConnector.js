@@ -3,28 +3,30 @@ const logger = require('../../Config/loggerConfig');
 const sendMailRef = require('../../Modules/service.js');
 const config = require('../../Config/config.js');
 const { mongoTimeoutOptions } = require('../../Modules/Agents/engine/timeouts');
-process.on('uncaughtException', (err) => {
-    if(err.name.includes("MongoNetworkError")) {
-        logger.error(err);
-    } else if(err.name.includes("MongoServerError")) {
-        if(err?.code === 8000 && err.message.includes("cannot create a new collection")) {
-            sendMailRef.sendAttachMail(`Mongo Collection Error in ${config.NODE_ENV} Environment`,err.message,config.ERRORRECIVEREMAIL,[],(result) => {
-                if (!result.status) {
-                    logger.error(`Mail Sent Error: ${result.statusText}`);
-                    return;
-                }
-            })
+const { onFatal } = require('../../Config/processGuards');
+
+const mailReport = (subject, body) => new Promise((resolve) => {
+    sendMailRef.sendAttachMail(subject, body, config.ERRORRECIVEREMAIL, [], (result) => {
+        if (!result.status) console.error(`[FATAL] crash report mail failed: ${result.statusText}`);
+        resolve();
+    });
+});
+
+exports.crashReport = async (err) => {
+    if (!config.ERRORRECIVEREMAIL) return;
+    const name = String(err && err.name || '');
+    if (name.includes('MongoNetworkError')) return;
+    if (name.includes('MongoServerError')) {
+        if (err.code === 8000 && String(err.message).includes('cannot create a new collection')) {
+            await mailReport(`Mongo Collection Error in ${config.NODE_ENV} Environment`, err.message);
         }
-    } else {
-        sendMailRef.sendAttachMail(`CRASHED: Mongo Error in ${config.NODE_ENV} Environment`,`${err?.message} > ${err}`,config.ERRORRECIVEREMAIL,[],(result) => {
-            if (!result.status) {
-                logger.error(`Mail Sent Error: ${result.statusText}`);
-                return;
-            }
-        })
-        throw err;
+        return;
     }
-})
+    await mailReport(`CRASHED: Mongo Error in ${config.NODE_ENV} Environment`, `${err?.message} > ${err}`);
+};
+
+onFatal('crash-report-mail', exports.crashReport);
+
 exports.connect = (db) => {
     return new Promise(async (resolve, reject) => {
         const MONGODB_URL = process.env.MONGODB_URL;

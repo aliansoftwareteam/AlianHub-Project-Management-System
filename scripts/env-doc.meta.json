@@ -791,5 +791,10 @@
     "group": "database",
     "description": "Inactivity timeout on a MongoDB socket before it is closed (default 300000).",
     "default": "300000"
+  },
+  "FATAL_FLUSH_TIMEOUT_MS": {
+    "group": "logging",
+    "description": "Upper bound, in milliseconds, that a fatal crash waits for flushers (log files, telemetry exporter, crash report mail) before the process exits with 1.",
+    "default": "3000"
   }
 }

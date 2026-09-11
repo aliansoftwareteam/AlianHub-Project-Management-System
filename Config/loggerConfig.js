@@ -35,7 +35,7 @@ function rotatingTransport(filenameTemplate, level) {
     });
 }
 
-module.exports = createLogger({
+const logger = createLogger({
     format: combine(
         label({ label: 'log' }),
         timestamp(),
@@ -50,3 +50,13 @@ module.exports = createLogger({
         rotatingTransport('combined-%DATE%.log', 'info'),
     ]
 })
+
+const closeTransport = (transport) => new Promise((resolve) => {
+    if (typeof transport.close !== 'function' || !transport.logStream) return resolve();
+    transport.once('finish', resolve);
+    transport.close();
+});
+
+require('./processGuards').onFatal('logger', () => Promise.all(logger.transports.map(closeTransport)), { last: true });
+
+module.exports = logger;

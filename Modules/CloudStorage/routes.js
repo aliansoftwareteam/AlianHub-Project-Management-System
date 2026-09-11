@@ -13,9 +13,9 @@ const importLimiter = rateLimit({ windowMs: 60 * 1000, limit: 20, standardHeader
  * Error boundary for every handler in this module. NOTHING here may take the
  * server down.
  *
- * index.js registers `process.on('unhandledRejection', … process.exit(1))`, so a
- * single throw inside an async Express handler kills the whole process — Express 4
- * does not catch async rejections. That is exactly what happened once already: a
+ * Express 4 does not catch async rejections, so a single throw inside an async
+ * handler never answers the request (Config/processGuards.js logs the rejection),
+ * and an uncaught exception still kills the whole process. That happened once: a
  * `provider` reference in a catch block was out of scope, the ReferenceError
  * rejected, and the server died on the first failing thumbnail lookup.
  *
