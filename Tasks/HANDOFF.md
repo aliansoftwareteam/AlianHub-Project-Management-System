@@ -1,35 +1,48 @@
 # Handoff — where to start next session
 
-Updated 2026-09-11 (evening). Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
+Updated 2026-09-11 (night). Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (7f423ea2, `14.36.0-beta.105`)
+## State of `beta` (0afa408a, `14.36.0-beta.116`)
 
-- **QA programme (task 034):** all ten area sweeps and their regression suites merged, and every fix PR merged (builds 72–105). The area-by-area PR list is in `Tasks/active/034-end-to-end-qa-programme/progress.md`; everything the fixes left out is in `followups.md` next to it.
-- **Sprint 3 (task 026):** all six steps merged. Step 5, rate alerts, is #629 (build 103) and ships off by default.
-- **Beta versioning (task 033):** merged and verified; #617 (build 87) keeps the version honest when git is slow. `npm run version:show` prints the running build; `docs/BETA-LOG.md` is regenerated in every docs PR (CLAUDE.md Rule 4).
-- Sprints 0–2 (tasks 023–025) are code-complete; their live-environment checks are still open below.
-- Open PRs: only #613, which duplicates the merged #612. The owner decides whether to close it.
+- **Task 035 (QA follow-ups):** merged today #632 project filters and task reads (build 108), #633 company updates and verification email (build 109), #634 e2e on beta pushes and harness fixes (build 110), #638 access tokens without the refresh token and tracker one-time codes (build 115), #640 invite links (build 111), #641 verification resend and dial code (build 113), #642 automation dispatch rejections (build 112), #644 user and company check for the caller only (build 114), #643 server-controlled company fields (build 116).
+- **CI:** the `e2e` job now runs on every push to `beta` as well as on PRs; the first beta run passed.
+- **Earlier today:** the QA programme (task 034) merged through build 105 and Sprint 3 (task 026) is code-complete; see their progress files.
+- **Open PRs:** #635, #636, #637, #639 (held, see below), #613 (duplicate of #612, owner to close).
 
-## Owner decisions recorded today
+## Resume here first
 
-- Only owners and admins delete agents; an agent's creator does not keep delete rights (#620).
-- `REFRESH_TOKEN_REUSE_GRACE_SECONDS` defaults to 10; set it to 0 for strict refresh-token revocation (#609).
-- Webhooks to private or internal hosts are refused with no opt-out (#625). The planned instance-owner allowlist is waiting on the owner.
+Five pieces of work are in flight. Fix agents were pushing to these branches when the session ended; they may not have finished. For each, check the branch head and CI, read the PR's "Review fixes" section, and finish any review finding still open. The owner's local notes hold the full review data.
 
-## Next up
+1. **Signup authorization fix** (`fix/signup-product-owner-mass-assignment`, critical). A PR may not exist yet. Merge it first once green, then run the audit script it adds on every deployed instance and review the accounts it lists.
+2. **#639** storage uploads and profile images: a Wasabi upload regression, capture uploads, the Wasabi bucket-size cron.
+3. **#637** default sprint: tenant pinning at the HTTP entry and a failed sprint reported as success.
+4. **#636** webhook private-host allowlist: wider never-allowed ranges, a prefix floor, hex entries, a redirect test.
+5. **#635** timesheet and invoice scoping: member regressions (task joins, the desktop tracker's Today list) and the remaining time reads.
 
-1. Owner and member browser sweeps still to record: task 026 (run trace, replay, AI Health, Notification settings alerts), task 033 (Stats and Upgrade), task 025 (revision history, pinned revision), task 023 (undo deadline).
-2. A live OTLP collector check for task 026, then move 026 to `done/` once its exit gate is met.
-3. Schedule the items in `Tasks/active/034-end-to-end-qa-programme/followups.md`. The security ones first: `PUT` company open to any member, project filter IDOR, `GET /api/v1/task/:id` without a visibility check, `invoice/find` across companies, refresh token embedded in the access token.
-4. Sprint 4 (task 027, the model router) is next in the programme.
+Merge in that order and merge `origin/beta` into the rest after each merge. `frontend/src/locales/*.pending.json` conflicts resolve by keeping every key from both sides.
 
-## Still open on tasks 023–025 (needs the live environment, owner does these)
+A separate local session was changing the unverified-login response. It must keep returning `userData._id`, which the login page's resend button needs.
 
-1. `npm run migrate -- up` on the dev database (007 and 008, Sprint 2's 009 and 010, then 011 and 012; the server also runs them at start unless `MIGRATIONS_AUTO=false`).
-2. The in-process sweep with the real model: every configured provider books a non-zero cost, and an unpriced model is refused with the named reason.
-3. The browser sweeps listed under Next up, then move 023, 024 and 025 to `done/`.
+## Next up after that
+
+1. A docs PR closing task 035: tick groups 3, 4 and 6 with their builds and regenerate `docs/BETA-LOG.md`.
+2. Unscheduled follow-ups in `Tasks/active/034-end-to-end-qa-programme/followups.md`: items 4, 11, 13, 14, 26, 30 and 45, 34, 35, 38, 39, 41–44, 46, 47. Owner decisions: 32 and 37.
+3. Owner checks: migrations on the dev database, browser sweeps for tasks 023–026 and 033, a live OTLP collector check for 026.
+4. Sprint 4 (task 027, the model router).
+
+## Owner decisions recorded
+
+- Only owners and admins delete agents (#620). `REFRESH_TOKEN_REUSE_GRACE_SECONDS` defaults to 10 (#609).
+- The `e2e` job runs on pushes to `beta` (#634).
+- Webhooks to private hosts are allowed only through an instance-owner allowlist that is empty by default (#636, pending merge).
+- Timesheet reads respect an admin's "Everyone" grant in the permission matrix; members see only their own time by default (#635, pending merge).
 
 ## Things learned that affect the next session
+
+- **Review green PRs before merging security fixes.** A multi-agent review (three reviewers per PR, skeptics voting on each finding) confirmed 36 real defects across five PRs whose CI was green, including regressions for members and the desktop tracker. Budget it for every security PR.
+- **Agents stop before CI finishes.** They often open the PR and exit while checks are pending; start your own `gh pr checks <n> --watch`.
+- **zsh:** never name a shell variable `path`; it is tied to `PATH` and breaks every command after it.
+- **Unfixed security details stay out of this repo.** Detailed notes for work in progress live in the owner's local notes, not in committed docs or PR bodies.
 
 - **Parallel agents:** keep to 6–8 heavy agents with `jest --maxWorkers=2`; about twenty at once pushed load past 118 on 8 CPUs and caused false timeouts. Check `uptime` first.
 - **Never `git stash` in a worktree.** The stash stack is shared by every worktree, and one agent popped another's stash. Set work aside with a WIP commit. The lint-staged pre-commit hook makes its own stash, so agents commit with `git -c core.hooksPath=/dev/null commit` and run eslint themselves.

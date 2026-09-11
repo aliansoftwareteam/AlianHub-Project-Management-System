@@ -388,7 +388,7 @@ const backToLogin = () => {
 const handleSubmitResend = () => {
     if (!userData.value?._id) { $toast.error(t("Toast.something_went_wrong"), { position: "top-right" }); return; }
     busy.value = true;
-    axios.post(env.API_URI + env.SEND_VARIFICATION_EMAIL, { uid: userData.value._id, email: userData.value.Employee_Email || form.email }).then((result) => {
+    axios.post(env.API_URI + env.SEND_VARIFICATION_EMAIL, { uid: userData.value._id }).then((result) => {
         if (result.data.status === true) { resendWait.value = 60; $toast.success(t("Toast.Verification_mail_has_been_send_successfully"), { position: "top-right" }); }
         else $toast.error(result.data.statusText, { position: "top-right" });
     }).catch(() => $toast.error(t("Toast.something_went_wrong"), { position: "top-right" })).finally(() => { busy.value = false; });

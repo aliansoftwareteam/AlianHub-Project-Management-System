@@ -80,7 +80,8 @@ const publishFormSubmitted = (input) => {
         domainEventBus.bus.emit(EVENT_TYPE, envelope);
         return envelope;
     } catch (error) {
-        logger.error(`${LOG_PREFIX} could not publish ${EVENT_TYPE}: ${error.message}`);
+        const { companyId, form, task } = input || {};
+        logger.error(`${LOG_PREFIX} could not publish ${EVENT_TYPE} for form ${form && form._id} on task ${task && task._id} in company ${companyId}: ${domainEventBus.failureText(error)}`);
         return null;
     }
 };

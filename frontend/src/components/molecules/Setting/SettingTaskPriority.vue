@@ -47,7 +47,7 @@
                         <div class="con-vs-chip vs-chip-null">
                             <span class="text-chip vs-chip--text">
                                 <div class="priorityWrapper d-flex align-items-center">
-                                    <img v-if="!item.image || item.image === ''" :src="companyPrioritiesIcons(item.value)?.statusImage" alt="priority_img">
+                                    <img v-if="isBundledPriorityImage(item.image)" :src="companyPrioritiesIcons(item.value)?.statusImage" alt="priority_img">
                                     <WasabiImage v-else :data="{ url: item?.statusImage }" class="wasabi__priority-image"/>
                                     <span class="font_family_status">{{ item.name }}</span>
                                     <img class="cursor-pointer" :src="cancel_icon" alt="cancel" @click="deleteTaskPriority(index,item)" v-if="item.isDeleted && props.editPermission">
@@ -92,7 +92,7 @@ import { useStore } from "vuex";
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
 import { useValidation } from "@/composable/Validation.js";
 import ConfirmModal from '@/components/atom/Modal/Modal.vue';
-import { companyPrioritiesIcons } from '@/composable/commonFunction';
+import { companyPrioritiesIcons, isBundledPriorityImage } from '@/composable/commonFunction';
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import { apiRequest, apiRequestWithoutCompnay } from '../../../services';
 import { useCustomComposable } from "@/composable";

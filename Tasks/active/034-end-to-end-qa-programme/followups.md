@@ -61,7 +61,7 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 33 | Settings → General logs `TypeError: Cannot read properties of undefined (reading 'isoCode')` in the test harness. | #634 |
 | 34 | Socket handshakes check only the JWT signature, not that the session is still live, so a logged-out access token can still open a socket until it expires. | #638 |
 | 35 | Auth cookies are readable by JavaScript (not `httpOnly`), tracked as P1-SEC-09. | #638 |
-| 36 | `/timesheet/timelog`, `/timesheet/logDetail`, `/timesheet/milestone` and `POST /api/v1/estimatedTime` still trust client filters or pipelines; #635 scoped the five main timesheet reads only. | #635; being fixed in #635 after review (critical: `estimatedTime` pipeline `$merge`) |
+| 36 | `/timesheet/timelog`, `/timesheet/logDetail`, `/timesheet/milestone` and `POST /api/v1/estimatedTime` still trust client filters or pipelines; #635 scoped the five main timesheet reads only. | #635; being fixed in #635 after review |
 | 37 | The `invoices` (subscription) collection has no company field and nothing in the repo writes it; `POST /api/v1/invoice/find` is limited to the instance owner until its producer is known. | #635 |
 | 38 | Profile images under `USER_PROFILES/` can be read by any signed-in user, including the credit-note PDFs stored in `USER_PROFILES/InvoiceAndCreditNotes/`. | #639 |
 | 39 | `PUT /api/v1/user` accepts any value for `Employee_profileImage`, so a user can point their profile at another user's image path. | #639 |

@@ -1,9 +1,12 @@
 // Spins up an express app behind the real JWT middleware lists, and signs web sessions the
 // way login does, with the session row and company membership pre-seeded in the cache so the
 // middleware never needs a database.
+const crypto = require('crypto');
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { myCache } = require('../../Config/config');
+const { sessionCacheKey } = require('../../Modules/Auth/helpers/refreshTokenRules');
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'unit-test-secret';
 process.env.JWT_ALGORITHM = process.env.JWT_ALGORITHM || 'HS256';
@@ -11,9 +14,11 @@ process.env.JWT_EXP = process.env.JWT_EXP || '1h';
 
 function signSession(uid, companyIds = []) {
     const options = { algorithm: 'HS256', expiresIn: '1h' };
-    const refreshToken = jwt.sign({}, process.env.JWT_SECRET, options);
-    const token = jwt.sign({ uid, refreshToken }, process.env.JWT_SECRET, companyIds.length ? { ...options, audience: companyIds.join(',') } : options);
-    myCache.set(`session:${uid}:${refreshToken}`, JSON.stringify({ userId: uid, refreshToken }), 600);
+    const sid = new mongoose.Types.ObjectId().toHexString();
+    const rti = crypto.randomUUID();
+    const sexp = Math.floor(Date.now() / 1000) + 3600;
+    const token = jwt.sign({ uid, sid, rti, sexp }, process.env.JWT_SECRET, companyIds.length ? { ...options, audience: companyIds.join(',') } : options);
+    myCache.set(sessionCacheKey(uid, sid, rti), JSON.stringify({ _id: sid, userId: uid }), 600);
     companyIds.forEach((companyId) => myCache.set(`membership:${uid}:${companyId}`, true, 600));
     return token;
 }

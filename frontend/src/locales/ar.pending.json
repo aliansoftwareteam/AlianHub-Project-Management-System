@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-11T09:38:28.255Z",
+  "updatedAt": "2026-09-11T12:39:00.825Z",
   "keys": {
     "Scrum.stranded_head": "These {count} will stay in this sprint",
     "Scrum.stranded_hint": "They are unfinished, but their parent task is done — and a subtask moves with its parent. Finish them, or reopen the parent task, before completing the sprint.",
@@ -7578,6 +7578,7 @@
     "AiAlerts.notice_resolved_cost_forecast": "Resolved: spend is back under its forecast threshold.",
     "AiAlerts.notice_resolved_queue_age": "Resolved: the run queue is moving again.",
     "dashboardCard.dashboard_updated": "Dashboard updated successfully",
-    "Time.variance_own_only": "Showing only the time you logged"
+    "Time.variance_own_only": "Showing only the time you logged",
+    "Auth.tracker_code_failed": "Couldn't start the tracker sign-in. Refresh this page and try again."
   }
 }

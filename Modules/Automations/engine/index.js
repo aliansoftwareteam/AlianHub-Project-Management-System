@@ -43,25 +43,40 @@ const defineRecurring = (name, intervalMs, handler) => {
     return Promise.resolve();
 };
 
-async function onEnvelope(envelope) {
-    try {
-        const rules = await matcher.match(envelope.companyId, envelope);
-        if (!rules.length) return;
+const logDispatchFailure = (envelope, error, rule) => {
+    const ruleLabel = rule ? ` rule ${rule._id}` : '';
+    logger.error(`${LOG_PREFIX} dispatch failed for ${domainEventBus.eventLabel(envelope)}${ruleLabel}: ${domainEventBus.failureText(error)}`);
+};
 
-        for (const rule of rules) {
-            // Sequential on purpose: matching rules for one event are few, and a
-            // burst of parallel writes against one tenant's pool of 10 is how you
-            // turn a working automation into a timeout.
-            // eslint-disable-next-line no-await-in-loop
-            const run = await runner.createRun(envelope.companyId, rule, envelope);
-            if (!run) continue; // duplicate event — the unique index rejected it
-            // eslint-disable-next-line no-await-in-loop
-            await enqueueRun({ companyId: envelope.companyId, runId: String(run._id), ruleId: String(rule._id) });
-        }
+async function dispatchRule(envelope, rule) {
+    const run = await runner.createRun(envelope.companyId, rule, envelope);
+    if (!run) return;
+    await enqueueRun({ companyId: envelope.companyId, runId: String(run._id), ruleId: String(rule._id) });
+}
+
+async function onEnvelope(envelope) {
+    let rules;
+    try {
+        rules = await matcher.match(envelope.companyId, envelope);
     } catch (error) {
-        logger.error(`${LOG_PREFIX} dispatch failed for ${envelope.type}: ${error.message}`);
+        logDispatchFailure(envelope, error);
+        return;
+    }
+    // Sequential on purpose: matching rules for one event are few, and a burst of
+    // parallel writes against one tenant's pool of 10 is how you turn a working
+    // automation into a timeout.
+    for (const rule of rules) {
+        try {
+            // eslint-disable-next-line no-await-in-loop
+            await dispatchRule(envelope, rule);
+        } catch (error) {
+            logDispatchFailure(envelope, error, rule);
+        }
     }
 }
+
+// The bus drops whatever a listener returns, so the run starts after the write has answered and its promise needs its own handler.
+const dispatch = (envelope) => onEnvelope(envelope).catch((error) => logDispatchFailure(envelope, error));
 
 async function start() {
     if (started) return;
@@ -76,7 +91,7 @@ async function start() {
         await runner.execute({ companyId, runId, ruleId, enqueue: enqueueRun, keepAlive });
     });
     await driver.start();
-    domainEventBus.bus.on('domain.event', onEnvelope);
+    domainEventBus.bus.on('domain.event', dispatch);
     started = true;
     logger.info(`${LOG_PREFIX} started (queue=${driver.name})`);
     for (const [name, { intervalMs, handler }] of recurring) {
@@ -87,7 +102,7 @@ async function start() {
 
 async function stop() {
     if (!started) return;
-    domainEventBus.bus.removeListener('domain.event', onEnvelope);
+    domainEventBus.bus.removeListener('domain.event', dispatch);
     if (driver) await driver.stop();
     started = false;
 }
