@@ -1,7 +1,7 @@
 ---
 id: 024
 title: Sprint 1 — shared AI core and run correctness
-status: backlog
+status: active
 priority: high
 depends_on: [023]
 created: 2026-09-10
@@ -9,7 +9,7 @@ created: 2026-09-10
 
 # 024 — Sprint 1 — shared AI core and run correctness
 
-Status: backlog · depends on 023 · sprint 1 · two weeks · branch `feat/sprint-1-shared-core-run-correctness` (from `beta`)
+Status: active · depends on 023 · sprint 1 · two weeks · branch `feat/sprint-1-shared-core-run-correctness` (from `beta`)
 
 Source: `docs/AI-PLATFORM-ARCHITECTURE.md`, "Development and integration plan", Sprint 1. Filed 2026-09-10.
 
