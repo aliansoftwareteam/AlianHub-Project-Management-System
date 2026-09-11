@@ -31,7 +31,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 023 | Sprint 0 — stop the bleeding: exploitable findings and cost correctness | active | high | — | active/023-sprint-0-stop-the-bleeding |
 | 024 | Sprint 1 — shared AI core and run correctness | active | high | 023 | active/024-sprint-1-shared-core-run-correctness |
 | 025 | Sprint 2 — agent revisions and the skill record | active | high | 024 | active/025-sprint-2-revisions-and-skill-record |
-| 026 | Sprint 3 — observability foundation | backlog | high | 024 | backlog/026-sprint-3-observability-foundation |
+| 026 | Sprint 3 — observability foundation | active | high | 024 | active/026-sprint-3-observability-foundation |
 | 027 | Sprint 4 — the model router | backlog | high | 024, 026 | backlog/027-sprint-4-model-router |
 | 028 | Sprint 5 — the workflow engine | backlog | high | 024, 027 | backlog/028-sprint-5-workflow-engine |
 | 029 | Sprint 6 — skill authoring and migration | backlog | medium | 025, 028 | backlog/029-sprint-6-skill-authoring-migration |
@@ -39,3 +39,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 031 | Sprint 8 — security hardening | backlog | high | 024 | backlog/031-sprint-8-security-hardening |
 | 032 | Sprint 11 — data skills reach outside (ADR 003 phase 4) | backlog | medium | 029, 031 | backlog/032-sprint-11-data-skills-reach |
 | 033 | Beta build version and log — every merge is a numbered build | active | high | — | active/033-beta-build-version-and-log |
+| 034 | End-to-end QA programme — sweep every function, keep it covered in CI | active | high | — | active/034-end-to-end-qa-programme |
