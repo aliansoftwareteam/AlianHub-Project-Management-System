@@ -1,7 +1,7 @@
 {
   "locale": "ru",
   "machineTranslated": false,
-  "updatedAt": "2026-09-11T09:38:28.450Z",
+  "updatedAt": "2026-09-11T10:02:12.543Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5369,6 +5369,7 @@
     "AiHealth.owner_only_body": "Ask an owner or admin of this workspace for the AI health figures.",
     "AiHealth.load_failed": "The health figures could not be loaded.",
     "AiHealth.retry": "Retry",
-    "Instance.channel_unknown": "version unresolved"
+    "Instance.channel_unknown": "version unresolved",
+    "Time.variance_own_only": "Showing only the time you logged"
   }
 }

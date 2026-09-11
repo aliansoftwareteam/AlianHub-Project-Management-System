@@ -1,7 +1,7 @@
 {
   "locale": "ch",
   "machineTranslated": false,
-  "updatedAt": "2026-09-11T09:38:28.281Z",
+  "updatedAt": "2026-09-11T10:02:08.191Z",
   "keys": {
     "errorPage.card_name": "card name",
     "Auth.welcome_back": "Welcome back",
@@ -5370,6 +5370,7 @@
     "AiHealth.owner_only_body": "Ask an owner or admin of this workspace for the AI health figures.",
     "AiHealth.load_failed": "The health figures could not be loaded.",
     "AiHealth.retry": "Retry",
-    "Instance.channel_unknown": "version unresolved"
+    "Instance.channel_unknown": "version unresolved",
+    "Time.variance_own_only": "Showing only the time you logged"
   }
 }

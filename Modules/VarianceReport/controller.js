@@ -2,12 +2,14 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const R = require('./helpers/varianceRules');
+const { resolveTimeScope, visibleProjectsFor } = require('../TimeSheet/helpers/timeScope');
 
 const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId);
 
 // GET /api/v1/reports/variance?projectId=&sprintId=
 // Estimate (tasks.totalEstimatedTime) vs actual (sum of timesheets.LogTimeDuration
-// by TicketID), per task + rolled up. Everything in minutes. companyId-scoped.
+// by TicketID), per task + rolled up. Everything in minutes. A per-project report,
+// so a non-admin gets it only for the projects they can open.
 exports.getVarianceReport = async (req, res) => {
     try {
         const companyId = companyOf(req);
@@ -19,6 +21,12 @@ exports.getVarianceReport = async (req, res) => {
         const match = { deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true };
         if (q.projectId) match.ProjectID = String(q.projectId);
         if (q.sprintId) match.sprintId = String(q.sprintId);
+        const scope = await resolveTimeScope(companyId, req.uid);
+        const visible = await visibleProjectsFor(companyId, scope);
+        if (visible && q.projectId && !visible.includes(String(q.projectId))) {
+            return res.status(403).json({ status: false, statusText: 'You do not have access to this project.' });
+        }
+        if (visible && !q.projectId) match.ProjectID = { $in: visible };
 
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -63,6 +71,7 @@ const LARGE_ESTIMATE_MINUTES = 16 * 60;
 // GET /api/v1/reports/variance/summary?from=YYYY-MM-DD&to=YYYY-MM-DD
 // Estimate vs actual for the tasks worked in the window, rolled up by project and by
 // person (person = who logged), plus the tasks whose estimates drifted the most.
+// Company-wide for owners and admins; anyone else sees only the time they logged.
 exports.getVarianceSummary = async (req, res) => {
     try {
         const companyId = companyOf(req);
@@ -73,9 +82,12 @@ exports.getVarianceSummary = async (req, res) => {
         if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to < from) {
             return res.status(400).json({ status: false, statusText: 'from and to must be valid dates.' });
         }
+        const scope = await resolveTimeScope(companyId, req.uid);
+        const logMatch = { LogStartTime: { $gte: Math.floor(from.getTime() / 1000), $lte: Math.floor(to.getTime() / 1000) } };
+        if (!scope.companyWide) logMatch.Loggeduser = scope.uid;
         const logs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
-            data: [{ LogStartTime: { $gte: Math.floor(from.getTime() / 1000), $lte: Math.floor(to.getTime() / 1000) } }, { TicketID: 1, Loggeduser: 1, ProjectId: 1, LogTimeDuration: 1 }],
+            data: [logMatch, { TicketID: 1, Loggeduser: 1, ProjectId: 1, LogTimeDuration: 1 }],
         }, 'find').catch(() => []);
         const actualByTask = {};
         const actualByUser = {};
@@ -143,6 +155,7 @@ exports.getVarianceSummary = async (req, res) => {
             statusText: 'OK',
             data: {
                 from: q.from, to: q.to,
+                scope: scope.label,
                 totals: R.rollup(rows),
                 byProject, byPerson, drivers, largest,
                 takeaway: worst ? { ...worst, projectName: projectName[worst.projectId] || '' } : null,

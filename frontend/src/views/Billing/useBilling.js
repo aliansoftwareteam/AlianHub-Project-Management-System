@@ -158,7 +158,7 @@ export function useBilling(projectId) {
             await loadInvoices();
             return { ok: true, message: body.statusText || "", data: body.data };
         } catch (error) {
-            return { ok: false, message: error.message || "" };
+            return { ok: false, message: error?.response?.data?.statusText || error.message || "" };
         } finally {
             saving.value = false;
         }

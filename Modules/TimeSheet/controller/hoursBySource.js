@@ -1,6 +1,7 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { humanHoursFromEntries } = require("../helpers/timelogSourceSplit");
+const { resolveTimeScope } = require("../helpers/timeScope");
 const logger = require("../../../Config/loggerConfig");
 
 // GET /api/v1/timesheet/hours-by-source?start=&end= (handoff 27c) — the people
@@ -16,6 +17,8 @@ exports.getHoursBySource = async (req, res) => {
         const start = Number(req.query && req.query.start);
         const end = Number(req.query && req.query.end);
         const match = { actorType: { $ne: 'agent' } };
+        const scope = await resolveTimeScope(companyId, req.uid);
+        if (!scope.companyWide) match.Loggeduser = scope.uid;
         if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
             match.LogStartTime = { $gte: start, $lte: end };
         }
@@ -33,6 +36,7 @@ exports.getHoursBySource = async (req, res) => {
                 entryCount: entries.length,
                 start: match.LogStartTime ? start : null,
                 end: match.LogStartTime ? end : null,
+                scope: scope.label,
             },
         });
     } catch (error) {
