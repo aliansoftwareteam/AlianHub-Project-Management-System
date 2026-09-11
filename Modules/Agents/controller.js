@@ -373,8 +373,27 @@ exports.getRun = async (req, res) => {
             audit.push(state ? { ...o, undoUntil: state.undoUntil, undoable: state.undoable, undoReason: state.reason } : o);
         }
         const revision = { n: Number(pinned.n), state: pinned.state, synthetic: Boolean(pinned.synthetic), missing: Boolean(pinned.missing), createdAt: pinned.createdAt || null, createdBy: pinned.createdBy || null, serves: pinned.serves || [], skillRefs: pinned.skillRefs || [] };
+        const [firstReplay] = await replaysOf(companyId, run._id, { _id: 1 }, 1).catch(() => []);
+        if (firstReplay) plain.replayId = String(firstReplay._id);
         return res.send({ status: true, data: { run: plain, audit, revision } });
     } catch (e) { logger.error(`getRun: ${e.message}`); return fail(res, e.message); }
+};
+
+const REPLAY_LIMIT = 200;
+const replaysOf = async (companyId, runId, fields, limit) => (await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AI_REPLAYS, data: [{ runId: String(runId) }, fields, { sort: { createdAt: 1 }, limit }] }, 'find')) || [];
+
+/* GET /api/v2/agents/runs/:id/replay — owner/admin only: the records hold the prompts and raw responses */
+exports.getRunReplay = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        const { human } = await humanActor(req);
+        if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
+        if (!human || !(await privileged(companyId, req.uid))) return fail(res, 'Owner/admin only.', 403);
+        if (!OBJECT_ID.test(req.params.id)) return fail(res, 'A valid run id is required.', 400);
+        const run = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(req.params.id) }] }, 'findOne');
+        if (!run) return fail(res, 'Run not found.', 404);
+        return res.send({ status: true, data: await replaysOf(companyId, run._id, {}, REPLAY_LIMIT) });
+    } catch (e) { logger.error(`getRunReplay: ${e.message}`); return fail(res, e.message); }
 };
 
 /* POST /api/v2/agents/runs  body: { agentId, taskId, skill?, trigger?, note?, spendCapUsd?, notifyMe?, idempotencyKey? }

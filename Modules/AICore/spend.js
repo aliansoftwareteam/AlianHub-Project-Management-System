@@ -3,6 +3,7 @@ const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const usage = require('./usage');
+const replay = require('./replay');
 const { isFeature, UNKNOWN_FEATURE } = require('./features');
 const { isProviderError } = require('./providerError');
 
@@ -87,19 +88,23 @@ function metered(adapter) {
         async chat(opts) {
             const context = contextOf(opts);
             ensurePriced(adapter.model, context);
+            const startedAt = Date.now();
             let result;
             try {
                 result = await adapter.chat(opts);
             } catch (error) {
                 if (isProviderError(error)) logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} failed [${error.groupKey()}]${error.requestId ? ` request ${error.requestId}` : ''}: ${error.message}`);
+                await replay.record({ context, opts, adapter, error, durationMs: Date.now() - startedAt });
                 throw error;
             }
+            const durationMs = Date.now() - startedAt;
             try {
                 await record(context, result, adapter);
             } catch (e) {
                 if (strict()) throw e;
                 logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} spent ${usage.usageFromResult(result).totalTokens} tokens that could not be booked: ${e.message}`);
             }
+            await replay.record({ context, opts, adapter, result, durationMs });
             await alert(context);
             return result;
         },

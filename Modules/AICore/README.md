@@ -9,6 +9,7 @@ The shared AI core: what every AI feature needs and no feature owns (ADR 003, ph
 | Pre-call estimate | `estimate.js` | `estimateCall()` — what a call will cost before it is made (chars/4 with a safety factor, plus the max output), for spend gates |
 | Features | `features.js` | the closed list of feature tags a model call must carry |
 | Spend ledger | `spend.js` | the meter around every `chat()`: refuses an unpriced model before the vendor call, books one `ai_usage` row per call, announces budget levels for non-run features |
+| Replay record | `replay.js`, `redact.js` | one `ai_replays` row per call from the same meter: prompt hash (unredacted), redacted and capped prompt and raw response, model, parameters, agent and skill revisions; `AI_REPLAY` (`off`, `agent`, `all`) and `AI_REPLAY_RETENTION_DAYS` set the policy, and a failed write only warns |
 | Instruction guard | `instructionGuard.js` | detects prompt-injection phrasing in user-supplied text before it reaches a prompt or memory |
 | Model call | `modelCall.js` | `askModel()` — the single "call the model and parse JSON" helper, with an optional `budget.guard` that reserves the estimate before the call and reconciles after — and `parseModelJson()` |
 | Persistence | `persistence.js` | per-company LangGraph checkpointer and store (Mongo, or in-memory under tests) |

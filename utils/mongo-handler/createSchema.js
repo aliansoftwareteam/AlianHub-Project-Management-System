@@ -210,6 +210,11 @@ aiUsageSchema.index({ runId: 1 });
 aiUsageSchema.index({ userId: 1, at: -1 });
 aiUsageSchema.index({ createdAt: 1 }, { expireAfterSeconds: 34214400 });
 
+const aiReplaysSchema = new Schema(schema.aiReplays, {strict: true, timestamps: false});
+aiReplaysSchema.index({ runId: 1, createdAt: 1 });
+aiReplaysSchema.index({ feature: 1, createdAt: -1 });
+aiReplaysSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
 const agentSkillsSchema = new Schema(schema.agentSkills, {strict: true, timestamps: true});
 agentSkillsSchema.index({ key: 1 }, { unique: true });
 agentSkillsSchema.index({ enabled: 1, retiredAt: 1 });
@@ -352,6 +357,7 @@ module.exports = {
     agentRunsSchema,
     agentRevisionsSchema,
     aiUsageSchema,
+    aiReplaysSchema,
     agentProposalsSchema,
     agentSkillsSchema,
     callsSchema,

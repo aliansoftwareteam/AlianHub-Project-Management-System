@@ -77,6 +77,8 @@
                 <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="busy || control === 'closed'" :title="control === 'closed' ? $t('Ai.undo_window_passed') : ''" @click="revert">{{ busy ? $t('Ai.reverting') : $t('Ai.revert_run') }}</button>
                 <span v-if="control === 'closed'" class="ah-small" data-test="undo-reason">{{ $t('Ai.undo_window_passed') }}</span>
             </div>
+
+            <AgentRunReplay v-if="privileged" :run-id="runId" :replay-id="run.replayId || ''" />
         </template>
     </div>
 </template>
@@ -88,6 +90,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import { useAgents, revertControlState, undoDeadlineOf, pinnedRevisionOf } from "./useAgents";
 import { normaliseEpisode, declinedLine as declinedText } from "./episodeText";
+import AgentRunReplay from "./AgentRunReplay.vue";
 
 defineOptions({ name: "AgentRunDetail" });
 

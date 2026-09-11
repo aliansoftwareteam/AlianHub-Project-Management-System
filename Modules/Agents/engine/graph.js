@@ -101,7 +101,7 @@ async function analyse(state, config) {
     const { companyId, deps } = config.context;
     const { run, task, agent } = state;
     const guard = spendGuard.forRun({ companyId, run, actor: deps && deps.actor });
-    const spendContext = { feature: FEATURES.AGENT_RUN, companyId, runId: String(run._id), userId: run.startedBy || null, account: run.viaAccount || 'workspace' };
+    const spendContext = { feature: FEATURES.AGENT_RUN, companyId, runId: String(run._id), userId: run.startedBy || null, account: run.viaAccount || 'workspace', agentId: String(run.agentId), agentRevision: run.agentRevision, skillRevision: run.skillRevision };
     const result = state.result || await orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: { ...MODEL_BUDGET, guard }, spend: spendContext, companyId, agent });
     const spend = await runs.recordSpend(companyId, run, result.usage, result.model);
     if (result.status !== 'success') {

@@ -1,7 +1,7 @@
 {
   "locale": "it",
   "machineTranslated": false,
-  "updatedAt": "2026-09-11T07:27:38.222Z",
+  "updatedAt": "2026-09-11T07:28:43.631Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5279,6 +5279,30 @@
     "Ai.failure_type_server": "Provider error",
     "Ai.failure_type_timeout": "Timed out",
     "Ai.failure_type_network": "Network error",
-    "Ai.failure_type_unknown": "Unknown error"
+    "Ai.failure_type_unknown": "Unknown error",
+    "Ai.replay_title": "Replay",
+    "Ai.replay_policy": "Prompts and responses are redacted per the replay policy: email addresses, tokens and secrets are masked.",
+    "Ai.replay_loading": "Loading model calls…",
+    "Ai.replay_load_failed": "Could not load the replay.",
+    "Ai.replay_none": "No model calls were recorded for this run.",
+    "Ai.replay_call": "Call {n}",
+    "Ai.replay_tokens": "{input} in · {output} out",
+    "Ai.replay_cost": "{usd}",
+    "Ai.replay_cost_unpriced": "unpriced",
+    "Ai.replay_duration": "{ms} ms",
+    "Ai.replay_status_ok": "ok",
+    "Ai.replay_status_error": "error",
+    "Ai.replay_error_code": "Error code: {code}",
+    "Ai.replay_show": "Show the prompt and response",
+    "Ai.replay_hide": "Hide the prompt and response",
+    "Ai.replay_system": "System prompt",
+    "Ai.replay_system_empty": "No system prompt was sent.",
+    "Ai.replay_messages": "Messages",
+    "Ai.replay_passages": "Retrieved passages",
+    "Ai.replay_passages_empty": "No passages were retrieved for this call.",
+    "Ai.replay_response": "Raw response",
+    "Ai.replay_response_empty": "No response was recorded.",
+    "Ai.replay_truncated": "Content over 200 KB was cut.",
+    "Ai.replay_prompt_hash": "Prompt hash {hash}"
   }
 }

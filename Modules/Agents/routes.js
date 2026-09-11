@@ -39,6 +39,7 @@ exports.init = (app) => {
     app.get('/api/v2/agents/runs', ctrl.listRuns);
     app.post('/api/v2/agents/runs', ctrl.startRun);
     app.get('/api/v2/agents/runs/:id', ctrl.getRun);
+    app.get('/api/v2/agents/runs/:id/replay', ctrl.getRunReplay);
     app.post('/api/v2/agents/runs/:id/stop', ctrl.stopRun);
     app.post('/api/v2/agents/runs/:id/revert', ctrl.revertRun);
 

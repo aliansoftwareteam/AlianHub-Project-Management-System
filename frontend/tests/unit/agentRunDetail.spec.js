@@ -180,6 +180,19 @@ describe('AgentRunDetail', () => {
         expect(wrapper.find('[data-test="skill-identity"]').text()).toBe('Ai.run_skill_identity_nohash {"key":"qa-review"}');
     });
 
+    it('mounts the replay for owners and admins only', async () => {
+        const payload = { run: { ...run, replayId: 'rp1' }, audit: [] };
+        const owner = await mountDetail({ roleType: 1, payload });
+        expect(owner.find('#replay').exists()).toBe(true);
+        expect(apiRequest).toHaveBeenCalledWith('get', '/api/v2/agents/runs/r1/replay', undefined);
+        expect((await mountDetail({ roleType: 2, payload })).find('#replay').exists()).toBe(true);
+
+        apiRequest.mockClear();
+        const member = await mountDetail({ roleType: 3, payload });
+        expect(member.find('#replay').exists()).toBe(false);
+        expect(apiRequest.mock.calls.some(([, url]) => url.endsWith('/replay'))).toBe(false);
+    });
+
     it('reads a data-skill revision number once one is pinned', async () => {
         const wrapper = await mountDetail({ payload: { run: { ...run, agentId: 'a1', agentRevision: 5, skillRevision: { key: 'brief.parse', hash: null, n: 3 } }, audit: [] } });
         expect(wrapper.find('[data-test="revision-link"]').text()).toBe('Ai.run_revision {"n":5}');
