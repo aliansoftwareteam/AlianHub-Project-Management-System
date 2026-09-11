@@ -53,49 +53,16 @@ exports.createBucketOnStorage = async(req, res) => {
 }
 
 
-/**
- * @description Get a bucket with the specified bucket id.
- * @param {*} req 
- * @param {*} res
- */
-exports.getBucketOnStorage = (req,res) => {
-    const {bucketId} = req.params;
-
-    if(!bucketId) {
-        return res.status(400).json({
-            success: false,
-            statusText: 'bucketId is required'
-        })
-    }
-
-    const object = {
-        type: dbCollections.BUCKETS,
-        data: [{id : bucketId}]
-    }
-
+exports.getBucketOnStorage = async (req, res) => {
+    const { bucketId } = req.params;
     try {
-        MongoDbCrudOpration("global", object, "find")
-        .then(result => {
-            if(result.length > 0){
-                return res.status(200).json(result)
-            } else {
-                return res.status(400).json({
-                    success: false,
-                    statusText: 'Bucket not found'
-                })
-            }
-        })
-        .catch(err => {
-            return res.status(400).json({
-                success: false,
-                statusText: err
-            })
-        })
+        const bucket = await MongoDbCrudOpration("global", { type: dbCollections.BUCKETS, data: [{ id: bucketId }] }, "findOne");
+        if (!bucket) {
+            return res.status(404).json({ status: false, statusText: 'Bucket not found', message: 'Bucket not found' });
+        }
+        return res.status(200).json({ status: true, statusText: 'Bucket found', data: bucket });
     } catch (error) {
-        return res.status(400).json({
-            success: false,
-            statusText: error
-        })
+        return res.status(400).json({ status: false, statusText: 'Bucket lookup failed', message: error.message });
     }
 }
 
@@ -157,92 +124,30 @@ exports.updateBucketOnStorage = (req,res) => {
 }
 
 
-/**
- * @description This is remove bucket from the database as well as from storage.
- * @param {*} req
- * @param {*} res
- */
-exports.removeBucketOnStorage = (req, res) => {
-    const {bucketId} = req.params;
-    if(!bucketId) {
-        return res.status(400).json({
-            success: false,
-            statusText: 'bucketId is required'
-        })
-    }
-
-    const object = {
-        type: dbCollections.BUCKETS,
-        data: [
-            {
-                id : bucketId
-            }
-        ]
-    }
+exports.removeBucketOnStorage = async (req, res) => {
+    const { bucketId } = req.params;
     try {
-        MongoDbCrudOpration("global", object, "findOneAndDelete")
-       .then(result => {
-            if(result!== null){
-                const bucketDir = path.join(__dirname, '../../../storage', bucketId);
-                if (fs.existsSync(bucketDir)) {
-                    fs.rmdirSync(bucketDir, { recursive: true });
-                    return res.status(200).json({
-                        success: true,
-                        data: result
-                    })
-                } else {
-                    return res.status(400).json({
-                        success: false,
-                        statusText: 'Bucket not found'
-                    })
-                }
-
-            } else {
-                return res.status(400).json({
-                    success: false,
-                    statusText: 'Bucket not found'
-                })
-            }
-        })
-       .catch(err => {
-            return res.status(400).json({
-                success: false,
-                statusText: err
-            })
-        })
+        const removed = await MongoDbCrudOpration("global", { type: dbCollections.BUCKETS, data: [{ id: bucketId }] }, "findOneAndDelete");
+        if (!removed) {
+            return res.status(404).json({ status: false, statusText: 'Bucket not found', message: 'Bucket not found' });
+        }
+        await fs.promises.rm(path.join(__dirname, '../../../storage', bucketId), { recursive: true, force: true });
+        return res.status(200).json({ status: true, statusText: 'Bucket removed', data: removed });
     } catch (error) {
-        return res.status(400).json({
-            success: false,
-            statusText: error
-        })
+        return res.status(400).json({ status: false, statusText: 'Bucket removal failed', message: error.message });
     }
 }
 
 
-/**
- * @description Get Bucket size with Bucket id in server storage derectory.
- * @param {*} req
- * @param {*} res
- */
-exports.getBucketSizeOnStorage = (req,res) =>{
-    const {bucketId} = req.params;
-    const {unit = ''} = req.query;
-
-    if(!bucketId) {
-        return res.status(400).json({
-            success: false,
-            statusText: 'bucketId is required'
-        })
+exports.getBucketSizeOnStorage = async (req, res) => {
+    const { bucketId } = req.params;
+    const { unit = '' } = req.query;
+    try {
+        const size = await getBucketSizeCompanyWiseStorage(bucketId, unit);
+        return res.status(200).json({ status: true, statusText: 'Bucket size', data: size });
+    } catch (error) {
+        return res.status(400).json({ status: false, statusText: 'Bucket size failed', message: error.message || String(error.statusText || error) });
     }
-
-    getBucketSizeCompanyWiseStorage(bucketId, unit).then((res)=>{
-        return res.status(200).json({...res})
-    }).catch((err)=>{
-        return res.status(400).json({
-            success: false,
-            statusText: err
-        })
-    })
 }
 
 /**
