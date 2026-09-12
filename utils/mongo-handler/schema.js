@@ -1174,6 +1174,26 @@ const schema = {
         comment: { type: String, required: false },
         context: { type: Object, default: {}, required: false },
     },
+    /* Task 028 sprint 5. A workflow an author composed and saved, as opposed to
+     * `workflowRuns`, which is one execution of one. A definition is saved
+     * disabled and stays that way until somebody turns it on, the way an
+     * automation rule does: a workflow that starts spending the moment it is
+     * saved gives its author no chance to read it back first. */
+    workflowDefinitions: {
+        name: { type: String, required: true },
+        description: { type: String, required: false },
+        // [{ id, type, action, dependsOn, config, maxAttempts }] — the same shape
+        // `workflowRuns.definition.steps` snapshots when a run starts.
+        steps: { type: Array, default: [], required: false },
+        deadlineMs: { type: Number, required: false },
+        budgetUsd: { type: Number, required: false },
+        enabled: { type: Boolean, default: false, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        enabledBy: { type: String, required: false },
+        enabledAt: { type: Date, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Integration connections — managed by Modules/Integrations (AUTO-04). Generic
     // registry backing the marketplace, Slack and iframe apps. Secret config keys
     // are AES-256-GCM ciphertext (utils/secretField); secretsVersion 0 marks a row

@@ -2,11 +2,15 @@ const logger = require('../../Config/loggerConfig');
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 const access = require('../Agents/access');
 const revert = require('../Agents/revert');
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const store = require('./store');
 const flag = require('./flag');
 const executors = require('./executors');
 const queue = require('./queue');
 const stepTypes = require('./stepTypes');
+const definitions = require('./definitions');
+const dryRun = require('./dryRun');
 
 // The workflow API: start a run, read a run and its steps, and apply the four
 // controls a person has over a step that went wrong.
@@ -159,12 +163,21 @@ exports.startRun = async (req, res) => {
         if (!requireManager(res, ctx.caller)) return undefined;
         const body = req.body || {};
         const key = idempotencyKeyOf(req);
-        const steps = stepsFor(body);
+        // A saved workflow only runs once somebody has turned it on, which is
+        // what saving disabled is for.
+        let saved = null;
+        if (body.definitionId !== undefined && body.definitionId !== null && body.definitionId !== '') {
+            if (!OBJECT_ID.test(String(body.definitionId))) return fail(res, 'Workflow not found.', 404);
+            saved = await definitions.get(ctx.companyId, body.definitionId);
+            if (!saved) return fail(res, 'Workflow not found.', 404);
+            if (!saved.enabled) return fail(res, 'This workflow is turned off. Turn it on before starting a run.', 409);
+        }
+        const steps = saved ? validateSteps(saved.steps) : stepsFor(body);
         const dedupeKey = key ? `api:${ctx.caller.actor.userId}:${key}` : null;
 
         const run = await store.createRun(ctx.companyId, {
-            workflowId: String(body.workflowId || `api:${steps[0].type}`),
-            name: String(body.name || '').slice(0, 200),
+            workflowId: String(body.workflowId || (saved && saved._id) || `api:${steps[0].type}`),
+            name: String(body.name || (saved && saved.name) || '').slice(0, 200),
             source: 'api',
             dedupeKey,
             startedBy: ctx.caller.actor.userId,
@@ -172,7 +185,10 @@ exports.startRun = async (req, res) => {
             taskId: body.taskId ? String(body.taskId) : null,
             projectId: body.projectId ? String(body.projectId) : null,
             steps,
-            ...boundsOf(body),
+            ...boundsOf({
+                deadlineMs: body.deadlineMs === undefined && saved ? saved.deadlineMs : body.deadlineMs,
+                budgetUsd: body.budgetUsd === undefined && saved ? saved.budgetUsd : body.budgetUsd,
+            }),
         });
         if (!run) {
             const existing = dedupeKey ? await store.findRunByDedupeKey(ctx.companyId, dedupeKey) : null;
@@ -288,6 +304,179 @@ exports.compensateStep = async (req, res) => {
         return ok(res, 'Step compensated.', { step: compensated, revert: out });
     } catch (error) {
         logger.error(`[workflow-api] compensateStep: ${error.message}`);
+        return fail(res, error.message, error.status || 500);
+    }
+};
+
+/* GET /api/v2/workflows/step-types
+ * The manifest the builder draws its forms from — the same data `validateSteps`
+ * reads its rules from, so a step type the server does not know cannot be
+ * composed and a rule the server enforces cannot be missing from the form. */
+exports.getStepTypes = async (req, res) => {
+    try {
+        const ctx = await context(req, res);
+        if (!ctx) return undefined;
+        return ok(res, 'Step types fetched.', stepTypes.manifest());
+    } catch (error) {
+        logger.error(`[workflow-api] getStepTypes: ${error.message}`);
+        return fail(res, error.message, 500);
+    }
+};
+
+const failFields = (res, errors) => res.status(400).send({ status: false, statusText: errors[0], message: errors[0], errors });
+
+/* The shape of a saved workflow. The errors come back as a list rather than one
+ * sentence so the builder can mark the slot that is wrong. */
+const definitionFrom = (body) => {
+    const errors = [];
+    const name = String(body.name || '').trim();
+    if (!name) errors.push('name: required');
+    let steps = [];
+    try {
+        steps = validateSteps(body.steps);
+    } catch (error) {
+        const checked = stepTypes.validateSteps(Array.isArray(body.steps) ? body.steps : []);
+        errors.push(...(checked.valid ? [error.message] : checked.errors));
+    }
+    try {
+        boundsOf(body);
+    } catch (error) {
+        errors.push(error.message);
+    }
+    return { errors, value: { name, description: body.description || '', steps, deadlineMs: body.deadlineMs, budgetUsd: body.budgetUsd } };
+};
+
+exports.listDefinitions = async (req, res) => {
+    try {
+        const ctx = await context(req, res);
+        if (!ctx) return undefined;
+        if (!requireManager(res, ctx.caller)) return undefined;
+        return ok(res, 'Workflows fetched.', await definitions.list(ctx.companyId));
+    } catch (error) {
+        logger.error(`[workflow-api] listDefinitions: ${error.message}`);
+        return fail(res, error.message, 500);
+    }
+};
+
+/* POST /api/v2/workflows/definitions
+ * Saved disabled, whatever the body says: enabling is `PATCH …/enabled`, a
+ * separate act by a person who has read the workflow back. */
+exports.createDefinition = async (req, res) => {
+    try {
+        const ctx = await context(req, res);
+        if (!ctx) return undefined;
+        if (!requireManager(res, ctx.caller)) return undefined;
+        const { errors, value } = definitionFrom(req.body || {});
+        if (errors.length) return failFields(res, errors);
+        const saved = await definitions.create(ctx.companyId, { ...value, by: ctx.caller.actor.userId });
+        return ok(res, 'Workflow saved.', saved);
+    } catch (error) {
+        logger.error(`[workflow-api] createDefinition: ${error.message}`);
+        return fail(res, error.message, error.status || 500);
+    }
+};
+
+exports.updateDefinition = async (req, res) => {
+    try {
+        const ctx = await context(req, res);
+        if (!ctx) return undefined;
+        if (!requireManager(res, ctx.caller)) return undefined;
+        if (!OBJECT_ID.test(String(req.params.id || ''))) return fail(res, 'Workflow not found.', 404);
+        const { errors, value } = definitionFrom(req.body || {});
+        if (errors.length) return failFields(res, errors);
+        const updated = await definitions.update(ctx.companyId, req.params.id, { ...value, by: ctx.caller.actor.userId });
+        if (!updated) return fail(res, 'Workflow not found.', 404);
+        return ok(res, 'Workflow saved.', updated);
+    } catch (error) {
+        logger.error(`[workflow-api] updateDefinition: ${error.message}`);
+        return fail(res, error.message, error.status || 500);
+    }
+};
+
+/* PATCH /api/v2/workflows/definitions/:id/enabled
+ * A workflow whose definition no longer validates cannot be turned on: the
+ * moment enabling means anything is the moment it has to be runnable. */
+exports.setDefinitionEnabled = async (req, res) => {
+    try {
+        const ctx = await context(req, res);
+        if (!ctx) return undefined;
+        if (!requireManager(res, ctx.caller)) return undefined;
+        if (!OBJECT_ID.test(String(req.params.id || ''))) return fail(res, 'Workflow not found.', 404);
+        const existing = await definitions.get(ctx.companyId, req.params.id);
+        if (!existing) return fail(res, 'Workflow not found.', 404);
+        const enabled = (req.body || {}).enabled === true;
+        if (enabled) {
+            const checked = stepTypes.validateSteps(existing.steps || []);
+            if (!checked.valid) return failFields(res, checked.errors);
+        }
+        const updated = await definitions.setEnabled(ctx.companyId, req.params.id, enabled, ctx.caller.actor.userId);
+        return ok(res, enabled ? 'Workflow enabled.' : 'Workflow disabled.', updated);
+    } catch (error) {
+        logger.error(`[workflow-api] setDefinitionEnabled: ${error.message}`);
+        return fail(res, error.message, error.status || 500);
+    }
+};
+
+exports.deleteDefinition = async (req, res) => {
+    try {
+        const ctx = await context(req, res);
+        if (!ctx) return undefined;
+        if (!requireManager(res, ctx.caller)) return undefined;
+        if (!OBJECT_ID.test(String(req.params.id || ''))) return fail(res, 'Workflow not found.', 404);
+        const removed = await definitions.remove(ctx.companyId, req.params.id);
+        if (!removed) return fail(res, 'Workflow not found.', 404);
+        return ok(res, 'Workflow removed.', { _id: removed._id });
+    } catch (error) {
+        logger.error(`[workflow-api] deleteDefinition: ${error.message}`);
+        return fail(res, error.message, error.status || 500);
+    }
+};
+
+/* The real thing the author wants to try the workflow against, read rather than
+ * touched. A task that is not there is an answer, not an error: the plan comes
+ * back saying the input was not found. */
+const inputFor = async (companyId, body) => {
+    if (OBJECT_ID.test(String(body.taskId || ''))) {
+        const task = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS, data: [{ _id: String(body.taskId) }, { TaskName: 1, ProjectID: 1 }],
+        }, 'findOne');
+        if (!task) return { kind: 'task', id: String(body.taskId), found: false };
+        return { kind: 'task', id: String(task._id), name: task.TaskName || '', projectId: task.ProjectID ? String(task.ProjectID) : null, found: true };
+    }
+    if (OBJECT_ID.test(String(body.projectId || ''))) {
+        const project = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECTS, data: [{ _id: String(body.projectId) }, { ProjectName: 1 }],
+        }, 'findOne');
+        if (!project) return { kind: 'project', id: String(body.projectId), found: false };
+        return { kind: 'project', id: String(project._id), name: project.ProjectName || '', found: true };
+    }
+    return { kind: 'none', found: false };
+};
+
+/* POST /api/v2/workflows/dry-run
+ * body: { steps, deadlineMs?, budgetUsd?, taskId? | projectId? }
+ *
+ * What the workflow would do against a real input, and nothing else: the same
+ * validation and the same ready-set scheduling a start would reach, over step
+ * rows held in memory. No run is created, no queue job is booked and no step
+ * executor is called, so an author can try a workflow on the task they actually
+ * care about without it happening to that task.
+ *
+ * An invalid definition is a 200 whose plan says so, with the field named. The
+ * dry run did its job — it told you the workflow is wrong. */
+exports.dryRun = async (req, res) => {
+    try {
+        const ctx = await context(req, res);
+        if (!ctx) return undefined;
+        if (!requireManager(res, ctx.caller)) return undefined;
+        const body = req.body || {};
+        const steps = Array.isArray(body.steps) ? body.steps : [];
+        if (!steps.length) return fail(res, 'steps must be a non-empty array');
+        if (steps.length > MAX_STEPS) return fail(res, `a workflow may not have more than ${MAX_STEPS} steps`);
+        const input = await inputFor(ctx.companyId, body);
+        return ok(res, 'Dry run planned.', dryRun.plan({ steps, deadlineMs: body.deadlineMs, budgetUsd: body.budgetUsd, input }));
+    } catch (error) {
+        logger.error(`[workflow-api] dryRun: ${error.message}`);
         return fail(res, error.message, error.status || 500);
     }
 };
