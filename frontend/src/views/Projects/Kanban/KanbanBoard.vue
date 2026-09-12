@@ -47,7 +47,7 @@
                 >
                     <template #item="{ element }">
                         <div
-                            class="kanban-card hover-bg-light-lavender"
+                            class="kanban-card"
                             :class="{ 'is-agent-run': !!runFor(element._id) }"
                             draggable="true"
                             @dragstart="(e) => onManualDragStart(cardData, e)"

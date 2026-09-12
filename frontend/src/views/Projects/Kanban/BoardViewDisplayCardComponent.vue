@@ -20,7 +20,7 @@
                                 aria-label="Select task"
                             />
                         </label>
-                        <div class="list-group-kanban-item__taskName text-ellipsis font-weight-500 font-size-14 ml-5px black" :title="element.TaskName">
+                        <div class="list-group-kanban-item__taskName card-title text-ellipsis font-weight-500 ml-5px" :title="element.TaskName">
                             <img v-if="element.deletedStatusKey === 2" :src="inventoryIcon" alt="inventory" class="ml-5px" />
                             <img v-if="element.deletedStatusKey === 1" :src="deleteIcon" alt="delete" class="ml-5px" />
                             {{ element.TaskName }}
