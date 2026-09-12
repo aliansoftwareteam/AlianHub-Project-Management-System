@@ -295,11 +295,12 @@ const recordCompensation = (companyId, runId, stepId, compensation) => call(comp
     { returnDocument: 'after' },
 ], 'findOneAndUpdate');
 
-/* A run a control has touched is open again: it has work to do, and its verdict
- * and error belong to the attempt the control just replaced. */
+/* A run a control has touched is open again: it has work to do, and its verdict,
+ * its error and whatever it was blocked on belong to the attempt the control
+ * just replaced. */
 const reopenRun = (companyId, runId) => call(companyId, RUNS, [
     { _id: String(runId) },
-    { $set: { status: 'running', finishedAt: null, error: null } },
+    { $set: { status: 'running', finishedAt: null, error: null, blocked: null } },
 ], 'updateOne');
 
 /* Fan-out children are rows the definition never named, written while the run is
