@@ -1,41 +1,37 @@
 # Handoff — where to start next session
 
-Updated 2026-09-11 (night). Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
+Updated 2026-09-12. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (0afa408a, `14.36.0-beta.116`)
+## State of `beta` (732bf025, `14.36.0-beta.122`)
 
-- **Task 035 (QA follow-ups):** merged today #632 project filters and task reads (build 108), #633 company updates and verification email (build 109), #634 e2e on beta pushes and harness fixes (build 110), #638 access tokens without the refresh token and tracker one-time codes (build 115), #640 invite links (build 111), #641 verification resend and dial code (build 113), #642 automation dispatch rejections (build 112), #644 user and company check for the caller only (build 114), #643 server-controlled company fields (build 116).
-- **CI:** the `e2e` job now runs on every push to `beta` as well as on PRs; the first beta run passed.
-- **Earlier today:** the QA programme (task 034) merged through build 105 and Sprint 3 (task 026) is code-complete; see their progress files.
-- **Open PRs:** #635, #636, #637, #639 (held, see below), #613 (duplicate of #612, owner to close).
+- **Task 035 (QA follow-ups) is code-complete.** All seven groups merged, each after an adversarial review that confirmed 36 defects across five PRs whose CI was already green: #632, #633, #634, #635, #637, #638, #639, #640, #641, #642, #643, #644, #645 and #647. Build numbers are in `docs/BETA-LOG.md`.
+- **Upgrade step for every deployed instance:** run `node scripts/audit-product-owners.js` (added by #645) and review each account it marks REVIEW.
+- **CI:** the `e2e` job runs on pull requests and on pushes to `beta`; beta is green.
+- **Open PRs:** #613 only, a duplicate of the merged #612 for the owner to close.
 
-## Resume here first
+## In flight
 
-Four PRs are in flight. Fix agents were pushing to these branches when the session ended; they may not have finished. For each, check the branch head and CI, read the PR's "Review fixes" section, and finish any review finding still open. The owner's local notes hold the full review data.
+Four fixes for the remaining follow-ups, one branch each, opened as PRs when green:
 
-1. **Signup authorization fix: merged as #645 (`87917dfa`).** Upgrade step for every deployed instance: `node scripts/audit-product-owners.js`, then review each account it marks REVIEW.
-2. **#639** storage uploads and profile images: a Wasabi upload regression, capture uploads, the Wasabi bucket-size cron.
-3. **#637** default sprint: tenant pinning at the HTTP entry and a failed sprint reported as success.
-4. **#636** webhook private-host allowlist: wider never-allowed ranges, a prefix floor, hex entries, a redirect test.
-5. **#635** timesheet and invoice scoping: member regressions (task joins, the desktop tracker's Today list) and the remaining time reads.
+1. `fix/auth-responses-self-view` — login, token and signup responses still return a raw `users` document (items 41, 42 and the unverified-login body).
+2. `fix/estimated-time-write-guard` — `PUT /api/v1/estimatedTime` builds its filter and update from the request body (the write half of item 36).
+3. `fix/profile-image-reads` — profile images and credit notes are readable by any signed-in user; `PUT /api/v1/user` accepts any image path (items 38, 39).
+4. `fix/role-lookup-active-membership` — `getRoleType` counts removed and pending rows, and two company routes skip the live membership re-check (items 30, 45, 46).
 
-Merge #639, #637, #636, #635 in that order and merge `origin/beta` into the rest after each merge. `frontend/src/locales/*.pending.json` conflicts resolve by keeping every key from both sides.
+## Next up
 
-A separate local session was changing the unverified-login response. It must keep returning `userData._id`, which the login page's resend button needs.
-
-## Next up after that
-
-1. A docs PR closing task 035: tick groups 3, 4 and 6 with their builds and regenerate `docs/BETA-LOG.md`.
-2. Unscheduled follow-ups in `Tasks/active/034-end-to-end-qa-programme/followups.md`: items 4, 11, 13, 14, 26, 30 and 45, 34, 35, 38, 39, 41–44, 46, 47. Owner decisions: 32 and 37.
-3. Owner checks: migrations on the dev database, browser sweeps for tasks 023–026 and 033, a live OTLP collector check for 026.
-4. Sprint 4 (task 027, the model router).
+1. Merge the four above once green, merging `origin/beta` between merges; `*.pending.json` conflicts resolve by keeping every key.
+2. Remaining follow-ups in `Tasks/active/034-end-to-end-qa-programme/followups.md`: 4, 11, 13, 14, 26, 32 and 37 (owner decisions), 34, 35, 43, 44, 47. Items 16 and 17 belong to Sprint 8 (task 031).
+3. Owner checks still open: migrations on the dev database, browser sweeps for tasks 023–026 and 033, a live OTLP collector check for 026.
+4. Then Sprint 4 (task 027, the model router).
 
 ## Owner decisions recorded
 
 - Only owners and admins delete agents (#620). `REFRESH_TOKEN_REUSE_GRACE_SECONDS` defaults to 10 (#609).
 - The `e2e` job runs on pushes to `beta` (#634).
-- Webhooks to private hosts are allowed only through an instance-owner allowlist that is empty by default (#636, pending merge).
-- Timesheet reads respect an admin's "Everyone" grant in the permission matrix; members see only their own time by default (#635, pending merge).
+- Webhooks reach private hosts only through an instance-owner allowlist, empty by default, with metadata and link-local ranges never allowed (#647). A consequence: `100.64.0.0/10` cannot be allowlisted whole, because it contains Alibaba Cloud's metadata address; use a narrower range.
+- Timesheet reads respect an admin's "Everyone" grant per screen; members see only their own time by default (#635).
+- `project.project_create` is enforced for API tokens but not for web sessions (#637); changing that is a separate decision.
 
 ## Things learned that affect the next session
 
