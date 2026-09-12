@@ -1,6 +1,30 @@
 # 016 — progress
 
-Branch `feat/agent-trust-layer` (from `beta` 1989b987). Three parallel workstreams, merged 2026-09-05.
+Branch `feat/agent-trust-layer` (from `beta` 1989b987). Three parallel workstreams, merged to `beta` as PR #545, merge commit `a50c9f42`, build `14.36.0-beta.22`. The revert-schema fix found by the API sweep landed as PR #547, build 24.
+
+## Checklist
+
+One line per bullet of `task.md` "## Acceptance". Verified against `origin/beta` at `71c9332f` on 2026-09-12.
+
+- [x] Every registry action has a rating; a test fails when one is added without it — `Modules/Agents/actions.js:32` `RATING_KEYS`, the `RATINGS` table at L35-54 with 18 entries against 18 keys in `registry.js`, `unrated()` at L60; `tests/agent-actions-rated.test.js` parametrises over `registry.keys()` and asserts `unrated()` is empty, and proves a new key surfaces — `a50c9f42` (#545)
+- [x] L2 run with one risky action: safe actions apply, the risky one becomes a proposal, the run ends `waiting_approval` with `decisions[]` explaining each — `Modules/Agents/policy.js` returns `{ decision, reason, rating }` with named reasons; `decisions[]` is initialised at `runs.js:119` and appended at `engine/graph.js:134-137`; `tests/agent-policy.test.js` (43) and `tests/agent-run-policy.test.js` (16) — `a50c9f42` (#545). Caveat kept from the sweep below: the mixed safe-plus-risky batch was never exercised live on `beta`, because the seeded agents' skills only emit task-scoped writes; it is covered by tests only.
+- [x] Revert of a run with 6 actions restores all 6; a revert after the window is refused with the reason; partial failure reports which actions did not revert — `POST /api/v2/agents/runs/:id/revert` at `routes.js:51`; `Modules/Agents/revert.js` takes the window from `budget.settings(companyId).undoHours` (stored as `company.agentUndoHours`, not `company.settings.agentUndoHours` as `task.md` wrote it) and builds a `failed[]` of `{ action, auditId, reason }`; `AgentRunDetail.vue:71` renders the partial case; `tests/agent-revert.test.js` (8) — `a50c9f42` (#545), made durable by `#547` after the API sweep found the run schema was silently dropping `revertedAt`/`revertedBy`
+- [x] Company at 100% budget: new runs refused, rule-triggered runs refused, owner notified once — `Modules/Agents/budget.js` `check()` at L145 refuses with "Company agent budget reached ($X of $Y this month)."; `LEVELS = ['80','100']` at L22 with once-per-month alert stamps; `runs.canStart` calls it, and `runAgent.js` goes through `canStart`, so rule-triggered runs are refused on the same path; `tests/agent-budget.test.js` (10) — `a50c9f42` (#545)
+- [ ] Gates: `npm test`, vitest, i18n check, lint, build, **browser sweep as owner and member** — **partly delivered.** The gates were green at merge (1581 backend tests, vitest 65, lint 0, i18n clean) and CI on the tip of `beta` is green (`gh pr checks 684`: backend, frontend, e2e all pass). The owner browser sweep is recorded below and passed. **Outstanding: the member sweep.** Members were swept at the API level by task 034 on 2026-09-11 (`findings/agents.md`), which raised AGT-01 to AGT-11 — all fixed by PR #620 — but its coverage table records "Screens opened (11 total) | 11 | – | – | –", owner only. The build-141 member browser pass logged in the sprint tasks explicitly excludes the trust layer's own screen: it lists "the AI agents spend card" among the things still to sweep.
+
+Also delivered, beyond the acceptance list: `GET/PUT /api/v2/agents/settings` with undo hours 1–168 and budget validation (`routes.js:22-23`, `budget.js:20-21,53,58`; `tests/agent-settings.test.js`), `views/Ai/policyPreview.js` feeding the "What L2 will do without asking" panel at `AgentSettings.vue:54`, the instance console panel at `views/Settings/Instance/InstanceAgents.vue`, and the L1 default for a new agent (`controller.js:146`).
+
+## Last step
+
+Audited 2026-09-12. Four of the five acceptance bullets are delivered and on `beta`. The task stays in `active/` for the last half-bullet: no trust-layer screen has ever been opened as a member, and the one member browser pass that has happened named the AI agents spend card as still unswept.
+
+## Blockers
+
+None. The member account that blocked the sweep exists now (`docs/QA-DEMO-TEAM.md`, `npm run demo:token`).
+
+## Log
+
+### 2026-09-05 — what landed
 
 | Item | What landed | Tests |
 |---|---|---|
@@ -34,6 +58,11 @@ Notes for review
 
 Finding (pre-existing, task 013 area; fixed in PR #549): loading `/settings/instance/settings` directly bounces to My Profile because the shell checks instance access after mounting; navigating from inside the settings shell works. Worth a guard that waits for the access answer.
 
-Open
-- Member-role pass — needs a member account.
-- 019 evals should start from the `decisions[]` data this produces.
+## 2026-09-12 — record audited
+
+Checklist above rebuilt from `task.md` "## Acceptance" and checked against `origin/beta` at `71c9332f`.
+
+- Ratings, policy, revert and budgets are all present on `beta` with their six test suites; the only unmet acceptance is the member half of the browser sweep.
+- The status line claimed "merged 2026-09-05 (PR #545), member-role sweep open", which was true but did not say the task was still `active` or what the sweep would cover; it now does, and `task.md` gained the YAML frontmatter it never had.
+- The member-account blocker recorded here was resolved on 2026-09-11 by the demo team seed (#593); the sweep was simply never re-run.
+- Still noted for elsewhere: 019 evals should start from the `decisions[]` data this produces. The pre-existing instance-settings routing finding recorded above was fixed in PR #549.

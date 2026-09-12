@@ -36,17 +36,17 @@ Source: `docs/AI-PLATFORM-ARCHITECTURE.md`. One task per sprint, one pull reques
 
 | Sprint | Task | Delivers | Size | Needs | Status |
 |---|---|---|---|---|---|
-| 0 | 023 | stop the bleeding: exploitable findings and cost correctness | one week | — | active |
-| 1 | 024 | shared AI core and run correctness | two weeks | 023 | backlog |
-| 2 | 025 | agent revisions and the skill record | two weeks | 024 | backlog |
-| 3 | 026 | observability foundation | two weeks | 024 | backlog |
-| 4 | 027 | the model router | two weeks | 024, 026 | backlog |
-| 5 | 028 | the workflow engine | three weeks | 024, 027 | backlog |
-| 6 | 029 | skill authoring and migration | two weeks | 025, 028 | backlog |
+| 0 | 023 | stop the bleeding: exploitable findings and cost correctness | one week | — | done |
+| 1 | 024 | shared AI core and run correctness | two weeks | 023 | done |
+| 2 | 025 | agent revisions and the skill record | two weeks | 024 | done |
+| 3 | 026 | observability foundation | two weeks | 024 | done |
+| 4 | 027 | the model router | two weeks | 024, 026 | done |
+| 5 | 028 | the workflow engine | three weeks | 024, 027 | done |
+| 6 | 029 | skill authoring and migration | two weeks | 025, 028 | next |
 | 7 | 030 | knowledge and retrieval | three weeks | 024 | backlog |
 | 8 | 031 | security hardening | three weeks | 024 | backlog |
 | 9 | 019 | evals and routing measurement | two weeks | 026, 027, 030 | backlog |
 | 10 | 018 | external agents: OAuth, scopes, delegation | three weeks | 028, 031 | backlog |
 | 11 | 032 | data skills reach outside (ADR 003 phase 4) | two weeks | 029, 031 | backlog |
 
-Totals: 12 tasks, 55 steps, about 27 weeks of engineering; Sprint 0 is active, the rest backlog. Existing 018 and 019 were rewritten as Sprints 10 and 9; Sprint 11 (ADR 003 phase 4) was added because the document's plan had no home for it.
+Totals: 12 tasks, 55 steps, about 27 weeks of engineering. Sprints 0 to 5 are delivered — tasks 023, 024, 025, 026, 027 and 028 are all in `Tasks/done/`, Sprint 5 closed by PR #684 (merge `71c9332f`, build 159) — Sprint 6 (task 029) is next, and Sprints 7 to 11 are backlog. Existing 018 and 019 were rewritten as Sprints 10 and 9; Sprint 11 (ADR 003 phase 4) was added because the document's plan had no home for it.

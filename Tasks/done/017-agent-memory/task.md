@@ -1,6 +1,15 @@
+---
+id: 017
+title: Agent memory the product owns
+status: done
+priority: high
+depends_on: [015, 016]
+created: 2026-09-10
+---
+
 # 017 — Agent memory the product owns, on LangGraph
 
-Status: active · depends on 015, 016 (both on `beta`) · branch `feat/agent-memory` (from `beta` 64f4f507)
+Status: done · merged 2026-09-10 (PR #552, `bdc860bf`, build 29) · all ten acceptance bullets met, closed 2026-09-12 · branch `feat/agent-memory` (from `beta` 64f4f507)
 
 ## Goal
 The second project in a workspace is briefed and planned better than the first, because the agents remember what this workspace decided, what each person prefers, and what past runs proposed and how people answered. The agent engine moves onto LangGraph so that memory, run state and human approval use one runtime instead of hand-rolled code.
