@@ -79,8 +79,13 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
-    if (client) { await client.db(`company_${COMPANY}`).dropDatabase().catch(() => {}); await client.close(); }
-    await Promise.resolve(closeConnection()).catch(() => {});
+    if (client) {
+        await client.db(COMPANY).dropDatabase().catch(() => {});
+        await client.close();
+    }
+    closeConnection(COMPANY);
+    // The close events land on the next tick; without this they arrive after teardown.
+    await sleep(50);
 });
 
 describe('typed results at each edge', () => {
