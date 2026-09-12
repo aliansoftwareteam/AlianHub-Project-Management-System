@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
+const { keepVisibleProjectIds } = require('../../Config/projectAccess');
 const logger = require('../../Config/loggerConfig');
 const H = require('./helpers/milestoneMoves');
 
@@ -50,9 +51,12 @@ exports.getMilestones = async (req, res) => {
                 deletedStatusKey: { $nin: [1, 2] },
             }, 'ProjectName status'],
         }, 'find') || [];
+        /* Without a projectId this reports on the whole company, so the catalogue is
+         * narrowed to what the caller may open before anything is read from it. */
+        const projectIds = await keepVisibleProjectIds(companyId, req.uid, projects.map((p) => String(p._id)));
+        const visible = new Set(projectIds);
         const projectName = {};
-        projects.forEach((p) => { projectName[String(p._id)] = p.ProjectName || ''; });
-        const projectIds = Object.keys(projectName);
+        projects.forEach((p) => { if (visible.has(String(p._id))) projectName[String(p._id)] = p.ProjectName || ''; });
         if (!projectIds.length) {
             return res.send({ status: true, statusText: 'No projects.', data: { milestones: [], totals: { total: 0, atRisk: 0, missed: 0 } } });
         }
