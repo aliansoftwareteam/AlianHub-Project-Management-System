@@ -36,6 +36,7 @@ const tabs = [
     { name: "InstanceBackups", label: "Instance.nav_backups", anchor: "backup-restore" },
     { name: "InstanceUpgrade", label: "Instance.nav_upgrade", anchor: "upgrade" },
     { name: "InstanceLogs", label: "Instance.nav_logs", anchor: "troubleshooting" },
+    { name: "InstanceProviders", label: "Providers.nav", anchor: "configure" },
     { name: "InstanceStats", label: "Instance.nav_stats", anchor: "reference" },
 ];
 const anchor = computed(() => tabs.find((t) => t.name === route.name)?.anchor || "install");
