@@ -52,10 +52,7 @@ async function logHour(session, { project, task }) {
 async function planHour(session, { project, task }) {
     const date = `${today()}T00:00:00.000Z`;
     const res = await session.api.put('/api/v1/estimatedTime', {
-        key: '$set',
-        updateObject: { UserId: session.uid, TaskId: task._id, ProjectId: project._id, EstimatedTime: 90, Date: date },
-        compareObj: { userId: session.uid, Date: date, TaskId: task._id },
-        newObj: { upsert: true, new: true },
+        userId: session.uid, taskId: task._id, projectId: project._id, minutes: 90, date,
     });
     expect(res.status).toBe(200);
 }
