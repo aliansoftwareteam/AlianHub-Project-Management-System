@@ -89,9 +89,9 @@ async function buildSnapshots(companyId, form, req) {
     }, 'findOne');
     if (!project) return { ok: false, reason: 'Project not found.' };
 
-    // Read the sprint from the sprints collection, not from anything embedded on
-    // the project: a project document does not reliably carry sprintsObj (the ones
-    // checked were empty), so scanning it rejected sprints that plainly exist.
+    // Read the sprint from the sprints collection, the one source of truth: a
+    // project document's sprintsObj is a legacy copy that no sprint write
+    // maintains, so scanning it rejected sprints that plainly exist.
     //
     // Naming the project in the FILTER is what keeps this a check rather than a
     // lookup — a sprint id from another project simply does not match, so a form

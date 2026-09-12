@@ -97,12 +97,44 @@ describe('useProjectTree', () => {
         expect(setFolders).toHaveBeenCalledWith({ projectId: 'p1' });
     });
 
-    it('leaves the tree to the views for a global-permission project opened without a folder', async () => {
+    it('loads the tree for a global-permission project opened without a folder', async () => {
         projects.value = [alpha, beta];
         routeParams.id = 'p1';
         mountTree();
         await flushPromises();
-        expect(setSprints).not.toHaveBeenCalled();
-        expect(setFolders).not.toHaveBeenCalled();
+        expect(setSprints).toHaveBeenCalledWith({ projectId: 'p1' });
+        expect(setFolders).toHaveBeenCalledWith({ projectId: 'p1' });
+    });
+
+    /* The board hangs its tasks off project.sprintsObj, and a sprint created through
+       POST /api/v1/sprint is written only to the sprints collection — so a project
+       document that embeds no sprintsObj must still end up with one to render. */
+    it('makes a sprint that exists only in the sprints collection visible on the project', async () => {
+        const project = { _id: 'p3', ProjectName: 'Gamma', isGlobalPermission: true, ProjectRequiredComponent: [{ keyName: 'ProjectListView' }] };
+        const sprint = { _id: 's9', name: 'Sprint from the API', projectId: 'p3', deletedStatusKey: 0 };
+        setSprints.mockResolvedValueOnce([sprint]);
+        setFolders.mockResolvedValueOnce([]);
+
+        projects.value = [project];
+        routeParams.id = 'p3';
+        mountTree();
+        await flushPromises();
+
+        expect(project.sprintsObj).toEqual({ s9: { ...sprint, id: 's9' } });
+    });
+
+    it('files a sprint that lives in a folder under that folder rather than the project root', async () => {
+        const project = { _id: 'p4', ProjectName: 'Delta', isGlobalPermission: true, ProjectRequiredComponent: [{ keyName: 'ProjectListView' }] };
+        const sprint = { _id: 's10', name: 'Foldered', projectId: 'p4', folderId: 'f9', deletedStatusKey: 0 };
+        setSprints.mockResolvedValueOnce([sprint]);
+        setFolders.mockResolvedValueOnce([{ _id: 'f9', name: 'Folder', projectId: 'p4', deletedStatusKey: 0 }]);
+
+        projects.value = [project];
+        routeParams.id = 'p4';
+        mountTree();
+        await flushPromises();
+
+        expect(project.sprintsObj).toEqual({});
+        expect(project.sprintsfolders.f9.sprintsObj.s10).toMatchObject({ _id: 's10', id: 's10', folderName: 'Folder' });
     });
 });
