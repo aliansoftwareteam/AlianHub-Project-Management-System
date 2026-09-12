@@ -1080,7 +1080,11 @@ const schema = {
         budgetUsd: { type: Number, required: false },
         spentUsd: { type: Number, default: 0, required: false },
         depth: { type: Number, default: 0, required: false },
-        // { code, reason, stepId, at } — the hop that was refused for running out.
+        /* Why the run stopped short of what it was asked to do, when that was a
+         * limit rather than an error: the hourly run limit of step 5
+         * ({ reason, stepId, agentId, limit, used, resetsAt, detail, at }) or the
+         * deadline, budget or depth a hop was refused for in step 4
+         * ({ code, reason, stepId, at }). */
         blocked: { type: Object, required: false },
         startedAt: { type: Date, required: false },
         finishedAt: { type: Date, required: false },

@@ -152,11 +152,13 @@ const CONTRACTS = Object.freeze([
             maxIterations: { type: 'number', label: 'At most', max: flag.maxLoopIterations() },
             budgetUsd: { type: 'number', label: 'Budget (USD)' },
             while: { type: 'condition', label: 'While' },
+            maxRunsPerHour: { type: 'number', label: 'Agent runs an hour' },
         },
         output: {
             iterations: { type: 'number', label: 'Iterations', required: true },
             stoppedBy: { type: 'string', label: 'Stopped by', required: true },
             budgetUsedUsd: { type: 'number', label: 'Budget used (USD)', required: true },
+            runLimit: { type: 'object', label: 'Run limit' },
             cap: { type: 'number', label: 'Cap' },
             budgetUsd: { type: 'number', label: 'Budget (USD)' },
         },

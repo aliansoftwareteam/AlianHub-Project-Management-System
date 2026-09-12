@@ -976,6 +976,16 @@
     "description": "Iterations a loop step may re-enter its body for. The ceiling a definition's own maxIterations is capped to.",
     "default": "25"
   },
+  "WORKFLOW_MAX_RUNS_PER_HOUR": {
+    "group": "jobs",
+    "description": "Agent runs an hour, per company and per agent, that a workflow loop may admit an iteration for. The ceiling a loop's own maxRunsPerHour and a rule's stored limits.maxRunsPerHour are capped to; 0 means no ceiling for the installation.",
+    "default": "0"
+  },
+  "WORKFLOW_RUN_LIMIT_CACHE_MS": {
+    "group": "jobs",
+    "description": "How long an hour of an agent's run start times is trusted before it is read again. The hour rolls in memory between reads; this is only how quickly a run another process started is noticed.",
+    "default": "60000"
+  },
   "WORKFLOW_RUN_DEADLINE_MS": {
     "group": "jobs",
     "description": "Ceiling on how long a whole workflow run may take, in milliseconds. Each step takes its share and hands on what is left; a step asking for more than remains is refused and the run is marked blocked. Unset means no ceiling.",

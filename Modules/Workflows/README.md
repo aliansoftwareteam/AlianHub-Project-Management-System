@@ -112,7 +112,7 @@ API validates a definition with `stepTypes.validateSteps()`.
 | `condition` | `when`, `then`, `else` | `matched`, `taken`, `skipped` |
 | `wait` | `forMs` | `waitedMs`, `until` |
 | `timer` | `at` or `atFrom` | `waitedMs`, `until` |
-| `loop` | `body`, `maxIterations`, `budgetUsd`, `while` | `iterations`, `stoppedBy`, `budgetUsedUsd` |
+| `loop` | `body`, `maxIterations`, `budgetUsd`, `while`, `maxRunsPerHour` | `iterations`, `stoppedBy`, `budgetUsedUsd`, `runLimit` |
 
 A step reads an earlier step's output as `$<stepId>.field`, which the expression
 language only recognises when the id begins with `s`; `validateSteps` refuses a
@@ -155,10 +155,37 @@ more: `WORKFLOW_MAX_FAN_OUT` (50) and `WORKFLOW_MAX_LOOP_ITERATIONS` (25). Over
 the fan bound the step fails rather than doing part of the work.
 
 A loop stops at whichever bound it reaches first — the iteration cap, the spend
-its body reported, or its own `while` condition — and records which in
-`stoppedBy`. Re-entry re-keys the idempotency of the body it resets, because
-idempotency is keyed on the run, the step and the action, and a loop is the one
-place where running the same step again is the point rather than the bug.
+its body reported, its own `while` condition, or the hourly run limit of an agent
+its body would start again — and records which in `stoppedBy`. Re-entry re-keys
+the idempotency of the body it resets, because idempotency is keyed on the run,
+the step and the action, and a loop is the one place where running the same step
+again is the point rather than the bug.
+
+## The hourly run limit
+
+`automationRules.limits.maxRunsPerHour` has been written on every v2 rule, with
+a default of 500, and read by nothing. It is the loop's admission control:
+before a loop re-enters a body that would start an agent run, every agent in
+that body has to be inside the hour's allowance, and the first one that is not
+stops the loop with `stoppedBy: 'run_limit'` rather than failing it. It has
+never meant an ordinary agent run — an agent's own limit is `rateLimitPerDay`,
+which `Agents/runs.canStart` enforces — so nothing about starting a run one at a
+time changes.
+
+The number is the smallest of the ones that are set: the loop step's own
+`maxRunsPerHour`, the rule's stored `limits.maxRunsPerHour` when the run came
+from a rule, and `WORKFLOW_MAX_RUNS_PER_HOUR`. Zero or absent is no limit, the
+same convention `rateLimitPerDay` uses, and when none of the three is set a loop
+is bounded by its iterations and its budget exactly as before.
+
+Counting is per company and per agent over a rolling hour, and it costs one
+query per agent per `WORKFLOW_RUN_LIMIT_CACHE_MS`, not one per iteration: the
+query reads that agent's run start times in the last hour, the window then rolls
+in memory — so the allowance refills as the hour passes without asking again —
+and each iteration this process admits appends its own reservation to it. The
+reason is written where a person will look for it: `stoppedBy` on the step, the
+`blocked` object on the run, and an `agent.action_refused` audit row naming the
+agent, the limit and the hour it resets.
 
 ## A schedule as a trigger
 
@@ -287,9 +314,6 @@ passes, so an agent hop inside a workflow is refused by the guard that already
 existed rather than by a second one.
 
 ## What these slices do not do
-
-The hourly run limit as loop admission control is step 5. It registers against
-`executors.js` and reads the same collections; the engine does not change for it.
 
 Per the task's out-of-scope: no Temporal. The queue stays behind
 `Modules/Automations/engine/queue` and the step types behind `executors.js`, so

@@ -321,10 +321,10 @@ const recordCompensation = (companyId, runId, stepId, compensation) => call(comp
     { returnDocument: 'after' },
 ], 'findOneAndUpdate');
 
-/* A run a control has touched is open again: it has work to do, and its verdict
- * and error belong to the attempt the control just replaced — the block among
- * them, so a person who extends a deadline and retries is not refused by the
- * record of the refusal. */
+/* A run a control has touched is open again: it has work to do, and its verdict,
+ * its error and whatever it was blocked on belong to the attempt the control
+ * just replaced — so a person who extends a deadline and retries is not refused
+ * by the record of the refusal. */
 const reopenRun = (companyId, runId) => call(companyId, RUNS, [
     { _id: String(runId) },
     { $set: { status: 'running', finishedAt: null, error: null, blocked: null } },

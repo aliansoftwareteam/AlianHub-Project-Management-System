@@ -43,6 +43,17 @@ const maxFanOut = () => number(process.env.WORKFLOW_MAX_FAN_OUT, 50);
 
 const maxLoopIterations = () => number(process.env.WORKFLOW_MAX_LOOP_ITERATIONS, 25);
 
+/* The hourly run limit the loop admits iterations against (sprint 5 step 5).
+ * Zero is no ceiling for the installation, which is today's behaviour: without
+ * it a loop is bounded by a definition's own number or by the rule's stored
+ * `limits.maxRunsPerHour`, and by nothing else. */
+const maxRunsPerHour = () => number(process.env.WORKFLOW_MAX_RUNS_PER_HOUR, 0);
+
+/* How long a company-and-agent hour of run starts is trusted before it is read
+ * again. The window itself rolls in memory; this is only how quickly a run some
+ * other process started is noticed. */
+const runLimitCacheMs = () => number(process.env.WORKFLOW_RUN_LIMIT_CACHE_MS, 60 * 1000);
+
 /* The workspace ceiling on how long a whole run may take and what it may spend
  * (sprint 5 step 4). Unset means unbounded, which is what every run written
  * before this existed is; a caller may ask for less and never for more. */
@@ -70,6 +81,6 @@ const approvalDeadlineMs = () => number(process.env.WORKFLOW_APPROVAL_DEADLINE_M
 
 module.exports = {
     enabled, leaseMs, heartbeatMs, tenantConcurrency, maxAttempts, backoffLadder, DEFAULT_BACKOFF_MS,
-    maxFanOut, maxLoopIterations, approvalPollMs, joinPollMs, approvalDeadlineMs,
+    maxFanOut, maxLoopIterations, maxRunsPerHour, runLimitCacheMs, approvalPollMs, joinPollMs, approvalDeadlineMs,
     runDeadlineMs, runBudgetUsd,
 };
