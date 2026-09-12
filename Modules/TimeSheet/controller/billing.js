@@ -7,14 +7,13 @@ const { resolveTimeScope } = require("../helpers/timeScope");
 // TIME-07 — billing rates + invoicing. Rates live in the per-company
 // billing_rates collection (one per scope+refId). Invoices are generated from
 // billable time entries at the resolved rates (user > project > default).
-const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId);
+const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const MONEY_RESTRICTED = 'Only an owner or admin can see billing amounts.';
 
 /* POST /api/v1/timesheet/rates — upsert a rate. body { scope, refId?, rate, currency?, userData } */
 exports.setRate = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const caller = await resolveTimeScope(companyId, req.uid);
         if (!caller.canSeeMoney) return res.status(403).json({ status: false, statusText: 'Only an owner or admin can set billing rates.' });
         const { scope, refId = '', rate, currency = 'USD', userData } = req.body || {};
@@ -35,6 +34,7 @@ exports.setRate = async (req, res) => {
         }, 'findOneAndUpdate');
         return res.send({ status: true, statusText: 'Rate saved.', data: saved });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in setRate: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -43,8 +43,7 @@ exports.setRate = async (req, res) => {
 /* GET /api/v1/timesheet/rates — list configured rates. */
 exports.listRates = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         if (!(await resolveTimeScope(companyId, req.uid)).canSeeMoney) {
             return res.send({ status: true, statusText: MONEY_RESTRICTED, data: [], restricted: true });
         }
@@ -54,6 +53,7 @@ exports.listRates = async (req, res) => {
         }, 'find');
         return res.send({ status: true, statusText: 'OK', data: rates || [] });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in listRates: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -63,8 +63,7 @@ exports.listRates = async (req, res) => {
  * body { start, end (seconds), userArray?, projectArray?, currency?, defaultRate? } */
 exports.generateInvoice = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         if (!(await resolveTimeScope(companyId, req.uid)).canSeeMoney) {
             return res.send({ status: true, statusText: MONEY_RESTRICTED, data: null, restricted: true });
         }
@@ -84,6 +83,7 @@ exports.generateInvoice = async (req, res) => {
         const invoice = buildInvoice({ entries: entries || [], rates: rates || [], currency, defaultRate });
         return res.send({ status: true, statusText: 'Invoice generated.', data: invoice });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in generateInvoice: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }

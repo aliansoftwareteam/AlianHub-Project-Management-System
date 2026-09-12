@@ -14,13 +14,14 @@ const R = require('./helpers/scheduleRules');
 
 const { oidOrNull } = access;
 
-const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
+const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 
 const DIM_LABELS = { status: 'Status', project: 'Project', sprint: 'Sprint', person: 'Person', month: 'Month' };
 const METRIC_LABELS = { count: 'Task count', points: 'Story points', hours: 'Hours', entries: 'Entries', revenue: 'Amount' };
 
 const reply = (res, code, statusText, extra = {}) => res.status(code).json({ status: false, statusText, message: statusText, ...extra });
 const serverError = (res, where, e) => {
+    if (e instanceof TenantError) return reply(res, e.statusCode, e.message);
     logger.error(`${where}: ${e && e.message}`);
     return reply(res, 500, 'Something went wrong while handling the schedule.');
 };
@@ -101,9 +102,8 @@ const runScheduledReportsForAllCompanies = async () => {
 };
 
 const callerFor = async (req, res) => {
-    const companyId = companyOf(req);
-    if (!companyId) { reply(res, 400, 'companyId is required.'); return null; }
     if (!req.uid) { reply(res, 401, 'An authenticated user is required.'); return null; }
+    const companyId = sessionTenantOf(req);
     return access.callerOf(companyId, req.uid);
 };
 

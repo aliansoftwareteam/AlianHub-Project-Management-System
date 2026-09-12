@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { removeCache } = require('../../utils/commonFunctions');
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 
 // Per-status work-in-progress limit. Lives on the status entry inside
 // project.taskStatusData (`wipLimit`), so it travels with the board columns that
@@ -30,10 +31,10 @@ const plainStatus = (entry) => (entry && entry.toObject ? entry.toObject() : { .
  * body: { projectId, statusKey, wipLimit } */
 async function setWipLimit(req, res) {
     try {
-        const companyId = req.headers['companyid'] || (req.body && req.body.companyId);
+        const companyId = sessionTenantOf(req);
         const { projectId, statusKey } = req.body || {};
-        if (!companyId || !projectId || statusKey === undefined || statusKey === null || statusKey === '') {
-            return res.send({ status: false, statusText: 'companyId, projectId and statusKey are required.' });
+        if (!projectId || statusKey === undefined || statusKey === null || statusKey === '') {
+            return res.send({ status: false, statusText: 'projectId and statusKey are required.' });
         }
         if (!mongoose.Types.ObjectId.isValid(String(projectId))) {
             return res.send({ status: false, statusText: 'Invalid project id.' });
@@ -82,6 +83,7 @@ async function setWipLimit(req, res) {
             data: { statusKey: String(statusKey), wipLimit: limit, taskStatusData: statuses },
         });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`${LOG_PREFIX} set failed: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }

@@ -4,6 +4,7 @@ const { SendEmail } = require("../../service");
 const { usersNeedingReminder, reminderSubject, reminderHtml } = require("../helpers/reminderRules");
 const reminderSettings = require("../helpers/reminderSettings");
 const logger = require("../../../Config/loggerConfig");
+const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const { isPrivileged } = require('../../../Config/roleTypes');
 
 // TIME-06 — time-entry reminders. A daily nudge (prod cron) to members who
@@ -104,11 +105,11 @@ const isCompanyOwner = async (companyId, userId) => {
 // POST /api/v1/timesheet/send-reminders — manual trigger for the caller's company.
 exports.triggerReminders = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || (req.body && req.body.companyId);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const result = await sendTimeRemindersForCompany(companyId);
         return res.send({ status: true, statusText: 'Reminders processed.', data: result });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in triggerReminders: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
