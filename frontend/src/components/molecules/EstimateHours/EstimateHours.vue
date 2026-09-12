@@ -270,7 +270,7 @@ function getUserData(uid) {
         companyOwnerId: user.companyOwnerId,
     };
 }
-function saveEta() {
+async function saveEta() {
     if(updatedEta.value.length) {
         const estimates = JSON.parse(JSON.stringify(updatedEta.value));
         updatedEta.value = [];
@@ -344,7 +344,7 @@ function saveEta() {
             })
         }
 
-        estimates.forEach((data) => {
+        const saves = estimates.map((data) => {
             const planObj = {
                 userId: data.UserId,
                 taskId: props.task._id,
@@ -353,55 +353,41 @@ function saveEta() {
                 date: new Date(data.timeStamp).toISOString()
             }
 
-            if(data.id && data.id != null) {
-                const axiosObj = { ...planObj, id: data.id }
+            const isUpdate = !!(data.id && data.id != null);
+            const axiosObj = isUpdate ? { ...planObj, id: data.id } : planObj;
 
-                apiRequest("put", `${env.ESTIMATED_TIME}`,axiosObj)
+            return apiRequest("put", `${env.ESTIMATED_TIME}`, axiosObj)
                 .then((resp) => {
                     const docData = resp.data;
                     let changeDate = new Date(docData.Date).setHours(0,0,0,0);
                     let etaIndex = estimatedHours.value.findIndex((x) => new Date(x.Date).setHours(0,0,0,0) === changeDate && x.UserId === docData.UserId)
                     if(etaIndex !== -1) {
                         estimatedHours.value[etaIndex] = {...docData}
-                    }
-                    try {
-                        saveHistory(data, true);
-                    } catch (error) {
-                        console.error("ERROR", error);
-                    }
-                    savingETA.value = false;
-                })
-                .catch((error) => {
-                    savingETA.value = false;
-                    console.error("ERROR in update ETA in mongo: ", error);
-                })
-            } else {
-                apiRequest("put", `${env.ESTIMATED_TIME}`,planObj)
-                .then((res) => {
-                    const docData = res.data;
-                    let changeDate = new Date(docData.Date).setHours(0,0,0,0);
-                    let etaIndex = estimatedHours.value.findIndex((x) => new Date(x.Date).setHours(0,0,0,0) === changeDate && x.UserId === docData.UserId)
-                    if(etaIndex !== -1) {
-                        estimatedHours.value[etaIndex] = {...docData}
-                    } else {
+                    } else if(!isUpdate) {
                         estimatedHours.value.push(docData)
                     }
-                    data.id = docData._id;
-
-                    savingETA.value = false;
-
+                    if(!isUpdate) {
+                        data.id = docData._id;
+                    }
                     try {
-                        saveHistory(data);
+                        saveHistory(data, isUpdate);
                     } catch (error) {
                         console.error("ERROR", error);
                     }
                 })
                 .catch((error) => {
-                    savingETA.value = false;
                     console.error("ERROR in update ETA in mongo: ", error);
+                    throw error;
                 })
-            }
-        })
+        });
+
+        const results = await Promise.allSettled(saves);
+        savingETA.value = false;
+
+        if(results.some((result) => result.status === "rejected")) {
+            $toast.error(t(`Toast.Estimated_time_not_updated`), {position: "top-right"});
+            return;
+        }
         $toast.success(t(`Toast.Estimated_time_updated_successfully`), {position: "top-right"});
     } else {
         $toast.success(t(`Toast.Nothing_to_update`), {position: "top-right"});
