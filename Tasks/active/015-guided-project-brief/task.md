@@ -1,6 +1,15 @@
+---
+id: 015
+title: Guided project start — complete brief, agent/human split
+status: active
+priority: high
+depends_on: [014]
+created: 2026-09-05
+---
+
 # 015 — Guided project start: complete brief, honest agent/human split
 
-Status: planned · 2026-09-05 · branch `feat/guided-project-brief` (from `beta`) · runs in parallel with 016 (file ownership in `Tasks/ROADMAP-agents.md`)
+Status: active · built and merged 2026-09-05 (PR #546, `1d8cd48d`, build 23; UI follow-ups #549, build 26) · nine of ten acceptance bullets met · three items open: the owner browser sweep covered one of the three domain briefs rather than three and has no screenshots; the sweep's finding 3 (implementation tasks labelled `agent` because a plan-only skill fits — `Modules/Agents/taskSplit.js:71`) needs an owner decision and is filed nowhere else; and the member-role pass over the wizard has never been run
 
 ## Goal
 When someone starts any project from a goal (an online store, a mobile app, a multi-team platform), the system gets a complete brief out of them with at most a handful of questions, drafts the improved brief for approval, and produces a plan where every task says up front whether an agent can do it or a person must.

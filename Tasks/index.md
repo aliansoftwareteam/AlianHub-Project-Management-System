@@ -22,7 +22,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 014 | AI hub full test and fixes | active | high | 006, 010 | active/014-ai-hub-sweep |
 | 015 | Guided project start — complete brief, agent/human split | active | high | 014 | active/015-guided-project-brief |
 | 016 | Agent trust layer — risk-rated actions, policy L2, whole-run revert, budgets | active | high | 014 | active/016-agent-trust-layer |
-| 017 | Agent memory the product owns | active | high | 015, 016 | active/017-agent-memory |
+| 017 | Agent memory the product owns | done | high | 015, 016 | done/017-agent-memory |
 | 018 | Sprint 10 — external agents: OAuth, scopes, delegation | backlog | medium | 028, 031 | backlog/018-agent-interop |
 | 019 | Sprint 9 — evals and routing measurement | backlog | medium | 026, 027, 030 | backlog/019-agent-evals-observability |
 | 020 | Automation comments show as Ghost User | backlog | medium | — | backlog/020-automation-comment-author |
