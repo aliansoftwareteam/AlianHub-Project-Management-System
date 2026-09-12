@@ -345,27 +345,16 @@ function saveEta() {
         }
 
         estimates.forEach((data) => {
-            const firebaseObj = {
-                UserId: data.UserId,
-                TaskId: props.task._id,
-                ProjectId: props.task.ProjectID,
-                EstimatedTime: data.minutes,
-                Date: new Date(data.timeStamp),
-                createdAt: new Date(),
-                updatedAt: new Date()
+            const planObj = {
+                userId: data.UserId,
+                taskId: props.task._id,
+                projectId: props.task.ProjectID,
+                minutes: data.minutes,
+                date: new Date(data.timeStamp).toISOString()
             }
 
             if(data.id && data.id != null) {
-                const axiosObj = {
-                    updateObject: firebaseObj,
-                    key: "$set",
-                    compareObj: {
-                        _id: data.id
-                    },
-                    newObj: {
-                        new: true
-                    }
-                }
+                const axiosObj = { ...planObj, id: data.id }
 
                 apiRequest("put", `${env.ESTIMATED_TIME}`,axiosObj)
                 .then((resp) => {
@@ -386,23 +375,8 @@ function saveEta() {
                     savingETA.value = false;
                     console.error("ERROR in update ETA in mongo: ", error);
                 })
-                delete firebaseObj.createdAt;
             } else {
-                const axiosObj = {
-                    updateObject: firebaseObj,
-                    key: "$set",
-                    newObj: {
-                        upsert: true,
-                        new: true
-                    },
-                    compareObj: {
-                        userId: data.UserId,
-                        Date: new Date(data.timeStamp),
-                        TaskId: props.task._id
-                    }
-                }
-
-                apiRequest("put", `${env.ESTIMATED_TIME}`,axiosObj)
+                apiRequest("put", `${env.ESTIMATED_TIME}`,planObj)
                 .then((res) => {
                     const docData = res.data;
                     let changeDate = new Date(docData.Date).setHours(0,0,0,0);
