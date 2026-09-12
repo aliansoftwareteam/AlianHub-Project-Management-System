@@ -1,5 +1,6 @@
 const { validate: validateConditions, usesChangeOps } = require('../engine/expression');
 const registry = require('../engine/registry');
+const timeTrigger = require('../../Workflows/timeTrigger');
 
 // Validation for v2 (event-triggered, multi-step) rules.
 //
@@ -57,6 +58,9 @@ const validateRuleV2 = (input = {}) => {
     if (!triggerDef) {
         errors.push(`trigger.event: unknown event "${trigger.event}"`);
     }
+    // A schedule carries its own shape, and it is the only trigger that does:
+    // every other one is named by an event the bus publishes.
+    if (triggerDef && triggerDef.kind === 'time') errors.push(...timeTrigger.validateSchedule(trigger.schedule));
 
     errors.push(...validateConditions(input.conditions, 'conditions'));
 
@@ -84,7 +88,9 @@ const validateRuleV2 = (input = {}) => {
         value: {
             name,
             version: 2,
-            trigger: { type: 'event', event: trigger.event },
+            trigger: triggerDef.kind === 'time'
+                ? { type: 'time', event: trigger.event, schedule: { ...trigger.schedule, timezone: 'UTC' } }
+                : { type: 'event', event: trigger.event },
             scope: {
                 allProjects: scope.allProjects !== false,
                 projectIds: Array.isArray(scope.projectIds) ? scope.projectIds.map(String) : [],
@@ -103,7 +109,8 @@ const validateRuleV2 = (input = {}) => {
  * so a rule reads identically wherever it appears. */
 const describeV2 = (rule = {}) => {
     const trigger = registry.getTrigger(rule.trigger?.event);
-    const when = trigger ? trigger.label : (rule.trigger?.event || 'unknown trigger');
+    const schedule = rule.trigger?.type === 'time' ? timeTrigger.describe(rule.trigger.schedule) : null;
+    const when = schedule || (trigger ? trigger.label : (rule.trigger?.event || 'unknown trigger'));
     const actions = (rule.steps || [])
         .filter((s) => s.type === 'action')
         .map((s) => (registry.getAction(s.action)?.label || s.action));

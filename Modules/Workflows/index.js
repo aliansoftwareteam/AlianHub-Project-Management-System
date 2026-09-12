@@ -7,6 +7,9 @@ const concurrency = require('./concurrency');
 const idempotency = require('./idempotency');
 const flag = require('./flag');
 const automationRule = require('./automationRule');
+const stepTypes = require('./stepTypes');
+const approvals = require('./approvals');
+const timeTrigger = require('./timeTrigger');
 
 // Workflow runs and step runs (task 028, sprint 5 step 1).
 //
@@ -45,5 +48,9 @@ module.exports = {
     concurrency,
     idempotency,
     flag,
+    stepTypes,
+    approvals,
+    timeTrigger,
+    blockedReason: stepTypes.blockedReason,
     AUTOMATION_RULE: automationRule.TYPE,
 };
