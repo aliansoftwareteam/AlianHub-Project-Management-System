@@ -185,6 +185,9 @@ const workflowRunsSchema = new Schema(schema.workflowRuns, {strict: true, timest
 workflowRunsSchema.index({ dedupeKey: 1 }, { unique: true, partialFilterExpression: { dedupeKey: { $type: 'string' } } });
 workflowRunsSchema.index({ status: 1, startedAt: -1 });
 workflowRunsSchema.index({ workflowId: 1, startedAt: -1 });
+// What the API lists by: the runs of one kind, and the runs of one agent.
+workflowRunsSchema.index({ source: 1, startedAt: -1 });
+workflowRunsSchema.index({ agentId: 1, startedAt: -1 });
 workflowRunsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 });
 
 const workflowStepRunsSchema = new Schema(schema.workflowStepRuns, {strict: true, timestamps: true});

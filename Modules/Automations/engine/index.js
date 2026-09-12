@@ -28,6 +28,15 @@ const selectDriver = () => {
 
 const enqueueRun = (data, opts) => driver.enqueue(JOB_NAME, data, opts);
 
+/* The seam Modules/Workflows dispatches a run through. False means there is no
+ * queue to take it — the engine is off or has not started — and the caller has
+ * to execute the run itself. */
+const enqueueWorkflowRun = async (data, opts) => {
+    if (!driver) return false;
+    await enqueueRun(data, opts);
+    return true;
+};
+
 const scheduleRecurring = async (name, intervalMs, handler) => {
     driver.define(name, async (job) => {
         try { await handler(job); } catch (error) { logger.error(`${LOG_PREFIX} ${name} failed: ${error.message}`); }
@@ -126,4 +135,4 @@ async function stop() {
     started = false;
 }
 
-module.exports = { start, stop, onEnvelope, enabled, defineRecurring, JOB_NAME, _setDriver: (d) => { driver = d; }, _isStarted: () => started };
+module.exports = { start, stop, onEnvelope, enabled, defineRecurring, enqueueWorkflowRun, JOB_NAME, _setDriver: (d) => { driver = d; }, _isStarted: () => started };

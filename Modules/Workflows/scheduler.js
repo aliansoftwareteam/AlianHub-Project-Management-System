@@ -13,6 +13,13 @@ const BLOCKING = Object.freeze(['failed', 'stopped', 'skipped']);
 
 const byId = (steps) => new Map(steps.map((step) => [String(step.stepId), step]));
 
+/* A person who skips a failed step is saying "go on without it", so their skip
+ * satisfies the steps that depend on it. A skip the engine wrote, because the
+ * dependency could never run, means the opposite and still blocks. */
+const skippedByPerson = (step) => Boolean(step && step.status === 'skipped' && step.skippedBy);
+
+const settledWell = (step) => Boolean(step) && (step.status === SUCCEEDED || skippedByPerson(step));
+
 const due = (step, now) => !step.nextAttemptAt || new Date(step.nextAttemptAt).getTime() <= now.getTime();
 
 const dependencies = (step, index) => (step.dependsOn || []).map((id) => index.get(String(id)));
@@ -21,9 +28,9 @@ const dependencies = (step, index) => (step.dependsOn || []).map((id) => index.g
  * treating a typo as "no dependency" would run the step out of order. */
 const blockedBy = (step, index) => (step.dependsOn || [])
     .map((id) => ({ id: String(id), dependency: index.get(String(id)) || null }))
-    .filter(({ dependency }) => !dependency || BLOCKING.includes(dependency.status));
+    .filter(({ dependency }) => !dependency || (BLOCKING.includes(dependency.status) && !skippedByPerson(dependency)));
 
-const satisfied = (step, index) => dependencies(step, index).every((dep) => dep && dep.status === SUCCEEDED);
+const satisfied = (step, index) => dependencies(step, index).every(settledWell);
 
 const readySet = (steps, now = new Date()) => {
     const index = byId(steps);
@@ -75,4 +82,4 @@ const runStatus = (steps) => {
     return 'success';
 };
 
-module.exports = { readySet, blockedSet, nextAttemptAt, allSettled, runStatus, byId, SUCCEEDED, BLOCKING };
+module.exports = { readySet, blockedSet, nextAttemptAt, allSettled, runStatus, byId, skippedByPerson, settledWell, SUCCEEDED, BLOCKING };

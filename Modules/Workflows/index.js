@@ -6,7 +6,9 @@ const retry = require('./retry');
 const concurrency = require('./concurrency');
 const idempotency = require('./idempotency');
 const flag = require('./flag');
+const queue = require('./queue');
 const automationRule = require('./automationRule');
+const agentRun = require('./agentRun');
 
 // Workflow runs and step runs (task 028, sprint 5 step 1).
 //
@@ -32,9 +34,48 @@ const startForRule = (companyId, rule, envelope, automationRun) => store.createR
     steps: [{ id: 'rule', type: automationRule.TYPE, dependsOn: [], maxAttempts: flag.maxAttempts() }],
 });
 
+/* A run a person started from a task, as a one-node workflow.
+ *
+ * The agent run row already exists and is already this person's run; the
+ * workflow wraps it so that it is claimed, leased and retried on the queue
+ * instead of executed on the web request's own event loop. Dedupe on the agent
+ * run means a retried request wraps the run it already made.
+ */
+const startForAgentRun = (companyId, run, { note } = {}) => store.createRun(companyId, {
+    workflowId: `agent:${run.agentId}`,
+    name: run.agentName || '',
+    source: 'agent_run',
+    dedupeKey: `agentrun:${run._id}`,
+    agentId: String(run.agentId),
+    taskId: run.taskId ? String(run.taskId) : null,
+    projectId: run.projectId ? String(run.projectId) : null,
+    startedBy: run.startedBy || null,
+    traceId: run.traceId || null,
+    steps: [{
+        id: 'agent',
+        type: agentRun.TYPE,
+        dependsOn: [],
+        config: { agentRunId: String(run._id), agentId: String(run.agentId), taskId: run.taskId ? String(run.taskId) : null, note: note || '' },
+        maxAttempts: flag.maxAttempts(),
+    }],
+});
+
+/* Puts a run on the queue and hands the agent run back, so a caller that used to
+ * execute in process swaps one line. Null when the workflow could not be created,
+ * which is the caller's signal to fall back to the path it had. */
+const enqueueForAgentRun = async (companyId, run, options) => {
+    const workflowRun = await startForAgentRun(companyId, run, options);
+    if (!workflowRun) return null;
+    await queue.dispatch(companyId, workflowRun._id);
+    return workflowRun;
+};
+
 module.exports = {
     enabled: flag.enabled,
     startForRule,
+    startForAgentRun,
+    enqueueForAgentRun,
+    dispatch: queue.dispatch,
     tick: engine.tick,
     runStep: engine.runStep,
     store,
@@ -45,5 +86,7 @@ module.exports = {
     concurrency,
     idempotency,
     flag,
+    queue,
     AUTOMATION_RULE: automationRule.TYPE,
+    AGENT_RUN: agentRun.TYPE,
 };
