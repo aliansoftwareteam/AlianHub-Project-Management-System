@@ -20,6 +20,8 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const mongoose = require('mongoose');
 const logger = require('../../Config/loggerConfig');
 const provenance = require('../Tasks/helpers/provenanceRollup');
+const { canSeeSprint, sprintIdentities } = require('../Sprints/helpers/sprintVisibility');
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 
@@ -45,17 +47,23 @@ exports.getVelocity = async (req, res) => {
                     mainChat: { $ne: true },
                     isBacklog: { $ne: true },
                 },
-                '_id name createdAt startDate endDate commitment closeReport',
+                '_id name createdAt startDate endDate commitment closeReport private AssigneeUserId',
             ],
         }, 'find');
 
-        const measurable = (sprints || []).filter((s) => s.commitment && s.commitment.at);
+        /* A private sprint is not on the chart for someone it was not shared with. */
+        const identities = await sprintIdentities(companyId, req.uid);
+        const visible = isPrivileged(await getRoleType(companyId, req.uid))
+            ? (sprints || [])
+            : (sprints || []).filter((sprint) => canSeeSprint(sprint, identities));
+
+        const measurable = visible.filter((s) => s.commitment && s.commitment.at);
 
         if (!measurable.length) {
             return res.send({
                 status: true,
                 statusText: 'No completed sprints yet.',
-                data: { sprints: [], skipped: (sprints || []).length },
+                data: { sprints: [], skipped: visible.length },
             });
         }
 
@@ -105,7 +113,7 @@ exports.getVelocity = async (req, res) => {
         return res.send({
             status: true,
             statusText: 'Velocity computed.',
-            data: { sprints: withAvg, skipped: (sprints || []).length - measurable.length },
+            data: { sprints: withAvg, skipped: visible.length - measurable.length },
         });
     } catch (error) {
         logger.error(`ERROR in agile velocity: ${error.message}`);

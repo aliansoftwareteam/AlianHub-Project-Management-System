@@ -4,6 +4,7 @@ const hours = require('./hours');
 const scrum = require('./scrum');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { READ, WRITE, requireProjectAccess, projectIdsFrom } = require('../../Config/projectAccess');
+const { requireSprintAccess } = require('./helpers/sprintVisibility');
 
 // Whitelist of functions allowed to be called via PATCH /sprint/:id
 const ALLOWED_SPRINT_TYPES = ['editSprintName', 'updateSprint', 'deleteChannel'];
@@ -21,6 +22,10 @@ const FOLDER_RENAME = 'project.project_folder_name_edit';
 const FOLDER_STATUS = { 0: 'project.folder_restore', 1: 'project.folder_delete', 2: 'project.folder_archive' };
 
 const bodyOf = (req) => req.body || {};
+
+// The project guard lets any project member through, so the scrum board needs the sprint
+// rule on top: a private sprint is only its assignees', their teams' and the admins'.
+const onSprint = (pick) => requireSprintAccess(pick);
 
 const sprintProject = (pick, direct) => projectIdsFrom({ records: [[SCHEMA_TYPE.SPRINTS, pick]], direct });
 
@@ -41,19 +46,21 @@ const folderPatchPermissions = (req) => {
 };
 
 exports.init = (app) => {
-    app.post('/api/v2/sprints/burndown', guard(READ, sprintProject((req) => bodyOf(req).sprintId || (req.query && req.query.sprintId))), burndown.getSprintBurndown);
-    app.post('/api/v2/sprints/hours', guard(READ, sprintProject((req) => bodyOf(req).sprintId)), hours.getSprintHours);
+    const burndownSprint = (req) => bodyOf(req).sprintId || (req.query && req.query.sprintId);
+    app.post('/api/v2/sprints/burndown', guard(READ, sprintProject(burndownSprint)), onSprint(burndownSprint), burndown.getSprintBurndown);
+    app.post('/api/v2/sprints/hours', guard(READ, sprintProject((req) => bodyOf(req).sprintId)), onSprint((req) => bodyOf(req).sprintId), hours.getSprintHours);
 
     // Scrum lifecycle. Deliberately under /api/v2/sprints: setMiddleware.js
     // registers that as a PREFIX, so these are behind a token by default.
     // /api/v1/sprints (plural) is NOT registered anywhere and would be open.
     const managesSprint = guard(WRITE, sprintProject((req) => [bodyOf(req).sprintId, bodyOf(req).incompleteDestination]), () => [SPRINT_CREATE]);
-    app.post('/api/v2/sprints/scrum', managesSprint, scrum.setScrum);
-    app.post('/api/v2/sprints/start', managesSprint, scrum.startSprint);
-    app.post('/api/v2/sprints/complete', managesSprint, scrum.completeSprint);
-    app.get('/api/v2/sprints/complete-preview', guard(READ, sprintProject((req) => req.query && req.query.sprintId)), scrum.completePreview);
+    const writesSprint = onSprint((req) => [bodyOf(req).sprintId, bodyOf(req).incompleteDestination]);
+    app.post('/api/v2/sprints/scrum', managesSprint, writesSprint, scrum.setScrum);
+    app.post('/api/v2/sprints/start', managesSprint, writesSprint, scrum.startSprint);
+    app.post('/api/v2/sprints/complete', managesSprint, writesSprint, scrum.completeSprint);
+    app.get('/api/v2/sprints/complete-preview', guard(READ, sprintProject((req) => req.query && req.query.sprintId)), onSprint((req) => req.query && req.query.sprintId), scrum.completePreview);
     app.post('/api/v2/sprints/backlog', guard(READ, (req) => bodyOf(req).projectId), scrum.getBacklog);
-    app.get('/api/v2/sprints/report', guard(READ, sprintProject((req) => req.query && req.query.sprintId)), scrum.sprintReport);
+    app.get('/api/v2/sprints/report', guard(READ, sprintProject((req) => req.query && req.query.sprintId)), onSprint((req) => req.query && req.query.sprintId), scrum.sprintReport);
 
     const addsSprint = projectIdsFrom({ records: [[SCHEMA_TYPE.FOLDERS, (req) => bodyOf(req).folder && bodyOf(req).folder.folderId]], direct: (req) => bodyOf(req).projectId });
     app.post('/api/v1/sprint', guard(WRITE, addsSprint, () => [SPRINT_CREATE]), ctrl.addSprint);

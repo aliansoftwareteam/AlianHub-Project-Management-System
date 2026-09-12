@@ -7,6 +7,7 @@ const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 const { visibleProjectIds } = require("../Agents/scope");
 const { pageVisibilityFilter } = require("../Pages/helpers/pageRules");
 const { validateSearchInput, truncate, RESULT_LIMIT_PER_TYPE } = require('./helpers/searchRules');
+const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
 
 // Regex rather than $text: it works on every existing tenant database and keeps
 // short queries and substring matches predictable.
@@ -15,18 +16,6 @@ const asObjectIds = (ids) => ids
     .map(String)
     .filter((id) => mongoose.Types.ObjectId.isValid(id))
     .map((id) => new mongoose.Types.ObjectId(id));
-
-/* Private sprints hide their tasks and comments from everyone not assigned to them, as the sidebar does. */
-const hiddenSprintIds = async (companyId, uid, projectIds, privileged) => {
-    if (privileged || !projectIds.length) return [];
-    const sprints = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.SPRINTS,
-        data: [{ projectId: { $in: projectIds }, private: true }, 'AssigneeUserId'],
-    }, 'find');
-    return (sprints || [])
-        .filter((sprint) => !(sprint.AssigneeUserId || []).map(String).includes(uid))
-        .map((sprint) => sprint._id);
-};
 
 /* A task comment is visible where its task is, whatever project id the comment row carries. */
 const onVisibleTasks = async (companyId, comments, projectIds, sprintClause) => {
@@ -56,7 +45,7 @@ exports.globalSearch = async (req, res) => {
             return res.status(403).send({ status: false, statusText: 'You are not a member of this company.' });
         }
         const projectIds = asObjectIds(await visibleProjectIds(companyId, uid));
-        const hidden = await hiddenSprintIds(companyId, uid, projectIds, isPrivileged(roleType));
+        const hidden = isPrivileged(roleType) ? [] : await hiddenSprintIds(companyId, uid, projectIds);
         const sprintClause = hidden.length ? { sprintId: { $nin: hidden } } : {};
 
         const rx = { $regex: escapeRegex(String(query).trim()), $options: 'i' };

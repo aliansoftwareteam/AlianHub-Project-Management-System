@@ -25,6 +25,7 @@ exports.init = (app) => {
     app.get(`${admin}/backups/:name/download`, ctrl.downloadBackup);
     app.post(`${admin}/backups/:name/restore`, ctrl.restoreBackup);
     app.delete(`${admin}/backups/:name`, ctrl.deleteBackup);
+    app.get(`${admin}/ai/providers`, ctrl.aiProviders);
     app.get(`${admin}/stats`, ctrl.stats);
     app.get(`${admin}/companies`, ctrl.companies);
     app.get(`${admin}/audit-export`, ctrl.auditExport);

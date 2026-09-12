@@ -9,6 +9,7 @@ const { escapeRegex } = require("../../utils/escapeRegex");
 const { parseMentionIds } = require("./helpers/parseMentions");
 const { handleNotificationtFun } = require("../notification/prepare-notification-data/controllerV2");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
+const { sprintIdentities, visibleSprintExpr } = require("../Sprints/helpers/sprintVisibility");
 
 /* @mention delivery: record the mention (feeds the in-app "mentions" tab, which
  * queries the mentions collection by mentionIds) and fire the notification
@@ -399,16 +400,13 @@ exports.searchComments = async (req, res) => {
                 },
             });
         } else{
+            /* The assignee list holds user ids and `tId_<teamId>`, and the caller comes from the
+             * session: a body userId would let a client read someone else's private sprints. */
+            const identities = await sprintIdentities(req.headers['companyid'], req.uid);
             sprintLookup.$lookup.pipeline.push(
                 {
                     $addFields: {
-                        isAccessible: {
-                            $cond: {
-                                if: { $eq: ['$private', true] },
-                                then: { $in: [req.body.userId, '$AssigneeUserId'] },
-                                else: true,
-                            },
-                        },
+                        isAccessible: visibleSprintExpr(identities),
                     },
                 },
                 {

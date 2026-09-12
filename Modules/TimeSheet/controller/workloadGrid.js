@@ -9,7 +9,7 @@ const socketEmitter = require('../../../event/socketEventEmitter');
 const { removeCache } = require('../../../utils/commonFunctions');
 const R = require('../helpers/weekRules');
 
-const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId);
+const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const safeZone = (z) => (z && DateTime.local().setZone(z).isValid ? z : 'UTC');
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
@@ -33,8 +33,7 @@ const nameMap = async (userIds) => {
 // People × days: estimate chips (estimated_time) and logged minutes against capacity (working hours − approved PTO).
 exports.getWorkloadGrid = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const b = req.body || {};
         if (!isDay(b.start) || !isDay(b.end)) return res.status(400).json({ status: false, statusText: 'start and end (YYYY-MM-DD) are required.' });
         const days = R.dayKeys(b.start, b.end);
@@ -126,6 +125,7 @@ exports.getWorkloadGrid = async (req, res) => {
 
         return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, hoursPerDay, users } });
     } catch (e) {
+        if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
         logger.error(`getWorkloadGrid: ${e.message}`);
         return res.status(500).json({ status: false, statusText: e.message });
     }
@@ -136,8 +136,7 @@ exports.getWorkloadGrid = async (req, res) => {
 // onto the task's due date / assignee so the plan and the task agree.
 exports.moveWorkloadChip = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const b = req.body || {};
         const taskId = oid(b.taskId);
         if (!taskId) return res.status(400).json({ status: false, statusText: 'A valid taskId is required.' });
@@ -182,6 +181,7 @@ exports.moveWorkloadChip = async (req, res) => {
         socketEmitter.emit('update', { type: 'update', data: { taskId: String(b.taskId), fromUserId, toUserId, fromDate: b.fromDate, toDate: b.toDate }, module: 'estimatedTime' });
         return res.json({ status: true, statusText: 'Work moved.', data: { taskId: String(b.taskId), updatedFields: set } });
     } catch (e) {
+        if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
         logger.error(`moveWorkloadChip: ${e.message}`);
         return res.status(500).json({ status: false, statusText: e.message });
     }

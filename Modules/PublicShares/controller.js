@@ -55,7 +55,12 @@ exports.createShare = async (req, res) => {
             return refuse(res, allowed, entityType === 'page' ? 'Doc not found.' : 'Not found.');
         }
         if (allowed.privateDoc) {
-            return res.send({ status: false, statusText: 'This doc is private. Set it to Shared before creating a public link.' });
+            return res.send({
+                status: false,
+                statusText: entityType === 'sprint'
+                    ? 'This sprint is private. Set it to Shared before creating a public link.'
+                    : 'This doc is private. Set it to Shared before creating a public link.',
+            });
         }
 
         const existing = await MongoDbCrudOpration(companyId, {

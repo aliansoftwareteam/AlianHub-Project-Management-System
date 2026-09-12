@@ -3,8 +3,14 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const R = require('./helpers/varianceRules');
 const { resolveTimeScope, visibleProjectsFor } = require('../TimeSheet/helpers/timeScope');
+const { canSeeSprintById, hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 
-const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId);
+const { sessionTenantOf, TenantError } = require('../../Config/tenant');
+const failed = (res, where, e) => {
+    if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
+    logger.error(`${where}: ${e.message}`);
+    return res.status(500).json({ status: false, statusText: e.message });
+};
 
 // GET /api/v1/reports/variance?projectId=&sprintId=
 // Estimate (tasks.totalEstimatedTime) vs actual (sum of timesheets.LogTimeDuration
@@ -12,8 +18,7 @@ const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.c
 // so a non-admin gets it only for the projects they can open.
 exports.getVarianceReport = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const q = req.query || {};
         if (!q.projectId && !q.sprintId) {
             return res.status(400).json({ status: false, statusText: 'projectId or sprintId is required.' });
@@ -27,6 +32,12 @@ exports.getVarianceReport = async (req, res) => {
             return res.status(403).json({ status: false, statusText: 'You do not have access to this project.' });
         }
         if (visible && !q.projectId) match.ProjectID = { $in: visible };
+        if (q.sprintId && !(await canSeeSprintById(companyId, req.uid, q.sprintId))) {
+            return res.status(404).json({ status: false, statusText: 'Sprint not found.' });
+        }
+        if (!q.sprintId) {
+            Object.assign(match, await hiddenSprintFilter(companyId, req.uid, q.projectId ? [String(q.projectId)] : (visible || [])));
+        }
 
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -60,7 +71,7 @@ exports.getVarianceReport = async (req, res) => {
         });
         const totals = R.rollup(rows);
         return res.json({ status: true, data: { totals, tasks: rows } });
-    } catch (e) { logger.error(`getVarianceReport: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, 'getVarianceReport', e); }
 };
 
 const mongoose = require('mongoose');
@@ -74,8 +85,7 @@ const LARGE_ESTIMATE_MINUTES = 16 * 60;
 // Company-wide for owners and admins; anyone else sees only the time they logged.
 exports.getVarianceSummary = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const q = req.query || {};
         const from = new Date(q.from ? `${String(q.from).slice(0, 10)}T00:00:00.000Z` : NaN);
         const to = new Date(q.to ? `${String(q.to).slice(0, 10)}T23:59:59.999Z` : NaN);
@@ -161,5 +171,5 @@ exports.getVarianceSummary = async (req, res) => {
                 takeaway: worst ? { ...worst, projectName: projectName[worst.projectId] || '' } : null,
             },
         });
-    } catch (e) { logger.error(`getVarianceSummary: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, 'getVarianceSummary', e); }
 };

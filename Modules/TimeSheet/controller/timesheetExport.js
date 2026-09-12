@@ -3,6 +3,7 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { buildTimesheetCsv } = require("../helpers/timesheetCsv");
 const logger = require("../../../Config/loggerConfig");
+const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 
 const toObjId = (id) => {
     try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; }
@@ -13,8 +14,7 @@ const toObjId = (id) => {
 // (User, Project, Date, Description, Billable, Hours). LogStartTime is seconds.
 exports.exportTimesheetCsv = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || (req.body && req.body.companyId);
-        if (!companyId) return res.status(400).send('companyId is required');
+        const companyId = sessionTenantOf(req);
         const { userArray = [], projectArray = [], start, end } = req.body || {};
         const match = {};
         if (Array.isArray(userArray) && userArray.length) match.Loggeduser = { $in: userArray };
@@ -51,6 +51,7 @@ exports.exportTimesheetCsv = async (req, res) => {
         res.setHeader('Content-Disposition', 'attachment; filename="timesheet-export.csv"');
         return res.status(200).send(csv);
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in timesheet CSV export: ${error.message}`);
         return res.status(500).send('Export failed');
     }

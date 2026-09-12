@@ -3,6 +3,7 @@ const logger = require('../../../Config/loggerConfig');
 const { removeCache } = require('../../../utils/commonFunctions');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries.js');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
+const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const { recordAuditFromReq } = require('../../Audit/recorder');
 const { getRoleType } = require('../../../Config/permissionGuard');
@@ -21,12 +22,9 @@ const math = require('../helpers/billingMath');
 const DONE_STATUS_TYPE = 'close';
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 
-const companyOf = (req) => String(
-    req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId) || '',
-);
-const actorId = (req) => String(
-    req.uid || (req.body && req.body.userData && (req.body.userData.id || req.body.userData._id)) || '',
-);
+// The guest refusal below looks the caller's role up by this id, so it comes from the verified
+// session only: a body-supplied userData.id let a guest borrow an admin's id and see the money.
+const actorId = (req) => String(req.uid || '');
 const isObjectIdString = (id) => OBJECT_ID.test(String(id || ''));
 
 /**
@@ -36,7 +34,7 @@ const isObjectIdString = (id) => OBJECT_ID.test(String(id || ''));
  * view. Refused here, at the endpoint, rather than hidden in the UI.
  */
 const refuseGuest = async (req, res) => {
-    const roleType = await getRoleType(companyOf(req), actorId(req));
+    const roleType = await getRoleType(sessionTenantOf(req), actorId(req));
     if (roleType !== ROLE_GUEST) return false;
     res.send({ status: false, statusText: 'Guests can only see the client view of this project.' });
     return true;
@@ -280,10 +278,10 @@ const buildBillingContext = async (companyId, projectId) => {
 /* GET /api/v2/billing/contract?projectId= */
 exports.getBillingContract = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const projectId = String((req.query && req.query.projectId) || '');
-        if (!companyId || !isObjectIdString(projectId)) {
-            return res.send({ status: false, statusText: 'companyId and a valid projectId are required.' });
+        if (!isObjectIdString(projectId)) {
+            return res.send({ status: false, statusText: 'A valid projectId is required.' });
         }
         if (await refuseGuest(req, res)) return undefined;
         const ctx = await buildBillingContext(companyId, projectId);
@@ -340,6 +338,7 @@ exports.getBillingContract = async (req, res) => {
             },
         });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in get billing contract: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -382,10 +381,10 @@ const sanitizeContractPatch = (body = {}) => {
 /* PUT /api/v2/billing/contract  body: { projectId, ...terms } */
 exports.updateBillingContract = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const projectId = String((req.body && req.body.projectId) || '');
-        if (!companyId || !isObjectIdString(projectId)) {
-            return res.send({ status: false, statusText: 'companyId and a valid projectId are required.' });
+        if (!isObjectIdString(projectId)) {
+            return res.send({ status: false, statusText: 'A valid projectId is required.' });
         }
         if (await refuseGuest(req, res)) return undefined;
         const set = sanitizeContractPatch(req.body);
@@ -416,6 +415,7 @@ exports.updateBillingContract = async (req, res) => {
         });
         return res.send({ status: true, statusText: 'Contract saved.', data: contractShape(saved) });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in update billing contract: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -424,10 +424,10 @@ exports.updateBillingContract = async (req, res) => {
 /* POST /api/v2/billing/milestone  body: { projectId, milestoneName, amount, dueDate?, signOffUserId? } */
 exports.createBillingMilestone = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const { projectId, milestoneName, amount, startDate, dueDate, signOffUserId } = req.body || {};
-        if (!companyId || !isObjectIdString(String(projectId || ''))) {
-            return res.send({ status: false, statusText: 'companyId and a valid projectId are required.' });
+        if (!isObjectIdString(String(projectId || ''))) {
+            return res.send({ status: false, statusText: 'A valid projectId is required.' });
         }
         if (await refuseGuest(req, res)) return undefined;
         const name = String(milestoneName || '').trim();
@@ -466,6 +466,7 @@ exports.createBillingMilestone = async (req, res) => {
         });
         return res.send({ status: true, statusText: 'Milestone added.', data: saved });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in create billing milestone: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -474,11 +475,11 @@ exports.createBillingMilestone = async (req, res) => {
 /* PATCH /api/v2/billing/milestone/:id  body: { projectId, ...fields } */
 exports.updateBillingMilestone = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const id = String(req.params.id || '');
         const projectId = String((req.body && req.body.projectId) || '');
-        if (!companyId || !isObjectIdString(id) || !isObjectIdString(projectId)) {
-            return res.send({ status: false, statusText: 'companyId, a valid milestone id and projectId are required.' });
+        if (!isObjectIdString(id) || !isObjectIdString(projectId)) {
+            return res.send({ status: false, statusText: 'A valid milestone id and projectId are required.' });
         }
         if (await refuseGuest(req, res)) return undefined;
         const body = req.body || {};
@@ -519,6 +520,7 @@ exports.updateBillingMilestone = async (req, res) => {
         });
         return res.send({ status: true, statusText: 'Milestone saved.', data: saved });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in update billing milestone: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -540,10 +542,10 @@ const monthWindow = (month) => {
  * actually approved the period, not that the hours merely exist. */
 exports.getHourlyBilling = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const projectId = String((req.query && req.query.projectId) || '');
-        if (!companyId || !isObjectIdString(projectId)) {
-            return res.send({ status: false, statusText: 'companyId and a valid projectId are required.' });
+        if (!isObjectIdString(projectId)) {
+            return res.send({ status: false, statusText: 'A valid projectId is required.' });
         }
         if (await refuseGuest(req, res)) return undefined;
         const { start, end, label } = monthWindow(req.query && req.query.month);
@@ -632,6 +634,7 @@ exports.getHourlyBilling = async (req, res) => {
             },
         });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in get hourly billing: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -641,7 +644,6 @@ module.exports.buildBillingContext = buildBillingContext;
 module.exports.contractShape = contractShape;
 module.exports.resolveMilestoneScope = resolveMilestoneScope;
 module.exports.monthWindow = monthWindow;
-module.exports.companyOf = companyOf;
 module.exports.actorId = actorId;
 module.exports.isObjectIdString = isObjectIdString;
 module.exports.toEpoch = toEpoch;

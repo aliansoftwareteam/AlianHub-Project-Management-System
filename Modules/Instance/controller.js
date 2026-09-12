@@ -1,4 +1,5 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const axios = require('axios');
 const logger = require('../../Config/loggerConfig');
@@ -16,6 +17,7 @@ const logs = require('./logsPath');
 const backups = require('./backups');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { csvCell: formulaSafeCell } = require('../../utils/csv');
+const llmProvider = require('../AICore/llmProvider');
 
 const PUBLIC_CONFIG_KEY = 'instance:public-config';
 const LATEST_RELEASE_KEY = 'instance:latest-release';
@@ -317,6 +319,17 @@ exports.auditExport = async (req, res) => {
             lines.push([row.createdAt ? new Date(row.createdAt).toISOString() : '', row.Type, row.Key, row.UserId, row.ProjectId, row.TaskId, row.Message].map(csvCell).join(','));
         });
         return res.send('﻿' + lines.join('\r\n'));
+    } catch (error) {
+        return fail(res, 500, error.message);
+    }
+};
+
+/* The routing console's provider rows: what the registry knows about each
+ * provider plus what this process has seen it do. Health and breakers are per
+ * node, so this answers for the node that served the request, not the cluster. */
+exports.aiProviders = async (req, res) => {
+    try {
+        return ok(res, 'AI providers.', { node: os.hostname(), ...llmProvider.providerStatus() });
     } catch (error) {
         return fail(res, 500, error.message);
     }

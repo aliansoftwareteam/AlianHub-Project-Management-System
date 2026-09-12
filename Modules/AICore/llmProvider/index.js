@@ -1,6 +1,9 @@
-const { metered } = require('../spend');
-const { ADAPTERS, PROVIDER_NAMES, adapterFor, configuredNames, isAnyConfigured, describe, list } = require('./registry');
+const registry = require('./registry');
+const { ADAPTERS, PROVIDER_NAMES, adapterFor, configuredNames, isAnyConfigured, describe, list } = registry;
 const { routerEnabled } = require('./normalise');
+const { resilient } = require('./router');
+const health = require('./health');
+const rateLimit = require('./rateLimit');
 
 function configuredAdapter() {
     const selected = (process.env.LLM_PROVIDER || '').trim().toLowerCase();
@@ -29,16 +32,33 @@ function selectAdapter(selection) {
 
 /**
  * The selected adapter behind the spend meter: every chat() is priced
- * before the vendor call and booked to the ledger after it.
+ * before the vendor call and booked to the ledger after it. While the router
+ * flag is on it is also behind the breaker, the token bucket and failover to
+ * the next configured provider; with the flag off it is one adapter and one
+ * attempt, exactly as before, with the outcome recorded for the console.
  * @param {{provider?: string}} [selection]
  * @returns {import('./types').LlmProvider}
  */
 function getProvider(selection) {
-    return metered(selectAdapter(selection));
+    return resilient(selectAdapter(selection), registry);
 }
 
 function isAnyProviderConfigured() {
     return isAnyConfigured();
+}
+
+/* The instance console's provider row: what the registry knows about a
+ * provider, plus what this process has seen it do. */
+function providerStatus() {
+    return {
+        routerEnabled: routerEnabled(),
+        breakerPolicy: health.policy(),
+        providers: list().map((row) => ({
+            ...row,
+            health: health.snapshot(row.provider, row.model),
+            rateLimit: rateLimit.budget(row.provider),
+        })),
+    };
 }
 
 module.exports = {
@@ -49,5 +69,8 @@ module.exports = {
     adapterFor,
     describeProvider: describe,
     listProviders: list,
+    providerStatus,
+    health,
+    rateLimit,
     PROVIDER_NAMES,
 };

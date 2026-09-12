@@ -5,6 +5,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { visibleProjectIds } = require('../Agents/scope');
+const { canSeeSprintById, hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const { validateExportInput, buildFileName, taskToRow, rowsToCsv } = require('./helpers/exportRules');
 
 // Files stay on the server and only stream back through the download endpoint,
@@ -32,6 +33,10 @@ async function processJob(companyId, jobId) {
         };
         if (job.filters.sprintId) {
             filter.sprintId = new mongoose.Types.ObjectId(job.filters.sprintId);
+        } else {
+            /* The job runs detached from the request, so the private sprints are excluded
+             * again here against the person the export belongs to. */
+            Object.assign(filter, await hiddenSprintFilter(companyId, job.userId, [String(job.filters.projectId)]));
         }
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -77,6 +82,9 @@ exports.createExport = async (req, res) => {
         const visible = await visibleProjectIds(companyId, userId);
         if (!visible.includes(String(projectId))) {
             return res.status(404).send({ status: false, statusText: 'Project not found.' });
+        }
+        if (sprintId && !(await canSeeSprintById(companyId, userId, sprintId))) {
+            return res.status(404).send({ status: false, statusText: 'Sprint not found.' });
         }
 
         const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');

@@ -10,7 +10,7 @@ const { parsePeriod } = require('../../TimesheetApproval/helpers/approvalRules')
 const R = require('../helpers/weekRules');
 
 const RUNNING_WINDOW_SEC = 10 * 60;
-const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId) || (req.body && req.body.companyId);
+const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const safeZone = (z) => (z && DateTime.local().setZone(z).isValid ? z : 'UTC');
 
@@ -44,8 +44,7 @@ const approvalFor = async (companyId, userId, start, end) => {
 // GET /api/v1/timesheet/week?start=&end=&userId=&projectId=&hoursPerDay=&timeZone=
 exports.getWeekTimesheet = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const q = req.query || {};
         if (!q.start || !q.end) return res.status(400).json({ status: false, statusText: 'start and end are required.' });
         const zone = safeZone(q.timeZone);
@@ -125,6 +124,7 @@ exports.getWeekTimesheet = async (req, res) => {
             },
         });
     } catch (e) {
+        if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
         logger.error(`getWeekTimesheet: ${e.message}`);
         return res.status(500).json({ status: false, statusText: e.message });
     }
@@ -133,8 +133,7 @@ exports.getWeekTimesheet = async (req, res) => {
 // PUT /api/v1/timesheet/entries/billable  body: { entryIds: [], billable }
 exports.setEntriesBillable = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const { entryIds, billable } = req.body || {};
         const ids = Array.isArray(entryIds) ? entryIds.map(oid).filter(Boolean) : [];
         if (!ids.length) return res.status(400).json({ status: false, statusText: 'entryIds are required.' });
@@ -149,6 +148,7 @@ exports.setEntriesBillable = async (req, res) => {
         socketEmitter.emit('update', { type: 'update', data: { entryIds: ids.map(String), billable: billable !== false }, module: 'timesheet' });
         return res.json({ status: true, statusText: 'Billable updated.', data: { updated: result && result.modifiedCount, billable: billable !== false } });
     } catch (e) {
+        if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
         logger.error(`setEntriesBillable: ${e.message}`);
         return res.status(500).json({ status: false, statusText: e.message });
     }

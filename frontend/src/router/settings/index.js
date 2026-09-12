@@ -177,6 +177,7 @@ export default [
                     { path: "backups", name: "InstanceBackups", meta: { title: "Backups", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceBackups.vue') },
                     { path: "upgrade", name: "InstanceUpgrade", meta: { title: "Upgrade", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceUpgrade.vue') },
                     { path: "logs", name: "InstanceLogs", meta: { title: "Logs", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceLogs.vue') },
+                    { path: "providers", name: "InstanceProviders", meta: { title: "AI providers", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceProviders.vue') },
                     { path: "stats", name: "InstanceStats", meta: { title: "Instance stats", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceStats.vue') },
                 ]
             },
