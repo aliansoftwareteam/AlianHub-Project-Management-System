@@ -2,20 +2,22 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { myCache } = require('../../Config/config');
 const { removeCache } = require("../../utils/commonFunctions");
+const { teamsCachePrefix, teamsListKey } = require("./cacheKeys");
 
 exports.getTeams = async(req,res) => {
     try {
+        const companyId = req.headers['companyid'];
         const teamsObj = {
             type: SCHEMA_TYPE.TEAMS_MANAGEMENT,
             data: []
         };
 
-        const teamCache = 'teams';
+        const teamCache = teamsListKey(companyId);
         let teams = myCache.get(teamCache);
         let isFromCache = true;
         if(!teams){
             isFromCache = false;
-            teams =  await MongoDbCrudOpration(req.headers['companyid'], teamsObj, 'find');
+            teams =  await MongoDbCrudOpration(companyId, teamsObj, 'find');
             myCache.set(teamCache, teams, 604800);
         }
 
@@ -43,7 +45,7 @@ exports.addTeam = async (req,res) => {
         if (!response) {
             return res.status(400).json({ message: "Teams not added" });
         }
-        removeCache('teams',true);
+        removeCache(teamsCachePrefix(req.headers['companyid']), true);
         return res.status(200).json(response);
     } catch (error) {
         res.status(500).json({ message: "An error occurred while creating the teams", error: error.message });
@@ -74,7 +76,7 @@ exports.updateTeam = async(req,res) => {
         if (!team) {
             return res.status(400).json({ message: "Team not updated" });
         }
-        removeCache('teams',true);
+        removeCache(teamsCachePrefix(req.headers['companyid']), true);
         return res.status(200).json(team);
 
     } catch (error) {
