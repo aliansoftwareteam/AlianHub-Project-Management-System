@@ -9,6 +9,9 @@
  * server. Single source of truth (MCP plan decision D4).
  *
  * Model (mirrors the frontend exactly):
+ *   - A role comes from an ACTIVE company seat and nothing else: a pending invitee
+ *     and a removed member both keep a company_users row carrying a roleType, and
+ *     neither of them is a member.
  *   - roleType 1 (owner) and 2 (admin) bypass all permission checks.
  *   - Every other role, guest (0) included, is evaluated against the company
  *     RULES, or the project's own PROJECT_RULES when that project has
@@ -25,6 +28,7 @@ const { MongoDbCrudOpration } = require("../utils/mongo-handler/mongoQueries");
 const { fetchRules } = require("../Modules/settings/securityPermissions/controller");
 const logger = require("./loggerConfig");
 const { ROLE_GUEST, ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER, isPrivileged } = require("./roleTypes");
+const { ACTIVE_SEAT, INVITED_SEAT } = require("./seatStatus");
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const ROLE_CACHE_TTL_SECONDS = 60;
@@ -64,18 +68,32 @@ const TASK_ACTION_PERMISSION = {
 
 const toObjectId = (value) => (OBJECT_ID_PATTERN.test(String(value || '')) ? new mongoose.Types.ObjectId(String(value)) : null);
 
-/** Resolve a user's roleType within a company (cached 60s). null if not a member. */
-const getRoleType = async (companyId, uid) => {
+/**
+ * Which company_users rows a lookup may read. `active` is the only one that answers
+ * "what may this caller do": a pending invitee has not accepted yet and a removed member
+ * keeps their row, and neither is a member. The other two exist so a flow that must still
+ * see such a row says so, and is read as a deliberate exception at the call site.
+ */
+const SEAT_SCOPES = {
+    active: ACTIVE_SEAT,
+    invited: INVITED_SEAT,
+    any: {},
+};
+
+/** Resolve a user's roleType within a company from a live seat (cached 60s). null if not a member. */
+const getRoleType = async (companyId, uid, { seat = 'active' } = {}) => {
     if (!companyId || !uid || !OBJECT_ID_PATTERN.test(String(companyId)) || !OBJECT_ID_PATTERN.test(String(uid))) {
         return null;
     }
-    const cacheKey = `roleType:${companyId}:${uid}`;
+    const seatFilter = SEAT_SCOPES[seat];
+    if (!seatFilter) throw new Error(`getRoleType: unknown seat scope ${seat}`);
+    const cacheKey = `roleType:${seat}:${companyId}:${uid}`;
     const cached = myCache.get(cacheKey);
     if (cached !== undefined) return cached;
     try {
         const companyUser = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [{ userId: String(uid) }, { roleType: 1 }],
+            data: [{ userId: String(uid), ...seatFilter }, { roleType: 1 }],
         }, "findOne");
         const roleType = companyUser && typeof companyUser.roleType === "number" ? companyUser.roleType : null;
         myCache.set(cacheKey, roleType, ROLE_CACHE_TTL_SECONDS);
@@ -289,7 +307,7 @@ const evaluateMany = async (companyId, uid, keys = MCP_PERMISSION_KEYS) => {
 
 /** Invalidate the cached roleType (call from member add/remove/role-change flows). */
 const invalidateRoleCache = (companyId, uid) => {
-    if (companyId && uid) myCache.del(`roleType:${companyId}:${uid}`);
+    if (companyId && uid) Object.keys(SEAT_SCOPES).forEach((seat) => myCache.del(`roleType:${seat}:${companyId}:${uid}`));
 };
 
 module.exports = {

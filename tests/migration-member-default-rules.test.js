@@ -30,7 +30,7 @@ const memberEntry = (companyId, key) => (ruleFor(companyId, key).roles || []).fi
 const seedCompany = (companyId, { member = null } = {}) => {
     const db = mockDbFor(companyId);
     db.seed(SCHEMA_TYPE.SETTINGS, { name: settingsCollectionDocs.ROLES, settings: [{ key: 0, name: 'Guest' }, { key: 1, name: 'Owner' }, { key: 2, name: 'Admin' }, { key: 3, name: 'Member' }] });
-    db.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: 3 });
+    db.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: 3, status: 2, isDelete: false });
     const project = db.seed(SCHEMA_TYPE.RULES, { key: 'project', name: 'Project', isParent: true, roles: [...GUEST_ONLY] });
     const task = db.seed(SCHEMA_TYPE.RULES, { key: 'task', name: 'Task', isParent: true, roles: [...GUEST_ONLY] });
     const settings = db.seed(SCHEMA_TYPE.RULES, { key: 'settings', name: 'Company Settings', isParent: true, roles: [...GUEST_ONLY] });

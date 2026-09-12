@@ -4,11 +4,11 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { dbCollections } = require('../../Config/collections');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { safeFileFilter, safeRelativePath } = require('../../utils/uploadConfig');
+const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 const { escapeRegex } = require('../../utils/escapeRegex');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const USER_PROFILES_BUCKET = 'USER_PROFILES';
-const ACTIVE_SEAT = 2;
 const OWNED_PROFILE_IMAGE = /^[a-f0-9]{24}_/i;
 const THUMBNAIL_SUFFIX = /-\d+x\d+(\.[^./]+)$/i;
 
@@ -24,7 +24,7 @@ const inAudience = (aud, companyId) => {
 async function hasActiveSeat(uid, companyId) {
     const seat = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMPANY_USERS,
-        data: [{ userId: uid, status: ACTIVE_SEAT, isDelete: { $ne: true } }, { _id: 1 }],
+        data: [{ userId: uid, ...ACTIVE_SEAT }, { _id: 1 }],
     }, 'findOne');
     return Boolean(seat);
 }

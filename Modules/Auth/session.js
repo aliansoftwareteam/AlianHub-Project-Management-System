@@ -235,7 +235,9 @@ exports.canManageUserSessions = async (uid, targetId, companyId) => {
     const { getRoleType, isPrivileged, ROLE_OWNER } = require("../../Config/permissionGuard");
     const callerRole = await getRoleType(companyId, uid);
     if (!isPrivileged(callerRole)) return false;
-    const targetRole = await getRoleType(companyId, targetId);
+    // Ending a departed member's sessions is exactly what an admin needs after removing them, so the
+    // target's role is read from whatever row they still hold.
+    const targetRole = await getRoleType(companyId, targetId, { seat: 'any' });
     if (targetRole === null) return false;
     return callerRole === ROLE_OWNER || targetRole !== ROLE_OWNER;
 };

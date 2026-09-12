@@ -58,7 +58,8 @@ beforeEach(() => {
     myCache.flushAll();
     seats = { [COMPANY]: Object.entries(ROLE_OF).map(([userId, roleType]) => ({ userId, roleType, status: ACTIVE, isDelete: false })) };
     getRoleType.mockReset();
-    // The real lookup matches on userId alone, so removed and pending rows still report their role.
+    // Deliberately looser than the real lookup, which reads an active seat only: the handler must
+    // refuse a removed or pending caller on the seat it reads itself, not on the role cache.
     getRoleType.mockImplementation(async (companyId, uid) => {
         const row = (seats[companyId] || []).find((seat) => seat.userId === uid);
         return row ? row.roleType : null;

@@ -31,7 +31,7 @@ const task = (proj, over) => mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Secret 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     myCache.flushAll();
-    Object.entries(ROLES).forEach(([userId, roleType]) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType }));
+    Object.entries(ROLES).forEach(([userId, roleType]) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false }));
 });
 
 describe('GET /api/v1/task/:id follows project visibility', () => {
