@@ -121,7 +121,7 @@ function metered(adapter) {
                 result = await adapter.chat(opts);
             } catch (error) {
                 await reservation.release(ticket);
-                call.settled(decision.RESERVATION.RELEASED);
+                call.settled(ticket.id ? decision.RESERVATION.RELEASED : ticket.state);
                 if (isProviderError(error)) logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} failed [${error.groupKey()}]${error.requestId ? ` request ${error.requestId}` : ''}: ${error.message}`);
                 telemetry.setAttributes(call.attributes());
                 await replay.record({ context, opts, adapter, error, durationMs: Date.now() - startedAt, decision: call.record() });
