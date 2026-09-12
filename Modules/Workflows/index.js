@@ -8,7 +8,10 @@ const idempotency = require('./idempotency');
 const flag = require('./flag');
 const queue = require('./queue');
 const automationRule = require('./automationRule');
-const agentRun = require('./agentRun');
+const agentRunner = require('./agentRun');
+const stepTypes = require('./stepTypes');
+const approvals = require('./approvals');
+const timeTrigger = require('./timeTrigger');
 
 // Workflow runs and step runs (task 028, sprint 5 step 1).
 //
@@ -34,6 +37,10 @@ const startForRule = (companyId, rule, envelope, automationRun) => store.createR
     steps: [{ id: 'rule', type: automationRule.TYPE, dependsOn: [], maxAttempts: flag.maxAttempts() }],
 });
 
+// A step id beginning with "s" is what lets a later step read this one's output
+// as "$sAgent.agentRunId"; the expression language recognises no other form.
+const STEP_ID = 'sAgent';
+
 /* A run a person started from a task, as a one-node workflow.
  *
  * The agent run row already exists and is already this person's run; the
@@ -52,8 +59,8 @@ const startForAgentRun = (companyId, run, { note } = {}) => store.createRun(comp
     startedBy: run.startedBy || null,
     traceId: run.traceId || null,
     steps: [{
-        id: 'agent',
-        type: agentRun.TYPE,
+        id: STEP_ID,
+        type: stepTypes.AGENT_RUN,
         dependsOn: [],
         config: { agentRunId: String(run._id), agentId: String(run.agentId), taskId: run.taskId ? String(run.taskId) : null, note: note || '' },
         maxAttempts: flag.maxAttempts(),
@@ -87,6 +94,11 @@ module.exports = {
     idempotency,
     flag,
     queue,
+    agentRunner,
+    stepTypes,
+    approvals,
+    timeTrigger,
+    blockedReason: stepTypes.blockedReason,
     AUTOMATION_RULE: automationRule.TYPE,
-    AGENT_RUN: agentRun.TYPE,
+    AGENT_RUN: stepTypes.AGENT_RUN,
 };

@@ -112,6 +112,15 @@ export default [
                 component: () => import(/* webpackChunkName: Security & Permissions */ '@/views/Settings/SecurityPermissions/SecurityPermissions.vue')
             },
             {
+                path: "routing-policy",
+                name: "RoutingPolicy",
+                meta: {
+                    title: "Routing Policy",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: Routing Policy */ '@/views/Settings/RoutingPolicy/RoutingPolicy.vue')
+            },
+            {
                 path: "my-profile",
                 name: "My Profile",
                 meta: {

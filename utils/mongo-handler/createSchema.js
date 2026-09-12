@@ -199,6 +199,17 @@ workflowStepRunsSchema.index({ runId: 1, status: 1 });
 workflowStepRunsSchema.index({ status: 1, leaseExpiresAt: 1 });
 workflowStepRunsSchema.index({ status: 1, nextAttemptAt: 1 });
 workflowStepRunsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 });
+// The fan-out join and the loop both ask "what belongs to this step?".
+workflowStepRunsSchema.index({ runId: 1, parentStepId: 1 });
+
+const workflowApprovalsSchema = new Schema(schema.workflowApprovals, {strict: true, timestamps: true});
+// One approval per step of a run: a redelivered tick opens the same row rather
+// than a second request for the same decision.
+workflowApprovalsSchema.index({ runId: 1, stepId: 1 }, { unique: true });
+// The escalation and deadline sweeps read this one.
+workflowApprovalsSchema.index({ status: 1, deadlineAt: 1 });
+workflowApprovalsSchema.index({ ownerUserId: 1, status: 1 });
+workflowApprovalsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 });
 
 const agentFindingsSchema = new Schema(schema.agentFindings, {strict: true, timestamps: true});
 // The dedup key. Unique, so a concurrent second run cannot race in a duplicate.
@@ -391,6 +402,7 @@ module.exports = {
     automationRunsSchema,
     workflowRunsSchema,
     workflowStepRunsSchema,
+    workflowApprovalsSchema,
     agentFindingsSchema,
     agentsSchema,
     agentRunsSchema,

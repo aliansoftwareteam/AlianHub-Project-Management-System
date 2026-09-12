@@ -35,4 +35,28 @@ const backoffLadder = () => {
     return parsed.length ? parsed : DEFAULT_BACKOFF_MS;
 };
 
-module.exports = { enabled, leaseMs, heartbeatMs, tenantConcurrency, maxAttempts, backoffLadder, DEFAULT_BACKOFF_MS };
+/* The bounds the step types carry (sprint 5 step 2). A fan-out and a loop are
+ * the two places where a workflow can expand without a person asking it to, so
+ * both have a ceiling the definition cannot raise — a definition may ask for
+ * less, never for more. */
+const maxFanOut = () => number(process.env.WORKFLOW_MAX_FAN_OUT, 50);
+
+const maxLoopIterations = () => number(process.env.WORKFLOW_MAX_LOOP_ITERATIONS, 25);
+
+/* How often a waiting step is looked at again. A person deciding an approval is
+ * not polled for: deciding wakes the step, and this is only the floor that
+ * catches a deadline nobody else noticed. */
+const approvalPollMs = () => number(process.env.WORKFLOW_APPROVAL_POLL_MS, 5 * MINUTE);
+
+/* A join and a loop wait on rows this process just wrote, so they come back
+ * quickly; a wait or a timer sleeps until its own moment and never uses this. */
+const joinPollMs = () => number(process.env.WORKFLOW_JOIN_POLL_MS, 2000);
+
+/* An approval with no deadline of its own expires rather than waiting forever:
+ * a step nobody can ever finish is a run that never ends. */
+const approvalDeadlineMs = () => number(process.env.WORKFLOW_APPROVAL_DEADLINE_MS, 3 * 24 * 60 * MINUTE);
+
+module.exports = {
+    enabled, leaseMs, heartbeatMs, tenantConcurrency, maxAttempts, backoffLadder, DEFAULT_BACKOFF_MS,
+    maxFanOut, maxLoopIterations, approvalPollMs, joinPollMs, approvalDeadlineMs,
+};

@@ -16,7 +16,16 @@ const DETERMINISTIC_NAMES = new Set(['DeterministicError', 'ValidationError', 'C
 const TRANSIENT_NAMES = new Set(['MongoNetworkError', 'MongoServerSelectionError', 'MongoTimeoutError', 'MongoNotConnectedError']);
 const TRANSIENT_CODES = new Set(['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'ECONNABORTED', 'ENOTFOUND', 'EAI_AGAIN', 'EPIPE', 'EHOSTUNREACH', 'ENETUNREACH', 'ERR_NETWORK']);
 
+/* Waiting is not failing. A step that is waiting on a person, a clock or its
+ * own children throws to hand the worker back, and says so with this name; the
+ * decision below lets it come back as often as its own deadline allows rather
+ * than spending the attempt budget a real failure is rationed by. */
+const WAITING = 'WorkflowWaiting';
+
 const classify = (error) => {
+    if (error && error.name === WAITING) {
+        return { deterministic: false, type: 'waiting', code: error.code || 'waiting', retryAfterMs: error.retryAfterMs || null, wait: error.wait || null };
+    }
     if (isProviderError(error)) {
         return { deterministic: !error.retryable, type: error.type, code: error.code, retryAfterMs: error.retryAfterMs || null };
     }
@@ -49,9 +58,12 @@ const backoffMs = (attempt, { retryAfterMs = null, jitter = Math.random } = {}) 
 /* The one decision a failed step makes: give up, or come back at `runAt`. */
 const decide = (error, { attempt, maxAttempts }) => {
     const failure = classify(error);
+    if (failure.type === 'waiting') {
+        return { retry: true, reason: 'waiting', failure, delayMs: Math.max(0, Number(failure.retryAfterMs) || 0) };
+    }
     if (failure.deterministic) return { retry: false, reason: 'deterministic', failure };
     if (attempt >= maxAttempts) return { retry: false, reason: 'attempts_exhausted', failure };
     return { retry: true, reason: 'transient', failure, delayMs: backoffMs(attempt, { retryAfterMs: failure.retryAfterMs }) };
 };
 
-module.exports = { classify, backoffMs, decide, DETERMINISTIC_NAMES, TRANSIENT_NAMES, TRANSIENT_CODES };
+module.exports = { classify, backoffMs, decide, WAITING, DETERMINISTIC_NAMES, TRANSIENT_NAMES, TRANSIENT_CODES };

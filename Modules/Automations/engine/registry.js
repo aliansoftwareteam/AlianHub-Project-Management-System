@@ -4,6 +4,8 @@ const addComment = require('./actions/addComment');
 const createSubtaskAction = require('./actions/createSubtask');
 const runAgent = require('./actions/runAgent');
 const { COMPARISON_OPS, CHANGE_OPS, LOGICAL_OPS } = require('./expression');
+const timeTrigger = require('../../Workflows/timeTrigger');
+const workflowEngine = require('../../Workflows/flag');
 
 // The manifest the builder UI renders itself from.
 //
@@ -34,6 +36,28 @@ const TRIGGERS = [
     // a task action on one fails as a missing entity.
     { key: 'form.submitted', label: 'Form is submitted', entity: 'form', actsOn: 'task', hasDiff: false },
 ];
+
+/* A schedule is a trigger too, and it belongs in this list rather than in one of
+ * its own — the builder, the validator and the rule sentence all read from here.
+ * It carries `kind: 'time'`, because nothing publishes it: what fires a due
+ * schedule is the workflow engine, so it is offered only while that is on. */
+const TIME_TRIGGERS = [
+    {
+        key: timeTrigger.EVENT,
+        label: 'On a schedule',
+        entity: 'schedule',
+        hasDiff: false,
+        kind: 'time',
+        schema: {
+            every: { type: 'select', label: 'Every', options: timeTrigger.EVERY, required: true },
+            at: { type: 'time', label: 'At (UTC)' },
+            weekday: { type: 'number', label: 'Day of the week' },
+            minute: { type: 'number', label: 'Minute of the hour' },
+        },
+    },
+];
+
+const availableTriggers = () => (workflowEngine.enabled() ? TRIGGERS.concat(TIME_TRIGGERS) : TRIGGERS);
 
 /* Fields a condition may read, with the operators that make sense for each — so
  * the builder offers "is empty" for assignees and "greater than" for subtask
@@ -69,7 +93,7 @@ const describeAction = (action) => ({
 });
 
 const manifest = () => ({
-    triggers: TRIGGERS,
+    triggers: availableTriggers(),
     conditionFields: CONDITION_FIELDS,
     conditionFieldsByEntity: { task: CONDITION_FIELDS, form: FORM_CONDITION_FIELDS },
     operators: { logical: LOGICAL_OPS, comparison: COMPARISON_OPS, change: CHANGE_OPS },
@@ -79,6 +103,6 @@ const manifest = () => ({
 const getAction = (key) => ACTIONS_BY_KEY.get(String(key)) || null;
 const hasAction = (key) => ACTIONS_BY_KEY.has(String(key));
 const actionKeys = () => ACTIONS.map((a) => a.key);
-const getTrigger = (key) => TRIGGERS.find((t) => t.key === String(key)) || null;
+const getTrigger = (key) => availableTriggers().find((t) => t.key === String(key)) || null;
 
-module.exports = { manifest, getAction, hasAction, actionKeys, getTrigger, describeAction, TRIGGERS, CONDITION_FIELDS, FORM_CONDITION_FIELDS };
+module.exports = { manifest, getAction, hasAction, actionKeys, getTrigger, availableTriggers, describeAction, TRIGGERS, TIME_TRIGGERS, CONDITION_FIELDS, FORM_CONDITION_FIELDS };

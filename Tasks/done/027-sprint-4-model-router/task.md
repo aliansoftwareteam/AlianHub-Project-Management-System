@@ -1,7 +1,7 @@
 ---
 id: 027
 title: Sprint 4 — the model router
-status: active
+status: done
 priority: high
 depends_on: [024, 026]
 created: 2026-09-10
@@ -9,7 +9,7 @@ created: 2026-09-10
 
 # 027 — Sprint 4 — the model router
 
-Status: active · depends on 024, 026 · sprint 4 · two weeks · branch `feat/sprint-4-model-router` (from `beta`)
+Status: done · depends on 024, 026 · sprint 4 · two weeks · branch `feat/sprint-4-model-router` (from `beta`)
 
 Source: `docs/AI-PLATFORM-ARCHITECTURE.md`, "Development and integration plan", Sprint 4. Filed 2026-09-10.
 

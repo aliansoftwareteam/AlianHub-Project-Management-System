@@ -1,7 +1,7 @@
 ---
 id: 026
 title: Sprint 3 — observability foundation
-status: active
+status: done
 priority: high
 depends_on: [024]
 created: 2026-09-10
@@ -9,7 +9,7 @@ created: 2026-09-10
 
 # 026 — Sprint 3 — observability foundation
 
-Status: active · depends on 024 · sprint 3 · two weeks · branch `feat/sprint-3-observability-foundation` (from `beta`)
+Status: done · depends on 024 · sprint 3 · two weeks · branch `feat/sprint-3-observability-foundation` (from `beta`)
 
 Source: `docs/AI-PLATFORM-ARCHITECTURE.md`, "Development and integration plan", Sprint 3. Filed 2026-09-10.
 

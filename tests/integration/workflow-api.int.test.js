@@ -31,7 +31,8 @@ const store = require('../../Modules/Workflows/store');
 const executors = require('../../Modules/Workflows/executors');
 const workflows = require('../../Modules/Workflows');
 const controller = require('../../Modules/Workflows/controller');
-const agentRunStep = require('../../Modules/Workflows/agentRun');
+const agentRunner = require('../../Modules/Workflows/agentRun');
+const stepTypes = require('../../Modules/Workflows/stepTypes');
 const runs = require('../../Modules/Agents/runs');
 
 const id = () => crypto.randomBytes(12).toString('hex');
@@ -194,13 +195,13 @@ describe('an agent run as a step', () => {
         const started = await startAgentStep();
         const runId = String(started.body.data.run._id);
 
-        const step = await stepRow(runId, 'agent');
+        const step = await stepRow(runId, 'sAgent');
         expect(step.status).toBe('success');
         expect(step.output.agentRunId).toBeTruthy();
 
         const agentRun = plain(await runs.get(COMPANY, step.output.agentRunId));
-        expect(agentRun).toMatchObject({ agentId: String(agent._id), taskId: String(task._id), trigger: agentRunStep.TRIGGER, status: runs.STATUS.DONE });
-        expect(agentRun.idempotencyKey).toBe(`wf:${runId}:agent`);
+        expect(agentRun).toMatchObject({ agentId: String(agent._id), taskId: String(task._id), trigger: agentRunner.TRIGGER, status: runs.STATUS.DONE });
+        expect(agentRun.idempotencyKey).toBe(`wf:${runId}:sAgent`);
         expect(runs.executeSkill).toHaveBeenCalled();
         expect(String((await store.getRun(COMPANY, runId)).status)).toBe('success');
     });
@@ -210,7 +211,7 @@ describe('an agent run as a step', () => {
         const started = await startAgentStep();
         const runId = String(started.body.data.run._id);
 
-        const step = await stepRow(runId, 'agent');
+        const step = await stepRow(runId, 'sAgent');
         expect(step.status).toBe('failed');
         expect(step.error).toMatch(/the provider refused/);
         expect(step.output.agentRunId).toBeTruthy();
@@ -222,17 +223,17 @@ describe('an agent run as a step', () => {
         skillOutcome = { status: runs.STATUS.FAILED, error: 'the provider refused' };
         const started = await startAgentStep();
         const runId = String(started.body.data.run._id);
-        const firstAgentRunId = (await stepRow(runId, 'agent')).output.agentRunId;
+        const firstAgentRunId = (await stepRow(runId, 'sAgent')).output.agentRunId;
 
         skillOutcome = { status: runs.STATUS.DONE, outcome: 'reviewed' };
-        const retried = await call(controller.retryStep, { params: { id: runId, stepId: 'agent' }, body: { reason: 'the provider is back' } });
+        const retried = await call(controller.retryStep, { params: { id: runId, stepId: 'sAgent' }, body: { reason: 'the provider is back' } });
 
         expect(retried.body.status).toBe(true);
-        const step = await stepRow(runId, 'agent');
+        const step = await stepRow(runId, 'sAgent');
         expect(step.status).toBe('success');
         expect(step.control).toMatchObject({ action: 'retry', by: OWNER });
         expect(step.output.agentRunId).toBe(firstAgentRunId);
-        expect(await agentRunRows(COMPANY, { idempotencyKey: `wf:${runId}:agent` })).toHaveLength(1);
+        expect(await agentRunRows(COMPANY, { idempotencyKey: `wf:${runId}:sAgent` })).toHaveLength(1);
         expect((await store.getRun(COMPANY, runId)).status).toBe('success');
     });
 
@@ -241,7 +242,7 @@ describe('an agent run as a step', () => {
         const started = await startAgentStep();
         const runId = String(started.body.data.run._id);
 
-        const step = await stepRow(runId, 'agent');
+        const step = await stepRow(runId, 'sAgent');
         expect(step.status).toBe('pending');
         expect(step.failure.deterministic).toBe(false);
         expect(step.error).toMatch(/waiting for approval/);
@@ -258,8 +259,8 @@ describe('a run a person started from a task', () => {
 
         expect(workflowRun).not.toBeNull();
         expect(workflowRun.source).toBe('agent_run');
-        expect(workflowRun.definition.steps[0]).toMatchObject({ type: agentRunStep.TYPE });
-        const step = await stepRow(workflowRun._id, 'agent');
+        expect(workflowRun.definition.steps[0]).toMatchObject({ type: stepTypes.AGENT_RUN });
+        const step = await stepRow(workflowRun._id, 'sAgent');
         expect(step.status).toBe('success');
         expect(step.output.agentRunId).toBe(String(agentRun._id));
         expect(plain(await runs.get(COMPANY, agentRun._id)).status).toBe(runs.STATUS.DONE);
@@ -322,9 +323,9 @@ describe('skip, resume and compensate on a failed step', () => {
     it('compensates an agent-run step by reverting the run it made', async () => {
         const started = await call(controller.startRun, { body: { agentId: String(agent._id), taskId: String(task._id) } });
         const runId = String(started.body.data.run._id);
-        const agentRunId = (await stepRow(runId, 'agent')).output.agentRunId;
+        const agentRunId = (await stepRow(runId, 'sAgent')).output.agentRunId;
 
-        const compensated = await call(controller.compensateStep, { params: { id: runId, stepId: 'agent' } });
+        const compensated = await call(controller.compensateStep, { params: { id: runId, stepId: 'sAgent' } });
 
         // The run made no reversible change in this environment, so the agents'
         // own revert refuses it — the point is that the step routes to that check

@@ -7,6 +7,7 @@ const executors = require('./executors');
 const concurrency = require('./concurrency');
 const idempotency = require('./idempotency');
 const retry = require('./retry');
+const agentRunner = require('./agentRun');
 const { leaseMs, heartbeatMs } = require('./flag');
 
 // The engine: claim a ready step, hold it under a lease, run it once, record
@@ -101,7 +102,9 @@ const runStep = async (companyId, run, pending, { workerId = WORKER_ID, context 
                 run,
                 step: claimed,
                 claim,
-                context: { ...context, keepAlive: () => store.heartbeat(companyId, claim), leaseLost: () => lost.value },
+                // The agent runner comes from here rather than from every caller of
+                // tick: a step type asks for `context.runAgent` and gets one.
+                context: { ...agentRunner.contextFor(companyId, claim), ...context, keepAlive: () => store.heartbeat(companyId, claim), leaseLost: () => lost.value },
             }),
         )));
         // A replay has no output of its own; the one the first attempt recorded stands.

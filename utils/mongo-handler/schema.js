@@ -1112,6 +1112,47 @@ const schema = {
         compensation: { type: Object, required: false },
         startedAt: { type: Date, required: false },
         finishedAt: { type: Date, required: false },
+        /* Task 028 sprint 5 step 2. A step that is waiting — on a person, on a
+         * clock, on its fan-out children — is pending with a `nextAttemptAt`,
+         * and these say why, so a pending row is readable as blocked rather
+         * than as failed-and-retrying. */
+        waitingSince: { type: Date, required: false },
+        waitUntil: { type: Date, required: false },
+        waitReason: { type: String, required: false },
+        approvalId: { type: String, required: false },
+        // Fan-out children are written at run time and point back at the step that expanded them.
+        parentStepId: { type: String, required: false },
+        childIndex: { type: Number, required: false },
+        item: { type: Object, required: false },
+        // A loop's bounds: the iteration it is on and the spend its body has taken.
+        iteration: { type: Number, required: false },
+        budgetUsedUsd: { type: Number, required: false },
+    },
+    /* Task 028 sprint 5 step 2. One row per human approval step: who owns the
+     * decision, when it escalates, when it expires and what happened. The step
+     * run waits on this row and resumes when it is decided. */
+    workflowApprovals: {
+        runId: { type: String, required: true },
+        stepId: { type: String, required: true },
+        workflowId: { type: String, required: false },
+        title: { type: String, required: false },
+        prompt: { type: String, required: false },
+        ownerUserId: { type: String, required: false },
+        ownerRole: { type: String, required: false },
+        escalateToUserId: { type: String, required: false },
+        escalateAt: { type: Date, required: false },
+        escalatedAt: { type: Date, required: false },
+        // Owners in order: the original owner first, then whoever an escalation handed it to.
+        owners: { type: Array, default: [], required: false },
+        deadlineAt: { type: Date, required: false },
+        // escalate | approve | reject | fail — what the deadline does when nobody decided.
+        onDeadline: { type: String, default: 'fail', required: false },
+        // pending | approved | rejected | expired
+        status: { type: String, default: 'pending', required: true },
+        decidedBy: { type: String, required: false },
+        decidedAt: { type: Date, required: false },
+        comment: { type: String, required: false },
+        context: { type: Object, default: {}, required: false },
     },
     // Integration connections — managed by Modules/Integrations (AUTO-04). Generic
     // registry backing the marketplace, Slack and iframe apps. Secret config keys

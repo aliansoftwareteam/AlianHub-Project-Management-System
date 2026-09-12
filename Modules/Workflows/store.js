@@ -140,10 +140,10 @@ const heartbeat = async (companyId, { runId, stepId, fencingToken, now = new Dat
 
 /* Every post-claim write goes through here, so there is exactly one place where
  * a stale fencing token is turned into a refusal. */
-const settleStep = async (companyId, { runId, stepId, fencingToken, set }) => {
+const settleStep = async (companyId, { runId, stepId, fencingToken, set, inc }) => {
     const updated = await call(companyId, STEPS, [
         { runId: String(runId), stepId: String(stepId), status: 'running', fencingToken: Number(fencingToken) },
-        { $set: set },
+        { $set: set, ...(inc ? { $inc: inc } : {}) },
         { returnDocument: 'after' },
     ], 'findOneAndUpdate');
     if (!updated) throw new StaleLeaseError(runId, stepId, fencingToken);
@@ -163,21 +163,50 @@ const noteStep = async (companyId, claim, set) => {
     }
 };
 
+const DONE_WAITING = { waitUntil: null, waitReason: null };
+
 const succeedStep = (companyId, claim, { output, auditId, replayed }) => settleStep(companyId, {
     ...claim,
-    set: { status: 'success', output: output || {}, error: null, failure: null, auditId: auditId || null, replayed: Boolean(replayed), finishedAt: new Date(), leaseExpiresAt: null },
+    set: { status: 'success', output: output || {}, error: null, failure: null, auditId: auditId || null, replayed: Boolean(replayed), finishedAt: new Date(), leaseExpiresAt: null, ...DONE_WAITING },
 });
 
 const failStep = (companyId, claim, { error, failure }) => settleStep(companyId, {
     ...claim,
-    set: { status: 'failed', error: String(error || '').slice(0, 500), failure: failure || null, finishedAt: new Date(), leaseExpiresAt: null },
+    set: { status: 'failed', error: String(error || '').slice(0, 500), failure: failure || null, finishedAt: new Date(), leaseExpiresAt: null, ...DONE_WAITING },
 });
 
-/* A transient failure: back to pending, with the time it may next be claimed. */
-const deferStep = (companyId, claim, { error, failure, runAt }) => settleStep(companyId, {
-    ...claim,
-    set: { status: 'pending', error: String(error || '').slice(0, 500), failure: failure || null, nextAttemptAt: runAt, workerId: null, claimedAt: null, leaseExpiresAt: null },
-});
+/* A transient failure: back to pending, with the time it may next be claimed.
+ *
+ * A wait comes back through here too, because handing a worker back is handing a
+ * worker back — but it is not a failure, so it is recorded as what it is: the
+ * reason and the moment it waits for instead of an error, and the attempt given
+ * back, so `attempts` keeps meaning "times this step ran" and a step waiting a
+ * week on a person does not spend a retry budget meant for a broken one. */
+const deferStep = (companyId, claim, { error, failure, runAt }) => {
+    const waiting = failure && failure.type === 'waiting' ? (failure.wait || {}) : null;
+    if (!waiting) {
+        return settleStep(companyId, {
+            ...claim,
+            set: { status: 'pending', error: String(error || '').slice(0, 500), failure: failure || null, nextAttemptAt: runAt, workerId: null, claimedAt: null, leaseExpiresAt: null },
+        });
+    }
+    return settleStep(companyId, {
+        ...claim,
+        set: {
+            status: 'pending',
+            error: null,
+            failure: null,
+            nextAttemptAt: runAt,
+            workerId: null,
+            claimedAt: null,
+            leaseExpiresAt: null,
+            waitUntil: waiting.until || runAt,
+            waitReason: String(waiting.reason || 'waiting').slice(0, 500),
+            ...(waiting.set || {}),
+        },
+        inc: { attempts: -1 },
+    });
+};
 
 /* Handing a claim back untaken — the tenant is at its concurrency limit. The
  * attempt is given back too, because nothing ran. */
@@ -273,10 +302,99 @@ const reopenRun = (companyId, runId) => call(companyId, RUNS, [
     { $set: { status: 'running', finishedAt: null, error: null } },
 ], 'updateOne');
 
+/* Fan-out children are rows the definition never named, written while the run is
+ * going. The fractional index keeps them between the step that expanded them and
+ * the join that waits for them, which is the order a tick walks its ready set. */
+const childRowsFor = (runId, parent, items, { type, config = {}, maxAttempts: attempts } = {}) => items.map((item, i) => ({
+    runId: String(runId),
+    stepId: `${parent.stepId}#${i + 1}`,
+    index: Number(parent.index || 0) + ((i + 1) / (items.length + 1)),
+    type: String(type),
+    action: config.action ? String(config.action) : null,
+    dependsOn: [String(parent.stepId)],
+    config: { ...config, item, itemIndex: i },
+    parentStepId: String(parent.stepId),
+    childIndex: i,
+    item: item !== null && typeof item === 'object' && !Array.isArray(item) ? item : { value: item },
+    status: 'pending',
+    attempts: 0,
+    maxAttempts: Number(attempts) > 0 ? Number(attempts) : maxAttempts(),
+    fencingToken: 0,
+}));
+
+/* Unordered, and a duplicate is tolerated: a step that expanded, died and was
+ * claimed again writes the same child ids, and the unique index on
+ * { runId, stepId } makes the second write a no-op rather than a twin. */
+const addSteps = async (companyId, rows) => {
+    if (!rows.length) return [];
+    try {
+        return await call(companyId, STEPS, [rows, { ordered: false }], 'insertMany');
+    } catch (error) {
+        if (isDuplicateKey(error)) return [];
+        throw error;
+    }
+};
+
+const listChildren = (companyId, runId, parentStepId) => call(companyId, STEPS, [
+    { runId: String(runId), parentStepId: String(parentStepId) }, null, { sort: { childIndex: 1 } },
+], 'find');
+
+/* A loop iteration starts from steps that look untouched, or the ready set would
+ * never offer them again. The attempt count goes back with them: each iteration
+ * gets the retry budget the definition asked for, not what the last one left.
+ *
+ * `iteration` re-keys the action, and it has to: idempotency is keyed on the run,
+ * the step and the action, and a loop is the one place where running the same
+ * step again is the point rather than the bug. Without the iteration in the key,
+ * the second pass of a body would find its own first pass applied and do
+ * nothing. Written as a pipeline so the iteration replaces the last one rather
+ * than accumulating on the end of the string. */
+const iterationTag = (iteration) => ({
+    $concat: [{ $arrayElemAt: [{ $split: [{ $ifNull: ['$action', ''] }, '#'] }, 0] }, '#', String(iteration)],
+});
+
+const resetSteps = async (companyId, runId, stepIds, { iteration = null } = {}) => {
+    if (!stepIds.length) return 0;
+    const result = await call(companyId, STEPS, [
+        { runId: String(runId), stepId: { $in: stepIds.map(String) } },
+        [{
+            $set: {
+                status: 'pending', attempts: 0, output: { $literal: {} }, error: null, failure: null,
+                workerId: null, claimedAt: null, leaseExpiresAt: null, nextAttemptAt: null,
+                startedAt: null, finishedAt: null, waitUntil: null, waitReason: null, waitingSince: null,
+                ...(iteration === null ? {} : { action: iterationTag(iteration) }),
+            },
+        }],
+    ], 'updateMany');
+    return Number((result && result.modifiedCount) || 0);
+};
+
+/* What a decision does to the step that waited for it: take away its reason to
+ * sleep, so the next tick claims it and the executor reads the decision itself. */
+const wakeStep = async (companyId, runId, stepId) => {
+    const woken = await call(companyId, STEPS, [
+        { runId: String(runId), stepId: String(stepId), status: 'pending' },
+        { $set: { nextAttemptAt: null, waitUntil: null } },
+    ], 'updateOne');
+    return Boolean(woken && woken.modifiedCount > 0);
+};
+
+/* The outputs as they are now, read from the step rows rather than from the run:
+ * a condition or a loop asking what a step produced is usually asking about a
+ * step that finished inside this same tick, which the run row does not yet know. */
+const outputsOf = async (companyId, runId) => {
+    const steps = await listSteps(companyId, runId);
+    return steps.reduce((acc, step) => {
+        if (step.status === 'success') acc[String(step.stepId)] = step.output || {};
+        return acc;
+    }, {});
+};
+
 module.exports = {
     RUNS, STEPS, TERMINAL, STEP_TERMINAL, StaleLeaseError, isDuplicateKey, stepRowsFor,
     createRun, getRun, findRunByDedupeKey, listRuns, patchRun, listSteps, getStep,
     retryStep, operatorSkipStep, resumeStep, recordCompensation, reopenRun,
     claimStep, heartbeat, settleStep, noteStep, succeedStep, failStep, deferStep, releaseStep, skipStep,
+    childRowsFor, addSteps, listChildren, resetSteps, wakeStep, outputsOf,
     countLiveClaims, countClaimsAhead,
 };

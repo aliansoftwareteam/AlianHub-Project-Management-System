@@ -9,7 +9,7 @@ const access = require('../Modules/Agents/access');
 const revert = require('../Modules/Agents/revert');
 const controller = require('../Modules/Workflows/controller');
 const scheduler = require('../Modules/Workflows/scheduler');
-const agentRun = require('../Modules/Workflows/agentRun');
+const stepTypes = require('../Modules/Workflows/stepTypes');
 
 const COMPANY = '0123456789abcdef01234567';
 const RUN_ID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
@@ -53,7 +53,7 @@ describe('the flag gates the whole surface', () => {
         for (const handler of handlers) {
             const res = resSpy();
             // eslint-disable-next-line no-await-in-loop
-            await handler(reqFor({ params: { id: RUN_ID, stepId: 'agent' } }), res);
+            await handler(reqFor({ params: { id: RUN_ID, stepId: 'sAgent' } }), res);
             expect(res.statusCode).toBe(503);
             expect(res.body).toMatchObject({ status: false });
             expect(res.body.message).toMatch(/WORKFLOW_ENGINE/);
@@ -72,7 +72,7 @@ describe('who may manage a workflow run', () => {
         for (const handler of [controller.startRun, controller.retryStep, controller.skipStep, controller.resumeStep, controller.compensateStep]) {
             const res = resSpy();
             // eslint-disable-next-line no-await-in-loop
-            await handler(reqFor({ params: { id: RUN_ID, stepId: 'agent' }, body: { agentId: AGENT_ID, taskId: TASK_ID } }), res);
+            await handler(reqFor({ params: { id: RUN_ID, stepId: 'sAgent' }, body: { agentId: AGENT_ID, taskId: TASK_ID } }), res);
             expect(res.statusCode).toBe(403);
             expect(res.body.message).toMatch(/Owner or an Admin/);
         }
@@ -117,7 +117,7 @@ describe('starting a run', () => {
 
         expect(res.body.status).toBe(true);
         const [, created] = store.createRun.mock.calls[0];
-        expect(created.steps).toEqual([expect.objectContaining({ id: 'agent', type: agentRun.TYPE })]);
+        expect(created.steps).toEqual([expect.objectContaining({ id: 'sAgent', type: stepTypes.AGENT_RUN })]);
         expect(created.steps[0].config).toMatchObject({ agentId: AGENT_ID, taskId: TASK_ID, note: 'please review' });
         expect(created.startedBy).toBe(OWNER);
         expect(queue.dispatch).toHaveBeenCalledWith(COMPANY, RUN_ID);
@@ -140,8 +140,8 @@ describe('starting a run', () => {
         const cases = [
             [{ steps: [] }, /non-empty/],
             [{ steps: [{ id: 'a', type: 'no_such_type' }] }, /no executor is registered/],
-            [{ steps: [{ id: 'a', type: agentRun.TYPE }, { id: 'a', type: agentRun.TYPE }] }, /used twice/],
-            [{ steps: [{ id: 'a', type: agentRun.TYPE, dependsOn: ['ghost'] }] }, /not a step of this workflow/],
+            [{ steps: [{ id: 'a', type: stepTypes.AGENT_RUN }, { id: 'a', type: stepTypes.AGENT_RUN }] }, /used twice/],
+            [{ steps: [{ id: 'a', type: stepTypes.AGENT_RUN, dependsOn: ['ghost'] }] }, /not a step of this workflow/],
             [{ agentId: AGENT_ID }, /valid taskId/],
             [{}, /valid agentId/],
         ];
@@ -159,25 +159,25 @@ describe('starting a run', () => {
 describe('the per-step controls', () => {
     beforeEach(() => {
         store.getRun.mockResolvedValue({ _id: RUN_ID, status: 'failed', startedBy: OWNER });
-        store.getStep.mockResolvedValue({ runId: RUN_ID, stepId: 'agent', type: agentRun.TYPE, status: 'failed' });
+        store.getStep.mockResolvedValue({ runId: RUN_ID, stepId: 'sAgent', type: stepTypes.AGENT_RUN, status: 'failed' });
     });
 
-    const control = (handler, over = {}) => handler(reqFor({ params: { id: RUN_ID, stepId: 'agent' }, body: { reason: 'the provider was down' }, ...over }), resSpy());
+    const control = (handler, over = {}) => handler(reqFor({ params: { id: RUN_ID, stepId: 'sAgent' }, body: { reason: 'the provider was down' }, ...over }), resSpy());
 
     it('retries, skips and resumes a step and puts the run back on the queue', async () => {
         const cases = [[controller.retryStep, store.retryStep], [controller.skipStep, store.operatorSkipStep], [controller.resumeStep, store.resumeStep]];
         for (const [handler, write] of cases) {
             jest.clearAllMocks();
             store.getRun.mockResolvedValue({ _id: RUN_ID, status: 'failed' });
-            store.getStep.mockResolvedValue({ runId: RUN_ID, stepId: 'agent', status: 'failed' });
+            store.getStep.mockResolvedValue({ runId: RUN_ID, stepId: 'sAgent', status: 'failed' });
             store.listSteps.mockResolvedValue([]);
             queue.dispatch.mockResolvedValue('queued');
-            write.mockResolvedValue({ runId: RUN_ID, stepId: 'agent', status: 'pending' });
+            write.mockResolvedValue({ runId: RUN_ID, stepId: 'sAgent', status: 'pending' });
 
             // eslint-disable-next-line no-await-in-loop
             const res = await control(handler);
             expect(res.body.status).toBe(true);
-            expect(write).toHaveBeenCalledWith(COMPANY, RUN_ID, 'agent', { by: OWNER, reason: 'the provider was down' });
+            expect(write).toHaveBeenCalledWith(COMPANY, RUN_ID, 'sAgent', { by: OWNER, reason: 'the provider was down' });
             expect(store.reopenRun).toHaveBeenCalledWith(COMPANY, RUN_ID);
             expect(queue.dispatch).toHaveBeenCalledWith(COMPANY, RUN_ID);
         }
@@ -202,15 +202,15 @@ describe('the per-step controls', () => {
 describe('compensating a step', () => {
     it('reverts the agent run the step made and records what came back', async () => {
         store.getRun.mockResolvedValue({ _id: RUN_ID, status: 'failed' });
-        store.getStep.mockResolvedValue({ runId: RUN_ID, stepId: 'agent', type: agentRun.TYPE, status: 'success', output: { agentRunId: 'a1' } });
+        store.getStep.mockResolvedValue({ runId: RUN_ID, stepId: 'sAgent', type: stepTypes.AGENT_RUN, status: 'success', output: { agentRunId: 'a1' } });
         revert.revertRun.mockResolvedValue({ reverted: 2, failed: [] });
-        store.recordCompensation.mockResolvedValue({ stepId: 'agent', compensation: { reverted: 2 } });
+        store.recordCompensation.mockResolvedValue({ stepId: 'sAgent', compensation: { reverted: 2 } });
         const res = resSpy();
 
-        await controller.compensateStep(reqFor({ params: { id: RUN_ID, stepId: 'agent' } }), res);
+        await controller.compensateStep(reqFor({ params: { id: RUN_ID, stepId: 'sAgent' } }), res);
 
         expect(revert.revertRun).toHaveBeenCalledWith(COMPANY, 'a1', expect.objectContaining({ isPrivileged: true }));
-        expect(store.recordCompensation).toHaveBeenCalledWith(COMPANY, RUN_ID, 'agent', expect.objectContaining({ reverted: 2, agentRunId: 'a1' }));
+        expect(store.recordCompensation).toHaveBeenCalledWith(COMPANY, RUN_ID, 'sAgent', expect.objectContaining({ reverted: 2, agentRunId: 'a1' }));
         expect(res.body.data.revert).toMatchObject({ reverted: 2 });
     });
 
@@ -225,10 +225,10 @@ describe('compensating a step', () => {
 
     it('passes the revert refusal straight through', async () => {
         store.getRun.mockResolvedValue({ _id: RUN_ID });
-        store.getStep.mockResolvedValue({ runId: RUN_ID, stepId: 'agent', type: agentRun.TYPE, status: 'success', output: { agentRunId: 'a1' } });
+        store.getStep.mockResolvedValue({ runId: RUN_ID, stepId: 'sAgent', type: stepTypes.AGENT_RUN, status: 'success', output: { agentRunId: 'a1' } });
         revert.revertRun.mockResolvedValue({ error: 'The revert window closed.', status: 409 });
         const res = resSpy();
-        await controller.compensateStep(reqFor({ params: { id: RUN_ID, stepId: 'agent' } }), res);
+        await controller.compensateStep(reqFor({ params: { id: RUN_ID, stepId: 'sAgent' } }), res);
         expect(res.statusCode).toBe(409);
         expect(store.recordCompensation).not.toHaveBeenCalled();
     });

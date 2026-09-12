@@ -6,7 +6,7 @@ const store = require('./store');
 const flag = require('./flag');
 const executors = require('./executors');
 const queue = require('./queue');
-const agentRun = require('./agentRun');
+const stepTypes = require('./stepTypes');
 
 // The workflow API: start a run, read a run and its steps, and apply the four
 // controls a person has over a step that went wrong.
@@ -26,6 +26,8 @@ const STEP_ID = /^[A-Za-z0-9_.-]{1,64}$/;
 const MAX_STEPS = 50;
 const IDEMPOTENCY_KEY_MAX = 200;
 const REASON_MAX = 500;
+// Beginning with "s", so a later step can read this one's output as "$sAgent.…".
+const AGENT_STEP_ID = 'sAgent';
 
 const UNAVAILABLE = 'The workflow engine is off. Set WORKFLOW_ENGINE=on to use workflows.';
 
@@ -76,6 +78,12 @@ const readableRun = async (companyId, caller, runId) => {
 
 const stepsOf = (companyId, run) => store.listSteps(companyId, run._id);
 
+/* Shape first, then the step types' own rules.
+ *
+ * The shape — an id, a known type, a dependency that exists — is what the engine
+ * needs to execute the graph at all; `stepTypes.validateSteps` is what each type
+ * requires of its own configuration, and it answers with field-level errors so a
+ * builder can mark the slot that is wrong. */
 const validateSteps = (raw) => {
     if (!Array.isArray(raw) || !raw.length) throw invalid('steps must be a non-empty array');
     if (raw.length > MAX_STEPS) throw invalid(`a workflow may not have more than ${MAX_STEPS} steps`);
@@ -101,6 +109,8 @@ const validateSteps = (raw) => {
             if (!ids.has(dependency)) throw invalid(`step "${step.id}" depends on "${dependency}", which is not a step of this workflow`);
         }
     }
+    const checked = stepTypes.validateSteps(steps);
+    if (!checked.valid) throw invalid(checked.errors.join('; '));
     return steps;
 };
 
@@ -111,15 +121,14 @@ const stepsFor = (body) => {
     if (!OBJECT_ID.test(String(body.agentId || ''))) throw invalid('a valid agentId, or a steps array, is required');
     if (!OBJECT_ID.test(String(body.taskId || ''))) throw invalid('a valid taskId is required to run an agent');
     return validateSteps([{
-        id: 'agent',
-        type: agentRun.TYPE,
+        id: AGENT_STEP_ID,
+        type: stepTypes.AGENT_RUN,
         config: {
             agentId: String(body.agentId),
             taskId: String(body.taskId),
             skill: body.skill ? String(body.skill) : null,
             note: body.note ? String(body.note).slice(0, 2000) : '',
-            ...(Number(body.spendCapUsd) > 0 ? { spendCapUsd: Number(body.spendCapUsd) } : {}),
-            notifyMe: Boolean(body.notifyMe),
+            ...(Number(body.spendCapUsd) > 0 ? { budgetUsd: Number(body.spendCapUsd) } : {}),
         },
     }]);
 };
@@ -249,7 +258,7 @@ exports.compensateStep = async (req, res) => {
         if (!run) return fail(res, 'Workflow run not found.', 404);
         const step = await store.getStep(ctx.companyId, run._id, req.params.stepId);
         if (!step) return fail(res, 'Step not found.', 404);
-        if (step.type !== agentRun.TYPE) return fail(res, `A ${step.type} step has nothing to compensate.`, 409);
+        if (step.type !== stepTypes.AGENT_RUN) return fail(res, `A ${step.type} step has nothing to compensate.`, 409);
         const agentRunId = (step.output && step.output.agentRunId) || (step.config && step.config.agentRunId);
         if (!agentRunId) return fail(res, 'This step never started an agent run, so there is nothing to compensate.', 409);
 

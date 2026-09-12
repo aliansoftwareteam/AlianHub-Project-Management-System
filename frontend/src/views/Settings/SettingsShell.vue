@@ -155,6 +155,7 @@ const rawGroups = computed(() => [
             { key: "projects", text: label("settingslider.Projects"), icon: "projects", to: to("Settings-Projects"), names: ["Settings-Projects"], show: checkPermission("settings.settings_project_list") !== null },
             ...tabRouteHelper().map((tab) => ({ key: tab.to.name, text: label(`settingslider.${tab.label}`), icon: "automations", to: to(tab.to.name), names: [tab.to.name], show: tab.permissions ? anyVisible(tab.permissions) : !!tab.isVisible })),
             { key: "security", text: t("Settings.nav_security_permissions"), icon: "shield", to: to("Security & Permissions"), names: ["Security & Permissions"], show: checkPermission("settings.settings_security_permissions") !== null },
+            { key: "routing-policy", text: t("Routing.nav"), icon: "ai", to: to("RoutingPolicy"), names: ["RoutingPolicy"], show: isOwnerOrAdmin.value },
             { key: "sso", text: t("Settings.nav_signin_sso"), icon: "key", to: to("SsoSettings"), names: ["SsoSettings"], show: isOwnerOrAdmin.value },
             { key: "scim", text: label("settingslider.SCIM"), icon: "integrations", to: to("ScimSettings"), names: ["ScimSettings"], show: isOwnerOrAdmin.value },
             { key: "integrations", text: label("settingslider.Integrations"), icon: "integrations", to: to("Integrations"), names: ["Integrations"], show: true },

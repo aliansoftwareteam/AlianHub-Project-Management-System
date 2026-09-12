@@ -965,5 +965,30 @@
     "group": "jobs",
     "description": "Comma-separated backoff ladder, in milliseconds, a transient workflow step failure waits between attempts.",
     "default": "30000,120000,600000"
+  },
+  "WORKFLOW_MAX_FAN_OUT": {
+    "group": "jobs",
+    "description": "Children one fan-out step may expand into. A workflow definition may ask for fewer, never more; over the bound the step fails instead of doing part of the work.",
+    "default": "50"
+  },
+  "WORKFLOW_MAX_LOOP_ITERATIONS": {
+    "group": "jobs",
+    "description": "Iterations a loop step may re-enter its body for. The ceiling a definition's own maxIterations is capped to.",
+    "default": "25"
+  },
+  "WORKFLOW_APPROVAL_POLL_MS": {
+    "group": "jobs",
+    "description": "How often a workflow step waiting on a human approval is looked at again. A decision wakes the step immediately; this is the floor that notices a deadline nobody answered.",
+    "default": "300000"
+  },
+  "WORKFLOW_JOIN_POLL_MS": {
+    "group": "jobs",
+    "description": "How often a fan-in join or a loop checks whether the steps it is waiting on have finished.",
+    "default": "2000"
+  },
+  "WORKFLOW_APPROVAL_DEADLINE_MS": {
+    "group": "jobs",
+    "description": "Deadline given to an approval step whose definition names none, so a run cannot wait forever on a decision nobody will make.",
+    "default": "259200000"
   }
 }
