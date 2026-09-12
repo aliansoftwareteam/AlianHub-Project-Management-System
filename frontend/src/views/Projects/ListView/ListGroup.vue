@@ -25,6 +25,7 @@
                             :data="task"
                             :selected="selection.isSelected(task._id)"
                             :expanded="isExpanded(task._id)"
+                            :progress="progressFor(task._id)"
                             :can-select="canSelect"
                             :can-set-status="canSetStatus"
                             :run="agents.runFor(task._id)"
@@ -80,6 +81,9 @@ import { taskListHelper, useUpdateTasks } from "@/views/Projects/helper.js";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { useListDragDrop } from "./useListDragDrop.js";
 import { useProjectAgentActivity } from "./useProjectAgentActivity.js";
+import { hasSubtasks, indexProgress, pendingExpandIds, progressQuery, progressSignature } from "./subtaskProgress";
+import { apiRequest } from "@/services";
+import * as env from "@/config/env";
 
 defineOptions({ name: "ListGroup" });
 
@@ -165,7 +169,18 @@ const wip = computed(() => {
 });
 
 const isExpanded = (taskId) => expandedIds.value.includes(String(taskId));
-const hasSubtasks = (task) => Boolean(task.isParentTask && (task.subtaskArray?.length || Number(task.subTasks)));
+
+const subtaskCounts = ref({});
+const progressFor = (taskId) => subtaskCounts.value[String(taskId)] || null;
+
+function loadSubtaskCounts() {
+    const ids = rows.value.filter(hasSubtasks).map((task) => String(task._id));
+    if (!ids.length) return;
+    apiRequest("post", `${env.TASK}/find`, { findQuery: progressQuery(ids) })
+        .then((response) => { subtaskCounts.value = { ...subtaskCounts.value, ...indexProgress(response?.data) }; })
+        .catch((error) => console.error("ERROR in list subtask progress: ", error));
+}
+watch(() => progressSignature(rows.value), loadSubtaskCounts, { immediate: true });
 
 function loadSubtasks(task) {
     if (task.subtaskArray?.length) return;
@@ -189,17 +204,23 @@ function toggleSubtasks(task) {
     loadSubtasks(task);
 }
 
-/* The toolbar's expand / collapse control drives every row at once. */
-watch(taskCollapsed, (collapsed) => {
+/* The toolbar's expand / collapse control drives every row at once, and has to keep doing
+ * so for rows that arrive later -- a group opened after the toggle was flipped loads its
+ * tasks only then. */
+const autoExpandedIds = ref([]);
+watch([taskCollapsed, rows], () => {
     if (searchedTask.value) return;
-    if (collapsed) {
+    if (taskCollapsed.value) {
         expandedIds.value = [];
+        autoExpandedIds.value = [];
         return;
     }
-    const parents = rows.value.filter(hasSubtasks);
-    expandedIds.value = parents.map((task) => String(task._id));
-    parents.forEach(loadSubtasks);
-});
+    const pending = pendingExpandIds(rows.value, autoExpandedIds.value);
+    if (!pending.length) return;
+    autoExpandedIds.value = [...autoExpandedIds.value, ...pending];
+    expandedIds.value = [...new Set([...expandedIds.value, ...pending])];
+    rows.value.filter((task) => pending.includes(String(task._id))).forEach(loadSubtasks);
+}, { immediate: true });
 
 function visibleSubtasks(task) {
     return (task.subtaskArray || []).filter((sub) => (showArchived.value ? sub.deletedStatusKey === 2 : !sub.deletedStatusKey));
