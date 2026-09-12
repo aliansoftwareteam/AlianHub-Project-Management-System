@@ -8,6 +8,7 @@ const {generalReminderSocketHandler} = require('./controller/generalReminderSock
 const {callSocketHandler} = require('./controller/callSocket');
 const { instrument } = require('@socket.io/admin-ui');
 const jwt = require('jsonwebtoken');
+const { resolveAccessSession } = require('../Config/jwt');
 const logger = require('../Config/loggerConfig');
 const { corsOriginDelegate } = require('../utils/cors.js');
 const { removeRoom, removeBySocket } = require('./helper');
@@ -49,6 +50,29 @@ exports.getAdminUiConfig = (env = process.env) => {
     };
 };
 
+/**
+ * The session behind a socket's access token.
+ *
+ * A socket used to be judged on the token signature alone, so a tab that had logged out —
+ * or whose token had since expired — kept receiving every event it was subscribed to. The
+ * session is resolved through the same `resolveAccessSession` the HTTP middleware uses, so
+ * a logout that deletes the session row and drops its cache entry ends the socket too.
+ *
+ * Cost: a cache hit for the life of the cached session (10 minutes, the HTTP TTL), one
+ * Mongo read after that — not a read per event. Logging out deletes the cache entry, so
+ * the very next event from that socket reaches Mongo, finds nothing and closes it.
+ */
+const sessionOf = async (payload) => {
+    if (!payload) return { ok: false };
+    if (Number.isFinite(payload.exp) && payload.exp * 1000 <= Date.now()) return { ok: false };
+    try {
+        return await resolveAccessSession(payload);
+    } catch (error) {
+        logger.error(`Socket session lookup error ${error.message || error}`);
+        return { ok: false };
+    }
+};
+
 exports.initSocket = (server) => {
 
     let io = new Server(server, {
@@ -63,18 +87,23 @@ exports.initSocket = (server) => {
         },
     });
     const userNamespace = io.of(/^\/userid_\w+$/);
-    userNamespace.use((socket, next) => {
+    userNamespace.use(async (socket, next) => {
         const token = socket.handshake.auth.token;
         if (!token) {
             return next(new Error('Authentication error: Token not provided'));
         }
-        jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-            if (err) {
-                return next(new Error('Authentication error: Invalid token'));
-            }
-            socket.user = decoded;
-            next();
-        });
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (error) {
+            return next(new Error('Authentication error: Invalid token'));
+        }
+        const session = await sessionOf(decoded);
+        if (!session.ok) {
+            return next(new Error('Authentication error: Session has ended'));
+        }
+        socket.user = decoded;
+        next();
     });
     const adminUiConfig = exports.getAdminUiConfig();
     if (adminUiConfig) {
@@ -88,6 +117,19 @@ exports.initSocket = (server) => {
         const {userRole} = socket.handshake.query;
         socket.customData = {userRole};
         const namespace = socket.nsp;
+
+        // A handshake only proves the session was live when the socket opened. Every event
+        // re-checks it, so a socket whose session has since ended is closed on its next one.
+        socket.use((_event, next) => {
+            sessionOf(socket.user).then((session) => {
+                if (session.ok) {
+                    next();
+                    return;
+                }
+                next(new Error('Session has ended'));
+                socket.disconnect(true);
+            });
+        });
 
         // SOCKET-PERFORMANCE-PLAN #4 (Phase 1) + #1 (Phase 2): auto-purge
         // every entry for this socket from the room index when the socket
