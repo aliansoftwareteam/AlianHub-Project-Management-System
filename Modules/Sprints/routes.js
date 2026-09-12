@@ -64,7 +64,7 @@ exports.init = (app) => {
 
     const addsSprint = projectIdsFrom({ records: [[SCHEMA_TYPE.FOLDERS, (req) => bodyOf(req).folder && bodyOf(req).folder.folderId]], direct: (req) => bodyOf(req).projectId });
     app.post('/api/v1/sprint', guard(WRITE, addsSprint, () => [SPRINT_CREATE]), ctrl.addSprint);
-    app.patch('/api/v1/sprint/:id', guard(WRITE, sprintProject((req) => [req.params.id, bodyOf(req).prevData], (req) => bodyOf(req).projectId), sprintPatchPermissions), (req, res) => {
+    app.patch('/api/v1/sprint/:id', guard(WRITE, sprintProject((req) => req.params.id, (req) => bodyOf(req).projectId), sprintPatchPermissions), (req, res) => {
         if(!req?.body?.type) {
             res.send({status: false, statusText: "type not found"});
             return;

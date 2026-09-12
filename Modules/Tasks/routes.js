@@ -58,6 +58,12 @@ exports.init = (app) => {
     app.patch('/api/v2/tasks', requireTaskActionPermission(), (req, res) => {
         taskMongo[req.body.action](req.body)
         .then((response) => {
+            // A handler that matched no document resolves {status:false}; without this the
+            // envelope below would report a write that never happened as a success.
+            if (response && response.status === false) {
+                res.send(response);
+                return;
+            }
             res.send({status: true, statusText: 'Task updated successfully.',data:response});
         })
         .catch((error) => {

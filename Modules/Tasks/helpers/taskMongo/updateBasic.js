@@ -72,6 +72,11 @@ module.exports = {
                     }
                     MongoDbCrudOpration(project.CompanyId,object, "findOneAndUpdate")
                     .then((result) => {
+                        if (!result) {
+                            resolve({ status: false, statusText: "Task not found" });
+                            return;
+                        }
+
                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
                         resolve({status: true, statusText: "Due Date updated successfully"});
     
@@ -156,6 +161,11 @@ module.exports = {
                     }
                     MongoDbCrudOpration(project.CompanyId,object, "findOneAndUpdate")
                     .then((result) => {
+                        if (!result) {
+                            resolve({ status: false, statusText: "Task not found" });
+                            return;
+                        }
+
                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
                         resolve({status: true, statusText: "Start Date updated successfully"});
     
@@ -250,11 +260,17 @@ module.exports = {
                         })
                     }
                 } else {
+                    const taskId = task && task._id;
+                    if (!taskId) {
+                        resolve({ status: false, statusText: "Task not found" });
+                        return;
+                    }
+
                     const query = {
                         type: dbCollections.TASKS,
                         data: [
                             {
-                                _id: new mongoose.Types.ObjectId(prevStatus.taskId)
+                                _id: new mongoose.Types.ObjectId(taskId)
                             }, {
                                 $set: {
                                     ...newStatus,
@@ -269,9 +285,14 @@ module.exports = {
 
                     MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
                     .then((result) => {
+                        if (!result) {
+                            resolve({ status: false, statusText: "Task not found" });
+                            return;
+                        }
+
                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: newStatus, module: 'task' });
                         resolve({status: true, statusText: "Status updated successfully"});
-                        recordCompletion({ companyId: projectData.CompanyId, taskId: prevStatus.taskId, task, newStatus, userData });
+                        recordCompletion({ companyId: projectData.CompanyId, taskId, task, newStatus, userData });
 
                         let obj = {
                             'ProjectName': projectData.ProjectName,
@@ -376,11 +397,17 @@ module.exports = {
                     };
                     HandleHistory('task',projectData.CompanyId, projectData._id,priorityObj.taskId,historyObj, userData).then(async () => {});
                 } else {
+                    const taskId = taskData && taskData._id;
+                    if (!taskId) {
+                        resolve({ status: false, statusText: "Task not found" });
+                        return;
+                    }
+
                     const query = {
                         type: dbCollections.TASKS,
                         data: [
                             {
-                                _id: new mongoose.Types.ObjectId(priorityObj.taskId)
+                                _id: new mongoose.Types.ObjectId(taskId)
                             }, {
                                 $set: {
                                     ...firebaseObj,
@@ -395,6 +422,11 @@ module.exports = {
 
                     MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
                     .then((result) => {
+                        if (!result) {
+                            resolve({ status: false, statusText: "Task not found" });
+                            return;
+                        }
+
                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
                         resolve({status: true, statusText: "Priority updated successfully"});
                         let notificationObj = {
@@ -462,6 +494,11 @@ module.exports = {
                 }
                 MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
                 .then((result) => {
+                    if (!result) {
+                        resolve({ status: false, statusText: "Task not found" });
+                        return;
+                    }
+
                     socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
                     resolve({status: true, statusText: "Story points updated successfully"});
 
@@ -505,6 +542,11 @@ module.exports = {
                 }
                 MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
                 .then((result) => {
+                    if (!result) {
+                        resolve({ status: false, statusText: "Task not found" });
+                        return;
+                    }
+
                     socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
                     resolve({status: true, statusText: "Task name updated successfully"});
 
@@ -578,6 +620,11 @@ module.exports = {
                 }
                 MongoDbCrudOpration(projectData.CompanyId, query, "findOneAndUpdate")
                 .then((result) => {
+                    if (!result) {
+                        resolve({ status: false, statusText: "Task not found" });
+                        return;
+                    }
+
                     socketEmitter.emit('update', { type: "update", data: result , updatedFields: setObj, module: 'task' });
                     resolve({status: true, statusText: "Dates updated successfully"});
 

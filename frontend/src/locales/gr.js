@@ -6607,6 +6607,7 @@ export default {
         "Channel_updated_successfully": "Channel updated successfully",
         "Channel_deleted_successfully": "Channel deleted successfully",
         "Folder_not_found": "Ο φάκελος δεν βρέθηκε",
+        "Sprint_not_found": "Sprint not found",
         "Template_&_Project_data_has_been_added_successfully": "Τα δεδομένα του προτύπου και του έργου προστέθηκαν με επιτυχία.",
         "Project_data_has_been_added_successfully": "Τα δεδομένα του έργου προστέθηκαν με επιτυχία{filterMessage}",
         "Error_in_creating_project": "Σφάλμα κατά τη δημιουργία έργου",

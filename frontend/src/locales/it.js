@@ -6607,6 +6607,7 @@ export default {
         "Channel_updated_successfully": "Channel updated successfully",
         "Channel_deleted_successfully": "Channel deleted successfully",
         "Folder_not_found": "Cartella non trovata",
+        "Sprint_not_found": "Sprint not found",
         "Template_&_Project_data_has_been_added_successfully": "I dati del template e del progetto sono stati aggiunti con successo.",
         "Project_data_has_been_added_successfully": "I dati del progetto sono stati aggiunti con successo{filterMessage}",
         "Error_in_creating_project": "Errore nella creazione del progetto",

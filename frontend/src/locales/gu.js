@@ -6607,6 +6607,7 @@ export default {
         "Channel_updated_successfully": "Channel updated successfully",
         "Channel_deleted_successfully": "Channel deleted successfully",
         "Folder_not_found": "ફોલ્ડર મળ્યું નથી",
+        "Sprint_not_found": "Sprint not found",
         "Template_&_Project_data_has_been_added_successfully": "ટેમ્પલેટ અને પ્રોજેક્ટ ડેટા સફળતાપૂર્વક ઉમેરવામાં આવ્યા છે.",
         "Project_data_has_been_added_successfully": "પ્રોજેક્ટ ડેટા સફળતાપૂર્વક ઉમેરવામાં આવ્યા છે{filterMessage}",
         "Error_in_creating_project": "પ્રોજેક્ટ બનાવવામાં ભૂલ",

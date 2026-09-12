@@ -188,71 +188,54 @@ exports.addSprintFun = (req) => {
     }
 };
 
+/**
+ * Rename the sprint named in the route. The sprint id is taken from req.params.id and
+ * never from the body: read endpoints return sprints as `_id`, so keying the update on
+ * `prevData.id` renamed nothing whenever a client handed the server its own object back,
+ * and answered success anyway. `prevData.name` is still read, but only for history text.
+ */
 exports.editSprintName = (req, res) => {
     try {
-        const {companyId, projectId, folder = null, sprintName, userData, projectName, prevData, mainChat = false} = req.body;
-        let queryObject = null;
-        queryObject = {
-            $set: {
-                name: sprintName
-            },
-        }
-        const schema = SCHEMA_TYPE.SPRINTS
-        let object = {
-            type: schema,
+        const {companyId, projectId, folder = null, sprintName, userData, projectName, prevData = {}, mainChat = false} = req.body;
+        const { id } = req.params;
+
+        const object = {
+            type: SCHEMA_TYPE.SPRINTS,
             data: [
-                {
-                    _id: new mongoose.Types.ObjectId(prevData.id)
-                },
-                { ...queryObject },
-                {returnDocument: 'after'}
+                { _id: new mongoose.Types.ObjectId(id) },
+                { $set: { name: sprintName } },
+                { returnDocument: 'after' }
             ]
-        }
-        MongoQ.MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((resP) => {  
-            res.send({status: true, statusText: "Sprint_updated_successfully",data: resP});
+        };
+
+        MongoQ.MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((response) => {
+            if (!response) {
+                res.send({ status: false, statusText: "Sprint not found" });
+                return;
+            }
+
+            res.send({status: true, statusText: "Sprint_updated_successfully", data: response});
+            if (mainChat) return;
+
+            const previousName = prevData.name || '';
+            const historyObj = folder && folder.folderId !== ""
+                ? {
+                    'message': `<b>${userData.Employee_Name}</b> has changed <b>Sprint</b> name from <b>${previousName}</b> to <b>${sprintName}</b> in <b>${folder.folderName}</b> folder in <b>${projectName}</b> project.`,
+                    'key' : 'Sub_Sprint_Created',
+                }
+                : {
+                    'message': `<b>${userData.Employee_Name}</b> has changed <b>Sprint</b> name from <b>${previousName}</b> to <b>${sprintName}</b> in <b>${projectName}</b> project.`,
+                    'key' : 'Create_Sprint',
+                };
+
+            HandleHistoryref.HandleHistory('project', companyId, projectId, null, historyObj, userData)
+            .catch((error) => {
+                logger.error("ERROR in handle history", error.message);
+            });
         }).catch((error)=>{
             logger.error(`EDIT SPRINT ERROR : ${error}`);
             res.send({status: false, statusText: "Error in sprit update"});
         });
-        if(mainChat) return;
-
-        // Call history function
-        let historyObj = {};
-        if(folder && folder.folderId !== "") {
-            historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b>Sprint</b> name from <b>${prevData.name}</b> to <b>${sprintName}</b> in <b>${folder.folderName}</b> folder in <b>${projectName}</b> project.`,
-                'key' : 'Sub_Sprint_Created',
-            }
-        } else {
-            historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b>Sprint</b> name from <b>${prevData.name}</b> to <b>${sprintName}</b> in <b>${projectName}</b> project.`,
-                'key' : 'Create_Sprint',
-            }
-        }
-
-        HandleHistoryref.HandleHistory('project', companyId, projectId, null, historyObj, userData)
-        .catch((error) => {
-            logger.error("ERROR in handle history", error.message);
-        });
-
-        // Call notification function
-        // let notifyObj = {
-        //     'sprintName' : sprintName,
-        //     'ProjectName' : projectName,
-        //     'previousSprint' : prevData.name
-        // }
-        // if(folder!==null) {
-        //     notifyObj.name = folder.folderName;
-        // }
-
-        // const notificationObject = {
-        //     'message': folder !== null ? editSubSprint(notifyObj) : EditSprint(notifyObj),
-        //     'key': 'project_sprint_create'
-        // }
-        // HandleNotification({type:'project',companyId, projectId: projectId, sprintId: id, object: notificationObject, userData})
-        // .catch((error) => {
-        //     logger.error("ERROR in handle notification", error.message);
-        // });
     } catch (error) {
         logger.error(error.message);
         res.send({status: false, statusText: error.message});
@@ -376,6 +359,13 @@ exports.updateSprintFun = (req) => {
             lifecycleCheck
             .then(() => MongoQ.MongoDbCrudOpration(companyId, obj, "findOneAndUpdate"))
             .then((response) => {
+                // Nothing matched: the cascades below would run against a sprint that is
+                // not there, and the caller would be told the update landed.
+                if (!response) {
+                    resolve({ status: false, statusText: "Sprint not found" });
+                    return;
+                }
+
                 resolve({ status: true, statusText: "Sprint_updated_successfully",data:response });
                 if(mainChat) return;
 
@@ -588,6 +578,11 @@ exports.editFolderName = (req, res) => {
         }
 
         MongoQ.MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((response) => {
+            if (!response) {
+                res.send({ status: false, statusText: "Folder not found" });
+                return;
+            }
+
             res.send({status: true, statusText: "Folder renamed successfully",data:response});
             if(mainChat) return;
 
@@ -639,6 +634,11 @@ exports.updateFolder = (req, res) => {
         }
 
         MongoQ.MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((ele) => {
+            if (!ele) {
+                res.send({ status: false, statusText: "Folder not found" });
+                return;
+            }
+
             res.send({status: true, statusText: "Folder updated successfully",data:ele});
             if(mainChat) return;
 

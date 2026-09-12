@@ -1,7 +1,7 @@
 {
   "locale": "gu",
   "machineTranslated": false,
-  "updatedAt": "2026-09-12T08:53:54.175Z",
+  "updatedAt": "2026-09-12T11:05:38.018Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5720,6 +5720,7 @@
     "Workflows.lineage_unowned": "Waiting on nobody in particular",
     "Workflows.lineage_run_by": "{person} started the run",
     "Workflows.lineage_run_unowned": "Started by the system",
-    "Workflows.lineage_somebody": "somebody"
+    "Workflows.lineage_somebody": "somebody",
+    "Toast.Sprint_not_found": "Sprint not found"
   }
 }

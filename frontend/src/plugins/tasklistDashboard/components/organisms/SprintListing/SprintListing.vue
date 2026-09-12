@@ -189,6 +189,18 @@ function getUserData() {
     return userData;
 }
 
+// The sprint/folder PATCH answers a refusal as prose in `statusText`, and the scrum
+// lifecycle refusals are only phrased server-side — so the raw text stays the fallback
+// and only the refusals that have a translation are mapped.
+const REFUSAL_KEYS = {
+    "Sprint not found": "Toast.Sprint_not_found",
+    "Folder not found": "Toast.Folder_not_found",
+};
+
+const refusalMessage = (statusText) => (REFUSAL_KEYS[statusText]
+    ? t(REFUSAL_KEYS[statusText])
+    : (statusText || t("Toast.something_went_wrong")));
+
 function updateItem(value = null) {
     showSpinner.value = true;
 
@@ -238,7 +250,7 @@ function updateItem(value = null) {
             close.value = false;
             showSidebar.value = false;
             showSpinner.value = false;
-            $toast.error(res?.data?.statusText || t(`Toast.something_went_wrong`), {position: "top-right"});
+            $toast.error(refusalMessage(res?.data?.statusText), {position: "top-right"});
             return;
         }
         if (props.sprint.isFolder) {

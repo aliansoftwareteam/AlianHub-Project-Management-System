@@ -6851,6 +6851,7 @@ export default {
         Channel_updated_successfully: "Channel updated successfully",
         Channel_deleted_successfully: "Channel deleted successfully",
         Folder_not_found: "Folder not found",
+        Sprint_not_found: "Sprint not found",
         "Template_&_Project_data_has_been_added_successfully":
             "Template & Project data has been added successfully.",
         Project_data_has_been_added_successfully:
