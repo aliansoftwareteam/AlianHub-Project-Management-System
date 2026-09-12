@@ -19,15 +19,18 @@ const RETRYABLE = new Set([TYPES.RATE_LIMIT, TYPES.OVERLOADED, TYPES.SERVER, TYP
 const TIMEOUT_CODES = new Set(['ECONNABORTED', 'ETIMEDOUT', 'ESOCKETTIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT']);
 const NETWORK_CODES = new Set(['ECONNRESET', 'ENOTFOUND', 'ECONNREFUSED', 'EAI_AGAIN', 'EPIPE', 'EHOSTUNREACH', 'ENETUNREACH', 'ENETDOWN', 'UND_ERR_SOCKET', 'ERR_NETWORK']);
 
-const SECRET = /\b(sk-[A-Za-z0-9_*-]{4,}|Bearer\s+[A-Za-z0-9._*-]+)/g;
+/* Vendors do echo the key back inside an error message. `AIza`/`ya29.` are
+ * Google's API key and OAuth token shapes; the rest cover the Bearer providers. */
+const SECRET = /\b(sk-[A-Za-z0-9_*-]{4,}|AIza[A-Za-z0-9_*-]{4,}|ya29\.[A-Za-z0-9._*-]+|Bearer\s+[A-Za-z0-9._*-]+)/g;
 const redact = (text) => (typeof text === 'string' ? text.replace(SECRET, '[redacted]') : text);
 
 const BILLING_URL = {
     openai: 'https://platform.openai.com/account/billing',
     anthropic: 'https://console.anthropic.com/settings/billing',
     deepseek: 'https://platform.deepseek.com/top_up',
+    google: 'https://console.cloud.google.com/billing',
 };
-const LABEL = { openai: 'OpenAI', anthropic: 'Anthropic', deepseek: 'DeepSeek' };
+const LABEL = { openai: 'OpenAI', anthropic: 'Anthropic', deepseek: 'DeepSeek', google: 'Google' };
 
 /* Callers such as the project generator show this message to the person who asked,
  * so the types a person can act on keep a sentence that says what to do. */
@@ -165,4 +168,51 @@ const fromOpenAiCompatible = (provider, model, error) => {
     });
 };
 
-module.exports = { AIProviderError, TYPES, TYPE_LIST, isProviderError, failureOf, headerValue, requestIdOf, retryAfterMsOf, vendorRaw, typeOfStatus, fromTransport, fromOpenAiCompatible, redact, CONTEXT_LENGTH, QUOTA_MESSAGE };
+/* Google's generative-language API answers with the Cloud status envelope,
+ * { error: { code, message, status, details } }, where `status` is the gRPC
+ * name rather than an HTTP code. */
+const GOOGLE_STATUS = {
+    INVALID_ARGUMENT: TYPES.INVALID_REQUEST,
+    FAILED_PRECONDITION: TYPES.INVALID_REQUEST,
+    OUT_OF_RANGE: TYPES.INVALID_REQUEST,
+    UNAUTHENTICATED: TYPES.AUTH,
+    PERMISSION_DENIED: TYPES.PERMISSION,
+    NOT_FOUND: TYPES.NOT_FOUND,
+    RESOURCE_EXHAUSTED: TYPES.RATE_LIMIT,
+    DEADLINE_EXCEEDED: TYPES.TIMEOUT,
+    UNAVAILABLE: TYPES.OVERLOADED,
+    ABORTED: TYPES.OVERLOADED,
+    CANCELLED: TYPES.TIMEOUT,
+    INTERNAL: TYPES.SERVER,
+    UNKNOWN: TYPES.UNKNOWN,
+};
+
+/* RetryInfo rides in `details` as a duration string ("17s"), not in a header. */
+const googleRetryAfterMs = (body) => {
+    const details = (body && Array.isArray(body.details) && body.details) || [];
+    const info = details.find((d) => d && typeof d['@type'] === 'string' && d['@type'].endsWith('RetryInfo'));
+    const seconds = parseFloat(String((info && info.retryDelay) || ''));
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : null;
+};
+
+const fromGoogle = (model, error) => {
+    if (isProviderError(error)) return error;
+    const response = error && error.response;
+    if (!response || !response.status) return fromTransport('google', model, error);
+    const { status, headers } = response;
+    const body = (response.data && response.data.error) || null;
+    const vendorStatus = (body && body.status) || null;
+    const message = String((body && body.message) || '');
+    let type = GOOGLE_STATUS[vendorStatus] || typeOfStatus(status);
+    if (type === TYPES.INVALID_REQUEST && CONTEXT_LENGTH.test(message)) type = TYPES.CONTEXT_LENGTH;
+    else if ((type === TYPES.RATE_LIMIT || type === TYPES.INVALID_REQUEST) && QUOTA_MESSAGE.test(message)) type = TYPES.QUOTA;
+    return new AIProviderError({
+        provider: 'google', model, status, type,
+        code: vendorStatus || `http_${status}`,
+        requestId: requestIdOf(headers),
+        retryAfterMs: retryAfterMsOf(headers) !== null ? retryAfterMsOf(headers) : googleRetryAfterMs(body),
+        raw: vendorRaw(body && { type: body.status, code: body.code, message: body.message }),
+    });
+};
+
+module.exports = { AIProviderError, TYPES, TYPE_LIST, isProviderError, failureOf, headerValue, requestIdOf, retryAfterMsOf, vendorRaw, typeOfStatus, fromTransport, fromOpenAiCompatible, fromGoogle, redact, CONTEXT_LENGTH, QUOTA_MESSAGE };

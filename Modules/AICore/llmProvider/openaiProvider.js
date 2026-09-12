@@ -2,6 +2,7 @@ const axios = require('axios');
 const config = require('../../../Config/config');
 const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
 const { fromOpenAiCompatible } = require('../providerError');
+const { normaliseRequest, STRUCTURED_OUTPUT } = require('./normalise');
 
 const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -57,6 +58,13 @@ const openaiProvider = {
     get model() {
         return config.AI_MODEL || null;
     },
+    capabilities: Object.freeze({
+        structuredOutput: STRUCTURED_OUTPUT.JSON_OBJECT,
+        defaultMaxTokens: 32000,
+        maxOutputTokens: openaiMaxOutputTokens,
+        isReasoningModel,
+        omitTemperatureWhenReasoning: true,
+    }),
 
     /**
      * @param {import('./types').ChatOptions} opts
@@ -74,23 +82,16 @@ const openaiProvider = {
             messages.push({ role: m.role, content: m.content });
         }
 
-        const reasoning = isReasoningModel(config.AI_MODEL);
-        const maxTokens = Math.min(opts.maxTokens || 32000, openaiMaxOutputTokens(config.AI_MODEL));
-        const body = {
-            model: config.AI_MODEL,
-            messages,
-        };
+        const request = normaliseRequest(openaiProvider, opts);
+        const { model, reasoning, maxTokens } = request;
+        const body = { model, messages };
         if (reasoning) {
-            // Reasoning models: leave temperature at the default (any explicit
-            // value returns 400) and use max_completion_tokens. Reasoning
-            // models burn hidden tokens internally on top of the visible
-            // output, so a roomy default is essential.
             body.max_completion_tokens = maxTokens;
         } else {
-            body.temperature = typeof opts.temperature === 'number' ? opts.temperature : 0.4;
+            body.temperature = request.temperature;
             body.max_tokens = maxTokens;
         }
-        if (opts.jsonMode) {
+        if (request.jsonMode) {
             body.response_format = { type: 'json_object' };
         }
 
@@ -109,7 +110,7 @@ const openaiProvider = {
                 timeout: timeoutMs,
             });
         } catch (error) {
-            throw fromOpenAiCompatible('openai', config.AI_MODEL || null, error);
+            throw fromOpenAiCompatible('openai', model, error);
         }
 
         const choice = response.data && response.data.choices && response.data.choices[0];
@@ -122,7 +123,7 @@ const openaiProvider = {
             inputTokens: (usage && usage.prompt_tokens) || 0,
             outputTokens: (usage && usage.completion_tokens) || 0,
             totalTokens: (usage && usage.total_tokens) || 0,
-            model: config.AI_MODEL,
+            model,
             // 'length' from OpenAI means the response was truncated at the
             // token cap — caller should treat this as truncation, not as a
             // bad-JSON case that's worth a repair retry.

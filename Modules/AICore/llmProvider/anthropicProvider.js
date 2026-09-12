@@ -19,8 +19,14 @@ try {
 // derived from the same module, so raising it here raises the lock too.
 const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
 const { AIProviderError, TYPES, isProviderError, requestIdOf, retryAfterMsOf, vendorRaw, typeOfStatus, fromTransport, CONTEXT_LENGTH, QUOTA_MESSAGE } = require('../providerError');
+const { normaliseRequest, STRUCTURED_OUTPUT, JSON_ONLY_INSTRUCTION } = require('./normalise');
 
 const PROVIDER = 'anthropic';
+
+// Claude's output ceiling. The caller asks freely; every adapter bounds the
+// ask to what its own model accepts, so a shared LLM_MAX_TOKENS_PLAN raised
+// for DeepSeek's 384K cannot make every Anthropic request 400.
+const ANTHROPIC_MAX_OUTPUT_TOKENS = 128000;
 
 /* The `error.type` values of the SDK's ErrorType (resources/shared.d.ts). */
 const VENDOR_TYPES = {
@@ -74,6 +80,13 @@ const anthropicProvider = {
     get model() {
         return process.env.ANTHROPIC_MODEL || null;
     },
+    capabilities: Object.freeze({
+        structuredOutput: STRUCTURED_OUTPUT.SYSTEM_PROMPT,
+        defaultMaxTokens: 32000,
+        maxOutputTokens: () => ANTHROPIC_MAX_OUTPUT_TOKENS,
+        isReasoningModel: () => false,
+        omitTemperatureWhenReasoning: false,
+    }),
 
     /**
      * @param {import('./types').ChatOptions} opts
@@ -96,27 +109,19 @@ const anthropicProvider = {
             content: m.content,
         }));
 
-        // 32000 default — large plans (30+ tasks) with rich descriptions
-        // can run 15-25K output tokens. Claude Sonnet 4.5 supports up to
-        // 64K output natively, so 32K is well within range.
-        // Clamp to Claude's output ceiling. Unlike DeepSeek this provider had no
-        // clamp at all, so once the shared default was raised past 128K for
-        // DeepSeek's sake, every Anthropic request would have been rejected
-        // outright. Each provider bounds its own limit; the caller asks freely.
-        const ANTHROPIC_MAX_OUTPUT_TOKENS = 128000;
-        const maxTokens = Math.min(opts.maxTokens || 32000, ANTHROPIC_MAX_OUTPUT_TOKENS);
-
+        const request = normaliseRequest(anthropicProvider, opts);
         const params = {
-            model: process.env.ANTHROPIC_MODEL,
-            max_tokens: maxTokens,
-            temperature: typeof opts.temperature === 'number' ? opts.temperature : 0.4,
+            model: request.model,
+            max_tokens: request.maxTokens,
+            temperature: request.temperature,
             messages,
         };
+        // Claude has no JSON mode, so structured output is asked for in the
+        // system prompt instead.
         if (opts.systemPrompt) {
-            params.system = opts.systemPrompt
-                + (opts.jsonMode ? '\n\nRespond with ONLY a single valid JSON object. No prose, no markdown fences. The first character must be `{` and the last must be `}`.' : '');
-        } else if (opts.jsonMode) {
-            params.system = 'Respond with ONLY a single valid JSON object. No prose, no markdown fences. The first character must be `{` and the last must be `}`.';
+            params.system = opts.systemPrompt + (request.jsonMode ? `\n\n${JSON_ONLY_INSTRUCTION}` : '');
+        } else if (request.jsonMode) {
+            params.system = JSON_ONLY_INSTRUCTION;
         }
 
         // Stream the response and resolve to the assembled final message.
@@ -128,7 +133,7 @@ const anthropicProvider = {
             const stream = client.messages.stream(params);
             response = await stream.finalMessage();
         } catch (err) {
-            throw toProviderError(err);
+            throw toProviderError(err, request.model);
         }
 
         let text = '';
@@ -145,7 +150,7 @@ const anthropicProvider = {
             inputTokens: usage.input_tokens || 0,
             outputTokens: usage.output_tokens || 0,
             totalTokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
-            model: response.model || process.env.ANTHROPIC_MODEL,
+            model: response.model || request.model,
             // 'max_tokens' from Anthropic = the response was cut off at the
             // token cap. Surface it so the caller doesn't waste a repair
             // attempt on output that's truncated, not malformed.

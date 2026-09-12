@@ -17,6 +17,7 @@ const PROVIDER_OVERRIDES = Object.freeze({
     anthropic: process.env.ANTHROPIC_TIMEOUT_MS,
     openai: process.env.OPENAI_TIMEOUT_MS,
     deepseek: process.env.DEEPSEEK_TIMEOUT_MS,
+    google: process.env.GOOGLE_TIMEOUT_MS,
 });
 
 /* Reasoning models get the full budget; classic chat models answer well inside

@@ -70,6 +70,13 @@ const DEFAULT_PRICING = {
     'deepseek-v4-pro': { input: 1.32, output: 3.96 },
     'deepseek-chat': { input: 0.27, output: 1.1 },
     'deepseek-reasoner': { input: 0.55, output: 2.19 },
+
+    'gemini-3-pro': { input: 2, output: 12 },
+    'gemini-3-flash': { input: 0.3, output: 2.5 },
+    'gemini-3-flash-lite': { input: 0.1, output: 0.4 },
+    'gemini-2.5-pro': { input: 1.25, output: 10 },
+    'gemini-2.5-flash': { input: 0.3, output: 2.5 },
+    'gemini-2.5-flash-lite': { input: 0.1, output: 0.4 },
 };
 
 /**

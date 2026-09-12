@@ -2,6 +2,7 @@ const axios = require('axios');
 const config = require('../../../Config/config');
 const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
 const { fromOpenAiCompatible } = require('../providerError');
+const { normaliseRequest, STRUCTURED_OUTPUT } = require('./normalise');
 
 // DeepSeek exposes an OpenAI-compatible Chat Completions API, so this
 // provider mirrors openaiProvider.js almost exactly — same request body
@@ -56,6 +57,13 @@ const deepseekProvider = {
     get model() {
         return config.DEEPSEEK_MODEL || null;
     },
+    capabilities: Object.freeze({
+        structuredOutput: STRUCTURED_OUTPUT.JSON_OBJECT,
+        defaultMaxTokens: DEEPSEEK_MAX_OUTPUT_TOKENS,
+        maxOutputTokens: () => DEEPSEEK_MAX_OUTPUT_TOKENS,
+        isReasoningModel,
+        omitTemperatureWhenReasoning: true,
+    }),
 
     /**
      * @param {import('./types').ChatOptions} opts
@@ -73,22 +81,18 @@ const deepseekProvider = {
             messages.push({ role: m.role, content: m.content });
         }
 
-        const reasoning = isReasoningModel(config.DEEPSEEK_MODEL);
-
-        // Clamp to DeepSeek's hard 8192-token output ceiling regardless of
-        // what the caller requested.
-        const requestedMax = opts.maxTokens || DEEPSEEK_MAX_OUTPUT_TOKENS;
-        const maxTokens = Math.min(requestedMax, DEEPSEEK_MAX_OUTPUT_TOKENS);
+        const request = normaliseRequest(deepseekProvider, opts);
+        const { model, reasoning } = request;
 
         const body = {
-            model: config.DEEPSEEK_MODEL,
+            model,
             messages,
-            max_tokens: maxTokens,
+            max_tokens: request.maxTokens,
         };
-        if (!reasoning) {
-            body.temperature = typeof opts.temperature === 'number' ? opts.temperature : 0.4;
+        if (request.temperature !== null) {
+            body.temperature = request.temperature;
         }
-        if (opts.jsonMode) {
+        if (request.jsonMode) {
             // DeepSeek requires the literal word "json" somewhere in the
             // prompt when json_object mode is on. The shared output-format
             // partial already instructs JSON-only output, so this is
@@ -111,7 +115,7 @@ const deepseekProvider = {
                 timeout: timeoutMs,
             });
         } catch (error) {
-            throw fromOpenAiCompatible('deepseek', config.DEEPSEEK_MODEL || null, error);
+            throw fromOpenAiCompatible('deepseek', model, error);
         }
 
         const choice = response.data && response.data.choices && response.data.choices[0];
@@ -124,7 +128,7 @@ const deepseekProvider = {
             inputTokens: (usage && usage.prompt_tokens) || 0,
             outputTokens: (usage && usage.completion_tokens) || 0,
             totalTokens: (usage && usage.total_tokens) || 0,
-            model: config.DEEPSEEK_MODEL,
+            model,
             // DeepSeek mirrors OpenAI's `finish_reason`: 'length' means the
             // output hit the token cap (likely the 8192 ceiling) and is
             // truncated, not malformed — so the caller should not waste a

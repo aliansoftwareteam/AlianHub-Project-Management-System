@@ -6,6 +6,7 @@ const usage = require('./usage');
 const replay = require('./replay');
 const { isFeature, UNKNOWN_FEATURE } = require('./features');
 const { isProviderError } = require('./providerError');
+const { resolveModel } = require('./llmProvider/normalise');
 
 /* The spend ledger: one row per model call, written here and nowhere else, so
  * a feature cannot spend without the budget seeing it. Callers name the
@@ -53,8 +54,8 @@ function ensurePriced(model, context) {
     throw error;
 }
 
-async function record(context, result, adapter) {
-    const model = (result && result.model) || adapter.model || null;
+async function record(context, result, adapter, requestedModel) {
+    const model = (result && result.model) || requestedModel || adapter.model || null;
     const priced = usage.summarize(usage.usageFromResult(result), model);
     const row = {
         companyId: context.companyId, feature: context.feature, model, provider: adapter.name || null,
@@ -85,9 +86,13 @@ function metered(adapter) {
         get name() { return adapter.name; },
         get isConfigured() { return adapter.isConfigured; },
         get model() { return adapter.model; },
+        get capabilities() { return adapter.capabilities; },
         async chat(opts) {
             const context = contextOf(opts);
-            ensurePriced(adapter.model, context);
+            // The model the adapter will send, which is not the configured one
+            // once the router lets a caller name a model on the chat options.
+            const requestedModel = resolveModel(adapter, opts);
+            ensurePriced(requestedModel, context);
             const startedAt = Date.now();
             let result;
             try {
@@ -99,7 +104,7 @@ function metered(adapter) {
             }
             const durationMs = Date.now() - startedAt;
             try {
-                await record(context, result, adapter);
+                await record(context, result, adapter, requestedModel);
             } catch (e) {
                 if (strict()) throw e;
                 logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} spent ${usage.usageFromResult(result).totalTokens} tokens that could not be booked: ${e.message}`);
