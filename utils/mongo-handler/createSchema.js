@@ -216,6 +216,11 @@ aiReplaysSchema.index({ runId: 1, createdAt: 1 });
 aiReplaysSchema.index({ feature: 1, createdAt: -1 });
 aiReplaysSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+const aiReservationsSchema = new Schema(schema.aiReservations, {strict: true, timestamps: true});
+aiReservationsSchema.index({ state: 1, at: -1 });
+aiReservationsSchema.index({ runId: 1 });
+aiReservationsSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
 const aiAlertsSchema = new Schema(schema.aiAlerts, {strict: true, timestamps: true});
 aiAlertsSchema.index({ type: 1, key: 1 }, { unique: true, partialFilterExpression: { status: 'open' } });
 aiAlertsSchema.index({ status: 1, openedAt: -1 });
@@ -365,6 +370,7 @@ module.exports = {
     agentRunsSchema,
     agentRevisionsSchema,
     aiUsageSchema,
+    aiReservationsSchema,
     aiReplaysSchema,
     aiAlertsSchema,
     agentProposalsSchema,

@@ -911,6 +911,8 @@ const schema = {
             maxTokens: { type: Number, required: false },
             jsonMode: { type: Boolean, required: false },
         },
+        // the routing decision for this call (Modules/AICore/decision.js)
+        decision: { type: Object, required: false },
         // sha256 of the unredacted { system, messages }
         promptHash: { type: String, required: true },
         system: { type: String, required: false },
@@ -930,6 +932,28 @@ const schema = {
         errorCode: { type: String, required: false },
         traceId: { type: String, required: false },
         createdAt: { type: Date, required: true },
+        expiresAt: { type: Date, required: true },
+    },
+    // One in-flight budget hold (Modules/AICore/reservation.js); deleted by the
+    // TTL on expiresAt, which is also what stops a stranded hold blocking a budget
+    aiReservations: {
+        companyId: { type: String, required: false },
+        feature: { type: String, required: true },
+        // held | settled | released
+        state: { type: String, required: true },
+        amountUsd: { type: Number, default: 0, required: true },
+        model: { type: String, required: false },
+        provider: { type: String, required: false },
+        taskClass: { type: String, required: false },
+        estimatedInputTokens: { type: Number, default: 0, required: false },
+        estimatedOutputTokens: { type: Number, default: 0, required: false },
+        actualInputTokens: { type: Number, required: false },
+        actualOutputTokens: { type: Number, required: false },
+        actualUsd: { type: Number, required: false },
+        runId: { type: String, required: false },
+        userId: { type: String, required: false },
+        at: { type: Date, required: true },
+        settledAt: { type: Date, required: false },
         expiresAt: { type: Date, required: true },
     },
     // One rate-alert incident (Modules/Agents/alerts.js); at most one open row per { type, key }
