@@ -79,6 +79,7 @@ import { useGetterFunctions } from "@/composable";
 import { dueBucket, dueLabel, fmtEstimate, priorityMeta } from "@/components/molecules/Home/homeFormat";
 import { timerState, isTimerFor, elapsedSeconds } from "@/components/organisms/TaskDetailOverlay/useTaskTimer";
 import { taskRisk } from "@/views/Projects/composables/taskRisk";
+import { isClosedTask, subtaskProgress, subtaskTotal } from "./subtaskProgress";
 
 defineOptions({ name: "ListRow" });
 
@@ -90,22 +91,23 @@ const props = defineProps({
     canSelect: { type: Boolean, default: false },
     canSetStatus: { type: Boolean, default: false },
     run: { type: Object, default: null },
-    proposal: { type: Object, default: null }
+    proposal: { type: Object, default: null },
+    progress: { type: Object, default: null }
 });
 const emit = defineEmits(["open", "select", "toggle-subtasks", "toggle-done", "review-agent"]);
 
 const { t } = useI18n();
 const { getUser } = useGetterFunctions();
 
-const done = computed(() => (props.data.status?.type || props.data.statusType) === "close");
-const subtaskCount = computed(() => (Array.isArray(props.data.subtaskArray) ? props.data.subtaskArray.length : 0) || Number(props.data.subTasks) || 0);
-const subtaskDone = computed(() => (props.data.subtaskArray || []).filter((s) => (s?.status?.type || s?.statusType) === "close").length);
+const done = computed(() => isClosedTask(props.data));
+const subtaskCount = computed(() => subtaskTotal(props.data, props.progress));
+const progress = computed(() => subtaskProgress(props.data, props.progress));
 
 const metaText = computed(() => {
     const key = props.data.TaskKey && props.data.TaskKey !== "--" ? props.data.TaskKey : "";
-    if (!subtaskCount.value) return key;
-    const progress = `${subtaskDone.value}/${subtaskCount.value}`;
-    return key ? `${key} · ${progress}` : progress;
+    if (!progress.value) return key;
+    const text = `${progress.value.done}/${progress.value.total}`;
+    return key ? `${key} · ${text}` : text;
 });
 
 const assignee = computed(() => {

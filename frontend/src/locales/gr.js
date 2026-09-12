@@ -1884,6 +1884,7 @@ export default {
         "tracking_now": "Tracking now",
         "agent_working": "working on this",
         "wip": "WIP {used}/{limit}",
+        "sprint_total_hint": "Every task in this sprint, subtasks included. Reports and the burndown count parent tasks only.",
         "add_task_to": "Add task to {group}…",
         "group_empty": "Nothing in this group yet.",
         "select_group": "Select every task in this group",

@@ -56,7 +56,7 @@
                         <button v-if="groupedTasks.length > 1 || !sprint.isExpanded" type="button" class="lv2__sprint-head" @click="toggleSprints(sprint?.id)">
                             <span class="lv2__caret" :class="{ 'lv2__caret--open': sprint.isExpanded }">▸</span>
                             <span class="lv2__sprint-name">{{ sprint.name }}</span>
-                            <span class="lv2__sprint-meta">{{ sprint.tasks || 0 }}</span>
+                            <span class="lv2__sprint-meta" :title="$t('List.sprint_total_hint')">{{ sprint.tasks || 0 }}</span>
                         </button>
 
                         <template v-if="sprint.isExpanded">
