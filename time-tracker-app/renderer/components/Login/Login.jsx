@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { login } from '../../store/authSlice';
 import { useRouter } from 'next/router';
@@ -9,15 +9,17 @@ import getConfig from "next/config";
 import { apiRequestWithoutSecure} from '../../utils/services';
 const { APIURL } = publicRuntimeConfig
 const Login = () => {
-  // const [email, setEmail] = useState('');
-  // const [password, setPassword] = useState('');
   const dispatch = useDispatch();
   const router = useRouter();
 
-  const loginAPI = (code, userId) => {
+  // The verifier for the sign-in this window started. It stays in memory, is spent on the first
+  // deep link that follows, and is the only thing that makes an incoming `authorize` link ours.
+  const pendingVerifier = useRef(null);
+
+  const loginAPI = (code, userId, codeVerifier) => {
     return new Promise((resolve, reject) => {
       try {
-        apiRequestWithoutSecure("post", `/api/v1/auth/loginAuthTracker`, {code, userId}).then((ele) => {
+        apiRequestWithoutSecure("post", `/api/v1/auth/loginAuthTracker`, {code, userId, codeVerifier}).then((ele) => {
           resolve(ele?.data)
         }).catch((error)=>{
           reject(error);
@@ -33,10 +35,16 @@ const Login = () => {
     
     const handleDeeplinkUrl = (url) => {
       if (isProcessing) return; // Prevent multiple executions
+      // A link nobody here asked for is someone else's: without a pending sign-in there is no
+      // verifier to present, and a page that pushes an `authorize` link at the tracker would
+      // otherwise sign this computer in as whoever wrote the link.
+      const codeVerifier = pendingVerifier.current;
+      if (!codeVerifier) return;
+      pendingVerifier.current = null;
       isProcessing = true;
-      
+
       const params = new URLSearchParams(url.url.split("?").slice(1).join("?"))
-      loginAPI(params.get("code"), params.get("client_id")).then((ele)=>{
+      loginAPI(params.get("code"), params.get("client_id"), codeVerifier).then((ele)=>{
         localStorage.setItem('refreshToken', ele.refreshToken)
         localStorage.setItem('token', ele.accessToken)
         localStorage.setItem("userId", ele.uid);
@@ -66,8 +74,10 @@ const Login = () => {
     };
   }, [dispatch, router]);
 
-  function openAlianhub() {
-    window.ipc.send("open-external-url", `${APIURL}/#/oauth2`)
+  async function openAlianhub() {
+    const { verifier, challenge } = await window.ipc.invoke("tracker:pkce");
+    pendingVerifier.current = verifier;
+    window.ipc.send("open-external-url", `${APIURL}/#/oauth2?code_challenge=${encodeURIComponent(challenge)}`)
   }
 
   return (

@@ -4,6 +4,9 @@ const handler = {
   send(channel, value) {
     ipcRenderer.send(channel, value)
   },
+  invoke(channel, value) {
+    return ipcRenderer.invoke(channel, value)
+  },
   on(channel, callback) {
     const subscription = (_event, ...args) => callback(...args)
     ipcRenderer.on(channel, subscription)
