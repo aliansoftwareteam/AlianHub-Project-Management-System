@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-12T08:53:54.045Z",
+  "updatedAt": "2026-09-12T11:04:20.426Z",
   "keys": {
     "Scrum.stranded_head": "These {count} will stay in this sprint",
     "Scrum.stranded_hint": "They are unfinished, but their parent task is done — and a subtask moves with its parent. Finish them, or reopen the parent task, before completing the sprint.",
@@ -7862,6 +7862,8 @@
     "Workflows.lineage_unowned": "Waiting on nobody in particular",
     "Workflows.lineage_run_by": "{person} started the run",
     "Workflows.lineage_run_unowned": "Started by the system",
-    "Workflows.lineage_somebody": "somebody"
+    "Workflows.lineage_somebody": "somebody",
+    "EmptyState.no_visible_tasks_title": "No tasks to show here",
+    "EmptyState.no_visible_tasks_msg": "This project has had tasks before, but none are visible in this view. They may have been archived or deleted."
   }
 }

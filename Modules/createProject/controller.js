@@ -12,6 +12,7 @@ const { tenantOf } = require("../../Config/tenant");
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const projectTemplate = require("../../utils/projectTemplates.json");
 const { pickKnownApps } = require("./apps");
+const { withViewIds } = require("./viewEntries");
 const blankTemplate = require("./blankTemplate");
 const { focusForTemplate, normaliseFocus, sampleTaskNamesFor, SAMPLE_TASK_COUNT } = require("./sampleTasks");
 
@@ -507,6 +508,9 @@ exports.createProject = async (req) => {
                     if (clientApps) {
                         createProjectObject.apps = pickKnownApps(clientApps, appArray);
                     }
+                    // Every branch above can leave an entry whose view the company's catalogue does
+                    // not carry, and the project view bar cannot render an entry with no id.
+                    createProjectObject.ProjectRequiredComponent = withViewIds(createProjectObject.ProjectRequiredComponent, tabComponentsArray);
                     createProjectObject.skills = await resolveProjectSkills(req.body.CompanyId, createProjectObject.skills);
                     createProjectObject.DueDate = createProjectObject.DueDate ? new Date(createProjectObject.DueDate) : '';
                     createProjectObject.viewColumn = [
