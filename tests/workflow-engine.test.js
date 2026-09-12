@@ -113,6 +113,14 @@ describe('the ready set', () => {
         expect(scheduler.nextAttemptAt(steps)).toBeInstanceOf(Date);
     });
 
+    it('offers a step again once the claim on it has lapsed, and not before', () => {
+        const running = (lease) => graph().map((s) => (s.stepId === 'b' ? { ...s, status: 'running', leaseExpiresAt: lease } : s));
+        expect(scheduler.readySet(running(new Date(Date.now() + 60000))).map((s) => s.stepId)).toEqual(['c']);
+        expect(scheduler.readySet(running(new Date(Date.now() - 1))).map((s) => s.stepId)).toEqual(['b', 'c']);
+        expect(scheduler.readySet(running(null)).map((s) => s.stepId)).toEqual(['c']);
+        expect(scheduler.runStatus(running(new Date(Date.now() - 1)))).toBeNull();
+    });
+
     it('blocks, rather than strands, a step whose dependency failed', () => {
         const steps = graph().map((s) => (s.stepId === 'a' ? { ...s, status: 'failed' } : s));
         expect(scheduler.readySet(steps)).toEqual([]);

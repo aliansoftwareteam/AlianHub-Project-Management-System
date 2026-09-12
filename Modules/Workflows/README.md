@@ -58,6 +58,12 @@ lapses, another worker reclaims the step and the token moves on; when the first
 worker finally comes back its write matches nothing and raises
 `StaleLeaseError` instead of overwriting the new worker's result.
 
+Reclaiming needs both halves. `claimStep` takes back a `running` step whose lease
+has run out, and `scheduler.readySet` is what offers it one: a step is claimable
+when it is pending **or** running under a lapsed lease. Without the second half a
+run killed mid-step sits at that step until a person presses resume, which is not
+what a durable engine promises.
+
 ## Per-tenant concurrency
 
 The limit is `WORKFLOW_TENANT_CONCURRENCY` steps running at once **per tenant,

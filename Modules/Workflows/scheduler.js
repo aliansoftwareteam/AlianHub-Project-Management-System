@@ -1,7 +1,8 @@
 // Ready-set scheduling over the step graph.
 //
-// A step is ready when it is still pending, every step it depends on has
-// finished successfully, and any backoff it is serving has elapsed. A step whose
+// A step is ready when it is claimable — pending, or running under a lease that
+// has lapsed — every step it depends on has finished successfully, and any
+// backoff it is serving has elapsed. A step whose
 // dependency failed, stopped or was skipped can never become ready, so it is
 // skipped rather than left pending forever — which is what turns a failed step
 // into a finished run instead of a stuck one.
@@ -32,10 +33,22 @@ const blockedBy = (step, index) => (step.dependsOn || [])
 
 const satisfied = (step, index) => dependencies(step, index).every(settledWell);
 
+/* A worker that died holding a claim leaves a `running` row nobody is working,
+ * and the lapsed lease is what says so. Offering it again is the other half of
+ * the mechanism `store.claimStep` already has: its filter takes back a running
+ * step whose lease has run out, under a fresh fencing token, so the worker that
+ * eventually comes back has its write refused rather than applied. Without this
+ * a run killed mid-step waits for a person to press resume. */
+const abandoned = (step, now) => step.status === 'running'
+    && Boolean(step.leaseExpiresAt)
+    && new Date(step.leaseExpiresAt).getTime() <= now.getTime();
+
+const claimable = (step, now) => step.status === 'pending' || abandoned(step, now);
+
 const readySet = (steps, now = new Date()) => {
     const index = byId(steps);
     return steps
-        .filter((step) => step.status === 'pending' && !blockedBy(step, index).length && satisfied(step, index) && due(step, now))
+        .filter((step) => claimable(step, now) && !blockedBy(step, index).length && satisfied(step, index) && due(step, now))
         .sort((a, b) => (a.index || 0) - (b.index || 0));
 };
 
@@ -82,4 +95,4 @@ const runStatus = (steps) => {
     return 'success';
 };
 
-module.exports = { readySet, blockedSet, nextAttemptAt, allSettled, runStatus, byId, skippedByPerson, settledWell, SUCCEEDED, BLOCKING };
+module.exports = { readySet, abandoned, blockedSet, nextAttemptAt, allSettled, runStatus, byId, skippedByPerson, settledWell, SUCCEEDED, BLOCKING };
