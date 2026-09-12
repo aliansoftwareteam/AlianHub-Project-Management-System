@@ -40,34 +40,32 @@ const buildTemplate = (b, companyId) => {
 };
 
 // Pick the project's first usable sprint (top-level first, then inside folders) so
-// the inbound task has a real target. Projects embed sprintsObj / sprintsfolders.
-const resolveDefaultSprint = (project) => {
-    if (!project) return null;
-    const pick = (obj, folder) => {
-        for (const k of Object.keys(obj || {})) {
-            const s = obj[k];
-            if (s && s.deletedStatusKey !== 1) {
-                const sid = String(s.id || s._id || k);
-                const out = { sprintId: sid, sprintArray: { id: sid, name: s.name || 'Sprint' } };
-                if (folder) {
-                    out.sprintArray.folderId = folder.folderId;
-                    out.sprintArray.folderName = folder.folderName || '';
-                    out.folderObjId = folder.folderId;
-                }
-                return out;
-            }
-        }
-        return null;
-    };
-    const top = pick(project.sprintsObj);
-    if (top) return top;
-    const folders = project.sprintsfolders || {};
-    for (const fk of Object.keys(folders)) {
-        const f = folders[fk];
-        const inFolder = pick(f && f.sprintsObj, { folderId: (f && (f.folderId || fk)), folderName: f && f.folderName });
-        if (inFolder) return inFolder;
+// the inbound task has a real target. Read from the sprints collection: a project
+// document's sprintsObj is a legacy copy that no sprint write maintains, so a
+// project whose sprints were created through the API embeds none of them.
+const resolveDefaultSprint = async (companyId, projectId) => {
+    const pid = oid(projectId);
+    if (!pid) return null;
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.SPRINTS,
+        data: [{ projectId: pid, deletedStatusKey: { $ne: 1 } }],
+    }, 'find').catch(() => []);
+    const sprints = Array.isArray(rows) ? rows : [];
+    const sprint = sprints.find((s) => s && !s.folderId) || sprints[0];
+    if (!sprint) return null;
+
+    const sid = String(sprint._id);
+    const out = { sprintId: sid, sprintArray: { id: sid, name: sprint.name || 'Sprint' } };
+    if (sprint.folderId) {
+        const folder = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.FOLDERS,
+            data: [{ _id: sprint.folderId }],
+        }, 'findOne').catch(() => null);
+        out.folderObjId = String(sprint.folderId);
+        out.sprintArray.folderId = out.folderObjId;
+        out.sprintArray.folderName = (folder && folder.name) || '';
     }
-    return null;
+    return out;
 };
 
 // POST /api/v1/email-in/inboxes  { projectId | projectData:{_id}, userData, name? }
@@ -90,7 +88,7 @@ exports.createInbox = async (req, res) => {
         let sprintArray = (b.sprintArray && (b.sprintArray.id || b.sprintArray._id)) ? b.sprintArray : null;
         let folderObjId = '';
         if (!sprintId || !sprintArray) {
-            const def = resolveDefaultSprint(projObj);
+            const def = await resolveDefaultSprint(companyId, projectId);
             if (!def) return res.send({ status: false, statusText: 'This project has no sprint to receive tasks — create a sprint first.' });
             sprintId = def.sprintId; sprintArray = def.sprintArray; folderObjId = def.folderObjId || '';
         }

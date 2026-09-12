@@ -16,7 +16,11 @@ const defaultTab = (project, current) => {
 
 /* The sprint/folder tree of the open project. Sprints and folders are fetched once
    per project into the store (projectData/sprints|folders) and folded into the
-   project document so every view reads project.sprintsObj / sprintsfolders. */
+   project document so every view reads project.sprintsObj / sprintsfolders.
+   The fetch is unconditional because the project document's own sprintsObj is a
+   legacy copy that no sprint write maintains: POST /api/v1/sprint only writes the
+   sprints collection, so a project whose sprints were created through the API
+   carries an empty (or absent) sprintsObj and would render an empty board. */
 export function useProjectTree(projectData) {
     const { getters, commit, dispatch } = useStore();
     const route = useRoute();
@@ -73,9 +77,6 @@ export function useProjectTree(projectData) {
         }
     }
 
-    // Folder routes read the folder tree straight from the project, and nothing else loads it for a global-permission project.
-    const needsSprintTree = (project) => project.isGlobalPermission === false || Boolean(route.params?.folderId);
-
     function selectProject(data, updateRoute = false) {
         const project = byId(projects.value, data?._id) || data;
         if (!project?._id) return;
@@ -84,7 +85,7 @@ export function useProjectTree(projectData) {
         }
         commit('projectData/mutateCurrentProjectDetails', project);
         projectData.value = project;
-        if (needsSprintTree(project)) loadSprintFolderData(project._id);
+        loadSprintFolderData(project._id);
     }
 
     // A project created seconds ago is in the store before it reaches the list.

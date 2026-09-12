@@ -1192,6 +1192,19 @@ async function loadProjectForTasks(companyId, projectId) {
     return (Array.isArray(rows) && rows[0]) || null;
 }
 
+// The project's sprint names, for the planning prompt. Read from the SPRINTS
+// collection for the same reason as loadSprintForTasks below: the project doc's
+// sprintsObj is a legacy copy that no sprint write maintains.
+async function loadSprintNamesForProject(companyId, projectId) {
+    let oid;
+    try { oid = new mongoose.Types.ObjectId(String(projectId)); } catch (_e) { return []; }
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.SPRINTS,
+        data: [{ projectId: oid, deletedStatusKey: { $ne: 1 } }],
+    }, 'find').catch(() => []);
+    return (Array.isArray(rows) ? rows : []).map((s) => s && s.name).filter(Boolean);
+}
+
 // Load a single sprint by id (company-scoped, non-deleted) from the SPRINTS
 // collection — the source of truth — rather than the project doc's
 // denormalized `sprintsObj`, which a freshly-loaded project doc may not carry.
@@ -1547,6 +1560,7 @@ module.exports = {
     executePlan,
     executeTasksIntoProject,
     loadProjectForTasks,
+    loadSprintNamesForProject,
     normalizePlanColors,
     // Exported for tests / debugging.
     buildProjectDoc,

@@ -5,7 +5,7 @@ jest.mock('../Modules/AICore/llmProvider', () => ({
 }));
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn(async () => []) }));
 jest.mock('../Modules/settings/ProjectSkills/helper', () => ({ resolveProjectSkills: jest.fn(async () => []), getActiveSkillSlugs: jest.fn(async () => []) }));
-jest.mock('../Modules/AIProjectGenerator/orchestrator', () => ({ normalizePlanColors: (p) => p, executePlan: jest.fn(async () => ({ ok: true })), loadProjectForTasks: jest.fn(async () => null) }));
+jest.mock('../Modules/AIProjectGenerator/orchestrator', () => ({ normalizePlanColors: (p) => p, executePlan: jest.fn(async () => ({ ok: true })), loadProjectForTasks: jest.fn(async () => null), loadSprintNamesForProject: jest.fn(async () => []) }));
 jest.mock('../Modules/AIProjectGenerator/sseEmitter', () => ({ emit: jest.fn(), handleEvents: jest.fn(), COMPLETE_EVENT: 'complete' }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
@@ -254,7 +254,7 @@ describe('/plan', () => {
 
 describe('/tasks-plan for an existing project', () => {
     it('carries the project\'s own rows in the DATA fence after the clarifications, with the partial in the system prompt', async () => {
-        orchestrator.loadProjectForTasks.mockResolvedValue({ _id: P, ProjectName: 'Bike shop', description: 'Bikes for commuters', taskStatusData: [{ name: 'To Do' }], taskTypeCounts: [{ key: 'task', name: 'Task' }], sprintsObj: {} });
+        orchestrator.loadProjectForTasks.mockResolvedValue({ _id: P, ProjectName: 'Bike shop', description: 'Bikes for commuters', taskStatusData: [{ name: 'To Do' }], taskTypeCounts: [{ key: 'task', name: 'Task' }] });
         primeProvider({ coverage: cov(POINTS) });
         const spy = jest.spyOn(memory, 'contextFor');
         const r = res();
