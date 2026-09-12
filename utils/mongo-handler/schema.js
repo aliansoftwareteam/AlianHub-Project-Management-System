@@ -1041,6 +1041,66 @@ const schema = {
         startedAt: { type: Date, required: false },
         finishedAt: { type: Date, required: false },
     },
+    /* Task 028 sprint 5 step 1. A workflow run is the durable unit of multi-step
+     * work; an automation rule is a one-node workflow, so `definition.steps` holds
+     * exactly one node of type "automation_rule" and `automationRunId` points at
+     * the automation_runs row the compatibility wrapper executes. */
+    workflowRuns: {
+        workflowId: { type: String, required: true },
+        name: { type: String, required: false },
+        source: { type: String, default: 'automation_rule', required: false },
+        // Unique when present: what makes a redelivered trigger a no-op rather than a second run.
+        dedupeKey: { type: String, required: false },
+        ruleId: { type: String, required: false },
+        ruleName: { type: String, required: false },
+        automationRunId: { type: String, required: false },
+        eventId: { type: String, required: false },
+        eventType: { type: String, required: false },
+        entity: { type: Object, default: {}, required: false },
+        envelope: { type: Object, default: {}, required: false },
+        traceId: { type: String, required: false },
+        startedBy: { type: String, required: false },
+        // queued | running | success | failed | stopped
+        status: { type: String, default: 'queued', required: true },
+        // { steps: [{ id, type, action, dependsOn, config, maxAttempts }] } — snapshotted at
+        // start, so editing the rule mid-run cannot change the graph underneath it.
+        definition: { type: Object, default: {}, required: false },
+        outputs: { type: Object, default: {}, required: false },
+        error: { type: String, required: false },
+        startedAt: { type: Date, required: false },
+        finishedAt: { type: Date, required: false },
+    },
+    /* One row per step of a workflow run, unique on { runId, stepId }. `fencingToken`
+     * is bumped by every claim; a worker whose token is stale has lost its lease and
+     * its write is refused. */
+    workflowStepRuns: {
+        runId: { type: String, required: true },
+        stepId: { type: String, required: true },
+        index: { type: Number, default: 0, required: false },
+        type: { type: String, required: true },
+        action: { type: String, required: false },
+        dependsOn: { type: Array, default: [], required: false },
+        config: { type: Object, default: {}, required: false },
+        // pending | running | success | failed | skipped | stopped
+        status: { type: String, default: 'pending', required: true },
+        attempts: { type: Number, default: 0, required: false },
+        maxAttempts: { type: Number, default: 3, required: false },
+        fencingToken: { type: Number, default: 0, required: false },
+        workerId: { type: String, required: false },
+        claimedAt: { type: Date, required: false },
+        leaseExpiresAt: { type: Date, required: false },
+        nextAttemptAt: { type: Date, required: false },
+        // Action-level key: the audit row it opens is what stops a replay repeating the effect.
+        idempotencyKey: { type: String, required: false },
+        auditId: { type: String, required: false },
+        replayed: { type: Boolean, default: false, required: false },
+        output: { type: Object, required: false },
+        error: { type: String, required: false },
+        // { type, code, deterministic } — `deterministic` is what decides retry versus give up.
+        failure: { type: Object, required: false },
+        startedAt: { type: Date, required: false },
+        finishedAt: { type: Date, required: false },
+    },
     // Integration connections — managed by Modules/Integrations (AUTO-04). Generic
     // registry backing the marketplace, Slack and iframe apps. Secret config keys
     // are AES-256-GCM ciphertext (utils/secretField); secretsVersion 0 marks a row

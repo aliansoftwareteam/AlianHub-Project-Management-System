@@ -4,6 +4,7 @@ const matcher = require('./matcher');
 const runner = require('./runner');
 const { createInlineDriver } = require('./queue');
 const { createAgendaDriver } = require('./queue/agendaDriver');
+const workflows = require('../../Workflows');
 
 // Wires the five stages together: ingest (the bus) → match → enqueue → execute → record.
 //
@@ -48,10 +49,24 @@ const logDispatchFailure = (envelope, error, rule) => {
     logger.error(`${LOG_PREFIX} dispatch failed for ${domainEventBus.eventLabel(envelope)}${ruleLabel}: ${domainEventBus.failureText(error)}`);
 };
 
+/* With WORKFLOW_ENGINE on the rule becomes a one-node workflow run and the job
+ * carries its id; the automation run is created and executed exactly as before
+ * either way, so the rule's own behaviour and log do not change. A workflow run
+ * that could not be created (a redelivered event loses the dedupe key) falls
+ * back to the direct path, where the automation run's own unique index has
+ * already dropped the duplicate. */
 async function dispatchRule(envelope, rule) {
     const run = await runner.createRun(envelope.companyId, rule, envelope);
     if (!run) return;
-    await enqueueRun({ companyId: envelope.companyId, runId: String(run._id), ruleId: String(rule._id) });
+    const job = { companyId: envelope.companyId, runId: String(run._id), ruleId: String(rule._id) };
+    if (workflows.enabled()) {
+        const workflowRun = await workflows.startForRule(envelope.companyId, rule, envelope, run);
+        if (workflowRun) {
+            await enqueueRun({ ...job, workflowRunId: String(workflowRun._id) });
+            return;
+        }
+    }
+    await enqueueRun(job);
 }
 
 async function onEnvelope(envelope) {
@@ -86,8 +101,12 @@ async function start() {
     }
     driver = selectDriver();
     driver.define(JOB_NAME, async (job) => {
-        const { companyId, runId, ruleId } = job.attrs.data || {};
+        const { companyId, runId, ruleId, workflowRunId } = job.attrs.data || {};
         const keepAlive = typeof job.touch === 'function' ? () => job.touch() : null;
+        if (workflowRunId && workflows.enabled()) {
+            await workflows.tick(companyId, workflowRunId, { enqueue: enqueueRun, context: { keepAlive } });
+            return;
+        }
         await runner.execute({ companyId, runId, ruleId, enqueue: enqueueRun, keepAlive });
     });
     await driver.start();
