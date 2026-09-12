@@ -6,6 +6,7 @@ const state = readState();
 const anon = createApiClient({ baseURL: state.baseURL });
 const COMPANY_A = state.companyId;
 const TASK_TYPE_IMAGE = 'setting/task_type/task.png';
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
 /* The harness seeds one company and no pre-provisioned ones, so /api/v2/company/create
  * answers "Predefine company not found". Company B is an id outside every fixture
@@ -111,11 +112,16 @@ describe('own-company flows still work', () => {
         expect(file.status).toBe(200);
     });
 
-    it('a signed-in user without a company header gets a profile image URL', async () => {
+    it('a signed-in user without a company header gets their own profile image URL', async () => {
         const member = await loginAs('member');
+        const avatar = `${member.uid}_${crypto.randomBytes(3).toString('hex')}_avatar.png`;
+        expect((await member.api.post('/api/v1/storage/uploadFileBase64', { companyId: 'USER_PROFILES', path: avatar, key: 'userProfile', base64String: PNG, isUserProfile: true })).status).toBe(200);
+
         const noCompany = createApiClient({ baseURL: state.baseURL, accessToken: member.accessToken });
-        const res = await noCompany.post('/api/v1/getUserProfile', { path: 'avatar.png' });
+        const res = await noCompany.post('/api/v1/getUserProfile', { path: avatar });
         expect(res.status).toBe(200);
-        expect(res.body.statusText).toContain('/api/v1/download/USER_PROFILES/avatar.png?token=');
+        expect(res.body.statusText).toContain(`/api/v1/download/USER_PROFILES/${avatar}?token=`);
+
+        await member.api.delete('/api/v1/storage/removeFile/USER_PROFILES', { query: { filepath: avatar, thubmkey: 'userProfile' } });
     });
 });

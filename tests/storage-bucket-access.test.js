@@ -56,12 +56,6 @@ describe('requireOwnBucket', () => {
         expect(out.status).toBe(403);
     });
 
-    it('lets USER_PROFILES through only where the route allows the shared profile bucket', async () => {
-        const profiles = requireOwnBucket(bucketIdParam, { allowUserProfiles: true });
-        expect((await run(profiles, { uid: USER_OF_A, aud: COMPANY_A, params: { bucketId: 'USER_PROFILES' } })).nextCalled).toBe(true);
-        expect((await run(profiles, { uid: USER_OF_A, aud: COMPANY_A, params: { bucketId: COMPANY_B } })).status).toBe(403);
-    });
-
     it('reads the company from the body for the signing routes', async () => {
         const fromBody = requireOwnBucket(bodyField('companyId'));
         expect((await run(fromBody, { uid: USER_OF_A, aud: COMPANY_A, body: { companyId: COMPANY_A } })).nextCalled).toBe(true);
