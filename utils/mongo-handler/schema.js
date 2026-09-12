@@ -733,6 +733,9 @@ const schema = {
         // is the switch that stops rule A and rule B triggering each other forever.
         reactToAutomation: { type: Boolean, default: false, required: false },
         enabled: { type: Boolean, default: true, required: false },
+        // The v1 on-demand bulk apply only: when it last ran and how many tasks it
+        // changed. A v2 rule is fired by events, never applied, so these stay unset
+        // on one — how often it fired is counted from its automationRuns.
         lastRunAt: { type: Date, required: false },
         lastRunCount: { type: Number, default: 0, required: false },
         createdBy: { type: String, required: false },

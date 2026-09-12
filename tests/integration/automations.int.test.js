@@ -48,11 +48,47 @@ async function createRule(api, rule) {
 
 const removeRule = (api, id) => (id ? api.delete(`/api/v2/automations/${id}`) : null);
 
-const finishedRuns = (api, ruleId) => waitFor(async () => {
+const finishedRuns = (api, ruleId, atLeast = 1) => waitFor(async () => {
     const res = await api.get(`/api/v2/automations/${ruleId}/runs`);
     const rows = res.body.data || [];
-    return rows.length && rows.every((run) => FINISHED_RUN.includes(run.status)) ? rows : null;
-}, { timeout: 15000 });
+    return rows.length >= atLeast && rows.every((run) => FINISHED_RUN.includes(run.status)) ? rows : null;
+}, { timeout: 20000 });
+
+const commenterFor = (projectId, body) => ruleFor(projectId, {
+    steps: [{ id: 's1', type: 'action', action: 'add_comment', config: { body } }],
+});
+
+/* The shape the builder saves: no name, because the server composes it from the
+ * rule. Everything below drops it the same way. */
+const unnamed = (rule) => ({ ...rule, name: undefined });
+
+const setPriority = (api, { project, task, user, priority }) => api.patch('/api/v2/tasks', {
+    action: 'updatePriority',
+    firebaseObj: { Task_Priority: priority },
+    projectData: { _id: String(project._id), ProjectName: project.ProjectName, CompanyId: api.companyId },
+    taskData: { _id: String(task._id), ProjectID: String(project._id), sprintId: task.sprintId },
+    priorityObj: { taskId: String(task._id), taskName: task.name || '', priorityName: 'MEDIUM', newPriorityName: priority },
+    userData: { Employee_Name: 'E2E', id: user.userId, companyOwnerId: user.userId },
+    isUpdateTask: true,
+});
+
+const commentsSaying = async (api, { project, task, body }) => {
+    const res = await api.get('/api/v1/comments/get-paginated-messages', {
+        query: { projectId: String(project._id), taskId: String(task._id), isDefault: 'true', batchLimit: 100 },
+    });
+    return (res.body.data || []).filter((c) => c.message === body);
+};
+
+const listedRule = async (api, ruleId) => {
+    const res = await api.get('/api/v2/automations');
+    return (res.body.data || []).find((r) => r._id === ruleId);
+};
+
+async function projectWithTask(owner) {
+    const project = await createProject(owner.api, { assigneeIds: [owner.uid], createdBy: owner.uid });
+    const task = await createTask(owner.api, { project, user: state.users.owner, companyOwnerId: owner.uid });
+    return { project, task };
+}
 
 async function mcpCall(pat, method, params = {}) {
     const client = createApiClient({ baseURL: state.baseURL, accessToken: pat, companyId: state.companyId });
@@ -229,6 +265,87 @@ describe('automation rules (v2)', () => {
         expect(patch.body.status).toBe(false);
     });
 
+    it('AUT-10 names a saved rule after the rule it saved, action body and all', async () => {
+        const { api } = await loginAs('owner');
+        const body = `E2E body ${uniqueSuffix()}`;
+        const rule = await createRule(api, unnamed(commenterFor(state.projects.shared._id, body)));
+        try {
+            expect(rule.name).toContain(body);
+            expect(rule.name).toBe(rule.sentence);
+            expect((await listedRule(api, rule._id)).name).toContain(body);
+        } finally {
+            await removeRule(api, rule._id);
+        }
+    });
+
+    it('AUT-10 renames a rule when its action body is edited, rather than keeping the old sentence', async () => {
+        const { api } = await loginAs('owner');
+        const rule = await createRule(api, unnamed(commenterFor(state.projects.shared._id, 'E2E before')));
+        try {
+            const body = `E2E after ${uniqueSuffix()}`;
+            const updated = await api.put(`/api/v2/automations/${rule._id}`, unnamed(commenterFor(state.projects.shared._id, body)));
+            expect(updated.body.data.name).toContain(body);
+            expect(updated.body.data.name).not.toContain('E2E before');
+        } finally {
+            await removeRule(api, rule._id);
+        }
+    });
+
+    it('AUT-11 counts one run per firing and posts one comment for each run that worked', async () => {
+        const owner = await loginAs('owner');
+        const { project, task } = await projectWithTask(owner);
+        const body = `E2E counted ${uniqueSuffix()}`;
+        const commenter = await createRule(owner.api, unnamed(commenterFor(project._id, body)));
+        const broken = await createRule(owner.api, unnamed(ruleFor(project._id, {
+            steps: [{ id: 's1', type: 'action', action: 'set_status', config: { status: 'No such status' } }],
+        })));
+        try {
+            for (const rule of [commenter, broken]) {
+                await owner.api.patch(`/api/v2/automations/${rule._id}/enabled`, { enabled: true });
+            }
+            expect((await setPriority(owner.api, { project, task, user: state.users.owner, priority: 'HIGH' })).body.status).toBe(true);
+
+            const [worked, failed] = [await finishedRuns(owner.api, commenter._id), await finishedRuns(owner.api, broken._id)];
+            expect(worked.map((r) => r.status)).toEqual(['success']);
+            expect(failed.map((r) => r.status)).toEqual(['failed']);
+
+            const counted = await Promise.all([commenter, broken].map((r) => listedRule(owner.api, r._id)));
+            expect(counted.map((r) => [r.firedCount, r.failedCount])).toEqual([[1, 0], [1, 1]]);
+            // The number people actually care about: a fire that did its work left a
+            // comment, and a fire that did not is the one `failedCount` names.
+            expect(await commentsSaying(owner.api, { project, task, body })).toHaveLength(counted[0].firedCount - counted[0].failedCount);
+            expect(counted.every((r) => r.lastRunCount === undefined)).toBe(true);
+        } finally {
+            for (const rule of [commenter, broken]) {
+                await owner.api.patch(`/api/v2/automations/${rule._id}/enabled`, { enabled: false });
+                await removeRule(owner.api, rule._id);
+            }
+        }
+    });
+
+    it('AUT-11 fires once for every priority change, including ones inside the same debounce window', async () => {
+        const owner = await loginAs('owner');
+        const { project, task } = await projectWithTask(owner);
+        const body = `E2E every change ${uniqueSuffix()}`;
+        const rule = await createRule(owner.api, unnamed(commenterFor(project._id, body)));
+        const priorities = ['HIGH', 'LOW', 'MEDIUM'];
+        try {
+            await owner.api.patch(`/api/v2/automations/${rule._id}/enabled`, { enabled: true });
+            for (const priority of priorities) {
+                await setPriority(owner.api, { project, task, user: state.users.owner, priority });
+            }
+
+            const runs = await finishedRuns(owner.api, rule._id, priorities.length);
+            expect(runs.map((r) => r.status)).toEqual(priorities.map(() => 'success'));
+            expect(runs.map((r) => r.envelope.data.Task_Priority).sort()).toEqual([...priorities].sort());
+            expect(await commentsSaying(owner.api, { project, task, body })).toHaveLength(priorities.length);
+            expect((await listedRule(owner.api, rule._id)).firedCount).toBe(priorities.length);
+        } finally {
+            await owner.api.patch(`/api/v2/automations/${rule._id}/enabled`, { enabled: false });
+            await removeRule(owner.api, rule._id);
+        }
+    });
+
     it('AUT-03 keeps private-project tasks out of a guest backtest', async () => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
@@ -275,6 +392,18 @@ describe('automation rules (v1)', () => {
             expect(preview.body.data.sample).toEqual([expect.objectContaining({ id: task._id, priority: 'HIGH' })]);
         } finally {
             await owner.api.delete(`/api/v1/automations/${id}`);
+        }
+    });
+
+    it('AUT-11 keeps event-driven rules out of the bulk-apply list and refuses to apply one', async () => {
+        const { api } = await loginAs('owner');
+        const rule = await createRule(api, unnamed(commenterFor(state.projects.shared._id, 'E2E v1 leak')));
+        try {
+            expect((await api.get('/api/v1/automations')).body.data.map((r) => r._id)).not.toContain(rule._id);
+            const applied = await api.post(`/api/v1/automations/${rule._id}/apply`, {});
+            expect(refused(applied)).toBe(true);
+        } finally {
+            await removeRule(api, rule._id);
         }
     });
 

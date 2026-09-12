@@ -167,7 +167,7 @@ const backtest = ref(null);
 
 const scopeChoice = ref('all');
 const conditions = ref([]);
-const draft = reactive({ name: '', trigger: { type: 'event', event: '' }, steps: [] });
+const draft = reactive({ trigger: { type: 'event', event: '' }, steps: [] });
 
 let stepSeq = 0;
 const nextStepId = () => { stepSeq += 1; return `s${stepSeq}`; };
@@ -248,8 +248,10 @@ const loadConditions = (node) => {
     return list.filter((n) => n && n.field).map((n) => ({ field: n.field, op: n.op, value: n.value ?? '' }));
 };
 
+/* No name: the server composes it from the rule it is saving. A name derived
+ * here would come from the sentence box, which is one compile behind whatever was
+ * typed last. */
 const currentRule = () => ({
-    name: draft.name || sentence.value.slice(0, 120),
     version: 2,
     trigger: { type: 'event', event: draft.trigger.event },
     scope: scopeChoice.value === 'all'
@@ -273,7 +275,7 @@ const applyRule = (rule) => {
 const compileSentence = async () => {
     if (!sentence.value.trim()) return;
     backtest.value = null;
-    const body = (await apiRequest('post', env.AUTOMATIONS_COMPILE, { sentence: sentence.value, name: draft.name }))?.data;
+    const body = (await apiRequest('post', env.AUTOMATIONS_COMPILE, { sentence: sentence.value }))?.data;
     if (!body?.status) { errors.value = [body?.statusText || 'Could not read that sentence.']; return; }
     errors.value = body.data.errors || [];
     ambiguities.value = body.data.ambiguities || [];
@@ -287,7 +289,7 @@ const compileSentence = async () => {
 /* rule → sentence, so editing a slot rewrites the sentence above it. */
 const onRuleEdit = async () => {
     backtest.value = null;
-    const body = (await apiRequest('post', env.AUTOMATIONS_COMPILE, { rule: currentRule(), name: draft.name }))?.data;
+    const body = (await apiRequest('post', env.AUTOMATIONS_COMPILE, { rule: currentRule() }))?.data;
     if (!body?.status) return;
     errors.value = body.data.errors || [];
     sentence.value = body.data.sentence;
@@ -314,7 +316,6 @@ const startNew = async () => {
     ambiguities.value = [];
     backtest.value = null;
     editingId.value = null;
-    draft.name = '';
     draft.trigger = { type: 'event', event: manifest.triggers[0]?.key || '' };
     draft.steps = [];
     conditions.value = [];
@@ -333,7 +334,6 @@ const edit = (rule) => {
     ambiguities.value = [];
     backtest.value = null;
     editingId.value = rule._id;
-    draft.name = rule.name || '';
     applyRule(rule);
     sentence.value = rule.sentence || '';
     building.value = true;
@@ -345,8 +345,7 @@ const save = async (enabled) => {
     saving.value = true;
     errors.value = [];
     try {
-        if (!draft.name) await onRuleEdit();
-        const body = { ...currentRule(), name: draft.name || sentence.value.slice(0, 120), enabled };
+        const body = { ...currentRule(), enabled };
         const res = editingId.value
             ? await apiRequest('put', `${env.AUTOMATIONS_V2}/${editingId.value}`, body)
             : await apiRequest('post', env.AUTOMATIONS_V2, body);

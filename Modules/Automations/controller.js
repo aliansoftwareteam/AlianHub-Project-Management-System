@@ -15,6 +15,7 @@ const { canEditProject } = require('../AIProjectGenerator/projectAccess');
 
 const NOT_FOUND = 'Not found.';
 const APPLY_REFUSED = 'You cannot edit every task this automation targets.';
+const V2_NOT_APPLIABLE = 'This automation runs on events and cannot be applied in bulk.';
 
 const companyOf = (req) => req.headers['companyid'];
 const oid = (id) => (/^[0-9a-fA-F]{24}$/.test(String(id || '')) ? new mongoose.Types.ObjectId(String(id)) : null);
@@ -69,8 +70,11 @@ exports.listRules = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return refuse(res, 400, 'companyId is required.');
+        // v2 rules are excluded: they carry `steps`, not `actions`, so R.describe
+        // reads them as empty and `lastRunCount` — which only the bulk apply below
+        // ever writes — reads as "0 tasks affected" for a rule that has been firing.
         const rows = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { updatedAt: -1 } }],
+            type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ deletedStatusKey: { $ne: 1 }, version: { $ne: 2 } }, {}, { sort: { updatedAt: -1 } }],
         }, 'find');
         return res.send({ status: true, data: (rows || []).map((r) => ({ ...(r.toObject ? r.toObject() : r), summary: R.describe(r) })) });
     } catch (e) { logger.error(`listRules: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
@@ -144,6 +148,10 @@ exports.applyRule = async (req, res) => {
         const target = await ruleForWrite(req, res, companyId);
         if (!target) return undefined;
         const { id, rule } = target;
+        // A v2 rule keeps its work in `steps`, so this would find no action, touch
+        // nothing, and still answer "Applied to 0 task(s)" while stamping a zero
+        // over the counter.
+        if (Number(rule.version) === 2) return refuse(res, 400, V2_NOT_APPLIABLE);
         const pr = (rule.actions || []).find((a) => a.type === 'set_priority');
         const tasks = pr
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [R.buildMatch(rule.conditions || {}, oid), 'ProjectID Task_Priority'] }, 'find')
@@ -176,9 +184,16 @@ exports.getRegistry = async (req, res) => {
     }
 };
 
+const V1_APPLY_FIELDS = ['lastRunAt', 'lastRunCount'];
+
+/* Those two belong to the v1 bulk apply and are dropped here: the schema default
+ * would otherwise report "never run, 0 tasks" for a rule the engine has been firing
+ * on every matching event. */
 const v2Summary = (r) => {
     const raw = r.toObject ? r.toObject() : r;
-    return { ...raw, summary: V2.describeV2(raw), sentence: sentences.describeRule(raw) };
+    const summarised = { ...raw, summary: V2.describeV2(raw), sentence: sentences.describeRule(raw) };
+    V1_APPLY_FIELDS.forEach((field) => delete summarised[field]);
+    return summarised;
 };
 
 // GET /api/v2/automations
@@ -190,9 +205,19 @@ exports.listRulesV2 = async (req, res) => {
             type: SCHEMA_TYPE.AUTOMATION_RULES,
             data: [{ deletedStatusKey: { $ne: 1 }, version: 2 }, {}, { sort: { updatedAt: -1 } }],
         }, 'find');
+        // Lifetime, every run the rule has ever started, and one run per matched
+        // event whatever its outcome — so it is not the number of comments posted
+        // today, and `failedCount` is what says the difference.
         const fired = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AUTOMATION_RUNS,
-            data: [[{ $group: { _id: '$ruleId', runs: { $sum: 1 }, lastAt: { $max: '$startedAt' } } }]],
+            data: [[{
+                $group: {
+                    _id: '$ruleId',
+                    runs: { $sum: 1 },
+                    failures: { $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] } },
+                    lastAt: { $max: '$startedAt' },
+                },
+            }]],
         }, 'aggregate').catch(() => []);
         const byRule = {};
         (fired || []).forEach((f) => { byRule[String(f._id)] = f; });
@@ -200,7 +225,7 @@ exports.listRulesV2 = async (req, res) => {
             status: true,
             data: (rows || []).map((r) => {
                 const stats = byRule[String(r._id)] || {};
-                return { ...v2Summary(r), firedCount: Number(stats.runs || 0), lastFiredAt: stats.lastAt || null };
+                return { ...v2Summary(r), firedCount: Number(stats.runs || 0), failedCount: Number(stats.failures || 0), lastFiredAt: stats.lastAt || null };
             }),
         });
     } catch (e) { logger.error(`listRulesV2: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
@@ -217,10 +242,12 @@ exports.createRuleV2 = async (req, res) => {
         if (denied) return refuse(res, denied.code, denied.statusText);
 
         // A rule that mutates tasks the instant it is saved gives the author no chance to look at it first.
+        // No lastRunCount: that counter belongs to the v1 bulk apply, and seeding it
+        // here puts a permanent 0 next to a rule the event engine does fire.
         const data = {
             _id: new mongoose.Types.ObjectId(), ...check.value,
             enabled: req.body.enabled === true,
-            createdBy: String(req.uid || ''), lastRunCount: 0, deletedStatusKey: 0,
+            createdBy: String(req.uid || ''), deletedStatusKey: 0,
         };
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUTOMATION_RULES, data }, 'save');
         rulesChanged(companyId);
