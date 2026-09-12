@@ -5,6 +5,7 @@
             <div class="ah-toolbar">
                 <div class="ah-toolbar__title">{{ $t('Workflows.run_title') }}</div>
                 <div class="ah-toolbar__spacer"></div>
+                <router-link v-if="!engineOff" class="ah-btn ah-btn--ghost ah-btn--sm" :to="lineageLink" data-test="lineage-link">{{ $t('Workflows.lineage_open') }}</router-link>
                 <button v-if="!engineOff" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="refresh" @click="load">{{ $t('Workflows.refresh') }}</button>
             </div>
 
@@ -117,6 +118,8 @@ const { canManage } = useAgentAccess();
 
 const runId = () => props.runId || String(route.params.id || "");
 const { run, error, engineOff, loaded, busy, nodes, blocked, totals, load, control, toggleChildren } = useWorkflowRun(runId);
+
+const lineageLink = computed(() => ({ name: "WorkflowLineage", params: { cid: route.params.cid, id: runId() } }));
 
 const runStatus = computed(() => runStatusOf(run.value));
 const RUN_CHIPS = { success: "ah-chip--ok", failed: "ah-chip--danger", blocked: "ah-chip--danger", running: "ah-chip--brand", queued: "ah-chip--warn", stopped: "ah-chip--dark" };

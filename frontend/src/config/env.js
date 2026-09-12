@@ -216,6 +216,7 @@ module.exports.AGENT_ACCOUNT = '/api/v2/agents/account';
 module.exports.AGENT_PAUSE_ALL = '/api/v2/agents/pause-all';
 module.exports.AGENT_POLICY = '/api/v2/agents/policy';
 module.exports.WORKFLOW_RUNS = '/api/v2/workflows/runs';
+module.exports.WORKFLOW_APPROVALS = '/api/v2/workflows/approvals';
 module.exports.API_TOKENS = '/api/v2/api-tokens';
 module.exports.MCP_TOKENS = '/api/v2/api-tokens/mcp';
 module.exports.MCP_MANIFEST = '/mcp/manifest';

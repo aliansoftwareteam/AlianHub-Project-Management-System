@@ -66,6 +66,12 @@ export default [
         meta: { title: 'Workflow run', requiresAuth: true }
     },
     {
+        path: '/:cid/ai/workflows/runs/:id/lineage',
+        name: 'WorkflowLineage',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/WorkflowLineageView.vue'),
+        meta: { title: 'Workflow lineage', requiresAuth: true }
+    },
+    {
         path: '/:cid/ai/accounts',
         name: 'AiAccounts',
         component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiAccounts.vue'),
