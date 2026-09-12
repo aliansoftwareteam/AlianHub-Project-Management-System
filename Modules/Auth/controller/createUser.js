@@ -7,6 +7,7 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const mongoose = require("mongoose");
 const { importUserNotifications } = require("../../../utils/data");
 const { addAndRemoveUserInMongodbNotificationCount } = require("../../Auth/controller");
+const { toAuthView } = require("../../Users/helpers/userAccessRules");
 
 
 exports.authenticateToken = "";
@@ -62,7 +63,7 @@ exports.addUserMongodbV2 = (data) => new Promise((resolve, reject) => {
         if (!iUserRes.status) return reject(iUserRes.message);
         object.data._id = iUserRes.data._id;
         mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, object, 'save')
-            .then((res) => resolve({ status: true, statusText: res }))
+            .then((res) => resolve({ status: true, statusText: toAuthView(res) }))
             .catch(reject);
     });
 });
@@ -207,7 +208,7 @@ exports.googleSignup = async (req, res) => {
         return res.status(200).json({
             status: true,
             message: "Google signup successful",
-            data: userRes,
+            data: toAuthView(userRes),
         });
     } catch (error) {
         logger.error(`Google Signup API Error: ${error.message}`);
@@ -317,7 +318,7 @@ exports.githubSignup = async (req, res) => {
         return res.status(200).json({
             status: true,
             message: "Github signup successful",
-            data: userRes,
+            data: toAuthView(userRes),
         });
     } catch (error) {
         logger.error(`Github Signup API Error: ${error.message}`);
@@ -427,7 +428,7 @@ exports.gitlabSignup = async (req, res) => {
         return res.status(200).json({
             status: true,
             message: "Gitlab signup successful",
-            data: userRes,
+            data: toAuthView(userRes),
         });
     } catch (error) {
         logger.error(`Gitlab Signup API Error: ${error.message}`);

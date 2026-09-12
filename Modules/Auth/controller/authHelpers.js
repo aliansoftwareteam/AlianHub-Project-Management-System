@@ -12,6 +12,7 @@ const sesstionCtr = require("../session.js");
 const mongoose = require("mongoose");
 const { removeCache } = require("../../../utils/commonFunctions.js");
 const { updateUserFun } = require("../../Users/controller.js");
+const { toAuthView } = require("../../Users/helpers/userAccessRules");
 
 
 
@@ -88,7 +89,7 @@ exports.generateTokenV2Fun = (uid, refreshToken, cb) => {
                     status: false,
                     isLogout: true,
                     isEmailVerified: false,
-                    userData: response ?? null,
+                    userData: toAuthView(response),
                     message: 'Email is not verified.',
                 });
                 return;
