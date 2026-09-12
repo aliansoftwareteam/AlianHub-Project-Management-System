@@ -15,7 +15,9 @@ The shared AI core: what every AI feature needs and no feature owns (ADR 003, ph
 | Model catalogue | `llmProvider/catalogue.js` | the priced allowlist: the pricing table joined to the registry, with the provider and quality tier of a model id |
 | Model pins | `modelPin.js` | `validatePin()` — what an agent or skill may pin, refused at save time when the model is unpriced or its provider is not configured |
 | Routing policy | `routingPolicy.js` | the per-workspace task class to model preferences, on the company row; `effective()` is what a router reads |
-| Pre-call estimate | `estimate.js` | `estimateCall()` — what a call will cost before it is made (chars/4 with a safety factor, plus the max output), for spend gates |
+| Pre-call estimate | `estimate.js` | `estimateCall()` / `preflight()` — what a call will cost before it is made (chars/4 with a safety factor, plus the max output), read against the task class's input budget |
+| Budget reservation | `reservation.js` | the tenant hold taken before a call and settled after it, so parallel runs cannot each spend the same last dollar |
+| Routing decision | `decision.js` | which model answered and why: task class, skipped candidates, attempts and retries, estimate versus actual — onto the span and the replay row |
 | Features | `features.js` | the closed list of feature tags a model call must carry |
 | Spend ledger | `spend.js` | the meter around every `chat()`: refuses an unpriced model before the vendor call, books one `ai_usage` row per call, announces budget levels for non-run features |
 | Replay record | `replay.js`, `redact.js` | one `ai_replays` row per call from the same meter: prompt hash (unredacted), redacted and capped prompt and raw response, model, parameters, agent and skill revisions; `AI_REPLAY` (`off`, `agent`, `all`) and `AI_REPLAY_RETENTION_DAYS` set the policy, and a failed write only warns |
@@ -99,6 +101,62 @@ rest; 0, the default, means no bucket and so no change). A call with no token
 waits up to `AI_ROUTER_RATE_WAIT_MS` and otherwise takes the next candidate. A
 429 drains the bucket for as long as the vendor's retry hint asks, so the next
 call does not earn another one.
+
+**The estimate.** No tokenizer ships with the app, so input is sized from
+characters: `chars / 4 × 1.25`, plus four tokens per message. Four characters
+per token is the documented rule of thumb for English prose and JSON on the GPT
+and Claude tokenizers, and the 1.25 covers code, URLs and non-Latin text, which
+tokenize denser. Output is taken at the call's ceiling, because nothing shorter
+is guaranteed.
+
+The result is a ceiling, not a forecast. Measured against cl100k_base on four
+samples — English prose, a JSON payload, a source file and this README — it came
+out between 1.18x and 1.70x the real input count and never under; the output
+half is looser still, since a call may be capped at 100k tokens and answer in
+500. That asymmetry is deliberate: erring high refuses a call that would have
+fit, erring low lets one through, and only the second overspends. It is what
+reconciliation is for — the hold is sized by the ceiling and released to the
+real cost as soon as the call returns, so the over-estimate costs a workspace
+nothing beyond the seconds the call takes.
+
+`preflight()` also reads the estimate against the input budget of the task class
+the feature belongs to and marks `overInputBudget`; it refuses nothing, because
+which model can hold a long prompt is the router's business.
+
+**Reservation and reconciliation.** With the router on, a billed call holds its
+estimate against the workspace's monthly budget before the vendor request
+(`ai_reservations`) and settles it with the real usage after, at which point the
+`ai_usage` ledger — still the one record of what was spent — carries the cost
+and the hold stops counting. The month's number a budget reads is the booked
+ledger plus what is currently held, so ten runs starting at once no longer each
+read the same "spent so far" and each decide they fit. A call that would take
+the month past its budget is refused before any token is bought. Two calls
+racing for the last of a budget are decided by insertion order: a call totals
+the holds up to and including its own row, so the earlier one sees only itself
+and goes while the later one sees both and is refused, rather than both backing
+out. The agent run's own `spendCapUsd` is unaffected either way: that hold lives
+on the run row and answers for the run, while the reservation answers for the
+month. With the flag off nothing is reserved and nothing new is refused; only
+the run cap applies, exactly as before.
+
+**A crash between reserving and settling.** The hold stays `held` and would
+otherwise block the budget for the rest of the month, so every reservation
+carries `expiresAt` (`AI_RESERVATION_TTL_MS`, 15 minutes by default): the total
+counts unexpired holds only, and the collection's TTL index deletes the row
+after that. Two mechanisms, because the query is what protects the budget on a
+node whose index has not finished building. The trade is deliberate — an expired
+hold on a call that is somehow still running can let a month go slightly over,
+and whatever was actually spent is booked to the ledger either way, while
+holding forever refuses work nobody is doing.
+
+**The decision.** Every call builds one, flag or no flag: the task class, the
+provider and model that answered, every candidate that did not and why (breaker
+open, rate limited, unpriced, the vendor's own error class, a pin that could not
+travel to the provider that took over), how many attempts and how many of those
+were retries, the reservation's state, and the estimate beside the tokens the
+call really used. It lands on the model-call span as `ai.routing.*` and
+`ai.budget.*` attributes and in the `decision` block of the replay row. It holds
+provider names and numbers only — no prompt, no response, nothing to redact.
 
 **Retry and failover.** A retryable provider error is retried on the same
 provider up to `AI_ROUTER_MAX_ATTEMPTS`, waiting the vendor's retry hint if it

@@ -1,4 +1,19 @@
 {
+  "AGENT_ACT_BUDGET_MS": {
+    "group": "ai",
+    "description": "Wall-clock budget for the act phase of an agent run, added to the model timeout when sizing the job lock (default 5 min).",
+    "default": "300000"
+  },
+  "AGENT_ALERTS_INTERVAL_MINUTES": {
+    "group": "jobs",
+    "description": "Minutes between runs of the agent rate-alert evaluator (error rate, approval rate, cost forecast, queue age).",
+    "default": "15"
+  },
+  "AGENT_PROPOSAL_STUCK_MINUTES": {
+    "group": "jobs",
+    "description": "Minutes an agent proposal may sit in 'applying' before the reaper fails it.",
+    "default": "10"
+  },
   "AI_API_KEY": {
     "group": "ai",
     "description": "API key for the configured LLM provider (LLM_PROVIDER).",
@@ -13,6 +28,11 @@
     "description": "recommended: gpt-4o or gpt-4.1 for best instruction-following on complex plans",
     "default": "gpt-4.1"
   },
+  "AI_MODEL_ROUTER": {
+    "group": "ai",
+    "description": "model router: \"on\" lets a caller pick the provider and model per call and lets the workspace routing policy name a model per task class; default \"off\" keeps the single configured provider answering everything, so a saved policy changes nothing",
+    "default": "off"
+  },
   "AI_REPLAY": {
     "group": "ai",
     "description": "Which model calls keep a replay record (prompt, raw response, model, revisions; redacted): off, agent (agent runs only) or all.",
@@ -22,6 +42,77 @@
     "group": "ai",
     "description": "Days a replay record is kept before the TTL index deletes it.",
     "default": "30"
+  },
+  "AI_RESERVATION_TTL_MS": {
+    "group": "ai",
+    "description": "How long a budget reservation holds a workspace's money before it is treated as stranded and stops counting; a process killed mid-call leaves one behind.",
+    "default": "900000"
+  },
+  "AI_ROUTER_BACKOFF_MAX_MS": {
+    "group": "ai",
+    "description": "ceiling for one backoff wait, and for a retry-after hint the provider returns",
+    "default": "8000"
+  },
+  "AI_ROUTER_BACKOFF_MS": {
+    "group": "ai",
+    "description": "base delay for the jittered exponential backoff between retries of a transient provider error",
+    "default": "500"
+  },
+  "AI_ROUTER_BREAKER_COOLDOWN_MS": {
+    "group": "ai",
+    "description": "how long a breaker stays open before it half-opens for one probe; doubles on each failed probe",
+    "default": "30000"
+  },
+  "AI_ROUTER_BREAKER_MAX_COOLDOWN_MS": {
+    "group": "ai",
+    "description": "ceiling for the doubling breaker cooldown",
+    "default": "300000"
+  },
+  "AI_ROUTER_BREAKER_THRESHOLD": {
+    "group": "ai",
+    "description": "share of provider-caused failures in the window that opens the breaker (0..1)",
+    "default": "0.5"
+  },
+  "AI_ROUTER_BREAKER_VOLUME": {
+    "group": "ai",
+    "description": "calls needed in the health window before the circuit breaker may open, so one bad call cannot trip it",
+    "default": "5"
+  },
+  "AI_ROUTER_DEFAULT_RPM": {
+    "group": "ai",
+    "description": "requests per minute for a provider with no entry in AI_ROUTER_RATE_LIMITS; 0 means no bucket",
+    "default": "0"
+  },
+  "AI_ROUTER_HEALTH_SAMPLES": {
+    "group": "ai",
+    "description": "most recent calls kept per provider and model in the health window",
+    "default": "50"
+  },
+  "AI_ROUTER_HEALTH_WINDOW_MS": {
+    "group": "ai",
+    "description": "how far back the per-provider health window looks when computing success rate, latency and the breaker",
+    "default": "300000"
+  },
+  "AI_ROUTER_MAX_ATTEMPTS": {
+    "group": "ai",
+    "description": "attempts on one provider before the router fails over to the next candidate (router flag on only)",
+    "default": "2"
+  },
+  "AI_ROUTER_RATE_LIMITS": {
+    "group": "ai",
+    "description": "per-provider request-per-minute budgets as token buckets, e.g. \"openai:500,anthropic:200\"; empty means no bucket",
+    "default": ""
+  },
+  "AI_ROUTER_RATE_WAIT_MS": {
+    "group": "ai",
+    "description": "longest the router waits for a rate-limit token before taking the next candidate instead",
+    "default": "2000"
+  },
+  "ALIANHUB_DOCKER": {
+    "group": "general",
+    "description": "Set by the Docker image so defaults suit a container (storage under /app/storage).",
+    "secret": false,
+    "required": false
   },
   "ANTHROPIC_API_KEY": {
     "group": "ai",
@@ -86,11 +177,6 @@
     "group": "integrations",
     "description": "Firebase auth domain."
   },
-  "AGENT_PROPOSAL_STUCK_MINUTES": {
-    "group": "jobs",
-    "description": "Minutes an agent proposal may sit in 'applying' before the reaper fails it.",
-    "default": "10"
-  },
   "AUTOMATION_CONCURRENCY": {
     "group": "jobs",
     "description": "Automation runs processed in parallel.",
@@ -128,6 +214,12 @@
     "description": "AWS secret key for SES mail delivery.",
     "secret": true
   },
+  "BACKUP_DIR": {
+    "group": "general",
+    "description": "Directory where in-app backups are written (default backups/).",
+    "secret": false,
+    "required": false
+  },
   "BODY_LIMIT": {
     "group": "limits",
     "description": "Maximum JSON/urlencoded/raw request body (body-parser size string).",
@@ -151,6 +243,12 @@
     "group": "security",
     "description": "Extra origins allowed by CORS, comma-separated (WEBURL and APIURL are always allowed).",
     "default": "http://localhost:8080"
+  },
+  "CRON_ENABLED": {
+    "group": "general",
+    "description": "Run the scheduled jobs in this process (default true; set false on extra replicas).",
+    "secret": false,
+    "required": false
   },
   "CRON_TZ": {
     "group": "jobs",
@@ -219,6 +317,11 @@
     "group": "ai",
     "description": "Target accuracy band the AI estimator calibrates against.",
     "default": ""
+  },
+  "FATAL_FLUSH_TIMEOUT_MS": {
+    "group": "logging",
+    "description": "Upper bound, in milliseconds, that a fatal crash waits for flushers (log files, telemetry exporter, crash report mail) before the process exits with 1.",
+    "default": "3000"
   },
   "FORM_MAX_FILES": {
     "group": "limits",
@@ -289,6 +392,16 @@
     "group": "security",
     "description": "Requests per minute allowed per IP by the global rate limiter."
   },
+  "GOOGLE_API_KEY": {
+    "group": "ai",
+    "description": "Google AI Studio API key, used when LLM_PROVIDER is google.",
+    "secret": true
+  },
+  "GOOGLE_BASE_URL": {
+    "group": "ai",
+    "description": "optional: override the Google generative-language base URL (e.g. for a compatible proxy)",
+    "default": "https://generativelanguage.googleapis.com"
+  },
   "GOOGLE_CLIENT_ID": {
     "group": "integrations",
     "description": "used for token exchange AND id-token verification"
@@ -297,6 +410,11 @@
     "group": "integrations",
     "description": "Google OAuth client secret.",
     "secret": true
+  },
+  "GOOGLE_MODEL": {
+    "group": "ai",
+    "description": "Gemini model id, e.g. gemini-3-flash / gemini-3-pro / gemini-2.5-flash",
+    "default": "gemini-3-flash"
   },
   "GOOGLE_OAUTH_CLIENT_ID": {
     "group": "integrations",
@@ -311,6 +429,23 @@
     "group": "integrations",
     "description": "Google token endpoint",
     "default": "https://oauth2.googleapis.com/token"
+  },
+  "GOOGLE_TIMEOUT_MS": {
+    "group": "ai",
+    "description": "optional: override the Google axios timeout (default: LLM_TIMEOUT_MS for thinking models, 4 min for the rest)",
+    "default": "600000"
+  },
+  "HEALTH_DB_TIMEOUT_MS": {
+    "group": "general",
+    "description": "How long /health waits for the database ping before reporting it down (default 2000).",
+    "secret": false,
+    "required": false
+  },
+  "HELMET_ENABLED": {
+    "group": "security",
+    "description": "Send the helmet security headers (default true).",
+    "secret": false,
+    "required": false
   },
   "IAM_ENDPOINT": {
     "group": "storage",
@@ -367,6 +502,11 @@
     "description": "optional: the inference region the provider is pinned to; shown read-only in the agent settings (GET /api/v2/agents/settings)",
     "default": ""
   },
+  "LLM_TIMEOUT_MS": {
+    "group": "ai",
+    "description": "Model call timeout every provider inherits unless overridden per provider (default 10 min). The agent job lock is model timeout + AGENT_ACT_BUDGET_MS + 2 min.",
+    "default": "600000"
+  },
   "LOG_DATE_PATTERN": {
     "group": "logging",
     "description": "Date pattern appended to rotated log file names.",
@@ -420,6 +560,12 @@
     "group": "integrations",
     "description": "Firebase messaging sender id."
   },
+  "MIGRATIONS_AUTO": {
+    "group": "general",
+    "description": "Apply pending migrations at boot (default true; false only reports them).",
+    "secret": false,
+    "required": false
+  },
   "MONGODB_URL": {
     "group": "general",
     "description": "mongo connection string (no trailing slash)",
@@ -432,6 +578,11 @@
     "external": true,
     "default": "https://cloud.mongodb.com/api"
   },
+  "MONGO_CONNECT_TIMEOUT_MS": {
+    "group": "database",
+    "description": "How long a new MongoDB connection may take to establish (default 60000).",
+    "default": "60000"
+  },
   "MONGO_MIN_POOL_SIZE": {
     "group": "database",
     "description": "Minimum connections kept open per company database."
@@ -439,6 +590,16 @@
   "MONGO_POOL_SIZE": {
     "group": "database",
     "description": "Maximum connections per company database."
+  },
+  "MONGO_SERVER_SELECTION_TIMEOUT_MS": {
+    "group": "database",
+    "description": "How long the MongoDB driver waits to find a usable server before failing an operation (default 60000).",
+    "default": "60000"
+  },
+  "MONGO_SOCKET_TIMEOUT_MS": {
+    "group": "database",
+    "description": "Inactivity timeout on a MongoDB socket before it is closed (default 300000).",
+    "default": "300000"
   },
   "MONGO_WAIT_QUEUE_TIMEOUT_MS": {
     "group": "database",
@@ -542,6 +703,21 @@
     "group": "storage",
     "description": "Socket timeout for S3-compatible storage calls."
   },
+  "SERVER_HEADERS_TIMEOUT_MS": {
+    "group": "server",
+    "description": "How long the HTTP server waits for a full request header block; always kept above the keep-alive timeout (default 66000).",
+    "default": "66000"
+  },
+  "SERVER_KEEP_ALIVE_TIMEOUT_MS": {
+    "group": "server",
+    "description": "Idle keep-alive timeout of the HTTP server; keep it above the idle timeout of any proxy in front (default 65000).",
+    "default": "65000"
+  },
+  "SERVER_REQUEST_TIMEOUT_MS": {
+    "group": "server",
+    "description": "How long the HTTP server waits to receive a whole request (default 300000). Server-sent event streams are exempt.",
+    "default": "300000"
+  },
   "SERVICE_FILE": {
     "group": "integrations",
     "description": "Path to Firebase service account JSON (must be inside project root)",
@@ -581,6 +757,12 @@
     "group": "storage",
     "description": "Days to keep time-tracker screenshots before deletion.",
     "default": "180"
+  },
+  "TRANSLATE_API_KEY": {
+    "group": "general",
+    "description": "Machine-translation key used by scripts/i18n-backfill.js; unset means English copies are written for review.",
+    "secret": true,
+    "required": false
   },
   "TRUST_PROXY": {
     "group": "server",
@@ -745,193 +927,16 @@
     "group": "storage",
     "description": "Wasabi account user id used for IAM policies."
   },
-  "WEBURL": {
-    "group": "server",
-    "description": "Public base URL of the web app, used in emails and CORS.",
-    "default": "http://localhost:4000"
-  },
-  "ALIANHUB_DOCKER": {
-    "group": "general",
-    "description": "Set by the Docker image so defaults suit a container (storage under /app/storage).",
-    "secret": false,
-    "required": false
-  },
-  "BACKUP_DIR": {
-    "group": "general",
-    "description": "Directory where in-app backups are written (default backups/).",
-    "secret": false,
-    "required": false
-  },
-  "CRON_ENABLED": {
-    "group": "general",
-    "description": "Run the scheduled jobs in this process (default true; set false on extra replicas).",
-    "secret": false,
-    "required": false
-  },
-  "HEALTH_DB_TIMEOUT_MS": {
-    "group": "general",
-    "description": "How long /health waits for the database ping before reporting it down (default 2000).",
-    "secret": false,
-    "required": false
-  },
-  "HELMET_ENABLED": {
-    "group": "security",
-    "description": "Send the helmet security headers (default true).",
-    "secret": false,
-    "required": false
-  },
   "WEBHOOK_ALLOWED_PRIVATE_HOSTS": {
     "group": "security",
     "description": "Private hosts webhooks may post to: exact hostnames or CIDR ranges, comma-separated (empty by default, so every private host is refused). Also editable under Instance > Settings > Security. Link-local and cloud metadata addresses stay blocked, and a range can be no wider than /8 (IPv4) or /32 (IPv6).",
     "secret": false,
     "required": false
   },
-  "MIGRATIONS_AUTO": {
-    "group": "general",
-    "description": "Apply pending migrations at boot (default true; false only reports them).",
-    "secret": false,
-    "required": false
-  },
-  "TRANSLATE_API_KEY": {
-    "group": "general",
-    "description": "Machine-translation key used by scripts/i18n-backfill.js; unset means English copies are written for review.",
-    "secret": true,
-    "required": false
-  },
-  "LLM_TIMEOUT_MS": {
-    "group": "ai",
-    "description": "Model call timeout every provider inherits unless overridden per provider (default 10 min). The agent job lock is model timeout + AGENT_ACT_BUDGET_MS + 2 min.",
-    "default": "600000"
-  },
-  "AGENT_ACT_BUDGET_MS": {
-    "group": "ai",
-    "description": "Wall-clock budget for the act phase of an agent run, added to the model timeout when sizing the job lock (default 5 min).",
-    "default": "300000"
-  },
-  "SERVER_KEEP_ALIVE_TIMEOUT_MS": {
+  "WEBURL": {
     "group": "server",
-    "description": "Idle keep-alive timeout of the HTTP server; keep it above the idle timeout of any proxy in front (default 65000).",
-    "default": "65000"
-  },
-  "SERVER_HEADERS_TIMEOUT_MS": {
-    "group": "server",
-    "description": "How long the HTTP server waits for a full request header block; always kept above the keep-alive timeout (default 66000).",
-    "default": "66000"
-  },
-  "SERVER_REQUEST_TIMEOUT_MS": {
-    "group": "server",
-    "description": "How long the HTTP server waits to receive a whole request (default 300000). Server-sent event streams are exempt.",
-    "default": "300000"
-  },
-  "MONGO_CONNECT_TIMEOUT_MS": {
-    "group": "database",
-    "description": "How long a new MongoDB connection may take to establish (default 60000).",
-    "default": "60000"
-  },
-  "MONGO_SERVER_SELECTION_TIMEOUT_MS": {
-    "group": "database",
-    "description": "How long the MongoDB driver waits to find a usable server before failing an operation (default 60000).",
-    "default": "60000"
-  },
-  "MONGO_SOCKET_TIMEOUT_MS": {
-    "group": "database",
-    "description": "Inactivity timeout on a MongoDB socket before it is closed (default 300000).",
-    "default": "300000"
-  },
-  "FATAL_FLUSH_TIMEOUT_MS": {
-    "group": "logging",
-    "description": "Upper bound, in milliseconds, that a fatal crash waits for flushers (log files, telemetry exporter, crash report mail) before the process exits with 1.",
-    "default": "3000"
-  },
-  "AGENT_ALERTS_INTERVAL_MINUTES": {
-    "group": "jobs",
-    "description": "Minutes between runs of the agent rate-alert evaluator (error rate, approval rate, cost forecast, queue age).",
-    "default": "15"
-  },
-  "AI_MODEL_ROUTER": {
-    "group": "ai",
-    "description": "model router: \"on\" lets a caller pick the provider and model per call and lets the workspace routing policy name a model per task class; default \"off\" keeps the single configured provider answering everything, so a saved policy changes nothing",
-    "default": "off"
-  },
-  "AI_ROUTER_HEALTH_WINDOW_MS": {
-    "group": "ai",
-    "description": "how far back the per-provider health window looks when computing success rate, latency and the breaker",
-    "default": "300000"
-  },
-  "AI_ROUTER_HEALTH_SAMPLES": {
-    "group": "ai",
-    "description": "most recent calls kept per provider and model in the health window",
-    "default": "50"
-  },
-  "AI_ROUTER_BREAKER_VOLUME": {
-    "group": "ai",
-    "description": "calls needed in the health window before the circuit breaker may open, so one bad call cannot trip it",
-    "default": "5"
-  },
-  "AI_ROUTER_BREAKER_THRESHOLD": {
-    "group": "ai",
-    "description": "share of provider-caused failures in the window that opens the breaker (0..1)",
-    "default": "0.5"
-  },
-  "AI_ROUTER_BREAKER_COOLDOWN_MS": {
-    "group": "ai",
-    "description": "how long a breaker stays open before it half-opens for one probe; doubles on each failed probe",
-    "default": "30000"
-  },
-  "AI_ROUTER_BREAKER_MAX_COOLDOWN_MS": {
-    "group": "ai",
-    "description": "ceiling for the doubling breaker cooldown",
-    "default": "300000"
-  },
-  "AI_ROUTER_MAX_ATTEMPTS": {
-    "group": "ai",
-    "description": "attempts on one provider before the router fails over to the next candidate (router flag on only)",
-    "default": "2"
-  },
-  "AI_ROUTER_BACKOFF_MS": {
-    "group": "ai",
-    "description": "base delay for the jittered exponential backoff between retries of a transient provider error",
-    "default": "500"
-  },
-  "AI_ROUTER_BACKOFF_MAX_MS": {
-    "group": "ai",
-    "description": "ceiling for one backoff wait, and for a retry-after hint the provider returns",
-    "default": "8000"
-  },
-  "AI_ROUTER_RATE_LIMITS": {
-    "group": "ai",
-    "description": "per-provider request-per-minute budgets as token buckets, e.g. \"openai:500,anthropic:200\"; empty means no bucket",
-    "default": ""
-  },
-  "AI_ROUTER_DEFAULT_RPM": {
-    "group": "ai",
-    "description": "requests per minute for a provider with no entry in AI_ROUTER_RATE_LIMITS; 0 means no bucket",
-    "default": "0"
-  },
-  "AI_ROUTER_RATE_WAIT_MS": {
-    "group": "ai",
-    "description": "longest the router waits for a rate-limit token before taking the next candidate instead",
-    "default": "2000"
-  },
-  "GOOGLE_API_KEY": {
-    "group": "ai",
-    "description": "Google AI Studio API key, used when LLM_PROVIDER is google.",
-    "secret": true
-  },
-  "GOOGLE_MODEL": {
-    "group": "ai",
-    "description": "Gemini model id, e.g. gemini-3-flash / gemini-3-pro / gemini-2.5-flash",
-    "default": "gemini-3-flash"
-  },
-  "GOOGLE_BASE_URL": {
-    "group": "ai",
-    "description": "optional: override the Google generative-language base URL (e.g. for a compatible proxy)",
-    "default": "https://generativelanguage.googleapis.com"
-  },
-  "GOOGLE_TIMEOUT_MS": {
-    "group": "ai",
-    "description": "optional: override the Google axios timeout (default: LLM_TIMEOUT_MS for thinking models, 4 min for the rest)",
-    "default": "600000"
+    "description": "Public base URL of the web app, used in emails and CORS.",
+    "default": "http://localhost:4000"
   },
   "WORKFLOW_ENGINE": {
     "group": "jobs",

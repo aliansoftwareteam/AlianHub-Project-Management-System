@@ -17,7 +17,7 @@
 const NEW_COLLECTIONS = (ctx) => [ctx.SCHEMA_TYPE.WORKFLOW_RUNS, ctx.SCHEMA_TYPE.WORKFLOW_STEP_RUNS];
 
 module.exports = {
-    id: '015-workflow-runs',
+    id: '016-workflow-runs',
     scope: 'company',
     async up(ctx) {
         await ctx.forEachCompany(async (companyId) => {
@@ -27,7 +27,7 @@ module.exports = {
                 synced[type] = (await ctx.company(companyId, { type, data: [] }, 'syncIndexes')) || [];
             }
             await ctx.company(companyId, { type: ctx.SCHEMA_TYPE.AUDIT_LOGS, data: [] }, 'createIndexes');
-            ctx.logger.info(`[migrations] 015 ${companyId}: ${JSON.stringify(synced)}, audit idempotency index ensured`);
+            ctx.logger.info(`[migrations] 016 ${companyId}: ${JSON.stringify(synced)}, audit idempotency index ensured`);
             return { synced, auditIndex: true };
         });
     },

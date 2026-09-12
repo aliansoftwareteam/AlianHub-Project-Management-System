@@ -1,4 +1,5 @@
 const usage = require('./usage');
+const taskClass = require('./taskClass');
 
 /**
  * What a model call is about to cost, before it is made.
@@ -40,4 +41,30 @@ function estimateCall({ systemPrompt, messages, prompt, maxTokens, model } = {})
     return { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens, model: priced.model, priced: priced.priced, costUsd: priced.costUsd };
 }
 
-module.exports = { estimateTokens, estimateCall, CHARS_PER_TOKEN, SAFETY_FACTOR, PER_MESSAGE_OVERHEAD_TOKENS };
+/**
+ * The same estimate, read against the input budget of the task class the
+ * feature belongs to. The budget is the platform's own number (taskClass.js),
+ * so a prompt that has grown past what its class was sized for is visible on
+ * the routing decision instead of only surfacing as a context-length error
+ * from whichever vendor answered.
+ *
+ * Nothing is refused here: an over-budget prompt is a fact about the call, and
+ * the model that can hold it is the router's problem, not the estimator's.
+ *
+ * @returns {{taskClass:string, inputBudgetTokens:number, overInputBudget:boolean,
+ *            inputTokens:number, outputTokens:number, totalTokens:number,
+ *            model:string, priced:boolean, costUsd:number|null}}
+ */
+function preflight(request = {}) {
+    const key = taskClass.isTaskClass(request.taskClass) ? request.taskClass : taskClass.classOfFeature(request.feature);
+    const definition = taskClass.definitionOf(key);
+    const call = estimateCall(request);
+    return {
+        ...call,
+        taskClass: key,
+        inputBudgetTokens: definition.inputBudgetTokens,
+        overInputBudget: call.inputTokens > definition.inputBudgetTokens,
+    };
+}
+
+module.exports = { estimateTokens, estimateCall, preflight, CHARS_PER_TOKEN, SAFETY_FACTOR, PER_MESSAGE_OVERHEAD_TOKENS };

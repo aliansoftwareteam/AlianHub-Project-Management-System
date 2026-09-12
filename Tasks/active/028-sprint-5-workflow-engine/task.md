@@ -1,7 +1,7 @@
 ---
 id: 028
 title: Sprint 5 — the workflow engine
-status: backlog
+status: active
 priority: high
 depends_on: [024, 027]
 created: 2026-09-10
@@ -9,7 +9,7 @@ created: 2026-09-10
 
 # 028 — Sprint 5 — the workflow engine
 
-Status: backlog · depends on 024, 027 · sprint 5 · three weeks · branch `feat/sprint-5-workflow-engine` (from `beta`)
+Status: active · depends on 024, 027 · sprint 5 · three weeks · branch `feat/sprint-5-workflow-engine` (from `beta`)
 
 Source: `docs/AI-PLATFORM-ARCHITECTURE.md`, "Development and integration plan", Sprint 5. Filed 2026-09-10.
 
