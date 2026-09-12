@@ -45,10 +45,18 @@ function namedCompanyIds(req) {
     return [...new Set(named)];
 }
 
+// A signed-in route takes its tenant from the verified companyid header. A body or query that
+// names a different company is an attempt to steer the request, not a fallback for a missing
+// header, so the pair is refused rather than resolved in the header's favour.
+function sessionTenantOf(req) {
+    if (namedCompanyIds(req).length > 1) throw new TenantError('The request names more than one company.');
+    return tenantOf(req);
+}
+
 function tenantDb(req) {
     const companyId = tenantOf(req);
     const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
     return (mongoObj, method) => MongoDbCrudOpration(companyId, mongoObj, method);
 }
 
-module.exports = { tenantOf, tenantDb, namedCompanyIds, TenantError };
+module.exports = { tenantOf, sessionTenantOf, tenantDb, namedCompanyIds, TenantError };

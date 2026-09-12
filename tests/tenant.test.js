@@ -1,4 +1,4 @@
-const { tenantOf, TenantError } = require('../Config/tenant');
+const { tenantOf, sessionTenantOf, TenantError } = require('../Config/tenant');
 
 const COMPANY = '64b1f0c2a1b2c3d4e5f60718';
 const OTHER = '64b1f0c2a1b2c3d4e5f60719';
@@ -33,5 +33,22 @@ describe('tenantOf', () => {
             expect(error.statusCode).toBe(403);
             expect(error.name).toBe('TenantError');
         }
+    });
+});
+
+describe('sessionTenantOf', () => {
+    it('takes the header when nothing else names a company', () => {
+        expect(sessionTenantOf({ headers: { companyid: COMPANY }, body: {}, aud: COMPANY })).toBe(COMPANY);
+    });
+
+    it('accepts a body that repeats the header', () => {
+        expect(sessionTenantOf({ headers: { companyid: COMPANY }, body: { companyId: COMPANY }, aud: COMPANY })).toBe(COMPANY);
+    });
+
+    it.each([
+        ['body', { headers: { companyid: COMPANY }, body: { companyId: OTHER } }],
+        ['query', { headers: { companyid: COMPANY }, query: { companyId: OTHER } }],
+    ])('refuses a %s that names a second company', (_label, req) => {
+        expect(() => sessionTenantOf({ ...req, aud: `${COMPANY},${OTHER}` })).toThrow(TenantError);
     });
 });

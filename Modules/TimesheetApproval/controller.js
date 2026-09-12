@@ -1,4 +1,5 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
+const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
@@ -14,12 +15,9 @@ const {
 // reject (with a reason) or reopen it. The raw `timesheets` entries are never
 // touched — totals are snapshotted at submit time for the reviewer's context.
 
-const actorId = (req) => String(
-    req.uid || (req.body && req.body.userData && (req.body.userData.id || req.body.userData._id)) || ''
-);
-const companyOf = (req) => String(
-    req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId) || ''
-);
+// The reviewer's role is looked up by this id, so it comes from the verified session only:
+// a body-supplied userData.id let a member claim an owner's id and approve their own sheet.
+const actorId = (req) => String(req.uid || '');
 
 /* Sum logged minutes + entry count for a user over the period, by work time
  * (LogStartTime), covering whole days inclusive. */
@@ -43,7 +41,7 @@ const computePeriodTotals = async (companyId, userId, periodStart, periodEnd) =>
 
 /* Resolve whether the caller can review (owner/admin). { ok, roleType }. */
 const callerCanReview = async (req) => {
-    const roleType = await getRoleType(companyOf(req), actorId(req));
+    const roleType = await getRoleType(sessionTenantOf(req), actorId(req));
     return { ok: canReview({ roleType }) || isPrivileged(roleType), roleType };
 };
 
@@ -51,10 +49,10 @@ const callerCanReview = async (req) => {
  * body: { periodStart, periodEnd, periodType?, note?, userId?, userData } */
 exports.submitTimesheet = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const uid = actorId(req);
-        if (!companyId || !uid) {
-            return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        if (!uid) {
+            return res.send({ status: false, statusText: 'An authenticated user is required.' });
         }
         const { periodStart, periodEnd, periodType, note } = req.body || {};
         // A member submits their own timesheet; only owner/admin may submit for someone else.
@@ -104,6 +102,7 @@ exports.submitTimesheet = async (req, res) => {
         socketEmitter.emit('update', { type: 'update', data: saved, module: 'timesheetApproval' });
         return res.send({ status: true, statusText: 'Timesheet submitted for approval.', data: saved });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in submit timesheet: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -112,8 +111,7 @@ exports.submitTimesheet = async (req, res) => {
 /* GET /api/v2/timesheet-approval/status?userId=&periodStart=&periodEnd= */
 exports.getStatus = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const userId = req.query && req.query.userId ? String(req.query.userId) : actorId(req);
         const period = parsePeriod({ periodStart: req.query && req.query.periodStart, periodEnd: req.query && req.query.periodEnd });
         if (!period.valid) return res.send({ status: false, statusText: period.reason });
@@ -123,6 +121,7 @@ exports.getStatus = async (req, res) => {
         }, 'findOne');
         return res.send({ status: true, statusText: 'OK', data: doc || null });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in timesheet status: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -131,8 +130,7 @@ exports.getStatus = async (req, res) => {
 /* GET /api/v2/timesheet-approval/mine?userId= — a user's submission history. */
 exports.listMine = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const userId = req.query && req.query.userId ? String(req.query.userId) : actorId(req);
         const docs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
@@ -140,6 +138,7 @@ exports.listMine = async (req, res) => {
         }, 'find');
         return res.send({ status: true, statusText: 'OK', data: docs || [] });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in timesheet mine: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -148,8 +147,7 @@ exports.listMine = async (req, res) => {
 /* GET /api/v2/timesheet-approval/pending — owner/admin queue of submitted periods. */
 exports.listPending = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const { ok } = await callerCanReview(req);
         if (!ok) return res.send({ status: false, statusText: 'Only an owner or admin can review timesheets.' });
         const docs = await MongoDbCrudOpration(companyId, {
@@ -158,6 +156,7 @@ exports.listPending = async (req, res) => {
         }, 'find');
         return res.send({ status: true, statusText: 'OK', data: docs || [] });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in timesheet pending: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -166,11 +165,11 @@ exports.listPending = async (req, res) => {
 /* POST /api/v2/timesheet-approval/:id/review  body: { action, reason?, userData } */
 exports.reviewTimesheet = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const uid = actorId(req);
         const { id } = req.params;
-        if (!companyId || !isObjectIdString(id)) {
-            return res.send({ status: false, statusText: 'companyId and a valid id are required.' });
+        if (!isObjectIdString(id)) {
+            return res.send({ status: false, statusText: 'A valid id is required.' });
         }
         const { ok } = await callerCanReview(req);
         if (!ok) return res.send({ status: false, statusText: 'Only an owner or admin can review timesheets.' });
@@ -212,6 +211,7 @@ exports.reviewTimesheet = async (req, res) => {
         socketEmitter.emit('update', { type: 'update', data: updated, module: 'timesheetApproval' });
         return res.send({ status: true, statusText: `Timesheet ${transition.to}.`, data: updated });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in review timesheet: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -226,8 +226,7 @@ const pto = require('../Pto/helpers/ptoRules');
  * and how far over capacity (working hours − approved PTO) the week landed. */
 exports.listQueue = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const { ok } = await callerCanReview(req);
         if (!ok) return res.send({ status: false, statusText: 'Only an owner or admin can review timesheets.' });
         const hoursPerDay = Number(req.query && req.query.hoursPerDay) > 0 ? Number(req.query.hoursPerDay) : 8;
@@ -273,6 +272,7 @@ exports.listQueue = async (req, res) => {
         }));
         return res.send({ status: true, statusText: 'OK', data });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in timesheet queue: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }

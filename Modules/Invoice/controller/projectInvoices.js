@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const logger = require('../../../Config/loggerConfig');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
+const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { removeCache } = require('../../../utils/commonFunctions');
 const socketEmitter = require('../../../event/socketEventEmitter');
@@ -18,7 +19,7 @@ const billing = require('../../Milestone/controller/billing');
 // by trusting the label. Every mutation here touches money, so every one of
 // them is audited.
 
-const { companyOf, actorId, isObjectIdString, refuseGuest } = billing;
+const { actorId, isObjectIdString, refuseGuest } = billing;
 const LINE_KINDS = Object.freeze(['milestone', 'time', 'change_request', 'expense', 'adjustment']);
 const STATUSES = Object.freeze(['draft', 'sent', 'paid']);
 
@@ -130,10 +131,10 @@ const saveDraft = async ({ companyId, req, projectId, ctx, source, lines, period
 /* GET /api/v2/invoices?projectId= */
 exports.listInvoices = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const projectId = String((req.query && req.query.projectId) || '');
-        if (!companyId || !isObjectIdString(projectId)) {
-            return res.send({ status: false, statusText: 'companyId and a valid projectId are required.' });
+        if (!isObjectIdString(projectId)) {
+            return res.send({ status: false, statusText: 'A valid projectId is required.' });
         }
         if (await refuseGuest(req, res)) return undefined;
         const docs = await MongoDbCrudOpration(companyId, {
@@ -142,6 +143,7 @@ exports.listInvoices = async (req, res) => {
         }, 'find');
         return res.send({ status: true, statusText: 'OK', data: docs || [] });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in list invoices: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -151,10 +153,10 @@ exports.listInvoices = async (req, res) => {
  * was drafted from, so a line can be expanded without a second round trip. */
 exports.getInvoice = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const id = String(req.params.id || '');
-        if (!companyId || !isObjectIdString(id)) {
-            return res.send({ status: false, statusText: 'companyId and a valid invoice id are required.' });
+        if (!isObjectIdString(id)) {
+            return res.send({ status: false, statusText: 'A valid invoice id is required.' });
         }
         if (await refuseGuest(req, res)) return undefined;
         const invoice = await MongoDbCrudOpration(companyId, {
@@ -196,6 +198,7 @@ exports.getInvoice = async (req, res) => {
             },
         });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in get invoice: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -204,11 +207,11 @@ exports.getInvoice = async (req, res) => {
 /* POST /api/v2/invoices/draft-from-milestone  body: { projectId, milestoneId } */
 exports.draftFromMilestone = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const projectId = String((req.body && req.body.projectId) || '');
         const milestoneId = String((req.body && req.body.milestoneId) || '');
-        if (!companyId || !isObjectIdString(projectId) || !isObjectIdString(milestoneId)) {
-            return res.send({ status: false, statusText: 'companyId, a valid projectId and milestoneId are required.' });
+        if (!isObjectIdString(projectId) || !isObjectIdString(milestoneId)) {
+            return res.send({ status: false, statusText: 'A valid projectId and milestoneId are required.' });
         }
         if (await refuseGuest(req, res)) return undefined;
         const ctx = await billing.buildBillingContext(companyId, projectId);
@@ -238,6 +241,7 @@ exports.draftFromMilestone = async (req, res) => {
         const saved = await saveDraft({ companyId, req, projectId, ctx, source: 'milestone', lines });
         return res.send({ status: true, statusText: 'Draft invoice created.', data: saved });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in draft invoice from milestone: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -247,10 +251,10 @@ exports.draftFromMilestone = async (req, res) => {
  * One line per person, from that month's BILLABLE logs at their resolved rate. */
 exports.draftFromMonth = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const projectId = String((req.body && req.body.projectId) || '');
-        if (!companyId || !isObjectIdString(projectId)) {
-            return res.send({ status: false, statusText: 'companyId and a valid projectId are required.' });
+        if (!isObjectIdString(projectId)) {
+            return res.send({ status: false, statusText: 'A valid projectId is required.' });
         }
         if (await refuseGuest(req, res)) return undefined;
         const ctx = await billing.buildBillingContext(companyId, projectId);
@@ -303,6 +307,7 @@ exports.draftFromMonth = async (req, res) => {
         });
         return res.send({ status: true, statusText: 'Draft invoice created.', data: saved });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in draft invoice from month: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -312,10 +317,10 @@ exports.draftFromMonth = async (req, res) => {
  * Only a draft is editable — an issued invoice is a document the client has. */
 exports.updateInvoice = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const id = String(req.params.id || '');
-        if (!companyId || !isObjectIdString(id)) {
-            return res.send({ status: false, statusText: 'companyId and a valid invoice id are required.' });
+        if (!isObjectIdString(id)) {
+            return res.send({ status: false, statusText: 'A valid invoice id is required.' });
         }
         if (await refuseGuest(req, res)) return undefined;
         const invoice = await MongoDbCrudOpration(companyId, {
@@ -367,16 +372,17 @@ exports.updateInvoice = async (req, res) => {
         });
         return res.send({ status: true, statusText: 'Invoice saved.', data: saved });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in update invoice: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };
 
 const transition = async (req, res, target) => {
-    const companyId = companyOf(req);
+    const companyId = sessionTenantOf(req);
     const id = String(req.params.id || '');
-    if (!companyId || !isObjectIdString(id)) {
-        return res.send({ status: false, statusText: 'companyId and a valid invoice id are required.' });
+    if (!isObjectIdString(id)) {
+        return res.send({ status: false, statusText: 'A valid invoice id is required.' });
     }
     if (await refuseGuest(req, res)) return undefined;
     const invoice = await MongoDbCrudOpration(companyId, {
@@ -425,11 +431,11 @@ const transition = async (req, res, target) => {
  * a document the client already holds, so it can only be superseded, never removed. */
 exports.deleteInvoice = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const id = String(req.params.id || '');
         const projectId = String((req.query && req.query.projectId) || (req.body && req.body.projectId) || '');
-        if (!companyId || !isObjectIdString(id) || !isObjectIdString(projectId)) {
-            return res.status(400).json({ status: false, statusText: 'companyId, a valid invoice id and projectId are required.' });
+        if (!isObjectIdString(id) || !isObjectIdString(projectId)) {
+            return res.status(400).json({ status: false, statusText: 'A valid invoice id and projectId are required.' });
         }
         const uid = String(req.uid || '');
         if (!isPrivileged(await getRoleType(companyId, uid))) {
@@ -462,6 +468,7 @@ exports.deleteInvoice = async (req, res) => {
         });
         return res.json({ status: true, statusText: 'Draft invoice deleted.', data: { _id: id } });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in delete invoice: ${error.message}`);
         return res.status(500).json({ status: false, statusText: 'The invoice was not deleted.', message: error.message });
     }
@@ -472,6 +479,7 @@ exports.sendInvoice = async (req, res) => {
     try {
         return await transition(req, res, 'sent');
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in send invoice: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -482,6 +490,7 @@ exports.markInvoicePaid = async (req, res) => {
     try {
         return await transition(req, res, 'paid');
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in mark invoice paid: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }

@@ -10,7 +10,7 @@ const { isPeriodLocked } = require('../../TimesheetApproval/helpers/lockGuard');
 const { updateProjectForTimelog, updateRemainingTime } = require('./helpers');
 const T = require('./timerRules');
 
-const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId) || (req.body && req.body.companyId);
+const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const safeZone = (z) => (z && DateTime.local().setZone(z).isValid ? z : 'UTC');
 
@@ -18,8 +18,8 @@ const safeZone = (z) => (z && DateTime.local().setZone(z).isValid ? z : 'UTC');
 // (live or abandoned), flagged when they ran overnight so the client can offer a trim.
 exports.listRunningTimers = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId || !req.uid) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        const companyId = sessionTenantOf(req);
+        if (!req.uid) return res.send({ status: false, statusText: 'An authenticated user is required.' });
         const zone = safeZone(req.query && req.query.timeZone);
         const nowSec = Math.floor(Date.now() / 1000);
         const dayStartSec = Math.floor(DateTime.now().setZone(zone).startOf('day').toSeconds());
@@ -61,6 +61,7 @@ exports.listRunningTimers = async (req, res) => {
         });
         return res.send({ status: true, statusText: 'OK', data });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`listRunningTimers: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -70,8 +71,8 @@ exports.listRunningTimers = async (req, res) => {
 // start + minutes (the "Trim to 3h" fix for a timer left running).
 exports.trimTimer = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId || !req.uid) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        const companyId = sessionTenantOf(req);
+        if (!req.uid) return res.send({ status: false, statusText: 'An authenticated user is required.' });
         const { timeSheetId } = req.body || {};
         const id = oid(timeSheetId);
         if (!id) return res.send({ status: false, statusText: 'A valid timeSheetId is required.' });
@@ -99,6 +100,7 @@ exports.trimTimer = async (req, res) => {
         socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: bounds, module: 'timesheet' });
         return res.send({ status: true, statusText: 'Timer trimmed.', data: updated });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`trimTimer: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }

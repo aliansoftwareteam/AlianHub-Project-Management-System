@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueri
 const { humanHoursFromEntries } = require("../helpers/timelogSourceSplit");
 const { resolveTimeScope } = require("../helpers/timeScope");
 const logger = require("../../../Config/loggerConfig");
+const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 
 // GET /api/v1/timesheet/hours-by-source?start=&end= (handoff 27c) — the people
 // half of the hours-by-source bar. One number, not a split: a time log records
@@ -11,8 +12,7 @@ const logger = require("../../../Config/loggerConfig");
 // LogStartTime is stored in Unix SECONDS, as the other timesheet endpoints use.
 exports.getHoursBySource = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || (req.query && req.query.companyId);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
 
         const start = Number(req.query && req.query.start);
         const end = Number(req.query && req.query.end);
@@ -40,6 +40,7 @@ exports.getHoursBySource = async (req, res) => {
             },
         });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in hours by source: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }

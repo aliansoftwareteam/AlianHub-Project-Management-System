@@ -10,12 +10,13 @@ const access = require('./helpers/reportAccess');
 
 const { oidOrNull } = access;
 
-const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
+const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 
 const ID_DIMENSIONS = { project: 'project', sprint: 'sprint', person: 'person' };
 
 const reply = (res, code, statusText, extra = {}) => res.status(code).json({ status: false, statusText, message: statusText, ...extra });
 const serverError = (res, where, e) => {
+    if (e instanceof TenantError) return reply(res, e.statusCode, e.message);
     logger.error(`${where}: ${e && e.message}`);
     return reply(res, 500, 'Something went wrong while handling the report.');
 };
@@ -93,9 +94,8 @@ const runConfig = async (companyId, cfg) => {
 exports.runConfig = runConfig;
 
 const callerFor = async (req, res) => {
-    const companyId = companyOf(req);
-    if (!companyId) { reply(res, 400, 'companyId is required.'); return null; }
     if (!req.uid) { reply(res, 401, 'An authenticated user is required.'); return null; }
+    const companyId = sessionTenantOf(req);
     return access.callerOf(companyId, req.uid);
 };
 

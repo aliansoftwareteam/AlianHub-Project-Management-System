@@ -8,7 +8,12 @@ const R = require('./helpers/ptoRules');
 const { createNotificationsBody } = require('../notification/prepare-notification-data/controllerV2');
 const sendMail = require('../service.js');
 
-const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
+const { sessionTenantOf, TenantError } = require('../../Config/tenant');
+const failed = (res, where, e) => {
+    if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
+    logger.error(`${where}: ${e.message}`);
+    return res.status(500).json({ status: false, statusText: e.message });
+};
 const audit = (req, entry) => { try { require('../Audit/recorder').recordAuditFromReq(req, entry); } catch (e) { /* best-effort */ } };
 
 // Best-effort: notify the requester when their leave is approved/rejected — an
@@ -59,8 +64,7 @@ const notifyPtoDecision = async (req, companyId, entry, status) => {
 // owner/admin may create for another user and/or set status (e.g. auto-approve).
 exports.createPto = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const roleType = await getRoleType(companyId, req.uid);
         const privileged = isPrivileged(roleType);
         const body = req.body || {};
@@ -74,15 +78,14 @@ exports.createPto = async (req, res) => {
         removeCache(`pto:${companyId}`);
         audit(req, { action: 'pto.create', entityType: 'pto', entityId: String(saved._id), meta: { type: data.type, userId: targetUser } });
         return res.status(201).json({ status: true, statusText: 'PTO entry created.', data: saved });
-    } catch (e) { logger.error(`createPto: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, 'createPto', e); }
 };
 
 // GET /api/v1/pto?userId=&from=&to=&status= — list (calendar feed). A member sees
 // their own; owner/admin see everyone (optionally filtered by userId).
 exports.listPto = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const roleType = await getRoleType(companyId, req.uid);
         const privileged = isPrivileged(roleType);
         const q = req.query || {};
@@ -146,14 +149,13 @@ exports.listPto = async (req, res) => {
             return { ...o, userName: nameById[String(o.userId)] || '', totalDays: R.leaveDays(o), createdAt };
         });
         return res.json({ status: true, data, total, page, pageSize });
-    } catch (e) { logger.error(`listPto: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, 'listPto', e); }
 };
 
 // PUT /api/v1/pto/:id/status — approve / reject (owner/admin only).
 exports.updatePtoStatus = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const roleType = await getRoleType(companyId, req.uid);
         if (!isPrivileged(roleType)) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
         const status = String(req.body.status || '');
@@ -171,14 +173,13 @@ exports.updatePtoStatus = async (req, res) => {
             notifyPtoDecision(req, companyId, updated, status).catch((e) => logger.error(`notifyPtoDecision: ${e.message}`));
         }
         return res.json({ status: true, statusText: `PTO ${status}.`, data: updated });
-    } catch (e) { logger.error(`updatePtoStatus: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, 'updatePtoStatus', e); }
 };
 
 // DELETE /api/v1/pto/:id — soft-delete. The entry's owner, or any owner/admin.
 exports.deletePto = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const roleType = await getRoleType(companyId, req.uid);
         const privileged = isPrivileged(roleType);
         const id = req.params.id;
@@ -199,7 +200,7 @@ exports.deletePto = async (req, res) => {
         }, 'updateOne');
         removeCache(`pto:${companyId}`);
         return res.json({ status: true, statusText: 'PTO entry removed.' });
-    } catch (e) { logger.error(`deletePto: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, 'deletePto', e); }
 };
 
 // GET /api/v1/pto/capacity?userId=&from=&to=&hoursPerDay= — available capacity for
@@ -207,8 +208,7 @@ exports.deletePto = async (req, res) => {
 // PTO entries reduce a user's available capacity (feeds REP-06 capacity planning).
 exports.getCapacity = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const roleType = await getRoleType(companyId, req.uid);
         const privileged = isPrivileged(roleType);
         const q = req.query || {};
@@ -226,5 +226,5 @@ exports.getCapacity = async (req, res) => {
             rangeStart: q.from, rangeEnd: q.to, ptoEntries: entries || [], workingHoursPerDay,
         });
         return res.json({ status: true, data: { userId, from: q.from, to: q.to, ...capacity } });
-    } catch (e) { logger.error(`getCapacity: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, 'getCapacity', e); }
 };

@@ -10,14 +10,18 @@ const R = require('./helpers/portfolioRules');
 const { getProvider, isAnyProviderConfigured } = require('../AICore/llmProvider');
 const { FEATURES } = require('../AICore/features');
 
-const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
+const { sessionTenantOf, TenantError } = require('../../Config/tenant');
+const failed = (res, where, e) => {
+    if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
+    logger.error(`${where}: ${e.message}`);
+    return res.status(500).json({ status: false, statusText: e.message });
+};
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
 
 // POST /api/v1/portfolio — create a portfolio grouping N projects.
 exports.createPortfolio = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const name = String(req.body.name || '').trim();
         if (!name) return res.status(400).json({ status: false, statusText: 'name is required.' });
         const projectIds = Array.isArray(req.body.projectIds) ? req.body.projectIds.map(String) : [];
@@ -29,26 +33,24 @@ exports.createPortfolio = async (req, res) => {
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PORTFOLIOS, data }, 'save');
         removeCache(`portfolios:${companyId}`);
         return res.status(201).json({ status: true, statusText: 'Portfolio created.', data: saved });
-    } catch (e) { logger.error(`createPortfolio: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, 'createPortfolio', e); }
 };
 
 // GET /api/v1/portfolio — list portfolios for the company.
 exports.listPortfolios = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PORTFOLIOS, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { updatedAt: -1 } }],
         }, 'find');
         return res.json({ status: true, data: rows || [] });
-    } catch (e) { logger.error(`listPortfolios: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, 'listPortfolios', e); }
 };
 
 // PUT /api/v1/portfolio/:id — rename / re-describe / change member projects.
 exports.updatePortfolio = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const set = { updatedBy: String(req.uid || '') };
         if (req.body.name !== undefined) set.name = String(req.body.name).trim();
         if (req.body.description !== undefined) set.description = String(req.body.description).slice(0, 1000);
@@ -60,21 +62,20 @@ exports.updatePortfolio = async (req, res) => {
         if (!updated) return res.status(404).json({ status: false, statusText: 'Not found.' });
         removeCache(`portfolios:${companyId}`);
         return res.json({ status: true, statusText: 'Portfolio updated.', data: updated });
-    } catch (e) { logger.error(`updatePortfolio: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, 'updatePortfolio', e); }
 };
 
 // DELETE /api/v1/portfolio/:id — soft delete.
 exports.deletePortfolio = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PORTFOLIOS,
             data: [{ _id: oid(req.params.id) }, { $set: { deletedStatusKey: 1 } }],
         }, 'updateOne');
         removeCache(`portfolios:${companyId}`);
         return res.json({ status: true, statusText: 'Portfolio removed.' });
-    } catch (e) { logger.error(`deletePortfolio: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, 'deletePortfolio', e); }
 };
 
 // The cross-project leadership rollup: per-project progress / at-risk /
@@ -132,12 +133,11 @@ const buildRollup = async (companyId, portfolioId, uid) => {
 // GET /api/v1/portfolio/:id/rollup
 exports.getRollup = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const data = await buildRollup(companyId, req.params.id, req.uid);
         if (!data) return res.status(404).json({ status: false, statusText: 'Not found.' });
         return res.json({ status: true, data });
-    } catch (e) { logger.error(`getRollup: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, 'getRollup', e); }
 };
 
 const SUMMARY_SYSTEM_PROMPT = [
@@ -168,8 +168,7 @@ const dayStamp = () => new Date().toISOString().slice(0, 10);
 // provider configured the screen keeps its figures and simply has no paragraph.
 exports.getPortfolioSummary = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const portfolioId = String((req.body && req.body.portfolioId) || '');
         if (!portfolioId) return res.status(400).json({ status: false, statusText: 'portfolioId is required.' });
 
@@ -209,5 +208,5 @@ exports.getPortfolioSummary = async (req, res) => {
         const payload = { summary, model: (result && result.model) || '', generatedAt: new Date().toISOString() };
         myCache.set(cacheKey, payload, 86400);
         return res.json({ status: true, data: payload });
-    } catch (e) { logger.error(`getPortfolioSummary: ${e.message}`); return res.status(500).json({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, 'getPortfolioSummary', e); }
 };
