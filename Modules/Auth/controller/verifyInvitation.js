@@ -11,6 +11,7 @@ const atob = (input) => Buffer.from(input, 'base64').toString('binary');
 const { updateUserFun, getUserByQueyFun } = require("../../Users/controller");
 const { updateMemberFunction } = require('../../settings/Members/controller');
 const { importUserNotifications } = require("../../../utils/data");
+const { recordInvitedOwner } = require("../../Company/helpers/recordInvitedOwner");
 
 /**
  * BUG-011 / #65 fix: parse the base64 invitation blob into a *local*
@@ -197,6 +198,11 @@ exports.checkPermission = (req, res) => {
 
                 updateMemberFunction(invite.companyId, memberObject, "updateOne")
                 .then(() => {
+                    recordInvitedOwner({ companyId: invite.companyId, invitation: userData, userId: invite.userId })
+                    .catch((error) => {
+                        logger.error(`ERROR in record invited owner: ${error.message}`);
+                    })
+
                     const userUpdateQuery = {
                         type: dbCollections.USERS,
                         data: [
