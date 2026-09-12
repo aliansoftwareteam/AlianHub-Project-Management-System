@@ -49,6 +49,9 @@ const items = computed(() => [
     { name: "AiInbox", label: "Ai.inbox", icon: "inbox", count: waiting.value },
     { name: "AgentTeammates", label: "Parity.nav_teammates", icon: "members" },
     { name: "AgentRouting", label: "Parity.nav_routing", icon: "automations" },
+    // The workflow API refuses everybody but an Owner and an Admin, so the way in
+    // is theirs too rather than a link that can only end in a refusal.
+    ...(canManage.value ? [{ name: "WorkflowBuilder", label: "WorkflowBuilder.nav", icon: "layout" }] : []),
     { name: "AiAsk", label: "Parity.nav_ask", icon: "ai" },
     { name: "AiSkills", label: "Ai.skills", icon: "docs" },
     { name: "AiPipeline", label: "Pipeline.nav_pipeline", icon: "layout" },

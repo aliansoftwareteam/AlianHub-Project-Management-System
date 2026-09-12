@@ -92,6 +92,7 @@ const {
     workflowRunsSchema,
     workflowStepRunsSchema,
     workflowApprovalsSchema,
+    workflowDefinitionsSchema,
     agentFindingsSchema,
     agentsSchema,
     agentRunsSchema,
@@ -296,6 +297,8 @@ exports.checkType = (type) => {
             return workflowStepRunsSchema
         case SCHEMA_TYPE.WORKFLOW_APPROVALS:
             return workflowApprovalsSchema
+        case SCHEMA_TYPE.WORKFLOW_DEFINITIONS:
+            return workflowDefinitionsSchema
         case SCHEMA_TYPE.AGENT_FINDINGS:
             return agentFindingsSchema
         case SCHEMA_TYPE.AGENTS:
@@ -520,6 +523,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.WORKFLOW_STEP_RUNS}`
         case SCHEMA_TYPE.WORKFLOW_APPROVALS:
                 return `${dbCollections.WORKFLOW_APPROVALS}`
+        case SCHEMA_TYPE.WORKFLOW_DEFINITIONS:
+                return `${dbCollections.WORKFLOW_DEFINITIONS}`
         case SCHEMA_TYPE.AGENT_FINDINGS:
                 return `${dbCollections.AGENT_FINDINGS}`
         case SCHEMA_TYPE.AGENTS:

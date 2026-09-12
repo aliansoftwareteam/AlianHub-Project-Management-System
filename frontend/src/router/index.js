@@ -17,6 +17,7 @@ import home from './home';
 import people from './people';
 import ai from './ai';
 import automations from './automations';
+import workflows from './workflows';
 import billing from './billing';
 import team from './team';
 import trash from './trash';
@@ -34,6 +35,9 @@ const routes = [
 
 	// AUTOMATIONS
 	...automations,
+
+	// WORKFLOW BUILDER
+	...workflows,
 
 	// PROJECT ROUTES
 	...projects,
