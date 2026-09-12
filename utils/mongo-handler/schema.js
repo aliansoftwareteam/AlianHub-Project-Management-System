@@ -1072,6 +1072,10 @@ const schema = {
         definition: { type: Object, default: {}, required: false },
         outputs: { type: Object, default: {}, required: false },
         error: { type: String, required: false },
+        /* Task 028 sprint 5 step 5. Why the run stopped short of what it was
+         * asked to do, when that was a limit rather than an error:
+         * { reason, stepId, agentId, limit, used, resetsAt, detail, at }. */
+        blocked: { type: Object, required: false },
         startedAt: { type: Date, required: false },
         finishedAt: { type: Date, required: false },
     },
