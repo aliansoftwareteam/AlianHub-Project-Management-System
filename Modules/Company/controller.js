@@ -18,6 +18,8 @@ const { storeRefferalCode, checkAndStoreRefferalCode } = require("../Affiliate/c
 const { handleCreateCompanyDataStorageFunForUpload, handleCreateCompanyDataStorageFun } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const { seedSampleProject } = require("../createProject/sampleProject.js");
 const { normaliseFocus, FOCUS_LABELS } = require("../createProject/sampleTasks.js");
+const { pinSessionTenant } = require("../../Config/tenant.js");
+const { getRoleType, ROLE_OWNER } = require("../../Config/permissionGuard.js");
 
 const TEAM_SIZES = ["1", "2-15", "16-50", "50+"];
 
@@ -701,61 +703,64 @@ exports.checkFreeCompanyCounts = (userId) => {
     });
 };
 
-exports.deleteCompany = (req, res) => {
+/* A dedicated short-lived connection, built the way mongoConnector builds every other one.
+ * mongoose.connect would instead open the process-wide default connection, which nothing else
+ * in this app uses and which refuses to reopen for a second company once it is active. */
+const dropCompanyDatabase = async (companyId) => {
+    const baseUrl = String(process.env.MONGODB_URL || '').replace(/\/+$/, '');
+    const connStr = baseUrl.startsWith('mongodb+srv') ? `${baseUrl}/${companyId}` : `${baseUrl}/${companyId}?authSource=admin`;
+    const connection = await mongoose.createConnection(connStr).asPromise();
     try {
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: "CompanyId is required"
-            })
-            return;
-        }
-        mongoose.connect(process.env.MONGODB_URL+"/"+req.body.companyId);
-        const connection = mongoose.connection;
-        connection.once('open', () => {
-            logger.info(`MongoDB database connection established successfully ${req.body.companyId}`);
-        });
-        mongoose.connection.dropDatabase().then(() => {
-            try {
-                mongoose.connection.close();
-                let delObj = {
-                    type: SCHEMA_TYPE.COMPANIES,
-                    data: [
-                        {
-                            _id: new mongoose.Types.ObjectId(req.body.companyId)
-                        }
-                    ]
-                }
-                updateCompanyFun(SCHEMA_TYPE.GOLBAL,delObj,"deleteOne",req.body.companyId)
-                .then(() => {
-                    let findObj = {
-                        type: dbCollections.USERS,
-                        data: [
-                            {'AssignCompany': { $in: [req.body.companyId]}},
-                            {
-                                $pull: { 'AssignCompany': req.body.companyId }
-                            }
-                        ]
-                    };
+        await connection.dropDatabase();
+    } finally {
+        await connection.close();
+    }
+};
 
-                    updateUserFun(dbCollections.GLOBAL,findObj,"updateMany",req.body.companyId,'',true)
-                    .then(() => {
-                        res.send({ status: true, statusText: "Done"});
-                    }).catch((error) => {
-                        res.send({ status: false, statusText: error});
-                        console.error(error,"errorerror");
-                    });
-                })
-            } catch (err) {
-                res.send({ status: false, statusText: err});
-                console.error(err,"ERROR IN CLOSE CONNECTION");
-            }
-        }).catch((error) => {
-            res.send({ status: false, statusText: error});
-            console.error(error,"ERROR IN DROP DATABASE");
-        });
+/* Destroys the tenant's whole database, so it is gated harder than any other company write:
+ * the owner of the company the verified session names, who has typed that company's name back.
+ * The role is read against the pinned tenant, not the header, so the company being judged and
+ * the company being dropped cannot be two different ones. */
+exports.deleteCompany = async (req, res) => {
+    const refuse = (code, statusText) => res.status(code).send({ status: false, statusText });
+    try {
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        if (req.apiToken) return refuse(403, "An API token cannot delete a company.");
+
+        const roleType = await getRoleType(companyId, req.uid);
+        if (roleType !== ROLE_OWNER) return refuse(403, "Only the company owner can delete this company.");
+
+        const company = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+            type: SCHEMA_TYPE.COMPANIES,
+            data: [{ _id: new mongoose.Types.ObjectId(companyId) }, { Cst_CompanyName: 1 }],
+        }, "findOne");
+        if (!company) return refuse(404, "No such company.");
+        if (String(req.body.confirm || "") !== String(company.Cst_CompanyName || "")) {
+            return refuse(400, "Type the company name to confirm the deletion.");
+        }
+
+        await dropCompanyDatabase(companyId);
+
+        const delObj = {
+            type: SCHEMA_TYPE.COMPANIES,
+            data: [{ _id: new mongoose.Types.ObjectId(companyId) }],
+        };
+        await updateCompanyFun(SCHEMA_TYPE.GOLBAL, delObj, "deleteOne", companyId);
+
+        const findObj = {
+            type: dbCollections.USERS,
+            data: [
+                { 'AssignCompany': { $in: [companyId] } },
+                { $pull: { 'AssignCompany': companyId } },
+            ],
+        };
+        await updateUserFun(dbCollections.GLOBAL, findObj, "updateMany", companyId, '', true);
+
+        logger.info(`Company ${companyId} deleted by ${req.uid}`);
+        return res.send({ status: true, statusText: "Done" });
     } catch (error) {
-        res.send({ status: false, statusText: error});
-        console.error(error,"ERROR IN DELETE COMPANY:");
+        logger.error(`ERROR in delete company: ${error.message || error}`);
+        return refuse(500, "Could not delete the company.");
     }
 }

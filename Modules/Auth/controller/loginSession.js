@@ -18,6 +18,7 @@ const { updateUserFun } = require("../../Users/controller.js");
 
 const { addAndRemoveUserInMongodbNotificationCount, generateTokenV2Fun, verifyAuth } = require('./authHelpers');
 const twoFactorRules = require('../helpers/twoFactorRules');
+const { pinSessionTenant } = require('../../../Config/tenant');
 exports.manageAttempt = (req, res) => {
     const forwarded = req?.headers['x-forwarded-for'] || req.ip;
     const clientIp = forwarded ? forwarded?.split(',')[0] : req?.connection?.remoteAddress;
@@ -38,13 +39,7 @@ exports.manageAttempt = (req, res) => {
  */
 
 exports.removeUserNotification = (req,res) => {
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: "CompanyId is required"
-        })
-        return;
-    }
+    if (!pinSessionTenant(req, res)) return;
     if (!(req.body && req.body.userId)) {
         res.send({
             status: false,
