@@ -3804,6 +3804,10 @@ const schema = {
             type: Date,
             required: false
         },
+        trackerCodeChallenge: {
+            type: String,
+            required: false
+        },
         lastActive: {
             type: Date,
             default: new Date()

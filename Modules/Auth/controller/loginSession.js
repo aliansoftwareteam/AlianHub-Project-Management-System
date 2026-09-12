@@ -164,7 +164,11 @@ exports.issueTrackerCode = async (req, res) => {
     const refuse = (statusCode, message) => res.status(statusCode).json({ status: false, statusText: message, message });
     try {
         if (!(req.uid && req.sessionId)) return refuse(401, 'Sign in to connect the desktop tracker.');
-        const issued = await trackerCode.issueTrackerCode({ userId: req.uid, sessionId: req.sessionId });
+        const codeChallenge = req.body && req.body.codeChallenge;
+        if (codeChallenge && !trackerCode.isCodeChallenge(codeChallenge)) {
+            return refuse(400, 'The desktop tracker sent an unusable code challenge.');
+        }
+        const issued = await trackerCode.issueTrackerCode({ userId: req.uid, sessionId: req.sessionId, codeChallenge });
         if (!issued) return refuse(401, 'Your session is expired');
         return res.status(200).json({ status: true, statusText: 'OK', data: { code: issued.code, expiresAt: issued.expiresAt } });
     } catch (error) {
@@ -176,10 +180,16 @@ exports.issueTrackerCode = async (req, res) => {
 exports.loginAuthTracker = async (req, res) => {
     const invalid = () => res.status(400).json({message: 'Invalid or expired tracker sign-in code'});
     try {
-        const { code, refreshToken, userId } = req.body || {};
+        const { code, refreshToken, userId, codeVerifier } = req.body || {};
         // Tracker builds released before one-time codes post the deep-link value as `refreshToken`.
-        const sessionUserId = await trackerCode.redeemTrackerCode(code || refreshToken);
-        if (!sessionUserId) return invalid();
+        const redeemed = await trackerCode.redeemTrackerCode(code || refreshToken, codeVerifier || (req.body || {}).code_verifier);
+        if (!redeemed.ok) {
+            if (redeemed.reason === 'legacy') {
+                return res.status(400).json({message: 'This desktop tracker is too old to sign in. Update it and try again.'});
+            }
+            return invalid();
+        }
+        const sessionUserId = redeemed.userId;
         if (userId && String(userId) !== sessionUserId) return invalid();
 
         const forwarded = req?.headers['x-forwarded-for'] || req.ip;
