@@ -5,13 +5,13 @@ One pull request per group; tick with the merge commit and build.
 
 - [x] 1. Company updates and verification email (items 1, 12) — #633 `d5616681` (build 109)
 - [x] 2. Project filters and task read visibility (items 2, 3) — #632 `25344f46` (build 108)
-- [ ] 3. Subscription invoices and timesheet reads (items 16a, 16c, 16d)
-- [ ] 4. Storage uploads, profile images, bucket cron (items 5, 6, 7)
+- [x] 3. Subscription invoices and timesheet reads (items 16a, 16c, 16d) — #635 `1501b196` (#635 (build 120)); review fixes included
+- [x] 4. Storage uploads, profile images, bucket cron (items 5, 6, 7) — #639 `e5835b6a` (#639 (build 121)); review fixes included
 - [x] 5. Access token without the refresh token, tracker login (items 8, 9, 10) — #638 `4fdd5650` (build 115); also closed a session-update route that let a caller rewrite their own session row
-- [ ] 6a. Webhook private-host allowlist (item 15)
-- [ ] 6b. `createproject` default sprint (item 18)
+- [x] 6a. Webhook private-host allowlist (item 15) — #647 `732bf025` (#647 (build 122)), replacing #636 after a commit subject exceeded commitlint's limit
+- [x] 6b. `createproject` default sprint (item 18) — #637 `8e8e7726` (#637 (build 118)); also pins the tenant at the http entry
 - [x] 7. Harness and CI: e2e on beta pushes, lint-staged `--no-stash`, messaging worker, priority icons, testing docs (items 16e, 20, 21, 23, 24, 25) — #634 `2f208fe5` (build 110); item 20 reproduced on companies seeded before 4202a796 and fixed in `SettingTaskPriority.vue`; the messaging worker is skipped when Firebase is not configured
-- [ ] `followups.md` updated and `docs/BETA-LOG.md` regenerated
+- [x] `followups.md` updated and `docs/BETA-LOG.md` regenerated — this PR
 
 ## Log
 | Date | Entry |
@@ -22,6 +22,7 @@ One pull request per group; tick with the merge commit and build.
 | 2026-09-11 | #641 merged as `81e0f922` (follow-ups 31 and 33): verification resend sends only the account id, the Settings General dial-code crash is fixed at its data default, and the review finding reproduced and was fixed (Enter on a filtered list selected an undefined country; one selection path, no stray emits, the keydown listener removed on unmount). |
 | 2026-09-11 | #644 merged as `45c1bb75`: `POST /api/v1/userAndCompanyCheck` answers only for the signed-in user and returns `toSelfView`. Reproduced first: a guest read an unrelated sign-up's `verificationToken` and verified that address. Follow-ups 41 and 42 filed for the remaining raw `users` responses outside the unverified-login path. |
 | 2026-09-11 | #643 merged as `0afa408a` (build 116) after its review fixes reproduced and closed: owner-invite acceptance, an active seat for company updates, one company per request. A multi-agent adversarial review of #635–#639 confirmed 36 of 41 findings, including regressions CI missed; #638 merged (only low findings) and fix agents started on #635, #636, #637, #639 plus a new critical authorization fix on signup. Other merges today: #640 (build 111), #641 (build 113), #642 (build 112), #644 (build 114). Beta is `14.36.0-beta.116`. |
+| 2026-09-12 | Every group merged. #635 `1501b196` (#635 (build 120)), #639 `e5835b6a` (#639 (build 121)), #637 `8e8e7726` (#637 (build 118)) and #647 `732bf025` (#647 (build 122), replacing #636) landed after their review fixes; the critical signup authorization fix merged as #645 `87917dfa` (#645 (build 117)) with `scripts/audit-product-owners.js` as its upgrade step. Beta is `14.36.0-beta.122`. Next wave started on the remaining follow-ups: auth responses returning raw user documents (41, 42 and the unverified-login body), estimated-time writes (36), profile image reads (38, 39) and role lookups ignoring removed members (30, 45, 46). |
 
 ## Last step
-Groups 1, 2, 5, 7 merged, plus #640–#644. Groups 3 (#635), 4 (#639), 6a (#636) and 6b (#637) are green but held while their review findings are fixed on their branches; a critical signup authorization fix is in progress. Resume from `Tasks/HANDOFF.md`.
+All seven groups merged. Remaining follow-ups are listed in `Tasks/active/034-end-to-end-qa-programme/followups.md`; four are being fixed now, the rest are unscheduled.
