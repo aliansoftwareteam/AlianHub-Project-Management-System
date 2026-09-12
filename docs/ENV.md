@@ -159,7 +159,7 @@ Backend variables: 151. Frontend build-time variables: 23.
 | `HELMET_ENABLED` |  |  | Send the helmet security headers (default true). | `index.js` |
 | `INSTANCE_ADMIN_KEY` (secret) |  |  | Shared key that grants the instance-admin API without a product-owner session. | `Modules/Instance/guard.js` |
 | `MEMBERSHIP_CACHE_TTL_SECONDS` |  | `60` | Seconds a user-company membership check is cached before MongoDB is asked again. | `Config/jwt.js` |
-| `PRECOMPANYKEY` (secret) | yes | `your_preset_key` | Random key that identifies the preset company routes; generated at setup. | `Config/config.js` |
+| `PRECOMPANYKEY` (secret) | yes | `your_preset_key` | Random key for the preset company routes, presented in the x-preset-key header; generated at setup. | `Config/config.js` |
 | `SOCKETIO_ADMIN_PASSWORD_HASH` (secret) |  | `$2a$12$HHemhzmTrC8Dmf2Gd9v/Teo9oiCxfYJb.St3HKMBx1L3wJmZLeX5u` | bcrypt hash of the Socket.IO admin UI password; the UI stays off while unset. | `socket/socketinit.js` |
 | `SOCKETIO_ADMIN_USERNAME` |  | `alian` | Username for the Socket.IO admin UI; the UI stays off while unset. | `socket/socketinit.js` |
 | `WEBHOOK_ALLOWED_PRIVATE_HOSTS` |  |  | Private hosts webhooks may post to: exact hostnames or CIDR ranges, comma-separated (empty by default, so every private host is refused). Also editable under Instance > Settings > Security. Link-local and cloud metadata addresses stay blocked, and a range can be no wider than /8 (IPv4) or /32 (IPv6). | `Modules/Webhooks/helpers/privateHostAllowlist.js` |

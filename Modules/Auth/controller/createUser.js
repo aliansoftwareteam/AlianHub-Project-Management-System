@@ -8,6 +8,7 @@ const mongoose = require("mongoose");
 const { importUserNotifications } = require("../../../utils/data");
 const { addAndRemoveUserInMongodbNotificationCount } = require("../../Auth/controller");
 const { toAuthView } = require("../../Users/helpers/userAccessRules");
+const { recordInvitedOwner } = require("../../Company/helpers/recordInvitedOwner");
 
 
 exports.authenticateToken = "";
@@ -176,6 +177,10 @@ exports.googleSignup = async (req, res) => {
             }
             await mongoRef.MongoDbCrudOpration(assignCompany, query, 'findOneAndUpdate');
 
+            await recordInvitedOwner({ companyId: invitedCompany, invitation, userId: authRes._id }).catch((error) => {
+                logger.error(`Record invited owner error in googleSignup hook: ${error}`);
+            });
+
             // Import notification settings
             await importUserNotifications(assignCompany, authRes._id).catch((error) => {
                 logger.error(`Import notification setting error in googleSignup hook: ${error}`);
@@ -286,6 +291,10 @@ exports.githubSignup = async (req, res) => {
             }
             await mongoRef.MongoDbCrudOpration(assignCompany, query, 'findOneAndUpdate');
 
+            await recordInvitedOwner({ companyId: invitedCompany, invitation, userId: authRes._id }).catch((error) => {
+                logger.error(`Record invited owner error in githubSignup hook: ${error}`);
+            });
+
             // Import notification settings
             await importUserNotifications(assignCompany, authRes._id).catch((error) => {
                 logger.error(`Import notification setting error in githubSignup hook: ${error}`);
@@ -395,6 +404,10 @@ exports.gitlabSignup = async (req, res) => {
                 ]
             }
             await mongoRef.MongoDbCrudOpration(assignCompany, query, 'findOneAndUpdate');
+
+            await recordInvitedOwner({ companyId: invitedCompany, invitation, userId: authRes._id }).catch((error) => {
+                logger.error(`Record invited owner error in gitlabSignup hook: ${error}`);
+            });
 
             // Import notification settings
             await importUserNotifications(assignCompany, authRes._id).catch((error) => {

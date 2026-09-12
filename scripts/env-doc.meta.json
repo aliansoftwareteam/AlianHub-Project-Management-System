@@ -510,7 +510,7 @@
   },
   "PRECOMPANYKEY": {
     "group": "security",
-    "description": "Random key that identifies the preset company routes; generated at setup.",
+    "description": "Random key for the preset company routes, presented in the x-preset-key header; generated at setup.",
     "required": true,
     "secret": true,
     "default": "your_preset_key"
