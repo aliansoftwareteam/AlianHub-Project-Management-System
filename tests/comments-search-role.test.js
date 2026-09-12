@@ -25,7 +25,8 @@ const pipelineFor = async ({ storedRole, bodyRole }) => {
     const res = { status: jest.fn(() => res), json: jest.fn() };
     await searchComments({ headers: { companyid: COMPANY }, uid: USER, body: { pids: [PROJECT], roleType: bodyRole } }, res);
     expect(res.status).toHaveBeenCalledWith(200);
-    return MongoDbCrudOpration.mock.calls[0][1].data[0];
+    const search = MongoDbCrudOpration.mock.calls.find(([, params]) => params.type === 'comments');
+    return search[1].data[0];
 };
 
 beforeEach(() => jest.clearAllMocks());

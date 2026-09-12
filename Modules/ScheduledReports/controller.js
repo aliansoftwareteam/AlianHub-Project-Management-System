@@ -34,7 +34,7 @@ const sendOne = (subject, html, recipients) => new Promise((resolve) => {
 const runSavedReport = async (companyId, report) => {
     const check = reportRules.validateConfig(report);
     if (!check.valid) return { rows: [], total: 0, config: null };
-    const out = await customReports.runConfig(companyId, check.value);
+    const out = await customReports.runConfig(companyId, check.value, report.createdBy);
     const rows = out.rows.map((r) => ({ label: r.label, value: r.value }));
     return { rows, total: Math.round(rows.reduce((a, r) => a + (r.value || 0), 0) * 100) / 100, config: check.value };
 };

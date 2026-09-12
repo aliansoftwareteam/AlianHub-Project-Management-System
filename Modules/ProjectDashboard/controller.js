@@ -1,4 +1,5 @@
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const { evaluatePermission } = require('../../Config/permissionGuard');
@@ -42,6 +43,7 @@ exports.getProjectDashboard = async (req, res) => {
             deletedStatusKey: { $in: [0, undefined] },
         };
         if (!seeAll) filter.AssigneeUserId = String(req.uid);
+        Object.assign(filter, await hiddenSprintFilter(companyId, req.uid, [String(projectId)]));
 
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,

@@ -3,6 +3,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { projectAccess, isCompanyAdmin, isCompanyMember } = require('../../../Config/contentAccess');
 const { pageVisibleTo } = require('../../Pages/helpers/pageRules');
+const { canSeeSprint, sprintIdentities } = require('../../Sprints/helpers/sprintVisibility');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const NOT_FOUND = Object.freeze({ ok: false, statusCode: 404 });
@@ -21,7 +22,8 @@ const findOne = (companyId, type, filter) => MongoDbCrudOpration(companyId, { ty
  * entity: they must be able to edit the project the entity lives in. A saved report
  * aggregates every project unless it is filtered to one, so an unfiltered report is
  * owner/admin only. `privateDoc` marks the author's own private doc: they may manage an
- * existing link, but a new one is refused because the renderer would not serve it.
+ * existing link, but a new one is refused because the renderer would not serve it. A
+ * private sprint is marked the same way.
  */
 const canManageShare = async ({ companyId, uid, entityType, entityId }) => {
     const user = String(uid || '');
@@ -38,7 +40,15 @@ const canManageShare = async ({ companyId, uid, entityType, entityId }) => {
     }
     if (entityType === 'sprint') {
         const sprint = await findOne(companyId, SCHEMA_TYPE.SPRINTS, { _id, deletedStatusKey: { $ne: 1 } });
-        return sprint ? fromProject(companyId, user, sprint.projectId) : NOT_FOUND;
+        if (!sprint) return NOT_FOUND;
+        const decision = await fromProject(companyId, user, sprint.projectId);
+        if (sprint.private !== true) return decision;
+        /* A private sprint is only its assignees' to publish, and like a private doc a new
+         * link is refused outright: the sharer sets it back to Shared first. An existing
+         * link keeps serving while its author can still see the sprint, and stops the
+         * moment they cannot — the same rule the project half of this check already uses. */
+        if (!(await isCompanyAdmin(companyId, user)) && !canSeeSprint(sprint, await sprintIdentities(companyId, user))) return NOT_FOUND;
+        return decision.ok ? { ...decision, privateDoc: true } : decision;
     }
     if (entityType === 'form') {
         const form = await findOne(companyId, SCHEMA_TYPE.FORMS, { _id, deletedStatusKey: 0 });

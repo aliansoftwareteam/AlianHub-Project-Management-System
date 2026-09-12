@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const R = require('./helpers/varianceRules');
 const { resolveTimeScope, visibleProjectsFor } = require('../TimeSheet/helpers/timeScope');
+const { canSeeSprintById, hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 const failed = (res, where, e) => {
@@ -31,6 +32,12 @@ exports.getVarianceReport = async (req, res) => {
             return res.status(403).json({ status: false, statusText: 'You do not have access to this project.' });
         }
         if (visible && !q.projectId) match.ProjectID = { $in: visible };
+        if (q.sprintId && !(await canSeeSprintById(companyId, req.uid, q.sprintId))) {
+            return res.status(404).json({ status: false, statusText: 'Sprint not found.' });
+        }
+        if (!q.sprintId) {
+            Object.assign(match, await hiddenSprintFilter(companyId, req.uid, q.projectId ? [String(q.projectId)] : (visible || [])));
+        }
 
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,

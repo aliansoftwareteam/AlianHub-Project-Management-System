@@ -83,7 +83,7 @@ Every account uses the password in `PASSWORD` (`fixtures.js`). The run state (`r
 
 ## Rules for every test
 
-1. **Create your own data.** The shared fixtures (company, the four users, two projects, three tasks) are read-only context. If a test changes something, it creates that thing first with `createProject`, `createTask` or `inviteMember`, and uses `uniqueSuffix()` for names and codes.
+1. **Create your own data.** The shared fixtures (company, the four users, two projects, three tasks) are read-only context. If a test changes something, it creates that thing first with `createProject`, `createTask` or `inviteMember`, and uses `uniqueSuffix()` for names and codes. `createTask` takes an optional `assigneeIds` when the test needs the task to belong to somebody — the views that show a plain member only their own work read it.
 2. **Never depend on test order.** Any test must pass when run alone (`npx playwright test -g "<title>"`, `npx jest -t "<title>"`) and in parallel with every other test. No test reads what another test wrote.
 3. **Assert through the product.** Sign in with `loginAs` or a role's storage state; do not write to MongoDB from a test.
 4. **Keep strings stable.** UI assertions use the English copy from `frontend/src/locales/en.js` or a `data-test` attribute. Add a `data-test` to the component when a selector would otherwise depend on layout.
