@@ -11,7 +11,7 @@
                 </span>
             </div>
 
-            <div class="ai-inbox" :class="{ 'ai-inbox--detail': selected }">
+            <div class="ai-inbox" :class="{ 'ai-inbox--detail': selected || selectedApproval }">
                 <div class="ai-inbox__list ah-scroll">
                     <div class="ai-inbox__tabs">
                         <div class="ah-tabs">
@@ -21,7 +21,22 @@
                         </div>
                     </div>
 
-                    <div v-if="loading" class="ah-empty" style="margin:14px">{{ $t('Ai.loading') }}</div>
+                    <template v-if="view === 'approvals'">
+                        <EmptyState v-if="approvalsEngineOff" data-test="approvals-engine-off" :title="$t('Workflows.engine_off_title')" :message="$t('Workflows.engine_off_body')" />
+                        <div v-else-if="!approvalsLoaded" class="ah-empty" style="margin:14px">{{ $t('Ai.loading') }}</div>
+                        <EmptyState v-else-if="approvalsError" :title="$t('Ai.load_failed')" :message="approvalsError" :action-label="$t('Ai.retry')" @action="loadApprovals" />
+                        <EmptyState v-else-if="!approvals.length" data-test="approvals-empty" :title="$t('Workflows.approvals_empty_title')" :message="$t('Workflows.approvals_empty_body')" />
+                        <WorkflowApprovalRow
+                            v-for="approval in approvals"
+                            v-else
+                            :key="approval._id"
+                            :approval="approval"
+                            :active="selectedApproval && selectedApproval._id === approval._id"
+                            @pick="selectedApproval = approval"
+                        />
+                    </template>
+
+                    <div v-else-if="loading" class="ah-empty" style="margin:14px">{{ $t('Ai.loading') }}</div>
                     <EmptyState v-else-if="loadError" :title="$t('Ai.load_failed')" :message="loadError" :action-label="$t('Ai.retry')" @action="switchView(view)" />
                     <div v-else-if="!proposals.length && view === 'pending'" class="ai-done">
                         <div class="ai-done__n ah-mono">{{ counts.doneByAi || 0 }}</div>
@@ -50,7 +65,21 @@
                     </button>
                 </div>
 
-                <div v-if="!selected" class="ai-detail ai-detail__empty">
+                <WorkflowApprovalDetail
+                    v-if="view === 'approvals' && selectedApproval"
+                    :approval="selectedApproval"
+                    :busy="approvalsBusy"
+                    :error="approvalError"
+                    @back="selectedApproval = null"
+                    @decide="onDecideApproval"
+                    @reassign="onReassignApproval"
+                />
+
+                <div v-else-if="view === 'approvals'" class="ai-detail ai-detail__empty">
+                    <span class="ah-small">{{ $t('Workflows.approval_pick_one') }}</span>
+                </div>
+
+                <div v-else-if="!selected" class="ai-detail ai-detail__empty">
                     <span class="ah-small">{{ $t('Ai.pick_one') }}</span>
                 </div>
 
@@ -121,6 +150,9 @@ import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
+import WorkflowApprovalRow from "./WorkflowApprovalRow.vue";
+import WorkflowApprovalDetail from "./WorkflowApprovalDetail.vue";
+import { useWorkflowApprovals } from "./useWorkflowApprovals";
 import { useAgents, reasonOf } from "./useAgents";
 import { DECLINE_REASONS } from "./episodeText";
 import { useAgentAccess } from "./agentAccess";
@@ -133,11 +165,24 @@ const { t } = useI18n();
 const { canManage, userId, mayUndo } = useAgentAccess();
 const $toast = useToast();
 const { proposals, counts, loadProposals, loadSummary, decide } = useAgents();
+const {
+    approvals,
+    count: approvalCount,
+    error: approvalsError,
+    engineOff: approvalsEngineOff,
+    loaded: approvalsLoaded,
+    busy: approvalsBusy,
+    load: loadApprovals,
+    decide: decideApproval,
+    reassign: reassignApproval
+} = useWorkflowApprovals();
 
 const view = ref("pending");
 const loading = ref(true);
 const loadError = ref("");
 const selected = ref(null);
+const selectedApproval = ref(null);
+const approvalError = ref("");
 const editing = ref(false);
 const editable = ref([]);
 const busy = ref(false);
@@ -157,6 +202,7 @@ const canDecide = computed(() => !selected.value || selected.value.gate !== GATE
 
 const tabs = computed(() => [
     { key: "pending", label: "Ai.waiting", count: counts.value.waiting || 0 },
+    { key: "approvals", label: "Workflows.approvals_tab", count: approvalCount.value },
     { key: "done", label: "Ai.done_by_ai", count: counts.value.doneByAi || 0 },
     { key: "declined", label: "Ai.declined", count: counts.value.declined || 0 }
 ]);
@@ -185,6 +231,8 @@ const shortTime = (at) => {
     return m.isSame(moment(), "day") ? m.format("H:mm") : m.fromNow();
 };
 
+watch(selectedApproval, () => { approvalError.value = ""; });
+
 watch(selected, (p) => {
     editing.value = false;
     declining.value = false;
@@ -207,7 +255,29 @@ const reload = async () => {
 const switchView = async (key) => {
     view.value = key;
     selected.value = null;
-    await reload();
+    selectedApproval.value = null;
+    await (key === "approvals" ? loadApprovals() : reload());
+};
+
+const onDecideApproval = async ({ approval, decision }) => {
+    approvalError.value = "";
+    try {
+        await decideApproval(approval, decision);
+        selectedApproval.value = null;
+        $toast.success(t(decision === "approved" ? "Workflows.approval_approved" : "Workflows.approval_rejected"), { position: "top-right" });
+    } catch (e) {
+        approvalError.value = e.message;
+    }
+};
+
+const onReassignApproval = async ({ approval, toUserId, reason }) => {
+    approvalError.value = "";
+    try {
+        selectedApproval.value = await reassignApproval(approval, toUserId, reason);
+        $toast.success(t("Workflows.approval_reassigned"), { position: "top-right" });
+    } catch (e) {
+        approvalError.value = e.message;
+    }
 };
 
 const afterDecision = async (message) => {
@@ -271,11 +341,15 @@ const onUndo = async () => {
     }
 };
 
-onMounted(reload);
+/* The approvals are loaded on arrival whatever tab is open, because the tab's
+ * count is the only sign a workflow is waiting on somebody. With the engine off
+ * the load answers 503 and the count is simply nought. */
+onMounted(() => Promise.all([reload(), loadApprovals()]));
 </script>
 
 <style>
 @import "./style.css";
+@import "./workflow.css";
 .ai-back { display: none; }
 @media (max-width: 900px) { .ai-back { display: inline-flex; margin-bottom: 10px; } }
 .ai-decline { margin-top: 18px; padding: 12px 14px; border: 1px solid var(--hairline); border-radius: 9px; background: var(--surface); display: flex; flex-direction: column; gap: 8px; }

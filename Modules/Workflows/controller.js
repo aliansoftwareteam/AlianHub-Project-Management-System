@@ -1,10 +1,13 @@
 const logger = require('../../Config/loggerConfig');
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
+const { getRoleType } = require('../../Config/permissionGuard');
 const access = require('../Agents/access');
 const revert = require('../Agents/revert');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const store = require('./store');
+const approvals = require('./approvals');
+const people = require('./people');
 const flag = require('./flag');
 const executors = require('./executors');
 const queue = require('./queue');
@@ -358,6 +361,94 @@ exports.listDefinitions = async (req, res) => {
     }
 };
 
+/* The approval half of the API.
+ *
+ * An approval step waits on a row in `workflow_approvals`; these three routes
+ * are how a person sees that row, answers it and hands it on. Deciding is the
+ * approvals helper's own compare-and-set, so the wake of the step and the
+ * "somebody else got there first" answer are the ones it already had.
+ *
+ * Who may answer is not the manage rule on its own: an approval names an owner,
+ * and the owner of the step answers it whatever their role. An Owner or an Admin
+ * may answer any of them, because they can already retry, skip and compensate
+ * the step the approval is holding. A past owner may not: a request handed on is
+ * not theirs any more. */
+const ownsApproval = (caller, request) => Boolean(request.ownerUserId)
+    && String(request.ownerUserId) === String(caller.actor.userId);
+
+const mayDecide = (caller, request) => caller.privileged || ownsApproval(caller, request);
+
+const approvalRow = (request, run, step, names) => {
+    const owners = (request.owners || []).map(String);
+    return {
+        _id: String(request._id),
+        runId: String(request.runId),
+        stepId: String(request.stepId),
+        workflowId: request.workflowId || null,
+        title: request.title || '',
+        prompt: request.prompt || '',
+        status: request.status,
+        ownerUserId: request.ownerUserId ? String(request.ownerUserId) : null,
+        ownerName: names[String(request.ownerUserId)] || null,
+        ownerRole: request.ownerRole || null,
+        owners,
+        ownerNames: owners.map((id) => names[id] || null),
+        escalateToUserId: request.escalateToUserId ? String(request.escalateToUserId) : null,
+        escalateToName: names[String(request.escalateToUserId)] || null,
+        escalateAt: request.escalateAt || null,
+        escalatedAt: request.escalatedAt || null,
+        deadlineAt: request.deadlineAt || null,
+        onDeadline: request.onDeadline || 'fail',
+        decidedBy: request.decidedBy ? String(request.decidedBy) : null,
+        decidedByName: names[String(request.decidedBy)] || null,
+        decidedAt: request.decidedAt || null,
+        comment: request.comment || '',
+        reassignedBy: request.reassignedBy ? String(request.reassignedBy) : null,
+        reassignedAt: request.reassignedAt || null,
+        reassignments: (request.reassignments || []).map((move) => ({
+            ...move,
+            fromName: names[String(move.from)] || null,
+            toName: names[String(move.to)] || null,
+            byName: names[String(move.by)] || null,
+        })),
+        createdAt: request.createdAt || null,
+        context: request.context || {},
+        run: run ? { _id: String(run._id), name: run.name || '', workflowId: run.workflowId, status: run.status, startedBy: run.startedBy || null } : null,
+        step: step ? { stepId: step.stepId, type: step.type, status: step.status, waitUntil: step.waitUntil || null } : null,
+    };
+};
+
+const namesForApprovals = (rows) => people.namesOf(rows.flatMap((row) => [
+    row.ownerUserId, row.escalateToUserId, row.decidedBy, row.reassignedBy,
+    ...(row.owners || []), ...(row.reassignments || []).flatMap((move) => [move.from, move.to, move.by]),
+]));
+
+/* GET /api/v2/workflows/approvals?status=pending
+ * What a person is being asked to decide. A reader who is neither an Owner nor
+ * an Admin sees the ones they own and the ones on a run they may already read —
+ * the same visibility `readableRun` gives, so an approval never reveals a run
+ * the caller could not open for themselves. */
+exports.listApprovals = async (req, res) => {
+    try {
+        const ctx = await context(req, res);
+        if (!ctx) return undefined;
+        const status = String((req.query || {}).status || approvals.STATUS.PENDING);
+        const rows = (await approvals.listByStatus(ctx.companyId, status)) || [];
+        const names = await namesForApprovals(rows);
+        const out = [];
+        for (const request of rows) {
+            const run = await readableRun(ctx.companyId, ctx.caller, request.runId);
+            if (!run && !ownsApproval(ctx.caller, request)) continue;
+            const step = await store.getStep(ctx.companyId, request.runId, request.stepId);
+            out.push({ ...approvalRow(request, run, step, names), canDecide: mayDecide(ctx.caller, request) });
+        }
+        return ok(res, 'Approvals fetched.', out);
+    } catch (error) {
+        logger.error(`[workflow-api] listApprovals: ${error.message}`);
+        return fail(res, error.message, 500);
+    }
+};
+
 /* POST /api/v2/workflows/definitions
  * Saved disabled, whatever the body says: enabling is `PATCH …/enabled`, a
  * separate act by a person who has read the workflow back. */
@@ -432,6 +523,63 @@ exports.deleteDefinition = async (req, res) => {
     }
 };
 
+/* The approval a route is about, with the caller's standing on it settled. */
+const approvalContext = async (req, res) => {
+    const ctx = await context(req, res);
+    if (!ctx) return null;
+    if (!STEP_ID.test(String(req.params.stepId || ''))) { fail(res, 'A valid step id is required.'); return null; }
+    if (!OBJECT_ID.test(String(req.params.id || ''))) { fail(res, 'Approval not found.', 404); return null; }
+    const request = await approvals.get(ctx.companyId, req.params.id, req.params.stepId);
+    if (!request) { fail(res, 'Approval not found.', 404); return null; }
+    if (!mayDecide(ctx.caller, request)) {
+        fail(res, 'Only the owner of this approval, an Owner or an Admin can act on it.', 403);
+        return null;
+    }
+    return { ...ctx, request };
+};
+
+/* A decision reopens the run and puts it back on the queue, for the same reason
+ * a step control does: there is one way a run is moved forward. */
+const wake = async (companyId, runId) => {
+    await store.reopenRun(companyId, runId);
+    return queue.dispatch(companyId, runId);
+};
+
+const approvalAnswer = async (companyId, request, caller, statusText, res, extra = {}) => {
+    const names = await namesForApprovals([request]);
+    const run = await store.getRun(companyId, request.runId);
+    const step = await store.getStep(companyId, request.runId, request.stepId);
+    return ok(res, statusText, {
+        approval: { ...approvalRow(request, run, step, names), canDecide: mayDecide(caller, request) },
+        ...extra,
+    });
+};
+
+/* POST /api/v2/workflows/runs/:id/steps/:stepId/decide
+ * body: { decision: 'approved' | 'rejected', comment? } */
+exports.decideApproval = async (req, res) => {
+    try {
+        const ctx = await approvalContext(req, res);
+        if (!ctx) return undefined;
+        const decision = String((req.body || {}).decision || '');
+        if (!approvals.DECISIONS.includes(decision)) return fail(res, `decision must be one of ${approvals.DECISIONS.join(', ')}.`);
+        const decided = await approvals.decide(ctx.companyId, {
+            runId: req.params.id,
+            stepId: req.params.stepId,
+            decision,
+            decidedBy: ctx.caller.actor.userId,
+            comment: String((req.body || {}).comment || '').slice(0, REASON_MAX),
+        });
+        if (!decided) return fail(res, 'This approval has already been decided.', 409);
+        const dispatched = await wake(ctx.companyId, req.params.id);
+        const statusText = decision === approvals.STATUS.APPROVED ? 'Approved.' : 'Rejected.';
+        return approvalAnswer(ctx.companyId, decided, ctx.caller, statusText, res, { dispatched });
+    } catch (error) {
+        logger.error(`[workflow-api] decideApproval: ${error.message}`);
+        return fail(res, error.message, error.status || 500);
+    }
+};
+
 /* The real thing the author wants to try the workflow against, read rather than
  * touched. A task that is not there is an answer, not an error: the plan comes
  * back saying the input was not found. */
@@ -477,6 +625,33 @@ exports.dryRun = async (req, res) => {
         return ok(res, 'Dry run planned.', dryRun.plan({ steps, deadlineMs: body.deadlineMs, budgetUsd: body.budgetUsd, input }));
     } catch (error) {
         logger.error(`[workflow-api] dryRun: ${error.message}`);
+        return fail(res, error.message, error.status || 500);
+    }
+};
+
+/* POST /api/v2/workflows/runs/:id/steps/:stepId/reassign
+ * body: { toUserId, reason? }
+ * The handover is recorded rather than merely applied: who moved it, from whom,
+ * to whom and when, so a request that has travelled can say where it has been. */
+exports.reassignApproval = async (req, res) => {
+    try {
+        const ctx = await approvalContext(req, res);
+        if (!ctx) return undefined;
+        const toUserId = String((req.body || {}).toUserId || '');
+        if (!OBJECT_ID.test(toUserId)) return fail(res, 'A valid toUserId is required.');
+        if (toUserId === String(ctx.request.ownerUserId || '')) return fail(res, 'This approval is already theirs.', 409);
+        if ((await getRoleType(ctx.companyId, toUserId)) === null) return fail(res, 'That person is not a member of this company.');
+        const moved = await approvals.reassign(ctx.companyId, {
+            runId: req.params.id,
+            stepId: req.params.stepId,
+            toUserId,
+            by: ctx.caller.actor.userId,
+            reason: reasonOf(req),
+        });
+        if (!moved) return fail(res, 'This approval has already been decided or handed on.', 409);
+        return approvalAnswer(ctx.companyId, moved, ctx.caller, 'Approval reassigned.', res);
+    } catch (error) {
+        logger.error(`[workflow-api] reassignApproval: ${error.message}`);
         return fail(res, error.message, error.status || 500);
     }
 };

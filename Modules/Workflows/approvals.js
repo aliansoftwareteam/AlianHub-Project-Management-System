@@ -57,6 +57,10 @@ const listForOwner = (companyId, ownerUserId, status = STATUS.PENDING) => call(c
     { ownerUserId: String(ownerUserId), status }, null, { sort: { deadlineAt: 1, createdAt: 1 } },
 ], 'find');
 
+const listByStatus = (companyId, status = STATUS.PENDING) => call(companyId, [
+    status === 'all' ? {} : { status: String(status) }, null, { sort: { deadlineAt: 1, createdAt: 1 } },
+], 'find');
+
 const listDue = (companyId, now = new Date()) => call(companyId, [
     { status: STATUS.PENDING, $or: [{ deadlineAt: { $lte: now } }, { escalateAt: { $lte: now }, escalatedAt: null }] },
 ], 'find');
@@ -88,10 +92,28 @@ const escalate = async (companyId, { runId, stepId, toUserId, at = new Date() })
     return escalated || null;
 };
 
-const reassign = async (companyId, { runId, stepId, toUserId }) => {
+/* Handing the request to somebody else, with the handover itself on the row:
+ * who moved it, from whom, to whom and when. The compare-and-set carries the
+ * owner it read, so two people handing the same request on at once produce one
+ * move and one refusal rather than a `from` that was never true. */
+const reassign = async (companyId, { runId, stepId, toUserId, by, reason = '' }) => {
+    const current = await find(companyId, runId, stepId);
+    if (!current || current.status !== STATUS.PENDING) return null;
+    const from = current.ownerUserId ? String(current.ownerUserId) : null;
+    const at = new Date();
+    const handover = {
+        from,
+        to: String(toUserId),
+        by: by ? String(by) : 'system',
+        at,
+        reason: String(reason || '').slice(0, 500),
+    };
     const moved = await call(companyId, [
-        { runId: String(runId), stepId: String(stepId), status: STATUS.PENDING },
-        { $set: { ownerUserId: String(toUserId) }, $push: { owners: String(toUserId) } },
+        { runId: String(runId), stepId: String(stepId), status: STATUS.PENDING, ownerUserId: from },
+        {
+            $set: { ownerUserId: String(toUserId), reassignedBy: handover.by, reassignedAt: at },
+            $push: { owners: String(toUserId), reassignments: handover },
+        },
         { returnDocument: 'after' },
     ], 'findOneAndUpdate');
     return moved || null;
@@ -106,4 +128,4 @@ const expire = async (companyId, { runId, stepId, at = new Date() }) => {
     return expired || null;
 };
 
-module.exports = { STATUS, ON_DEADLINE, DECISIONS, open, get, listForOwner, listDue, decide, escalate, reassign, expire };
+module.exports = { STATUS, ON_DEADLINE, DECISIONS, open, get, listForOwner, listByStatus, listDue, decide, escalate, reassign, expire };

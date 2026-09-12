@@ -242,15 +242,15 @@ the reason — the feature is not refused, it is not running.
 | `PATCH /definitions/:id/enabled` | turns one on or off. Turning on re-validates the steps first |
 | `DELETE /definitions/:id` | soft-deletes one, turned off on the way out |
 | `POST /dry-run` | plans a definition against a real task or project and writes nothing |
+| `GET /approvals` | the approvals a person may see, with the owner, the deadline and the escalation path on each — what the AI Inbox reads |
+| `POST /runs/:id/steps/:stepId/decide` | approves or rejects the approval on that step, through the same compare-and-set the engine uses, then reopens the run |
+| `POST /runs/:id/steps/:stepId/reassign` | hands the approval to somebody else, recording who moved it, from whom and when on `reassignments` |
 
 `POST /runs` also takes `{ definitionId }`, and refuses one nobody has turned on.
-
 ## A saved workflow, and the builder that composes it
-
 A definition is `workflow_definitions` — a row of its own, separate from the runs
 that execute it, so editing a workflow cannot change a run already under way; a
 run still snapshots the graph it was started with.
-
 It is saved turned off and stays that way until somebody turns it on, which is
 what an automation rule already does and for the same reason: a workflow that
 starts spending the moment it is saved gives its author no chance to read it
@@ -258,18 +258,14 @@ back first. `enabled` is therefore never taken from a create or an update body �
 `PATCH …/enabled` is the only thing that moves it, and it re-validates the steps
 on the way, because the moment enabling means anything is the moment the
 workflow has to be runnable.
-
 The builder is `frontend/src/views/Workflows/WorkflowBuilderPage.vue`, the
 automation sentence builder one level up: every slot is drawn from `GET
 /step-types`, so a step type the engine does not know cannot be composed and a
 rule the engine enforces cannot be missing from the form. With the flag off the
 first call answers 503 and the screen says the engine is not running, rather than
 failing.
-
 ## The dry run
-
 `POST /dry-run` answers what a workflow would do, and does none of it.
-
 The definition goes through the same `stepTypes.validateSteps` a start does and
 the same ready-set scheduler the engine ticks, over step rows held in memory.
 What comes back is the order the steps would run in as waves, what each one
@@ -277,14 +273,19 @@ would be granted of the run's deadline and budget by `hop.allow`, which steps
 change something and which ask a person, which `$step.field` each one reads, any
 step refused before it could start, and any step that could never run at all
 because its dependencies form a cycle.
-
 The only database read is the task or project the author picked, and it is a
 read: no run row, no step row, no queue job, no audit row, and no executor is
 called. An invalid definition comes back as a plan that says so, with the field
 named — the dry run did its job when it told you the workflow is wrong.
-
 The answer is data rather than sentences, because every word the builder shows a
 person comes from the locale file.
+
+The three approval routes are the one place the manage rule is not the whole
+answer: an approval names an owner, and the owner decides it whatever their
+role. An Owner or an Admin may decide any of them, because they can already
+retry, skip and compensate the step the approval is holding; a past owner may
+not, because a request handed on is not theirs any more. Reading is the run's own
+visibility, plus the approvals the caller owns.
 
 Every control bumps the fencing token, because the worker whose attempt it
 overrides may still be alive; with a new token that worker's late write matches

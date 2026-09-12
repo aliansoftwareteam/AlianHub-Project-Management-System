@@ -1172,6 +1172,11 @@ const schema = {
         decidedBy: { type: String, required: false },
         decidedAt: { type: Date, required: false },
         comment: { type: String, required: false },
+        // Who handed the request on, and to whom: one entry per reassignment,
+        // in the order they happened.
+        reassignedBy: { type: String, required: false },
+        reassignedAt: { type: Date, required: false },
+        reassignments: { type: Array, default: [], required: false },
         context: { type: Object, default: {}, required: false },
     },
     /* Task 028 sprint 5. A workflow an author composed and saved, as opposed to

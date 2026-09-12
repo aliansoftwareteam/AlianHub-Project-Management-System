@@ -38,7 +38,11 @@ const mountView = async ({ run, steps, roleType = OWNER, status = true, httpStat
             plugins: [storeFor(roleType)],
             provide: { $userId: ref('u1'), $companyId: ref('c1') },
             mocks: { $t: echo },
-            stubs: { AiSidebar: true, EmptyState: { props: ['title', 'message'], template: '<div class="empty" :data-title="title"></div>' } }
+            stubs: {
+                AiSidebar: true,
+                RouterLink: { props: ['to'], template: '<a><slot /></a>' },
+                EmptyState: { props: ['title', 'message'], template: '<div class="empty" :data-title="title"></div>' }
+            }
         }
     });
     await flushPromises();
