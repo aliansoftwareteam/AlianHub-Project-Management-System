@@ -243,11 +243,47 @@ const refuseSession = (res, error, statusText = 'Unauthorized') => {
         isLogout: true
     });
 };
-
 const sessionsQuery = (uid, sid, method) => mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, {
     type: dbCollections.SESSIONS,
     data: [{ _id: new mongoose.Types.ObjectId(sid), userId: uid }]
 }, method);
+
+/**
+ * The session an access token names, or why it can no longer be used.
+ *
+ * The signature alone says nothing about whether the session still exists: logging out
+ * deletes the session row, and the token the browser (or an open socket) still holds keeps
+ * verifying until it expires. Anything that authenticates a caller from an access token —
+ * the HTTP middleware below and the socket handshake in socket/socketinit.js — resolves it
+ * through here so there is one answer, cached under one key, invalidated by one logout.
+ *
+ * Reasons: 'legacy' and 'rotated' mean the client should refresh; every other reason means
+ * the session is gone and the client should be signed out.
+ */
+const resolveAccessSession = async (payload) => {
+    const access = readAccessSession(payload);
+    if (access.kind === 'legacy') return { ok: false, reason: 'legacy' };
+    if (access.kind !== 'session') return { ok: false, reason: 'invalid' };
+    const { uid, sid, rti, sexp } = access;
+    const cacheKey = sessionCacheKey(uid, sid, rti);
+    if (sexp * 1000 <= Date.now()) {
+        myCache.del(cacheKey);
+        sessionsQuery(uid, sid, "deleteMany").catch((error) => logger.error(`Expired session remove error ${error.message || error}`));
+        return { ok: false, reason: 'expired', uid, sid };
+    }
+    if (myCache.get(cacheKey)) return { ok: true, uid, sid };
+    let session;
+    try {
+        session = await sessionsQuery(uid, sid, "findOne");
+    } catch (error) {
+        logger.error(`Session lookup error ${error.message || error}`);
+        return { ok: false, reason: 'unreadable', uid, sid };
+    }
+    if (!(session && session._id)) return { ok: false, reason: 'ended', uid, sid };
+    if (session.refreshTokenJti !== rti) return { ok: false, reason: 'rotated', uid, sid };
+    myCache.set(cacheKey, JSON.stringify({ _id: session._id, userId: uid }), SESSION_CACHE_SECONDS);
+    return { ok: true, uid, sid };
+};
 
 const checkToken = async (isValid, req, res, next) => {
     if (!isValid) {
@@ -256,9 +292,11 @@ const checkToken = async (isValid, req, res, next) => {
     }
     req.uid = isValid.uid;
     req.aud = isValid.aud;
-    const access = readAccessSession(isValid);
-    if (access.kind === 'legacy') return refuseForRefresh(res);
-    if (access.kind !== 'session') {
+    const session = await resolveAccessSession(isValid);
+    if (session.sid) req.sessionId = session.sid;
+    if (session.ok) return next();
+    if (session.reason === 'legacy' || session.reason === 'rotated') return refuseForRefresh(res);
+    if (session.reason === 'invalid') {
         res.clearCookie('accessToken');
         return res.status(401).json({
             status: false,
@@ -269,30 +307,9 @@ const checkToken = async (isValid, req, res, next) => {
             isLogout: true
         });
     }
-    const { uid, sid, rti, sexp } = access;
-    req.sessionId = sid;
-    const cacheKey = sessionCacheKey(uid, sid, rti);
-    if (sexp * 1000 <= Date.now()) {
-        myCache.del(cacheKey);
-        sessionsQuery(uid, sid, "deleteMany").catch((error) => logger.error(`Expired session remove error ${error.message || error}`));
-        return refuseSession(res, 'Refresh Token has expired', 'Refresh Token has expired');
-    }
-    if (!myCache.get(cacheKey)) {
-        let session;
-        try {
-            session = await sessionsQuery(uid, sid, "findOne");
-        } catch (error) {
-            logger.error(`Session lookup error ${error.message || error}`);
-            return refuseSession(res, "Your session is expired");
-        }
-        if (!(session && session._id)) return refuseSession(res, "Your session is expired");
-        if (session.refreshTokenJti !== rti) return refuseForRefresh(res);
-        myCache.set(cacheKey, JSON.stringify({ _id: session._id, userId: uid }), SESSION_CACHE_SECONDS);
-    }
-    return next();
-}
-
-/**
+    if (session.reason === 'expired') return refuseSession(res, 'Refresh Token has expired', 'Refresh Token has expired');
+    return refuseSession(res, "Your session is expired");
+}/**
  * Verify JWT Auth token is valid or not
  * @param {Object} req
  * @param {Object} res
@@ -669,6 +686,7 @@ module.exports = {
     verifyJWTToken: verifyJWTToken,
     verifyJWTTokenV2: verifyJWTTokenV2,
     verifyToken: verifyToken,
+    resolveAccessSession: resolveAccessSession,
     removeCacheAndCookie: removeCacheAndCookie,
     requireCompanyAud: requireCompanyAud,
     requireLiveCompanyMembership: requireLiveCompanyMembership,

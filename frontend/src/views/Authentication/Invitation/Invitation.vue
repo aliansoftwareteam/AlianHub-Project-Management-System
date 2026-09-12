@@ -135,7 +135,7 @@ onMounted(async () => {
     localStorage.setItem("companyId", companyIdRoute.value);
     localStorage.setItem("companyUserDocID", requestId.value);
     try {
-        const preview = await axios.post(env.API_URI + env.INVITATION_PREVIEW, { companyId: companyIdRoute.value, memberId: requestId.value });
+        const preview = await axios.post(env.API_URI + env.INVITATION_PREVIEW, { companyId: companyIdRoute.value, memberId: requestId.value, linkId: String(route.query.token || "") });
         if (!preview.data.status) { stage.value = "invalid"; return; }
         const invite = preview.data.data || {};
         workspaceName.value = invite.workspaceName || "";

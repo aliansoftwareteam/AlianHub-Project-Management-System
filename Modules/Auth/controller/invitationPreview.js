@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const logger = require('../../../Config/loggerConfig');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
@@ -5,18 +6,36 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const PENDING = 1;
 
+/**
+ * The link token the invitation email carries, checked by exact match.
+ *
+ * An invitation id alone used to be enough to read who was invited, which anyone could
+ * guess or replay. Invitations sent before the link carried a token stored an empty
+ * `linkId`: those keep answering without one, because the link already in someone's inbox
+ * has no token to present. Every invitation sent from now on has one and must present it.
+ */
+const linkTokenAccepted = (stored, provided) => {
+    const expected = Buffer.from(String(stored || ''));
+    if (!expected.length) return true;
+    const given = Buffer.from(String(provided || ''));
+    return given.length === expected.length && crypto.timingSafeEqual(given, expected);
+};
+
+exports.linkTokenAccepted = linkTokenAccepted;
+
 /* The invitation page runs before the invitee has an account, so it gets only the fields
  * it renders; the email is withheld once the invitation is no longer pending. */
 exports.invitationPreview = async (req, res) => {
     try {
-        const { companyId, memberId } = req.body || {};
+        const { companyId, memberId, linkId } = req.body || {};
         if (!OBJECT_ID_PATTERN.test(String(companyId || '')) || !OBJECT_ID_PATTERN.test(String(memberId || ''))) {
             return res.send({ status: false, statusText: 'Invalid invitation link.' });
         }
         const company = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: [{ _id: companyId }, { Cst_CompanyName: 1 }] }, 'findOne');
         if (!company) return res.send({ status: false, statusText: 'Invalid invitation link.' });
-        const member = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [{ _id: memberId }, { status: 1, userEmail: 1 }] }, 'findOne');
+        const member = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [{ _id: memberId }, { status: 1, userEmail: 1, linkId: 1 }] }, 'findOne');
         if (!member) return res.send({ status: false, statusText: 'Invalid invitation link.' });
+        if (!linkTokenAccepted(member.linkId, linkId)) return res.send({ status: false, statusText: 'Invalid invitation link.' });
         return res.send({
             status: true,
             statusText: 'Invitation found.',
