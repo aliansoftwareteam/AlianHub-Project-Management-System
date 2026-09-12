@@ -1,7 +1,7 @@
 ---
 id: 023
 title: Sprint 0 — stop the bleeding: exploitable findings and cost correctness
-status: active
+status: done
 priority: high
 depends_on: []
 created: 2026-09-10
@@ -9,7 +9,7 @@ created: 2026-09-10
 
 # 023 — Sprint 0 — stop the bleeding: exploitable findings and cost correctness
 
-Status: active · sprint 0 · one week · branch `feat/sprint-0-stop-the-bleeding` (from `beta`)
+Status: done · sprint 0 · one week · branch `feat/sprint-0-stop-the-bleeding` (from `beta`)
 
 Source: `docs/AI-PLATFORM-ARCHITECTURE.md`, "Development and integration plan", Sprint 0. Filed 2026-09-10.
 
