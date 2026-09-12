@@ -25,7 +25,9 @@ const { handleFileUploadForTrackerSS,handleuploadMainFileForbase64Thumbnail } = 
  * @returns
  */
 const { updateProjectForTimelog, findAndUpdateProjectOrTaskStartDate, updateRemainingTime } = require('./helpers');
+const { pinSessionTenant } = require('../../../Config/tenant');
 exports.timeTrackerStart = (req, res) => {
+    if (!pinSessionTenant(req, res)) return;
     if (!(req.body && req.body.description)) {
         res.send({
             status: false,
@@ -51,13 +53,6 @@ exports.timeTrackerStart = (req, res) => {
         res.send({
             status: false,
             statusText: `TaskId is required`
-        })
-        return;
-    }
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: `CompanyId is required`
         })
         return;
     }
@@ -107,6 +102,7 @@ exports.timeTrackerStart = (req, res) => {
  */
 
 exports.timeTrackerStart2 = (req, res) => {
+    if (!pinSessionTenant(req, res)) return;
     if (!(req.body && req.body.description)) {
         res.send({
             status: false,
@@ -135,17 +131,8 @@ exports.timeTrackerStart2 = (req, res) => {
         })
         return;
     }
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: `CompanyId is required`
-        })
-        return;
-    }
     const utcDateTime = DateTime.utc();
     const timeStamp = Math.floor(utcDateTime.toSeconds());
-    // console.log(req.body.considerActionTime,"req.body.considerActionTime",req.body.actionTime);
-    
     let companyId = req.body.companyId
     let type = req.body.type || SCHEMA_TYPE.TIMESHEET
     let data = {
@@ -218,17 +205,11 @@ exports.timeTrackerStart2 = (req, res) => {
  */
 
 exports.endTimeTracker = (req, res) => {
+    if (!pinSessionTenant(req, res)) return;
     if (!(req.body && req.body.timeSheetId)) {
         res.send({
             status: false,
             statusText: "timeSheetId is required"
-        })
-        return;
-    }
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: "companyId is required"
         })
         return;
     }

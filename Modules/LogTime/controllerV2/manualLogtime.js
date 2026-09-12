@@ -26,7 +26,9 @@ const { handleFileUploadForTrackerSS,handleuploadMainFileForbase64Thumbnail } = 
  */
 const { updateProjectForTimelog, findAndUpdateProjectOrTaskStartDate, updateRemainingTime } = require('./helpers');
 const { isPeriodLocked } = require('../../TimesheetApproval/helpers/lockGuard');
+const { pinSessionTenant } = require('../../../Config/tenant');
 exports.manualLogTime = async (req, res) => {
+    if (!pinSessionTenant(req, res)) return;
     if (!(req.body && req.body.logTimeDate)) {
         res.send({
             status: false,
@@ -73,14 +75,6 @@ exports.manualLogTime = async (req, res) => {
         res.send({
             status: false,
             statusText: "ProjectId is required"
-        })
-        return;
-    }
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            // BUG-028 / #82 fix: was copy-paste error "ProjectId is required".
-            statusText: "CompanyId is required"
         })
         return;
     }
@@ -368,13 +362,7 @@ const getTimeStamp = (timezone, date, time) => {
  */
 
 exports.deleteManualLogtime = async (req, res) => {
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: "CompanyId is required"
-        })
-        return;
-    }
+    if (!pinSessionTenant(req, res)) return;
     if (!(req.body && req.body.timeSheetId)) {
         res.send({
             status: false,

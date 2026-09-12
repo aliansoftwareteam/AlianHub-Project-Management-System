@@ -1,4 +1,4 @@
-const { tenantOf, sessionTenantOf, TenantError } = require('../Config/tenant');
+const { tenantOf, sessionTenantOf, pinSessionTenant, TenantError } = require('../Config/tenant');
 
 const COMPANY = '64b1f0c2a1b2c3d4e5f60718';
 const OTHER = '64b1f0c2a1b2c3d4e5f60719';
@@ -50,5 +50,48 @@ describe('sessionTenantOf', () => {
         ['query', { headers: { companyid: COMPANY }, query: { companyId: OTHER } }],
     ])('refuses a %s that names a second company', (_label, req) => {
         expect(() => sessionTenantOf({ ...req, aud: `${COMPANY},${OTHER}` })).toThrow(TenantError);
+    });
+});
+
+describe('pinSessionTenant', () => {
+    const spyRes = () => {
+        const res = { statusCode: 0, payload: null };
+        res.status = (code) => { res.statusCode = code; return res; };
+        res.send = (payload) => { res.payload = payload; return res; };
+        return res;
+    };
+
+    it('pins the body to the header and returns the company', () => {
+        const req = { headers: { companyid: COMPANY }, body: { companyId: COMPANY, CompanyId: COMPANY }, aud: COMPANY };
+        const res = spyRes();
+        expect(pinSessionTenant(req, res)).toBe(COMPANY);
+        expect(req.body).toEqual({ companyId: COMPANY, CompanyId: COMPANY });
+        expect(res.statusCode).toBe(0);
+    });
+
+    it('fills in a body that names no company', () => {
+        const req = { headers: { companyid: COMPANY }, body: { description: 'work' }, aud: COMPANY };
+        expect(pinSessionTenant(req, spyRes())).toBe(COMPANY);
+        expect(req.body.companyId).toBe(COMPANY);
+        expect(req.body.CompanyId).toBeUndefined();
+    });
+
+    it.each([
+        ['companyId', { companyId: OTHER }],
+        ['CompanyId', { CompanyId: OTHER }],
+    ])('answers 403 and leaves the body alone when %s names another company', (_label, body) => {
+        const req = { headers: { companyid: COMPANY }, body, aud: `${COMPANY},${OTHER}` };
+        const res = spyRes();
+        expect(pinSessionTenant(req, res)).toBe('');
+        expect(res.statusCode).toBe(403);
+        expect(res.payload.status).toBe(false);
+        expect(req.body).toEqual(body);
+    });
+
+    it('answers 403 when the body carries an object instead of a company id', () => {
+        const req = { headers: {}, body: { companyId: { $ne: null } } };
+        const res = spyRes();
+        expect(pinSessionTenant(req, res)).toBe('');
+        expect(res.statusCode).toBe(403);
     });
 });

@@ -10,16 +10,14 @@ const mongoose = require("mongoose")
 const { settingsCollectionDocs } = require("../../../Config/collections");
 
 const { addMilestoneHistoryNotification, updateMilestoneNotification, deleteMilestoneNotification, addMilestoneHistory, updateMilestoneHistory } = require('./helpers');
+const { pinSessionTenant } = require('../../../Config/tenant');
 exports.addMilestone = async (req, res) => {
     try{
         if(!req.body){
             res.send({status: false, statusText: 'Request body is required'});
             return;
         }
-        if(!req.body.companyId){
-            res.send({status: false, statusText: 'Company Id is required'});
-            return;
-        }
+        if (!pinSessionTenant(req, res)) return;
         if(!req.body.projectId){
             res.send({status: false, statusText: 'project Id is required'});
             return;
@@ -130,10 +128,7 @@ exports.updateMilestone = async (req, res) => {
             res.send({status: false, statusText: 'Request body is required'});
             return;
         }
-        if(!req.body.companyId){
-            res.send({status: false, statusText: 'Company Id is required'});
-            return;
-        }
+        if (!pinSessionTenant(req, res)) return;
         if(!req.body.projectId){
             res.send({status: false, statusText: 'project Id is required'});
             return;
@@ -254,10 +249,7 @@ exports.deleteMilestone = async (req, res) => {
             res.send({status: false, statusText: 'Request body is required'});
             return;
         }
-        if(!req.body.companyId){
-            res.send({status: false, statusText: 'Company Id is required'});
-            return;
-        }
+        if (!pinSessionTenant(req, res)) return;
         if(!req.body.projectId){
             res.send({status: false, statusText: 'project Id is required'});
             return;

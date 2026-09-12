@@ -10,16 +10,14 @@ const mongoose = require("mongoose")
 const { settingsCollectionDocs } = require("../../../Config/collections");
 
 const { clearMilestoneStatusNotification } = require('./helpers');
+const { pinSessionTenant } = require('../../../Config/tenant');
 exports.clearMilestoneStatus = async (req, res) => {
     try {
         if(!req.body){
             res.send({status: false, statusText: 'Request body is required'});
             return;
         }
-        if(!req.body.companyId){
-            res.send({status: false, statusText: 'Company Id is required'});
-            return;
-        }
+        if (!pinSessionTenant(req, res)) return;
         if(!req.body.projectId){
             res.send({status: false, statusText: 'project Id is required'});
             return;
@@ -104,10 +102,7 @@ exports.cancelMilestoneStatus = async (req, res) => {
             res.send({status: false, statusText: 'Request body is required'});
             return;
         }
-        if(!req.body.companyId){
-            res.send({status: false, statusText: 'Company Id is required'});
-            return;
-        }
+        if (!pinSessionTenant(req, res)) return;
         if(!req.body.projectId){
             res.send({status: false, statusText: 'project Id is required'});
             return;
@@ -194,10 +189,7 @@ exports.refundAmount = async (req, res) => {
             res.send({status: false, statusText: 'Request body is required'});
             return;
         }
-        if(!req.body.companyId){
-            res.send({status: false, statusText: 'Company Id is required'});
-            return;
-        }
+        if (!pinSessionTenant(req, res)) return;
         if(!req.body.projectId){
             res.send({status: false, statusText: 'project Id is required'});
             return;
@@ -282,10 +274,7 @@ exports.draggableMilestone = async (req, res) => {
             res.send({status: false, statusText: 'Request body is required'});
             return;
         }
-        if(!req.body.companyId){
-            res.send({status: false, statusText: 'Company Id is required'});
-            return;
-        }
+        if (!pinSessionTenant(req, res)) return;
         if(!req.body.projectId){
             res.send({status: false, statusText: 'project Id is required'});
             return;
