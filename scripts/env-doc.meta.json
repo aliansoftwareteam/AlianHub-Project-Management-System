@@ -932,5 +932,33 @@
     "group": "ai",
     "description": "optional: override the Google axios timeout (default: LLM_TIMEOUT_MS for thinking models, 4 min for the rest)",
     "default": "600000"
+  },
+  "WORKFLOW_ENGINE": {
+    "group": "jobs",
+    "description": "Durable workflow runs for automation rules: \"off\" runs a rule through the automation runner exactly as before, \"on\" makes it a one-node workflow run with a lease, a claim and engine-scheduled retries.",
+    "default": "off"
+  },
+  "WORKFLOW_LEASE_MS": {
+    "group": "jobs",
+    "description": "How long a claimed workflow step run keeps its lease before another worker may reclaim it. Defaults to the agent run lock, so the two cannot drift."
+  },
+  "WORKFLOW_HEARTBEAT_MS": {
+    "group": "jobs",
+    "description": "How often a running workflow step renews its lease. Defaults to a third of WORKFLOW_LEASE_MS."
+  },
+  "WORKFLOW_TENANT_CONCURRENCY": {
+    "group": "jobs",
+    "description": "Workflow step runs one tenant may have claimed at once, counted across every worker.",
+    "default": "5"
+  },
+  "WORKFLOW_MAX_ATTEMPTS": {
+    "group": "jobs",
+    "description": "Attempts a workflow step gets before a transient failure is given up on.",
+    "default": "3"
+  },
+  "WORKFLOW_BACKOFF_MS": {
+    "group": "jobs",
+    "description": "Comma-separated backoff ladder, in milliseconds, a transient workflow step failure waits between attempts.",
+    "default": "30000,120000,600000"
   }
 }

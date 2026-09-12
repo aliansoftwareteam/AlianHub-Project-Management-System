@@ -142,6 +142,9 @@ auditLogsSchema.index({ createdAt: -1 });
 auditLogsSchema.index({ actorId: 1, createdAt: -1 });
 auditLogsSchema.index({ entityType: 1, entityId: 1, createdAt: -1 });
 auditLogsSchema.index({ action: 1, createdAt: -1 });
+// Action-level idempotency (028): a replayed step opens no second row, so the
+// row's own state is what says whether the effect already happened.
+auditLogsSchema.index({ 'meta.idempotencyKey': 1 }, { unique: true, partialFilterExpression: { 'meta.idempotencyKey': { $type: 'string' } } });
 const scimConfigsSchema = new Schema(schema.scimConfigs, {strict: true, timestamps: true});
 const ptoEntriesSchema = new Schema(schema.ptoEntries, {strict: true, timestamps: true});
 ptoEntriesSchema.index({ userId: 1, startDate: 1 });
@@ -175,6 +178,24 @@ automationRunsSchema.index({ ruleId: 1, eventId: 1 }, { unique: true });
 automationRunsSchema.index({ startedAt: -1 });
 automationRunsSchema.index({ status: 1, startedAt: -1 });
 automationRunsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 });
+
+const workflowRunsSchema = new Schema(schema.workflowRuns, {strict: true, timestamps: true});
+// Same job the automation index does, one level up: a redelivered trigger loses
+// the insert instead of starting a second run of the same workflow.
+workflowRunsSchema.index({ dedupeKey: 1 }, { unique: true, partialFilterExpression: { dedupeKey: { $type: 'string' } } });
+workflowRunsSchema.index({ status: 1, startedAt: -1 });
+workflowRunsSchema.index({ workflowId: 1, startedAt: -1 });
+workflowRunsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 });
+
+const workflowStepRunsSchema = new Schema(schema.workflowStepRuns, {strict: true, timestamps: true});
+// The unique index on run and step. One row per step of a run means a step can
+// only ever be claimed by winning the compare-and-set on that one row.
+workflowStepRunsSchema.index({ runId: 1, stepId: 1 }, { unique: true });
+workflowStepRunsSchema.index({ runId: 1, status: 1 });
+// The reclaim scan and the per-tenant claim count both read this one.
+workflowStepRunsSchema.index({ status: 1, leaseExpiresAt: 1 });
+workflowStepRunsSchema.index({ status: 1, nextAttemptAt: 1 });
+workflowStepRunsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 });
 
 const agentFindingsSchema = new Schema(schema.agentFindings, {strict: true, timestamps: true});
 // The dedup key. Unique, so a concurrent second run cannot race in a duplicate.
@@ -360,6 +381,8 @@ module.exports = {
     automationRulesSchema,
     automationEventLogSchema,
     automationRunsSchema,
+    workflowRunsSchema,
+    workflowStepRunsSchema,
     agentFindingsSchema,
     agentsSchema,
     agentRunsSchema,

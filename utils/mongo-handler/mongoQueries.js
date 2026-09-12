@@ -89,6 +89,8 @@ const {
     automationRulesSchema,
     automationEventLogSchema,
     automationRunsSchema,
+    workflowRunsSchema,
+    workflowStepRunsSchema,
     agentFindingsSchema,
     agentsSchema,
     agentRunsSchema,
@@ -286,6 +288,10 @@ exports.checkType = (type) => {
             return automationEventLogSchema
         case SCHEMA_TYPE.AUTOMATION_RUNS:
             return automationRunsSchema
+        case SCHEMA_TYPE.WORKFLOW_RUNS:
+            return workflowRunsSchema
+        case SCHEMA_TYPE.WORKFLOW_STEP_RUNS:
+            return workflowStepRunsSchema
         case SCHEMA_TYPE.AGENT_FINDINGS:
             return agentFindingsSchema
         case SCHEMA_TYPE.AGENTS:
@@ -502,6 +508,10 @@ exports.tableType = (type) => {
                 return `${dbCollections.AUTOMATION_EVENT_LOG}`
         case SCHEMA_TYPE.AUTOMATION_RUNS:
                 return `${dbCollections.AUTOMATION_RUNS}`
+        case SCHEMA_TYPE.WORKFLOW_RUNS:
+                return `${dbCollections.WORKFLOW_RUNS}`
+        case SCHEMA_TYPE.WORKFLOW_STEP_RUNS:
+                return `${dbCollections.WORKFLOW_STEP_RUNS}`
         case SCHEMA_TYPE.AGENT_FINDINGS:
                 return `${dbCollections.AGENT_FINDINGS}`
         case SCHEMA_TYPE.AGENTS:

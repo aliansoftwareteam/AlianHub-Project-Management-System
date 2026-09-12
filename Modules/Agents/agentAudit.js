@@ -94,7 +94,7 @@ const baseMeta = (actor) => {
 
 /* Opens the row for an allowed agent call before anything is mutated. Throws
  * AuditUnavailableError, and the caller must not act. */
-const openAction = async (companyId, actor, { action, reason, params, cost, entityType, entityId, entityName, ip }) => {
+const openAction = async (companyId, actor, { action, reason, params, cost, entityType, entityId, entityName, ip, idempotencyKey }) => {
     const a = attribution(actor);
     try {
         return await write(companyId, {
@@ -102,7 +102,8 @@ const openAction = async (companyId, actor, { action, reason, params, cost, enti
             action: ACTION_DONE,
             entityType: entityType || 'task', entityId: entityId ? String(entityId) : '', entityName: entityName || '',
             meta: { ...baseMeta(actor), action, reason: reason || '', params: safeParams(params), cost: cost || null,
-                    state: STATE.PENDING, undo: null, undoable: false, undoneAt: null, undoneBy: null },
+                    state: STATE.PENDING, undo: null, undoable: false, undoneAt: null, undoneBy: null,
+                    ...(idempotencyKey ? { idempotencyKey: String(idempotencyKey) } : {}) },
         });
     } catch (e) {
         logger.error(`agent audit: ${AUDIT_UNAVAILABLE} for ${action}: ${e.message}`);
@@ -208,6 +209,12 @@ const markUndone = async (companyId, auditId, byActorId) => {
     }, 'updateOne').catch((e) => logger.error(`markUndone: ${e.message}`));
 };
 
+/* The unique partial index on meta.idempotencyKey makes this the one row for an
+ * action key; its state says whether the effect already happened. */
+const findByIdempotencyKey = (companyId, idempotencyKey) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ 'meta.idempotencyKey': String(idempotencyKey) }],
+}, 'findOne');
+
 const findById = async (companyId, auditId) => {
     const filter = rowFilter(auditId);
     if (!filter) return null;
@@ -217,5 +224,5 @@ const findById = async (companyId, auditId) => {
 module.exports = {
     ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED, AGENT_DELETED, RUN_REVERTED, REVISION_PROMOTED, REVISION_ROLLED_BACK, STATE, AUDIT_UNAVAILABLE, AUDIT_UNMARKED,
     AuditUnavailableError, AuditUnmarkedError,
-    openAction, applyAction, failAction, recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentDeleted, recordRunReverted, recordRevisionChange, markUndone, findById,
+    openAction, applyAction, failAction, recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentDeleted, recordRunReverted, recordRevisionChange, markUndone, findById, findByIdempotencyKey,
 };
