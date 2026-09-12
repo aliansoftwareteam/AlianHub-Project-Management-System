@@ -11,7 +11,8 @@
 </template>
 
 <script setup>
-import { inject, onMounted, ref } from "vue";
+import { inject, ref } from "vue";
+import { useRoute } from "vue-router";
 import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutCompnay } from "@/services";
@@ -20,16 +21,21 @@ import * as env from "@/config/env";
 defineOptions({ name: "TrackerLoginPage" });
 
 const userId = inject("$userId");
+const route = useRoute();
 const opening = ref(false);
 const failed = ref(false);
 
-// Each code works once, so every attempt to open the tracker asks for a fresh one.
+// The code is issued on a click, never on page load, so a page that sends a signed-in browser
+// here cannot mint one on its own. Each code works once, so every attempt asks for a fresh one.
+// The challenge comes from the tracker that opened this page; the server then only hands the
+// session to whoever can present the matching verifier (PKCE).
 const redirect = async () => {
     if (opening.value) return;
     opening.value = true;
     failed.value = false;
     try {
-        const response = await apiRequestWithoutCompnay("post", env.TRACKER_CODE, {});
+        const codeChallenge = route?.query?.code_challenge;
+        const response = await apiRequestWithoutCompnay("post", env.TRACKER_CODE, codeChallenge ? { codeChallenge } : {});
         const code = response?.data?.data?.code;
         if (!code) throw new Error("No tracker sign-in code");
         window.location.href = `myapp://authorize?client_id=${encodeURIComponent(userId.value)}&code=${encodeURIComponent(code)}`;
@@ -39,7 +45,6 @@ const redirect = async () => {
         opening.value = false;
     }
 };
-onMounted(redirect);
 </script>
 
 <style>
