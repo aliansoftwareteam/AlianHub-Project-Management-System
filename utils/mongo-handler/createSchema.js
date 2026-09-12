@@ -208,6 +208,11 @@ const workflowApprovalsSchema = new Schema(schema.workflowApprovals, {strict: tr
 workflowApprovalsSchema.index({ runId: 1, stepId: 1 }, { unique: true });
 // The escalation and deadline sweeps read this one.
 workflowApprovalsSchema.index({ status: 1, deadlineAt: 1 });
+
+const workflowDefinitionsSchema = new Schema(schema.workflowDefinitions, {strict: true, timestamps: true});
+// What the builder lists: the company's workflows, most recently edited first.
+workflowDefinitionsSchema.index({ deletedStatusKey: 1, updatedAt: -1 });
+workflowDefinitionsSchema.index({ enabled: 1, updatedAt: -1 });
 workflowApprovalsSchema.index({ ownerUserId: 1, status: 1 });
 workflowApprovalsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 });
 
@@ -403,6 +408,7 @@ module.exports = {
     workflowRunsSchema,
     workflowStepRunsSchema,
     workflowApprovalsSchema,
+    workflowDefinitionsSchema,
     agentFindingsSchema,
     agentsSchema,
     agentRunsSchema,
