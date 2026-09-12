@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { myCache } = require('../../../Config/config');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const logger = require('../../../Config/loggerConfig');
+const { teamIdentitiesKey } = require('../../Teams/cacheKeys');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const TEAM_PREFIX = 'tId_';
@@ -16,10 +17,10 @@ const asObjectIds = (ids) => (ids || [])
 /* A sprint's AssigneeUserId holds user ids and `tId_<teamId>` entries, so membership is
  * decided against the caller's own identities rather than their user id alone. Expanding
  * the caller's teams once per company and user costs a single query instead of one per
- * sprint; the key carries "teams" so Modules/Teams' removeCache('teams', true) drops it
- * as soon as a membership changes. */
+ * sprint; the key sits under Modules/Teams' own `teams:<companyId>:` prefix so a team
+ * write drops it as soon as a membership changes, and never reaches another company. */
 const sprintIdentities = async (companyId, uid) => {
-    const key = `teams:sprintIdentities:${companyId}:${uid}`;
+    const key = teamIdentitiesKey(companyId, uid);
     const cached = myCache.get(key);
     if (cached !== undefined) return cached;
     const teams = await MongoDbCrudOpration(companyId, {
