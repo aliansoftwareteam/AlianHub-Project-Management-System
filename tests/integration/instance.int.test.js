@@ -561,8 +561,19 @@ describe('common, admin and api docs', () => {
     });
 
     it('refuses the connections list without the preset key', async () => {
-        const res = await anonymous.get('/connections/not-the-key');
-        expect(res.body).toBe('Unauthorized');
+        const res = await anonymous.get('/connections', { headers: { 'x-preset-key': 'not-the-key' } });
+        expect(res.status).toBe(401);
+        expect(res.body.status).toBe(false);
+    });
+
+    it('QA-13 sends a preset key in the URL back unread, so it cannot leak through a log', async () => {
+        for (const path of ['/connections/not-the-key', '/api/v1/setPresetCompany/not-the-key']) {
+            const res = await anonymous.get(path);
+            expect(res.status).toBe(400);
+            expect(String(res.body.message)).toMatch(/x-preset-key/);
+        }
+        const started = await anonymous.post('/api/v1/setPresetCompany', {});
+        expect(started.status).toBe(401);
     });
 
     it('serves the API docs', async () => {
