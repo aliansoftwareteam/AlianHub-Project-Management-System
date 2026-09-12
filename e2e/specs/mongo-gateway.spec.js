@@ -22,9 +22,10 @@ test.describe('invitation page while signed out', () => {
             email, companyId: state.companyId, companyName: 'E2E Workspace', role: 3, designation: 0,
         });
         const memberId = invite.body.data._id;
+        const token = invite.body.data.linkId;
 
         const preview = page.waitForResponse((res) => res.url().includes('/api/v2/auth/invitation-preview'));
-        await page.goto(`/#/invitation?companyId=${state.companyId}-${memberId}`);
+        await page.goto(`/#/invitation?companyId=${state.companyId}-${memberId}&token=${token}`);
         expect((await preview).status()).toBe(200);
         await expect(page.locator('#inv-email')).toHaveText(email);
     });
