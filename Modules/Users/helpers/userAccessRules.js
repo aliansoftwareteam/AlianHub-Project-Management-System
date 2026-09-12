@@ -11,6 +11,14 @@ const SELF_FIELDS = [
     'isEmailVerified', 'isProductOwner', 'tour', 'lastSelectedCompany', 'customerId', 'customerIds',
     'homeChecklist', 'localePreferences', 'agentAccount', 'demo',
 ];
+// What a pre-authentication answer may carry: the sign-in, OAuth and sign-up screens read
+// these, and the caller is only as trusted as the password or invite they arrived with, so
+// the billing and ownership fields of the self view stay out of it.
+const AUTH_FIELDS = [
+    '_id', 'Employee_Email', 'Employee_FName', 'Employee_LName', 'Employee_Name',
+    'Employee_profileImage', 'Employee_profileImageURL', 'Time_Format', 'Time_Zone',
+    'isActive', 'isEmailVerified', 'AssignCompany', 'languageCode', 'createdAt', 'updatedAt',
+];
 const SELF_WRITABLE = [
     'isOnline', 'lastActive', 'lastSelectedCompany', 'tour', 'homeChecklist', 'presence', 'languageCode',
     'localePreferences', 'updatedAt', 'Employee_FName', 'Employee_LName', 'Employee_Name',
@@ -32,6 +40,8 @@ const pick = (doc, fields) => {
 };
 
 const toSelfView = (doc) => pick(doc, SELF_FIELDS);
+
+const toAuthView = (doc) => (doc ? pick(doc, AUTH_FIELDS) : null);
 
 const toMemberView = (doc, sharedCompanyIds) => {
     const view = pick(doc, MEMBER_FIELDS);
@@ -120,9 +130,11 @@ const sanitizeUpdateOptions = (options) => (options && options.returnDocument ==
 module.exports = {
     MEMBER_FIELDS,
     SELF_FIELDS,
+    AUTH_FIELDS,
     SELF_WRITABLE,
     isObjectId,
     toSelfView,
+    toAuthView,
     toMemberView,
     sharedCompanies,
     sanitizeUserQuery,
