@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const { buildClientView } = require('../helpers/clientProjection');
+const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const billing = require('./billing');
 
 // Client view (handoff 19d). The ONE place the guest payload is assembled.
@@ -14,7 +15,7 @@ const billing = require('./billing');
 // added to the schema next.
 
 const MAX_MESSAGE = 2000;
-const { companyOf, actorId, isObjectIdString, toEpoch, DONE_STATUS_TYPE } = billing;
+const { actorId, isObjectIdString, toEpoch, DONE_STATUS_TYPE } = billing;
 
 const signedOff = (milestone) => Boolean(milestone.signOffAt)
     || milestone.billingState === 'paid'
@@ -101,15 +102,16 @@ const buildClientPayload = async (companyId, projectId) => {
  * no richer variant of this endpoint to accidentally serve. */
 exports.getClientView = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const projectId = String((req.query && req.query.projectId) || '');
-        if (!companyId || !isObjectIdString(projectId)) {
-            return res.send({ status: false, statusText: 'companyId and a valid projectId are required.' });
+        if (!isObjectIdString(projectId)) {
+            return res.send({ status: false, statusText: 'A valid projectId is required.' });
         }
         const data = await buildClientPayload(companyId, projectId);
         if (!data) return res.send({ status: false, statusText: 'Project not found.' });
         return res.send({ status: true, statusText: 'OK', data });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in get client view: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -119,12 +121,12 @@ exports.getClientView = async (req, res) => {
  * Posts into the project channel, which is where the mock says it goes. */
 exports.postClientMessage = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const uid = actorId(req);
         const projectId = String((req.body && req.body.projectId) || '');
         const message = String((req.body && req.body.message) || '').trim();
-        if (!companyId || !isObjectIdString(projectId) || !uid) {
-            return res.send({ status: false, statusText: 'companyId, a valid projectId and an authenticated user are required.' });
+        if (!isObjectIdString(projectId) || !uid) {
+            return res.send({ status: false, statusText: 'A valid projectId and an authenticated user are required.' });
         }
         if (!message) return res.send({ status: false, statusText: 'Write a message first.' });
 
@@ -150,6 +152,7 @@ exports.postClientMessage = async (req, res) => {
         socketEmitter.emit('update', { type: 'add', data: saved, module: 'comments' });
         return res.send({ status: true, statusText: 'Message sent.', data: { _id: String(saved && saved._id) } });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in post client message: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }

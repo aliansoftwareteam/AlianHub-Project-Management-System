@@ -116,7 +116,9 @@ exports.init = (app) => {
      */
 	app.post("/api/v2/company/create", upload.single("file"), ctrl.createCompanyV2);
 	app.get("/api/v1/freeCompanyCount/:userId", ctrl.checkFreeCompanyCountsApi);
-	app.post("/api/v2/company/delete", ctrl.deleteCompany);
+	// The audience is frozen at login, so the membership re-check is what stops a removed
+	// member reaching a handler that drops the whole database.
+	app.post("/api/v2/company/delete", requireLiveCompanyMembership, ctrl.deleteCompany);
     app.get('/company-create/events/:id', (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
