@@ -174,6 +174,7 @@ const rawGroups = computed(() => [
             { key: "instance-backups", text: t("Instance.nav_backups"), icon: "download", to: to("InstanceBackups"), names: ["InstanceBackups"], show: instanceAdmin.value === true },
             { key: "instance-upgrade", text: t("Instance.nav_upgrade"), icon: "refresh", to: to("InstanceUpgrade"), names: ["InstanceUpgrade"], show: instanceAdmin.value === true },
             { key: "instance-logs", text: t("Instance.nav_logs"), icon: "file", to: to("InstanceLogs"), names: ["InstanceLogs"], show: instanceAdmin.value === true },
+            { key: "instance-providers", text: t("Providers.nav"), icon: "ai", to: to("InstanceProviders"), names: ["InstanceProviders"], show: instanceAdmin.value === true },
             { key: "instance-stats", text: t("Instance.nav_stats"), icon: "reports", to: to("InstanceStats"), names: ["InstanceStats"], show: instanceAdmin.value === true }
         ]
     }

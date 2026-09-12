@@ -853,6 +853,66 @@
     "description": "model router: \"on\" lets a caller pick the provider and model per call; default \"off\" keeps the single configured provider answering everything",
     "default": "off"
   },
+  "AI_ROUTER_HEALTH_WINDOW_MS": {
+    "group": "ai",
+    "description": "how far back the per-provider health window looks when computing success rate, latency and the breaker",
+    "default": "300000"
+  },
+  "AI_ROUTER_HEALTH_SAMPLES": {
+    "group": "ai",
+    "description": "most recent calls kept per provider and model in the health window",
+    "default": "50"
+  },
+  "AI_ROUTER_BREAKER_VOLUME": {
+    "group": "ai",
+    "description": "calls needed in the health window before the circuit breaker may open, so one bad call cannot trip it",
+    "default": "5"
+  },
+  "AI_ROUTER_BREAKER_THRESHOLD": {
+    "group": "ai",
+    "description": "share of provider-caused failures in the window that opens the breaker (0..1)",
+    "default": "0.5"
+  },
+  "AI_ROUTER_BREAKER_COOLDOWN_MS": {
+    "group": "ai",
+    "description": "how long a breaker stays open before it half-opens for one probe; doubles on each failed probe",
+    "default": "30000"
+  },
+  "AI_ROUTER_BREAKER_MAX_COOLDOWN_MS": {
+    "group": "ai",
+    "description": "ceiling for the doubling breaker cooldown",
+    "default": "300000"
+  },
+  "AI_ROUTER_MAX_ATTEMPTS": {
+    "group": "ai",
+    "description": "attempts on one provider before the router fails over to the next candidate (router flag on only)",
+    "default": "2"
+  },
+  "AI_ROUTER_BACKOFF_MS": {
+    "group": "ai",
+    "description": "base delay for the jittered exponential backoff between retries of a transient provider error",
+    "default": "500"
+  },
+  "AI_ROUTER_BACKOFF_MAX_MS": {
+    "group": "ai",
+    "description": "ceiling for one backoff wait, and for a retry-after hint the provider returns",
+    "default": "8000"
+  },
+  "AI_ROUTER_RATE_LIMITS": {
+    "group": "ai",
+    "description": "per-provider request-per-minute budgets as token buckets, e.g. \"openai:500,anthropic:200\"; empty means no bucket",
+    "default": ""
+  },
+  "AI_ROUTER_DEFAULT_RPM": {
+    "group": "ai",
+    "description": "requests per minute for a provider with no entry in AI_ROUTER_RATE_LIMITS; 0 means no bucket",
+    "default": "0"
+  },
+  "AI_ROUTER_RATE_WAIT_MS": {
+    "group": "ai",
+    "description": "longest the router waits for a rate-limit token before taking the next candidate instead",
+    "default": "2000"
+  },
   "GOOGLE_API_KEY": {
     "group": "ai",
     "description": "Google AI Studio API key, used when LLM_PROVIDER is google.",

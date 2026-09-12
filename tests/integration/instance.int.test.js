@@ -89,6 +89,7 @@ const INSTANCE_ROUTES = [
     ['get', '/api/v2/instance/backups/alianhub-14.0.0-20260101-000000.tar.gz/download'],
     ['post', '/api/v2/instance/backups/alianhub-14.0.0-20260101-000000.tar.gz/restore', { confirm: 'alianhub-14.0.0-20260101-000000.tar.gz' }],
     ['delete', '/api/v2/instance/backups/alianhub-14.0.0-20260101-000000.tar.gz'],
+    ['get', '/api/v2/instance/ai/providers'],
     ['get', '/api/v2/instance/stats'],
     ['get', '/api/v2/instance/companies'],
     ['get', `/api/v2/instance/audit-export?companyId=${state.companyId}`],
@@ -161,6 +162,23 @@ describe('instance console as the owner', () => {
         expect(res.status).toBe(200);
         expect(res.body.data).toMatchObject({ status: 'ok', db: { ok: true }, maintenance: false });
         expect(res.body.data.readiness).toEqual(expect.objectContaining({ storageChosen: true }));
+    });
+
+    it('lists every provider with its health, breaker state and rate-limit budget', async () => {
+        const { api } = await as('owner');
+        const res = await api.get('/api/v2/instance/ai/providers');
+        expect(res.status).toBe(200);
+        expect(res.body.data).toMatchObject({ node: expect.any(String), routerEnabled: expect.any(Boolean), breakerPolicy: { scope: 'process' } });
+        expect(res.body.data.providers.map((p) => p.provider)).toEqual(['openai', 'anthropic', 'deepseek', 'google']);
+        res.body.data.providers.forEach((row) => {
+            expect(row).toMatchObject({
+                configured: expect.any(Boolean),
+                priced: expect.any(Boolean),
+                health: { calls: expect.any(Number), breaker: { state: expect.stringMatching(/^(closed|open|half_open)$/) } },
+                rateLimit: { limitPerMinute: expect.any(Number) },
+            });
+        });
+        expect(JSON.stringify(res.body.data)).not.toMatch(/sk-|AIza/);
     });
 
     it('blocks the API during maintenance and keeps the console and health open', async () => {
