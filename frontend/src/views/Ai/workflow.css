@@ -1,0 +1,35 @@
+.wf-run__head { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-bottom: 12px; }
+.wf-run__read-only { margin-top: 12px; color: var(--text-muted); }
+
+.wf-blocked { border: 1px solid var(--hairline); border-left: 3px solid var(--warn, #c8871a); border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; }
+.wf-blocked--terminal { border-left-color: var(--danger, #c0392b); }
+.wf-blocked__reason { margin: 6px 0 2px; font: 400 13px/1.45 var(--font-ui); }
+
+.wf-graph { list-style: none; margin: 0; padding: 0; }
+.wf-graph__node { border-bottom: 1px solid var(--hairline); padding: 8px 0; }
+.wf-graph__node:last-of-type { border-bottom: 0; }
+.wf-graph__children { list-style: none; margin: 4px 0 0; padding: 0 0 0 22px; border-left: 1px solid var(--hairline); }
+
+.wf-step { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+.wf-step--child { opacity: 0.92; }
+.wf-step__id { font-size: 12px; min-width: 90px; }
+.wf-step__duration, .wf-step__cost { color: var(--text-muted); }
+.wf-step__spacer { flex: 1 1 auto; }
+
+.wf-fan { display: flex; align-items: center; gap: 8px; padding: 2px 0 2px 22px; color: var(--text-muted); }
+
+.wf-failure { margin: 6px 0 2px 22px; padding: 9px 11px; border: 1px solid var(--hairline); border-radius: 6px; }
+.wf-failure__head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.wf-failure__message { margin: 6px 0 4px; font: 400 13px/1.45 var(--font-ui); }
+.wf-failure__why { color: var(--text-muted); margin: 0 0 6px; }
+.wf-failure__meta { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0 0 8px; font-size: 12px; }
+.wf-failure__meta dt { color: var(--text-muted); }
+.wf-failure__meta dd { margin: 0; }
+.wf-failure__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.wf-failure__hint { color: var(--text-muted); }
+
+.wf-loop { margin: 6px 0 2px 22px; padding: 9px 11px; border: 1px solid var(--hairline); border-radius: 6px; }
+.wf-loop__head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.wf-loop__meter { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+.wf-loop__bar { flex: 0 1 200px; height: 6px; }
+.wf-loop__stopped { color: var(--text-muted); margin: 4px 0 6px; }
