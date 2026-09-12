@@ -1,6 +1,7 @@
 const { validate: validateConditions, usesChangeOps } = require('../engine/expression');
 const registry = require('../engine/registry');
 const timeTrigger = require('../../Workflows/timeTrigger');
+const { describeRule } = require('./sentenceRules');
 
 // Validation for v2 (event-triggered, multi-step) rules.
 //
@@ -15,6 +16,10 @@ const MAX_STEPS = 25;
 const MAX_NAME = 120;
 
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/* The one composer of a rule's own words: `sentence` on every read and `name` on
+ * every save come from here, so the two can never describe different rules. */
+const composedName = (rule) => describeRule(rule).slice(0, MAX_NAME);
 
 const validateStep = (step, index, errors) => {
     const at = `steps[${index}]`;
@@ -50,7 +55,6 @@ const validateRuleV2 = (input = {}) => {
     const errors = [];
 
     const name = String(input.name || '').trim();
-    if (!name) errors.push('name: required');
     if (name.length > MAX_NAME) errors.push(`name: must be ${MAX_NAME} characters or fewer`);
 
     const trigger = isPlainObject(input.trigger) ? input.trigger : {};
@@ -79,30 +83,39 @@ const validateRuleV2 = (input = {}) => {
     const ids = steps.map((s) => s && s.id).filter(Boolean);
     if (new Set(ids).size !== ids.length) errors.push('steps: step ids must be unique');
 
-    if (errors.length) return { valid: false, errors, value: null };
+    // Composing the name needs a rule that parses, so an unusable one still has to
+    // carry its own.
+    if (errors.length) {
+        if (!name) errors.push('name: required');
+        return { valid: false, errors, value: null };
+    }
 
     const scope = isPlainObject(input.scope) ? input.scope : {};
-    return {
-        valid: true,
-        errors: [],
-        value: {
-            name,
-            version: 2,
-            trigger: triggerDef.kind === 'time'
-                ? { type: 'time', event: trigger.event, schedule: { ...trigger.schedule, timezone: 'UTC' } }
-                : { type: 'event', event: trigger.event },
-            scope: {
-                allProjects: scope.allProjects !== false,
-                projectIds: Array.isArray(scope.projectIds) ? scope.projectIds.map(String) : [],
-            },
-            conditions: isPlainObject(input.conditions) ? input.conditions : {},
-            steps: steps.map((s) => (s.type === 'condition'
-                ? { id: s.id, type: 'condition', condition: s.condition }
-                : { id: s.id, type: 'action', action: s.action, config: isPlainObject(s.config) ? s.config : {} })),
-            reactToAutomation: input.reactToAutomation === true,
-            limits: { maxRunsPerHour: Number(input.limits?.maxRunsPerHour) > 0 ? Number(input.limits.maxRunsPerHour) : 500 },
+    const value = {
+        name,
+        version: 2,
+        trigger: triggerDef.kind === 'time'
+            ? { type: 'time', event: trigger.event, schedule: { ...trigger.schedule, timezone: 'UTC' } }
+            : { type: 'event', event: trigger.event },
+        scope: {
+            allProjects: scope.allProjects !== false,
+            projectIds: Array.isArray(scope.projectIds) ? scope.projectIds.map(String) : [],
         },
+        conditions: isPlainObject(input.conditions) ? input.conditions : {},
+        steps: steps.map((s) => (s.type === 'condition'
+            ? { id: s.id, type: 'condition', condition: s.condition }
+            : { id: s.id, type: 'action', action: s.action, config: isPlainObject(s.config) ? s.config : {} })),
+        reactToAutomation: input.reactToAutomation === true,
+        limits: { maxRunsPerHour: Number(input.limits?.maxRunsPerHour) > 0 ? Number(input.limits.maxRunsPerHour) : 500 },
     };
+
+    // An unnamed rule is named by the sentence that describes the rule being saved,
+    // composed here rather than by the caller: a name the client derived from an
+    // earlier compile can be a step behind the rule it is attached to, and then the
+    // list, the audit trail and the run log all quote a rule that was never saved.
+    if (!value.name) value.name = composedName(value);
+
+    return { valid: true, errors: [], value };
 };
 
 /* One-line human summary for the rule list — the same sentence the builder shows,
@@ -117,4 +130,4 @@ const describeV2 = (rule = {}) => {
     return `${when} → ${actions.join(', ') || 'no actions'}`;
 };
 
-module.exports = { validateRuleV2, describeV2, validateStep, MAX_STEPS };
+module.exports = { validateRuleV2, describeV2, validateStep, composedName, MAX_STEPS, MAX_NAME };

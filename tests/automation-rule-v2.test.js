@@ -1,4 +1,4 @@
-const { validateRuleV2, describeV2 } = require('../Modules/Automations/helpers/ruleSchemaV2');
+const { validateRuleV2, describeV2, MAX_NAME } = require('../Modules/Automations/helpers/ruleSchemaV2');
 
 const valid = () => ({
     name: 'Escalate closed stories',
@@ -71,5 +71,40 @@ describe('v2 rule validation', () => {
 
     it('describes a rule as the same sentence the builder shows', () => {
         expect(describeV2(valid())).toBe('Task status changes → Change priority');
+    });
+});
+
+describe('v2 rule name', () => {
+    const commenter = (body) => ({
+        trigger: { type: 'event', event: 'task.priority_changed' },
+        scope: { allProjects: true },
+        steps: [{ id: 's1', type: 'action', action: 'add_comment', config: { body } }],
+    });
+
+    it('names an unnamed rule after the rule itself, body and all', () => {
+        const r = validateRuleV2(commenter('Sweep automation fired'));
+        expect(r.valid).toBe(true);
+        expect(r.value.name).toBe('When a task priority changes, post a comment saying "Sweep automation fired".');
+    });
+
+    it('never keeps a name that describes a different rule than the one being saved', () => {
+        const stale = 'When a task priority changes, post a comment saying "".';
+        const r = validateRuleV2({ ...commenter('Sweep automation fired'), name: '' });
+        expect(r.value.name).not.toBe(stale);
+        expect(r.value.name).toContain('Sweep automation fired');
+    });
+
+    it('leaves a name somebody typed alone', () => {
+        expect(validateRuleV2({ ...commenter('hi'), name: 'Nudge the reporter' }).value.name).toBe('Nudge the reporter');
+    });
+
+    it('keeps the composed name inside the stored length', () => {
+        const r = validateRuleV2(commenter('x'.repeat(400)));
+        expect(r.valid).toBe(true);
+        expect(r.value.name.length).toBe(MAX_NAME);
+    });
+
+    it('still asks for a name on a rule it cannot describe', () => {
+        expect(validateRuleV2({ name: '', steps: [] }).errors).toEqual(expect.arrayContaining(['name: required', 'steps: at least one action is required']));
     });
 });
