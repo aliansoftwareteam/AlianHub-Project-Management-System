@@ -83,6 +83,7 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 55 | Timesheet approval and milestone billing resolved the actor as `req.uid || req.body.userData.id`, so a member could approve as an owner and a guest read billing as an admin. | #661 (build 136) |
 | 56 | `TimesheetApproval.getStatus` and `listMine` still read `req.query.userId` (reviewer-queue behaviour; owner decision). | #661 (build 136) |
 | 57 | Translators must supply the new keys: the reworded tracker sentence, the planner error, and the routing and providers namespaces (about 60 keys). | #659, #663, #664 |
+| 58 | The workflow builder is reachable only from the AI sidebar's Workflows entry (`AiSidebar.vue`, owners and admins), and `WorkflowBuilderPage.vue` is the one AI-section screen that does not render that sidebar, so arriving there drops the section nav with no way back. The global rail's AI entry matches route names beginning with `Ai` (`components/organisms/Shell/navItems.js:38`), which `WorkflowBuilder`, `WorkflowRun` and `WorkflowLineage` do not, so the rail goes dark on all three. No AI hub card or button points at the builder either. | sprint 5 sweep (028) |
 
 ## Owner decisions recorded
 

@@ -2,22 +2,25 @@
 
 Updated 2026-09-12. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (b15159e5, `14.36.0-beta.131`)
+## State of `beta` (b7e9f9fe, `14.36.0-beta.158`)
 
-- **Task 035 (QA follow-ups):** the first wave closed yesterday; today's second wave merged #649 to #656, each reproduced with a failing test before the fix. Build numbers are in `docs/BETA-LOG.md`, details in `Tasks/active/035-qa-followups/progress.md`.
+- **Sprint 5 (task 028, the workflow engine) is closed** and moved to `Tasks/done/`. Five steps merged — #669 (build 144), #674 (149), #675 (151), #677 (152), #678 (154) — the six interface rows in #680 (155), #681 (156) and #682 (157), and the exit gate in #683 (158): a fifteen-step workflow killed at step eleven resumes there and writes every effect exactly once. Writing that gate found a real hole first: `scheduler.readySet` offered only `pending` steps, so a killed run waited for a person to press resume. Defect #17 closed — the stored hourly run limit is now the loop's admission control.
+- **Sprints 0 to 4 are closed too:** 0 to 2 by #676 (build 150), 3 and 4 by #673 (148). Sprint 5 leaves task 029 (Sprint 6) as the next sprint.
+- **Task 035 (QA follow-ups):** the first wave closed on the 11th; the second wave merged #649 to #656, each reproduced with a failing test before the fix. Build numbers are in `docs/BETA-LOG.md`, details in `Tasks/active/035-qa-followups/progress.md`.
 - **Upgrade steps for a deployed instance:**
   1. `node scripts/audit-product-owners.js` (from #645) and review every account it marks REVIEW.
   2. Migration 013 runs at server start; it activates seats that SSO and SCIM created with the invited status.
   3. Operator routes changed shape in #655: the preset key now travels in the `x-preset-key` header, and first-install setup is `POST /api/v1/setPresetCompany`. Update runbooks and bookmarks.
   4. `TRACKER_PKCE_LEGACY_UNTIL` (from #653) is unset by default, so trackers already installed keep signing in. Set it to a date once the new tracker build has rolled out.
+  5. `WORKFLOW_ENGINE` is off by default and off is today's behaviour exactly, so sprint 5 changes nothing until it is turned on. Migrations 016 (workflow runs and step runs) and 020 (workflow definitions) run at server start either way. The workflow API answers 503 with the reason while the flag is off.
 - **Open PRs:** #613 only, a duplicate of the merged #612 for the owner to close.
 
 ## Next up
 
 1. **Owner decisions**, listed in `followups.md`: item 32 (should saving a project filter for another user answer 403, as the task side does?), item 37 (who writes the subscription `invoices` collection?), item 35 (make auth cookies unreadable by JavaScript, which changes how the frontend reads them), and whether the planner's estimate permission should line up with the timesheet permissions (#656).
-2. **Remaining follow-ups:** 14 and 26, plus the new 48 to 51. Items 16 and 17 belong to Sprint 8 (task 031).
-3. **Owner checks still open:** migrations on the dev database, browser sweeps for tasks 023 to 026 and 033, a live OTLP collector check for 026.
-4. **Then Sprint 4** (task 027, the model router).
+2. **Remaining follow-ups:** 14, 26, 55, 56 and 57, plus the new 58 — the workflow screens sit outside the AI section's chrome, so the rail goes dark on them and the builder has no way back. Items 16 and 17 belong to Sprint 8 (task 031).
+3. **Owner checks still open:** migrations on the dev database; the owner and member sweep of the six sprint 5 workflow screens, which is task 028's one unmet acceptance bullet; the Stats and Upgrade sweep and the Docker label check for task 033.
+4. **Then Sprint 6** (task 029, skill authoring and migration): the Skill Library becomes a real library — create, edit, dry-run, risk preview, retire — the three duplicated frontend input tables go, and the reporter and project-guide skills are re-expressed as data. It depends on 025 and 028, both now closed.
 
 ## Owner decisions recorded
 
