@@ -145,10 +145,11 @@ describe('time — variance and estimates', () => {
         const admin = await loginAs('admin');
         const { project, task } = await projectWithTask(owner, admin);
         const up = await admin.api.put('/api/v1/estimatedTime', {
-            key: '$set',
-            compareObj: { ProjectId: project._id, TaskId: task._id, UserId: admin.uid },
-            updateObject: { EstimatedTime: 45, ProjectId: project._id, TaskId: task._id, UserId: admin.uid, Date: new Date().toISOString() },
-            newObj: { upsert: true, returnDocument: 'after' },
+            projectId: project._id,
+            taskId: task._id,
+            userId: admin.uid,
+            minutes: 45,
+            date: new Date().toISOString(),
         });
         expect(up.status).toBe(200);
         const got = await admin.api.get(`/api/v1/estimatedTime/${project._id}/${task._id}`);

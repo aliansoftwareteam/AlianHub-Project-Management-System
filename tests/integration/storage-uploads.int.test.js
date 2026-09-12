@@ -143,16 +143,16 @@ describe('USER_PROFILES images are bound to their owner', () => {
         uploadedProfileImages.push({ api: member.api, filePath: second });
     });
 
-    it('refuses deleting a legacy image another user holds under different letter case', async () => {
-        const victim = await freshMember();
+    /* The legacy-name delete guard now has a second lock in front of it: a user can no longer
+     * point their record at a name they did not upload, so they cannot claim one to delete it. */
+    it('refuses claiming a legacy image by name, and deleting one claimed that way', async () => {
         const attacker = await freshMember();
         const apiFor = (member) => createApiClient({ baseURL: state.baseURL, accessToken: member.accessToken, companyId: COMPANY_A });
-        const pointAt = (member, name) => apiFor(member).put('/api/v1/user', { userId: member.userId, updateObject: { $set: { Employee_profileImage: name } } });
         const legacyName = `${Date.now()}_${uniqueSuffix()}_photo.png`;
         const shouted = legacyName.toUpperCase();
 
-        expect((await pointAt(victim, legacyName)).body.status).toBe(true);
-        expect((await pointAt(attacker, shouted)).body.status).toBe(true);
+        const claimed = await apiFor(attacker).put('/api/v1/user', { userId: attacker.userId, updateObject: { $set: { Employee_profileImage: shouted } } });
+        expect(claimed.status).toBe(403);
 
         const res = await apiFor(attacker).delete('/api/v1/storage/removeFile/USER_PROFILES', { query: { filepath: shouted, thubmkey: 'userProfile' } });
         expect(res.status).toBe(403);

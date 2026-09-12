@@ -7,8 +7,9 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.
 const mongoose = require("mongoose")
 const {
     isObjectId, toSelfView, toMemberView, sharedCompanies, sanitizeUserQuery, scopeQueryToCompany,
-    sanitizeSelfUpdate, companyRemovalOf, sanitizeUpdateOptions,
+    sanitizeSelfUpdate, companyRemovalOf, sanitizeUpdateOptions, unownedProfileImages, hasProfileImage,
 } = require("./helpers/userAccessRules.js");
+const { mayWriteProfileImage } = require("../storage/bucketAccess.js");
 
 const refuse = (res, code, message) => res.status(code).json({ status: false, statusText: message, message });
 
@@ -30,10 +31,15 @@ exports.updateUserStatus = async (req, res) => {
         if (String(userId) === String(req.uid)) {
             const checked = sanitizeSelfUpdate(updateObject);
             if (!checked.ok) return refuse(res, 403, checked.error);
-            const selected = checked.update.$set.lastSelectedCompany;
-            if (selected !== undefined) {
-                const me = await loadGlobalUser(req.uid);
-                if (!sharedCompanies(me, { AssignCompany: [selected] }).length) return refuse(res, 403, 'You are not a member of that company.');
+            const fields = checked.update.$set;
+            const selected = fields.lastSelectedCompany;
+            let me;
+            if (selected !== undefined || hasProfileImage(fields)) me = await loadGlobalUser(req.uid);
+            if (selected !== undefined && !sharedCompanies(me, { AssignCompany: [selected] }).length) {
+                return refuse(res, 403, 'You are not a member of that company.');
+            }
+            if (unownedProfileImages(fields, me, (value) => mayWriteProfileImage(req.uid, value)).length) {
+                return refuse(res, 403, 'You can only use a profile image you uploaded yourself.');
             }
             update = checked.update;
             view = toSelfView;

@@ -36,6 +36,8 @@ jest.mock('../Modules/storage/bucketAccess', () => {
         refuseUpload: tracked(actual.refuseUpload),
         requireBucketWrite: tracked(actual.requireBucketWrite),
         requireBucketRemoval: tracked(actual.requireBucketRemoval),
+        requireBucketRead: tracked(actual.requireBucketRead),
+        requireProfileImageRead: tracked(actual.requireProfileImageRead),
         requireOwnBucket: tracked(actual.requireOwnBucket),
     };
 });

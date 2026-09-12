@@ -11,6 +11,14 @@ const SELF_FIELDS = [
     'isEmailVerified', 'isProductOwner', 'tour', 'lastSelectedCompany', 'customerId', 'customerIds',
     'homeChecklist', 'localePreferences', 'agentAccount', 'demo',
 ];
+// What a pre-authentication answer may carry: the sign-in, OAuth and sign-up screens read
+// these, and the caller is only as trusted as the password or invite they arrived with, so
+// the billing and ownership fields of the self view stay out of it.
+const AUTH_FIELDS = [
+    '_id', 'Employee_Email', 'Employee_FName', 'Employee_LName', 'Employee_Name',
+    'Employee_profileImage', 'Employee_profileImageURL', 'Time_Format', 'Time_Zone',
+    'isActive', 'isEmailVerified', 'AssignCompany', 'languageCode', 'createdAt', 'updatedAt',
+];
 const SELF_WRITABLE = [
     'isOnline', 'lastActive', 'lastSelectedCompany', 'tour', 'homeChecklist', 'presence', 'languageCode',
     'localePreferences', 'updatedAt', 'Employee_FName', 'Employee_LName', 'Employee_Name',
@@ -32,6 +40,8 @@ const pick = (doc, fields) => {
 };
 
 const toSelfView = (doc) => pick(doc, SELF_FIELDS);
+
+const toAuthView = (doc) => (doc ? pick(doc, AUTH_FIELDS) : null);
 
 const toMemberView = (doc, sharedCompanyIds) => {
     const view = pick(doc, MEMBER_FIELDS);
@@ -117,12 +127,30 @@ const companyRemovalOf = (updateObject) => {
 
 const sanitizeUpdateOptions = (options) => (options && options.returnDocument === 'after' ? { returnDocument: 'after' } : undefined);
 
+const PROFILE_IMAGE_FIELDS = ['Employee_profileImage', 'Employee_profileImageURL'];
+
+/* A user may point their profile at an image they uploaded — the storage guards only let
+ * them write a name starting with their own id — or leave the one their record already
+ * holds, which is how an image uploaded before that rule keeps working. Any other name
+ * would be someone else's image. */
+const unownedProfileImages = (fields, currentUser, mayWrite) => {
+    const held = PROFILE_IMAGE_FIELDS.map((field) => String((currentUser && currentUser[field]) || '')).filter(Boolean);
+    return PROFILE_IMAGE_FIELDS
+        .filter((field) => fields[field] !== undefined)
+        .map((field) => String(fields[field] || ''))
+        .filter((value) => value !== '' && !held.includes(value) && !mayWrite(value));
+};
+
+const hasProfileImage = (fields) => PROFILE_IMAGE_FIELDS.some((field) => fields[field] !== undefined);
+
 module.exports = {
     MEMBER_FIELDS,
     SELF_FIELDS,
+    AUTH_FIELDS,
     SELF_WRITABLE,
     isObjectId,
     toSelfView,
+    toAuthView,
     toMemberView,
     sharedCompanies,
     sanitizeUserQuery,
@@ -130,4 +158,6 @@ module.exports = {
     sanitizeSelfUpdate,
     companyRemovalOf,
     sanitizeUpdateOptions,
+    unownedProfileImages,
+    hasProfileImage,
 };
