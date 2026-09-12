@@ -4,7 +4,8 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { replaceObjectKey } = require("../Auth/helper");
 const { escapeRegex } = require("../../utils/escapeRegex");
-const { isPrivileged } = require('../../Config/roleTypes');
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+const { sprintIdentities, visibleSprintClause } = require('../Sprints/helpers/sprintVisibility');
 const savedFilters = require("./helpers/savedFilters");
 
 /**
@@ -72,8 +73,6 @@ exports.searchTasks = async (req, res) => {
             skip = 0,
             batchSize = 20,
             sortBy = 'createdAt',
-            userId,
-            roleType,
         } = req.body;
 
         // Parse inputs and prepare default values
@@ -87,8 +86,6 @@ exports.searchTasks = async (req, res) => {
 
         additionalFilter = replaceObjectKey(additionalFilter, ["objId", "dbDate"]);
 
-        // Current user ID as string (because AssigneeUserId is stored as string) 
-        const currentUserId = userId ? userId.toString() : null;
 
         // Aggregation stages
         const searchResultMatch = {
@@ -123,20 +120,14 @@ exports.searchTasks = async (req, res) => {
 
         const sprintUnwind = { $unwind: '$sprintArray' };
 
+        /* The caller is read from the session, never from the body: the body's own userId and
+         * roleType would let a client name someone else and inherit their private sprints. */
+        const companyId = req.headers['companyid'] || '';
+        const roleType = await getRoleType(companyId, req.uid);
         let sprintPrivacyFilter = null;
         if (!isPrivileged(roleType)) {
-            sprintPrivacyFilter = currentUserId
-                ? {
-                    $match: {
-                        $or: [
-                            { 'sprintArray.private': { $ne: true } },
-                            { 'sprintArray.AssigneeUserId': currentUserId },
-                        ],
-                    },
-                }
-                : {
-                    $match: { 'sprintArray.private': { $ne: true } },
-                };
+            const identities = req.uid ? await sprintIdentities(companyId, req.uid) : [];
+            sprintPrivacyFilter = { $match: visibleSprintClause(identities, 'sprintArray.') };
         }
 
         const folderLookup = {
@@ -185,7 +176,7 @@ exports.searchTasks = async (req, res) => {
             data: [aggregationPipeline],
         };
 
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'aggregate');
+        const response = await MongoDbCrudOpration(companyId, params, 'aggregate');
 
         return res.status(200).json({
             status: true,
