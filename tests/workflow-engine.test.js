@@ -251,9 +251,10 @@ describe('the automation rule node', () => {
 });
 
 describe('an automation rule is a one-node workflow', () => {
-    it('is a registered executor like any other step type', () => {
-        expect(executors.types()).toContain(workflows.AUTOMATION_RULE);
+    it('is a registered executor like any other step type, beside the agent run', () => {
+        expect(executors.types()).toEqual(expect.arrayContaining([workflows.AUTOMATION_RULE, workflows.AGENT_RUN]));
         expect(typeof executors.get(workflows.AUTOMATION_RULE)).toBe('function');
+        expect(typeof executors.get(workflows.AGENT_RUN)).toBe('function');
     });
 
     it('starts one node that points at the rule run rather than copying its steps', async () => {

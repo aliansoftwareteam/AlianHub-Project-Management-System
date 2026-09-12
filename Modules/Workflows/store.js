@@ -53,7 +53,7 @@ const stepRowsFor = (runId, steps) => steps.map((step, index) => ({
 }));
 
 /* Returns null when the dedupe key says this trigger has already started a run. */
-const createRun = async (companyId, { workflowId, name, source, dedupeKey, ruleId, ruleName, automationRunId, eventId, eventType, entity, envelope, traceId, startedBy, steps }) => {
+const createRun = async (companyId, { workflowId, name, source, dedupeKey, ruleId, ruleName, automationRunId, eventId, eventType, entity, envelope, traceId, startedBy, agentId, taskId, projectId, steps }) => {
     let run;
     try {
         run = await call(companyId, RUNS, {
@@ -70,6 +70,9 @@ const createRun = async (companyId, { workflowId, name, source, dedupeKey, ruleI
             envelope: envelope || {},
             traceId: traceId || null,
             startedBy: startedBy ? String(startedBy) : null,
+            agentId: agentId ? String(agentId) : null,
+            taskId: taskId ? String(taskId) : null,
+            projectId: projectId ? String(projectId) : null,
             status: 'queued',
             definition: { steps },
             outputs: {},
@@ -84,6 +87,21 @@ const createRun = async (companyId, { workflowId, name, source, dedupeKey, ruleI
 };
 
 const getRun = (companyId, runId) => call(companyId, RUNS, [{ _id: String(runId) }], 'findOne');
+
+const findRunByDedupeKey = (companyId, dedupeKey) => call(companyId, RUNS, [{ dedupeKey: String(dedupeKey) }], 'findOne');
+
+const LIST_LIMIT = 200;
+
+const listRuns = (companyId, { status, source, agentId, workflowId, limit = 50 } = {}) => call(companyId, RUNS, [
+    {
+        ...(status ? { status: String(status) } : {}),
+        ...(source ? { source: String(source) } : {}),
+        ...(agentId ? { agentId: String(agentId) } : {}),
+        ...(workflowId ? { workflowId: String(workflowId) } : {}),
+    },
+    {},
+    { sort: { startedAt: -1 }, limit: Math.min(LIST_LIMIT, Math.max(1, Number(limit) || 50)) },
+], 'find');
 
 const patchRun = (companyId, runId, set) => call(companyId, RUNS, [{ _id: String(runId) }, { $set: set }], 'updateOne');
 
@@ -130,6 +148,19 @@ const settleStep = async (companyId, { runId, stepId, fencingToken, set, inc }) 
     ], 'findOneAndUpdate');
     if (!updated) throw new StaleLeaseError(runId, stepId, fencingToken);
     return updated;
+};
+
+/* What a step learnt before it finished — the agent run it started, above all.
+ * Recorded under the same fence, and best-effort: a note that cannot be written
+ * because the lease moved on must not fail the work the step is doing. */
+const noteStep = async (companyId, claim, set) => {
+    try {
+        await settleStep(companyId, { ...claim, set });
+        return true;
+    } catch (error) {
+        if (error instanceof StaleLeaseError) return false;
+        throw error;
+    }
 };
 
 const DONE_WAITING = { waitUntil: null, waitReason: null };
@@ -213,6 +244,63 @@ const countClaimsAhead = (companyId, claimed, now = new Date()) => call(companyI
         ],
     },
 ], 'countDocuments');
+
+/* The operator controls, as one conditional write each.
+ *
+ * The status filter is the permission: retry only applies to a step that has
+ * finished badly, skip only to one that has not succeeded, resume only to one
+ * that is failed or holding a claim nobody is working. A step in the wrong state
+ * matches nothing and the caller is told so, rather than a live step being
+ * yanked out from under the worker running it.
+ *
+ * Every one of them bumps the fencing token, because the worker whose attempt
+ * this control is overriding may still be alive: with a new token its late write
+ * matches nothing and is refused, exactly as a lapsed lease is. */
+const control = async (companyId, runId, stepId, { from, set, unset }) => call(companyId, STEPS, [
+    { runId: String(runId), stepId: String(stepId), status: { $in: from } },
+    { $set: set, $inc: { fencingToken: 1 }, ...(unset ? { $unset: unset } : {}) },
+    { returnDocument: 'after' },
+], 'findOneAndUpdate');
+
+const CLEARED = Object.freeze({ workerId: null, claimedAt: null, leaseExpiresAt: null, nextAttemptAt: null, finishedAt: null });
+
+const controlEntry = (action, by, reason) => ({ action, by: by ? String(by) : null, at: new Date(), reason: String(reason || '').slice(0, 500) });
+
+/* A fresh attempt budget: the person asking for a retry is saying the reason it
+ * failed is gone, which is a different claim from "try the ladder again". */
+const retryStep = (companyId, runId, stepId, { by, reason } = {}) => control(companyId, runId, stepId, {
+    from: ['failed', 'skipped'],
+    set: { ...CLEARED, status: 'pending', attempts: 0, error: null, failure: null, skippedBy: null, startedAt: null, control: controlEntry('retry', by, reason) },
+});
+
+/* An operator skip carries who asked for it, and that is what lets the steps
+ * behind it run: a step skipped because its dependency failed blocks its own
+ * dependents, and a step a person skipped does not. */
+const operatorSkipStep = (companyId, runId, stepId, { by, reason } = {}) => control(companyId, runId, stepId, {
+    from: ['pending', 'failed'],
+    set: { status: 'skipped', skippedBy: by ? String(by) : null, error: String(reason || 'skipped by a person').slice(0, 500), finishedAt: new Date(), leaseExpiresAt: null, workerId: null, control: controlEntry('skip', by, reason) },
+});
+
+/* Resume keeps the attempts already spent: it is "carry on from here", not "start
+ * again". A running step is included because a worker that died holding the claim
+ * leaves one, and the bumped token is what makes taking it back safe. */
+const resumeStep = (companyId, runId, stepId, { by, reason } = {}) => control(companyId, runId, stepId, {
+    from: ['failed', 'running'],
+    set: { ...CLEARED, status: 'pending', error: null, control: controlEntry('resume', by, reason) },
+});
+
+const recordCompensation = (companyId, runId, stepId, compensation) => call(companyId, STEPS, [
+    { runId: String(runId), stepId: String(stepId) },
+    { $set: { compensation: { ...compensation, at: new Date() } } },
+    { returnDocument: 'after' },
+], 'findOneAndUpdate');
+
+/* A run a control has touched is open again: it has work to do, and its verdict
+ * and error belong to the attempt the control just replaced. */
+const reopenRun = (companyId, runId) => call(companyId, RUNS, [
+    { _id: String(runId) },
+    { $set: { status: 'running', finishedAt: null, error: null } },
+], 'updateOne');
 
 /* Fan-out children are rows the definition never named, written while the run is
  * going. The fractional index keeps them between the step that expanded them and
@@ -304,8 +392,9 @@ const outputsOf = async (companyId, runId) => {
 
 module.exports = {
     RUNS, STEPS, TERMINAL, STEP_TERMINAL, StaleLeaseError, isDuplicateKey, stepRowsFor,
-    createRun, getRun, patchRun, listSteps, getStep,
-    claimStep, heartbeat, settleStep, succeedStep, failStep, deferStep, releaseStep, skipStep,
+    createRun, getRun, findRunByDedupeKey, listRuns, patchRun, listSteps, getStep,
+    retryStep, operatorSkipStep, resumeStep, recordCompensation, reopenRun,
+    claimStep, heartbeat, settleStep, noteStep, succeedStep, failStep, deferStep, releaseStep, skipStep,
     childRowsFor, addSteps, listChildren, resetSteps, wakeStep, outputsOf,
     countLiveClaims, countClaimsAhead,
 };

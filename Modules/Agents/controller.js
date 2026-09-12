@@ -25,6 +25,7 @@ const taskClass = require('../AICore/taskClass');
 const revisions = require('./revisions');
 const skillRecord = require('./skillRecord');
 const { buildTrace } = require('./runTrace');
+const workflows = require('../Workflows');
 
 const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId) || '';
 // 'mention' is a run started by @naming the agent in a comment (13b); it is
@@ -452,7 +453,13 @@ exports.startRun = async (req, res) => {
         if (deduplicated) return res.send({ status: true, statusText: 'Run already started.', data: { ...plain, deduplicated: true } });
         if (task && registry.has('subtask.create')) {
             const runActor = { kind: 'agent', userId: actor.userId, agentId: String(agent._id), agentName: agent.name, runId: String(run._id), viaAccount: run.viaAccount, tokenId: null };
-            setImmediate(() => runs.executeSkill(companyId, run, agent, task, { proposals, actions, actor: runActor }));
+            // With the engine on the run rides the queue, like a rule-started one: the
+            // same runner executes it, under a lease, and a worker that dies does not
+            // take the run with it. Off, it executes here exactly as it always has.
+            const execute = () => (workflows.enabled()
+                ? workflows.enqueueForAgentRun(companyId, plain, { note })
+                : runs.executeSkill(companyId, run, agent, task, { proposals, actions, actor: runActor }));
+            setImmediate(() => Promise.resolve(execute()).catch((e) => logger.error(`startRun: ${run._id} was not dispatched: ${e.message}`)));
         }
         return res.send({ status: true, statusText: 'Run started.', data: { ...plain, deduplicated: false } });
     } catch (e) { logger.error(`startRun: ${e.message}`); return fail(res, e.message, e.status || 500); }

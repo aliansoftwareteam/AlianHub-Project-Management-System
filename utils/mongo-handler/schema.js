@@ -1060,6 +1060,11 @@ const schema = {
         envelope: { type: Object, default: {}, required: false },
         traceId: { type: String, required: false },
         startedBy: { type: String, required: false },
+        // The agent, task and project an agent-run workflow works on; what scopes
+        // a run to the projects its reader may open.
+        agentId: { type: String, required: false },
+        taskId: { type: String, required: false },
+        projectId: { type: String, required: false },
         // queued | running | success | failed | stopped
         status: { type: String, default: 'queued', required: true },
         // { steps: [{ id, type, action, dependsOn, config, maxAttempts }] } — snapshotted at
@@ -1098,6 +1103,13 @@ const schema = {
         error: { type: String, required: false },
         // { type, code, deterministic } — `deterministic` is what decides retry versus give up.
         failure: { type: Object, required: false },
+        // Set when a person skipped the step by hand. A skip nobody asked for blocks
+        // everything behind it; one an operator asked for lets the run carry on.
+        skippedBy: { type: String, required: false },
+        // { action: retry | skip | resume, by, at, reason } — the last operator control applied.
+        control: { type: Object, required: false },
+        // { at, by, reverted, failed } — the result of compensating this step.
+        compensation: { type: Object, required: false },
         startedAt: { type: Date, required: false },
         finishedAt: { type: Date, required: false },
         /* Task 028 sprint 5 step 2. A step that is waiting — on a person, on a

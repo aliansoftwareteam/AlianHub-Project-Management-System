@@ -1,6 +1,6 @@
 # Workflows
 
-Durable workflow runs and step runs — task 028, sprint 5, steps 1 and 2.
+Durable workflow runs and step runs — task 028, sprint 5, steps 1 to 3.
 
 | Piece | File | Role |
 |-------|------|------|
@@ -15,6 +15,9 @@ Durable workflow runs and step runs — task 028, sprint 5, steps 1 and 2.
 | Approvals | `approvals.js` | the human decision a run waits on: owner, escalation, deadline |
 | Schedules | `timeTrigger.js` | a schedule as an entry in the automation trigger catalogue |
 | Compatibility wrapper | `automationRule.js` | an existing automation rule as a one-node workflow |
+| Agent run step | `agentRun.js` | an agent run as a step, through the existing runner |
+| Queue seam | `queue.js` | the one way a run is moved forward: the automation queue |
+| API | `controller.js`, `routes.js` | `/api/v2/workflows`: start, read, retry, skip, resume, compensate |
 | Engine | `engine.js` | claim, lease, run once, record, decide |
 
 ## The flag
@@ -115,8 +118,8 @@ A step reads an earlier step's output as `$<stepId>.field`, which the expression
 language only recognises when the id begins with `s`; `validateSteps` refuses a
 reference that would otherwise read nothing at all.
 
-`agent_run` is the type and its contract, not yet its wiring: the executor calls
-`context.runAgent`, which sprint 5 step 3 supplies.
+`agent_run` is the type and its contract; the runner it calls through
+`context.runAgent` is `agentRun.js`, below.
 
 ## Waiting, without holding a worker
 
@@ -164,15 +167,69 @@ list, and `Modules/Workflows/timeTrigger.js` holds its vocabulary: every minute,
 every hour at a minute, every day at a time, every week on a day at a time, UTC.
 It carries `kind: 'time'` because nothing publishes it, and it is offered only
 while `WORKFLOW_ENGINE` is on. What turns a due schedule into a run is the
-workflow queue in step 3.
+workflow queue, `queue.js`.
+
+## The agent runner behind `agent_run`
+
+`stepTypes/agentRun.js` settled what the step is; `agentRun.js` is the runner it
+calls through `context.runAgent`, which every tick supplies. It starts nothing of
+its own: it hands the existing runner an `agent_runs` row and lets the run's
+identity, its account, its spend cap, the policy and the proposal path apply
+exactly as they do for a run a person started from a task.
+
+Two shapes reach it. A run a person started through `POST /api/v2/agents/runs`
+already exists, and the step carries its `agentRunId`: with the flag on that
+endpoint wraps the run it just created in a one-node workflow and puts it on the
+queue instead of executing it on the web request's own event loop, so a
+user-started run and a rule-started one travel the same path. A step composed in
+a workflow carries an `agentId` and a `taskId` instead and starts the run itself
+under the idempotency key `wf:<runId>:<stepId>`, so a retried or replayed step
+finds the run its first attempt made rather than billing a second one.
+
+The run is written to the step before it executes, so a step that ends up failing
+still says which run it was — the first thing anyone reading a failed step asks.
+
+A run that stops for an approval of its own comes back as a transient failure:
+the step waits with it, and once the attempts are spent it fails visibly, which
+`resume` then picks up after the decision has settled the run. An approval as a
+step in its own right is `human_approval`.
+
+## The API
+
+`/api/v2/workflows`, behind the same flag. Off, every route answers `503` with
+the reason — the feature is not refused, it is not running.
+
+| Route | What it does |
+|---|---|
+| `POST /runs` | starts a run from a `steps` definition, or from the `{ agentId, taskId }` shorthand. An `Idempotency-Key` header (or an `idempotencyKey` field) becomes the run's dedupe key, so a repeated start returns the first run rather than making a second |
+| `GET /runs` | the company's runs, newest first |
+| `GET /runs/:id` | one run and every step of it |
+| `POST /runs/:id/steps/:stepId/retry` | a failed or skipped step back to pending with a fresh attempt budget |
+| `POST /runs/:id/steps/:stepId/skip` | a pending or failed step skipped by a person, which lets the steps behind it run |
+| `POST /runs/:id/steps/:stepId/resume` | a failed step, or one holding a claim nobody is working, back to pending with the attempts it has already spent |
+| `POST /runs/:id/steps/:stepId/compensate` | undoes what the step did, which for an agent-run step is the agents' own run revert: the same inverse, the same undo window, the same audit trail |
+
+Every control bumps the fencing token, because the worker whose attempt it
+overrides may still be alive; with a new token that worker's late write matches
+nothing, exactly as a lapsed lease's would. A control then reopens the run and
+puts it back on the queue, so there is one place a run is moved forward.
+
+Authorisation is the agents' rule, because a workflow step spends the same money
+and makes the same changes an agent run does: managing takes an Owner or an
+Admin, every request is scoped to the company of its `companyid` header, and a
+reader who is neither sees only the runs they started or whose project they can
+open. Agents do not drive workflows at all.
+
+A skip a person asked for is the one skip that does not block: `skippedBy` is
+what tells the scheduler the difference between "go on without it" and "this
+could never run".
 
 ## What these slices do not do
 
-Agent runs as real executors, user-started runs through the queue, the
-`/api/v2/workflows` API, typed dispatch results, deadline and budget shrinking
-per hop and the hourly run limit as loop admission control are steps 3 to 5 of
-the sprint. They register against `executors.js` and read the same collections;
-the engine does not change for them.
+Typed dispatch results, deadline and budget shrinking per hop and the depth guard
+are step 4; the hourly run limit as loop admission control is step 5. They
+register against `executors.js` and read the same collections; the engine does
+not change for them.
 
 Per the task's out-of-scope: no Temporal. The queue stays behind
 `Modules/Automations/engine/queue` and the step types behind `executors.js`, so

@@ -267,6 +267,9 @@ const verifyJWTTokenWithCRoute = [
     // A prefix, so /:id, /runs, /proposals/:id/approve are all behind a token. The MCP
     // endpoint (/mcp) is deliberately NOT here — it authenticates its own bearer PAT.
     '/api/v2/agents',
+    // Workflow runs (Modules/Workflows) — JWT+company; prefix-matches /workflows/runs
+    // and the per-step controls. Owner/admin is enforced in-controller.
+    "/api/v2/workflows",
     // SCIM admin config (Modules/Scim) — JWT+company; owner/admin gated
     // in-controller. The SCIM 2.0 protocol routes (/scim/v2/*) use bearer-token
     // auth (company resolved from the token) and are intentionally NOT listed.
