@@ -5,6 +5,14 @@ const config = require('../../Config/config.js');
 const { mongoTimeoutOptions } = require('../../Modules/Agents/engine/timeouts');
 const { onFatal } = require('../../Config/processGuards');
 
+// A connection closes asynchronously, so its last lifecycle events land after
+// the Jest suite that opened it has torn down; a console write there fails the
+// suite with "Cannot log after tests are done". The log file keeps every event.
+const reportConnectionState = (message) => {
+    logger.info(message);
+    if (process.env.NODE_ENV !== 'test') console.log(message);
+};
+
 const mailReport = (subject, body) => new Promise((resolve) => {
     sendMailRef.sendAttachMail(subject, body, config.ERRORRECIVEREMAIL, [], (result) => {
         if (!result.status) console.error(`[FATAL] crash report mail failed: ${result.statusText}`);
@@ -61,32 +69,17 @@ exports.connect = (db) => {
                 }
             );
 
+            const announce = (state) => reportConnectionState(`MONGO CONNECTION ${db}: ${state}`);
+
             connection.on('connected', () => {
-                logger.info(`MONGO CONNECTION ${db}: connected`);
-                console.log(`MONGO CONNECTION ${db}: connected`);
+                announce('connected');
                 resolve(connection);
             });
-            connection.on('open', () => {
-                logger.info(`MONGO CONNECTION ${db}: open`);
-                console.log(`MONGO CONNECTION ${db}: open`);
-                // resolve(connection);
-            });
-            connection.on('disconnected', () => {
-                logger.info(`MONGO CONNECTION ${db}: disconnected`);
-                console.log(`MONGO CONNECTION ${db}: disconnected`);
-            });
-            connection.on('reconnected', () => {
-                logger.info(`MONGO CONNECTION ${db}: reconnected`);
-                console.log(`MONGO CONNECTION ${db}: reconnected`);
-            });
-            connection.on('disconnecting', () => {
-                logger.info(`MONGO CONNECTION ${db}: disconnecting`);
-                console.log(`MONGO CONNECTION ${db}: disconnecting`);
-            });
-            connection.on('close', () => {
-                logger.info(`MONGO CONNECTION ${db}: close`);
-                console.log(`MONGO CONNECTION ${db}: close`);
-            });
+            connection.on('open', () => announce('open'));
+            connection.on('disconnected', () => announce('disconnected'));
+            connection.on('reconnected', () => announce('reconnected'));
+            connection.on('disconnecting', () => announce('disconnecting'));
+            connection.on('close', () => announce('close'));
 
             connection.on('error', (error) => {
                 logger.error(`MONGO CONNECTION: error >> ${JSON.stringify(error)}`)
