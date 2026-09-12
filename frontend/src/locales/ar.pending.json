@@ -7864,6 +7864,7 @@
     "Workflows.lineage_run_unowned": "Started by the system",
     "Workflows.lineage_somebody": "somebody",
     "EmptyState.no_visible_tasks_title": "No tasks to show here",
-    "EmptyState.no_visible_tasks_msg": "This project has had tasks before, but none are visible in this view. They may have been archived or deleted."
+    "EmptyState.no_visible_tasks_msg": "This project has had tasks before, but none are visible in this view. They may have been archived or deleted.",
+    "Toast.Sprint_not_found": "Sprint not found"
   }
 }

@@ -44,7 +44,7 @@ const agentActionGuard = (action, paramsOf = () => ({})) => withActor(async (req
 /* PATCH /api/v2/tasks carries many actions in body.action. Map each to a
  * registry key so setting Done, deleting, or anything unmapped is refused. */
 const TASK_PATCH_ACTIONS = {
-    updateStatus: (b) => ({ action: 'task.status.set', params: { taskId: b.prevStatus && b.prevStatus.taskId, status: { statusType: b.newStatus && b.newStatus.statusType, name: b.newStatus && b.newStatus.status && b.newStatus.status.text } } }),
+    updateStatus: (b) => ({ action: 'task.status.set', params: { taskId: taskIdOf(b), status: { statusType: b.newStatus && b.newStatus.statusType, name: b.newStatus && b.newStatus.status && b.newStatus.status.text } } }),
     updateAssignee: (b) => ({ action: 'task.assign', params: { taskId: taskIdOf(b) } }),
     updatePriority: (b) => ({ action: 'task.update', params: { taskId: taskIdOf(b), fields: { Task_Priority: 1 } } }),
     updateDueDate: (b) => ({ action: 'task.update', params: { taskId: taskIdOf(b), fields: { DueDate: 1 } } }),

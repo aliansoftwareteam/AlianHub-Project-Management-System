@@ -6609,6 +6609,7 @@ export default {
         "Channel_updated_successfully": "Channel updated successfully",
         "Channel_deleted_successfully": "Channel deleted successfully",
         "Folder_not_found": "未找到文件夹。",
+        "Sprint_not_found": "Sprint not found",
         "Template_&_Project_data_has_been_added_successfully": "模板和项目数据已成功添加。",
         "Project_data_has_been_added_successfully": "项目数据已成功添加 {filterMessage}。",
         "Error_in_creating_project": "创建项目时出错。",
