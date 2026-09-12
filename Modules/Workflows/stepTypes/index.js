@@ -16,6 +16,12 @@ const waiting = require('./waiting');
 // automation registry has — the manifest a builder draws its forms from and a
 // validator reads its rules from, so a new step type is one file and one entry
 // rather than a form somebody has to hand-write.
+//
+// `output` is typed the way `config` is, and for the same reason: it is the
+// promise the step makes to whatever reads it next. `Modules/Workflows/typed.js`
+// holds the executor to it on the way out and holds the consumer to it on the
+// way in, so a field that is missing or of the wrong shape stops the run naming
+// the field instead of arriving somewhere as a silent undefined.
 
 const CONTRACTS = Object.freeze([
     {
@@ -30,7 +36,12 @@ const CONTRACTS = Object.freeze([
             deadlineMs: { type: 'duration', label: 'Deadline' },
             budgetUsd: { type: 'number', label: 'Budget (USD)' },
         },
-        output: ['agentRunId', 'status', 'costUsd', 'findings'],
+        output: {
+            agentRunId: { type: 'string', label: 'Agent run' },
+            status: { type: 'string', label: 'Status', required: true },
+            costUsd: { type: 'number', label: 'Cost (USD)', required: true },
+            findings: { type: 'list', label: 'Findings', required: true },
+        },
     },
     {
         key: toolCall.TYPE,
@@ -39,7 +50,10 @@ const CONTRACTS = Object.freeze([
             tool: { type: 'action', label: 'Tool', required: true },
             params: { type: 'object', label: 'Parameters' },
         },
-        output: ['tool', 'result'],
+        output: {
+            tool: { type: 'string', label: 'Tool', required: true },
+            result: { type: 'object', label: 'Result', required: true },
+        },
     },
     {
         key: approval.TYPE,
@@ -55,7 +69,15 @@ const CONTRACTS = Object.freeze([
             onDeadline: { type: 'select', label: 'On the deadline', options: ['fail', 'approve', 'reject'] },
             onReject: { type: 'select', label: 'If refused', options: ['skip', 'continue'] },
         },
-        output: ['approvalId', 'decision', 'decidedBy', 'decidedAt', 'escalated'],
+        output: {
+            approvalId: { type: 'string', label: 'Approval', required: true },
+            decision: { type: 'string', label: 'Decision', required: true },
+            decidedBy: { type: 'string', label: 'Decided by' },
+            decidedAt: { type: 'date', label: 'Decided at' },
+            escalated: { type: 'boolean', label: 'Escalated' },
+            comment: { type: 'string', label: 'Comment' },
+            skipped: { type: 'list', label: 'Skipped' },
+        },
     },
     {
         key: fanOut.FAN_OUT,
@@ -67,7 +89,11 @@ const CONTRACTS = Object.freeze([
             config: { type: 'object', label: 'Child configuration' },
             maxChildren: { type: 'number', label: 'At most', max: flag.maxFanOut() },
         },
-        output: ['children', 'count'],
+        output: {
+            children: { type: 'list', label: 'Children', required: true },
+            count: { type: 'number', label: 'How many', required: true },
+            reused: { type: 'boolean', label: 'Reused' },
+        },
     },
     {
         key: fanOut.FAN_IN,
@@ -76,7 +102,12 @@ const CONTRACTS = Object.freeze([
             from: { type: 'step', label: 'The fan-out it joins', required: true },
             onChildFailure: { type: 'select', label: 'If a child fails', options: ['fail', 'continue'] },
         },
-        output: ['total', 'succeeded', 'failed', 'results'],
+        output: {
+            total: { type: 'number', label: 'Total', required: true },
+            succeeded: { type: 'number', label: 'Succeeded', required: true },
+            failed: { type: 'number', label: 'Failed', required: true },
+            results: { type: 'list', label: 'Results', required: true },
+        },
     },
     {
         key: condition.TYPE,
@@ -86,13 +117,20 @@ const CONTRACTS = Object.freeze([
             then: { type: 'steps', label: 'Then' },
             else: { type: 'steps', label: 'Otherwise' },
         },
-        output: ['matched', 'taken', 'skipped'],
+        output: {
+            matched: { type: 'boolean', label: 'Matched', required: true },
+            taken: { type: 'list', label: 'Taken', required: true },
+            skipped: { type: 'list', label: 'Skipped', required: true },
+        },
     },
     {
         key: wait.WAIT,
         label: 'Wait',
         config: { forMs: { type: 'duration', label: 'For', required: true } },
-        output: ['waitedMs', 'until'],
+        output: {
+            waitedMs: { type: 'number', label: 'Waited', required: true },
+            until: { type: 'date', label: 'Until', required: true },
+        },
     },
     {
         key: wait.TIMER,
@@ -101,7 +139,10 @@ const CONTRACTS = Object.freeze([
             at: { type: 'datetime', label: 'Until' },
             atFrom: { type: 'text', label: 'Until, from a step output' },
         },
-        output: ['waitedMs', 'until'],
+        output: {
+            waitedMs: { type: 'number', label: 'Waited', required: true },
+            until: { type: 'date', label: 'Until', required: true },
+        },
     },
     {
         key: loop.TYPE,
@@ -112,7 +153,13 @@ const CONTRACTS = Object.freeze([
             budgetUsd: { type: 'number', label: 'Budget (USD)' },
             while: { type: 'condition', label: 'While' },
         },
-        output: ['iterations', 'stoppedBy', 'budgetUsedUsd'],
+        output: {
+            iterations: { type: 'number', label: 'Iterations', required: true },
+            stoppedBy: { type: 'string', label: 'Stopped by', required: true },
+            budgetUsedUsd: { type: 'number', label: 'Budget used (USD)', required: true },
+            cap: { type: 'number', label: 'Cap' },
+            budgetUsd: { type: 'number', label: 'Budget (USD)' },
+        },
     },
 ]);
 

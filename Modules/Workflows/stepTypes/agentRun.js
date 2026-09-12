@@ -12,8 +12,10 @@ const { deterministic, num } = require('./graph');
 // hands back — is settled here, so the step type can be validated, saved in a
 // definition and dry-run without knowing where the runner lives.
 //
-// The deadline and the budget are carried but not yet shrunk per hop; that is
-// step 4, and it changes what is passed down, not the shape of this contract.
+// The deadline and the budget are the run's, shrunk per hop: the engine works
+// out what is left before the step is claimed and hands it down in the context,
+// and the step's own config may ask for less of it but never for more. Same for
+// the depth — `context.depth` is the one counter `runs.canStart` enforces.
 
 const TYPE = 'agent_run';
 
@@ -39,8 +41,12 @@ const execute = async ({ companyId, run, step, context = {} }) => {
         input: config.input || {},
         taskId: config.taskId || null,
         projectId: config.projectId || null,
+        deadlineAt: context.deadlineAt || null,
         deadlineMs: num(config.deadlineMs, 0) || null,
-        budgetUsd: Number(config.budgetUsd) > 0 ? Number(config.budgetUsd) : null,
+        // What the engine granted this hop, which is already the smaller of what
+        // the step asked for and what the run has left.
+        budgetUsd: Number(context.budgetUsd) > 0 ? Number(context.budgetUsd) : (Number(config.budgetUsd) > 0 ? Number(config.budgetUsd) : null),
+        depth: Number(context.depth) || 0,
         traceId: run.traceId || null,
         keepAlive: context.keepAlive,
         noteOutput: context.noteOutput,

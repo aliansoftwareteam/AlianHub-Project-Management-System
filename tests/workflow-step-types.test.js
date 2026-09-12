@@ -30,7 +30,12 @@ describe('the step types', () => {
         stepTypes.CONTRACTS.forEach((contract) => {
             expect(typeof contract.label).toBe('string');
             expect(Object.keys(contract.config).length).toBeGreaterThan(0);
-            expect(Array.isArray(contract.output)).toBe(true);
+            const output = Object.entries(contract.output);
+            expect(output.length).toBeGreaterThan(0);
+            output.forEach(([field, spec]) => {
+                expect(typeof field).toBe('string');
+                expect(Object.keys(require('../Modules/Workflows/typed').CHECKS)).toContain(spec.type);
+            });
         });
         expect(JSON.stringify(stepTypes.manifest())).not.toContain('function');
     });

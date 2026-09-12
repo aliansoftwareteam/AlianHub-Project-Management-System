@@ -133,8 +133,23 @@ const stepsFor = (body) => {
     }]);
 };
 
+const MAX_RUN_DEADLINE_MS = 30 * 24 * 60 * 60 * 1000;
+
+/* The deadline and the budget the whole run spends down. Both optional, and both
+ * only ever a request: `hop.ceilingFor` takes the smaller of what was asked for
+ * and what the workspace allows. */
+const boundsOf = (body) => {
+    const deadlineMs = body.deadlineMs === undefined || body.deadlineMs === null ? null : Number(body.deadlineMs);
+    const budgetUsd = body.budgetUsd === undefined || body.budgetUsd === null ? null : Number(body.budgetUsd);
+    if (deadlineMs !== null && (!Number.isFinite(deadlineMs) || deadlineMs <= 0 || deadlineMs > MAX_RUN_DEADLINE_MS)) {
+        throw invalid(`deadlineMs must be a positive number of milliseconds, at most ${MAX_RUN_DEADLINE_MS}`);
+    }
+    if (budgetUsd !== null && (!Number.isFinite(budgetUsd) || budgetUsd <= 0)) throw invalid('budgetUsd must be a positive number of dollars');
+    return { deadlineMs, budgetUsd };
+};
+
 /* POST /api/v2/workflows/runs
- * body: { workflowId?, name?, steps? } or { agentId, taskId, skill?, note?, … }
+ * body: { workflowId?, name?, steps?, deadlineMs?, budgetUsd? } or { agentId, taskId, skill?, note?, … }
  * An Idempotency-Key header (or an idempotencyKey field) makes a repeated start
  * return the run the first request created rather than starting a second. */
 exports.startRun = async (req, res) => {
@@ -157,6 +172,7 @@ exports.startRun = async (req, res) => {
             taskId: body.taskId ? String(body.taskId) : null,
             projectId: body.projectId ? String(body.projectId) : null,
             steps,
+            ...boundsOf(body),
         });
         if (!run) {
             const existing = dedupeKey ? await store.findRunByDedupeKey(ctx.companyId, dedupeKey) : null;

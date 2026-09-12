@@ -51,7 +51,7 @@ const taskFor = async (companyId, taskId) => {
     return task;
 };
 
-const startFor = async (companyId, { workflowRunId, stepId, agentId, taskId, skill, note, spendCapUsd, budgetUsd, startedBy, traceId }) => {
+const startFor = async (companyId, { workflowRunId, stepId, agentId, taskId, skill, note, spendCapUsd, budgetUsd, startedBy, traceId, depth }) => {
     const agent = await runs.getAgent(companyId, agentId);
     if (!agent) throw permanent(`agent ${agentId} was not found`);
     const task = await taskFor(companyId, taskId);
@@ -60,7 +60,9 @@ const startFor = async (companyId, { workflowRunId, stepId, agentId, taskId, ski
     }
     // A paused agent, a spend cap or a daily limit will not clear inside a backoff,
     // so the step fails with the reason rather than spending its attempts on it.
-    const check = await runs.canStart(agent, { trigger: TRIGGER, companyId });
+    // `depth` is the workflow's own re-entry count, checked by the same guard a
+    // rule-started run is checked by — one counter, not a second one.
+    const check = await runs.canStart(agent, { trigger: TRIGGER, companyId, depth });
     if (!check.ok) throw permanent(check.reason);
     const { run } = await runs.start(companyId, {
         agent,
@@ -74,6 +76,7 @@ const startFor = async (companyId, { workflowRunId, stepId, agentId, taskId, ski
         spendCapUsd: Number(budgetUsd) > 0 ? Number(budgetUsd) : spendCapUsd,
         idempotencyKey: idempotencyKeyFor(workflowRunId, stepId),
         traceId: traceId || null,
+        triggerDepth: depth,
     });
     return run;
 };
@@ -105,12 +108,12 @@ const executeAgentRun = async (companyId, agentRun) => {
 };
 
 /* What `context.runAgent` is. The step type calls this and nothing else. */
-const runAgent = async ({ companyId, workflowRunId, stepId, agentRunId, agentId, taskId, skill, note, spendCapUsd, budgetUsd, startedBy, traceId, noteOutput }) => {
+const runAgent = async ({ companyId, workflowRunId, stepId, agentRunId, agentId, taskId, skill, note, spendCapUsd, budgetUsd, startedBy, traceId, depth, noteOutput }) => {
     const existing = agentRunId ? await runs.get(companyId, agentRunId) : null;
     if (agentRunId && !existing) throw permanent(`agent run ${agentRunId} no longer exists`);
     if (!existing && !agentId) throw permanent('an agent run step needs an agentId or an agentRunId');
 
-    const agentRun = existing || await startFor(companyId, { workflowRunId, stepId, agentId, taskId, skill, note, spendCapUsd, budgetUsd, startedBy, traceId });
+    const agentRun = existing || await startFor(companyId, { workflowRunId, stepId, agentId, taskId, skill, note, spendCapUsd, budgetUsd, startedBy, traceId, depth });
     // Written before the run executes, so a step that ends up failing still says
     // which run it was — the first thing anyone reading a failed step asks.
     if (typeof noteOutput === 'function') await noteOutput({ agentRunId: String(agentRun._id), status: agentRun.status });

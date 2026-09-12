@@ -976,6 +976,16 @@
     "description": "Iterations a loop step may re-enter its body for. The ceiling a definition's own maxIterations is capped to.",
     "default": "25"
   },
+  "WORKFLOW_RUN_DEADLINE_MS": {
+    "group": "jobs",
+    "description": "Ceiling on how long a whole workflow run may take, in milliseconds. Each step takes its share and hands on what is left; a step asking for more than remains is refused and the run is marked blocked. Unset means no ceiling.",
+    "default": ""
+  },
+  "WORKFLOW_RUN_BUDGET_USD": {
+    "group": "jobs",
+    "description": "Ceiling on what a whole workflow run may spend, in dollars. Each step's cost is taken off the run's remaining budget; a step asking for more than remains is refused and the run is marked blocked. Unset means no ceiling.",
+    "default": ""
+  },
   "WORKFLOW_APPROVAL_POLL_MS": {
     "group": "jobs",
     "description": "How often a workflow step waiting on a human approval is looked at again. A decision wakes the step immediately; this is the floor that notices a deadline nobody answered.",
