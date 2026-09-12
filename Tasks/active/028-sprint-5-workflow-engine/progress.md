@@ -21,6 +21,7 @@ One pull request per step; tick with the merge commit.
 | Date | Entry |
 |---|---|
 | 2026-09-10 | Filed from `docs/AI-PLATFORM-ARCHITECTURE.md` (sprint 5) |
+| 2026-09-12 | Started. Step 1 (durable workflow and step runs, dependency scheduling, per-tenant claim counts, heartbeat leases with fencing, deterministic versus transient retries, idempotency keys) is in progress on `feat/sprint-5-workflow-runs`. Steps 2–5 wait for it. |
 
 ## Last step
-Not started.
+Step 1 in progress.
