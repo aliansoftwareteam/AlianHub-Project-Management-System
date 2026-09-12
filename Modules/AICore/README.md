@@ -4,7 +4,9 @@ The shared AI core: what every AI feature needs and no feature owns (ADR 003, ph
 
 | Piece | File | Role |
 |-------|------|------|
-| Provider factory | `llmProvider/` | `getProvider()` / `isAnyProviderConfigured()` plus the OpenAI, Anthropic and DeepSeek adapters behind one `chat()` interface |
+| Provider registry | `llmProvider/registry.js` | the one place a provider is known: the OpenAI, Anthropic, DeepSeek and Google adapters, plus `listProviders()` for the routing console |
+| Provider factory | `llmProvider/index.js` | `getProvider(selection)` / `isAnyProviderConfigured()` — picks the adapter, wraps it in the spend meter |
+| Request normalisation | `llmProvider/normalise.js` | one request out of the same chat options for every vendor: output ceiling, structured-output mode, reasoning-model parameters, and the `AI_MODEL_ROUTER` flag |
 | Usage and pricing | `usage.js` | token accounting, cost estimation, the unpriced-model gate |
 | Pre-call estimate | `estimate.js` | `estimateCall()` — what a call will cost before it is made (chars/4 with a safety factor, plus the max output), for spend gates |
 | Features | `features.js` | the closed list of feature tags a model call must carry |
@@ -32,3 +34,17 @@ feature tag fails under test and is booked as `unknown` with a warning in produc
 a call without a tenant is booked against the global database the same way.
 Agent runs pass `runId`: the row is booked once here, and `runs.recordSpend` only
 keeps the run's own `spend` fields, the agent's monthly cap and the run-context alert.
+
+## Routing
+
+`AI_MODEL_ROUTER` defaults to `off`, which is today's behaviour exactly: the provider
+chosen by `LLM_PROVIDER` (or the first configured one) answers every call, and a
+`provider` or `model` named on the chat options is ignored. With the flag `on`,
+`getProvider({ provider })` picks that adapter and `chat({ model })` sends that model —
+priced by the meter like any other, so a model with no price is still refused before
+the vendor call.
+
+An adapter declares what differs about its vendor in `capabilities`; `normalise.js`
+turns those plus the caller's options into the model id, output ceiling, temperature
+and structured-output mode the vendor wants. `tests/ai-provider-contract.test.js`
+drives every adapter in the registry through the same requests and failures.

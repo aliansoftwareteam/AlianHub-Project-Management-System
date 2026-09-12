@@ -847,5 +847,30 @@
     "group": "jobs",
     "description": "Minutes between runs of the agent rate-alert evaluator (error rate, approval rate, cost forecast, queue age).",
     "default": "15"
+  },
+  "AI_MODEL_ROUTER": {
+    "group": "ai",
+    "description": "model router: \"on\" lets a caller pick the provider and model per call; default \"off\" keeps the single configured provider answering everything",
+    "default": "off"
+  },
+  "GOOGLE_API_KEY": {
+    "group": "ai",
+    "description": "Google AI Studio API key, used when LLM_PROVIDER is google.",
+    "secret": true
+  },
+  "GOOGLE_MODEL": {
+    "group": "ai",
+    "description": "Gemini model id, e.g. gemini-3-flash / gemini-3-pro / gemini-2.5-flash",
+    "default": "gemini-3-flash"
+  },
+  "GOOGLE_BASE_URL": {
+    "group": "ai",
+    "description": "optional: override the Google generative-language base URL (e.g. for a compatible proxy)",
+    "default": "https://generativelanguage.googleapis.com"
+  },
+  "GOOGLE_TIMEOUT_MS": {
+    "group": "ai",
+    "description": "optional: override the Google axios timeout (default: LLM_TIMEOUT_MS for thinking models, 4 min for the rest)",
+    "default": "600000"
   }
 }
