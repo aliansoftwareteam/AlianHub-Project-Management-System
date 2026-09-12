@@ -971,6 +971,8 @@ const schema = {
         // Template for the run's summary over answer and emitted; absent means the answer's own summary.
         summary: { type: String, required: false },
         risk: { type: String, required: false },
+        // Model pinned to this skill, validated against the priced allowlist at save time
+        model: { type: String, required: false },
         retiredAt: { type: Date, required: false },
         createdBy: { type: String, required: false },
     },
@@ -1598,6 +1600,12 @@ const schema = {
         },
         // { enabled, errorRatePct, errorMinRuns, approvalFloorPct, approvalDropPts, costForecastPct, queueAgeMinutes }
         agentAlerts: {
+            type: Object,
+            required: false
+        },
+        // { classes: { <task class>: { model?, qualityFloor?, latencyTargetMs? } }, updatedAt, updatedBy }
+        // — the routing policy (Modules/AICore/routingPolicy.js); read only while AI_MODEL_ROUTER is on
+        aiRoutingPolicy: {
             type: Object,
             required: false
         },

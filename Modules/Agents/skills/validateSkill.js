@@ -3,6 +3,7 @@
 // is the normalised document that gets written, and only that.
 
 const registry = require('../registry');
+const modelPin = require('../../AICore/modelPin');
 const { tagsIn, structureErrors } = require('./skillTemplate');
 const { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, MAX_EMIT_EACH } = require('./catalogues');
 
@@ -200,6 +201,9 @@ const validateSkill = (input = {}) => {
 
     if (doc.risk !== undefined && !RISKS.includes(doc.risk)) errors.push(error('risk', 'invalid', `must be one of ${RISKS.join(', ')}`));
 
+    const pin = modelPin.validatePin(doc.model);
+    if (!pin.ok) errors.push(error('model', pin.code, pin.message));
+
     if (errors.length) return { ok: false, errors, value: null };
 
     const emits = [...new Set(emit.map((m) => m.action))];
@@ -213,6 +217,7 @@ const validateSkill = (input = {}) => {
             enabled: doc.enabled !== false,
             inputs, gather, prompt, emit, emits,
             ...(summary ? { summary } : {}),
+            model: pin.model,
             risk: doc.risk && riskRank(doc.risk) > riskRank(computed) ? doc.risk : computed,
         },
     };

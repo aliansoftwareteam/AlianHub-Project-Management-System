@@ -177,6 +177,22 @@ function priceFor(modelId) {
     return { priced: true, model, input: table[match].input, output: table[match].output };
 }
 
+/** Every model id with a price on file: the defaults plus the LLM_PRICING overrides. */
+const pricedModels = () => Object.keys(pricing()).sort();
+
+/**
+ * The save-time gate for a pinned model, and the one pricing check anything
+ * that stores a model id should use.
+ *
+ * @returns {{ok: boolean, model: string, code?: string, message?: string}}
+ */
+function ensurePriced(modelId) {
+    const model = String(modelId || '').trim();
+    const price = priceFor(model);
+    if (price.priced) return { ok: true, model };
+    return { ok: false, model, code: UNPRICED_MODEL, message: unpricedMessage(model) };
+}
+
 /**
  * Price a tally.
  *
@@ -229,4 +245,4 @@ function checkConfiguredModelPriced() {
     return { ok: false, reason: price.message, code: UNPRICED_MODEL, model };
 }
 
-module.exports = { emptyUsage, usageFromResult, addUsage, summarize, priceFor, parsePricing, configuredModel, checkConfiguredModelPriced, unpricedMessage, UNPRICED_MODEL, DEFAULT_PRICING };
+module.exports = { emptyUsage, usageFromResult, addUsage, summarize, priceFor, pricedModels, ensurePriced, parsePricing, configuredModel, checkConfiguredModelPriced, unpricedMessage, UNPRICED_MODEL, DEFAULT_PRICING };

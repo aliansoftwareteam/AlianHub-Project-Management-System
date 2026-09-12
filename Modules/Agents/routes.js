@@ -22,6 +22,9 @@ exports.init = (app) => {
     app.get('/api/v2/agents/settings', ctrl.getSettings);
     app.put('/api/v2/agents/settings', ctrl.putSettings);
     app.get('/api/v2/agents/budget', ctrl.getBudget);
+    app.get('/api/v2/agents/models', ctrl.getModels);
+    app.get('/api/v2/agents/routing-policy', ctrl.getRoutingPolicy);
+    app.put('/api/v2/agents/routing-policy', ctrl.putRoutingPolicy);
     app.get('/api/v2/agents/metrics', metricsCtrl.getMetrics);
     app.get('/api/v2/agents/alerts', metricsCtrl.getAlerts);
     app.post('/api/v2/agents/alerts/evaluate', metricsCtrl.evaluateAlerts);

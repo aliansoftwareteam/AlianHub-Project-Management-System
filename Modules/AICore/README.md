@@ -7,7 +7,11 @@ The shared AI core: what every AI feature needs and no feature owns (ADR 003, ph
 | Provider registry | `llmProvider/registry.js` | the one place a provider is known: the OpenAI, Anthropic, DeepSeek and Google adapters, plus `listProviders()` for the routing console |
 | Provider factory | `llmProvider/index.js` | `getProvider(selection)` / `isAnyProviderConfigured()` — picks the adapter, wraps it in the spend meter |
 | Request normalisation | `llmProvider/normalise.js` | one request out of the same chat options for every vendor: output ceiling, structured-output mode, reasoning-model parameters, and the `AI_MODEL_ROUTER` flag |
-| Usage and pricing | `usage.js` | token accounting, cost estimation, the unpriced-model gate |
+| Usage and pricing | `usage.js` | token accounting, cost estimation, the unpriced-model gate, and `ensurePriced()` / `pricedModels()` — the one pricing check anything that stores a model id uses |
+| Task classes | `taskClass.js` | the four shapes of work every feature falls into, each with a quality floor, a latency target and an input budget |
+| Model catalogue | `llmProvider/catalogue.js` | the priced allowlist: the pricing table joined to the registry, with the provider and quality tier of a model id |
+| Model pins | `modelPin.js` | `validatePin()` — what an agent or skill may pin, refused at save time when the model is unpriced or its provider is not configured |
+| Routing policy | `routingPolicy.js` | the per-workspace task class to model preferences, on the company row; `effective()` is what a router reads |
 | Pre-call estimate | `estimate.js` | `estimateCall()` — what a call will cost before it is made (chars/4 with a safety factor, plus the max output), for spend gates |
 | Features | `features.js` | the closed list of feature tags a model call must carry |
 | Spend ledger | `spend.js` | the meter around every `chat()`: refuses an unpriced model before the vendor call, books one `ai_usage` row per call, announces budget levels for non-run features |
@@ -42,7 +46,15 @@ chosen by `LLM_PROVIDER` (or the first configured one) answers every call, and a
 `provider` or `model` named on the chat options is ignored. With the flag `on`,
 `getProvider({ provider })` picks that adapter and `chat({ model })` sends that model —
 priced by the meter like any other, so a model with no price is still refused before
-the vendor call.
+the vendor call, and `routingPolicy.effective()` hands over the model the workspace
+picked for the task class. With the flag off that model is always null, so a saved
+policy changes nothing.
+
+A pin is a different thing from the policy: the policy is a workspace preference per
+task class, a pin is one agent or one skill saying "always this model". Both are held
+to the same allowlist — every model with a price on file, served by a provider this
+instance has configured — and both are checked when they are saved, so an unpriced or
+unreachable model is a refusal in the settings form, not a failed run later.
 
 An adapter declares what differs about its vendor in `capabilities`; `normalise.js`
 turns those plus the caller's options into the model id, output ceiling, temperature

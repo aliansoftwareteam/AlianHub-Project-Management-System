@@ -850,7 +850,7 @@
   },
   "AI_MODEL_ROUTER": {
     "group": "ai",
-    "description": "model router: \"on\" lets a caller pick the provider and model per call; default \"off\" keeps the single configured provider answering everything",
+    "description": "model router: \"on\" lets a caller pick the provider and model per call and lets the workspace routing policy name a model per task class; default \"off\" keeps the single configured provider answering everything, so a saved policy changes nothing",
     "default": "off"
   },
   "GOOGLE_API_KEY": {
