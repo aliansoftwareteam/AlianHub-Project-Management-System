@@ -10,7 +10,9 @@ const { redact, redactMessages } = require('./redact');
 /* The replay record: one row per model call, written by the core meter
  * (spend.js) so no feature can call a model without leaving one. The prompt
  * holds tenant content, so the stored copy is redacted and capped and expires;
- * promptHash is taken before redaction so identical prompts still match. */
+ * promptHash is taken before redaction so identical prompts still match.
+ * `decision` is the routing decision for the same call (decision.js): provider
+ * names and numbers only, so it carries nothing to redact. */
 
 const LOG_PREFIX = '[ai-replay]';
 const MODES = ['off', 'agent', 'all'];
@@ -76,7 +78,7 @@ const currentTraceId = () => {
 
 const errorCodeOf = (error) => String(error.code || error.status || error.name || 'error');
 
-function rowFor({ context, opts, adapter, result, error, durationMs }) {
+function rowFor({ context, opts, adapter, result, error, durationMs, decision }) {
     const given = (opts && opts.spend) || {};
     const model = (result && result.model) || adapter.model || null;
     const tally = usage.usageFromResult(result);
@@ -102,6 +104,7 @@ function rowFor({ context, opts, adapter, result, error, durationMs }) {
         usage: { inputTokens: tally.inputTokens, outputTokens: tally.outputTokens },
         costUsd: priced && priced.priced ? priced.costUsd : null,
         durationMs: Number(durationMs) || 0,
+        decision: decision || null,
         status: error ? 'error' : 'ok',
         errorCode: error ? errorCodeOf(error) : null,
         traceId: currentTraceId(),

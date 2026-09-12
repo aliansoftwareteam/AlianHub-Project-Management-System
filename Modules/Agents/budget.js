@@ -7,6 +7,7 @@ const { ROLE_OWNER, ROLE_ADMIN } = require('../../Config/permissionGuard');
 const logger = require('../../Config/loggerConfig');
 const runs = require('./runs');
 const spend = require('../AICore/spend');
+const { routerEnabled } = require('../AICore/llmProvider/normalise');
 const alertRules = require('./alertRules');
 
 // Company-level agent settings (undo window, monthly budget) and this month's
@@ -88,18 +89,29 @@ const provider = () => {
     };
 };
 
-/* Booked spend from the ledger, plus what open runs hold for calls in flight.
- * A reservation left on a finished run is a leftover, never spend, so only
- * open runs count. */
-const ledgerThisMonth = async (companyId, month) => {
+/* What open runs hold for calls in flight. A reservation left on a finished run
+ * is a leftover, never spend, so only open runs count. */
+const runHolds = async (companyId, month) => {
     const from = new Date(`${month}-01T00:00:00.000Z`);
     const to = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1));
-    const [booked, open] = await Promise.all([
+    const open = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ startedAt: { $gte: from }, status: { $in: runs.OPEN } }, 'startedAt reservedUsd'] }, 'find').catch(() => []);
+    return money((open || []).filter((r) => new Date(r.startedAt).getTime() < to.getTime()).reduce((s, r) => s + Number(r.reservedUsd || 0), 0));
+};
+
+/* Booked spend from the ledger, plus what is held for calls in flight.
+ *
+ * Which hold that is depends on the router flag. With it off, agent runs are
+ * the only calls that hold anything and they hold it on the run row. With it
+ * on, every billed call reserves against the tenant (AICore/reservation.js),
+ * including the agent's, so the reservation ledger is the whole in-flight
+ * number and the run row's hold is left to the run's own cap — counting both
+ * would count an agent call twice. */
+const ledgerThisMonth = async (companyId, month) => {
+    const [booked, reservedUsd] = await Promise.all([
         spend.monthly(companyId, month),
-        MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ startedAt: { $gte: from }, status: { $in: runs.OPEN } }, 'startedAt reservedUsd'] }, 'find').catch(() => []),
+        routerEnabled() ? require('../AICore/reservation').heldUsd(companyId, month) : runHolds(companyId, month),
     ]);
-    const inMonth = (open || []).filter((r) => new Date(r.startedAt).getTime() < to.getTime());
-    return { usedUsd: money(booked.usedUsd), reservedUsd: money(inMonth.reduce((s, r) => s + Number(r.reservedUsd || 0), 0)) };
+    return { usedUsd: money(booked.usedUsd), reservedUsd: money(reservedUsd) };
 };
 
 const alertsOf = (company, month) => {

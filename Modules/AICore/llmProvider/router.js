@@ -2,6 +2,7 @@ const logger = require('../../../Config/loggerConfig');
 const { metered } = require('../spend');
 const { isProviderError } = require('../providerError');
 const { resolveModel, routerEnabled } = require('./normalise');
+const decision = require('../decision');
 const health = require('./health');
 const rateLimit = require('./rateLimit');
 
@@ -75,9 +76,10 @@ function observed(adapter) {
         get capabilities() { return adapter.capabilities; },
         async chat(opts) {
             const model = resolveModel(adapter, opts);
+            const forThis = { ...opts, [decision.KEY]: decision.begin({ routerEnabled: false, provider: adapter.name, model: null }) };
             const startedAt = Date.now();
             try {
-                const result = await metre.chat(opts);
+                const result = await metre.chat(forThis);
                 health.record({ provider: adapter.name, model, ok: true, durationMs: Date.now() - startedAt });
                 return result;
             } catch (error) {
@@ -102,16 +104,21 @@ async function waitForToken(name) {
 
 async function callCandidate(adapter, opts, reasons) {
     const model = resolveModel(adapter, opts);
+    const call = decision.of(opts);
+    const skipped = (reason) => {
+        reasons.push({ provider: adapter.name, model, reason });
+        if (call) call.skip(adapter.name, model, reason);
+    };
     const maxAttempts = attempts();
     let lastError = null;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         if (!(await waitForToken(adapter.name))) {
-            reasons.push({ provider: adapter.name, model, reason: 'rate_limited' });
+            skipped(decision.SKIP.RATE_LIMITED);
             return { ok: false, error: lastError };
         }
         const admission = health.admit(adapter.name, model);
         if (!admission.allowed) {
-            reasons.push({ provider: adapter.name, model, reason: `breaker_${admission.state}` });
+            skipped(`breaker_${admission.state}`);
             return { ok: false, error: lastError };
         }
         try {
@@ -123,7 +130,7 @@ async function callCandidate(adapter, opts, reasons) {
                 await sleep(backoffFor(attempt, error));
                 continue;
             }
-            reasons.push({ provider: adapter.name, model, reason: typeOf(error) });
+            skipped(typeOf(error));
             return { ok: false, error };
         }
     }
@@ -149,9 +156,11 @@ function routed(primary, registry) {
         get capabilities() { return primary.capabilities; },
         async chat(opts) {
             const reasons = [];
+            const call = decision.begin({ routerEnabled: true, provider: primary.name, model: opts && opts.model });
             let lastError = null;
             for (const adapter of candidates) {
-                const forThis = adapter === primary ? opts : { ...opts, model: undefined, provider: adapter.name };
+                if (adapter !== primary && opts && opts.model) call.skip(adapter.name, opts.model, decision.SKIP.PIN_DROPPED);
+                const forThis = adapter === primary ? { ...opts, [decision.KEY]: call } : { ...opts, [decision.KEY]: call, model: undefined, provider: adapter.name };
                 const outcome = await callCandidate(adapter, forThis, reasons);
                 if (outcome.ok) {
                     if (adapter !== primary) logger.warn(`${LOG_PREFIX} ${primary.name} was skipped or failed; ${adapter.name} answered (${reasons.map((r) => `${r.provider}: ${r.reason}`).join('; ')})`);

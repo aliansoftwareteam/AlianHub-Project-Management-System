@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { AsyncLocalStorage } = require('async_hooks');
 const fs = require('fs');
 const path = require('path');
 const api = require('@opentelemetry/api');
@@ -104,12 +105,30 @@ const handleFor = ({ traceId, spanId, attributes, span }) => {
     };
 };
 
+/* The innermost span handle of the current async context, so a module deep
+ * under withSpan (the spend meter, say) can add what it learns to the span its
+ * caller opened without that caller passing the handle down. */
+const openSpans = new AsyncLocalStorage();
+
+const current = () => openSpans.getStore() || null;
+
+/** Adds attributes to the innermost open span; no-op outside one. */
+function setAttributes(attributes) {
+    const handle = current();
+    if (handle) handle.setAttributes(attributes);
+    return Boolean(handle);
+}
+
 function withSpan(name, attributes, fn) {
-    if (!sdk) return fn(handleFor({ traceId: traceIdNow(), spanId: newSpanId(), attributes }));
+    if (!sdk) {
+        const handle = handleFor({ traceId: traceIdNow(), spanId: newSpanId(), attributes });
+        return openSpans.run(handle, () => fn(handle));
+    }
     return api.trace.getTracer(TRACER_NAME).startActiveSpan(name, { attributes: cleanAttributes(attributes) }, async (span) => {
         const { traceId, spanId } = span.spanContext();
         try {
-            return await fn(handleFor({ traceId, spanId, attributes, span }));
+            const handle = handleFor({ traceId, spanId, attributes, span });
+            return await openSpans.run(handle, () => fn(handle));
         } catch (error) {
             span.recordException(error);
             span.setStatus({ code: api.SpanStatusCode.ERROR, message: error && error.message });
@@ -120,4 +139,4 @@ function withSpan(name, attributes, fn) {
     });
 }
 
-module.exports = { start, boot, stop, flush, isActive, traceIdNow, withTrace, withSpan, newTraceId, newSpanId, isTraceId };
+module.exports = { start, boot, stop, flush, isActive, traceIdNow, withTrace, withSpan, setAttributes, currentSpan: current, newTraceId, newSpanId, isTraceId };

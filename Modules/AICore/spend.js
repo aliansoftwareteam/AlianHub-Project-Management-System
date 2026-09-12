@@ -6,7 +6,11 @@ const usage = require('./usage');
 const replay = require('./replay');
 const { isFeature, UNKNOWN_FEATURE } = require('./features');
 const { isProviderError } = require('./providerError');
-const { resolveModel } = require('./llmProvider/normalise');
+const { resolveModel, routerEnabled } = require('./llmProvider/normalise');
+const { preflight } = require('./estimate');
+const decision = require('./decision');
+const reservation = require('./reservation');
+const telemetry = require('../../Config/telemetry');
 
 /* The spend ledger: one row per model call, written here and nowhere else, so
  * a feature cannot spend without the budget seeing it. Callers name the
@@ -92,24 +96,50 @@ function metered(adapter) {
             // The model the adapter will send, which is not the configured one
             // once the router lets a caller name a model on the chat options.
             const requestedModel = resolveModel(adapter, opts);
-            ensurePriced(requestedModel, context);
+            const call = decision.attach(opts, { routerEnabled: routerEnabled(), provider: adapter.name, model: opts && opts.model });
+            call.classified(context.feature, null);
+            try {
+                ensurePriced(requestedModel, context);
+            } catch (error) {
+                call.skip(adapter.name, requestedModel, decision.SKIP.UNPRICED);
+                telemetry.setAttributes(call.attributes());
+                throw error;
+            }
+            const estimate = preflight({ systemPrompt: opts.systemPrompt, messages: opts.messages, maxTokens: opts.maxTokens, model: requestedModel, feature: context.feature });
+            call.estimated(estimate);
+            const ticket = await reservation.reserve(context, estimate, adapter.name);
+            call.reserved(ticket);
+            if (!ticket.ok) {
+                call.skip(adapter.name, requestedModel, ticket.code);
+                telemetry.setAttributes(call.attributes());
+                throw Object.assign(new Error(ticket.reason), { code: ticket.code, feature: context.feature });
+            }
+            call.attempt(adapter.name, requestedModel);
             const startedAt = Date.now();
             let result;
             try {
                 result = await adapter.chat(opts);
             } catch (error) {
+                await reservation.release(ticket);
+                call.settled(decision.RESERVATION.RELEASED);
                 if (isProviderError(error)) logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} failed [${error.groupKey()}]${error.requestId ? ` request ${error.requestId}` : ''}: ${error.message}`);
-                await replay.record({ context, opts, adapter, error, durationMs: Date.now() - startedAt });
+                telemetry.setAttributes(call.attributes());
+                await replay.record({ context, opts, adapter, error, durationMs: Date.now() - startedAt, decision: call.record() });
                 throw error;
             }
             const durationMs = Date.now() - startedAt;
+            const spent = usage.summarize(usage.usageFromResult(result), (result && result.model) || requestedModel || adapter.model);
+            call.answered(adapter.name, spent.model).used(spent);
             try {
                 await record(context, result, adapter, requestedModel);
             } catch (e) {
                 if (strict()) throw e;
                 logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} spent ${usage.usageFromResult(result).totalTokens} tokens that could not be booked: ${e.message}`);
             }
-            await replay.record({ context, opts, adapter, result, durationMs });
+            await reservation.reconcile(ticket, spent);
+            call.settled(ticket.id ? decision.RESERVATION.SETTLED : ticket.state);
+            telemetry.setAttributes(call.attributes());
+            await replay.record({ context, opts, adapter, result, durationMs, decision: call.record() });
             await alert(context);
             return result;
         },
