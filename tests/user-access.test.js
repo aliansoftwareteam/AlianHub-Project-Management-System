@@ -18,11 +18,12 @@ const GUEST = '6f0000000000000000000004';
 const STRANGER = '6f0000000000000000000005';
 const UNVERIFIED = '6f0000000000000000000006';
 
+const LEGACY_IMAGE = '171_member.png';
 const SECRETS = { webTokens: ['push-token'], verificationToken: 'verify-secret', forgotPasswordToken: 'reset-secret', forgotPasswordTokenTime: 1 };
 const USERS = {
     [OWNER]: { _id: OWNER, Employee_Name: 'Owner', AssignCompany: [COMPANY, OTHER_COMPANY], isProductOwner: true, customerId: 'cus_1', ...SECRETS },
     [ADMIN]: { _id: ADMIN, Employee_Name: 'Admin', AssignCompany: [COMPANY], ...SECRETS },
-    [MEMBER]: { _id: MEMBER, Employee_Name: 'Member', AssignCompany: [COMPANY], ...SECRETS },
+    [MEMBER]: { _id: MEMBER, Employee_Name: 'Member', AssignCompany: [COMPANY], Employee_profileImage: LEGACY_IMAGE, Employee_profileImageURL: LEGACY_IMAGE, ...SECRETS },
     [GUEST]: { _id: GUEST, Employee_Name: 'Guest', AssignCompany: [COMPANY], ...SECRETS },
     [STRANGER]: { _id: STRANGER, Employee_Name: 'Stranger', AssignCompany: [OTHER_COMPANY], ...SECRETS },
     [UNVERIFIED]: { _id: UNVERIFIED, Employee_Email: 'new@example.test', AssignCompany: [], isEmailVerified: false, ...SECRETS },
@@ -216,6 +217,25 @@ describe('ACC-05 PUT /api/v1/user', () => {
     it('refuses an admin removing a member from a company they do not administer', async () => {
         const res = await put(ADMIN, { userId: STRANGER, updateObject: { $pull: { AssignCompany: OTHER_COMPANY } } });
         expect(res.status).toBe(403);
+    });
+
+    it.each([
+        ['another user\'s upload', { Employee_profileImage: `${OWNER}_17_photo.png` }],
+        ['a name nobody uploaded', { Employee_profileImage: 'stolen.png' }],
+        ['another user\'s upload as the image URL', { Employee_profileImageURL: `${OWNER}_17_photo.png` }],
+        ['a path outside the flat profile bucket', { Employee_profileImage: `InvoiceAndCreditNotes/CreditNotes/${COMPANY}/inv-9.pdf` }],
+    ])('refuses pointing a profile at %s', async (_what, fields) => {
+        const res = await put(MEMBER, { userId: MEMBER, updateObject: { $set: fields } });
+        expect(res.status).toBe(403);
+        expect(callsOf('findOneAndUpdate')).toHaveLength(0);
+    });
+
+    it('accepts the caller\'s own upload, the name their record already holds, and clearing it', async () => {
+        const own = `${MEMBER}_17_photo.png`;
+        for (const fields of [{ Employee_profileImage: own, Employee_profileImageURL: own }, { Employee_profileImage: LEGACY_IMAGE }, { Employee_profileImage: '' }]) {
+            const res = await put(MEMBER, { userId: MEMBER, updateObject: { $set: { ...fields, Employee_Name: 'Member' } } });
+            expect([JSON.stringify(fields), res.status]).toEqual([JSON.stringify(fields), 200]);
+        }
     });
 });
 

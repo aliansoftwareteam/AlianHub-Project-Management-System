@@ -117,6 +117,22 @@ const companyRemovalOf = (updateObject) => {
 
 const sanitizeUpdateOptions = (options) => (options && options.returnDocument === 'after' ? { returnDocument: 'after' } : undefined);
 
+const PROFILE_IMAGE_FIELDS = ['Employee_profileImage', 'Employee_profileImageURL'];
+
+/* A user may point their profile at an image they uploaded — the storage guards only let
+ * them write a name starting with their own id — or leave the one their record already
+ * holds, which is how an image uploaded before that rule keeps working. Any other name
+ * would be someone else's image. */
+const unownedProfileImages = (fields, currentUser, mayWrite) => {
+    const held = PROFILE_IMAGE_FIELDS.map((field) => String((currentUser && currentUser[field]) || '')).filter(Boolean);
+    return PROFILE_IMAGE_FIELDS
+        .filter((field) => fields[field] !== undefined)
+        .map((field) => String(fields[field] || ''))
+        .filter((value) => value !== '' && !held.includes(value) && !mayWrite(value));
+};
+
+const hasProfileImage = (fields) => PROFILE_IMAGE_FIELDS.some((field) => fields[field] !== undefined);
+
 module.exports = {
     MEMBER_FIELDS,
     SELF_FIELDS,
@@ -130,4 +146,6 @@ module.exports = {
     sanitizeSelfUpdate,
     companyRemovalOf,
     sanitizeUpdateOptions,
+    unownedProfileImages,
+    hasProfileImage,
 };
