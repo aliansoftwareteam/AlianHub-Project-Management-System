@@ -2,36 +2,31 @@
 
 Updated 2026-09-12. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (732bf025, `14.36.0-beta.122`)
+## State of `beta` (b15159e5, `14.36.0-beta.131`)
 
-- **Task 035 (QA follow-ups) is code-complete.** All seven groups merged, each after an adversarial review that confirmed 36 defects across five PRs whose CI was already green: #632, #633, #634, #635, #637, #638, #639, #640, #641, #642, #643, #644, #645 and #647. Build numbers are in `docs/BETA-LOG.md`.
-- **Upgrade step for every deployed instance:** run `node scripts/audit-product-owners.js` (added by #645) and review each account it marks REVIEW.
-- **CI:** the `e2e` job runs on pull requests and on pushes to `beta`; beta is green.
+- **Task 035 (QA follow-ups):** the first wave closed yesterday; today's second wave merged #649 to #656, each reproduced with a failing test before the fix. Build numbers are in `docs/BETA-LOG.md`, details in `Tasks/active/035-qa-followups/progress.md`.
+- **Upgrade steps for a deployed instance:**
+  1. `node scripts/audit-product-owners.js` (from #645) and review every account it marks REVIEW.
+  2. Migration 013 runs at server start; it activates seats that SSO and SCIM created with the invited status.
+  3. Operator routes changed shape in #655: the preset key now travels in the `x-preset-key` header, and first-install setup is `POST /api/v1/setPresetCompany`. Update runbooks and bookmarks.
+  4. `TRACKER_PKCE_LEGACY_UNTIL` (from #653) is unset by default, so trackers already installed keep signing in. Set it to a date once the new tracker build has rolled out.
 - **Open PRs:** #613 only, a duplicate of the merged #612 for the owner to close.
-
-## In flight
-
-Four fixes for the remaining follow-ups, one branch each, opened as PRs when green:
-
-1. `fix/auth-responses-self-view` — login, token and signup responses still return a raw `users` document (items 41, 42 and the unverified-login body).
-2. `fix/estimated-time-write-guard` — `PUT /api/v1/estimatedTime` builds its filter and update from the request body (the write half of item 36).
-3. `fix/profile-image-reads` — profile images and credit notes are readable by any signed-in user; `PUT /api/v1/user` accepts any image path (items 38, 39).
-4. `fix/role-lookup-active-membership` — `getRoleType` counts removed and pending rows, and two company routes skip the live membership re-check (items 30, 45, 46).
 
 ## Next up
 
-1. Merge the four above once green, merging `origin/beta` between merges; `*.pending.json` conflicts resolve by keeping every key.
-2. Remaining follow-ups in `Tasks/active/034-end-to-end-qa-programme/followups.md`: 4, 11, 13, 14, 26, 32 and 37 (owner decisions), 34, 35, 43, 44, 47. Items 16 and 17 belong to Sprint 8 (task 031).
-3. Owner checks still open: migrations on the dev database, browser sweeps for tasks 023–026 and 033, a live OTLP collector check for 026.
-4. Then Sprint 4 (task 027, the model router).
+1. **Owner decisions**, listed in `followups.md`: item 32 (should saving a project filter for another user answer 403, as the task side does?), item 37 (who writes the subscription `invoices` collection?), item 35 (make auth cookies unreadable by JavaScript, which changes how the frontend reads them), and whether the planner's estimate permission should line up with the timesheet permissions (#656).
+2. **Remaining follow-ups:** 14 and 26, plus the new 48 to 51. Items 16 and 17 belong to Sprint 8 (task 031).
+3. **Owner checks still open:** migrations on the dev database, browser sweeps for tasks 023 to 026 and 033, a live OTLP collector check for 026.
+4. **Then Sprint 4** (task 027, the model router).
 
 ## Owner decisions recorded
 
 - Only owners and admins delete agents (#620). `REFRESH_TOKEN_REUSE_GRACE_SECONDS` defaults to 10 (#609).
 - The `e2e` job runs on pushes to `beta` (#634).
-- Webhooks reach private hosts only through an instance-owner allowlist, empty by default, with metadata and link-local ranges never allowed (#647). A consequence: `100.64.0.0/10` cannot be allowlisted whole, because it contains Alibaba Cloud's metadata address; use a narrower range.
+- Webhooks reach private hosts only through an instance-owner allowlist, empty by default, with metadata and link-local ranges never allowed (#647). `100.64.0.0/10` cannot be allowlisted whole; use a narrower range.
 - Timesheet reads respect an admin's "Everyone" grant per screen; members see only their own time by default (#635).
-- `project.project_create` is enforced for API tokens but not for web sessions (#637); changing that is a separate decision.
+- `project.project_create` is enforced for API tokens but not for web sessions (#637).
+- A private sprint is visible to its assignees plus owners and admins, the rule the rest of the app already used (#656).
 
 ## Things learned that affect the next session
 
