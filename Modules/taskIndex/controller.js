@@ -6,6 +6,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { getCompanyDataFun } = require("../Company/controller/updateCompany");
 const socketEmitter = require("../../event/socketEventEmitter");
+const { pinSessionTenant } = require("../../Config/tenant");
 
 const projectQueues = {};
 const processingProjects = new Set();
@@ -15,6 +16,8 @@ const processingProjects = new Set();
  */
 exports.updateTaskIndex = (req,res) => {
     try {
+        // Hoisted above the checks below: those answer without returning, so they cannot stop the handler.
+        if (!pinSessionTenant(req, res)) return;
         if (!req.body&& req.body.isFirst === undefined) {
             res.send({
                 status: false,
@@ -31,12 +34,6 @@ exports.updateTaskIndex = (req,res) => {
             res.send({
                 status: false,
                 statusText: `taskId is required`
-            })
-        }
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: `companyId is required`
             })
         }
         if (!(req.body && req.body.projectId)) {
@@ -340,13 +337,7 @@ exports.updateTaskIndexWhenLoad = (req,res) => {
             }))
             return;
         }
-        if(!(req.body && req.body.companyId)) {
-            res.send(({
-                status: false,
-                statusText: `CompanyId Is Required`
-            }))
-            return;
-        }
+        if (!pinSessionTenant(req, res)) return;
         let obj = {
             type: dbCollections.TASKS,
             data: [

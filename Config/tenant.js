@@ -53,10 +53,29 @@ function sessionTenantOf(req) {
     return tenantOf(req);
 }
 
+/* For a signed-in handler that reads its tenant out of the request body: answers 403 and returns
+ * '' when the body names another company, and otherwise pins the body to the verified header so
+ * nothing further down the handler can be steered into a company the caller is not in. */
+function pinSessionTenant(req, res) {
+    let companyId;
+    try {
+        companyId = sessionTenantOf(req);
+    } catch (error) {
+        if (!(error instanceof TenantError)) throw error;
+        res.status(error.statusCode).send({ status: false, statusText: error.message });
+        return '';
+    }
+    if (req.body && typeof req.body === 'object') {
+        if (req.body.CompanyId !== undefined) req.body.CompanyId = companyId;
+        req.body.companyId = companyId;
+    }
+    return companyId;
+}
+
 function tenantDb(req) {
     const companyId = tenantOf(req);
     const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
     return (mongoObj, method) => MongoDbCrudOpration(companyId, mongoObj, method);
 }
 
-module.exports = { tenantOf, sessionTenantOf, tenantDb, namedCompanyIds, TenantError };
+module.exports = { tenantOf, sessionTenantOf, pinSessionTenant, tenantDb, namedCompanyIds, TenantError };

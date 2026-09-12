@@ -3,6 +3,7 @@ const {
     trimTask,
     resolveActor,
     buildEnvelope,
+    supersedesPending,
     MAX_DEPTH,
 } = require('../event/domainEventBus');
 
@@ -104,6 +105,43 @@ describe('domainEventBus', () => {
 
         it('exposes the depth ceiling the publisher enforces', () => {
             expect(MAX_DEPTH).toBe(3);
+        });
+    });
+
+    describe('supersedesPending', () => {
+        const waiting = (doc, ...changed) => ({ doc, changed: new Set(changed) });
+
+        it('merges the echo emits one write produces — same values, nothing superseded', () => {
+            const doc = { Task_Priority: 'HIGH', statusType: 'open' };
+            expect(supersedesPending(waiting(doc, 'Task_Priority'), doc, fields('Task_Priority'))).toBe(false);
+        });
+
+        it('merges an emit that touches a field the pending one never claimed', () => {
+            const pendingDoc = { Task_Priority: 'HIGH', groupByPriorityIndex: 1 };
+            const next = { Task_Priority: 'HIGH', groupByPriorityIndex: 2 };
+            expect(supersedesPending(waiting(pendingDoc, 'Task_Priority'), next, fields('groupByPriorityIndex'))).toBe(false);
+        });
+
+        it('publishes the pending change when the same field moves again — three changes are three events', () => {
+            const urgent = waiting({ Task_Priority: 'URGENT' }, 'Task_Priority');
+            expect(supersedesPending(urgent, { Task_Priority: 'BANANA' }, fields('Task_Priority'))).toBe(true);
+        });
+
+        it('compares arrays and subdocuments by value, not by reference', () => {
+            const entry = waiting({ AssigneeUserId: ['u1'], status: { text: 'To do' } }, 'AssigneeUserId', 'status');
+            expect(supersedesPending(entry, { AssigneeUserId: ['u1'], status: { text: 'To do' } }, fields('AssigneeUserId'))).toBe(false);
+            expect(supersedesPending(entry, { AssigneeUserId: ['u1', 'u2'], status: { text: 'To do' } }, fields('AssigneeUserId'))).toBe(true);
+            expect(supersedesPending(entry, { AssigneeUserId: ['u1'], status: { text: 'Done' } }, fields('status'))).toBe(true);
+        });
+
+        it('treats a cleared field as a change rather than as an absent one', () => {
+            const entry = waiting({ Task_Leader: 'u1' }, 'Task_Leader');
+            expect(supersedesPending(entry, { Task_Leader: null }, fields('Task_Leader'))).toBe(true);
+            expect(supersedesPending(waiting({}, 'Task_Leader'), { Task_Leader: undefined }, fields('Task_Leader'))).toBe(false);
+        });
+
+        it('has nothing to supersede when no emit is waiting', () => {
+            expect(supersedesPending(undefined, { Task_Priority: 'HIGH' }, fields('Task_Priority'))).toBe(false);
         });
     });
 });

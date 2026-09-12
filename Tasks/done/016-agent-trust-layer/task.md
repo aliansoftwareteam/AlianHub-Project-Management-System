@@ -1,6 +1,15 @@
+---
+id: 016
+title: Agent trust layer — risk-rated actions, policy L2, whole-run revert, budgets
+status: done
+priority: high
+depends_on: [014]
+created: 2026-09-05
+---
+
 # 016 — Agent trust layer: risk-rated actions, policy-reviewed L2, whole-run revert, budgets
 
-Status: merged 2026-09-05 (PR #545), member-role sweep open · ran in parallel with 015 · branch `feat/agent-trust-layer` (from `beta`)
+Status: done 2026-09-12 · merged 2026-09-05 (PR #545, `a50c9f42`, build 22; revert-schema fix #547, build 24) · four of five acceptance bullets met · closed on the task 028 precedent (owner decision 2026-09-12): the remaining member sweep is tracked as an open owner check in HANDOFF.md, not as an open task. Carried forward: the last bullet asks for a browser sweep "as owner and member" and only the owner pass has been run — no trust-layer screen has been opened as a member, and the one member browser pass that exists (build 141) names the AI agents spend card as still unswept
 
 ## Goal
 An owner can leave an agent at L2 and trust it: every action is rated for risk, a policy decides per action whether to act or to propose, any run can be reverted as a whole inside a window the owner sets, and spend is capped and alerted per company.

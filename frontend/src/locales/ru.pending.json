@@ -1,7 +1,7 @@
 {
   "locale": "ru",
   "machineTranslated": false,
-  "updatedAt": "2026-09-12T11:05:38.119Z",
+  "updatedAt": "2026-09-12T11:04:20.663Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5720,6 +5720,8 @@
     "Workflows.lineage_run_by": "{person} started the run",
     "Workflows.lineage_run_unowned": "Started by the system",
     "Workflows.lineage_somebody": "somebody",
+    "EmptyState.no_visible_tasks_title": "No tasks to show here",
+    "EmptyState.no_visible_tasks_msg": "This project has had tasks before, but none are visible in this view. They may have been archived or deleted.",
     "Toast.Sprint_not_found": "Sprint not found"
   }
 }

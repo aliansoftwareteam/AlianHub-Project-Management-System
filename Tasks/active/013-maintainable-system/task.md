@@ -1,6 +1,15 @@
+---
+id: 013
+title: Make AlianHub easy to maintain (admins, teams, developers)
+status: active
+priority: high
+depends_on: []
+created: 2026-09-04
+---
+
 # 013 — Make AlianHub easy to maintain (admins, teams, developers)
 
-Status: active · Started 2026-09-04 · Branch `feat/maintainable-system` (from `beta`)
+Status: active · built and merged 2026-09-04 (PR #542, `d75df67b`, build 19) · four items open: B.2 (`.github/workflows/main.yml` still triggers on push to `staging`), B.4 (`tenantOf`/`tenantDb` not adopted in `Modules/Trash`, `Modules/Instance` or `Modules/Tasks/helpers/taskMongo/bulk.js`), G10 (107 `PermissionDesc.*` keys with no consumer), and the admin and member halves of the team-path verification, which were never run
 
 # Make AlianHub easy to maintain — for admins, teams and developers
 

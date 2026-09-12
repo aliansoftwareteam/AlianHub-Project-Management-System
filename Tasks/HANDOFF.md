@@ -2,11 +2,12 @@
 
 Updated 2026-09-12. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (b7e9f9fe, `14.36.0-beta.158`)
+## State of `beta` (71c9332f, `14.36.0-beta.159`)
 
 - **Sprint 5 (task 028, the workflow engine) is closed** and moved to `Tasks/done/`. Five steps merged — #669 (build 144), #674 (149), #675 (151), #677 (152), #678 (154) — the six interface rows in #680 (155), #681 (156) and #682 (157), and the exit gate in #683 (158): a fifteen-step workflow killed at step eleven resumes there and writes every effect exactly once. Writing that gate found a real hole first: `scheduler.readySet` offered only `pending` steps, so a killed run waited for a person to press resume. Defect #17 closed — the stored hourly run limit is now the loop's admission control.
 - **Sprints 0 to 4 are closed too:** 0 to 2 by #676 (build 150), 3 and 4 by #673 (148). Sprint 5 leaves task 029 (Sprint 6) as the next sprint.
 - **Task 035 (QA follow-ups):** the first wave closed on the 11th; the second wave merged #649 to #656, each reproduced with a failing test before the fix. Build numbers are in `docs/BETA-LOG.md`, details in `Tasks/active/035-qa-followups/progress.md`.
+- **Tasks 013 to 017 audited against the code (2026-09-12).** All five had merged to `beta` long ago behind stale prose status lines. Each now carries a real checklist keyed to its own acceptance criteria. **017 (agent memory) is closed** — all ten bullets met — and moved to `Tasks/done/`. The other four stay in `active/` with precisely one kind of gap each: 013 has three code leftovers (`main.yml` still triggers on `staging`; the tenant helper is unadopted in Trash, Instance and Tasks bulk; 107 `PermissionDesc` keys have no consumer) plus an admin and member pass that was never run; 014 and 016 are fully built and are waiting only on the member-role **browser** sweep of the `/ai` and trust-layer screens; 015 is waiting on two of its three domain briefs in the browser and on an owner decision about labelling plan-only skills as `agent`. Two orphaned follow-ups surfaced: the instruction guard's patterns (`Modules/AICore/instructionGuard.js:5-13`) do not catch "Ignore your rules…" and are recorded in no task file, and task 021's entry for `GET /api/v1/notifications/preferences` is stale because the route now exists.
 - **Upgrade steps for a deployed instance:**
   1. `node scripts/audit-product-owners.js` (from #645) and review every account it marks REVIEW.
   2. Migration 013 runs at server start; it activates seats that SSO and SCIM created with the invited status.
@@ -19,10 +20,13 @@ Updated 2026-09-12. Read this first, then `Tasks/index.md`. Overwrite this file 
 
 1. **Owner decisions**, listed in `followups.md`: item 32 (should saving a project filter for another user answer 403, as the task side does?), item 37 (who writes the subscription `invoices` collection?), item 35 (make auth cookies unreadable by JavaScript, which changes how the frontend reads them), and whether the planner's estimate permission should line up with the timesheet permissions (#656).
 2. **Remaining follow-ups:** 14, 26, 55, 56 and 57, plus the new 58 — the workflow screens sit outside the AI section's chrome, so the rail goes dark on them and the builder has no way back. Items 16 and 17 belong to Sprint 8 (task 031).
-3. **Owner checks still open:** migrations on the dev database; the owner and member sweep of the six sprint 5 workflow screens, which is task 028's one unmet acceptance bullet; the Stats and Upgrade sweep and the Docker label check for task 033.
+3. **Owner checks still open:** migrations on the dev database; the owner and member sweep of the six sprint 5 workflow screens, which is task 028's one unmet acceptance bullet; the Stats and Upgrade sweep and the Docker label check for task 033. The 013–017 audit adds three more, all now unblocked by the demo team: the member-role browser sweep of the `/ai` screens (014) and of the trust-layer screens (016), and the admin and member pass of the day-to-day screens at 1280 and 800 px (013). One decision goes with them — whether a task an agent can only *plan* should carry a label other than `agent` (015). Also the member browser sweep of the `/ai` screens (task 014) and of the trust-layer screens (task 016) — both tasks were closed to `done/` on 2026-09-12 on the task 028 precedent, with the member pass tracked here rather than holding the task open.
 4. **Then Sprint 6** (task 029, skill authoring and migration): the Skill Library becomes a real library — create, edit, dry-run, risk preview, retire — the three duplicated frontend input tables go, and the reporter and project-guide skills are re-expressed as data. It depends on 025 and 028, both now closed.
 
 ## Owner decisions recorded
+
+- Tasks 014 and 016 close to `done/` with only their member browser sweep outstanding, tracked as an owner check (2026-09-12), following the precedent set by task 028.
+- An agent task is not plan-only: the agent also acts on it and does the work, so the `agent` label in `Modules/Agents/taskSplit.js` stays as it is and needs no plan-only variant (2026-09-12). This matches the code as written — the planning work-kind already grants `subtask.create` and `task.update`, not just reads.
 
 - Only owners and admins delete agents (#620). `REFRESH_TOKEN_REUSE_GRACE_SECONDS` defaults to 10 (#609).
 - The `e2e` job runs on pushes to `beta` (#634).

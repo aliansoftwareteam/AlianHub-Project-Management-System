@@ -12,6 +12,7 @@ const { tenantOf } = require("../../Config/tenant");
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const projectTemplate = require("../../utils/projectTemplates.json");
 const { pickKnownApps } = require("./apps");
+const { withViewIds } = require("./viewEntries");
 const blankTemplate = require("./blankTemplate");
 const { focusForTemplate, normaliseFocus, sampleTaskNamesFor, SAMPLE_TASK_COUNT } = require("./sampleTasks");
 
@@ -57,6 +58,7 @@ function seedTemplateSamples (project, createObject, sprintRes) {
 }
 const { resolveProjectSkills } = require("../settings/ProjectSkills/helper");
 const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require("../Project/helpers/projectSourceRules");
+const { stepProjectCount } = require("../Project/helpers/projectQuota");
 
 exports.checkProjectPlan = (req) => {
     return new Promise(async(resolve,reject) => {
@@ -507,6 +509,9 @@ exports.createProject = async (req) => {
                     if (clientApps) {
                         createProjectObject.apps = pickKnownApps(clientApps, appArray);
                     }
+                    // Every branch above can leave an entry whose view the company's catalogue does
+                    // not carry, and the project view bar cannot render an entry with no id.
+                    createProjectObject.ProjectRequiredComponent = withViewIds(createProjectObject.ProjectRequiredComponent, tabComponentsArray);
                     createProjectObject.skills = await resolveProjectSkills(req.body.CompanyId, createProjectObject.skills);
                     createProjectObject.DueDate = createProjectObject.DueDate ? new Date(createProjectObject.DueDate) : '';
                     createProjectObject.viewColumn = [
@@ -759,22 +764,14 @@ exports.deleteProject = (data,companyId) => {
     }
 }
 
+// Rolls back the increment `checkProjectPlan` already applied, for a creation that
+// never produced a project. The delete path decrements on its own transition, so the
+// two can never both fire for the same project.
 exports.removeProjectCount = (companyId,isPrivateSpace) => {
     try {
-        let decObj = {
-            type: SCHEMA_TYPE.COMPANIES,
-            data: [
-                { _id : new mongoose.Types.ObjectId(companyId)},
-                { $inc: {'projectCount.projectCount': -1} },
-                { new: true }
-            ]
-        }
-        if(isPrivateSpace === true){
-            decObj.data[1].$inc = {...decObj.data[1].$inc,'projectCount.privateCount': -1 }
-        }else{
-            decObj.data[1].$inc = {...decObj.data[1].$inc,'projectCount.publicCount': -1 }
-        }
-        updateCompanyFun(SCHEMA_TYPE.GOLBAL,decObj,"findOneAndUpdate",companyId,true);
+        stepProjectCount(companyId, isPrivateSpace, -1).catch((error) => {
+            logger.error(`removeProjectCount ${companyId}: ${error && error.message ? error.message : error}`);
+        });
     } catch (error) {
         logger.error(`ERROR: ${error}`);
     }

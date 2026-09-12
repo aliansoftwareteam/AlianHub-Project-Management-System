@@ -3,8 +3,20 @@ const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-h
 const {removeCache} = require('../../../utils/commonFunctions');
 const { resolveProjectSkills } = require('../../settings/ProjectSkills/helper');
 const { PROJECT_SOURCES, normaliseSource, sourceOrDefault, cleanProposalId, numericProposalId, validateProposalId } = require('../helpers/projectSourceRules');
+const { quotaStatus, syncProjectQuota } = require('../helpers/projectQuota');
+const logger = require('../../../Config/loggerConfig');
 
 exports.updateProjectInternal = async (companyId, projectId, updateObject, key, arrayFilters) => {
+    // Trashing and restoring a project are the only writes that change what a company
+    // owns, and every client reaches them through here. A counter failure must not block
+    // the delete: a stuck count is recoverable, a project nobody can remove is not.
+    const nextStatus = quotaStatus(updateObject, key);
+    if (nextStatus !== null && companyId && validateObjectId(projectId)) {
+        await syncProjectQuota(companyId, projectId, nextStatus).catch((error) => {
+            logger.error(`syncProjectQuota ${projectId}: ${error && error.message ? error.message : error}`);
+        });
+    }
+
     return new Promise((resolve, reject) => {
         if (!(updateObject && Object.keys(updateObject).length)) {
             reject("Update Object is Required");

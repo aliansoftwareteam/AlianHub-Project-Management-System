@@ -4980,6 +4980,8 @@ export default {
         "no_tasks_action": "Create task",
         "no_match_title": "Nothing matches your filters",
         "no_match_msg": "There is work in this project, it is just hidden right now. Try clearing a filter or widening the date range.",
+        "no_visible_tasks_title": "No tasks to show here",
+        "no_visible_tasks_msg": "This project has had tasks before, but none are visible in this view. They may have been archived or deleted.",
         "no_sprints_title": "No lists yet",
         "no_sprints_msg": "Lists group related tasks together — a sprint, a phase, or simply a heading. Add one to organise this project.",
         "no_sprints_action": "Create list",

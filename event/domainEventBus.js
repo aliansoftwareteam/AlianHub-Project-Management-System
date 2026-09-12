@@ -162,6 +162,20 @@ function flush(key) {
     publish(buildEnvelope({ companyId, type, doc, changedFields: changed, previous, actor, depth }));
 }
 
+const fieldValue = (doc, field) => {
+    const value = doc ? doc[field] : undefined;
+    if (value === null || value === undefined) return '';
+    return typeof value === 'object' ? JSON.stringify(value) : String(value);
+};
+
+/* Whether this emit is a second change rather than another echo of the pending one.
+ * The window exists to collapse the several emits ONE write produces, and those all
+ * carry the same values; an emit that reports a NEW value for a field the pending
+ * emit already moved is a separate domain event, and merging the two would publish
+ * one envelope for two changes — an automation that should fire twice fires once. */
+const supersedesPending = (entry, doc, changedNow) => Boolean(entry) && [...changedNow]
+    .some((field) => entry.changed.has(field) && fieldValue(entry.doc, field) !== fieldValue(doc, field));
+
 /* One user action fires several emits (the write, then counter and index updates).
  * Collapsing them within a window means a status+priority change in the same save
  * produces one envelope carrying both fields, not two envelopes that each see half
@@ -174,11 +188,14 @@ function onTaskEvent(emitType) {
 
             const companyId = String(doc.CompanyId);
             const key = `${companyId}:${String(doc._id)}:${emitType}`;
+            const changedNow = normalizeChangedFields(payload?.updatedFields);
             const existing = pending.get(key);
             if (existing) clearTimeout(existing.timer);
+            if (supersedesPending(existing, doc, changedNow)) flush(key);
 
-            const changed = new Set(existing ? existing.changed : []);
-            normalizeChangedFields(payload?.updatedFields).forEach((field) => changed.add(field));
+            const carried = pending.get(key);
+            const changed = new Set(carried ? carried.changed : []);
+            changedNow.forEach((field) => changed.add(field));
 
             pending.set(key, {
                 companyId,
@@ -223,4 +240,5 @@ module.exports = {
     trimTask,
     resolveActor,
     buildEnvelope,
+    supersedesPending,
 };

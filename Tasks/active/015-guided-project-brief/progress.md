@@ -1,8 +1,38 @@
 # 015 — progress
 
-Branch `feat/guided-project-brief` (from `beta` 1989b987). Contract agreed first (`contract.md`), three parallel workstreams, merged 2026-09-05.
+Branch `feat/guided-project-brief` (from `beta` 1989b987). Contract agreed first (`contract.md`), three parallel workstreams, merged to `beta` as PR #546, merge commit `1d8cd48d`, build `14.36.0-beta.23`. Two of the three UI-sweep findings were fixed by PR #549, build 26.
 
-## Evidence gate (section E) — passed 3 of 3
+## Checklist
+
+One line per bullet of `task.md` "## Acceptance criteria", plus the section E evidence gate. Verified against `origin/beta` at `71c9332f` on 2026-09-12.
+
+- [x] A two-line brief gets ≤ 3 questions in round one and ≤ 6 in total; a brief that covers all five points gets none — `Modules/AIProjectGenerator/clarifier.js:34-36` sets the three caps and `planRound()` at `:169-182` enforces them (`Math.min(3, MAX_TOTAL - answers.length, askPoints.length)`), with a second guard in the question loop at `:241`; the five points are in `schemaValidator.js:430` and `coverage` is returned by `controller.js:512`; `tests/ai-project-coverage.test.js` (9 cases, including the zero-question path) — `1d8cd48d` (#546)
+- [x] "I don't know yet" on any question produces an assumption line in the drafted brief and the plan — `allowUnknown: true` on every question (`clarifier.js:240`), `gaveUp()` at `:159` treats skip and unknown alike, `requiredAssumptionsFor()` at `:254-274` emits one per given-up answer and per still-missing point, and `coversRequired`/`fallbackAssumption` at `:278-300` guarantee the line even when the model omits it; it reaches the plan via `promptBuilder.js:169` and the project via `aiAssumptions` — `1d8cd48d` (#546)
+- [x] The plan cannot be generated until the brief is approved; the approved text is what `plan` receives and what `execute` stores — `POST /api/v1/ai/project/brief` at `routes.js:59`; `BriefStep.vue:86` disables Generate plan on `!approved` and editing the draft revokes approval (`AiProjectCreator.vue:955`); `promptBuilder.js:161-172` feeds the approved brief and leaves description and upload out rather than sending them twice; `orchestrator.js:1047` stores it on the project; `tests/ai-project-brief.test.js` — `1d8cd48d` (#546). Noted: `AiProjectCreator.vue:975` keeps an `onSkipBrief()` escape hatch that plans with an empty approved brief, deliberately, for when `/brief` is unavailable.
+- [x] Every task in the plan view carries `agent` / `agent-after` / `person` with a reason, and matches what `/api/v2/agents/routable` + `agentFit` would give — `Modules/Agents/taskSplit.js` is the shared classifier; `tests/agent-split-parity.test.js` pins it against `frontend/src/views/Ai/agentFit.js` by regex source, kind order and input rules; `planSplit.js:51` attaches the labels and `splitSummary` — `1d8cd48d` (#546)
+- [x] Executing a plan with agent-labelled tasks creates runs that respect pause, spend cap and daily limit; a paused workspace creates none and says so — `executeAgents.queueRuns()` goes through `runs.canStart`, and `prepare()` loads agents with `includePaused: true` so a pause since `/plan` surfaces as a refusal rather than a silent relabel; `tests/ai-project-execute-agents.test.js` (13 cases, including the all-paused and cap/limit ones) — `1d8cd48d` (#546)
+- [x] Executing a plan creates a project-scoped Guide agent; mentioning it produces a next-step answer grounded in the plan and the stored guide, and nothing outside the project — `POST /api/v1/ai/project/guide` at `routes.js:75`; `executeAgents.createGuideAgent` sets skill `project.guide`, autonomy 1, `trigger: 'mention'`, `projectIds: [projectId]` and read/comment actions; `Modules/Agents/skills/projectGuide.js`; `tests/ai-project-guide.test.js` (18 cases) — `1d8cd48d` (#546)
+- [x] No domain-specific code anywhere in the flow — 0 matches for vertical names across the generator, `taskSplit.js` and `projectGuide.js`; the stages come from the model (`prompts/guide/system.md` rule 1) and `tests/ai-project-guide.test.js:24-39` fails if a template stage list or a `stages: […]` literal ever appears — `1d8cd48d` (#546)
+- [x] Section E evidence gate — three thin briefs from three domains through coverage → clarify → brief, recorded in `evidence.md` (`## Online store` L33, `## Mobile app` L131, `## Multi-team system (ERP rollout)` L230), each with its coverage table, both rounds and the drafted brief. Passed 3 of 3
+- [x] Every new string goes through i18n; `npm test`, vitest and lint green; production build succeeds — 62 keys backfilled at merge with the hardcoded-text baseline falling 385 → 372; CI on the tip of `beta` is green (`gh pr checks 684`: backend, frontend, e2e) — `1d8cd48d` (#546)
+- [ ] Browser sweep of the whole flow as owner **on the three domain briefs**, recorded with screenshots of the coverage questions, the brief diff and the split summary — **partly delivered.** The 2026-09-05 sweep below walked the whole wizard end to end as owner and passed every step, but on **one** brief (the gym mobile app), not three, and the evidence is the table below rather than screenshots. The other two domains were only exercised through the API for the section E gate.
+
+**Open beyond the acceptance list**
+
+- [ ] **Finding 3 — needs an owner decision, filed nowhere.** Implementation tasks such as "Implement user login flow" are labelled `agent` because a *planning* skill fits the work kind and the task carries a brief. The reason text ("Daily PM can run project.plan on it") is accurate, but the badge alone reads as "an agent will implement this". Both sweeps below raised it and asked for a distinct label or wording. Nothing changed: `git log 1d8cd48d..HEAD -- Modules/Agents/taskSplit.js frontend/src/views/Ai/agentFit.js` returns 0 commits, `taskSplit.js:71` still maps `^(brief\.parse|project\.plan)$` to a plain `agent`, and a repo-wide search finds the idea recorded only in this file.
+- [ ] **Member-role pass — outstanding.** Not one of this task's acceptance bullets (bullet 8 says "as owner"), but recorded as open since the sweep. The guided-brief surface was never swept as a member: task 034's ten findings files, progress and follow-ups have 0 matches for the brief, clarify or wizard routes. The blocker is gone — `docs/QA-DEMO-TEAM.md` and `npm run demo:token` now provide members, an admin and a guest.
+
+## Last step
+
+Audited 2026-09-12. Nine of the ten acceptance bullets are delivered and on `beta`, and the section E gate passed. The task stays in `active/` because the browser sweep covered one of the three domain briefs rather than three, because finding 3 is an open product question with no home anywhere, and because the member pass was never run.
+
+## Blockers
+
+None. The member account that blocked the member pass exists now (`docs/QA-DEMO-TEAM.md`, `npm run demo:token`).
+
+## Log
+
+### 2026-09-05 — evidence gate (section E) — passed 3 of 3
 `evidence.md`: three two-line briefs (online store, mobile app, ERP rollout across three departments) through coverage → clarify → brief on the repo's configured model. Store 3 questions, app 3, ERP 2; every unknown answer became exactly one assumption; about $0.03–0.04 per brief. Caveat: the store run echoed the prompt's own example closely; the app and ERP runs are the honest signal.
 
 | Item | What landed | Tests |
@@ -59,5 +89,12 @@ Findings (1 and 2 fixed in PR #549)
 
 Cleanup: two sweep projects exist now ("Gym Class Booking App (sweep 015)" from the API run and "Gym Class Booking App" from the UI run) with their Guide agents; trash both when done.
 
-Open
-- Member-role pass — needs a member account.
+## 2026-09-12 — record audited
+
+Checklist above rebuilt from `task.md` "## Acceptance criteria" and checked against `origin/beta` at `71c9332f`.
+
+- The coverage bar, the approved-brief gate, the shared split classifier with its parity test, the execute-time run queueing and the Guide agent are all present on `beta` with their five test suites; the domain-agnostic rule is enforced by a test that fails if a template stage list ever appears.
+- The status line said "planned", which was three states out of date: the work was built, merged on 2026-09-05 as PR #546 (build 23) and partly followed up by PR #549 (build 26). It now names what remains.
+- Findings 1 and 2 from the sweep below are confirmed fixed on `beta` today: the Source field gates all five Continue buttons (`AiProjectCreator.vue:576` + five `:disabled` bindings) and the done-screen total counts subtasks (`:632-641`, `:1152`, with the SSE overwrite removed). Finding 3 was never acted on and is recorded nowhere else, so it stays here as an owner decision.
+- YAML frontmatter added to `task.md` (it had none). Task stays in `active/`.
+- **Owner decision 2026-09-12 — finding 3 closed, no code change.** An agent task is not plan-only: the agent also acts on it and does the work, so the `agent` label stays. This matches the code as written — the planning work-kind in `Modules/Agents/taskSplit.js` grants `subtask.create` and `task.update` alongside `task.get`, so a task labelled `agent` there is one an agent acts on, not merely plans. Two items remain: the two unswept domain briefs, and the member-role pass over the wizard.

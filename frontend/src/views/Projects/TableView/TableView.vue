@@ -55,8 +55,8 @@
                 <div class="d-flex align-items-center justify-content-center flex-column" v-if="!totalTaskInFirstSprint.length">
                     <EmptyState
                         v-if="project?.deletedStatusKey !== 2"
-                        :title="!project?.lastTaskId ? $t('EmptyState.no_tasks_title') : $t('EmptyState.no_match_title')"
-                        :message="!project?.lastTaskId ? $t('EmptyState.no_tasks_msg') : $t('EmptyState.no_match_msg')"
+                        :title="$t(emptyTitleKey)"
+                        :message="$t(emptyMessageKey)"
                         helpPath="tasks"
                     />
                 </div>
@@ -82,6 +82,7 @@ import ListBulkBar from '@/views/Projects/ListView/ListBulkBar.vue';
 import { useCustomComposable } from "@/composable";
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
+import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 
 // PACKAGES
@@ -116,6 +117,7 @@ const project = inject('selectedProject');
 const companyId = inject('$companyId');
 const searchedTask = inject('searchedTask');
 const showArchiveVar = inject("showArchived");
+const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 
 const createTask = ref(false);
 const globalSortKey = ref('');

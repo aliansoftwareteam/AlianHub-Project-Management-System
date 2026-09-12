@@ -48,8 +48,8 @@
                 <div class="d-flex align-items-center justify-content-center flex-column mt-1">
                     <EmptyState
                         v-if="project?.deletedStatusKey !== 2"
-                        :title="!project?.lastTaskId ? $t('EmptyState.no_tasks_title') : $t('EmptyState.no_match_title')"
-                        :message="!project?.lastTaskId ? $t('EmptyState.no_tasks_msg') : $t('EmptyState.no_match_msg')"
+                        :title="$t(emptyTitleKey)"
+                        :message="$t(emptyMessageKey)"
                         helpPath="tasks"
                     />
                 </div>
@@ -73,6 +73,7 @@ import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 
 // Helpers
 import { taskListHelper } from '@/views/Projects/helper.js';
+import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
 import { useRoute } from 'vue-router';
 const route = useRoute();
 
@@ -92,6 +93,7 @@ const { groupBy, checkCase } = taskListHelper();
 const showArchiveVar = inject("showArchived");
 const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
+const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 
 // --- Reactive State ---
 const isLoading = ref(true);

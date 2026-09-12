@@ -18,6 +18,7 @@ const { updateProjectInternal } = require('../../Project/controller/updateProjec
 const loggerConfig = require('../../../Config/loggerConfig');
 const socketEmitter = require('../../../event/socketEventEmitter.js');
 const { handleFileUploadForTrackerSS,handleuploadMainFileForbase64Thumbnail } = require(`../../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
+const { pinSessionTenant } = require('../../../Config/tenant');
 /**
  * Add and Edit Manual Log Time
  * @param {Objcet} req
@@ -25,14 +26,7 @@ const { handleFileUploadForTrackerSS,handleuploadMainFileForbase64Thumbnail } = 
  * @returns
  */
 exports.getTimelog = (req, res) => {
-
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: "companyId is required"
-        })
-        return;
-    }
+    if (!pinSessionTenant(req, res)) return;
    if (!(req.body && req.body.userId)) {
         res.send({
             status: false,

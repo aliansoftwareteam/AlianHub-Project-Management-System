@@ -10,10 +10,14 @@ const { default: axios } = require("axios");
 const config =  require('../../../Config/config.js');
 const socketEmitter = require('../../../event/socketEventEmitter.js');
 const { getUserProfilePresignedUrlCallBackFunction } = require("../../storage/wasabi/controller.js")
+const { pinSessionTenant } = require('../../../Config/tenant');
 
 
 
+// The tenant is pinned here rather than in handleNotificationtFun: every other caller of that
+// is an internal one passing a synthetic { body } and no res, so it has no response to refuse on.
 exports.handleNotification = (req, res) => {
+  if (!pinSessionTenant(req, res)) return;
   exports.handleNotificationtFun(req).then((data) => {
     res.json(data);
   }).catch((error) => {
