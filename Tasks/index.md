@@ -19,9 +19,9 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 011 | Redesign stage 5 — money & scale | done | medium | 009 | done/011-redesign-money-scale |
 | 012 | Run the rest of the redesign from inside AlianHub (dogfood) | done | high | 009 | done/012-dogfood-in-alianhub |
 | 013 | Make AlianHub easy to maintain (admins, teams, developers) | active | high | — | active/013-maintainable-system |
-| 014 | AI hub full test and fixes | active | high | 006, 010 | active/014-ai-hub-sweep |
+| 014 | AI hub full test and fixes | done | high | 006, 010 | done/014-ai-hub-sweep |
 | 015 | Guided project start — complete brief, agent/human split | active | high | 014 | active/015-guided-project-brief |
-| 016 | Agent trust layer — risk-rated actions, policy L2, whole-run revert, budgets | active | high | 014 | active/016-agent-trust-layer |
+| 016 | Agent trust layer — risk-rated actions, policy L2, whole-run revert, budgets | done | high | 014 | done/016-agent-trust-layer |
 | 017 | Agent memory the product owns | done | high | 015, 016 | done/017-agent-memory |
 | 018 | Sprint 10 — external agents: OAuth, scopes, delegation | backlog | medium | 028, 031 | backlog/018-agent-interop |
 | 019 | Sprint 9 — evals and routing measurement | backlog | medium | 026, 027, 030 | backlog/019-agent-evals-observability |
