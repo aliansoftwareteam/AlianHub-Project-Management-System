@@ -9,6 +9,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const mongoose = require('mongoose');
 const logger = require('../../Config/loggerConfig');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 const MAX_DAYS = 120;
@@ -46,7 +47,12 @@ exports.getCFD = async (req, res) => {
                 // Tasks declare ProjectID, not projectId (schema.js). Matching the
                 // wrong name returned nothing, so CFD has answered "No tasks yet."
                 // for every project since it shipped.
-                { ProjectID: projectObjId, deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true },
+                {
+                    ProjectID: projectObjId,
+                    deletedStatusKey: { $in: [0, 2, undefined] },
+                    isParentTask: true,
+                    ...(await hiddenSprintFilter(companyId, req.uid, [projectId])),
+                },
                 '_id statusType createdAt updatedAt',
             ],
         }, 'find');

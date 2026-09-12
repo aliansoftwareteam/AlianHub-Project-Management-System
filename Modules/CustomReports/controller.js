@@ -7,6 +7,8 @@ const { resolveRate } = require('../TimeSheet/helpers/billingRules');
 const R = require('./helpers/reportRules');
 const T = require('./helpers/reportTemplates');
 const access = require('./helpers/reportAccess');
+const { visibleProjectIds } = require('../Agents/scope');
+const { asObjectIds, hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 
 const { oidOrNull } = access;
 
@@ -63,9 +65,23 @@ const foldRevenue = async (companyId, raw) => {
 
 const UNITS = { hours: 'hours', revenue: 'currency', points: 'points', count: 'count', entries: 'count' };
 
-const runConfig = async (companyId, cfg) => {
+/* A report aggregates the whole tasks collection, so it is narrowed to what the person it
+ * runs for may read: their projects, minus the private sprints they are not on. `viewer` is
+ * the session for a live run, and the report's author for a schedule or a public link —
+ * neither may show more than its author could see on screen. */
+const viewerScope = async (companyId, viewer, isLogs) => {
+    const uid = String(viewer || '');
+    if (!uid) return null;
+    if (await access.isPrivilegedUser(companyId, uid)) return null;
+    const projects = await visibleProjectIds(companyId, uid);
+    if (isLogs) return { ProjectId: { $in: asObjectIds(projects) } };
+    return { ProjectID: { $in: asObjectIds(projects) }, ...(await hiddenSprintFilter(companyId, uid, projects)) };
+};
+
+const runConfig = async (companyId, cfg, viewer) => {
     const isLogs = cfg.source === 'timelogs';
-    const pipeline = R.buildPipeline(cfg);
+    const scope = await viewerScope(companyId, viewer, isLogs);
+    const pipeline = [...(scope ? [{ $match: scope }] : []), ...R.buildPipeline(cfg)];
     let raw = await MongoDbCrudOpration(companyId, {
         type: isLogs ? SCHEMA_TYPE.TIMESHEET : SCHEMA_TYPE.TASKS, data: [pipeline],
     }, 'aggregate');
@@ -130,7 +146,7 @@ exports.runReport = async (req, res) => {
         const check = R.validateConfig(req.body || {});
         if (!check.valid) return reply(res, 400, check.errors.join('; '));
         if (refusesFinancial(caller, check.value, res)) return undefined;
-        const out = await runConfig(caller.companyId, check.value);
+        const out = await runConfig(caller.companyId, check.value, caller.uid);
         return res.json({ status: true, data: { config: check.value, result: out.rows, unit: out.unit } });
     } catch (e) { return serverError(res, 'runReport', e); }
 };
@@ -169,7 +185,7 @@ exports.getReportResult = async (req, res) => {
         if (!rep) return undefined;
         if (refusesFinancial(caller, rep, res)) return undefined;
         const check = R.validateConfig(rep);
-        const out = check.valid ? await runConfig(caller.companyId, check.value) : { rows: [], unit: 'count' };
+        const out = check.valid ? await runConfig(caller.companyId, check.value, caller.uid) : { rows: [], unit: 'count' };
         return res.json({ status: true, data: { report: rep, config: check.value, result: out.rows, unit: out.unit } });
     } catch (e) { return serverError(res, 'getReportResult', e); }
 };

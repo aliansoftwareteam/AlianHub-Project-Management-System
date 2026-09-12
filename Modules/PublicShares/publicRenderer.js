@@ -5,6 +5,7 @@ const logger = require("../../Config/loggerConfig");
 const { isShareToken, validateIntakeSubmission, escapeHtml, sanitizeDocHtml } = require('./helpers/shareRules');
 const { shareStillAuthorised } = require('./helpers/shareAccess');
 const reportRules = require('../CustomReports/helpers/reportRules'); // REP-09 — share saved reports
+const customReports = require('../CustomReports/controller');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 
@@ -300,10 +301,11 @@ async function resolveShare(token) {
 const DIM_LABELS = { status: 'Status', project: 'Project', sprint: 'Sprint' };
 const METRIC_LABELS = { count: 'Task count', points: 'Story points' };
 
-async function runReportRows(companyId, cfg) {
-    const pipeline = reportRules.buildPipeline(cfg);
-    const raw = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [pipeline] }, 'aggregate');
-    return (raw || []).map((r) => ({ label: (r._id === null || r._id === undefined || r._id === '') ? '(none)' : String(r._id), value: r.value || 0 }));
+/* The public page shows what the person who published it could see, no more: the rows are
+ * built by the reports module under the share author's own project and sprint scope. */
+async function runReportRows(companyId, cfg, viewer) {
+    const out = await customReports.runConfig(companyId, cfg, viewer);
+    return (out.rows || []).map((r) => ({ label: r.label, value: r.value }));
 }
 
 async function renderReport(companyId, share) {
@@ -315,7 +317,7 @@ async function renderReport(companyId, share) {
     }
     // Resolve through the same whitelist engine — never raw fields.
     const check = reportRules.validateConfig(report);
-    const rows = check.valid ? await runReportRows(companyId, check.value) : [];
+    const rows = check.valid ? await runReportRows(companyId, check.value, share.createdBy) : [];
     const total = rows.reduce((a, r) => a + (r.value || 0), 0);
     const dimLabel = DIM_LABELS[check.value && check.value.dimension] || 'Group';
     const metricLabel = METRIC_LABELS[check.value && check.value.metric] || 'Value';

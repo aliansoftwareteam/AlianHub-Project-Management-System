@@ -4,15 +4,17 @@ const cfd = require('./cfd');
 const sprintInsights = require('./sprintInsights');
 const milestones = require('./milestones');
 const provenance = require('./provenance');
+const { requireSprintAccess } = require('../Sprints/helpers/sprintVisibility');
 
 exports.init = (app) => {
     // Unified agile-reports read API (S4). Burndown reuses the existing Sprints
     // handler (now query-param aware); velocity + CFD are computed in this module.
     // All read-only; auth/companyId come from the global middleware like other routes.
-    app.get('/api/v1/agile/burndown', getSprintBurndown);
+    const onSprint = requireSprintAccess((req) => (req.query || {}).sprintId);
+    app.get('/api/v1/agile/burndown', onSprint, getSprintBurndown);
     app.get('/api/v1/agile/velocity', velocity.getVelocity);
     app.get('/api/v1/agile/cfd', cfd.getCFD);
-    app.get('/api/v1/agile/sprint-insights', sprintInsights.getSprintInsights);
+    app.get('/api/v1/agile/sprint-insights', onSprint, sprintInsights.getSprintInsights);
     app.get('/api/v1/agile/milestones', milestones.getMilestones);
-    app.get('/api/v1/agile/provenance', provenance.getProvenance);
+    app.get('/api/v1/agile/provenance', onSprint, provenance.getProvenance);
 };

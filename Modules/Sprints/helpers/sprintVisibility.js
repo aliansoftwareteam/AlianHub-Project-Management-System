@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { myCache } = require('../../../Config/config');
+const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
+const logger = require('../../../Config/loggerConfig');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const TEAM_PREFIX = 'tId_';
@@ -84,8 +86,41 @@ const canSeeSprintById = async (companyId, uid, sprintId) => {
     return canSeeSprint(sprint, identities);
 };
 
+/* Owners and admins read past sprint privacy, so every caller-facing entry point starts here. */
+const privileged = async (companyId, uid) => isPrivileged(await getRoleType(String(companyId || ''), String(uid || '')));
+
+/* `{ sprintId: { $nin: [...] } }` for a task read already scoped to `projectIds`, or `{}`
+ * when the caller may see every sprint in them. Spread into an existing find filter. */
+const hiddenSprintFilter = async (companyId, uid, projectIds) => {
+    if (await privileged(companyId, uid)) return {};
+    const hidden = await hiddenSprintIds(companyId, uid, projectIds);
+    return hidden.length ? { sprintId: { $nin: hidden } } : {};
+};
+
+/* Express middleware for the routes addressed by sprint id — the scrum board, the agile
+ * reports, the hour and burndown charts. A private sprint the caller is not on answers 404
+ * rather than 403, so the refusal says nothing the sprint list would not already say. */
+const requireSprintAccess = (pick) => async (req, res, next) => {
+    try {
+        const companyId = String(req.headers['companyid'] || '');
+        const ids = [...new Set([].concat(pick(req) || []).map(String).filter((id) => OBJECT_ID.test(id)))];
+        if (!ids.length || await privileged(companyId, req.uid)) return next();
+        for (const id of ids) {
+            if (!(await canSeeSprintById(companyId, req.uid, id))) {
+                return res.status(404).json({ status: false, statusText: 'Sprint not found.', error: 'Not Found' });
+            }
+        }
+        return next();
+    } catch (error) {
+        logger.error(`requireSprintAccess error: ${error.message || error}`);
+        return res.status(403).json({ status: false, statusText: 'Permission check failed.', error: 'Forbidden' });
+    }
+};
+
 module.exports = {
     TEAM_PREFIX,
+    hiddenSprintFilter,
+    requireSprintAccess,
     asObjectIds,
     canSeeSprint,
     canSeeSprintById,

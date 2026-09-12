@@ -4,6 +4,7 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const logger = require('../../Config/loggerConfig');
 const H = require('./helpers/milestoneMoves');
 
@@ -66,7 +67,12 @@ exports.getMilestones = async (req, res) => {
             }, 'find').catch(() => []),
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
-                data: [{ ProjectID: { $in: projectIds }, deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true }, '_id ProjectID DueDate statusType'],
+                data: [{
+                    ProjectID: { $in: projectIds },
+                    deletedStatusKey: { $in: [0, 2, undefined] },
+                    isParentTask: true,
+                    ...(await hiddenSprintFilter(companyId, req.uid, projectIds)),
+                }, '_id ProjectID DueDate statusType'],
             }, 'find').catch(() => []),
         ]);
 
