@@ -1,8 +1,8 @@
 const { requireInstanceAdmin } = require('../Instance/guard');
 const { DateTime } = require("luxon");
 const fs = require("fs");
-const config =  require('../../Config/config.js');
 const { connections } = require("../../middlewares/mongoConnector/helper.js");
+const { matchesPresetKey, refusePresetKey, refuseKeyInUrl } = require('../../Config/presetKey.js');
 const commonctrl = require('./controller.js');
 
 /**
@@ -28,18 +28,28 @@ exports.init = (app) => {
     });
 
     // Get Connections
-    app.get("/connections/:id", (req, res) => {
-        if (req.params && req.params.id && req.params.id === config.PRECOMPANYKEY) {
-            const connectionsJSON = connections.map((x) => ({
-                db: x.db,
-                createdAt: new Date(x.createdAt),
-                lastRequest: new Date(x.lastRequest)
-            }))
-            res.json({data: connectionsJSON, total: connectionsJSON.length});
-        } else {
-            res.send('Unauthorized');
+    app.get("/connections", (req, res) => {
+        if (!matchesPresetKey(req)) {
+            return refusePresetKey(res);
         }
+        const connectionsJSON = connections.map((x) => ({
+            db: x.db,
+            createdAt: new Date(x.createdAt),
+            lastRequest: new Date(x.lastRequest)
+        }));
+        return res.json({ data: connectionsJSON, total: connectionsJSON.length });
     });
+
+    app.post("/api/v1/setPresetCompany", (req, res) => {
+        if (!matchesPresetKey(req)) {
+            return refusePresetKey(res);
+        }
+        require('../Company/controller2.js').preCompanySetup();
+        return res.json({ status: true, statusText: 'Preset Company Process Start Successful' });
+    });
+
+    app.get("/connections/:id", (req, res) => refuseKeyInUrl(res));
+    app.get("/api/v1/setPresetCompany/:id", (req, res) => refuseKeyInUrl(res));
 
     /**
      * Create Default Folder

@@ -79,15 +79,6 @@ function initializeControllers() {
     const { startInterval } = require("./middlewares/mongoConnector/helper.js");
     startInterval();
     const { currentDirectory } = require(`./common-storage/common-${process.env.STORAGE_TYPE}.js`);
-    const { preCompanySetup, } = require("./Modules/Company/controller2.js");
-    app.get("/api/v1/setPresetCompany/:id", (req, res) => {
-        if (req.params && req.params.id && req.params.id === config.PRECOMPANYKEY) {
-            preCompanySetup();
-            res.send('Preset Company Process Start Successful');
-        } else {
-            res.send('Unauthorized');
-        }
-    })
     //IMPORT CUSTOM FILES
     require('./Modules/Auth/init').init(app);
     require('./Modules/SSO/init').init(app);
