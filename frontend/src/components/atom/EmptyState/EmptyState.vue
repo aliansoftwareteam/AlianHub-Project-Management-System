@@ -58,17 +58,13 @@ const resolvedHelpHref = computed(() => {
     max-width: 180px;
 }
 .empty-state__title {
-    font-family: Roboto, sans-serif;
-    font-size: 18px;
-    font-weight: 500;
-    color: #172b4d;
+    font: var(--text-h3);
+    color: var(--ink);
     margin-bottom: 6px;
 }
 .empty-state__msg {
-    font-family: Roboto, sans-serif;
-    font-size: 13.5px;
-    line-height: 1.5;
-    color: #8c8c8c;
+    font: var(--text-small);
+    color: var(--ink-2);
     max-width: 380px;
     margin: 0 0 16px;
 }
@@ -78,9 +74,8 @@ const resolvedHelpHref = computed(() => {
 .empty-state__help {
     display: inline-block;
     margin-top: 12px;
-    font-family: Roboto, sans-serif;
-    font-size: 13px;
-    color: #2f6fdb;
+    font: var(--text-small);
+    color: var(--brand);
     text-decoration: none;
 }
 .empty-state__help:hover {

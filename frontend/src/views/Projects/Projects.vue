@@ -12,6 +12,7 @@
                             :activeView="activeTab"
                             :favourite="isProjectFavourite"
                             :agentSummary="agentSummary"
+                            :showFilter="false"
                             :showAiAssist="canAiAssist"
                             :showAddTask="canAddTask"
                             @toggle-favourite="markProjectFavourite()"

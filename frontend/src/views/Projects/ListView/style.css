@@ -6,6 +6,7 @@
     flex-direction: column;
     min-height: 0;
     background: var(--canvas);
+    position: relative;
 }
 
 .lv2__scroll {
@@ -29,7 +30,7 @@
     text-transform: uppercase;
     color: var(--ink-label);
 }
-.lv2__cols span:last-child { color: var(--brand); }
+.lv2__cols .lv2__c-risk { color: var(--brand); }
 
 .lv2__sprint { display: flex; flex-direction: column; gap: 12px; }
 .lv2__sprint-head {
@@ -120,7 +121,7 @@
 .lv2__row.is-sub .lv2__name { font-weight: 400; }
 .lv2__row.is-sub.is-done .lv2__name { text-decoration: line-through; color: var(--ink-3); }
 .lv2__key { font: 500 10px/1 var(--font-mono); color: var(--ink-label); flex: none; }
-.lv2__timer { font: 500 10px/1 var(--font-mono); color: var(--ok); display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.lv2__timer { font: 500 10px/1 var(--font-mono); color: var(--ok-ink); display: inline-flex; align-items: center; gap: 4px; flex: none; }
 .lv2__agent-line {
     font: 500 10px/1.3 var(--font-ui);
     color: var(--brand);
@@ -188,11 +189,11 @@
 }
 .lv2__collapsed-count { font: var(--text-data); color: var(--ink-label); }
 
-.lv2__empty-group { padding: 10px 12px; color: var(--ink-3); font-size: 12px; }
+.lv2__empty-group { margin: 0; padding: 10px 12px; color: var(--ink-3); font-size: 12px; }
 .lv2__skeleton { height: 44px; border-radius: var(--r-card); }
 
 @media (max-width: 1279px) {
-    .lv2 { --lv2-cols: 28px minmax(0, 1fr) 80px 90px 76px 60px 56px; }
+    .lv2 { --lv2-cols: 28px minmax(0, 1fr) 80px 90px 76px 60px 56px 104px; }
 }
 @media (max-width: 767px) {
     .lv2 { --lv2-cols: 28px minmax(0, 1fr) 60px 56px; }
@@ -218,5 +219,5 @@
 
 /* Declared last so it wins over the tablet rule above: at phone width the name keeps the row. */
 @media (max-width: 767px) {
-    .lv2 { --lv2-cols: 28px minmax(0, 1fr) 60px 56px; }
+    .lv2 { --lv2-cols: 28px minmax(0, 1fr); }
 }

@@ -118,10 +118,13 @@
     background: none;
 }
 
+/* An empty column's drop container was 0px tall, leaving Sortable's 5px
+   emptyInsertThreshold as the only catchment. */
 .kanban-board .kanban-cards {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    min-height: 88px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
 }
@@ -139,6 +142,7 @@
     transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
 }
 .kanban-board .kanban-card:hover { border-color: var(--border); }
+.kanban-board .kanban-card .card-title { color: var(--ink); font: 500 13px/1.35 var(--font-ui); }
 
 /* Blocked columns tint their cards' border, as in the mock. */
 .kanban-board .kanban-column--danger .kanban-card { border-color: rgba(193, 18, 31, .3); }
@@ -189,7 +193,7 @@
     margin-top: 7px;
 }
 .kanban-board .card-key { font: 600 9.5px/1 var(--font-mono); color: var(--ink-3); }
-.kanban-board .card-timer { font: 500 10px/1 var(--font-mono); color: var(--ok); white-space: nowrap; }
+.kanban-board .card-timer { font: 500 10px/1 var(--font-mono); color: var(--ok-ink); white-space: nowrap; }
 .kanban-board .card-progress { height: 4px; border-radius: 99px; background: rgba(0, 0, 0, .07); margin-top: 7px; overflow: hidden; }
 .kanban-board .card-progress > span { display: block; height: 100%; border-radius: 99px; background: var(--brand); }
 

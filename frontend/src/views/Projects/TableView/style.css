@@ -35,11 +35,12 @@
     font-size: 12.5px;
 }
 
+/* No non-visible overflow here: it would capture .tv2__head's sticky positioning,
+   so the corners are rounded on the head and the last row instead. */
 .tv2__grid {
     background: var(--surface);
     border: 1px solid var(--hairline);
     border-radius: var(--r-card);
-    overflow: hidden;
     min-width: 900px;
 }
 
@@ -54,6 +55,7 @@
     color: var(--ink-label);
     border-bottom: 1px solid var(--hairline);
     background: var(--surface-2);
+    border-radius: var(--r-card) var(--r-card) 0 0;
     position: sticky;
     top: 0;
     z-index: 2;
@@ -92,7 +94,7 @@
 }
 .tv2__row:hover { background: var(--surface-hover); }
 .tv2__row.is-selected { background: var(--brand-tint); }
-.tv2__row:last-child { border-bottom: 0; }
+.tv2__row:last-child { border-bottom: 0; border-radius: 0 0 var(--r-card) var(--r-card); }
 
 .tv2__name {
     background: none; border: 0; padding: 0;

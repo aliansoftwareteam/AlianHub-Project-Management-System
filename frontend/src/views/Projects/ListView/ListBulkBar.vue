@@ -224,10 +224,10 @@ onBeforeUnmount(() => {
 </script>
 
 <style>
-/* Bulk bar (14a) */
+/* Out of flow: in flow its 40px came out of the list's height, so the first checkbox
+   click moved every row out from under the pointer. */
 .lv2-bulk {
     height: 40px;
-    flex: none;
     background: var(--rail);
     color: #fff;
     display: flex;
@@ -235,9 +235,13 @@ onBeforeUnmount(() => {
     padding: 0 20px;
     gap: 14px;
     font-size: 12.5px;
-    position: relative;
-    z-index: 4;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
 }
+.lv2-bulk ~ .lv2__scroll { padding-bottom: 48px; }
 .lv2-bulk__count { font-weight: 600; }
 .lv2-bulk__btn {
     background: none; border: 0; padding: 0;
@@ -254,7 +258,7 @@ onBeforeUnmount(() => {
 .lv2-bulk__menu-wrap { position: relative; }
 .lv2-bulk__menu {
     position: absolute;
-    top: calc(100% + 8px);
+    bottom: calc(100% + 8px);
     left: 0;
     min-width: 200px;
     max-height: 280px;
