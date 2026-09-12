@@ -36,8 +36,8 @@ const priorityUpdate = (userId) => actions.perform({ companyId: CID, actor: acto
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     jest.clearAllMocks();
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1 });
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: MEMBER_ROLE });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: MEMBER_ROLE, status: 2, isDelete: false });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT_ID, CompanyId: CID, isGlobalPermission: true });
     mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK_ID, CompanyId: CID, ProjectID: PROJECT_ID, TaskName: 'Fix the thing', TaskKey: 'AR-1', Task_Priority: 'LOW' });
 });

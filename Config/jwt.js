@@ -546,27 +546,26 @@ const verifyJWTTokenV2 = (req, res, next) => {
  * authorization for that bucket. Forcing them through this check would
  * 400-block legitimate uploads.
  *
+ * Every company the request names is checked, the `companyid` header first: this used to judge
+ * the body before the header, while `tenantOf` takes the header before the body, so a request
+ * could be judged on one company and then served for another.
+ *
  * Applied after `verifyJWTTokenV2` so `req.aud` is already populated.
  */
 const requireCompanyAud = (req, res, next) => {
     try {
-        const candidate =
-            (req.body && (req.body.companyId || req.body.CompanyId)) ||
-            (req.params && req.params.companyId) ||
-            (req.query && req.query.companyId) ||
-            (req.headers && req.headers.companyid) ||
-            null;
+        const candidates = [
+            req.headers && req.headers.companyid,
+            req.params && req.params.companyId,
+            req.query && req.query.companyId,
+            req.body && req.body.companyId,
+            req.body && req.body.CompanyId,
+        ].map((value) => String(value == null ? '' : value).trim())
+            // Non-ObjectId values (special buckets like USER_PROFILES) aren't tenants and have
+            // controller-level checks; forcing them through here would block legitimate uploads.
+            .filter((value) => OBJECT_ID_PATTERN.test(value));
 
-        if (!candidate) return next();
-
-        const companyId = String(candidate).trim();
-        // Skip enforcement for non-ObjectId values (special buckets like
-        // USER_PROFILES). Those aren't tenants and have controller-level
-        // checks.
-        if (!OBJECT_ID_PATTERN.test(companyId)) {
-            return next();
-        }
-        if (!isCompanyInAudience(req.aud, companyId)) {
+        if (candidates.some((companyId) => !isCompanyInAudience(req.aud, companyId))) {
             return res.status(403).json({
                 status: false,
                 error: 'You do not have access to this company',
@@ -582,6 +581,37 @@ const requireCompanyAud = (req, res, next) => {
             statusText: 'Unauthorized',
             isJwtError: true,
         });
+    }
+};
+
+/**
+ * The live membership re-check `verifyJWTTokenWithCV2` does, for the company routes that take
+ * their company from the request body and so only ever ran `verifyJWTTokenV2` + `requireCompanyAud`.
+ * The audience is frozen at login, so without this a caller removed from the company keeps
+ * reaching those handlers with the token they already hold.
+ *
+ * API-token requests are left alone: `verifyApiTokenRequest` has already re-checked membership.
+ */
+const requireLiveCompanyMembership = async (req, res, next) => {
+    if (req.apiToken) return next();
+    try {
+        const { namedCompanyIds } = require('./tenant');
+        const named = namedCompanyIds(req).filter((companyId) => OBJECT_ID_PATTERN.test(companyId));
+        for (const companyId of named) {
+            if (!(await verifyCompanyMembership(req.uid, companyId))) {
+                return res.status(403).json({
+                    status: false,
+                    error: 'You are no longer a member of this company',
+                    statusText: 'Forbidden',
+                    isJwtError: true,
+                    isLogout: true,
+                });
+            }
+        }
+        return next();
+    } catch (error) {
+        logger.error(`requireLiveCompanyMembership error for uid=${req.uid}: ${error.message || error}`);
+        return res.status(403).json({ status: false, error: 'Forbidden', statusText: 'Forbidden' });
     }
 };
 
@@ -641,6 +671,7 @@ module.exports = {
     verifyToken: verifyToken,
     removeCacheAndCookie: removeCacheAndCookie,
     requireCompanyAud: requireCompanyAud,
+    requireLiveCompanyMembership: requireLiveCompanyMembership,
     // BUG-013 / #67
     verifyCompanyMembership: verifyCompanyMembership,
     invalidateMembershipCache: invalidateMembershipCache,

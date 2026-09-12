@@ -4,6 +4,7 @@ const { dbCollections } = require("../../Config/collections");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { addAndRemoveUserInMongodbNotificationCount } = require("../Auth/controller/authHelpers");
 const logger = require("../../Config/loggerConfig");
+const { SEAT_ACTIVE } = require('../../Config/seatStatus');
 
 // SEC-02 — Just-In-Time provision (or link) an SSO user into a company. Mirrors
 // the OAuth signup path (createUser.googleSignup): global userAuth + users,
@@ -55,7 +56,7 @@ const jitProvisionUser = async ({ companyId, email, firstName, lastName, externa
     if (!existingMember) {
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
-            data: { userId: String(uid), roleType: Number(defaultRoleType) || 3, status: 1, userEmail: normEmail },
+            data: { userId: String(uid), roleType: Number(defaultRoleType) || 3, status: SEAT_ACTIVE, userEmail: normEmail },
         }, 'save');
         await addAndRemoveUserInMongodbNotificationCount(companyId, uid, 'add')
             .catch((e) => logger.error(`SSO JIT notif add: ${e.message || e}`));

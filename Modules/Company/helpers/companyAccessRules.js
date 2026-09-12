@@ -1,3 +1,5 @@
+const { ACTIVE_SEAT, INVITED_SEAT } = require('../../../Config/seatStatus');
+
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
 const MEMBER_STAGES = ['$match', '$project', '$sort', '$limit', '$skip', '$addFields', '$set', '$unset', '$count'];
@@ -79,14 +81,7 @@ const companyUpdateKind = (body) => {
     return countUpdateKind(body);
 };
 
-const PENDING_SEAT = 1;
-const ACTIVE_SEAT = 2;
-
 // Invitation.vue records an invited owner while they accept, so only that write takes the caller's own pending row.
-const seatFilter = (uid, kind) => ({
-    userId: String(uid),
-    isDelete: { $ne: true },
-    status: { $in: kind === 'ownerClaim' ? [PENDING_SEAT, ACTIVE_SEAT] : [ACTIVE_SEAT] },
-});
+const seatFilter = (uid, kind) => ({ userId: String(uid), ...(kind === 'ownerClaim' ? INVITED_SEAT : ACTIVE_SEAT) });
 
 module.exports = { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, companyUpdateKind, seatFilter };

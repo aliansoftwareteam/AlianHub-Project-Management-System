@@ -5,6 +5,10 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { jitProvisionUser } = require('../SSO/provisioning');
 const { removeCache } = require('../../utils/commonFunctions');
 const logger = require('../../Config/loggerConfig');
+const { SEAT_ACTIVE } = require('../../Config/seatStatus');
+
+// scimRules.isActive reads this back as "not active"; isDelete is what keeps the seat out of the guards.
+const SCIM_DEACTIVATED = 0;
 
 let invalidateRoleCache = () => {};
 try { ({ invalidateRoleCache } = require('../../Config/permissionGuard')); } catch (e) { /* optional */ }
@@ -46,7 +50,7 @@ const provision = async (companyId, { email, firstName, lastName, externalId, ac
         companyId, email, firstName, lastName, externalId,
         defaultRoleType: defaultRoleType || 3, autoProvision: true,
     });
-    const set = { status: active === false ? 0 : 1, isDelete: active === false, userEmail: String(email).toLowerCase() };
+    const set = { status: active === false ? SCIM_DEACTIVATED : SEAT_ACTIVE, isDelete: active === false, userEmail: String(email).toLowerCase() };
     if (externalId) set.scimExternalId = String(externalId);
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMPANY_USERS,
@@ -63,7 +67,7 @@ const setActive = async (companyId, uid, active) => {
     if (!cu) return null;
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMPANY_USERS,
-        data: [{ userId: String(uid) }, { $set: { status: active ? 1 : 0, isDelete: !active } }],
+        data: [{ userId: String(uid) }, { $set: { status: active ? SEAT_ACTIVE : SCIM_DEACTIVATED, isDelete: !active } }],
     }, 'updateOne');
     clearUserCaches(companyId, uid);
     return getCompanyUser(companyId, uid);

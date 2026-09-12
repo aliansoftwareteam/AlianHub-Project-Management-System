@@ -44,9 +44,9 @@ const patRequest = (uid, body) => ({ apiToken: { _id: 't' }, uid, headers: { com
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     mockFailing.rules = false;
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1 });
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: ADMIN, roleType: 2 });
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: 3 });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: ADMIN, roleType: 2, status: 2, isDelete: false });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: 3, status: 2, isDelete: false });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: GLOBAL_PROJECT, isGlobalPermission: true });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: OWN_RULES_PROJECT, isGlobalPermission: false });
     mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK_IN_OWN_RULES, ProjectID: OWN_RULES_PROJECT });

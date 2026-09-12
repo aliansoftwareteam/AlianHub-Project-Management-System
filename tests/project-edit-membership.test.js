@@ -102,10 +102,10 @@ const projectName = (id) => mockDb.store[SCHEMA_TYPE.PROJECTS].find((p) => Strin
 beforeEach(() => {
     myCache.flushAll();
     mockDb = fakeMongo.create();
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1 });
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: ADMIN, roleType: 2 });
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: MEMBER_ROLE });
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: TEAMMATE, roleType: MEMBER_ROLE });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: ADMIN, roleType: 2, status: 2, isDelete: false });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: MEMBER_ROLE, status: 2, isDelete: false });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: TEAMMATE, roleType: MEMBER_ROLE, status: 2, isDelete: false });
 });
 
 describe('PUT /api/v1/project/:id', () => {
@@ -173,7 +173,7 @@ describe('PUT /api/v1/project/:id', () => {
 
         myCache.flushAll();
         mockDb = fakeMongo.create();
-        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: MEMBER_ROLE });
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: MEMBER_ROLE, status: 2, isDelete: false });
         seedRules({ 'project.project_name_edit': null });
         const denied = seedProject({ isPrivateSpace: false });
         expect((await rename(MEMBER, denied)).statusCode).toBe(403);

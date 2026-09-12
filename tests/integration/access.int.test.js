@@ -459,7 +459,8 @@ describe('access — company writes need a live seat in that company', () => {
         const before = await readCompany(admin);
         const res = await admin.api.withCompany(randomId()).put('/api/v1/admin/company', { companyId: state.companyId, updateObject: { Cst_CompanyName: 'Taken over' } });
         expect(res.status).toBe(403);
-        expect(res.body).toMatchObject({ status: false, message: expect.stringMatching(/more than one company/) });
+        // The header company is judged against the audience before the handler ever sees the body.
+        expect(res.body).toMatchObject({ status: false, error: 'You do not have access to this company' });
         expect(guarded(await readCompany(admin))).toEqual(guarded(before));
     });
 

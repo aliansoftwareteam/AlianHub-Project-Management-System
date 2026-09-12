@@ -48,7 +48,9 @@ exports.updateUserStatus = async (req, res) => {
             if (!companyId || req.apiToken) return refuse(res, 403, 'You can only update your own profile.');
             const { getRoleType, isPrivileged, ROLE_OWNER } = require("../../Config/permissionGuard.js");
             const callerRole = await getRoleType(companyId, req.uid);
-            const targetRole = await getRoleType(companyId, userId);
+            // Members.vue cancels the seat first and drops AssignCompany second, so by the time this
+            // runs the target holds no live seat: their role has to be read from whatever row is left.
+            const targetRole = await getRoleType(companyId, userId, { seat: 'any' });
             if (!isPrivileged(callerRole) || targetRole === null || targetRole === ROLE_OWNER) {
                 return refuse(res, 403, 'Only an owner or admin of that company can remove this member.');
             }
