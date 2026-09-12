@@ -85,6 +85,14 @@
                                 <input id="cap" v-model.number="form.spendCapUsd" type="number" min="0" step="1" class="ah-input" :disabled="!canManage" />
                                 <span class="ah-field__hint">{{ $t('Ai.cap_hint') }}</span>
                             </div>
+                            <div class="ah-field">
+                                <label class="ah-field__label" for="model-pin">{{ $t('Ai.model_pin') }}</label>
+                                <select id="model-pin" v-model="form.model" class="ah-input" :disabled="!canManage" data-test="model-pin">
+                                    <option value="">{{ $t('Ai.model_pin_none') }}</option>
+                                    <option v-for="m in pinnableModels" :key="m.model" :value="m.model">{{ m.model }} · {{ m.provider }}</option>
+                                </select>
+                                <span class="ah-field__hint">{{ pinnableModels.length ? $t('Ai.model_pin_hint') : $t('Ai.model_pin_empty') }}</span>
+                            </div>
                         </div>
                         <p v-if="spendRow" class="ai-ladder__rule ah-mono">{{ $t('Ai.spent_this_month', { usd: spendRow.usd.toFixed(2), runs: spendRow.runs }) }}</p>
                     </section>
@@ -167,7 +175,8 @@ const agent = ref({});
 const skills = ref([]);
 const recentRuns = ref([]);
 const deleteConfirm = ref("");
-const form = reactive({ autonomy: 1, rateLimitPerDay: 40, spendCapUsd: 30 });
+const form = reactive({ autonomy: 1, rateLimitPerDay: 40, spendCapUsd: 30, model: "" });
+const pinnableModels = ref([]);
 const openRunCount = computed(() => (activeRuns.value[String(route.params.id)] || []).length);
 
 const AUTONOMY = computed(() => (registryManifest.value.autonomy || []).map((a) => ({ level: a.level, key: `L${a.level}` })));
@@ -189,6 +198,11 @@ const time = (at) => (at ? moment(at).format("HH:mm") : "");
 const runChip = (run) => (run.status === "failed" ? "ah-chip--danger" : run.status === "running" ? "ah-chip--brand" : run.status === "skipped" ? "ah-chip--warn" : "ah-chip--ok");
 const toggleRun = (id) => { expandedRun.value = expandedRun.value === id ? "" : id; };
 
+const loadPinnableModels = async () => {
+    const res = await apiRequest("get", `${env.AGENT_MODELS}?configured=true`).catch(() => null);
+    pinnableModels.value = res?.data?.status ? (res.data.data?.models || []) : [];
+};
+
 const reloadRuns = async () => {
     const res = await apiRequest("get", `${env.AGENT_RUNS}?agentId=${route.params.id}&limit=5`);
     if (res?.data?.status) recentRuns.value = res.data.data || [];
@@ -205,6 +219,7 @@ const load = async () => {
     form.autonomy = Number(found.autonomy ?? 1);
     form.rateLimitPerDay = Number(found.rateLimitPerDay || 40);
     form.spendCapUsd = Number(found.spendCapUsd || 30);
+    form.model = found.model || "";
     skills.value = (found.skills || []).map((s) => ({
         key: s.key || String(s),
         name: s.name || s.key || String(s),
@@ -212,7 +227,7 @@ const load = async () => {
         enabled: s.enabled !== false
     }));
 
-    await reloadRuns();
+    await Promise.all([reloadRuns(), loadPinnableModels()]);
     loadingAgent.value = false;
 };
 
@@ -225,6 +240,7 @@ const save = async () => {
             autonomy: form.autonomy,
             rateLimitPerDay: form.rateLimitPerDay,
             spendCapUsd: form.spendCapUsd,
+            model: form.model,
             skills: skills.value.map((s) => ({ key: s.key, name: s.name, actions: s.actions, enabled: s.enabled }))
         });
         $toast.success(t("Ai.saved"), { position: "top-right" });

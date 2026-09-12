@@ -19,6 +19,9 @@ const { inputsOf } = require('./taskInputs');
 const revert = require('./revert');
 const undo = require('./undo');
 const budget = require('./budget');
+const routingPolicy = require('../AICore/routingPolicy');
+const modelPin = require('../AICore/modelPin');
+const taskClass = require('../AICore/taskClass');
 const revisions = require('./revisions');
 const skillRecord = require('./skillRecord');
 const { buildTrace } = require('./runTrace');
@@ -79,6 +82,16 @@ const normaliseSkill = (skill) => {
     };
 };
 
+/* A pin that cannot be billed or cannot be reached is refused here, so the
+ * person who set it hears about it instead of a run failing on it later. */
+const refusePin = (res, set) => {
+    if (set.model === undefined) return null;
+    const pin = modelPin.validatePin(set.model);
+    if (!pin.ok) return fail(res, pin.message, 400, { code: pin.code });
+    set.model = pin.model;
+    return null;
+};
+
 const refuseSkills = async (res, companyId, set) => {
     const errors = set.skills ? await skillRecord.checkAgentSkills(companyId, set.skills) : [];
     return errors.length ? fail(res, 'The agent names skills that cannot run.', 400, { data: { errors } }) : null;
@@ -94,7 +107,7 @@ const agentPatchFields = (body) => {
     if (body.autonomy !== undefined) set.autonomy = autonomyOf(body.autonomy);
     if (body.spendCapUsd !== undefined) set.spendCapUsd = Math.max(0, Number(body.spendCapUsd) || 0);
     if (body.account !== undefined && accounts.MODES.includes(body.account)) set.account = body.account;
-    if (body.model !== undefined) set.model = String(body.model).slice(0, 120);
+    if (body.model !== undefined) set.model = String(body.model).slice(0, modelPin.MAX_LENGTH);
     // `schedule` is stored for a scheduler that does not exist yet: nothing reads
     // it, so the UI hides the field. `rateLimitPerDay` is enforced in runs.canStart.
     if (body.schedule !== undefined && typeof body.schedule === 'object') set.schedule = body.schedule;
@@ -125,6 +138,7 @@ exports.createAgent = async (req, res) => {
         const { actor } = caller;
         const set = agentPatchFields(req.body || {});
         if (!set.name) return fail(res, 'name is required.');
+        if (refusePin(res, set)) return undefined;
         if (await refuseSkills(res, companyId, set)) return undefined;
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENTS,
@@ -145,6 +159,7 @@ exports.updateAgent = async (req, res) => {
         const { actor } = caller;
         const set = agentPatchFields(req.body || {});
         if (!Object.keys(set).length) return fail(res, 'Nothing to update.');
+        if (refusePin(res, set)) return undefined;
         if (await refuseSkills(res, companyId, set)) return undefined;
         const before = await runs.getAgent(companyId, req.params.id);
         if (!before) return fail(res, 'Agent not found.', 404);
@@ -500,6 +515,35 @@ exports.getBudget = async (req, res) => {
         if (!companyId) return fail(res, 'companyId is required.');
         return res.send({ status: true, statusText: 'Budget fetched.', data: await budget.status(companyId) });
     } catch (e) { logger.error(`getBudget: ${e.message}`); return fail(res, e.message, 500); }
+};
+
+/* GET /api/v2/agents/models — the priced allowlist a pin may name */
+exports.getModels = (req, res) => {
+    const configuredOnly = String((req.query && req.query.configured) || '') === 'true';
+    const models = modelPin.allowlist({ configuredOnly });
+    return res.send({ status: true, statusText: 'Models fetched.', data: { models, taskClasses: taskClass.list() } });
+};
+
+/* GET /api/v2/agents/routing-policy — task class to model preferences for this workspace */
+exports.getRoutingPolicy = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return fail(res, 'companyId is required.');
+        return res.send({ status: true, statusText: 'Routing policy fetched.', data: await routingPolicy.get(companyId) });
+    } catch (e) { logger.error(`getRoutingPolicy: ${e.message}`); return fail(res, e.message, 500); }
+};
+
+/* PUT /api/v2/agents/routing-policy */
+exports.putRoutingPolicy = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
+        const caller = await callerOf(req, companyId);
+        if (refuseUnlessManager(res, caller, 'Agents cannot change the routing policy.')) return undefined;
+        const out = await routingPolicy.update(companyId, req.body || {}, caller.actor.userId);
+        if (out.error) return fail(res, out.error, out.status || 400, out.code ? { code: out.code } : undefined);
+        return res.send({ status: true, statusText: 'Routing policy updated.', data: out.policy });
+    } catch (e) { logger.error(`putRoutingPolicy: ${e.message}`); return fail(res, e.message, 500); }
 };
 
 /* GET /api/v2/agents/proposals?status=pending&bucket=primary|later&agentId= */

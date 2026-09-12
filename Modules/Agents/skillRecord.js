@@ -103,6 +103,7 @@ const compile = (doc) => ({
     source: SOURCE.DATA,
     version: doc.version,
     risk: doc.risk || riskOf(doc.emits || []),
+    model: doc.model || null,
     inputs: [...(doc.inputs || [])],
     emits: [...(doc.emits || [])],
     reads: (doc.gather || []).map((s) => s.reader),
@@ -188,6 +189,7 @@ const dataEntry = (doc) => ({
     reads: (doc.gather || []).map((s) => s.reader),
     emits: [...(doc.emits || [])],
     risk: doc.risk || riskOf(doc.emits || []),
+    model: doc.model || null,
     enabled: doc.enabled !== false,
     version: doc.version,
     retiredAt: doc.retiredAt || null,
@@ -212,7 +214,7 @@ const createSkill = async (companyId, input, { createdBy } = {}) => {
     return plainOf(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_SKILLS, data: { ...checked.value, createdBy: createdBy || null } }, 'save'));
 };
 
-const EDITABLE = Object.freeze(['name', 'description', 'enabled', 'inputs', 'gather', 'prompt', 'emit', 'summary', 'risk']);
+const EDITABLE = Object.freeze(['name', 'description', 'enabled', 'inputs', 'gather', 'prompt', 'emit', 'summary', 'risk', 'model']);
 
 const updateSkill = async (companyId, key, patch = {}) => {
     const existing = await findData(companyId, key);

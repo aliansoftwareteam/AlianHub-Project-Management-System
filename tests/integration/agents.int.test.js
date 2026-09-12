@@ -289,6 +289,45 @@ describe('agents: settings, policy, accounts and preferences', () => {
         expect((await api.get('/api/v2/agents/account')).body.data.account).toBeNull();
     });
 
+    it.each(['member', 'guest'])('refuses a %s changing the routing policy', async (role) => {
+        const { api } = await as(role);
+        const res = await api.put('/api/v2/agents/routing-policy', { classes: { classify: { latencyTargetMs: 2000 } } });
+        expect(res.status).toBe(403);
+    });
+
+    it('lets the owner set a latency target and refuses a model outside the priced allowlist', async () => {
+        const { api } = await as('owner');
+        const before = (await api.get('/api/v2/agents/routing-policy')).body.data;
+        const classify = before.classes.find((c) => c.taskClass === 'classify');
+        expect(classify).toMatchObject({ qualityFloor: expect.any(String), inputBudgetTokens: expect.any(Number) });
+
+        const refusedPin = await api.put('/api/v2/agents/routing-policy', { classes: { classify: { model: 'model-that-has-no-price' } } });
+        expect(refusedPin.status).toBe(400);
+        expect(refusedPin.body.code).toBe('unpriced_model');
+
+        const changed = await api.put('/api/v2/agents/routing-policy', { classes: { classify: { latencyTargetMs: classify.latencyTargetMs === 2500 ? 2750 : 2500 } } });
+        expect(changed.body.status).toBe(true);
+        const restored = await api.put('/api/v2/agents/routing-policy', { classes: { classify: { latencyTargetMs: classify.latencyTargetMs } } });
+        expect(restored.body.data.classes.find((c) => c.taskClass === 'classify').latencyTargetMs).toBe(classify.latencyTargetMs);
+    });
+
+    it('lists only priced models a pin may name', async () => {
+        const { api } = await as('owner');
+        const res = await api.get('/api/v2/agents/models');
+        expect(res.body.status).toBe(true);
+        expect(res.body.data.models.every((m) => m.priced === true && m.provider)).toBe(true);
+        expect(res.body.data.taskClasses.map((c) => c.key)).toContain('long_context');
+    });
+
+    it('refuses an agent pinned to a model outside the priced allowlist', async () => {
+        const { api } = await as('owner');
+        const agent = await createAgent(api);
+        const res = await api.put(`/api/v2/agents/${agent._id}`, { model: 'model-that-has-no-price' });
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('unpriced_model');
+        await api.delete(`/api/v2/agents/${agent._id}`);
+    });
+
     it('validates preferences', async () => {
         const { api } = await as('guest');
         const bad = await api.put('/api/v2/agents/preferences', { tone: 'shouty' });

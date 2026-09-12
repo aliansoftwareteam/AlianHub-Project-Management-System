@@ -84,7 +84,7 @@ Backend variables: 168. Frontend build-time variables: 23.
 | `AI_API_KEY` (secret) |  |  | API key for the configured LLM provider (LLM_PROVIDER). | `Config/config.js` |
 | `AI_MAX_TASK_MINUTES` |  |  | Upper bound, in minutes, for a task the AI project generator may plan. | `Modules/AIProjectGenerator/planRules.js` |
 | `AI_MODEL` |  | `gpt-4.1` | recommended: gpt-4o or gpt-4.1 for best instruction-following on complex plans | `Config/config.js` |
-| `AI_MODEL_ROUTER` |  | `off` | model router: "on" lets a caller pick the provider and model per call; default "off" keeps the single configured provider answering everything | `Modules/AICore/llmProvider/normalise.js` |
+| `AI_MODEL_ROUTER` |  | `off` | model router: "on" lets a caller pick the provider and model per call and lets the workspace routing policy name a model per task class; default "off" keeps the single configured provider answering everything, so a saved policy changes nothing | `Modules/AICore/llmProvider/normalise.js` |
 | `AI_REPLAY` |  | `agent` | Which model calls keep a replay record (prompt, raw response, model, revisions; redacted): off, agent (agent runs only) or all. | `Modules/AICore/replay.js` |
 | `AI_REPLAY_RETENTION_DAYS` |  | `30` | Days a replay record is kept before the TTL index deletes it. | `Modules/AICore/replay.js` |
 | `AI_ROUTER_BACKOFF_MAX_MS` |  | `8000` | ceiling for one backoff wait, and for a retry-after hint the provider returns | `Modules/AICore/llmProvider/router.js` |
