@@ -235,6 +235,16 @@ the reason — the feature is not refused, it is not running.
 | `POST /runs/:id/steps/:stepId/skip` | a pending or failed step skipped by a person, which lets the steps behind it run |
 | `POST /runs/:id/steps/:stepId/resume` | a failed step, or one holding a claim nobody is working, back to pending with the attempts it has already spent |
 | `POST /runs/:id/steps/:stepId/compensate` | undoes what the step did, which for an agent-run step is the agents' own run revert: the same inverse, the same undo window, the same audit trail |
+| `GET /approvals` | the approvals a person may see, with the owner, the deadline and the escalation path on each — what the AI Inbox reads |
+| `POST /runs/:id/steps/:stepId/decide` | approves or rejects the approval on that step, through the same compare-and-set the engine uses, then reopens the run |
+| `POST /runs/:id/steps/:stepId/reassign` | hands the approval to somebody else, recording who moved it, from whom and when on `reassignments` |
+
+The three approval routes are the one place the manage rule is not the whole
+answer: an approval names an owner, and the owner decides it whatever their
+role. An Owner or an Admin may decide any of them, because they can already
+retry, skip and compensate the step the approval is holding; a past owner may
+not, because a request handed on is not theirs any more. Reading is the run's own
+visibility, plus the approvals the caller owns.
 
 Every control bumps the fencing token, because the worker whose attempt it
 overrides may still be alive; with a new token that worker's late write matches
