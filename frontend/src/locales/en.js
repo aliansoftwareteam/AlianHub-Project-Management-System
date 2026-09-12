@@ -6723,6 +6723,8 @@ export default {
         No_self_assignee_found: "No self assignee found",
         Estimated_time_updated_successfully:
             "Task Planning updated successfully",
+        Estimated_time_not_updated:
+            "Couldn't save the task planning. Try again.",
         Description_updated_successfully: "Description updated successfully",
         Description_not_updated: "Description not updated",
         Copied: "Copied!",
