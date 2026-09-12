@@ -9,6 +9,8 @@ const flag = require('./flag');
 const queue = require('./queue');
 const automationRule = require('./automationRule');
 const agentRunner = require('./agentRun');
+const hop = require('./hop');
+const typed = require('./typed');
 const stepTypes = require('./stepTypes');
 const approvals = require('./approvals');
 const timeTrigger = require('./timeTrigger');
@@ -34,6 +36,10 @@ const startForRule = (companyId, rule, envelope, automationRun) => store.createR
     eventType: envelope.type,
     entity: envelope.entity || {},
     traceId: automationRun.traceId || envelope.traceId || null,
+    // The depth the event arrived at. A rule that fires on a change an agent made
+    // is already one hop in, and the workflow carries on that count rather than
+    // starting a second one.
+    depth: Number(envelope.depth) || 0,
     steps: [{ id: 'rule', type: automationRule.TYPE, dependsOn: [], maxAttempts: flag.maxAttempts() }],
 });
 
@@ -58,6 +64,11 @@ const startForAgentRun = (companyId, run, { note } = {}) => store.createRun(comp
     projectId: run.projectId ? String(run.projectId) : null,
     startedBy: run.startedBy || null,
     traceId: run.traceId || null,
+    // Wrapping a run in a workflow is itself a hop: an agent whose action starts
+    // a workflow must not get a fresh depth budget by changing engines.
+    depth: Math.max(0, Number(run.triggerDepth) || 0),
+    deadlineMs: Number(run.deadlineMs) > 0 ? Number(run.deadlineMs) : null,
+    budgetUsd: Number(run.spendCapUsd) > 0 ? Number(run.spendCapUsd) : null,
     steps: [{
         id: STEP_ID,
         type: stepTypes.AGENT_RUN,
@@ -95,6 +106,8 @@ module.exports = {
     flag,
     queue,
     agentRunner,
+    hop,
+    typed,
     stepTypes,
     approvals,
     timeTrigger,

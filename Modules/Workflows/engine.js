@@ -8,10 +8,20 @@ const concurrency = require('./concurrency');
 const idempotency = require('./idempotency');
 const retry = require('./retry');
 const agentRunner = require('./agentRun');
+const hop = require('./hop');
+const typed = require('./typed');
 const { leaseMs, heartbeatMs } = require('./flag');
 
-// The engine: claim a ready step, hold it under a lease, run it once, record
-// what happened, and decide whether a failure comes back.
+// The engine: check the step may run at all, claim it, hold it under a lease,
+// run it once, check what it produced, record it, and decide whether a failure
+// comes back.
+//
+// Four gates stand between a ready step and its executor, and all four are shut
+// before anything is spent: the input it reads must match what its producers
+// declared, the run must have deadline left, it must have budget left, and the
+// step must not be past the re-entry depth guard. The first is a contract
+// mismatch and fails that step; the other three are the run running out, and
+// block the whole run — nothing after it could do better.
 //
 // Everything durable lives on the two collections; nothing about a run is held
 // in this process between ticks. That is what makes a run resumable — a tick
@@ -53,17 +63,45 @@ const startHeartbeat = (companyId, claim, lost) => {
 
 const claimOf = (step) => ({ runId: String(step.runId), stepId: String(step.stepId), fencingToken: Number(step.fencingToken) });
 
+/* Fail a step that never ran, which needs a claim of its own to write under. */
+const failUnclaimed = async (companyId, run, pending, { workerId, error, code }) => {
+    await store.claimStep(companyId, { runId: run._id, stepId: pending.stepId, workerId });
+    const claimed = await store.getStep(companyId, run._id, pending.stepId);
+    if (!claimed) return false;
+    await store.failStep(companyId, claimOf(claimed), {
+        error,
+        failure: { type: 'deterministic', code, deterministic: true },
+    });
+    return true;
+};
+
 /* One step, start to finish. Returns what the tick should do next. */
-const runStep = async (companyId, run, pending, { workerId = WORKER_ID, context = {} } = {}) => {
+const runStep = async (companyId, run, pending, { workerId = WORKER_ID, context = {}, steps = [] } = {}) => {
     const executor = executors.get(pending.type);
     if (!executor) {
-        await store.claimStep(companyId, { runId: run._id, stepId: pending.stepId, workerId });
-        const claimed = await store.getStep(companyId, run._id, pending.stepId);
-        await store.failStep(companyId, claimOf(claimed), {
-            error: `no executor is registered for step type "${pending.type}"`,
-            failure: { type: 'deterministic', code: 'unknown_step_type', deterministic: true },
-        });
+        await failUnclaimed(companyId, run, pending, { workerId, error: `no executor is registered for step type "${pending.type}"`, code: 'unknown_step_type' });
         return { outcome: 'failed' };
+    }
+
+    // The inbound edge. A step that reads a field its producer does not have is
+    // stopped here rather than reading undefined somewhere downstream, where the
+    // symptom would be a branch that is quietly always false.
+    const inputs = typed.checkInputs(pending, steps);
+    if (!inputs.valid) {
+        const error = `step ${pending.stepId} (${pending.type}) cannot be given its input: ${inputs.errors.join('; ')}`;
+        await failUnclaimed(companyId, run, pending, { workerId, error, code: 'contract_mismatch' });
+        logger.error(`${LOG_PREFIX} ${run._id}/${pending.stepId}: ${error}`);
+        return { outcome: 'failed', reason: error };
+    }
+
+    // What the run has left, against what this hop needs. Refused before the
+    // claim, so a chain that cannot finish has not started a model call it will
+    // have to abandon.
+    const permit = hop.allow(run, steps, pending);
+    if (!permit.ok) {
+        await failUnclaimed(companyId, run, pending, { workerId, error: permit.reason, code: permit.code });
+        logger.warn(`${LOG_PREFIX} ${run._id}/${pending.stepId} refused (${permit.code}): ${permit.reason}`);
+        return { outcome: 'blocked', code: permit.code, reason: permit.reason, stepId: String(pending.stepId) };
     }
 
     const capacity = await concurrency.atCapacity(companyId);
@@ -77,6 +115,10 @@ const runStep = async (companyId, run, pending, { workerId = WORKER_ID, context 
     }
 
     const claim = claimOf(claimed);
+    // What this hop was given out of what the run had left, on the row before it
+    // runs: the answer to "why did this step only get ninety seconds" has to
+    // outlive the tick that decided it.
+    await store.noteStep(companyId, claim, { deadlineAt: permit.grant.deadlineAt, budgetUsd: permit.grant.budgetUsd, depth: permit.depth });
     const lost = { value: false };
     const stopHeartbeat = startHeartbeat(companyId, claim, lost);
     const key = idempotency.keyFor({ runId: run._id, stepId: claimed.stepId, action: claimed.action });
@@ -104,12 +146,28 @@ const runStep = async (companyId, run, pending, { workerId = WORKER_ID, context 
                 claim,
                 // The agent runner comes from here rather than from every caller of
                 // tick: a step type asks for `context.runAgent` and gets one.
-                context: { ...agentRunner.contextFor(companyId, claim), ...context, keepAlive: () => store.heartbeat(companyId, claim), leaseLost: () => lost.value },
+                context: {
+                    ...agentRunner.contextFor(companyId, claim),
+                    ...context,
+                    // What is left after this hop takes its share — the executor
+                    // passes it on rather than inventing a budget of its own.
+                    deadlineAt: permit.grant.deadlineAt,
+                    budgetUsd: permit.grant.budgetUsd,
+                    depth: permit.depth,
+                    keepAlive: () => store.heartbeat(companyId, claim),
+                    leaseLost: () => lost.value,
+                },
             }),
         )));
         // A replay has no output of its own; the one the first attempt recorded stands.
-        await store.succeedStep(companyId, claim, { output: result.output || claimed.output || {}, auditId: result.auditId, replayed: result.replayed });
-        return { outcome: 'success', replayed: result.replayed, output: result.output || {} };
+        const output = result.output || claimed.output || {};
+        // The outbound edge, before the output is written and therefore before
+        // anything can read it.
+        typed.assertOutput(claimed, output);
+        const costUsd = hop.costOf(output);
+        await store.succeedStep(companyId, claim, { output, auditId: result.auditId, replayed: result.replayed, costUsd });
+        if (costUsd > 0) await store.spendOnRun(companyId, run._id, costUsd);
+        return { outcome: 'success', replayed: result.replayed, output, costUsd };
     } catch (error) {
         if (error instanceof store.StaleLeaseError) throw error;
         const decision = retry.decide(error, { attempt: Number(claimed.attempts) || 1, maxAttempts: Number(claimed.maxAttempts) || 3 });
@@ -137,7 +195,14 @@ const skipBlocked = async (companyId, runId, steps) => {
     }
 };
 
-const finish = async (companyId, run, steps) => {
+const finish = async (companyId, run, steps, blocked = null) => {
+    // A blocked run has a verdict of its own and it outranks whatever the step
+    // rows add up to: the steps behind the refused hop are skipped, which would
+    // otherwise read as an ordinary failure and hide the reason.
+    if (blocked) {
+        await store.blockRun(companyId, run._id, blocked);
+        return 'blocked';
+    }
     const status = scheduler.runStatus(steps);
     if (!status) return null;
     const failed = steps.find((step) => step.status === 'failed');
@@ -162,6 +227,8 @@ const tick = async (companyId, runId, { enqueue = null, workerId = WORKER_ID, co
     const outputs = { ...(run.outputs || {}) };
     let retryInMs = null;
     let executed = 0;
+    let spent = 0;
+    let blocked = null;
 
     for (let guard = 0; guard < maxSteps; guard++) {
         // eslint-disable-next-line no-await-in-loop
@@ -170,12 +237,22 @@ const tick = async (companyId, runId, { enqueue = null, workerId = WORKER_ID, co
         await skipBlocked(companyId, run._id, steps);
         const ready = scheduler.readySet(steps);
         if (!ready.length) break;
+        // The budget the last step took, so the next hop of this same tick is
+        // measured against what is actually left rather than against the run row
+        // as it was read before any of them ran.
+        run.spentUsd = Number(run.spentUsd || 0) + spent;
+        spent = 0;
 
         // eslint-disable-next-line no-await-in-loop
-        const result = await runStep(companyId, run, ready[0], { workerId, context });
+        const result = await runStep(companyId, run, ready[0], { workerId, context, steps });
         if (result.outcome === 'success') {
             outputs[ready[0].stepId] = result.output;
+            spent += result.costUsd || 0;
             executed += 1;
+        }
+        if (result.outcome === 'blocked') {
+            blocked = { code: result.code, reason: result.reason, stepId: result.stepId };
+            break;
         }
         if (result.outcome === 'deferred' || result.outcome === 'retrying') {
             retryInMs = result.retryInMs;
@@ -188,13 +265,13 @@ const tick = async (companyId, runId, { enqueue = null, workerId = WORKER_ID, co
     await skipBlocked(companyId, run._id, steps);
     const settled = await store.listSteps(companyId, run._id);
     await store.patchRun(companyId, run._id, { outputs });
-    const status = await finish(companyId, run, settled);
+    const status = await finish(companyId, run, settled, blocked);
 
     if (!status && retryInMs !== null && typeof enqueue === 'function') {
         await enqueue({ companyId: String(companyId), workflowRunId: String(run._id), runId: run.automationRunId || null, ruleId: run.ruleId || null }, { runAt: new Date(Date.now() + retryInMs) });
     }
 
-    return { status: status || 'running', executed, retryInMs };
+    return { status: status || 'running', executed, retryInMs, ...(blocked ? { blocked } : {}) };
 };
 
-module.exports = { tick, runStep, finish, skipBlocked, WORKER_ID, CAPACITY_RETRY_MS, stepActor };
+module.exports = { tick, runStep, finish, skipBlocked, failUnclaimed, WORKER_ID, CAPACITY_RETRY_MS, stepActor };

@@ -251,11 +251,69 @@ A skip a person asked for is the one skip that does not block: `skippedBy` is
 what tells the scheduler the difference between "go on without it" and "this
 could never run".
 
-## What these slices do not do
+## The four gates before a step runs
 
-Typed dispatch results, deadline and budget shrinking per hop and the depth guard
-are step 4. They register against `executors.js` and read the same collections;
-the engine does not change for them.
+Nothing is claimed until all four are open, and all four are decided on rows the
+engine already has, so a chain that cannot finish has not started a model call it
+will have to abandon.
+
+| Gate | Where | What a refusal is |
+|---|---|---|
+| The input it reads | `typed.checkInputs` | that step fails deterministically, naming the reference and the field the producer does not declare |
+| Deadline left | `hop.allow` | the whole run is blocked, naming what the step asked for and what remained |
+| Budget left | `hop.allow` | the whole run is blocked, naming both amounts |
+| Re-entry depth | `hop.allow` | the whole run is blocked with `loop_depth_exceeded` |
+
+The first fails one step because a later step may still be fine. The other three
+block the run, because nothing after them could do better.
+
+### Typed results at each edge
+
+Each contract in `stepTypes/index.js` types its `output` the way it types its
+`config`. `typed.js` holds an executor to that on the way out — checked before
+the output is written, so a malformed result never becomes anybody's input — and
+holds a consumer to it on the way in, against both the producer's contract and
+what the producer actually produced.
+
+The inbound half is the one that earns its keep: the expression language reads a
+missing field as `undefined`, a condition on `undefined` is silently false, and a
+run that quietly took the wrong branch is worse than one that stopped and said
+which field was missing.
+
+### Deadline and budget shrinking per hop
+
+A run carries `deadlineAt`, `budgetUsd` and `spentUsd`, fixed at the start —
+`hop.ceilingFor` takes the smaller of what the caller asked for and what
+`WORKFLOW_RUN_DEADLINE_MS` and `WORKFLOW_RUN_BUDGET_USD` allow. Before each hop
+`hop.allow` works out what is left and grants the step the smaller of that and
+what the step's own config asked for; the grant is written to the step row and
+handed to the executor, which passes it down rather than inventing a cap of its
+own. A finished step's cost goes back on the run with an `$inc`, so two workers
+finishing two steps of one run add up instead of overwriting each other.
+
+A step that asks for more than remains is refused rather than clamped to fit.
+Clamping looks kinder and is worse: a step given a tenth of the deadline it says
+it needs usually fails part-way through, having spent the money and made half the
+changes. The run goes to `blocked` — terminal, because waiting cannot give a run
+back its deadline — with the code, the reason and the step that was refused. A
+person who extends the bound and uses a step control clears the block, because
+reopening a run clears it.
+
+### The depth guard on re-entry
+
+There is one counter, the `triggerDepth` sprint 1 threaded through agent actions
+and `MAX_DEPTH` on the event bus. A workflow run inherits it from whatever started
+it — the envelope's depth for a rule, the agent run's `triggerDepth` for a wrapped
+run — and `hop.nestingOf` adds how far inside the run each step sits: a fan-out
+child and a loop body are each one level below the step that opened them, and they
+nest. Repetition is not depth; the twelfth iteration of a loop is as deep as the
+first, because the iteration cap bounds that instead.
+
+The depth reaches `runs.canStart` as the same `depth` argument a rule-started run
+passes, so an agent hop inside a workflow is refused by the guard that already
+existed rather than by a second one.
+
+## What these slices do not do
 
 Per the task's out-of-scope: no Temporal. The queue stays behind
 `Modules/Automations/engine/queue` and the step types behind `executors.js`, so

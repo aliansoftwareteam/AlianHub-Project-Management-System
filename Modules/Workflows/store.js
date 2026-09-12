@@ -1,6 +1,7 @@
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { leaseMs, maxAttempts } = require('./flag');
+const hop = require('./hop');
 
 // Every durable read and write of a workflow run and its step runs.
 //
@@ -18,7 +19,10 @@ const { leaseMs, maxAttempts } = require('./flag');
 const RUNS = SCHEMA_TYPE.WORKFLOW_RUNS;
 const STEPS = SCHEMA_TYPE.WORKFLOW_STEP_RUNS;
 
-const TERMINAL = Object.freeze(['success', 'failed', 'stopped']);
+/* `blocked` is terminal on purpose: a run that ran out of deadline, of budget
+ * or of depth cannot become runnable again by waiting, so a later tick has to
+ * stop at the door rather than pick the next step up. */
+const TERMINAL = Object.freeze(['success', 'failed', 'stopped', 'blocked']);
 const STEP_TERMINAL = Object.freeze(['success', 'failed', 'skipped', 'stopped']);
 
 class StaleLeaseError extends Error {
@@ -53,7 +57,7 @@ const stepRowsFor = (runId, steps) => steps.map((step, index) => ({
 }));
 
 /* Returns null when the dedupe key says this trigger has already started a run. */
-const createRun = async (companyId, { workflowId, name, source, dedupeKey, ruleId, ruleName, automationRunId, eventId, eventType, entity, envelope, traceId, startedBy, agentId, taskId, projectId, steps }) => {
+const createRun = async (companyId, { workflowId, name, source, dedupeKey, ruleId, ruleName, automationRunId, eventId, eventType, entity, envelope, traceId, startedBy, agentId, taskId, projectId, steps, depth, deadlineMs, budgetUsd }) => {
     let run;
     try {
         run = await call(companyId, RUNS, {
@@ -76,6 +80,11 @@ const createRun = async (companyId, { workflowId, name, source, dedupeKey, ruleI
             status: 'queued',
             definition: { steps },
             outputs: {},
+            // The two the chain spends down and the depth it starts at. Fixed at
+            // the start, because a deadline a run can extend is not a deadline.
+            ...hop.ceilingFor({ deadlineMs, budgetUsd }),
+            spentUsd: 0,
+            depth: Math.max(0, Number(depth) || 0),
             startedAt: new Date(),
         }, 'save');
     } catch (error) {
@@ -104,6 +113,23 @@ const listRuns = (companyId, { status, source, agentId, workflowId, limit = 50 }
 ], 'find');
 
 const patchRun = (companyId, runId, set) => call(companyId, RUNS, [{ _id: String(runId) }, { $set: set }], 'updateOne');
+
+/* What a finished step took out of the run's budget, added where every worker
+ * sees it. An $inc rather than a read-modify-write, because two steps of the
+ * same run finish on two workers and the budget they share has to be the sum of
+ * what both of them spent, not whichever wrote last. */
+const spendOnRun = async (companyId, runId, usd) => {
+    const amount = Number(usd);
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+    return call(companyId, RUNS, [{ _id: String(runId) }, { $inc: { spentUsd: amount } }, { returnDocument: 'after' }], 'findOneAndUpdate');
+};
+
+/* A run that ran out of deadline, budget or depth. Terminal, and it carries the
+ * hop that was refused, because "blocked" without the step is not a reason. */
+const blockRun = (companyId, runId, { code, reason, stepId }) => call(companyId, RUNS, [
+    { _id: String(runId) },
+    { $set: { status: 'blocked', finishedAt: new Date(), error: String(reason || '').slice(0, 500), blocked: { code: String(code), reason: String(reason || '').slice(0, 500), stepId: String(stepId), at: new Date() } } },
+], 'updateOne');
 
 const listSteps = (companyId, runId) => call(companyId, STEPS, [{ runId: String(runId) }, null, { sort: { index: 1 } }], 'find');
 
@@ -165,9 +191,9 @@ const noteStep = async (companyId, claim, set) => {
 
 const DONE_WAITING = { waitUntil: null, waitReason: null };
 
-const succeedStep = (companyId, claim, { output, auditId, replayed }) => settleStep(companyId, {
+const succeedStep = (companyId, claim, { output, auditId, replayed, costUsd = 0 }) => settleStep(companyId, {
     ...claim,
-    set: { status: 'success', output: output || {}, error: null, failure: null, auditId: auditId || null, replayed: Boolean(replayed), finishedAt: new Date(), leaseExpiresAt: null, ...DONE_WAITING },
+    set: { status: 'success', output: output || {}, error: null, failure: null, auditId: auditId || null, replayed: Boolean(replayed), costUsd: Math.max(0, Number(costUsd) || 0), finishedAt: new Date(), leaseExpiresAt: null, ...DONE_WAITING },
 });
 
 const failStep = (companyId, claim, { error, failure }) => settleStep(companyId, {
@@ -297,7 +323,8 @@ const recordCompensation = (companyId, runId, stepId, compensation) => call(comp
 
 /* A run a control has touched is open again: it has work to do, and its verdict,
  * its error and whatever it was blocked on belong to the attempt the control
- * just replaced. */
+ * just replaced — so a person who extends a deadline and retries is not refused
+ * by the record of the refusal. */
 const reopenRun = (companyId, runId) => call(companyId, RUNS, [
     { _id: String(runId) },
     { $set: { status: 'running', finishedAt: null, error: null, blocked: null } },
@@ -393,7 +420,7 @@ const outputsOf = async (companyId, runId) => {
 
 module.exports = {
     RUNS, STEPS, TERMINAL, STEP_TERMINAL, StaleLeaseError, isDuplicateKey, stepRowsFor,
-    createRun, getRun, findRunByDedupeKey, listRuns, patchRun, listSteps, getStep,
+    createRun, getRun, findRunByDedupeKey, listRuns, patchRun, spendOnRun, blockRun, listSteps, getStep,
     retryStep, operatorSkipStep, resumeStep, recordCompensation, reopenRun,
     claimStep, heartbeat, settleStep, noteStep, succeedStep, failStep, deferStep, releaseStep, skipStep,
     childRowsFor, addSteps, listChildren, resetSteps, wakeStep, outputsOf,

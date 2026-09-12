@@ -1065,16 +1065,26 @@ const schema = {
         agentId: { type: String, required: false },
         taskId: { type: String, required: false },
         projectId: { type: String, required: false },
-        // queued | running | success | failed | stopped
+        // queued | running | success | failed | stopped | blocked
         status: { type: String, default: 'queued', required: true },
         // { steps: [{ id, type, action, dependsOn, config, maxAttempts }] } — snapshotted at
         // start, so editing the rule mid-run cannot change the graph underneath it.
         definition: { type: Object, default: {}, required: false },
         outputs: { type: Object, default: {}, required: false },
         error: { type: String, required: false },
-        /* Task 028 sprint 5 step 5. Why the run stopped short of what it was
-         * asked to do, when that was a limit rather than an error:
-         * { reason, stepId, agentId, limit, used, resetsAt, detail, at }. */
+        /* Task 028 sprint 5 step 4. The deadline and the budget the whole chain
+         * spends down, fixed when the run starts, and the re-entry depth it
+         * inherited from whatever started it. Absent means unbounded, which is
+         * every run written before these existed. */
+        deadlineAt: { type: Date, required: false },
+        budgetUsd: { type: Number, required: false },
+        spentUsd: { type: Number, default: 0, required: false },
+        depth: { type: Number, default: 0, required: false },
+        /* Why the run stopped short of what it was asked to do, when that was a
+         * limit rather than an error: the hourly run limit of step 5
+         * ({ reason, stepId, agentId, limit, used, resetsAt, detail, at }) or the
+         * deadline, budget or depth a hop was refused for in step 4
+         * ({ code, reason, stepId, at }). */
         blocked: { type: Object, required: false },
         startedAt: { type: Date, required: false },
         finishedAt: { type: Date, required: false },
@@ -1131,6 +1141,12 @@ const schema = {
         // A loop's bounds: the iteration it is on and the spend its body has taken.
         iteration: { type: Number, required: false },
         budgetUsedUsd: { type: Number, required: false },
+        /* Task 028 sprint 5 step 4. What this hop was granted out of what the run
+         * had left, the re-entry depth it ran at, and what it took. */
+        deadlineAt: { type: Date, required: false },
+        budgetUsd: { type: Number, required: false },
+        costUsd: { type: Number, required: false },
+        depth: { type: Number, required: false },
     },
     /* Task 028 sprint 5 step 2. One row per human approval step: who owns the
      * decision, when it escalates, when it expires and what happened. The step

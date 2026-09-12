@@ -54,6 +54,18 @@ const maxRunsPerHour = () => number(process.env.WORKFLOW_MAX_RUNS_PER_HOUR, 0);
  * other process started is noticed. */
 const runLimitCacheMs = () => number(process.env.WORKFLOW_RUN_LIMIT_CACHE_MS, 60 * 1000);
 
+/* The workspace ceiling on how long a whole run may take and what it may spend
+ * (sprint 5 step 4). Unset means unbounded, which is what every run written
+ * before this existed is; a caller may ask for less and never for more. */
+const optional = (raw) => {
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+const runDeadlineMs = () => optional(process.env.WORKFLOW_RUN_DEADLINE_MS);
+
+const runBudgetUsd = () => optional(process.env.WORKFLOW_RUN_BUDGET_USD);
+
 /* How often a waiting step is looked at again. A person deciding an approval is
  * not polled for: deciding wakes the step, and this is only the floor that
  * catches a deadline nobody else noticed. */
@@ -70,4 +82,5 @@ const approvalDeadlineMs = () => number(process.env.WORKFLOW_APPROVAL_DEADLINE_M
 module.exports = {
     enabled, leaseMs, heartbeatMs, tenantConcurrency, maxAttempts, backoffLadder, DEFAULT_BACKOFF_MS,
     maxFanOut, maxLoopIterations, maxRunsPerHour, runLimitCacheMs, approvalPollMs, joinPollMs, approvalDeadlineMs,
+    runDeadlineMs, runBudgetUsd,
 };
