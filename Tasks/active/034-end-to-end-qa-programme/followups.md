@@ -47,7 +47,7 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 24 | `@playwright/test` isn't installed in the main checkout's `node_modules`, so a fresh local checkout can't run Playwright until `npm install`. | several agents Fixed by #634 (build 110). |
 | 25 | The lint-staged pre-commit hook makes its own `git stash` backup, which briefly hides uncommitted files from parallel test runs. Some agents then committed with `--no-verify` and ran the checks by hand. | several agents Fixed by #634 (build 110). |
 | 26 | Agents share one scratchpad and overwrote each other's `pr-body.md`. Future prompts should require a unique file prefix. | several agents |
-| 27 | `e2e/specs/access.spec.js` "Two-factor and change-password screens render" is flaky: the second hash-only `page.goto` keeps the Two-Factor title for 15 s. It failed on #608 (flaky) and on #626 (both attempts), neither of which touches settings or the router. | CI on #608, #626 |
+| 27 | `e2e/specs/access.spec.js` "Two-factor and change-password screens render" is flaky: the second hash-only `page.goto` keeps the Two-Factor title for 15 s. It failed on #608 (flaky) and on #626 (both attempts), neither of which touches settings or the router. | CI on #608, #626 Fixed by #631 (build 107). |
 
 ## Found while fixing (task 035)
 
@@ -61,7 +61,7 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 33 | Settings → General logs `TypeError: Cannot read properties of undefined (reading 'isoCode')` in the test harness. | #634 Fixed by #641 (build 113). |
 | 34 | Socket handshakes check only the JWT signature, not that the session is still live, so a logged-out access token can still open a socket until it expires. | #638 Fixed by #654 (build 131). |
 | 35 | Auth cookies are readable by JavaScript (not `httpOnly`), tracked as P1-SEC-09. | #638 |
-| 36 | `/timesheet/timelog`, `/timesheet/logDetail`, `/timesheet/milestone` and `POST /api/v1/estimatedTime` still trust client filters or pipelines; #635 scoped the five main timesheet reads only. | #635; read side fixed by #635 (build 120); write side fixed by #650 (build 125), read side by #656 (build 129) |
+| 36 | `/timesheet/timelog`, `/timesheet/logDetail`, `/timesheet/milestone` and `POST /api/v1/estimatedTime` still trust client filters or pipelines; #635 scoped the five main timesheet reads only. | #635; read side fixed by #635 (build 120); fixed: reads #635 (build 120), writes #650 (build 125), per-task reads #656 (build 129) |
 | 37 | The `invoices` (subscription) collection has no company field and nothing in the repo writes it; `POST /api/v1/invoice/find` is limited to the instance owner until its producer is known. | #635 |
 | 38 | Profile images under `USER_PROFILES/` can be read by any signed-in user, including the credit-note PDFs stored in `USER_PROFILES/InvoiceAndCreditNotes/`. | #639 Fixed by #651 (build 126). |
 | 39 | `PUT /api/v1/user` accepts any value for `Employee_profileImage`, so a user can point their profile at another user's image path. | #639 Fixed by #651 (build 126). |
@@ -73,10 +73,16 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 45 | `getRoleType` in `Config/permissionGuard.js` matches deleted and pending `company_users` rows; #643 checks the active seat itself in `updateCompany`, but other callers still trust the stale role. | #643 Fixed by #652 (build 127). |
 | 46 | `PUT /api/v1/admin/company` and `/api/v1/company-invitation` skip the live membership re-check, and `requireCompanyAud` in `Config/jwt.js` checks the body company before the header. | #643 Fixed by #652 (build 127). |
 | 47 | An invited owner who accepts through `/verify-invitation` or an OAuth sign-up is never recorded as the company owner. | #643 Fixed by #655 (build 130). |
-| 48 | A private sprint assigned to a team (`AssigneeUserId` holding `tId_` ids) is not recognised for members of that team; no existing filter expands team ids. | #656 (build 129) |
-| 49 | The scrum board, reports, public shares, dashboards and the `?count=true` task path still guard at project level only, not per sprint. | #656 (build 129) |
-| 50 | `Auth.tracker_body` was reworded in `en.js` under the same key, so the other 13 locales still carry the old sentence. | #653 (build 128) |
-| 51 | The estimate planner's success toast fires before its saves settle. | #650 (build 125) |
+| 48 | A private sprint assigned to a team (`AssigneeUserId` holding `tId_` ids) is not recognised for members of that team; no existing filter expands team ids. | #656 (build 129) Fixed by #662 (build 137). |
+| 49 | The scrum board, reports, public shares, dashboards and the `?count=true` task path still guard at project level only, not per sprint. | #656 (build 129) Fixed by #662 (build 137). |
+| 50 | `Auth.tracker_body` was reworded in `en.js` under the same key, so the other 13 locales still carry the old sentence. | #653 (build 128) Fixed by #659 (build 134). |
+| 51 | The estimate planner's success toast fires before its saves settle. | #650 (build 125) Fixed by #659 (build 134). |
+| 52 | The team list was cached under a bare `teams` key with no company, so one company's teams could be served to another. | review of #662. Fixed by #665 (build 139). |
+| 53 | `/api/v1/agile/velocity`, `/cfd` and `/milestones` had no project guard. | review of #662. Fixed by #665 (build 139). |
+| 54 | The token-authenticated `/api/public-v1/*` reads ignored the token owner's task and project visibility. | review of #662. Fixed by #665 (build 139). |
+| 55 | Timesheet approval and milestone billing resolved the actor as `req.uid || req.body.userData.id`, so a member could approve as an owner and a guest read billing as an admin. | #661 (build 136) |
+| 56 | `TimesheetApproval.getStatus` and `listMine` still read `req.query.userId` (reviewer-queue behaviour; owner decision). | #661 (build 136) |
+| 57 | Translators must supply the new keys: the reworded tracker sentence, the planner error, and the routing and providers namespaces (about 60 keys). | #659, #663, #664 |
 
 ## Owner decisions recorded
 
