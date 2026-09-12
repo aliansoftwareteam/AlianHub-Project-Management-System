@@ -5,26 +5,36 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const { replaceObjectKey } = require("../Auth/helper");
 const { estimateAndPersist: estimateTaskTimeWithAI, _internal: aiEstimatorInternal } = require("./aiTaskEstimator");
 const { updateRemainingTime } = require("../LogTime/controllerV2/helpers");
-const { resolveSheetScope, SHEET_PERMISSION } = require("../TimeSheet/helpers/timeScope");
+const { resolveSheetScope, SHEET_PERMISSION, scopedEstimateMatch } = require("../TimeSheet/helpers/timeScope");
 const { scopeEstimatePipeline, TimesheetQueryRefused } = require("../TimeSheet/helpers/timesheetQueryScope");
 const { buildEstimateWrite, EstimateWriteRefused } = require("./helpers/estimateWriteScope");
 
+/* The same grant that decides who may plan another person's time decides who may read it. */
+const ESTIMATE_SCOPE_PERMISSIONS = [SHEET_PERMISSION.workload, SHEET_PERMISSION.project];
+
 exports.getEstimatedTime = async(req,res) => {
     try {
+        const companyId = req.headers['companyid'];
         const projectId = req.params.pid;
         const TaskId = req.params.tid;
+
+        const scope = await resolveSheetScope(companyId, req.uid, ESTIMATE_SCOPE_PERMISSIONS);
+        if (scope.visible && !scope.visible.includes(String(projectId))) {
+            return res.status(200).json([]);
+        }
 
         const estimatedObj = {
             type: SCHEMA_TYPE.ESTIMATES_TIME,
             data: [
                 {
+                    ...scopedEstimateMatch(scope),
                     "ProjectId": projectId,
                     "TaskId": TaskId
                 }
             ]
         };
 
-        const estimatedTime =  await MongoDbCrudOpration(req.headers['companyid'], estimatedObj, 'find');
+        const estimatedTime =  await MongoDbCrudOpration(companyId, estimatedObj, 'find');
 
         if (!estimatedTime) {
             return res.status(404).json({ message: "Estimated time not found" });
@@ -39,7 +49,7 @@ exports.getEstimatedTime = async(req,res) => {
 exports.updateEstimatedTime = async(req,res) => {
     try {
         const companyId = req.headers['companyid'];
-        const scope = await resolveSheetScope(companyId, req.uid, [SHEET_PERMISSION.workload, SHEET_PERMISSION.project]);
+        const scope = await resolveSheetScope(companyId, req.uid, ESTIMATE_SCOPE_PERMISSIONS);
         let write;
         try {
             write = buildEstimateWrite(req.body, scope);
@@ -213,7 +223,7 @@ exports.generateAiEstimate = async (req, res) => {
 exports.getEstimateByAggregate = async (req,res) => {
     try {
         const companyId = req.headers['companyid'];
-        const scope = await resolveSheetScope(companyId, req.uid, [SHEET_PERMISSION.workload, SHEET_PERMISSION.project]);
+        const scope = await resolveSheetScope(companyId, req.uid, ESTIMATE_SCOPE_PERMISSIONS);
         let pipeline;
         try {
             /* replaceObjectKey rebuilds every object, so it runs before the guard adds ObjectIds. */
