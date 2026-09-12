@@ -148,11 +148,11 @@ describe('the same routes with a session', () => {
 });
 
 describe('invitations', () => {
-    it('previews a pending invitation without a session', async () => {
+    it('previews a pending invitation without a session, for whoever holds the link token', async () => {
         const { api } = await loginAs('owner');
         const email = `preview-${uniqueSuffix()}@e2e.alianhub.test`;
         const invite = await api.post('/api/v2/sendInvitationEmail', { email, companyId: state.companyId, companyName: 'E2E', role: 3, designation: 0 });
-        const res = await anonymous.post('/api/v2/auth/invitation-preview', { companyId: state.companyId, memberId: invite.body.data._id });
+        const res = await anonymous.post('/api/v2/auth/invitation-preview', { companyId: state.companyId, memberId: invite.body.data._id, linkId: invite.body.data.linkId });
         expect(res.body.status).toBe(true);
         expect(res.body.data).toMatchObject({ status: 1, email });
         expect(res.body.data.workspaceName).toBeTruthy();

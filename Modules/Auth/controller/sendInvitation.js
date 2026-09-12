@@ -220,7 +220,7 @@ exports.sendInvitationEmailFun = (bodyData) => {
                                 const re = res.data;
         
                                 if(userId === "") {
-                                    let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${re._id}`;
+                                    let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${re._id}&token=${token}`;
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                                 } else {
                                     let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${re._id}&linkId=${token}`)}`;
@@ -262,7 +262,7 @@ exports.sendInvitationEmailFun = (bodyData) => {
                                 const resp = response.data
                                 
                                 if(userId === "") {
-                                    let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${resp._id}`;
+                                    let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${resp._id}&token=${token}`;
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                                 } else {
                                     let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${resp._id}&linkId=${token}`)}`;
@@ -299,7 +299,7 @@ exports.sendInvitationEmailFun = (bodyData) => {
                         let userId = response._id;
                         sendCheckRequest(email, userId, token)
                     } else {
-                        sendCheckRequest(email, "", "")
+                        sendCheckRequest(email, "", newLinkToken())
                     }
                 } catch (error) {
                     reject({
@@ -432,7 +432,7 @@ exports.sendInvitationEmail = (req,res) => {
                         const re = res.data;
 
                         if(userId === "") {
-                            let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${re._id}`;
+                            let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${re._id}&token=${token}`;
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                         } else {
                             let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${re._id}&linkId=${token}`)}`;
@@ -474,7 +474,7 @@ exports.sendInvitationEmail = (req,res) => {
                         const resp = response.data
                         
                         if(userId === "") {
-                            let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${resp._id}`;
+                            let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${resp._id}&token=${token}`;
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                         } else {
                             let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${resp._id}&linkId=${token}`)}`;
@@ -504,7 +504,7 @@ exports.sendInvitationEmail = (req,res) => {
                 let userId = response._id;
                 sendCheckRequest(email, userId, token)
             } else {
-                sendCheckRequest(email, "", "")
+                sendCheckRequest(email, "", newLinkToken())
             }
         }).catch((error)=>{
             res.send({
