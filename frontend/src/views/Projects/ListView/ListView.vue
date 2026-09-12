@@ -90,13 +90,11 @@
                 </div>
             </template>
             <div class="list_view d-flex align-items-center justify-content-center flex-column" v-else>
-                <!-- lastTaskId is 0 until the project's first task is ever created, which is what
-                     separates "nothing here yet" from "a filter is hiding the work". -->
                 <EmptyState
                     v-if="project?.deletedStatusKey !== 2"
                     :image="noSearchResult"
-                    :title="showArchived ? $t('ProjectSlider.no_archived') : (!project?.lastTaskId ? $t('EmptyState.no_tasks_title') : $t('EmptyState.no_match_title'))"
-                    :message="showArchived ? '' : (!project?.lastTaskId ? $t('EmptyState.no_tasks_msg') : $t('EmptyState.no_match_msg'))"
+                    :title="showArchived ? $t('ProjectSlider.no_archived') : $t(emptyTitleKey)"
+                    :message="showArchived ? '' : $t(emptyMessageKey)"
                     :helpPath="showArchived ? '' : 'tasks'"
                 />
             </div>
@@ -124,6 +122,7 @@ import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { useProjectAgentActivity } from './useProjectAgentActivity.js';
+import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 
 // UTILS
@@ -140,6 +139,7 @@ const {
     getMongoDBUpdate
 } = taskListHelper();
 const agents = useProjectAgentActivity();
+const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 
 // EMITS
 defineEmits(['change'])
