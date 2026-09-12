@@ -4,11 +4,17 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { verifyToken, logTokenActivity } = require('./controller');
 const { hasScope } = require('./helpers/apiTokenRules');
+const { visibilityStage } = require('../Tasks/helpers/taskQueryGuard');
+const { visibleProjectIds } = require('../Agents/scope');
 
 // Token-authenticated public REST namespace (/api/public-v1/*). Fully
 // self-contained: its own middleware, zero coupling with the session-JWT
 // auth the web app uses. Clients send:
 //   Authorization: Bearer ahp_…        companyId: <company id>
+//
+// A token acts for the person who minted it, so every read here is narrowed to
+// what that person may open in the web app — a token is not a way past project
+// and sprint visibility.
 
 const tokenAuth = async (req, res, next) => {
     const started = Date.now();
@@ -38,6 +44,15 @@ const tokenAuth = async (req, res, next) => {
     }
 };
 
+const tokenUid = (req) => String((req.apiToken && req.apiToken.userId) || '');
+
+/* Empty for an owner or admin, who read company-wide; otherwise the projects and sprints
+ * the token owner may open, as a filter to spread into a task read. */
+const taskVisibility = async (req) => {
+    const stage = await visibilityStage(req.apiCompanyId, tokenUid(req));
+    return stage ? stage.$match : {};
+};
+
 const requireScope = (scope) => (req, res, next) => {
     if (!hasScope(req.apiToken, scope)) {
         return res.status(403).send({ status: false, statusText: `Token lacks the '${scope}' scope.` });
@@ -48,9 +63,14 @@ const requireScope = (scope) => (req, res, next) => {
 /* GET /api/public-v1/projects */
 const listProjects = async (req, res) => {
     try {
+        const visible = await visibleProjectIds(req.apiCompanyId, tokenUid(req));
         const projects = await MongoDbCrudOpration(req.apiCompanyId, {
             type: SCHEMA_TYPE.PROJECTS,
-            data: [{ deletedStatusKey: { $in: [0, undefined] } }, 'ProjectName ProjectCode createdAt', { limit: 200 }],
+            data: [
+                { _id: { $in: visible.map((id) => new mongoose.Types.ObjectId(id)) }, deletedStatusKey: { $in: [0, undefined] } },
+                'ProjectName ProjectCode createdAt',
+                { limit: 200 },
+            ],
         }, 'find');
         return res.send({ status: true, data: projects || [] });
     } catch (error) {
@@ -66,10 +86,14 @@ const listTasks = async (req, res) => {
             return res.status(400).send({ status: false, statusText: 'A valid projectId query param is required.' });
         }
         const limit = Math.min(500, Math.max(1, Number(req.query?.limit) || 100));
+        const visibility = await taskVisibility(req);
+        if (visibility.ProjectID && !(visibility.ProjectID.$in || []).map(String).includes(projectId)) {
+            return res.status(404).send({ status: false, statusText: 'Project not found.' });
+        }
         const tasks = await MongoDbCrudOpration(req.apiCompanyId, {
             type: SCHEMA_TYPE.TASKS,
             data: [
-                { ProjectID: new mongoose.Types.ObjectId(projectId), deletedStatusKey: { $ne: 1 } },
+                { ...visibility, ProjectID: new mongoose.Types.ObjectId(projectId), deletedStatusKey: { $ne: 1 } },
                 'TaskKey TaskName status statusType Task_Priority AssigneeUserId DueDate sprintId epicId createdAt updatedAt',
                 { limit, sort: { updatedAt: -1 } },
             ],
@@ -89,7 +113,7 @@ const getTaskByKey = async (req, res) => {
         }
         const task = await MongoDbCrudOpration(req.apiCompanyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [{ TaskKey: key, deletedStatusKey: { $ne: 1 } }],
+            data: [{ ...(await taskVisibility(req)), TaskKey: key, deletedStatusKey: { $ne: 1 } }],
         }, 'findOne');
         if (!task) {
             return res.status(404).send({ status: false, statusText: 'Task not found.' });
