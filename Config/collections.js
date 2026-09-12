@@ -91,6 +91,7 @@ const dbCollections = {
     AUTOMATION_RUNS: "automation_runs",
     WORKFLOW_RUNS: "workflow_runs",
     WORKFLOW_STEP_RUNS: "workflow_step_runs",
+    WORKFLOW_APPROVALS: "workflow_approvals",
     AGENT_FINDINGS: "agent_findings",
     AGENTS: "agents",
     AGENT_RUNS: "agent_runs",

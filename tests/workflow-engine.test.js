@@ -251,8 +251,8 @@ describe('the automation rule node', () => {
 });
 
 describe('an automation rule is a one-node workflow', () => {
-    it('registers exactly one executor in this slice', () => {
-        expect(executors.types()).toEqual([workflows.AUTOMATION_RULE]);
+    it('is a registered executor like any other step type', () => {
+        expect(executors.types()).toContain(workflows.AUTOMATION_RULE);
         expect(typeof executors.get(workflows.AUTOMATION_RULE)).toBe('function');
     });
 
