@@ -8,7 +8,7 @@ const { dbCollections } = require("../../Config/collections");
 const { unsetAllCounts } = require("../notification-count/controller");
 const requestQueue = new RequestQueue();
 const { getCachedCompanyData } = require('../../utils/planHelper');
-const { updateCompanyFun } = require("../Company/controller/updateCompany");
+const { stepCompanyCounters } = require("../Company/helpers/companyCounters");
 const scrumRules = require("./scrumRules");
 
 exports.addSprint = (req, res) => {
@@ -21,26 +21,14 @@ exports.addSprint = (req, res) => {
 
 exports.updateChannelsCounts = (companyId, private, type) => {
     return new Promise((resolve, reject) => {
-        let params = {};
-
         const channelType = private ? 'privateChannels' : 'publicChannels';
-        params.$inc = {
-            [`projectCount.${channelType}`]: type === 'inc' ? 1 : -1,
-            [`projectCount.channels`]: type === 'inc' ? 1 : -1
-        };
-        const queryObj = [
-            { _id: new mongoose.Types.ObjectId(companyId) },
-            params,
-            { new: true }
-        ];
-
-        const query = {
-            type: SCHEMA_TYPE.COMPANIES,
-            data: queryObj
-        };
+        const step = type === 'inc' ? 1 : -1;
 
         requestQueue.enqueue(() => {
-            updateCompanyFun(SCHEMA_TYPE.GOLBAL,query,"findOneAndUpdate",companyId,true)
+            stepCompanyCounters(companyId, {
+                [`projectCount.${channelType}`]: step,
+                'projectCount.channels': step
+            })
             .then((response) => {
                 // BUG-030 / #84 fix: pre-fix code went straight to
                 // `JSON.stringify(response.data)` and then read deeply
@@ -259,6 +247,19 @@ exports.editSprintName = (req, res) => {
     }
 };
 
+/* Only a sprint whose container is a main-chat project was ever counted: addSprintFun
+   increments the channel quota for `mainChat` creates alone, while this route accepts
+   any sprint id. Decrementing for a plain project list is what drove the live counters
+   negative, and a negative quota can never be spent back. */
+const isCountedChannel = async (companyId, sprint) => {
+    if (!sprint || !sprint.projectId) return false;
+    const container = await MongoQ.MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.MAIN_CHATS,
+        data: [{ _id: new mongoose.Types.ObjectId(String(sprint.projectId)) }, { _id: 1 }]
+    }, 'findOne').catch(() => null);
+    return Boolean(container);
+};
+
 /**
  * Soft-delete a main-chat channel.
  *
@@ -279,19 +280,23 @@ exports.deleteChannel = (req, res) => {
         const object = {
             type: SCHEMA_TYPE.SPRINTS,
             data: [
-                { _id: new mongoose.Types.ObjectId(id) },
+                // The filter is what makes the quota step once: a channel already in the
+                // trash matches nothing, so a repeated delete cannot decrement again.
+                { _id: new mongoose.Types.ObjectId(id), deletedStatusKey: { $ne: 1 } },
                 { $set: { deletedStatusKey: 1 } },
                 { returnDocument: 'after' }
             ]
         };
 
-        MongoQ.MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((response) => {
+        MongoQ.MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then(async (response) => {
             if (!response) {
                 res.send({ status: false, statusText: "Channel not found" });
                 return;
             }
 
             res.send({ status: true, statusText: "Sprint_deleted_successfully", data: response });
+
+            if (!(await isCountedChannel(companyId, response))) return;
 
             // Read the private flag off the STORED document, not the request body, so
             // a stale or forged value cannot decrement the wrong quota bucket.
