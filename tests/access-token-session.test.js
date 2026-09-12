@@ -7,6 +7,7 @@ const mockDb = require('./fixtures/fakeMongo').create();
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { dbCollections } = require('../Config/collections');
 const { myCache } = require('../Config/config');
@@ -153,6 +154,21 @@ describe.each([
         expect(out.passed).toBe(false);
         expect(out.status).toBe(401);
     });
+
+    it("refuses a token that names another user's session", async () => {
+        myCache.set(`membership:${USER_B}:${COMPANY}`, true, 600);
+        const a = await signIn(USER_A);
+        const claims = jwt.decode(a.accessToken);
+        const stolen = jwt.sign(
+            { uid: USER_B, sid: claims.sid, rti: claims.rti, sexp: claims.sexp },
+            process.env.JWT_SECRET,
+            { audience: COMPANY, algorithm: process.env.JWT_ALGORITHM, expiresIn: '1h' }
+        );
+        const out = await throughMiddleware(stolen, { verifier, headers });
+        expect(out.passed).toBe(false);
+        expect(out.status).toBe(401);
+        expect(out.body.isLogout).toBe(true);
+    });
 });
 
 describe('verifyJWTTokenV2 and tokens that name no session', () => {
@@ -279,6 +295,95 @@ describe('tracker sign-in with a one-time code', () => {
 
     it('declares the code fields, so the strict sessions schema keeps them', () => {
         const { sessionsSchema } = require('../utils/mongo-handler/createSchema');
-        ['trackerCodeHash', 'trackerCodeExpiresAt'].forEach((field) => expect(sessionsSchema.path(field)).toBeDefined());
+        ['trackerCodeHash', 'trackerCodeExpiresAt', 'trackerCodeChallenge'].forEach((field) => expect(sessionsSchema.path(field)).toBeDefined());
+    });
+});
+
+describe('tracker sign-in bound to the tracker that asked for it (PKCE)', () => {
+    const VERIFIER = crypto.randomBytes(32).toString('base64url');
+    const OTHER_VERIFIER = crypto.randomBytes(32).toString('base64url');
+    const challengeOf = (verifier) => crypto.createHash('sha256').update(verifier).digest('base64url');
+    const issueCode = async (accessToken, body = {}) => {
+        const { passed, req } = await throughMiddleware(accessToken, { body });
+        expect(passed).toBe(true);
+        return call(loginSession.issueTrackerCode, req);
+    };
+    const boundCode = async () => {
+        const res = await issueCode((await signIn(USER_A)).accessToken, { codeChallenge: challengeOf(VERIFIER) });
+        expect(res.statusCode).toBe(200);
+        return res.body.data.code;
+    };
+
+    it('stores the challenge and never the verifier', async () => {
+        await boundCode();
+        expect(JSON.stringify(sessions())).toContain(challengeOf(VERIFIER));
+        expect(JSON.stringify(sessions())).not.toContain(VERIFIER);
+    });
+
+    it('exchanges a bound code for the matching verifier', async () => {
+        const code = await boundCode();
+        const tracker = await call(loginSession.loginAuthTracker, { body: { code, userId: USER_A, codeVerifier: VERIFIER } });
+        expect(refused(tracker)).toBe(false);
+        expect(tracker.body.uid).toBe(USER_A);
+    });
+
+    it('refuses a bound code presented with another verifier, and spends it', async () => {
+        const code = await boundCode();
+        const wrong = await call(loginSession.loginAuthTracker, { body: { code, userId: USER_A, codeVerifier: OTHER_VERIFIER } });
+        expect(refused(wrong)).toBe(true);
+        expect(wrong.body.accessToken).toBeUndefined();
+        const retry = await call(loginSession.loginAuthTracker, { body: { code, userId: USER_A, codeVerifier: VERIFIER } });
+        expect(refused(retry)).toBe(true);
+        expect(sessionsOf(USER_A)).toHaveLength(1);
+    });
+
+    it('refuses a bound code presented with no verifier, whatever the legacy window says', async () => {
+        const code = await boundCode();
+        expect(refused(await call(loginSession.loginAuthTracker, { body: { code, userId: USER_A } }))).toBe(true);
+    });
+
+    it('refuses a code challenge that is not a base64url sha-256 digest', async () => {
+        const res = await issueCode((await signIn(USER_A)).accessToken, { codeChallenge: 'not-a-challenge' });
+        expect(res.statusCode).toBe(400);
+        expect(res.body.data).toBeUndefined();
+    });
+
+    it('still signs in a tracker build that sends no verifier while the legacy window is open', async () => {
+        const code = (await issueCode((await signIn(USER_A)).accessToken)).body.data.code;
+        const tracker = await call(loginSession.loginAuthTracker, { body: { code, userId: USER_A } });
+        expect(refused(tracker)).toBe(false);
+        expect(tracker.body.uid).toBe(USER_A);
+    });
+
+    it('refuses a tracker build that sends no verifier once TRACKER_PKCE_LEGACY_UNTIL has passed', async () => {
+        process.env.TRACKER_PKCE_LEGACY_UNTIL = new Date(NOW - 1000).toISOString();
+        try {
+            const code = (await issueCode((await signIn(USER_A)).accessToken)).body.data.code;
+            const res = await call(loginSession.loginAuthTracker, { body: { code, userId: USER_A } });
+            expect(refused(res)).toBe(true);
+            expect(res.body.accessToken).toBeUndefined();
+        } finally {
+            delete process.env.TRACKER_PKCE_LEGACY_UNTIL;
+        }
+    });
+
+    it('keeps a bound code working after the legacy window closes', async () => {
+        process.env.TRACKER_PKCE_LEGACY_UNTIL = new Date(NOW - 1000).toISOString();
+        try {
+            const code = await boundCode();
+            const tracker = await call(loginSession.loginAuthTracker, { body: { code, userId: USER_A, codeVerifier: VERIFIER } });
+            expect(refused(tracker)).toBe(false);
+            expect(tracker.body.uid).toBe(USER_A);
+        } finally {
+            delete process.env.TRACKER_PKCE_LEGACY_UNTIL;
+        }
+    });
+
+    it('drops the challenge left by an earlier code when the next one carries none', async () => {
+        const browser = await signIn(USER_A);
+        await issueCode(browser.accessToken, { codeChallenge: challengeOf(VERIFIER) });
+        const code = (await issueCode(browser.accessToken)).body.data.code;
+        const tracker = await call(loginSession.loginAuthTracker, { body: { code, userId: USER_A } });
+        expect(refused(tracker)).toBe(false);
     });
 });
