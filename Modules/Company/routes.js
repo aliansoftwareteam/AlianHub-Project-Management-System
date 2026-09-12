@@ -2,6 +2,7 @@ const ctrl = require('./controller');
 const multer = require("multer");
 const { handleEvents } = require('./eventController');
 const updateCompanyCtrl = require('./controller/updateCompany');
+const { requireLiveCompanyMembership } = require('../../Config/jwt');
 const { DEFAULT_LIMITS, safeFileFilter } = require('../../utils/uploadConfig');
 const upload = multer({
     dest: "wasabiUploads/",
@@ -127,7 +128,9 @@ exports.init = (app) => {
     app.post('/api/v1/company',updateCompanyCtrl.getCompany);
     app.post('/api/v1/admin/company',updateCompanyCtrl.getCompany); // For Admin side Get
     app.post('/api/v1/admin/company/find',updateCompanyCtrl.getCompanyByAggregate); // For Admin side Get Aggregate
-    app.put('/api/v1/company-invitation',updateCompanyCtrl.updateCompany);
-    app.put('/api/v1/admin/company',updateCompanyCtrl.updateCompany); // For Admin Side Company Update
+    // Both take their company from the request body, so neither runs the membership re-check
+    // verifyJWTTokenWithCV2 gives every other company route.
+    app.put('/api/v1/company-invitation', requireLiveCompanyMembership, updateCompanyCtrl.updateCompany);
+    app.put('/api/v1/admin/company', requireLiveCompanyMembership, updateCompanyCtrl.updateCompany);
     app.get('/api/v1/getcompany-reffercode',updateCompanyCtrl.getCompanyRefferCode);
 }
