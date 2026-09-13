@@ -3,7 +3,7 @@
     Created By: Parth Detroja
 -->
 <template>
-    <div class="bg-white d-flex align-items-center position-re border-radius-6-px" :class="{'mr-15' : clientWidth > 767 , 'mr-010' : clientWidth <= 767}">
+    <div class="d-flex align-items-center position-re" :class="{'mr-15' : clientWidth > 767 , 'mr-010' : clientWidth <= 767}">
         <DropDown maxHeight="47dvh" zIndex="99" :bodyClass="{'main-filter-dropdown-wrapper' : true}">
             <template #head>
                 <div class="d-flex align-items-center justify-content-between filter-title" v-if="clientWidth <= 767">
@@ -18,9 +18,13 @@
             </template>
             <template #button>
                 <div class="top-filter-section">
-                    <img :src="editIcon" id="projectviewfilter_driver" alt="TaskFilter" class="task-filter-icon cursor-pointer" ref="closeFilterRef"/>
+                    <button type="button" id="projectviewfilter_driver" ref="closeFilterRef" class="task-filter-trigger" :title="$t('Projects.filter')" :aria-label="$t('Projects.filter')">
+                        <img :src="editIcon" alt="" aria-hidden="true" class="task-filter-icon"/>
+                    </button>
                     <span v-if="isApplyed" class="task-filter-count">{{inputs.length}}</span>
-                    <img v-if="isApplyed" src="@/assets/images/svg/deletered.svg" alt="close" class="task-filter-close cursor-pointer" @click.stop.prevent="clearFilter"/>
+                    <button v-if="isApplyed" type="button" class="task-filter-clear" :title="$t('Filters.clearall')" :aria-label="$t('Filters.clearall')" @click.stop.prevent="clearFilter">
+                        <img src="@/assets/images/svg/deletered.svg" alt="" aria-hidden="true" class="task-filter-close"/>
+                    </button>
                 </div>
             </template>
             <template #options>
