@@ -1,11 +1,20 @@
 <template>
     <div class="priority__component" :id="tourId">
-        <div class="d-flex align-items-center cursor-pointer" @click.stop.prevent="permission ? visible = true : ''">
+        <div
+            class="d-flex align-items-center cursor-pointer"
+            :role="permission ? 'button' : null"
+            :tabindex="permission ? 0 : null"
+            :title="selectedPriority.name"
+            :aria-label="selectedPriority.name"
+            @click.stop.prevent="permission ? visible = true : ''"
+            @keydown.enter.stop.prevent="permission ? visible = true : ''"
+            @keydown.space.stop.prevent="permission ? visible = true : ''"
+        >
             <img
                 v-if="isBundledPriorityImage(selectedPriority.image)"
                 :src="companyPrioritiesIcons(priorityVal)?.statusImage"
-                alt="priority_image" 
-                :title="selectedPriority.name"
+                alt=""
+                aria-hidden="true"
                 class="priority__image"
             />
             <WasabiImage v-else
