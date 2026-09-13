@@ -5733,6 +5733,7 @@
     "List.due_group_tomorrow": "Tomorrow",
     "List.due_group_this_week": "This week",
     "List.due_group_later": "Later",
-    "List.due_group_none": "No due date"
+    "List.due_group_none": "No due date",
+    "List.sort_by": "Sort by {column}"
   }
 }
