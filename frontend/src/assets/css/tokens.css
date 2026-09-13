@@ -4,6 +4,7 @@
     --brand-deep: #1e2666;
     --brand-tint: rgba(47, 57, 144, .10);
     --brand-ring: rgba(47, 57, 144, .12);
+    --brand-border: rgba(47, 57, 144, .35);
 
     --ink: #17161c;
     --ink-2: rgba(0, 0, 0, .55);
@@ -15,11 +16,19 @@
     --surface: #ffffff;
     --surface-2: #faf9f7;
     --surface-hover: rgba(0, 0, 0, .04);
+    --fill: rgba(0, 0, 0, .06);
+    --track: rgba(0, 0, 0, .07);
     --rail: #1a1a1a;
     --rail-ink: rgba(255, 255, 255, .72);
     --rail-ink-strong: #ffffff;
+    --rail-ink-2: rgba(255, 255, 255, .5);
     --rail-hover: rgba(255, 255, 255, .08);
     --rail-active: rgba(255, 255, 255, .14);
+    /* The rail is dark in both themes, so its accents are defined once and never re-stated
+       in the dark block — unlike --ok / --brand / --danger, which flip. */
+    --rail-ok: #3ad29f;
+    --rail-brand: #a892ff;
+    --rail-danger: #ff7b85;
 
     --ok: #2f9e7e;
     --ok-bg: #e6f4ef;
@@ -76,6 +85,7 @@
     --brand-deep: #8f7bf0;
     --brand-tint: rgba(168, 146, 255, .16);
     --brand-ring: rgba(168, 146, 255, .22);
+    --brand-border: rgba(168, 146, 255, .35);
     --ink: #f2f1f6;
     --ink-2: rgba(255, 255, 255, .62);
     --ink-3: rgba(255, 255, 255, .42);
@@ -86,6 +96,8 @@
     --surface: #18181c;
     --surface-2: #1d1d22;
     --surface-hover: rgba(255, 255, 255, .05);
+    --fill: rgba(255, 255, 255, .1);
+    --track: rgba(255, 255, 255, .1);
     --rail: #000000;
     --ok: #3ad29f;
     --ok-bg: rgba(58, 210, 159, .14);
@@ -162,9 +174,8 @@ html, body, #app {
     font: var(--text-label);
     letter-spacing: .06em;
     text-transform: uppercase;
-    color: rgba(0, 0, 0, .42);
+    color: var(--ink-label);
 }
-:root[data-theme="dark"] .ah-label { color: rgba(255, 255, 255, .42); }
 .ah-mono { font-family: var(--font-mono); font-weight: 500; font-size: 11.5px; }
 .ah-h1 { font: var(--text-h1); letter-spacing: -.4px; margin: 0; color: var(--ink); }
 .ah-h2 { font: var(--text-h2); letter-spacing: -.3px; margin: 0; color: var(--ink); }
@@ -273,6 +284,7 @@ html, body, #app {
 .ah-chip--agent { background: var(--agent-bg); color: var(--agent); }
 .ah-chip--mono { font: var(--text-data); }
 .ah-chip--dark { background: var(--rail); color: #fff; }
+.ah-chip--sm { height: 18px; font-size: 10.5px; }
 
 .ah-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
 .ah-dot--ok { background: var(--ok); }

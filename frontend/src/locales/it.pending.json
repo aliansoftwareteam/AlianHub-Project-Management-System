@@ -1,7 +1,7 @@
 {
   "locale": "it",
   "machineTranslated": false,
-  "updatedAt": "2026-09-13T12:36:29.573Z",
+  "updatedAt": "2026-09-13T12:31:43.020Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -1082,7 +1082,7 @@
     "EmptyState.no_tasks_msg": "Tasks are the individual pieces of work your team picks up. Add the first one and it will appear here.",
     "EmptyState.no_tasks_action": "Create task",
     "EmptyState.no_match_title": "Nothing matches your filters",
-    "EmptyState.no_match_msg": "There is work in this project, it is just hidden right now. Try clearing a filter or widening the date range.",
+    "EmptyState.no_match_msg": "No task here matches the search, assignee or filter you have on. Clear them to see everything this view holds.",
     "EmptyState.no_sprints_title": "No lists yet",
     "EmptyState.no_sprints_msg": "Lists group related tasks together — a sprint, a phase, or simply a heading. Add one to organise this project.",
     "EmptyState.no_sprints_action": "Create list",
@@ -5722,9 +5722,11 @@
     "Workflows.lineage_run_unowned": "Started by the system",
     "Workflows.lineage_somebody": "somebody",
     "EmptyState.no_visible_tasks_title": "No tasks to show here",
-    "EmptyState.no_visible_tasks_msg": "This project has had tasks before, but none are visible in this view. They may have been archived or deleted.",
+    "EmptyState.no_visible_tasks_msg": "A task was created in this project at some point and nothing is narrowing this view, so we cannot tell you why it is empty. The tasks may have been archived or deleted, or this view may have failed to load them — reloading rules that last one out.",
     "Toast.Sprint_not_found": "Sprint not found",
     "List.sprint_total_hint": "Every task in this sprint, subtasks included. Reports and the burndown count parent tasks only.",
+    "EmptyState.no_archived_title": "No archived tasks to show",
+    "EmptyState.no_archived_msg": "Archiving keeps a task out of the way without deleting it. Nothing archived is showing here — if a search or a filter is on, clear it to be sure the archive is really empty.",
     "List.sort_by": "Sort by {column}"
   }
 }
