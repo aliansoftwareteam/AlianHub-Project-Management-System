@@ -31,8 +31,15 @@ export const deriveBadge = (completion) => {
 export const isDone = (task) => String((task && task.statusType) || "") === DONE_TYPE;
 
 /* An open task has no pattern yet — the badge is a statement about finished
- * work, so it is null until the task is closed. */
-export const badgeOf = (task) => (isDone(task) ? deriveBadge(task && task.completion) : null);
+ * work, so it is null until the task is closed. And a closed task with no
+ * `closedBy` has no record either: deriveBadge would fall through to HUMAN,
+ * which is a guess, not a fact. The server's visibleBadge gates on the same
+ * field (Modules/Tasks/helpers/completion.js). */
+export const badgeOf = (task) => {
+    if (!isDone(task)) return null;
+    const completion = task && task.completion;
+    return normalize(completion).closedBy ? deriveBadge(completion) : null;
+};
 
 export const isAgentWork = (task) => {
     const badge = badgeOf(task);

@@ -1,7 +1,7 @@
 {
   "locale": "ch",
   "machineTranslated": false,
-  "updatedAt": "2026-09-13T12:31:42.861Z",
+  "updatedAt": "2026-09-13T12:38:42.964Z",
   "keys": {
     "errorPage.card_name": "card name",
     "Auth.welcome_back": "Welcome back",
@@ -3861,7 +3861,7 @@
     "Projects.wip_limit": "WIP limit",
     "Projects.wip_set": "Set a WIP limit",
     "Projects.wip_none": "No limit",
-    "Projects.more_count": "{n} more",
+    "Projects.more_count": "+{n} more",
     "Projects.new": "New",
     "Projects.new_list": "New list",
     "Projects.new_folder": "New folder",
@@ -5737,6 +5737,13 @@
     "Projects.menu_view": "View",
     "Projects.expand_subtasks": "Expand subtasks",
     "Projects.collapse_subtasks": "Collapse subtasks",
-    "Projects.assignee_count": "Assignee: {n} selected"
+    "Projects.assignee_count": "Assignee: {n} selected",
+    "Projects.task_actions": "Task actions",
+    "Projects.column_empty_drop": "Drop a task here",
+    "Projects.add_task_to_column": "Add a task to {name}",
+    "Projects.archive_task": "Archive task",
+    "Projects.delete_task": "Delete task",
+    "Projects.confirm_word_archive": "archive",
+    "Projects.confirm_word_delete": "delete"
   }
 }

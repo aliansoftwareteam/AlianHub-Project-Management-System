@@ -77,26 +77,23 @@
     white-space: nowrap;
 }
 
+/* The count is also the "set a WIP limit" control, so it needs to read as one. */
 .kanban-board .task-count {
     font: var(--text-label);
-    color: var(--ink-3);
-    border: 0;
-    background: none;
-    padding: 0;
+    color: var(--ink-label);
+    border: 1px solid var(--hairline);
+    background: var(--surface-2);
+    border-radius: var(--r-chip);
+    padding: 1px 6px;
     margin: 0;
     cursor: pointer;
-}
-
-.kanban-board .column-head__spacer { flex: 1; }
-
-.kanban-board .wip-chip {
-    font: var(--text-label);
-    color: var(--ink-label);
     white-space: nowrap;
 }
 
-.kanban-board .wip-chip--at { color: var(--warn-ink); }
-.kanban-board .wip-chip--over { color: var(--danger-ink); }
+.kanban-board .task-count--at { color: var(--warn-ink); }
+.kanban-board .task-count--over { color: var(--danger-ink); }
+
+.kanban-board .column-head__spacer { flex: 1; }
 
 .kanban-board .wip-pop {
     position: absolute;
@@ -131,6 +128,29 @@
 
 .kanban-board .kanban-cards::-webkit-scrollbar { width: 0; }
 
+/* The placeholder is drawn over the drop container rather than beside it, so
+   the 88px catchment above stays the thing the pointer hits. */
+.kanban-board .kanban-cards-area { position: relative; }
+.kanban-board .column-empty {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    display: grid;
+    place-items: center;
+    padding: 0 10px;
+    text-align: center;
+    border: 1px dashed var(--hairline);
+    border-radius: 10px;
+    font: var(--text-small);
+    color: var(--ink-2);
+    pointer-events: none;
+}
+.kanban-board .kanban-column.is-drop-target .column-empty {
+    border-color: var(--brand);
+    background: var(--brand-tint);
+    color: var(--brand);
+}
+
 .kanban-board .kanban-card {
     background: var(--surface);
     padding: 10px 12px;
@@ -142,10 +162,20 @@
     transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
 }
 .kanban-board .kanban-card:hover { border-color: var(--border); }
-.kanban-board .kanban-card .card-title { color: var(--ink); font: 500 13px/1.35 var(--font-ui); }
+.kanban-board .card-title-row { flex: 1; min-width: 0; }
+.kanban-board .kanban-card .card-title {
+    color: var(--ink);
+    font: 500 13px/1.35 var(--font-ui);
+    flex: 1;
+    min-width: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
 
 /* Blocked columns tint their cards' border, as in the mock. */
-.kanban-board .kanban-column--danger .kanban-card { border-color: rgba(193, 18, 31, .3); }
+.kanban-board .kanban-column--danger .kanban-card { border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
 
 /* 28b — a card an agent is working on right now. */
 .kanban-board .kanban-card.is-agent-run {
@@ -162,9 +192,9 @@
     border-radius: 7px;
     margin-top: 7px;
 }
-.kanban-board .agent-strip__dot { width: 7px; height: 7px; border-radius: 50%; background: #3ad29f; flex: none; }
-.kanban-board .agent-strip__name { font: var(--text-label); color: #fff; flex: 1; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kanban-board .agent-strip__meta { font-size: 9px; color: rgba(255, 255, 255, .6); white-space: nowrap; }
+.kanban-board .agent-strip__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rail-ok); flex: none; }
+.kanban-board .agent-strip__name { font: var(--text-label); color: var(--rail-ink-strong); flex: 1; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kanban-board .agent-strip__meta { font-size: 9px; color: var(--rail-ink-2); white-space: nowrap; }
 
 .kanban-board .agent-proposal {
     margin-top: 7px;
@@ -192,7 +222,7 @@
     gap: 6px;
     margin-top: 7px;
 }
-.kanban-board .card-key { font: 600 9.5px/1 var(--font-mono); color: var(--ink-3); }
+.kanban-board .card-key { font: 600 9.5px/1 var(--font-mono); color: var(--ink-3); margin-right: 5px; }
 .kanban-board .card-timer { font: 500 10px/1 var(--font-mono); color: var(--ok-ink); white-space: nowrap; }
 .kanban-board .card-progress { height: 4px; border-radius: 99px; background: rgba(0, 0, 0, .07); margin-top: 7px; overflow: hidden; }
 .kanban-board .card-progress > span { display: block; height: 100%; border-radius: 99px; background: var(--brand); }
@@ -212,23 +242,47 @@
     border: 1px solid var(--hairline);
 }
 
-.kanban-board .add-task-icon {
+.kanban-board .add-task-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 4px;
     background: var(--surface);
     border-radius: 6px;
     border: 1px solid var(--hairline);
     margin-left: 6px;
     flex: none;
+    cursor: pointer;
 }
 
+.kanban-board .add-task-icon { display: block; width: 13px; height: 12px; }
+
+/* The menu is the only entry point to ten per-task actions, so it leaves the
+   flow rather than taking a permanent 18% bite out of every title. */
 .kanban-card .option-list {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
     opacity: 0;
     visibility: hidden;
+    background: var(--surface);
+    border-radius: 6px;
 }
 
-.kanban-card:hover .option-list {
+.kanban-card:hover .option-list,
+.kanban-card:focus-within .option-list {
     opacity: 1;
     visibility: visible;
+}
+
+.kanban-card .option-list__trigger {
+    display: block;
+    border: 0;
+    background: none;
+    padding: 2px 0 2px 6px;
+    cursor: pointer;
+    line-height: 0;
 }
 
 .kanban-board .sub-task-count {
@@ -284,6 +338,7 @@
     font-weight: 600;
     color: var(--ink-label);
     max-width: 120px;
+    white-space: nowrap;
 }
 .kanban-board .priority__compo .ml-10px { margin-left: 4px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kanban-board .priority__compo .priority__image { width: 11px; height: 11px; }
@@ -352,14 +407,24 @@
         min-height: 44px;
     }
     .kanban-board .column-head { min-height: 44px; }
-    .kanban-board .add-task-icon { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+    .kanban-board .add-task-btn { min-width: 44px; min-height: 44px; }
+    /* No hover on touch, so the per-task menu has no other way in — and being
+       permanently on screen it needs its own gutter rather than the title's. */
+    .kanban-card .option-list { opacity: 1; visibility: visible; }
+    .kanban-board .kanban-card .card-title { padding-right: 46px; }
+    .kanban-card .option-list__trigger { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
 }
 
 .kanban-board .more-count {
     font-size: 12px;
-    color: var(--ink-3);
+    color: var(--ink-2);
     padding: 4px 2px;
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
 }
+.kanban-board .more-count:hover { color: var(--brand); }
 
 /* 28b — an agent is acting through this assignee: rounded-square corner badge. */
 .kanban-board .card-assignee { position: relative; display: inline-block; }
@@ -371,7 +436,7 @@
     height: 14px;
     border-radius: 4px;
     background: var(--ink);
-    color: #fff;
+    color: var(--rail-ink-strong);
     display: grid;
     place-items: center;
     font-size: 7px;
@@ -379,8 +444,6 @@
     z-index: 2;
 }
 
-/* 375px: a generic 44px tap-target rule stretched the 13x12 plus glyph to 44px tall.
-   Keep the target, shrink the glyph: padding makes up the difference. */
 @media (max-width: 767px) {
-    .kanban-board .add-task-icon { width: 14px; height: 14px; min-width: 0; min-height: 0; padding: 15px; box-sizing: content-box; object-fit: contain; }
+    .kanban-board .add-task-icon { width: 14px; height: 14px; object-fit: contain; }
 }

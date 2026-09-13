@@ -11,7 +11,7 @@
     <div v-else>
         <template v-if="isLoading">
             <div class="kanban-board-skeleton">
-                <div class="kanban-column-skeleton" v-for="j in Math.round(Math.random() * (5 - 2) + 2)" :key="j">
+                <div class="kanban-column-skeleton" v-for="j in skeletonColumns" :key="j">
                     <div class="d-flex justify-content-between w-100 mb-15px">
                         <Skelaton class="border-radius-5-px" style="height: 25px; width: 70px;" />
                         <span class="cursor-pointer">
@@ -19,8 +19,8 @@
                         </span>
                     </div>
                     <div class="">
-                        <div class="kanban-card-wrapper-skeleton" :style="{ backgroundColor: '#FFF' }">
-                            <div class="kanban-card-skeleton pt-10px pl-10px pr-10px pb-5px w-100 mb-10px" v-for="i in Math.round(Math.random() * (5 - 2) + 2)" :key="i">
+                        <div class="kanban-card-wrapper-skeleton">
+                            <div class="kanban-card-skeleton pt-10px pl-10px pr-10px pb-5px w-100 mb-10px" v-for="i in SKELETON_CARDS" :key="i">
                                 <Skelaton class="border-radius-5-px mt-5px" style="height: 22px; width: 278px;" />
                                 <div class="d-flex align-items-center mt-5px justify-content-between">
                                     <div class="d-flex align-items-center">
@@ -99,6 +99,15 @@ const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 const isLoading = ref(true);
 const internalGroupedTasks = ref([]);
 const sprintId = ref(null);
+
+// A skeleton that redraws at a different size on every load reads as movement
+// rather than as the shape of what is coming.
+const SKELETON_CARDS = 3;
+const skeletonColumns = computed(() => {
+    const groups = internalGroupedTasks.value[0]?.items?.length
+        || (props.grouped === 0 ? project.value?.taskStatusData?.length : 0);
+    return Math.min(Math.max(Number(groups) || 3, 2), 5);
+});
 
 // --- Computed Properties ---
 const currentCompany = computed(() => getters["settings/selectedCompany"]);
@@ -222,4 +231,4 @@ onMounted(async () => {
 });
 
 </script>
-<style src="./new-style.css" scoped />
+<style src="./new-style.css" />

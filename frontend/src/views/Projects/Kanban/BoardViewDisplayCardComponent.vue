@@ -3,7 +3,7 @@
         <div @click.stop.prevent="!showArchiveVar ? toggleTaskDetail(element) : ''">
             <div>
                 <div class="d-flex justify-content-between">
-                    <div class="d-flex align-items-center mw-82">
+                    <div class="d-flex align-items-start card-title-row">
                         <label
                             v-if="canCardMultiSelect"
                             class="kanban-card-multi-select"
@@ -17,10 +17,11 @@
                                 @click.stop
                                 @mousedown.stop
                                 @change="handleCardCheckboxChange($event)"
-                                aria-label="Select task"
+                                :aria-label="$t('Common.select_task')"
                             />
                         </label>
-                        <div class="list-group-kanban-item__taskName card-title text-ellipsis font-weight-500 ml-5px" :title="element.TaskName">
+                        <div class="card-title font-weight-500 ml-5px" :title="element.TaskName">
+                            <span v-if="taskKey" class="card-key">{{ taskKey }}</span>
                             <img v-if="element.deletedStatusKey === 2" :src="inventoryIcon" alt="inventory" class="ml-5px" />
                             <img v-if="element.deletedStatusKey === 1" :src="deleteIcon" alt="delete" class="ml-5px" />
                             {{ element.TaskName }}
@@ -30,7 +31,15 @@
                         <div class="option-list" id="modelListComponent">
                             <DropDown :title="element.TaskName" v-if="showArchiveVar ? element.deletedStatusKey === 2 : element.deletedStatusKey === 0">
                                 <template #button>
-                                    <img :ref="element.id+'options'" :src="horizontalDots" alt="horizontalDots">
+                                    <button
+                                        type="button"
+                                        class="option-list__trigger"
+                                        :ref="element.id+'options'"
+                                        :title="$t('Projects.task_actions')"
+                                        :aria-label="$t('Projects.task_actions')"
+                                    >
+                                        <img :src="horizontalDots" alt="" aria-hidden="true">
+                                    </button>
                                 </template>
                                 <template #options>
                                     <DropDownOption @click="$refs[element.id+`options`].click(),copyTaskLink()">
@@ -121,10 +130,9 @@
                     <span class="agent-proposal__who">✦ {{ agentProposal.agentName }}:</span> {{ agentProposal.what }}
                     <button type="button" class="agent-proposal__review" @click.stop="openAiInbox()">{{ $t('Projects.review') }}</button>
                 </div>
-                <div v-if="showCardMeta" class="card-meta">
-                    <span v-if="taskKey" class="card-key">{{ taskKey }}</span>
+                <div v-if="isTiming || showSplitBadge" class="card-meta">
                     <span v-if="isTiming" class="card-timer">● {{ timerClock }}</span>
-                    <ProvenanceBadge :task="element" />
+                    <ProvenanceBadge v-if="showSplitBadge" :task="element" />
                 </div>
                 <div class="d-flex justify-content-between mt-10px" :class="{'ml-5px': element.AssigneeUserId.length > 0}">
                     <!-- Assignee -->
@@ -158,13 +166,13 @@
                     </div>
                     <div class="d-flex align-items-center board-view-action-wrapper">
                         <span class="mr-5px date-picker d-flex align-items-center"
-                            v-if="checkPermission('task.task_due_date', projectData?.isGlobalPermission) !== null && (groupValue !== 3 || isSubTask)"
+                            v-if="showDueDateChip"
                             :class="(myCounts || myParentCounts) > 0 ? 'mr-5px' : ''"
                             :style="`border-radius: ${element?.DueDate ? '5px' : '50%'}; padding: ${element?.DueDate ? '3px 6px' : '6px'};`"
                         >
                             <img class="mr-5px" v-if="element?.DueDate" src="@/assets/images/svg/component-inactive-icons/comp_calender_inactive.svg" />
                             <DueDateCompo
-                                v-if="!showArchiveVar && checkPermission('task.task_due_date',projectData?.isGlobalPermission) === true && checkPermission('task.task_list',projectData?.isGlobalPermission) === true && showArchiveVar === false" 
+                                v-if="canEditDueDate"
                                 id="due-date-task"
                                 class="d-flex align-items-center"
                                 :displyDate="dueDate? new Date(dueDate) : ''"
@@ -172,24 +180,22 @@
                                 @SelectedDate="($event) => updateDueDate($event)"
                                 :isWithoutBorderImage="true"
                             />
-                            <template v-else>
-                                <span>{{convertDateFormat(element.DueDate, '', { showDayName: false })}}</span>
-                            </template>
+                            <span v-else>{{ element.DueDate ? convertDateFormat(element.DueDate, '', { showDayName: false }) : '' }}</span>
                         </span>
-                        <span class="priority__compo" v-if="groupValue !== 2 || isSubTask" :class="((element?.subTasks) || (myCounts || myParentCounts) > 0) ? 'mr-5px' : ''">
-                            <div
-                                v-if="checkPermission('task.task_priority',projectData?.isGlobalPermission) !== null && checkApps('Priority')">
-                                <Priority
-                                    :priorityVal="element.Task_Priority"
-                                    @select="updatePriority"
-                                    :permission="!showArchiveVar && checkPermission('task.task_priority',projectData?.isGlobalPermission) === true"
-                                    :showName="true"
-                                />
-                            </div>
+                        <span class="priority__compo"
+                            v-if="(groupValue !== 2 || isSubTask) && checkPermission('task.task_priority',projectData?.isGlobalPermission) !== null && checkApps('Priority')"
+                            :class="((element?.subTasks) || (myCounts || myParentCounts) > 0) ? 'mr-5px' : ''"
+                        >
+                            <Priority
+                                :priorityVal="element.Task_Priority"
+                                @select="updatePriority"
+                                :permission="!showArchiveVar && checkPermission('task.task_priority',projectData?.isGlobalPermission) === true"
+                                :showName="true"
+                            />
                         </span>
                         <span v-if="!isSubTask && element?.subTasks" class="d-flex align-items-center task-count-section" :class="myCounts > 0 ? 'mr-5px' : ''">
                             <img class="mr-5px" src="@/assets/images/png/subTaskShape.png" />
-                            <span class="font-size-12" :style="{'color': (element.isExpanded && element?.subtaskArray?.length > 0) ? '#2F3990' : ''}">
+                            <span class="font-size-12" :style="{'color': (element.isExpanded && element?.subtaskArray?.length > 0) ? 'var(--brand)' : ''}">
                                 {{(showArchiveVar || searchedTask) ? element?.subtaskArray?.length : element?.subTasks}}
                             </span>
                             <span v-if="myParentCounts > 0" class="sub-task-count">{{myParentCounts > 99 ? "+99" : myParentCounts}}</span>
@@ -215,9 +221,9 @@
             />
             <ConfirmationSidebar
                 v-model="showSidebar"
-                :title="`${archive ? $t('Projects.archive') : $t('Projects.delete')} Task`"
+                :title="archive ? $t('Projects.archive_task') : $t('Projects.delete_task')"
                 :message="archive ? $t('conformationmsg.archive') : $t('conformationmsg.delete')"
-                :confirmationString="`${archive ? 'archive' : 'delete'}`"
+                :confirmationString="archive ? $t('Projects.confirm_word_archive') : $t('Projects.confirm_word_delete')"
                 :acceptButtonClass="archive ? 'btn-primary': 'btn-danger'"
                 :acceptButton="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
                 @confirm="updateTask(), showSidebar = false"
@@ -238,6 +244,7 @@
     import { useRoute, useRouter } from "vue-router"
     import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
     import ProvenanceBadge from '@/components/molecules/Provenance/ProvenanceBadge.vue';
+    import { isAgentWork } from '@/components/molecules/Provenance/provenance';
     import { useUpdateTasks } from "@/views/Projects/helper"
     import TagChip from '@/components/atom/TagChip/TagChip.vue'
     import Priority from "@/components/molecules/PriorityCompo/PriorityComp.vue"
@@ -328,7 +335,18 @@
 
     const taskKey = computed(() => (element.value?.TaskKey && element.value.TaskKey !== '--' ? element.value.TaskKey : ''));
     const isTiming = computed(() => Boolean(timer.active?.running) && isTracking(element.value?._id));
-    const showCardMeta = computed(() => Boolean(taskKey.value) || isTiming.value);
+
+    /* The card only carries the split label when it says something: HUMAN is
+     * what every task without a matching agent gets, so on a board it is noise.
+     * The full badge stays on the list row and in the task detail. */
+    const showSplitBadge = computed(() => isAgentWork(element.value));
+
+    const canEditDueDate = computed(() => showArchiveVar.value === false
+        && checkPermission('task.task_due_date', projectData.value?.isGlobalPermission) === true
+        && checkPermission('task.task_list', projectData.value?.isGlobalPermission) === true);
+    const showDueDateChip = computed(() => checkPermission('task.task_due_date', projectData.value?.isGlobalPermission) !== null
+        && (props.groupValue !== 3 || props.isSubTask)
+        && (Boolean(element.value?.DueDate) || canEditDueDate.value));
 
     const clock = (ms) => {
         const total = Math.floor(Math.max(0, ms) / 1000);
@@ -634,4 +652,3 @@
         openTask({ ...paramsObj, companyId: paramsObj.cid, projectId: paramsObj.id, tab: 'activity' })
     }
 </script>
-<style src="./new-style.css" scoped />

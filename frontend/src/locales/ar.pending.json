@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-13T12:31:42.832Z",
+  "updatedAt": "2026-09-13T12:38:42.935Z",
   "keys": {
     "Scrum.stranded_head": "These {count} will stay in this sprint",
     "Scrum.stranded_hint": "They are unfinished, but their parent task is done — and a subtask moves with its parent. Finish them, or reopen the parent task, before completing the sprint.",
@@ -6003,7 +6003,7 @@
     "Projects.wip_limit": "WIP limit",
     "Projects.wip_set": "Set a WIP limit",
     "Projects.wip_none": "No limit",
-    "Projects.more_count": "{n} more",
+    "Projects.more_count": "+{n} more",
     "Projects.new": "New",
     "Projects.new_list": "New list",
     "Projects.new_folder": "New folder",
@@ -7879,6 +7879,13 @@
     "Projects.menu_view": "View",
     "Projects.expand_subtasks": "Expand subtasks",
     "Projects.collapse_subtasks": "Collapse subtasks",
-    "Projects.assignee_count": "Assignee: {n} selected"
+    "Projects.assignee_count": "Assignee: {n} selected",
+    "Projects.task_actions": "Task actions",
+    "Projects.column_empty_drop": "Drop a task here",
+    "Projects.add_task_to_column": "Add a task to {name}",
+    "Projects.archive_task": "Archive task",
+    "Projects.delete_task": "Delete task",
+    "Projects.confirm_word_archive": "archive",
+    "Projects.confirm_word_delete": "delete"
   }
 }

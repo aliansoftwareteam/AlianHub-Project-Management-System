@@ -90,7 +90,6 @@
     "frontend/src/views/Projects/Comments/Comments.vue": 1,
     "frontend/src/views/Projects/DashboardView/DashboardView.vue": 2,
     "frontend/src/views/Projects/GanttView/GanttView.vue": 1,
-    "frontend/src/views/Projects/Kanban/BoardViewDisplayCardComponent.vue": 1,
     "frontend/src/views/Projects/MapView/MapView.vue": 9,
     "frontend/src/views/Projects/MindMapView/MindMapView.vue": 3,
     "frontend/src/views/Projects/Projects.vue": 2,

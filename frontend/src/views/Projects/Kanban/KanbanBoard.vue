@@ -4,66 +4,75 @@
             v-for="(column, columnIndex) in columns"
             :key="column.key"
             class="kanban-column"
-            :class="{ 'kanban-column--danger': isBlockedColumn(column) }"
-            @drop.prevent="onDrop(columnIndex)"
+            :class="{ 'kanban-column--danger': isBlockedColumn(column), 'is-drop-target': hoveredColumnIndex === columnIndex }"
+            @dragover.prevent="hoveredColumnIndex = columnIndex"
+            @dragleave="onColumnDragLeave"
+            @drop="hoveredColumnIndex = null"
         >
             <!-- Card Area -->
             <div class="kanban-card-wrapper">
                 <div class="column-head column-head-wrap">
-                    <span class="status-color-dot" :style="`background-color: ${column.textColor || '#000'}`"></span>
+                    <span class="status-color-dot" :style="`background-color: ${column.textColor || 'var(--ink-3)'}`"></span>
                     <span class="column-title" :title="column.name">{{ column.name }}</span>
-                    <button type="button" class="task-count" :title="$t('Projects.wip_set')" @click.stop="wipFor = wipFor === column.key ? '' : column.key">{{ tasksCount(column) }}</button>
+                    <button
+                        type="button"
+                        class="task-count"
+                        :class="{ 'task-count--at': atWipLimit(column), 'task-count--over': overWipLimit(column) }"
+                        :title="overWipLimit(column) ? $t('Gaps.wip_over', { limit: wipLimit(column) }) : $t('Projects.wip_set')"
+                        :aria-expanded="wipFor === column.key"
+                        @click.stop="wipFor = wipFor === column.key ? '' : column.key"
+                    >{{ wipLimit(column) > 0 ? $t('Projects.wip_chip', { n: tasksCount(column), limit: wipLimit(column) }) : tasksCount(column) }}</button>
                     <span class="column-head__spacer"></span>
-                    <span
-                        v-if="wipLimit(column) > 0"
-                        class="wip-chip"
-                        :class="{ 'wip-chip--at': atWipLimit(column), 'wip-chip--over': overWipLimit(column) }"
-                        :title="overWipLimit(column) ? $t('Gaps.wip_over', { limit: wipLimit(column) }) : ''"
-                    >{{ $t('Projects.wip_chip', { n: tasksCount(column), limit: wipLimit(column) }) }}</span>
                     <div v-if="wipFor === column.key" class="ah-pop wip-pop" @click.stop>
                         <div class="ah-label">{{ $t('Projects.wip_limit') }}</div>
                         <input class="ah-input" type="number" min="0" :value="wipLimit(column) || ''" :placeholder="$t('Projects.wip_none')" @change="setWipLimit(column, $event.target.value)">
                         <p class="ah-small wip-pop__note">{{ wipError || $t('Gaps.wip_note') }}</p>
                     </div>
-                    <img class="cursor-pointer add-task-icon" src="@/assets/images/svg/pluss.svg" alt="addTask" @click="showAddInput(column.key)">
+                    <button
+                        type="button"
+                        class="add-task-btn"
+                        :title="$t('Projects.add_task_to_column', { name: column.name })"
+                        :aria-label="$t('Projects.add_task_to_column', { name: column.name })"
+                        @click="showAddInput(column.key)"
+                    >
+                        <img class="add-task-icon" src="@/assets/images/svg/pluss.svg" alt="" aria-hidden="true">
+                    </button>
                 </div>
                 <div class="add-task-section" v-if="activeColumnId === column.key" :id="column.key">
                     <BoardViewTaskCreateVue :data="column" :groupValue="groupValue" @toggle="(val) => showAddInput(val)" :sprintData="{}" :sprintId="sprintId" />
                 </div>
 
                 <!-- Tasks List -->
-                <Draggable 
-                    class="kanban-cards"
-                    :list="column.tasksArray"
-                    group="tasks"
-                    item-key="id"
-                    @start="onDragStart"
-                    @change="updateEvent($event, column)"
-                    @scroll="checkScroll($event, column)"
-                    :style="`max-height: ${columnMaxHeight(column.key)};`"
-                    :disabled="isDisabled"
-                    :delay="clientWidth <= 767 ? 250 : 0"
-                    :delayOnTouchOnly="true"
-                >
-                    <template #item="{ element }">
-                        <div
-                            class="kanban-card"
-                            :class="{ 'is-agent-run': !!runFor(element._id) }"
-                            draggable="true"
-                            @dragstart="(e) => onManualDragStart(cardData, e)"
-                        >
-                            <BoardViewDisplayCardComponent
-                                :data="element"
-                                :groupValue="groupValue"
-                                :isSubTask="false"
-                                :agentRun="runFor(element._id)"
-                                :agentProposal="proposalFor(element._id)"
-                            />
-                        </div>
-                    </template>
-                </Draggable>
+                <div class="kanban-cards-area">
+                    <Draggable
+                        class="kanban-cards"
+                        :list="column.tasksArray"
+                        group="tasks"
+                        item-key="id"
+                        @change="updateEvent($event, column)"
+                        @scroll="checkScroll($event, column)"
+                        :style="`max-height: ${columnMaxHeight(column.key)};`"
+                        :disabled="isDisabled"
+                        :delay="clientWidth <= 767 ? 250 : 0"
+                        :delayOnTouchOnly="true"
+                        :emptyInsertThreshold="24"
+                    >
+                        <template #item="{ element }">
+                            <div class="kanban-card" :class="{ 'is-agent-run': !!runFor(element._id) }">
+                                <BoardViewDisplayCardComponent
+                                    :data="element"
+                                    :groupValue="groupValue"
+                                    :isSubTask="false"
+                                    :agentRun="runFor(element._id)"
+                                    :agentProposal="proposalFor(element._id)"
+                                />
+                            </div>
+                        </template>
+                    </Draggable>
+                    <p v-if="!column.tasksArray?.length" class="column-empty">{{ $t('Projects.column_empty_drop') }}</p>
+                </div>
 
-                <div v-if="moreCount(column) > 0" class="more-count">+ {{ $t('Projects.more_count', { n: moreCount(column) }) }}</div>
+                <button v-if="moreCount(column) > 0" type="button" class="more-count" @click="loadMore(column)">{{ $t('Projects.more_count', { n: moreCount(column) }) }}</button>
             </div>
 
             <!-- Drop Area -->
@@ -113,9 +122,7 @@ const companyId = inject("$companyId")
 const projectData = inject("selectedProject")
 const showArchiveVar = inject("showArchived");
 const clientWidth = inject("$clientWidth");
-const draggedCard = ref(null)
 const hoveredColumnIndex = ref(null)
-const isExternalDrop = ref(false)
 const timer = ref(null)
 const { dispatch, commit } = useStore()
 const { t } = useI18n()
@@ -232,42 +239,10 @@ function debouncer(timeout = 1000) {
     })
 }
 
-const onDragStart = (evt) => {
-    const draggedElement = evt.item?._underlying_vm_;
-    if (draggedElement) {
-        draggedCard.value = draggedElement;
-        isExternalDrop.value = true;
-    }
-}
-
-const onManualDragStart = (card, event) => {
-    if (!event.dataTransfer.types.includes('application/json')) {
-        draggedCard.value = card
-        isExternalDrop.value = true
-        event.dataTransfer.setData("application/json", JSON.stringify(card))
-    }
-}
-
-const onDrop = (columnIndex) => {
-    if (!draggedCard.value || !isExternalDrop.value) return
-
-    columns.value.forEach((col) => {
-        const index = col.tasksArray.findIndex((task) =>
-            task._id === draggedCard.value._id
-        )
-        if (index !== -1) {
-            col.tasksArray.splice(index, 1)
-        }
-    })
-
-    const droppedCard = draggedCard.value
-    columns.value[columnIndex].tasksArray.push(droppedCard)
-
-    updateTaskByGroup(droppedCard, columns.value[columnIndex], groupValue.value, null, true)
-
-    draggedCard.value = null
-    isExternalDrop.value = false
-    hoveredColumnIndex.value = null
+// dragleave also fires when the pointer crosses into a child, which would blink
+// the highlight off over every card in the column.
+const onColumnDragLeave = (event) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) hoveredColumnIndex.value = null;
 }
 
 const showAddInput = (columnId) => {
@@ -292,7 +267,6 @@ function getPaginatedTasks(params) {
 }
 
 const updateEvent = (event, task) => {
-    isExternalDrop.value = false;
     let element = null;
     let index = null;
     if (event.added) {
@@ -417,6 +391,10 @@ const tasksCount = (column) => {
 // The column header counts every task in the status; the list itself is paged.
 const moreCount = (column) => Math.max(0, tasksCount(column) - (column?.tasksArray?.length || 0));
 
+// A column that never overflows never fires checkScroll, so the remainder needs
+// its own way in.
+const loadMore = (column) => getPaginatedTasks({ pid: projectData.value?._id, sprintId: column.sprintId, item: column, fetchNew: true });
+
 const isBlockedColumn = (column) => /block/i.test(String(column?.name || ''));
 
 // The limit lives on the status entry inside project.taskStatusData, which the
@@ -516,4 +494,3 @@ const closeWipPop = () => { wipFor.value = ''; };
 document.addEventListener('click', closeWipPop);
 onUnmounted(() => document.removeEventListener('click', closeWipPop));
 </script>
-<style src="./new-style.css" scoped />

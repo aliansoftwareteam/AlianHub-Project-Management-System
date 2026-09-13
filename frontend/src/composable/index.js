@@ -740,6 +740,9 @@ export function useConvertDate() {
     function convertDateFormat(dueDate, format = '', options = {showDayName: true, minuteDifference: false}) {
         const getters  = Store.getters;
 
+        // moment(undefined) is *now*, so an absent date used to render as today.
+        if (!dueDate) return '';
+
         try {
             if (format === '') {
                 format = getters['settings/companyDateFormat'].dateFormat;
