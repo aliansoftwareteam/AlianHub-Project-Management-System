@@ -60,7 +60,7 @@
                             <input type="checkbox" class="ah-check hc-row__check" :checked="isDone(task)" :aria-label="task.TaskName" @change="toggleDone(task)" />
                             <button type="button" class="personal__name" @click="openTask(task)">{{ task.TaskName }}</button>
                             <span class="personal__mono" :class="{ 'personal__mono--danger': !isDone(task) && dueBucket(task) === 'overdue' }">{{ task.DueDate ? dueLabel(task.DueDate, $t) : '—' }}</span>
-                            <span v-if="!isDone(task)" class="hc-row__prio" :class="priorityMeta(task.Task_Priority).cls" style="width: max-content">{{ $t(priorityMeta(task.Task_Priority).label) }}</span>
+                            <span v-if="!isDone(task) && priorityMeta(task.Task_Priority).label" class="hc-row__prio" :class="priorityMeta(task.Task_Priority).cls" style="width: max-content">{{ $t(priorityMeta(task.Task_Priority).label) }}</span>
                             <span v-else></span>
                             <span class="personal__status">
                                 <span class="personal__status-dot" :style="{ background: statusColor(task) }"></span>{{ statusName(task) }}

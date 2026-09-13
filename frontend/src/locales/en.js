@@ -699,7 +699,7 @@ export default {
         task_update_failed: "Couldn't update the task. Try again.",
         priority_urgent: "Urgent",
         priority_high: "High",
-        priority_medium: "Normal",
+        priority_medium: "Medium",
         priority_low: "Low",
         agenda: "Agenda",
         agenda_today: "TODAY",

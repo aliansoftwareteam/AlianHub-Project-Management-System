@@ -38,64 +38,76 @@
                     :calendarDateChange="calendarDateChange"
                 />
             </div>
-            <template v-else-if="groupedTasks.length">
+            <template v-else-if="groupedTasks.length && (totalTasks || !countsSettled)">
                 <ListBulkBar v-if="project" :project="project" />
-                <div class="lv2__scroll ah-scroll" id="list_scroll">
-                    <div class="lv2__cols">
-                        <span></span>
-                        <span>{{ $t('List.col_task') }}</span>
-                        <span class="lv2__c-assignee">{{ $t('List.col_assignee') }}</span>
-                        <span class="lv2__c-due">{{ $t('List.col_due') }}</span>
-                        <span class="lv2__c-prio">{{ $t('List.col_priority') }}</span>
-                        <span class="lv2__c-est">{{ $t('List.col_est') }}</span>
-                        <span class="lv2__c-risk">✦ {{ $t('List.col_risk') }}</span>
-                        <span class="lv2__c-done">{{ $t('Provenance.col_done_by') }}</span>
+                <div class="lv2__scroll ah-scroll" id="list_scroll" role="table">
+                    <div class="lv2__cols" role="row">
+                        <span class="lv2__c-select" role="columnheader"></span>
+                        <span class="lv2__c-title" role="columnheader">{{ $t('List.col_task') }}</span>
+                        <span class="lv2__c-assignee" role="columnheader">{{ $t('List.col_assignee') }}</span>
+                        <span class="lv2__c-due" role="columnheader">{{ $t('List.col_due') }}</span>
+                        <span class="lv2__c-prio" role="columnheader">{{ $t('List.col_priority') }}</span>
+                        <span class="lv2__c-est" role="columnheader">{{ $t('List.col_est') }}</span>
+                        <span class="lv2__c-risk" role="columnheader">✦ {{ $t('List.col_risk') }}</span>
+                        <span class="lv2__c-done" role="columnheader">{{ $t('Provenance.col_done_by') }}</span>
                     </div>
 
-                    <section v-for="sprint in groupedTasks" :key="sprint?.id" class="lv2__sprint" :id="`sprint_${sprint?.id}`">
-                        <button v-if="groupedTasks.length > 1 || !sprint.isExpanded" type="button" class="lv2__sprint-head" @click="toggleSprints(sprint?.id)">
-                            <span class="lv2__caret" :class="{ 'lv2__caret--open': sprint.isExpanded }">▸</span>
+                    <section v-for="sprint in groupedTasks" :key="sprint?.id" class="lv2__sprint" role="presentation" :id="`sprint_${sprint?.id}`">
+                        <button v-if="groupedTasks.length > 1 || !sprint.isExpanded" type="button" class="lv2__sprint-head" :aria-expanded="!!sprint.isExpanded" @click="toggleSprints(sprint?.id)">
+                            <span class="lv2__caret lv2__caret--sprint" aria-hidden="true">{{ sprint.isExpanded ? '▼' : '►' }}</span>
                             <span class="lv2__sprint-name">{{ sprint.name }}</span>
                             <span class="lv2__sprint-meta" :title="$t('List.sprint_total_hint')">{{ sprint.tasks || 0 }}</span>
                         </button>
 
                         <template v-if="sprint.isExpanded">
-                            <ListGroup
-                                v-for="item in expandedGroups(sprint)"
-                                :key="item.key"
-                                :item="item"
-                                :sprint="sprint"
-                                :project="project"
-                                :groupType="grouped"
-                                @toggle="item.isExpanded = false"
-                                @open="openRow"
-                                @review-agent="reviewAgent"
-                            />
-                            <div v-if="collapsedGroups(sprint).length" class="lv2__collapsed">
+                            <template v-for="item in (sprint.items || [])" :key="item.key">
+                                <ListGroup
+                                    v-if="isGroupOpen(sprint, item)"
+                                    :item="item"
+                                    :sprint="sprint"
+                                    :project="project"
+                                    :groupType="grouped"
+                                    @toggle="toggleGroup(sprint, item)"
+                                    @open="openRow"
+                                    @review-agent="reviewAgent"
+                                />
                                 <button
-                                    v-for="item in collapsedGroups(sprint)"
-                                    :key="item.key"
+                                    v-else
                                     type="button"
                                     class="lv2__collapsed-item"
-                                    @click="item.isExpanded = true"
+                                    :aria-expanded="false"
+                                    @click="toggleGroup(sprint, item)"
                                 >
-                                    <span class="lv2__caret">▸</span>
+                                    <span class="lv2__caret" aria-hidden="true">▸</span>
                                     <span class="lv2__swatch" :style="{ background: item.textColor || 'var(--ink-3)' }"></span>
                                     {{ item.name }}
                                     <span class="lv2__collapsed-count">{{ groupCount(sprint, item) }}</span>
                                 </button>
-                            </div>
+                            </template>
                         </template>
                     </section>
                 </div>
             </template>
             <div class="list_view d-flex align-items-center justify-content-center flex-column" v-else>
+                <div v-if="creatingFirstTask" class="lv2__first-task">
+                    <CreateTask
+                        :sprint="groupedTasks[0]"
+                        :assigneeOptions="project?.AssigneeUserId"
+                        :groupBy="grouped"
+                        :groupType="grouped"
+                        :considerWidth="false"
+                        @cancel="creatingFirstTask = false"
+                        @submit="creatingFirstTask = false"
+                    />
+                </div>
                 <EmptyState
-                    v-if="project?.deletedStatusKey !== 2"
+                    v-else-if="project?.deletedStatusKey !== 2"
                     :image="noSearchResult"
                     :title="showArchived ? $t('ProjectSlider.no_archived') : $t(emptyTitleKey)"
                     :message="showArchived ? '' : $t(emptyMessageKey)"
+                    :actionLabel="canCreateFirstTask ? $t('EmptyState.no_tasks_action') : ''"
                     :helpPath="showArchived ? '' : 'tasks'"
+                    @action="creatingFirstTask = true"
                 />
             </div>
         </template>
@@ -118,10 +130,13 @@ import Skelaton from "@/components/atom/Skelaton/Skelaton.vue"
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import ListGroup from './ListGroup.vue';
 import ListBulkBar from './ListBulkBar.vue';
+import CreateTask from '@/components/atom/CreateTask/CreateTask.vue';
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
+import { useCustomComposable } from '@/composable';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { useProjectAgentActivity } from './useProjectAgentActivity.js';
+import * as listGroups from './listGroups.js';
 import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 
@@ -138,6 +153,7 @@ const {
     getSprintTasks,
     getMongoDBUpdate
 } = taskListHelper();
+const { checkPermission } = useCustomComposable();
 const agents = useProjectAgentActivity();
 const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 
@@ -179,6 +195,8 @@ const groupedTasks = ref([]);
 const expandedSprint = ref("");
 const initialDate = ref(0);
 const isLoading = ref(false);
+const creatingFirstTask = ref(false);
+const openedEmptyGroups = ref(new Set());
 
 const currentCompany = computed(() => getters["settings/selectedCompany"])
 const isCalendarTab = computed(() => route?.query?.tab === 'Calendar');
@@ -186,19 +204,44 @@ const isCalendarTab = computed(() => route?.query?.tab === 'Calendar');
 const { setActiveView, setActiveProject } = useTaskSelection();
 setActiveView('list');
 watch(() => project.value?._id, (newId) => {
+    creatingFirstTask.value = false;
+    openedEmptyGroups.value.clear();
     if (newId) {
         setActiveProject(String(newId));
         agents.load(newId);
     }
 }, { immediate: true });
 
-const expandedGroups = (sprint) => (sprint.items || []).filter((item) => item.isExpanded);
-const collapsedGroups = (sprint) => (sprint.items || []).filter((item) => !item.isExpanded);
+function groupCounts(sprint) {
+    return getters['projectData/tasks']?.[project.value?._id]?.[sprint?.id]?.found;
+}
 
 function groupCount(sprint, item) {
-    const store = getters['projectData/tasks']?.[project.value?._id]?.[sprint?.id];
-    return store?.found?.[`${item.searchKey}_${item.searchValue}`] ?? 0;
+    return listGroups.groupCount(groupCounts(sprint), item);
 }
+
+function isGroupOpen(sprint, item) {
+    return listGroups.isGroupOpen(groupCounts(sprint), item, openedEmptyGroups.value, listGroups.groupRef(sprint, item));
+}
+
+function toggleGroup(sprint, item) {
+    const key = listGroups.groupRef(sprint, item);
+    if (isGroupOpen(sprint, item)) {
+        item.isExpanded = false;
+        openedEmptyGroups.value.delete(key);
+        return;
+    }
+    item.isExpanded = true;
+    openedEmptyGroups.value.add(key);
+}
+
+const totalTasks = computed(() => groupedTasks.value.reduce((sum, sprint) => sum + listGroups.sprintTotal(sprint, groupCounts(sprint)), 0));
+const countsSettled = computed(() => groupedTasks.value.every((sprint) => Boolean(groupCounts(sprint))));
+
+const canCreateFirstTask = computed(() => Boolean(groupedTasks.value.length)
+    && !showArchived.value
+    && checkPermission('task.task_create', project.value?.isGlobalPermission) === true
+    && checkPermission('task.task_list', project.value?.isGlobalPermission) === true);
 
 function openRow(task) {
     openTask({
