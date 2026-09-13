@@ -192,7 +192,7 @@
     border-radius: 7px;
     margin-top: 7px;
 }
-.kanban-board .agent-strip__dot { width: 7px; height: 7px; border-radius: 50%; background: #3ad29f; flex: none; }
+.kanban-board .agent-strip__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rail-ok); flex: none; }
 .kanban-board .agent-strip__name { font: var(--text-label); color: var(--rail-ink-strong); flex: 1; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kanban-board .agent-strip__meta { font-size: 9px; color: var(--rail-ink); white-space: nowrap; }
 

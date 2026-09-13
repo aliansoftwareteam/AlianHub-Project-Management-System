@@ -5,7 +5,7 @@
             <h2>{{ $t('ProjectSlider.you_dont') }}</h2>
             <div v-if="canCreate && !isFilterHasData" class="d-flex justify-content-center align-items-center mt-2">
                 <button class="outline-primary font-size-16 p0x-13px" @click="$emit('createProject')">+ {{ $t('ProjectSlider.new_project') }}</button>
-                <button v-if="currentCompany?.planFeature?.aiPermission" class="outline-primary ml-1 font-size-16 p0x-13px" @click="$emit('createAiProject')">{{ aiButtonLabel }}</button>
+                <button v-if="currentCompany?.planFeature?.aiPermission" class="outline-primary ml-1 font-size-16 p0x-13px" @click="$emit('createAiProject')">✦ {{ $t('Projects.create_with_ai') }}</button>
             </div>
         </template>
         <template v-else>
@@ -28,5 +28,4 @@ defineProps({
 defineEmits(['createProject', 'createAiProject', 'hideArchive']);
 
 const noProjectsIcon = require('@/assets/images/svg/No-Search-Result.svg');
-const aiButtonLabel = '✨ Create with AI';
 </script>
