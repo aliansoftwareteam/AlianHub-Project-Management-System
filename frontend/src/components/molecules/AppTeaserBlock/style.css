@@ -65,36 +65,3 @@
     color: #4B5DEE;
     white-space: nowrap;
 }
-
-/* Inline "locked" chip variant */
-.app-teaser-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 30px;
-    padding: 0 10px;
-    font-size: 12px;
-    font-weight: 500;
-    color: #565979;
-    background: #F4F4FA;
-    border: 1px solid #E1E1EF;
-    border-radius: 8px;
-    white-space: nowrap;
-}
-.app-teaser-chip:hover {
-    border-color: #B9C0F5;
-    background: #EEF0FF;
-}
-.app-teaser-chip__lock {
-    display: inline-flex;
-    align-items: center;
-    color: #8A8CA6;
-}
-.app-teaser-chip__label {
-    color: #191A2B;
-}
-.app-teaser-chip__cta {
-    color: #4B5DEE;
-    font-weight: 600;
-}
-

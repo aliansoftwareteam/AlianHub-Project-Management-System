@@ -5734,6 +5734,10 @@
     "List.due_group_this_week": "This week",
     "List.due_group_later": "Later",
     "List.due_group_none": "No due date",
-    "List.sort_by": "Sort by {column}"
+    "List.sort_by": "Sort by {column}",
+    "Projects.menu_view": "View",
+    "Projects.expand_subtasks": "Expand subtasks",
+    "Projects.collapse_subtasks": "Collapse subtasks",
+    "Projects.assignee_count": "Assignee: {n} selected"
   }
 }

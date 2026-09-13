@@ -82,7 +82,6 @@ export default {
         expanded: "Expandido",
         collapsed: "Recolhido",
         me: "Eu",
-        burndown: "Burndown",
         select_sprint: "Sprint",
         no_burndown_data: "Ainda não há dados para esta sprint",
         recent_tasks: "Recentes",

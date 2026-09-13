@@ -1,17 +1,5 @@
 <template>
-    <div v-if="variant === 'inline'" class="app-teaser-chip cursor-pointer" role="button" tabindex="0"
-        :title="$t('Apps.enable_under', { desc: resolvedDescription, location: resolvedLocation })" @click="goToSettings" @keyup.enter="goToSettings">
-        <span class="app-teaser-chip__lock" aria-hidden="true">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="4" y="11" width="16" height="9" rx="2"></rect>
-                <path d="M8 11V8a4 4 0 0 1 8 0v3"></path>
-            </svg>
-        </span>
-        <span class="app-teaser-chip__label">{{ resolvedTitle }}</span>
-        <span class="app-teaser-chip__cta">{{ $t('Apps.enable') }}</span>
-    </div>
-
-    <div v-else class="app-teaser-banner cursor-pointer" role="button" tabindex="0" @click="goToSettings" @keyup.enter="goToSettings">
+    <div class="app-teaser-banner cursor-pointer" role="button" tabindex="0" @click="goToSettings" @keyup.enter="goToSettings">
         <span class="app-teaser-banner__ic" aria-hidden="true">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="4" y="11" width="16" height="9" rx="2"></rect>
@@ -43,7 +31,6 @@ import { useI18n } from 'vue-i18n';
 
 const props = defineProps({
     appKey: { type: String, default: '' },
-    variant: { type: String, default: 'block' },
     title: { type: String, default: '' },
     description: { type: String, default: '' },
     buttonText: { type: String, default: '' },
