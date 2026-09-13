@@ -1,19 +1,21 @@
 <template>
-    <div v-if="tasks.length || isLoading">
-        <div class="tv2__group">
-            <label v-if="canGroupSelect && groupTaskIds.length" @click.stop>
-                <input
-                    type="checkbox"
-                    class="ah-check"
-                    :checked="groupCheckboxState === 'all'"
-                    :indeterminate.prop="groupCheckboxState === 'some'"
-                    :aria-label="$t('List.select_group')"
-                    @click.stop
-                    @change="selection.toggleGroup(groupTaskIds)"
-                />
-            </label>
-            <span class="tv2__group-chip" :style="chipStyle">{{ groupLabel }}</span>
-            <span class="tv2__group-count">{{ tasks.length }}</span>
+    <div role="rowgroup">
+        <div class="tv2__group" role="row">
+            <span role="cell" :aria-colspan="7" class="tv2__group-cell">
+                <label v-if="canGroupSelect && groupTaskIds.length" @click.stop>
+                    <input
+                        type="checkbox"
+                        class="ah-check"
+                        :checked="groupCheckboxState === 'all'"
+                        :indeterminate.prop="groupCheckboxState === 'some'"
+                        :aria-label="$t('List.select_group')"
+                        @click.stop
+                        @change="selection.toggleGroup(groupTaskIds)"
+                    />
+                </label>
+                <span class="ah-chip" :style="chipStyle">{{ groupLabel }}</span>
+                <span v-if="hasFetched || tasks.length" class="tv2__group-count">{{ tasks.length }}</span>
+            </span>
         </div>
 
         <template v-if="!isLoading">
@@ -72,6 +74,9 @@ const showArchivedInj = inject("showArchived", null);
 const permit = checkPermission("task.show_tasks", project?.value?.isGlobalPermission);
 const isLoading = ref(false);
 const observerRef = ref(null);
+/* An unfetched group and an empty one both hold zero tasks; only print the count
+   once this group's own query has answered. */
+const hasFetched = ref(false);
 
 selection.setActiveView("table");
 watch(() => project.value?._id, (newId) => {
@@ -132,6 +137,8 @@ function addIntersections() {
                 sortKey: props.globalSortKey,
                 isFirst: false,
                 showAllTasks: project.value.isGlobalPermission === false ? permit : true
+            }).catch(() => {}).finally(() => {
+                hasFetched.value = true;
             });
         }, options);
         const target = document.getElementById(`table_list_item_${props.sprintId}_${props.data.key}`);
@@ -153,7 +160,10 @@ watch(() => props.globalSortKey, () => {
         sortKey: props.globalSortKey,
         isFirst: true,
         showAllTasks: project.value.isGlobalPermission === false ? permit : true
-    }).then(addIntersections);
+    }).catch(() => {}).finally(() => {
+        hasFetched.value = true;
+        addIntersections();
+    });
 });
 
 /* Rows created before the group index existed have no sort index; the server

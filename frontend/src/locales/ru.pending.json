@@ -5732,6 +5732,7 @@
     "List.due_group_this_week": "This week",
     "List.due_group_later": "Later",
     "List.due_group_none": "No due date",
+    "List.sort_by": "Sort by {column}",
     "Projects.task_actions": "Task actions",
     "Projects.column_empty_drop": "Drop a task here",
     "Projects.add_task_to_column": "Add a task to {name}",

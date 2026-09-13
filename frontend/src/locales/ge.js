@@ -1880,6 +1880,7 @@ export default {
         "col_owner": "Owner",
         "col_summary": "Summary",
         "col_area": "Area",
+        "sort_by": "Sort by {column}",
         "toggle_subtasks": "Show subtasks",
         "tracking_now": "Tracking now",
         "agent_working": "working on this",

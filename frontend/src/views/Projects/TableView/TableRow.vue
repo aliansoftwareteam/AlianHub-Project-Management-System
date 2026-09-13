@@ -1,6 +1,6 @@
 <template>
-    <div ref="rowRef" class="tv2__row" :class="{ 'is-selected': selected }" @click="$emit('open', data)">
-        <span @click.stop>
+    <div ref="rowRef" class="tv2__row" :class="{ 'is-selected': selected }" role="row" @click="$emit('open', data)">
+        <span role="cell" @click.stop>
             <input
                 v-if="canSelect"
                 type="checkbox"
@@ -11,18 +11,20 @@
             />
         </span>
 
-        <button type="button" class="tv2__name" :title="data.TaskName" @click.stop="$emit('open', data)">{{ data.TaskName }}</button>
+        <span role="cell" class="tv2__name-cell">
+            <button type="button" class="tv2__name" :title="data.TaskName" @click.stop="$emit('open', data)">{{ data.TaskName }}</button>
+        </span>
 
-        <span class="tv2__status" :style="statusStyle">{{ status.name }}</span>
+        <span role="cell" class="ah-chip tv2__status" :style="statusStyle">{{ status.name }}</span>
 
-        <span>
+        <span role="cell">
             <span v-if="owner" class="ah-avatar" :title="owner.Employee_Name">
                 <img v-if="owner.Employee_profileImageURL" :src="owner.Employee_profileImageURL" :alt="owner.Employee_Name" />
                 <template v-else>{{ initial(owner.Employee_Name) }}</template>
             </span>
         </span>
 
-        <span class="tv2__cell-ai" @click.stop>
+        <span role="cell" class="tv2__cell-ai" @click.stop>
             <span v-if="summary.state === 'ready'" class="tv2__summary" :title="summary.summary">{{ summary.summary }}</span>
             <span v-else-if="summary.state === 'loading'" class="tv2__summary tv2__summary--empty">{{ $t('List.ai_loading') }}</span>
             <span v-else-if="summary.state === 'empty'" class="tv2__summary tv2__summary--empty">{{ $t('List.ai_nothing_to_summarise') }}</span>
@@ -43,12 +45,12 @@
             </span>
         </span>
 
-        <span class="tv2__risk" :class="`tv2__risk--${risk.level}`" :title="riskTitle">
+        <span role="cell" class="tv2__risk" :class="`tv2__risk--${risk.level}`" :title="riskTitle">
             <span class="tv2__risk-dot"></span>{{ $t(`List.risk_${risk.level}`) }} · {{ risk.score }}
         </span>
 
-        <span class="tv2__cell-ai" @click.stop>
-            <span v-if="category.state === 'ready'" class="tv2__area" :title="categoryTitle">{{ category.category }}</span>
+        <span role="cell" class="tv2__cell-ai" @click.stop>
+            <span v-if="category.state === 'ready'" class="ah-chip tv2__area" :title="categoryTitle">{{ category.category }}</span>
             <span v-else-if="category.state === 'loading'" class="tv2__area-empty">{{ $t('Category.loading') }}</span>
             <span v-else-if="category.state === 'empty'" class="tv2__area-empty" :title="categoryTitle">{{ $t(`Category.empty_${category.reason === 'no-vocabulary' ? 'no_vocabulary' : 'no_fit'}`) }}</span>
             <span v-else-if="category.state === 'unavailable'" class="tv2__area-empty">{{ $t('List.ai_not_configured') }}</span>
