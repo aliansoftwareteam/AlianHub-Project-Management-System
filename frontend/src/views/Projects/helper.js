@@ -9,6 +9,7 @@ const t = i18n.global.t;
 import * as env from '@/config/env';
 import { apiRequest } from '../../services';
 import { isOwnerOrAdmin } from "@/utils/roles";
+import { dueDateBuckets, dueDateCondition, restoreGroupState, sprintToLoad } from "./taskGroups";
 
 const projectsList = ref([]);
 const filterdProjects = ref([]);
@@ -757,7 +758,6 @@ export function taskListHelper() {
     const indexKey= ref("");
     const expandedSprint = ref("");
     const priorities = computed(() => getters["settings/companyPriority"])
-    const weekDays= ref(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"])
     const project = inject('selectedProject');
     const permit = checkPermission("task.show_tasks",project?.value?.isGlobalPermission);
     function getSprintTasks({projectId, sprintId, item, fetchNew = false, projectData ,indexName,parentId = '',groupType,resetTable}) {
@@ -829,10 +829,6 @@ export function taskListHelper() {
         .catch((error) => {
             console.error(`ERROR in get tasks > ${projectId} > ${sprintId}: `, error);
         })
-    }
-
-    function updateTaskKanbanIndex() {
-        return;
     }
 
     async function groupBy(type, refetch = false,project,sprintData,groupedTasks,isBoard,lView='list',resetTable=false,fetchTask = true,cb) {
@@ -980,206 +976,38 @@ export function taskListHelper() {
             } else if(type === 3) {
                 // DUE DATE
                 indexKey.value = "dueDateIndex";
-                let dt = new Date();
-                let todayS = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime() / 1000;
-                let currentDay = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getDay();
-                let daysRemaining = 6 - currentDay
-                let dayHrs = 24 * 60 * 60 * 1000;
-    
-                let items = [];
-    
-                for (let i = 0; i <= daysRemaining; i++) {
-                    let dateSeconds = (todayS * 1000) + (i * dayHrs);
-                    let dayName = (dateSeconds/1000) === todayS ? "Today" : weekDays.value[new Date(dateSeconds).getDay()];
-    
-                    items.push({
-                        name: dayName,
-                        value: dayName.toUpperCase(),
-                        operation: "eq",
-                        searchCondition: ":=",
-                        isExpanded: true,
-                        seconds: dateSeconds / 1000
-                    })
-                }
-    
-                items.splice(1, 0, {
-                    name: "Overdue",
-                    textColor: "red",
-                    value: "OVERDUE",
-                    operation: "lt",
-                    searchCondition: ":>",
-                    isExpanded: true,
-                    seconds: todayS-1
-                });
-    
-                items = [
-                    ...items,
-                    {
-                        name: "Next",
-                        value: "NEXT",
-                        operation: "gt",
-                        searchCondition: ":<",
-                        isExpanded: true,
-                        seconds: ((todayS * 1000) + ((daysRemaining + 1) * dayHrs)) / 1000
-                    },
-                    {
-                        name: "No Due Date",
-                        value: "NO_DUE_DATE",
-                        operation: "non",
-                        searchCondition: ":=",
-                        isExpanded: true,
-                        seconds: 0
-                    }
-                ]
-
-                arr = items;
-
-                let checkCase = (op, key, seconds, dateFormat = false) => {
-                    switch(op) {
-                        case "eq":
-                            if (dateFormat) {
-                                return {
-                                    [key]: {
-                                        dbDate: {
-                                            $gte: new Date(seconds * 1000),
-                                            $lte: new Date(new Date(seconds * 1000).setHours(23,59,59))
-                                        }
-                                    }
-                                }
-                            } else {
-                                return {
-                                    [key]: {
-                                        dbDate: {
-                                            $gte: seconds,
-                                            $lte: seconds + dayHrs
-                                        }
-                                    }
-                                }
-                            }
-                            // return `${key} :>= ${seconds} && ${key} :<= ${seconds + dayHrs}`
-
-                        case "lt":
-                            if (dateFormat) {
-                                return {
-                                    [key]: {
-                                        dbDate: {
-                                            $lte: seconds,
-                                        }
-                                    }
-                                }
-                            } else {
-                                return {
-                                    [key]: {
-                                        dbDate: {
-                                            $$lte: seconds,
-                                        }
-                                    }
-                                }
-                            }
-                            // return `${key} :<= ${seconds + dayHrs}`
-
-                        case "gt":
-                            if (dateFormat) {
-                                return {
-                                    [key]: {
-                                        dbDate: {
-                                            $gte: seconds,
-                                        }
-                                    }
-                                }
-                            } else {
-                                return {
-                                    [key]: {
-                                        dbDate: {
-                                            $gte: seconds,
-                                        }
-                                    }
-                                }
-                            }
-                            // return `${key} :>= ${seconds}`
-
-                        default:
-                            return {[key]: null}
-                    }
-                }
+                arr = dueDateBuckets(new Date(), t);
 
                 sprints.forEach((sprint, index) => {
                     sprint.isExpanded = false;
-                    let tmp = [];
-                    arr.forEach((x, arrIndex) => {
-                        let conditions = [checkCase(x.operation, "DueDate", x.seconds)].filter((x) => x);
-                        let mongoConditions = [checkCase(x.operation, "DueDate", x.seconds, true)].filter((x) => x);
-                        let obj = {
-                            key: `${index}_${arrIndex}_${x.name}`,
-                            ...x,
-                            tasksArray: tasks,
-    
-                            searchKey: "DueDate",
-                            indexName: "groupByDueDateIndex",
-                            searchValue: x.value === "NO_DUE_DATE" ? 0 : x.seconds,
-                        }
-                        if(conditions?.length) {
-                            obj.conditions = conditions;
-                            obj.mongoConditions = mongoConditions;
-                        }
-                        tmp.push({...obj})
-                    })
-    
-                    sprint.items = tmp;
+                    sprint.items = arr.map((x, arrIndex) => ({
+                        key: `${index}_${arrIndex}_${x.value}`,
+                        ...x,
+                        tasksArray: tasks,
+
+                        searchKey: "DueDate",
+                        indexName: "groupByDueDateIndex",
+                        searchValue: x.value === "NO_DUE_DATE" ? 0 : x.seconds,
+                        mongoConditions: [dueDateCondition(x, "DueDate")]
+                    }));
                 })
             }
 
-            // MAINTAIN PREVIOUSLY EXPANDED
             if (!isBoard) {
-                sprints.forEach((sprint) => {
-                    groupedTasks.value.forEach((sprint2) => {
-                        if(sprint.id === sprint2.id) {
-                            sprint.isExpanded = false;
-                            sprint.items.forEach((item) => {
-                                sprint2.items.forEach((item2) => {
-                                    if(item.name === item2.name) {
-                                        item.isExpanded = item2.isExpanded;
-    
-                                        item.tasksArray = item.tasksArray.sort((x, y) => x[indexKey.value] > y[indexKey.value] ? 1 : -1);
-                                        item.tasksArray.forEach((task, index) => {
-                                            if(task[indexKey.value] === undefined) {
-                                                task[indexKey.value] = index;
-                                                updateTaskKanbanIndex(indexKey.value ,task, index);
-                                            }
-                                            item2.tasksArray.forEach((task2) => {
-                                                if(task.id === task2.id) {
-                                                    task.isExpanded = task2.isExpanded;
-    
-                                                    task.subtaskArray = task.subtaskArray.sort((x, y) => x[indexKey.value] > y[indexKey.value] ? 1 : -1);
-                                                    task.subtaskArray.forEach((subTask, index2) => {
-                                                        if(subTask[indexKey.value] === undefined) {
-                                                            subTask[indexKey.value] = index2;
-                                                            updateTaskKanbanIndex(indexKey.value ,subTask, index2);
-                                                        }
-                                                    })
-                                                }
-                                            })
-                                        })
-                                    }
-                                })
-                            })
-    
-                        }
-                    })
-                })
+                restoreGroupState(sprints, groupedTasks.value, indexKey.value);
             }
 
             if(sprints && sprints.length) {
-                if((sprints[0].deletedStatusKey === undefined || sprints[0].deletedStatusKey === 0) && fetchTask === true) {
-                    sprints[0].isExpanded = true;
-                    expandedSprint.value = sprints[0].id;
+                const openSprint = sprintToLoad(sprints, fetchTask === true);
+                if(openSprint?.isExpanded) {
+                    expandedSprint.value = openSprint.id;
                 }
 
                 if(refetch === true && fetchTask === true) {
                     let promises = [];
-                    sprints[0].items.forEach((item) => {
+                    openSprint.items.forEach((item) => {
                         promises.push(
-                            getSprintTasks({projectId: project._id, sprintId:sprints[0]?.id ? sprints[0]?.id : sprints[0]?._id, item, fetchNew: lView == 'table' ? refetch : true,projectData: project, indexName: item.indexName, groupType: lView,resetTable:resetTable})
+                            getSprintTasks({projectId: project._id, sprintId:openSprint?.id ? openSprint?.id : openSprint?._id, item, fetchNew: lView == 'table' ? refetch : true,projectData: project, indexName: item.indexName, groupType: lView,resetTable:resetTable})
                         )
                     })
                     Promise.allSettled(promises)
@@ -1188,13 +1016,11 @@ export function taskListHelper() {
                         cb(groupedTasks.value)
                         // getTaskArray();
 
-                        const sprintData = sprints[0];
-
                         getMongoDBUpdate({
                             projectId: project._id,
-                            sprintId: sprintData.id ? sprintData.id : sprintData._id,
+                            sprintId: openSprint.id ? openSprint.id : openSprint._id,
                             projectData: project,
-                            groupBy: {type: type,items: sprintData.items?.map((x) => ({key: `${x.searchKey}_${x.searchValue}`, value: x.searchValue, name: x.name}))},
+                            groupBy: {type: type,items: openSprint.items?.map((x) => ({key: `${x.searchKey}_${x.searchValue}`, value: x.searchValue, name: x.matchName || x.name}))},
                             currentView: lView == 'table' ? 'tableTasks' : 'tasks'
                         });
                     })
