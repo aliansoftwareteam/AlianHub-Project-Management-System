@@ -3891,7 +3891,10 @@ export default {
         "remove_sample_done": "Sample data moved to the Trash.",
         "prev_month": "Previous month",
         "next_month": "Next month",
-        "this_month": "This month"
+        "this_month": "This month",
+        "search_views": "Search or describe a view to create",
+        "no_views_match": "No view matches that search.",
+        "private_view": "Private view"
     },
     "Watcher": {
         "ignore": "Ignorieren",
@@ -3936,6 +3939,28 @@ export default {
         "error_message_for_empty": "Bitte wählen Sie mindestens eine Ansicht aus",
         "set_as_default": "Als Standard festlegen",
         "remove_as_default": "Als Standard entfernen"
+    },
+    "ViewListTag": {
+        "ProjectListView": "List",
+        "ProjectKanban": "Kanban",
+        "TableView": "Table",
+        "Calendar": "Calendar",
+        "GanttView": "Chart",
+        "TimelineView": "Timeline",
+        "ProjectDashboard": "Report",
+        "Workload": "Capacity",
+        "ActivityLog": "Feed",
+        "Comments": "Discussion",
+        "DocsView": "Wiki",
+        "FormsView": "Survey",
+        "MindMapView": "Map",
+        "WhiteboardView": "Canvas",
+        "CanvasView": "Canvas",
+        "MapView": "Map",
+        "RecurringTasks": "Schedule",
+        "Reports": "Report",
+        "Embed": "Embed",
+        "ProjectDetail": "Details"
     },
     "Apps": {
         "tags": "Tags",
