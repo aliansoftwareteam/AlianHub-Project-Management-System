@@ -161,8 +161,6 @@ html, body, #app {
 /* Legacy utility classes inside the redesigned project toolbars (filter trigger, mic, + View). */
 :root[data-theme="dark"] .ph2 .bg-white, :root[data-theme="dark"] .ph2 .btn-white,
 :root[data-theme="dark"] .pft .bg-white, :root[data-theme="dark"] .pft .btn-white { background: var(--surface) !important; color: var(--ink); }
-:root[data-theme="dark"] .ph2 .project-views-row, :root[data-theme="dark"] .ph2 .view-list-wrapper,
-:root[data-theme="dark"] .ph2 .view_list_scroll { background: transparent !important; color: var(--ink); }
 .ah-page { color: var(--ink); min-height: 100%; display: flex; flex-direction: column; }
 /* Page roots that put a sidebar beside the content. The column above is the default for
    toolbar-over-body pages; these need the row back, and two classes beat .ah-page whatever
