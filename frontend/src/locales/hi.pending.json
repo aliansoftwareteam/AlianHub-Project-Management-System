@@ -1,7 +1,7 @@
 {
   "locale": "hi",
   "machineTranslated": false,
-  "updatedAt": "2026-09-13T12:38:43.108Z",
+  "updatedAt": "2026-09-13T15:11:22.281Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -3856,7 +3856,7 @@
     "Projects.task": "Task",
     "Projects.ai_assist": "AI Assist",
     "Projects.review": "review",
-    "Projects.agents_working": "{n} agents working",
+    "Projects.agents_working": "{n} agent working | {n} agents working",
     "Projects.agents_chip_title": "Agents running on this project — elapsed time and spend so far",
     "Projects.wip_chip": "WIP {n}/{limit}",
     "Projects.wip_limit": "WIP limit",
@@ -5745,6 +5745,9 @@
     "Projects.archive_task": "Archive task",
     "Projects.delete_task": "Delete task",
     "Projects.confirm_word_archive": "archive",
-    "Projects.confirm_word_delete": "delete"
+    "Projects.confirm_word_delete": "delete",
+    "Projects.watchers_count": "{n} watcher | {n} watchers",
+    "Projects.switch_project": "Switch project",
+    "Projects.views_tablist": "Project views"
   }
 }

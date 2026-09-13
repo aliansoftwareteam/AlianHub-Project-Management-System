@@ -9,15 +9,12 @@
                             :project="projectData"
                             :projects="projects"
                             :sprint="headerSprint"
-                            :activeView="activeTab"
                             :favourite="isProjectFavourite"
                             :agentSummary="agentSummary"
-                            :showFilter="false"
                             :showAiAssist="canAiAssist"
                             :showAddTask="canAddTask"
                             @toggle-favourite="markProjectFavourite()"
                             @select-project="selectProject({ _id: $event }, true)"
-                            @filter="$refs.filtersToolbar && $refs.filtersToolbar.openFilter()"
                             @ai-assist="openAiTaskCreator()"
                             @add-task="addTaskRequest++"
                         >
@@ -31,15 +28,7 @@
                                         </template>
                                     </div>
                                     <div class="list-text-wrapper">
-                                        <template v-if="!editProject">
-                                            <span v-if="checkPermission('project.project_name_edit',projectData.isGlobalPermission) === true" class="text-ellipsis font-weight-bold text-capitalize black list-view-header-title ml-12px" @dblclick="projectName.value = projectData?.ProjectName, editProject = true" :title="projectData.ProjectName">
-                                                {{ projectData?.ProjectName }}
-                                            </span>
-                                            <span v-else class="text-ellipsis font-weight-bold text-capitalize black list-view-header-title ml-12px" :title="projectData.ProjectName">
-                                                {{ projectData?.ProjectName }}
-                                            </span>
-                                        </template>
-                                        <div v-else class="position-re project-titlerename-input ml-10px mr-5px" :class="{'list-type-error': projectName.error }">
+                                        <div v-if="editProject" class="position-re project-titlerename-input ml-10px mr-5px" :class="{'list-type-error': projectName.error }">
                                             <input
                                                 type="text"
                                                 class="form-control project__name-input"
@@ -123,18 +112,23 @@
                             <template #views>
                                 <div class="project-views-row" id="projectview_driver">
                                     <template v-if="clientWidth > 765">
-                                        <div class="d-flex align-items-center overflow-x-auto view_list_scroll h-100">
-                                            <ViewsList
-                                                v-for="(view, index) in (viewsListArray)"
-                                                :key="view._id"
-                                                :id="view.keyName"
-                                                :item="view"
-                                                :active="activeTab === view.keyName"
-                                                :firstChild="index === 0"
-                                                :isDeleteDisabled="viewsListArray.length == 1"
-                                                :commentCount="view.keyName === 'Comments' ? myCounts?.[`project_${projectData._id}_comments`] || 0 : 0"
-                                                @click="activeTab = view.keyName,$router.replace({query: {tab: view.keyName}})"
-                                            />
+                                        <div class="d-flex view_list_scroll h-100">
+                                            <div class="ph2__tablist" role="tablist" :aria-label="$t('Projects.views_tablist')">
+                                                <ViewsList
+                                                    v-for="(view, index) in (viewsListArray)"
+                                                    role="tab"
+                                                    :aria-selected="activeTab === view.keyName ? 'true' : 'false'"
+                                                    :tabindex="activeTab === view.keyName ? 0 : -1"
+                                                    :key="view._id"
+                                                    :id="view.keyName"
+                                                    :item="view"
+                                                    :active="activeTab === view.keyName"
+                                                    :firstChild="index === 0"
+                                                    :isDeleteDisabled="viewsListArray.length == 1"
+                                                    :commentCount="view.keyName === 'Comments' ? myCounts?.[`project_${projectData._id}_comments`] || 0 : 0"
+                                                    @click="activeTab = view.keyName,$router.replace({query: {tab: view.keyName}})"
+                                                />
+                                            </div>
                                             <div class="project__requirementcomponent-wrapper" v-if="projectData?.ProjectRequiredComponent && (embedViews).length">
                                                 <DropDown :bodyClass="{'dropdown-width':true}" @isVisible="(val)=> !val? (renameValue = {name:'',id:''}) :''">
                                                     <template #button>
@@ -210,10 +204,10 @@
                                         <div class="d-flex align-items-center text-nowrap border-top-radius-10-px cursor-pointer view-list-wrapper h-100">
                                             <DropDown v-if="checkPermission('project.view_list',projectData.isGlobalPermission) === true" maxHeight="80vh" :bodyClass="{'embed__dropdown':true}" id="embeddropdown">
                                                 <template #button>
-                                                    <div ref="embeddropdown" id="embeddropdown_button" class="d-flex align-items-center justify-content-center font-size-14 view-list-title p0x-10px">
-                                                        <img :src="addIcon" alt="addIcon" class="mr-10px">
-                                                        <span>{{ $t('Projects.view') }}</span>
-                                                    </div>
+                                                    <button type="button" ref="embeddropdown" id="embeddropdown_button" class="ph2__tab ph2__tab--add d-flex align-items-center justify-content-center">
+                                                        <img :src="addIcon" alt="" aria-hidden="true" class="mr-10px">
+                                                        <span>{{ $t('Projects.add_view') }}</span>
+                                                    </button>
                                                 </template>
                                                 <template #options>
                                                     <ViewsDropdown :projectData="projectData" @closeDropdown="$refs['embeddropdown'].click()" :tourId="'projectviewlist_driver'"/>
@@ -271,10 +265,8 @@
                                 },
                                 {'board-veiw-main-parent': activeTab === 'ProjectKanban'}
                             ]"
-                            :style="{height: clientWidth > 767 ? 'calc(100% - var(--toolbar-h))' : 'calc(100% - 96px)'}"
                         >
                             <ProjectFiltersToolbar
-                                ref="filtersToolbar"
                                 :activeTab="activeTab"
                                 :projectData="projectData"
                                 :clientWidth="clientWidth"

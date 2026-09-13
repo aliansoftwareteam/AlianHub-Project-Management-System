@@ -16,16 +16,6 @@
     color: var(--ink);
 }
 
-.ph2__back {
-    border: 0;
-    background: none;
-    color: var(--ink-2);
-    cursor: pointer;
-    padding: 4px;
-    line-height: 0;
-    transform: rotate(90deg);
-}
-
 .ph2__swatch {
     width: 8px;
     height: 8px;
@@ -46,20 +36,26 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 240px;
+    min-width: 0;
 }
 
 .ph2__sep { color: var(--ink-3); }
 .ph2__switch {
-    max-width: 220px;
-    height: 28px;
-    padding: 0 8px;
-    border: 1px solid var(--hairline);
-    border-radius: 6px;
-    background: var(--surface);
+    max-width: none;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
     color: var(--ink);
-    font: var(--text-small);
+    font: 600 14px/1.2 var(--font-ui);
+    letter-spacing: -.2px;
+    cursor: pointer;
 }
+/* While the inline rename input is open it carries the name; the switcher next
+   to it would be a second copy of the same string. */
+.ph2:has(.project-titlerename-input) .ph2__switch,
+.ph2:has(.project-titlerename-input) .ph2__project { display: none; }
+
 .ph2__sprint { white-space: nowrap; }
 
 .ph2__range {
@@ -92,16 +88,25 @@
     white-space: nowrap;
 }
 
-.ph2__views {
-    margin-left: 2px;
+/* Row two: the view tabs get the full width, one hairline and one scroller.
+   `color` is set here because the legacy dark-mode patch keeps light-theme ink
+   on everything under .ah-app__view that has not been redesigned. */
+.ph2__viewrow {
     display: flex;
     align-items: stretch;
-    gap: 2px;
     min-width: 0;
+    min-height: 38px;
     overflow-x: auto;
-    height: var(--toolbar-h);
+    padding: 0 20px;
+    border-top: 1px solid var(--hairline);
+    color: var(--ink);
 }
-.ph2__views::-webkit-scrollbar { height: 0; }
+.ph2__viewrow::-webkit-scrollbar { height: 0; }
+
+.ph2__tablist {
+    display: flex;
+    align-items: stretch;
+}
 
 .ph2__tab {
     border: 0;
@@ -120,17 +125,28 @@
 
 /* The existing ViewsList row, when Projects.vue passes it through the `views`
    slot: strip its legacy chrome so it reads as the mock's underline tabs. */
-.ph2__views .wrapper { height: auto; border-radius: 0; }
-.ph2__views .wrapper.bg-light-gray { background: none; }
-.ph2__views .view-list {
+.ph2__viewrow .wrapper { height: auto; border-radius: 0; align-items: stretch; }
+.ph2__viewrow .wrapper.bg-light-gray { background: none; }
+.ph2__viewrow .view-list {
     border: 0 !important;
     padding: 6px 10px;
     height: auto !important;
+    align-items: center;
     border-bottom: 2px solid transparent;
 }
-.ph2__views .wrapper.bg-light-gray .view-list { border-bottom: 2px solid var(--brand) !important; }
-.ph2__views .wrapper.bg-light-gray .view-list .gray81 { color: var(--ink); font-weight: 600; }
-.ph2__views .view-list .gray81 { color: var(--ink-2); font-size: 12.5px; }
+.ph2__viewrow .wrapper.bg-light-gray .view-list { border-bottom: 2px solid var(--brand) !important; }
+.ph2__viewrow .wrapper.bg-light-gray .view-list .gray81 { color: var(--ink); font-weight: 600; }
+.ph2__viewrow .view-list .gray81 { color: var(--ink-2); font-size: 12.5px; }
+
+/* The shared --focus ring is 12% brand; on a tab with no border or fill of its
+   own that alone is not a visible focus state, so it is paired with an outline. */
+.ph2__viewrow [role="tab"]:focus-visible,
+.ph2__viewrow .ph2__tab:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: -2px;
+    border-radius: var(--r-chip);
+    box-shadow: var(--focus);
+}
 
 .ph2__actions {
     margin-left: auto;
@@ -140,8 +156,20 @@
     flex: none;
 }
 
+.ph2 .ah-btn--ghost { padding: 0 6px; line-height: 0; }
+.ph2 .ah-btn--ghost img { vertical-align: middle; }
+.ph2 .open__watcher { padding: 0; background: var(--surface); color: var(--ink-2); }
+.ph2 .open__watcher:hover { background: var(--surface-hover); }
+
+.ph2 .sprint-watcher-count {
+    background-color: var(--fill);
+    color: var(--ink-2);
+    font: var(--text-label);
+    line-height: 16px;
+}
+
 .ph2__ai {
-    border-color: rgba(47, 57, 144, .35);
+    border-color: var(--brand-border);
     color: var(--brand);
     background: var(--surface);
     font-weight: 600;
@@ -154,14 +182,14 @@
     gap: 7px;
     padding: 5px 10px;
     background: var(--rail);
-    color: #fff;
+    color: var(--rail-ink-strong);
     border-radius: 8px;
     font-size: 11.5px;
     white-space: nowrap;
 }
-.ph2__agents-dot { width: 7px; height: 7px; border-radius: 50%; background: #3ad29f; }
+.ph2__agents-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rail-ok); }
 .ph2__agents-label { font-weight: 600; }
-.ph2__agents-meta { font: var(--text-data); color: rgba(255, 255, 255, .5); }
+.ph2__agents-meta { font: var(--text-data); color: var(--rail-ink-2); }
 
 @media (max-width: 1279px) {
     .ph2__code { display: none; }
@@ -174,13 +202,7 @@
         row-gap: 6px;
         min-height: 0;
     }
-    .ph2__views {
-        order: 3;
-        width: 100%;
-        height: auto;
-        margin-left: 0;
-    }
-    .ph2__tab { min-height: 44px; }
+    .ph2__viewrow { display: none; }
     .ph2__actions { margin-left: auto; }
     .ph2__project { max-width: 46vw; }
 }
@@ -191,13 +213,13 @@
     display: flex;
     align-items: center;
     min-width: 0;
+    flex: 0 1 auto;
     gap: 2px;
 }
 .ph2__title-slot .list-view-header-title {
     font: 600 14px/1.2 var(--font-ui);
     letter-spacing: -.2px;
     color: var(--ink);
-    max-width: 240px;
 }
 .ph2__title-slot .key-wapper .key-text {
     font: var(--text-data);

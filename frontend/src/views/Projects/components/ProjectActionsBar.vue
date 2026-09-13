@@ -2,17 +2,27 @@
     <div class="list-head-right">
         <ul class="d-flex align-items-center m-0">
             <li v-if="clientWidth > 767">
-                <img @click="$emit('openSidebar', 'filesLinks')" id="projectviewfiles_driver" :src="fileLinks" class="cursor-pointer"/>
+                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('Projects.files_links')" :title="$t('Projects.files_links')" @click="$emit('openSidebar', 'filesLinks')">
+                    <img id="projectviewfiles_driver" :src="fileLinks" alt="" aria-hidden="true"/>
+                </button>
             </li>
             <li class="ml-10px" v-if="clientWidth > 767" :class="clientWidth>767 ? 'mr-10px' : 'm-0'">
-                <img @click="$emit('openSidebar', 'audio')" id="projectviewaudio_driver" :src="audio" alt="audio" class="cursor-pointer"/>
+                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :aria-label="$t('Projects.audio_files')" :title="$t('Projects.audio_files')" @click="$emit('openSidebar', 'audio')">
+                    <img id="projectviewaudio_driver" :src="audio" alt="" aria-hidden="true"/>
+                </button>
             </li>
             <li v-if="clientWidth > 767">
                 <div class="position-re">
-                    <a href.prevent="#" @click="$emit('openWatcher')" class="d-flex align-items-center justify-content-center border border-radius-5-px open__watcher cursor-pointer">
-                        <img id="projectviewwatch_driver" :src="eyeIcon">
-                    </a>
-                    <span class="sprint-watcher-count">{{ Object.keys(projectData?.watchers || {})?.length || 0 }}</span>
+                    <button
+                        type="button"
+                        class="d-flex align-items-center justify-content-center border border-radius-5-px open__watcher cursor-pointer"
+                        :aria-label="$t('Projects.watchers_count', { n: watcherCount }, watcherCount)"
+                        :title="$t('Projects.watchers')"
+                        @click="$emit('openWatcher')"
+                    >
+                        <img id="projectviewwatch_driver" :src="eyeIcon" alt="" aria-hidden="true">
+                    </button>
+                    <span class="sprint-watcher-count" aria-hidden="true">{{ watcherCount }}</span>
                 </div>
             </li>
             <li :style="[{marginLeft : clientWidth > 767 ? '1rem' : '20px'}]" class="audio-list-wrapper">
@@ -25,15 +35,15 @@
                                 <img v-else class="profile-sm-square mobile-projectlist-icon" :src="projectData.projectIcon.data" alt=""/>
                             </template>
                             <div class="list-text-wrapper">
-                                <span class="text-ellipsis font-weight-bold text-capitalize black list-view-header-title ml-12px" @dblclick="$emit('startEditName')" :title="projectData.ProjectName">
+                                <span class="text-ellipsis font-weight-bold black list-view-header-title ml-12px" @dblclick="$emit('startEditName')" :title="projectData.ProjectName">
                                     {{ projectData?.ProjectName }}
                                 </span>
                             </div>
                         </div>
                     </template>
                     <template #button>
-                        <button class="cursor-pointer dot-btn border-0" :ref="`projectdd_${projectData._id || ''}`">
-                            <img :src="clientWidth > 767 ? horizontalDots : horizontalDotsMobile" id="projectoptions_driver"/>
+                        <button type="button" class="cursor-pointer dot-btn border-0" :aria-label="$t('Projects.more_features')" :title="$t('Projects.more_features')" :ref="`projectdd_${projectData._id || ''}`">
+                            <img :src="clientWidth > 767 ? horizontalDots : horizontalDotsMobile" id="projectoptions_driver" alt="" aria-hidden="true"/>
                         </button>
                     </template>
                     <template #options>
@@ -60,7 +70,7 @@
                                             <div class="d-flex align-items-center justify-content-center border border-radius-5-px open__watcher">
                                                 <img :src="eyeIcon">
                                             </div>
-                                            <span class="sprint-watcher-count">{{ Object.keys(projectData?.watchers || {})?.length || 0 }}</span>
+                                            <span class="sprint-watcher-count" aria-hidden="true">{{ watcherCount }}</span>
                                         </div>
                                         <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.watchers') }}</span>
                                     </div>
@@ -131,7 +141,7 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from 'vue';
+import { computed, defineProps, defineEmits } from 'vue';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
@@ -140,12 +150,14 @@ import { useCustomComposable } from '@/composable';
 
 const { checkPermission } = useCustomComposable();
 
-defineProps({
+const props = defineProps({
     projectData: { type: Object, required: true },
     clientWidth: { type: Number, required: true },
     users: { type: Array, default: () => [] },
     teams: { type: Array, default: () => [] },
 });
+
+const watcherCount = computed(() => Object.keys(props.projectData?.watchers || {}).length);
 
 defineEmits(['openSidebar', 'openWatcher', 'changeAssignee', 'openPermissionSidebar', 'startEditName', 'openColorAvatar', 'archiveProject']);
 

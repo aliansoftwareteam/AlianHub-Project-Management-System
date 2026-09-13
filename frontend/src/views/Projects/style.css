@@ -1,5 +1,10 @@
+/* Column layout so the body claims whatever the two header rows leave, rather
+   than subtracting a hard-coded header height. */
 .section-right {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 .list-type-error {
   padding-bottom: 3px;
@@ -14,19 +19,12 @@
   height: 44px;
   background-color: #fff;
 }
-/* ── Project view-tabs strip lives on its OWN full-width row (ClickUp-style),
-   between the project header and the filter toolbar — so short tab names like
-   "List" get a roomy, unambiguous clickable area instead of being squeezed in
-   the header next to the title + actions. Hidden on mobile (the header keeps
-   its own "all views" dropdown there). */
+/* The strip sits inside .ph2__viewrow, which owns the row's height, padding,
+   hairline and horizontal scrolling. */
 .project-views-row {
   display: flex;
-  align-items: center;
-  height: 36px;
-  min-height: 36px;
-  padding: 0 12px;
-  background-color: #fff;
-  border-bottom: 1px solid #e8eaed;
+  align-items: stretch;
+  min-width: 0;
   box-sizing: border-box;
 }
 @media (max-width: 767px) {
@@ -45,50 +43,22 @@
   /* margin-top: 6px; */
 }
 
-/* ── Project view-tabs: responsive + readable (AHE) ─────────────────────
-   With many views (List, Board, Table, Whiteboard, Canvas, Map, Reports,
-   Gantt, Recurring, Timeline …) the tab row overflowed the header. The strip
-   now fills the available width and scrolls horizontally (a flex item only
-   scrolls if it can shrink below its content — hence `min-width: 0`), tabs
-   get a gap, the right-side icon bar stays fully visible, and the scrollbar
-   is clearly visible so users know there are more views to scroll to. */
 .list-head-leftrightwrappper { min-width: 0; }
 .list-head-mid { min-width: 0; }
-/* Right-side action icons (files / audio / watchers): never shrink and don't
-   cap the width, so they're always clearly visible. !important overrides the
-   old base rule that capped this bar to ~15%. */
-.list-head-right { flex-shrink: 0; max-width: none !important; }
-/* Tab strip: sized to its tabs (no width cap) so "+ View" sits right after the
-   last tab, ClickUp-style, across the full-width row. It only scrolls when the
-   tabs genuinely overflow the row — in the common case everything fits and no
-   scrollbar shows at all. */
+/* Scrolling belongs to .ph2__viewrow, one row up, so the tabs and "+ View"
+   travel together instead of in two nested scrollers. */
 .view_list_scroll {
-  flex: 0 1 auto;
-  min-width: 0;
-  /* Horizontal scroll only (the tall active tab must not trigger a vertical
-     scrollbar). No top padding: with no scrollbar in the common case the tabs
-     sit vertically centered on their own. */
-  overflow-y: hidden;
+  flex: 0 0 auto;
+  align-items: stretch;
   box-sizing: border-box;
-  scrollbar-width: thin;                 /* Firefox */
-  scrollbar-color: #c7ccd4 transparent;  /* Firefox: thumb / track */
 }
 .view-list-wrapper { flex-shrink: 0; }
 .project__requirementcomponent-wrapper { flex-shrink: 0; }
-/* Clearly-visible 6px horizontal scrollbar (the strip no longer uses the
-   2px `style-scroll` utility). */
-.view_list_scroll::-webkit-scrollbar { height: 4px; }
-.view_list_scroll::-webkit-scrollbar-track { background: transparent; }
-.view_list_scroll::-webkit-scrollbar-thumb { background: #c7ccd4; border-radius: 4px; }
-.view_list_scroll::-webkit-scrollbar-thumb:hover { background: #a9afb9; }
-/* Per-tab "⋯" menu shows on hover only; it's positioned over the tab's right
-   edge in ViewsList (out of flow) so it never reserves space or resizes. */
 .list-head-right {
-  max-width: 15%;
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  /* margin-left: auto; */
 }
 .list-head-right ul{
   padding-left: 0 !important;
@@ -98,7 +68,7 @@
   align-items: center;
 }
 .list-text-wrapper{
-  max-width: 288px;
+  min-width: 0;
 }
 .list-view-header-title, .key-text
 {
@@ -115,7 +85,8 @@
   margin-right: 2px;
 }
 .list-view-body {
-  /* height: calc(100% - 46px); */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .showProjectDetailRight{
   width: calc(100% - 375px);
@@ -286,11 +257,9 @@
   .view-list {padding: 0 12px;}
   .view-list-wrapper {margin-left: 5px;}
   .list-head-leftrightwrappper {width: 80%;}
-  .list-head-right {width: 20%;}
   .view-list-wrapper {margin-left: 10px;}
 }
 @media (max-width: 1599px) {
-  .list-text-wrapper {max-width: 200px;}
   .key-wapper {max-width: 75px;}
   .list-head-mid {max-width: 50%;}
   .list-head-left {max-width: 50%;}
@@ -305,14 +274,11 @@
 @media (max-width: 1024px) {
 .search__in-dropdown {margin-left: -8px;}
 .list-head-leftrightwrappper {width: 80%;}
-.list-head-right {width: 20%;max-width: 20%;}
 .list-view-header{padding: 0px 16px;}
 }
 @media (max-width: 991px) {
 .list-head-left {max-width: 55%;}
 .list-head-mid {max-width: 45%;}
-.list-text-wrapper {max-width: 130px;}
-
 }
 @media (max-width: 767px) {
   .project_detail_dropdown_wrapper{height: 50px;color: #4B4B4B;}
@@ -324,7 +290,6 @@
   .list-view-header {padding: 5.3px 16px;height: auto;}
   .list-head-left {max-width: 100%;}
   .list-head-leftrightwrappper {max-width: 70%;width: 70%;}
-  .list-head-right {max-width: 30%;width: 30%;}
   .list-view-header-title {padding-right: 10px;margin-left: 0 !important;overflow: hidden;color: #090A0A;text-overflow: ellipsis;font-size: 18px;font-weight: 500;padding-bottom: 5px;}
   .assigneelist-audiofile-dropdown {min-width: auto;left: 50% !important;right: auto !important;}
   .assigneelist-audiofile-dropdown .search-project-filter {height: 100% !important;min-width: 100% !important;width: 100% !important;padding: 0 20px !important;}
@@ -373,7 +338,6 @@
 @media (max-width: 414px) {
 .list-text-wrapper {max-width: calc(100% - 35px);}
 .list-head-leftrightwrappper {max-width: 63%;width: 63%;}
-.list-head-right {max-width: 37%;width: inherit;}
 .list-view-header {padding: 5.3px 10px;flex-wrap: wrap;}
 .assignee-filter .monthly-calendar-view {width: 75px !important;}
 .task-filter-assignee{overflow: auto;}

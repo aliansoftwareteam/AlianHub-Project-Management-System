@@ -339,10 +339,6 @@ const moreGroups = computed(() => {
     return groups;
 });
 
-// ProjectHeader's Filter button opens the same TaskFilter dropdown that lives in
-// this toolbar, so there is only ever one filter surface.
-const openFilter = () => document.getElementById('projectviewfilter_driver')?.click();
-defineExpose({ openFilter });
 </script>
 
 <style>
