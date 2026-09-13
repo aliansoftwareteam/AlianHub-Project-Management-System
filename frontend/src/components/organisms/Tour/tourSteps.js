@@ -10,7 +10,7 @@ const STEPS = {
     ],
     project: [
         { key: 'header', els: ['.ph2__bar'], side: 'bottom', align: 'start' },
-        { key: 'views', els: ['.ph2__views'], side: 'bottom', align: 'start' },
+        { key: 'views', els: ['.ph2__viewrow'], side: 'bottom', align: 'start' },
         { key: 'new', els: ['.nip', '.ph2__actions'], side: 'bottom', align: 'end' },
         { key: 'search', els: ['#projectviewfiltersearch_driver', '.pft'], side: 'bottom', align: 'start' },
         { key: 'more', els: ['#more_features', '.pft'], side: 'bottom', align: 'end' }
