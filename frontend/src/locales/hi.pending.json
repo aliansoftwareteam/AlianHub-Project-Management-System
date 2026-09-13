@@ -5727,6 +5727,12 @@
     "Toast.Sprint_not_found": "Sprint not found",
     "List.sprint_total_hint": "Every task in this sprint, subtasks included. Reports and the burndown count parent tasks only.",
     "EmptyState.no_archived_title": "No archived tasks to show",
-    "EmptyState.no_archived_msg": "Archiving keeps a task out of the way without deleting it. Nothing archived is showing here — if a search or a filter is on, clear it to be sure the archive is really empty."
+    "EmptyState.no_archived_msg": "Archiving keeps a task out of the way without deleting it. Nothing archived is showing here — if a search or a filter is on, clear it to be sure the archive is really empty.",
+    "List.due_group_overdue": "Overdue",
+    "List.due_group_today": "Today",
+    "List.due_group_tomorrow": "Tomorrow",
+    "List.due_group_this_week": "This week",
+    "List.due_group_later": "Later",
+    "List.due_group_none": "No due date"
   }
 }
