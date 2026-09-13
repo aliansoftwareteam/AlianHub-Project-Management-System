@@ -4,12 +4,17 @@ export const PRIORITY_RANK = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
 export const priorityKey = (value) => String(value || "").toUpperCase();
 
+/* Only the four keys the built-in vocabulary defines get a label. A workspace is
+ * free to define its own priorities, and naming one of those after a key it does
+ * not use would state a priority the task does not have -- callers that know the
+ * company vocabulary read the name from it instead. */
 export function priorityMeta(value) {
     const key = priorityKey(value);
     if (key === "URGENT") return { key, label: "Home.priority_urgent", cls: "ah-chip--danger" };
     if (key === "HIGH") return { key, label: "Home.priority_high", cls: "ah-chip--warn" };
+    if (key === "MEDIUM") return { key, label: "Home.priority_medium", cls: "" };
     if (key === "LOW") return { key, label: "Home.priority_low", cls: "" };
-    return { key: "MEDIUM", label: "Home.priority_medium", cls: "" };
+    return { key, label: "", cls: "" };
 }
 
 export function dueBucket(task) {

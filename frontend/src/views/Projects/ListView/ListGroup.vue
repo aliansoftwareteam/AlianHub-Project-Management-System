@@ -1,7 +1,7 @@
 <template>
-    <section class="lv2__group">
-        <button type="button" class="lv2__group-head" @click="$emit('toggle')">
-            <span class="lv2__caret" :class="{ 'lv2__caret--open': item.isExpanded }">▸</span>
+    <section class="lv2__group" role="rowgroup">
+        <button type="button" class="lv2__group-head" :aria-expanded="!!item.isExpanded" @click="$emit('toggle')">
+            <span class="lv2__caret" :class="{ 'lv2__caret--open': item.isExpanded }" aria-hidden="true">▸</span>
             <span class="lv2__swatch" :style="{ background: swatch }"></span>
             <span class="lv2__group-name">{{ groupName }}</span>
             <span class="lv2__group-meta">{{ headMeta }}</span>
@@ -14,13 +14,14 @@
                 handle=".draggable_icon"
                 item-key="_id"
                 tag="div"
+                role="presentation"
                 :group="{ name: 'lv2-task' }"
                 :sortable="canDrag"
                 :disabled="!canDrag"
                 @change="onDragChange"
             >
                 <template #item="{ element: task }">
-                    <div>
+                    <div role="presentation">
                         <ListRow
                             :data="task"
                             :selected="selection.isSelected(task._id)"

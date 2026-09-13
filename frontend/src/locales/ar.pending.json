@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-12T13:04:37.351Z",
+  "updatedAt": "2026-09-13T12:38:43.018Z",
   "keys": {
     "Scrum.stranded_head": "These {count} will stay in this sprint",
     "Scrum.stranded_hint": "They are unfinished, but their parent task is done — and a subtask moves with its parent. Finish them, or reopen the parent task, before completing the sprint.",
@@ -4089,7 +4089,6 @@
     "Home.task_update_failed": "Couldn't update the task. Try again.",
     "Home.priority_urgent": "Urgent",
     "Home.priority_high": "High",
-    "Home.priority_medium": "Normal",
     "Home.priority_low": "Low",
     "Home.agenda": "Agenda",
     "Home.agenda_today": "TODAY",
@@ -7866,6 +7865,7 @@
     "EmptyState.no_visible_tasks_title": "No tasks to show here",
     "EmptyState.no_visible_tasks_msg": "This project has had tasks before, but none are visible in this view. They may have been archived or deleted.",
     "Toast.Sprint_not_found": "Sprint not found",
-    "List.sprint_total_hint": "Every task in this sprint, subtasks included. Reports and the burndown count parent tasks only."
+    "List.sprint_total_hint": "Every task in this sprint, subtasks included. Reports and the burndown count parent tasks only.",
+    "Home.priority_medium": "Medium"
   }
 }

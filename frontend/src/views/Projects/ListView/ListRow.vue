@@ -1,10 +1,11 @@
 <template>
     <div
         class="lv2__row"
+        role="row"
         :class="{ 'is-selected': selected, 'is-sub': isSub, 'is-done': done, 'is-agent': !!run }"
         @click="open"
     >
-        <span class="lv2__select lv2__c-select" @click.stop>
+        <span class="lv2__select lv2__c-select" role="cell" @click.stop>
             <input
                 v-if="!isSub && canSelect"
                 type="checkbox"
@@ -15,7 +16,7 @@
             />
         </span>
 
-        <div class="lv2__title" :class="{ 'lv2__title--sub': isSub }">
+        <div class="lv2__title lv2__c-title" role="cell" :class="{ 'lv2__title--sub': isSub }">
             <span v-if="!isSub" class="lv2__grip draggable_icon" aria-hidden="true"><ShellIcon name="grip" :size="12" /></span>
             <button
                 v-if="!isSub && data.isParentTask && subtaskCount"
@@ -43,28 +44,28 @@
             </button>
         </div>
 
-        <span class="lv2__c-assignee">
+        <span class="lv2__c-assignee" role="cell">
             <span v-if="assignee" class="ah-avatar" :title="assignee.Employee_Name">
                 <img v-if="assignee.Employee_profileImageURL" :src="assignee.Employee_profileImageURL" :alt="assignee.Employee_Name" />
                 <template v-else>{{ initial(assignee.Employee_Name) }}</template>
             </span>
         </span>
 
-        <span class="lv2__due lv2__c-due" :class="{ 'lv2__due--overdue': overdue }">{{ dueText }}</span>
+        <span class="lv2__due lv2__c-due" role="cell" :class="{ 'lv2__due--overdue': overdue }">{{ dueText }}</span>
 
-        <span class="lv2__c-prio">
-            <span v-if="!isSub && data.Task_Priority" class="lv2__prio" :class="priorityClass">{{ $t(priority.label) }}</span>
+        <span class="lv2__c-prio" role="cell">
+            <span v-if="!isSub && priorityName" class="ah-chip" :class="priority.cls">{{ priorityName }}</span>
         </span>
 
-        <span class="lv2__est lv2__c-est">{{ estimate }}</span>
+        <span class="lv2__est lv2__c-est" role="cell">{{ estimate }}</span>
 
-        <span class="lv2__c-risk">
+        <span class="lv2__c-risk" role="cell">
             <span v-if="!isSub && risk.score" class="lv2__risk" :class="`lv2__risk--${risk.level}`" :title="riskTitle">
-                <span class="lv2__risk-dot"></span>{{ risk.score }}
+                <span class="lv2__risk-dot"></span>{{ $t(`List.risk_${risk.level}`) }} · {{ risk.score }}
             </span>
         </span>
 
-        <span class="lv2__c-done">
+        <span class="lv2__c-done" role="cell">
             <ProvenanceBadge :task="data" />
         </span>
     </div>
@@ -97,7 +98,7 @@ const props = defineProps({
 const emit = defineEmits(["open", "select", "toggle-subtasks", "toggle-done", "review-agent"]);
 
 const { t } = useI18n();
-const { getUser } = useGetterFunctions();
+const { getUser, getPriority } = useGetterFunctions();
 
 const done = computed(() => isClosedTask(props.data));
 const subtaskCount = computed(() => subtaskTotal(props.data, props.progress));
@@ -124,11 +125,15 @@ const overdue = computed(() => {
 });
 const dueText = computed(() => (props.data.DueDate ? dueLabel(props.data.DueDate, t) : ""));
 
+/* The chip tone keys off the built-in priority key, but the word only ever comes from
+ * the company's own vocabulary: a workspace that renames or adds a priority must not
+ * have the row state one it never defined. */
 const priority = computed(() => priorityMeta(props.data.Task_Priority));
-const priorityClass = computed(() => ({
-    "lv2__prio--danger": priority.value.cls === "ah-chip--danger",
-    "lv2__prio--warn": priority.value.cls === "ah-chip--warn"
-}));
+const priorityName = computed(() => {
+    if (!props.data.Task_Priority) return "";
+    const name = getPriority(props.data.Task_Priority)?.name;
+    return name && name !== "N/A" ? name : "";
+});
 
 const estimate = computed(() => fmtEstimate(props.data.totalEstimatedTime));
 
