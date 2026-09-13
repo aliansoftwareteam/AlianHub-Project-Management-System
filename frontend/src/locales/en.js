@@ -1949,7 +1949,13 @@ export default {
         risk_factor_blocked: "Blocked, and quiet for {days} days",
         risk_factor_burn: "{pct}% over its estimate",
         risk_factor_silence: "No activity for {days} days",
-        risk_factor_subtasks: "Only {done} of {total} subtasks done"
+        risk_factor_subtasks: "Only {done} of {total} subtasks done",
+        due_group_overdue: "Overdue",
+        due_group_today: "Today",
+        due_group_tomorrow: "Tomorrow",
+        due_group_this_week: "This week",
+        due_group_later: "Later",
+        due_group_none: "No due date"
     },
     Views: {
         desktop_only_title: "Open this on a desktop",
