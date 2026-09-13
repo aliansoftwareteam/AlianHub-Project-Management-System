@@ -17,11 +17,10 @@
                 class="tv2__add"
                 @click.stop="createTask = true"
             >+ {{ $t('Projects.new_task') }}</button>
-            <span class="tv2__note">{{ $t('List.ai_fields_note') }}</span>
         </div>
         <div v-if="createTask" class="tv2__bar">
             <CreateTask
-                :sprint="sprints[0]"
+                :sprint="createSprint"
                 :assigneeOptions="project.AssigneeUserId"
                 :groupBy="grouped"
                 :considerWidth="false"
@@ -30,41 +29,75 @@
         </div>
 
         <div class="tv2__scroll ah-scroll" id="tableview_scroll">
-            <div class="tv2__grid">
-                <div class="tv2__head">
-                    <span></span>
-                    <button type="button" class="tv2__sort" @click="sortByColumns(globalSortKey === `TaskName: ${1}` ? `TaskName: ${-1}` : `TaskName: ${1}`)">{{ $t('Projects.tasks') }}</button>
-                    <button type="button" class="tv2__sort" @click="sortByColumns(globalSortKey === `statusKey: ${1}` ? `statusKey: ${-1}` : `statusKey: ${1}`)">{{ $t('Projects.status') }}</button>
-                    <span>{{ $t('List.col_owner') }}</span>
-                    <span class="tv2__head-ai">✦ {{ $t('List.col_summary') }}</span>
-                    <span class="tv2__head-ai">✦ {{ $t('List.col_risk') }}</span>
-                    <span class="tv2__head-ai">✦ {{ $t('List.col_area') }}</span>
+            <div v-if="hasRows" class="tv2__grid" role="table" :aria-label="$t('Projects.tasks')">
+                <div class="tv2__head" role="row">
+                    <span role="columnheader"></span>
+                    <span role="columnheader" :aria-sort="ariaSort('TaskName')">
+                        <button
+                            type="button"
+                            class="tv2__sort"
+                            :title="$t('List.sort_by', { column: $t('Projects.tasks') })"
+                            @click="toggleSort('TaskName')"
+                        >
+                            {{ $t('Projects.tasks') }}<span class="tv2__sort-caret" :class="{ 'is-on': sortOf('TaskName') }" aria-hidden="true">{{ sortGlyph('TaskName') }}</span>
+                        </button>
+                    </span>
+                    <span role="columnheader" :aria-sort="ariaSort('statusKey')">
+                        <button
+                            type="button"
+                            class="tv2__sort"
+                            :title="$t('List.sort_by', { column: $t('Projects.status') })"
+                            @click="toggleSort('statusKey')"
+                        >
+                            {{ $t('Projects.status') }}<span class="tv2__sort-caret" :class="{ 'is-on': sortOf('statusKey') }" aria-hidden="true">{{ sortGlyph('statusKey') }}</span>
+                        </button>
+                    </span>
+                    <span role="columnheader">{{ $t('List.col_owner') }}</span>
+                    <span role="columnheader" class="tv2__head-ai" :title="$t('List.ai_source_hint')">✦ {{ $t('List.col_summary') }}</span>
+                    <span role="columnheader" class="tv2__head-ai" :title="$t('List.risk_formula')">✦ {{ $t('List.col_risk') }}</span>
+                    <span role="columnheader" class="tv2__head-ai" :title="$t('List.ai_source_hint')">✦ {{ $t('List.col_area') }}</span>
                 </div>
 
-                <TableViewTable
-                    v-for="item in groupItems"
-                    :key="item.key"
-                    :data="item"
-                    :sprintId="firstSprintId"
-                    :group="grouped"
-                    :globalSortKey="globalSortKey"
-                    :keys="`${item.key}`"
-                    @open="openRow"
-                />
+                <template v-for="sprint in groupedTasks" :key="sprintKey(sprint)">
+                    <div class="tv2__sprint-row" role="row">
+                        <span role="cell" class="tv2__sprint-cell" :aria-colspan="7">
+                            <button
+                                type="button"
+                                class="tv2__sprint-head"
+                                :aria-expanded="isSprintOpen(sprint)"
+                                @click="toggleSprint(sprint)"
+                            >
+                                <span class="tv2__caret" :class="{ 'tv2__caret--open': isSprintOpen(sprint) }" aria-hidden="true">▸</span>
+                                <span class="tv2__sprint-name">{{ sprint.name }}</span>
+                                <span class="tv2__sprint-meta" :title="$t('List.sprint_total_hint')">{{ sprint.tasks || 0 }}</span>
+                            </button>
+                        </span>
+                    </div>
 
-                <div class="d-flex align-items-center justify-content-center flex-column" v-if="!totalTaskInFirstSprint.length">
-                    <EmptyState
-                        v-if="project?.deletedStatusKey !== 2"
-                        :title="$t(emptyTitleKey)"
-                        :message="$t(emptyMessageKey)"
-                        helpPath="tasks"
-                    />
-                </div>
+                    <template v-if="isSprintOpen(sprint)">
+                        <TableViewTable
+                            v-for="item in (sprint.items || [])"
+                            :key="`${sprintKey(sprint)}_${item.key}`"
+                            :data="item"
+                            :sprintId="sprintKey(sprint)"
+                            :group="grouped"
+                            :globalSortKey="globalSortKey"
+                            :keys="`${item.key}`"
+                            @open="openRow"
+                        />
+                    </template>
+                </template>
             </div>
 
-            <div class="tv2__foot">
-                <span>{{ $t('List.ai_source_hint') }}</span>
-                <span>{{ $t('List.risk_formula') }}</span>
+            <div v-else class="d-flex align-items-center justify-content-center flex-column">
+                <EmptyState
+                    v-if="project?.deletedStatusKey !== 2"
+                    :title="$t(emptyTitleKey)"
+                    :message="$t(emptyMessageKey)"
+                    :actionLabel="canCreate ? $t('EmptyState.no_tasks_action') : ''"
+                    helpPath="tasks"
+                    @action="createTask = true"
+                />
             </div>
         </div>
     </div>
@@ -122,24 +155,48 @@ const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 const createTask = ref(false);
 const globalSortKey = ref('');
 const groupedTasks = ref([]);
+const expandedSprints = ref([]);
 
 const taskData = computed(() => getters["projectData/tableTasks"]);
 const currentCompany = computed(() => getters["settings/selectedCompany"]);
 const canCreate = computed(() => checkPermission('task.task_create', project.value?.isGlobalPermission) === true
     && checkPermission('task.task_list', project.value?.isGlobalPermission) === true);
 
-const firstSprintId = computed(() => props.sprints[0]?.id || props.sprints[0]?._id || "");
-const groupItems = computed(() => groupedTasks.value[0]?.items || []);
+const sprintKey = (sprint) => String(sprint?.id || sprint?._id || "");
+const isSprintOpen = (sprint) => expandedSprints.value.includes(sprintKey(sprint));
 
-const totalTaskInFirstSprint = computed(() => {
-    const sprintTasks = getters['projectData/tableTasks']?.[props.projectData?._id]?.[firstSprintId.value];
-    return sprintTasks?.tasks || [];
+const createSprint = computed(() => groupedTasks.value.find((sprint) => isSprintOpen(sprint)) || props.sprints[0]);
+
+/* Collapsed sprints are never fetched, so the store can only answer for what is
+   open; the sprint counters cover the rest. */
+const visibleTaskCount = computed(() => {
+    if (searchedTask?.value) return (getters['projectData/searchedTasks'] || []).length;
+    const store = taskData.value?.[props.projectData?._id];
+    const loaded = (store?.sprints || []).reduce((total, id) => total + (store?.[id]?.tasks?.length || 0), 0);
+    return loaded || groupedTasks.value.reduce((total, sprint) => total
+        + (showArchiveVar?.value ? (sprint.archiveTaskCount || 0) : (sprint.tasks || 0)), 0);
 });
+const hasRows = computed(() => Boolean(groupedTasks.value.length && visibleTaskCount.value));
+
+function syncExpandedSprints(sprints) {
+    const ids = sprints.map(sprintKey).filter(Boolean);
+    const kept = expandedSprints.value.filter((id) => ids.includes(id));
+    expandedSprints.value = kept.length ? kept : ids.slice(0, 1);
+}
+
+function toggleSprint(sprint) {
+    const id = sprintKey(sprint);
+    if (!id) return;
+    expandedSprints.value = isSprintOpen(sprint)
+        ? expandedSprints.value.filter((open) => open !== id)
+        : [...expandedSprints.value, id];
+}
 
 function load(refetch) {
     if (!project.value || !Object.keys(project.value).length) return;
     groupBy(props.grouped, refetch, project.value, props.sprints, groupedTasks, true, 'table', null, true, (resp) => {
         groupedTasks.value = resp;
+        syncExpandedSprints(resp);
     });
 }
 
@@ -163,8 +220,18 @@ function openRow(task) {
     });
 }
 
-const sortByColumns = (sortKey = "") => {
-    globalSortKey.value = sortKey;
+const sortOf = (field) => {
+    const [key, direction] = globalSortKey.value.split(':');
+    return key === field ? Number(direction) : 0;
+};
+const sortGlyph = (field) => (sortOf(field) === -1 ? '▼' : '▲');
+const ariaSort = (field) => {
+    const direction = sortOf(field);
+    if (!direction) return 'none';
+    return direction === -1 ? 'descending' : 'ascending';
+};
+const toggleSort = (field) => {
+    globalSortKey.value = `${field}: ${sortOf(field) === 1 ? -1 : 1}`;
 };
 </script>
 <style>
