@@ -1,0 +1,121 @@
+/* The AI section's landing: one composer, and the open backlog read back as
+   work that can be started. Tokens only — tokens.css is the source of truth. */
+
+.land { display: flex; justify-content: center; width: 100%; }
+.land__col { width: 100%; max-width: 880px; display: flex; flex-direction: column; gap: var(--sp-7); }
+
+.land__hero { display: flex; flex-direction: column; align-items: center; gap: var(--sp-4); text-align: center; padding-top: var(--sp-6); }
+.land__glyph { width: 38px; height: 38px; border-radius: 11px; background: var(--brand-tint); color: var(--brand); display: grid; place-items: center; }
+.land__title { font: var(--text-display); color: var(--ink); margin: 0; }
+.land__sub { font: var(--text-small); color: var(--ink-2); margin: 0; max-width: 560px; }
+
+.land__composer {
+    display: flex; flex-direction: column; gap: var(--sp-4);
+    padding: var(--sp-5) var(--sp-6);
+    border: 1.5px solid var(--brand-border); border-radius: var(--r-card);
+    background: var(--surface); box-shadow: var(--shadow-card);
+    transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
+}
+.land__composer:focus-within { border-color: var(--brand); box-shadow: var(--focus); }
+.land__composer--off { border-color: var(--border); background: var(--surface-2); }
+.land__input { width: 100%; min-height: 62px; padding: 0; border: 0; background: transparent; color: var(--ink); font: var(--text-body); font-size: 14px; resize: vertical; }
+.land__input:focus { outline: none; }
+.land__input::placeholder { color: var(--ink-3); }
+
+.land__controls { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.land__spacer { flex: 1; min-width: var(--sp-2); }
+.land__ctl {
+    display: inline-flex; align-items: center; gap: var(--sp-2);
+    height: 28px; padding: 0 var(--sp-3);
+    border: 1px solid var(--border); border-radius: var(--r-chip);
+    background: var(--surface); color: var(--ink-label);
+    font: var(--text-small); cursor: pointer;
+    transition: background var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
+}
+.land__ctl:hover:not(:disabled) { background: var(--surface-hover); }
+.land__ctl:focus-visible { outline: none; box-shadow: var(--focus); }
+.land__ctl:disabled { opacity: .55; cursor: not-allowed; }
+.land__ctl.is-on { border-color: var(--brand); background: var(--brand-tint); color: var(--brand); }
+.land__ctl--select { padding-right: var(--sp-2); }
+.land__ctl--select select { border: 0; background: transparent; color: inherit; font: var(--text-small); max-width: 180px; cursor: pointer; }
+.land__ctl--select select:focus { outline: none; }
+.land__ctl--warn { border-color: var(--warn-ink); background: var(--warn-bg); color: var(--warn-ink); }
+
+.land__pop-wrap { position: relative; }
+.land__pop {
+    position: absolute; z-index: 6; bottom: 34px; left: 0; width: 330px;
+    padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-card);
+    background: var(--surface); box-shadow: var(--shadow-pop);
+    display: flex; flex-direction: column; gap: var(--sp-3); text-align: left;
+}
+.land__pop-row { display: flex; align-items: baseline; gap: var(--sp-3); font: var(--text-small); color: var(--ink-label); }
+.land__pop-row strong { font: 600 13px/1.3 var(--font-ui); color: var(--ink); }
+.land__pop-reach { margin-left: auto; font: var(--text-data); color: var(--ink-2); flex: none; }
+.land__pop-reach--none { color: var(--warn-ink); }
+.land__pop-note { margin: 0; font: var(--text-small); color: var(--ink-2); line-height: 1.5; }
+
+.land__note { display: flex; align-items: center; gap: var(--sp-2); font: var(--text-small); color: var(--ink-2); flex-wrap: wrap; }
+
+.land__read { display: flex; flex-direction: column; gap: var(--sp-2); }
+.land__read-line { font: var(--text-h2); color: var(--ink); margin: 0; }
+.land__read-sub { font: var(--text-small); color: var(--ink-2); margin: 0; }
+
+.land__cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); }
+.land__card {
+    display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start;
+    padding: var(--sp-5); text-align: left; cursor: pointer;
+    border: 1px solid var(--hairline); border-radius: var(--r-card); background: var(--surface);
+    transition: border-color var(--t-state) var(--ease), background var(--t-state) var(--ease);
+}
+.land__card:hover { background: var(--surface-hover); }
+.land__card:focus-visible { outline: none; box-shadow: var(--focus); }
+.land__card.is-open { border-color: var(--brand); background: var(--brand-tint); }
+.land__card--people { border-style: dashed; }
+.land__card-n { font: 600 24px/1 var(--font-mono); color: var(--ink); }
+.land__card--people .land__card-n { color: var(--warn-ink); }
+.land__card strong { font: 600 13px/1.3 var(--font-ui); color: var(--ink); }
+.land__card span { font: var(--text-small); color: var(--ink-2); line-height: 1.45; }
+
+.land__panel { border: 1.5px solid var(--brand); border-radius: var(--r-card); background: var(--surface); overflow: hidden; }
+.land__panel-head { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-4) var(--sp-6); border-bottom: 1px solid var(--hairline); background: var(--brand-tint); }
+.land__panel-head .ah-h3 { min-width: 0; }
+.land__panel-body { padding: var(--sp-5) var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-4); }
+.land__rows { display: flex; flex-direction: column; }
+.land__row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) 0; font: var(--text-body); border-bottom: 1px solid var(--hairline); }
+.land__row:last-child { border-bottom: 0; }
+.land__row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.land__row-to { display: flex; align-items: center; gap: var(--sp-2); width: 210px; flex: none; }
+.land__row--refused .land__row-to { color: var(--warn-ink); }
+.land__row-key { font: var(--text-data); color: var(--ink-3); flex: none; }
+
+.land__trust { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4); border-radius: var(--r-input); background: var(--surface-2); }
+.land__trust dl { margin: 0; display: flex; flex-direction: column; gap: var(--sp-2); font: var(--text-body); }
+.land__trust dl > div { display: flex; gap: var(--sp-3); }
+.land__trust dt { width: 112px; flex: none; color: var(--ink-2); }
+.land__trust dd { margin: 0; min-width: 0; color: var(--ink); }
+.land__trust-note { margin: 0; font: var(--text-small); color: var(--ink-label); line-height: 1.5; }
+
+.land__actions { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.land__actions .land__cost { font: var(--text-small); color: var(--ink-2); }
+
+.land__agents { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-3); }
+.land__agent { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-5); border: 1px solid var(--hairline); border-radius: var(--r-card); background: var(--surface); }
+.land__agent-top { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.land__agent-top strong { font: 600 13px/1.3 var(--font-ui); }
+.land__agent-line { font: var(--text-small); color: var(--ink-2); margin: 0; }
+.land__agent-skills { display: flex; gap: var(--sp-1); flex-wrap: wrap; }
+
+.land__sell { display: flex; flex-direction: column; align-items: center; gap: var(--sp-4); text-align: center; padding: var(--sp-9) var(--sp-6); border: 1px dashed var(--border); border-radius: var(--r-card); background: var(--surface); }
+.land__sell h3 { font: var(--text-h2); color: var(--ink); margin: 0; }
+.land__sell p { font: var(--text-small); color: var(--ink-2); margin: 0; max-width: 520px; line-height: 1.55; }
+.land__sell-promise { font: var(--text-data); color: var(--ink-label); }
+
+@media (max-width: 1100px) {
+    .land__cards { grid-template-columns: repeat(2, 1fr); }
+    .land__agents { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+    .land__cards { grid-template-columns: 1fr; }
+    .land__row-to { width: auto; }
+    .land__title { font: var(--text-h1); }
+}
