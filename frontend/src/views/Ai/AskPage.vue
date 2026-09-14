@@ -116,6 +116,7 @@
                                 </div>
                             </div>
                         </section>
+                        <p v-else-if="answer.configured === false" class="ah-empty">{{ $t('AiLanding.no_model_note') }}</p>
                         <p v-else-if="answer.empty" class="ah-empty">{{ answer.empty }}</p>
 
                         <div v-if="loading" class="ah-empty">{{ $t('Parity.loading') }}</div>
@@ -177,6 +178,8 @@
                                 <div class="land__panel-body">
                                     <div class="land__rows">
                                         <div v-for="row in rows" :key="row.taskId" class="land__row" :class="{ 'land__row--refused': !row.routed }">
+                                            <input v-if="row.routed" class="ah-check" type="checkbox" :checked="accepted.includes(row.taskId)" @change="acceptToggle(row)" />
+                                            <span v-else class="ah-dot ah-dot--warn"></span>
                                             <span class="land__row-title">{{ row.title }}</span>
                                             <span class="land__row-to">
                                                 <template v-if="row.routed">
@@ -202,8 +205,8 @@
                                     <p v-if="startError" class="ah-field__error">{{ startError }}</p>
 
                                     <div class="land__actions">
-                                        <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!totals.routed || starting" @click="startAll">
-                                            {{ starting ? $t('Parity.starting') : $t('AiLanding.start_n', { n: totals.routed }) }}
+                                        <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="!chosen.length || starting" @click="startAll">
+                                            {{ starting ? $t('Parity.starting') : $t('AiLanding.start_n', { n: chosen.length }) }}
                                         </button>
                                         <router-link class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'AgentRouting', params: { cid: companyId } }">{{ $t('AiLanding.open_router') }}</router-link>
                                         <span class="land__cost">{{ $t('AiLanding.revert_note') }}</span>
@@ -302,6 +305,7 @@ const models = ref([]);
 const loading = ref(true);
 const pop = ref("");
 const openKey = ref("");
+const accepted = ref([]);
 const starting = ref(false);
 const startError = ref("");
 const listening = ref(false);
@@ -311,11 +315,16 @@ const recorder = ref(null);
 const read = computed(() => backlogRead(routable.value));
 const reach = computed(() => skillReach(skillManifest.value, routable.value));
 
-const modelReady = computed(() => sources.value.configured !== false && models.value.some((m) => m.priced));
+const providerReady = computed(() => sources.value.configured !== false);
+/* A model the pricing table does not cover is refused by name when a run starts
+ * (Agents/runs canStart), so the composer refuses it here too rather than
+ * letting the button promise something the engine will not do. */
+const unpriced = computed(() => providerReady.value && models.value.length > 0 && !models.value.some((m) => m.priced));
+const modelReady = computed(() => providerReady.value && !unpriced.value);
 
 const modelChip = computed(() => {
-    if (sources.value.configured === false) return t("AiLanding.no_model_chip");
-    if (!modelReady.value) return t("AiLanding.unpriced_chip");
+    if (!providerReady.value) return t("AiLanding.no_model_chip");
+    if (unpriced.value) return t("AiLanding.unpriced_chip");
     return t("AiLanding.ctl_model");
 });
 
@@ -337,8 +346,10 @@ const rows = computed(() => routeTasks({
 }));
 
 const totals = computed(() => routingTotals(rows.value));
+const chosen = computed(() => rows.value.filter((r) => r.routed && accepted.value.includes(r.taskId)));
+const chosenTotals = computed(() => routingTotals(chosen.value));
 
-const routedAgents = computed(() => rows.value.filter((r) => r.routed).map((r) => r.agent));
+const routedAgents = computed(() => chosen.value.map((r) => r.agent));
 
 const listOf = (pick) => {
     const all = [...new Set(routedAgents.value.flatMap(pick))];
@@ -347,8 +358,8 @@ const listOf = (pick) => {
 const willTouch = computed(() => listOf((a) => a.will));
 const wontTouch = computed(() => listOf((a) => a.wont));
 
-const costLine = computed(() => (totals.value.priced
-    ? t("Parity.about_usd", { usd: totals.value.usd.toFixed(2) })
+const costLine = computed(() => (chosenTotals.value.priced
+    ? t("Parity.about_usd", { usd: chosenTotals.value.usd.toFixed(2) })
     : t("Parity.cost_unknown")));
 
 const reachLabel = (skill) => {
@@ -372,8 +383,17 @@ const spendLine = (agent) => {
 const toggle = (which) => { pop.value = pop.value === which ? "" : which; };
 const closePops = () => { pop.value = ""; };
 
-const openGroup = (group) => { openKey.value = openKey.value === group.labelKey ? "" : group.labelKey; startError.value = ""; };
+const openGroup = (group) => {
+    openKey.value = openKey.value === group.labelKey ? "" : group.labelKey;
+    startError.value = "";
+    accepted.value = rows.value.filter((r) => r.routed).map((r) => r.taskId);
+};
 const openPeople = () => { openKey.value = openKey.value === "people" ? "" : "people"; };
+const acceptToggle = (row) => {
+    accepted.value = accepted.value.includes(row.taskId)
+        ? accepted.value.filter((id) => id !== row.taskId)
+        : accepted.value.concat(row.taskId);
+};
 
 const submit = async () => {
     if (!question.value.trim() || !modelReady.value) return;
@@ -397,7 +417,7 @@ const startAll = async () => {
     startError.value = "";
     let done = 0;
     try {
-        for (const row of rows.value.filter((r) => r.routed)) {
+        for (const row of chosen.value) {
             // Sequential on purpose: every run is a spend decision, and a refusal
             // half way through must leave the rest unstarted rather than racing.
             // eslint-disable-next-line no-await-in-loop
