@@ -4,7 +4,7 @@
             <div class="ah-card aw rtp" role="dialog" aria-modal="true">
                 <div class="aw__head">
                     <span class="ah-avatar ah-avatar--agent"><ShellIcon name="agent" :size="13" /></span>
-                    <span class="ah-h3">{{ $t('Ai.run_on_task', { name: agent.name }) }}</span>
+                    <span class="ah-h3">{{ title || $t('Ai.run_on_task', { name: agent.name }) }}</span>
                     <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="$emit('close')"><ShellIcon name="x" :size="15" /></button>
                 </div>
 
@@ -44,7 +44,7 @@
                     <div class="ah-toolbar__spacer"></div>
                     <button type="button" class="ah-btn ah-btn--secondary" @click="$emit('close')">{{ $t('Ai.cancel') }}</button>
                     <button type="button" class="ah-btn ah-btn--primary" :disabled="!chosen || busy" @click="$emit('run', chosen)">
-                        {{ busy ? $t('Ai.starting') : $t('Ai.run_now') }}
+                        {{ busy ? $t('Ai.starting') : (cta || $t('Ai.run_now')) }}
                     </button>
                 </div>
             </div>
@@ -57,17 +57,24 @@ import { computed, nextTick, onMounted, ref } from "vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
-import { reasonOf } from "./useAgents";
-import { requirementsOf } from "./skillInputs";
+import { useAgents, reasonOf } from "./useAgents";
+import { requirementsOf, indexSkills } from "./skillInputs";
 
 defineOptions({ name: "RunTaskPicker" });
 
 const props = defineProps({
-    agent: { type: Object, required: true },
+    agent: { type: Object, default: () => ({}) },
     busy: { type: Boolean, default: false },
-    error: { type: String, default: "" }
+    error: { type: String, default: "" },
+    title: { type: String, default: "" },
+    cta: { type: String, default: "" },
+    // A skill picked straight from the library has its own requirement; an agent
+    // has whatever its enabled skills between them need.
+    requirementCodes: { type: Array, default: null }
 });
 defineEmits(["run", "close"]);
+
+const { skillManifest } = useAgents();
 
 const searchField = ref(null);
 const query = ref("");
@@ -77,7 +84,7 @@ const searching = ref(false);
 const searchError = ref("");
 let debounce = null;
 
-const requirements = computed(() => requirementsOf(props.agent));
+const requirements = computed(() => props.requirementCodes || requirementsOf(props.agent, indexSkills(skillManifest.value)));
 const scopeIds = computed(() => (props.agent.projectIds || []).map(String));
 const inScope = (task) => !scopeIds.value.length || scopeIds.value.includes(String(task.ProjectID || ""));
 

@@ -140,6 +140,8 @@ export function useAgents() {
 
     const loadCatalogues = async () => (await request("get", env.AGENT_SKILL_CATALOGUES, undefined, "Ai.load_failed")).data;
 
+    const loadSkill = async (key) => (await request("get", `${env.AGENT_SKILLS}/${encodeURIComponent(key)}`, undefined, "Ai.load_failed")).data;
+
     const createSkill = async (body) => (await request("post", env.AGENT_SKILLS, body, "Ai.skill_save_failed")).data;
 
     const updateSkill = async (key, body) => (await request("put", `${env.AGENT_SKILLS}/${encodeURIComponent(key)}`, body, "Ai.skill_save_failed")).data;
@@ -230,7 +232,7 @@ export function useAgents() {
         agents, proposals, counts, runSummary, spend, registryManifest, skillManifest, loading, lastError,
         running, waiting, AUTONOMY,
         loadAll, loadAgents, loadProposals, loadSummary, loadSpend, loadRegistry,
-        loadSkills, loadCatalogues, createSkill, updateSkill, retireSkill, dryRunSkill,
+        loadSkills, loadCatalogues, loadSkill, createSkill, updateSkill, retireSkill, dryRunSkill,
         decide, setPaused, pauseAll, runNow, saveAgent, deleteAgent, activeRuns, loadActiveRuns, stopActive,
         loadRun, revertRun, loadRunReplay, loadRevisions, promoteRevision, rollbackRevision
     };

@@ -12,9 +12,11 @@
 //
 // Pure — no network, no store, no Vue. Tested in tests/agent-fit.test.js.
 
-const agentWork = require('@agentWork');
+// Required by path rather than by the @agentWork alias: this file is CommonJS,
+// and the node test runner loads it directly.
+const agentWork = require('../../../../Modules/Agents/workKinds');
 
-const { READ_ACTIONS, WORK_KINDS, classifyTask, taskText, inputsOf, hasInput, indexSkills, requiresOf, text, words } = agentWork.default || agentWork;
+const { READ_ACTIONS, WORK_KINDS, classifyTask, taskText, inputsOf, hasInput, indexSkills, requiresOf, text, words } = agentWork;
 
 const uniq = (list) => [...new Set(list)];
 const round2 = (n) => Math.round(Number(n || 0) * 100) / 100;

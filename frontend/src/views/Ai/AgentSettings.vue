@@ -26,12 +26,25 @@
                             <div class="ai-skill__head">
                                 <input :id="`sk-${skill.key}`" v-model="skill.enabled" type="checkbox" class="ah-check" :disabled="!canManage" />
                                 <label :for="`sk-${skill.key}`" class="ai-skill__name">{{ skill.name }}</label>
+                                <span class="ah-chip ah-chip--mono ah-chip--sm">{{ skill.key }}</span>
+                                <span v-if="skill.source === 'data'" class="ah-chip ah-chip--brand ah-chip--sm">{{ $t('Ai.skill_source_yours') }}</span>
+                                <span v-if="skill.model" class="ah-chip ah-chip--mono ah-chip--sm">{{ skill.model }}</span>
                                 <span v-if="!skill.enabled" class="ah-chip">{{ $t('Ai.off') }}</span>
+                                <span v-else-if="!skill.resolved" class="ah-chip ah-chip--danger ah-chip--sm">{{ $t('Ai.skill_unresolved') }}</span>
                             </div>
                             <div class="ai-skill__actions">
-                                <span v-for="a in skill.actions" :key="a" class="ah-chip ah-chip--mono">{{ a }}</span>
+                                <span v-for="a in effectiveOf(skill)" :key="a" class="ah-chip ah-chip--mono">{{ a }}</span>
+                                <span v-for="a in outsideOf(skill)" :key="`x-${a}`" class="ah-chip ah-chip--mono ai-skill__outside">{{ a }}</span>
                             </div>
+                            <p v-if="skill.enabled" class="ah-small ai-skill__needs">
+                                {{ $t('Ai.skill_needs', { what: $t(`Ai.req_${skill.requires ? skill.requires.code : 'task'}`) }) }}
+                                <span v-if="outsideOf(skill).length">· {{ $t('Ai.skill_outside_agent', { list: outsideOf(skill).join(', ') }) }}</span>
+                            </p>
                         </div>
+                        <p class="ah-small">{{ $t('Ai.skills_effective_note') }}</p>
+                        <router-link v-if="canManage" class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'AiSkills', params: { cid: companyId } }">
+                            {{ $t('Ai.skills_open_library') }}
+                        </router-link>
 
                         <p class="ai-never">
                             <strong>{{ $t('Ai.never_label') }}</strong>
@@ -165,7 +178,7 @@ const $toast = useToast();
 const route = useRoute();
 const router = useRouter();
 const companyId = inject("$companyId");
-const { agents, spend, registryManifest, loadAgents, loadSpend, loadRegistry, saveAgent, setPaused, deleteAgent, activeRuns, loadActiveRuns } = useAgents();
+const { agents, spend, registryManifest, skillManifest, loadAgents, loadSpend, loadRegistry, loadSkills, saveAgent, setPaused, deleteAgent, activeRuns, loadActiveRuns } = useAgents();
 const { canManage } = useAgentAccess();
 
 const loadingAgent = ref(true);
@@ -173,6 +186,7 @@ const busy = ref(false);
 const error = ref("");
 const agent = ref({});
 const skills = ref([]);
+const namedKeys = ref(new Set());
 const recentRuns = ref([]);
 const deleteConfirm = ref("");
 const form = reactive({ autonomy: 1, rateLimitPerDay: 40, spendCapUsd: 30, model: "" });
@@ -186,9 +200,18 @@ const expandedRun = ref("");
 const revisionsKey = ref(0);
 const highlightRevision = computed(() => { const n = Number(route.query.rev); return Number.isInteger(n) && n > 0 ? n : null; });
 
+/* What this agent would actually let the skill do: the skill's emits cut to the
+ * agent's allowed actions. An agent with no allowed actions is un-narrowed. */
+const effectiveOf = (skill) => {
+    const emits = skill.emits || skill.actions || [];
+    const allowed = agent.value.allowedActions || [];
+    return allowed.length ? emits.filter((a) => allowed.includes(a)) : [...emits];
+};
+const outsideOf = (skill) => (skill.emits || []).filter((a) => !effectiveOf(skill).includes(a));
+
 const allowedKeys = computed(() => {
     const keys = new Set();
-    skills.value.filter((s) => s.enabled).forEach((s) => (s.actions || []).forEach((a) => keys.add(a)));
+    skills.value.filter((s) => s.enabled).forEach((s) => effectiveOf(s).forEach((a) => keys.add(a)));
     if (!keys.size) (agent.value.allowedActions || []).forEach((a) => keys.add(a));
     return [...keys];
 });
@@ -209,7 +232,7 @@ const reloadRuns = async () => {
 };
 
 const load = async () => {
-    await Promise.all([loadAgents(), loadSpend(), loadRegistry(), loadActiveRuns()]);
+    await Promise.all([loadAgents(), loadSpend(), loadRegistry(), loadActiveRuns(), loadSkills().catch(() => [])]);
     const found = agents.value.find((a) => String(a._id) === String(route.params.id));
     if (!found) {
         router.replace({ name: "AiHub", params: { cid: companyId.value } });
@@ -220,12 +243,24 @@ const load = async () => {
     form.rateLimitPerDay = Number(found.rateLimitPerDay || 40);
     form.spendCapUsd = Number(found.spendCapUsd || 30);
     form.model = found.model || "";
-    skills.value = (found.skills || []).map((s) => ({
+    // Every live skill in the manifest is offered; the ones this agent already
+    // names keep their own state and sit first.
+    const chosen = (found.skills || []).map((s) => ({
         key: s.key || String(s),
         name: s.name || s.key || String(s),
-        actions: s.actions || found.allowedActions || [],
+        emits: s.emits || s.actions || [],
+        requires: s.requires || null,
+        source: s.source || null,
+        model: s.model || null,
+        resolved: s.resolved !== false,
         enabled: s.enabled !== false
     }));
+    const named = new Set(chosen.map((s) => s.key));
+    namedKeys.value = named;
+    const offered = (skillManifest.value || [])
+        .filter((s) => !named.has(s.key) && !s.retiredAt && s.enabled !== false)
+        .map((s) => ({ key: s.key, name: s.name, emits: s.emits || [], requires: s.requires || null, source: s.source, model: s.model || null, resolved: true, enabled: false }));
+    skills.value = [...chosen, ...offered];
 
     await Promise.all([reloadRuns(), loadPinnableModels()]);
     loadingAgent.value = false;
@@ -241,7 +276,8 @@ const save = async () => {
             rateLimitPerDay: form.rateLimitPerDay,
             spendCapUsd: form.spendCapUsd,
             model: form.model,
-            skills: skills.value.map((s) => ({ key: s.key, name: s.name, actions: s.actions, enabled: s.enabled }))
+            // Actions are the manifest's to state, so only the choice is stored.
+            skills: skills.value.filter((s) => s.enabled || namedKeys.value.has(s.key)).map((s) => ({ key: s.key, name: s.name, enabled: s.enabled }))
         });
         $toast.success(t("Ai.saved"), { position: "top-right" });
         revisionsKey.value += 1;
@@ -288,6 +324,8 @@ onMounted(load);
 .ai-skill__head { display: flex; align-items: center; gap: 9px; }
 .ai-skill__name { font: 600 13px/1.2 var(--font-ui); cursor: pointer; }
 .ai-skill__actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 7px 0 0 24px; }
+.ai-skill__outside { opacity: .5; text-decoration: line-through; }
+.ai-skill__needs { margin: 6px 0 0 24px; }
 .ai-never { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--hairline); font: var(--text-small); color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; }
 .ai-never strong { color: var(--ink); }
 .ai-radios { display: flex; flex-direction: column; gap: 7px; margin: 8px 0 10px; }
