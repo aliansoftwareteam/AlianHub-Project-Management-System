@@ -1,5 +1,5 @@
 <template>
-  <div class="mm-view">
+  <div class="mm-view ah-page">
     <div class="mm-view__bar">
       <span class="mm-view__title">Mind Map</span>
       <span class="mm-view__count">{{ nodeCount }} nodes</span>
@@ -125,19 +125,19 @@ watch(() => props.sprints, () => ensureTasksLoaded(), { deep: true });
 </script>
 
 <style scoped>
-.mm-view { display: flex; flex-direction: column; width: 100%; height: 100%; background: #fff; }
-.mm-view__bar { display: flex; align-items: center; gap: 14px; padding: 8px 14px; border-bottom: 1px solid #eee; flex: 0 0 auto; }
-.mm-view__title { font-size: 14px; font-weight: 700; color: #2b2f44; }
-.mm-view__count { margin-left: auto; font-size: 12px; color: #888; }
+.mm-view { display: flex; flex-direction: column; width: 100%; height: 100%; background: var(--surface); color: var(--ink); }
+.mm-view__bar { display: flex; align-items: center; gap: 14px; padding: 8px 14px; border-bottom: 1px solid var(--hairline); flex: 0 0 auto; }
+.mm-view__title { font-size: 14px; font-weight: 700; color: var(--ink); }
+.mm-view__count { margin-left: auto; font-size: 12px; color: var(--ink-2); }
 .mm-view__main { position: relative; flex: 1 1 auto; min-height: 360px; overflow: hidden; }
-.mm-view__empty { position: absolute; top: 48px; left: 0; right: 0; text-align: center; color: #999; font-size: 14px; padding: 20px; }
+.mm-view__empty { position: absolute; top: 48px; left: 0; right: 0; text-align: center; color: var(--ink-2); font-size: 14px; padding: 20px; }
 .mm-view__scroll { width: 100%; height: 100%; overflow: auto; padding: 16px; }
-.mm-view__edge { fill: none; stroke: #cfd4e6; stroke-width: 1.6; }
-.mm-view__node rect { fill: #fff; stroke: #8a93b5; stroke-width: 1.4; }
-.mm-view__node text { font-size: 12px; fill: #33384a; }
-.mm-view__node.is-root rect { fill: #2f3a8f; stroke: #2f3a8f; }
-.mm-view__node.is-root text { fill: #fff; font-weight: 700; }
-.mm-view__node.is-progress rect { stroke: #2f6fed; }
-.mm-view__node.is-done rect { stroke: #1c9b5e; }
-.mm-view__node.is-done text { fill: #1c7a43; }
+.mm-view__edge { fill: none; stroke: var(--border); stroke-width: 1.6; }
+.mm-view__node rect { fill: var(--surface); stroke: var(--border); stroke-width: 1.4; }
+.mm-view__node text { font-size: 12px; fill: var(--ink); }
+.mm-view__node.is-root rect { fill: var(--brand); stroke: var(--brand); }
+.mm-view__node.is-root text { fill: var(--surface); font-weight: 700; }
+.mm-view__node.is-progress rect { stroke: var(--warn); }
+.mm-view__node.is-done rect { stroke: var(--ok); }
+.mm-view__node.is-done text { fill: var(--ok-ink); }
 </style>
