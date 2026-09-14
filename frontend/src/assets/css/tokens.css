@@ -145,6 +145,15 @@ html, body, #app {
     .ah-app__main { height: calc(100dvh - var(--tabbar-h)); }
 }
 
+/* Teleport hosts (main.js) are empty, zero-height divs appended to #app. Without a stacking
+   context their fixed children compete in the root context and lose to .ah-detail's z-index 40,
+   so every picker opened from the task panel rendered behind it. 100 keeps them below the
+   legacy 1000-tier panels, which is where they already sat relative to each other. */
+#my-sidebar,
+#my-modal,
+#my-dropdown,
+#my-image-slider { position: relative; z-index: 100; }
+
 /* Legacy (not yet restyled) views keep dark text on their white surfaces in dark mode;
    redesigned views opt in with .ah-page. */
 :root[data-theme="dark"] .ah-app__view { color: #17161c; }
