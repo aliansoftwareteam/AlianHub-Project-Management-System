@@ -97,6 +97,8 @@ const series = computed(() => {
 
 const chartOptions = computed(() => ({
     chart: { id: 'burndown', toolbar: { show: false }, animations: { enabled: false } },
+    // Ideal vs actual are data series, not theme colours: they stay literal so the
+    // two lines never collapse into the same hue.
     colors: ['#bdbdbd', '#2F3990'],
     stroke: { curve: 'straight', width: [2, 3], dashArray: [6, 0] },
     markers: { size: 0 },
@@ -153,19 +155,20 @@ onMounted(() => {
 <style scoped>
 .agile-report { padding: 12px; }
 .agile-report__bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-.agile-report__select { border: 1px solid #d9d9d9; border-radius: 6px; padding: 6px 10px; font-size: 13px; min-width: 200px; background: #fff; }
-.agile-report__toggle button { border: 1px solid #d9d9d9; background: #fff; padding: 5px 12px; font-size: 12px; cursor: pointer; }
-.agile-report__toggle button:first-child { border-radius: 6px 0 0 6px; }
-.agile-report__toggle button:last-child { border-radius: 0 6px 6px 0; border-left: none; }
-.agile-report__toggle button.active { background: #2F3990; color: #fff; border-color: #2F3990; }
-.agile-report__pdf { margin-left: auto; border: 1px solid #2F3990; color: #2F3990; background: #fff; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+.agile-report__select { border: 1px solid var(--border); border-radius: var(--r-input); padding: 6px 10px; font-size: 13px; min-width: 200px; background: var(--surface); color: var(--ink); }
+.agile-report__toggle button { border: 1px solid var(--border); background: var(--surface); color: var(--ink); padding: 5px 12px; font-size: 12px; cursor: pointer; }
+.agile-report__toggle button:first-child { border-radius: var(--r-chip) 0 0 var(--r-chip); }
+.agile-report__toggle button:last-child { border-radius: 0 var(--r-chip) var(--r-chip) 0; border-left: none; }
+/* --surface, not white: dark --brand is a light lavender that white sits on at 2.6:1. */
+.agile-report__toggle button.active { background: var(--brand); color: var(--surface); border-color: var(--brand); }
+.agile-report__pdf { margin-left: auto; border: 1px solid var(--brand); color: var(--brand); background: var(--surface); border-radius: var(--r-chip); padding: 6px 14px; font-size: 13px; cursor: pointer; }
 .agile-report__pdf:disabled { opacity: 0.5; cursor: not-allowed; }
-.agile-report__msg { color: #888; font-size: 14px; padding: 40px; text-align: center; }
+.agile-report__msg { color: var(--ink-2); font-size: 14px; padding: 40px; text-align: center; }
 .agile-report__box { display: flex; align-items: center; gap: 10px; margin: -4px 0 10px; }
-.agile-report__state { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; background: #eceef7; color: #4b5162; }
-.agile-report__state.is-active { background: #e4f0e8; color: #1c7a43; }
-.agile-report__state.is-overdue { background: #fdece7; color: #b0431f; }
-.agile-report__state.is-closed { background: #eceef7; color: #8b90a0; }
-.agile-report__range { font-size: 12.5px; color: #6b7280; font-variant-numeric: tabular-nums; }
-.agile-report__goal { font-size: 12.5px; font-style: italic; color: #8b90a0; }
+.agile-report__state { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; background: var(--fill); color: var(--ink-label); }
+.agile-report__state.is-active { background: var(--ok-bg); color: var(--ok-ink); }
+.agile-report__state.is-overdue { background: var(--warn-bg); color: var(--warn-ink); }
+.agile-report__state.is-closed { background: var(--fill); color: var(--ink-2); }
+.agile-report__range { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.agile-report__goal { font-size: 12.5px; font-style: italic; color: var(--ink-2); }
 </style>
