@@ -233,6 +233,8 @@ const scopeMarkers = computed(() => {
     });
     return Object.keys(byDay)
         .filter((key) => burndownDays.value.some((d) => d.date === key))
+        // --warn is #d98324 in both themes, and ApexCharts gives the label's background
+        // rect no class to hang a token on, so these three stay literal.
         .map((key) => ({
             x: key,
             borderColor: '#d98324',
@@ -242,6 +244,8 @@ const scopeMarkers = computed(() => {
 
 const burndownOptions = computed(() => ({
     chart: { id: 'sprint-burndown', toolbar: { show: false }, animations: { enabled: false }, fontFamily: 'Inter Tight, sans-serif' },
+    // Remaining vs ideal are data series, not theme colours: they stay literal so the
+    // two lines never collapse into the same hue.
     colors: ['#2F3990', 'rgba(0,0,0,.2)'],
     stroke: { width: [2.5, 1.5], dashArray: [0, 5], curve: 'straight' },
     dataLabels: { enabled: false },
@@ -249,7 +253,6 @@ const burndownOptions = computed(() => ({
     xaxis: { categories: burndownDays.value.map((d) => d.date), labels: { rotate: -45, hideOverlappingLabels: true, style: { fontSize: '10px' } }, tooltip: { enabled: false } },
     yaxis: { min: 0, labels: { style: { fontSize: '10px' } } },
     legend: { position: 'top', horizontalAlign: 'right', fontSize: '11px' },
-    grid: { borderColor: 'rgba(0,0,0,.07)' },
     annotations: { xaxis: scopeMarkers.value },
     tooltip: { shared: true },
 }));
