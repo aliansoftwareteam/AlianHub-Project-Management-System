@@ -63,6 +63,17 @@
                             <span class="ah-field__hint">{{ $t('Ai.start_low') }}</span>
                         </div>
                         <div class="ah-field">
+                            <span class="ah-field__label">{{ $t('Ai.scope') }}</span>
+                            <div v-if="projects.length" class="ai-radios">
+                                <label v-for="p in projects" :key="p._id" class="ai-radio" :class="{ 'is-on': form.projectIds.includes(String(p._id)) }">
+                                    <input v-model="form.projectIds" type="checkbox" :value="String(p._id)" class="ah-check" />
+                                    <span>{{ p.ProjectName }}</span>
+                                </label>
+                            </div>
+                            <span v-else class="ah-field__hint">{{ $t('Ai.scope_no_projects') }}</span>
+                            <span class="ah-field__hint">{{ $t('Ai.scope_lead') }}</span>
+                        </div>
+                        <div class="ah-field">
                             <label class="ah-field__label" for="aw-cap">{{ $t('Ai.spend_cap') }}</label>
                             <input id="aw-cap" v-model.number="form.spendCapUsd" type="number" min="0" step="1" class="ah-input" />
                         </div>
@@ -86,6 +97,7 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useAgents, NEW_AGENT_DEFAULTS } from "./useAgents";
 import { AGENT_TEMPLATES } from "./agentTemplates";
@@ -97,7 +109,9 @@ const props = defineProps({ template: { type: Object, default: null } });
 const emit = defineEmits(["close", "created"]);
 
 const { t } = useI18n();
+const { getters } = useStore();
 const { registryManifest, loadRegistry, saveAgent, skillManifest, loadSkills } = useAgents();
+const projects = computed(() => (getters["projectData/projects"]?.data || []).filter((p) => !p.deletedStatusKey));
 
 const step = ref(1);
 const chosenSlug = ref("");
@@ -112,7 +126,8 @@ const form = reactive({
     description: "",
     allowedActions: [...NEW_AGENT_DEFAULTS.allowedActions],
     autonomy: NEW_AGENT_DEFAULTS.autonomy,
-    spendCapUsd: NEW_AGENT_DEFAULTS.spendCapUsd
+    spendCapUsd: NEW_AGENT_DEFAULTS.spendCapUsd,
+    projectIds: [...NEW_AGENT_DEFAULTS.projectIds]
 });
 
 const writeActions = computed(() => (registryManifest.value.actions || []).filter((a) => !a.proposeOnly));
@@ -137,6 +152,7 @@ const create = async () => {
             allowedActions: form.allowedActions,
             autonomy: form.autonomy,
             spendCapUsd: form.spendCapUsd,
+            projectIds: form.projectIds,
             skills: (effectiveTemplate.value?.skills || []).map((key) => ({ key, name: key, actions: form.allowedActions, enabled: true }))
         });
         emit("created");
