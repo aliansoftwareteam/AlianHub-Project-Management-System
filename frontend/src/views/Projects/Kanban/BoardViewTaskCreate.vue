@@ -423,7 +423,7 @@
 .priority__component {
     min-width: 22px;
     border-radius: 50%;
-    border: 1px solid #E0E0E0;
+    border: 1px solid var(--border);
     display: flex;
     justify-content: center;
     align-items: center;
