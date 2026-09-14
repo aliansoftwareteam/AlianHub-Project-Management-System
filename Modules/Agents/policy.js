@@ -44,6 +44,9 @@ const decide = ({ agent = {}, action, params = {}, rating = null, run = null, ta
     if (!isComplete(rating)) return refuse(`${key} has no risk rating`);
 
     if (!rating.write) return out(DECISION.ACT, `${key} only reads`);
+    // An empty projectIds grants reads — an L0 "answers only" agent has no other way
+    // to work — but no writes: a write needs a project a person chose on purpose.
+    if (!projects.length) return refuse(`${key} writes, and this agent has no project scope`);
     const autonomy = Number(agent.autonomy) || 0;
     if (autonomy < REVIEW_LEVEL) return out(DECISION.PROPOSE, `autonomy L${autonomy} proposes every write`);
 
