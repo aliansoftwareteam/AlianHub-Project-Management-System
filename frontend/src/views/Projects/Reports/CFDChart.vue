@@ -29,6 +29,8 @@ const rows = ref([]); // [{ date, open, inprogress, onhold, close }]
 const chartRef = ref(null);
 
 // Bottom-to-top stack: Done at the bottom (grows), To-do at the top.
+// The band colours are data series, not theme colours: they stay literal so the
+// four stacked bands never collapse into the same hue.
 const BANDS = [
     { key: 'close', label: 'Done', color: '#3aaa6f' },
     { key: 'onhold', label: 'On hold', color: '#e8a33d' },
@@ -76,8 +78,8 @@ onMounted(load);
 <style scoped>
 .agile-report { padding: 12px; }
 .agile-report__bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-.agile-report__label { font-size: 13px; color: #555; }
-.agile-report__pdf { margin-left: auto; border: 1px solid #2F3990; color: #2F3990; background: #fff; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+.agile-report__label { font-size: 13px; color: var(--ink-2); }
+.agile-report__pdf { margin-left: auto; border: 1px solid var(--brand); color: var(--brand); background: var(--surface); border-radius: var(--r-chip); padding: 6px 14px; font-size: 13px; cursor: pointer; }
 .agile-report__pdf:disabled { opacity: 0.5; cursor: not-allowed; }
-.agile-report__msg { color: #888; font-size: 14px; padding: 40px; text-align: center; }
+.agile-report__msg { color: var(--ink-2); font-size: 14px; padding: 40px; text-align: center; }
 </style>
