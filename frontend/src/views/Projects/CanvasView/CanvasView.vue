@@ -1,5 +1,5 @@
 <template>
-  <div class="cv-view">
+  <div class="cv-view ah-page">
     <div class="cv-view__bar">
       <span class="cv-view__title">Canvas</span>
       <div class="cv-view__chips">
@@ -164,37 +164,37 @@ watch(() => props.sprints, () => ensureTasksLoaded(), { deep: true });
 </script>
 
 <style scoped>
-.cv-view { display: flex; flex-direction: column; width: 100%; height: 100%; background: #f7f8fc; }
-.cv-view__bar { display: flex; align-items: center; gap: 14px; padding: 8px 14px; border-bottom: 1px solid #e6e7ee; background: #fff; flex: 0 0 auto; flex-wrap: wrap; }
-.cv-view__title { font-size: 14px; font-weight: 700; color: #2b2f44; }
+.cv-view { display: flex; flex-direction: column; width: 100%; height: 100%; background: var(--canvas); color: var(--ink); }
+.cv-view__bar { display: flex; align-items: center; gap: 14px; padding: 8px 14px; border-bottom: 1px solid var(--hairline); background: var(--surface); flex: 0 0 auto; flex-wrap: wrap; }
+.cv-view__title { font-size: 14px; font-weight: 700; color: var(--ink); }
 .cv-view__chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.cv-view__chip { border: 1px solid #d8d8e0; background: #fff; color: #777; border-radius: 14px; padding: 3px 11px; font-size: 12px; cursor: pointer; }
-.cv-view__chip.on { background: #eef0ff; border-color: #c7ccf5; color: #2f3a8f; }
+.cv-view__chip { border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); border-radius: 14px; padding: 3px 11px; font-size: 12px; cursor: pointer; }
+.cv-view__chip.on { background: var(--brand-tint); border-color: var(--brand-border); color: var(--brand); }
 .cv-view__board { flex: 1 1 auto; overflow: auto; padding: 16px; }
-.cv-view__empty { text-align: center; color: #999; font-size: 14px; padding: 40px; }
+.cv-view__empty { text-align: center; color: var(--ink-2); font-size: 14px; padding: 40px; }
 .cv-view__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
-.cv-card { background: #fff; border: 1px solid #e6e7ee; border-radius: 12px; padding: 14px 16px; min-height: 120px; }
-.cv-card__head { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: #9aa0b4; margin-bottom: 10px; }
+.cv-card { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); padding: 14px 16px; min-height: 120px; }
+.cv-card__head { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-label); margin-bottom: 10px; }
 .cv-card__big { text-align: center; }
-.cv-card__num { font-size: 36px; font-weight: 700; color: #2b2f44; line-height: 1; }
-.cv-card__num.danger { color: #c0392b; }
-.cv-card__sub { font-size: 12px; color: #6b7280; margin-top: 4px; }
+.cv-card__num { font-size: 36px; font-weight: 700; color: var(--ink); line-height: 1; }
+.cv-card__num.danger { color: var(--danger); }
+.cv-card__sub { font-size: 12px; color: var(--ink-2); margin-top: 4px; }
 .cv-card__rows { display: flex; flex-direction: column; gap: 9px; }
 .cv-row { display: flex; align-items: center; gap: 8px; }
-.cv-row__label { width: 78px; font-size: 12px; color: #555; }
-.cv-row__val { width: 24px; text-align: right; font-size: 12px; color: #333; font-weight: 600; }
-.cv-bar { flex: 1; height: 9px; background: #eef0f6; border-radius: 4px; overflow: hidden; }
-.cv-bar__fill { height: 100%; background: #8a93b5; }
-.cv-bar__fill.is-todo { background: #8a93b5; }
-.cv-bar__fill.is-progress { background: #2f6fed; }
-.cv-bar__fill.is-done { background: #1c9b5e; }
-.cv-bar__fill.is-high { background: #e6593f; }
-.cv-bar__fill.is-med { background: #e2a23b; }
-.cv-bar__fill.is-low { background: #6c9bd2; }
+.cv-row__label { width: 78px; font-size: 12px; color: var(--ink-label); }
+.cv-row__val { width: 24px; text-align: right; font-size: 12px; color: var(--ink); font-weight: 600; }
+.cv-bar { flex: 1; height: 9px; background: var(--track); border-radius: 4px; overflow: hidden; }
+.cv-bar__fill { height: 100%; background: var(--ink-3); }
+.cv-bar__fill.is-todo { background: var(--ink-3); }
+.cv-bar__fill.is-progress { background: var(--warn); }
+.cv-bar__fill.is-done { background: var(--ok); }
+.cv-bar__fill.is-high { background: var(--danger); }
+.cv-bar__fill.is-med { background: var(--warn); }
+.cv-bar__fill.is-low { background: var(--brand); }
 .cv-card__big + .cv-bar, .cv-card__big .cv-bar { margin-top: 10px; }
 .cv-card__list { display: flex; flex-direction: column; gap: 7px; }
-.cv-card__muted { font-size: 12px; color: #9aa0b4; }
+.cv-card__muted { font-size: 12px; color: var(--ink-2); }
 .cv-up { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; }
-.cv-up__name { color: #33384a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cv-up__date { color: #9aa0b4; white-space: nowrap; }
+.cv-up__name { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-up__date { color: var(--ink-2); white-space: nowrap; }
 </style>

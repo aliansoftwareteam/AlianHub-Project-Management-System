@@ -1,5 +1,5 @@
 <template>
-  <div class="tl-view">
+  <div class="tl-view ah-page">
     <div class="tl-view__bar">
       <span class="tl-view__title">Timeline</span>
       <span class="tl-view__count">
@@ -140,29 +140,32 @@ watch(() => props.sprints, () => ensureTasksLoaded(), { deep: true });
 </script>
 
 <style scoped>
-.tl-view { display: flex; flex-direction: column; width: 100%; height: 100%; background: #fff; }
-.tl-view__bar { display: flex; align-items: center; gap: 14px; padding: 8px 14px; border-bottom: 1px solid #eee; flex: 0 0 auto; }
-.tl-view__title { font-size: 14px; font-weight: 700; color: #2b2f44; }
-.tl-view__count { margin-left: auto; font-size: 12px; color: #888; }
+.tl-view { display: flex; flex-direction: column; width: 100%; height: 100%; background: var(--surface); color: var(--ink); }
+.tl-view__bar { display: flex; align-items: center; gap: 14px; padding: 8px 14px; border-bottom: 1px solid var(--hairline); flex: 0 0 auto; }
+.tl-view__title { font-size: 14px; font-weight: 700; color: var(--ink); }
+.tl-view__count { margin-left: auto; font-size: 12px; color: var(--ink-2); }
 .tl-view__main { position: relative; flex: 1 1 auto; display: flex; min-height: 360px; overflow: hidden; }
 .tl-view__chart { flex: 1 1 auto; overflow: auto; padding-bottom: 12px; }
-.tl-view__empty { position: absolute; top: 48px; left: 0; right: 0; text-align: center; color: #999; font-size: 14px; padding: 20px; }
-.tl-view__axis { display: flex; position: sticky; top: 0; background: #fafbff; border-bottom: 1px solid #eee; z-index: 1; }
+.tl-view__empty { position: absolute; top: 48px; left: 0; right: 0; text-align: center; color: var(--ink-2); font-size: 14px; padding: 20px; }
+.tl-view__axis { display: flex; position: sticky; top: 0; background: var(--surface-2); border-bottom: 1px solid var(--hairline); z-index: 1; }
 .tl-view__axis-label { width: 240px; flex: 0 0 240px; }
 .tl-view__axis-track { position: relative; flex: 1 1 auto; height: 26px; }
-.tl-view__tick { position: absolute; top: 5px; font-size: 11px; color: #9aa0b4; transform: translateX(-50%); white-space: nowrap; }
-.tl-view__tick::before { content: ''; position: absolute; top: -5px; left: 50%; width: 1px; height: 100%; background: #eef0f6; }
-.tl-view__row { display: flex; align-items: center; border-bottom: 1px solid #f4f4f8; }
-.tl-view__row-label { width: 240px; flex: 0 0 240px; padding: 7px 12px; font-size: 13px; color: #3a3f52; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tl-view__key { color: #7b68ee; font-weight: 600; margin-right: 6px; }
+.tl-view__tick { position: absolute; top: 5px; font-size: 11px; color: var(--ink-2); transform: translateX(-50%); white-space: nowrap; }
+.tl-view__tick::before { content: ''; position: absolute; top: -5px; left: 50%; width: 1px; height: 100%; background: var(--hairline); }
+.tl-view__row { display: flex; align-items: center; border-bottom: 1px solid var(--hairline); }
+.tl-view__row-label { width: 240px; flex: 0 0 240px; padding: 7px 12px; font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-view__key { color: var(--brand); font-weight: 600; margin-right: 6px; }
 .tl-view__row-track { position: relative; flex: 1 1 auto; height: 34px; }
-.tl-view__barseg { position: absolute; top: 7px; height: 20px; border-radius: 5px; display: flex; align-items: center; padding: 0 8px; overflow: hidden; min-width: 6px; }
-.tl-view__barseg-text { font-size: 11px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tl-view__barseg.is-todo { background: #8a93b5; }
-.tl-view__barseg.is-progress { background: #2f6fed; }
-.tl-view__barseg.is-done { background: #1c9b5e; }
-.tl-view__tray { width: 210px; flex: 0 0 auto; border-left: 1px solid #eee; padding: 10px; overflow: auto; background: #fafafe; }
-.tl-view__tray-title { font-size: 12px; text-transform: uppercase; color: #999; margin: 0 0 8px; letter-spacing: .04em; }
+.tl-view__barseg { position: absolute; top: 7px; height: 20px; border-radius: var(--r-chip); display: flex; align-items: center; padding: 0 8px; overflow: hidden; min-width: 6px; }
+/* The bar fills stay mid-tone in both themes, so this label wants dark ink in both;
+   --ink and --surface each flip and drop under 3:1 on one side. --rail is the only
+   token that is dark in both. */
+.tl-view__barseg-text { font-size: 11px; color: var(--rail); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-view__barseg.is-todo { background: var(--ink-3); }
+.tl-view__barseg.is-progress { background: var(--warn); }
+.tl-view__barseg.is-done { background: var(--ok); }
+.tl-view__tray { width: 210px; flex: 0 0 auto; border-left: 1px solid var(--hairline); padding: 10px; overflow: auto; background: var(--surface-2); }
+.tl-view__tray-title { font-size: 12px; text-transform: uppercase; color: var(--ink-label); margin: 0 0 8px; letter-spacing: .04em; }
 .tl-view__tray-list { list-style: none; margin: 0; padding: 0; }
-.tl-view__tray-item { padding: 6px 0; border-bottom: 1px dashed #eee; font-size: 13px; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-view__tray-item { padding: 6px 0; border-bottom: 1px dashed var(--hairline); font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
