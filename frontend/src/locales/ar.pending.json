@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-14T11:03:13.068Z",
+  "updatedAt": "2026-09-14T12:49:02.130Z",
   "keys": {
     "Scrum.stranded_head": "These {count} will stay in this sprint",
     "Scrum.stranded_hint": "They are unfinished, but their parent task is done — and a subtask moves with its parent. Finish them, or reopen the parent task, before completing the sprint.",
@@ -7990,6 +7990,13 @@
     "Ai.skill_grounded_numbers": "Gathered counts, e.g. gather.plan.counts",
     "Ai.skill_grounded_fields": "Answer fields to check, comma separated",
     "Ai.skill_grounded_must_name_key": "Answer lists that must name a gathered task",
-    "Ai.skill_grounded_allow_hours": "Hour windows the skill itself names, e.g. 24, 48"
+    "Ai.skill_grounded_allow_hours": "Hour windows the skill itself names, e.g. 24, 48",
+    "Ai.nav_home": "Home",
+    "Ai.nav_analytics": "Analytics",
+    "Ai.group_setup": "Setup",
+    "Ai.soon_flag": "Coming next",
+    "Ai.soon_meanwhile": "What works today",
+    "Ai.soon_home": "This becomes the way into AI: one place to ask a question, start an agent and pick up a run that is waiting on you. It is being built now — nothing on this screen is wired yet.",
+    "Ai.soon_analytics": "This will report what the AI actually did — work completed, time saved and what it cost — rather than run counts and error rates. It is being built now; until then Health carries the system numbers."
   }
 }
