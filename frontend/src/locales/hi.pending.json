@@ -1,7 +1,7 @@
 {
   "locale": "hi",
   "machineTranslated": false,
-  "updatedAt": "2026-09-13T20:53:02.779Z",
+  "updatedAt": "2026-09-14T03:42:26.465Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5771,6 +5771,7 @@
     "ViewListTag.RecurringTasks": "Schedule",
     "ViewListTag.Reports": "Report",
     "ViewListTag.Embed": "Embed",
-    "ViewListTag.ProjectDetail": "Details"
+    "ViewListTag.ProjectDetail": "Details",
+    "Projects.view_options": "Options for the {view} view"
   }
 }

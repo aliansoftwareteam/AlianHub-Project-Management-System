@@ -3892,6 +3892,7 @@ export default {
         "prev_month": "Previous month",
         "next_month": "Next month",
         "this_month": "This month",
+        "view_options": "Options for the {view} view",
         "search_views": "Search or describe a view to create",
         "no_views_match": "No view matches that search.",
         "private_view": "Private view"

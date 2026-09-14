@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-13T20:53:02.618Z",
+  "updatedAt": "2026-09-14T03:42:26.290Z",
   "keys": {
     "Scrum.stranded_head": "These {count} will stay in this sprint",
     "Scrum.stranded_hint": "They are unfinished, but their parent task is done — and a subtask moves with its parent. Finish them, or reopen the parent task, before completing the sprint.",
@@ -7912,6 +7912,7 @@
     "ViewListTag.RecurringTasks": "Schedule",
     "ViewListTag.Reports": "Report",
     "ViewListTag.Embed": "Embed",
-    "ViewListTag.ProjectDetail": "Details"
+    "ViewListTag.ProjectDetail": "Details",
+    "Projects.view_options": "Options for the {view} view"
   }
 }

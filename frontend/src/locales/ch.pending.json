@@ -1,7 +1,7 @@
 {
   "locale": "ch",
   "machineTranslated": false,
-  "updatedAt": "2026-09-13T20:53:02.646Z",
+  "updatedAt": "2026-09-14T03:42:26.320Z",
   "keys": {
     "errorPage.card_name": "card name",
     "Auth.welcome_back": "Welcome back",
@@ -5770,6 +5770,7 @@
     "ViewListTag.RecurringTasks": "Schedule",
     "ViewListTag.Reports": "Report",
     "ViewListTag.Embed": "Embed",
-    "ViewListTag.ProjectDetail": "Details"
+    "ViewListTag.ProjectDetail": "Details",
+    "Projects.view_options": "Options for the {view} view"
   }
 }
