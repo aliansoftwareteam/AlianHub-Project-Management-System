@@ -80,7 +80,7 @@ const READERS = Object.freeze({
                    { TaskKey: 1, TaskName: 1, status: 1, statusType: 1, DueDate: 1, AssigneeUserId: 1, updatedAt: 1, sprintArray: 1 },
                    { limit: 400, sort: { DueDate: 1 } }],
         }, 'find')) || [];
-        if (!tasks.length) return { skip: 'the project has no tasks yet' };
+        if (!tasks.length && params.requireTasks) return { skip: 'the project has no tasks yet' };
         const now = Date.now();
         const open = tasks.filter((t) => !isDone(t));
         const statusIs = (re) => (t) => re.test(String((t.status && t.status.text) || ''));
@@ -100,7 +100,7 @@ const READERS = Object.freeze({
             done: tasks.length - open.length,
             ...Object.fromEntries(Object.entries(buckets).map(([name, items]) => [name, items.length])),
         };
-        const shown = [listed, ...Object.values(buckets)].flat();
+        const singledOut = Object.values(buckets).flat();
         return {
             ...counted,
             list: listed.map((t) => `- ${row(t)}`).join('\n'),
@@ -111,7 +111,7 @@ const READERS = Object.freeze({
             unassignedList: rows(buckets.unassigned),
             plan: planRows(tasks, params.rowsPerBucket),
             next: nextOpen(open),
-            keys: [...new Set(shown.map((t) => String(t.TaskKey || '')).filter(Boolean))],
+            keys: [...new Set(singledOut.map((t) => String(t.TaskKey || '')).filter(Boolean))],
             counts: Object.values(counted).map(String),
         };
     },

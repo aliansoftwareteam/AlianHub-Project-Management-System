@@ -100,6 +100,7 @@ const READER_CATALOGUE = Object.freeze({
             limit: Object.freeze({ type: 'number', min: 1, max: 200, default: 50 }),
             openOnly: Object.freeze({ type: 'boolean', default: false }),
             rowsPerBucket: Object.freeze({ type: 'number', min: 1, max: 50, default: 10 }),
+            requireTasks: Object.freeze({ type: 'boolean', default: true }),
         }),
         fields: Object.freeze([
             'count', 'open', 'done', 'overdue', 'dueSoon', 'blocked', 'inReview', 'unassigned', 'moved',

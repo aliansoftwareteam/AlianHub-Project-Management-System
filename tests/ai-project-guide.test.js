@@ -30,7 +30,7 @@ describe('the guide has no fixed stage list', () => {
     });
 
     it('no code path carries a stage list either', () => {
-        ['Modules/AIProjectGenerator/guideController.js', 'Modules/AIProjectGenerator/executeAgents.js', 'Modules/Agents/skills/projectGuide.js'].forEach((rel) => {
+        ['Modules/AIProjectGenerator/guideController.js', 'Modules/AIProjectGenerator/executeAgents.js', 'Modules/Agents/skills/seeds/projectGuide.js'].forEach((rel) => {
             const src = read(rel);
             expect(src).not.toMatch(TEMPLATE_STAGES);
             expect(src).not.toMatch(/stages\s*:\s*\[\s*['"{]/);
@@ -117,7 +117,7 @@ describe('skill project.guide', () => {
     it('is registered as a generic skill that may only read, comment and create subtasks', () => {
         expect(skill).toBeTruthy();
         expect(skill.kind).toBe('generic');
-        expect(skill.scopes).toEqual(['task.read', 'task.comment', 'task.subtask.create']);
+        expect(skill.emits).toEqual(['subtask.create', 'task.comment']);
     });
 
     it('reads the stored guide and the plan of the task\'s project, and nothing from another project', async () => {
@@ -128,12 +128,12 @@ describe('skill project.guide', () => {
         mockDb.seed(SCHEMA_TYPE.TASKS, { ProjectID: P2, TaskKey: 'OT-1', TaskName: 'Elsewhere', statusType: 'active', isParentTask: true });
         const context = await skill.gather({ task: task(), companyId: C });
         expect(context.skip).toBeUndefined();
-        expect(context.guide).toContain('Catalogue');
-        expect(context.guide).not.toContain('SECRET');
-        expect(context.plan).toContain('BS-1 List the bikes');
-        expect(context.plan).toContain('Week 1: 1 open, 1 done');
-        expect(context.plan).not.toContain('OT-1');
-        expect(context.fallback.nextStep).toBe('Start with BS-1 List the bikes');
+        expect(context.gather.project.guide).toContain('Catalogue');
+        expect(context.gather.project.guide).not.toContain('SECRET');
+        expect(context.gather.plan.plan).toContain('BS-1 List the bikes');
+        expect(context.gather.plan.plan).toContain('Week 1: 1 open, 1 done');
+        expect(context.gather.plan.plan).not.toContain('OT-1');
+        expect(context.fallback).toContain('Start with BS-1 List the bikes');
         mockDb.calls.forEach((c) => {
             expect(c.companyId).toBe(C);
             if (c.type === SCHEMA_TYPE.TASKS) expect(c.data[0].ProjectID).toBe(P1);
@@ -150,8 +150,8 @@ describe('skill project.guide', () => {
         const run = mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { projectId: P1, status: 'done', finishedAt: new Date('2026-09-09T10:00:00.000Z') });
         await memory.recordEpisode({ companyId: C, projectId: P1, runId: run._id, patch: { skill: 'project.guide', taskTitle: 'Set up CI', proposed: 3, approved: 2, at: '2026-09-09T10:00:00.000Z' } });
         const context = await skill.gather({ task: task(), companyId: C });
-        expect(context.memory).toContain('- Budget is fixed at $12k. (from the approved brief)');
-        expect(context.memory).toContain('- 2026-09-09 project.guide on "Set up CI": proposed 3, approved 2');
+        expect(context.gather.memory.text).toContain('- Budget is fixed at $12k. (from the approved brief)');
+        expect(context.gather.memory.text).toContain('- 2026-09-09 project.guide on "Set up CI": proposed 3, approved 2');
         const prompt = skill.buildUserPrompt({ task: task(), context });
         expect(prompt.indexOf('GUIDE:')).toBeLessThan(prompt.indexOf('MEMORY:'));
         expect(prompt.indexOf('MEMORY:')).toBeLessThan(prompt.indexOf('PLAN:'));
@@ -167,16 +167,18 @@ describe('skill project.guide', () => {
 
     it('turns the answer into one comment plus at most three proposed subtasks', () => {
         const raw = { nextStep: 'Wire the payment account first.', why: 'Every order needs it.', proposedTasks: [{ title: 'Create the payment account', why: 'Needed', hours: 2 }, { title: 'Add the webhook', hours: 3 }, { title: 'Test a payment', hours: 1 }, { title: 'Too many' }], flags: ['No launch date in the brief'] };
-        const { summary, changes } = skill.toChanges({ task: task(), raw, context: { fallback: {} } });
+        const { summary, changes } = skill.toChanges({ task: task(), raw, context: {} });
         expect(summary).toBe('Wire the payment account first.');
-        expect(changes.map((c) => c.action)).toEqual(['task.comment', 'subtask.create', 'subtask.create', 'subtask.create']);
-        expect(changes[0].params.body).toContain('Next step: Wire the payment account first.');
-        expect(changes[0].params.body).toContain('• No launch date in the brief');
-        expect(changes[1].params).toMatchObject({ taskId: '6f0000000000000000000901', title: 'Create the payment account' });
+        expect(changes.map((c) => c.action)).toEqual(['subtask.create', 'subtask.create', 'subtask.create', 'task.comment']);
+        const comment = changes[changes.length - 1];
+        expect(comment.params.body).toContain('Next step: Wire the payment account first.');
+        expect(comment.params.body).toContain('• No launch date in the brief');
+        expect(comment.params.body).toContain('Proposed 3 follow-up task(s).');
+        expect(changes[0].params).toMatchObject({ taskId: '6f0000000000000000000901', title: 'Create the payment account' });
     });
 
     it('answers from the deterministic fallback when the model gave nothing', () => {
-        const context = { fallback: { nextStep: 'Start with BS-1 List the bikes', why: 'It is the earliest open task in the plan.', proposedTasks: [], flags: [] } };
+        const context = { fallback: 'Start with BS-1 List the bikes. It is the earliest open task in the plan.' };
         const { changes } = skill.toChanges({ task: task(), raw: null, context });
         expect(changes).toHaveLength(1);
         expect(changes[0].params.body).toContain('Start with BS-1 List the bikes');

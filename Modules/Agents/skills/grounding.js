@@ -17,33 +17,41 @@ const setOf = (path, ctx) => {
 };
 
 const keysIn = (value) => text(value).match(KEY_RE) || [];
-const numbersIn = (value) => text(value).replace(KEY_RE, ' ').match(NUMBER_RE) || [];
+
+/* The windows the skill's own wording introduces ("in the last 24h") are not
+ * claims about the board; the same number anywhere else still is. */
+const windowRe = (hours) => (hours.length ? new RegExp(`\\b(?:${hours.join('|')})\\s*(?:h|hrs?|hours?)\\b`, 'gi') : null);
+
+const numbersIn = (value, windows) => {
+    const stripped = text(value).replace(KEY_RE, ' ');
+    return (windows ? stripped.replace(windows, ' ') : stripped).match(NUMBER_RE) || [];
+};
 
 /* What is wrong with one sentence or list item, or null when every key and
  * number in it was gathered. */
-const faultIn = (value, known, counts) => {
+const faultIn = (value, known, counts, windows = null) => {
     const badKey = keysIn(value).find((k) => !known.has(k.toUpperCase()));
     if (badKey) return `mentions ${badKey}, which is not in the data`;
-    const badNumber = numbersIn(value).find((n) => !counts.has(n));
+    const badNumber = numbersIn(value, windows).find((n) => !counts.has(n));
     if (badNumber) return `mentions ${badNumber}, which is not one of the counts`;
     return null;
 };
 
-const groundString = (value, known, counts, dropped) => {
+const groundString = (value, known, counts, dropped, windows) => {
     const kept = text(value).split(SENTENCE_RE).filter((s) => s.trim()).filter((sentence) => {
-        const fault = faultIn(sentence, known, counts);
+        const fault = faultIn(sentence, known, counts, windows);
         if (fault) dropped.push({ reason: fault, text: sentence.trim() });
         return !fault;
     });
     return kept.join(' ') || null;
 };
 
-const groundList = (value, known, counts, dropped, mustNameKey) => (Array.isArray(value) ? value : []).filter((item) => {
+const groundList = (value, known, counts, dropped, mustNameKey, windows) => (Array.isArray(value) ? value : []).filter((item) => {
     if (mustNameKey && !keysIn(item).some((k) => known.has(k.toUpperCase()))) {
         dropped.push({ reason: 'it names no task from the data', text: text(item) });
         return false;
     }
-    const fault = faultIn(item, known, counts);
+    const fault = faultIn(item, known, counts, windows);
     if (fault) dropped.push({ reason: fault, text: text(item) });
     return !fault;
 });
@@ -53,18 +61,19 @@ const groundList = (value, known, counts, dropped, mustNameKey) => (Array.isArra
 const ground = (spec, raw, ctx) => {
     if (!raw || typeof raw !== 'object' || !spec) return { raw, dropped: [] };
     const known = setOf(spec.keys, ctx);
-    const counts = new Set([...setOf(spec.numbers, ctx), ...(spec.allow || []).map(String)]);
+    const counts = setOf(spec.numbers, ctx);
+    const windows = windowRe((spec.allowHours || []).map(String));
     const dropped = [];
     const out = { ...raw };
     (spec.fields || []).forEach((field) => {
         if (out[field] === undefined || out[field] === null) return;
         out[field] = Array.isArray(out[field])
-            ? groundList(out[field], known, counts, dropped, false)
-            : groundString(out[field], known, counts, dropped);
+            ? groundList(out[field], known, counts, dropped, false, windows)
+            : groundString(out[field], known, counts, dropped, windows);
     });
     (spec.mustNameKey || []).forEach((field) => {
         if (out[field] === undefined || out[field] === null) return;
-        out[field] = groundList(out[field], known, counts, dropped, true);
+        out[field] = groundList(out[field], known, counts, dropped, true, windows);
     });
     return { raw: out, dropped: dropped.slice(0, MAX_DROPPED) };
 };

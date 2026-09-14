@@ -68,12 +68,14 @@ describe('digest.ceo (Reporter)', () => {
         { TaskKey: 'AR-2', TaskName: 'Stuck', statusType: 'active', status: { text: 'On Hold' }, AssigneeUserId: ['u'] },
         { TaskKey: 'AR-3', TaskName: 'Shipped', statusType: 'close', status: { text: 'Complete' } },
     ];
-    it('buckets the board from ground truth', () => {
-        const b = skill.buckets(rows, now);
-        expect(b.total).toBe(2); expect(b.done).toBe(1);
-        expect(b.overdue.map((t) => t.TaskKey)).toEqual(['AR-1']);
-        expect(b.blocked.map((t) => t.TaskKey)).toEqual(['AR-2']);
-        expect(b.unassigned.map((t) => t.TaskKey)).toEqual(['AR-1']);
+    it('buckets the board from ground truth', async () => {
+        MongoDbCrudOpration.mockResolvedValueOnce(rows);
+        const { gather } = await skill.gather({ task, companyId: 'c1' });
+        expect(gather.plan.open).toBe(2); expect(gather.plan.done).toBe(1);
+        expect(gather.plan.overdueList).toContain('AR-1 Late');
+        expect(gather.plan.blockedList).toContain('AR-2 Stuck');
+        expect(gather.plan.unassignedList).toContain('AR-1 Late');
+        expect(gather.plan.keys.sort()).toEqual(['AR-1', 'AR-2']);
     });
     it('still produces a digest when the model is unavailable', async () => {
         MongoDbCrudOpration.mockResolvedValueOnce(rows);
@@ -93,13 +95,19 @@ describe('digest.ceo (Reporter)', () => {
 
 describe('project.guide (Guide)', () => {
     const skill = getSkill('project.guide');
-    const context = { projectName: 'Bike shop', guide: '## Stages\n1. **Catalogue in place**', plan: 'Week 1: 1 open, 0 done', title: 'Set up payments', brief: '', fallback: {} };
-    it('renders a MEMORY block between the guide and the plan only when gather found one', () => {
-        const prompt = skill.buildUserPrompt({ task, context: { ...context, memory: '### Workspace memory (DATA)\nProject decisions and constraints:\n- Budget is fixed at $12k. (from the approved brief)' } });
+    const project = { ProjectName: 'Bike shop', aiGuide: { markdown: '## Stages\n1. **Catalogue in place**' } };
+    const rows = [{ TaskKey: 'BS-1', TaskName: 'Catalogue', statusType: 'active', sprintArray: { name: 'Week 1' } }];
+    const inProject = { ...task, ProjectID: '6aa5435985eec7393809d9cb' };
+    const gatherWith = async (memory) => {
+        MongoDbCrudOpration.mockResolvedValueOnce(project).mockResolvedValueOnce(rows);
+        return skill.gather({ task: inProject, companyId: 'c1', memory });
+    };
+    it('renders a MEMORY block between the guide and the plan only when gather found one', async () => {
+        const prompt = skill.buildUserPrompt({ task: inProject, context: await gatherWith('### Workspace memory (DATA)\nProject decisions and constraints:\n- Budget is fixed at $12k. (from the approved brief)') });
         expect(prompt.indexOf('GUIDE:')).toBeLessThan(prompt.indexOf('MEMORY:'));
         expect(prompt.indexOf('MEMORY:')).toBeLessThan(prompt.indexOf('PLAN:'));
         expect(prompt).toContain('- Budget is fixed at $12k. (from the approved brief)');
-        expect(skill.buildUserPrompt({ task, context })).not.toContain('MEMORY:');
+        expect(skill.buildUserPrompt({ task: inProject, context: await gatherWith('') })).not.toContain('MEMORY:');
     });
 });
 
@@ -109,13 +117,14 @@ describe('grounding — what the model was not given is dropped', () => {
         { TaskKey: 'AR-1', TaskName: 'Late', statusType: 'active', status: { text: 'In Progress' }, DueDate: '2026-09-01', AssigneeUserId: [] },
         { TaskKey: 'AR-2', TaskName: 'Stuck', statusType: 'active', status: { text: 'On Hold' }, AssigneeUserId: ['u'] },
     ];
-    it('drops a digest sentence that invents a number or a task key, keeps the rest', () => {
-        const context = { buckets: digest.buckets(rows, Date.parse('2026-09-04T12:00:00Z')) };
+    it('drops a digest sentence that invents a number or a task key, keeps the rest', async () => {
+        MongoDbCrudOpration.mockResolvedValueOnce(rows);
+        const context = await digest.gather({ task, companyId: 'c1' });
         const raw = { digest: 'There are 2 open tasks moved in the last 24 hours. AR-1 is overdue. AR-17 has been in review for 24 days. Nothing else moved.', lookFirst: ['AR-1 — overdue', 'AR-99 — invented', 'AR-2 — blocked for 24 days'] };
         const { raw: cleaned, dropped } = digest.verify({ raw, context });
         expect(cleaned.digest).toBe('There are 2 open tasks moved in the last 24 hours. AR-1 is overdue. Nothing else moved.');
         expect(cleaned.lookFirst).toEqual(['AR-1 — overdue']);
-        expect(dropped.map((d) => d.reason)).toEqual(['mentions AR-17, which is not in the data', 'look-first item names a task not in the data', 'look-first item claims "24", which is not in the data']);
+        expect(dropped.map((d) => d.reason)).toEqual(['mentions AR-17, which is not in the data', 'it names no task from the data', 'mentions 24, which is not one of the counts']);
     });
     it('drops a PR risk that cites a file the diff never touched', () => {
         const pr = getSkill('pr.summary');

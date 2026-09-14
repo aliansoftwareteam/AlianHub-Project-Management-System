@@ -221,13 +221,12 @@ const validateGrounded = (input, declared, errors) => {
     const mustNameKey = answerFields(spec.mustNameKey, 'grounded.mustNameKey', errors);
     if (!fields.length && !mustNameKey.length) errors.push(error('grounded.fields', 'required', 'name at least one answer field to hold to the data'));
     if (!keys && !numbers) errors.push(error('grounded.keys', 'required', 'name the gathered keys or counts the answer is checked against'));
-    let allow = [];
-    if (spec.allow !== undefined) {
-        if (!Array.isArray(spec.allow)) errors.push(error('grounded.allow', 'invalid', 'must be a list of numbers'));
-        else if (spec.allow.some((n) => !Number.isFinite(Number(n)))) errors.push(error('grounded.allow', 'invalid', 'must be a list of numbers'));
-        else allow = spec.allow.slice(0, MAX_GROUNDED_FIELDS).map(Number);
+    let allowHours = [];
+    if (spec.allowHours !== undefined) {
+        if (!Array.isArray(spec.allowHours) || spec.allowHours.some((n) => !Number.isInteger(Number(n)) || Number(n) < 1)) errors.push(error('grounded.allowHours', 'invalid', 'must be a list of whole hour windows the skill itself names'));
+        else allowHours = spec.allowHours.slice(0, MAX_GROUNDED_FIELDS).map(Number);
     }
-    return { ...(keys ? { keys } : {}), ...(numbers ? { numbers } : {}), fields, mustNameKey, allow };
+    return { ...(keys ? { keys } : {}), ...(numbers ? { numbers } : {}), fields, mustNameKey, allowHours };
 };
 
 const validateSkill = (input = {}) => {
