@@ -119,6 +119,17 @@ describe('POST /api/v2/agents/skills/:key/dry-run', () => {
         expect(r.body.status).toBe(false);
     });
 
+    it('gathers a page-audit skill without building the prompt it cannot render yet', async () => {
+        mockDb.seed(SCHEMA_TYPE.TASKS, task({ TaskName: 'Audit https://example.com/checkout for contrast' }));
+
+        const r = await call(skillsCtrl.dryRunSkill, req({ taskId: TASK_ID }, { params: { key: 'qa-review' } }));
+
+        expect(r.body.status).toBe(true);
+        expect(r.body.data.ran).toBe(true);
+        expect(r.body.data.prompt).toBe(null);
+        expect(r.body.data.gathered).toMatchObject({ url: 'https://example.com/checkout' });
+    });
+
     it('dry-runs a built-in code skill too, so the library is one list', async () => {
         mockDb.seed(SCHEMA_TYPE.TASKS, task());
 

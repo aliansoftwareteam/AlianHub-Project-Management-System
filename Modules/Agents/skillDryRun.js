@@ -87,7 +87,9 @@ const dryRun = async (companyId, key, { taskId, agentId, uid } = {}) => {
     }
 
     const context = gathered.context || {};
-    const prompt = typeof skill.buildUserPrompt === 'function'
+    // The page audit builds its prompt from a fetched page, which a dry run does
+    // not perform; only a generic skill can be asked what it would send.
+    const prompt = skill.kind === 'generic' && typeof skill.buildUserPrompt === 'function'
         ? { system: String(skill.systemPrompt || '').slice(0, MAX_PROMPT), user: String(skill.buildUserPrompt({ task, context }) || '').slice(0, MAX_PROMPT), maxTokens: skill.maxTokens || null }
         : null;
 
