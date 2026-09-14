@@ -32,6 +32,7 @@ exports.init = (app) => {
     app.get('/api/v2/agents/skills/catalogues', skillsCtrl.getCatalogues);
     app.get('/api/v2/agents/skills', skillsCtrl.listSkills);
     app.post('/api/v2/agents/skills', skillsCtrl.createSkill);
+    app.post('/api/v2/agents/skills/:key/dry-run', skillsCtrl.dryRunSkill);
     app.get('/api/v2/agents/skills/:key', skillsCtrl.getSkill);
     app.put('/api/v2/agents/skills/:key', skillsCtrl.updateSkill);
     app.delete('/api/v2/agents/skills/:key', skillsCtrl.retireSkill);

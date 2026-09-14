@@ -24,6 +24,7 @@ const counts = ref({});
 const runSummary = ref({});
 const spend = ref({});
 const registryManifest = ref({ actions: [], never: [] });
+const skillManifest = ref([]);
 const loading = ref(false);
 const lastError = ref("");
 const activeRuns = ref({});
@@ -131,6 +132,22 @@ export function useAgents() {
         if (ok(res)) registryManifest.value = res.data.data || { actions: [], never: [] };
     };
 
+    const loadSkills = async ({ includeRetired = false } = {}) => {
+        const res = await apiRequest("get", `${env.AGENT_SKILLS}${includeRetired ? "?retired=true" : ""}`);
+        if (ok(res)) skillManifest.value = res.data.data || [];
+        return skillManifest.value;
+    };
+
+    const loadCatalogues = async () => (await request("get", env.AGENT_SKILL_CATALOGUES, undefined, "Ai.load_failed")).data;
+
+    const createSkill = async (body) => (await request("post", env.AGENT_SKILLS, body, "Ai.skill_save_failed")).data;
+
+    const updateSkill = async (key, body) => (await request("put", `${env.AGENT_SKILLS}/${encodeURIComponent(key)}`, body, "Ai.skill_save_failed")).data;
+
+    const retireSkill = async (key) => (await request("delete", `${env.AGENT_SKILLS}/${encodeURIComponent(key)}`, {}, "Ai.skill_retire_failed")).data;
+
+    const dryRunSkill = async (key, body) => (await request("post", `${env.AGENT_SKILLS}/${encodeURIComponent(key)}/dry-run`, body, "Ai.skill_dry_run_failed")).data;
+
     const loadAll = async () => {
         loading.value = true;
         lastError.value = "";
@@ -210,9 +227,10 @@ export function useAgents() {
     const rollbackRevision = async (agentId, n) => (await request("post", `${env.AGENTS}/${agentId}/revisions/${n}/rollback`, {}, "Ai.revision_rollback_failed")).data;
 
     return {
-        agents, proposals, counts, runSummary, spend, registryManifest, loading, lastError,
+        agents, proposals, counts, runSummary, spend, registryManifest, skillManifest, loading, lastError,
         running, waiting, AUTONOMY,
         loadAll, loadAgents, loadProposals, loadSummary, loadSpend, loadRegistry,
+        loadSkills, loadCatalogues, createSkill, updateSkill, retireSkill, dryRunSkill,
         decide, setPaused, pauseAll, runNow, saveAgent, deleteAgent, activeRuns, loadActiveRuns, stopActive,
         loadRun, revertRun, loadRunReplay, loadRevisions, promoteRevision, rollbackRevision
     };

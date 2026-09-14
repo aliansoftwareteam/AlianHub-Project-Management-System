@@ -2,12 +2,13 @@ const { tenantOf } = require('../../Config/tenant');
 const logger = require('../../Config/loggerConfig');
 const { callerOf, canManageAgents } = require('./access');
 const skillRecord = require('./skillRecord');
+const skillDryRun = require('./skillDryRun');
 
 const fail = (res, message, code, extra) => res.status(code || 400).send({ status: false, statusText: message, message, ...(extra || {}) });
 
 const failWith = (res, e) => {
     if (e && e.errors) return fail(res, e.message, 400, { data: { errors: e.errors } });
-    if (e && e.statusCode === 403) return fail(res, e.message, 403);
+    if (e && (e.statusCode === 403 || e.statusCode === 404)) return fail(res, e.message, e.statusCode);
     logger.error(`agent skills: ${e && e.message}`);
     return fail(res, (e && e.message) || 'Something went wrong.', 500);
 };
@@ -71,6 +72,19 @@ exports.updateSkill = async (req, res) => {
         const saved = await skillRecord.updateSkill(companyId, req.params.key, req.body || {});
         if (!saved) return fail(res, 'Skill not found.', 404);
         return res.send({ status: true, statusText: 'Skill updated.', data: saved });
+    } catch (e) { return failWith(res, e); }
+};
+
+/* POST /api/v2/agents/skills/:key/dry-run — what this skill would read, ask and
+ * change on one task. No model call, no write. */
+exports.dryRunSkill = async (req, res) => {
+    try {
+        const companyId = tenantOf(req);
+        const actor = await privilegedHuman(req, companyId);
+        if (!actor) return fail(res, 'Owner/admin only.', 403);
+        const body = req.body || {};
+        const data = await skillDryRun.dryRun(companyId, req.params.key, { taskId: body.taskId, agentId: body.agentId, uid: actor.userId });
+        return res.send({ status: true, statusText: 'Dry run complete.', data });
     } catch (e) { return failWith(res, e); }
 };
 

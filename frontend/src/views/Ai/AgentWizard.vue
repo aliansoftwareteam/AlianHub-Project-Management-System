@@ -89,7 +89,7 @@ import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useAgents, NEW_AGENT_DEFAULTS } from "./useAgents";
 import { AGENT_TEMPLATES } from "./agentTemplates";
-import { requirementsOf } from "./skillInputs";
+import { requirementsOf, indexSkills } from "./skillInputs";
 
 defineOptions({ name: "AgentWizard" });
 
@@ -97,12 +97,13 @@ const props = defineProps({ template: { type: Object, default: null } });
 const emit = defineEmits(["close", "created"]);
 
 const { t } = useI18n();
-const { registryManifest, loadRegistry, saveAgent } = useAgents();
+const { registryManifest, loadRegistry, saveAgent, skillManifest, loadSkills } = useAgents();
 
 const step = ref(1);
 const chosenSlug = ref("");
+const skillIndex = computed(() => indexSkills(skillManifest.value));
 const effectiveTemplate = computed(() => props.template || AGENT_TEMPLATES.find((t) => t.slug === chosenSlug.value) || null);
-const requirements = computed(() => (effectiveTemplate.value ? requirementsOf({ skills: effectiveTemplate.value.skills }) : []));
+const requirements = computed(() => (effectiveTemplate.value ? requirementsOf({ skills: effectiveTemplate.value.skills }, skillIndex.value) : []));
 const busy = ref(false);
 const nameField = ref(null);
 const errors = reactive({ name: "", form: "" });
@@ -147,7 +148,7 @@ const create = async () => {
 };
 
 onMounted(async () => {
-    await loadRegistry();
+    await Promise.all([loadRegistry(), loadSkills().catch(() => [])]);
     await nextTick();
     nameField.value?.focus();
 });
