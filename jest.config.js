@@ -1,7 +1,10 @@
 const base = {
     testEnvironment: 'node',
     rootDir: __dirname,
-    testPathIgnorePatterns: ['/node_modules/', '<rootDir>/frontend/', '<rootDir>/time-tracker-app/', '<rootDir>/.claude/']
+    testPathIgnorePatterns: ['/node_modules/', '<rootDir>/frontend/', '<rootDir>/time-tracker-app/', '<rootDir>/.claude/'],
+    // The picker under frontend/src/views/Ai reads the same work-kind and input
+    // vocabulary the server runs; webpack and vitest alias it the same way.
+    moduleNameMapper: { '^@agentWork$': '<rootDir>/Modules/Agents/workKinds.js' }
 };
 
 module.exports = {

@@ -3,7 +3,13 @@
 // in a skill document is ever executed as code.
 
 const registry = require('../registry');
-const { inputsOf, MIN_BRIEF_CHARS } = require('../taskInputs');
+const { isBlockedHostname } = require('../engine/safeFetch');
+const workKinds = require('../workKinds');
+
+const { MIN_BRIEF_CHARS } = workKinds;
+
+const valueOf = (code) => (task) => workKinds.valueOfInput(code, task, isBlockedHostname);
+const hasInput = (code, task) => workKinds.hasInput(code, task, isBlockedHostname);
 
 const SKILL_VERSION = 1;
 const RISKS = Object.freeze(['low', 'medium', 'high']);
@@ -17,39 +23,52 @@ const text = (value) => {
 };
 
 const plain = (html) => String(html || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-const docLinkOf = (task) => (Array.isArray(task.links) ? task.links : []).find((l) => /^doc$/i.test(String(l.kind || '')) && l.url) || null;
 
-/* What a task must carry for a skill to be eligible. `value` is what the
- * template can read as {{input.<key>}}; `missing` is the reason a run skips. */
+/* What a task must carry for a skill to be eligible — the one table of which
+ * skill needs which input, read through each skill's declared `inputs`. `value`
+ * is what the template can read as {{input.<key>}}; `missing` is the reason a
+ * run skips; `needs` is the short form the board's agent/person split shows.
+ * `scope: 'project'` marks an input a whole project satisfies, so a skill that
+ * declares it reports on the project and is never the agent for one task. */
 const INPUT_CATALOGUE = Object.freeze({
     brief: Object.freeze({
         label: 'A written brief',
         description: `The task description, at least ${MIN_BRIEF_CHARS} characters of plain text.`,
-        value: (task) => { const text = plain(task.description || task.rawDescription || ''); return text.length >= MIN_BRIEF_CHARS ? text : null; },
+        needs: `it needs a brief of at least ${MIN_BRIEF_CHARS} characters`,
+        scope: workKinds.scopeOfInput('brief'),
+        value: valueOf('brief'),
         missing: (task) => `the brief is too short to work from (${plain(task.description || task.rawDescription || '').length} characters) — write the goal and the acceptance criteria first`,
     }),
     public_url: Object.freeze({
         label: 'A public page link',
         description: 'A URL in the task that resolves to a public host.',
-        value: (task) => inputsOf(task).publicUrl,
+        needs: 'it needs a public URL to review',
+        scope: workKinds.scopeOfInput('public_url'),
+        value: valueOf('public_url'),
         missing: () => 'no public URL found in the task title, description or links',
     }),
     pr_link: Object.freeze({
         label: 'A pull request link',
         description: 'A pull request, merge request or branch link on the task.',
-        value: (task) => inputsOf(task).prUrl,
+        needs: 'it needs a pull request link on the task',
+        scope: workKinds.scopeOfInput('pr_link'),
+        value: valueOf('pr_link'),
         missing: () => 'no pull request or branch link on this task',
     }),
     project_task: Object.freeze({
         label: 'A task inside a project',
         description: 'The task belongs to a project the skill can read.',
-        value: (task) => (task.ProjectID ? String(task.ProjectID) : null),
+        needs: 'it reports on a whole project, not on one task',
+        scope: workKinds.scopeOfInput('project_task'),
+        value: valueOf('project_task'),
         missing: () => 'the task has no project',
     }),
     linked_doc: Object.freeze({
         label: 'A linked document',
         description: 'A doc link on the task, or a page attached to it.',
-        value: (task) => { const link = docLinkOf(task); return link ? String(link.url) : null; },
+        needs: 'it needs a document linked to the task',
+        scope: workKinds.scopeOfInput('linked_doc'),
+        value: valueOf('linked_doc'),
         missing: () => 'no document is linked to this task',
     }),
 });
@@ -176,13 +195,14 @@ const MAX_EMIT_EACH = 25;
 
 const catalogues = () => ({
     version: SKILL_VERSION,
-    inputs: Object.entries(INPUT_CATALOGUE).map(([key, v]) => ({ key, label: v.label, description: v.description })),
+    inputs: Object.entries(INPUT_CATALOGUE).map(([key, v]) => ({ key, label: v.label, description: v.description, needs: v.needs, scope: v.scope })),
     readers: Object.entries(READER_CATALOGUE).map(([key, v]) => ({ key, label: v.label, description: v.description, params: v.params, fields: [...v.fields] })),
     partials: Object.entries(PROMPT_PARTIALS).map(([key, text]) => ({ key, text })),
     actions: EMIT_ACTIONS.map((key) => { const a = registry.get(key); return { key, label: a.label, risk: a.risk, undoable: a.undoable, required: [...(EMIT_REQUIRED[key] || [])] }; }),
     taskFields: [...TASK_FIELDS],
     filters: Object.entries(FILTERS).map(([key, f]) => ({ key, label: f.label, description: f.description, args: f.args.map((a) => ({ ...a })) })),
+    inputScopes: { ...workKinds.INPUT_SCOPE },
     risks: [...RISKS],
 });
 
-module.exports = { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, FILTERS, MAX_EMIT_EACH, MIN_BRIEF_CHARS, catalogues, plain, text };
+module.exports = { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, FILTERS, MAX_EMIT_EACH, MIN_BRIEF_CHARS, catalogues, hasInput, plain, text };

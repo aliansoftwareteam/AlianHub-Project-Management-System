@@ -10,6 +10,7 @@ const codeSkills = require('./skills');
 const readers = require('./skills/readers');
 const { validateSkill, riskOf } = require('./skills/validateSkill');
 const { effectiveActions } = require('./skills/effectiveActions');
+const { requirementDetail } = require('./skills/inputRules');
 const { INPUT_CATALOGUE, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, catalogues, plain } = require('./skills/catalogues');
 const { render, renderString, tagsIn } = require('./skills/skillTemplate');
 const { readField } = require('../Automations/engine/expression');
@@ -172,6 +173,7 @@ const codeEntry = (skill) => ({
     source: SOURCE.CODE,
     aliases: [...(skill.aliases || [])],
     inputs: [...(skill.inputs || [])],
+    requires: requirementDetail(skill),
     reads: [...(skill.reads || [])],
     emits: [...(skill.emits || [])],
     risk: riskOf(skill.emits || []),
@@ -186,6 +188,7 @@ const dataEntry = (doc) => ({
     source: SOURCE.DATA,
     aliases: [],
     inputs: [...(doc.inputs || [])],
+    requires: requirementDetail(doc),
     reads: (doc.gather || []).map((s) => s.reader),
     emits: [...(doc.emits || [])],
     risk: doc.risk || riskOf(doc.emits || []),
@@ -250,9 +253,34 @@ const manifestSkill = async (agent, entry, resolve) => {
     const skill = key ? await resolve(key) : null;
     const own = entry && typeof entry === 'object' ? entry : {};
     const base = { key, name: String(own.name || (skill && skill.name) || key), enabled: own.enabled !== false };
-    if (!skill) return { ...base, resolved: false, source: null, version: null, emits: [], effectiveActions: [] };
+    if (!skill) return { ...base, resolved: false, source: null, version: null, inputs: [], requires: null, emits: [], risk: null, effectiveActions: [] };
     const source = skill.source || SOURCE.CODE;
-    return { ...base, resolved: true, source, version: source === SOURCE.DATA ? skill.version : null, emits: [...(skill.emits || [])], effectiveActions: effectiveActions(agent, skill) };
+    return {
+        ...base,
+        resolved: true,
+        source,
+        version: source === SOURCE.DATA ? skill.version : null,
+        inputs: [...(skill.inputs || [])],
+        requires: requirementDetail(skill),
+        emits: [...(skill.emits || [])],
+        risk: skill.risk || riskOf(skill.emits || []),
+        effectiveActions: effectiveActions(agent, skill),
+    };
+};
+
+/* Agent documents with each named skill answered from the manifest: what it
+ * needs, what it emits, and the actions this agent would actually let it take.
+ * The stored entry's own fields survive, so a save round-trips unchanged. */
+const enrichAgentSkills = async (companyId, agents = []) => {
+    const resolved = new Map();
+    const resolve = (key) => { if (!resolved.has(key)) resolved.set(key, getSkill(companyId, key)); return resolved.get(key); };
+    return Promise.all(agents.map(plainOf).map(async (agent) => ({
+        ...agent,
+        skills: await Promise.all((Array.isArray(agent.skills) ? agent.skills : []).map(async (entry) => ({
+            ...(entry && typeof entry === 'object' ? plainOf(entry) : {}),
+            ...(await manifestSkill(agent, entry, resolve)),
+        }))),
+    })));
 };
 
 const agentManifest = async (companyId) => {
@@ -278,4 +306,4 @@ const retireSkill = async (companyId, key) => {
     return plainOf(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_SKILLS, data: [{ _id: existing._id }, { $set: { enabled: false, retiredAt: new Date() } }, { returnDocument: 'after' }] }, 'findOneAndUpdate'));
 };
 
-module.exports = { SOURCE, compile, taskView, contextOf, getSkill, listSkills, findData, createSkill, updateSkill, retireSkill, checkAgentSkills, agentManifest, validateSkill, catalogues };
+module.exports = { SOURCE, compile, taskView, contextOf, getSkill, listSkills, findData, createSkill, updateSkill, retireSkill, checkAgentSkills, agentManifest, enrichAgentSkills, validateSkill, catalogues };

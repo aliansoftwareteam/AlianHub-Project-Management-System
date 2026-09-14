@@ -1,31 +1,25 @@
-// What each executable skill needs on the task before a run can do anything —
-// mirrors the gather() checks in Modules/Agents/skills. A run without the input
-// is skipped, so the wizard and the pickers state the requirement up front.
+// What a skill needs on the task before a run can do anything. The answer comes
+// from the skill manifest the server sends — `requires` on each skill entry —
+// so there is no table here to fall out of step with the engine.
 // Pure: components turn the codes into text with $t('Ai.req_<code>').
 
-const REQUIREMENT_BY_SKILL = Object.freeze({
-    "qa-review": "public_url",
-    "pr.summary": "pr_link",
-    "risk.flags": "pr_link",
-    "brief.parse": "brief",
-    "project.plan": "brief",
-    "digest.ceo": "project_task",
-    "risk.today": "project_task"
-});
+import agentWork from "@agentWork";
 
-export const REQUIREMENT_CODES = Object.freeze([...new Set(Object.values(REQUIREMENT_BY_SKILL))]);
+const work = agentWork.default || agentWork;
 
-export const skillKeyOf = (skill) => {
-    if (!skill) return "";
-    if (typeof skill === "string") return skill;
-    return String(skill.key || skill.slug || skill.name || "");
+export const REQUIREMENT_CODES = Object.freeze([...work.INPUT_CODES]);
+export const DEFAULT_REQUIREMENT = "task";
+
+export const skillKeyOf = work.skillKeyOf;
+export const indexSkills = work.indexSkills;
+export const requiresOf = work.requiresOf;
+
+export const requirementOf = (skill, index = null) => requiresOf(skill, index)?.code || DEFAULT_REQUIREMENT;
+
+export const enabledSkillsOf = (agent) => {
+    const skills = Array.isArray(agent?.skills) ? agent.skills : [];
+    return skills.filter((s) => typeof s === "string" || s.enabled !== false);
 };
-
-export const requirementOf = (skill) => REQUIREMENT_BY_SKILL[skillKeyOf(skill)] || "task";
 
 /* Distinct requirements across an agent's enabled skills, first skill first. */
-export const requirementsOf = (agent) => {
-    const skills = Array.isArray(agent?.skills) ? agent.skills : [];
-    const enabled = skills.filter((s) => typeof s === "string" || s.enabled !== false);
-    return [...new Set(enabled.map(requirementOf))];
-};
+export const requirementsOf = (agent, index = null) => [...new Set(enabledSkillsOf(agent).map((s) => requirementOf(s, index)))];

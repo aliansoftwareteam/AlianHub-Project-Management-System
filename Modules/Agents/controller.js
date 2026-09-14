@@ -125,7 +125,7 @@ exports.listAgents = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
         const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { createdAt: 1 } }] }, 'find');
-        return res.send({ status: true, statusText: 'Agents fetched.', data: rows || [] });
+        return res.send({ status: true, statusText: 'Agents fetched.', data: await skillRecord.enrichAgentSkills(companyId, rows || []) });
     } catch (e) { logger.error(`listAgents: ${e.message}`); return fail(res, e.message, 500); }
 };
 
