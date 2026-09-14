@@ -54,7 +54,7 @@
                 <div v-if="rows.length" class="rp-legend">
                     <span><i style="background: var(--ok)"></i>{{ $t('Reports.legend_completed') }}</span>
                     <span><i class="rp-bar__fill is-committed" style="display:inline-block"></i>{{ $t('Reports.legend_committed') }}</span>
-                    <span v-if="forecast.ok"><i style="border: 1.5px dashed rgba(47,57,144,.5)"></i>{{ $t('Reports.legend_forecast') }}</span>
+                    <span v-if="forecast.ok"><i style="border: 1.5px dashed var(--brand-border)"></i>{{ $t('Reports.legend_forecast') }}</span>
                 </div>
                 <span v-if="humanOnly" class="ah-small">{{ $t('Reports.human_only_note') }}</span>
             </div>
@@ -132,6 +132,8 @@ const velocityNote = computed(() => {
 
 const shortName = (name) => String(name || '').replace(/sprint\s*/i, 'S').slice(0, 6);
 
+// The band colours are data series, not theme colours: they stay literal so the
+// four stacked bands never collapse into the same hue.
 const CFD_BANDS = [
     { key: 'close', label: 'Reports.band_done', color: '#2f9e7e' },
     { key: 'inprogress', label: 'Reports.band_progress', color: '#2F3990' },
@@ -153,7 +155,6 @@ const cfdOptions = computed(() => ({
     xaxis: { categories: cfdDays.value.map((d) => d.date), labels: { rotate: -45, hideOverlappingLabels: true, style: { fontSize: '10px' } }, tooltip: { enabled: false } },
     yaxis: { min: 0, labels: { style: { fontSize: '10px' } } },
     legend: { position: 'top', horizontalAlign: 'right', fontSize: '11px' },
-    grid: { borderColor: 'rgba(0,0,0,.07)' },
 }));
 
 const loadProjects = async () => {
