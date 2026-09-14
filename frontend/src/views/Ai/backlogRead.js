@@ -1,19 +1,11 @@
-// What the open backlog looks like to the agent engine, before any model is
-// called: GET /api/v2/agents/routable is a plain scoped query and classifyTask
-// is a regex, so the landing screen can open with real work on day one instead
-// of a wall of zeros.
-//
-// Pure — no network, no store, no Vue, no i18n. Required by path rather than by
-// the @agentWork alias so the node test runner can load it directly, the same
-// reason agentFit.js does.
+// Required by path rather than through the @agentWork alias so the node test
+// runner can load it directly, the same reason agentFit.js does.
 
 const agentWork = require('../../../../Modules/Agents/workKinds');
 
-const { classifyTask, hasInput, requiresOf, skillKeyOf } = agentWork;
+const { classifyTask, hasInput, requiresOf, skillKeyOf, FALLBACK_KIND } = agentWork;
 
-/* Kinds an agent can act on, most actionable first. A kind absent from the
- * backlog is absent from the screen — the counts are never padded. */
-const KIND_ORDER = ['review', 'code', 'write', 'plan', 'general'];
+const KIND_ORDER = ['review', 'code', 'write', 'plan'];
 
 const rank = (labelKey) => {
     const at = KIND_ORDER.indexOf(labelKey);
@@ -23,11 +15,19 @@ const rank = (labelKey) => {
 const backlogRead = (tasks = []) => {
     const groups = new Map();
     const people = [];
+    const unshaped = [];
 
     tasks.forEach((task) => {
         const work = classifyTask(task);
         if (work.needsPerson) {
             people.push({ task, work });
+            return;
+        }
+        /* The fallback kind is what is left when no rule matched, so nothing was
+         * recognised about the task. Offering it as work an agent could take
+         * would be a guess dressed as a read. */
+        if (work.labelKey === FALLBACK_KIND.labelKey) {
+            unshaped.push(task);
             return;
         }
         const group = groups.get(work.labelKey) || { labelKey: work.labelKey, kind: work.kind, work, tasks: [] };
@@ -42,13 +42,13 @@ const backlogRead = (tasks = []) => {
         groups: ordered,
         people,
         needsPerson: people.length,
+        unshaped: unshaped.length,
         whyKeys: [...new Set(people.map((p) => p.work.whyKey))]
     };
 };
 
-/* How far each skill in the library reaches into this backlog. A skill that
- * reports on a whole project can never be counted in tasks, so it says so
- * rather than showing a zero it would always show. */
+/* A skill that reports on a whole project can never be counted in tasks, so it
+ * says so rather than showing a zero it would always show. */
 const skillReach = (skills = [], tasks = []) => (Array.isArray(skills) ? skills : []).map((skill) => {
     const requires = requiresOf(skill) || null;
     const scope = requires ? requires.scope || 'task' : 'task';

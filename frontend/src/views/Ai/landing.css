@@ -60,6 +60,8 @@
 .land__read-line { font: var(--text-h2); color: var(--ink); margin: 0; }
 .land__read-sub { font: var(--text-small); color: var(--ink-2); margin: 0; }
 
+.land__rest { font: var(--text-small); color: var(--ink-2); margin: 0; }
+
 .land__cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); }
 .land__card {
     display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start;

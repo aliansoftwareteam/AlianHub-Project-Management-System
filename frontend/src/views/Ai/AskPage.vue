@@ -150,9 +150,11 @@
                                 >
                                     <span class="land__card-n">{{ read.needsPerson }}</span>
                                     <strong>{{ $t('AiLanding.kind_person') }}</strong>
-                                    <span>{{ $t(`Parity.why_${read.whyKeys[0]}`) }}</span>
+                                    <span>{{ peopleWhy }}</span>
                                 </button>
                             </div>
+
+                            <p v-if="read.unshaped" class="land__rest">{{ restLine }}</p>
 
                             <section v-if="openKey === 'people'" class="ah-card">
                                 <div class="ah-card__head">
@@ -278,15 +280,11 @@ import { routeTasks, routingTotals } from "./agentFit";
 import { refusalText } from "./fitText";
 import { backlogRead, skillReach } from "./backlogRead";
 
-// The AI landing (13i, re-framed). Ask stays the way in, and beneath it the open
-// backlog is read back through the same classifier the router uses — a scoped
-// query and a regex, no model call — so a workspace with no run history still
-// opens on real work rather than on zeros.
 defineOptions({ name: "AskPage" });
 
 const PANEL_LIMIT = 8;
-// The server caps /routable at 100, so a full page is a window on the backlog
-// rather than the whole of it, and the headline has to say which it is.
+/* The server caps /routable at 100, so a full page is a window on the backlog
+ * rather than the whole of it, and the headline has to say which it is. */
 const BACKLOG_LIMIT = 100;
 
 const { t } = useI18n();
@@ -338,6 +336,12 @@ const readLine = computed(() => {
     if (read.value.needsPerson) parts.push(t("AiLanding.read_part", { n: read.value.needsPerson, work: t("AiLanding.kind_person") }));
     return t(capped.value ? "AiLanding.read_line_capped" : "AiLanding.read_line", { n: read.value.total, parts: parts.join(t("AiLanding.read_join")) });
 });
+
+const restLine = computed(() => t("AiLanding.rest_line", { n: read.value.unshaped, work: t("AiLanding.kind_general") }));
+
+const peopleWhy = computed(() => (read.value.whyKeys.length === 1
+    ? t(`Parity.why_${read.value.whyKeys[0]}`)
+    : t("AiLanding.why_mixed")));
 
 const openGroupRef = computed(() => read.value.groups.find((g) => g.labelKey === openKey.value) || null);
 const panelTasks = computed(() => (openGroupRef.value ? openGroupRef.value.tasks.slice(0, PANEL_LIMIT) : []));
@@ -475,8 +479,6 @@ onMounted(async () => {
 </script>
 
 <style>
-/* The sidebar carries no style block of its own, and this is the section's
-   first screen, so the shared AI stylesheet has to arrive with it. */
 @import "./style.css";
 @import "./parity.css";
 @import "./landing.css";

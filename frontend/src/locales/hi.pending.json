@@ -1,7 +1,7 @@
 {
   "locale": "hi",
   "machineTranslated": false,
-  "updatedAt": "2026-09-14T13:03:10.239Z",
+  "updatedAt": "2026-09-14T15:39:01.112Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5926,6 +5926,8 @@
     "AiLanding.manage_agents": "Manage agents",
     "AiLanding.open_inbox": "Approvals inbox",
     "AiLanding.agents_note": "Every write an agent proposes waits for a person.",
-    "AiLanding.read_line_capped": "Your {n} most recently updated open tasks — {parts}."
+    "AiLanding.read_line_capped": "Your {n} most recently updated open tasks — {parts}.",
+    "AiLanding.rest_line": "{n} more {work}, so no agent is offered for them. Give one a brief and it joins the work above.",
+    "AiLanding.why_mixed": "for more than one reason — each task says which"
   }
 }

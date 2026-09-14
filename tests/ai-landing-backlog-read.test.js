@@ -8,6 +8,18 @@ describe('backlogRead', () => {
         expect(read.total).toBe(0);
         expect(read.groups).toEqual([]);
         expect(read.needsPerson).toBe(0);
+        expect(read.unshaped).toBe(0);
+    });
+
+    test('a task no rule recognised is counted apart, never offered as work an agent could take', () => {
+        const read = backlogRead([
+            task({ _id: '1', TaskName: 'Review the sprint copy' }),
+            task({ _id: '2', TaskName: 'Invite a teammate and hand them the pipeline' }),
+            task({ _id: '3', TaskName: 'Umbrella stand for the lobby' })
+        ]);
+        expect(read.groups.map((g) => g.labelKey)).toEqual(['review']);
+        expect(read.unshaped).toBe(2);
+        expect(read.total).toBe(3);
     });
 
     test('groups open tasks by the kind of work the router would see', () => {

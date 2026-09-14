@@ -2954,6 +2954,8 @@ export default {
         "kind_general": "have no obvious shape yet",
         "kind_person": "need a person",
         "n_tasks": "{n} task(s)",
+        "rest_line": "{n} more {work}, so no agent is offered for them. Give one a brief and it joins the work above.",
+        "why_mixed": "for more than one reason — each task says which",
         "panel_title": "Tasks that {kind}",
         "panel_showing": "{n} of {total}, most recently updated",
         "before_start": "Before you start",
