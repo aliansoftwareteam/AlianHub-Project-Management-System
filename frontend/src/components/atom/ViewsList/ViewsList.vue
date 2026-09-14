@@ -1,56 +1,71 @@
 <template>
     <div
-    v-if="item._id && item._id.length>6"
+        v-if="item._id && item._id.length>6"
         :class="{'bg-light-gray': active, 'has-view-menu': hasViewMenu}"
-        class="d-flex align-items-center text-nowrap border-top-radius-10-px cursor-pointer wrapper h-100"
-        @click.stop="$emit('click', item)"
+        class="d-flex align-items-center text-nowrap border-top-radius-10-px wrapper h-100"
     >
-        <div :class="{'border-left': firstChild && !active, 'border-right': !active, 'border-none activeViewList': active}" class="d-flex align-items-center font-size-14 view-list position-re"
-        :style="{ height: active ? '36px' : 'auto' }">
-           <img :src="active ? projectComponentsIcons(item.keyName)?.activeIcon : projectComponentsIcons(item.keyName)?.icon" :alt="item.name" class="mr-10px">
+        <button
+            type="button"
+            role="tab"
+            :aria-selected="active ? 'true' : 'false'"
+            :tabindex="active ? 0 : -1"
+            :class="{'border-left': firstChild && !active, 'border-right': !active, 'border-none activeViewList': active}"
+            class="d-flex align-items-center font-size-14 view-list position-re cursor-pointer"
+            :style="{ height: active ? '36px' : 'auto' }"
+            @click.stop="$emit('click', item)"
+        >
+           <img :src="active ? projectComponentsIcons(item.keyName)?.activeIcon : projectComponentsIcons(item.keyName)?.icon" alt="" aria-hidden="true" class="mr-10px">
            <span class="gray81">{{$t(`ViewList.${item.name}`)}}</span>
-           <span v-if="commentCount" class="count-block comment__count white">{{commentCount <= 99 ? commentCount : '+99'}}</span>
-           <img class="list__default-home" v-if="item.setAsDefault" :src="viewDefaultIcon" />
-           <img :src="active ? activePin : pin" v-if="item?.isPin && item.isPin" class="ml-10px active__pin-condition">
-           <span class="notification-tick blinking position-sti ml-7px" v-if="item?.isPrivate"></span>
-           <div class="view-list__menu" v-if="hasViewMenu">
-           <DropDown :id="item._id" @isVisible="isDropDownVisible" :zIndex="6">
+           <span v-if="commentCount" class="count-block comment__count white">{{commentBadge}}</span>
+           <img class="list__default-home" v-if="item.setAsDefault" :src="viewDefaultIcon" :alt="$t('ViewList.set_as_default')" />
+           <img :src="active ? activePin : pin" v-if="item?.isPin && item.isPin" class="ml-10px active__pin-condition" :alt="$t('Projects.pinview')">
+           <span class="notification-tick blinking position-sti ml-7px" v-if="item?.isPrivate" :title="$t('Projects.private_view')"></span>
+        </button>
+        <div class="view-list__menu" v-if="hasViewMenu">
+           <DropDown :id="item._id" @isVisible="(visible) => isDropDownVisible = visible" :zIndex="6">
                 <template #button>
-                    <img :src="dots" class="dots ml-5px" :ref="item._id">
+                    <button type="button" class="dots ml-5px" :ref="item._id" :aria-expanded="isDropDownVisible ? 'true' : 'false'" :aria-label="$t('Projects.view_options', {view: $t(`ViewList.${item.name}`)})">
+                        <img :src="dots" alt="" aria-hidden="true">
+                    </button>
                 </template>
                 <template #options>
                     <div>
-                        <ul class="p-0 m-0 justify-content-start cursor-pointer">
-                            <li class="embed-edit-options mb-7px" @click.stop="editOptions('Pin'),$refs[item._id].click()" >
-                                <img :src="pin" class="mr-14-px list__edit" />
-                                <span class="font-roboto-sans font-weight-400 font-size-14 line-height-19 text-left gray81">{{item?.isPin ? $t('Projects.unpin') :$t('Projects.pinview') }}</span>
+                        <ul class="p-0 m-0 justify-content-start" role="menu">
+                            <li role="none">
+                                <button type="button" role="menuitem" class="embed-edit-options mb-7px view-list__menuitem cursor-pointer" @click.stop="editOptions('Pin'),$refs[item._id].click()">
+                                    <img :src="pin" class="mr-14-px list__edit" alt="" aria-hidden="true" />
+                                    <span class="font-roboto-sans font-weight-400 font-size-14 line-height-19 text-left gray81">{{item?.isPin ? $t('Projects.unpin') :$t('Projects.pinview') }}</span>
+                                </button>
                             </li>
-                            <li class="embed-edit-options cursor-pointer mb-7px" @click.stop="editOptions('AddDefault'),$refs[item._id].click()" v-if="project?.ProjectRequiredComponent && (project?.ProjectRequiredComponent?.filter((e)=>e.setAsDefault === true).length == 0 || project?.ProjectRequiredComponent?.find((e)=>e.setAsDefault === true).keyName === item?.keyName)">
-                                <img :src="defaultView" class="mr-14-px list__edit" />
-                                <span class="font-roboto-sans font-weight-400 font-size-14 line-height-19 text-left gray81">{{!item?.setAsDefault ? $t('ViewList.set_as_default') :$t('ViewList.remove_as_default') }}</span>
+                            <li role="none" v-if="project?.ProjectRequiredComponent && (project?.ProjectRequiredComponent?.filter((e)=>e.setAsDefault === true).length == 0 || project?.ProjectRequiredComponent?.find((e)=>e.setAsDefault === true).keyName === item?.keyName)">
+                                <button type="button" role="menuitem" class="embed-edit-options mb-7px view-list__menuitem cursor-pointer" @click.stop="editOptions('AddDefault'),$refs[item._id].click()">
+                                    <img :src="defaultView" class="mr-14-px list__edit" alt="" aria-hidden="true" />
+                                    <span class="font-roboto-sans font-weight-400 font-size-14 line-height-19 text-left gray81">{{!item?.setAsDefault ? $t('ViewList.set_as_default') :$t('ViewList.remove_as_default') }}</span>
+                                </button>
                             </li>
-                            <li class="embed-edit-options cursor-pointer" @click.stop="isDelete = true, $refs[item._id].click()" v-if="isDeleteDisabled == false">
-                                <img :src="deleteImage" class="mr-14-px list__edit"/>
-                                <span class="font-roboto-sans font-weight-400 font-size-14 line-height-19 text-left red pt-2px">{{$t('Projects.deleteview')}}</span>
+                            <li role="none" v-if="isDeleteDisabled == false">
+                                <button type="button" role="menuitem" class="embed-edit-options view-list__menuitem cursor-pointer" @click.stop="isDelete = true, $refs[item._id].click()">
+                                    <img :src="deleteImage" class="mr-14-px list__edit" alt="" aria-hidden="true"/>
+                                    <span class="font-roboto-sans font-weight-400 font-size-14 line-height-19 text-left red pt-2px">{{$t('Projects.deleteview')}}</span>
+                                </button>
                             </li>
                         </ul>
                     </div>
                 </template>
             </DropDown>
-            </div>
-            <ConfirmationSidebar
-                v-model="isDelete"
-                :title="$t('Projects.deleteview')"
-                :message="`${$t('Filters.are_you_sure')}  ${item.name} ${$t('Projects.view')}?`"
-                acceptButtonClass="btn-danger"
-                @confirm="() => editOptions('Delete')"
-                 :acceptButton="$t('Projects.delete')"
-                >
-                <template #body>
-                    <div></div>
-                </template>
-            </ConfirmationSidebar>
         </div>
+        <ConfirmationSidebar
+            v-model="isDelete"
+            :title="$t('Projects.deleteview')"
+            :message="`${$t('Filters.are_you_sure')}  ${item.name} ${$t('Projects.view')}?`"
+            acceptButtonClass="btn-danger"
+            @confirm="() => editOptions('Delete')"
+            :acceptButton="$t('Projects.delete')"
+            >
+            <template #body>
+                <div></div>
+            </template>
+        </ConfirmationSidebar>
     </div>
 </template>
 
@@ -124,6 +139,8 @@ const props = defineProps({
         default: false
     }
 })
+
+const commentBadge = computed(() => (props.commentCount > 99 ? '+99' : props.commentCount));
 
 const editOptions = (type) =>{
     let historyObj = ''
@@ -213,13 +230,27 @@ defineEmits(['click']);
     height: 20px;
     width: 15px;
 }
-/* Clear hover affordance on non-active tabs (active tabs already carry
-   .bg-light-gray) so short-named tabs read as an obvious clickable target. */
 .wrapper{
     border-radius: 8px 8px 0 0;
+    position: relative;
 }
 .wrapper:hover:not(.bg-light-gray){
-    background: #f4f5f7;
+    background: var(--surface-hover);
+}
+.view-list{
+    border: 0;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    -webkit-appearance: none;
+    appearance: none;
+}
+.view-list__menuitem{
+    border: 0;
+    background: none;
+    font: inherit;
+    width: 100%;
 }
 /* ⋯ menu: out of flow at the tab's right edge (so its dropdown popup is never
    clipped), shown only on hover. On hover the tab grows its right padding
@@ -233,20 +264,30 @@ defineEmits(['click']);
     display: inline-flex;
     align-items: center;
 }
-/* Compact ⋯ trigger: it now lives in empty space (not over the label), so it
-   no longer needs the white "masking chip" — just a light hover highlight. */
 .dots{
     height: 20px;
     width: 20px;
     padding: 3px;
     border-radius: 5px;
     box-sizing: border-box;
-    object-fit: contain;
     cursor: pointer;
     background: transparent;
+    border: 0;
+    display: inline-flex;
+}
+.dots img{
+    height: 100%;
+    width: 100%;
+    object-fit: contain;
 }
 .dots:hover{
-    background: #e9eaee;
+    background: var(--fill);
+}
+/* .dots is visibility:hidden until hover (views/Projects/style.css), which also
+   takes it out of the tab order — so reveal it once focus is anywhere in the
+   tab, or the ⋯ menu is unreachable by keyboard. */
+.wrapper:focus-within .dots{
+    visibility: visible;
 }
 /* "Default view" home marker — in-flow after the name (not an absolute corner
    badge) so it never overlaps the label. */
@@ -260,9 +301,9 @@ defineEmits(['click']);
 /* In-flow pill after the view name (not an absolute corner badge) so the
    comment count never overlaps the label — in any state, at any tab width. */
 .count-block.comment__count{
-   color: #eabb00 !important;
+   color: var(--warn) !important;
    background-color: transparent;
-   border: 1px solid #eabb00 !important;
+   border: 1px solid var(--warn) !important;
    margin-left: 6px;
    flex: 0 0 auto;
 }

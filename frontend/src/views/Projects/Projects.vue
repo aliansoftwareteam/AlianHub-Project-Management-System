@@ -116,9 +116,6 @@
                                             <div class="ph2__tablist" role="tablist" :aria-label="$t('Projects.views_tablist')">
                                                 <ViewsList
                                                     v-for="(view, index) in (viewsListArray)"
-                                                    role="tab"
-                                                    :aria-selected="activeTab === view.keyName ? 'true' : 'false'"
-                                                    :tabindex="activeTab === view.keyName ? 0 : -1"
                                                     :key="view._id"
                                                     :id="view.keyName"
                                                     :item="view"

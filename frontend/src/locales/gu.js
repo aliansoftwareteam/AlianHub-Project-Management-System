@@ -3891,7 +3891,11 @@ export default {
         "remove_sample_done": "Sample data moved to the Trash.",
         "prev_month": "Previous month",
         "next_month": "Next month",
-        "this_month": "This month"
+        "this_month": "This month",
+        "view_options": "Options for the {view} view",
+        "search_views": "Search or describe a view to create",
+        "no_views_match": "No view matches that search.",
+        "private_view": "Private view"
     },
     "Watcher": {
         "ignore": "અવગણો",
@@ -3936,6 +3940,28 @@ export default {
         "error_message_for_empty": "કૃપા કરીને ઓછામાં ઓછી એક દૃશ્ય પસંદ કરો",
         "set_as_default": "મૂળભૂત તરીકે સુયોજિત કરો",
         "remove_as_default": "મૂળભૂત તરીકે દૂર કરો"
+    },
+    "ViewListTag": {
+        "ProjectListView": "List",
+        "ProjectKanban": "Kanban",
+        "TableView": "Table",
+        "Calendar": "Calendar",
+        "GanttView": "Chart",
+        "TimelineView": "Timeline",
+        "ProjectDashboard": "Report",
+        "Workload": "Capacity",
+        "ActivityLog": "Feed",
+        "Comments": "Discussion",
+        "DocsView": "Wiki",
+        "FormsView": "Survey",
+        "MindMapView": "Map",
+        "WhiteboardView": "Canvas",
+        "CanvasView": "Canvas",
+        "MapView": "Map",
+        "RecurringTasks": "Schedule",
+        "Reports": "Report",
+        "Embed": "Embed",
+        "ProjectDetail": "Details"
     },
     "Apps": {
         "tags": "ટૅગ્સ",
