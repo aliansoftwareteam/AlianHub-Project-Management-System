@@ -80,6 +80,8 @@ button.rp-row:hover .rp-row__name { color: var(--brand); text-decoration: underl
    alone because they carry their own status colour; the legend is the one part
    the library sets inline, which is why that rule needs !important. */
 .rp-page .apexcharts-gridline, .rp-page .apexcharts-grid-borders line { stroke: var(--hairline); }
+/* Burndown's ideal line is a reference rule, not a series: a literal tint disappeared on a dark card. */
+.rp-page #sprint-burndown .apexcharts-series:nth-of-type(2) path { stroke: var(--ink-3); }
 .rp-page .apexcharts-xaxis-label, .rp-page .apexcharts-yaxis-label,
 .rp-page .apexcharts-xaxis-title-text, .rp-page .apexcharts-yaxis-title-text { fill: var(--ink-2); }
 .rp-page .apexcharts-title-text { fill: var(--ink); }

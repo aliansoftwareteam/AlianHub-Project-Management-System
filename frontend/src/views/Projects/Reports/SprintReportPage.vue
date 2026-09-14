@@ -244,9 +244,10 @@ const scopeMarkers = computed(() => {
 
 const burndownOptions = computed(() => ({
     chart: { id: 'sprint-burndown', toolbar: { show: false }, animations: { enabled: false }, fontFamily: 'Inter Tight, sans-serif' },
-    // Remaining vs ideal are data series, not theme colours: they stay literal so the
-    // two lines never collapse into the same hue.
-    colors: ['#2F3990', 'rgba(0,0,0,.2)'],
+    // Remaining is the data series and stays literal. The ideal line is a reference
+    // rule, not data, so reportsV2.css strokes it from a token — a literal black tint
+    // vanished on a dark card.
+    colors: ['#2F3990', 'transparent'],
     stroke: { width: [2.5, 1.5], dashArray: [0, 5], curve: 'straight' },
     dataLabels: { enabled: false },
     markers: { size: 0 },
