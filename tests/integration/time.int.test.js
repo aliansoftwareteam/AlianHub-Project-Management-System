@@ -9,6 +9,13 @@ const anon = createApiClient({ baseURL: state.baseURL });
 jest.setTimeout(60000);
 const refused = (res) => res.status >= 400 || (res.body && typeof res.body === 'object' && res.body.status === false);
 const isoDay = (offsetDays = 0) => new Date(Date.now() + offsetDays * 86400000).toISOString().slice(0, 10);
+// Capacity is zero on a weekend by design (weekRules.js dayCapacity), so a test that
+// asserts a working day's hours has to land on one rather than on a floating offset.
+const isoWeekday = (offsetDays = 0) => {
+    const d = new Date(Date.now() + offsetDays * 86400000);
+    while ([0, 6].includes(d.getUTCDay())) d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+};
 
 /* A project the given member is on, plus one task in it. The default sprint a
  * blank project creates can lag a moment behind createProject, so retry. */
@@ -103,10 +110,11 @@ describe('time — PTO role rules', () => {
     it('reflects approved PTO in the capacity calculation', async () => {
         const member = await loginAs('member');
         const admin = await loginAs('admin');
-        const created = await member.api.post('/api/v1/pto', { type: 'casual', startDate: isoDay(40), endDate: isoDay(40), hoursPerDay: 8, reason: '[QA time] cap' });
+        const day = isoWeekday(40);
+        const created = await member.api.post('/api/v1/pto', { type: 'casual', startDate: day, endDate: day, hoursPerDay: 8, reason: '[QA time] cap' });
         const id = created.body.data._id;
         await admin.api.put(`/api/v1/pto/${id}/status`, { status: 'approved' });
-        const cap = await admin.api.get('/api/v1/pto/capacity', { query: { userId: member.uid, from: isoDay(40), to: isoDay(40), hoursPerDay: 8 } });
+        const cap = await admin.api.get('/api/v1/pto/capacity', { query: { userId: member.uid, from: day, to: day, hoursPerDay: 8 } });
         expect(cap.status).toBe(200);
         expect(cap.body.data.ptoHours).toBe(8);
         expect(cap.body.data.availableHours).toBe(0);
