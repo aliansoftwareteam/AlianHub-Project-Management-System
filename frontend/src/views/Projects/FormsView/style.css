@@ -74,7 +74,7 @@
 }
 .fb__type:hover, .fb__prop:hover { border-color: var(--brand); background: var(--brand-tint); }
 .fb__props { display: flex; flex-direction: column; gap: 4px; }
-.fb__prop { text-align: left; border-color: rgba(47, 57, 144, .3); color: var(--brand); padding: 7px 9px; }
+.fb__prop { text-align: left; border-color: var(--brand-border); color: var(--brand); padding: 7px 9px; }
 .fb__prop:disabled { opacity: .45; cursor: default; }
 .fb__palette-note { margin: auto 4px 0; padding-top: 12px; }
 
@@ -163,6 +163,8 @@
 .fb__scale { display: flex; align-items: center; gap: 8px; color: var(--ink-2); }
 .fb__scale input { width: 64px; height: 28px; border: 1px solid var(--border); border-radius: 6px; padding: 0 8px; background: var(--surface); color: var(--ink); }
 .fb__card-foot { display: flex; align-items: center; justify-content: space-between; }
+/* Sits on the form author's own buttonColor and is mirrored on the public form,
+ * which renders outside the app shell — so this white stays literal. */
 .fb__submit { align-self: flex-start; border: 0; border-radius: var(--r-input); color: #fff; padding: 9px 18px; font: var(--text-body); cursor: default; }
 
 .fb__drop {
