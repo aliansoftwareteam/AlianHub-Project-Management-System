@@ -39,7 +39,7 @@
                                                 :isOutline="false"
                                                 :isDirectFocus="true"
                                                 @blur="editProject = false"
-                                                :style="{borderColor: !projectName.error.length ? '#cecece' : 'red'}"
+                                                :style="{borderColor: !projectName.error.length ? 'var(--border)' : 'var(--danger)'}"
                                                 @keypress.enter="projectName.value !== projectData?.ProjectName ? updateProjectName() : editProject = false"
                                                 @keyup="checkErrors({'field':projectName,
                                                 'name':projectName.name,
@@ -597,7 +597,7 @@ provide('showLoader', showLoader);
 const currentProgress = ref(0);
 
 const circleStyle = computed(() => ({
-    background: `conic-gradient(#4caf50 0% ${currentProgress.value}%, #ddd ${currentProgress.value}% 100%)`,
+    background: `conic-gradient(var(--ok) 0% ${currentProgress.value}%, var(--track) ${currentProgress.value}% 100%)`,
 }));
 
 watch(progress, (newVal) => {
@@ -1300,7 +1300,7 @@ function closeModal() {
 
 .show-archived-active {
     width: 100%;
-    background-color: #FBE6D3 !important;
+    background-color: var(--warn-bg) !important;
     height: 44px;
     padding: 0px 20px;
 }
@@ -1342,8 +1342,8 @@ function closeModal() {
     height:35px;
 }
 .addview__dropdown{
-    border-color: #2F3990;
-    background-color: white !important;
+    border-color: var(--brand);
+    background-color: var(--surface) !important;
     margin-bottom: 0px !important;
     bottom: 0px;
 }
@@ -1382,7 +1382,7 @@ function closeModal() {
 }
 .board-veiw-main-parent.list-view-body,
 .board-veiw-main-parent .task-filtersearchassignee-wrapper {
-    background-color: #FFF;
+    background-color: var(--surface);
 }
 .board-veiw-main-parent .task-assigneesearch-groupbywrapper {
     margin-bottom: 0;
@@ -1403,7 +1403,7 @@ function closeModal() {
 .saving__avtar-div{
     top: 0px;
     left: 0px;
-    background-color: #FFFFFFde !important;
+    background-color: color-mix(in srgb, var(--surface) 87%, transparent) !important;
 }
 .skelaton__option{
     height: 35px;
@@ -1422,7 +1422,7 @@ function closeModal() {
     background: transparent;
     border: none;
     font-size: 16px;
-    color: #2F3990;
+    color: var(--brand);
     cursor: pointer;
 }
 .projecttour_driver_modal .btn-primary {
@@ -1462,7 +1462,7 @@ function closeModal() {
   content: "";
   width: 85%;
   height: 85%;
-  background-color: #fff;
+  background-color: var(--surface);
   border-radius: 50%;
   position: absolute;
 }

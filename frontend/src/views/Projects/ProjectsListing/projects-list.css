@@ -150,10 +150,9 @@
 .pl2__bar {
     height: 6px;
     border-radius: 99px;
-    background: rgba(0, 0, 0, .07);
+    background: var(--track);
     overflow: hidden;
 }
-:root[data-theme="dark"] .pl2__bar { background: rgba(255, 255, 255, .1); }
 
 .pl2__bar-fill {
     height: 100%;

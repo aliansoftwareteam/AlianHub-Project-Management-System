@@ -368,7 +368,7 @@ onMounted(load);
     width: 30px;
     height: 18px;
     border-radius: 9px;
-    background: rgba(0, 0, 0, .15);
+    background: var(--border);
     position: relative;
     transition: background var(--t-state) var(--ease);
 }
@@ -379,6 +379,8 @@ onMounted(load);
     width: 14px;
     height: 14px;
     border-radius: 50%;
+    /* Stays white in both themes: it has to read against the neutral off track
+     * and the --brand on track alike. */
     background: #fff;
     transition: left var(--t-state) var(--ease);
 }
@@ -404,11 +406,10 @@ onMounted(load);
 .rtx__chip {
     padding: 4px 9px;
     border-radius: var(--r-chip);
-    background: rgba(0, 0, 0, .05);
+    background: var(--fill);
     font: 400 12px/1.2 var(--font-ui);
     color: var(--ink-label);
 }
-:root[data-theme="dark"] .rtx__chip { background: rgba(255, 255, 255, .08); }
 .rtx__chip.is-first { background: var(--brand-tint); color: var(--brand); font-weight: 600; }
 
 .rtx__choices { display: flex; gap: 6px; flex-wrap: wrap; }

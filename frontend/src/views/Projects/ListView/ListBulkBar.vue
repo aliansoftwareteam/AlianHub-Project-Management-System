@@ -228,7 +228,7 @@ onBeforeUnmount(() => {
     height: 40px;
     flex: none;
     background: var(--rail);
-    color: #fff;
+    color: var(--rail-ink-strong);
     display: flex;
     align-items: center;
     padding: 0 20px;
@@ -251,16 +251,16 @@ onBeforeUnmount(() => {
 .lv2-bulk__count { font-weight: 600; }
 .lv2-bulk__btn {
     background: none; border: 0; padding: 0;
-    color: rgba(255, 255, 255, .7);
+    color: var(--rail-ink);
     font: 400 12.5px/1 var(--font-ui);
     cursor: pointer;
 }
-.lv2-bulk__btn:hover:not(:disabled) { color: #fff; }
+.lv2-bulk__btn:hover:not(:disabled) { color: var(--rail-ink-strong); }
 .lv2-bulk__btn:disabled { opacity: .4; cursor: not-allowed; }
-.lv2-bulk__btn--ai { color: #a892ff; font-weight: 600; }
-.lv2-bulk__btn--danger { color: #ff9b9b; }
-.lv2-bulk__btn--danger:hover:not(:disabled) { color: #ffc2c2; }
-.lv2-bulk__esc { margin-left: auto; color: rgba(255, 255, 255, .5); }
+.lv2-bulk__btn--ai { color: var(--rail-brand); font-weight: 600; }
+.lv2-bulk__btn--danger { color: var(--rail-danger); }
+.lv2-bulk__btn--danger:hover:not(:disabled) { color: color-mix(in srgb, var(--rail-danger) 65%, var(--rail-ink-strong)); }
+.lv2-bulk__esc { margin-left: auto; color: var(--rail-ink-2); }
 .lv2-bulk__menu-wrap { position: relative; }
 .lv2-bulk__menu {
     position: absolute;
