@@ -95,3 +95,4 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 - Refresh-token reuse grace window: `REFRESH_TOKEN_REUSE_GRACE_SECONDS`, default 10. The owner may set it to 0 for strict revocation.
 - Agent creators do not keep delete rights; only owners and admins can delete an agent. Owner, 2026-09-11.
 - PR #613 duplicates #612. Recommended: close #613 after #612 merges; the owner decides.
+| 64 | The per-skill and per-agent model pin is stored and validated but never reaches the provider. `AICore/modelCall.js` `askModel` builds its request from `getProvider()` and never reads `skill.model`. The router already accepts a pinned model (`decision.js` `pin_dropped`). | Sprint 6 (#714) | Honouring the pin at the call, against a priced allowlist, is the cost-and-routing half of ADR 003 phase 3, not the migration half. |

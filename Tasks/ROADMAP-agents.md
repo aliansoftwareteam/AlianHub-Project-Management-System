@@ -42,9 +42,9 @@ Source: `docs/AI-PLATFORM-ARCHITECTURE.md`. One task per sprint, one pull reques
 | 3 | 026 | observability foundation | two weeks | 024 | done |
 | 4 | 027 | the model router | two weeks | 024, 026 | done |
 | 5 | 028 | the workflow engine | three weeks | 024, 027 | done |
-| 6 | 029 | skill authoring and migration | two weeks | 025, 028 | next |
-| 7 | 030 | knowledge and retrieval | three weeks | 024 | backlog |
-| 8 | 031 | security hardening | three weeks | 024 | backlog |
+| 6 | 029 | skill authoring and migration | two weeks | 025, 028 | done |
+| 7 | 030 | knowledge and retrieval | three weeks | 024 | next |
+| 8 | 031 | security hardening | three weeks | 024 | next |
 | 9 | 019 | evals and routing measurement | two weeks | 026, 027, 030 | backlog |
 | 10 | 018 | external agents: OAuth, scopes, delegation | three weeks | 028, 031 | backlog |
 | 11 | 032 | data skills reach outside (ADR 003 phase 4) | two weeks | 029, 031 | backlog |

@@ -34,7 +34,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 026 | Sprint 3 — observability foundation | done | high | 024 | done/026-sprint-3-observability-foundation |
 | 027 | Sprint 4 — the model router | done | high | 024, 026 | done/027-sprint-4-model-router |
 | 028 | Sprint 5 — the workflow engine | done | high | 024, 027 | done/028-sprint-5-workflow-engine |
-| 029 | Sprint 6 — skill authoring and migration | backlog | medium | 025, 028 | backlog/029-sprint-6-skill-authoring-migration |
+| 029 | Sprint 6 — skill authoring and migration | done | medium | 025, 028 | done/029-sprint-6-skill-authoring-migration |
 | 030 | Sprint 7 — knowledge and retrieval | backlog | medium | 024 | backlog/030-sprint-7-knowledge-and-retrieval |
 | 031 | Sprint 8 — security hardening | backlog | high | 024 | backlog/031-sprint-8-security-hardening |
 | 032 | Sprint 11 — data skills reach outside (ADR 003 phase 4) | backlog | medium | 029, 031 | backlog/032-sprint-11-data-skills-reach |
