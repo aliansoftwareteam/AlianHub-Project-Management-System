@@ -253,7 +253,7 @@ watch(() => props.formId, () => { term.value = ''; load(1); });
 .fs__when, .fs__task { color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .fs__val { display: inline-block; max-width: 320px; overflow: hidden; text-overflow: ellipsis;
     vertical-align: bottom; }
-.fs__blank { color: var(--ink-3); }
+.fs__blank { color: var(--ink-2); }
 .fs__file { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border);
     background: var(--surface); border-radius: var(--r-input); padding: 4px 9px; font-family: inherit; font-size: 12.5px;
     color: var(--brand); cursor: pointer; max-width: 260px; }
