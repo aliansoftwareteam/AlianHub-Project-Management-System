@@ -14,6 +14,7 @@ const MAX_TEMPLATE = 20000;
 const MAX_STEPS = 10;
 const MAX_EMIT = 10;
 const MAX_TOKENS = { min: 200, max: 8000, default: 2500 };
+const MAX_GROUNDED_FIELDS = 10;
 
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const asString = (v) => (v === undefined || v === null ? '' : String(v)).trim();
@@ -29,6 +30,10 @@ const checkPlaceholder = (path, field, declared, roots, errors) => {
     const parts = path.split('.');
     const [root, second] = parts[0] === 'task' && parts.length > 1 ? parts.slice(1) : parts;
     if (root === TEMPLATE_ROOTS.memory) return;
+    if (root === TEMPLATE_ROOTS.fallback) {
+        if (!roots.includes(root)) errors.push(error(field, 'unknown_placeholder', `"{{${path}}}" is only available in emit mappings and the summary`));
+        return;
+    }
     if (root === TEMPLATE_ROOTS.input) {
         if (!second) errors.push(error(field, 'unknown_placeholder', `"{{${path}}}" names no input`));
         else if (!declared.inputs.has(second)) errors.push(error(field, 'undeclared_input', `"{{${path}}}" reads input "${second}", which the skill does not declare`));
@@ -153,7 +158,9 @@ const validateEmit = (input, declared, errors) => {
         }
         const params = isPlainObject(mapping.params) ? mapping.params : {};
         if (mapping.params !== undefined && !isPlainObject(mapping.params)) errors.push(error(`${at}.params`, 'invalid', 'must be an object'));
-        const roots = each ? [TEMPLATE_ROOTS.answer, TEMPLATE_ROOTS.item, TEMPLATE_ROOTS.emitted] : [TEMPLATE_ROOTS.answer, TEMPLATE_ROOTS.emitted];
+        const roots = each
+            ? [TEMPLATE_ROOTS.answer, TEMPLATE_ROOTS.item, TEMPLATE_ROOTS.emitted, TEMPLATE_ROOTS.fallback]
+            : [TEMPLATE_ROOTS.answer, TEMPLATE_ROOTS.emitted, TEMPLATE_ROOTS.fallback];
         (EMIT_REQUIRED[action] || []).forEach((name) => {
             if (params[name] === undefined || params[name] === null || params[name] === '') errors.push(error(`${at}.params.${name}`, 'required', `required by "${action}"`));
         });
@@ -171,8 +178,55 @@ const validateSummary = (input, declared, errors) => {
     if (input.summary !== undefined && input.summary !== null && typeof input.summary !== 'string') { errors.push(error('summary', 'invalid', 'must be a template string')); return ''; }
     const summary = asString(input.summary);
     if (summary.length > MAX_TEMPLATE) errors.push(error('summary', 'too_long', `must be ${MAX_TEMPLATE} characters or fewer`));
-    checkTemplate(summary, 'summary', declared, [TEMPLATE_ROOTS.answer, TEMPLATE_ROOTS.emitted], errors);
+    checkTemplate(summary, 'summary', declared, [TEMPLATE_ROOTS.answer, TEMPLATE_ROOTS.emitted, TEMPLATE_ROOTS.fallback], errors);
     return summary;
+};
+
+/* What the run posts when the model answered nothing: rendered from gathered
+ * data alone, so it may not read the answer, an item or a count of emitted
+ * changes. Without one, a skill whose provider is down proposes nothing. */
+const validateFallback = (input, declared, errors) => {
+    if (input.fallback !== undefined && input.fallback !== null && typeof input.fallback !== 'string') { errors.push(error('fallback', 'invalid', 'must be a template string')); return ''; }
+    const fallback = asString(input.fallback);
+    if (fallback.length > MAX_TEMPLATE) errors.push(error('fallback', 'too_long', `must be ${MAX_TEMPLATE} characters or fewer`));
+    checkTemplate(fallback, 'fallback', declared, [], errors);
+    return fallback;
+};
+
+const gatherPath = (value, field, declared, errors) => {
+    const path = asString(value);
+    if (!path) return '';
+    const parts = path.replace(/^task\./, '').split('.');
+    if (parts[0] !== TEMPLATE_ROOTS.gather || !parts[1]) { errors.push(error(field, 'invalid', 'must name a gathered value, as "gather.<step>.<field>"')); return ''; }
+    if (!declared.gather.has(parts[1])) errors.push(error(field, 'undeclared_reader', `reads "${parts[1]}", which no gather step provides`));
+    return path;
+};
+
+const answerFields = (value, field, errors) => {
+    if (value === undefined) return [];
+    if (!Array.isArray(value)) { errors.push(error(field, 'invalid', 'must be a list of answer field names')); return []; }
+    if (value.length > MAX_GROUNDED_FIELDS) errors.push(error(field, 'too_many', `at most ${MAX_GROUNDED_FIELDS}`));
+    return value.slice(0, MAX_GROUNDED_FIELDS).map(asString).filter(Boolean);
+};
+
+/* The ground-truth gate: which gathered values hold the task keys and the
+ * counts the answer is allowed to name, and which answer fields to hold to them. */
+const validateGrounded = (input, declared, errors) => {
+    if (input.grounded === undefined || input.grounded === null) return null;
+    if (!isPlainObject(input.grounded)) { errors.push(error('grounded', 'invalid', 'must be an object')); return null; }
+    const spec = input.grounded;
+    const keys = gatherPath(spec.keys, 'grounded.keys', declared, errors);
+    const numbers = gatherPath(spec.numbers, 'grounded.numbers', declared, errors);
+    const fields = answerFields(spec.fields, 'grounded.fields', errors);
+    const mustNameKey = answerFields(spec.mustNameKey, 'grounded.mustNameKey', errors);
+    if (!fields.length && !mustNameKey.length) errors.push(error('grounded.fields', 'required', 'name at least one answer field to hold to the data'));
+    if (!keys && !numbers) errors.push(error('grounded.keys', 'required', 'name the gathered keys or counts the answer is checked against'));
+    let allowHours = [];
+    if (spec.allowHours !== undefined) {
+        if (!Array.isArray(spec.allowHours) || spec.allowHours.some((n) => !Number.isInteger(Number(n)) || Number(n) < 1)) errors.push(error('grounded.allowHours', 'invalid', 'must be a list of whole hour windows the skill itself names'));
+        else allowHours = spec.allowHours.slice(0, MAX_GROUNDED_FIELDS).map(Number);
+    }
+    return { ...(keys ? { keys } : {}), ...(numbers ? { numbers } : {}), fields, mustNameKey, allowHours };
 };
 
 const validateSkill = (input = {}) => {
@@ -198,6 +252,8 @@ const validateSkill = (input = {}) => {
     const prompt = validatePrompt(doc, declared, errors);
     const emit = validateEmit(doc, declared, errors);
     const summary = validateSummary(doc, declared, errors);
+    const fallback = validateFallback(doc, declared, errors);
+    const grounded = validateGrounded(doc, declared, errors);
 
     if (doc.risk !== undefined && !RISKS.includes(doc.risk)) errors.push(error('risk', 'invalid', `must be one of ${RISKS.join(', ')}`));
 
@@ -217,6 +273,8 @@ const validateSkill = (input = {}) => {
             enabled: doc.enabled !== false,
             inputs, gather, prompt, emit, emits,
             ...(summary ? { summary } : {}),
+            ...(fallback ? { fallback } : {}),
+            ...(grounded ? { grounded } : {}),
             model: pin.model,
             risk: doc.risk && riskRank(doc.risk) > riskRank(computed) ? doc.risk : computed,
         },

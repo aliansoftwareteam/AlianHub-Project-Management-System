@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-14T10:26:43.888Z",
+  "updatedAt": "2026-09-14T11:03:13.068Z",
   "keys": {
     "Scrum.stranded_head": "These {count} will stay in this sprint",
     "Scrum.stranded_hint": "They are unfinished, but their parent task is done — and a subtask moves with its parent. Finish them, or reopen the parent task, before completing the sprint.",
@@ -7981,6 +7981,15 @@
     "Ai.skill_enabled": "Available to agents",
     "Ai.skills_effective_note": "The chips are what this agent would allow the skill to do: the skill's actions cut to the agent's allowed actions.",
     "Ai.skills_open_library": "Open the skill library",
-    "Ai.available_actions_note": "Every action a skill may emit, and what the guard does with it."
+    "Ai.available_actions_note": "Every action a skill may emit, and what the guard does with it.",
+    "Ai.skill_fallback": "What to post when the model says nothing",
+    "Ai.skill_fallback_hint": "Rendered from the gathered data alone, so a run still says what the board already knows. It cannot read the answer.",
+    "Ai.skill_grounded": "Hold the answer to the data",
+    "Ai.skill_grounded_hint": "Drops any sentence or item naming a task or a count the skill did not gather. Leave the first two empty to check nothing.",
+    "Ai.skill_grounded_keys": "Gathered task keys, e.g. gather.plan.keys",
+    "Ai.skill_grounded_numbers": "Gathered counts, e.g. gather.plan.counts",
+    "Ai.skill_grounded_fields": "Answer fields to check, comma separated",
+    "Ai.skill_grounded_must_name_key": "Answer lists that must name a gathered task",
+    "Ai.skill_grounded_allow_hours": "Hour windows the skill itself names, e.g. 24, 48"
   }
 }

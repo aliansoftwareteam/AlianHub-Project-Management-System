@@ -133,6 +133,28 @@
                         <textarea id="sk-summary" v-model="form.summary" class="ah-input ah-textarea ah-mono"></textarea>
                     </div>
 
+                    <div class="ah-field">
+                        <label class="ah-field__label" for="sk-fallback">{{ $t('Ai.skill_fallback') }}</label>
+                        <textarea id="sk-fallback" v-model="form.fallback" class="ah-input ah-textarea ah-mono" :class="{ 'ah-input--error': errorFor('fallback') }"></textarea>
+                        <span class="ah-field__hint">{{ $t('Ai.skill_fallback_hint') }}</span>
+                        <span v-if="errorFor('fallback')" class="ah-field__error">{{ errorFor('fallback') }}</span>
+                    </div>
+
+                    <div class="ah-field">
+                        <span class="ah-field__label">{{ $t('Ai.skill_grounded') }}</span>
+                        <span class="ah-field__hint">{{ $t('Ai.skill_grounded_hint') }}</span>
+                        <div class="sk-editor__row">
+                            <input v-model.trim="form.groundedKeys" type="text" class="ah-input ah-mono" :aria-label="$t('Ai.skill_grounded_keys')" :placeholder="$t('Ai.skill_grounded_keys')" />
+                            <input v-model.trim="form.groundedNumbers" type="text" class="ah-input ah-mono" :aria-label="$t('Ai.skill_grounded_numbers')" :placeholder="$t('Ai.skill_grounded_numbers')" />
+                        </div>
+                        <div class="sk-editor__row">
+                            <input v-model.trim="form.groundedFields" type="text" class="ah-input ah-mono" :aria-label="$t('Ai.skill_grounded_fields')" :placeholder="$t('Ai.skill_grounded_fields')" />
+                            <input v-model.trim="form.groundedMustNameKey" type="text" class="ah-input ah-mono" :aria-label="$t('Ai.skill_grounded_must_name_key')" :placeholder="$t('Ai.skill_grounded_must_name_key')" />
+                        </div>
+                        <input v-model.trim="form.groundedAllowHours" type="text" class="ah-input ah-mono" :aria-label="$t('Ai.skill_grounded_allow_hours')" :placeholder="$t('Ai.skill_grounded_allow_hours')" />
+                        <span v-if="groundedError" class="ah-field__error">{{ groundedError }}</span>
+                    </div>
+
                     <label class="sk-editor__check">
                         <input v-model="form.enabled" type="checkbox" class="ah-check" />
                         <span>{{ $t('Ai.skill_enabled') }}</span>
@@ -195,6 +217,12 @@ const form = reactive({
     template: props.skill?.prompt?.template || "",
     output: props.skill?.prompt?.output || "",
     summary: props.skill?.summary || "",
+    fallback: props.skill?.fallback || "",
+    groundedKeys: props.skill?.grounded?.keys || "",
+    groundedNumbers: props.skill?.grounded?.numbers || "",
+    groundedFields: (props.skill?.grounded?.fields || []).join(", "),
+    groundedMustNameKey: (props.skill?.grounded?.mustNameKey || []).join(", "),
+    groundedAllowHours: (props.skill?.grounded?.allowHours || []).join(", "),
     emit: (props.skill?.emit || []).map((m) => ({ action: m.action, each: m.each || "", params: { ...(m.params || {}) } }))
 });
 
@@ -210,6 +238,22 @@ const computedRisk = computed(() => form.emit.reduce((worst, m) => {
 
 const fieldsOf = (reader) => ((props.catalogues.readers || []).find((r) => r.key === reader)?.fields || []).join(", ");
 const errorFor = (field) => errors.value.find((e) => e.field === field)?.message || "";
+const groundedError = computed(() => errors.value.find((e) => e.field.startsWith("grounded"))?.message || "");
+
+const listOf = (value) => String(value || "").split(",").map((v) => v.trim()).filter(Boolean);
+
+/* Only sent when the skill says what the answer is checked against; the
+ * validator refuses a half-written clause rather than checking nothing. */
+const groundedOf = () => {
+    if (!form.groundedKeys && !form.groundedNumbers) return null;
+    return {
+        ...(form.groundedKeys ? { keys: form.groundedKeys } : {}),
+        ...(form.groundedNumbers ? { numbers: form.groundedNumbers } : {}),
+        fields: listOf(form.groundedFields),
+        mustNameKey: listOf(form.groundedMustNameKey),
+        allowHours: listOf(form.groundedAllowHours).map(Number),
+    };
+};
 
 const toggleInput = (key) => {
     const at = form.inputs.indexOf(key);
@@ -253,7 +297,9 @@ const body = () => ({
     gather: form.gather.map((s) => ({ reader: s.reader, as: s.as || s.reader, params: { ...s.params } })),
     prompt: { partials: [...form.partials], instructions: form.instructions, template: form.template, output: form.output, maxTokens: props.skill?.prompt?.maxTokens || undefined },
     emit: form.emit.map((m) => ({ action: m.action, ...(m.each ? { each: m.each } : {}), params: { ...m.params } })),
-    ...(form.summary ? { summary: form.summary } : {})
+    ...(form.summary ? { summary: form.summary } : {}),
+    ...(form.fallback ? { fallback: form.fallback } : {}),
+    ...(groundedOf() ? { grounded: groundedOf() } : {})
 });
 
 const save = async () => {
