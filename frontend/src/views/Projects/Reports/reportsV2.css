@@ -47,15 +47,15 @@ button.rp-row:hover .rp-row__name { color: var(--brand); text-decoration: underl
 .rp-dot.is-warn { background: var(--warn); }
 .rp-dot.is-ok { background: var(--ok); }
 
-.rp-dark { background: var(--rail); color: #fff; border-radius: var(--r-card); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; font: 400 12.5px/1.55 var(--font-ui); }
+.rp-dark { background: var(--rail); color: var(--rail-ink-strong); border-radius: var(--r-card); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; font: 400 12.5px/1.55 var(--font-ui); }
 .rp-dark__head { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-.rp-dark__mark { width: 22px; height: 22px; border-radius: 6px; background: rgba(255, 255, 255, .12); display: grid; place-items: center; flex: none; }
-.rp-dark__body { color: rgba(255, 255, 255, .85); }
-.rp-dark__body strong { color: #fff; font-weight: 600; }
-.rp-dark__meta { margin-left: auto; font: 500 10px/1 var(--font-mono); color: rgba(255, 255, 255, .45); text-transform: uppercase; }
+.rp-dark__mark { width: 22px; height: 22px; border-radius: var(--r-chip); background: var(--rail-active); display: grid; place-items: center; flex: none; }
+.rp-dark__body { color: var(--rail-ink); }
+.rp-dark__body strong { color: var(--rail-ink-strong); font-weight: 600; }
+.rp-dark__meta { margin-left: auto; font: 500 10px/1 var(--font-mono); color: var(--rail-ink-2); text-transform: uppercase; }
 
 .rp-note { padding: 11px 13px; background: var(--surface); border: 1px solid var(--hairline); border-radius: 10px; font: var(--text-small); line-height: 1.5; color: var(--ink-2); }
-.rp-note--brand { border-color: rgba(47, 57, 144, .25); color: var(--ink); }
+.rp-note--brand { border-color: var(--brand-border); color: var(--ink); }
 .rp-spark { color: var(--brand); font-weight: 600; }
 
 .rp-table { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); overflow: hidden; }
@@ -76,22 +76,31 @@ button.rp-row:hover .rp-row__name { color: var(--brand); text-decoration: underl
 .rp-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--ink-2); }
 .rp-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
 
+/* ApexCharts hardcodes light-grey chrome of its own. Annotation labels are left
+   alone because they carry their own status colour; the legend is the one part
+   the library sets inline, which is why that rule needs !important. */
+.rp-page .apexcharts-gridline, .rp-page .apexcharts-grid-borders line { stroke: var(--hairline); }
+.rp-page .apexcharts-xaxis-label, .rp-page .apexcharts-yaxis-label,
+.rp-page .apexcharts-xaxis-title-text, .rp-page .apexcharts-yaxis-title-text { fill: var(--ink-2); }
+.rp-page .apexcharts-title-text { fill: var(--ink); }
+.rp-page .apexcharts-legend-text { color: var(--ink-2) !important; }
+.rp-page .apexcharts-tooltip.apexcharts-theme-light { background: var(--surface); border-color: var(--border); color: var(--ink); }
+.rp-page .apexcharts-tooltip.apexcharts-theme-light .apexcharts-tooltip-title { background: var(--surface-2); border-bottom-color: var(--hairline); }
+
 .rp-bars { flex: 1; display: flex; align-items: flex-end; gap: 14px; padding-top: 8px; min-height: 150px; }
 .rp-bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; }
 .rp-bar__pair { width: 100%; display: flex; gap: 3px; align-items: flex-end; height: 130px; }
 .rp-bar__fill { flex: 1; border-radius: 4px 4px 0 0; background: var(--ok); min-height: 2px; }
-.rp-bar__fill.is-committed { background: rgba(0, 0, 0, .12); }
-:root[data-theme="dark"] .rp-bar__fill.is-committed { background: rgba(255, 255, 255, .16); }
+.rp-bar__fill.is-committed { background: var(--border); }
 .rp-bar__fill.is-current { background: var(--brand); }
 .rp-bar__fill.is-agent { background: var(--agent); }
-.rp-bar__forecast { width: 100%; border: 1.5px dashed rgba(47, 57, 144, .5); border-radius: 4px 4px 0 0; background: var(--brand-tint); min-height: 2px; }
+.rp-bar__forecast { width: 100%; border: 1.5px dashed var(--brand-border); border-radius: 4px 4px 0 0; background: var(--brand-tint); min-height: 2px; }
 .rp-bar__label { font: 500 10px/1 var(--font-mono); color: var(--ink-3); }
 .rp-bar__label.is-current { font-weight: 600; color: var(--brand); }
 
 .rp-meter { display: flex; align-items: center; gap: 10px; }
 .rp-meter__name { width: 84px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rp-meter__track { flex: 1; height: 8px; border-radius: 99px; background: rgba(0, 0, 0, .07); overflow: hidden; }
-:root[data-theme="dark"] .rp-meter__track { background: rgba(255, 255, 255, .1); }
+.rp-meter__track { flex: 1; height: 8px; border-radius: 99px; background: var(--track); overflow: hidden; }
 .rp-meter__fill { display: block; height: 100%; border-radius: 99px; background: var(--brand); transition: width var(--t-state) var(--ease); }
 .rp-meter__fill.is-over { background: var(--danger); }
 .rp-meter__pct { width: 44px; flex: none; text-align: right; font: 500 11px/1.2 var(--font-mono); }
