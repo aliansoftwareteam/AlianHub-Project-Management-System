@@ -1,5 +1,5 @@
 <template>
-  <div class="wb-view">
+  <div class="wb-view ah-page">
     <div class="wb-view__bar">
       <span class="wb-view__title">Whiteboard</span>
       <span class="wb-view__count">{{ cards.length }} cards</span>
@@ -111,20 +111,20 @@ onBeforeUnmount(() => { window.removeEventListener('mousemove', onDrag); window.
 </script>
 
 <style scoped>
-.wb-view { display: flex; flex-direction: column; width: 100%; height: 100%; background: #fff; }
-.wb-view__bar { display: flex; align-items: center; gap: 14px; padding: 8px 14px; border-bottom: 1px solid #eee; flex: 0 0 auto; }
-.wb-view__title { font-size: 14px; font-weight: 700; color: #2b2f44; }
-.wb-view__count { font-size: 12px; color: #888; }
-.wb-view__btn { margin-left: auto; border: 1px solid #d8d8e0; background: #fff; color: #444; border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; }
-.wb-view__btn:hover { background: #f2f3fb; }
+.wb-view { display: flex; flex-direction: column; width: 100%; height: 100%; background: var(--surface); color: var(--ink); }
+.wb-view__bar { display: flex; align-items: center; gap: 14px; padding: 8px 14px; border-bottom: 1px solid var(--hairline); flex: 0 0 auto; }
+.wb-view__title { font-size: 14px; font-weight: 700; color: var(--ink); }
+.wb-view__count { font-size: 12px; color: var(--ink-2); }
+.wb-view__btn { margin-left: auto; border: 1px solid var(--border); background: var(--surface); color: var(--ink); border-radius: var(--r-chip); padding: 5px 12px; font-size: 12px; cursor: pointer; }
+.wb-view__btn:hover { background: var(--surface-hover); }
 .wb-view__board { position: relative; flex: 1 1 auto; min-height: 360px; overflow: auto; background:
-    linear-gradient(#f4f5fa 1px, transparent 1px) 0 0 / 24px 24px,
-    linear-gradient(90deg, #f4f5fa 1px, transparent 1px) 0 0 / 24px 24px, #fff; }
-.wb-view__empty { position: absolute; top: 48px; left: 0; right: 0; text-align: center; color: #999; font-size: 14px; }
-.wb-view__card { position: absolute; width: 180px; min-height: 64px; box-sizing: border-box; background: #fff; border: 1px solid #e0e2ee; border-left: 4px solid #8a93b5; border-radius: 8px; padding: 8px 10px; box-shadow: 0 1px 4px rgba(0,0,0,.08); cursor: grab; user-select: none; }
-.wb-view__card.dragging { cursor: grabbing; box-shadow: 0 6px 18px rgba(0,0,0,.18); z-index: 5; }
-.wb-view__card.is-progress { border-left-color: #2f6fed; }
-.wb-view__card.is-done { border-left-color: #1c9b5e; }
-.wb-view__card-key { display: block; font-size: 11px; font-weight: 600; color: #7b68ee; margin-bottom: 3px; }
-.wb-view__card-name { font-size: 13px; color: #33384a; }
+    linear-gradient(var(--hairline) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, var(--hairline) 1px, transparent 1px) 0 0 / 24px 24px, var(--surface); }
+.wb-view__empty { position: absolute; top: 48px; left: 0; right: 0; text-align: center; color: var(--ink-2); font-size: 14px; }
+.wb-view__card { position: absolute; width: 180px; min-height: 64px; box-sizing: border-box; background: var(--surface); border: 1px solid var(--hairline); border-left: 4px solid var(--ink-3); border-radius: var(--r-input); padding: 8px 10px; box-shadow: var(--shadow-card); cursor: grab; user-select: none; }
+.wb-view__card.dragging { cursor: grabbing; box-shadow: var(--shadow-pop); z-index: 5; }
+.wb-view__card.is-progress { border-left-color: var(--warn); }
+.wb-view__card.is-done { border-left-color: var(--ok); }
+.wb-view__card-key { display: block; font-size: 11px; font-weight: 600; color: var(--brand); margin-bottom: 3px; }
+.wb-view__card-name { font-size: 13px; color: var(--ink); }
 </style>
