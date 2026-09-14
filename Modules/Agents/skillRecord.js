@@ -84,7 +84,7 @@ const createSkill = async (companyId, input, { createdBy } = {}) => {
     return plainOf(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_SKILLS, data: { ...checked.value, createdBy: createdBy || null } }, 'save'));
 };
 
-const EDITABLE = Object.freeze(['name', 'description', 'enabled', 'inputs', 'gather', 'prompt', 'emit', 'summary', 'risk', 'model']);
+const EDITABLE = Object.freeze(['name', 'description', 'enabled', 'inputs', 'gather', 'prompt', 'emit', 'summary', 'fallback', 'grounded', 'risk', 'model']);
 
 const updateSkill = async (companyId, key, patch = {}) => {
     const existing = await findData(companyId, key);

@@ -87,17 +87,25 @@ const READER_CATALOGUE = Object.freeze({
     project: Object.freeze({
         label: 'The project',
         description: 'The project name and its stored guide.',
-        params: Object.freeze({ maxChars: Object.freeze({ type: 'number', min: 200, max: 20000, default: 8000 }) }),
+        params: Object.freeze({
+            maxChars: Object.freeze({ type: 'number', min: 200, max: 20000, default: 8000 }),
+            requireGuide: Object.freeze({ type: 'boolean', default: false }),
+        }),
         fields: Object.freeze(['name', 'guide', 'hasGuide']),
     }),
     'project.tasks': Object.freeze({
         label: 'Tasks in the project',
-        description: 'Parent tasks of the project, with counts and a plain list.',
+        description: 'Parent tasks of the project: the counts, the board split into what is overdue, due soon, blocked, in review and unassigned, the plan by sprint, and the keys and counts a grounded skill checks the model against.',
         params: Object.freeze({
             limit: Object.freeze({ type: 'number', min: 1, max: 200, default: 50 }),
             openOnly: Object.freeze({ type: 'boolean', default: false }),
+            rowsPerBucket: Object.freeze({ type: 'number', min: 1, max: 50, default: 10 }),
         }),
-        fields: Object.freeze(['count', 'open', 'done', 'overdue', 'blocked', 'unassigned', 'list']),
+        fields: Object.freeze([
+            'count', 'open', 'done', 'overdue', 'dueSoon', 'blocked', 'inReview', 'unassigned', 'moved',
+            'list', 'overdueList', 'dueSoonList', 'blockedList', 'inReviewList', 'unassignedList',
+            'plan', 'next', 'keys', 'counts',
+        ]),
     }),
     memory: Object.freeze({
         label: 'Agent memory',
@@ -157,8 +165,10 @@ const EMIT_REQUIRED = Object.freeze({
 const TASK_FIELDS = Object.freeze(['_id', 'TaskKey', 'TaskName', 'description', 'Task_Priority', 'DueDate', 'startDate', 'ProjectID', 'statusType', 'status.text', 'tagsArray', 'points', 'totalEstimatedTime']);
 
 /* Roots a placeholder may start with besides a task field. `emitted` counts the
- * changes kept so far by action ({{emitted.subtask.create}}), in mapping order. */
-const TEMPLATE_ROOTS = Object.freeze({ input: 'input', gather: 'gather', memory: 'memory', answer: 'answer', item: 'item', emitted: 'emitted' });
+ * changes kept so far by action ({{emitted.subtask.create}}), in mapping order;
+ * `fallback` is what the skill renders from gathered data alone, so a run whose
+ * model said nothing still posts what the board already knows. */
+const TEMPLATE_ROOTS = Object.freeze({ input: 'input', gather: 'gather', memory: 'memory', answer: 'answer', item: 'item', emitted: 'emitted', fallback: 'fallback' });
 
 /* Pure formatters a placeholder may pipe through ({{item.hours | int:1:40}}).
  * Arguments are numbers only, so a template never hands a filter text to interpret. */
