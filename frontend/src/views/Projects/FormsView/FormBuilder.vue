@@ -402,6 +402,10 @@ const TABS = ['build', 'preview'];
 const THEMES = ['light', 'dark'];
 const TOGGLES = ['answersInDescription', 'hideBranding'];
 const ALIGNMENTS = ['left', 'center', 'right'];
+// The author picks from these and the choice is stored on the form, then
+// replayed on the public form outside the app shell. They are data, not theme:
+// a design token here would repaint every saved form when a viewer — not the
+// author — switched between light and dark.
 const BACKGROUNDS = ['#f5f6fa', '#ffffff', '#eef2ff', '#eefaf3', '#fff7e6', '#fdeef1', '#f3eefa', '#1f2130'];
 const BUTTON_COLORS = ['#2f3a8f', '#4b5563', '#6473e8', '#2f80ed', '#24c110', '#f5a623', '#ec4141', '#9759c0'];
 
