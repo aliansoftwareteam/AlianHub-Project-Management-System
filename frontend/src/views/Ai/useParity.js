@@ -32,8 +32,12 @@ export function useParity() {
         if (ok(res)) runs.value = res.data.data || [];
     };
 
-    const loadRoutable = async (projectId = "") => {
-        const res = await apiRequest("get", `${env.AGENT_ROUTABLE}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""}`);
+    const loadRoutable = async (projectId = "", { limit } = {}) => {
+        const query = new URLSearchParams();
+        if (projectId) query.set("projectId", projectId);
+        if (limit) query.set("limit", String(limit));
+        const suffix = query.toString();
+        const res = await apiRequest("get", `${env.AGENT_ROUTABLE}${suffix ? `?${suffix}` : ""}`);
         if (ok(res)) routable.value = res.data.data || [];
     };
 

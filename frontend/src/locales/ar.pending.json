@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-14T12:52:57.554Z",
+  "updatedAt": "2026-09-14T13:03:10.042Z",
   "keys": {
     "Scrum.stranded_head": "These {count} will stay in this sprint",
     "Scrum.stranded_hint": "They are unfinished, but their parent task is done — and a subtask moves with its parent. Finish them, or reopen the parent task, before completing the sprint.",
@@ -8066,6 +8066,7 @@
     "AiLanding.agent_reads_only": "Reads and comments only.",
     "AiLanding.manage_agents": "Manage agents",
     "AiLanding.open_inbox": "Approvals inbox",
-    "AiLanding.agents_note": "Every write an agent proposes waits for a person."
+    "AiLanding.agents_note": "Every write an agent proposes waits for a person.",
+    "AiLanding.read_line_capped": "Your {n} most recently updated open tasks — {parts}."
   }
 }

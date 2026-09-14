@@ -5,10 +5,6 @@
             <div class="ah-toolbar">
                 <div class="ah-toolbar__title">{{ $t('AiLanding.title') }}</div>
                 <div class="ah-toolbar__spacer"></div>
-                <div class="ah-tabs">
-                    <button type="button" class="ah-tab" :class="{ 'is-active': tab === 'ask' }" @click="tab = 'ask'">{{ $t('AiLanding.tab_ask') }}</button>
-                    <button type="button" class="ah-tab" :class="{ 'is-active': tab === 'agents' }" @click="tab = 'agents'">{{ $t('AiLanding.tab_agents') }}</button>
-                </div>
             </div>
 
             <div class="parity-page__body ah-scroll land" @click="closePops">
@@ -17,6 +13,10 @@
                         <span class="land__glyph"><ShellIcon name="ai" :size="20" /></span>
                         <h1 class="land__title">{{ $t('AiLanding.headline') }}</h1>
                         <p class="land__sub">{{ $t('AiLanding.sub') }}</p>
+                        <div class="ah-tabs">
+                            <button type="button" class="ah-tab" :class="{ 'is-active': tab === 'ask' }" @click="tab = 'ask'">{{ $t('AiLanding.tab_ask') }}</button>
+                            <button type="button" class="ah-tab" :class="{ 'is-active': tab === 'agents' }" @click="tab = 'agents'">{{ $t('AiLanding.tab_agents') }}</button>
+                        </div>
                     </div>
 
                     <template v-if="tab === 'ask'">
@@ -285,6 +285,9 @@ import { backlogRead, skillReach } from "./backlogRead";
 defineOptions({ name: "AskPage" });
 
 const PANEL_LIMIT = 8;
+// The server caps /routable at 100, so a full page is a window on the backlog
+// rather than the whole of it, and the headline has to say which it is.
+const BACKLOG_LIMIT = 100;
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -328,10 +331,12 @@ const modelChip = computed(() => {
     return t("AiLanding.ctl_model");
 });
 
+const capped = computed(() => read.value.total >= BACKLOG_LIMIT);
+
 const readLine = computed(() => {
     const parts = read.value.groups.map((g) => t("AiLanding.read_part", { n: g.tasks.length, work: t(`AiLanding.kind_${g.labelKey}`) }));
     if (read.value.needsPerson) parts.push(t("AiLanding.read_part", { n: read.value.needsPerson, work: t("AiLanding.kind_person") }));
-    return t("AiLanding.read_line", { n: read.value.total, parts: parts.join(t("AiLanding.read_join")) });
+    return t(capped.value ? "AiLanding.read_line_capped" : "AiLanding.read_line", { n: read.value.total, parts: parts.join(t("AiLanding.read_join")) });
 });
 
 const openGroupRef = computed(() => read.value.groups.find((g) => g.labelKey === openKey.value) || null);
@@ -460,7 +465,7 @@ onMounted(async () => {
     if (sourceRes?.data?.status) sources.value = sourceRes.data.data || {};
     if (modelRes?.data?.status) models.value = modelRes.data.data?.models || [];
     try {
-        await Promise.all([loadRoutable(), loadAgents(), loadRegistry(), loadRuns(), loadSkills(), loadSpend()]);
+        await Promise.all([loadRoutable("", { limit: BACKLOG_LIMIT }), loadAgents(), loadRegistry(), loadRuns(), loadSkills(), loadSpend()]);
     } catch (e) {
         error.value = reasonOf(e, "Ai.load_failed");
     } finally {
@@ -470,6 +475,9 @@ onMounted(async () => {
 </script>
 
 <style>
+/* The sidebar carries no style block of its own, and this is the section's
+   first screen, so the shared AI stylesheet has to arrive with it. */
+@import "./style.css";
 @import "./parity.css";
 @import "./landing.css";
 </style>
