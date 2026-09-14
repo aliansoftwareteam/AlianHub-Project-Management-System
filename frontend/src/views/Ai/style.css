@@ -3,45 +3,6 @@
 .ai-page__body { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; }
 
 
-.ai-side {
-    width: var(--sidebar-w-narrow);
-    flex: none;
-    border-right: 1px solid var(--hairline);
-    background: var(--surface);
-    display: flex;
-    flex-direction: column;
-    padding: 14px 10px 10px;
-}
-.ai-side__head { display: flex; align-items: center; gap: 8px; padding: 0 6px 12px; }
-.ai-side__nav { display: flex; flex-direction: column; gap: 2px; }
-.ai-side__item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 8px 10px; border-radius: 8px;
-    font: 500 13px/1.2 var(--font-ui); color: var(--ink); text-decoration: none;
-    transition: background var(--t-state) var(--ease);
-}
-.ai-side__item:hover { background: var(--surface-hover); color: var(--ink); text-decoration: none; }
-.ai-side__item:focus-visible { outline: none; box-shadow: var(--focus); }
-.ai-side__item.router-link-active { background: var(--brand-tint); color: var(--brand); }
-.ai-side__count { margin-left: auto; color: var(--ink-2); }
-.ai-side__item.router-link-active .ai-side__count { color: var(--brand); }
-.ai-side__group { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--hairline); }
-.ai-side__group-head {
-    display: flex; align-items: center; gap: 10px; width: 100%;
-    padding: 7px 10px; border: 0; border-radius: 8px; background: none; cursor: pointer;
-    font: var(--text-label); letter-spacing: .06em; text-transform: uppercase;
-    color: var(--ink-label); text-align: left;
-    transition: background var(--t-state) var(--ease);
-}
-.ai-side__group-head:hover { background: var(--surface-hover); color: var(--ink); }
-.ai-side__group-head:focus-visible { outline: none; box-shadow: var(--focus); }
-.ai-side__caret { margin-left: auto; transition: transform var(--t-state) var(--ease); }
-.ai-side__caret.is-open { transform: rotate(180deg); }
-.ai-side__group-body { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
-.ai-side__usage { margin-top: auto; padding: 12px 6px 4px; border-top: 1px solid var(--hairline); display: flex; flex-direction: column; gap: 7px; }
-.ai-side__running { display: flex; align-items: center; gap: 7px; font: var(--text-small); color: var(--ink); }
-.ai-side__spend { color: var(--ink-2); }
-
 .ai-lead { font: var(--text-small); margin: 0 0 14px; max-width: 640px; }
 .ai-lead strong { color: var(--ink); font-weight: 600; }
 
@@ -104,19 +65,7 @@
 .ai-soon__links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
 
 @media (max-width: 1280px) {
-    /* Icon rail rather than gone: the Setup consoles have no other entry point at this
-       width, so the group still opens, just to icons. Below 768 the tab bar takes over. */
-    .ai-side { width: 56px; padding: 14px 6px 10px; align-items: center; }
-    .ai-side__head span, .ai-side__usage, .ai-side__item > span:not(.ai-side__count) { display: none; }
-    .ai-side__group-label, .ai-side__caret { display: none; }
-    .ai-side__group { width: 100%; }
-    .ai-side__group-head { width: 40px; height: 40px; padding: 0; margin: 0 auto; justify-content: center; }
-    .ai-side__item { width: 40px; height: 40px; padding: 0; justify-content: center; position: relative; }
-    .ai-side__count { position: absolute; top: 2px; right: 2px; margin: 0; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--brand); color: #fff; font-size: 10px; line-height: 16px; text-align: center; }
     .ai-inbox { grid-template-columns: 300px 1fr; }
-}
-@media (max-width: 767px) {
-    .ai-side { display: none; }
 }
 @media (max-width: 900px) {
     .ai-inbox { grid-template-columns: 1fr; }

@@ -134,3 +134,7 @@ const onPauseAll = async () => {
     }
 };
 </script>
+
+<style>
+@import "./sidebar.css";
+</style>

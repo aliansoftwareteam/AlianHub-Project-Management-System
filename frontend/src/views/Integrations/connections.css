@@ -2,7 +2,9 @@
 
 .conn { background: var(--canvas); min-height: 100%; }
 .conn__body { flex: 1; min-height: 0; overflow: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
-.conn__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+/* minmax(0) rather than 1fr: the CLI command is a single unbreakable line, and an
+   auto minimum lets it size its own column and push the next one off the page. */
+.conn__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: start; }
 
 .conn__card { padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; }
 .conn__top { display: flex; align-items: center; gap: 8px; }
