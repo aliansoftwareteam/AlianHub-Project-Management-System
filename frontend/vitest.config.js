@@ -19,7 +19,8 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, 'src'),
-            '@pageContent': path.resolve(__dirname, '../Modules/Pages/helpers/pageContent.js')
+            '@pageContent': path.resolve(__dirname, '../Modules/Pages/helpers/pageContent.js'),
+            '@agentWork': path.resolve(__dirname, '../Modules/Agents/workKinds.js')
         }
     },
     test: {

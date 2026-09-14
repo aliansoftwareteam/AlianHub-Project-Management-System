@@ -171,9 +171,9 @@ describe('GET /api/v2/agents/manifest', () => {
             paused: false,
             allowedActions: ['task.get', 'task.comment'],
             skills: [
-                { key: 'brief.parse', name: 'Intake', enabled: true, resolved: true, source: 'code', version: null, emits: ['subtask.create', 'task.comment'], effectiveActions: ['task.comment'] },
-                { key: 'task.summary', name: 'Summariser', enabled: true, resolved: true, source: 'data', version: 1, emits: ['task.comment'], effectiveActions: ['task.comment'] },
-                { key: 'gone.skill', name: 'gone.skill', enabled: false, resolved: false, source: null, version: null, emits: [], effectiveActions: [] },
+                { key: 'brief.parse', name: 'Intake', enabled: true, resolved: true, source: 'code', version: null, inputs: ['brief'], requires: { code: 'brief', needs: 'it needs a brief of at least 40 characters', scope: 'task' }, emits: ['subtask.create', 'task.comment'], risk: 'low', effectiveActions: ['task.comment'] },
+                { key: 'task.summary', name: 'Summariser', enabled: true, resolved: true, source: 'data', version: 1, inputs: ['brief'], requires: { code: 'brief', needs: 'it needs a brief of at least 40 characters', scope: 'task' }, emits: ['task.comment'], risk: 'low', effectiveActions: ['task.comment'] },
+                { key: 'gone.skill', name: 'gone.skill', enabled: false, resolved: false, source: null, version: null, inputs: [], requires: null, emits: [], risk: null, effectiveActions: [] },
             ],
         });
         expect(r.body.data[1].skills[0]).toMatchObject({ key: 'project.plan', source: 'code', effectiveActions: ['subtask.create', 'task.comment'] });

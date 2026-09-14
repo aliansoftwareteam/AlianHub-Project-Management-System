@@ -1,8 +1,14 @@
 const F = require('../frontend/src/views/Ai/agentFit');
 const registry = require('../Modules/Agents/registry');
+const codeSkills = require('../Modules/Agents/skills');
+const { requirementDetail } = require('../Modules/Agents/skills/inputRules');
 
 const REGISTRY_ACTIONS = registry.manifest().actions;
 const NEVER = registry.NEVER;
+
+// The skill manifest as GET /api/v2/agents/skills sends it: the picker reads
+// what a skill needs from here, never from a table of its own.
+const SKILLS = codeSkills.ALL.map((s) => ({ key: s.slug, aliases: s.aliases || [], inputs: s.inputs || [], requires: requirementDetail(s) }));
 
 const task = (over = {}) => ({ _id: 't1', TaskName: 'Audit login contrast', ProjectID: 'p1', tagsArray: [], ...over });
 
@@ -13,7 +19,7 @@ const agent = (over = {}) => ({
 
 const run = (over = {}) => ({ _id: 'r1', agentId: 'a1', status: 'done', skill: 'review', elapsedMs: 8 * 60000, spend: { usd: 0.05 }, ...over });
 
-const rank = (opts) => F.rankAgents({ registryActions: REGISTRY_ACTIONS, never: NEVER, ...opts });
+const rank = (opts) => F.rankAgents({ registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS, ...opts });
 
 describe('classifyTask', () => {
     test('an audit is review work', () => {
@@ -46,7 +52,7 @@ describe('classifyTask', () => {
 describe('fit is built from allowed actions', () => {
     test('an agent that cannot write to the task at all is not eligible for code work', () => {
         const readOnly = agent({ allowedActions: ['task.get'] });
-        const out = F.fitFor({ agent: readOnly, task: task({ TaskName: 'Fix failing tests' }), registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const out = F.fitFor({ agent: readOnly, task: task({ TaskName: 'Fix failing tests' }), registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         expect(out.eligible).toBe(false);
         expect(out.blockedReason).toMatch(/no allowed action/);
         expect(out.percent).toBeNull();
@@ -62,14 +68,14 @@ describe('fit is built from allowed actions', () => {
     });
 
     test('"will" and "wont" come from the server registry, never a local copy', () => {
-        const out = F.fitFor({ agent: agent(), task: task(), registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const out = F.fitFor({ agent: agent(), task: task(), registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         expect(out.will).toContain('Comment on a task');
         expect(out.wont).toContain('Assign a task');
         expect(out.wont).toEqual(expect.arrayContaining(NEVER));
     });
 
     test('an agent with no declared allowedActions is treated as un-narrowed, not as forbidden', () => {
-        const out = F.fitFor({ agent: agent({ allowedActions: [] }), task: task({ TaskName: 'Fix failing tests' }), registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const out = F.fitFor({ agent: agent({ allowedActions: [] }), task: task({ TaskName: 'Fix failing tests' }), registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         expect(out.eligible).toBe(true);
         expect(out.coverage).toBe(1);
     });
@@ -77,7 +83,7 @@ describe('fit is built from allowed actions', () => {
 
 describe('fit is built from this workspace\'s own history', () => {
     test('a new agent shows "no history yet" instead of a percentage', () => {
-        const out = F.fitFor({ agent: agent(), task: task(), runs: [], registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const out = F.fitFor({ agent: agent(), task: task(), runs: [], registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         expect(out.noHistory).toBe(true);
         expect(out.percent).toBeNull();
         expect(out.reason).toMatch(/No history in this workspace yet/);
@@ -86,7 +92,7 @@ describe('fit is built from this workspace\'s own history', () => {
 
     test('a percentage appears once the agent has finished runs here', () => {
         const runs = [run(), run({ _id: 'r2' }), run({ _id: 'r3' })];
-        const out = F.fitFor({ agent: agent(), task: task(), runs, registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const out = F.fitFor({ agent: agent(), task: task(), runs, registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         expect(out.noHistory).toBe(false);
         expect(out.percent).toBeGreaterThan(0);
         expect(out.reason).toMatch(/3 similar runs here, 3 finished clean/);
@@ -95,13 +101,13 @@ describe('fit is built from this workspace\'s own history', () => {
     test('failed runs pull the score down', () => {
         const clean = [run(), run({ _id: 'r2' }), run({ _id: 'r3' })];
         const messy = clean.concat([run({ _id: 'r4', status: 'failed' }), run({ _id: 'r5', status: 'stopped' })]);
-        const good = F.fitFor({ agent: agent(), task: task(), runs: clean, registryActions: REGISTRY_ACTIONS, never: NEVER });
-        const bad = F.fitFor({ agent: agent(), task: task(), runs: messy, registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const good = F.fitFor({ agent: agent(), task: task(), runs: clean, registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
+        const bad = F.fitFor({ agent: agent(), task: task(), runs: messy, registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         expect(bad.score).toBeLessThan(good.score);
     });
 
     test('another agent\'s runs never count towards this one', () => {
-        const out = F.fitFor({ agent: agent({ _id: 'a1' }), task: task(), runs: [run({ agentId: 'a2' })], registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const out = F.fitFor({ agent: agent({ _id: 'a1' }), task: task(), runs: [run({ agentId: 'a2' })], registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         expect(out.history.runs).toBe(0);
         expect(out.noHistory).toBe(true);
     });
@@ -112,7 +118,7 @@ describe('fit is built from this workspace\'s own history', () => {
             run({ _id: 'r2', elapsedMs: 8 * 60000, spend: { usd: 0.40 } }),
             run({ _id: 'r3', elapsedMs: 35 * 60000, spend: { usd: 0.90 } })
         ];
-        const out = F.fitFor({ agent: agent(), task: task(), runs, registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const out = F.fitFor({ agent: agent(), task: task(), runs, registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         expect(out.estimate.minutes).toBe(8);
         expect(out.estimate.usd).toBe(0.4);
         expect(out.estimate.basis).toBe('median of 3 finished runs');
@@ -121,18 +127,18 @@ describe('fit is built from this workspace\'s own history', () => {
 
 describe('not eligible states name the reason', () => {
     test('paused', () => {
-        const out = F.fitFor({ agent: agent({ paused: true, pausedReason: 'spend_cap' }), task: task(), registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const out = F.fitFor({ agent: agent({ paused: true, pausedReason: 'spend_cap' }), task: task(), registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         expect(out.eligible).toBe(false);
         expect(out.blockedReason).toBe('Paused (spend_cap).');
     });
 
     test('spend cap reached', () => {
-        const out = F.fitFor({ agent: agent({ spendCapUsd: 10, spendMonth: { usd: 10 } }), task: task(), registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const out = F.fitFor({ agent: agent({ spendCapUsd: 10, spendMonth: { usd: 10 } }), task: task(), registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         expect(out.blockedReason).toMatch(/Spend cap reached/);
     });
 
     test('scoped to other projects', () => {
-        const out = F.fitFor({ agent: agent({ projectIds: ['p9'] }), task: task({ ProjectID: 'p1' }), registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const out = F.fitFor({ agent: agent({ projectIds: ['p9'] }), task: task({ ProjectID: 'p1' }), registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         expect(out.blockedReason).toBe('Not scoped to this project.');
     });
 
@@ -163,7 +169,7 @@ describe('bulk routing', () => {
     ];
 
     test('routes the mechanical work and refuses the two that need a person', () => {
-        const rows = F.routeTasks({ tasks, agents, registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const rows = F.routeTasks({ tasks, agents, registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         const totals = F.routingTotals(rows);
         expect(totals.routed).toBe(3);
         expect(totals.forPeople).toBe(2);
@@ -172,21 +178,21 @@ describe('bulk routing', () => {
     });
 
     test('code work goes to the agent with repo actions, review work to the reviewer', () => {
-        const rows = F.routeTasks({ tasks, agents, registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const rows = F.routeTasks({ tasks, agents, registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         expect(rows[1].agent.name).toBe('Claude Code');
         expect(rows[2].agent.name).toBe('Reviewer');
     });
 
     test('the total only prices the rows that have a real estimate', () => {
         const runs = [run({ agentId: 'a2', spend: { usd: 0.60 }, elapsedMs: 30 * 60000 })];
-        const rows = F.routeTasks({ tasks, agents, runs, registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const rows = F.routeTasks({ tasks, agents, runs, registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         const totals = F.routingTotals(rows);
         expect(totals.priced).toBeGreaterThan(0);
         expect(totals.usd).toBeGreaterThan(0);
     });
 
     test('with no eligible agent at all, every row falls to a person', () => {
-        const rows = F.routeTasks({ tasks, agents: [], registryActions: REGISTRY_ACTIONS, never: NEVER });
+        const rows = F.routeTasks({ tasks, agents: [], registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
         expect(F.routingTotals(rows)).toEqual({ routed: 0, forPeople: 5, usd: 0, priced: 0 });
         expect(rows[0].refusal).toBe('no agent here is allowed to do this');
     });
@@ -197,7 +203,7 @@ describe('routing refuses a task that lacks what the agent\'s skills need (brows
     const qa = agent({ _id: 'qa', name: 'QA', skills: [{ key: 'qa-review' }], allowedActions: ['task.get', 'task.comment'] });
     const intake = agent({ _id: 'in', name: 'Intake', skills: [{ key: 'brief.parse' }], allowedActions: ['task.get', 'subtask.create', 'task.comment'] });
     const reporter = agent({ _id: 'rep', name: 'Reporter', skills: [{ key: 'digest.ceo' }], allowedActions: ['task.get', 'task.comment'] });
-    const fit = (a, t, runs = []) => F.fitFor({ agent: a, task: t, runs, registryActions: REGISTRY_ACTIONS, never: NEVER });
+    const fit = (a, t, runs = []) => F.fitFor({ agent: a, task: t, runs, registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
 
     test('pr.summary needs a PR link — typed link, github URL in the description, or none', () => {
         const noPr = fit(reviewer, task({ TaskName: 'Review the checkout change' }));
@@ -226,7 +232,7 @@ describe('routing refuses a task that lacks what the agent\'s skills need (brows
     test('bulk routing sends those tasks to a person with the reason instead of assigning them', () => {
         const rows = F.routeTasks({
             tasks: [task({ _id: '1', TaskName: 'Review the checkout change' }), task({ _id: '2', TaskName: 'Review https://github.com/a/b/pull/3' })],
-            agents: [reviewer], registryActions: REGISTRY_ACTIONS, never: NEVER
+            agents: [reviewer], registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS
         });
         expect(rows[0].routed).toBe(false);
         expect(rows[0].refusal).toBe('needs a person — it needs a pull request link on the task');

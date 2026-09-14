@@ -3,36 +3,8 @@
 // instead of starting a run that skips.
 
 const { isBlockedHostname } = require('./engine/safeFetch');
+const workKinds = require('./workKinds');
 
-const URL_RE = /https?:\/\/[^\s<>"')]+/gi;
-const PR_RE = /\/pull\/\d+|\/merge_requests\/\d+|\/compare\//;
-const MIN_BRIEF_CHARS = 40;
+const inputsOf = (task = {}) => workKinds.inputsOf(task, isBlockedHostname);
 
-const plain = (html) => String(html || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-
-const hostOf = (url) => { try { return new URL(url).hostname; } catch (e) { return ''; } };
-const isPublic = (url) => { const h = hostOf(url); return Boolean(h) && !isBlockedHostname(h); };
-
-const urlsIn = (task) => [task.TaskName, task.description, task.rawDescription].map((v) => String(v || '')).join(' ').match(URL_RE) || [];
-
-const prUrlOf = (task) => {
-    const links = Array.isArray(task.links) ? task.links : [];
-    const linked = links.find((l) => /^(pr|branch)$/i.test(String(l.kind || '')) && l.url) || links.find((l) => PR_RE.test(String(l.url || '')));
-    if (linked) return String(linked.url);
-    return urlsIn(task).find((u) => PR_RE.test(u)) || null;
-};
-
-const publicUrlOf = (task) => {
-    const links = Array.isArray(task.links) ? task.links : [];
-    const linked = links.map((l) => String(l.url || '')).find((u) => /^https?:\/\//i.test(u) && !PR_RE.test(u) && isPublic(u));
-    if (linked) return linked;
-    return urlsIn(task).find((u) => !PR_RE.test(u) && isPublic(u)) || null;
-};
-
-const inputsOf = (task = {}) => ({
-    prUrl: prUrlOf(task),
-    publicUrl: publicUrlOf(task),
-    briefChars: plain(task.description || task.rawDescription || '').length,
-});
-
-module.exports = { inputsOf, MIN_BRIEF_CHARS };
+module.exports = { inputsOf, MIN_BRIEF_CHARS: workKinds.MIN_BRIEF_CHARS };
