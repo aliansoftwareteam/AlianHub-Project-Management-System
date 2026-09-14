@@ -12,12 +12,12 @@
 }
 .list-view-header {
   padding: 0px 19px;
-  border-bottom: 1px solid #e8eaed;
+  border-bottom: 1px solid var(--hairline);
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 44px;
-  background-color: #fff;
+  background-color: var(--surface);
 }
 /* The strip sits inside .ph2__viewrow, which owns the row's height, padding,
    hairline and horizontal scrolling. */
@@ -125,7 +125,7 @@
   display: none;
 }
 .activeViewList span {
-  color: #2f3990;
+  color: var(--brand);
   font-weight: 500;
 }
 .list_make_as_defaultimg {
@@ -159,7 +159,7 @@
 }
 
 .embed__dropdown .search-project-filter {
-  background-color: #F4F5F7;
+  background-color: var(--surface-2);
   width: 669px;
   height: auto;
   padding: 0 !important;
@@ -167,7 +167,7 @@
 }
 .embed__dropdown {
   border-radius: 6px !important;
-  box-shadow: 0px 5px 10px 0px rgba(0, 0, 0, 0.10);
+  box-shadow: var(--shadow-pop);
   border: 0 !important;
 }
 .embed__dropdown .drop-down-options {
@@ -185,7 +185,7 @@
 }
 
 .view-count{
-    background-color: rgb(56, 69, 179);
+    background-color: var(--brand);
     border-radius: 20px;
     margin-left: 5px;
     width: 100%;
@@ -208,11 +208,11 @@
 }
 
 .embed-edit-options:hover {
-  background: #F4F5F7;
+  background: var(--surface-hover);
 }
 
 .embed-option:hover {
-    background: #F4F5F7;
+    background: var(--surface-hover);
     border-radius: 5px;
 }
 
@@ -281,7 +281,7 @@
 .list-head-mid {max-width: 45%;}
 }
 @media (max-width: 767px) {
-  .project_detail_dropdown_wrapper{height: 50px;color: #4B4B4B;}
+  .project_detail_dropdown_wrapper{height: 50px;color: var(--ink);}
   .project-firtsleeter-box{min-width: 22px !important;max-width: 22px !important;height: 22px !important;border-radius: 6px;font-size: 14px;font-weight: 400;color: #fff;margin-left: 0px !important;margin-right: 10px;}
   .mobile-projectlist-icon {min-width: 22px !important; width: 22px !important;height: 22px !important;border-radius: 5px;margin-left: 0px !important; margin-right: 10px;}
   .list-text-wrapper {max-width: 207px;padding-left: 12px;}
@@ -290,22 +290,22 @@
   .list-view-header {padding: 5.3px 16px;height: auto;}
   .list-head-left {max-width: 100%;}
   .list-head-leftrightwrappper {max-width: 70%;width: 70%;}
-  .list-view-header-title {padding-right: 10px;margin-left: 0 !important;overflow: hidden;color: #090A0A;text-overflow: ellipsis;font-size: 18px;font-weight: 500;padding-bottom: 5px;}
+  .list-view-header-title {padding-right: 10px;margin-left: 0 !important;overflow: hidden;color: var(--ink);text-overflow: ellipsis;font-size: 18px;font-weight: 500;padding-bottom: 5px;}
   .assigneelist-audiofile-dropdown {min-width: auto;left: 50% !important;right: auto !important;}
   .assigneelist-audiofile-dropdown .search-project-filter {height: 100% !important;min-width: 100% !important;width: 100% !important;padding: 0 20px !important;}
   .mobiledropdown-projecttitleimage-wrapper {display: flex;align-items: center;}
   .mobiledropdown-projecttitleimage-wrapper .mobile-projectlist-icon,  .mobiledropdown-projecttitleimage-wrapper .project-firtsleeter-box {width: 30px !important;height: 30px !important;border-radius: 5px;font-size: 16px;font-weight: 400;line-height: 19.24px;min-width: 30px !important;max-width: 30px !important;}
   .mobiledropdown-projecttitleimage-wrapper .mobile-projectlist-icon{margin-left: 0 !important;}
   .mobiledropdown-projecttitleimage-wrapper .list-text-wrapper {max-width: 70%;padding-left: 10px;}
-  .mobiledropdown-projecttitleimage-wrapper .list-view-header-title {padding-bottom: 0;font-size: 16px;font-weight: 500;color: #3a3a3a !important; padding-top: 4px;}
+  .mobiledropdown-projecttitleimage-wrapper .list-view-header-title {padding-bottom: 0;font-size: 16px;font-weight: 500;color: var(--ink) !important; padding-top: 4px;}
   .assigneelist-audiofile-dropdown .assignee-data img.profile-image.asignee-profile {width: 30px !important;height: 30px !important;border: 0 !important;object-fit: cover !important;}
   .assigneelist-audiofile-dropdown .assignee-data .position-re.cursor-pointerm,  .assigneelist-audiofile-dropdown .profile-image {width: 30px !important;height: 30px !important;}
   .assigneelist-audiofile-dropdown .assignee-data {margin-left: 5px !important;width: 100%;padding-bottom: 30px;padding-top: 30px;}
   ul.filelinks-audiolist li {height: 50px;}
   ul.filelinks-audiolist{padding-bottom: 20px;}
-  .assigneelist-audiofile-dropdown .drop-down-item {background: #fff !important;padding: 0px 0px !important;width: 100%;display: inline-block;margin-bottom: 0!important;border-radius: 0 !important;}
+  .assigneelist-audiofile-dropdown .drop-down-item {background: var(--surface) !important;padding: 0px 0px !important;width: 100%;display: inline-block;margin-bottom: 0!important;border-radius: 0 !important;}
   ul.filelinks-audiolist li img {vertical-align: middle;margin-right: 15px;}
-  ul.filelinks-audiolist li:hover, .avtar-options:hover {border-radius: 12px;background: #F4F5F7;}
+  ul.filelinks-audiolist li:hover, .avtar-options:hover {border-radius: 12px;background: var(--surface-hover);}
   ul.filelinks-audiolist li {height: 50px;margin-right: 0 !important;padding-left: 10px;}
   .project-titlerename-input{margin-left: 0 !important;}
   .assigneelist-audiofile-dropdown .assignee-data .position-re.cursor-pointer {width: 30px !important;height: 30px !important;}
@@ -314,17 +314,17 @@
   .viewlist-mobile-dropdown .mobileCloseIcon {display: none;}
   .mobile-defaultview-text img.list_make_as_defaultimg {margin-right: 10px;margin-bottom: 1px;}
   .activeTab-tick{height: 10px;width: 10px;}
-  .showProjectDetailRight .description-main, .showProjectDetailRight .checklist-main, .showProjectDetailRight .project__detail-atttachment{padding: 10px 20px 0px 20px;background-color: #fff;border-bottom: 0;}
+  .showProjectDetailRight .description-main, .showProjectDetailRight .checklist-main, .showProjectDetailRight .project__detail-atttachment{padding: 10px 20px 0px 20px;background-color: var(--surface);border-bottom: 0;}
   .showProjectDetailRight .project__detail-atttachment{padding-bottom: 20px;padding-top: 15px;}
   .showProjectDetailRight{width:100%;order: 2;padding: 0 !important;height: calc(100% - 0px);}
-  .projectRightside {max-width: 100%;order: 1;background-color: #fff;padding: 0px;height: auto;overflow: auto;padding: 20px;}
-  .sticky_item-wrapper{background-color: #fff;}
+  .projectRightside {max-width: 100%;order: 1;background-color: var(--surface);padding: 0px;height: auto;overflow: auto;padding: 20px;}
+  .sticky_item-wrapper{background-color: var(--surface);}
   .checklist-main .hover-action {visibility: visible;}
   .list-view-body {flex-wrap: wrap;}
   .task-body-buttons button {width: 46.25%;height: 39px;}
-  .showProjectDetailRight .description-main h4.task-details-subtitle {margin-top: 0;margin-bottom: 10px;background: #fff;position: relative;}
-  .description-main .ql-editor p{font-size: 14px;color: #3a3a3a !important;line-height: 22.4px !important;}
-  .milestone__fixhourly-wrapper {margin: 20px 0;padding: 20px;background-color: #fff;}
+  .showProjectDetailRight .description-main h4.task-details-subtitle {margin-top: 0;margin-bottom: 10px;background: var(--surface);position: relative;}
+  .description-main .ql-editor p{font-size: 14px;color: var(--ink) !important;line-height: 22.4px !important;}
+  .milestone__fixhourly-wrapper {margin: 20px 0;padding: 20px;background-color: var(--surface);}
   .milestone__fixhourly-wrapper .milestone_font {padding: 0;border-top: 0;}
   .task-assigneesearch-groupbywrapper .task-body-buttons{padding: 20px !important;}
   .viewlist-mobile-dropdown .drop-down-options{max-height: 70vh!important;}
@@ -363,15 +363,12 @@
   margin: 0!important;
 }
 .calendar-currentday-text {
-  font-size: 14px!important;
-  font-weight: 500!important;
-  line-height: 20.72px!important;
-  color: #535358!important;
+  font: var(--text-h3)!important;
+  color: var(--ink)!important;
   text-transform: capitalize!important;
   margin-left: 14px!important;
   background: transparent!important;
   border: 0!important;
   padding: 0!important;
   cursor: pointer!important;
-  font-family: Roboto!important;
 }
