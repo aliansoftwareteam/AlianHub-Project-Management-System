@@ -53,6 +53,18 @@
                         </p>
                     </section>
 
+                    <section class="ah-card ai-agent" data-test="scope">
+                        <div class="ah-label">{{ $t('Ai.scope') }}</div>
+                        <p class="ai-lead" style="margin:6px 0 10px">{{ $t('Ai.scope_lead') }}</p>
+                        <div v-if="projects.length" class="ai-radios">
+                            <label v-for="p in projects" :key="p._id" class="ai-radio" :class="{ 'is-on': form.projectIds.includes(String(p._id)) }">
+                                <input v-model="form.projectIds" type="checkbox" :value="String(p._id)" class="ah-check" :disabled="!canManage" />
+                                <span>{{ p.ProjectName }}</span>
+                            </label>
+                        </div>
+                        <p v-else class="ai-ladder__rule">{{ $t('Ai.scope_no_projects') }}</p>
+                    </section>
+
                     <section class="ah-card ai-agent">
                         <div class="ah-label">{{ $t('Ai.autonomy') }}</div>
                         <div class="ai-radios">
@@ -158,6 +170,7 @@
 <script setup>
 import { computed, inject, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import moment from "moment";
@@ -177,6 +190,7 @@ const { t } = useI18n();
 const $toast = useToast();
 const route = useRoute();
 const router = useRouter();
+const { getters } = useStore();
 const companyId = inject("$companyId");
 const { agents, spend, registryManifest, skillManifest, loadAgents, loadSpend, loadRegistry, loadSkills, saveAgent, setPaused, deleteAgent, activeRuns, loadActiveRuns } = useAgents();
 const { canManage } = useAgentAccess();
@@ -189,7 +203,8 @@ const skills = ref([]);
 const namedKeys = ref(new Set());
 const recentRuns = ref([]);
 const deleteConfirm = ref("");
-const form = reactive({ autonomy: 1, rateLimitPerDay: 40, spendCapUsd: 30, model: "" });
+const form = reactive({ autonomy: 1, rateLimitPerDay: 40, spendCapUsd: 30, model: "", projectIds: [] });
+const projects = computed(() => (getters["projectData/projects"]?.data || []).filter((p) => !p.deletedStatusKey));
 const pinnableModels = ref([]);
 const openRunCount = computed(() => (activeRuns.value[String(route.params.id)] || []).length);
 
@@ -243,6 +258,7 @@ const load = async () => {
     form.rateLimitPerDay = Number(found.rateLimitPerDay || 40);
     form.spendCapUsd = Number(found.spendCapUsd || 30);
     form.model = found.model || "";
+    form.projectIds = (found.projectIds || []).map(String);
     // Every live skill in the manifest is offered; the ones this agent already
     // names keep their own state and sit first.
     const chosen = (found.skills || []).map((s) => ({
@@ -276,6 +292,7 @@ const save = async () => {
             rateLimitPerDay: form.rateLimitPerDay,
             spendCapUsd: form.spendCapUsd,
             model: form.model,
+            projectIds: form.projectIds,
             // Actions are the manifest's to state, so only the choice is stored.
             skills: skills.value.filter((s) => s.enabled || namedKeys.value.has(s.key)).map((s) => ({ key: s.key, name: s.name, enabled: s.enabled }))
         });
