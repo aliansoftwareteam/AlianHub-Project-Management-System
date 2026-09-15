@@ -41,7 +41,6 @@
         </div>
 
         <Sidebar
-            :top="clientWidth<=767 ? '0px' : '46px' "
             :title="$t('Projects.list_of_user')"
             :value="detailedUsers.map((x) => ({value: x.id, label: x.title ,id: x.id, image: x.image, isOnline: x.isOnline,designation:x.designation}))"
             v-model:visible="visible"
