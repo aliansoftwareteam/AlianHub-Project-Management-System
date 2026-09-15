@@ -4,7 +4,7 @@
 		<DemoBanner/>
 		<MaintenanceBanner/>
 		<template v-if="$route.meta.requiresAuth">
-			<template v-if="logged && (rules && Object.keys(rules).length && companyUserDetail && Object.keys(companyUserDetail).length) && socket">
+			<template v-if="logged && (rules && Object.keys(rules).length && companyUserDetail && Object.keys(companyUserDetail).length) && socketSettled">
                 <!-- Mounted at the root so an incoming call rings wherever the user is,
                      not only when the conversation that called them is on screen. -->
                 <CallOverlay />
@@ -180,6 +180,9 @@ const isAdvanceSearch = ref(false);
 const openReleaseNoteModel = ref(false);
 const defaultImageUser = require("@/assets/images/default_user.png")
 const socket = ref(null);
+// The shell waits for the connect attempt to settle, not for it to succeed — live updates
+// are a transport, and the data behind this UI arrives over HTTP either way.
+const socketSettled = ref(false);
 const defaultTaskStatus = require("@/assets/images/defaut_task_status_img.png");
 const defaultGhostCustomUser = `${env.API_URI}/api/v1/getlogo?key=ghostuser`;
 
@@ -772,8 +775,17 @@ const handleSocketsConnection = async () => {
         });
         const serverURL = env.API_URI;
         const namespace = `userid_${companyId.value}_${userId.value}`;
-        socket.value = await connectServer(serverURL,namespace,{userRole: getters['settings/companyUserDetail'].roleType});
-        commit("settings/mutateSocketInstance", socket.value);
+        // A failed connect must not abort the rest of this function: the visibilitychange
+        // listener registered below is the only in-session path back to a live socket.
+        try {
+            socket.value = await connectServer(serverURL,namespace,{userRole: getters['settings/companyUserDetail'].roleType});
+        } catch (error) {
+            console.error("ERROR in socket connect: ", error);
+        } finally {
+            socketSettled.value = true;
+        }
+        // socketInstanceWatcher (store/index.js) calls Object.keys on this on every mutation.
+        if (socket.value) commit("settings/mutateSocketInstance", socket.value);
         dispatch("users/myCounts", {uid: userId.value})
         .catch((error) => {
             console.error("ERROR in myCounts: ", error);
@@ -783,38 +795,48 @@ const handleSocketsConnection = async () => {
             console.error("ERROR in set socket company: ", error);
         });
         window.addEventListener("beforeunload", () => {
-            socket.value.emit('disconnectNameSpace',socket.value.id);
+            socket.value?.emit('disconnectNameSpace',socket.value.id);
         });
         let debounceTimeout;
         document.addEventListener('visibilitychange', async () => {
             clearTimeout(debounceTimeout);
             debounceTimeout = setTimeout(async () => {
                 if (document.hidden) {
-                    socket.value.emit('getRoomList', socket.value.id, (rooms) => {
+                    socket.value?.emit('getRoomList', socket.value.id, (rooms) => {
                         sessionStorage.setItem('joinedRooms', JSON.stringify(rooms));
                     });
                     const timeStamp = await apiRequestWithoutCompnay("get", `/api/v1/getTime?zone=${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
                     sessionStorage.setItem('tableaveTime',new Date(timeStamp.data.data).getTime());
-                    socket.value.emit('disconnectNameSpace',socket.value.id);
+                    socket.value?.emit('disconnectNameSpace',socket.value.id);
                 } else {
                     if (userId.value !== null && companyId.value) {
-                        socket.value = await connectServer(serverURL,namespace,{userRole: getters['settings/companyUserDetail'].roleType});
-                        commit("settings/mutateSocketInstance", socket.value);
-                        dispatch("users/myCounts", {uid: userId.value})
+                        // Keep the socket we already have if the retry fails, rather than
+                        // trading a working connection for null.
+                        const nextSocket = await connectServer(serverURL,namespace,{userRole: getters['settings/companyUserDetail'].roleType})
                         .catch((error) => {
-                            console.error("ERROR in myCounts: ", error);
+                            console.error("ERROR in socket reconnect: ", error);
+                            return null;
                         });
-                        dispatch("settings/setSocketCompanies", {companyId: companyId.value})
-                        .catch((error) => {
-                            console.error("ERROR in set socket company: ", error);
-                        });
-                        tabSync();
+                        if (nextSocket) {
+                            socket.value = nextSocket;
+                            commit("settings/mutateSocketInstance", nextSocket);
+                            dispatch("users/myCounts", {uid: userId.value})
+                            .catch((error) => {
+                                console.error("ERROR in myCounts: ", error);
+                            });
+                            dispatch("settings/setSocketCompanies", {companyId: companyId.value})
+                            .catch((error) => {
+                                console.error("ERROR in set socket company: ", error);
+                            });
+                            tabSync();
+                        }
                     }
                 }
             },1000)
         });
     } catch (error) {
         console.error(error);
+        socketSettled.value = true;
     }
 }
 
