@@ -3,31 +3,6 @@
 .ai-page__body { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; }
 
 
-.ai-side {
-    width: var(--sidebar-w-narrow);
-    flex: none;
-    border-right: 1px solid var(--hairline);
-    background: var(--surface);
-    display: flex;
-    flex-direction: column;
-    padding: 14px 10px 10px;
-}
-.ai-side__head { display: flex; align-items: center; gap: 8px; padding: 0 6px 12px; }
-.ai-side__nav { display: flex; flex-direction: column; gap: 2px; }
-.ai-side__item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 8px 10px; border-radius: 8px;
-    font: 500 13px/1.2 var(--font-ui); color: var(--ink); text-decoration: none;
-    transition: background var(--t-state) var(--ease);
-}
-.ai-side__item:hover { background: var(--surface-hover); color: var(--ink); text-decoration: none; }
-.ai-side__item.router-link-active { background: var(--brand-tint); color: var(--brand); }
-.ai-side__count { margin-left: auto; color: var(--ink-2); }
-.ai-side__item.router-link-active .ai-side__count { color: var(--brand); }
-.ai-side__usage { margin-top: auto; padding: 12px 6px 4px; border-top: 1px solid var(--hairline); display: flex; flex-direction: column; gap: 7px; }
-.ai-side__running { display: flex; align-items: center; gap: 7px; font: var(--text-small); color: var(--ink); }
-.ai-side__spend { color: var(--ink-2); }
-
 .ai-lead { font: var(--text-small); margin: 0 0 14px; max-width: 640px; }
 .ai-lead strong { color: var(--ink); font-weight: 600; }
 
@@ -83,17 +58,14 @@
 .ai-done { text-align: center; padding: 48px 24px; }
 .ai-done__n { font: var(--text-display); color: var(--ink); }
 
+.ai-soon { max-width: 560px; padding: 22px 24px 24px; }
+.ai-soon__flag { margin-bottom: 12px; }
+.ai-soon__lead { margin: 8px 0 0; }
+.ai-soon__label { margin-top: 20px; }
+.ai-soon__links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+
 @media (max-width: 1280px) {
-    /* Icon rail rather than gone: Inbox, Teammates, Pipeline and Audit have no other
-       entry point at this width. Below 768 the tab bar and More menu take over. */
-    .ai-side { width: 56px; padding: 14px 6px 10px; align-items: center; }
-    .ai-side__head span, .ai-side__usage, .ai-side__item > span:not(.ai-side__count) { display: none; }
-    .ai-side__item { width: 40px; height: 40px; padding: 0; justify-content: center; position: relative; }
-    .ai-side__count { position: absolute; top: 2px; right: 2px; margin: 0; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--brand); color: #fff; font-size: 10px; line-height: 16px; text-align: center; }
     .ai-inbox { grid-template-columns: 300px 1fr; }
-}
-@media (max-width: 767px) {
-    .ai-side { display: none; }
 }
 @media (max-width: 900px) {
     .ai-inbox { grid-template-columns: 1fr; }
