@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-14T12:53:57.864Z",
+  "updatedAt": "2026-09-15T03:46:32.498Z",
   "keys": {
     "Scrum.stranded_head": "These {count} will stay in this sprint",
     "Scrum.stranded_hint": "They are unfinished, but their parent task is done — and a subtask moves with its parent. Finish them, or reopen the parent task, before completing the sprint.",
@@ -7995,6 +7995,7 @@
     "Ai.scope_none": "No project — reads only",
     "Ai.scope_no_projects": "No projects to pick yet.",
     "Ai.l2_preview_lead": "Read off this agent's allowed actions and each action's risk rating. Reads always run. A write runs on its own only when this agent is scoped to the project and the change can be undone, stays inside one task and moves no money; everything else goes to the AI Inbox first.",
-    "Parity.no_project_scope": "No project scope"
+    "Parity.no_project_scope": "No project scope",
+    "Instance.built_at": "Updated {at}"
   }
 }
