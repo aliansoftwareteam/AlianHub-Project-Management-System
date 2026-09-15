@@ -944,6 +944,9 @@ onMounted(() => {
     }, 1500);
 });
 onUnmounted(() => {
+    // The shell now renders when the socket never connected, so leaving a project must not
+    // depend on having one — there is no room to leave in that case anyway.
+    if (!socket.value) return;
     socket.value.emit('getRoomList', socket.value.id, (rooms) => {
         const currentSocketRooms = rooms.find((x) => x.includes(socket.value.id) && x.includes('project_sprint_'));
         if (currentSocketRooms) {
