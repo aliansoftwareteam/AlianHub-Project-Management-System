@@ -9,6 +9,7 @@ const actions = require('../Modules/Agents/actions');
 const policy = require('../Modules/Agents/policy');
 const audit = require('../Modules/Agents/agentAudit');
 const mcp = require('../Modules/Mcp/tools');
+const { SEEDS } = require('../Modules/Agents/skills/seeds');
 
 const safe = { write: true, reversible: true, scope: 'task', money: false };
 
@@ -125,5 +126,41 @@ describe('perform() honours a policy refusal', () => {
             .rejects.toMatchObject({ name: 'RefusedError', message: 'Agents cannot perform task.comment (not in this agent\'s skills)' });
         await expect(actions.perform({ companyId: 'c1', actor, action: 'project.delete', params: {}, decision: { decision: 'act', reason: 'x' } }))
             .rejects.toMatchObject({ name: 'RefusedError', message: 'Agents cannot perform project.delete (never_listed)' });
+    });
+});
+
+/* digest.ceo and project.guide ship as documents, so the actions they emit are
+ * data. Each one is put through the policy here, for an agent that names the
+ * project and for one with no scope at all. */
+describe('the skills that ship as data, run through the policy', () => {
+    const agent = (over = {}) => ({ autonomy: 2, allowedActions: [], projectIds: ['p1'], ...over });
+    const task = { _id: 't1', ProjectID: 'p1' };
+    const emitted = (seed) => [...new Set(seed.emit.map((e) => e.action))];
+    const verdict = (seed, over = {}) => emitted(seed).map((action) => ({
+        action,
+        ...policy.decide({ agent: agent(), action, params: { taskId: 't1' }, rating: actions.rating(action), task, ...over }),
+    }));
+    const skills = [['digest.ceo', SEEDS.digest], ['project.guide', SEEDS.projectGuide]];
+
+    it.each(skills)('%s emits only rated registry writes', (key, seed) => {
+        expect(emitted(seed).length).toBeGreaterThan(0);
+        emitted(seed).forEach((action) => {
+            expect(registry.has(action)).toBe(true);
+            expect(policy.isComplete(actions.rating(action))).toBe(true);
+        });
+    });
+
+    it.each(skills)('%s still acts in a project its agent is scoped to', (key, seed) => {
+        verdict(seed).forEach((out) => expect(out).toMatchObject({ decision: 'act' }));
+    });
+
+    it.each(skills)('%s is refused outside its agent\'s projects', (key, seed) => {
+        verdict(seed, { agent: agent({ projectIds: ['p2'] }) })
+            .forEach((out) => expect(out).toMatchObject({ decision: 'refuse', reason: "project p1 is outside this agent's projects" }));
+    });
+
+    it.each(skills)('%s writes nowhere when its agent has no project scope', (key, seed) => {
+        verdict(seed, { agent: agent({ projectIds: [] }) })
+            .forEach((out) => expect(out).toMatchObject({ decision: 'refuse', reason: `${out.action} writes, and this agent has no project scope` }));
     });
 });

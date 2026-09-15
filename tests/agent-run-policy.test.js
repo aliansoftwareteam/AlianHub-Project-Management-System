@@ -16,7 +16,7 @@ const { rating } = require('../Modules/Agents/actions');
 const C = 'c1';
 const AGENT_ID = '6f0000000000000000000a01';
 const TASK = { _id: '6f0000000000000000000701', TaskName: 'Review https://example.com', TaskKey: 'AR-1', ProjectID: 'p1' };
-const agent = (over = {}) => ({ _id: AGENT_ID, name: 'Reviewer', autonomy: 2, allowedActions: [], projectIds: [], account: 'workspace', spendCapUsd: 10, ...over });
+const agent = (over = {}) => ({ _id: AGENT_ID, name: 'Reviewer', autonomy: 2, allowedActions: [], projectIds: ['p1'], account: 'workspace', spendCapUsd: 10, ...over });
 const actor = { kind: 'agent', userId: 'u1', agentId: AGENT_ID, agentName: 'Reviewer', runId: null, viaAccount: 'workspace', tokenId: null };
 
 const comment = (body) => ({ action: 'task.comment', label: `Comment: ${body}`, reversible: true, params: { taskId: TASK._id, body } });

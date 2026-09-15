@@ -6,7 +6,7 @@ const registry = require('./registry');
 const runs = require('./runs');
 const revisions = require('./revisions');
 
-const DEFAULTS = Object.freeze({ autonomy: 0, spendCapUsd: 30, paused: false, account: 'workspace', deletedStatusKey: 0 });
+const DEFAULTS = Object.freeze({ autonomy: 0, spendCapUsd: 30, paused: false, account: 'workspace', deletedStatusKey: 0, projectIds: [] });
 
 const createAgentRecord = async (companyId, fields, { ownerId } = {}) => {
     const name = String((fields && fields.name) || '').trim().slice(0, 80);

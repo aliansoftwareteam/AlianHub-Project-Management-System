@@ -143,7 +143,7 @@ exports.createAgent = async (req, res) => {
         if (await refuseSkills(res, companyId, set)) return undefined;
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENTS,
-            data: { autonomy: 1, spendCapUsd: 30, paused: false, account: 'workspace', deletedStatusKey: 0, ...set, ownerId: actor.userId },
+            data: { autonomy: 1, spendCapUsd: 30, paused: false, account: 'workspace', deletedStatusKey: 0, projectIds: [], ...set, ownerId: actor.userId },
         }, 'save');
         await revisions.recordCreate(companyId, saved, { actor });
         return res.send({ status: true, statusText: 'Agent created.', data: saved });

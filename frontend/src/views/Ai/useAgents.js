@@ -55,6 +55,8 @@ export const refusalCount = (run) => (Array.isArray(run?.refusals) ? run.refusal
 export const NEW_AGENT_DEFAULTS = Object.freeze({
     autonomy: 1,
     spendCapUsd: 30,
+    // No project until someone picks one: an unscoped agent reads, but every write is refused.
+    projectIds: Object.freeze([]),
     allowedActions: Object.freeze(["task.comment", "tasks.search", "task.get"])
 });
 
