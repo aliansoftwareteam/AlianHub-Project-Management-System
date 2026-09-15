@@ -447,7 +447,7 @@ export function useProjectsHelper() {
     }
 }
 
-export function useUpdateTasks() {
+export function useUpdateTasks(project) {
     const $toast = useToast();
     const {getTaskStatus, getUser, getPriority, getTaskType} = useGetterFunctions();
     const {changeDateFormate} = useMoment();
@@ -455,7 +455,9 @@ export function useUpdateTasks() {
     const userId = inject("$userId");
     const companyId = inject("$companyId")
     const dateFormat = inject('$dateFormat');
-    const projectData = inject("selectedProject");
+    // The task detail overlay mounts beside router-view, so no ancestor provides
+    // selectedProject; callers outside a project route pass their own.
+    const projectData = project || inject("selectedProject");
 
     function returnMethodByGroupType(groupType) {
         switch (groupType) {
@@ -713,7 +715,9 @@ export function useUpdateTasks() {
     const updateTaskType = (task, newTaskType, type,isUpdateTask) => {
         return new Promise(async(resolve, reject) => {
             try {
-                let prevStatus = getTaskType(task.TaskTypeKey)
+                // Without the project this falls back to a getter only the project view sets,
+                // so the overlay opened from Home or search read the wrong project's types.
+                let prevStatus = getTaskType(task.TaskTypeKey, projectData.value)
                 const userData = getUserData()
                 let newTaskTypeImage = await getWasabiImageLink(projectData.value.CompanyId,newTaskType.taskImage);
                 let oldTaskTypeImage = await getWasabiImageLink(projectData.value.CompanyId,prevStatus.taskImage);

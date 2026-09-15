@@ -315,7 +315,6 @@ const route = useRoute();
 const { getters, dispatch, commit } = useStore();
 const { getUser, getPriority } = useGetterFunctions();
 const { checkPermission, checkApps } = useCustomComposable();
-const { updateTaskByGroup } = useUpdateTasks();
 const socket = inject("$socket");
 const clientWidth = inject("$clientWidth");
 const currentUserId = inject("$userId");
@@ -326,6 +325,10 @@ const isMobile = computed(() => clientWidth.value <= 767);
 const task = ref({});
 const parentTask = ref(null);
 const projectData = ref({});
+// projectSlice, not projectData: this ref holds the whole detail payload (subtasks,
+// sprints), and the helper forwards what it is given straight into the PATCH body.
+// taskTypeCounts rides along because the helper reads the previous type off it.
+const { updateTaskByGroup } = useUpdateTasks(computed(() => ({ ...projectSlice(), taskTypeCounts: projectData.value.taskTypeCounts })));
 const subTasks = ref([]);
 const subTaskLimit = 35;
 const fetchedSubtaskCount = ref(null);
@@ -500,7 +503,9 @@ function updateWatchers(userId, type) {
 function changeTaskType(status) {
     const index = projectData.value.taskTypeCounts?.findIndex((x) => x.key === task.value.TaskTypeKey);
     if (index === -1 || index === undefined) return;
-    updateTaskByGroup(task.value, status, 4);
+    updateTaskByGroup(task.value, status, 4)
+    .then(() => reflectOwnUpdate({ TaskType: status.value, TaskTypeKey: status.key }))
+    .catch((error) => console.error("ERROR in changeTaskType: ", error));
 }
 
 function toggleDone(done) {
