@@ -148,7 +148,7 @@
 
 <script setup>
 // PACKAGES
-import { ref, watch, defineProps, inject, defineEmits, defineComponent, computed, onMounted, provide } from "vue"
+import { ref, watch, defineProps, inject, defineEmits, defineComponent, computed, onMounted } from "vue"
 
 // COMPONENTS
 import Assignee from "@/components/molecules/Assignee/Assignee.vue"
@@ -177,7 +177,6 @@ const {convertDateFormat} = useConvertDate();
 const {checkPermission, checkApps} = useCustomComposable();
 const showArchiveVar = inject("showArchived");
 const $toast = useToast()
-const {updateTaskByGroup} = useUpdateTasks();
 
 // IMAGES
 const triangleBlack = require("@/assets/images/svg/triangleBlack.svg");
@@ -244,7 +243,9 @@ const customFieldList = computed(() => (getters['settings/finalCustomFields'] &&
 const companyUsers = computed(() => getters["settings/companyUsers"]?.map((x) => x.userId))
 
 const projectData = ref(props.projectObject)
-provide("selectedProject", {});
+// Pass the row's own project: on the dashboard the nearest selectedProject provider is
+// HomePage's placeholder {}, which has no .value for the helper to read.
+const {updateTaskByGroup} = useUpdateTasks(projectData);
 
 const companyOwner = computed(() => {
     return getters["settings/companyOwnerDetail"];
@@ -460,7 +461,8 @@ function changeAssignee(type, value) {
 // CHANGE PRIORITY
 function updatePriority(val = null) {
     if(!val) return;
-    updateTaskByGroup(props.data, val, 2);
+    updateTaskByGroup(props.data, val, 2)
+    .catch((error) => console.error("ERROR in updatePriority: ", error));
 }
 
 const myCounts = computed(() => {
