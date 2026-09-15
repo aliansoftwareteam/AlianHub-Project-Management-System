@@ -365,10 +365,15 @@ function toggleSprints(sprintId) {
                 Promise.allSettled(promises)
                     .then(() => {
                         nextTick(() => {
-                            document.getElementById(`sprint_${SprintId}`)?.scrollIntoView({
-                                behavior: "smooth",
-                                block: "start",
-                                inline: "nearest"
+                            const section = document.getElementById(`sprint_${SprintId}`);
+                            const scroller = document.getElementById("list_scroll");
+                            if (!section || !scroller) return;
+                            // scrollIntoView walks every scrollable ancestor, including the
+                            // overflow:hidden box holding the project header, and nothing can
+                            // scroll that one back.
+                            scroller.scrollTo({
+                                top: scroller.scrollTop + section.getBoundingClientRect().top - scroller.getBoundingClientRect().top,
+                                behavior: "smooth"
                             });
                         })
 
