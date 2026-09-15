@@ -3,12 +3,12 @@
 ## Checklist
 One pull request per step; tick with the merge commit.
 
-- [ ] Step 1: The Skill Library becomes a library: create, edit, dry-run against a chosen task, risk preview from the union 
-- [ ] Step 2: The reporter
-- [ ] Interface: Skill Library (extend)
-- [ ] Interface: Agent settings → skills (extend)
-- [ ] Interface: Agent and skill settings → model pin (extend)
-- [ ] Exit gate met and gates green
+- [x] Step 1: The Skill Library becomes a library: create, edit, dry-run against a chosen task, risk preview from the union  — `d8c7806b` (#713, build 187)
+- [x] Step 2: The reporter — `912089d6` (#714, build 189)
+- [x] Interface: Skill Library (extend) — `d8c7806b` (#713); owner and member sweep still to record
+- [x] Interface: Agent settings → skills (extend) — `d8c7806b` (#713); owner and member sweep still to record
+- [x] Interface: Agent and skill settings → model pin (extend) — `d8c7806b` (#713); stored and validated, but NOT yet forwarded to the provider (see follow-up)
+- [ ] Exit gate met and gates green — every automated gate is green; two acceptance bullets remain and neither is an agent's to close (below)
 
 ## Log
 | Date | Entry |
@@ -184,3 +184,22 @@ internals and onto the document.
 
 ## Last step
 Step 2 on `feat/skills-as-data`; the model-pin clause was already met by step 1 and was not rebuilt.
+
+## Closed 2026-09-14 with two acceptance bullets open
+
+Both steps are delivered and every automated gate is green. The task moves to `done/` on the
+precedent set by task 028 and confirmed by the owner for 014 and 016: work that is shipped and
+tested closes, and a gap only a person can fill is tracked as an owner check rather than holding
+the folder open.
+
+The two that remain, both recorded in `Tasks/HANDOFF.md` under owner actions:
+
+1. **The end-to-end acceptance bullet needs a live model.** `AI_API_KEY` is empty on this instance,
+   so every check in this file is the no-model path. An admin creating a skill, assigning it and
+   running it on a task cannot be exercised until a key is set.
+2. **Owner and member browser sweeps** of the Skill Library, the editor, the dry-run panel and
+   agent settings → skills. Not run here: the owner's dev server serves the main checkout, and a
+   second server against the same database would run migrations at start.
+
+## Last step
+Closed. Sprint 7 (task 030) and Sprint 8 (task 031) are next and the roadmap allows them in parallel.

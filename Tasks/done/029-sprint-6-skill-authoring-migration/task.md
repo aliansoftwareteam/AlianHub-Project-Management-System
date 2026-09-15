@@ -1,7 +1,7 @@
 ---
 id: 029
 title: Sprint 6 — skill authoring and migration
-status: backlog
+status: done
 priority: medium
 depends_on: [025, 028]
 created: 2026-09-10
@@ -9,7 +9,7 @@ created: 2026-09-10
 
 # 029 — Sprint 6 — skill authoring and migration
 
-Status: backlog · depends on 025, 028 · sprint 6 · two weeks · branch `feat/sprint-6-skill-authoring-migration` (from `beta`)
+Status: done 2026-09-14 (#713 build 187, #714 build 189) · depends on 025, 028 · sprint 6 · two weeks · branch `feat/sprint-6-skill-authoring-migration` (from `beta`)
 
 Source: `docs/AI-PLATFORM-ARCHITECTURE.md`, "Development and integration plan", Sprint 6. Filed 2026-09-10.
 
