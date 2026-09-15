@@ -71,7 +71,7 @@
             :sprint="{ ...task.sprintArray, id: task.sprintId, folderId: task.folderObjId }"
             :taskId="task._id"
             :project="project"
-            :assigneeOptions="task.AssigneeUserId"
+            :assigneeOptions="subtaskAssigneeOptions"
             :considerWidth="false"
             class="stx__create"
             @cancel="createSubTask = false"
@@ -99,6 +99,7 @@ import { useAiApiFunction } from "@/composable/aiHelper";
 import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
+import { subtaskCreateAssignees } from "@/utils/assigneeOptions";
 
 const { t } = useI18n();
 const { checkPermission, checkApps, debouncerWithPromise, debounce } = useCustomComposable();
@@ -145,6 +146,11 @@ const { generateAiRequestForFunction } = useAiApiFunction();
 
 const companyOwner = computed(() => getters["settings/companyOwnerDetail"]);
 const taskDetailGetter = computed(() => getters["projectData/gettaskDetailData"]);
+const subtaskAssigneeOptions = computed(() => subtaskCreateAssignees({
+    parent: props.task,
+    project: project?.value,
+    companyUsers: getters["settings/companyUsers"]?.map((x) => x.userId)
+}));
 
 const canCreate = computed(() => checkPermission("task.sub_task_create", project.value?.isGlobalPermission) === true);
 const canSetStatus = computed(() => checkPermission("task.task_status", project.value?.isGlobalPermission) === true);

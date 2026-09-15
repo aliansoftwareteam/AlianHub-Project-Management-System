@@ -297,6 +297,7 @@ import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { openInTracker, isTrackerCapableDevice } from '@/utils/trackerDeepLink';
+import { permittedAssignees, selfAssignable } from '@/utils/assigneeOptions';
 import Modal from '@/components/atom/Modal/Modal.vue';
 
 // Icon for the "Generate estimate using AI" sidebar button. Same asset
@@ -445,61 +446,15 @@ const sprintData = computed(() => {
     return sprintData || null;
 });
 
-const permittedOptions = computed(() => {
-    let users = [];
-    if(sprintData.value) {
-        if(props.task.isParentTask) {
-            if(sprintData.value?.private) {
-                users = sprintData.value?.AssigneeUserId || [];
-            } else {
-                if(project.value?.isPrivateSpace) {
-                    users = project.value?.AssigneeUserId || [];
-                } else {
-                    users = companyUsers.value;
-                }
-            }
-        } else {
-            if(sprintData.value?.private) {
-                users = (props.parentTask?.AssigneeUserId || []).filter((x) => sprintData.value?.AssigneeUserId?.includes(x))
-            } else {
-                users = (props.parentTask?.AssigneeUserId || [])
-            }
-        }
-    }
-    if(project.value?.isPrivateSpace) {
-        users = users.filter((x) => project.value?.AssigneeUserId.includes(x));
-        return Array.from(new Set([...users, ...(props.task?.AssigneeUserId || [])]));
-    } else {
-        return users;
-    }
-})
-const nonPermittedOptions = computed(() => {
-    let users = [];
-    if(sprintData.value) {
-        if(props.task.isParentTask) {
-            if(sprintData.value?.private) {
-                users = (sprintData.value?.AssigneeUserId || []).filter((x) => x === userId.value);
-            } else {
-                if(project.value?.isPrivateSpace) {
-                    users = (project.value?.AssigneeUserId || []).filter((x) => x === userId.value);
-                } else {
-                    users = [userId.value];
-                }
-            }
-        } else {
-            users = (props.parentTask?.AssigneeUserId || [])?.filter((x) => x === userId.value)
-            if(sprintData.value?.private) {
-                users = users.filter((x) => sprintData.value?.AssigneeUserId?.includes(x))
-            }
-        }
-    }
-    if(project.value?.isPrivateSpace) {
-        users = users.filter((x) => project.value?.AssigneeUserId.includes(x));
-        return users;
-    } else {
-        return users;
-    }
-})
+const assigneeInput = computed(() => ({
+    task: props.task,
+    sprint: sprintData.value,
+    project: project.value,
+    parentAssignees: props.parentTask?.AssigneeUserId,
+    companyUsers: companyUsers.value
+}));
+const permittedOptions = computed(() => permittedAssignees(assigneeInput.value));
+const nonPermittedOptions = computed(() => selfAssignable({ ...assigneeInput.value, userId: userId.value }));
 
 function getUserData() {
     const user = getUser(userId.value);
