@@ -41,7 +41,6 @@
         </div>
 
         <Sidebar
-            :top="clientWidth<=767 ? '0px' : '46px' "
             :title="$t('Projects.list_of_user')"
             :value="detailedUsers.map((x) => ({value: x.id, label: x.title ,id: x.id, image: x.image, isOnline: x.isOnline,designation:x.designation}))"
             v-model:visible="visible"
@@ -60,7 +59,7 @@
 </template>
 <script setup>
 // PACKAGES
-import { defineComponent, defineProps, defineEmits, ref, computed ,inject} from "vue";
+import { defineComponent, defineProps, defineEmits, ref, computed } from "vue";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useStore } from 'vuex';
 
@@ -77,7 +76,6 @@ const {makeUniqueId} = useCustomComposable();
 const { getters } = useStore();
 
 const addUserIcon = require("@/assets/images/svg/Assign_white.svg")
-const clientWidth = inject("$clientWidth");
 const {t} = useI18n()
 
 // COMPONENT
