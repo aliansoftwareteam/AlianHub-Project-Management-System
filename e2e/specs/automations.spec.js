@@ -49,7 +49,7 @@ test.describe('ask as a guest', () => {
         const sources = page.waitForResponse((res) => res.url().includes('/api/v1/ai/ask/sources'));
         await page.goto(`/#/${state.companyId}/ai/ask`);
         expect((await sources).status()).toBe(200);
-        await expect(page.locator('.ah-toolbar__title').first()).toHaveText('Ask');
+        await expect(page.locator('.ah-toolbar__title').first()).toHaveText('AI');
         await expect(page.getByText('Only projects you can already open. Ask never widens what you can see.')).toBeVisible();
     });
 });
