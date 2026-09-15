@@ -40,7 +40,7 @@
                 :sprint="{ ...task.sprintArray, id: task.sprintId, folderId: task.folderObjId }"
                 :taskId="task._id"
                 :project="project"
-                :assigneeOptions="task.AssigneeUserId"
+                :assigneeOptions="subtaskAssigneeOptions"
                 :considerWidth="false"
                 @cancel="creating = false"
             />
@@ -60,6 +60,7 @@ import Skelaton from "@/components/atom/Skelaton/Skelaton.vue";
 import CreateTask from "@/components/atom/CreateTask/CreateTask.vue";
 import taskClass from "@/utils/TaskOperations";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
+import { subtaskCreateAssignees } from "@/utils/assigneeOptions";
 
 defineOptions({ name: "TaskSubtaskList" });
 
@@ -82,6 +83,11 @@ const creating = ref(false);
 const pending = reactive({});
 const optimistic = reactive({});
 
+const subtaskAssigneeOptions = computed(() => subtaskCreateAssignees({
+    parent: props.task,
+    project: props.project,
+    companyUsers: getters["settings/companyUsers"]?.map((x) => x.userId)
+}));
 const canCreate = computed(() => checkPermission("task.sub_task_create", props.project?.isGlobalPermission) === true);
 const canSetStatus = computed(() => checkPermission("task.task_status", props.project?.isGlobalPermission) === true);
 

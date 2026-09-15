@@ -162,6 +162,7 @@ import { useConvertDate, useCustomComposable, useGetterFunctions } from "@/compo
 import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification"
 import { useUpdateTasks } from "@/views/Projects/helper"
+import { permittedAssignees, selfAssignable } from "@/utils/assigneeOptions"
 import {customField} from '../../../../customFieldView/helper.js';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
@@ -273,62 +274,15 @@ const taskType = computed(() => {
 const sprintData = computed(() => {
     return props.sprintObject || null;
 })
-const permittedOptions = computed(() => {
-    let users = [];
-    if(sprintData.value) {
-        if(props.data.isParentTask) {
-            if(sprintData.value?.private) {
-                users = sprintData.value?.AssigneeUserId || [];
-            } else {
-                if(projectData.value?.isPrivateSpace) {
-                    users = projectData.value?.AssigneeUserId || [];
-                } else {
-                    users = companyUsers.value;
-                }
-            }
-        } else {
-            if(sprintData.value?.private) {
-                users = props.parentAssignee.filter((x) => sprintData.value?.AssigneeUserId?.includes(x))
-            } else {
-                users = props.parentAssignee
-            }
-        }
-    }
-
-    if(projectData.value?.isPrivateSpace) {
-        users = users.filter((x) => projectData.value?.AssigneeUserId.includes(x));
-        return Array.from(new Set([...users, ...(props.data?.AssigneeUserId || [])]));
-    } else {
-        return users;
-    }
-})
-const nonPermittedOptions = computed(() => {
-    let users = [];
-    if(sprintData.value) {
-        if(props.data.isParentTask) {
-            if(sprintData.value?.private) {
-                users = (sprintData.value?.AssigneeUserId || []).filter((x) => x === userId.value);
-            } else {
-                if(projectData.value?.isPrivateSpace) {
-                    users = (projectData.value?.AssigneeUserId || []).filter((x) => x === userId.value);
-                } else {
-                    users = [userId.value];
-                }
-            }
-        } else {
-            users = (props.parentAssignee || [])?.filter((x) => x === userId.value)
-            if(sprintData.value?.private) {
-                users = users.filter((x) => sprintData.value?.AssigneeUserId?.includes(x))
-            }
-        }
-    }
-    if(projectData.value?.isPrivateSpace) {
-        users = users.filter((x) => projectData.value?.AssigneeUserId.includes(x));
-        return users;
-    } else {
-        return users;
-    }
-})
+const assigneeInput = computed(() => ({
+    task: props.data,
+    sprint: sprintData.value,
+    project: projectData.value,
+    parentAssignees: props.parentAssignee,
+    companyUsers: companyUsers.value
+}))
+const permittedOptions = computed(() => permittedAssignees(assigneeInput.value))
+const nonPermittedOptions = computed(() => selfAssignable({ ...assigneeInput.value, userId: userId.value }))
 
 watch(() => props.data, (newVal, oldVal) => {
     if(JSON.stringify(newVal) !== JSON.stringify(oldVal)) {

@@ -262,6 +262,7 @@
     import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
     import { useI18n } from "vue-i18n";
     import { useTimer } from "@/components/molecules/Home/useTimer";
+    import { permittedAssignees, selfAssignable } from "@/utils/assigneeOptions";
     const { t } = useI18n();
     const props = defineProps({
         data: Object,
@@ -399,61 +400,15 @@
         }
         return sprintData || null;
     })
-    const permittedOptions = computed(() => {
-        let users = [];
-        if(sprintData.value) {
-            if(element.value?.isParentTask) {
-                if(sprintData.value?.private) {
-                    users = sprintData.value?.AssigneeUserId || [];
-                } else {
-                    if(projectData.value?.isPrivateSpace) {
-                        users = projectData.value?.AssigneeUserId || [];
-                    } else {
-                        users = companyUsers.value;
-                    }
-                }
-            } else {
-                if(sprintData.value?.private) {
-                    users = (props.parentAssignee || []).filter((x) => sprintData.value?.AssigneeUserId?.includes(x))
-                } else {
-                    users = (props.parentAssignee || [])
-                }
-            }
-        }
-        if(projectData.value?.isPrivateSpace) {
-            users = users.filter((x) => projectData.value?.AssigneeUserId.includes(x));
-            return Array.from(new Set([...users, ...(props.data?.AssigneeUserId || [])]));
-        } else {
-            return users;
-        }
-    })
-    const nonPermittedOptions = computed(() => {
-        let users = [];
-        if(sprintData.value) {
-            if(element.value?.isParentTask) {
-                if(sprintData.value?.private) {
-                    users = (sprintData.value?.AssigneeUserId || []).filter((x) => x === userId.value);
-                } else {
-                    if(projectData.value?.isPrivateSpace) {
-                        users = (projectData.value?.AssigneeUserId || []).filter((x) => x === userId.value);
-                    } else {
-                        users = [userId.value];
-                    }
-                }
-            } else {
-                users = (props.parentAssignee || [])?.filter((x) => x === userId.value)
-                if(sprintData.value?.private) {
-                    users = users.filter((x) => sprintData.value?.AssigneeUserId?.includes(x))
-                }
-            }
-        }
-        if(projectData.value?.isPrivateSpace) {
-            users = users.filter((x) => projectData.value?.AssigneeUserId.includes(x));
-            return users;
-        } else {
-            return users;
-        }
-    })
+    const assigneeInput = computed(() => ({
+        task: element.value,
+        sprint: sprintData.value,
+        project: projectData.value,
+        parentAssignees: props.parentAssignee,
+        companyUsers: companyUsers.value
+    }))
+    const permittedOptions = computed(() => permittedAssignees(assigneeInput.value))
+    const nonPermittedOptions = computed(() => selfAssignable({ ...assigneeInput.value, userId: userId.value }))
 
     const emit = defineEmits(["subtaskOpen"]);
 
