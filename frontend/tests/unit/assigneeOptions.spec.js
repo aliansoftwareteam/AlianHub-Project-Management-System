@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { permittedAssignees, selfAssignable, sprintOf, subtaskCreateAssignees } from "@/utils/assigneeOptions";
+import { permittedAssignees, scopedAssignees, selfAssignable, sprintOf, subtaskCreateAssignees } from "@/utils/assigneeOptions";
 
 const COMPANY = ["u1", "u2", "u3", "u4", "me"];
 
@@ -79,10 +79,23 @@ describe("assignee options", () => {
             const legacy = legacyPermitted(input);
             if (!isParentTask && !legacy.length) continue;
             expect(permittedAssignees(input)).toEqual(legacy);
+            if (!project.isPrivateSpace) expect(scopedAssignees(input)).toEqual(legacy);
             if (isParentTask || legacySelf(input).length) expect(selfAssignable(input)).toEqual(legacySelf(input));
             checked++;
         }
         expect(checked).toBeGreaterThan(10);
+    });
+
+    it("does not fall back while the parent is still loading", () => {
+        const input = { task: { isParentTask: false }, sprint: sprints[0], project: projects[0], parentAssignees: undefined, companyUsers: COMPANY, userId: "me" };
+        expect(permittedAssignees(input)).toEqual([]);
+        expect(selfAssignable(input)).toEqual([]);
+    });
+
+    it("falls back when the parent's people have all left the private space", () => {
+        const input = { task: { isParentTask: false }, sprint: sprints[0], project: projects[1], parentAssignees: ["u2"], companyUsers: COMPANY, userId: "me" };
+        expect(permittedAssignees(input)).toEqual(["u1", "u3", "me"]);
+        expect(selfAssignable(input)).toEqual(["me"]);
     });
 
     it("offers nothing new when the task's sprint cannot be found", () => {
@@ -93,6 +106,11 @@ describe("assignee options", () => {
         const project = { sprintsObj: { s1: { private: false } } };
         expect(subtaskCreateAssignees({ parent: { sprintId: "s1", AssigneeUserId: [] }, project, companyUsers: COMPANY })).toEqual(COMPANY);
         expect(subtaskCreateAssignees({ parent: { sprintId: "s1", AssigneeUserId: ["u2"] }, project, companyUsers: COMPANY })).toEqual(["u2"]);
+    });
+
+    it("keeps offering the parent's own assignees on the create row without narrowing them", () => {
+        const project = { isPrivateSpace: true, AssigneeUserId: ["u1", "u3", "me"], sprintsObj: { s1: { private: true, AssigneeUserId: ["u1", "u2", "me"] } } };
+        expect(subtaskCreateAssignees({ parent: { sprintId: "s1", AssigneeUserId: ["u1", "u4"] }, project, companyUsers: COMPANY })).toEqual(["u1", "u4"]);
     });
 
     it("keeps the create row's old answer when the host has no real project to resolve a sprint", () => {

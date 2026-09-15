@@ -97,7 +97,7 @@
                             :numOfUsers="1"
                             :users="task.Task_Leader ? [task.Task_Leader] : []"
                             :addUser="true"
-                            :options="permittedOptions"
+                            :options="leaderOptions"
                             @selected="updateTaskLeader($event)"
                             imageWidth="30px"
                             :showAddUser="false"
@@ -297,7 +297,7 @@ import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { openInTracker, isTrackerCapableDevice } from '@/utils/trackerDeepLink';
-import { permittedAssignees, selfAssignable } from '@/utils/assigneeOptions';
+import { permittedAssignees, scopedAssignees, selfAssignable } from '@/utils/assigneeOptions';
 import Modal from '@/components/atom/Modal/Modal.vue';
 
 // Icon for the "Generate estimate using AI" sidebar button. Same asset
@@ -450,11 +450,14 @@ const assigneeInput = computed(() => ({
     task: props.task,
     sprint: sprintData.value,
     project: project.value,
-    parentAssignees: props.parentTask?.AssigneeUserId,
+    parentAssignees: props.parentTask ? (props.parentTask.AssigneeUserId || []) : undefined,
     companyUsers: companyUsers.value
 }));
 const permittedOptions = computed(() => permittedAssignees(assigneeInput.value));
 const nonPermittedOptions = computed(() => selfAssignable({ ...assigneeInput.value, userId: userId.value }));
+// Created-by keeps its old list: the current-assignee union exists so an assignee stays
+// removable, which has no meaning for the task's creator.
+const leaderOptions = computed(() => (project.value?.isPrivateSpace ? permittedOptions.value : scopedAssignees(assigneeInput.value)));
 
 function getUserData() {
     const user = getUser(userId.value);
