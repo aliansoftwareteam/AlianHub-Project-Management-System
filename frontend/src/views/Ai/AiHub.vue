@@ -135,7 +135,7 @@ const ladderLabel = (step) => t(`Ai.autonomy_${step.level}`);
 
 const scopeOf = (agent) => {
     const ids = agent.projectIds || [];
-    return ids.length ? t("Ai.scope_projects", { n: ids.length }) : t("Ai.scope_all");
+    return ids.length ? t("Ai.scope_projects", { n: ids.length }) : t("Ai.scope_none");
 };
 
 const monthLine = (agent) => {

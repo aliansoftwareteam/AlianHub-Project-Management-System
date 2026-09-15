@@ -37,7 +37,7 @@ const C = '6f0000000000000000000c01';
 const C2 = '6f0000000000000000000c02';
 const AGENT_ID = '6f0000000000000000000a01';
 const TASK = { _id: '6f0000000000000000000701', TaskName: 'Plan the launch', TaskKey: 'AR-1', ProjectID: 'p1' };
-const agent = (over = {}) => ({ _id: AGENT_ID, name: 'Planner', autonomy: 1, allowedActions: [], projectIds: [], account: 'workspace', spendCapUsd: 10, ...over });
+const agent = (over = {}) => ({ _id: AGENT_ID, name: 'Planner', autonomy: 1, allowedActions: [], projectIds: ['p1'], account: 'workspace', spendCapUsd: 10, ...over });
 const actor = { kind: 'agent', userId: 'u1', agentId: AGENT_ID, agentName: 'Planner', runId: null, viaAccount: 'workspace', tokenId: null };
 const decider = { kind: 'human', userId: 'u9' };
 const decide = { decider, isPrivileged: true, ip: '' };

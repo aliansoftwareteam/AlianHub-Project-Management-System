@@ -5,7 +5,7 @@ const safe = { write: true, reversible: true, scope: 'task', money: false };
 const read = { write: false, reversible: true, scope: 'task', money: false };
 const task = { _id: 't1', ProjectID: 'p1' };
 const run = { _id: 'r1', projectId: 'p1' };
-const agent = (over = {}) => ({ autonomy: 2, allowedActions: [], projectIds: [], ...over });
+const agent = (over = {}) => ({ autonomy: 2, allowedActions: [], projectIds: ['p1'], ...over });
 const decide = (over = {}) => policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: 't1' }, rating: safe, run, task, ...over });
 
 describe('rule 1 — never-list and unknown actions are refused at every level', () => {
@@ -57,8 +57,25 @@ describe('rule 3 — outside the agent\'s projects is refused', () => {
         expect(decide({ agent: agent({ projectIds: ['p3'] }), task: null, run: null }).reason).toBe('project (none) is outside this agent\'s projects');
     });
 
-    it('an agent without projectIds may work anywhere', () => {
-        expect(decide({ agent: agent({ projectIds: undefined }) }).decision).toBe('act');
+    it.each([[[]], [undefined]])('an agent whose projectIds is %p still reads anywhere', (projectIds) => {
+        expect(decide({ agent: agent({ projectIds }), action: 'task.get', rating: read })).toEqual({ decision: 'act', reason: 'task.get only reads', rating: read });
+    });
+
+    it.each([[[]], [undefined]])('an agent whose projectIds is %p writes nowhere', (projectIds) => {
+        expect(decide({ agent: agent({ projectIds }) })).toEqual({ decision: 'refuse', reason: "task.comment writes, and this agent has no project scope", rating: safe });
+    });
+
+    it.each([0, 1, 2, 3])('L%i refuses an unscoped write, so no level inherits the workspace', (autonomy) => {
+        expect(decide({ agent: agent({ autonomy, projectIds: [] }) }).decision).toBe('refuse');
+    });
+
+    it('refuses an unscoped write before the autonomy and propose-only rules get a say', () => {
+        expect(decide({ agent: agent({ projectIds: [] }), action: 'deploy.staging', rating: safe }).reason).toBe('deploy.staging writes, and this agent has no project scope');
+        expect(decide({ agent: agent({ projectIds: [] }), action: 'task.create', params: { projectId: 'p1', title: 'x' }, rating: { ...safe, scope: 'project' } }).reason).toBe('task.create writes, and this agent has no project scope');
+    });
+
+    it('an explicit scope that names the project still acts', () => {
+        expect(decide({ agent: agent({ projectIds: ['p1'] }) }).decision).toBe('act');
     });
 });
 

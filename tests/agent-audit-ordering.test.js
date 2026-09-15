@@ -38,7 +38,7 @@ const PROJECT_ID = '6a9954186dd786246031e47b';
 
 const agentActor = { kind: 'agent', userId: 'u1', agentId: AGENT_ID, agentName: 'Code Reviewer', runId: RUN_ID, viaAccount: 'workspace', tokenId: null };
 const task = () => ({ _id: TASK_ID, CompanyId: CID, ProjectID: PROJECT_ID, TaskName: 'Fix the thing', TaskKey: 'AR-1', Task_Priority: 'LOW' });
-const agent = (over = {}) => ({ _id: AGENT_ID, name: 'Code Reviewer', autonomy: 2, allowedActions: [], projectIds: [], account: 'workspace', spendCapUsd: 10, ...over });
+const agent = (over = {}) => ({ _id: AGENT_ID, name: 'Code Reviewer', autonomy: 2, allowedActions: [], projectIds: [PROJECT_ID], account: 'workspace', spendCapUsd: 10, ...over });
 
 const rows = (type) => mockDb.store[type] || [];
 const auditRows = () => rows(SCHEMA_TYPE.AUDIT_LOGS);
