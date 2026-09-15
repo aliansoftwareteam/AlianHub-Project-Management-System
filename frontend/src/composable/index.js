@@ -386,6 +386,13 @@ export function useCustomComposable() {
     function getWasabiImageLink(companyId,path) {
         return new Promise((resolve, reject) => {
             try {
+                // Bundled icons have no stored object to sign — getPriority returns '' for every
+                // seeded priority — and the signing route answers an empty path with a 400, which
+                // used to reject the caller's whole priority update.
+                if (!path) {
+                    resolve('');
+                    return;
+                }
                 let reqAPi;
                 if(env.STORAGE_TYPE && env.STORAGE_TYPE==='server') {
                     let axiousObject = storageQueryBuilder('get',companyId,path);
