@@ -12,7 +12,6 @@
             v-model:visible="isVisible"
             width="607px"
             :zIndex="zIndexEstimate"
-            :top="clientWidth<=767 ? '0px' : '46px'"
         >
             <template #head-left>
                 <h3 class="blue" :class="clientWidth > 767 ? 'font-size-18' : 'font-size-16' ">{{$t('Milestone.adding_taskPlanning')}}</h3>
@@ -105,7 +104,6 @@
             v-model:visible="isVisible"
             width="607px"
             :zIndex="zIndexEstimate"
-            :top="clientWidth<=767 ? '0px' : '46px'"
         >
             <template #head-left>
                 <div></div>

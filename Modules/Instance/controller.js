@@ -275,8 +275,8 @@ exports.stats = async (req, res) => {
             MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: [{}] }, 'countDocuments'),
             MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.USERS, data: [{}] }, 'countDocuments'),
         ]);
-        const { version, release, commit, channel, build } = buildInfo.summary();
-        return ok(res, 'Instance stats.', { version, release, commit, channel, build, nodeVersion: process.version, uptimeSeconds: Math.round(process.uptime()), companies: companies || 0, users: users || 0 });
+        const { version, release, commit, channel, build, builtAt } = buildInfo.summary();
+        return ok(res, 'Instance stats.', { version, release, commit, channel, build, builtAt, nodeVersion: process.version, uptimeSeconds: Math.round(process.uptime()), companies: companies || 0, users: users || 0 });
     } catch (error) {
         return fail(res, 500, error.message);
     }
