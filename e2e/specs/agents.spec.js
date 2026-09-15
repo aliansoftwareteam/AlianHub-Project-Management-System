@@ -25,7 +25,7 @@ test.describe('ai agents as the owner', () => {
         const errors = [];
         page.on('pageerror', (e) => errors.push(e.message));
 
-        await page.goto(`/#/${state.companyId}/ai`);
+        await page.goto(`/#/${state.companyId}/ai/agents`);
         await expect(page.locator('.ah-toolbar__title')).toHaveText('AI Agents');
         await expect(page.getByRole('button', { name: 'New agent' })).toBeVisible();
         await expect(page.locator('.ai-agent__name', { hasText: name })).toBeVisible();
@@ -68,7 +68,7 @@ test.describe('ai agents as a guest', () => {
     test.use(asRole('guest'));
 
     test('AGT-01 the hub does not offer New agent to a guest', async ({ page, state }) => {
-        await page.goto(`/#/${state.companyId}/ai`);
+        await page.goto(`/#/${state.companyId}/ai/agents`);
         await expect(page.locator('.ah-toolbar__title')).toHaveText('AI Agents');
         await expect(page.getByRole('button', { name: 'New agent' })).toHaveCount(0, { timeout: 5000 });
     });

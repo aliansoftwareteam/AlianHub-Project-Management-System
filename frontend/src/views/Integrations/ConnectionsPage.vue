@@ -1,69 +1,72 @@
 <template>
-    <div class="ah-page conn">
-        <div class="ah-toolbar">
-            <div class="ah-toolbar__title">{{ $t('Parity.connections') }}</div>
-            <div class="ah-tabs" style="margin-left:8px">
-                <button v-for="tab in tabs" :key="tab" type="button" class="ah-tab" :class="{ 'is-active': view === tab }" @click="view = tab">
-                    {{ $t(`Parity.conn_tab_${tab}`) }}
-                </button>
-            </div>
-            <div class="ah-toolbar__spacer"></div>
-            <router-link class="ah-btn ah-btn--primary ah-btn--sm" :to="{ name: 'IntegrationsHub', params: { cid } }">
-                <ShellIcon name="plus" :size="14" />{{ $t('Parity.connect') }}
-            </router-link>
-        </div>
-
-        <div class="conn__body ah-scroll">
-            <p class="parity-lead">{{ $t('Parity.connections_lead') }}</p>
-            <p v-if="error" class="ah-field__error">{{ error }}</p>
-
-            <div class="conn__grid">
-                <article v-for="card in visible" :key="card.key" class="ah-card conn__card">
-                    <div class="conn__top">
-                        <span class="conn__mark" :class="`conn__mark--${card.mark}`">{{ card.glyph }}</span>
-                        <div class="conn__id">
-                            <div class="conn__name">
-                                <strong>{{ card.name }}</strong>
-                                <span v-if="card.badge" class="ah-chip ah-chip--mono conn__badge">{{ card.badge }}</span>
-                            </div>
-                            <div class="conn__sub">{{ card.sub }}</div>
-                        </div>
-                        <span class="ah-dot" :class="card.live ? 'ah-dot--ok' : 'ah-dot--warn'"></span>
-                    </div>
-                    <p class="conn__grants">{{ card.grants }}</p>
-                    <div v-if="card.key === 'mcp-self'" class="conn__setup">
-                        <div class="ah-label">{{ $t('Parity.mcp_setup') }}</div>
-                        <code class="conn__code ah-mono">{{ mcpCommand }}</code>
-                        <div class="conn__actions">
-                            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="minting" @click="mint">
-                                {{ minting ? $t('Parity.minting') : $t('Parity.mint_token') }}
-                            </button>
-                            <span class="ah-small">{{ $t('Parity.mcp_tools_count', { n: (mcpManifest.tools || []).length }) }}</span>
-                        </div>
-                        <div v-if="minted" class="conn__token">
-                            <div class="ah-label">{{ $t('Parity.copy_now') }}</div>
-                            <code class="conn__code ah-mono">{{ minted.token }}</code>
-                            <p class="ah-small">{{ $t('Parity.token_once') }}</p>
-                        </div>
-                        <p v-if="mintError" class="ah-field__error">{{ mintError }}</p>
-                    </div>
-                </article>
-
-                <article v-if="view === 'all' || view === 'apps'" class="conn__more">
-                    <div class="conn__more-title">{{ availableNames }}</div>
-                    <div class="conn__more-sub">{{ $t('Parity.or_any_mcp') }}</div>
-                </article>
-            </div>
-
-            <section v-if="mcpManifest.never" class="ah-card conn__never">
-                <div class="ah-card__head"><span class="ah-label">{{ $t('Parity.never_label') }}</span></div>
-                <div class="ah-card__body">
-                    <p class="parity-lead">{{ $t('Parity.never_body') }}</p>
-                    <div class="conn__never-list">
-                        <span v-for="item in mcpManifest.never" :key="item" class="ah-chip ah-chip--mono">{{ item }}</span>
-                    </div>
+    <div class="ah-page parity-page conn">
+        <AiSidebar />
+        <div class="parity-page__main">
+            <div class="ah-toolbar">
+                <div class="ah-toolbar__title">{{ $t('Parity.connections') }}</div>
+                <div class="ah-tabs" style="margin-left:8px">
+                    <button v-for="tab in tabs" :key="tab" type="button" class="ah-tab" :class="{ 'is-active': view === tab }" @click="view = tab">
+                        {{ $t(`Parity.conn_tab_${tab}`) }}
+                    </button>
                 </div>
-            </section>
+                <div class="ah-toolbar__spacer"></div>
+                <router-link class="ah-btn ah-btn--primary ah-btn--sm" :to="{ name: 'IntegrationsHub', params: { cid } }">
+                    <ShellIcon name="plus" :size="14" />{{ $t('Parity.connect') }}
+                </router-link>
+            </div>
+
+            <div class="conn__body ah-scroll">
+                <p class="parity-lead">{{ $t('Parity.connections_lead') }}</p>
+                <p v-if="error" class="ah-field__error">{{ error }}</p>
+
+                <div class="conn__grid">
+                    <article v-for="card in visible" :key="card.key" class="ah-card conn__card">
+                        <div class="conn__top">
+                            <span class="conn__mark" :class="`conn__mark--${card.mark}`">{{ card.glyph }}</span>
+                            <div class="conn__id">
+                                <div class="conn__name">
+                                    <strong>{{ card.name }}</strong>
+                                    <span v-if="card.badge" class="ah-chip ah-chip--mono conn__badge">{{ card.badge }}</span>
+                                </div>
+                                <div class="conn__sub">{{ card.sub }}</div>
+                            </div>
+                            <span class="ah-dot" :class="card.live ? 'ah-dot--ok' : 'ah-dot--warn'"></span>
+                        </div>
+                        <p class="conn__grants">{{ card.grants }}</p>
+                        <div v-if="card.key === 'mcp-self'" class="conn__setup">
+                            <div class="ah-label">{{ $t('Parity.mcp_setup') }}</div>
+                            <code class="conn__code ah-mono">{{ mcpCommand }}</code>
+                            <div class="conn__actions">
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="minting" @click="mint">
+                                    {{ minting ? $t('Parity.minting') : $t('Parity.mint_token') }}
+                                </button>
+                                <span class="ah-small">{{ $t('Parity.mcp_tools_count', { n: (mcpManifest.tools || []).length }) }}</span>
+                            </div>
+                            <div v-if="minted" class="conn__token">
+                                <div class="ah-label">{{ $t('Parity.copy_now') }}</div>
+                                <code class="conn__code ah-mono">{{ minted.token }}</code>
+                                <p class="ah-small">{{ $t('Parity.token_once') }}</p>
+                            </div>
+                            <p v-if="mintError" class="ah-field__error">{{ mintError }}</p>
+                        </div>
+                    </article>
+
+                    <article v-if="view === 'all' || view === 'apps'" class="conn__more">
+                        <div class="conn__more-title">{{ availableNames }}</div>
+                        <div class="conn__more-sub">{{ $t('Parity.or_any_mcp') }}</div>
+                    </article>
+                </div>
+
+                <section v-if="mcpManifest.never" class="ah-card conn__never">
+                    <div class="ah-card__head"><span class="ah-label">{{ $t('Parity.never_label') }}</span></div>
+                    <div class="ah-card__body">
+                        <p class="parity-lead">{{ $t('Parity.never_body') }}</p>
+                        <div class="conn__never-list">
+                            <span v-for="item in mcpManifest.never" :key="item" class="ah-chip ah-chip--mono">{{ item }}</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
         </div>
     </div>
 </template>
@@ -75,6 +78,7 @@ import { useRoute } from "vue-router";
 import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import AiSidebar from "@/views/Ai/AiSidebar.vue";
 
 // Connections (13e). Only what this workspace can actually connect to is listed:
 // the integrations catalogue the server serves, and the MCP server this product
