@@ -327,7 +327,8 @@ const parentTask = ref(null);
 const projectData = ref({});
 // projectSlice, not projectData: this ref holds the whole detail payload (subtasks,
 // sprints), and the helper forwards what it is given straight into the PATCH body.
-const { updateTaskByGroup } = useUpdateTasks(computed(projectSlice));
+// taskTypeCounts rides along because the helper reads the previous type off it.
+const { updateTaskByGroup } = useUpdateTasks(computed(() => ({ ...projectSlice(), taskTypeCounts: projectData.value.taskTypeCounts })));
 const subTasks = ref([]);
 const subTaskLimit = 35;
 const fetchedSubtaskCount = ref(null);
