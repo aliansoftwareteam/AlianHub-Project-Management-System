@@ -135,7 +135,7 @@ const props = defineProps({
     },
     top: {
         type: String,
-        default: "46px"
+        default: "var(--legacy-header-h)"
     },
     visible: {
         type: Boolean,

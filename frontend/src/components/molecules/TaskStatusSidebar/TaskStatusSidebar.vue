@@ -1,6 +1,6 @@
 <template>
     <div class="list__taskstatus-sidebar">
-        <Sidebar width="374px" :zIndex="props.zTndex" :top="clientWidth <= 767 ? '0px' : '46px'" >
+        <Sidebar width="374px" :zIndex="props.zTndex" >
             <template #head-left>
                 <div class="font-size-18 font-weight-700 black font-roboto-sans">{{title}}</div>
             </template>

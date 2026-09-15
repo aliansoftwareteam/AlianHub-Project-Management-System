@@ -6,7 +6,7 @@
             <div class="in-grid">
                 <section class="ah-card in-card"><span class="ah-label">{{ $t('Instance.companies') }}</span><strong class="in-big">{{ stats.companies }}</strong></section>
                 <section class="ah-card in-card"><span class="ah-label">{{ $t('Instance.users') }}</span><strong class="in-big">{{ stats.users }}</strong></section>
-                <section class="ah-card in-card"><span class="ah-label">{{ $t('Instance.version_short') }}</span><strong class="in-big ah-mono" data-test="version-label">{{ stats.version ? `v${stats.version}` : '—' }}</strong><span v-if="buildLine" class="ah-small ah-mono" data-test="version-line">{{ buildLine }}</span></section>
+                <section class="ah-card in-card"><span class="ah-label">{{ $t('Instance.version_short') }}</span><strong class="in-big ah-mono" data-test="version-label">{{ stats.version ? `v${stats.version}` : '—' }}</strong><span v-if="buildLine" class="ah-small ah-mono" data-test="version-line">{{ buildLine }}</span><span v-if="builtAtLine" class="ah-small ah-mono" data-test="built-at-line">{{ $t('Instance.built_at', { at: builtAtLine }) }}</span></section>
             </div>
             <section class="ah-card in-card">
                 <div class="in-card__head"><span class="in-card__title">{{ $t('Instance.companies') }}</span></div>
@@ -45,6 +45,13 @@ const buildLine = computed(() => {
     const s = stats.value || {};
     const channel = CHANNEL_KEYS[s.channel] ? t(CHANNEL_KEYS[s.channel]) : "";
     return [s.commit ? String(s.commit).slice(0, 8) : "", channel, s.nodeVersion || ""].filter(Boolean).join(" · ");
+});
+
+// The head commit's own date, so it answers "which build am I on" rather than "when did this
+// process start" — a restart must not make an old build look fresh.
+const builtAtLine = computed(() => {
+    const at = (stats.value || {}).builtAt;
+    return at ? new Date(at).toLocaleString() : "";
 });
 
 onMounted(async () => {

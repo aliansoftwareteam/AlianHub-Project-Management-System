@@ -8235,6 +8235,7 @@ export default {
         policy_body: "A breaker opens when {volume} or more calls in the last {minutes} minutes are at least {percent}% provider failures. It stays open for {cooldown}s, then lets one probe through: the probe closes it on success, or re-opens it for twice as long, up to {ceiling}s. A rate-limit answer alone never opens a breaker — the token bucket answers that — and a malformed prompt or an over-long context is never counted, because another provider would refuse it too.",
     },
     Instance: {
+        built_at: "Updated {at}",
         group: "Instance",
         nav_health: "Health",
         nav_settings: "Settings",
