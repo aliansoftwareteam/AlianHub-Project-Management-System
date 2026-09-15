@@ -59,7 +59,7 @@
 </template>
 <script setup>
 // PACKAGES
-import { defineComponent, defineProps, defineEmits, ref, computed ,inject} from "vue";
+import { defineComponent, defineProps, defineEmits, ref, computed } from "vue";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useStore } from 'vuex';
 
@@ -76,7 +76,6 @@ const {makeUniqueId} = useCustomComposable();
 const { getters } = useStore();
 
 const addUserIcon = require("@/assets/images/svg/Assign_white.svg")
-const clientWidth = inject("$clientWidth");
 const {t} = useI18n()
 
 // COMPONENT
