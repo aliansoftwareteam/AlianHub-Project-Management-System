@@ -8,6 +8,7 @@ const { getProvider, isAnyProviderConfigured } = require('../AICore/llmProvider'
 const { FEATURES } = require('../AICore/features');
 const { visibleProjects } = require('../Agents/scope');
 const { pageVisibilityFilter } = require('../Pages/helpers/pageRules');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 
 // Ask (handoff 13i) — a question box over the workspace.
 //
@@ -51,7 +52,7 @@ const gather = async (companyId, uid, { question, projectId, limit = MAX_PER_TYP
     if (!ids.length) return { sources: [], projects, scopedProjectIds: ids };
 
     const terms = searchTerms(question);
-    const taskMatch = { deletedStatusKey: { $ne: 1 }, ProjectID: { $in: ids } };
+    const taskMatch = { deletedStatusKey: { $ne: 1 }, ProjectID: { $in: ids }, ...(await hiddenSprintFilter(companyId, uid, ids)) };
     const textMatch = orRegex(terms, ['TaskName', 'TaskKey', 'rawDescription']);
     if (textMatch) Object.assign(taskMatch, textMatch);
 
