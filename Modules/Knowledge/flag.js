@@ -12,10 +12,22 @@ const logger = require('../../Config/loggerConfig');
 const MODES = ['off', 'tenant', 'all'];
 const COMPANY_FIELD = 'knowledgeRetrieval';
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const ON_VALUES = ['on', 'true', '1', 'yes', 'enabled'];
 
 const mode = () => {
     const raw = String(process.env.KNOWLEDGE_RETRIEVAL || 'off').trim().toLowerCase();
     return MODES.includes(raw) ? raw : 'off';
+};
+
+/* The row is hand-editable, so "off" may arrive as a bare string, in capitals or as a
+ * boolean. Only a recognisable "on" counts as on: any other value that is present
+ * reads as off, so a mistyped opt-out never turns retrieval on under "all". */
+const normaliseCompanyMode = (stored) => {
+    const raw = stored !== null && typeof stored === 'object' ? stored.mode : stored;
+    if (raw === undefined || raw === null) return null;
+    const value = String(raw).trim().toLowerCase();
+    if (!value) return null;
+    return ON_VALUES.includes(value) ? 'on' : 'off';
 };
 
 const companyMode = async (companyId) => {
@@ -24,8 +36,7 @@ const companyMode = async (companyId) => {
             type: dbCollections.COMPANIES,
             data: [{ _id: new mongoose.Types.ObjectId(String(companyId)) }, COMPANY_FIELD],
         }, 'findOne');
-        const stored = company && company[COMPANY_FIELD];
-        return stored && typeof stored.mode === 'string' ? stored.mode : null;
+        return normaliseCompanyMode(company && company[COMPANY_FIELD]);
     } catch (error) {
         logger.error(`knowledge flag: company ${companyId}: ${error.message}`);
         return undefined;
@@ -40,4 +51,4 @@ const enabledFor = async (companyId) => {
     return installation === 'all' ? own !== 'off' : own === 'on';
 };
 
-module.exports = { MODES, COMPANY_FIELD, mode, enabledFor };
+module.exports = { MODES, COMPANY_FIELD, mode, normaliseCompanyMode, enabledFor };

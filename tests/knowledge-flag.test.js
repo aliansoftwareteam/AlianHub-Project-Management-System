@@ -59,6 +59,49 @@ describe('KNOWLEDGE_RETRIEVAL', () => {
         expect(await flag.enabledFor(C)).toBe(expected);
     });
 
+    describe('reads the company switch however it was stored', () => {
+        const stored = (value) => mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C, knowledgeRetrieval: value });
+        const OFF_SHAPES = [
+            ['a bare string', 'off'],
+            ['a bare string in capitals with spaces', ' OFF '],
+            ['a mode in capitals', { mode: 'OFF' }],
+            ['a mode with spaces', { mode: ' off ' }],
+            ['a boolean mode', { mode: false }],
+            ['a bare boolean', false],
+            ['an unrecognised mode', { mode: 'paused' }],
+        ];
+        const ON_SHAPES = [
+            ['a bare string', 'on'],
+            ['a mode in capitals', { mode: ' ON ' }],
+            ['a boolean mode', { mode: true }],
+        ];
+        const ABSENT_SHAPES = [
+            ['an empty object', {}],
+            ['an empty mode', { mode: '' }],
+            ['null', null],
+        ];
+
+        it.each(['tenant', 'all'].flatMap((env) => OFF_SHAPES.map(([label, value]) => [env, label, value])))('%s: an opt-out stored as %s is off', async (env, label, value) => {
+            process.env.KNOWLEDGE_RETRIEVAL = env;
+            stored(value);
+            expect(await flag.enabledFor(C)).toBe(false);
+        });
+
+        it.each(['tenant', 'all'].flatMap((env) => ON_SHAPES.map(([label, value]) => [env, label, value])))('%s: an opt-in stored as %s is on', async (env, label, value) => {
+            process.env.KNOWLEDGE_RETRIEVAL = env;
+            stored(value);
+            expect(await flag.enabledFor(C)).toBe(true);
+        });
+
+        it.each(ABSENT_SHAPES)('a switch stored as %s is absent: off under tenant, on under all', async (label, value) => {
+            stored(value);
+            process.env.KNOWLEDGE_RETRIEVAL = 'tenant';
+            expect(await flag.enabledFor(C)).toBe(false);
+            process.env.KNOWLEDGE_RETRIEVAL = 'all';
+            expect(await flag.enabledFor(C)).toBe(true);
+        });
+    });
+
     it('never reads the company row while the installation is off', async () => {
         companyWith('on');
         expect(await flag.enabledFor(C)).toBe(false);

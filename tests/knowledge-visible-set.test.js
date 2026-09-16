@@ -92,6 +92,44 @@ describe('a task in a private sprint', () => {
     });
 });
 
+describe('a comment is visible only where its task is', () => {
+    const comment = (over) => seed(SCHEMA_TYPE.COMMENTS, { message: 'budget follow-up', type: 'text', projectId: SHARED, sprintId: OPEN_SPRINT, userId: OWNER, ...over });
+
+    it('is left out when its task is deleted, though the comment itself is live', async () => {
+        const onDeletedTask = comment({ taskId: rows.deletedTask });
+        expect(idsOf(await ask(OWNER), 'comment')).not.toContain(onDeletedTask);
+    });
+
+    it('is left out when its task is in a private sprint the caller is not on, though the comment names an open sprint', async () => {
+        const onSprintTask = comment({ taskId: rows.sprintTask });
+        expect(idsOf(await ask(MEMBER), 'comment')).not.toContain(onSprintTask);
+        expect(idsOf(await ask(COLLEAGUE), 'comment')).toContain(onSprintTask);
+    });
+
+    it('is left out when its task is in a project the caller cannot open, though the comment names one they can', async () => {
+        const onSecretTask = comment({ taskId: rows.secretTask });
+        expect(idsOf(await ask(MEMBER), 'comment')).not.toContain(onSecretTask);
+        expect(idsOf(await ask(ADMIN), 'comment')).toContain(onSecretTask);
+    });
+
+    it('is left out once deleted', async () => {
+        const deleted = comment({ taskId: rows.openTask, isDeleted: true });
+        expect(idsOf(await ask(OWNER), 'comment')).not.toContain(deleted);
+    });
+});
+
+describe('every read stays in the caller\'s company', () => {
+    it('searches, rechecks and follows comments to their tasks only in the company asked about', async () => {
+        await ask(COLLEAGUE);
+        const byId = (type) => mockDb.calls.filter((c) => c.type === type && c.data[0] && c.data[0]._id);
+        expect(byId(SCHEMA_TYPE.COMMENTS).length).toBeGreaterThan(0);
+        expect(byId(SCHEMA_TYPE.TASKS).length).toBeGreaterThanOrEqual(2);
+        expect(byId(SCHEMA_TYPE.PAGES).length).toBeGreaterThan(0);
+        expect(mockDb.calls.length).toBeGreaterThan(0);
+        expect([...new Set(mockDb.calls.map((c) => String(c.companyId)))]).toEqual([C]);
+    });
+});
+
 describe('what everyone in the company can see', () => {
     it('includes a company-wide page that has no project', async () => {
         const result = await ask(MEMBER);
@@ -108,6 +146,11 @@ describe('what everyone in the company can see', () => {
     it('returns a transcript only to the people who were on the call', async () => {
         expect(idsOf(await ask(MEMBER), 'transcript')).toEqual([rows.memberCall]);
         expect(idsOf(await ask(ADMIN), 'transcript')).toEqual([]);
+    });
+
+    it('never returns a deleted call transcript, even to someone who was on the call', async () => {
+        const deletedCall = seed(SCHEMA_TYPE.CALLS, { callId: 'call-3', title: 'Old', transcript: 'the budget we dropped', participants: [MEMBER], deletedStatusKey: 1 });
+        expect(idsOf(await ask(MEMBER), 'transcript')).not.toContain(deletedCall);
     });
 });
 
