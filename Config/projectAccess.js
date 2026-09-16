@@ -77,11 +77,9 @@ const isAssigned = async (companyId, project, uid) => {
     return (teams || []).some((team) => (team.assigneeUsersArray || []).map(String).includes(uid));
 };
 
-// Settings keys never live in a project's own rules, so they are always read company-wide.
 const anyWritable = async (companyId, uid, projectId, keys) => {
     for (const key of keys) {
-        const scope = key.startsWith('settings.') ? {} : { projectId };
-        if (isWritable(await evaluatePermission(companyId, uid, key, scope))) return true;
+        if (isWritable(await evaluatePermission(companyId, uid, key, { projectId }))) return true;
     }
     return false;
 };

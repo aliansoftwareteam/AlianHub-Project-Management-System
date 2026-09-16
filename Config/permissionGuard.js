@@ -15,7 +15,9 @@
  *   - roleType 1 (owner) and 2 (admin) bypass all permission checks.
  *   - Every other role, guest (0) included, is evaluated against the company
  *     RULES, or the project's own PROJECT_RULES when that project has
- *     isGlobalPermission === false.
+ *     isGlobalPermission === false. settings.* keys always read the company RULES.
+ *   - tests/fixtures/permissionParity.json holds the cases both evaluators must
+ *     agree on, and the known differences.
  *   - A role with no entry on a rule, or a rule that does not exist, is
  *     null: the matrix shows it as "None".
  *   - null = no access, false = read-only, true = write,
@@ -36,6 +38,9 @@ const PROJECT_RULES_TTL_SECONDS = 604800;
 
 // A project's own rules never hold these two keys, and checkPermission(path, false) grants them.
 const PROJECT_CONTEXT_GRANTED = ['project.project_list', 'project.public_projects'];
+
+// Project rules are seeded from the project and task sections only, and the web app never checks a settings key against them.
+const isCompanyWideKey = (path) => String(path).startsWith('settings.');
 
 // Ops escape hatch (runbook kill switch): if a fine-grained permission edge
 // case ever blocks a legitimate member workflow in production, set
@@ -141,15 +146,30 @@ const loadProjectRules = async (companyId, projectId) => {
     return rules || [];
 };
 
+/*
+ * The web app reads a missing flag as true (checkPermission's default) and an explicit null as the
+ * project rules. Null stays on the company rules here: the project routes enforce this evaluator for
+ * every session, so reading the project rules would refuse requests allowed today. Migration 029
+ * rewrites stored nulls to true.
+ */
+const usesProjectRules = (project) => Boolean(project) && project.isGlobalPermission === false;
+
 const rulesFor = async (companyId, projectId) => {
     const id = toObjectId(projectId);
     const project = id
         ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: id }, { isGlobalPermission: 1 }] }, 'findOne')
         : null;
-    if (project && project.isGlobalPermission === false) {
+    if (usesProjectRules(project)) {
         return { arranged: arrangeRules(await loadProjectRules(companyId, projectId)), projectScoped: true };
     }
     return { arranged: arrangeRules(await fetchRules(companyId)), projectScoped: false };
+};
+
+const permissionIn = ({ arranged, projectScoped }, roleType, path) => {
+    if (projectScoped && PROJECT_CONTEXT_GRANTED.includes(path)) return true;
+    const rule = lookupRule(arranged, path);
+    const match = rule && rule.roles.find((r) => r.key === roleType);
+    return match ? match.permission : null;
 };
 
 /**
@@ -160,24 +180,44 @@ const evaluatePermission = async (companyId, uid, path, { projectId } = {}) => {
     const roleType = await getRoleType(companyId, uid);
     if (roleType === null) return null;
     if (isPrivileged(roleType)) return true;
-    const { arranged, projectScoped } = await rulesFor(companyId, projectId);
-    if (projectScoped && PROJECT_CONTEXT_GRANTED.includes(path)) return true;
-    const rule = lookupRule(arranged, path);
-    if (!rule) return null;
-    const match = rule.roles.find((r) => r.key === roleType);
-    return match ? match.permission : null;
+    return permissionIn(await rulesFor(companyId, isCompanyWideKey(path) ? null : projectId), roleType, path);
 };
 
-/* A task named in the body decides the project, so a client cannot borrow a more permissive project's rules. */
-const projectIdForRequest = async (companyId, req) => {
+const TASK_ID_FIELDS = [['taskData', '_id'], ['task', '_id']];
+const PROJECT_ID_FIELDS = [['data', 'ProjectID'], ['projectData', '_id'], ['project', '_id'], ['projectId']];
+
+const idAt = (body, fields) => {
+    const value = fields.reduce((node, field) => (node && typeof node === 'object' ? node[field] : undefined), body);
+    return OBJECT_ID_PATTERN.test(String(value || '')) ? String(value) : null;
+};
+const idsAt = (body, paths) => [...new Set(paths.map((fields) => idAt(body, fields)).filter(Boolean))];
+
+/*
+ * The projects whose rules judge a request, from every body shape the web app sends to a guarded route
+ * (tests/permission-request-project.test.js). Named tasks decide over named projects and every one of
+ * them must allow, so a client cannot borrow a more permissive project's rules. `unresolved` marks a body
+ * whose tasks all failed to resolve. `legacyProjectId` is what this lookup returned before it covered the
+ * task and project shapes; the enforced API-token path still allows what that project allowed.
+ */
+const projectsForRequest = async (companyId, req) => {
     const body = (req && req.body) || {};
-    const taskId = toObjectId(body.taskData && body.taskData._id);
-    if (taskId) {
-        const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: taskId }, { ProjectID: 1 }] }, 'findOne');
-        return task && task.ProjectID ? String(task.ProjectID) : null;
+    const taskIds = idsAt(body, TASK_ID_FIELDS);
+    const projectOfTask = new Map();
+    if (taskIds.length) {
+        const tasks = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{ _id: { $in: taskIds.map(toObjectId) } }, { ProjectID: 1 }],
+        }, 'find');
+        (tasks || []).forEach((task) => { if (task.ProjectID) projectOfTask.set(String(task._id), String(task.ProjectID)); });
     }
-    const direct = [body.data && body.data.ProjectID, body.projectId].find((value) => OBJECT_ID_PATTERN.test(String(value || '')));
-    return direct ? String(direct) : null;
+    const projectIds = taskIds.length
+        ? [...new Set(taskIds.map((id) => projectOfTask.get(id)).filter(Boolean))]
+        : idsAt(body, PROJECT_ID_FIELDS);
+    const legacyTaskId = idAt(body, ['taskData', '_id']);
+    const legacyProjectId = legacyTaskId
+        ? (projectOfTask.get(legacyTaskId) || null)
+        : (idAt(body, ['data', 'ProjectID']) || idAt(body, ['projectId']));
+    return { projectIds, unresolved: taskIds.length > 0 && projectIds.length === 0, legacyProjectId };
 };
 
 /**
@@ -221,6 +261,30 @@ const requireCompanyAdmin = ({ permission = null } = {}) => async (req, res, nex
 const isWritable = (permission) => permission === true || permission === 1 || permission === 2;
 const isReadable = (permission) => permission !== null && permission !== undefined && permission !== 0;
 
+const passes = (permission, write) => (write ? isWritable(permission) : isReadable(permission));
+
+const allowedInEvery = async (companyId, uid, path, write, projectIds) => {
+    for (const projectId of projectIds.length ? projectIds : [null]) {
+        if (!passes(await evaluatePermission(companyId, uid, path, { projectId }), write)) return false;
+    }
+    return true;
+};
+
+/*
+ * A body whose tasks do not exist is judged on the company rules rather than passed through: the task
+ * handlers write through the ids and the company the body names, so it could reach a task this check never saw.
+ */
+const requestAllowed = async (companyId, uid, req, path, write) => {
+    if (isCompanyWideKey(path)) return passes(await evaluatePermission(companyId, uid, path), write);
+    const { projectIds, unresolved, legacyProjectId } = await projectsForRequest(companyId, req);
+    if (unresolved) logger.warn(`permission guard ${path}: the tasks named in the body were not found; judged on the company rules`);
+    if (await allowedInEvery(companyId, uid, path, write, projectIds)) return true;
+    const sameContext = projectIds.length <= 1 && (projectIds[0] || null) === legacyProjectId;
+    if (sameContext || !passes(await evaluatePermission(companyId, uid, path, { projectId: legacyProjectId }), write)) return false;
+    logger.warn(`permission guard ${path}: known difference, refused by project ${projectIds.join(', ') || 'none'} but allowed by ${legacyProjectId || 'the company rules'} as before`);
+    return true;
+};
+
 /**
  * Express middleware: require a permission KEY for the request's project.
  * write:true (default) needs a writable value, write:false any readable one.
@@ -231,9 +295,7 @@ const requirePermission = (path, { write = true } = {}) => async (req, res, next
     const forbid = (statusText) => res.status(403).json({ status: false, statusText, error: "Forbidden", permission: path });
     try {
         const companyId = req.headers["companyid"] || "";
-        const projectId = await projectIdForRequest(companyId, req);
-        const permission = await evaluatePermission(companyId, req.uid, path, { projectId });
-        if (write ? isWritable(permission) : isReadable(permission)) return next();
+        if (await requestAllowed(companyId, req.uid, req, path, write)) return next();
         return forbid("You do not have permission to perform this action.");
     } catch (error) {
         logger.error(`requirePermission error (${path}): ${error.message || error}`);
@@ -276,11 +338,14 @@ const MCP_PERMISSION_KEYS = [
     'sheet_settings.workload_timesheet',
 ];
 
+const NO_RULES = { arranged: {}, projectScoped: false };
+
 /**
- * The company-wide effective map { roleType, permissions: { key: value } } the
- * whoami endpoint hands the MCP server at connect time.
+ * The effective map { roleType, permissions: { key: value } }, read once for many keys, with the answers
+ * evaluatePermission gives. Without a projectId it is company-wide: what the whoami endpoint hands the
+ * MCP server at connect time. Unreadable rules answer null for every key.
  */
-const evaluateMany = async (companyId, uid, keys = MCP_PERMISSION_KEYS) => {
+const evaluateMany = async (companyId, uid, keys = MCP_PERMISSION_KEYS, { projectId } = {}) => {
     const roleType = await getRoleType(companyId, uid);
     const permissions = {};
     if (roleType === null) {
@@ -291,17 +356,17 @@ const evaluateMany = async (companyId, uid, keys = MCP_PERMISSION_KEYS) => {
         keys.forEach((k) => { permissions[k] = true; });
         return { roleType, permissions };
     }
-    let arranged = {};
+    let scoped = NO_RULES;
+    let company = NO_RULES;
     try {
-        arranged = arrangeRules(await fetchRules(companyId));
+        scoped = await rulesFor(companyId, projectId);
+        company = scoped.projectScoped && keys.some(isCompanyWideKey) ? await rulesFor(companyId, null) : scoped;
     } catch (error) {
-        logger.error(`evaluateMany fetchRules error: ${error.message || error}`);
+        scoped = NO_RULES;
+        company = NO_RULES;
+        logger.error(`evaluateMany rules error: ${error.message || error}`);
     }
-    for (const key of keys) {
-        const rule = lookupRule(arranged, key);
-        const match = rule && rule.roles.find((r) => r.key === roleType);
-        permissions[key] = match ? match.permission : null;
-    }
+    keys.forEach((key) => { permissions[key] = permissionIn(isCompanyWideKey(key) ? company : scoped, roleType, key); });
     return { roleType, permissions };
 };
 
@@ -319,6 +384,7 @@ module.exports = {
     isPrivileged,
     arrangeRules,
     evaluatePermission,
+    projectsForRequest,
     requireRole,
     requireCompanyAdmin,
     requirePermission,

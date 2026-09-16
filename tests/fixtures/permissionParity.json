@@ -1,0 +1,373 @@
+{
+  "about": "Shared by tests/permission-parity.test.js (Config/permissionGuard.js) and frontend/tests/unit/permissionParity.spec.js (checkPermission). A case with no project is evaluated without one; otherwise the project document is stored with exactly the fields given. expected is the raw matrix value: null None, false read, true write, 1 Own, 2 Everyone.",
+  "cases": [
+    {
+      "name": "a member may write where the company rule says true",
+      "role": 3,
+      "project": null,
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [],
+      "key": "task.task_create",
+      "expected": true
+    },
+    {
+      "name": "a member may only read where the company rule says false",
+      "role": 3,
+      "project": null,
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_comment","key":"task_comment","name":"task_comment","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":false}]}
+      ],
+      "projectRules": [],
+      "key": "task.task_comment",
+      "expected": false
+    },
+    {
+      "name": "a member gets nothing where the company rule says None",
+      "role": 3,
+      "project": null,
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_delete","key":"task_delete","name":"task_delete","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":null}]}
+      ],
+      "projectRules": [],
+      "key": "task.task_delete",
+      "expected": null
+    },
+    {
+      "name": "a member with no entry on the rule gets nothing",
+      "role": 3,
+      "project": null,
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_move","key":"task_move","name":"task_move","isParent":false,"parentId":"c-task","roles":[{"key":0,"permission":false}]}
+      ],
+      "projectRules": [],
+      "key": "task.task_move",
+      "expected": null
+    },
+    {
+      "name": "a rule with no roles gives nothing",
+      "role": 3,
+      "project": null,
+      "companyRules": [
+        {"_id":"c-project","key":"project","name":"project","isParent":true,"roles":[]},
+        {"_id":"c-project-project_create","key":"project_create","name":"project_create","isParent":false,"parentId":"c-project","roles":[]}
+      ],
+      "projectRules": [],
+      "key": "project.project_create",
+      "expected": null
+    },
+    {
+      "name": "a rule that does not exist gives nothing",
+      "role": 3,
+      "project": null,
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [],
+      "key": "task.task_nonexistent",
+      "expected": null
+    },
+    {
+      "name": "an owner passes a rule that says None",
+      "role": 1,
+      "project": null,
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_delete","key":"task_delete","name":"task_delete","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":null}]}
+      ],
+      "projectRules": [],
+      "key": "task.task_delete",
+      "expected": true
+    },
+    {
+      "name": "an admin passes a rule that does not exist",
+      "role": 2,
+      "project": null,
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [],
+      "key": "task.task_nonexistent",
+      "expected": true
+    },
+    {
+      "name": "a guest is judged like any other role",
+      "role": 0,
+      "project": null,
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_comment","key":"task_comment","name":"task_comment","isParent":false,"parentId":"c-task","roles":[{"key":0,"permission":false},{"key":3,"permission":true}]}
+      ],
+      "projectRules": [],
+      "key": "task.task_comment",
+      "expected": false
+    },
+    {
+      "name": "a custom role reads its own entry",
+      "role": 5,
+      "project": null,
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":null},{"key":5,"permission":true}]}
+      ],
+      "projectRules": [],
+      "key": "task.task_create",
+      "expected": true
+    },
+    {
+      "name": "a selection field returns Everyone as 2",
+      "role": 3,
+      "project": null,
+      "companyRules": [
+        {"_id":"c-project","key":"project","name":"project","isParent":true,"roles":[]},
+        {"_id":"c-project-private_projects","key":"private_projects","name":"private_projects","isParent":false,"parentId":"c-project","roles":[{"key":3,"permission":2}]}
+      ],
+      "projectRules": [],
+      "key": "project.private_projects",
+      "expected": 2
+    },
+    {
+      "name": "a selection field returns Own as 1",
+      "role": 3,
+      "project": null,
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-show_tasks","key":"show_tasks","name":"show_tasks","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":1}]}
+      ],
+      "projectRules": [],
+      "key": "task.show_tasks",
+      "expected": 1
+    },
+    {
+      "name": "someone without a seat gets nothing",
+      "role": null,
+      "project": null,
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [],
+      "key": "task.task_create",
+      "expected": null
+    },
+    {
+      "name": "a project on the global rules ignores rows left in its own rules",
+      "role": 3,
+      "project": {"isGlobalPermission":true},
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [
+        {"_id":"p-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"p-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"p-task","roles":[{"key":3,"permission":null}]}
+      ],
+      "key": "task.task_create",
+      "expected": true
+    },
+    {
+      "name": "a project with its own rules grants what the company rules refuse",
+      "role": 3,
+      "project": {"isGlobalPermission":false},
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":null}]}
+      ],
+      "projectRules": [
+        {"_id":"p-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"p-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"p-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "key": "task.task_create",
+      "expected": true
+    },
+    {
+      "name": "a project with its own rules narrows what the company rules grant",
+      "role": 3,
+      "project": {"isGlobalPermission":false},
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_priority","key":"task_priority","name":"task_priority","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [
+        {"_id":"p-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"p-task-task_priority","key":"task_priority","name":"task_priority","isParent":false,"parentId":"p-task","roles":[{"key":3,"permission":false}]}
+      ],
+      "key": "task.task_priority",
+      "expected": false
+    },
+    {
+      "name": "a key missing from the project rules gives nothing even when the company grants it",
+      "role": 3,
+      "project": {"isGlobalPermission":false},
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_move","key":"task_move","name":"task_move","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [
+        {"_id":"p-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"p-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"p-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "key": "task.task_move",
+      "expected": null
+    },
+    {
+      "name": "the project list is granted inside a project with its own rules",
+      "role": 3,
+      "project": {"isGlobalPermission":false},
+      "companyRules": [
+        {"_id":"c-project","key":"project","name":"project","isParent":true,"roles":[]},
+        {"_id":"c-project-project_list","key":"project_list","name":"project_list","isParent":false,"parentId":"c-project","roles":[{"key":3,"permission":null}]}
+      ],
+      "projectRules": [
+        {"_id":"p-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"p-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"p-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "key": "project.project_list",
+      "expected": true
+    },
+    {
+      "name": "the public project list is granted inside a project with its own rules",
+      "role": 3,
+      "project": {"isGlobalPermission":false},
+      "companyRules": [
+        {"_id":"c-project","key":"project","name":"project","isParent":true,"roles":[]},
+        {"_id":"c-project-public_projects","key":"public_projects","name":"public_projects","isParent":false,"parentId":"c-project","roles":[{"key":3,"permission":null}]}
+      ],
+      "projectRules": [
+        {"_id":"p-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"p-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"p-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "key": "project.public_projects",
+      "expected": true
+    },
+    {
+      "name": "an owner passes inside a project with its own rules",
+      "role": 1,
+      "project": {"isGlobalPermission":false},
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_delete","key":"task_delete","name":"task_delete","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [
+        {"_id":"p-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"p-task-task_delete","key":"task_delete","name":"task_delete","isParent":false,"parentId":"p-task","roles":[{"key":3,"permission":null}]}
+      ],
+      "key": "task.task_delete",
+      "expected": true
+    },
+    {
+      "name": "a section project rules never hold gives nothing inside a project with its own rules",
+      "role": 3,
+      "project": {"isGlobalPermission":false},
+      "companyRules": [
+        {"_id":"c-artificial_intelligence","key":"artificial_intelligence","name":"artificial_intelligence","isParent":true,"roles":[]},
+        {"_id":"c-artificial_intelligence-per_user_generate_limit","key":"per_user_generate_limit","name":"per_user_generate_limit","isParent":false,"parentId":"c-artificial_intelligence","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [
+        {"_id":"p-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"p-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"p-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "key": "artificial_intelligence.per_user_generate_limit",
+      "expected": null
+    },
+    {
+      "name": "a project with its own rules but no rows gives a member nothing",
+      "role": 3,
+      "project": {"isGlobalPermission":false},
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [],
+      "key": "task.task_create",
+      "expected": null
+    },
+    {
+      "name": "a settings key is read from the company rules inside a project with its own rules",
+      "role": 3,
+      "project": {"isGlobalPermission":false},
+      "companyRules": [
+        {"_id":"c-settings","key":"settings","name":"settings","isParent":true,"roles":[]},
+        {"_id":"c-settings-settings_member_list","key":"settings_member_list","name":"settings_member_list","isParent":false,"parentId":"c-settings","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [
+        {"_id":"p-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"p-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"p-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "key": "settings.settings_member_list",
+      "expected": true
+    },
+    {
+      "name": "a read-only settings key stays read-only inside a project with its own rules",
+      "role": 3,
+      "project": {"isGlobalPermission":false},
+      "companyRules": [
+        {"_id":"c-settings","key":"settings","name":"settings","isParent":true,"roles":[]},
+        {"_id":"c-settings-settings_security_permissions","key":"settings_security_permissions","name":"settings_security_permissions","isParent":false,"parentId":"c-settings","roles":[{"key":3,"permission":false}]}
+      ],
+      "projectRules": [
+        {"_id":"p-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"p-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"p-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "key": "settings.settings_security_permissions",
+      "expected": false
+    },
+    {
+      "name": "a project with no isGlobalPermission field is on the company rules",
+      "role": 3,
+      "project": {},
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [
+        {"_id":"p-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"p-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"p-task","roles":[{"key":3,"permission":null}]}
+      ],
+      "key": "task.task_create",
+      "expected": true
+    },
+    {
+      "name": "a project whose isGlobalPermission is null",
+      "role": 3,
+      "project": {"isGlobalPermission":null},
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [
+        {"_id":"p-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"p-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"p-task","roles":[{"key":3,"permission":null}]}
+      ],
+      "key": "task.task_create",
+      "knownDifference": {
+        "server": true,
+        "web": null,
+        "why": "checkPermission reads an explicit null as the project rules; the server keeps the company rules, because reading the project rules would refuse requests the enforced project routes allow today. Migration 029 rewrites stored nulls to true, the reading both sides share."
+      }
+    },
+    {
+      "name": "an owner inside a project with its own rules but no rows",
+      "role": 1,
+      "project": {"isGlobalPermission":false},
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "projectRules": [],
+      "key": "task.task_create",
+      "knownDifference": {
+        "server": true,
+        "web": null,
+        "why": "checkPermission returns null for an empty rule set before it reaches the owner check; the server lets owners and admins through, and refusing them would deny requests allowed today."
+      }
+    }
+  ]
+}
