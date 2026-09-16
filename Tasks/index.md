@@ -35,8 +35,8 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 027 | Sprint 4 — the model router | done | high | 024, 026 | done/027-sprint-4-model-router |
 | 028 | Sprint 5 — the workflow engine | done | high | 024, 027 | done/028-sprint-5-workflow-engine |
 | 029 | Sprint 6 — skill authoring and migration | done | medium | 025, 028 | done/029-sprint-6-skill-authoring-migration |
-| 030 | Sprint 7 — knowledge and retrieval | backlog | medium | 024 | backlog/030-sprint-7-knowledge-and-retrieval |
-| 031 | Sprint 8 — security hardening | backlog | high | 024 | backlog/031-sprint-8-security-hardening |
+| 030 | Sprint 7 — knowledge and retrieval | active | medium | 024 | active/030-sprint-7-knowledge-and-retrieval |
+| 031 | Sprint 8 — security hardening | active | high | 024 | active/031-sprint-8-security-hardening |
 | 032 | Sprint 11 — data skills reach outside (ADR 003 phase 4) | backlog | medium | 029, 031 | backlog/032-sprint-11-data-skills-reach |
 | 033 | Beta build version and log — every merge is a numbered build | active | high | — | active/033-beta-build-version-and-log |
 | 034 | End-to-end QA programme — sweep every function, keep it covered in CI | active | high | — | active/034-end-to-end-qa-programme |
