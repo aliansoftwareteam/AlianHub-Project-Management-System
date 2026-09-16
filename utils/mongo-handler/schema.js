@@ -1798,6 +1798,13 @@ const schema = {
             type: Object,
             required: false
         },
+        // { mode: 'on' | 'off' } — read by Modules/Knowledge/flag.js while KNOWLEDGE_RETRIEVAL is
+        // "tenant" or "all"; absent is off under "tenant". An Object, not a nested path: a nested
+        // path makes the company document a getter node-cache cannot clone, and every company read fails.
+        knowledgeRetrieval: {
+            type: Object,
+            required: false
+        },
         "legacyId": {
             type: String,
             required: false

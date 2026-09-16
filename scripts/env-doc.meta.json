@@ -475,6 +475,11 @@
     "secret": true,
     "default": "your_jwt_secret_here"
   },
+  "KNOWLEDGE_RETRIEVAL": {
+    "group": "ai",
+    "description": "Knowledge retrieval for Ask: \"off\" gathers sources exactly as before (task fields and page titles by regular expression); \"tenant\" searches tasks, page bodies and comments through the full-text indexes, and the caller's own call transcripts, with access control applied at query time, for a company whose knowledgeRetrieval.mode is \"on\"; \"all\" does so for every company except one set to \"off\".",
+    "default": "off"
+  },
   "LLM_MAX_TOKENS_CLARIFY": {
     "group": "ai",
     "description": "cap for follow-up Q&A",

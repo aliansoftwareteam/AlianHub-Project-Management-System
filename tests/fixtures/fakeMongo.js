@@ -1,5 +1,5 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
-// language for the agent modules (equality, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type, $set/$inc/$push,
+// language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type, $set/$inc/$push,
 // conditional findOneAndUpdate, findOneAndDelete, deleteOne, deleteMany, sort/limit on find, $match/$group aggregate, declared unique indexes that
 // reject a duplicate save with E11000) so a test can assert on what was written.
 
@@ -10,9 +10,18 @@ const hex = (v) => (v && typeof v.toHexString === 'function' ? v.toHexString() :
 
 const read = (doc, key) => key.split('.').reduce((v, k) => (v == null ? undefined : v[k]), doc);
 
+const words = (s) => String(s == null ? '' : s).toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+
+/* No stemming, stop words or score: a row matches when any searched word is a word of one of its string fields. */
+const textMatches = (doc, search) => {
+    const have = new Set(Object.values(doc).filter((v) => typeof v === 'string').flatMap(words));
+    return words(search).some((w) => have.has(w));
+};
+
 const matches = (doc, filter = {}) => Object.entries(filter).every(([key, cond]) => {
     if (key === '$or') return cond.some((f) => matches(doc, f));
     if (key === '$and') return cond.every((f) => matches(doc, f));
+    if (key === '$text') return textMatches(doc, cond.$search);
     const raw = read(doc, key);
     const value = raw === undefined ? undefined : (raw instanceof Date ? raw.getTime() : (key === '_id' ? String(raw) : hex(raw)));
     if (cond instanceof RegExp) return cond.test(String(value));
@@ -34,6 +43,7 @@ const matches = (doc, filter = {}) => Object.entries(filter).every(([key, cond])
         });
     }
     const want = cond instanceof Date ? cond.getTime() : (key === '_id' ? String(cond) : hex(cond));
+    if (Array.isArray(value) && !Array.isArray(want)) return value.some((item) => hex(item) === want);
     return value === want;
 });
 

@@ -43,6 +43,8 @@ function serverEnv({ port, mongoUrl, workDir }) {
         CRON_ENABLED: 'false',
         AUTOMATION_ENGINE: 'true',
         AUTOMATION_QUEUE_DRIVER: 'inline',
+        // Retrieval turns on only for a company whose own knowledgeRetrieval.mode is "on".
+        KNOWLEDGE_RETRIEVAL: 'tenant',
         GLOBAL_RATE_LIMIT_PER_MIN: 'off',
         AUTH_RATE_LIMIT_MAX_ATTEMPTS: '10000',
         MEMBERSHIP_CACHE_TTL_SECONDS: '0',
