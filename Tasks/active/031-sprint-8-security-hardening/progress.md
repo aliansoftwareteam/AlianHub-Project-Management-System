@@ -19,6 +19,7 @@ One pull request per step; tick with the merge commit.
 | Date | Entry |
 |---|---|
 | 2026-09-10 | Filed from `docs/AI-PLATFORM-ARCHITECTURE.md` (sprint 8) |
+| 2026-09-16 | Started, in parallel with Sprint 7. Planned against `beta` at `cb9ce0e9` into the fourteen pull requests listed under Decisions in task.md; none of the five steps existed, and the planning pass found two defects that ship first as slices 0a and 0b. The owner settled per-workspace enforcement and how erasure treats the audit chain. Slices 0a, 0b and 1 started, each in its own worktree. |
 
 ## Last step
-Not started.
+Slices 0a, 0b and 1 in progress.

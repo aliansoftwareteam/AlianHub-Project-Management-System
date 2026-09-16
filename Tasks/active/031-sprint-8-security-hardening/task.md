@@ -1,7 +1,7 @@
 ---
 id: 031
 title: Sprint 8 — security hardening
-status: backlog
+status: active
 priority: high
 depends_on: [024]
 created: 2026-09-10
@@ -9,7 +9,7 @@ created: 2026-09-10
 
 # 031 — Sprint 8 — security hardening
 
-Status: backlog · depends on 024 · sprint 8 · three weeks · branch `feat/sprint-8-security-hardening` (from `beta`)
+Status: active · started 2026-09-16 · depends on 024 · sprint 8 · three weeks · one branch per slice from `beta`, running in parallel with Sprint 7 (task 030)
 
 Source: `docs/AI-PLATFORM-ARCHITECTURE.md`, "Development and integration plan", Sprint 8. Filed 2026-09-10.
 
@@ -45,3 +45,8 @@ Authorization is enforced where the data is, and a leaked credential buys minute
 ## Decisions
 - Report-only mode is the safety net for the enforcement change, since the last attempt caused false denials in production.
 - Branch from `beta`, one slice per pull request, checks green before merge. New behaviour behind a flag whose default reproduces today. Schema fields declared before the first write; any shape change ships its migration in the same pull request. Deviations from the plan and their reasons recorded here.
+- Plan (2026-09-16), fourteen pull requests in merge order: 0a stop storing session credentials on tasks; 0b parse generated lists without eval; 1 align the server permission evaluator with the web app; 2 report-only enforcement for web sessions (`PERMISSION_ENFORCEMENT_MODE`); 3 map every task write to its permission key; 4 instance enforcement console; 5 per-tenant audit hash chain (`AUDIT_CHAIN`); 6 risky actions from tainted runs go to approval (`AGENT_TAINT_ROUTING`); 7 mandatory token expiry and explicit scopes (`API_TOKEN_STRICT`); 8 service identities and step credentials (`STEP_CREDENTIALS`); 9 tenant secrets by handle (`SECRETS_STORE`); 10 workspace egress allowlist (`AGENT_EGRESS_ALLOWLIST`); 11 http-only session cookies (`SESSION_COOKIE_HTTPONLY`); 12 content security policy (`CSP_MODE`). 0a and 0b are defects found while planning and ship first; slice 1 may not deny anything allowed today.
+- Shared with Sprint 7 (2026-09-16): migrations 028 onward belong to this sprint and 024–027 to Sprint 7. `Config/permissionGuard.js` belongs to this sprint; `Modules/Agents/scope.js` and `Config/contentAccess.js` are called, not changed, by either sprint without the integrator's agreement. Each sprint keeps its own i18n namespaces.
+- Enforcement mode is set per workspace, with the instance value as the default; a workspace moves to enforce once its would-be-denial log is clean (owner, 2026-09-16).
+- Erasure redacts personal fields in audit rows, which sit outside the hash, so the audit chain still verifies (owner, 2026-09-16).
+- Open until their slices come up: what counts as a clean would-be-denial log (2, 4), how in-place audit updates are chained and whether the chain hash is keyed (5), a deadline for existing tokens without expiry (7), the secrets key (9), and in-app egress or a proxy container plus what an empty allowlist means (10).

@@ -1,7 +1,7 @@
 ---
 id: 030
 title: Sprint 7 — knowledge and retrieval
-status: backlog
+status: active
 priority: medium
 depends_on: [024]
 created: 2026-09-10
@@ -9,7 +9,7 @@ created: 2026-09-10
 
 # 030 — Sprint 7 — knowledge and retrieval
 
-Status: backlog · depends on 024 · sprint 7 · three weeks · branch `feat/sprint-7-knowledge-and-retrieval` (from `beta`)
+Status: active · started 2026-09-16 · depends on 024 · sprint 7 · three weeks · one branch per slice from `beta`, running in parallel with Sprint 8 (task 031)
 
 Source: `docs/AI-PLATFORM-ARCHITECTURE.md`, "Development and integration plan", Sprint 7. Filed 2026-09-10.
 
@@ -43,3 +43,9 @@ None directly.
 ## Decisions
 - The index is built per tenant by a background migration; retrieval is flagged per tenant; answer quality is compared on a held-out set of real questions before the flag defaults on.
 - Branch from `beta`, one slice per pull request, checks green before merge. New behaviour behind a flag whose default reproduces today. Schema fields declared before the first write; any shape change ships its migration in the same pull request. Deviations from the plan and their reasons recorded here.
+- Plan (2026-09-16), twelve pull requests in merge order: 0 Ask applies the private-sprint rule to its sources; 1 retrieval interface, lexical first, access control at query time (`KNOWLEDGE_RETRIEVAL`, off); 2 chunk store and page ingestion off the event bus; 3 comments, transcripts and workspace pages as sources; 4 file text extraction and project guides; 5 performance read action; 6 embeddings and hybrid fusion; 7 hosted vector adapter; 8 agent-scoped memory; 9 Ask "why this answer" panel; 10 instance knowledge sources console; 11 retire the regular-expression path. Parallel tracks: 0 any time; after 1: 2, 5, 9; after 2: 3, 4, 6, 8, 10; 7 after 6.
+- Shared with Sprint 8 (2026-09-16): migrations 024–027 belong to this sprint and 028 onward to Sprint 8. `Config/permissionGuard.js` belongs to Sprint 8; `Modules/Agents/scope.js` and `Config/contentAccess.js` are called, not changed, by either sprint without the integrator's agreement. Each sprint keeps its own i18n namespaces.
+- A departed member's private pages leave the index; their shared tasks, comments and pages stay searchable (owner, 2026-09-16).
+- Pages drafted by agents are indexed and always ranked below pages people wrote (owner, 2026-09-16).
+- Erasure redacts personal fields in audit rows, which sit outside the hash, so the audit chain still verifies (owner, 2026-09-16).
+- Open until their slices come up: where hosted vectors live (7), the embedding provider (6), who an agent retrieves as (agent use of 1, and 8), and the held-out question set with its pass score (11 and the flag default).
