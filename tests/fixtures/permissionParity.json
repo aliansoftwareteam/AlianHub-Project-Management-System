@@ -335,7 +335,7 @@
       "expected": true
     },
     {
-      "name": "a project whose isGlobalPermission is null",
+      "name": "a project whose isGlobalPermission is null, with project rules narrower than the company rules",
       "role": 3,
       "project": {"isGlobalPermission":null},
       "companyRules": [
@@ -350,7 +350,26 @@
       "knownDifference": {
         "server": true,
         "web": null,
-        "why": "checkPermission reads an explicit null as the project rules; the server keeps the company rules, because reading the project rules would refuse requests the enforced project routes allow today. Migration 029 rewrites stored nulls to true, the reading both sides share."
+        "why": "checkPermission reads an explicit null as the project rules; the server keeps the company rules, because reading the project rules would refuse requests the enforced project routes allow today. The web app hides a control the server allows."
+      }
+    },
+    {
+      "name": "a project whose isGlobalPermission is null, with project rules wider than the company rules",
+      "role": 3,
+      "project": {"isGlobalPermission":null},
+      "companyRules": [
+        {"_id":"c-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"c-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"c-task","roles":[{"key":3,"permission":null}]}
+      ],
+      "projectRules": [
+        {"_id":"p-task","key":"task","name":"task","isParent":true,"roles":[]},
+        {"_id":"p-task-task_create","key":"task_create","name":"task_create","isParent":false,"parentId":"p-task","roles":[{"key":3,"permission":true}]}
+      ],
+      "key": "task.task_create",
+      "knownDifference": {
+        "server": null,
+        "web": true,
+        "why": "The same null reading in the other direction: the web app offers a control whose request the server judges on the company rules. The server is left unchanged so the null case never refuses a request allowed today; a report-only log will show these as would-be denials."
       }
     },
     {

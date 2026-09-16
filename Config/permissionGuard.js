@@ -149,8 +149,8 @@ const loadProjectRules = async (companyId, projectId) => {
 /*
  * The web app reads a missing flag as true (checkPermission's default) and an explicit null as the
  * project rules. Null stays on the company rules here: the project routes enforce this evaluator for
- * every session, so reading the project rules would refuse requests allowed today. Migration 029
- * rewrites stored nulls to true.
+ * every session, so reading the project rules would refuse requests allowed today. It is a known
+ * difference in tests/fixtures/permissionParity.json.
  */
 const usesProjectRules = (project) => Boolean(project) && project.isGlobalPermission === false;
 
@@ -186,9 +186,10 @@ const evaluatePermission = async (companyId, uid, path, { projectId } = {}) => {
 const TASK_ID_FIELDS = [['taskData', '_id'], ['task', '_id']];
 const PROJECT_ID_FIELDS = [['data', 'ProjectID'], ['projectData', '_id'], ['project', '_id'], ['projectId']];
 
+// Stored ids stringify in lower case, and a client may send upper-case hex that Mongo still matches.
 const idAt = (body, fields) => {
     const value = fields.reduce((node, field) => (node && typeof node === 'object' ? node[field] : undefined), body);
-    return OBJECT_ID_PATTERN.test(String(value || '')) ? String(value) : null;
+    return OBJECT_ID_PATTERN.test(String(value || '')) ? String(value).toLowerCase() : null;
 };
 const idsAt = (body, paths) => [...new Set(paths.map((fields) => idAt(body, fields)).filter(Boolean))];
 
@@ -208,7 +209,7 @@ const projectsForRequest = async (companyId, req) => {
             type: SCHEMA_TYPE.TASKS,
             data: [{ _id: { $in: taskIds.map(toObjectId) } }, { ProjectID: 1 }],
         }, 'find');
-        (tasks || []).forEach((task) => { if (task.ProjectID) projectOfTask.set(String(task._id), String(task.ProjectID)); });
+        (tasks || []).forEach((task) => { if (task.ProjectID) projectOfTask.set(String(task._id).toLowerCase(), String(task.ProjectID).toLowerCase()); });
     }
     const projectIds = taskIds.length
         ? [...new Set(taskIds.map((id) => projectOfTask.get(id)).filter(Boolean))]

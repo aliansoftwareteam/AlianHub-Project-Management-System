@@ -79,6 +79,15 @@ describe('projectsForRequest resolves the project of every body the web app send
         expect(await projectsForRequest(CID, {})).toMatchObject({ projectIds: [], unresolved: false });
     });
 
+    test.each([
+        ['taskData._id', { taskData: { _id: TASK_IN_OWN_RULES.toUpperCase() } }, OWN_RULES_PROJECT],
+        ['task._id', { task: { _id: TASK_IN_OWN_RULES.toUpperCase() } }, null],
+        ['data.ProjectID', { data: { ProjectID: OWN_RULES_PROJECT.toUpperCase() } }, OWN_RULES_PROJECT],
+        ['projectData._id', { projectData: { _id: OWN_RULES_PROJECT.toUpperCase() } }, null],
+    ])('an id sent in upper case (%s) resolves to the same project', async (_, body, legacyProjectId) => {
+        expect(await projectsForRequest(CID, { body })).toMatchObject({ projectIds: [OWN_RULES_PROJECT], unresolved: false, legacyProjectId });
+    });
+
     test('a body whose only task does not exist is marked unresolved', async () => {
         expect(await projectsForRequest(CID, { body: { task: { _id: MISSING_TASK }, projectData: project(OWN_RULES_PROJECT) } })).toMatchObject({ projectIds: [], unresolved: true });
     });
@@ -99,6 +108,18 @@ describe('the API-token guards judge web-app shaped bodies by their project', ()
         const shape = WEB_APP_SHAPES.find(([name]) => name.startsWith('PATCH updateStatus'))[1];
         expect((await run(requireTaskActionPermission(), patRequest(shape(TASK_IN_OWN_RULES, OWN_RULES_PROJECT)))).passed).toBe(true);
         expect((await run(requireTaskActionPermission(), patRequest(shape(TASK_IN_GLOBAL, GLOBAL_PROJECT)))).code).toBe(403);
+    });
+
+    test('a task id sent in upper case is judged by its project, as the single-task lookup on beta did', async () => {
+        const body = { action: 'updateStatus', taskData: { _id: TASK_IN_OWN_RULES.toUpperCase() } };
+        const result = await run(requireTaskActionPermission(), patRequest(body));
+        expect(result.passed).toBe(true);
+        expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+
+    test('a project id sent in upper case reads that project\'s own rules', async () => {
+        const body = { data: { ProjectID: OWN_RULES_PROJECT.toUpperCase(), sprintId: 's1' }, user: USER };
+        expect((await run(requirePermission('task.task_create'), patRequest(body))).passed).toBe(true);
     });
 
     test('a task created with projectData alone is judged by that project', async () => {
