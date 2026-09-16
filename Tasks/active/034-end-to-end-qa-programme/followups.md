@@ -89,6 +89,8 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 61 | `Modules/Webhooks/dispatcher.js` debounces on a sliding window keyed by company+task+event, clearing the pending timer on every emit — the same shape #690 (build 165) fixed in the domain event bus, where it collapsed distinct writes as well as the echoes the window exists for. Webhook deliveries very likely coalesce distinct writes the same way. | review of #690 |
 | 62 | `frontend/src/plugins/tasklistDashboard/views/DashBoardList/DashBoardList.vue:163` reimplements the task empty state inline and picks its copy from `project.lastTaskId`, so it blames a filter that was never set — the failure #697 (build 172) fixed on the other task empty states. | #697 (build 172) |
 | 63 | The workspace's `project_tab_components` catalogue holds only 3 of 20 rows, so Board, Table, Calendar, Comments, Activity, Workload, Docs and Forms are permanently absent from that workspace's "+ View" menu. Cause unknown; no application code deletes from that collection. | UI programme sweep |
+| 65 | SSO sign-in (`Modules/SSO/ssoSession.js:16`) inserts the session row before `generateTokenV2Fun` checks the account, so an SSO match on an existing unverified account still leaves a session row behind its refusal. #733 moved the check ahead of the session only in `finalizeSession`. | review of #733 (build 208) |
+| 66 | Desktop-tracker sign-in (`loginAuthTracker`, `Modules/Auth/controller/loginSession.js:203`) inserts its session before `generateTokenV2Fun` checks the account. Low risk: its sign-in code is issued from an existing session. | review of #733 (build 208) |
 
 ## Owner decisions recorded
 
