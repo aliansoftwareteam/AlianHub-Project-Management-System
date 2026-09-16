@@ -16,7 +16,7 @@ const { updateUserFun } = require("../../Users/controller.js");
 
 
 
-const { addAndRemoveUserInMongodbNotificationCount, generateTokenV2Fun, verifyAuth } = require('./authHelpers');
+const { addAndRemoveUserInMongodbNotificationCount, generateTokenV2Fun, sessionRefusalFor, verifyAuth } = require('./authHelpers');
 const twoFactorRules = require('../helpers/twoFactorRules');
 const { pinSessionTenant } = require('../../../Config/tenant');
 exports.manageAttempt = (req, res) => {
@@ -67,14 +67,25 @@ exports.removeUserNotification = (req,res) => {
  */
 
 /**
- * Issue a real session for `uid`: create the session row, mint the access
- * token, set the auth cookies, and respond — the canonical post-auth path.
- * Shared by password login and the 2FA second-step (/api/v2/auth/2fa/validate)
- * so both produce an identical session. On failure it sets
+ * Issue a real session for `uid`: check the account, create the session row,
+ * mint the access token, set the auth cookies, and respond. Password, 2FA,
+ * magic-link and setup sign-ins all end here. On failure it sets
  * req.errorMessageObject and calls next() (the route's manageAttempt handler
- * returns the error). Behaviour is unchanged from the previous inline block.
+ * returns the error), before any session row exists.
  */
-const finalizeSession = (req, res, uid, next, onSuccess) => {
+const finalizeSession = async (req, res, uid, next, onSuccess) => {
+    let refusal;
+    try {
+        refusal = await sessionRefusalFor(uid);
+    } catch (error) {
+        logger.error(`finalizeSession: ${error.message || error}`);
+        refusal = {message: "unauthorize user"};
+    }
+    if (refusal) {
+        req.errorMessageObject = refusal;
+        next();
+        return;
+    }
     const forwarded = req?.headers['x-forwarded-for'] || req.ip;
     const clientIp = forwarded ? forwarded?.split(',')[0] : req?.connection?.remoteAddress;
     sesstionCtr.insertSessionFun({userId: uid}, req.headers['user-agent'] || "", clientIp, (sData) => {

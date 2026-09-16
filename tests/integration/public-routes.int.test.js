@@ -1,9 +1,20 @@
+const { MongoClient, ObjectId } = require('mongodb');
 const { createApiClient } = require('../../e2e/support/api');
+const { resolveMongoUrl } = require('../../e2e/support/env');
 const { loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 
 const state = readState();
 const anonymous = createApiClient({ baseURL: state.baseURL });
 const anonymousWithCompany = createApiClient({ baseURL: state.baseURL, companyId: state.companyId });
+
+const sessionCountFor = async (uid) => {
+    const client = await MongoClient.connect(resolveMongoUrl());
+    try {
+        return await client.db('global').collection('sessions').countDocuments({ userId: { $in: [uid, new ObjectId(uid)] } });
+    } finally {
+        await client.close();
+    }
+};
 
 const REFUSED_WITHOUT_SESSION = [
     ['post', '/api/v1/removeCache', { global: true }],
@@ -212,5 +223,13 @@ describe('verification email', () => {
     it('refuses an account id that does not exist', async () => {
         const res = await anonymous.post('/api/v2/sendVerificationEmail', { uid: '000000000000000000000000', email: `someone-${uniqueSuffix()}@e2e.alianhub.test` });
         expect(res.body.status).toBe(false);
+    });
+
+    it('opens no session for an unverified login', async () => {
+        const { email, uid } = await newAccount();
+        const login = await anonymous.post('/api/v2/auth/login', { email, password, isLoginType: 'frontend' });
+        expect(login.status).toBe(400);
+        expect(login.body.isEmailVerified).toBe(false);
+        expect(await sessionCountFor(uid)).toBe(0);
     });
 });
