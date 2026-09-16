@@ -352,6 +352,7 @@ import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { apiRequest } from '../../../services'
 import { useAiApiFunction } from "@/composable/aiHelper";
+import { isTitledItem, parseGeneratedList } from "@/utils/parseGeneratedList";
 import taskClass from "@/utils/TaskOperations"
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
@@ -965,22 +966,13 @@ function suggestTask () {
             }
             generateAiRequestForFunction(data,project.value.ProjectName,project.value.rawDescription,'Create Task',true,'single',project.value?.isGlobalPermission).then((result) => {
                 if(result.status === true){
-                    try {
-                        isSpinner.value = false;
-                        taskListAi.value = JSON.parse(JSON.stringify(result.statusText.data.statusText));
-                        taskListAi.value = taskListAi.value.replace(/\n|\r/g, '').trim();
-                        taskListAi.value = eval(taskListAi.value);
-                        if(isArrayOfObjects(taskListAi.value) == true){
-                            taskListAi.value = eval(taskListAi.value).map((x) => ({...x,isSelected: true}));
-                        }else{
-                            isSpinner.value = false;
-                            isError.value = true;
-                            taskListAi.value = [];
-                        }
-                    } catch (error) {
-                        isSpinner.value = false;
+                    isSpinner.value = false;
+                    const parsed = parseGeneratedList(result.statusText?.data?.statusText, isTitledItem);
+                    if(parsed.ok){
+                        taskListAi.value = parsed.items.map((x) => ({...x,isSelected: true}));
+                    }else{
                         isError.value = true;
-                        console.error(error,"ERROR IN GENERAE PROMPTS:");
+                        taskListAi.value = [];
                     }
                 }else{
                     if(result.isReachedLimit){
@@ -1072,14 +1064,6 @@ function createTaskWithAi () {
 
 function handleChecked (item) {
     item.isChecked = !item.isChecked;
-}
-
-function isArrayOfObjects(arr) {
-  if (!Array.isArray(arr)) {
-    return false;
-  }
-
-  return arr.every(item => item !== null && typeof item === 'object');
 }
 
 function startTaskTour(key) {

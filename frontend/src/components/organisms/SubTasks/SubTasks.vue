@@ -89,7 +89,7 @@ import { useI18n } from "vue-i18n";
 
 // COMPONENTS
 import CreateTask from "@/components/atom/CreateTask/CreateTask.vue";
-import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp";
+import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue";
 
 // UTILS
@@ -100,6 +100,7 @@ import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverla
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { subtaskCreateAssignees } from "@/utils/assigneeOptions";
+import { isTitledItem, parseGeneratedList } from "@/utils/parseGeneratedList";
 
 const { t } = useI18n();
 const { checkPermission, checkApps, debouncerWithPromise, debounce } = useCustomComposable();
@@ -337,23 +338,13 @@ function sugestSubTask () {
             };
             generateAiRequestForFunction(data,props.task.TaskName,props.task.rawDescription,'Create SubTask',true,'single',project.value?.isGlobalPermission).then((result) => {
                 if(result.status === true){
-                    try {
-                        isSpinnerSuggest.value = false;
-                        subTasksList.value = JSON.parse(JSON.stringify(result.statusText.data.statusText));
-                        subTasksList.value = subTasksList.value.replace(/\n|\r/g, '').trim();
-                        subTasksList.value = eval(subTasksList.value);
-                        if(isArrayOfObjects(subTasksList.value) == true){
-                            subTasksList.value = eval(subTasksList.value).map((x) => ({...x,isSelected: true}));
-                        }else{
-                            isSpinnerSuggest.value = false;
-                            isError.value = true;
-                            subTasksList.value = [];
-                        }
-                    } catch (error) {
-                        isSpinnerSuggest.value = false;
+                    isSpinnerSuggest.value = false;
+                    const parsed = parseGeneratedList(result.statusText?.data?.statusText, isTitledItem);
+                    if(parsed.ok){
+                        subTasksList.value = parsed.items.map((x) => ({...x,isSelected: true}));
+                    }else{
                         isError.value = true;
                         subTasksList.value = [];
-                        console.error(error,"ERROR IN GENERAE PROMPTS:");
                     }
                 }else{
                     if(result.isReachedLimit){
@@ -440,13 +431,6 @@ function createSubTasks () {
     }else{
         $toast.error(t(`Toast.Please_select_sub_task.`), {position:"top-right"});
     }
-}
-
-function isArrayOfObjects(arr) {
-    if (!Array.isArray(arr)) {
-        return false;
-    }
-    return arr.every(item => item !== null && typeof item === 'object');
 }
 </script>
 

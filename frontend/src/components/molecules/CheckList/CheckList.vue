@@ -143,6 +143,7 @@ import { apiRequest } from '../../../services';
 import { useToast } from 'vue-toast-notification';
 import AiCheckList from './AiCheckList.vue';
 import { useAiApiFunction } from "@/composable/aiHelper";
+import { isChecklistItem, parseGeneratedList } from "@/utils/parseGeneratedList";
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue";
 import Skelatons from '@/components/atom/Skelaton/Skelaton.vue';
 import { useI18n } from "vue-i18n";
@@ -834,21 +835,16 @@ function generateChecklistWithAi (){
             }
             generateAiRequestForFunction(data,props.task.TaskName,props.task.rawDescription,'Generate a Checklist',true,'single',project.value?.isGlobalPermission).then((result) => {
                 if(result.status === true){
-                    try {
-                        let data = JSON.parse(JSON.stringify(result.statusText.data.statusText)).replace('```json', '').trim();
-                        data = data.replace('```', '').trim();
-                        data = data.replace(/\n|\r/g, '').trim();
-                        data = eval(data);
-                        data.forEach((element) => {
+                    isSpinnerAi.value = false;
+                    const parsed = parseGeneratedList(result.statusText?.data?.statusText, isChecklistItem);
+                    if(parsed.ok){
+                        parsed.items.forEach((element) => {
                             if (element.parentId === null) {
                                 delete element.parentId;
                             }
                         });
-                        checkListAi.value = data.map((x) => ({...x,AssigneeUserId:[],isExpand: true,isChecked:true,isAigenerated:true}));
-                        isSpinnerAi.value = false;
-                    } catch (error) {
-                        isSpinnerAi.value = false;
-                        console.error(error,"ERROR IN CATCH");
+                        checkListAi.value = parsed.items.map((x) => ({...x,AssigneeUserId:[],isExpand: true,isChecked:true,isAigenerated:true}));
+                    }else{
                         isError.value = true;
                     }
                 }else{
