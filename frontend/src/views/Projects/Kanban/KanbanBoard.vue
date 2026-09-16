@@ -86,7 +86,6 @@ import { ref, defineProps, nextTick, inject, watch, onMounted, onUnmounted, comp
 import Draggable from 'vuedraggable'
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import Cookies from "js-cookie";
 
 //Cmponents
 import BoardViewTaskCreateVue from "@/views/Projects/Kanban/BoardViewTaskCreate"
@@ -99,6 +98,7 @@ import { apiRequest } from "../../../services";
 import { useCustomComposable } from "@/composable";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { useProjectAgents } from "@/views/Projects/Kanban/useProjectAgents";
+import { tabUpdateMarker } from "@/utils/taskUpdateMarker";
 
 //Props
 const props = defineProps({
@@ -317,14 +317,14 @@ const updateEvent = (event, task) => {
                 status: updatedStatus,
                 'statusType': task.type,
                 'statusKey': task.key,
-                'updateToken': { user: Cookies.get('accessToken'), timeStamp: uniqueeTime },
+                'updateToken': tabUpdateMarker(uniqueeTime),
                 'islocalSnapStop': true
             }
         }
         if (groupValue.value === 2) {
             UpdateData = {
                 Task_Priority: task.value,
-                'updateToken': { user: localStorage.getItem('updateToken'), timeStamp: uniqueeTime },
+                'updateToken': tabUpdateMarker(uniqueeTime),
                 'islocalSnapStop': true,
                 Updated_At: new Date()
             }
@@ -332,14 +332,14 @@ const updateEvent = (event, task) => {
         if (groupValue.value === 1) {
             UpdateData = {
                 AssigneeUserId: task.value !== '' ? task.value.split("_") : [],
-                'updateToken': { user: localStorage.getItem('updateToken'), timeStamp: uniqueeTime },
+                'updateToken': tabUpdateMarker(uniqueeTime),
                 'islocalSnapStop': true
             }
         }
         if (groupValue.value === 3) {
             UpdateData = {
                 DueDate: new Date(task.searchValue * 1000),
-                'updateToken': { user: localStorage.getItem('updateToken'), timeStamp: uniqueeTime },
+                'updateToken': tabUpdateMarker(uniqueeTime),
                 Updated_At: new Date(),
                 'islocalSnapStop': true
             }

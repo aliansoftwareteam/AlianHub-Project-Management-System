@@ -7,6 +7,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { getCompanyDataFun } = require("../Company/controller/updateCompany");
 const socketEmitter = require("../../event/socketEventEmitter");
 const { pinSessionTenant } = require("../../Config/tenant");
+const { keepTabMarkerOnly } = require("./helpers/updateMarker");
 
 const projectQueues = {};
 const processingProjects = new Set();
@@ -96,7 +97,7 @@ exports.updateTaskIndex = (req,res) => {
             searchKey: req.body.searchKey,
             taskKey: req.body.taskKey,
             isFirstWithRecord: req.body.isFirstWithRecord,
-            updateData: req.body.updateData,
+            updateData: keepTabMarkerOnly(req.body.updateData),
             isTaskUpdate: true,
         }
         enqueueTask(req.body.projectId, taskData);

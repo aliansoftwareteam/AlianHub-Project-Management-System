@@ -17,6 +17,8 @@ const requireAssetsAsUrls = {
 export default defineConfig({
     plugins: [requireAssetsAsUrls, vue()],
     resolve: {
+        // vue-cli (webpack) resolves extensionless `.vue` imports; Vite does not by default.
+        extensions: ['.mjs', '.js', '.json', '.vue'],
         alias: {
             '@': path.resolve(__dirname, 'src'),
             '@pageContent': path.resolve(__dirname, '../Modules/Pages/helpers/pageContent.js'),

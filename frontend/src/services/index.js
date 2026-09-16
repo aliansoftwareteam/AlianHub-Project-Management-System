@@ -137,7 +137,8 @@ export const getAuth = async (id, isFirst) => {
     }
     const data = await pendingAuth;
     if (isFirst) {
-        localStorage.setItem('updateToken', data.token);
+        // Clears the value earlier builds stored under this key.
+        localStorage.removeItem('updateToken');
     }
     return data;
 };

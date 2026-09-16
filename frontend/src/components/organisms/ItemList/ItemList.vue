@@ -315,9 +315,9 @@ import { useCustomComposable } from '@/composable';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { taskListHelper, useUpdateTasks } from '@/views/Projects/helper';
 import taskClass from "@/utils/TaskOperations";
+import { tabUpdateMarker } from '@/utils/taskUpdateMarker';
 
 // COMPONENTS
-import Cookies from 'js-cookie';
 import Task from '../Task/Task.vue';
 import { useToast } from 'vue-toast-notification';
 import Toggle from "@/components/atom/Toggle/Toggle.vue";
@@ -962,14 +962,14 @@ function updateItem(type,e, item) {
                     status: updatedStatus,
                     'statusType': item.type,
                     'statusKey': item.key,
-                    'updateToken': {user: Cookies.get('accessToken'),timeStamp: uniqueeTime},
+                    'updateToken': tabUpdateMarker(uniqueeTime),
                     'islocalSnapStop': true
                 }
             }
             if (props.groupType ===2) {
                 UpdateData ={
                     Task_Priority : item.value,
-                    'updateToken': {user: localStorage.getItem('updateToken'),timeStamp: uniqueeTime},
+                    'updateToken': tabUpdateMarker(uniqueeTime),
                     'islocalSnapStop': true,
                     Updated_At: new Date()
                 }
@@ -977,14 +977,14 @@ function updateItem(type,e, item) {
             if (props.groupType === 1) {
                 UpdateData = {
                     AssigneeUserId : item.value !== '' ? item.value.split("_") : [],
-                    'updateToken': {user: localStorage.getItem('updateToken'),timeStamp: uniqueeTime},
+                    'updateToken': tabUpdateMarker(uniqueeTime),
                     'islocalSnapStop': true
                 }
             }
             if (props.groupType === 3) {
                 UpdateData = {
                     DueDate: item.searchValue ? new Date(item.searchValue * 1000) : null,
-                    'updateToken': {user: localStorage.getItem('updateToken'),timeStamp: uniqueeTime},
+                    'updateToken': tabUpdateMarker(uniqueeTime),
                     Updated_At: new Date(),
                     'islocalSnapStop': true
                 }
