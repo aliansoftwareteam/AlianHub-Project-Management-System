@@ -9,6 +9,8 @@ const { FEATURES } = require('../AICore/features');
 const { visibleProjects } = require('../Agents/scope');
 const { pageVisibilityFilter } = require('../Pages/helpers/pageRules');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
+const knowledgeFlag = require('../Knowledge/flag');
+const { askSources } = require('../Knowledge/askSources');
 
 // Ask (handoff 13i) — a question box over the workspace.
 //
@@ -49,6 +51,9 @@ const gather = async (companyId, uid, { question, projectId, limit = MAX_PER_TYP
     if (projectId && ids.includes(String(projectId))) ids = [String(projectId)];
     const nameById = {};
     projects.forEach((p) => { nameById[String(p._id)] = p.ProjectName || ''; });
+    if (await knowledgeFlag.enabledFor(companyId)) {
+        return { sources: await askSources({ companyId, uid, question, projectId, projects, limit: limit + Math.min(6, limit) }), projects, scopedProjectIds: ids };
+    }
     if (!ids.length) return { sources: [], projects, scopedProjectIds: ids };
 
     const terms = searchTerms(question);

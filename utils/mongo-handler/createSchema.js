@@ -300,10 +300,11 @@ projectInvoicesSchema.index({ ProjectID: 1, deletedStatusKey: 1, issuedDate: -1 
 // would collide the moment a second project raised its first invoice.
 projectInvoicesSchema.index({ ProjectID: 1, number: 1 }, { unique: true });
 
-// Global search: one combined text index per collection.
+// One combined text index per collection, for global search and knowledge retrieval.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
 commentSchema.index({ message: 'text' });
+pagesSchema.index({ title: 'text', rawText: 'text' });
 
 // BUG-021 / #75 — Indexes for the hottest query paths. Each company has its
 // own MongoDB database, so `companyId` itself is the database name and need
