@@ -1,8 +1,8 @@
 import { useStore } from "vuex";
-import Cookies from "js-cookie";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { useUpdateTasks } from "@/views/Projects/helper.js";
+import { tabUpdateMarker } from "@/utils/taskUpdateMarker";
 
 const GAP = 65536;
 
@@ -15,29 +15,29 @@ export function useListDragDrop() {
     const { updateTaskByGroup } = useUpdateTasks();
 
     function groupPayload(item, groupType, stamp) {
-        const token = { user: groupType === 0 ? Cookies.get("accessToken") : localStorage.getItem("updateToken"), timeStamp: stamp };
+        const marker = tabUpdateMarker(stamp);
         if (groupType === 0) {
             return {
                 status: { text: item.name, key: item.key, type: item.type },
                 statusType: item.type,
                 statusKey: item.key,
-                updateToken: token,
+                updateToken: marker,
                 islocalSnapStop: true
             };
         }
         if (groupType === 1) {
             return {
                 AssigneeUserId: item.value ? item.value.split("_") : [],
-                updateToken: token,
+                updateToken: marker,
                 islocalSnapStop: true
             };
         }
         if (groupType === 2) {
-            return { Task_Priority: item.value, updateToken: token, islocalSnapStop: true, Updated_At: new Date() };
+            return { Task_Priority: item.value, updateToken: marker, islocalSnapStop: true, Updated_At: new Date() };
         }
         return {
             DueDate: item.searchValue ? new Date(item.searchValue * 1000) : null,
-            updateToken: token,
+            updateToken: marker,
             islocalSnapStop: true,
             Updated_At: new Date()
         };
