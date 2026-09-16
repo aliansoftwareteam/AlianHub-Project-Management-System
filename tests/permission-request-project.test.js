@@ -106,7 +106,7 @@ describe('the API-token guards judge web-app shaped bodies by their project', ()
         expect((await run(requirePermission('task.task_create'), patRequest(body))).passed).toBe(true);
     });
 
-    test('a body naming a task that does not exist is judged on the company rules and logged, not refused silently', async () => {
+    test('a body naming a task that does not exist is judged on the company rules, with a warning naming the key', async () => {
         const body = { action: 'updateStatus', task: { _id: MISSING_TASK }, projectData: project(OWN_RULES_PROJECT) };
         const result = await run(requireTaskActionPermission(), patRequest(body));
         expect(result.code).toBe(403);
