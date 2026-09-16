@@ -56,6 +56,21 @@ exports.addAndRemoveUserInMongodbNotificationCount = (companyId,userId,type) => 
     })
 }
 
+const unverifiedEmailAnswer = (user) => ({
+    status: false,
+    isLogout: true,
+    isEmailVerified: false,
+    userData: toAuthView(user),
+    message: 'Email is not verified.',
+});
+
+exports.sessionRefusalFor = async (uid) => {
+    const user = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.USERS, data: [{ _id: uid }] }, "findOne");
+    if (!(user && user._id)) return { status: false, isLogout: true, message: 'user not found.' };
+    if (!user.isEmailVerified) return unverifiedEmailAnswer(user);
+    return null;
+};
+
 exports.generateTokenV2Fun = (uid, refreshToken, cb) => {
     try {
         const sessionClaims = accessClaimsFor(refreshToken);
@@ -85,13 +100,7 @@ exports.generateTokenV2Fun = (uid, refreshToken, cb) => {
                 return;
             }
             if(!response.isEmailVerified){
-                cb({
-                    status: false,
-                    isLogout: true,
-                    isEmailVerified: false,
-                    userData: toAuthView(response),
-                    message: 'Email is not verified.',
-                });
+                cb(unverifiedEmailAnswer(response));
                 return;
             }
             const companyIds = response.AssignCompany && response.AssignCompany.length ? response.AssignCompany : [];
