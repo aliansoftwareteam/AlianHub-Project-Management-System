@@ -110,15 +110,39 @@ describe('ingesting a page into the chunk store', () => {
         expect(live(page._id).map((r) => r.authorKind)).toEqual(['agent', 'agent']);
     });
 
-    it('skips the write when every content hash is unchanged', async () => {
+    it('writes nothing when the same version of a page is ingested again', async () => {
         const page = seedPage();
         await indexer.ingestPage(C, page);
         mockDb.calls.length = 0;
 
-        const result = await indexer.ingestPage(C, { ...page, updatedAt: new Date('2026-09-02T00:00:00Z') });
+        const result = await indexer.ingestPage(C, { ...page });
 
-        expect(result).toMatchObject({ written: 0, unchanged: 2 });
+        expect(result).toMatchObject({ written: 0, unchanged: 2, stamped: 0 });
         expect(chunkWrites()).toEqual([]);
+    });
+
+    it('skips rewriting chunks whose hash is unchanged in a newer version, and only moves their version forward', async () => {
+        const page = seedPage();
+        await indexer.ingestPage(C, page);
+        mockDb.calls.length = 0;
+        const newer = new Date('2026-09-02T00:00:00Z');
+
+        const result = await indexer.ingestPage(C, { ...page, updatedAt: newer });
+
+        expect(result).toMatchObject({ written: 0, unchanged: 2, stamped: 2 });
+        expect(chunkWrites().map((c) => [c.method, Object.keys(c.data[1].$set)])).toEqual([['updateMany', ['sourceUpdatedAt']]]);
+        expect(live(page._id).map((r) => r.sourceUpdatedAt)).toEqual([newer, newer]);
+    });
+
+    it('never lets a late read overwrite a chunk that a newer version kept unchanged', async () => {
+        const v1 = seedPage({ updatedAt: new Date('2026-09-01T00:00:00Z'), content: { html: '<p>Intro.</p><h2>Leave</h2><p>Twenty days.</p>' } });
+        await indexer.ingestPage(C, v1);
+        await indexer.ingestPage(C, { ...v1, updatedAt: new Date('2026-09-03T00:00:00Z'), content: { html: '<p>Intro.</p><h2>Leave</h2><p>Thirty days.</p>' } });
+
+        const lateRead = { ...v1, updatedAt: new Date('2026-09-02T00:00:00Z'), content: { html: '<p>Draft intro.</p><h2>Leave</h2><p>Thirty days.</p>' } };
+        await indexer.ingestPage(C, lateRead);
+
+        expect(live(v1._id).map((r) => r.text)).toEqual(['Handbook\nIntro.', 'Leave\nThirty days.']);
     });
 
     it('rewrites only the chunk whose text changed', async () => {
@@ -213,6 +237,25 @@ describe('page events on the bus', () => {
         expect(live(result.pageId)).toEqual([]);
     });
 
+    it('indexes the body of a draft a skill emits as text, through actions.perform', async () => {
+        const actions = require('../Modules/Agents/actions');
+        const permissions = require('../Modules/Agents/permissions');
+        jest.spyOn(permissions, 'holderMay').mockResolvedValue({ allowed: true, reason: '' });
+        const actor = { kind: 'agent', agentId: '6f00000000000000000000e1', agentName: 'Scribe', userId: '', viaAccount: 'workspace' };
+
+        try {
+            const { result } = await actions.perform({ companyId: C, actor, action: 'page.draft', params: { title: 'Weekly summary', text: 'Closed the harbour tickets.\n\n## Next\nStart the lighthouse audit.', projectId: P1 } });
+            await events.drain();
+
+            expect(live(result.pageId).map((r) => [r.authorKind, r.text])).toEqual([
+                ['agent', 'Weekly summary\nClosed the harbour tickets.'],
+                ['agent', 'Next\nStart the lighthouse audit.'],
+            ]);
+        } finally {
+            permissions.holderMay.mockRestore();
+        }
+    });
+
     it('does nothing for a company whose own switch is off', async () => {
         await domainEventBus.bus.emit('page.created', { companyId: OFF_COMPANY, type: 'page.created', entity: { kind: 'page', id: '6f00000000000000000000f1' }, data: {} });
         await events.drain();
@@ -237,6 +280,55 @@ describe('cascades', () => {
         await events.drain();
 
         expect(live(inTrash._id)).toHaveLength(2);
+    });
+
+    it('a project trashed while a page of it is being ingested ends with that page out of the index', async () => {
+        const page = seedPage({ title: 'Racing', ProjectID: P1 });
+        const crud = mockDb.crud.getMockImplementation();
+        let trashed = false;
+        mockDb.crud.mockImplementation(async (companyId, q, method) => {
+            if (!trashed && q.type === CHUNKS && method === 'updateOne') {
+                trashed = true;
+                mockDb.store[SCHEMA_TYPE.PROJECTS].find((p) => p._id === P1).deletedStatusKey = 1;
+                await indexer.tombstoneProject(C, P1);
+            }
+            return crud(companyId, q, method);
+        });
+
+        try {
+            await indexer.syncPage(C, String(page._id));
+        } finally {
+            mockDb.crud.mockImplementation(crud);
+        }
+
+        expect(trashed).toBe(true);
+        expect(live(page._id)).toEqual([]);
+    });
+
+    it('still runs a sync queued behind one that failed, so a delete is not lost', async () => {
+        const page = seedPage({ title: 'Flaky' });
+        await indexer.ingestPage(C, page);
+        mockDb.store[SCHEMA_TYPE.PAGES].find((p) => p._id === page._id).deletedStatusKey = 1;
+        const crud = mockDb.crud.getMockImplementation();
+        let failed = false;
+        mockDb.crud.mockImplementation(async (companyId, q, method) => {
+            if (!failed && q.type === SCHEMA_TYPE.PAGES && method === 'findOne') {
+                failed = true;
+                throw new Error('connection reset');
+            }
+            return crud(companyId, q, method);
+        });
+
+        try {
+            const first = indexer.syncPage(C, String(page._id));
+            const queued = indexer.syncPage(C, String(page._id));
+            await Promise.allSettled([first, queued]);
+        } finally {
+            mockDb.crud.mockImplementation(crud);
+        }
+
+        expect(failed).toBe(true);
+        expect(live(page._id)).toEqual([]);
     });
 
     it('re-sending a trash that crosses nothing announces nothing', async () => {

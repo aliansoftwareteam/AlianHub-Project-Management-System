@@ -128,6 +128,60 @@ describe('backfilling the pages a company already has', () => {
         [trashed, leftPrivate].forEach((id) => expect(indexedIds()).not.toContain(id));
     });
 
+    it('indexes the pages of a project restored while the backfill is running', async () => {
+        mockDb.store[SCHEMA_TYPE.PAGES].length = 0;
+        const [first, second, third, fourth] = seedPages(4, (i) => (i < 2 ? {} : { ProjectID: TRASHED }));
+        const crud = mockDb.crud.getMockImplementation();
+        let restored = false;
+        mockDb.crud.mockImplementation(async (companyId, q, method) => {
+            const result = await crud(companyId, q, method);
+            if (!restored && q.type === SCHEMA_TYPE.PAGES && method === 'find' && !q.data[0]._id) {
+                restored = true;
+                mockDb.store[SCHEMA_TYPE.PROJECTS].find((p) => p._id === TRASHED).deletedStatusKey = 0;
+                await indexer.reindexProject(C, TRASHED);
+            }
+            return result;
+        });
+
+        try {
+            await backfill.backfillCompany(C, { batchSize: 2 });
+        } finally {
+            mockDb.crud.mockImplementation(crud);
+        }
+
+        expect(restored).toBe(true);
+        expect(indexedIds()).toEqual([first, second, third, fourth].sort());
+    });
+
+    it('waits behind an event sync of the same page instead of writing beside it', async () => {
+        const [page] = pages;
+        let release;
+        const held = new Promise((resolve) => { release = resolve; });
+        const crud = mockDb.crud.getMockImplementation();
+        let holding = true;
+        mockDb.crud.mockImplementation(async (companyId, q, method) => {
+            if (holding && q.type === SCHEMA_TYPE.PAGES && method === 'findOne' && String(q.data[0]._id) === page) {
+                holding = false;
+                await held;
+            }
+            return crud(companyId, q, method);
+        });
+
+        try {
+            const eventSync = indexer.syncPage(C, page);
+            const run = backfill.backfillCompany(C, { batchSize: 10 });
+            for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve));
+
+            expect(mockDb.calls.filter((c) => c.type === CHUNKS && c.method !== 'find' && JSON.stringify(c.data[0]).includes(page))).toEqual([]);
+
+            release();
+            await Promise.all([eventSync, run]);
+        } finally {
+            mockDb.crud.mockImplementation(crud);
+        }
+        expect(indexedIds()).toEqual(pages);
+    });
+
     it('runs every company whose indexer is on and skips the rest', async () => {
         await backfill.backfillAll({ batchSize: 10 });
         expect(indexedIds()).toEqual(pages);

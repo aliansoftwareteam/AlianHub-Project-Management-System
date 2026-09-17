@@ -65,10 +65,55 @@ describe('erasing from the chunk store', () => {
         expect(mockDb.store[CHUNKS]).toHaveLength(2);
     });
 
-    it('touches only the chunk store: no audit row is written or changed', async () => {
+    it('touches only the knowledge store: no audit row is written or changed', async () => {
         await indexed({ createdBy: ALICE, visibility: 'private' });
         mockDb.calls.length = 0;
         await erasePerson(C, ALICE);
-        expect(mockDb.calls.map((c) => c.type)).toEqual([CHUNKS]);
+        expect([...new Set(mockDb.calls.map((c) => c.type))].sort()).toEqual([CHUNKS, SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS].sort());
+    });
+});
+
+describe('an erasure sticks', () => {
+    const backfill = require('../Modules/Knowledge/ingest/backfill');
+    const events = require('../Modules/Knowledge/ingest/events');
+    const ENV = process.env.KNOWLEDGE_INDEXER;
+
+    beforeAll(() => { process.env.KNOWLEDGE_INDEXER = 'all'; });
+    afterAll(() => {
+        if (ENV === undefined) delete process.env.KNOWLEDGE_INDEXER;
+        else process.env.KNOWLEDGE_INDEXER = ENV;
+    });
+
+    beforeEach(() => {
+        mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C });
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: ALICE, status: 2, isDelete: false });
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: BOB, status: 2, isDelete: false });
+    });
+
+    it('keeps an erased document out when it is synced, re-indexed with its project, or backfilled', async () => {
+        const erased = await indexed({ createdBy: ALICE });
+        const kept = await indexed({ createdBy: BOB });
+        await eraseDocument(C, { sourceType: 'page', sourceId: String(erased._id) });
+
+        await indexer.syncPage(C, String(erased._id));
+        await indexer.reindexProject(C, PROJECT);
+        await backfill.backfillCompany(C, { batchSize: 10 });
+
+        expect(stored(erased._id)).toEqual([]);
+        expect(stored(kept._id)).toHaveLength(2);
+    });
+
+    it("keeps an erased person's private pages out after a project restore, a backfill and a rejoin, and leaves their shared pages", async () => {
+        const secret = await indexed({ createdBy: ALICE, visibility: 'private' });
+        const shared = await indexed({ createdBy: ALICE });
+        await erasePerson(C, ALICE);
+
+        await indexer.reindexProject(C, PROJECT);
+        await backfill.backfillCompany(C, { batchSize: 10 });
+        await events.handle({ type: 'member.rejoined', companyId: C, entity: { kind: 'member', id: ALICE }, data: { userId: ALICE } });
+
+        expect(stored(secret._id)).toEqual([]);
+        expect(stored(shared._id).filter((c) => !c.deleted)).toHaveLength(2);
     });
 });

@@ -29,6 +29,7 @@ const PROJECTS = { [OWNER]: [SHARED, SECRET], [COLLEAGUE]: [SHARED], [OUTSIDER]:
 
 const CHUNKS = SCHEMA_TYPE.KNOWLEDGE_CHUNKS;
 const callsFor = (type) => mockDb.calls.filter((c) => c.type === type);
+const chunkSearches = () => callsFor(CHUNKS).filter((c) => c.method === 'aggregate' && c.data[0][0].$match && c.data[0][0].$match.$text);
 const textPaths = (node, path = []) => {
     if (!node || typeof node !== 'object') return [];
     return Object.entries(node).flatMap(([key, value]) => (key === '$text' ? [[...path, key].join('.')] : textPaths(value, [...path, key])));
@@ -80,7 +81,7 @@ describe('retrieval reads page passages from the chunk store once the index is b
         expect(pageIds(result)).toEqual([id]);
         expect(result.passages[0]).toMatchObject({ sourceType: 'page', title: 'Operations manual', projectId: SHARED, authorKind: 'user', permission: { visibility: 'project', via: 'project' } });
         expect(result.passages[0].excerpt).toContain('quartermaster');
-        expect(callsFor(CHUNKS).some((c) => c.method === 'find' && c.data[0].$text)).toBe(true);
+        expect(chunkSearches()).toHaveLength(1);
         expect(callsFor(SCHEMA_TYPE.PAGES).some((c) => c.data[0].$text || c.data[0].$and?.some((clause) => clause.$or?.some((f) => f.title || f.rawText)))).toBe(false);
     });
 
@@ -90,9 +91,10 @@ describe('retrieval reads page passages from the chunk store once the index is b
 
         await ask(COLLEAGUE, 'budget');
 
-        const [call] = callsFor(CHUNKS).filter((c) => c.data[0].$text);
-        const [where] = call.data;
-        expect(textPaths(where)).toEqual(['$text']);
+        const [call] = chunkSearches();
+        const [pipeline] = call.data;
+        const where = pipeline[0].$match;
+        expect(textPaths(pipeline)).toEqual(['0.$match.$text']);
         expect(where).toMatchObject({ companyId: C, sourceType: 'page', deleted: { $ne: true } });
         expect(JSON.stringify(where.$and)).toContain(JSON.stringify(pageVisibilityFilter(COLLEAGUE)));
         expect(JSON.stringify(where.$and)).toContain('"projectId"');
@@ -141,7 +143,50 @@ describe('retrieval reads page passages from the chunk store once the index is b
 
         expect(pageIds(result)).toEqual([human, agent]);
         expect(result.passages.map((p) => p.authorKind)).toEqual(['user', 'agent']);
-        expect(result.passages[0].score).toBe(result.passages[1].score);
+        expect(result.passages[1].score).toBe(result.passages[0].score / 2);
+    });
+});
+
+describe('long pages', () => {
+    beforeEach(() => indexReady());
+
+    it('cannot crowd other pages out: the search returns the best chunk of as many distinct pages as were asked for', async () => {
+        const section = (n) => `<h2>Orbit ${n}</h2><p>${'orbit '.repeat(30)}and the orbit review for part ${n}.</p>`;
+        const long = [];
+        for (let i = 0; i < 2; i += 1) {
+            long.push(await indexed({ title: `Orbit manual ${i}`, content: { html: Array.from({ length: 40 }, (_, n) => section(n)).join('') } }));
+        }
+        const short = [];
+        for (let i = 0; i < 4; i += 1) {
+            short.push(await indexed({ title: `Note ${i}`, content: { html: '<p>One orbit mention.</p>' } }));
+        }
+
+        const result = await ask(OWNER, 'orbit', { limit: 4 });
+
+        expect(new Set(pageIds(result)).size).toBe(4);
+        expect(pageIds(result).slice(0, 2).sort()).toEqual(long.sort());
+        expect(pageIds(result).slice(2).every((id) => short.includes(id))).toBe(true);
+    });
+});
+
+describe('a page edited after its chunks were written', () => {
+    beforeEach(() => indexReady());
+
+    it('never shows the old text: the passage takes the live title, drops the stale excerpt, and the page is synced again', async () => {
+        const events = require('../Modules/Knowledge/ingest/events');
+        const id = await indexed({ title: 'Launch plan', content: { html: '<p>The codename is falcon.</p>' } });
+        Object.assign(mockDb.store[SCHEMA_TYPE.PAGES].find((p) => String(p._id) === id), {
+            title: 'Launch plan (public)',
+            content: { html: '<p>The codename is withheld.</p>' },
+            updatedAt: new Date('2026-09-05T00:00:00Z'),
+        });
+
+        const first = await ask(OWNER, 'falcon');
+        expect(first.passages.map((p) => [p.sourceId, p.title, p.excerpt])).toEqual([[id, 'Launch plan (public)', '']]);
+
+        await events.drain();
+        expect(pageIds(await ask(OWNER, 'falcon'))).toEqual([]);
+        expect(pageIds(await ask(OWNER, 'withheld'))).toEqual([id]);
     });
 });
 

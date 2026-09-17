@@ -47,9 +47,40 @@ describe('scores from different sources are put on one scale before they compete
 
         expect(passages.map((p) => p.sourceId)).toEqual([call, top]);
     });
+
+    it('keeps a lone weak match weak instead of lifting it to the top of the scale', () => {
+        const scored = normaliseScores([passage('page', 'weak', 0.4), passage('task', 'strong', 3), passage('task', 'good', 2)]);
+        expect(scored.map((p) => [p.sourceId, Number(p.score.toFixed(3))])).toEqual([['weak', 0.4], ['strong', 1], ['good', 0.667]]);
+    });
+
+    it('weighs an agent draft down after scaling, so a weak draft never beats strong human results from another source', async () => {
+        const draft = livePage();
+        const tasks = [0, 1].map(() => seed(SCHEMA_TYPE.TASKS, { TaskName: 't', ProjectID: PROJECT, deletedStatusKey: 0 }));
+        const adapter = stub([
+            passage('page', draft, 0.9, { authorKind: 'agent', updatedAt: new Date('2026-09-09T00:00:00Z') }),
+            passage('task', tasks[0], 3),
+            passage('task', tasks[1], 2.4),
+        ]);
+
+        const { passages } = await run(adapter, 3);
+
+        expect(passages.map((p) => p.sourceId)).toEqual([tasks[0], tasks[1], draft]);
+        expect(passages[2].score).toBeCloseTo(0.45);
+    });
 });
 
 describe('candidates are rechecked before the list is cut', () => {
+    it('rechecks one window of candidates when it already fills the answer', async () => {
+        const visible = Array.from({ length: 40 }, () => livePage());
+        const adapter = stub(visible.map((id, i) => passage('page', id, 40 - i)));
+
+        const { passages } = await run(adapter, 2);
+
+        expect(passages.map((p) => p.sourceId)).toEqual(visible.slice(0, 2));
+        const rechecked = mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.PAGES && c.method === 'find').flatMap((c) => c.data[0]._id.$in);
+        expect(rechecked).toHaveLength(4);
+    });
+
     it('still fills the answer when the best-ranked candidates turn out to be deleted', async () => {
         const gone = [livePage({ deletedStatusKey: 1 }), livePage({ deletedStatusKey: 1 }), livePage({ deletedStatusKey: 1 })];
         const kept = livePage();

@@ -96,3 +96,48 @@ describe('a member leaving the workspace', () => {
         expect(live(pagesOf.ownerPrivate._id)).toHaveLength(1);
     });
 });
+
+describe('a departure sticks until the member rejoins', () => {
+    const accept = async (userId, data) => {
+        const res = { code: 200 };
+        res.status = (c) => { res.code = c; return res; };
+        res.json = (b) => { res.body = b; return res; };
+        await members.rootUpdateMember({ uid: userId, headers: {}, body: { id: String(rowOf(userId)._id), data, companyId: C }, params: {}, query: {} }, res);
+        await events.drain();
+        return res;
+    };
+
+    beforeEach(async () => {
+        expect((await update(OWNER, LEAVER, { isDelete: true })).code).toBe(200);
+        expect(live(pagesOf.leaverPrivate._id)).toEqual([]);
+    });
+
+    it("keeps a departed member's private page out when their project is restored and re-indexed", async () => {
+        await indexer.reindexProject(C, PROJECT);
+        expect(live(pagesOf.leaverPrivate._id)).toEqual([]);
+        expect(live(pagesOf.leaverShared._id)).toHaveLength(1);
+    });
+
+    it('keeps it out when the page is synced again for any other reason', async () => {
+        await indexer.syncPage(C, String(pagesOf.leaverPrivate._id));
+        expect(live(pagesOf.leaverPrivate._id)).toEqual([]);
+    });
+
+    it('brings their private pages back when they accept a new invitation to the same seat', async () => {
+        Object.assign(rowOf(LEAVER), { status: 1, isDelete: false, linkId: 'reinvite' });
+        await indexer.reindexProject(C, PROJECT);
+        expect(live(pagesOf.leaverPrivate._id)).toEqual([]);
+
+        const res = await accept(LEAVER, { status: 2 });
+
+        expect(res.code).toBe(200);
+        expect(live(pagesOf.leaverPrivate._id)).toHaveLength(1);
+        expect(live(pagesOf.ownerPrivate._id)).toHaveLength(1);
+    });
+
+    it('brings their private pages back when an owner reinstates the seat', async () => {
+        const res = await update(OWNER, LEAVER, { isDelete: false, status: 2 });
+        expect(res.code).toBe(200);
+        expect(live(pagesOf.leaverPrivate._id)).toHaveLength(1);
+    });
+});

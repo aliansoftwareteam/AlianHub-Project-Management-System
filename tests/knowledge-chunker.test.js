@@ -66,6 +66,20 @@ describe('chunking a page on its structure', () => {
         expect(chunks.map((c) => c.text)).toEqual(['Guide', 'Setup\nInstall the app.']);
     });
 
+    it('chunks the plain text of a page saved with no blocks, as an agent draft is, reading its markdown headings', () => {
+        const draft = { title: 'Release notes', content: { blocks: [] }, rawText: 'Shipped search.\n\n## Fixes\nThe <b> tag & friends.\n### Later\nMore to come.' };
+        expect(chunkPage(draft).map((c) => [c.headingPath, c.text])).toEqual([
+            [['Release notes'], 'Release notes\nShipped search.'],
+            [['Release notes', 'Fixes'], 'Fixes\nThe <b> tag & friends.'],
+            [['Release notes', 'Fixes', 'Later'], 'Later\nMore to come.'],
+        ]);
+    });
+
+    it('prefers the editor body to the plain text when a page has both', () => {
+        const page = { title: 'Guide', content: { blocks: [{ type: 'paragraph', data: { text: 'From the blocks.' } }] }, rawText: 'From the raw text.' };
+        expect(chunkPage(page).map((c) => c.text)).toEqual(['Guide\nFrom the blocks.']);
+    });
+
     it('gives a page with no body one chunk holding its title, so it is still found by title', () => {
         expect(chunkPage({ title: 'Empty page', content: {} }).map((c) => [c.headingPath, c.text])).toEqual([[['Empty page'], 'Empty page']]);
     });
