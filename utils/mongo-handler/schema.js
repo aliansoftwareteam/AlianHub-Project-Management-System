@@ -609,7 +609,8 @@ const schema = {
         entityName: { type: String, required: false },
         meta: { type: Object, required: false },
         ip: { type: String, required: false },
-        // Only on rows written while AUDIT_CHAIN is on (Modules/Audit/chain.js).
+        // Only on rows written while AUDIT_CHAIN is on (Modules/Audit/chain.js). The hash is taken before save,
+        // so no auditLogs field may have a default: a value Mongoose adds on save would fail verification.
         chain: {
             seq: { type: Number, required: false },
             prevHash: { type: String, required: false },
