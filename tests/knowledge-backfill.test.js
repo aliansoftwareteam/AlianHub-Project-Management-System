@@ -189,3 +189,91 @@ describe('backfilling the pages a company already has', () => {
         expect(mockDb.calls.filter((c) => c.companyId === OFF)).toEqual([]);
     });
 });
+
+describe('backfilling comments and transcripts beside pages', () => {
+    const TASK = '6f00000000000000000000e1';
+    const stateFor = (sourceType) => (mockDb.store[STATE] || []).find((s) => s.companyId === C && s.sourceType === sourceType);
+    const liveIds = (sourceType) => [...new Set((mockDb.store[CHUNKS] || []).filter((c) => c.sourceType === sourceType && !c.deleted).map((c) => c.sourceId))].sort();
+    const batchReads = (type) => mockDb.calls.filter((c) => c.type === type && c.method === 'find' && c.data[2] && c.data[2].sort && c.data[2].sort._id === 1);
+
+    let comments;
+    let calls;
+
+    beforeEach(() => {
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK, ProjectID: PROJECT, sprintId: '6f00000000000000000000d1', deletedStatusKey: 0 });
+        comments = Array.from({ length: 5 }, (_, i) => String(mockDb.seed(SCHEMA_TYPE.COMMENTS, {
+            _id: `6f00000000000000000c${String(i + 1).padStart(4, '0')}`, message: `Comment ${i + 1}`, type: 'text', projectId: PROJECT, taskId: TASK, userId: AUTHOR, isDeleted: false, updatedAt: new Date('2026-09-01T00:00:00Z'),
+        })._id));
+        calls = Array.from({ length: 5 }, (_, i) => String(mockDb.seed(SCHEMA_TYPE.CALLS, {
+            _id: `6f00000000000000000f${String(i + 1).padStart(4, '0')}`, callId: `call-${i}`, title: `Call ${i + 1}`, participants: [AUTHOR], transcript: `Transcript ${i + 1}`, createdBy: AUTHOR, deletedStatusKey: 0, updatedAt: new Date('2026-09-01T00:00:00Z'),
+        })._id));
+    });
+
+    it('keeps a position per source and resumes each from its own', async () => {
+        const first = await backfill.backfillCompany(C, { batchSize: 2, maxBatches: 1 });
+
+        expect(first.status).toBe('running');
+        expect(stateFor('page')).toMatchObject({ status: 'running', cursor: pages[1], indexed: 2 });
+        expect(stateFor('comment')).toMatchObject({ status: 'running', cursor: comments[1], indexed: 2 });
+        expect(stateFor('transcript')).toMatchObject({ status: 'running', cursor: calls[1], indexed: 2 });
+        expect(liveIds('comment')).toEqual(comments.slice(0, 2));
+        expect(liveIds('transcript')).toEqual(calls.slice(0, 2));
+        mockDb.calls.length = 0;
+
+        await backfill.backfillCompany(C, { batchSize: 2, maxBatches: 1 });
+
+        expect(String(batchReads(SCHEMA_TYPE.PAGES)[0].data[0]._id.$gt)).toBe(pages[1]);
+        expect(String(batchReads(SCHEMA_TYPE.COMMENTS)[0].data[0]._id.$gt)).toBe(comments[1]);
+        expect(String(batchReads(SCHEMA_TYPE.CALLS)[0].data[0]._id.$gt)).toBe(calls[1]);
+
+        const done = await backfill.backfillCompany(C, { batchSize: 2 });
+        expect(done.status).toBe('complete');
+        ['page', 'comment', 'transcript'].forEach((sourceType) => expect(stateFor(sourceType)).toMatchObject({ status: 'complete', indexed: 5 }));
+        expect(liveIds('comment')).toEqual(comments);
+        expect(liveIds('transcript')).toEqual(calls);
+        expect(await backfill.indexedSources(C, ['page', 'comment', 'transcript'])).toEqual(['page', 'comment', 'transcript']);
+    });
+
+    it('lets one source fail without holding the others back, and resumes the failed one from its saved position', async () => {
+        const ingest = indexer.ingestComment;
+        const spy = jest.spyOn(indexer, 'ingestComment').mockImplementation(async (companyId, row, context) => {
+            if (String(row._id) === comments[3]) throw new Error('connection reset');
+            return ingest(companyId, row, context);
+        });
+
+        await expect(backfill.backfillCompany(C, { batchSize: 2 })).rejects.toThrow('connection reset');
+        expect(stateFor('comment')).toMatchObject({ status: 'failed', cursor: comments[1], error: 'connection reset' });
+        expect(stateFor('page')).toMatchObject({ status: 'complete' });
+        expect(stateFor('transcript')).toMatchObject({ status: 'complete' });
+        expect(await backfill.indexedSources(C, ['page', 'comment', 'transcript'])).toEqual(['page', 'transcript']);
+
+        spy.mockRestore();
+        mockDb.calls.length = 0;
+        const done = await backfill.backfillCompany(C, { batchSize: 2 });
+
+        expect(String(batchReads(SCHEMA_TYPE.COMMENTS)[0].data[0]._id.$gt)).toBe(comments[1]);
+        expect(batchReads(SCHEMA_TYPE.PAGES)).toEqual([]);
+        expect(done.status).toBe('complete');
+        expect(liveIds('comment')).toEqual(comments);
+    });
+
+    it('leaves out deleted comments, media comments, comments on deleted tasks and discarded calls', async () => {
+        mockDb.store[SCHEMA_TYPE.COMMENTS].length = 0;
+        mockDb.store[SCHEMA_TYPE.CALLS].length = 0;
+        const DELETED_TASK = '6f00000000000000000000e2';
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: DELETED_TASK, ProjectID: PROJECT, deletedStatusKey: 1 });
+        const seedComment = (over) => String(mockDb.seed(SCHEMA_TYPE.COMMENTS, { message: 'Note', type: 'text', projectId: PROJECT, taskId: TASK, userId: AUTHOR, updatedAt: new Date('2026-09-01T00:00:00Z'), ...over })._id);
+        const kept = seedComment({});
+        seedComment({ isDeleted: true });
+        seedComment({ type: 'image' });
+        seedComment({ taskId: DELETED_TASK });
+        const keptCall = String(mockDb.seed(SCHEMA_TYPE.CALLS, { callId: 'a', participants: [AUTHOR], transcript: 'Kept', deletedStatusKey: 0, updatedAt: new Date('2026-09-01T00:00:00Z') })._id);
+        mockDb.seed(SCHEMA_TYPE.CALLS, { callId: 'b', participants: [AUTHOR], transcript: 'Gone', deletedStatusKey: 1, updatedAt: new Date('2026-09-01T00:00:00Z') });
+
+        await backfill.backfillCompany(C, { batchSize: 10 });
+
+        expect(liveIds('comment')).toEqual([kept]);
+        expect(stateFor('comment')).toMatchObject({ status: 'complete', indexed: 1, skipped: 1 });
+        expect(liveIds('transcript')).toEqual([keptCall]);
+    });
+});

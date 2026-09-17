@@ -144,6 +144,35 @@ const trimPage = (doc) => ({
     deletedStatusKey: Number(doc.deletedStatusKey) || 0,
 });
 
+/* A comment is deleted by setting isDeleted, so its delete arrives as an update emit. */
+const classifyCommentEvent = (emitType, doc) => {
+    if (doc.isDeleted === true) return 'comment.deleted';
+    return emitType === 'insert' ? 'comment.created' : 'comment.updated';
+};
+
+const idOrNull = (value) => (value ? String(value) : null);
+
+const trimComment = (doc) => ({
+    _id: String(doc._id),
+    projectId: idOrNull(doc.projectId),
+    sprintId: idOrNull(doc.sprintId),
+    taskId: idOrNull(doc.taskId),
+    isDeleted: doc.isDeleted === true,
+});
+
+/* Call notes are discarded by setting deletedStatusKey. The envelope never carries the transcript
+ * or who was on the call: a consumer that needs them reads the row. */
+const classifyTranscriptEvent = (emitType, doc) => {
+    if (Number(doc.deletedStatusKey) === 1) return 'transcript.deleted';
+    return emitType === 'insert' ? 'transcript.created' : 'transcript.updated';
+};
+
+const trimCall = (doc) => ({
+    _id: String(doc._id),
+    projectId: idOrNull(doc.projectId),
+    deletedStatusKey: Number(doc.deletedStatusKey) || 0,
+});
+
 // Mongo rejects with strings, plain objects and sometimes nothing at all.
 const failureText = (error) => (error && error.message) || String(error);
 
@@ -259,37 +288,43 @@ function publishEntityEvent(input) {
     return envelope;
 }
 
-/* A page row carries no company id, so page emits carry it beside the row
- * (Modules/Pages/helpers/pageEvents.js); one without it is dropped, never guessed. */
-function onPageEvent(emitType) {
+/* Page, comment and call rows carry no company id, so their emits carry it beside the row
+ * (Modules/Pages/helpers/pageEvents.js, Modules/Comments/controller.js, Modules/Calls/notes.js);
+ * one without it is dropped, never guessed. */
+function onEntityEmit(kind, emitType, classify, trim) {
     return (payload) => {
         try {
             const doc = payload?.data;
             if (!payload?.companyId || !doc || !doc._id) return;
-            const data = trimPage(doc);
+            const data = trim(doc);
             publishEntityEvent({
                 companyId: payload.companyId,
-                type: classifyPageEvent(emitType, doc),
-                entity: { kind: 'page', id: data._id },
-                scope: { projectId: data.ProjectID },
+                type: classify(emitType, doc),
+                entity: { kind, id: data._id },
+                scope: { projectId: data.ProjectID || data.projectId, sprintId: data.sprintId },
                 data,
                 actor: payload.actor,
             });
         } catch (error) {
-            logger.error(`${LOG_PREFIX} page event handling failed: ${failureText(error)}`);
+            logger.error(`${LOG_PREFIX} ${kind} event handling failed: ${failureText(error)}`);
         }
     };
 }
 
-let listeningForPages = false;
+const listening = new Set();
 
-function listenForPages() {
-    if (listeningForPages) return;
-    listeningForPages = true;
-    socketEmitter.on('pages:insert', onPageEvent('insert'));
-    socketEmitter.on('pages:update', onPageEvent('update'));
-    logger.info(`${LOG_PREFIX} listening for page events`);
+function listenFor(kind, modules, classify, trim) {
+    if (listening.has(kind)) return;
+    listening.add(kind);
+    modules.forEach((module) => ['insert', 'update'].forEach((emitType) => {
+        socketEmitter.on(`${module}:${emitType}`, onEntityEmit(kind, emitType, classify, trim));
+    }));
+    logger.info(`${LOG_PREFIX} listening for ${kind} events`);
 }
+
+const listenForPages = () => listenFor('page', ['pages'], classifyPageEvent, trimPage);
+const listenForComments = () => listenFor('comment', ['comments', 'comments_project'], classifyCommentEvent, trimComment);
+const listenForCalls = () => listenFor('transcript', ['calls'], classifyTranscriptEvent, trimCall);
 
 function start() {
     if (started) return;
@@ -302,6 +337,8 @@ function start() {
 module.exports = {
     start,
     listenForPages,
+    listenForComments,
+    listenForCalls,
     publishEntityEvent,
     bus,
     isRecording,
@@ -318,5 +355,9 @@ module.exports = {
     buildEntityEnvelope,
     classifyPageEvent,
     trimPage,
+    classifyCommentEvent,
+    trimComment,
+    classifyTranscriptEvent,
+    trimCall,
     supersedesPending,
 };

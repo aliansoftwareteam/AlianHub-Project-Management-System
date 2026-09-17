@@ -117,3 +117,100 @@ describe('an erasure sticks', () => {
         expect(stored(shared._id).filter((c) => !c.deleted)).toHaveLength(2);
     });
 });
+
+describe('erasing comments and transcripts', () => {
+    const backfill = require('../Modules/Knowledge/ingest/backfill');
+    const ENV = process.env.KNOWLEDGE_INDEXER;
+    const TASK = '6f00000000000000000000e1';
+
+    const storedOf = (sourceType, id) => (mockDb.store[CHUNKS] || []).filter((c) => c.sourceType === sourceType && c.sourceId === String(id));
+    const seedComment = async (over) => {
+        const row = mockDb.seed(SCHEMA_TYPE.COMMENTS, { message: 'The quay wall is cracked.', type: 'text', projectId: PROJECT, taskId: TASK, userId: ALICE, isDeleted: false, updatedAt: new Date('2026-09-01T00:00:00Z'), ...over });
+        await indexer.syncComment(C, String(row._id));
+        return row;
+    };
+    const seedCall = async (over) => {
+        const row = mockDb.seed(SCHEMA_TYPE.CALLS, { callId: `call-${Math.random()}`, title: 'Quay call', participants: [ALICE, BOB], transcript: 'The quay wall.', createdBy: ALICE, deletedStatusKey: 0, updatedAt: new Date('2026-09-01T00:00:00Z'), ...over });
+        await indexer.syncTranscript(C, String(row._id));
+        return row;
+    };
+
+    beforeAll(() => { process.env.KNOWLEDGE_INDEXER = 'all'; });
+    afterAll(() => {
+        if (ENV === undefined) delete process.env.KNOWLEDGE_INDEXER;
+        else process.env.KNOWLEDGE_INDEXER = ENV;
+    });
+
+    beforeEach(() => {
+        mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C });
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK, ProjectID: PROJECT, deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: ALICE, status: 2, isDelete: false });
+    });
+
+    it('erases one comment and keeps it out through a sync, a task re-index and a backfill', async () => {
+        const erased = await seedComment({});
+        const kept = await seedComment({});
+        expect(storedOf('comment', erased._id)).toHaveLength(1);
+
+        expect(await eraseDocument(C, { sourceType: 'comment', sourceId: String(erased._id) })).toEqual({ erased: 1 });
+        await indexer.syncComment(C, String(erased._id));
+        await indexer.reindexTask(C, TASK, { moved: true });
+        await backfill.backfillCompany(C, { batchSize: 10 });
+
+        expect(storedOf('comment', erased._id)).toEqual([]);
+        expect(storedOf('comment', kept._id)).toHaveLength(1);
+    });
+
+    it('erases one transcript and keeps it out through a sync and a backfill', async () => {
+        const erased = await seedCall({});
+        const kept = await seedCall({});
+
+        await eraseDocument(C, { sourceType: 'transcript', sourceId: String(erased._id) });
+        await indexer.syncTranscript(C, String(erased._id));
+        await backfill.backfillCompany(C, { batchSize: 10 });
+
+        expect(storedOf('transcript', erased._id)).toEqual([]);
+        expect(storedOf('transcript', kept._id).length).toBeGreaterThan(0);
+    });
+
+    it("erasing a person removes their private pages and the comments they wrote, and keeps the calls they were on and everyone else's comments", async () => {
+        const mine = await seedComment({ userId: ALICE });
+        const theirs = await seedComment({ userId: BOB });
+        const call = await seedCall({ createdBy: ALICE });
+        const secret = await indexed({ createdBy: ALICE, visibility: 'private' });
+        const shared = await indexed({ createdBy: ALICE });
+
+        const result = await erasePerson(C, ALICE);
+        await indexer.syncTranscript(C, String(call._id));
+
+        expect(result).toEqual({ erased: 3 });
+        expect(stored(secret._id)).toEqual([]);
+        expect(storedOf('comment', mine._id)).toEqual([]);
+        expect(storedOf('comment', theirs._id).filter((c) => !c.deleted)).toHaveLength(1);
+        expect(stored(shared._id).filter((c) => !c.deleted)).toHaveLength(2);
+        expect(storedOf('transcript', call._id).filter((c) => !c.deleted).length).toBeGreaterThan(0);
+        expect(mockDb.store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS]).toEqual([expect.objectContaining({ kind: 'author', userId: ALICE })]);
+    });
+
+    it("keeps an erased person's comments out after a sync, a project restore, a task restore, a backfill and a rejoin", async () => {
+        const events = require('../Modules/Knowledge/ingest/events');
+        const comment = await seedComment({ userId: ALICE });
+        expect(storedOf('comment', comment._id)).toHaveLength(1);
+        await erasePerson(C, ALICE);
+        const taskRow = () => mockDb.store[SCHEMA_TYPE.TASKS].find((t) => t._id === TASK);
+
+        await indexer.syncComment(C, String(comment._id));
+        await indexer.tombstoneProject(C, PROJECT);
+        await indexer.reindexProject(C, PROJECT);
+        taskRow().deletedStatusKey = 1;
+        await indexer.reindexTask(C, TASK);
+        taskRow().deletedStatusKey = 0;
+        await indexer.reindexTask(C, TASK);
+        await backfill.backfillCompany(C, { batchSize: 10 });
+        await events.handle({ type: 'member.activated', companyId: C, entity: { kind: 'member', id: ALICE }, data: { userId: ALICE } });
+        await events.drain();
+
+        expect(storedOf('comment', comment._id)).toEqual([]);
+    });
+});
