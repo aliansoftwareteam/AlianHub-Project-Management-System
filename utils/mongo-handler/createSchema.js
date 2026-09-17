@@ -146,9 +146,7 @@ auditLogsSchema.index({ action: 1, createdAt: -1 });
 // row's own state is what says whether the effect already happened.
 auditLogsSchema.index({ 'meta.idempotencyKey': 1 }, { unique: true, partialFilterExpression: { 'meta.idempotencyKey': { $type: 'string' } } });
 // Two servers appending the same sequence number: the second insert fails and retries on the new tip.
-// Range and $exists filters, not $type: the planner only uses a partial index for queries it can prove fall inside it.
-auditLogsSchema.index({ 'chain.seq': 1 }, { unique: true, name: 'audit_chain_seq', partialFilterExpression: { 'chain.seq': { $gte: 0 } } });
-auditLogsSchema.index({ 'meta.amends': 1 }, { name: 'audit_amends', partialFilterExpression: { 'meta.amends': { $exists: true } } });
+require('../../Modules/Audit/helpers/chainRules').CHAIN_INDEXES.forEach(([keys, options]) => auditLogsSchema.index({ ...keys }, { ...options }));
 const auditChainHeadsSchema = new Schema(schema.auditChainHeads, {strict: true, timestamps: false});
 const auditChainAnchorsSchema = new Schema(schema.auditChainAnchors, {strict: true, timestamps: true});
 auditChainAnchorsSchema.index({ seq: -1 }, { unique: true, name: 'audit_anchor_seq' });

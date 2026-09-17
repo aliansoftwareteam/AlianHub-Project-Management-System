@@ -64,6 +64,8 @@ exports.undoAuditLog = async (req, res) => {
     }
 };
 
+const searchTerm = (text) => String(text).slice(0, 120).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /* The stream is one collection, so the agent filters are meta lookups rather than a separate log. */
 const auditMatch = (q) => {
     const match = {};
@@ -80,7 +82,7 @@ const auditMatch = (q) => {
     if (q.runId) match['meta.runId'] = String(q.runId);
     if (q.projectId) match.$or = [{ 'meta.params.projectId': String(q.projectId) }, { projectId: String(q.projectId) }];
     if (q.q) {
-        const term = String(q.q).slice(0, 120).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const term = searchTerm(q.q);
         match.$and = [...(match.$and || []), { $or: [
             { entityName: { $regex: term, $options: 'i' } },
             { actorName: { $regex: term, $options: 'i' } },
@@ -96,11 +98,30 @@ const auditMatch = (q) => {
     return match;
 };
 
-/* Fields an appended change can set; under the chain they are matched after the fold. */
+/* Fields an appended change can set. */
 const FOLDED_FIELDS = ['entityType', 'entityId', 'meta.undoneAt', '$and'];
 
-const filterStages = async (companyId, q) => {
-    if (!chain.isOn()) return [{ $match: auditMatch(q) }];
+/* The same conditions auditMatch puts on those fields, tested on a row folded from its verified changes. */
+const matchesFolded = (row, q) => {
+    const meta = row.meta || {};
+    if (q.entityType && row.entityType !== String(q.entityType)) return false;
+    if (q.entityId && row.entityId !== String(q.entityId)) return false;
+    if (q.undone === 'true' && meta.undoneAt == null) return false;
+    if (q.q) {
+        const pattern = new RegExp(searchTerm(q.q), 'i');
+        if (![row.entityName, row.actorName, meta.action, meta.reason].some((v) => typeof v === 'string' && pattern.test(v))) return false;
+    }
+    return true;
+};
+
+/*
+ * How to read the rows a filter asks for. A company with chained history reads rows folded from their verified
+ * changes. When a filter names a field a change can set, the database only narrows to candidates (rows that
+ * match as stored, or that a chained change touching that field points at) and each candidate is re-checked on
+ * its verified state, so a change that does not verify can neither add a row to the result nor alter one in it.
+ */
+const auditPlan = async (companyId, q) => {
+    if (!(await chain.folding(companyId))) return { folding: false, exact: true, stages: [{ $match: auditMatch(q) }] };
     const base = auditMatch(q);
     const current = {};
     FOLDED_FIELDS.forEach((field) => {
@@ -108,13 +129,36 @@ const filterStages = async (companyId, q) => {
         current[field] = base[field];
         delete base[field];
     });
-    base.$and = [{ action: { $ne: AMENDED_ACTION } }];
-    if (!Object.keys(current).length) return [{ $match: base }];
-    const folding = await chain.hasAmendments(companyId);
-    return [{ $match: base }, ...(folding ? chain.foldStages() : []), { $match: current }];
+    const notAmendment = { action: { $ne: AMENDED_ACTION } };
+    if (!Object.keys(current).length || !(await chain.hasAmendments(companyId))) {
+        const { $and: search = [], ...rest } = current;
+        return { folding: true, exact: true, stages: [{ $match: { ...base, ...rest, $and: [notAmendment, ...search] } }] };
+    }
+    const amendedIds = await chain.amendedIdsMatching(companyId, {
+        entityType: q.entityType ? String(q.entityType) : '',
+        entityId: q.entityId ? String(q.entityId) : '',
+        undone: q.undone === 'true',
+        term: q.q ? searchTerm(q.q) : '',
+    });
+    const candidates = { $or: [current, ...(amendedIds.length ? [{ _id: { $in: amendedIds } }] : [])] };
+    return { folding: true, exact: false, stages: [{ $match: { ...base, $and: [notAmendment, candidates] } }] };
 };
 
 const NEWEST_FIRST = { $sort: { createdAt: -1, _id: -1 } };
+
+async function* plannedRows(companyId, q, plan, { integrity }) {
+    for (let skip = 0; ; skip += AUDIT_EXPORT_PAGE_SIZE) {
+        const batch = (await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.AUDIT_LOGS,
+            data: [[...plan.stages, NEWEST_FIRST, { $skip: skip }, { $limit: AUDIT_EXPORT_PAGE_SIZE }]],
+        }, 'aggregate')) || [];
+        const rows = plan.folding ? await chain.annotateRows(companyId, batch, { integrity }) : batch;
+        for (const row of rows) {
+            if (plan.exact || matchesFolded(row, q)) yield row;
+        }
+        if (batch.length < AUDIT_EXPORT_PAGE_SIZE) return;
+    }
+}
 
 // GET /api/v1/audit-logs?actorId=&entityType=&entityId=&action=&refused=&from=&to=&page=&limit=
 // Owner/admin only. Filterable + paginated, newest first; under AUDIT_CHAIN each row carries its integrity state.
@@ -128,17 +172,27 @@ exports.listAuditLogs = async (req, res) => {
         const q = req.query || {};
         const page = Math.max(1, Number(q.page) || 1);
         const limit = Math.min(100, Math.max(1, Number(q.limit) || 25));
-        const chained = chain.isOn();
-        const pipeline = [
-            ...(await filterStages(companyId, q)),
-            NEWEST_FIRST,
-            { $facet: { data: [{ $skip: (page - 1) * limit }, { $limit: limit }, ...(chained ? [{ $project: { _id: 1 } }] : [])], meta: [{ $count: 'total' }] } },
-        ];
-        const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [pipeline] }, 'aggregate');
-        const pageRows = (rows && rows[0] && rows[0].data) || [];
-        const data = await withUndoState(companyId, req.uid, chained ? await chain.readForList(companyId, pageRows.map((r) => r._id)) : pageRows);
-        const total = (rows && rows[0] && rows[0].meta && rows[0].meta[0] && rows[0].meta[0].total) || 0;
-        const metadata = { total, page, totalPages: Math.ceil(total / limit), ...(chained ? { chain: { on: true } } : {}) };
+        const plan = await auditPlan(companyId, q);
+        let listed;
+        let total;
+        if (plan.exact) {
+            const pipeline = [
+                ...plan.stages,
+                NEWEST_FIRST,
+                { $facet: { data: [{ $skip: (page - 1) * limit }, { $limit: limit }, ...(plan.folding ? [{ $project: { _id: 1 } }] : [])], meta: [{ $count: 'total' }] } },
+            ];
+            const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [pipeline] }, 'aggregate');
+            const pageRows = (rows && rows[0] && rows[0].data) || [];
+            listed = plan.folding ? await chain.readForList(companyId, pageRows.map((r) => r._id)) : pageRows;
+            total = (rows && rows[0] && rows[0].meta && rows[0].meta[0] && rows[0].meta[0].total) || 0;
+        } else {
+            const ids = [];
+            for await (const row of plannedRows(companyId, q, plan, { integrity: false })) ids.push(row._id);
+            total = ids.length;
+            listed = await chain.readForList(companyId, ids.slice((page - 1) * limit, page * limit));
+        }
+        const data = await withUndoState(companyId, req.uid, listed);
+        const metadata = { total, page, totalPages: Math.ceil(total / limit), ...(chain.isOn() ? { chain: { on: true } } : {}) };
         return res.send({ status: true, data, metadata });
     } catch (error) {
         logger.error(`listAuditLogs: ${error.message}`);
@@ -152,11 +206,17 @@ exports.auditExportCap = () => {
     return Number.isInteger(configured) && configured > 0 ? Math.min(configured, AUDIT_EXPORT_HARD_CAP) : AUDIT_EXPORT_HARD_CAP;
 };
 
-const auditCsvLine = (r) => {
+const integrityCell = (integrity) => {
+    if (!integrity) return '';
+    return integrity.state === 'broken' && integrity.brokenAt != null ? `broken:${integrity.brokenAt}` : integrity.state;
+};
+
+const auditCsvLine = (r, withIntegrity) => {
     const m = r.meta || {};
     return csvRow([
         r.createdAt ? new Date(r.createdAt).toISOString() : '', m.actorType || 'human', r.actorName || '', m.agentName || '', m.runId || '',
         m.action || r.action, r.entityName || r.entityId || '', m.reason || '', (m.cost && m.cost.usd) || '', m.undoneAt ? new Date(m.undoneAt).toISOString() : '',
+        ...(withIntegrity ? [integrityCell(r.integrity)] : []),
     ]);
 };
 
@@ -170,29 +230,35 @@ exports.exportAuditCsv = async (req, res) => {
         const roleType = await getRoleType(companyId, req.uid);
         if (!isPrivileged(roleType)) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
 
-        const stages = await filterStages(companyId, req.query || {});
+        const q = req.query || {};
+        const plan = await auditPlan(companyId, q);
+        const withIntegrity = chain.isOn();
         const cap = exports.auditExportCap();
-        const readPage = async (skip, limit) => chain.foldRows(companyId, (await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.AUDIT_LOGS,
-            data: [[...stages, NEWEST_FIRST, { $skip: skip }, { $limit: limit }]],
-        }, 'aggregate')) || []);
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="audit-${new Date().toISOString().slice(0, 10)}.csv"`);
         streaming = true;
-        res.write(AUDIT_CSV_HEADER.join(','));
+        res.write([...AUDIT_CSV_HEADER, ...(withIntegrity ? ['integrity'] : [])].join(','));
 
         let written = 0;
-        while (written < cap) {
-            const limit = Math.min(AUDIT_EXPORT_PAGE_SIZE, cap - written);
-            // eslint-disable-next-line no-await-in-loop
-            const rows = await readPage(written, limit);
-            if (rows.length) res.write(`\n${rows.map(auditCsvLine).join('\n')}`);
-            written += rows.length;
-            if (rows.length < limit) break;
+        let truncated = false;
+        let lines = [];
+        for await (const row of plannedRows(companyId, q, plan, { integrity: withIntegrity })) {
+            if (written >= cap) {
+                truncated = true;
+                break;
+            }
+            lines.push(auditCsvLine(row, withIntegrity));
+            written += 1;
+            if (lines.length >= AUDIT_EXPORT_PAGE_SIZE) {
+                res.write(`\n${lines.join('\n')}`);
+                lines = [];
+            }
         }
-        if (written >= cap && (await readPage(cap, 1)).length) {
-            res.write(`\n${csvRow(['', '', '', '', '', 'export.truncated', `Export truncated at ${cap} rows. Narrow the filter to export the rest.`, '', '', ''])}`);
+        if (lines.length) res.write(`\n${lines.join('\n')}`);
+        if (truncated) {
+            const note = ['', '', '', '', '', 'export.truncated', `Export truncated at ${cap} rows. Narrow the filter to export the rest.`, '', '', ''];
+            res.write(`\n${csvRow([...note, ...(withIntegrity ? [''] : [])])}`);
         }
         return res.end();
     } catch (error) {

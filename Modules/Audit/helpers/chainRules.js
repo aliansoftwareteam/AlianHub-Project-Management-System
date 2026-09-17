@@ -14,6 +14,15 @@ const AMENDABLE_ROW_FIELDS = Object.freeze(['entityType', 'entityId', 'entityNam
 
 const INTEGRITY = Object.freeze({ VERIFIED: 'verified', BROKEN: 'broken', UNCHAINED: 'unchained', UNVERIFIED: 'unverified' });
 
+/*
+ * The only indexes the chain builds itself. Range and $exists filters, not $type: the planner only uses a
+ * partial index for queries it can prove fall inside it.
+ */
+const CHAIN_INDEXES = Object.freeze([
+    [{ 'chain.seq': 1 }, { unique: true, name: 'audit_chain_seq', partialFilterExpression: { 'chain.seq': { $gte: 0 } } }],
+    [{ 'meta.amends': 1 }, { name: 'audit_amends', partialFilterExpression: { 'meta.amends': { $exists: true } } }],
+]);
+
 const chainConfig = (env = process.env) => {
     const requested = FLAG_ON.includes(String(env.AUDIT_CHAIN || '').trim().toLowerCase());
     const key = String(env.AUDIT_CHAIN_KEY || '');
@@ -34,16 +43,39 @@ const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[
 /* BSON writes strings as UTF-8, which has no encoding for a lone surrogate, so Mongo stores U+FFFD in its place. */
 const wellFormed = (text) => text.replace(LONE_SURROGATE, '\uFFFD');
 
-/* What Mongo stores for a value: undefined properties and empty objects dropped, undefined array items as null. */
+const isMongooseDocument = (v) => typeof v.toObject === 'function' && v.$__ !== undefined;
+
+/*
+ * The value as it is stored and hashed, with one defined encoding for everything JSON has no answer for, so the
+ * row read back from Mongo hashes the same: undefined properties, functions, symbols and empty objects dropped;
+ * array holes and undropped items as null; invalid dates as null; bytes as base64; BigInt, Decimal128 and
+ * unsafe Longs as decimal strings; RegExps as their source text; Maps and Mongoose documents as plain objects.
+ */
 const clean = (value) => {
+    if (value === undefined || typeof value === 'function' || typeof value === 'symbol') return undefined;
     if (typeof value === 'string') return wellFormed(value);
-    if (Array.isArray(value)) return value.map((item) => (item === undefined ? null : clean(item)));
-    if (!isPlainObject(value)) return value;
+    if (typeof value === 'bigint') return value.toString();
+    if (value === null || typeof value !== 'object') return value;
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+    if (isObjectId(value)) return value;
+    if (Buffer.isBuffer(value) || value instanceof Uint8Array) return Buffer.from(value).toString('base64');
+    if (value._bsontype === 'Binary') return Buffer.from(value.buffer).toString('base64');
+    if (value._bsontype === 'Decimal128') return value.toString();
+    if (value._bsontype === 'Long') return Number.isSafeInteger(value.toNumber()) ? value.toNumber() : value.toString();
+    if (value._bsontype === 'Int32' || value._bsontype === 'Double') return value.valueOf();
+    if (value instanceof RegExp) return String(value);
+    if (value instanceof Map) return clean(Object.fromEntries(value));
+    if (isMongooseDocument(value)) return clean(value.toObject());
+    if (Array.isArray(value)) {
+        return Array.from(value, (item) => {
+            const c = clean(item);
+            return c === undefined ? null : c;
+        });
+    }
     const out = {};
     Object.entries(value).forEach(([k, v]) => {
-        if (v === undefined) return;
         const c = clean(v);
-        if (isPlainObject(c) && !Object.keys(c).length) return;
+        if (c === undefined || (isPlainObject(c) && !Object.keys(c).length)) return;
         out[wellFormed(k)] = c;
     });
     return out;
@@ -125,8 +157,11 @@ const amendmentOf = (original, $set) => {
 const seqOf = (row) => (isChained(row) ? row.chain.seq : Number.MAX_SAFE_INTEGER);
 const inChainOrder = (rows) => [...rows].sort((a, b) => (seqOf(a) - seqOf(b)) || (new Date(a.createdAt) - new Date(b.createdAt)));
 
-/* Only a change that is in the chain and hashes under the key may alter what a row reads as. */
-const trustedAmendments = (key, companyId, amendments = []) => amendments.filter((a) => Boolean(key) && hashMatches(key, companyId, a));
+/*
+ * Only a change that is in the chain, and hashes under the key when there is one, may alter what a row reads
+ * as. Without the key a chained change is still read, so an action it applied or undid is not run again.
+ */
+const trustedAmendments = (key, companyId, amendments = []) => amendments.filter((a) => (key ? hashMatches(key, companyId, a) : isChained(a)));
 
 const applyAmendments = (row, amendments = []) => {
     if (!row || !amendments.length) return row;
@@ -185,7 +220,7 @@ const pageIntegrity = ({ key, companyId, report, chainStartedAt = null }, entrie
 };
 
 module.exports = {
-    AMENDED_ACTION, MIN_KEY_LENGTH, PERSONAL_FIELDS, AMENDABLE_ROW_FIELDS, INTEGRITY, GENESIS,
+    AMENDED_ACTION, MIN_KEY_LENGTH, PERSONAL_FIELDS, AMENDABLE_ROW_FIELDS, INTEGRITY, GENESIS, CHAIN_INDEXES,
     chainConfig, clean, canonical, hashedContent, rowHash, hashMatches, isChained, markMac, macMatches,
     amendmentOf, trustedAmendments, applyAmendments, inChainOrder, walkLinks, pageIntegrity,
 };

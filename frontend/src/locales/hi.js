@@ -5744,9 +5744,9 @@ export default {
         "integrity_unverified": "Not verified yet",
         "integrity_unverified_hint": "Not checked yet. It is checked the next time the audit log opens, once the chain key is available.",
         "integrity_unchained": "Unchained",
-        "integrity_unchained_hint": "Written before the audit chain was on, or while it was off, so it cannot be verified.",
+        "integrity_unchained_hint": "Written before the audit chain started, so it cannot be verified.",
         "integrity_broken_row": "Broken",
-        "integrity_broken_row_hint": "This row is outside the chain but was written after the chain started, or it carries a change that is not part of the chain.",
+        "integrity_broken_row_hint": "This row is outside the chain but was written after the chain started, for example while the audit chain was off, or it carries a change that is not part of the chain.",
         "names_not_checked": "Names aren't covered by the integrity check. The ids beside them are."
     },
     "Offline": {

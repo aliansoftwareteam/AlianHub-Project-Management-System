@@ -213,6 +213,7 @@ const create = () => {
             return run(list, pipeline).map(clone);
         }
         if (method === 'createIndexes') return undefined;
+        if (method === 'createIndex') return data[1] && data[1].name;
         throw new Error(`fakeMongo: unsupported method ${method}`);
     });
 

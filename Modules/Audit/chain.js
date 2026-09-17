@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
-const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const rules = require('./helpers/chainRules');
@@ -9,18 +8,22 @@ const LOG = '[audit-chain]';
 const COMPANY_HEAD_ID = 'head';
 const PAGE_SIZE = 500;
 const LIST_VERIFY_BUDGET = 5000;
+const COUNT_WINDOW = 5000;
 const MIRROR_INTERVAL_MS = 60 * 1000;
 const ERROR_LOG_INTERVAL_MS = 60 * 1000;
+const HISTORY_RECHECK_MS = 5 * 60 * 1000;
 const APPEND_ATTEMPTS = 20;
 const ANCHOR_LOOKBACK = 20;
 const QUEUE_LIMIT = 1000;
 const WRITE_TIMEOUT_MS = 15 * 1000;
+const INDEX_CONFLICT_CODES = [85, 86];
 
 const { AUDIT_LOGS, AUDIT_CHAIN_HEADS, AUDIT_CHAIN_ANCHORS, GOLBAL } = SCHEMA_TYPE;
 
 const db = (database, type, data, method) => MongoDbCrudOpration(String(database), { type, data }, method);
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const quietly = (what, promise) => promise.catch((error) => logger.error(`${LOG} ${what}: ${(error && error.message) || error}`));
 
 let lastErrorLoggedAt = 0;
 
@@ -61,7 +64,6 @@ const serially = (companyId, fn) => {
     return run;
 };
 
-/* A hung call must not hold the company's queue; whatever it does later is settled by the unique index. */
 const withTimeout = (promise, what) => {
     let timer;
     promise.catch(() => {});
@@ -90,14 +92,17 @@ const advance = async (database, companyId, key, { seq, hash, rowId }) => {
     }
 };
 
-/* The global copy is what makes truncating the newest rows detectable when the company head goes with them. */
+/* The newest row each company's chain has in this process: what it mirrors, and a floor for the next sequence number. */
+const written = new Map();
+const histories = new Map();
+
+/* The global copy is what makes truncating the newest rows detectable, so it comes from what this process wrote. */
 const mirrorHead = async (companyId, key = config().key, mark = null) => {
     if (!key) return;
-    const source = mark || trusted(key, 'head', companyId, await readHead(companyId));
-    if (source) await advance(GOLBAL, companyId, key, source);
+    const id = String(companyId);
+    const source = mark || written.get(id) || trusted(key, 'head', id, await readHead(id));
+    if (source) await advance(GOLBAL, id, key, source);
 };
-
-const quietly = (what, promise) => promise.catch((error) => logger.error(`${LOG} ${what}: ${(error && error.message) || error}`));
 
 const mirrors = new Map();
 
@@ -117,7 +122,7 @@ const mirrorSoon = (companyId, key, mark = null) => {
     slot.timer = setTimeout(() => {
         slot.timer = null;
         slot.at = Date.now();
-        quietly(`mirror ${id}`, mirrorHead(id, slot.key));
+        quietly(`mirror ${id}`, mirrorHead(id, slot.key, written.get(id)));
     }, wait);
     if (typeof slot.timer.unref === 'function') slot.timer.unref();
 };
@@ -129,7 +134,7 @@ const flushMirrors = async () => {
         clearTimeout(slot.timer);
         slot.timer = null;
         slot.at = Date.now();
-        return quietly(`mirror ${id}`, mirrorHead(id, slot.key));
+        return quietly(`mirror ${id}`, mirrorHead(id, slot.key, written.get(id)));
     }));
 };
 
@@ -138,47 +143,89 @@ const newestChained = async (companyId) => {
     return row ? plain(row).chain : null;
 };
 
-/* The furthest of the newest row and both heads, so a sweep or missing newest rows never hand out a used number. */
+/* The furthest of the newest row, both heads and what this process wrote, so missing rows never hand out a used number. */
 const tipOf = async (companyId, key) => {
-    const [row, head, mirrored] = await Promise.all([newestChained(companyId), readHead(companyId), readHead(companyId, GOLBAL)]);
-    const candidates = [row && { seq: row.seq, hash: row.hash }, trusted(key, 'head', companyId, head), trusted(key, 'head', companyId, mirrored)].filter(Boolean);
+    const id = String(companyId);
+    const [row, head, mirrored] = await Promise.all([newestChained(id), readHead(id), readHead(id, GOLBAL)]);
+    const candidates = [row && { seq: row.seq, hash: row.hash }, trusted(key, 'head', id, head), trusted(key, 'head', id, mirrored), written.get(id)].filter(Boolean);
     return candidates.reduce((best, mark) => (mark.seq > best.seq ? mark : best), rules.GENESIS);
 };
 
-const indexed = new Map();
+const indexes = new Map();
 
-/* Mongoose builds indexes in the background; two servers could both write seq 1 before the unique one exists. */
-const ensureIndexes = async (companyId) => {
+/*
+ * Builds only the chain's own indexes, and waits for them, since Mongoose builds in the background and two
+ * servers could both write seq 1 first. An existing index that conflicts leaves the company unchained rather
+ * than failing every audited action; it is never dropped here.
+ */
+const chainIndexesReady = async (companyId) => {
     const id = String(companyId);
-    if (!indexed.has(id)) indexed.set(id, db(id, AUDIT_LOGS, [], 'createIndexes'));
+    if (!indexes.has(id)) {
+        indexes.set(id, (async () => {
+            for (const [keys, options] of rules.CHAIN_INDEXES) {
+                try {
+                    await db(id, AUDIT_LOGS, [{ ...keys }, { ...options }], 'createIndex');
+                } catch (error) {
+                    if (!INDEX_CONFLICT_CODES.includes(error && error.code)) throw error;
+                    logger.error(`${LOG} company ${id} stays unchained: its ${options.name} index conflicts with an existing index (${error.message}). Drop or rename that index to chain this company's audit rows.`);
+                    return false;
+                }
+            }
+            return true;
+        })());
+    }
     try {
-        await indexed.get(id);
+        return await withTimeout(indexes.get(id), `building the audit chain indexes for company ${id}`);
     } catch (error) {
-        indexed.delete(id);
+        indexes.delete(id);
         throw error;
     }
 };
 
-const appendOnce = async (companyId, key, entry, createdAt) => {
+const afterWrite = async (companyId, key, link, rowId) => {
+    const id = String(companyId);
+    const mark = { seq: link.seq, hash: link.hash, rowId: String(rowId) };
+    const previous = written.get(id);
+    if (!previous || previous.seq < mark.seq) written.set(id, mark);
+    histories.set(id, { value: true, at: Date.now() });
+    await quietly(`head ${id}`, advance(id, id, key, mark));
+    mirrorSoon(id, key, mark);
+};
+
+const appendOnce = async (companyId, key, entry, createdAt, _id) => {
     const tip = await tipOf(companyId, key);
-    const row = rules.clean({ ...entry, _id: new mongoose.Types.ObjectId(), createdAt });
+    const row = rules.clean({ ...entry, _id, createdAt });
     row.chain = { seq: tip.seq + 1, prevHash: tip.hash };
     row.chain.hash = rules.rowHash(key, companyId, row, tip.hash);
     const saved = await db(companyId, AUDIT_LOGS, row, 'save');
-    const mark = { seq: row.chain.seq, hash: row.chain.hash, rowId: String(row._id) };
-    await quietly(`head ${companyId}`, advance(companyId, companyId, key, mark));
-    mirrorSoon(companyId, key, mark);
+    await afterWrite(companyId, key, row.chain, _id);
     return saved;
+};
+
+/* A write that failed or timed out may still have landed; if it did, it is written, and is not written again. */
+const landed = async (companyId, key, _id) => {
+    try {
+        const row = plain(await withTimeout(db(companyId, AUDIT_LOGS, [{ _id }], 'findOne'), 'checking whether an audit write landed'));
+        if (!rules.isChained(row)) return null;
+        await afterWrite(companyId, key, row.chain, _id);
+        return row;
+    } catch (error) {
+        return null;
+    }
 };
 
 /* The insert is the reservation: a sequence number exists only once its row does, so a failed write leaves no gap. */
 const append = (companyId, key, entry, createdAt = new Date()) => serially(companyId, async () => {
-    await withTimeout(ensureIndexes(companyId), 'building the audit indexes');
     for (let attempt = 1; ; attempt += 1) {
+        const _id = new mongoose.Types.ObjectId();
         try {
-            return await withTimeout(appendOnce(companyId, key, entry, createdAt), 'an audit write');
+            return await withTimeout(appendOnce(companyId, key, entry, createdAt, _id), 'an audit write');
         } catch (error) {
-            if (!isSeqConflict(error)) throw error;
+            if (!isSeqConflict(error)) {
+                const row = await landed(companyId, key, _id);
+                if (row) return row;
+                throw error;
+            }
             if (attempt >= APPEND_ATTEMPTS) {
                 throw new Error(`${LOG} the ${entry.action} row was not written for company ${companyId} after ${APPEND_ATTEMPTS} sequence conflicts`);
             }
@@ -187,10 +234,14 @@ const append = (companyId, key, entry, createdAt = new Date()) => serially(compa
     }
 });
 
-const saveAuditRow = (companyId, entry) => {
+const saveUnchained = (companyId, entry) => MongoDbCrudOpration(companyId, { type: AUDIT_LOGS, data: entry }, 'save');
+
+const saveAuditRow = async (companyId, entry) => {
     const cfg = config();
-    if (!cfg.on) return MongoDbCrudOpration(companyId, { type: AUDIT_LOGS, data: entry }, 'save');
-    return append(companyId, cfg.key, entry);
+    if (!cfg.on) return saveUnchained(companyId, entry);
+    const createdAt = new Date();
+    if (!(await chainIndexesReady(companyId))) return saveUnchained(companyId, entry);
+    return append(companyId, cfg.key, entry, createdAt);
 };
 
 const rowFilter = (auditId) => (/^[0-9a-fA-F]{24}$/.test(String(auditId)) ? { _id: new mongoose.Types.ObjectId(String(auditId)) } : null);
@@ -207,8 +258,27 @@ const amend = async (companyId, auditId, $set) => {
         logger.error(`${LOG} refused to change audit row ${auditId}: AUDIT_CHAIN_KEY is not set, and a chained row is never edited in place`);
         throw new Error(`audit row ${auditId} cannot change without AUDIT_CHAIN_KEY`);
     }
+    if (!(await chainIndexesReady(companyId))) {
+        if (rules.isChained(original)) throw new Error(`audit row ${auditId} is chained, and company ${companyId} cannot append to its chain`);
+        const r = await db(companyId, AUDIT_LOGS, [{ ...filter, chain: { $exists: false } }, { $set }], 'updateOne');
+        if (!r || !(r.matchedCount > 0 || r.modifiedCount > 0)) throw Object.assign(new Error(`audit row ${auditId} not found`), { notFound: true });
+        return null;
+    }
     return append(companyId, cfg.key, rules.amendmentOf(original, $set), createdAt);
 };
+
+/* A company that has ever had a chained row keeps reading its appended changes, whatever AUDIT_CHAIN says now. */
+const hasChainHistory = async (companyId) => {
+    const id = String(companyId);
+    const cached = histories.get(id);
+    if (cached && (cached.value || Date.now() - cached.at < HISTORY_RECHECK_MS)) return cached.value;
+    const [head, row] = await Promise.all([readHead(id), db(id, AUDIT_LOGS, [{ 'chain.seq': { $gte: 0 } }, { _id: 1 }], 'findOne')]);
+    const value = Boolean(head || row);
+    histories.set(id, { value, at: Date.now() });
+    return value;
+};
+
+const folding = async (companyId) => config().on || hasChainHistory(companyId);
 
 const amendmentsFor = async (companyId, rows) => {
     const ids = [...new Set(rows.filter((r) => r && r.action !== rules.AMENDED_ACTION).map((r) => String(r._id)))];
@@ -222,13 +292,14 @@ const amendmentsFor = async (companyId, rows) => {
     return byRow;
 };
 
-/* With the chain off nothing is read; rows with no trusted appended changes come back as they were read. */
+/* Rows with no trusted appended changes come back as they were read; a company with no chained history reads nothing more. */
 const foldRows = async (companyId, rows) => {
-    const cfg = config();
-    if (!cfg.on || !rows || !rows.length) return rows;
-    const byRow = await amendmentsFor(companyId, rows);
+    if (!rows || !rows.length || !(await folding(companyId))) return rows;
+    const id = String(companyId);
+    const { key } = config();
+    const byRow = await amendmentsFor(id, rows);
     return rows.map((row) => {
-        const amendments = row && rules.trustedAmendments(cfg.key, String(companyId), byRow.get(String(row._id)) || []);
+        const amendments = row && rules.trustedAmendments(key, id, byRow.get(String(row._id)) || []);
         return amendments && amendments.length ? rules.applyAmendments(plain(row), amendments) : row;
     });
 };
@@ -237,19 +308,17 @@ const foldOne = async (companyId, row) => (row ? (await foldRows(companyId, [row
 
 const hasAmendments = async (companyId) => Boolean(await db(companyId, AUDIT_LOGS, [{ action: rules.AMENDED_ACTION }, { _id: 1 }], 'findOne'));
 
-/* The same fold as applyAmendments, for filters that must see the current state before paging. */
-const foldStages = () => {
-    const rowField = (field) => ({ $reduce: { input: '$_amendments', initialValue: `$${field}`, in: { $ifNull: [`$$this.meta.setRow.${field}`, '$$value'] } } });
-    return [
-        { $set: { _auditId: { $toString: '$_id' } } },
-        { $lookup: { from: dbCollections.AUDIT_LOGS, localField: '_auditId', foreignField: 'meta.amends', as: '_amendments', pipeline: [{ $match: { action: rules.AMENDED_ACTION, 'chain.seq': { $gte: 0 } } }] } },
-        { $set: { _amendments: { $sortArray: { input: '$_amendments', sortBy: { 'chain.seq': 1 } } } } },
-        { $set: {
-            meta: { $reduce: { input: '$_amendments', initialValue: { $ifNull: ['$meta', {}] }, in: { $mergeObjects: ['$$value', { $ifNull: ['$$this.meta.set', {}] }] } } },
-            ...Object.fromEntries(rules.AMENDABLE_ROW_FIELDS.map((field) => [field, rowField(field)])),
-        } },
-        { $unset: ['_auditId', '_amendments'] },
-    ];
+/* Rows a chained change could have moved into a filter; the caller re-checks each one on its verified state. */
+const amendedIdsMatching = async (companyId, { entityType, entityId, undone, term }) => {
+    const or = [];
+    if (entityType) or.push({ 'meta.setRow.entityType': entityType });
+    if (entityId) or.push({ 'meta.setRow.entityId': entityId });
+    if (undone) or.push({ 'meta.set.undoneAt': { $exists: true, $ne: null } });
+    if (term) or.push({ 'meta.setRow.entityName': { $regex: term, $options: 'i' } });
+    if (!or.length) return [];
+    const found = (await db(companyId, AUDIT_LOGS, [{ action: rules.AMENDED_ACTION, 'chain.seq': { $gte: 0 }, $or: or }, { 'meta.amends': 1 }], 'find')) || [];
+    const ids = [...new Set(found.map(plain).map((a) => String(a.meta && a.meta.amends)))];
+    return ids.filter((value) => /^[0-9a-fA-F]{24}$/.test(value)).map((value) => new mongoose.Types.ObjectId(value));
 };
 
 const newestAnchor = async (companyId, key) => {
@@ -260,13 +329,17 @@ const newestAnchor = async (companyId, key) => {
 
 const cursors = new Map();
 
-/* A remembered position is trusted only while the row it names is unchanged and nothing below it is missing. */
-const positionHolds = async (companyId, start, position) => {
+/*
+ * A remembered position is trusted only while the row it names is unchanged and nothing is missing from the
+ * newest stretch below it; a gap further down is the re-walk's to find.
+ */
+const positionHolds = async (companyId, start, position, countWindow) => {
     if (!position || position.seq <= start.seq) return false;
     const row = plain(await db(companyId, AUDIT_LOGS, [{ 'chain.seq': position.seq }], 'findOne'));
     if (!row || !row.chain || row.chain.hash !== position.hash) return false;
-    const count = await db(companyId, AUDIT_LOGS, [{ 'chain.seq': { $gt: start.seq, $lte: position.seq } }], 'countDocuments');
-    return count === position.seq - start.seq;
+    const lower = Math.max(start.seq, position.seq - countWindow);
+    const count = await db(companyId, AUDIT_LOGS, [{ 'chain.seq': { $gt: lower, $lte: position.seq } }], 'countDocuments');
+    return count === position.seq - lower;
 };
 
 const headBreak = async (companyId, key, start, last, head) => {
@@ -310,7 +383,7 @@ const report = (start, last, complete, brokenAt, checked) => ({
  * rows cost one step each; and a re-walk that re-checks the stretch up to the tip a budget at a time, starting
  * over each time it reaches it. Nothing held in the database can move either of them.
  */
-const walk = async (companyId, key, { budget, pageSize, resume }) => {
+const walk = async (companyId, key, { budget, pageSize, resume, countWindow }) => {
     const [companyHead, globalHead] = await Promise.all([readHead(companyId), readHead(companyId, GOLBAL)]);
     const anchor = await newestAnchor(companyId, key);
     const start = anchor || rules.GENESIS;
@@ -323,7 +396,7 @@ const walk = async (companyId, key, { budget, pageSize, resume }) => {
     }
 
     const saved = cursors.get(companyId);
-    const cursor = saved && saved.anchorSeq === start.seq && await positionHolds(companyId, start, saved.tip)
+    const cursor = saved && saved.anchorSeq === start.seq && await positionHolds(companyId, start, saved.tip, countWindow)
         ? saved
         : { anchorSeq: start.seq, tip: start, rewalk: null };
     const ahead = await walkFrom(companyId, key, cursor.tip, { budget: Math.ceil(budget / 2), pageSize });
@@ -340,15 +413,15 @@ const walk = async (companyId, key, { budget, pageSize, resume }) => {
     return report(start, ahead.last, ahead.complete, brokenAt, checked);
 };
 
-const verifyChain = async (companyId, { budget = Infinity, pageSize = PAGE_SIZE, resume = false } = {}) => {
+const verifyChain = async (companyId, { budget = Infinity, pageSize = PAGE_SIZE, resume = false, countWindow = COUNT_WINDOW } = {}) => {
     const cfg = config();
     if (!cfg.keyValid) return { state: 'unavailable', brokenAt: null, verifiedThrough: null, anchorSeq: null, checked: 0 };
     const id = String(companyId);
-    const report = await walk(id, cfg.key, { budget, pageSize, resume });
-    if (report.brokenAt == null) return report;
+    const found = await walk(id, cfg.key, { budget, pageSize, resume, countWindow });
+    if (found.brokenAt == null) return found;
     const anchor = await newestAnchor(id, cfg.key);
     // A sweep that anchored and deleted while this walk ran looks like a gap at its start.
-    return anchor && anchor.seq > report.anchorSeq ? walk(id, cfg.key, { budget, pageSize, resume }) : report;
+    return anchor && anchor.seq > found.anchorSeq ? walk(id, cfg.key, { budget, pageSize, resume, countWindow }) : found;
 };
 
 /* The oldest chained row still kept, or the oldest anchor's cutoff once the sweep has taken them all. */
@@ -359,25 +432,45 @@ const chainStart = async (companyId) => {
     return anchor ? plain(anchor).cutoff || null : null;
 };
 
-const annotateIntegrity = async (companyId, entries, { budget = LIST_VERIFY_BUDGET } = {}) => {
+const annotateIntegrity = async (companyId, entries, { budget = LIST_VERIFY_BUDGET, countWindow = COUNT_WINDOW } = {}) => {
     const cfg = config();
     const chainedOnPage = entries.some((e) => rules.isChained(e.row));
     const chainStartedAt = entries.some((e) => !rules.isChained(e.row)) ? await chainStart(companyId) : null;
-    if (cfg.keyValid) mirrorSoon(companyId, cfg.key);
-    const report = chainedOnPage && cfg.keyValid ? await verifyChain(companyId, { budget, resume: true }) : null;
-    return rules.pageIntegrity({ key: cfg.key, companyId: String(companyId), report, chainStartedAt }, entries);
+    if (cfg.keyValid) mirrorSoon(companyId, cfg.key, written.get(String(companyId)));
+    const found = chainedOnPage && cfg.keyValid ? await verifyChain(companyId, { budget, resume: true, countWindow }) : null;
+    return rules.pageIntegrity({ key: cfg.key, companyId: String(companyId), report: found, chainStartedAt }, entries);
 };
 
-const readForList = async (companyId, ids) => {
+/* Rows folded from their verified changes, each with its integrity state when asked for. */
+const annotateRows = async (companyId, rows, { integrity = false } = {}) => {
+    if (!rows || !rows.length || !(await folding(companyId))) return rows || [];
+    const id = String(companyId);
+    const { key } = config();
+    const plainRows = rows.map(plain);
+    const amendments = await amendmentsFor(id, plainRows);
+    const entries = plainRows.map((row) => ({ row, amendments: amendments.get(String(row._id)) || [] }));
+    const states = integrity ? await annotateIntegrity(id, entries) : null;
+    return entries.map((e, i) => {
+        const folded = rules.applyAmendments(e.row, rules.trustedAmendments(key, id, e.amendments));
+        return states ? { ...folded, integrity: states[i] } : folded;
+    });
+};
+
+const readForList = async (companyId, ids, { integrity = isOn() } = {}) => {
     if (!ids.length) return [];
-    const cfg = config();
     const found = ((await db(companyId, AUDIT_LOGS, [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(String(id))) } }], 'find')) || []).map(plain);
     const byId = new Map(found.map((r) => [String(r._id), r]));
-    const rows = ids.map((id) => byId.get(String(id))).filter(Boolean);
-    const amendments = await amendmentsFor(companyId, rows);
-    const entries = rows.map((row) => ({ row, amendments: amendments.get(String(row._id)) || [] }));
-    const integrity = await annotateIntegrity(companyId, entries);
-    return entries.map((e, i) => ({ ...rules.applyAmendments(e.row, rules.trustedAmendments(cfg.key, String(companyId), e.amendments)), integrity: integrity[i] }));
+    return annotateRows(companyId, ids.map((id) => byId.get(String(id))).filter(Boolean), { integrity });
+};
+
+const countKept = (companyId, cutoff) => db(companyId, AUDIT_LOGS, [{ 'chain.seq': { $gte: 0 }, createdAt: { $lt: cutoff } }], 'countDocuments');
+
+const keptMessage = (companyId, kept, because) => `${LOG} audit prune ${companyId}: kept ${kept} chained row${kept === 1 ? '' : 's'} older than the cutoff, because ${because}`;
+
+/* With AUDIT_CHAIN off the sweep deletes no chained row, and says how many it left. */
+const reportKeptWhileOff = async (companyId, cutoff) => {
+    const kept = await countKept(companyId, cutoff);
+    if (kept) logger.warn(keptMessage(companyId, kept, 'AUDIT_CHAIN is off and chained rows are only swept behind an anchor'));
 };
 
 /*
@@ -387,8 +480,8 @@ const readForList = async (companyId, ids) => {
 const anchorBeforePrune = async (companyId, cutoff) => {
     const cfg = config();
     if (!cfg.keyValid) {
-        const kept = await db(companyId, AUDIT_LOGS, [{ 'chain.seq': { $gte: 0 }, createdAt: { $lt: cutoff } }], 'countDocuments');
-        if (kept) logger.error(`${LOG} audit prune ${companyId}: kept ${kept} chained rows older than the cutoff, since no anchor can be written without AUDIT_CHAIN_KEY`);
+        const kept = await countKept(companyId, cutoff);
+        if (kept) logger.error(keptMessage(companyId, kept, 'no anchor can be written without AUDIT_CHAIN_KEY'));
         return null;
     }
     const [row] = (await db(companyId, AUDIT_LOGS, [{ 'chain.seq': { $gte: 0 }, createdAt: { $lt: cutoff } }, { chain: 1 }, { sort: { createdAt: -1, 'chain.seq': -1 }, limit: 1 }], 'find')) || [];
@@ -411,6 +504,6 @@ const pruneFilter = (anchor, cutoff) => (anchor
 
 module.exports = {
     QUEUE_LIMIT, WRITE_TIMEOUT_MS,
-    isOn, config, logBootState, saveAuditRow, amend, foldRows, foldOne, hasAmendments, foldStages,
-    verifyChain, annotateIntegrity, readForList, mirrorHead, flushMirrors, anchorBeforePrune, pruneFilter,
+    isOn, config, logBootState, saveAuditRow, amend, folding, hasChainHistory, foldRows, foldOne, hasAmendments, amendedIdsMatching,
+    verifyChain, annotateIntegrity, annotateRows, readForList, mirrorHead, flushMirrors, reportKeptWhileOff, anchorBeforePrune, pruneFilter,
 };

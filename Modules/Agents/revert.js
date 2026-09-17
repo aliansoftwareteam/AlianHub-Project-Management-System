@@ -69,10 +69,16 @@ const revertRun = async (companyId, runId, { actor, isPrivileged, ip }) => {
     }
 
     const result = { reverted, alreadyUndone: rows.length - pending.length, failed, windowEndsAt, undoUntil: check.undoUntil };
-    await runs.patch(companyId, run._id, { revertedAt: new Date(), revertedBy: String(actor.userId), revert: { reverted, failed }, 'episode.reverted': true });
+    // A run with an action still in place is not reverted, so it can be reverted again once the cause is fixed.
+    const complete = failed.length === 0;
+    await runs.patch(companyId, run._id, complete
+        ? { revertedAt: new Date(), revertedBy: String(actor.userId), revert: { reverted, failed }, 'episode.reverted': true }
+        : { revert: { reverted, failed } });
     await audit.recordRunReverted(companyId, actor, { runId: String(run._id), agentId: run.agentId, agentName: run.agentName, reverted, failed, ip });
-    try { await memory.recordEpisode({ companyId, projectId: String(run.projectId || ''), runId: String(run._id), patch: { reverted: true } }); }
-    catch (e) { logger.error(`[agent-revert] ${run._id}: episode not updated: ${e.message}`); }
+    if (complete) {
+        try { await memory.recordEpisode({ companyId, projectId: String(run.projectId || ''), runId: String(run._id), patch: { reverted: true } }); }
+        catch (e) { logger.error(`[agent-revert] ${run._id}: episode not updated: ${e.message}`); }
+    }
     return result;
 };
 
