@@ -282,6 +282,15 @@ describe('verifying the chain', () => {
         expect(await chain.annotateIntegrity(CID, page())).toEqual([{ state: 'broken', brokenAt: 2 }, { state: 'broken', brokenAt: 2 }]);
     });
 
+    it('reports a changed row on the page at once, before the re-walk reaches it', async () => {
+        await writeRows(1, 6);
+        const page = () => [5, 6].map((seq) => ({ row: bySeq(seq), amendments: [] }));
+        expect(await chain.annotateIntegrity(CID, page(), { budget: 20 })).toEqual([{ state: 'verified' }, { state: 'verified' }]);
+
+        bySeq(5).meta = { ...bySeq(5).meta, fields: ['owner'] };
+        expect(await chain.annotateIntegrity(CID, page(), { budget: 2 })).toEqual([{ state: 'broken', brokenAt: 5 }, { state: 'broken', brokenAt: 5 }]);
+    });
+
     it('notices a row deleted below the part it has already verified', async () => {
         await writeRows(1, 6);
         const page = () => [5, 6].map((seq) => ({ row: bySeq(seq), amendments: [] }));

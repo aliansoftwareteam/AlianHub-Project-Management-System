@@ -283,11 +283,11 @@ const verifyChain = async (companyId, { budget = Infinity, pageSize = PAGE_SIZE,
     return anchor && anchor.seq > report.anchorSeq ? walk(id, cfg.key, { budget, pageSize, resume }) : report;
 };
 
-const annotateIntegrity = async (companyId, entries) => {
+const annotateIntegrity = async (companyId, entries, { budget = LIST_VERIFY_BUDGET } = {}) => {
     if (!entries.some((e) => rules.isChained(e.row))) return entries.map(() => ({ state: rules.INTEGRITY.UNCHAINED }));
     const cfg = config();
     if (cfg.keyValid) mirrorAtMostOncePerInterval(companyId, cfg.key);
-    const report = cfg.keyValid ? await verifyChain(companyId, { budget: LIST_VERIFY_BUDGET, resume: true }) : null;
+    const report = cfg.keyValid ? await verifyChain(companyId, { budget, resume: true }) : null;
     return rules.pageIntegrity({ key: cfg.key, companyId: String(companyId), report }, entries);
 };
 
