@@ -122,6 +122,67 @@ describe('KNOWLEDGE_RETRIEVAL', () => {
     });
 });
 
+describe('KNOWLEDGE_INDEXER', () => {
+    const INDEXER_ENV = process.env.KNOWLEDGE_INDEXER;
+    const indexerWith = (value) => mockDb.seed(SCHEMA_TYPE.COMPANIES, value === undefined ? { _id: C } : { _id: C, knowledgeIndexer: value });
+
+    beforeEach(() => { delete process.env.KNOWLEDGE_INDEXER; });
+    afterAll(() => {
+        if (INDEXER_ENV === undefined) delete process.env.KNOWLEDGE_INDEXER;
+        else process.env.KNOWLEDGE_INDEXER = INDEXER_ENV;
+    });
+
+    it.each([
+        [undefined, 'off'],
+        ['off', 'off'],
+        [' Tenant ', 'tenant'],
+        ['ALL', 'all'],
+        ['on', 'off'],
+    ])('reads %p as %p, independently of KNOWLEDGE_RETRIEVAL', (value, expected) => {
+        process.env.KNOWLEDGE_RETRIEVAL = 'all';
+        if (value !== undefined) process.env.KNOWLEDGE_INDEXER = value;
+        expect(flag.indexer.mode()).toBe(expected);
+    });
+
+    it.each([
+        ['off', { mode: 'on' }, false],
+        ['tenant', undefined, false],
+        ['tenant', { mode: ' ON ' }, true],
+        ['tenant', 'off', false],
+        ['all', undefined, true],
+        ['all', { mode: 'OFF' }, false],
+        ['all', false, false],
+    ])('%s with the company knowledgeIndexer %p is %p', async (env, stored, expected) => {
+        process.env.KNOWLEDGE_INDEXER = env;
+        indexerWith(stored);
+        expect(await flag.indexer.enabledFor(C)).toBe(expected);
+    });
+
+    it('reads its own company field, not the retrieval switch', async () => {
+        process.env.KNOWLEDGE_RETRIEVAL = 'tenant';
+        process.env.KNOWLEDGE_INDEXER = 'tenant';
+        mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C, knowledgeRetrieval: { mode: 'on' } });
+        expect(await flag.enabledFor(C)).toBe(true);
+        expect(await flag.indexer.enabledFor(C)).toBe(false);
+    });
+
+    it('never reads the company row while the installation is off', async () => {
+        indexerWith({ mode: 'on' });
+        expect(await flag.indexer.enabledFor(C)).toBe(false);
+        expect(mockDb.calls).toEqual([]);
+    });
+
+    it('survives the company cache like the retrieval switch', () => {
+        const mongoose = require('mongoose');
+        const NodeCache = require('node-cache');
+        const { companies } = require('../utils/mongo-handler/createSchema');
+        const Company = new mongoose.Mongoose().model('companies', companies, 'companies');
+        const row = Company.hydrate({ _id: C, knowledgeIndexer: { mode: 'on' } });
+        expect(() => new NodeCache().set(`companyData_${C}`, row)).not.toThrow();
+        expect(row.knowledgeIndexer).toEqual({ mode: 'on' });
+    });
+});
+
 describe('the company switch in the schema', () => {
     it('survives the company cache: a company row carrying it can still be cloned into node-cache', () => {
         const mongoose = require('mongoose');

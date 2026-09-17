@@ -5,6 +5,7 @@ const socketEmitter = require('../../event/socketEventEmitter');
 const audit = require('./agentAudit');
 const budget = require('./budget');
 const scope = require('./scope');
+const { emitPageChange } = require('../Pages/helpers/pageEvents');
 
 // Undo replays the inverse action and logs it as the person who pressed Undo.
 // Only the descriptors perform() wrote are understood; anything else is
@@ -88,6 +89,7 @@ const inverses = {
     },
     async page(companyId, u) {
         await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PAGES, data: [{ _id: oid(u.pageId) }, { $set: { deletedStatusKey: 1 } }] }, 'updateOne');
+        emitPageChange(companyId, 'update', { _id: String(u.pageId), deletedStatusKey: 1, deleted: 1, ids: [String(u.pageId)] });
         return { pageId: u.pageId, deleted: true };
     },
 };

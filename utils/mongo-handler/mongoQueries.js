@@ -110,6 +110,9 @@ const {
     formSubmissionsSchema,
     projectContractsSchema,
     projectInvoicesSchema,
+    knowledgeChunksSchema,
+    knowledgeIndexStateSchema,
+    knowledgeExclusionsSchema,
     permissionDecisionsSchema,
     auditChainHeadsSchema,
     auditChainAnchorsSchema
@@ -336,6 +339,12 @@ exports.checkType = (type) => {
             return projectContractsSchema
         case SCHEMA_TYPE.PROJECT_INVOICES:
             return projectInvoicesSchema
+        case SCHEMA_TYPE.KNOWLEDGE_CHUNKS:
+            return knowledgeChunksSchema
+        case SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE:
+            return knowledgeIndexStateSchema
+        case SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS:
+            return knowledgeExclusionsSchema
         case SCHEMA_TYPE.PERMISSION_DECISIONS:
             return permissionDecisionsSchema
         case SCHEMA_TYPE.AUDIT_CHAIN_HEADS:
@@ -568,6 +577,12 @@ exports.tableType = (type) => {
                 return `${dbCollections.PROJECT_CONTRACTS}`
         case SCHEMA_TYPE.PROJECT_INVOICES:
                 return `${dbCollections.PROJECT_INVOICES}`
+        case SCHEMA_TYPE.KNOWLEDGE_CHUNKS:
+                return `${dbCollections.KNOWLEDGE_CHUNKS}`
+        case SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE:
+                return `${dbCollections.KNOWLEDGE_INDEX_STATE}`
+        case SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS:
+                return `${dbCollections.KNOWLEDGE_EXCLUSIONS}`
         case SCHEMA_TYPE.PERMISSION_DECISIONS:
                 return `${dbCollections.PERMISSION_DECISIONS}`
         case SCHEMA_TYPE.AUDIT_CHAIN_HEADS:

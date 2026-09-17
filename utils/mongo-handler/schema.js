@@ -1471,6 +1471,51 @@ const schema = {
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Retrieval corpus written by Modules/Knowledge/ingest: one row per chunk of a source document.
+    knowledgeChunks: {
+        companyId: { type: String, required: true },
+        sourceType: { type: String, required: true },
+        sourceId: { type: String, required: true },
+        ordinal: { type: Number, required: true },
+        projectId: { type: mongoose.Schema.Types.ObjectId, required: false, default: null },
+        visibility: { type: String, required: false, default: 'project' },
+        createdBy: { type: String, required: false, default: '' },
+        // 'human' | 'agent'
+        authorKind: { type: String, required: false, default: 'human' },
+        title: { type: String, required: false, default: '' },
+        headingPath: { type: [String], required: false, default: [] },
+        text: { type: String, required: false, default: '' },
+        contentHash: { type: String, required: true },
+        embeddingModel: { type: String, required: false, default: null },
+        deleted: { type: Boolean, required: false, default: false },
+        deletedAt: { type: Date, required: false, default: null },
+        // The source row's updatedAt when it was read, so a slower, older read never overwrites a newer one.
+        sourceUpdatedAt: { type: Date, required: false },
+    },
+    // What an erasure keeps out of the index for good: one document, or one person's private pages.
+    knowledgeExclusions: {
+        companyId: { type: String, required: true },
+        // 'document' | 'author'
+        kind: { type: String, required: true },
+        sourceType: { type: String, required: false, default: '' },
+        sourceId: { type: String, required: false, default: '' },
+        userId: { type: String, required: false, default: '' },
+        reason: { type: String, required: false, default: 'erased' },
+    },
+    // Backfill progress per source type, one row per tenant database.
+    knowledgeIndexState: {
+        companyId: { type: String, required: true },
+        sourceType: { type: String, required: true },
+        // 'running' | 'complete' | 'failed'
+        status: { type: String, required: false, default: 'running' },
+        cursor: { type: String, required: false, default: '' },
+        indexed: { type: Number, required: false, default: 0 },
+        skipped: { type: Number, required: false, default: 0 },
+        startedAt: { type: Date, required: false },
+        finishedAt: { type: Date, required: false, default: null },
+        lastRunAt: { type: Date, required: false },
+        error: { type: String, required: false, default: '' },
+    },
     // Submissions arriving through a public intake form
     intakeItems: {
         publicShareId: { type: mongoose.Schema.Types.ObjectId, required: true },
@@ -1848,6 +1893,11 @@ const schema = {
         // "tenant" or "all"; absent is off under "tenant". An Object, not a nested path: a nested
         // path makes the company document a getter node-cache cannot clone, and every company read fails.
         knowledgeRetrieval: {
+            type: Object,
+            required: false
+        },
+        // { mode: 'on' | 'off' } — read by Modules/Knowledge/flag.js while KNOWLEDGE_INDEXER is "tenant" or "all".
+        knowledgeIndexer: {
             type: Object,
             required: false
         },

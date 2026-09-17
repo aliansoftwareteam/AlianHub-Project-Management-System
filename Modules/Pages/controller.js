@@ -4,7 +4,7 @@ const { tenantOf } = require("../../Config/tenant");
 const { fail } = require("../../Config/respond");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
-const socketEmitter = require("../../event/socketEventEmitter");
+const { emitPageChange } = require('./helpers/pageEvents');
 const {
     validatePageInput,
     contentTooLarge,
@@ -24,14 +24,6 @@ const {
 } = require('./helpers/pageContent');
 const { composePage, isAiConfigured } = require('./helpers/pageAi');
 const { projectAccess, isCompanyAdmin, isCompanyMember, visibleProjectIds } = require('../../Config/contentAccess');
-
-const emitPageChange = (type, data) => {
-    try {
-        socketEmitter.emit(type, { type, data, module: 'pages' });
-    } catch (error) {
-        logger.error(`ERROR emitting page ${type}: ${error.message}`);
-    }
-};
 
 // There is no version history. It was removed rather than fixed: it recorded a snapshot
 // per save with no way to see what changed. The `pageVersions` collection stays registered
@@ -180,7 +172,7 @@ exports.createPage = async (req, res) => {
             doc.parentPageId = new mongoose.Types.ObjectId(parentPageId);
         }
         const created = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PAGES, data: doc }, 'save');
-        emitPageChange('insert', created);
+        emitPageChange(companyId, 'insert', created);
         return res.send({ status: true, statusText: 'Page created.', data: created });
     } catch (error) {
         logger.error(`ERROR in create page: ${error.message}`);
@@ -330,7 +322,7 @@ exports.updatePage = async (req, res) => {
             data: [{ _id: pageObjId }, { $set: update }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
 
-        emitPageChange('update', updated);
+        emitPageChange(companyId, 'update', updated);
         return res.send({ status: true, statusText: 'Page saved.', data: updated });
     } catch (error) {
         logger.error(`ERROR in update page: ${error.message}`);
@@ -373,7 +365,7 @@ exports.markReviewed = async (req, res) => {
         });
         const data = typeof updated.toObject === 'function' ? updated.toObject() : updated;
         data.reviewState = reviewState(data, now);
-        emitPageChange('update', data);
+        emitPageChange(companyId, 'update', data);
         return res.send({ status: true, statusText: 'Page marked as reviewed.', data });
     } catch (error) {
         logger.error(`ERROR in mark page reviewed: ${error.message}`);
@@ -398,7 +390,7 @@ exports.approvePage = async (req, res) => {
             return res.send({ status: false, statusText: 'Only agent-drafted pages need approval.' });
         }
         const updated = await patchPage(companyId, id, { agentStatus: 'approved', approvedBy: userId, updatedBy: userId });
-        emitPageChange('update', updated);
+        emitPageChange(companyId, 'update', updated);
         return res.send({ status: true, statusText: 'Page approved.', data: updated });
     } catch (error) {
         logger.error(`ERROR in approve page: ${error.message}`);
@@ -421,7 +413,7 @@ exports.restorePage = async (req, res) => {
             return res.send({ status: false, statusText: 'Page not found in trash.' });
         }
         const updated = await patchPage(companyId, id, { deletedStatusKey: 0, updatedBy: userId });
-        emitPageChange('insert', updated);
+        emitPageChange(companyId, 'insert', updated);
         return res.send({ status: true, statusText: 'Page restored.', data: updated });
     } catch (error) {
         logger.error(`ERROR in restore page: ${error.message}`);
@@ -497,7 +489,7 @@ exports.deletePage = async (req, res) => {
             type: SCHEMA_TYPE.PAGES,
             data: [{ _id: { $in: doomed } }, { $set: { deletedStatusKey: 1 } }],
         }, 'updateMany');
-        emitPageChange('update', { _id: id, deletedStatusKey: 1, deleted: doomed.length });
+        emitPageChange(companyId, 'update', { _id: id, deletedStatusKey: 1, deleted: doomed.length, ids: doomed.map(String) });
         return res.send({ status: true, statusText: 'Page deleted.', data: { deleted: doomed.length } });
     } catch (error) {
         logger.error(`ERROR in delete page: ${error.message}`);
