@@ -176,14 +176,19 @@ describe('the audit hash chain through real routes', () => {
         expect(restored.data.find((r) => r._id === String(third._id)).integrity).toEqual({ state: 'verified' });
     });
 
-    it('verifies a refusal whose action held a lone surrogate, as Mongo stored it', async () => {
-        const res = await agentApi.patch('/api/v2/tasks', { action: '\ud800', taskId: state.tasks[0]._id });
-        expect(res.status).toBe(403);
-        const refusal = await waitFor(() => audits.findOne({ action: 'agent.action_refused', 'meta.action': 'tasks.\ufffd', createdAt: { $gte: startedAt } }), 'the refusal row');
-        expect(refusal.chain.seq).toBeGreaterThan(0);
+    it('verifies a row whose text held a lone surrogate, as Mongo stored it', async () => {
+        const proposal = (await agentApi.post('/api/v2/agents/proposals', {
+            agentId: actionRow.meta.agentId, taskId: state.tasks[0]._id, projectId: state.projects.shared._id, what: '[QA chain] declined', why: 'integration',
+            changes: [{ action: 'task.comment', params: { taskId: state.tasks[0]._id, body: '[QA chain] never posted' }, label: 'Comment' }],
+        })).body.data;
+        const declined = await owner.post(`/api/v2/agents/proposals/${proposal._id}/decline`, { reason: 'odd \ud800 reason' });
+        expect(declined.body.status).toBe(true);
+        const decided = await waitFor(() => audits.findOne({ action: 'agent.proposal_decided', entityId: String(proposal._id) }), 'the decision row');
+        expect(decided.meta.decision).toBe('declined: odd \ufffd reason');
+        expect(decided.chain.seq).toBeGreaterThan(0);
 
-        const body = await list({ gated: 'true' });
-        expect(body.data.find((r) => r._id === String(refusal._id)).integrity).toEqual({ state: 'verified' });
+        const body = await list({ action: 'agent.proposal_decided' });
+        expect(body.data.find((r) => r._id === String(decided._id)).integrity).toEqual({ state: 'verified' });
     });
 
     it('filters to permission refusals, and reads an unchained row written after the chain started as broken', async () => {
