@@ -1,6 +1,6 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
 // language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type, $set/$inc/$push,
-// conditional findOneAndUpdate, findOneAndDelete, deleteOne, deleteMany, sort/limit on find, $match/$group aggregate, declared unique indexes that
+// conditional findOneAndUpdate, updateOne with upsert and $setOnInsert, findOneAndDelete, deleteOne, deleteMany, sort/limit on find, $match/$group aggregate, declared unique indexes that
 // reject a duplicate save with E11000) so a test can assert on what was written.
 
 let seq = 1;
@@ -30,7 +30,7 @@ const matches = (doc, filter = {}) => Object.entries(filter).every(([key, cond])
             const want = arg instanceof Date ? arg.getTime() : hex(arg);
             if (op === '$in') return arg.map(String).includes(String(value));
             if (op === '$nin') return !arg.map(String).includes(String(value));
-            if (op === '$ne') return value !== want;
+            if (op === '$ne') return Array.isArray(value) ? !value.map(hex).includes(want) : value !== want;
             if (op === '$gte') return value >= want;
             if (op === '$gt') return value > want;
             if (op === '$lte') return value <= want;
@@ -60,6 +60,15 @@ const apply = (doc, update = {}) => {
     Object.entries(update.$push || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = [...(t[l] || []), ...(v && Array.isArray(v.$each) ? v.$each : [v])]; }));
     Object.entries(update.$unset || {}).forEach(([k]) => write(doc, k, (t, l) => { delete t[l]; }));
     return doc;
+};
+
+const isOperatorObject = (v) => v && typeof v === 'object' && !(v instanceof Date) && !Array.isArray(v) && Object.keys(v).some((k) => k.startsWith('$'));
+
+/* An upsert inserts the filter's plain equality fields, then $setOnInsert, then the update. */
+const upserted = (filter = {}, update = {}) => {
+    const equalities = Object.entries(filter).filter(([key, value]) => !key.startsWith('$') && !key.includes('.') && !isOperatorObject(value));
+    const doc = { _id: nextId(), ...Object.fromEntries(equalities) };
+    return apply(apply(doc, { $set: update.$setOnInsert || {} }), update);
 };
 
 const sortable = (v) => (v instanceof Date ? v.getTime() : (v == null ? '' : v));
@@ -134,7 +143,16 @@ const create = () => {
         if (method === 'deleteOne') { const index = list.findIndex((d) => matches(d, data[0])); if (index !== -1) list.splice(index, 1); return { deletedCount: index === -1 ? 0 : 1 }; }
         if (method === 'deleteMany') { const kept = list.filter((d) => !matches(d, data[0])); store[type] = kept; return { deletedCount: list.length - kept.length }; }
         if (method === 'findOneAndUpdate') { const doc = list.find((d) => matches(d, data[0])); if (!doc) return null; apply(doc, data[1]); return clone(doc); }
-        if (method === 'updateOne') { const doc = list.find((d) => matches(d, data[0])); if (doc) apply(doc, data[1]); return { modifiedCount: doc ? 1 : 0 }; }
+        if (method === 'updateOne') {
+            const doc = list.find((d) => matches(d, data[0]));
+            if (doc) { apply(doc, data[1]); return { modifiedCount: 1 }; }
+            if (!(data[2] && data[2].upsert)) return { modifiedCount: 0 };
+            const inserted = upserted(data[0], data[1]);
+            const hit = collides(type, inserted);
+            if (hit) throw duplicateKey(hit.fields);
+            list.push(inserted);
+            return { modifiedCount: 0, upsertedCount: 1, upsertedId: inserted._id };
+        }
         if (method === 'updateMany') { const hit = list.filter((d) => matches(d, data[0])); hit.forEach((d) => apply(d, data[1])); return { modifiedCount: hit.length }; }
         if (method === 'findOneAndDelete') { const at = list.findIndex((d) => matches(d, data[0])); return at === -1 ? null : clone(list.splice(at, 1)[0]); }
         if (method === 'deleteOne') { const at = list.findIndex((d) => matches(d, data[0])); if (at !== -1) list.splice(at, 1); return { deletedCount: at === -1 ? 0 : 1 }; }

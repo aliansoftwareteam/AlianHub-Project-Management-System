@@ -300,6 +300,10 @@ projectInvoicesSchema.index({ ProjectID: 1, deletedStatusKey: 1, issuedDate: -1 
 // would collide the moment a second project raised its first invoice.
 projectInvoicesSchema.index({ ProjectID: 1, number: 1 }, { unique: true });
 
+const permissionDecisionsSchema = new Schema(schema.permissionDecisions, {strict: true, timestamps: false});
+permissionDecisionsSchema.index({ day: 1, mode: 1, method: 1, route: 1, permission: 1, role: 1, scope: 1, reason: 1 }, { unique: true, name: 'decision_key' });
+permissionDecisionsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+
 // One combined text index per collection, for global search and knowledge retrieval.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -427,6 +431,7 @@ module.exports = {
     formSubmissionsSchema,
     projectContractsSchema,
     projectInvoicesSchema,
+    permissionDecisionsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

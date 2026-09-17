@@ -70,6 +70,12 @@ const CATALOG = [
         validate: allowlistError,
     }),
     field('HELMET_ENABLED', 'security', 'boolean', { default: 'true', label: 'Security response headers', restart: true }),
+    field('PERMISSION_ENFORCEMENT_MODE', 'security', 'select', {
+        default: 'off',
+        options: ['off', 'report', 'enforce'],
+        label: 'Permission checks for browser sessions',
+        help: 'The default for every workspace; a workspace can set its own. Off lets browser sessions through as before, report lets them through and records what would be refused, enforce refuses. API tokens are always enforced.',
+    }),
 ];
 
 const byKey = new Map(CATALOG.map((f) => [f.key, f]));
