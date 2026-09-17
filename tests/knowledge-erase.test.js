@@ -155,7 +155,7 @@ describe('erasing comments and transcripts', () => {
 
         expect(await eraseDocument(C, { sourceType: 'comment', sourceId: String(erased._id) })).toEqual({ erased: 1 });
         await indexer.syncComment(C, String(erased._id));
-        await indexer.reindexTaskComments(C, TASK, { restored: true });
+        await indexer.reindexTask(C, TASK, { moved: true });
         await backfill.backfillCompany(C, { batchSize: 10 });
 
         expect(storedOf('comment', erased._id)).toEqual([]);
@@ -174,17 +174,43 @@ describe('erasing comments and transcripts', () => {
         expect(storedOf('transcript', kept._id).length).toBeGreaterThan(0);
     });
 
-    it("erasing a person keeps its meaning, their private pages only: the comments they wrote and the calls they were on stay", async () => {
-        const comment = await seedComment({ userId: ALICE });
+    it("erasing a person removes their private pages and the comments they wrote, and keeps the calls they were on and everyone else's comments", async () => {
+        const mine = await seedComment({ userId: ALICE });
+        const theirs = await seedComment({ userId: BOB });
         const call = await seedCall({ createdBy: ALICE });
         const secret = await indexed({ createdBy: ALICE, visibility: 'private' });
+        const shared = await indexed({ createdBy: ALICE });
 
-        await erasePerson(C, ALICE);
-        await indexer.syncComment(C, String(comment._id));
+        const result = await erasePerson(C, ALICE);
         await indexer.syncTranscript(C, String(call._id));
 
+        expect(result).toEqual({ erased: 3 });
         expect(stored(secret._id)).toEqual([]);
-        expect(storedOf('comment', comment._id).filter((c) => !c.deleted)).toHaveLength(1);
+        expect(storedOf('comment', mine._id)).toEqual([]);
+        expect(storedOf('comment', theirs._id).filter((c) => !c.deleted)).toHaveLength(1);
+        expect(stored(shared._id).filter((c) => !c.deleted)).toHaveLength(2);
         expect(storedOf('transcript', call._id).filter((c) => !c.deleted).length).toBeGreaterThan(0);
+        expect(mockDb.store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS]).toEqual([expect.objectContaining({ kind: 'author', userId: ALICE })]);
+    });
+
+    it("keeps an erased person's comments out after a sync, a project restore, a task restore, a backfill and a rejoin", async () => {
+        const events = require('../Modules/Knowledge/ingest/events');
+        const comment = await seedComment({ userId: ALICE });
+        expect(storedOf('comment', comment._id)).toHaveLength(1);
+        await erasePerson(C, ALICE);
+        const taskRow = () => mockDb.store[SCHEMA_TYPE.TASKS].find((t) => t._id === TASK);
+
+        await indexer.syncComment(C, String(comment._id));
+        await indexer.tombstoneProject(C, PROJECT);
+        await indexer.reindexProject(C, PROJECT);
+        taskRow().deletedStatusKey = 1;
+        await indexer.reindexTask(C, TASK);
+        taskRow().deletedStatusKey = 0;
+        await indexer.reindexTask(C, TASK);
+        await backfill.backfillCompany(C, { batchSize: 10 });
+        await events.handle({ type: 'member.activated', companyId: C, entity: { kind: 'member', id: ALICE }, data: { userId: ALICE } });
+        await events.drain();
+
+        expect(storedOf('comment', comment._id)).toEqual([]);
     });
 });

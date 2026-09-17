@@ -82,7 +82,7 @@ beforeEach(() => {
     mockDb.uniqueFromSchema(CHUNKS, knowledgeChunksSchema);
     mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C, knowledgeIndexer: { mode: 'on' } });
     mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: OFF_COMPANY });
-    ['page', 'comment', 'transcript'].forEach((sourceType) => mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType, status: 'complete' }));
+    ['page', 'comment', 'transcript'].forEach((sourceType) => mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType, status: 'complete', lastSeenOnAt: new Date() }));
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P1, ProjectName: 'One', isPrivateSpace: false, AssigneeUserId: [], deletedStatusKey: 0 });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P2, ProjectName: 'Two', isPrivateSpace: false, AssigneeUserId: [], deletedStatusKey: 0 });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, status: 2, isDelete: false, roleType: 1 });

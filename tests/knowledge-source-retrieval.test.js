@@ -62,7 +62,7 @@ const candidates = async (userId, query, sourceType) => {
     const set = await resolveVisibleSet({ companyId: C, caller: { kind: 'user', userId }, scope: { sourceTypes: [sourceType] } });
     return (await lexical.search({ companyId: C, query, filter: filterFor(set, { chunkSources: SOURCES }), limit: 20 })).map((p) => p.sourceId);
 };
-const indexReady = (sourceType, status = 'complete') => mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType, status });
+const indexReady = (sourceType, status = 'complete') => mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType, status, lastSeenOnAt: new Date() });
 
 beforeAll(() => { process.env.KNOWLEDGE_INDEXER = 'tenant'; });
 afterAll(() => {
