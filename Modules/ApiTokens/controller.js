@@ -4,7 +4,11 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { myCache } = require("../../Config/config");
-const { generateToken, hashToken, tokenPrefixOf, looksLikeToken, validateCreateInput, isExpired } = require('./helpers/apiTokenRules');
+const {
+    SCOPES, MIN_EXPIRY_DAYS, MAX_EXPIRY_DAYS, STRICT_GRACE_DAYS, LAST_USED_WRITE_INTERVAL_MS,
+    generateToken, hashToken, tokenPrefixOf, looksLikeToken, isStrict, validateCreateInput, isExpired, effectiveScopes, graceStanding, lastUsedIsStale,
+} = require('./helpers/apiTokenRules');
+const { strictSince } = require('./helpers/strictSince');
 
 // Resolve the acting user. These routes now sit behind the JWT middleware
 // (Config/setMiddleware.js) which populates req.uid; the body userData
@@ -19,11 +23,11 @@ const actingUserId = (req) => {
 // only its sha256 hash is stored. The prefix (first 12 chars) stays
 // visible so users can match a token in hand against the list.
 
-const maskToken = (doc) => ({
+const maskToken = (doc, standing = null) => ({
     _id: doc._id,
     name: doc.name,
     prefix: doc.prefix,
-    scopes: doc.scopes || [],
+    scopes: effectiveScopes(doc),
     active: doc.active !== false,
     userId: doc.userId,
     kind: doc.kind || 'personal',
@@ -32,7 +36,13 @@ const maskToken = (doc) => ({
     expiresAt: doc.expiresAt || null,
     lastUsedAt: doc.lastUsedAt || null,
     createdAt: doc.createdAt,
+    graceState: standing && standing.state !== 'ok' ? standing.state : null,
+    graceEndsAt: standing && standing.state !== 'ok' ? standing.deadline : null,
 });
+
+const ymd = (date) => new Date(date).toISOString().slice(0, 10);
+
+const NO_EXPIRY_UPDATE = 'Under the token expiry rule a token without an expiry cannot be changed, only revoked. Create a new token with an expiry.';
 
 /* POST /api/v2/api-tokens  body: { name, scopes?, expiresInDays?, userData } */
 exports.createToken = async (req, res) => {
@@ -70,17 +80,18 @@ exports.createToken = async (req, res) => {
     }
 };
 
-/* POST /api/v2/api-tokens/mcp  body: { name, mode?, provider?, projectIds?, expiresInDays? }
+/* POST /api/v2/api-tokens/mcp  body: { name, mode?, provider?, projectIds?, expiresInDays?, scopes? (strict mode only) }
  * Mints a token for a CLI/coding agent: kind 'agent', read+write scopes, and the
  * account mode the run is attributed to. Returns the MCP URL to paste. */
 exports.createMcpToken = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
         const userId = actingUserId(req);
-        const { name, mode, provider, projectIds, expiresInDays, label } = req.body || {};
+        const { name, mode, provider, projectIds, expiresInDays, label, scopes: askedScopes } = req.body || {};
         if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and userId are required.' });
         if (req.apiToken) return res.status(403).send({ status: false, statusText: 'API tokens cannot mint tokens.' });
-        const check = validateCreateInput({ name: name || 'CLI agent', scopes: ['read', 'write'], expiresInDays });
+        const scopes = isStrict() && askedScopes !== undefined ? askedScopes : ['read', 'write'];
+        const check = validateCreateInput({ name: name || 'CLI agent', scopes, expiresInDays });
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
         const accounts = require('../Agents/accounts');
         const policy = await accounts.getPolicy(companyId);
@@ -91,7 +102,7 @@ exports.createMcpToken = async (req, res) => {
         const rawToken = generateToken();
         const doc = {
             name: String(name || 'CLI agent').trim(), tokenHash: hashToken(rawToken), prefix: tokenPrefixOf(rawToken),
-            scopes: ['read', 'write'], userId, active: true, kind: 'agent',
+            scopes, userId, active: true, kind: 'agent',
             agentAccount: { mode: wanted, provider: accounts.PROVIDERS.includes(provider) ? provider : 'claude-code', linkedAt: new Date(), label: String(label || name || '').slice(0, 80) },
             projectIds: Array.isArray(projectIds) ? projectIds.filter((id) => /^[0-9a-fA-F]{24}$/.test(String(id))).map(String) : [],
         };
@@ -123,14 +134,23 @@ exports.listTokens = async (req, res) => {
             type: SCHEMA_TYPE.API_TOKENS,
             data: [{ userId }, null, { sort: { createdAt: -1 } }],
         }, 'find');
-        return res.send({ status: true, statusText: 'Tokens fetched.', data: (tokens || []).map(maskToken) });
+        const strict = isStrict();
+        const since = strict ? await strictSince() : null;
+        const now = new Date();
+        const policy = {
+            strict, minExpiryDays: MIN_EXPIRY_DAYS, maxExpiryDays: MAX_EXPIRY_DAYS, scopes: [...SCOPES], graceDays: STRICT_GRACE_DAYS,
+            strictSince: since,
+        };
+        const data = (tokens || []).map((doc) => maskToken(doc, graceStanding(doc, { strict, strictSince: since, now })));
+        return res.send({ status: true, statusText: 'Tokens fetched.', data, policy });
     } catch (error) {
         logger.error(`ERROR in list api tokens: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };
 
-/* PUT /api/v2/api-tokens/:id  body: { name?, active? } */
+/* PUT /api/v2/api-tokens/:id  body: { name?, active? }. Under strict mode a token
+ * without an expiry may only be revoked, so it is replaced rather than kept. */
 exports.updateToken = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
@@ -149,9 +169,15 @@ exports.updateToken = async (req, res) => {
         if (!Object.keys(update).length) {
             return res.send({ status: false, statusText: 'Nothing to update.' });
         }
+        const filter = { _id: new mongoose.Types.ObjectId(id), userId };
+        const onlyRevoking = Object.keys(update).length === 1 && update.active === false;
+        if (isStrict() && !onlyRevoking) {
+            const owned = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.API_TOKENS, data: [filter] }, 'findOne');
+            if (owned && !owned.expiresAt) return res.send({ status: false, statusText: NO_EXPIRY_UPDATE });
+        }
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.API_TOKENS,
-            data: [{ _id: new mongoose.Types.ObjectId(id), userId }, { $set: update }, { returnDocument: 'after' }],
+            data: [filter, { $set: update }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
         if (!updated) {
             return res.send({ status: false, statusText: 'Token not found.' });
@@ -218,33 +244,46 @@ exports.listTokenLogs = async (req, res) => {
     }
 };
 
-/* Resolve a raw token to its document — used by the public-API middleware.
- * Returns the token doc or null. Bumps lastUsedAt fire-and-forget. */
-exports.verifyToken = async (companyId, rawToken) => {
-    if (!companyId || !looksLikeToken(rawToken)) return null;
+/* Resolve a raw token for the token middlewares: { token, refusal }. `refusal` is
+ * set only when the caller should be told why, never for an unknown token. */
+exports.resolveToken = async (companyId, rawToken) => {
+    if (!companyId || !looksLikeToken(rawToken)) return { token: null, refusal: null };
     try {
         const doc = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.API_TOKENS,
             data: [{ tokenHash: hashToken(rawToken), active: true }],
         }, 'findOne');
-        if (!doc || isExpired(doc)) return null;
-        // Throttled lastUsedAt bump: at most one write per token per minute,
-        // so high-frequency API clients don't turn every request into a
-        // Mongo write. (Cache miss after restart just means one extra write.)
-        const throttleKey = `patLastUsed:${companyId}:${doc._id}`;
-        if (!myCache.get(throttleKey)) {
-            myCache.set(throttleKey, true, 60);
-            MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.API_TOKENS,
-                data: [{ _id: doc._id }, { $set: { lastUsedAt: new Date() } }],
-            }, 'updateOne').catch(() => {});
+        const now = new Date();
+        if (!doc || isExpired(doc, now)) return { token: null, refusal: null };
+        if (isStrict() && !doc.expiresAt) {
+            const standing = graceStanding(doc, { strict: true, strictSince: await strictSince(now), now });
+            if (standing.state === 'stopped') {
+                const when = standing.deadline ? `stopped working on ${ymd(standing.deadline)}` : 'cannot be checked against its grace period right now';
+                return { token: null, refusal: `This API token has no expiry and ${when}. Create a new token with an expiry.` };
+            }
         }
-        return doc;
+        recordLastUsed(companyId, doc, now);
+        return { token: doc, refusal: null };
     } catch (error) {
         logger.error(`ERROR in verify api token: ${error.message}`);
-        return null;
+        return { token: null, refusal: null };
     }
 };
+
+/* The stored value is the throttle, so a restart or a second server does not add
+ * writes; the cache only collapses a burst that arrives before the first write lands. */
+const recordLastUsed = (companyId, doc, now) => {
+    const throttleKey = `patLastUsed:${companyId}:${doc._id}`;
+    if (!lastUsedIsStale(doc, now) || myCache.get(throttleKey)) return;
+    myCache.set(throttleKey, true, LAST_USED_WRITE_INTERVAL_MS / 1000);
+    const staleBefore = new Date(now.getTime() - LAST_USED_WRITE_INTERVAL_MS);
+    MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.API_TOKENS,
+        data: [{ _id: doc._id, $or: [{ lastUsedAt: { $exists: false } }, { lastUsedAt: { $lte: staleBefore } }] }, { $set: { lastUsedAt: now } }],
+    }, 'updateOne').catch(() => {});
+};
+
+exports.verifyToken = async (companyId, rawToken) => (await exports.resolveToken(companyId, rawToken)).token;
 
 /* GET /api/v2/api-tokens/me — whoami for API clients (PAT or JWT).
  * The MCP server calls this once after connect to resolve the identity
@@ -288,7 +327,7 @@ exports.whoami = async (req, res) => {
                 timeZone: (user && user.Time_Zone) || '',
                 roleType,
                 permissions,
-                scopes: (req.apiToken && req.apiToken.scopes) || [],
+                scopes: req.apiToken ? effectiveScopes(req.apiToken) : [],
                 tokenName: (req.apiToken && req.apiToken.name) || null,
             },
         });

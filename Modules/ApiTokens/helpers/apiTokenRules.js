@@ -1,5 +1,4 @@
-// API-token rules. Pure (node crypto only) — shared by controller,
-// public-API middleware and tests.
+// No database or module dependencies, so Config/jwt.js can require this at load time.
 
 const crypto = require('crypto');
 
@@ -10,6 +9,10 @@ const MAX_NAME_LENGTH = 80;
 const SCOPES = Object.freeze(['read', 'write']);
 const MIN_EXPIRY_DAYS = 1;
 const MAX_EXPIRY_DAYS = 365;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const STRICT_GRACE_DAYS = 30;
+const LAST_USED_WRITE_INTERVAL_MS = 5 * 60 * 1000;
+const STRICT_ON = ['true', '1', 'on', 'yes'];
 
 const generateToken = () => TOKEN_PREFIX + crypto.randomBytes(TOKEN_BYTES).toString('hex');
 
@@ -19,8 +22,12 @@ const tokenPrefixOf = (rawToken) => String(rawToken).slice(0, PREFIX_LENGTH);
 
 const looksLikeToken = (rawToken) => typeof rawToken === 'string' && rawToken.startsWith(TOKEN_PREFIX) && rawToken.length === TOKEN_PREFIX.length + TOKEN_BYTES * 2;
 
+const isStrict = () => STRICT_ON.includes(String(process.env.API_TOKEN_STRICT || 'false').trim().toLowerCase());
+
+const hasExpiryInput = (expiresInDays) => expiresInDays !== undefined && expiresInDays !== null && expiresInDays !== '';
+
 /* Validate token creation input. Returns { valid, reason }. */
-const validateCreateInput = ({ name, scopes, expiresInDays }) => {
+const validateCreateInput = ({ name, scopes, expiresInDays }, { strict = isStrict() } = {}) => {
     if (!name || !String(name).trim() || String(name).length > MAX_NAME_LENGTH) {
         return { valid: false, reason: `A name up to ${MAX_NAME_LENGTH} characters is required.` };
     }
@@ -29,11 +36,17 @@ const validateCreateInput = ({ name, scopes, expiresInDays }) => {
             return { valid: false, reason: `scopes must be an array drawn from: ${SCOPES.join(', ')}.` };
         }
     }
-    if (expiresInDays !== undefined && expiresInDays !== null && expiresInDays !== '') {
+    if (hasExpiryInput(expiresInDays)) {
         const days = Number(expiresInDays);
         if (!Number.isInteger(days) || days < MIN_EXPIRY_DAYS || days > MAX_EXPIRY_DAYS) {
             return { valid: false, reason: `expiresInDays must be an integer between ${MIN_EXPIRY_DAYS} and ${MAX_EXPIRY_DAYS}.` };
         }
+    }
+    if (strict && (!Array.isArray(scopes) || !scopes.length)) {
+        return { valid: false, reason: `At least one scope is required: choose from ${SCOPES.join(', ')}.` };
+    }
+    if (strict && !hasExpiryInput(expiresInDays)) {
+        return { valid: false, reason: `An expiry is required: expiresInDays between ${MIN_EXPIRY_DAYS} and ${MAX_EXPIRY_DAYS}.` };
     }
     return { valid: true, reason: '' };
 };
@@ -41,22 +54,51 @@ const validateCreateInput = ({ name, scopes, expiresInDays }) => {
 const isExpired = (tokenDoc, now = new Date()) =>
     Boolean(tokenDoc?.expiresAt) && new Date(tokenDoc.expiresAt).getTime() < now.getTime();
 
-/* Does a token authorize this scope? Empty scopes = full access. */
-const hasScope = (tokenDoc, scope) => {
+/* Every scope check in the product asks for read or write, so empty scopes
+ * ("full access") never granted more than both; strict mode names them. */
+const effectiveScopes = (tokenDoc, { strict = isStrict() } = {}) => {
     const scopes = tokenDoc?.scopes || [];
-    return scopes.length === 0 || scopes.includes(scope);
+    return strict && !scopes.length ? [...SCOPES] : scopes;
 };
+
+const hasScope = (tokenDoc, scope, { strict = isStrict() } = {}) => {
+    const scopes = effectiveScopes(tokenDoc, { strict });
+    return (!strict && scopes.length === 0) || scopes.includes(scope);
+};
+
+/* The grace runs from the later of when this instance first ran strict and when the
+ * token was made, so a token minted while strict was off still gets its days. An
+ * unknown start (the settings could not be read) counts as stopped: fail closed. */
+const graceStanding = (tokenDoc, { strict = isStrict(), strictSince, now = new Date() } = {}) => {
+    if (!strict || tokenDoc?.expiresAt) return { state: 'ok', deadline: null };
+    if (!strictSince) return { state: 'stopped', deadline: null };
+    const createdAt = tokenDoc?.createdAt ? new Date(tokenDoc.createdAt).getTime() : 0;
+    const start = Math.max(new Date(strictSince).getTime(), Number.isFinite(createdAt) ? createdAt : 0);
+    const deadline = new Date(start + STRICT_GRACE_DAYS * DAY_MS);
+    return { state: now.getTime() < deadline.getTime() ? 'grace' : 'stopped', deadline };
+};
+
+const lastUsedIsStale = (tokenDoc, now = new Date()) =>
+    !tokenDoc?.lastUsedAt || now.getTime() - new Date(tokenDoc.lastUsedAt).getTime() >= LAST_USED_WRITE_INTERVAL_MS;
 
 module.exports = {
     TOKEN_PREFIX,
     PREFIX_LENGTH,
     MAX_NAME_LENGTH,
     SCOPES,
+    MIN_EXPIRY_DAYS,
+    MAX_EXPIRY_DAYS,
+    STRICT_GRACE_DAYS,
+    LAST_USED_WRITE_INTERVAL_MS,
     generateToken,
     hashToken,
     tokenPrefixOf,
     looksLikeToken,
+    isStrict,
     validateCreateInput,
     isExpired,
+    effectiveScopes,
     hasScope,
+    graceStanding,
+    lastUsedIsStale,
 };

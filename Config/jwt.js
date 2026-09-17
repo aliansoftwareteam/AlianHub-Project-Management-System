@@ -102,7 +102,7 @@ const PAT_ALLOWED_EXCEPTIONS = ['/api/v2/api-tokens/me'];
 const verifyApiTokenRequest = async (req, res, next, companyId, rawToken) => {
     try {
         // Lazy require keeps Config/jwt.js independent of module load order.
-        const { verifyToken: verifyApiToken, logTokenActivity } = require('../Modules/ApiTokens/controller');
+        const { resolveToken, logTokenActivity } = require('../Modules/ApiTokens/controller');
 
         const path = String(req.originalUrl || req.path || '').split('?')[0];
         if (path.startsWith(PAT_BLOCKED_PATH_PREFIX) && !PAT_ALLOWED_EXCEPTIONS.includes(path)) {
@@ -113,11 +113,11 @@ const verifyApiTokenRequest = async (req, res, next, companyId, rawToken) => {
             });
         }
 
-        const tokenDoc = await verifyApiToken(companyId, rawToken);
+        const { token: tokenDoc, refusal } = await resolveToken(companyId, rawToken);
         if (!tokenDoc) {
             return res.status(401).json({
                 status: false,
-                error: 'Invalid, expired or revoked API token',
+                error: refusal || 'Invalid, expired or revoked API token',
                 statusText: 'Unauthorized',
                 isJwtError: true,
             });

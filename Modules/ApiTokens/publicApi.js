@@ -2,7 +2,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
-const { verifyToken, logTokenActivity } = require('./controller');
+const { resolveToken, logTokenActivity } = require('./controller');
 const { hasScope } = require('./helpers/apiTokenRules');
 const { visibilityStage } = require('../Tasks/helpers/taskQueryGuard');
 const { visibleProjectIds } = require('../Agents/scope');
@@ -22,9 +22,9 @@ const tokenAuth = async (req, res, next) => {
         const companyId = req.headers['companyid'] || '';
         const auth = String(req.headers['authorization'] || '');
         const rawToken = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-        const tokenDoc = await verifyToken(companyId, rawToken);
+        const { token: tokenDoc, refusal } = await resolveToken(companyId, rawToken);
         if (!tokenDoc) {
-            return res.status(401).send({ status: false, statusText: 'Invalid or expired API token.' });
+            return res.status(401).send({ status: false, statusText: refusal || 'Invalid or expired API token.' });
         }
         req.apiToken = tokenDoc;
         req.apiCompanyId = companyId;

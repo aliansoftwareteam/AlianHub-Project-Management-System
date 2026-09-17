@@ -1,6 +1,7 @@
 import { computed, ref } from "vue";
 import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
+import { DEFAULT_TOKEN_POLICY } from "./tokenPolicy";
 
 // Coding-agent accounts (27a-d) and the CLI setup panel (26a). Everything here
 // reads from the endpoints that already exist; nothing is asserted that the
@@ -13,6 +14,7 @@ const account = ref(null);
 const policy = ref({ allowedModes: [...MODES], requireCheckBeforeDone: false });
 const summary = ref({});
 const tokens = ref([]);
+const tokenPolicy = ref({ ...DEFAULT_TOKEN_POLICY });
 const manifest = ref({ protocolVersion: "", tools: [], never: [] });
 const runs = ref([]);
 const peopleHours = ref(null);
@@ -43,6 +45,7 @@ export function useAccounts() {
     const loadTokens = async () => {
         const res = await apiRequest("get", env.API_TOKENS);
         tokens.value = ok(res) ? res.data.data || [] : [];
+        tokenPolicy.value = { ...DEFAULT_TOKEN_POLICY, ...((ok(res) && res.data.policy) || {}) };
     };
 
     // Public and secret-free: the tool list and the never-list come from the
@@ -137,7 +140,7 @@ export function useAccounts() {
     };
 
     return {
-        account, policy, summary, tokens, manifest, runs, peopleHours,
+        account, policy, summary, tokens, tokenPolicy, manifest, runs, peopleHours,
         mode, allowed, isAllowed,
         loadAccount, loadPolicy, loadTokens, loadManifest, loadRuns, loadPeopleHours,
         savePolicy, linkAccount, unlinkAccount, mintToken, revokeToken

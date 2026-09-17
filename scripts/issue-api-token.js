@@ -9,6 +9,7 @@
  *   node scripts/issue-api-token.js 64a1... 64b2... "CI read-only" read 90
  *
  * scopes: comma-separated from {read,write}; omit for full access.
+ * With API_TOKEN_STRICT on, scopes and expiresInDays are both required.
  * The raw token is printed ONCE and never stored — only its sha256 hash.
  */
 require('dotenv').config();

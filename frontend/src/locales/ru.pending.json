@@ -1,7 +1,7 @@
 {
   "locale": "ru",
   "machineTranslated": false,
-  "updatedAt": "2026-09-17T03:37:27.474Z",
+  "updatedAt": "2026-09-17T05:39:53.521Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5961,6 +5961,20 @@
     "Ask.empty_no_match": "Nothing in the projects you can open matches that. Try naming the project or the task.",
     "Ask.note_scope": "Only projects you can already open. Ask never widens what you can see.",
     "Ask.error_question_required": "Ask a question first.",
-    "Ask.error_unauthenticated": "Ask needs a signed-in member of this workspace."
+    "Ask.error_unauthenticated": "Ask needs a signed-in member of this workspace.",
+    "Parity.mint_on_accounts": "Create a token with an expiry",
+    "Accounts.field_expiry": "Expires after",
+    "Accounts.expiry_choose": "Choose how long it lasts",
+    "Accounts.expiry_days": "{n} days",
+    "Accounts.field_scopes": "What it may do",
+    "Accounts.token_scope_read": "Read",
+    "Accounts.token_scope_read_effect": "See the projects, tasks and pages you can already open.",
+    "Accounts.token_scope_write": "Write",
+    "Accounts.token_scope_write_effect": "Make the changes your own role allows.",
+    "Accounts.token_expiry_required": "Choose when the token expires. Tokens without an expiry are no longer issued.",
+    "Accounts.token_scope_required": "Tick read, write or both.",
+    "Accounts.grace_works_until": "no expiry · works until {d}",
+    "Accounts.grace_stopped_on": "no expiry · stopped on {d}",
+    "Accounts.strict_note": "Every new token needs an expiry and at least one scope. A token without an expiry keeps working for {n} days from when this rule was turned on, or from when the token was made if that is later. Replace it before then."
   }
 }

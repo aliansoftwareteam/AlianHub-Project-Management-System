@@ -6,6 +6,7 @@ const { oid } = require('../Automations/engine/tools');
 const { buildBrief } = require('./brief');
 const { htmlToRawText, pageVisibleTo } = require('../Pages/helpers/pageRules');
 const { blocksToRawText, contentToEditorData } = require('../Pages/helpers/pageContent');
+const { hasScope } = require('../ApiTokens/helpers/apiTokenRules');
 const performanceRead = require('../Agents/performanceRead');
 
 const PAGE_TEXT_MAX = 40000;
@@ -208,6 +209,9 @@ const call = async (ctx, name, args = {}) => {
     if (!tool) throw Object.assign(new Error(`Unknown tool "${name}"`), { code: -32601 });
 
     if (tool.run) {
+        if (!hasScope(ctx.token, 'read')) {
+            throw Object.assign(new Error('This token lacks the read scope.'), { code: -32004 });
+        }
         if (!tool.authorizesPerProject) await actions.authorizeRead({
             companyId: ctx.companyId, actor: ctx.actor, action: tool.action,
             params: { taskId: args.taskId }, ip: ctx.ip, allowedActions: ctx.allowedActions,

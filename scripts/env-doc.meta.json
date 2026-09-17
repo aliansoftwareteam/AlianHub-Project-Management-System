@@ -145,6 +145,11 @@
     "required": true,
     "default": ""
   },
+  "API_TOKEN_STRICT": {
+    "group": "security",
+    "description": "Set to true to require an expiry and at least one scope on every new API token, and to allow a token without an expiry only to be revoked. A token without an expiry keeps working for 30 days from the later of its creation and when this was first on for the instance (recorded once as apiTokenStrictSince on the instance settings document and kept across backup restores), then stops. Unset or false keeps the old rules.",
+    "default": "false"
+  },
   "APPID": {
     "group": "integrations",
     "description": "Firebase app id."
