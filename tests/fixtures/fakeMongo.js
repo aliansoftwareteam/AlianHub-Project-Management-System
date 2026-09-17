@@ -1,7 +1,7 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
 // language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type, $set/$inc/$push,
-// conditional findOneAndUpdate, findOneAndDelete, deleteOne, deleteMany, sort/limit on find, $match/$group aggregate, declared unique indexes that
-// reject a duplicate save with E11000) so a test can assert on what was written.
+// conditional findOneAndUpdate, updateOne and findOneAndUpdate with upsert, findOneAndDelete, deleteOne, deleteMany, sort/limit on find,
+// $match/$group aggregate, declared unique indexes that reject a duplicate save or upsert with E11000) so a test can assert on what was written.
 
 let seq = 1;
 const nextId = () => String(seq++).padStart(24, '0');
@@ -62,6 +62,11 @@ const apply = (doc, update = {}) => {
     return doc;
 };
 
+const isOperatorObject = (v) => Boolean(v) && typeof v === 'object' && !(v instanceof Date) && !Array.isArray(v) && Object.keys(v).some((k) => k.startsWith('$'));
+
+/* What an upsert inserts from its filter, as MongoDB does: the plain equality fields, never an operator or a $or. */
+const equalitiesOf = (filter = {}) => Object.fromEntries(Object.entries(filter).filter(([key, value]) => !key.startsWith('$') && !isOperatorObject(value)));
+
 const sortable = (v) => (v instanceof Date ? v.getTime() : (v == null ? '' : v));
 const ordered = (list, options = {}) => {
     let out = list;
@@ -118,6 +123,14 @@ const create = () => {
     const collides = (type, doc) => (uniques[type] || []).find((index) => covered(index, doc)
         && rows(type).some((other) => covered(index, other) && index.fields.every((f) => String(read(other, f)) === String(read(doc, f)))));
 
+    const upsert = (type, filter, update = {}) => {
+        const doc = apply({ _id: nextId(), createdAt: new Date(), ...equalitiesOf(filter), ...(update.$setOnInsert || {}) }, update);
+        const hit = collides(type, doc);
+        if (hit) throw duplicateKey(hit.fields);
+        rows(type).push(doc);
+        return doc;
+    };
+
     const crud = jest.fn(async (companyId, { type, data }, method) => {
         calls.push({ companyId, type, method, data });
         const list = rows(type);
@@ -133,8 +146,17 @@ const create = () => {
         if (method === 'countDocuments') return list.filter((d) => matches(d, data[0])).length;
         if (method === 'deleteOne') { const index = list.findIndex((d) => matches(d, data[0])); if (index !== -1) list.splice(index, 1); return { deletedCount: index === -1 ? 0 : 1 }; }
         if (method === 'deleteMany') { const kept = list.filter((d) => !matches(d, data[0])); store[type] = kept; return { deletedCount: list.length - kept.length }; }
-        if (method === 'findOneAndUpdate') { const doc = list.find((d) => matches(d, data[0])); if (!doc) return null; apply(doc, data[1]); return clone(doc); }
-        if (method === 'updateOne') { const doc = list.find((d) => matches(d, data[0])); if (doc) apply(doc, data[1]); return { modifiedCount: doc ? 1 : 0 }; }
+        if (method === 'findOneAndUpdate') {
+            const doc = list.find((d) => matches(d, data[0]));
+            if (doc) { apply(doc, data[1]); return clone(doc); }
+            return data[2] && data[2].upsert ? clone(upsert(type, data[0], data[1])) : null;
+        }
+        if (method === 'updateOne') {
+            const doc = list.find((d) => matches(d, data[0]));
+            if (doc) { apply(doc, data[1]); return { modifiedCount: 1, upsertedCount: 0 }; }
+            if (data[2] && data[2].upsert) { upsert(type, data[0], data[1]); return { modifiedCount: 0, upsertedCount: 1 }; }
+            return { modifiedCount: 0, upsertedCount: 0 };
+        }
         if (method === 'updateMany') { const hit = list.filter((d) => matches(d, data[0])); hit.forEach((d) => apply(d, data[1])); return { modifiedCount: hit.length }; }
         if (method === 'findOneAndDelete') { const at = list.findIndex((d) => matches(d, data[0])); return at === -1 ? null : clone(list.splice(at, 1)[0]); }
         if (method === 'deleteOne') { const at = list.findIndex((d) => matches(d, data[0])); if (at !== -1) list.splice(at, 1); return { deletedCount: at === -1 ? 0 : 1 }; }
