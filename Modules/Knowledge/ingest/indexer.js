@@ -3,7 +3,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { COMMENT_TYPES } = require('../sources');
-const { chunkPage, chunkComment, chunkTranscript } = require('./chunker');
+const { chunkPage, chunkComment, chunkTranscript, contentHashOf } = require('./chunker');
 
 // Writes source chunks into the store. Callers check KNOWLEDGE_INDEXER first; nothing here
 // reads the flag, so the backfill, the event handlers and a re-index share one write path.
@@ -14,6 +14,7 @@ const DUPLICATE_KEY = 11000;
 const TRASHED = 1;
 const MAX_SYNC_ROUNDS = 3;
 const TITLE_LENGTH = 160;
+const TASK_DELETED = 'task';
 const EXISTING_FIELDS = 'ordinal contentHash deleted companyId projectId sprintId taskId participants visibility createdBy authorKind sourceUpdatedAt';
 const COMPARED_FIELDS = ['companyId', 'projectId', 'sprintId', 'taskId', 'participants', 'visibility', 'createdBy', 'authorKind'];
 
@@ -121,17 +122,17 @@ const RULES = {
             title: asText(comment.message).replace(/\s+/g, ' ').trim().slice(0, TITLE_LENGTH),
         }),
         async decide(companyId, comment) {
-            if (comment.isDeleted === true) return leaveOut('tombstone', 'deleted', comment);
+            const erasure = [documentRule('comment', comment), ...(comment.userId ? [{ kind: 'author', userId: String(comment.userId) }] : [])];
+            if (await excluded(companyId, erasure)) return leaveOut('erase', 'erased', comment);
+            if (comment.isDeleted === true) return { ...leaveOut('tombstone', 'deleted', comment), deletesWin: true };
             if (!COMMENT_TYPES.includes(comment.type)) return leaveOut('tombstone', 'no text', comment);
             const task = comment.taskId ? await readTask(companyId, comment.taskId) : null;
             const context = { task };
             const fingerprint = [time(comment.updatedAt), task && time(task.updatedAt), task && task.ProjectID, task && task.sprintId, task && task.deletedStatusKey].map(asText).join('|');
             if (comment.taskId && !task) return { ...leaveOut('tombstone', 'no task', comment, {}, fingerprint), unconditional: true };
-            if (task && Number(task.deletedStatusKey) === 1) return leaveOut('tombstone', 'task deleted', comment, context, fingerprint);
+            if (task && Number(task.deletedStatusKey) === 1) return { ...leaveOut('tombstone', 'task deleted', comment, context, fingerprint), marker: TASK_DELETED };
             if (!comment.projectId && !(task && task.ProjectID)) return leaveOut('tombstone', 'no project', comment, context, fingerprint);
-            const [isErased, trashed] = await Promise.all([excluded(companyId, [documentRule('comment', comment)]), anyTrashed(companyId, [comment.projectId, task && task.ProjectID])]);
-            if (isErased) return leaveOut('erase', 'erased', comment, context, fingerprint);
-            if (trashed) return leaveOut('tombstone', 'trashed', comment, context, fingerprint);
+            if (await anyTrashed(companyId, [comment.projectId, task && task.ProjectID])) return leaveOut('tombstone', 'trashed', comment, context, fingerprint);
             return ingestDecision(comment, context, fingerprint);
         },
     },
@@ -153,7 +154,7 @@ const RULES = {
         }),
         async decide(companyId, call) {
             const fingerprint = String(time(call.updatedAt));
-            if (Number(call.deletedStatusKey) === 1) return leaveOut('tombstone', 'deleted', call, {}, fingerprint);
+            if (Number(call.deletedStatusKey) === 1) return { ...leaveOut('tombstone', 'deleted', call, {}, fingerprint), deletesWin: true };
             if (await excluded(companyId, [documentRule('transcript', call)])) return leaveOut('erase', 'erased', call, {}, fingerprint);
             return ingestDecision(call, {}, fingerprint);
         },
@@ -192,6 +193,13 @@ const tombstone = async (companyId, where, set = {}) => modified(await chunkStor
     { $set: { deleted: true, deletedAt: new Date(), ...set } },
 ], 'updateMany'));
 
+/* Moves chunks' version up to `at`, never down, so a read older than a delete or a task move cannot
+ * write its chunks back afterwards. */
+const stampForward = async (companyId, where, at) => modified(await chunkStore(companyId, [
+    { ...where, $or: [{ sourceUpdatedAt: { $lt: at } }, { sourceUpdatedAt: null }] },
+    { $set: { sourceUpdatedAt: at } },
+], 'updateMany'));
+
 const tombstoneSource = async (companyId, sourceType, ids, { sourceUpdatedAt } = {}) => {
     const unique = [...new Set((ids || []).map(asText).filter(Boolean))];
     if (!unique.length) return 0;
@@ -226,7 +234,7 @@ const ingest = async (companyId, sourceType, row, context = {}) => {
 
     let behind = false;
     for (const piece of pieces) {
-        const chunk = { ...metadata, ...piece, embeddingModel: null, deleted: false, deletedAt: null, sourceUpdatedAt };
+        const chunk = { ...metadata, ...piece, embeddingModel: null, deleted: false, deletedAt: null, tombstoneReason: '', sourceUpdatedAt };
         const stored = byOrdinal.get(piece.ordinal);
         if (unchanged(stored, chunk)) {
             result.unchanged += 1;
@@ -251,6 +259,32 @@ const ingest = async (companyId, sourceType, row, context = {}) => {
 };
 
 const ingestPage = (companyId, page) => ingest(companyId, 'page', page);
+
+/* Records why a source is out, on its tombstoned chunks or, when it was never indexed, on an empty
+ * tombstone: a task restore finds the comments to bring back by it without reading comments. */
+const markLeftOut = async (companyId, sourceType, decision) => {
+    const rules = RULES[sourceType];
+    const where = { sourceType, sourceId: String(decision.row._id) };
+    const relabelled = modified(await chunkStore(companyId, [
+        { ...where, deleted: true, tombstoneReason: { $ne: decision.marker } },
+        { $set: { tombstoneReason: decision.marker } },
+    ], 'updateMany'));
+    if (await chunkStore(companyId, [where, '_id', { lean: true }], 'findOne')) return relabelled;
+    const written = await upsertChunk(companyId, {
+        ...rules.metadata(companyId, decision.row, decision.context),
+        title: '',
+        ordinal: 0,
+        headingPath: [],
+        text: '',
+        contentHash: contentHashOf([], ''),
+        embeddingModel: null,
+        deleted: true,
+        deletedAt: new Date(),
+        tombstoneReason: decision.marker,
+        sourceUpdatedAt: rules.versionOf(decision.row, decision.context),
+    });
+    return relabelled + (written ? 1 : 0);
+};
 const ingestComment = (companyId, comment, context) => ingest(companyId, 'comment', comment, context);
 const ingestTranscript = (companyId, call) => ingest(companyId, 'transcript', call);
 
@@ -272,9 +306,16 @@ const applyDecision = async (companyId, sourceType, id, decision) => {
         const count = (removed && removed.deletedCount) || 0;
         return { erased: count, changed: count > 0 };
     }
+    const where = { sourceType, sourceId: String(id) };
+    if (decision.deletesWin) {
+        const stamped = await stampForward(companyId, where, rules.versionOf(decision.row, decision.context));
+        const tombstoned = await tombstone(companyId, where);
+        return { tombstoned, changed: stamped + tombstoned > 0 };
+    }
     const version = decision.unconditional || !decision.row ? {} : { sourceUpdatedAt: rules.versionOf(decision.row, decision.context) };
     const tombstoned = await tombstoneSource(companyId, sourceType, [id], version);
-    return { tombstoned, changed: tombstoned > 0 };
+    const marked = decision.marker ? await markLeftOut(companyId, sourceType, decision) : 0;
+    return { tombstoned, changed: tombstoned + marked > 0 };
 };
 
 const sameDecision = (a, b) => a.action === b.action && a.fingerprint === b.fingerprint;
@@ -334,43 +375,89 @@ const syncPage = (companyId, pageId) => sync(companyId, 'page', pageId);
 const syncComment = (companyId, commentId) => sync(companyId, 'comment', commentId);
 const syncTranscript = (companyId, callId) => sync(companyId, 'transcript', callId);
 
+/* Carries on past a sync that throws, then runs each failed one once more through the same
+ * per-source queue, and reports what still failed only after every other one has run. */
+const syncMany = async (companyId, sourceType, ids) => {
+    const failed = [];
+    for (const id of ids) {
+        try {
+            await sync(companyId, sourceType, id);
+        } catch (error) {
+            failed.push(id);
+        }
+    }
+    const stillFailing = [];
+    let lastError = null;
+    for (const id of failed) {
+        try {
+            await sync(companyId, sourceType, id);
+        } catch (error) {
+            stillFailing.push(id);
+            lastError = error;
+        }
+    }
+    if (stillFailing.length) throw new Error(`${sourceType} sync failed for ${stillFailing.length} of ${ids.length} (${stillFailing.join(', ')}): ${lastError.message}`);
+    return ids.length;
+};
+
 const syncEach = async (companyId, sourceType, where) => {
     const rows = await store(companyId, RULES[sourceType].collection, [where, '_id', { lean: true }], 'find');
-    for (const row of rows || []) {
-        await sync(companyId, sourceType, String(row._id));
-    }
-    return (rows || []).length;
+    return syncMany(companyId, sourceType, (rows || []).map((row) => String(row._id)));
 };
 
 const reindexProject = async (companyId, projectId) => {
     if (!isObjectId(projectId)) return 0;
-    const pages = await syncEach(companyId, 'page', { ProjectID: oid(projectId), deletedStatusKey: { $ne: 1 } });
-    const comments = await syncEach(companyId, 'comment', { projectId: oid(projectId), isDeleted: { $ne: true }, type: { $in: COMMENT_TYPES } });
-    return pages + comments;
+    let failure = null;
+    let count = 0;
+    for (const [sourceType, where] of [
+        ['page', { ProjectID: oid(projectId), deletedStatusKey: { $ne: 1 } }],
+        ['comment', { projectId: oid(projectId), isDeleted: { $ne: true }, type: { $in: COMMENT_TYPES } }],
+    ]) {
+        try {
+            count += await syncEach(companyId, sourceType, where);
+        } catch (error) {
+            failure = failure || error;
+        }
+    }
+    if (failure) throw failure;
+    return count;
 };
 
 const reindexAuthor = async (companyId, userId) => (isObjectId(userId)
     ? syncEach(companyId, 'page', { createdBy: String(userId), visibility: 'private', deletedStatusKey: { $ne: 1 } })
     : 0);
 
-/* Re-syncs the comments already indexed under a task. Comment rows are only read when the task was
- * restored, for comments left out while it was deleted: comments have no index on their task. */
-const reindexTaskComments = async (companyId, taskId, { restored = false } = {}) => {
-    if (!isObjectId(taskId)) return 0;
-    const ids = new Set();
-    const chunks = await chunkStore(companyId, [{ sourceType: 'comment', taskId: String(taskId) }, 'sourceId', { lean: true }], 'find');
-    (chunks || []).forEach((chunk) => ids.add(String(chunk.sourceId)));
-    const task = restored ? await readTask(companyId, taskId) : null;
-    if (task && Number(task.deletedStatusKey) !== 1) {
-        const rows = await store(companyId, SCHEMA_TYPE.COMMENTS, [
-            { taskId: { $in: [oid(taskId), String(taskId)] }, isDeleted: { $ne: true }, type: { $in: COMMENT_TYPES } }, '_id', { lean: true },
-        ], 'find');
-        (rows || []).forEach((row) => ids.add(String(row._id)));
-    }
-    for (const id of ids) {
-        await sync(companyId, 'comment', id);
-    }
-    return ids.size;
+/* A task change reaches its comments through the chunks recorded under it. A deleted task tombstones
+ * them in one write; a restore, known by the chunks it marked, re-syncs those comments and any
+ * others under the task; a move re-tags the chunks' project and sprint. Only a restore reads
+ * comments. Serialised per task, so a restore queued behind a delete reads the task again. */
+const reindexTask = (companyId, taskId, { moved = false } = {}) => {
+    if (!isObjectId(taskId)) return Promise.resolve(0);
+    return serialised(`${companyId}:task:${taskId}`, async () => {
+        const where = { sourceType: 'comment', taskId: String(taskId) };
+        const task = await readTask(companyId, taskId);
+        if (!task || Number(task.deletedStatusKey) === 1) {
+            if (task) await stampForward(companyId, where, rowVersion(task));
+            return tombstone(companyId, where, { tombstoneReason: TASK_DELETED });
+        }
+        let count = 0;
+        const marked = await chunkStore(companyId, [{ ...where, deleted: true, tombstoneReason: TASK_DELETED }, 'sourceId', { lean: true }], 'find');
+        if (marked && marked.length) {
+            const rows = await store(companyId, SCHEMA_TYPE.COMMENTS, [{ taskId: { $in: [oid(taskId), String(taskId)] } }, '_id', { lean: true }], 'find');
+            const ids = [...new Set([...marked.map((chunk) => String(chunk.sourceId)), ...(rows || []).map((row) => String(row._id))])];
+            count += await syncMany(companyId, 'comment', ids);
+        }
+        if (moved) {
+            const projectId = task.ProjectID || null;
+            const sprintId = task.sprintId || null;
+            await stampForward(companyId, where, rowVersion(task));
+            count += modified(await chunkStore(companyId, [
+                { ...where, $or: [{ projectId: { $ne: projectId } }, { sprintId: { $ne: sprintId } }] },
+                { $set: { projectId, sprintId } },
+            ], 'updateMany'));
+        }
+        return count;
+    });
 };
 
 module.exports = {
@@ -388,6 +475,6 @@ module.exports = {
     tombstoneProject,
     reindexProject,
     reindexAuthor,
-    reindexTaskComments,
+    reindexTask,
     removeDepartedMember,
 };

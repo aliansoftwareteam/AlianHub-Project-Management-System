@@ -1,18 +1,27 @@
-/* Builds in every tenant the chunk store's task key: a task that is deleted, restored or moved
- * looks up the comment chunks it carries by it. createIndexes, not syncIndexes, which would drop
- * any index the schema does not declare. */
+/* Builds in every tenant the two task keys the knowledge indexer reads by: the chunk store's, which
+ * a task that is deleted, restored or moved looks its comment chunks up by, and the comments'
+ * own, which a restore reads the task's comments by. createIndexes, not syncIndexes, which would
+ * drop any index the schema does not declare. */
 
 const ID = '026-knowledge-sources';
 
-const isTaskKey = (index) => Boolean(index && index.key) && index.key.sourceType === 1 && index.key.taskId === 1;
+const keyed = (fields) => (index) => Boolean(index && index.key)
+    && Object.keys(index.key).length === Object.keys(fields).length
+    && Object.entries(fields).every(([field, direction]) => index.key[field] === direction);
+
+async function built(ctx, companyId, type, fields, label) {
+    await ctx.company(companyId, { type, data: [] }, 'createIndexes');
+    const indexes = await ctx.company(companyId, { type, data: [] }, 'listIndexes') || [];
+    const index = indexes.find(keyed(fields));
+    if (!index) throw new Error(`${label} index missing after createIndexes`);
+    return index.name;
+}
 
 async function indexCompany(ctx, companyId) {
-    const { KNOWLEDGE_CHUNKS: chunks } = ctx.SCHEMA_TYPE;
-    await ctx.company(companyId, { type: chunks, data: [] }, 'createIndexes');
-    const indexes = await ctx.company(companyId, { type: chunks, data: [] }, 'listIndexes') || [];
-    const taskKey = indexes.find(isTaskKey);
-    if (!taskKey) throw new Error('knowledge_chunks task index missing after createIndexes');
-    return { taskIndex: taskKey.name };
+    const { KNOWLEDGE_CHUNKS: chunks, COMMENTS: comments } = ctx.SCHEMA_TYPE;
+    const taskIndex = await built(ctx, companyId, chunks, { sourceType: 1, taskId: 1 }, 'knowledge_chunks task');
+    const commentTaskIndex = await built(ctx, companyId, comments, { taskId: 1 }, 'comments task');
+    return { taskIndex, commentTaskIndex };
 }
 
 module.exports = {

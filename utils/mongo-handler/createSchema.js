@@ -341,6 +341,8 @@ taskSchema.index({ TaskKey: 1 });
 commentSchema.index({ 'objId.taskId': 1, deletedStatusKey: 1 });
 commentSchema.index({ 'objId.sprintId': 1 });
 commentSchema.index({ 'objId.projectId': 1 });
+// Comments are stored with a top-level taskId; the objId.* keys above index nothing.
+commentSchema.index({ taskId: 1 });
 
 // history: by task and by project (timeline display).
 historySchema.index({ TaskId: 1, createdAt: -1 });

@@ -135,7 +135,7 @@ describe('a company whose indexer was switched off and on again', () => {
         ['page', 'comment', 'transcript'].forEach((sourceType) => expect(stateOf(sourceType).status).toBe('complete'));
     });
 
-    it('reads chunks and catches nothing up while the heartbeat is fresh, and beats at most once a minute', async () => {
+    it('reads chunks and catches nothing up while the heartbeat is fresh, and beats each source at most once a minute', async () => {
         mockDb.store[STATE].forEach((state) => { state.lastSeenOnAt = ago(2 * MINUTE); });
         const page = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Tide tables', content: { html: '<p>Tides.</p>' }, visibility: 'project', createdBy: ME, ProjectID: PROJECT, deletedStatusKey: 0, updatedAt: ago(MINUTE) });
         await indexer.syncPage(C, String(page._id));
@@ -147,8 +147,9 @@ describe('a company whose indexer was switched off and on again', () => {
         await events.drain();
 
         expect(chunkSearchesOf('page')).toHaveLength(2);
-        expect(mockDb.calls.filter((c) => c.type === STATE && ['updateMany', 'updateOne', 'findOneAndUpdate'].includes(c.method))).toHaveLength(1);
-        expect(mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.PAGES && c.method === 'find')).toEqual([]);
+        const beaten = mockDb.calls.filter((c) => c.type === STATE && ['updateMany', 'updateOne', 'findOneAndUpdate'].includes(c.method)).flatMap((c) => c.data[0].sourceType.$in);
+        expect(beaten.sort()).toEqual(['comment', 'page', 'transcript']);
+        expect(mockDb.calls.filter((c) => c.method === 'find' && c.data[0] && c.data[0].updatedAt)).toEqual([]);
         expect(stateOf('page').status).toBe('complete');
     });
 
@@ -167,6 +168,26 @@ describe('a company whose indexer was switched off and on again', () => {
 
         expect(stateOf('page')).toMatchObject({ status: 'complete', catchUpFrom: null });
         expect(mockDb.store[CHUNKS].filter((c) => c.sourceId === pagesBefore[0] && !c.deleted).map((c) => c.text).join(' ')).toContain('Rewritten while off.');
+    });
+});
+
+describe('a catch-up that is still pending', () => {
+    it('keeps a source on its rows even with a fresh heartbeat and a complete status', async () => {
+        Object.assign(stateOf('page'), { lastSeenOnAt: new Date(), catchUpFrom: ago(30 * MINUTE) });
+        const page = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Buoys', rawText: 'buoys', visibility: 'project', createdBy: ME, ProjectID: PROJECT, deletedStatusKey: 0, updatedAt: ago(MINUTE) });
+        mockDb.calls.length = 0;
+
+        expect(idsOf(await ask('buoys', ['page']))).toEqual([String(page._id)]);
+        expect(chunkSearchesOf('page')).toEqual([]);
+    });
+
+    it('is started by the recurring job for a company whose heartbeat went stale', async () => {
+        const page = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Anchors', content: { html: '<p>Anchors.</p>' }, visibility: 'project', createdBy: ME, ProjectID: PROJECT, deletedStatusKey: 0, updatedAt: ago(5 * MINUTE) });
+
+        await backfill.backfillAll({ batchSize: 10 });
+
+        expect(liveChunkIds('page')).toEqual([String(page._id)]);
+        ['page', 'comment', 'transcript'].forEach((sourceType) => expect(stateOf(sourceType)).toMatchObject({ status: 'complete', catchUpFrom: null }));
     });
 });
 

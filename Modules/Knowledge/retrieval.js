@@ -1,6 +1,6 @@
 const lexical = require('./adapters/lexical');
 const flag = require('./flag');
-const { indexedSources } = require('./ingest/backfill');
+const backfill = require('./ingest/backfill');
 const { INDEXED_SOURCES } = require('./sources');
 const events = require('./ingest/events');
 const { resolveVisibleSet, filterFor, recheck } = require('./visibleSet');
@@ -63,12 +63,16 @@ const rechecked = async ({ set, ranked, wanted, onStale }) => {
     return kept.slice(0, wanted);
 };
 
-/* Until a company's backfill of a source completes, the chunk store is missing what that source
- * held before the indexer was switched on, so that source's rows are searched as before. */
+/* Until a company's backfill of a source completes, or while its heartbeat says events may have been
+ * missed and its catch-up has not finished, the chunk store may lack what that source holds, so
+ * that source's rows are searched as before. */
 const chunkSourcesFor = async (set) => {
     const wanted = set.sourceTypes.filter((sourceType) => INDEXED_SOURCES.includes(sourceType));
     if (!wanted.length || !(await flag.indexer.enabledFor(set.companyId))) return [];
-    return indexedSources(set.companyId, wanted).catch(() => []);
+    const states = await backfill.readStates(set.companyId, wanted).catch(() => null);
+    if (!states) return [];
+    events.keepAlive(set.companyId, states);
+    return backfill.indexedOf(states, wanted);
 };
 
 const createRetrieve = (adapter) => {

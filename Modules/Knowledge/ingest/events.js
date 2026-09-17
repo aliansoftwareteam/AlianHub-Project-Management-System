@@ -17,9 +17,14 @@ const SOURCE_EVENTS = [
  * carry a change to who sees the task's comments. */
 const TASK_EVENTS = ['task.updated', 'task.sprint_changed', 'task.status_changed', 'task.assignee_changed', 'task.priority_changed', 'task.lead_changed', 'task.due_date_changed', 'task.renamed'];
 const TASK_VISIBILITY_FIELDS = ['deletedStatusKey', 'sprintId', 'ProjectID'];
+const TASK_MOVE_FIELDS = ['sprintId', 'ProjectID'];
+/* A bulk move of hundreds of tasks is hundreds of envelopes at once; each company handles only this
+ * many at a time and queues the rest. */
+const MAX_CONCURRENT_PER_COMPANY = 4;
 const HANDLED = [...SOURCE_EVENTS, ...TASK_EVENTS, 'project.trashed', 'project.restored', 'member.departed', 'member.activated'];
 
 const pending = new Set();
+const lanes = new Map();
 let started = false;
 
 const track = (promise) => {
@@ -57,18 +62,46 @@ const apply = (envelope) => {
             return indexer.reindexAuthor(companyId, id);
         default:
             if (SOURCE_EVENTS.includes(envelope.type)) return indexer.sync(companyId, sourceOf(envelope.type), id);
-            if (TASK_EVENTS.includes(envelope.type)) return indexer.reindexTaskComments(companyId, id, { restored: changedFieldsOf(envelope).includes('deletedStatusKey') });
+            if (TASK_EVENTS.includes(envelope.type)) return indexer.reindexTask(companyId, id, { moved: changedFieldsOf(envelope).some((field) => TASK_MOVE_FIELDS.includes(field)) });
             return null;
     }
+};
+
+const inLane = (companyId, run) => new Promise((resolve, reject) => {
+    const key = String(companyId);
+    const lane = lanes.get(key) || { active: 0, waiting: [] };
+    lanes.set(key, lane);
+    const begin = () => {
+        lane.active += 1;
+        Promise.resolve().then(run).then(resolve, reject).finally(() => {
+            lane.active -= 1;
+            const next = lane.waiting.shift();
+            if (next) next();
+            else if (!lane.active) lanes.delete(key);
+        });
+    };
+    if (lane.active < MAX_CONCURRENT_PER_COMPANY) begin();
+    else lane.waiting.push(begin);
+});
+
+/* Heartbeats while the indexer is on, and starts the catch-up of any source found stale. */
+const keepAlive = (companyId, states) => {
+    if (flag.indexer.mode() === 'off') return;
+    track(backfill.keepAlive(companyId, { states })
+        .then((stale) => { if (stale.length) track(backfill.ensureBackfill(companyId)); })
+        .catch((error) => logger.error(`${LOG_PREFIX} heartbeat for company ${companyId} failed: ${domainEventBus.failureText(error)}`)));
 };
 
 const handle = async (envelope) => {
     try {
         if (!relevant(envelope)) return null;
-        if (!(await flag.indexer.enabledFor(envelope.companyId))) return null;
-        const result = await apply(envelope);
-        track(backfill.ensureBackfill(envelope.companyId));
-        return result;
+        return await inLane(envelope.companyId, async () => {
+            if (!(await flag.indexer.enabledFor(envelope.companyId))) return null;
+            keepAlive(envelope.companyId);
+            const result = await apply(envelope);
+            track(backfill.ensureBackfill(envelope.companyId));
+            return result;
+        });
     } catch (error) {
         logger.error(`${LOG_PREFIX} ${domainEventBus.eventLabel(envelope)}: ${domainEventBus.failureText(error)}`);
         return null;
@@ -130,6 +163,8 @@ const requestSync = (companyId, sourceId, sourceType = indexer.SOURCE) => {
 
 module.exports = {
     HANDLED,
+    MAX_CONCURRENT_PER_COMPANY,
+    keepAlive,
     start,
     stop,
     handle,

@@ -238,7 +238,7 @@ describe('a comment follows its task', () => {
         const task = seedTask({ deletedStatusKey: 1 });
         const comment = seedComment(task);
         await indexer.syncComment(C, String(comment._id));
-        expect(chunksOf(comment._id)).toEqual([]);
+        expect(chunksOf(comment._id).map((c) => [c.deleted, c.text, c.tombstoneReason])).toEqual([[true, '', 'task']]);
 
         rowOf(SCHEMA_TYPE.TASKS, task._id).deletedStatusKey = 0;
         taskChanged(rowOf(SCHEMA_TYPE.TASKS, task._id), ['deletedStatusKey']);

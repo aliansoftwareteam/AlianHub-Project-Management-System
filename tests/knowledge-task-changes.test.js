@@ -240,7 +240,41 @@ describe('restoring a project', () => {
     });
 });
 
+describe('restoring a project whose page keeps failing', () => {
+    it('still restores its comments, and reports the page', async () => {
+        const task = seedTask();
+        const comment = await indexed(task);
+        const page = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Broken', content: { html: '<p>x</p>' }, visibility: 'project', createdBy: AUTHOR, ProjectID: P1, deletedStatusKey: 0, updatedAt: at(1) });
+        await indexer.tombstoneProject(C, P1);
+        const crud = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async (companyId, q, method) => {
+            if (q.type === SCHEMA_TYPE.PAGES && method === 'findOne' && String(q.data[0]._id) === String(page._id)) throw new Error('corrupt page');
+            return crud(companyId, q, method);
+        });
+
+        try {
+            await expect(indexer.reindexProject(C, P1)).rejects.toThrow(/corrupt page/);
+        } finally {
+            mockDb.crud.mockImplementation(crud);
+        }
+
+        expect(live(comment._id)).toHaveLength(1);
+    });
+});
+
 describe('a deleted comment', () => {
+    it('cannot be written back by a read taken before it was deleted', async () => {
+        const task = seedTask();
+        const comment = await indexed(task, { updatedAt: at(1) });
+        const before = { ...rowOf(SCHEMA_TYPE.COMMENTS, comment._id) };
+        Object.assign(rowOf(SCHEMA_TYPE.COMMENTS, comment._id), { isDeleted: true, updatedAt: at(6) });
+        await indexer.syncComment(C, String(comment._id));
+
+        await indexer.ingestComment(C, before, { task: rowOf(SCHEMA_TYPE.TASKS, task._id) });
+
+        expect(live(comment._id)).toEqual([]);
+    });
+
     it('is tombstoned even when its task was stamped after the comment was last written', async () => {
         const task = seedTask();
         const comment = await indexed(task, { updatedAt: at(1) });
