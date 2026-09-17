@@ -37,7 +37,10 @@
                             <div class="ah-label">{{ $t('Parity.mcp_setup') }}</div>
                             <code class="conn__code ah-mono">{{ mcpCommand }}</code>
                             <div class="conn__actions">
-                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="minting" @click="mint">
+                                <router-link v-if="tokensNeedExpiry" class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'AiAccounts', params: { cid } }">
+                                    {{ $t('Parity.mint_on_accounts') }}
+                                </router-link>
+                                <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="minting" @click="mint">
                                     {{ minting ? $t('Parity.minting') : $t('Parity.mint_token') }}
                                 </button>
                                 <span class="ah-small">{{ $t('Parity.mcp_tools_count', { n: (mcpManifest.tools || []).length }) }}</span>
@@ -99,6 +102,8 @@ const minted = ref(null);
 const minting = ref(false);
 const mintError = ref("");
 const tokens = ref([]);
+// This one-click mint sends no expiry, which strict token mode refuses; the Accounts page asks for one.
+const tokensNeedExpiry = ref(false);
 const error = ref("");
 
 const MARKS = { github: "dark", gitlab: "orange", slack: "purple", google_calendar: "brand", microsoft_teams: "brand", zapier: "orange", custom_iframe: "grey" };
@@ -196,6 +201,7 @@ const loadTokens = async () => {
     const res = await apiRequest("get", env.API_TOKENS);
     const rows = res?.data?.status ? (res.data.data || []) : [];
     tokens.value = rows.filter((row) => row.kind === "agent");
+    tokensNeedExpiry.value = Boolean(res?.data?.policy?.strict);
 };
 
 onMounted(async () => {
