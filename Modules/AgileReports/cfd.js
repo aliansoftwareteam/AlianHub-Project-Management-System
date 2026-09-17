@@ -29,7 +29,8 @@ const flowFor = async (companyId, uid, projectId, { from, to } = {}) => {
 
     const rangeEnd = endOfDay(to ? new Date(to) : new Date());
     let rangeStart = startOfDay(from ? new Date(from) : new Date(rangeEnd.getTime() - 29 * 86400000));
-    let totalDays = Math.ceil((rangeEnd - rangeStart) / 86400000) + 1;
+    // Counted between day starts: end-of-day minus start-of-day rounded up drew one day past `to`.
+    let totalDays = Math.round((startOfDay(rangeEnd) - rangeStart) / 86400000) + 1;
     if (totalDays > MAX_DAYS) {
         totalDays = MAX_DAYS;
         rangeStart = startOfDay(new Date(rangeEnd.getTime() - (MAX_DAYS - 1) * 86400000));
