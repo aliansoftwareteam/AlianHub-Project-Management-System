@@ -23,6 +23,8 @@ const REASONS = Object.freeze({
     TASKS_NOT_FOUND: 'tasks_not_found',
     NULL_GLOBAL_FLAG: 'null_global_flag',
     CHECK_FAILED: 'check_failed',
+    UNRESOLVABLE_ID: 'unresolvable_id',
+    COMPANY_MISMATCH: 'company_mismatch',
 });
 
 const utcDay = (date) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));

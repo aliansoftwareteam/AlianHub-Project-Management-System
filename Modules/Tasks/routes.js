@@ -5,10 +5,11 @@ const advanceFilter = require('./helpers/manageGlobalFilter');
 const getTaskCtrl = require('./helpers/getTasksData');
 const { handleEvents } = require('../Company/eventController');
 const logger = require('../../Config/loggerConfig');
-const { requireTaskActionPermission, requirePermission } = require('../../Config/permissionGuard');
+const { requireTaskActionPermission, requireTaskWritePermission } = require('../../Config/permissionGuard');
+const { TASK_ACTIONS, PRE_V2_TASK_ACTIONS, RELATION_ACTIONS, TASK_WRITE_ROUTES, actionEntry } = require('../../Config/taskWritePermissions');
 
 exports.init = (app) => {
-    app.post('/api/tasks', (req, res) => {
+    app.post('/api/tasks', requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/tasks'].entry), (req, res) => {
         try {
             task.create(req.body)
             .then(() => {
@@ -24,7 +25,7 @@ exports.init = (app) => {
         }
     });
 
-    app.patch('/api/tasks/', (req, res) => {
+    app.patch('/api/tasks/', requireTaskActionPermission(PRE_V2_TASK_ACTIONS), (req, res) => {
         task[req.body.action](req.body)
         .then((response) => {
             res.send({status: true, statusText: 'Task updated successfully.',data:response});
@@ -35,7 +36,7 @@ exports.init = (app) => {
         });
     });
 
-    app.post('/api/v2/tasks', requirePermission('task.task_create'), (req, res) => {
+    app.post('/api/v2/tasks', requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v2/tasks'].entry), (req, res) => {
         try {
             taskMongo.create(req.body)
             .then((resData) => {
@@ -72,14 +73,8 @@ exports.init = (app) => {
         });
     });
 
-    // Bulk multi-task operations. Single endpoint, dynamic action dispatch —
-    // matches the PATCH /api/v2/tasks convention.
-    // Body: { action: 'bulkUpdateStatus' | 'bulkDelete' | ..., taskIds: [..], ...payload }
-    // CompanyId comes from the verified header set by the auth middleware;
-    // it overrides anything the client put in the body to prevent spoofing.
-    // requireTaskActionPermission judges only actions named in TASK_ACTION_PERMISSION, and no
-    // bulk action is named there yet; the map governs both endpoints so a bulk key cannot be missed.
-    app.post('/api/v2/tasks/bulk', requireTaskActionPermission(), (req, res) => {
+    // CompanyId comes from the verified header; it overrides anything the client put in the body to prevent spoofing.
+    app.post('/api/v2/tasks/bulk', requireTaskActionPermission(TASK_ACTIONS), (req, res) => {
         try {
             const action = req.body && req.body.action;
             if (!action || typeof action !== 'string' || !action.startsWith('bulk')) {
@@ -105,22 +100,13 @@ exports.init = (app) => {
         }
     });
 
-    // Task-to-task relations (blocks / blocked_by / duplicates / duplicated_by
-    // / relates_to). Single endpoint, explicit action allowlist — same dispatch
-    // + verified-header companyId convention as POST /api/v2/tasks/bulk above.
-    // Body: { action: 'add' | 'remove' | 'list', taskId, relatedTaskId?, type?, userData? }
-    app.post('/api/v2/tasks/relations', (req, res) => {
+    app.post('/api/v2/tasks/relations', requireTaskActionPermission(RELATION_ACTIONS), (req, res) => {
         try {
-            const RELATION_ACTIONS = {
-                add: 'addTaskRelation',
-                remove: 'removeTaskRelation',
-                list: 'getTaskRelations',
-                openBlockers: 'getOpenBlockers',
-            };
-            const method = RELATION_ACTIONS[req.body && req.body.action];
-            if (!method) {
+            const relation = actionEntry(RELATION_ACTIONS, req.body && req.body.action);
+            if (!relation) {
                 return res.send({ status: false, statusText: 'Invalid relation action' });
             }
+            const { method } = relation;
             const headerCompanyId = req.headers['companyid'] || '';
             const payload = { ...req.body, companyId: headerCompanyId };
 
@@ -138,7 +124,7 @@ exports.init = (app) => {
         }
     });
 
-    app.patch('/api/v1/importTasks', (req, res) => {
+    app.patch('/api/v1/importTasks', requireTaskWritePermission(TASK_WRITE_ROUTES['PATCH /api/v1/importTasks'].entry), (req, res) => {
         taskMongo.createMultipleTasks(req.body)
         .then((response) => {
             res.send({status: true, statusText: 'Task updated successfully.',data:response});
