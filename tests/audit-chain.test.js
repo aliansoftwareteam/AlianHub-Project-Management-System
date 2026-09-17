@@ -273,6 +273,24 @@ describe('verifying the chain', () => {
         ]);
     });
 
+    it('keeps re-checking rows it has already verified, including rows not on the page', async () => {
+        await writeRows(1, 6);
+        const page = () => [5, 6].map((seq) => ({ row: bySeq(seq), amendments: [] }));
+        expect(await chain.annotateIntegrity(CID, page())).toEqual([{ state: 'verified' }, { state: 'verified' }]);
+
+        bySeq(2).meta = { ...bySeq(2).meta, fields: ['owner'] };
+        expect(await chain.annotateIntegrity(CID, page())).toEqual([{ state: 'broken', brokenAt: 2 }, { state: 'broken', brokenAt: 2 }]);
+    });
+
+    it('notices a row deleted below the part it has already verified', async () => {
+        await writeRows(1, 6);
+        const page = () => [5, 6].map((seq) => ({ row: bySeq(seq), amendments: [] }));
+        expect(await chain.annotateIntegrity(CID, page())).toEqual([{ state: 'verified' }, { state: 'verified' }]);
+
+        removeAudit((r) => r.chain.seq === 3);
+        expect(await chain.annotateIntegrity(CID, page())).toEqual([{ state: 'broken', brokenAt: 3 }, { state: 'broken', brokenAt: 3 }]);
+    });
+
     it('reports rows as unverified when the key is not available to check them', async () => {
         await writeRows(1, 2);
         delete process.env.AUDIT_CHAIN_KEY;
