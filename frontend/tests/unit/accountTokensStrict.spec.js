@@ -26,7 +26,7 @@ const usedAt = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
 
 const token = (over) => ({ _id: over.name, prefix: 'ahp_1234abcd', scopes: ['read', 'write'], active: true, createdAt: new Date(Date.now() - 400 * DAY).toISOString(), lastUsedAt: null, expiresAt: null, graceState: null, graceEndsAt: null, projectIds: [], ...over });
 
-const policyOf = (strict) => ({ strict, graceDays: 30, graceEndsAt: strict ? graceEndsAt : null, minExpiryDays: 1, maxExpiryDays: 365 });
+const policyOf = (strict) => ({ strict, graceDays: 30, strictSince: strict ? new Date(Date.now() - 18 * DAY).toISOString() : null, minExpiryDays: 1, maxExpiryDays: 365 });
 
 const serve = ({ strict, tokens = [] }) => {
     apiRequest.mockImplementation((method, url) => {
@@ -120,7 +120,7 @@ describe('the token list under strict mode', () => {
         expect(rows[1].text()).toContain(t('Accounts.never_used'));
     });
 
-    it('marks a token in its grace with the day it must be replaced by, and a stopped one with the day it stopped', async () => {
+    it('says until when a token without an expiry works, and on which day one stopped', async () => {
         const wrapper = await openTokens({
             strict: true,
             tokens: [
@@ -130,11 +130,13 @@ describe('the token list under strict mode', () => {
             ]
         });
         const [grace, stopped, fine] = wrapper.findAll('.acct-token');
-        expect(grace.find('[data-test="token-grace"]').text()).toBe(t('Accounts.replace_by', { d: day(graceEndsAt) }));
-        expect(stopped.find('[data-test="token-stopped"]').text()).toBe(t('Accounts.stopped_on', { d: day(stoppedAt) }));
+        expect(grace.find('[data-test="token-grace"]').text()).toBe(t('Accounts.grace_works_until', { d: day(graceEndsAt) }));
+        expect(t('Accounts.grace_works_until', { d: 'X' })).toMatch(/works until X/);
+        expect(stopped.find('[data-test="token-stopped"]').text()).toBe(t('Accounts.grace_stopped_on', { d: day(stoppedAt) }));
+        expect(t('Accounts.grace_stopped_on', { d: 'X' })).toMatch(/stopped on X/);
         expect(fine.find('[data-test="token-grace"]').exists()).toBe(false);
         expect(fine.find('[data-test="token-stopped"]').exists()).toBe(false);
-        expect(wrapper.find('[data-test="token-strict-note"]').text()).toContain(day(graceEndsAt));
+        expect(wrapper.find('[data-test="token-strict-note"]').text()).toBe(t('Accounts.strict_note', { n: 30 }));
     });
 
     it('shows no grace marks when strict mode is off', async () => {

@@ -1,9 +1,20 @@
 const mockDb = require('./fixtures/fakeMongo').create();
-const mockHooks = { afterInstanceRead: null };
+const mockHooks = { afterInstanceRead: null, afterTokenRead: null, instanceReadError: false };
 
 /* fakeMongo has no upsert; the grace start is written with one when the instance
  * settings document does not exist yet, so that single case is emulated here. */
 const mockCrud = async (companyId, query, method) => {
+    if (method === 'findOne' && query.type === 'instance_settings' && mockHooks.instanceReadError) {
+        mockDb.calls.push({ companyId, type: query.type, method, data: query.data, failed: true });
+        throw new Error('connection reset');
+    }
+    if (method === 'findOne' && query.type === 'apiTokens' && mockHooks.afterTokenRead) {
+        const row = await mockDb.crud(companyId, query, method);
+        const hook = mockHooks.afterTokenRead;
+        mockHooks.afterTokenRead = null;
+        hook();
+        return row;
+    }
     if (method === 'findOne' && query.type === 'instance_settings' && mockHooks.afterInstanceRead) {
         const row = await mockDb.crud(companyId, query, method);
         const hook = mockHooks.afterInstanceRead;
@@ -27,6 +38,8 @@ const mockCrud = async (companyId, query, method) => {
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...args) => mockCrud(...args) }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
+
+const logger = require('../Config/loggerConfig');
 
 const DAY = 24 * 60 * 60 * 1000;
 const MINUTE = 60 * 1000;
@@ -95,6 +108,9 @@ const instanceWrites = () => mockDb.calls.filter((c) => c.type === INSTANCE && c
 
 beforeEach(() => {
     mockHooks.afterInstanceRead = null;
+    mockHooks.afterTokenRead = null;
+    mockHooks.instanceReadError = false;
+    logger.error.mockClear();
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask'] });
     clock(T0);
     Object.keys(mockDb.store).forEach((key) => { delete mockDb.store[key]; });
@@ -138,7 +154,7 @@ describe('API_TOKEN_STRICT off keeps today\'s behaviour', () => {
     it('lists tokens with strict mode reported off and no grace state', async () => {
         seedToken();
         const res = await call(ctrl.listTokens);
-        expect(res.body.policy).toMatchObject({ strict: false, graceEndsAt: null });
+        expect(res.body.policy).toMatchObject({ strict: false, strictSince: null });
         expect(res.body.data[0]).toMatchObject({ graceState: null, graceEndsAt: null });
     });
 
@@ -222,6 +238,50 @@ describe('a legacy token with no expiry gets 30 days from when strict mode was f
         expect(refused.body.error).toContain('2026-10-17');
     });
 
+    it('gives a token made after strict mode began 30 days from its own creation', async () => {
+        const { raw } = seedToken();
+        await ctrl.verifyToken(COMPANY, raw);
+
+        const late = seedToken({ name: 'Made later', createdAt: new Date(T0 + 20 * DAY) });
+        clock(T0 + 45 * DAY);
+        expect(await ctrl.verifyToken(COMPANY, raw)).toBeNull();
+        expect(await ctrl.verifyToken(COMPANY, late.raw)).toBeTruthy();
+
+        clock(T0 + 50 * DAY);
+        expect(await ctrl.verifyToken(COMPANY, late.raw)).toBeNull();
+        const refused = await throughJwt(late.raw);
+        expect(refused.body.error).toContain('2026-11-06');
+    });
+
+    it('turned off and back on after more than 30 days: old tokens stay stopped, tokens made while it was off get 30 days from creation', async () => {
+        const { raw: old } = seedToken({ name: 'Old' });
+        await ctrl.verifyToken(COMPANY, old);
+
+        strict(false);
+        boot();
+        clock(T0 + 10 * DAY);
+        const offEarly = seedToken({ name: 'Made while off, early', createdAt: new Date(T0 + 10 * DAY) });
+        clock(T0 + 25 * DAY);
+        const offLate = seedToken({ name: 'Made while off, late', createdAt: new Date(T0 + 25 * DAY) });
+        expect(await ctrl.verifyToken(COMPANY, old)).toBeTruthy();
+
+        clock(T0 + 45 * DAY);
+        strict(true);
+        boot();
+        expect(await ctrl.verifyToken(COMPANY, old)).toBeNull();
+        expect(await ctrl.verifyToken(COMPANY, offEarly.raw)).toBeNull();
+        expect(await ctrl.verifyToken(COMPANY, offLate.raw)).toBeTruthy();
+
+        const list = await call(ctrl.listTokens);
+        const row = (name) => list.body.data.find((t) => t.name === name);
+        expect(row('Old')).toMatchObject({ graceState: 'stopped' });
+        expect(new Date(row('Old').graceEndsAt).getTime()).toBe(T0 + 30 * DAY);
+        expect(row('Made while off, early')).toMatchObject({ graceState: 'stopped' });
+        expect(new Date(row('Made while off, early').graceEndsAt).getTime()).toBe(T0 + 40 * DAY);
+        expect(row('Made while off, late')).toMatchObject({ graceState: 'grace' });
+        expect(new Date(row('Made while off, late').graceEndsAt).getTime()).toBe(T0 + 55 * DAY);
+    });
+
     it('does not touch a token that has an expiry', async () => {
         const { raw } = seedToken({ scopes: ['read'], expiresAt: new Date(T0 + 200 * DAY) });
         await ctrl.verifyToken(COMPANY, raw);
@@ -235,7 +295,7 @@ describe('a legacy token with no expiry gets 30 days from when strict mode was f
 
         const during = await call(ctrl.listTokens);
         expect(during.body.policy).toMatchObject({ strict: true, graceDays: 30 });
-        expect(new Date(during.body.policy.graceEndsAt).getTime()).toBe(T0 + 30 * DAY);
+        expect(new Date(during.body.policy.strictSince).getTime()).toBe(T0);
         const legacy = during.body.data.find((t) => t.name === 'Legacy');
         expect(legacy.graceState).toBe('grace');
         expect(new Date(legacy.graceEndsAt).getTime()).toBe(T0 + 30 * DAY);
@@ -296,13 +356,21 @@ describe('lastUsedAt', () => {
         expect(new Date(storedLastUsed()).getTime()).toBe(T0 + 5 * MINUTE + 1);
     });
 
-    it('only overwrites a value that is still stale, so two servers do not both write', async () => {
+    it('does not overwrite a value another server refreshed after this one read the token', async () => {
         const { raw, doc } = seedToken({ scopes: ['read'], expiresAt: new Date(T0 + DAY), lastUsedAt: new Date(T0 - 10 * MINUTE) });
+        const stored = tokens().find((row) => row._id === doc._id);
+        mockHooks.afterTokenRead = () => { stored.lastUsedAt = new Date(T0 - 4 * MINUTE); };
         await ctrl.verifyToken(COMPANY, raw);
-        const [write] = lastUsedWrites();
-        const [filter] = write.data;
-        expect(String(filter._id)).toBe(String(doc._id));
-        expect(JSON.stringify(filter)).toContain('lastUsedAt');
+        expect(lastUsedWrites()).toHaveLength(1);
+        expect(stored.lastUsedAt.getTime()).toBe(T0 - 4 * MINUTE);
+    });
+
+    it('overwrites a stored value that is exactly five minutes old', async () => {
+        const { raw, doc } = seedToken({ scopes: ['read'], expiresAt: new Date(T0 + DAY), lastUsedAt: new Date(T0 - 10 * MINUTE) });
+        const stored = tokens().find((row) => row._id === doc._id);
+        mockHooks.afterTokenRead = () => { stored.lastUsedAt = new Date(T0 - 5 * MINUTE); };
+        await ctrl.verifyToken(COMPANY, raw);
+        expect(stored.lastUsedAt.getTime()).toBe(T0);
     });
 });
 
@@ -360,5 +428,47 @@ describe('the grace start', () => {
         mockHooks.afterInstanceRead = () => { doc.apiTokenStrictSince = new Date(T0 - 3 * DAY); };
         expect((await instanceSettings.markFirstSeen('apiTokenStrictSince', new Date(T0))).getTime()).toBe(T0 - 3 * DAY);
         expect(instanceDoc().apiTokenStrictSince.getTime()).toBe(T0 - 3 * DAY);
+    });
+});
+
+describe('when the grace start cannot be read', () => {
+    beforeEach(() => strict(true));
+
+    const instanceReads = () => mockDb.calls.filter((c) => c.type === INSTANCE && c.method === 'findOne');
+
+    it('treats a token without an expiry as stopped, and still accepts one with an expiry', async () => {
+        const legacy = seedToken();
+        const current = seedToken({ name: 'Current', scopes: ['read'], expiresAt: new Date(T0 + DAY) });
+        mockHooks.instanceReadError = true;
+
+        expect(await ctrl.verifyToken(COMPANY, legacy.raw)).toBeNull();
+        expect(await ctrl.verifyToken(COMPANY, current.raw)).toBeTruthy();
+        const refused = await throughJwt(legacy.raw);
+        expect(refused).toMatchObject({ passed: false, status: 401 });
+        expect(refused.body.error).toMatch(/no expiry/i);
+    });
+
+    it('retries at most once per window and logs once per window', async () => {
+        const legacy = seedToken();
+        mockHooks.instanceReadError = true;
+
+        for (let i = 0; i < 5; i += 1) await ctrl.verifyToken(COMPANY, legacy.raw);
+        clock(T0 + 20 * 1000);
+        await ctrl.verifyToken(COMPANY, legacy.raw);
+        expect(instanceReads()).toHaveLength(1);
+        expect(logger.error).toHaveBeenCalledTimes(1);
+
+        clock(T0 + 61 * 1000);
+        mockHooks.instanceReadError = false;
+        expect(await ctrl.verifyToken(COMPANY, legacy.raw)).toBeTruthy();
+        expect(instanceReads().length).toBeGreaterThan(1);
+    });
+
+    it('keeps using a start it already read', async () => {
+        const legacy = seedToken();
+        expect(await ctrl.verifyToken(COMPANY, legacy.raw)).toBeTruthy();
+        mockHooks.instanceReadError = true;
+        clock(T0 + 10 * DAY);
+        expect(await ctrl.verifyToken(COMPANY, legacy.raw)).toBeTruthy();
     });
 });

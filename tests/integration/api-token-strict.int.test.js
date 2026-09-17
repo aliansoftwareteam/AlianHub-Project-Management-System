@@ -2,7 +2,7 @@ const path = require('node:path');
 const { MongoClient } = require('mongodb');
 const { createApiClient } = require('../../e2e/support/api');
 const { STATE_DIR, resolveMongoUrl } = require('../../e2e/support/env');
-const { emailFor, login, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
+const { emailFor, login, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 const { startServer } = require('../../e2e/support/server');
 const { generateToken, hashToken, tokenPrefixOf } = require('../../Modules/ApiTokens/helpers/apiTokenRules');
 
@@ -118,6 +118,7 @@ describe('API tokens under API_TOKEN_STRICT', () => {
         const owner = await ownerOn(server.baseURL);
         const list = await owner.get('/api/v2/api-tokens');
         expect(list.body.policy).toMatchObject({ strict: true, graceDays: 30 });
+        expect(new Date(list.body.policy.strictSince).getTime()).toBe((await graceStart()).getTime());
         const row = list.body.data.find((t) => t.name === legacy.name);
         expect(row.graceState).toBe('grace');
         expect(new Date(row.graceEndsAt).getTime()).toBe((await graceStart()).getTime() + 30 * DAY);
@@ -147,4 +148,26 @@ describe('API tokens under API_TOKEN_STRICT', () => {
         expect(res.status).toBe(200);
         expect(res.body.data.scopes).toEqual([]);
     });
+});
+
+describe('a backup restore and the grace start', () => {
+    afterAll(() => setGraceStart(null));
+
+    it('keeps the recorded start when the backup was taken before strict mode was on', async () => {
+        await setGraceStart(null);
+        const { api } = await loginAs('owner');
+        const created = await api.post('/api/v2/instance/backups', {});
+        expect(created.status).toBe(200);
+        const { name } = created.body.data;
+        try {
+            const started = new Date(Date.now() - 12 * DAY);
+            await setGraceStart(started);
+            const restored = await api.post(`/api/v2/instance/backups/${name}/restore`, { confirm: name });
+            expect(restored.status).toBe(200);
+            expect(restored.body.status).toBe(true);
+            expect((await graceStart()).getTime()).toBe(started.getTime());
+        } finally {
+            await api.delete(`/api/v2/instance/backups/${name}`);
+        }
+    }, 90000);
 });
