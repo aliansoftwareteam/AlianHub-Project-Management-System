@@ -1,3 +1,5 @@
+process.env.STORAGE_TYPE = 'server';
+
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a), validateObjectId: (id) => /^[0-9a-fA-F]{24}$/.test(String(id)) }));
@@ -7,6 +9,9 @@ jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(async (
 jest.mock('../Modules/Pages/helpers/pageAi', () => ({ composePage: jest.fn(), isAiConfigured: () => false }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/Automations/engine', () => ({ defineRecurring: jest.fn(async () => undefined) }));
+jest.mock('../common-storage/common-server.js', () => ({ handleTaskAttachmentsDuplicateFunctionality: jest.fn() }));
+jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({ handleNotificationtFun: jest.fn() }));
+jest.mock('../Modules/AI/meetingNotes', () => ({ generateMeetingNotes: jest.fn(async () => ({ status: true, data: { summary: 'Summary.', actionItems: [] } })) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { dbCollections } = require('../Config/collections');
@@ -26,7 +31,7 @@ const OWNER = '6f0000000000000000000001';
 const PROJECT = '6f00000000000000000000a1';
 const ENV = process.env.KNOWLEDGE_INDEXER;
 
-const KNOWLEDGE_TYPES = [SCHEMA_TYPE.KNOWLEDGE_CHUNKS, SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE];
+const KNOWLEDGE_TYPES = [SCHEMA_TYPE.KNOWLEDGE_CHUNKS, SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS];
 const knowledgeCalls = () => mockDb.calls.filter((c) => KNOWLEDGE_TYPES.includes(c.type));
 const companyReads = () => mockDb.calls.filter((c) => c.companyId === dbCollections.GLOBAL && c.type === dbCollections.COMPANIES && c.method !== 'findOneAndUpdate');
 
@@ -116,5 +121,67 @@ describe('with KNOWLEDGE_INDEXER unset, nothing new runs, reads or writes', () =
         backfill.ensureBackfill(C);
         await events.drain();
         expect(mockDb.calls).toEqual([]);
+    });
+
+    it('saves, edits and deletes a comment, and posts and undoes an agent comment, with no knowledge read or write and nothing announced', async () => {
+        const comments = require('../Modules/Comments/controller');
+        const { executors } = require('../Modules/Agents/actions');
+        const { inverses } = require('../Modules/Agents/undo');
+        const task = mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Survey', CompanyId: C, ProjectID: PROJECT, sprintId: '6f00000000000000000000d1', deletedStatusKey: 0 });
+        const commentListeners = ['comments:insert', 'comments:update', 'comments_project:insert', 'comments_project:update'].map((name) => socketEmitter.listenerCount(name));
+        mockDb.calls.length = 0;
+
+        const saved = await call(comments.save, { body: { data: { message: 'Planks.', type: 'text', project: false, taskId: String(task._id), projectId: PROJECT, sprintId: '6f00000000000000000000d1' } } });
+        const id = String(saved.body.data._id);
+        await call(comments.update, { body: { id, data: { message: 'Steel.' } } });
+        await call(comments.update, { body: { id, data: { isDeleted: true } } });
+        const { result } = await executors['task.comment']({ companyId: C, actor: { kind: 'agent', agentId: '6f00000000000000000000e1', userId: OWNER }, params: { taskId: String(task._id), body: 'Booked.' } });
+        await inverses.comment(C, { commentId: result.commentId });
+        await events.drain();
+
+        expect(knowledgeCalls()).toEqual([]);
+        expect(companyReads()).toEqual([]);
+        expect(seen).toEqual([]);
+        expect(['comments:insert', 'comments:update', 'comments_project:insert', 'comments_project:update'].map((name) => socketEmitter.listenerCount(name))).toEqual(commentListeners);
+    });
+
+    it('saves, edits and discards call notes with no knowledge read or write and nothing announced', async () => {
+        const notes = require('../Modules/Calls/notes');
+        const before = ['calls:insert', 'calls:update'].map((name) => socketEmitter.listenerCount(name));
+
+        const created = await call(notes.createNotes, { body: { callId: 'call-off', participants: [], transcript: 'We met.' } });
+        const id = String(created.body.data._id);
+        await call(notes.updateNotes, { params: { id }, body: { summary: 'Edited.' } });
+        await call(notes.updateNotes, { params: { id }, body: { status: 'discarded' } });
+        await events.drain();
+
+        expect(knowledgeCalls()).toEqual([]);
+        expect(companyReads()).toEqual([]);
+        expect(seen).toEqual([]);
+        expect(['calls:insert', 'calls:update'].map((name) => socketEmitter.listenerCount(name))).toEqual(before);
+    });
+
+    it('does no work for a task deleted or moved to another sprint', async () => {
+        const task = { _id: '6f00000000000000000000e9', CompanyId: C, ProjectID: PROJECT, sprintId: '6f00000000000000000000d1' };
+        ['deletedStatusKey', 'sprintId'].forEach((field) => {
+            const changedFields = new Set([field]);
+            const type = domainEventBus.classifyTaskEvent('update', changedFields);
+            domainEventBus.bus.emit(type, domainEventBus.buildEnvelope({ companyId: C, type, doc: task, changedFields }));
+        });
+        await events.drain();
+        expect(mockDb.calls).toEqual([]);
+    });
+
+    it('retrieves comments and transcripts from their rows, never from chunks or the index state', async () => {
+        const task = mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Survey', ProjectID: PROJECT, deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.COMMENTS, { message: 'budget planks', type: 'text', projectId: PROJECT, taskId: String(task._id), userId: OWNER });
+        mockDb.seed(SCHEMA_TYPE.CALLS, { callId: 'c', title: 'Budget call', transcript: 'budget', participants: [OWNER], deletedStatusKey: 0 });
+        mockDb.calls.length = 0;
+
+        const { passages } = await retrieve({ companyId: C, caller: { kind: 'user', userId: OWNER }, query: 'budget', scope: { sourceTypes: ['comment', 'transcript'] } });
+
+        expect(passages.map((p) => p.sourceType).sort()).toEqual(['comment', 'transcript']);
+        expect(knowledgeCalls()).toEqual([]);
+        expect(companyReads()).toEqual([]);
     });
 });
