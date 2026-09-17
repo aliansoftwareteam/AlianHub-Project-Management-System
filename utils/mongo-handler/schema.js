@@ -1397,6 +1397,24 @@ const schema = {
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // One row per day, mode, method, route pattern, permission key, role, project scope and reason
+    // (Config/permissionDecisions.js). Never a request body or a query string.
+    permissionDecisions: {
+        day: { type: Date, required: true },
+        mode: { type: String, required: true },
+        method: { type: String, required: true },
+        route: { type: String, required: true },
+        permission: { type: String, required: true },
+        role: { type: Number, default: null, required: false },
+        scope: { type: String, required: true },
+        reason: { type: String, required: true },
+        count: { type: Number, required: false },
+        firstSeen: { type: Date, required: false },
+        lastSeen: { type: Date, required: false },
+        // When a permission.refused audit row was last written for this key, at most once a minute.
+        lastAuditedAt: { type: Date, required: false },
+        userIds: { type: [String], required: false },
+    },
     // Client invoices raised against a project (handoff 19c). Distinct from the
     // global `invoices` collection, which is AlianHub's own subscription billing.
     // Every line keeps the ids it was drafted from so a client question about a
@@ -1807,6 +1825,12 @@ const schema = {
         // "tenant" or "all"; absent is off under "tenant". An Object, not a nested path: a nested
         // path makes the company document a getter node-cache cannot clone, and every company read fails.
         knowledgeRetrieval: {
+            type: Object,
+            required: false
+        },
+        // { mode: 'off' | 'report' | 'enforce' } for browser sessions, read by Config/permissionEnforcement.js;
+        // absent inherits PERMISSION_ENFORCEMENT_MODE. An Object for the same reason as knowledgeRetrieval.
+        permissionEnforcement: {
             type: Object,
             required: false
         },

@@ -1,4 +1,7 @@
+const mongoose = require('mongoose');
 const { getRoleType, isPrivileged, ROLE_OWNER, ROLE_ADMIN } = require('../../../Config/permissionGuard');
+const { SCHEMA_TYPE } = require('../../../Config/schemaType');
+const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const logger = require('../../../Config/loggerConfig');
 
 const ACTIVE = 2;
@@ -7,10 +10,13 @@ const SELF_SERVICE_FIELDS = Object.freeze(['dashboardLocked']);
 const FIXED_FIELDS = Object.freeze(['_id', 'userId', 'companyId', 'userEmail', 'linkId', 'legacyId', 'demo', 'createdAt', 'updatedAt']);
 const INVITATION_FIELDS = Object.freeze(['userId', 'status']);
 
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+
 const allowed = Object.freeze({ ok: true });
 const refuse = (statusText, code = 403) => ({ ok: false, code, statusText });
 const has = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 const rootOf = (field) => String(field).split('.')[0];
+const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 const grantsPrivilege = (roleType) => Number(roleType) === ROLE_OWNER || Number(roleType) === ROLE_ADMIN;
 
 const judgeMemberUpdate = ({ callerId, callerRole, target, data, activeOwners }) => {
@@ -44,16 +50,47 @@ const judgeMemberUpdate = ({ callerId, callerRole, target, data, activeOwners })
     return allowed;
 };
 
-/* Accepting an invitation links the caller's own account and activates the seat; the role is whatever the invitation stored. */
-const judgeInvitationAcceptance = ({ callerId, callerEmail, invite, data }) => {
+const acceptanceShapeRefusal = (callerId, data) => {
     if (Object.keys(data).some((field) => !INVITATION_FIELDS.includes(field))) return refuse('Accepting an invitation only links your account to it.');
     if (has(data, 'userId') && String(data.userId) !== String(callerId)) return refuse('An invitation can only be linked to your own account.');
     if (has(data, 'status') && Number(data.status) !== ACTIVE) return refuse('Accepting an invitation can only activate it.');
+    return null;
+};
+
+/* Accepting an invitation links the caller's own account and activates the seat; the role is whatever the invitation stored. */
+const judgeInvitationAcceptance = ({ callerId, callerEmail, invite, data }) => {
+    const shape = acceptanceShapeRefusal(callerId, data);
+    if (shape) return shape;
     if (invite.isDelete === true || invite.status === CANCELLED) return refuse('That invitation is no longer valid.');
     const linkedToCaller = Boolean(invite.userId) && String(invite.userId) === String(callerId);
     const sentToCaller = Boolean(callerEmail) && String(invite.userEmail || '').toLowerCase() === String(callerEmail).toLowerCase();
     if (!linkedToCaller && !sentToCaller) return refuse('That invitation was sent to someone else.');
     return allowed;
+};
+
+/*
+ * For the root-members route guard. The invitee holds no seat yet and Invitation.vue sends no company header,
+ * so no permission key can answer; the handler checks the invitation is the caller's.
+ */
+const isOwnInvitationAcceptance = (req) => {
+    const { id, data, companyId } = (req && req.body) || {};
+    const callerId = String((req && req.uid) || '');
+    return [id, companyId, callerId].every((value) => OBJECT_ID.test(String(value || '')))
+        && isPlainObject(data) && acceptanceShapeRefusal(callerId, data) === null;
+};
+
+/* For the members route guard: the self-service branch of judgeMemberUpdate, which needs no member-list permission. */
+const isOwnPreferenceUpdate = async (req) => {
+    const { id, data } = (req && req.body) || {};
+    const companyId = String((req && req.headers && req.headers['companyid']) || '');
+    const callerId = String((req && req.uid) || '');
+    if (![id, companyId, callerId].every((value) => OBJECT_ID.test(String(value || ''))) || !isPlainObject(data)) return false;
+    if (Object.keys(data).some((field) => !SELF_SERVICE_FIELDS.includes(rootOf(field)))) return false;
+    const target = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMPANY_USERS,
+        data: [{ _id: new mongoose.Types.ObjectId(String(id)) }],
+    }, 'findOne');
+    return Boolean(target) && judgeMemberUpdate({ callerId, callerRole: null, target, data, activeOwners: 0 }).ok;
 };
 
 const grantRefusal = (callerRole, roles) => {
@@ -86,6 +123,8 @@ module.exports = {
     SELF_SERVICE_FIELDS,
     judgeMemberUpdate,
     judgeInvitationAcceptance,
+    isOwnInvitationAcceptance,
+    isOwnPreferenceUpdate,
     guardInvitation,
     guardUserImport,
 };
