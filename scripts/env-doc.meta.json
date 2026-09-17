@@ -9,6 +9,11 @@
     "description": "Minutes between runs of the agent rate-alert evaluator (error rate, approval rate, cost forecast, queue age).",
     "default": "15"
   },
+  "AGENT_PERFORMANCE_READ": {
+    "group": "ai",
+    "description": "The performance.read agent action: \"on\" registers it and offers it over MCP, so an agent can read logged time, estimate against actual, sprint velocity and cumulative flow for up to 5 projects over at most 120 days, as the person behind the agent and with each query and its numbers kept in the replay record; default \"off\" leaves the registry and the MCP tool list as they were.",
+    "default": "off"
+  },
   "AGENT_PROPOSAL_STUCK_MINUTES": {
     "group": "jobs",
     "description": "Minutes an agent proposal may sit in 'applying' before the reaper fails it.",

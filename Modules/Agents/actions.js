@@ -53,11 +53,18 @@ const RATINGS = Object.freeze({
     'deploy.staging': write(SCOPE.WORKSPACE, false),
 });
 
+// Rated only while the registry holds them, so a flag that is off leaves no rating behind.
+const FLAGGED_RATINGS = Object.freeze({
+    'performance.read': read(SCOPE.PROJECT),
+});
+
+const ratingTable = () => ({ ...RATINGS, ...Object.fromEntries(Object.entries(FLAGGED_RATINGS).filter(([k]) => registry.has(k))) });
+
 const isCompleteRating = (r) => Boolean(r) && typeof r.write === 'boolean' && typeof r.reversible === 'boolean'
     && Object.values(SCOPE).includes(r.scope) && typeof r.money === 'boolean';
-const rating = (key) => (isCompleteRating(RATINGS[String(key || '')]) ? { ...RATINGS[String(key)] } : null);
-const ratings = () => Object.fromEntries(Object.entries(RATINGS).map(([k, v]) => [k, { ...v }]));
-const unrated = (keys = registry.keys()) => keys.filter((k) => !isCompleteRating(RATINGS[k]));
+const rating = (key) => { const r = ratingTable()[String(key || '')]; return isCompleteRating(r) ? { ...r } : null; };
+const ratings = () => Object.fromEntries(Object.entries(ratingTable()).map(([k, v]) => [k, { ...v }]));
+const unrated = (keys = registry.keys()) => { const table = ratingTable(); return keys.filter((k) => !isCompleteRating(table[k])); };
 
 /* The registry manifest with each action's rating — what GET /agents/registry serves. */
 const manifest = () => {
@@ -243,8 +250,8 @@ const executors = {
     },
 };
 
-const refusal = async (companyId, actor, { action, params, reason, ip }) => {
-    const auditId = await audit.recordRefusal(companyId, actor, { action, reason, params, entityId: params.taskId, ip });
+const refusal = async (companyId, actor, { action, params, reason, ip, entityType, entityId }) => {
+    const auditId = await audit.recordRefusal(companyId, actor, { action, reason, params, entityType, entityId: entityId || params.taskId, ip });
     return new RefusedError(reason, auditId);
 };
 
@@ -285,4 +292,4 @@ const authorizeRead = async ({ companyId, actor, action, params = {}, ip = '', a
     return true;
 };
 
-module.exports = { perform, authorizeRead, RefusedError, executors, workEntry, SCOPE, RATING_KEYS, RATINGS, rating, ratings, unrated, isCompleteRating, manifest };
+module.exports = { perform, authorizeRead, refusal, RefusedError, executors, workEntry, SCOPE, RATING_KEYS, RATINGS, rating, ratings, unrated, isCompleteRating, manifest };

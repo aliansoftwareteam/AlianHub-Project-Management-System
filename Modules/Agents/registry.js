@@ -7,6 +7,8 @@
 // has nothing to switch on. The guard, the MCP server and the proposal approver
 // all resolve actions through this one file.
 
+const performanceFlag = require('./performanceFlag');
+
 // `permission` names the Security & Permissions catalogue entry
 // (Config/permissionGuard) that governs the same operation for a person.
 // perform() evaluates it for the person behind the agent, so a token never
@@ -51,11 +53,20 @@ const ACTIONS = Object.freeze([
       gate: 'owner_admin', proposeOnly: true, permission: 'settings.settings_edit_company' },
 ]);
 
+// Registered only while their flag is on. ACTIONS stays the unflagged list, so
+// everything that reads it directly is unchanged whatever the flags say.
+const FLAGGED = Object.freeze([
+    {
+        enabled: performanceFlag.enabled,
+        action: Object.freeze({ key: performanceFlag.ACTION, label: 'Read project performance numbers', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' }),
+    },
+]);
+
 /* A string maps the whole action at its own level (write for writes, read for
  * reads); { key, write } pins the level; { byField } holds each task.update
  * field to the entry a person editing that field is held to. */
 const permissionsFor = (key, params = {}) => {
-    const action = BY_KEY.get(String(key || ''));
+    const action = get(key);
     if (!action) return [];
     const p = action.permission;
     if (typeof p === 'string') return [{ key: p, write: Boolean(action.write) }];
@@ -107,10 +118,33 @@ const indexActions = (actions) => {
 };
 
 const BY_KEY = indexActions(validate(ACTIONS));
+indexActions(validate(FLAGGED.map((f) => f.action)));
+const FLAGGED_BY_KEY = new Map(FLAGGED.map((f) => [f.action.key, f]));
 
-const get = (key) => BY_KEY.get(String(key || '')) || null;
-const has = (key) => BY_KEY.has(String(key || ''));
-const keys = () => ACTIONS.map((a) => a.key);
+const active = () => [...ACTIONS, ...FLAGGED.filter((f) => f.enabled()).map((f) => f.action)];
+
+const get = (key) => {
+    const k = String(key || '');
+    if (BY_KEY.has(k)) return BY_KEY.get(k);
+    const flagged = FLAGGED_BY_KEY.get(k);
+    return flagged && flagged.enabled() ? flagged.action : null;
+};
+const has = (key) => Boolean(get(key));
+const keys = () => active().map((a) => a.key);
+const knows = (key) => BY_KEY.has(String(key || '')) || FLAGGED_BY_KEY.has(String(key || ''));
+
+/* An agent's allowed list narrows it and an empty list allows everything, so a save
+ * keeps every name the registry knows whether or not its flag is on (evaluate ignores
+ * the ones that are off), and a list that names only unknown actions is refused
+ * rather than stored empty. */
+const allowedActionsToStore = (list) => {
+    const given = (Array.isArray(list) ? list : []).map(String);
+    const kept = given.filter(knows);
+    if (given.length && !kept.length) {
+        throw Object.assign(new Error('allowedActions names no action an agent can be given, and an empty list would allow every action.'), { status: 400 });
+    }
+    return kept;
+};
 
 const normalizeName = (v) => String(v || '').trim().toLowerCase();
 
@@ -173,7 +207,7 @@ const mayActDirectly = (autonomy, key) => {
 };
 
 const manifest = () => ({
-    actions: ACTIONS.map((a) => ({ ...a })),
+    actions: active().map((a) => ({ ...a })),
     never: [...NEVER],
     agentStatusNames: [...AGENT_STATUS_NAMES],
     autonomy: Object.entries(AUTONOMY).map(([level, v]) => ({ level: Number(level), ...v })),
@@ -181,5 +215,5 @@ const manifest = () => ({
 
 module.exports = {
     ACTIONS, NEVER, RISK, AUTONOMY, DONE_STATUS_TYPE, DONE_STATUS_TYPES, AGENT_STATUS_NAMES,
-    get, has, keys, isNever, indexActions, evaluate, isAgentSettableStatus, mayActDirectly, manifest, permissionsFor, validate,
+    get, has, keys, knows, allowedActionsToStore, isNever, indexActions, evaluate, isAgentSettableStatus, mayActDirectly, manifest, permissionsFor, validate,
 };

@@ -7,6 +7,7 @@ const { buildBrief } = require('./brief');
 const { htmlToRawText, pageVisibleTo } = require('../Pages/helpers/pageRules');
 const { blocksToRawText, contentToEditorData } = require('../Pages/helpers/pageContent');
 const { hasScope } = require('../ApiTokens/helpers/apiTokenRules');
+const performanceRead = require('../Agents/performanceRead');
 
 const PAGE_TEXT_MAX = 40000;
 
@@ -167,11 +168,35 @@ const TOOLS = [
     },
 ];
 
-const BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
+// Offered only while the registry holds their action; TOOLS stays the unflagged list.
+const FLAGGED_TOOLS = [
+    {
+        name: performanceRead.ACTION,
+        action: performanceRead.ACTION,
+        description: `Numbers for up to ${performanceRead.MAX_PROJECTS} projects over a date range of at most ${performanceRead.MAX_RANGE_DAYS} days: logged time (minutes), estimate against actual (minutes), sprint velocity (story points) and cumulative flow. Quote these numbers rather than estimating; each call is kept in the run's replay record.`,
+        input: {
+            type: 'object',
+            properties: {
+                projectId: { type: 'string' },
+                projectIds: { type: 'array', items: { type: 'string' }, maxItems: performanceRead.MAX_PROJECTS },
+                from: { type: 'string', description: 'First day, YYYY-MM-DD' },
+                to: { type: 'string', description: 'Last day, YYYY-MM-DD' },
+                metrics: { type: 'array', items: { type: 'string', enum: [...performanceRead.METRICS] } },
+            },
+            required: ['from', 'to'],
+        },
+        // Judged per project inside read(): a company-wide check first would refuse a
+        // member whose grant comes from the project's own rules.
+        authorizesPerProject: true,
+        run: (ctx, args) => performanceRead.read({ companyId: ctx.companyId, actor: ctx.actor, args, projectScope: ctx.projectIds, allowedActions: ctx.allowedActions, ip: ctx.ip }),
+    },
+];
 
-const names = () => TOOLS.map((t) => t.name);
+const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action))];
 
-const manifest = () => TOOLS.map((t) => ({
+const names = () => offered().map((t) => t.name);
+
+const manifest = () => offered().map((t) => ({
     name: t.name,
     description: t.description,
     inputSchema: t.input,
@@ -180,14 +205,14 @@ const manifest = () => TOOLS.map((t) => ({
 /* Run a tool for an MCP caller. Reads are authorised through the registry;
  * writes go through actions.perform, so they are audited and undoable. */
 const call = async (ctx, name, args = {}) => {
-    const tool = BY_NAME.get(String(name));
+    const tool = offered().find((t) => t.name === String(name));
     if (!tool) throw Object.assign(new Error(`Unknown tool "${name}"`), { code: -32601 });
 
     if (tool.run) {
         if (!hasScope(ctx.token, 'read')) {
             throw Object.assign(new Error('This token lacks the read scope.'), { code: -32004 });
         }
-        await actions.authorizeRead({
+        if (!tool.authorizesPerProject) await actions.authorizeRead({
             companyId: ctx.companyId, actor: ctx.actor, action: tool.action,
             params: { taskId: args.taskId }, ip: ctx.ip, allowedActions: ctx.allowedActions,
         });

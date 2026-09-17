@@ -103,7 +103,7 @@ const agentPatchFields = (body) => {
     if (body.name !== undefined) set.name = String(body.name).trim().slice(0, 80);
     if (body.description !== undefined) set.description = String(body.description).slice(0, 1000);
     if (body.skills !== undefined && Array.isArray(body.skills)) set.skills = body.skills.slice(0, 20).map(normaliseSkill).filter(Boolean);
-    if (body.allowedActions !== undefined && Array.isArray(body.allowedActions)) set.allowedActions = body.allowedActions.filter((a) => registry.has(a));
+    if (body.allowedActions !== undefined && Array.isArray(body.allowedActions)) set.allowedActions = registry.allowedActionsToStore(body.allowedActions);
     if (body.projectIds !== undefined && Array.isArray(body.projectIds)) set.projectIds = body.projectIds.filter((id) => OBJECT_ID.test(String(id))).map(String);
     if (body.autonomy !== undefined) set.autonomy = autonomyOf(body.autonomy);
     if (body.spendCapUsd !== undefined) set.spendCapUsd = Math.max(0, Number(body.spendCapUsd) || 0);
