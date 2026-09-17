@@ -131,6 +131,20 @@ const get = (key) => {
 };
 const has = (key) => Boolean(get(key));
 const keys = () => active().map((a) => a.key);
+const knows = (key) => BY_KEY.has(String(key || '')) || FLAGGED_BY_KEY.has(String(key || ''));
+
+/* An agent's allowed list narrows it and an empty list allows everything, so a save
+ * keeps every name the registry knows whether or not its flag is on (evaluate ignores
+ * the ones that are off), and a list that names only unknown actions is refused
+ * rather than stored empty. */
+const allowedActionsToStore = (list) => {
+    const given = (Array.isArray(list) ? list : []).map(String);
+    const kept = given.filter(knows);
+    if (given.length && !kept.length) {
+        throw Object.assign(new Error('allowedActions names no action an agent can be given, and an empty list would allow every action.'), { status: 400 });
+    }
+    return kept;
+};
 
 const normalizeName = (v) => String(v || '').trim().toLowerCase();
 
@@ -201,5 +215,5 @@ const manifest = () => ({
 
 module.exports = {
     ACTIONS, NEVER, RISK, AUTONOMY, DONE_STATUS_TYPE, DONE_STATUS_TYPES, AGENT_STATUS_NAMES,
-    get, has, keys, isNever, indexActions, evaluate, isAgentSettableStatus, mayActDirectly, manifest, permissionsFor, validate,
+    get, has, keys, knows, allowedActionsToStore, isNever, indexActions, evaluate, isAgentSettableStatus, mayActDirectly, manifest, permissionsFor, validate,
 };
