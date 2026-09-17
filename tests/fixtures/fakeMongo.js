@@ -1,7 +1,8 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
 // language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type, $set/$inc/$push,
-// conditional findOneAndUpdate, updateOne with upsert and $setOnInsert, findOneAndDelete, deleteOne, deleteMany, sort/limit on find, $match/$group aggregate, declared unique indexes that
-// reject a duplicate save with E11000) so a test can assert on what was written.
+// conditional findOneAndUpdate, updateOne and findOneAndUpdate with upsert and $setOnInsert, findOneAndDelete, deleteOne, deleteMany,
+// sort/limit on find, $match/$project/$addFields/$group/$replaceRoot aggregate with a word-count textScore, declared unique indexes that
+// reject a duplicate save or upsert with E11000) so a test can assert on what was written.
 
 let seq = 1;
 const nextId = () => String(seq++).padStart(24, '0');
@@ -16,6 +17,12 @@ const words = (s) => String(s == null ? '' : s).toLowerCase().match(/[\p{L}\p{N}
 const textMatches = (doc, search) => {
     const have = new Set(Object.values(doc).filter((v) => typeof v === 'string').flatMap(words));
     return words(search).some((w) => have.has(w));
+};
+
+/* How often the searched words occur in a row's string fields: enough to rank a row that repeats a word above one that says it once. */
+const textScoreOf = (doc, search) => {
+    const wanted = new Set(words(search));
+    return Object.values(doc).filter((v) => typeof v === 'string').flatMap(words).filter((w) => wanted.has(w)).length;
 };
 
 const matches = (doc, filter = {}) => Object.entries(filter).every(([key, cond]) => {
@@ -89,30 +96,49 @@ const ordered = (list, options = {}) => {
     return options.limit ? out.slice(0, options.limit) : out;
 };
 
-const fieldOf = (doc, ref) => (typeof ref === 'string' && ref.startsWith('$') ? read(doc, ref.slice(1)) : ref);
+const fieldOf = (doc, ref) => {
+    if (ref === '$$ROOT') return doc;
+    return typeof ref === 'string' && ref.startsWith('$') ? read(doc, ref.slice(1)) : ref;
+};
 const groupKeyOf = (doc, id) => (id && typeof id === 'object' ? Object.fromEntries(Object.entries(id).map(([k, ref]) => [k, fieldOf(doc, ref)])) : fieldOf(doc, id));
 const ACCUMULATORS = {
     $sum: (prev, v) => (prev || 0) + (typeof v === 'number' ? v : 0),
     $max: (prev, v) => (v == null || (prev != null && sortable(prev) >= sortable(v)) ? prev : v),
+    $first: (prev, v, seen) => (seen ? prev : v),
 };
 
-/* $group with a field or compound _id and $sum / $max; a group naming no accumulator counts into `n`. */
+/* $group with a field or compound _id and $sum / $max / $first; a group naming no accumulator counts into `n`. */
 const group = (docs, spec) => {
     const fields = Object.entries(spec).filter(([name]) => name !== '_id');
     const out = new Map();
     docs.forEach((d) => {
         const id = groupKeyOf(d, spec._id);
         const key = JSON.stringify(id);
+        const seen = out.has(key);
         const acc = out.get(key) || { _id: id };
         if (!fields.length) acc.n = (acc.n || 0) + 1;
         fields.forEach(([name, op]) => {
             const [kind, ref] = Object.entries(op)[0];
             if (!ACCUMULATORS[kind]) throw new Error(`fakeMongo: unsupported accumulator ${kind}`);
-            acc[name] = ACCUMULATORS[kind](acc[name], fieldOf(d, ref));
+            acc[name] = ACCUMULATORS[kind](acc[name], fieldOf(d, ref), seen);
         });
         out.set(key, acc);
     });
     return [...out.values()];
+};
+
+const computed = (doc, value, search) => {
+    if (value && typeof value === 'object' && value.$meta === 'textScore') return textScoreOf(doc, search);
+    return fieldOf(doc, value);
+};
+
+const project = (doc, spec, search) => {
+    const out = spec._id === 0 ? {} : { _id: doc._id };
+    Object.entries(spec).filter(([key]) => key !== '_id').forEach(([key, value]) => {
+        const kept = value === 1 || value === true ? read(doc, key) : computed(doc, value, search);
+        if (kept !== undefined) write(out, key, (target, last) => { target[last] = kept; });
+    });
+    return out;
 };
 
 const duplicateKey = (fields) => Object.assign(new Error(`E11000 duplicate key error collection: fake index: ${fields.join('_1_')}_1`), { code: 11000 });
@@ -126,6 +152,14 @@ const create = () => {
     const covered = (index, doc) => (index.partial ? matches(doc, index.partial) : true);
     const collides = (type, doc) => (uniques[type] || []).find((index) => covered(index, doc)
         && rows(type).some((other) => covered(index, other) && index.fields.every((f) => String(read(other, f)) === String(read(doc, f)))));
+
+    const insertUpserted = (type, filter, update) => {
+        const inserted = upserted(filter, update);
+        const hit = collides(type, inserted);
+        if (hit) throw duplicateKey(hit.fields);
+        rows(type).push(inserted);
+        return inserted;
+    };
 
     const crud = jest.fn(async (companyId, { type, data }, method) => {
         calls.push({ companyId, type, method, data });
@@ -142,15 +176,16 @@ const create = () => {
         if (method === 'countDocuments') return list.filter((d) => matches(d, data[0])).length;
         if (method === 'deleteOne') { const index = list.findIndex((d) => matches(d, data[0])); if (index !== -1) list.splice(index, 1); return { deletedCount: index === -1 ? 0 : 1 }; }
         if (method === 'deleteMany') { const kept = list.filter((d) => !matches(d, data[0])); store[type] = kept; return { deletedCount: list.length - kept.length }; }
-        if (method === 'findOneAndUpdate') { const doc = list.find((d) => matches(d, data[0])); if (!doc) return null; apply(doc, data[1]); return clone(doc); }
+        if (method === 'findOneAndUpdate') {
+            const doc = list.find((d) => matches(d, data[0]));
+            if (doc) { apply(doc, data[1]); return clone(doc); }
+            return data[2] && data[2].upsert ? clone(insertUpserted(type, data[0], data[1])) : null;
+        }
         if (method === 'updateOne') {
             const doc = list.find((d) => matches(d, data[0]));
             if (doc) { apply(doc, data[1]); return { modifiedCount: 1 }; }
             if (!(data[2] && data[2].upsert)) return { modifiedCount: 0 };
-            const inserted = upserted(data[0], data[1]);
-            const hit = collides(type, inserted);
-            if (hit) throw duplicateKey(hit.fields);
-            list.push(inserted);
+            const inserted = insertUpserted(type, data[0], data[1]);
             return { modifiedCount: 0, upsertedCount: 1, upsertedId: inserted._id };
         }
         if (method === 'updateMany') { const hit = list.filter((d) => matches(d, data[0])); hit.forEach((d) => apply(d, data[1])); return { modifiedCount: hit.length }; }
@@ -158,8 +193,15 @@ const create = () => {
         if (method === 'deleteOne') { const at = list.findIndex((d) => matches(d, data[0])); if (at !== -1) list.splice(at, 1); return { deletedCount: at === -1 ? 0 : 1 }; }
         if (method === 'aggregate') {
             const [pipeline] = data;
+            let search = '';
             return pipeline.reduce((docs, stage) => {
-                if (stage.$match) return docs.filter((d) => matches(d, stage.$match));
+                if (stage.$match) {
+                    if (stage.$match.$text) search = stage.$match.$text.$search;
+                    return docs.filter((d) => matches(d, stage.$match));
+                }
+                if (stage.$project) return docs.map((d) => project(d, stage.$project, search));
+                if (stage.$addFields) return docs.map((d) => ({ ...d, ...Object.fromEntries(Object.entries(stage.$addFields).map(([k, v]) => [k, computed(d, v, search)])) }));
+                if (stage.$replaceRoot) return docs.map((d) => ({ ...fieldOf(d, stage.$replaceRoot.newRoot) }));
                 if (stage.$group) return group(docs, stage.$group);
                 if (stage.$sort) return ordered(docs, { sort: stage.$sort });
                 if (stage.$skip) return docs.slice(stage.$skip);

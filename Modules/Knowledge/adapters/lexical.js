@@ -1,11 +1,13 @@
+const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { escapeRegex } = require('../../../utils/escapeRegex');
 const logger = require('../../../Config/loggerConfig');
-const { SOURCE_COLLECTIONS } = require('../visibleSet');
+const { SOURCE_COLLECTIONS, SOURCE_TYPES } = require('../visibleSet');
 
-// The lexical backend searches the source rows themselves through the tenant's
-// full-text indexes, so there is nothing to upsert, tombstone or erase: a
-// deleted row stops matching the moment it is deleted.
+// The lexical backend searches through the tenant's full-text indexes: the source rows
+// themselves, or for pages the chunk store when the filter says the page index is built.
+// The chunk store is written by Modules/Knowledge/ingest, so upsert, tombstone and erase
+// stay no-ops here.
 
 const MAX_TEXT_TERMS = 16;
 const MAX_REGEX_TERMS = 8;
@@ -41,6 +43,20 @@ const SOURCES = {
         body: (row) => row.message,
         projectId: (row) => row.projectId,
         authorKind: (row) => (row.isAgent || row.actorType === 'agent' ? 'agent' : 'user'),
+    },
+    pageChunk: {
+        sourceType: 'page',
+        collection: SCHEMA_TYPE.KNOWLEDGE_CHUNKS,
+        textIndex: true,
+        regexFields: ['text'],
+        fields: ['sourceId', 'title', 'text', 'projectId', 'authorKind', 'sourceUpdatedAt', 'updatedAt'],
+        sourceId: (row) => row.sourceId,
+        title: (row) => row.title,
+        body: (row) => row.text,
+        projectId: (row) => row.projectId,
+        authorKind: (row) => (row.authorKind === 'agent' ? 'agent' : 'user'),
+        updatedAt: (row) => row.sourceUpdatedAt || row.updatedAt || null,
+        chunked: true,
     },
     transcript: {
         textIndex: false,
@@ -90,9 +106,10 @@ const regexScore = (source, row, terms) => {
     return terms.filter((t) => haystack.includes(t)).length / terms.length;
 };
 
-const toPassage = (sourceType, row, score, terms) => {
-    const source = SOURCES[sourceType];
-    const sourceId = String(row._id);
+const toPassage = (key, row, score, terms) => {
+    const source = SOURCES[key];
+    const sourceType = source.sourceType || key;
+    const sourceId = String(source.sourceId ? source.sourceId(row) : row._id);
     return {
         id: `${sourceType}:${sourceId}`,
         sourceType,
@@ -102,14 +119,14 @@ const toPassage = (sourceType, row, score, terms) => {
         excerpt: excerptOf(source.body(row), terms),
         score,
         authorKind: source.authorKind(row),
-        updatedAt: row.updatedAt || row.createdAt || null,
+        updatedAt: source.updatedAt ? source.updatedAt(row) : (row.updatedAt || row.createdAt || null),
     };
 };
 
 /* lean, because the text score is not a schema path: a hydrated document hides it. */
-const find = (companyId, sourceType, where, withScore, options) => MongoDbCrudOpration(companyId, {
-    type: SOURCE_COLLECTIONS[sourceType],
-    data: [where, projectionOf(SOURCES[sourceType], withScore), options],
+const find = (companyId, key, where, withScore, options) => MongoDbCrudOpration(companyId, {
+    type: SOURCES[key].collection || SOURCE_COLLECTIONS[key],
+    data: [where, projectionOf(SOURCES[key], withScore), options],
 }, 'find');
 
 const searchByRegex = async (companyId, sourceType, clause, query, limit) => {
@@ -121,25 +138,62 @@ const searchByRegex = async (companyId, sourceType, clause, query, limit) => {
 
 const isMissingTextIndex = (error) => Boolean(error) && (error.code === TEXT_INDEX_MISSING || /text index required/i.test(String(error.message || '')));
 
-const searchSource = async (companyId, sourceType, clause, query, limit) => {
-    const source = SOURCES[sourceType];
-    if (!source.textIndex) return searchByRegex(companyId, sourceType, clause, query, limit);
+const searchRows = async (companyId, key, clause, query, limit) => {
+    const source = SOURCES[key];
+    if (!source.textIndex) return searchByRegex(companyId, key, clause, query, limit);
     try {
-        const rows = await find(companyId, sourceType, textQuery(clause, query), true, { sort: { score: { $meta: 'textScore' } }, limit, lean: true });
-        return (rows || []).map((row) => toPassage(sourceType, row, Number(row.score) || 0, words(query)));
+        const rows = await find(companyId, key, textQuery(clause, query), true, { sort: { score: { $meta: 'textScore' } }, limit, lean: true });
+        return (rows || []).map((row) => toPassage(key, row, Number(row.score) || 0, words(query)));
     } catch (error) {
         if (!isMissingTextIndex(error)) throw error;
-        logger.warn(`knowledge lexical: ${companyId} has no ${sourceType} text index yet; searching by regular expression`);
-        return searchByRegex(companyId, sourceType, clause, query, limit);
+        logger.warn(`knowledge lexical: ${companyId} has no ${key} text index yet; searching by regular expression`);
+        return searchByRegex(companyId, key, clause, query, limit);
     }
 };
+
+/* One row per page, from its best chunk, grouped before the limit: a long page has hundreds of
+ * chunks, and limiting chunks first would let one page fill every slot. */
+const bestChunkPerSource = (source, match, withScore, limit) => {
+    const order = withScore ? { score: -1, ordinal: 1 } : { sourceUpdatedAt: -1, ordinal: 1 };
+    return [
+        { $match: match },
+        { $project: { ...projectionOf(source, withScore), ordinal: 1 } },
+        { $sort: order },
+        { $group: { _id: '$sourceId', chunk: { $first: '$$ROOT' } } },
+        { $replaceRoot: { newRoot: '$chunk' } },
+        { $sort: withScore ? { score: -1, sourceId: 1 } : { sourceUpdatedAt: -1, sourceId: 1 } },
+        { $limit: limit },
+    ];
+};
+
+const searchChunks = async (companyId, key, clause, query, limit) => {
+    const source = SOURCES[key];
+    const aggregate = (match, withScore) => MongoDbCrudOpration(companyId, { type: source.collection, data: [bestChunkPerSource(source, match, withScore, limit)] }, 'aggregate');
+    try {
+        const rows = await aggregate(textQuery(clause, query), true);
+        return (rows || []).map((row) => toPassage(key, row, Number(row.score) || 0, words(query)));
+    } catch (error) {
+        if (!isMissingTextIndex(error)) throw error;
+        logger.warn(`knowledge lexical: ${companyId} has no ${key} text index yet; searching by regular expression`);
+        const terms = regexTerms(query);
+        if (!terms.length) return [];
+        const rows = await aggregate(regexQuery(key, clause, query), false);
+        return (rows || []).map((row) => toPassage(key, row, regexScore(source, row, terms), terms));
+    }
+};
+
+const searchSource = (companyId, key, clause, query, limit) => (SOURCES[key].chunked
+    ? searchChunks(companyId, key, clause, query, limit)
+    : searchRows(companyId, key, clause, query, limit));
+
+const sourceKeyFor = (sourceType, filter) => (sourceType === 'page' && filter.pageChunks ? 'pageChunk' : sourceType);
 
 const search = async ({ companyId, query, filter, limit }) => {
     if (!textSearch(query)) return [];
     const sourceTypes = (filter && filter.sourceTypes) || [];
     const results = await Promise.all(sourceTypes.filter((type) => SOURCES[type] && filter.clauses[type]).map(async (sourceType) => {
         try {
-            return await searchSource(companyId, sourceType, filter.clauses[sourceType], query, limit);
+            return await searchSource(companyId, sourceKeyFor(sourceType, filter), filter.clauses[sourceType], query, limit);
         } catch (error) {
             logger.error(`knowledge lexical: ${sourceType} search failed for ${companyId}: ${error.message}`);
             return [];
@@ -156,7 +210,7 @@ module.exports = {
     upsert: async () => NOTHING_TO_INDEX,
     tombstone: async () => NOTHING_TO_INDEX,
     erase: async () => NOTHING_TO_INDEX,
-    stats: async () => ({ backend: 'lexical', sources: Object.keys(SOURCES), indexedSeparately: false }),
+    stats: async () => ({ backend: 'lexical', sources: SOURCE_TYPES, indexedSeparately: false }),
     textSearch,
     regexTerms,
     textQuery,

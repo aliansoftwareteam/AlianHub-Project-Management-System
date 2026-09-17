@@ -137,3 +137,100 @@ describe('knowledge retrieval behind the tenant switch', () => {
         }
     });
 });
+
+/* With the indexer on, page passages come from the chunk store the event bus keeps. A word
+ * placed past the 5,000 characters a page row keeps in rawText can only be found through a
+ * chunk, so finding it proves retrieval read the index. */
+describe('knowledge retrieval reading the page index', () => {
+    const PARAGRAPH = 'Routine paragraph about the weekly operations rota and nothing else.';
+
+    let client;
+    let companies;
+    let tenant;
+
+    const setSwitches = (on) => companies.updateOne(
+        { _id: new ObjectId(state.companyId) },
+        on ? { $set: { knowledgeRetrieval: { mode: 'on' }, knowledgeIndexer: { mode: 'on' } } } : { $unset: { knowledgeRetrieval: '', knowledgeIndexer: '' } },
+    );
+
+    const poll = async (check, deadlineMs = DELETE_DEADLINE_MS) => {
+        const deadline = Date.now() + deadlineMs;
+        let value = await check();
+        while (!value && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            value = await check();
+        }
+        return value;
+    };
+
+    const createLongPage = async (session, { word, visibility, projectId }) => {
+        const res = await session.api.post('/api/v2/pages', {
+            title: `[QA knowledge index] ${visibility} ${uniqueSuffix()}`,
+            visibility,
+            projectId,
+            contentBlocks: [
+                ...Array.from({ length: 120 }, () => ({ type: 'paragraph', data: { text: PARAGRAPH } })),
+                { type: 'header', data: { text: 'Appendix', level: 2 } },
+                { type: 'paragraph', data: { text: `The appendix names ${word}.` } },
+            ],
+        });
+        expect(res.body.status).toBe(true);
+        return String(res.body.data._id);
+    };
+
+    const liveChunks = (pageId) => tenant.collection('knowledge_chunks').find({ sourceType: 'page', sourceId: pageId, deleted: false }).toArray();
+
+    beforeAll(async () => {
+        client = await MongoClient.connect(resolveMongoUrl());
+        companies = client.db('global').collection('companies');
+        tenant = client.db(state.companyId);
+        await setSwitches(true);
+
+        const owner = await loginAs('owner');
+        await createPage(owner, { title: `[QA knowledge index] warm-up ${uniqueSuffix()}`, body: 'Starts the backfill.', visibility: 'project', projectId: state.projects.shared._id });
+        expect(await poll(() => tenant.collection('knowledge_index_state').findOne({ sourceType: 'page', status: 'complete' }))).toBeTruthy();
+    });
+
+    afterAll(async () => {
+        await setSwitches(false);
+        await client.close();
+    });
+
+    it('ingests a created page and finds a word only its chunks carry', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const word = token();
+        const pageId = await createLongPage(owner, { word, visibility: 'project', projectId: state.projects.shared._id });
+
+        const chunks = await poll(async () => { const rows = await liveChunks(pageId); return rows.some((c) => c.text.includes(word)) && rows; });
+        expect(chunks).toBeTruthy();
+        expect(chunks[0]).toMatchObject({ companyId: state.companyId, visibility: 'project', authorKind: 'human', embeddingModel: null });
+        const stored = await tenant.collection('pages').findOne({ _id: new ObjectId(pageId) });
+        expect(stored.rawText).not.toContain(word);
+
+        expect(await poll(async () => (await sourceIds(member, word)).includes(pageId))).toBe(true);
+    });
+
+    it('answers from a private page for its owner and never for a member', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const word = token();
+        const pageId = await createLongPage(owner, { word, visibility: 'private', projectId: state.projects.shared._id });
+
+        expect(await poll(async () => (await sourceIds(owner, word)).includes(pageId))).toBe(true);
+        expect(await sourceIds(member, word)).not.toContain(pageId);
+    });
+
+    it('drops a deleted page within a minute and tombstones its chunks', async () => {
+        const owner = await loginAs('owner');
+        const word = token();
+        const pageId = await createLongPage(owner, { word, visibility: 'project', projectId: state.projects.shared._id });
+        expect(await poll(async () => (await sourceIds(owner, word)).includes(pageId))).toBe(true);
+
+        const removed = await owner.api.delete(`/api/v2/pages/${pageId}`);
+        expect(removed.body.status).toBe(true);
+
+        expect(await poll(async () => !(await sourceIds(owner, word)).includes(pageId))).toBe(true);
+        expect(await poll(async () => (await liveChunks(pageId)).length === 0)).toBe(true);
+    });
+});
