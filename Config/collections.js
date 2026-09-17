@@ -111,6 +111,8 @@ const dbCollections = {
     PROJECT_CONTRACTS: "project_contracts",
     PROJECT_INVOICES: "project_invoices",
     PERMISSION_DECISIONS: "permission_decisions",
+    AUDIT_CHAIN_HEADS: "audit_chain_heads",
+    AUDIT_CHAIN_ANCHORS: "audit_chain_anchors",
     SCHEMA_VERSIONS: "schema_versions",
     INSTANCE_SETTINGS: "instance_settings",
 }

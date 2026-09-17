@@ -160,8 +160,9 @@ const undoAuditRow = async (companyId, row, actor, ip, ctx) => {
     if (!state.undoable) return refuse(companyId, actor, state, { entityType: row.entityType, entityId: row.entityId, action: row.meta && row.meta.action, ip });
     const u = row.meta.undo;
     const result = await inverses[u.kind](companyId, u);
-    await audit.markUndone(companyId, row._id, actor.userId);
+    const unmarked = await audit.markUndone(companyId, row._id, actor.userId).then(() => null, (error) => error);
     await audit.recordUndo(companyId, actor, { originalId: row._id, action: row.meta.action, entityType: row.entityType, entityId: row.entityId, ip });
+    if (unmarked) throw unmarked;
     return { ok: true, reason: '', result, undoUntil: state.undoUntil };
 };
 

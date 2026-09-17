@@ -164,16 +164,24 @@ describe('writing the chain', () => {
     });
 
     it('mirrors the head to the global database at most once a minute', async () => {
-        jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
         const mirror = () => heads().find((h) => h._id === CID);
-        await writeRows(1, 3);
-        await flush();
-        expect(mirror()).toMatchObject({ seq: 1 });
-        expect(mockDb.calls.filter((c) => c.companyId === 'global' && c.type === SCHEMA_TYPE.AUDIT_CHAIN_HEADS && c.method === 'updateOne')).toHaveLength(1);
+        const globalWrites = () => mockDb.calls.filter((c) => c.companyId === 'global' && c.type === SCHEMA_TYPE.AUDIT_CHAIN_HEADS && c.method === 'updateOne');
+        let now = Date.now();
+        const clock = jest.spyOn(Date, 'now').mockImplementation(() => now);
+        try {
+            await writeRows(1, 3);
+            await flush();
+            expect(mirror()).toMatchObject({ seq: 1, hash: bySeq(1).chain.hash });
+            expect(globalWrites()).toHaveLength(1);
 
-        jest.advanceTimersByTime(60 * 1000);
-        await flush();
-        expect(mirror()).toMatchObject({ seq: 3, hash: bySeq(3).chain.hash });
+            now += 60 * 1000;
+            await writeRows(4, 4);
+            await flush();
+            expect(mirror()).toMatchObject({ seq: 4, hash: bySeq(4).chain.hash });
+            expect(globalWrites()).toHaveLength(2);
+        } finally {
+            clock.mockRestore();
+        }
     });
 });
 

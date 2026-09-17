@@ -159,6 +159,16 @@
     "description": "Product name shown in emails and page titles.",
     "default": "Alian Hub"
   },
+  "AUDIT_CHAIN": {
+    "group": "security",
+    "description": "Set to true to chain every new audit row per company: each row carries a sequence number, the previous row's hash and an HMAC-SHA256 keyed with AUDIT_CHAIN_KEY, a change to a row is appended as a new row instead of editing it, retention anchors the rows it deletes and keeps audit rows at least as long as agent runs, and the audit log reports each row as verified, broken or unchained. Names, email, IP address and user agent are outside the hash. Needs AUDIT_CHAIN_KEY; without a valid key the chain stays off and an error is logged. Unset or false keeps rows unchained and edited in place.",
+    "default": "false"
+  },
+  "AUDIT_CHAIN_KEY": {
+    "group": "security",
+    "description": "Secret of at least 32 characters that keys the audit chain hash, so someone who can write to the database cannot recompute it. Rows chained under one key only verify under that key; keep it out of the database and its backups.",
+    "secret": true
+  },
   "AUDIT_EXPORT_MAX_ROWS": {
     "group": "security",
     "description": "Most rows one audit-log CSV export streams; a last row says when the filter held more. Can only lower the hard cap.",

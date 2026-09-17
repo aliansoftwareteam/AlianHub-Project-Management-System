@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const audit = require('./agentAudit');
+const auditChain = require('../Audit/chain');
 const undo = require('./undo');
 const runs = require('./runs');
 const budget = require('./budget');
@@ -16,9 +17,9 @@ const logger = require('../../Config/loggerConfig');
 const HOUR_MS = 60 * 60 * 1000;
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
-const actionRows = (companyId, runId) => MongoDbCrudOpration(companyId, {
+const actionRows = async (companyId, runId) => auditChain.foldRows(companyId, await MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ 'meta.runId': String(runId), action: audit.ACTION_DONE }, {}, { sort: { createdAt: 1 }, limit: 500 }],
-}, 'find');
+}, 'find'));
 
 const windowEnd = (run, undoHours) => new Date(new Date(run.finishedAt).getTime() + undoHours * HOUR_MS);
 
