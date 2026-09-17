@@ -113,6 +113,7 @@ const dbCollections = {
     KNOWLEDGE_CHUNKS: "knowledge_chunks",
     KNOWLEDGE_INDEX_STATE: "knowledge_index_state",
     KNOWLEDGE_EXCLUSIONS: "knowledge_exclusions",
+    PERMISSION_DECISIONS: "permission_decisions",
     SCHEMA_VERSIONS: "schema_versions",
     INSTANCE_SETTINGS: "instance_settings",
 }

@@ -1,8 +1,8 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
 // language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type, $set/$inc/$push,
-// conditional findOneAndUpdate, updateOne and findOneAndUpdate with upsert, findOneAndDelete, deleteOne, deleteMany, sort/limit on find,
-// $match/$project/$addFields/$group/$replaceRoot aggregate with a word-count textScore, declared unique indexes that reject a duplicate
-// save or upsert with E11000) so a test can assert on what was written.
+// conditional findOneAndUpdate, updateOne and findOneAndUpdate with upsert and $setOnInsert, findOneAndDelete, deleteOne, deleteMany,
+// sort/limit on find, $match/$project/$addFields/$group/$replaceRoot aggregate with a word-count textScore, declared unique indexes that
+// reject a duplicate save or upsert with E11000) so a test can assert on what was written.
 
 let seq = 1;
 const nextId = () => String(seq++).padStart(24, '0');
@@ -37,7 +37,7 @@ const matches = (doc, filter = {}) => Object.entries(filter).every(([key, cond])
             const want = arg instanceof Date ? arg.getTime() : hex(arg);
             if (op === '$in') return arg.map(String).includes(String(value));
             if (op === '$nin') return !arg.map(String).includes(String(value));
-            if (op === '$ne') return value !== want;
+            if (op === '$ne') return Array.isArray(value) ? !value.map(hex).includes(want) : value !== want;
             if (op === '$gte') return value >= want;
             if (op === '$gt') return value > want;
             if (op === '$lte') return value <= want;
@@ -69,10 +69,14 @@ const apply = (doc, update = {}) => {
     return doc;
 };
 
-const isOperatorObject = (v) => Boolean(v) && typeof v === 'object' && !(v instanceof Date) && !Array.isArray(v) && Object.keys(v).some((k) => k.startsWith('$'));
+const isOperatorObject = (v) => v && typeof v === 'object' && !(v instanceof Date) && !Array.isArray(v) && Object.keys(v).some((k) => k.startsWith('$'));
 
-/* What an upsert inserts from its filter, as MongoDB does: the plain equality fields, never an operator or a $or. */
-const equalitiesOf = (filter = {}) => Object.fromEntries(Object.entries(filter).filter(([key, value]) => !key.startsWith('$') && !isOperatorObject(value)));
+/* An upsert inserts the filter's plain equality fields, then $setOnInsert, then the update. */
+const upserted = (filter = {}, update = {}) => {
+    const equalities = Object.entries(filter).filter(([key, value]) => !key.startsWith('$') && !key.includes('.') && !isOperatorObject(value));
+    const doc = { _id: nextId(), ...Object.fromEntries(equalities) };
+    return apply(apply(doc, { $set: update.$setOnInsert || {} }), update);
+};
 
 const sortable = (v) => (v instanceof Date ? v.getTime() : (v == null ? '' : v));
 const ordered = (list, options = {}) => {
@@ -149,12 +153,12 @@ const create = () => {
     const collides = (type, doc) => (uniques[type] || []).find((index) => covered(index, doc)
         && rows(type).some((other) => covered(index, other) && index.fields.every((f) => String(read(other, f)) === String(read(doc, f)))));
 
-    const upsert = (type, filter, update = {}) => {
-        const doc = apply({ _id: nextId(), createdAt: new Date(), ...equalitiesOf(filter), ...(update.$setOnInsert || {}) }, update);
-        const hit = collides(type, doc);
+    const insertUpserted = (type, filter, update) => {
+        const inserted = upserted(filter, update);
+        const hit = collides(type, inserted);
         if (hit) throw duplicateKey(hit.fields);
-        rows(type).push(doc);
-        return doc;
+        rows(type).push(inserted);
+        return inserted;
     };
 
     const crud = jest.fn(async (companyId, { type, data }, method) => {
@@ -175,13 +179,14 @@ const create = () => {
         if (method === 'findOneAndUpdate') {
             const doc = list.find((d) => matches(d, data[0]));
             if (doc) { apply(doc, data[1]); return clone(doc); }
-            return data[2] && data[2].upsert ? clone(upsert(type, data[0], data[1])) : null;
+            return data[2] && data[2].upsert ? clone(insertUpserted(type, data[0], data[1])) : null;
         }
         if (method === 'updateOne') {
             const doc = list.find((d) => matches(d, data[0]));
-            if (doc) { apply(doc, data[1]); return { modifiedCount: 1, upsertedCount: 0 }; }
-            if (data[2] && data[2].upsert) { upsert(type, data[0], data[1]); return { modifiedCount: 0, upsertedCount: 1 }; }
-            return { modifiedCount: 0, upsertedCount: 0 };
+            if (doc) { apply(doc, data[1]); return { modifiedCount: 1 }; }
+            if (!(data[2] && data[2].upsert)) return { modifiedCount: 0 };
+            const inserted = insertUpserted(type, data[0], data[1]);
+            return { modifiedCount: 0, upsertedCount: 1, upsertedId: inserted._id };
         }
         if (method === 'updateMany') { const hit = list.filter((d) => matches(d, data[0])); hit.forEach((d) => apply(d, data[1])); return { modifiedCount: hit.length }; }
         if (method === 'findOneAndDelete') { const at = list.findIndex((d) => matches(d, data[0])); return at === -1 ? null : clone(list.splice(at, 1)[0]); }
