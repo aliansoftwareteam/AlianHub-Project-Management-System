@@ -21,6 +21,7 @@ let rules;
 let chain;
 let recorder;
 let agentAudit;
+const loaded = [];
 
 const load = () => {
     jest.resetModules();
@@ -29,6 +30,7 @@ const load = () => {
     chain = require('../Modules/Audit/chain');
     recorder = require('../Modules/Audit/recorder');
     agentAudit = require('../Modules/Agents/agentAudit');
+    loaded.push(chain);
 };
 
 const auditRows = () => mockDb.store[SCHEMA_TYPE.AUDIT_LOGS] || [];
@@ -53,6 +55,21 @@ const waitFor = async (check) => {
     for (let i = 0; i < 400 && !check(); i += 1) await new Promise((resolve) => setImmediate(resolve));
     if (!check()) throw new Error('condition not met');
 };
+const waitUntil = async (check, ms = 5000) => {
+    const deadline = Date.now() + ms;
+    while (!check() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
+    if (!check()) throw new Error('condition not met');
+};
+const withCrud = async (override, fn) => {
+    const real = mockDb.crud.getMockImplementation();
+    mockDb.crud.mockImplementation((companyId, query, method) => override(companyId, query, method, () => real(companyId, query, method)));
+    try {
+        return await fn();
+    } finally {
+        mockDb.crud.mockImplementation(real);
+    }
+};
+const FAKE_CLOCK = { doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] };
 
 beforeAll(() => {
     const schemas = require('../utils/mongo-handler/createSchema');
@@ -71,8 +88,9 @@ beforeEach(() => {
     jest.clearAllMocks();
 });
 
-afterEach(() => {
+afterEach(async () => {
     jest.useRealTimers();
+    await Promise.all(loaded.splice(0).map((instance) => instance.flushMirrors()));
 });
 
 afterAll(() => {
@@ -94,6 +112,16 @@ describe('canonical serialisation', () => {
         expect(rules.canonical({ a: [1, 2] })).not.toBe(rules.canonical({ a: [2, 1] }));
         expect(rules.canonical({ at: new Date(0) })).not.toBe(rules.canonical({ at: new Date(0).toISOString() }));
         expect(rules.canonical({ a: null })).not.toBe(rules.canonical({}));
+    });
+
+    it('hashes what BSON stores when a string holds a lone surrogate', async () => {
+        const { serialize, deserialize } = require('bson');
+        await chain.saveAuditRow(CID, entry(1, { meta: { action: 'tasks.\ud800', ['odd\udc00key']: 'x\udbff', pair: 'a\ud83d\ude00' } }));
+        await writeRows(2, 3);
+        mockDb.store[SCHEMA_TYPE.AUDIT_LOGS] = auditRows().map((row) => deserialize(serialize(row)));
+
+        expect(bySeq(1).meta).toMatchObject({ action: 'tasks.\ufffd', ['odd\ufffdkey']: 'x\ufffd', pair: 'a\ud83d\ude00' });
+        expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified', verifiedThrough: 3 });
     });
 
     it('pins the row hash: HMAC-SHA256 over the canonical hashed content, a newline and the previous hash', () => {
@@ -132,6 +160,7 @@ describe('writing the chain', () => {
     it('stays contiguous when two servers append to one company at once', async () => {
         let other;
         jest.isolateModules(() => { other = require('../Modules/Audit/chain'); });
+        loaded.push(other);
         await Promise.all(range(50).map((i) => (i % 2 ? chain : other).saveAuditRow(CID, entry(i))));
         const rows = chained();
         expect(rows.map((r) => r.chain.seq)).toEqual(range(50));
@@ -163,25 +192,119 @@ describe('writing the chain', () => {
         expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified', verifiedThrough: 2 });
     });
 
-    it('mirrors the head to the global database at most once a minute', async () => {
+    it('mirrors the newest head to the global database within a minute of a burst', async () => {
+        jest.useFakeTimers(FAKE_CLOCK);
         const mirror = () => heads().find((h) => h._id === CID);
         const globalWrites = () => mockDb.calls.filter((c) => c.companyId === 'global' && c.type === SCHEMA_TYPE.AUDIT_CHAIN_HEADS && c.method === 'updateOne');
-        let now = Date.now();
-        const clock = jest.spyOn(Date, 'now').mockImplementation(() => now);
-        try {
-            await writeRows(1, 3);
-            await flush();
-            expect(mirror()).toMatchObject({ seq: 1, hash: bySeq(1).chain.hash });
-            expect(globalWrites()).toHaveLength(1);
+        await Promise.all(range(50).map((i) => chain.saveAuditRow(CID, entry(i))));
+        await flush();
+        expect(mirror()).toMatchObject({ seq: 1, hash: bySeq(1).chain.hash });
+        expect(globalWrites()).toHaveLength(1);
 
-            now += 60 * 1000;
-            await writeRows(4, 4);
+        jest.advanceTimersByTime(60 * 1000);
+        await flush();
+        expect(mirror()).toMatchObject({ seq: 50, hash: bySeq(50).chain.hash });
+        expect(globalWrites()).toHaveLength(2);
+    });
+
+    it('never reuses a sequence number below the mirrored head, and reports the rows missing up to it', async () => {
+        jest.useFakeTimers(FAKE_CLOCK);
+        await Promise.all(range(50).map((i) => chain.saveAuditRow(CID, entry(i))));
+        jest.advanceTimersByTime(60 * 1000);
+        await flush();
+        jest.useRealTimers();
+
+        removeAudit((r) => r.chain.seq >= 2);
+        mockDb.store[SCHEMA_TYPE.AUDIT_CHAIN_HEADS] = heads().filter((h) => h._id !== 'head');
+        await chain.saveAuditRow(CID, entry(51));
+
+        expect(chained().map((r) => r.chain.seq)).toEqual([1, 51]);
+        expect(await chain.verifyChain(CID)).toMatchObject({ state: 'broken', brokenAt: 2 });
+    });
+});
+
+describe('the write queue', () => {
+    it('builds the unique sequence index before a company\'s first chained write', async () => {
+        await writeRows(1, 2);
+        const seen = mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.AUDIT_LOGS && ['createIndexes', 'save'].includes(c.method)).map((c) => c.method);
+        expect(seen).toEqual(['createIndexes', 'save', 'save']);
+    });
+
+    it('writes nothing while the index cannot be built, and tries again on the next write', async () => {
+        let failures = 1;
+        await withCrud(async (companyId, query, method, real) => {
+            if (method === 'createIndexes' && failures > 0) { failures -= 1; throw new Error('index build failed'); }
+            return real();
+        }, async () => {
+            await expect(chain.saveAuditRow(CID, entry(1))).rejects.toThrow('index build failed');
+            expect(auditRows()).toHaveLength(0);
+            await chain.saveAuditRow(CID, entry(2));
+        });
+        expect(chained().map((r) => r.meta.n)).toEqual([2]);
+    });
+
+    it('stamps createdAt when a row is queued, not when it is written', async () => {
+        jest.useFakeTimers({ ...FAKE_CLOCK, now: new Date('2026-09-17T10:00:00.000Z') });
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        await withCrud(async (companyId, query, method, real) => {
+            if (method === 'save' && query.data.meta && query.data.meta.n === 1) await gate;
+            return real();
+        }, async () => {
+            const first = chain.saveAuditRow(CID, entry(1));
             await flush();
-            expect(mirror()).toMatchObject({ seq: 4, hash: bySeq(4).chain.hash });
-            expect(globalWrites()).toHaveLength(2);
-        } finally {
-            clock.mockRestore();
-        }
+            jest.setSystemTime(new Date('2026-09-17T10:00:05.000Z'));
+            const second = chain.saveAuditRow(CID, entry(2));
+            jest.setSystemTime(new Date('2026-09-17T10:00:30.000Z'));
+            release();
+            await Promise.all([first, second]);
+        });
+        expect(new Date(bySeq(2).createdAt).toISOString()).toBe('2026-09-17T10:00:05.000Z');
+        expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified', verifiedThrough: 2 });
+    });
+
+    it('times out a write that hangs and moves on to the next one', async () => {
+        jest.useFakeTimers(FAKE_CLOCK);
+        await withCrud(async (companyId, query, method, real) => {
+            if (method === 'save' && query.data.meta && query.data.meta.n === 1) return new Promise(() => {});
+            return real();
+        }, async () => {
+            const hung = chain.saveAuditRow(CID, entry(1));
+            const refused = expect(hung).rejects.toThrow(/timed out/);
+            const next = chain.saveAuditRow(CID, entry(2));
+            await flush();
+            jest.advanceTimersByTime(chain.WRITE_TIMEOUT_MS);
+            await refused;
+            await next;
+        });
+        expect(chained().map((r) => r.meta.n)).toEqual([2]);
+    });
+
+    it('refuses a write once a company\'s queue is full', async () => {
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        await withCrud(async (companyId, query, method, real) => {
+            if (method === 'save') await gate;
+            return real();
+        }, async () => {
+            const queued = range(chain.QUEUE_LIMIT).map((i) => chain.saveAuditRow(CID, entry(i)));
+            await expect(chain.saveAuditRow(CID, entry(0))).rejects.toThrow(/queue is full/);
+            release();
+            await Promise.all(queued);
+        });
+        expect(chained()).toHaveLength(chain.QUEUE_LIMIT);
+    }, 60000);
+
+    it('surfaces an error, which the recorder logs with the action, when sequence conflicts never clear', async () => {
+        await withCrud(async (companyId, query, method, real) => {
+            if (method === 'save' && query.data.chain) throw Object.assign(new Error('E11000 duplicate key error collection: x index: audit_chain_seq dup key: { chain.seq: 1 }'), { code: 11000 });
+            return real();
+        }, async () => {
+            await expect(chain.saveAuditRow(CID, entry(1))).rejects.toThrow(/sequence conflicts/);
+            recorder.recordAudit(CID, entry(2, { action: 'member.role_change' }));
+            await waitUntil(() => logger.error.mock.calls.some(([message]) => /member\.role_change/.test(message) && /sequence conflicts/.test(message)));
+        });
+        expect(auditRows()).toHaveLength(0);
     });
 });
 
@@ -300,6 +423,28 @@ describe('verifying the chain', () => {
         expect(await chain.annotateIntegrity(CID, page())).toEqual([{ state: 'broken', brokenAt: 3 }, { state: 'broken', brokenAt: 3 }]);
     });
 
+    it('never applies an appended change that is not a verified part of the chain, and reports its row broken', async () => {
+        const id = await agentAudit.recordAction(CID, actor, { action: 'task.comment', params: { taskId: TASK }, undo: { kind: 'comment', commentId: 'c1', taskId: TASK }, entityId: TASK, idempotencyKey: 'wf:run:step' });
+        await mockDb.crud(CID, { type: SCHEMA_TYPE.AUDIT_LOGS, data: { action: 'audit.amended', actorId: '', meta: { amends: id, set: { state: 'failed', undoneAt: new Date(), undoneBy: 'someone' } } } }, 'save');
+        await mockDb.crud(CID, { type: SCHEMA_TYPE.AUDIT_LOGS, data: { action: 'audit.amended', actorId: '', meta: { amends: id, set: { undoable: false } }, chain: { seq: 3, prevHash: bySeq(2).chain.hash, hash: 'f'.repeat(64) } } }, 'save');
+
+        for (const row of [await agentAudit.findById(CID, id), await agentAudit.findByIdempotencyKey(CID, 'wf:run:step')]) {
+            expect(row.meta).toMatchObject({ state: 'applied', undoable: true, undoneAt: null });
+        }
+        const [listed] = await chain.readForList(CID, [id]);
+        expect(listed.meta).toMatchObject({ state: 'applied', undoable: true, undoneAt: null });
+        expect(listed.integrity).toMatchObject({ state: 'broken' });
+    });
+
+    it('reads a row without a chain as broken when it was written after the chain started', async () => {
+        mockDb.seed(SCHEMA_TYPE.AUDIT_LOGS, { action: 'member.update', actorId: 'u0', meta: {}, createdAt: new Date(Date.now() - DAY) });
+        await writeRows(1, 2);
+        mockDb.seed(SCHEMA_TYPE.AUDIT_LOGS, { action: 'member.update', actorId: 'u9', meta: {}, createdAt: new Date(Date.now() + 1000) });
+
+        const listed = await chain.readForList(CID, auditRows().map((r) => String(r._id)));
+        expect(listed.map((r) => r.integrity)).toEqual([{ state: 'unchained' }, { state: 'verified' }, { state: 'verified' }, { state: 'broken', brokenAt: null }]);
+    });
+
     it('reports rows as unverified when the key is not available to check them', async () => {
         await writeRows(1, 2);
         delete process.env.AUDIT_CHAIN_KEY;
@@ -348,6 +493,21 @@ describe('retention', () => {
         await mockDb.crud(CID, { type: SCHEMA_TYPE.AUDIT_CHAIN_ANCHORS, data: { seq: 4, hash: bySeq(4).chain.hash, mac: 'forged' } }, 'save');
         bySeq(2).actorId = 'u-other';
         expect(await chain.verifyChain(CID)).toMatchObject({ state: 'broken', brokenAt: 2 });
+    });
+
+    it('keeps chained rows it cannot anchor when the key is missing, and says so', async () => {
+        await writeAt(400, 1, 3);
+        mockDb.seed(SCHEMA_TYPE.AUDIT_LOGS, { action: 'member.update', meta: {}, createdAt: new Date(Date.now() - 400 * DAY) });
+        mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: CID });
+        delete process.env.AUDIT_CHAIN_KEY;
+        load();
+
+        await recorder.runAuditRetentionForAllCompanies(365);
+
+        expect(chained().map((r) => r.chain.seq)).toEqual([1, 2, 3]);
+        expect(auditRows().filter((r) => !r.chain)).toHaveLength(0);
+        expect(anchors()).toHaveLength(0);
+        expect(logger.error).toHaveBeenCalledWith(expect.stringMatching(/kept 3 chained rows/));
     });
 
     it('keeps audit rows at least as long as agent runs, with a warning', async () => {
@@ -409,6 +569,39 @@ describe('agent audit rows under the chain', () => {
 
         expect(await currentState(ids)).toEqual(today);
         expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified', verifiedThrough: 6 });
+    });
+
+    it('appends, and never edits, a chained row after the flag is turned off with the key kept', async () => {
+        const id = await agentAudit.openAction(CID, actor, { action: 'task.comment', params: { taskId: TASK }, entityId: TASK });
+        const before = JSON.stringify(bySeq(1));
+        process.env.AUDIT_CHAIN = 'false';
+        load();
+
+        await agentAudit.applyAction(CID, id, { undo: { kind: 'comment', commentId: 'c1', taskId: TASK }, entityType: 'task', entityId: TASK });
+        await agentAudit.markUndone(CID, id, 'u2');
+
+        expect(JSON.stringify(bySeq(1))).toBe(before);
+        expect(chained().filter((r) => r.action === 'audit.amended').map((r) => r.meta.amends)).toEqual([id, id]);
+        process.env.AUDIT_CHAIN = 'true';
+        load();
+        expect((await agentAudit.findById(CID, id)).meta).toMatchObject({ state: 'applied', undoneBy: 'u2' });
+        expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified', verifiedThrough: 3 });
+    });
+
+    it('refuses and logs an edit to a chained row once the key is gone, whatever the flag says', async () => {
+        const id = await agentAudit.openAction(CID, actor, { action: 'task.comment', params: { taskId: TASK }, entityId: TASK });
+        const before = JSON.stringify(bySeq(1));
+        for (const flag of ['false', 'true']) {
+            process.env.AUDIT_CHAIN = flag;
+            delete process.env.AUDIT_CHAIN_KEY;
+            load();
+            await expect(agentAudit.applyAction(CID, id, { undo: null })).rejects.toMatchObject({ reason: 'audit_unmarked' });
+            await expect(agentAudit.markUndone(CID, id, 'u2')).rejects.toMatchObject({ reason: 'audit_unmarked' });
+            await agentAudit.failAction(CID, id, 'boom');
+            expect(logger.error).toHaveBeenCalledWith(expect.stringContaining(id));
+        }
+        expect(JSON.stringify(bySeq(1))).toBe(before);
+        expect(auditRows().filter((r) => r.action === 'audit.amended')).toHaveLength(0);
     });
 
     it('still refuses to mark a row that does not exist', async () => {

@@ -60,9 +60,31 @@ describe('the audit log integrity indicator', () => {
         expect(indicators(wrapper)).toHaveLength(0);
     });
 
-    it('still flags rows chained earlier once the chain is off', async () => {
-        const wrapper = await open([row('a', { integrity: { state: 'broken', brokenAt: 3 } }), row('b', { integrity: { state: 'unchained' } })], { on: false });
-        expect(indicators(wrapper).map((chip) => chip.attributes('data-test'))).toEqual(['integrity-broken']);
+    it('shows no indicator while the chain is off, whatever a row carries', async () => {
+        const wrapper = await open([row('a', { integrity: { state: 'broken', brokenAt: 3 }, chain: { seq: 3 } }), row('b')], { on: false });
+        expect(indicators(wrapper)).toHaveLength(0);
+        expect(wrapper.find('[data-test="actor-id"]').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain(t('Audit.names_not_checked'));
+    });
+
+    it('labels a row that is broken on its own, outside the sequence', async () => {
+        const wrapper = await open([row('a', { integrity: { state: 'broken', brokenAt: null } })]);
+        const [chip] = indicators(wrapper);
+        expect(chip.text()).toBe(t('Audit.integrity_broken_row'));
+        expect(chip.attributes('title')).toBe(t('Audit.integrity_broken_row_hint'));
+    });
+
+    it('shows the hashed actor and entity ids beside the names on chained rows, and says the names are not checked', async () => {
+        const wrapper = await open([
+            row('a', { actorId: 'u-hashed', entityId: 'e-hashed', entityName: 'Renamed', chain: { seq: 4 }, integrity: { state: 'verified' } }),
+            row('b', { actorId: 'u-plain', entityId: 'e-plain', integrity: { state: 'unchained' } }),
+        ]);
+        const [chained, plain] = wrapper.findAll('.al__row');
+        expect(chained.find('[data-test="actor-id"]').text()).toBe('u-hashed');
+        expect(chained.find('[data-test="entity-id"]').text()).toBe('e-hashed');
+        expect(chained.find('[data-test="actor-id"]').attributes('title')).toBe(t('Audit.names_not_checked'));
+        expect(plain.find('[data-test="actor-id"]').exists()).toBe(false);
+        expect(wrapper.text()).toContain(t('Audit.names_not_checked'));
     });
 });
 

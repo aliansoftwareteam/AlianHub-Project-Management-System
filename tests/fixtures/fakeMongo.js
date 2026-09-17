@@ -1,7 +1,7 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
 // language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type, $set/$inc/$push,
 // conditional findOneAndUpdate, updateOne and findOneAndUpdate with upsert and $setOnInsert, findOneAndDelete, deleteOne, deleteMany,
-// sort/limit on find, $match/$project/$addFields/$group/$replaceRoot aggregate with a word-count textScore, declared unique indexes that
+// sort/limit on find, $match/$project/$addFields/$group/$replaceRoot/$count/$facet aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000) so a test can assert on what was written.
 
 let seq = 1;
@@ -194,7 +194,7 @@ const create = () => {
         if (method === 'aggregate') {
             const [pipeline] = data;
             let search = '';
-            return pipeline.reduce((docs, stage) => {
+            const run = (input, stages) => stages.reduce((docs, stage) => {
                 if (stage.$match) {
                     if (stage.$match.$text) search = stage.$match.$text.$search;
                     return docs.filter((d) => matches(d, stage.$match));
@@ -206,9 +206,13 @@ const create = () => {
                 if (stage.$sort) return ordered(docs, { sort: stage.$sort });
                 if (stage.$skip) return docs.slice(stage.$skip);
                 if (stage.$limit) return docs.slice(0, stage.$limit);
+                if (stage.$count) return docs.length ? [{ [stage.$count]: docs.length }] : [];
+                if (stage.$facet) return [Object.fromEntries(Object.entries(stage.$facet).map(([name, sub]) => [name, run(docs, sub)]))];
                 return docs;
-            }, list).map(clone);
+            }, input);
+            return run(list, pipeline).map(clone);
         }
+        if (method === 'createIndexes') return undefined;
         throw new Error(`fakeMongo: unsupported method ${method}`);
     });
 

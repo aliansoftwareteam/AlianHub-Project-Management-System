@@ -3,7 +3,7 @@ const path = require('node:path');
 const { MongoClient } = require('mongodb');
 const { createApiClient } = require('../../e2e/support/api');
 const { STATE_DIR, resolveMongoUrl } = require('../../e2e/support/env');
-const { emailFor, login, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
+const { emailFor, login, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 const { startServer } = require('../../e2e/support/server');
 const { generateToken, hashToken, tokenPrefixOf } = require('../../Modules/ApiTokens/helpers/apiTokenRules');
 
@@ -73,6 +73,8 @@ afterAll(async () => {
 describe('the audit hash chain through real routes', () => {
     let actionRow;
 
+    let agentApi;
+
     beforeAll(async () => {
         for (const isEnabled of [false, false, false]) {
             const res = await owner.put('/api/v2/scim/config', { isEnabled });
@@ -85,7 +87,8 @@ describe('the audit hash chain through real routes', () => {
             projectIds: [state.projects.shared._id], skills: [], allowedActions: ['task.comment'],
         })).body.data;
         const taskId = state.tasks[0]._id;
-        const proposal = (await (await agentToken(agent._id)).post('/api/v2/agents/proposals', {
+        agentApi = await agentToken(agent._id);
+        const proposal = (await agentApi.post('/api/v2/agents/proposals', {
             agentId: agent._id, taskId, projectId: state.projects.shared._id, what: '[QA chain] proposal', why: 'integration',
             changes: [{ action: 'task.comment', params: { taskId, body: `[QA chain] comment ${uniqueSuffix()}` }, label: 'Comment' }],
         })).body.data;
@@ -173,12 +176,46 @@ describe('the audit hash chain through real routes', () => {
         expect(restored.data.find((r) => r._id === String(third._id)).integrity).toEqual({ state: 'verified' });
     });
 
-    it('filters to permission refusals', async () => {
+    it('verifies a refusal whose action held a lone surrogate, as Mongo stored it', async () => {
+        const res = await agentApi.patch('/api/v2/tasks', { action: '\ud800', taskId: state.tasks[0]._id });
+        expect(res.status).toBe(403);
+        const refusal = await waitFor(() => audits.findOne({ action: 'agent.action_refused', 'meta.action': 'tasks.\ufffd', createdAt: { $gte: startedAt } }), 'the refusal row');
+        expect(refusal.chain.seq).toBeGreaterThan(0);
+
+        const body = await list({ gated: 'true' });
+        expect(body.data.find((r) => r._id === String(refusal._id)).integrity).toEqual({ state: 'verified' });
+    });
+
+    it('filters to permission refusals, and reads an unchained row written after the chain started as broken', async () => {
         const marker = `[QA chain] ${uniqueSuffix()}`;
         await audits.insertOne({ action: 'permission.refused', actorId: state.users.member.userId, actorName: '', entityType: 'permission', entityId: 'task.task_priority', entityName: marker, meta: { mode: 'enforce', reason: 'denied' }, ip: '', createdAt: new Date(), updatedAt: new Date() });
         const body = await list({ refused: 'true' });
         expect(body.data.length).toBeGreaterThanOrEqual(1);
         expect(body.data.every((r) => r.action === 'permission.refused')).toBe(true);
-        expect(body.data.find((r) => r.entityName === marker).integrity).toEqual({ state: 'unchained' });
+        expect(body.data.find((r) => r.entityName === marker).integrity).toEqual({ state: 'broken', brokenAt: null });
+    });
+
+    it('never applies an appended change inserted outside the chain', async () => {
+        const forged = await audits.insertOne({ action: 'audit.amended', actorId: '', entityType: 'task', entityId: '', meta: { amends: String(actionRow._id), set: { undoneAt: null, state: 'failed' } }, createdAt: new Date(), updatedAt: new Date() });
+        try {
+            const body = await list({ action: 'agent.action' });
+            const action = body.data.find((r) => r._id === String(actionRow._id));
+            expect(action.meta.state).toBe('applied');
+            expect(action.meta.undoneAt).toBeTruthy();
+            expect(action.integrity).toMatchObject({ state: 'broken' });
+        } finally {
+            await audits.deleteOne({ _id: forged.insertedId });
+        }
+    });
+});
+
+describe('the harness server, with AUDIT_CHAIN off', () => {
+    it('answers the audit log in the shape it had before the chain', async () => {
+        const harnessOwner = await loginAs('owner');
+        const res = await harnessOwner.api.get('/api/v1/audit-logs', { query: { limit: 100 } });
+        expect(res.body.status).toBe(true);
+        expect(Object.keys(res.body.metadata).sort()).toEqual(['page', 'total', 'totalPages']);
+        expect(res.body.data.length).toBeGreaterThan(0);
+        res.body.data.forEach((row) => expect(row).not.toHaveProperty('integrity'));
     });
 });
