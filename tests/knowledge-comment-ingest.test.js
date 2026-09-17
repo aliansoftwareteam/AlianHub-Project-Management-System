@@ -117,6 +117,23 @@ describe('comment events on the bus', () => {
         expect(rows[0].text).toBe('Order the timber for the pier.');
     });
 
+    it('ingests a task comment saved the way the task view sends it, with its ids under objId', async () => {
+        const task = seedTask();
+        const res = await call(comments.save, { uid: MEMBER, body: { data: { message: 'Planks arrive Tuesday.', type: 'text', project: false, objId: { taskId: String(task._id), projectId: P1, sprintId: OPEN_SPRINT } } } });
+        expect(res.body.status).toBe(true);
+        await events.drain();
+
+        expect(live(res.body.data._id).map((r) => [r.text, r.taskId, r.sprintId])).toEqual([['Planks arrive Tuesday.', String(task._id), OPEN_SPRINT]]);
+    });
+
+    it('ingests a project comment saved from the project conversation', async () => {
+        const res = await call(comments.save, { uid: MEMBER, body: { data: { message: 'Welcome aboard.', type: 'text', project: true, projectId: P1 } } });
+        expect(res.body.status).toBe(true);
+        await events.drain();
+
+        expect(live(res.body.data._id).map((r) => [r.text, r.projectId, r.taskId])).toEqual([['Welcome aboard.', P1, '']]);
+    });
+
     it('re-ingests a comment edited through the controller', async () => {
         const task = seedTask();
         const comment = seedComment(task);

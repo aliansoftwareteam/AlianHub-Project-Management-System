@@ -1455,6 +1455,9 @@ const schema = {
         sourceId: { type: String, required: true },
         ordinal: { type: Number, required: true },
         projectId: { type: mongoose.Schema.Types.ObjectId, required: false, default: null },
+        sprintId: { type: mongoose.Schema.Types.ObjectId, required: false, default: null },
+        taskId: { type: String, required: false, default: '' },
+        participants: { type: [String], required: false, default: [] },
         visibility: { type: String, required: false, default: 'project' },
         createdBy: { type: String, required: false, default: '' },
         // 'human' | 'agent'

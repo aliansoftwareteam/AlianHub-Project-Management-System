@@ -51,6 +51,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     mockDb.uniqueFromSchema(CHUNKS, knowledgeChunksSchema);
     mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C, knowledgeIndexer: { mode: 'on' } });
+    ['page', 'comment', 'transcript'].forEach((sourceType) => mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType, status: 'complete' }));
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: 'One', isPrivateSpace: false, AssigneeUserId: [], deletedStatusKey: 0 });
     generateMeetingNotes.mockResolvedValue({ status: true, data: { summary: 'Agreed to repaint the lighthouse.', actionItems: [{ id: 'ai_1', title: 'Order white paint', owner: 'Ann' }] } });
 });
@@ -137,11 +138,15 @@ describe('chunking a transcript', () => {
 
     it('stays indexed for its participants when its project is trashed, since a transcript follows the call rather than the project', async () => {
         const kept = mockDb.seed(SCHEMA_TYPE.CALLS, { callId: 'p', title: 'Project call', participants: [HOST], projectId: PROJECT, transcript: 'Paint.', deletedStatusKey: 0, createdBy: HOST, updatedAt: new Date('2026-09-01T00:00:00Z') });
+        const page = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Paint plan', content: { html: '<p>White.</p>' }, visibility: 'project', createdBy: HOST, ProjectID: PROJECT, deletedStatusKey: 0, updatedAt: new Date('2026-09-01T00:00:00Z') });
         await indexer.syncTranscript(C, String(kept._id));
+        await indexer.syncPage(C, String(page._id));
+        expect(live(kept._id).map((c) => c.projectId)).toEqual([PROJECT]);
 
         await updateProjectInternal(C, PROJECT, { deletedStatusKey: 1 });
         await events.drain();
 
+        expect((mockDb.store[CHUNKS] || []).filter((c) => c.sourceId === String(page._id) && !c.deleted)).toEqual([]);
         expect(live(kept._id).length).toBeGreaterThan(0);
     });
 });

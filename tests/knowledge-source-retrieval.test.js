@@ -252,6 +252,37 @@ describe('workspace pages, which have no project', () => {
     });
 });
 
+describe('every chunked source', () => {
+    beforeEach(() => SOURCES.forEach((s) => indexReady(s)));
+
+    it("never selects a tombstoned comment or transcript chunk, nor another company's", async () => {
+        const commentId = await comment('The harbour master retires.');
+        const callId = await transcript('The harbour master retires.');
+        expect((await candidates(MEMBER, 'retires', 'comment'))).toEqual([commentId]);
+        expect((await candidates(MEMBER, 'retires', 'transcript'))).toEqual([callId]);
+
+        mockDb.store[CHUNKS].forEach((row) => { row.companyId = '6f0000000000000000000c99'; });
+        expect(await candidates(MEMBER, 'retires', 'comment')).toEqual([]);
+        expect(await candidates(MEMBER, 'retires', 'transcript')).toEqual([]);
+
+        mockDb.store[CHUNKS].forEach((row) => { row.companyId = C; row.deleted = true; });
+        expect(await candidates(MEMBER, 'retires', 'comment')).toEqual([]);
+        expect(await candidates(MEMBER, 'retires', 'transcript')).toEqual([]);
+    });
+
+    it('narrows a transcript search scoped to one project to the calls of that project', async () => {
+        const inShared = await transcript('Painting the bollards.', { projectId: SHARED });
+        await transcript('Painting the bollards.', { projectId: SECRET });
+        await transcript('Painting the bollards.');
+
+        const scope = { sourceTypes: ['transcript'], projectId: SHARED };
+        const set = await resolveVisibleSet({ companyId: C, caller: { kind: 'user', userId: MEMBER }, scope });
+        const selected = await lexical.search({ companyId: C, query: 'bollards', filter: filterFor(set, { chunkSources: SOURCES }), limit: 20 });
+        expect(selected.map((p) => p.sourceId)).toEqual([inShared]);
+        expect(idsOf(await ask(MEMBER, 'bollards', ['transcript'], { scope }))).toEqual([inShared]);
+    });
+});
+
 describe('ranking across the chunked sources', () => {
     beforeEach(() => SOURCES.forEach((s) => indexReady(s)));
 
