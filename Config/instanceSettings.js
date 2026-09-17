@@ -88,6 +88,26 @@ async function saveInstanceSettings(values, updatedBy = '') {
     return { applied, restartRequired };
 }
 
+/* A moment stored beside the settings rather than in `values`, which every save
+ * rewrites whole. The conditional write means the first server to record it wins:
+ * a second one hits the existing _id on upsert and reads the stored moment back. */
+async function markFirstSeen(field, now = new Date()) {
+    const { run } = deps();
+    const stored = async () => {
+        const doc = await run([{ _id: DOC_ID }], 'findOne');
+        return doc && doc[field] ? new Date(doc[field]) : null;
+    };
+    const existing = await stored();
+    if (existing) return existing;
+    try {
+        const doc = await run([{ _id: DOC_ID, [field]: { $exists: false } }, { $set: { [field]: now } }, { upsert: true, returnDocument: 'after' }], 'findOneAndUpdate');
+        if (doc && doc[field]) return new Date(doc[field]);
+    } catch (error) {
+        if (error.code !== 11000) throw error;
+    }
+    return (await stored()) || now;
+}
+
 const describe = () => describeSettings({ saved, env: process.env, locked: lockedKeys() });
 
 /* What the login page and the SPA shell may know before anyone is logged in. */
@@ -117,7 +137,7 @@ function publicConfig() {
 
 module.exports = {
     DOC_ID, ENC_PREFIX, encrypt, decrypt, isEncrypted, decodeStored, lockedKeys, applyInstanceSettings,
-    loadInstanceSettings, saveInstanceSettings, describe, publicConfig,
+    loadInstanceSettings, saveInstanceSettings, markFirstSeen, describe, publicConfig,
     isLoaded: () => loaded,
     savedValues: () => ({ ...saved }),
     _resetForTests: () => { locked = null; saved = {}; loaded = false; },

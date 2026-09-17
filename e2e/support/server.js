@@ -84,7 +84,7 @@ function stopChild(child) {
     });
 }
 
-async function startServer({ mongoUrl, logFile }) {
+async function startServer({ mongoUrl, logFile, env = {} }) {
     const port = await freePort();
     const baseURL = `http://127.0.0.1:${port}`;
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'alianhub-e2e-'));
@@ -99,7 +99,7 @@ async function startServer({ mongoUrl, logFile }) {
 
     const child = spawn(process.execPath, ['-r', path.join(__dirname, 'ignore-dotenv.js'), 'index.js'], {
         cwd: ROOT,
-        env: serverEnv({ port, mongoUrl, workDir }),
+        env: { ...serverEnv({ port, mongoUrl, workDir }), ...env },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
     child.stdout.on('data', record);

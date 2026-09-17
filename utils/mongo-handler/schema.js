@@ -4092,6 +4092,8 @@ const schema = {
         values: { type: Object, required: false },
         updatedAt: { type: Date, required: false },
         updatedBy: { type: String, required: false },
+        // When API_TOKEN_STRICT was first seen on; the legacy-token grace counts from here and it is never rewritten.
+        apiTokenStrictSince: { type: Date, required: false },
     },
     globalSettings: {
         name: {
