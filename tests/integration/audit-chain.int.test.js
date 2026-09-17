@@ -20,6 +20,7 @@ let client;
 let audits;
 let owner;
 let startedAt;
+let agentId;
 
 const waitFor = async (read, what) => {
     const deadline = Date.now() + ROW_DEADLINE_MS;
@@ -63,6 +64,7 @@ beforeAll(async () => {
 }, BOOT_TIMEOUT_MS);
 
 afterAll(async () => {
+    if (owner && agentId) await owner.delete(`/api/v2/agents/${agentId}`);
     if (server) await server.stop();
     if (client) {
         await client.db(state.companyId).collection('apiTokens').deleteMany({ name: /^\[QA chain\]/ });
@@ -86,6 +88,7 @@ describe('the audit hash chain through real routes', () => {
             name: `[QA chain] ${uniqueSuffix()}`, description: 'audit chain', autonomy: 1, spendCapUsd: 1,
             projectIds: [state.projects.shared._id], skills: [], allowedActions: ['task.comment'],
         })).body.data;
+        agentId = agent._id;
         const taskId = state.tasks[0]._id;
         agentApi = await agentToken(agent._id);
         const proposal = (await agentApi.post('/api/v2/agents/proposals', {
@@ -193,11 +196,16 @@ describe('the audit hash chain through real routes', () => {
 
     it('filters to permission refusals, and reads an unchained row written after the chain started as broken', async () => {
         const marker = `[QA chain] ${uniqueSuffix()}`;
-        await audits.insertOne({ action: 'permission.refused', actorId: state.users.member.userId, actorName: '', entityType: 'permission', entityId: 'task.task_priority', entityName: marker, meta: { mode: 'enforce', reason: 'denied' }, ip: '', createdAt: new Date(), updatedAt: new Date() });
-        const body = await list({ refused: 'true' });
-        expect(body.data.length).toBeGreaterThanOrEqual(1);
-        expect(body.data.every((r) => r.action === 'permission.refused')).toBe(true);
-        expect(body.data.find((r) => r.entityName === marker).integrity).toEqual({ state: 'broken', brokenAt: null });
+        // Other suites count permission.refused rows in this shared database, so this one goes again at once.
+        const inserted = await audits.insertOne({ action: 'permission.refused', actorId: 'qa-chain', actorName: '', entityType: 'permission', entityId: 'task.task_priority', entityName: marker, meta: { mode: 'enforce', reason: 'denied' }, ip: '', createdAt: new Date(), updatedAt: new Date() });
+        try {
+            const body = await list({ refused: 'true' });
+            expect(body.data.length).toBeGreaterThanOrEqual(1);
+            expect(body.data.every((r) => r.action === 'permission.refused')).toBe(true);
+            expect(body.data.find((r) => r.entityName === marker).integrity).toEqual({ state: 'broken', brokenAt: null });
+        } finally {
+            await audits.deleteOne({ _id: inserted.insertedId });
+        }
     });
 
     it('never applies an appended change inserted outside the chain', async () => {
