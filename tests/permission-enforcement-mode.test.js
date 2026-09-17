@@ -1,10 +1,13 @@
 const mockDb = require('./fixtures/fakeMongo').create();
-const mockFailing = { companies: false };
+const mockFailing = { companies: false, companyReads: 0 };
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({
-    MongoDbCrudOpration: (companyId, q, method) => (mockFailing.companies && q.type === 'companies'
-        ? Promise.reject(new Error('global database unreachable'))
-        : mockDb.crud(companyId, q, method)),
+    MongoDbCrudOpration: (companyId, q, method) => {
+        if (q.type === 'companies') mockFailing.companyReads += 1;
+        return mockFailing.companies && q.type === 'companies'
+            ? Promise.reject(new Error('global database unreachable'))
+            : mockDb.crud(companyId, q, method);
+    },
 }));
 jest.mock('../Config/config', () => {
     const NodeCache = require('node-cache');
@@ -19,7 +22,7 @@ const enforcement = require('../Config/permissionEnforcement');
 const CID = '6f00000000000000000000c1';
 const ENV_KEYS = ['PERMISSION_ENFORCEMENT_MODE', 'DISABLE_PERMISSION_ENFORCEMENT', 'PERMISSION_ENFORCEMENT_CACHE_TTL_SECONDS'];
 
-const companyReads = () => mockDb.calls.filter((call) => call.type === 'companies').length;
+const companyReads = () => mockFailing.companyReads;
 const storeCompany = (stored) => {
     mockDb.store.companies = [stored === undefined ? { _id: CID } : { _id: CID, permissionEnforcement: stored }];
 };
@@ -29,6 +32,7 @@ beforeEach(() => {
     myCache.flushAll();
     mockDb.calls.length = 0;
     mockFailing.companies = false;
+    mockFailing.companyReads = 0;
     storeCompany(undefined);
     jest.clearAllMocks();
 });

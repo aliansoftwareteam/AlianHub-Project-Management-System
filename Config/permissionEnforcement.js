@@ -12,6 +12,7 @@ const COMPANY_FIELD = 'permissionEnforcement';
 const INHERIT = 'inherit';
 const CACHE_PREFIX = 'permissionEnforcement:';
 const DEFAULT_CACHE_TTL_SECONDS = 30;
+const FAILED_READ_TTL_SECONDS = 5;
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 const asMode = (raw) => {
@@ -34,7 +35,7 @@ const cacheTtlSeconds = () => {
 
 const cacheKey = (companyId) => `${CACHE_PREFIX}${companyId}`;
 
-/* A row that cannot be read inherits and is not cached, so the next request asks again. */
+/* A row that cannot be read inherits for a few seconds, so an outage costs one read and one log line per window. */
 const companyMode = async (companyId) => {
     const cached = myCache.get(cacheKey(companyId));
     if (cached !== undefined) return cached === INHERIT ? null : cached;
@@ -49,7 +50,8 @@ const companyMode = async (companyId) => {
         if (ttl > 0) myCache.set(cacheKey(companyId), own || INHERIT, ttl);
         return own;
     } catch (error) {
-        logger.error(`permission enforcement: company ${companyId}: ${error.message || error}`);
+        myCache.set(cacheKey(companyId), INHERIT, FAILED_READ_TTL_SECONDS);
+        logger.error(`permission enforcement: company ${companyId} unreadable, inheriting for ${FAILED_READ_TTL_SECONDS}s: ${error.message || error}`);
         return null;
     }
 };
@@ -80,6 +82,7 @@ module.exports = {
     MODES,
     COMPANY_FIELD,
     DEFAULT_CACHE_TTL_SECONDS,
+    FAILED_READ_TTL_SECONDS,
     instanceMode,
     normaliseCompanyMode,
     cacheTtlSeconds,

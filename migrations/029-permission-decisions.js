@@ -1,5 +1,6 @@
-/* Builds the permission_decisions indexes in every tenant before its first would-be denial: the unique
- * key keeps concurrent first writes on one row, and the TTL index is the only thing that expires rows.
+/* Builds the permission_decisions indexes in the global database, which holds decisions that name no
+ * company, and in every tenant, before their first would-be denial: the unique key keeps concurrent first
+ * writes on one row, and the TTL index is the only thing that expires rows.
  * createIndexes, not syncIndexes, which would drop any index the schema does not declare. */
 
 const ID = '029-permission-decisions';
@@ -18,6 +19,8 @@ module.exports = {
     scope: 'company',
     indexCompany,
     async up(ctx) {
+        const instance = await indexCompany(ctx, ctx.SCHEMA_TYPE.GOLBAL);
+        ctx.logger.info(`[migrations] 029 global: ${JSON.stringify(instance)}`);
         await ctx.forEachCompany(async (companyId) => {
             const counts = await indexCompany(ctx, companyId);
             ctx.logger.info(`[migrations] 029 ${companyId}: ${JSON.stringify(counts)}`);

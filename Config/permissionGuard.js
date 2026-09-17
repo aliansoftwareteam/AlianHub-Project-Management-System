@@ -82,8 +82,11 @@ const SEAT_SCOPES = {
     any: {},
 };
 
-/** Resolve a user's roleType within a company from a live seat (cached 60s). null if not a member. */
-const getRoleType = async (companyId, uid, { seat = 'active' } = {}) => {
+/**
+ * Resolve a user's roleType within a company from a live seat (cached 60s). null if not a member.
+ * A failed read is null too unless `throwOnError`, for callers that must not mistake an outage for a missing seat.
+ */
+const getRoleType = async (companyId, uid, { seat = 'active', throwOnError = false } = {}) => {
     if (!companyId || !uid || !OBJECT_ID_PATTERN.test(String(companyId)) || !OBJECT_ID_PATTERN.test(String(uid))) {
         return null;
     }
@@ -102,6 +105,7 @@ const getRoleType = async (companyId, uid, { seat = 'active' } = {}) => {
         return roleType;
     } catch (error) {
         logger.error(`getRoleType error company=${companyId} uid=${uid}: ${error.message || error}`);
+        if (throwOnError) throw error;
         return null;
     }
 };
@@ -173,8 +177,8 @@ const permissionIn = ({ arranged, projectScoped }, roleType, path) => {
  * null | false | true (or 1 | 2 for scoped keys), exactly as the matrix stores it.
  * Throws when the rules cannot be read; callers decide, and every guard refuses.
  */
-const evaluatePermission = async (companyId, uid, path, { projectId } = {}) => {
-    const roleType = await getRoleType(companyId, uid);
+const evaluatePermission = async (companyId, uid, path, { projectId, strict = false } = {}) => {
+    const roleType = await getRoleType(companyId, uid, { throwOnError: strict });
     if (roleType === null) return null;
     if (isPrivileged(roleType)) return true;
     return permissionIn(await rulesFor(companyId, isCompanyWideKey(path) ? null : projectId), roleType, path);
@@ -229,7 +233,7 @@ const requireRole = (allowed = [ROLE_OWNER, ROLE_ADMIN]) => async (req, res, nex
             permission: `role:${allowed.join(',')}`,
             refuse: forbid,
             check: async () => {
-                const role = await getRoleType(req.headers["companyid"] || "", req.uid);
+                const role = await getRoleType(req.headers["companyid"] || "", req.uid, { throwOnError: true });
                 if (role !== null && allowed.includes(role)) return ALLOWED;
                 return { allowed: false, role, scope: GLOBAL_SCOPE, reason: role === null ? REASONS.NO_SEAT : REASONS.ROLE_NOT_ALLOWED };
             },
@@ -269,9 +273,9 @@ const isReadable = (permission) => permission !== null && permission !== undefin
 const passes = (permission, write) => (write ? isWritable(permission) : isReadable(permission));
 
 /* The first project whose rules refuse, GLOBAL_SCOPE when the company rules refuse, or null when all allow. */
-const refusingScope = async (companyId, uid, path, write, projectIds) => {
+const refusingScope = async (companyId, uid, path, write, projectIds, strict) => {
     for (const projectId of projectIds.length ? projectIds : [null]) {
-        if (!passes(await evaluatePermission(companyId, uid, path, { projectId }), write)) return projectId || GLOBAL_SCOPE;
+        if (!passes(await evaluatePermission(companyId, uid, path, { projectId, strict }), write)) return projectId || GLOBAL_SCOPE;
     }
     return null;
 };
@@ -279,17 +283,18 @@ const refusingScope = async (companyId, uid, path, write, projectIds) => {
 /*
  * A body whose tasks do not exist is judged on the company rules rather than passed through: the task
  * handlers write through the ids and the company the body names, so it could reach a task this check never saw.
+ * `strict` makes a failed role read throw instead of reading as no seat; the API-token path keeps the old answer.
  */
-const requestVerdict = async (companyId, uid, req, path, write) => {
+const requestVerdict = async (companyId, uid, req, path, write, { strict = false } = {}) => {
     if (isCompanyWideKey(path)) {
-        return passes(await evaluatePermission(companyId, uid, path), write) ? ALLOWED : { allowed: false, scope: GLOBAL_SCOPE };
+        return passes(await evaluatePermission(companyId, uid, path, { strict }), write) ? ALLOWED : { allowed: false, scope: GLOBAL_SCOPE };
     }
     const { projectIds, unresolved, legacyProjectId } = await projectsForRequest(companyId, req);
     if (unresolved) logger.warn(`permission guard ${path}: the tasks named in the body were not found; judged on the company rules`);
-    const scope = await refusingScope(companyId, uid, path, write, projectIds);
+    const scope = await refusingScope(companyId, uid, path, write, projectIds, strict);
     if (!scope) return ALLOWED;
     const sameContext = projectIds.length <= 1 && (projectIds[0] || null) === legacyProjectId;
-    if (sameContext || !passes(await evaluatePermission(companyId, uid, path, { projectId: legacyProjectId }), write)) {
+    if (sameContext || !passes(await evaluatePermission(companyId, uid, path, { projectId: legacyProjectId, strict }), write)) {
         return { allowed: false, scope, unresolved };
     }
     logger.warn(`permission guard ${path}: known difference, refused by project ${projectIds.join(', ') || 'none'} but allowed by ${legacyProjectId || 'the company rules'} as before`);
@@ -306,16 +311,17 @@ const nullFlagWouldAllow = async (companyId, roleType, path, write, projectId) =
 };
 
 const denialReason = async (companyId, uid, path, write, { scope, unresolved }) => {
-    const role = await getRoleType(companyId, uid);
+    const role = await getRoleType(companyId, uid, { throwOnError: true });
     if (role === null) return { role, reason: REASONS.NO_SEAT };
     if (unresolved) return { role, reason: REASONS.TASKS_NOT_FOUND };
     if (scope !== GLOBAL_SCOPE && await nullFlagWouldAllow(companyId, role, path, write, scope)) return { role, reason: REASONS.NULL_GLOBAL_FLAG };
     return { role, reason: REASONS.DENIED };
 };
 
-const sessionPermissionVerdict = async (req, path, write) => {
+const sessionPermissionVerdict = async (req, path, write, sessionAllows) => {
+    if (sessionAllows && await sessionAllows(req)) return ALLOWED;
     const companyId = req.headers["companyid"] || "";
-    const verdict = await requestVerdict(companyId, req.uid, req, path, write);
+    const verdict = await requestVerdict(companyId, req.uid, req, path, write, { strict: true });
     return verdict.allowed ? verdict : { ...verdict, ...(await denialReason(companyId, req.uid, path, write, verdict)) };
 };
 
@@ -346,11 +352,13 @@ const judgeSession = async (req, res, next, { permission, check, refuse }) => {
 /**
  * Express middleware: require a permission KEY for the request's project.
  * write:true (default) needs a writable value, write:false any readable one.
+ * `sessionAllows(req)` names the browser-session requests the route's handler allows without the key,
+ * such as a member changing their own preferences; API tokens are judged on the key alone.
  */
-const requirePermission = (path, { write = true } = {}) => async (req, res, next) => {
+const requirePermission = (path, { write = true, sessionAllows = null } = {}) => async (req, res, next) => {
     const forbid = (statusText) => res.status(403).json({ status: false, statusText, error: "Forbidden", permission: path });
     if (!isApiTokenRequest(req)) {
-        return judgeSession(req, res, next, { permission: path, refuse: forbid, check: () => sessionPermissionVerdict(req, path, write) });
+        return judgeSession(req, res, next, { permission: path, refuse: forbid, check: () => sessionPermissionVerdict(req, path, write, sessionAllows) });
     }
     if (!fineGrainedEnforced()) return next();
     try {

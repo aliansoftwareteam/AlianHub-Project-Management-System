@@ -5,6 +5,8 @@ const logger = require('./loggerConfig');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const MAX_USER_IDS = 5;
+const AUDIT_INTERVAL_MS = 60 * 1000;
+const INSTANCE_BUCKET = SCHEMA_TYPE.GOLBAL;
 const GLOBAL_SCOPE = 'global';
 const UNKNOWN_ROUTE = 'unknown';
 const REFUSED_ACTION = 'permission.refused';
@@ -56,6 +58,18 @@ const writeDecision = async (companyId, key, uid, at) => {
     }, 'updateOne');
 };
 
+/* The row was just upserted; claiming it atomically keeps every replica to one audit row per key per minute. */
+const claimAudit = async (companyId, key, at) => {
+    const result = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PERMISSION_DECISIONS,
+        data: [
+            { ...key, $or: [{ lastAuditedAt: { $exists: false } }, { lastAuditedAt: { $lte: new Date(at.getTime() - AUDIT_INTERVAL_MS) } }] },
+            { $set: { lastAuditedAt: at } },
+        ],
+    }, 'updateOne');
+    return Boolean(result && result.modifiedCount);
+};
+
 const auditRefusal = (req, key) => recordAuditFromReq(req, {
     action: REFUSED_ACTION,
     entityType: 'permission',
@@ -66,21 +80,27 @@ const auditRefusal = (req, key) => recordAuditFromReq(req, {
 
 const fail = (error) => logger.error(`permission decision not recorded: ${(error && error.message) || error}`);
 
+const recordAfterResponse = async (req, tenant, key, uid, at) => {
+    await writeDecision(tenant || INSTANCE_BUCKET, key, uid, at);
+    if (tenant && key.mode === 'enforce' && await claimAudit(tenant, key, at)) auditRefusal(req, key);
+};
+
 /*
  * Records a would-be denial (report) or a refusal (enforce) once the response has finished, so the write
- * can neither delay nor change it. Never throws.
+ * can neither delay nor change it. A request naming no valid company is recorded in the instance bucket
+ * of the global database, with no audit row, since no tenant can own it. Never throws.
  */
 const recordDecision = (req, res, decision) => {
     try {
+        if (!res || typeof res.on !== 'function') return;
         const companyId = String(decision.companyId || '');
-        if (!OBJECT_ID.test(companyId) || !res || typeof res.on !== 'function') return;
+        const tenant = OBJECT_ID.test(companyId) ? companyId : null;
         const at = new Date();
         const key = decisionKey(req, decision, at);
         const uid = String(decision.uid || '');
         res.on('finish', () => {
             try {
-                writeDecision(companyId, key, uid, at).catch(fail);
-                if (key.mode === 'enforce') auditRefusal(req, key);
+                recordAfterResponse(req, tenant, key, uid, at).catch(fail);
             } catch (error) {
                 fail(error);
             }

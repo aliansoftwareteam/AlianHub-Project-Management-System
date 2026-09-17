@@ -1406,6 +1406,8 @@ const schema = {
         count: { type: Number, required: false },
         firstSeen: { type: Date, required: false },
         lastSeen: { type: Date, required: false },
+        // When a permission.refused audit row was last written for this key, at most once a minute.
+        lastAuditedAt: { type: Date, required: false },
         userIds: { type: [String], required: false },
     },
     // Client invoices raised against a project (handoff 19c). Distinct from the
