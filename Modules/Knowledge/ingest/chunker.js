@@ -21,12 +21,22 @@ const paragraphsOf = (html) => String(html || '')
     .map(inlineText)
     .filter(Boolean);
 
-/* The full body, never rawText: rawText is cut at 5,000 characters for list previews. */
-const htmlOf = (content) => {
-    if (!content) return '';
-    if (typeof content === 'string') return content;
-    if (typeof content.html === 'string' && content.html.trim()) return content.html;
-    return Array.isArray(content.blocks) ? blocksToHtml(content) : '';
+const escapeHtml = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/* Plain text as the chunker's html, reading markdown headings: an agent draft is saved as text. */
+const textToHtml = (text) => String(text || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+    const heading = /^(#{1,6})\s+(.*)$/.exec(line);
+    return heading ? `<h${heading[1].length}>${escapeHtml(heading[2])}</h${heading[1].length}>` : `<p>${escapeHtml(line)}</p>`;
+}).join('');
+
+/* The full body when there is one. rawText is cut at 5,000 characters for list previews on a page
+ * written in the editor, so it is only read for a page saved without a body, as agent drafts are. */
+const htmlOf = (page) => {
+    const content = page && page.content;
+    if (typeof content === 'string' && content.trim()) return content;
+    if (content && typeof content.html === 'string' && content.html.trim()) return content.html;
+    if (content && Array.isArray(content.blocks) && content.blocks.length) return blocksToHtml(content);
+    return textToHtml(page && page.rawText);
 };
 
 const sectionsOf = (html) => {
@@ -81,7 +91,7 @@ const contentHashOf = (headingPath, text) => crypto.createHash('sha256').update(
 
 const chunkPage = (page, { maxChars = MAX_CHUNK_CHARS } = {}) => {
     const title = inlineText(page && page.title);
-    const [intro, ...sections] = sectionsOf(htmlOf(page && page.content));
+    const [intro, ...sections] = sectionsOf(htmlOf(page));
     const open = [];
     const pieces = [];
     const add = (headingPath, lines) => pack(lines.filter(Boolean), maxChars).forEach((text) => pieces.push({ headingPath, text }));

@@ -8,7 +8,7 @@ const backfill = require('./backfill');
 // and nothing is published, so no page, project or member write does any extra work.
 
 const LOG_PREFIX = '[knowledge-indexer]';
-const HANDLED = ['page.created', 'page.updated', 'page.deleted', 'project.trashed', 'project.restored', 'member.departed'];
+const HANDLED = ['page.created', 'page.updated', 'page.deleted', 'project.trashed', 'project.restored', 'member.departed', 'member.activated'];
 
 const pending = new Set();
 let started = false;
@@ -39,6 +39,8 @@ const apply = (envelope) => {
             return indexer.reindexProject(companyId, id);
         case 'member.departed':
             return indexer.removeDepartedMember(companyId, id);
+        case 'member.activated':
+            return indexer.reindexAuthor(companyId, id);
         default:
             return null;
     }
@@ -94,6 +96,16 @@ const publish = (companyId, type, entity, data) => {
 const publishProjectTrashed = (companyId, projectId) => publish(companyId, 'project.trashed', { kind: 'project', id: String(projectId) }, { ProjectID: String(projectId) });
 const publishProjectRestored = (companyId, projectId) => publish(companyId, 'project.restored', { kind: 'project', id: String(projectId) }, { ProjectID: String(projectId) });
 const publishMemberDeparted = (companyId, userId) => publish(companyId, 'member.departed', { kind: 'member', id: String(userId) }, { userId: String(userId) });
+const publishMemberActivated = (companyId, userId) => publish(companyId, 'member.activated', { kind: 'member', id: String(userId) }, { userId: String(userId) });
+
+/* Asked for by retrieval when a page changed after its chunks were written. */
+const requestSync = (companyId, pageId) => {
+    if (flag.indexer.mode() === 'off') return;
+    track(indexer.syncPage(companyId, pageId).catch((error) => {
+        logger.error(`${LOG_PREFIX} sync of page ${pageId} in company ${companyId} failed: ${domainEventBus.failureText(error)}`);
+        return null;
+    }));
+};
 
 module.exports = {
     HANDLED,
@@ -104,4 +116,6 @@ module.exports = {
     publishProjectTrashed,
     publishProjectRestored,
     publishMemberDeparted,
+    publishMemberActivated,
+    requestSync,
 };

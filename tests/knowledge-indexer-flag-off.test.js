@@ -96,7 +96,7 @@ describe('with KNOWLEDGE_INDEXER unset, nothing new runs, reads or writes', () =
         expect(knowledgeCalls()).toEqual([]);
         expect(seen).toEqual([]);
         expect(events.publishMemberDeparted(C, OWNER)).toBeNull();
-        expect(events.publishMemberRejoined(C, OWNER)).toBeNull();
+        expect(events.publishMemberActivated(C, OWNER)).toBeNull();
         events.requestSync(C, PROJECT);
         await events.drain();
         expect(seen).toEqual([]);

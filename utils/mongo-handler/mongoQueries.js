@@ -111,7 +111,8 @@ const {
     projectContractsSchema,
     projectInvoicesSchema,
     knowledgeChunksSchema,
-    knowledgeIndexStateSchema
+    knowledgeIndexStateSchema,
+    knowledgeExclusionsSchema
 } = require('./createSchema');
 
 
@@ -339,6 +340,8 @@ exports.checkType = (type) => {
             return knowledgeChunksSchema
         case SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE:
             return knowledgeIndexStateSchema
+        case SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS:
+            return knowledgeExclusionsSchema
         default:
             return ""
     }
@@ -569,6 +572,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.KNOWLEDGE_CHUNKS}`
         case SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE:
                 return `${dbCollections.KNOWLEDGE_INDEX_STATE}`
+        case SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS:
+                return `${dbCollections.KNOWLEDGE_EXCLUSIONS}`
         default:
             return ""
     }

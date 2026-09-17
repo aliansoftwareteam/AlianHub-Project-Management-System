@@ -1,6 +1,7 @@
 const lexical = require('./adapters/lexical');
 const flag = require('./flag');
 const { pagesIndexed } = require('./ingest/backfill');
+const events = require('./ingest/events');
 const { resolveVisibleSet, filterFor, recheck } = require('./visibleSet');
 
 // One way in to what the workspace knows. The backend behind it is an adapter;
@@ -13,6 +14,9 @@ const ADAPTER_METHODS = ['search', 'upsert', 'tombstone', 'erase', 'stats'];
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 50;
 const RECHECK_HEADROOM = 2;
+const RECHECK_WINDOWS = 4;
+const SCORE_FLOOR = 1;
+const AGENT_WEIGHT = 0.5;
 
 const assertAdapter = (adapter) => {
     const missing = ADAPTER_METHODS.filter((method) => !adapter || typeof adapter[method] !== 'function');
@@ -35,11 +39,27 @@ const byRank = (a, b) => (b.score - a.score)
 
 /* A full-text score grows with how often the words occur and has no ceiling, while the
  * regular-expression fallback scores at most 1, so raw scores cannot be compared across
- * sources. Each source is scaled by its own best score before they are merged. */
+ * sources. Each source is scaled by its own best score, but never by less than a floor, so a
+ * source whose only match is weak stays weak instead of rising to the top of the scale. A
+ * machine-written passage is weighed down after scaling: its source's best could be itself. */
 const normaliseScores = (candidates) => {
     const best = {};
     candidates.forEach((p) => { best[p.sourceType] = Math.max(best[p.sourceType] || 0, Number(p.score) || 0); });
-    return candidates.map((p) => ({ ...p, score: best[p.sourceType] ? (Number(p.score) || 0) / best[p.sourceType] : 0 }));
+    return candidates.map((p) => {
+        const scaled = (Number(p.score) || 0) / Math.max(best[p.sourceType], SCORE_FLOOR);
+        return { ...p, score: p.authorKind === 'agent' ? scaled * AGENT_WEIGHT : scaled };
+    });
+};
+
+/* Rechecked a window at a time, so a list whose top candidates were deleted still fills, while
+ * the usual case costs one window of reads. */
+const rechecked = async ({ set, ranked, wanted, onStale }) => {
+    const size = wanted * RECHECK_HEADROOM;
+    const kept = [];
+    for (let start = 0, round = 0; start < ranked.length && kept.length < wanted && round < RECHECK_WINDOWS; start += size, round += 1) {
+        kept.push(...await recheck({ set, passages: ranked.slice(start, start + size), onStale }));
+    }
+    return kept.slice(0, wanted);
 };
 
 /* Until a company's backfill completes, the chunk store is missing the pages written before
@@ -64,7 +84,8 @@ const createRetrieve = (adapter) => {
         const pageChunks = await readsPageChunks(set);
         const candidates = await adapter.search({ companyId: set.companyId, query: String(query), filter: filterFor(set, { pageChunks }), limit: wanted * RECHECK_HEADROOM });
         const ranked = normaliseScores(candidates || []).sort(byRank);
-        const passages = (await recheck({ set, passages: ranked })).slice(0, wanted);
+        const onStale = pageChunks ? (p) => events.requestSync(set.companyId, p.sourceId) : null;
+        const passages = await rechecked({ set, ranked, wanted, onStale });
         return { passages, backend: adapter.name, scope: summary };
     };
 };

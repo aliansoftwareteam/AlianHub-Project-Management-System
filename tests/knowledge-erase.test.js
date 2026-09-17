@@ -111,7 +111,7 @@ describe('an erasure sticks', () => {
 
         await indexer.reindexProject(C, PROJECT);
         await backfill.backfillCompany(C, { batchSize: 10 });
-        await events.handle({ type: 'member.rejoined', companyId: C, entity: { kind: 'member', id: ALICE }, data: { userId: ALICE } });
+        await events.handle({ type: 'member.activated', companyId: C, entity: { kind: 'member', id: ALICE }, data: { userId: ALICE } });
 
         expect(stored(secret._id)).toEqual([]);
         expect(stored(shared._id).filter((c) => !c.deleted)).toHaveLength(2);

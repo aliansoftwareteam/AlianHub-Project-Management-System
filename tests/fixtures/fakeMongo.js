@@ -131,7 +131,8 @@ const computed = (doc, value, search) => {
 const project = (doc, spec, search) => {
     const out = spec._id === 0 ? {} : { _id: doc._id };
     Object.entries(spec).filter(([key]) => key !== '_id').forEach(([key, value]) => {
-        if (value === 1 || value === true) { if (read(doc, key) !== undefined) out[key] = read(doc, key); } else out[key] = computed(doc, value, search);
+        const kept = value === 1 || value === true ? read(doc, key) : computed(doc, value, search);
+        if (kept !== undefined) write(out, key, (target, last) => { target[last] = kept; });
     });
     return out;
 };

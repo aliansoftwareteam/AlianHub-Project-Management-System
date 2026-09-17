@@ -24,6 +24,7 @@ const MANAGER_ERROR = Object.freeze({
     [reportingLine.REASON.CYCLE]: 'That would make the reporting line loop back on itself.'
 });
 
+const holdsSeat = (row) => Boolean(row) && Number(row.status) === ACTIVE && row.isDelete !== true;
 const refuse = (res, code, statusText) => res.status(code).json({ status: false, statusText, message: statusText });
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
@@ -330,6 +331,8 @@ exports.updateMember = async (req, res) => {
         // A guest is still in the workspace and can still read their own private pages.
         if (data.isDelete === true || Number(data.status) === SEAT_CANCELLED) {
             knowledgeEvents.publishMemberDeparted(companyId, subject.userId);
+        } else if (holdsSeat(response) && !holdsSeat(subject)) {
+            knowledgeEvents.publishMemberActivated(companyId, subject.userId);
         }
 
         clearMemberCaches(companyId, response.userId);
@@ -433,6 +436,7 @@ exports.rootUpdateMember = async (req, res) => {
 
         clearMemberCaches(companyId, req.uid);
         forgetMembership(companyId, req.uid);
+        if (holdsSeat(response) && !holdsSeat(invite)) knowledgeEvents.publishMemberActivated(companyId, req.uid);
         socketEmitter.emit('update', {
             type: 'update',
             data: { data: response },

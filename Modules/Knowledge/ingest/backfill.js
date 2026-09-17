@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { dbCollections } = require('../../../Config/collections');
-const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const logger = require('../../../Config/loggerConfig');
 const flag = require('../flag');
@@ -10,7 +9,9 @@ const indexer = require('./indexer');
 // Indexes the pages a company already had before its indexer was switched on. Progress is
 // saved after every batch in knowledge_index_state, so a restart or a failure resumes from
 // the last saved page instead of starting over. Retrieval keeps reading page rows until the
-// state says complete.
+// state says complete. Each page goes through the same serialised sync as an event, so the
+// backfill never writes beside an event for the same page, and every decision about trash,
+// erasure or departure is read at write time rather than when the run started.
 
 const JOB_NAME = 'knowledge.backfill';
 const INTERVAL_MS = 5 * 60 * 1000;
@@ -41,23 +42,11 @@ const summaryOf = (state) => ({
     skipped: Number(state && state.skipped) || 0,
 });
 
-const trashedProjectIds = async (companyId) => {
-    const projects = await MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.PROJECTS, data: [{ deletedStatusKey: 1 }, '_id', { lean: true }] }, 'find');
-    return new Set((projects || []).map((project) => String(project._id)));
-};
-
-const activeAuthorsOf = async (companyId, pages) => {
-    const authors = [...new Set(pages.filter((page) => page.visibility === 'private' && page.createdBy).map((page) => String(page.createdBy)))];
-    if (!authors.length) return new Set();
-    const seats = await MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.COMPANY_USERS, data: [{ userId: { $in: authors }, ...ACTIVE_SEAT }, 'userId', { lean: true }] }, 'find');
-    return new Set((seats || []).map((seat) => String(seat.userId)));
-};
-
 const nextBatch = (companyId, cursor, batchSize) => MongoDbCrudOpration(String(companyId), {
     type: SCHEMA_TYPE.PAGES,
     data: [
         { deletedStatusKey: { $ne: 1 }, ...(cursor ? { _id: { $gt: new mongoose.Types.ObjectId(cursor) } } : {}) },
-        indexer.PAGE_FIELDS,
+        '_id',
         { sort: { _id: 1 }, limit: batchSize, lean: true },
     ],
 }, 'find');
@@ -70,12 +59,10 @@ const backfillCompany = async (companyId, { batchSize = BATCH_SIZE, maxBatches =
     let { cursor, indexed, skipped } = summaryOf(state);
     const startedAt = (state && state.startedAt) || new Date();
     try {
-        const trashed = await trashedProjectIds(company);
         for (let batch = 0; batch < maxBatches; batch += 1) {
             const pages = (await nextBatch(company, cursor, batchSize)) || [];
-            const activeAuthors = await activeAuthorsOf(company, pages);
             for (const page of pages) {
-                const result = await indexer.ingestPage(company, page, { trashedProjectIds: trashed, activeAuthors });
+                const result = await indexer.syncPage(company, String(page._id));
                 if (result && result.leftOut) skipped += 1;
                 else indexed += 1;
             }

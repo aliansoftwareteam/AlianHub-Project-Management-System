@@ -1446,6 +1446,16 @@ const schema = {
         // The source row's updatedAt when it was read, so a slower, older read never overwrites a newer one.
         sourceUpdatedAt: { type: Date, required: false },
     },
+    // What an erasure keeps out of the index for good: one document, or one person's private pages.
+    knowledgeExclusions: {
+        companyId: { type: String, required: true },
+        // 'document' | 'author'
+        kind: { type: String, required: true },
+        sourceType: { type: String, required: false, default: '' },
+        sourceId: { type: String, required: false, default: '' },
+        userId: { type: String, required: false, default: '' },
+        reason: { type: String, required: false, default: 'erased' },
+    },
     // Backfill progress per source type, one row per tenant database.
     knowledgeIndexState: {
         companyId: { type: String, required: true },

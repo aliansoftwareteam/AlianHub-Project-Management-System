@@ -13,7 +13,6 @@ const MAX_TEXT_TERMS = 16;
 const MAX_REGEX_TERMS = 8;
 const MIN_REGEX_TERM = 3;
 const EXCERPT_LENGTH = 300;
-const CHUNKS_PER_PAGE = 3;
 const TITLE_LENGTH = 160;
 const TEXT_INDEX_MISSING = 27;
 
@@ -57,7 +56,7 @@ const SOURCES = {
         projectId: (row) => row.projectId,
         authorKind: (row) => (row.authorKind === 'agent' ? 'agent' : 'user'),
         updatedAt: (row) => row.sourceUpdatedAt || row.updatedAt || null,
-        onePerSource: true,
+        chunked: true,
     },
     transcript: {
         textIndex: false,
@@ -124,16 +123,6 @@ const toPassage = (key, row, score, terms) => {
     };
 };
 
-/* Several chunks of one page can match; the page is one passage, from its best chunk. */
-const bestPerSource = (passages) => {
-    const best = new Map();
-    passages.forEach((passage) => {
-        const kept = best.get(passage.sourceId);
-        if (!kept || passage.score > kept.score) best.set(passage.sourceId, passage);
-    });
-    return [...best.values()];
-};
-
 /* lean, because the text score is not a schema path: a hydrated document hides it. */
 const find = (companyId, key, where, withScore, options) => MongoDbCrudOpration(companyId, {
     type: SOURCES[key].collection || SOURCE_COLLECTIONS[key],
@@ -162,10 +151,40 @@ const searchRows = async (companyId, key, clause, query, limit) => {
     }
 };
 
-const searchSource = async (companyId, key, clause, query, limit) => {
-    if (!SOURCES[key].onePerSource) return searchRows(companyId, key, clause, query, limit);
-    return bestPerSource(await searchRows(companyId, key, clause, query, limit * CHUNKS_PER_PAGE)).slice(0, limit);
+/* One row per page, from its best chunk, grouped before the limit: a long page has hundreds of
+ * chunks, and limiting chunks first would let one page fill every slot. */
+const bestChunkPerSource = (source, match, withScore, limit) => {
+    const order = withScore ? { score: -1, ordinal: 1 } : { sourceUpdatedAt: -1, ordinal: 1 };
+    return [
+        { $match: match },
+        { $project: { ...projectionOf(source, withScore), ordinal: 1 } },
+        { $sort: order },
+        { $group: { _id: '$sourceId', chunk: { $first: '$$ROOT' } } },
+        { $replaceRoot: { newRoot: '$chunk' } },
+        { $sort: withScore ? { score: -1, sourceId: 1 } : { sourceUpdatedAt: -1, sourceId: 1 } },
+        { $limit: limit },
+    ];
 };
+
+const searchChunks = async (companyId, key, clause, query, limit) => {
+    const source = SOURCES[key];
+    const aggregate = (match, withScore) => MongoDbCrudOpration(companyId, { type: source.collection, data: [bestChunkPerSource(source, match, withScore, limit)] }, 'aggregate');
+    try {
+        const rows = await aggregate(textQuery(clause, query), true);
+        return (rows || []).map((row) => toPassage(key, row, Number(row.score) || 0, words(query)));
+    } catch (error) {
+        if (!isMissingTextIndex(error)) throw error;
+        logger.warn(`knowledge lexical: ${companyId} has no ${key} text index yet; searching by regular expression`);
+        const terms = regexTerms(query);
+        if (!terms.length) return [];
+        const rows = await aggregate(regexQuery(key, clause, query), false);
+        return (rows || []).map((row) => toPassage(key, row, regexScore(source, row, terms), terms));
+    }
+};
+
+const searchSource = (companyId, key, clause, query, limit) => (SOURCES[key].chunked
+    ? searchChunks(companyId, key, clause, query, limit)
+    : searchRows(companyId, key, clause, query, limit));
 
 const sourceKeyFor = (sourceType, filter) => (sourceType === 'page' && filter.pageChunks ? 'pageChunk' : sourceType);
 

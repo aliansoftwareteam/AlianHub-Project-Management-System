@@ -305,6 +305,8 @@ knowledgeChunksSchema.index({ projectId: 1, deleted: 1 });
 knowledgeChunksSchema.index({ createdBy: 1, visibility: 1 });
 const knowledgeIndexStateSchema = new Schema(schema.knowledgeIndexState, {strict: true, timestamps: true});
 knowledgeIndexStateSchema.index({ sourceType: 1 }, { unique: true });
+const knowledgeExclusionsSchema = new Schema(schema.knowledgeExclusions, {strict: true, timestamps: true});
+knowledgeExclusionsSchema.index({ kind: 1, sourceType: 1, sourceId: 1, userId: 1 }, { unique: true });
 
 // One combined text index per collection, for global search and knowledge retrieval.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
@@ -436,6 +438,7 @@ module.exports = {
     projectInvoicesSchema,
     knowledgeChunksSchema,
     knowledgeIndexStateSchema,
+    knowledgeExclusionsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

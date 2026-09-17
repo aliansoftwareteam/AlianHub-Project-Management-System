@@ -16,6 +16,7 @@ const SOURCE_TYPES = ['task', 'page', 'comment', 'transcript'];
 const CALLER_KINDS = ['user', 'agent', 'mcp'];
 const COMMENT_TYPES = ['text', 'link'];
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const TITLE_LENGTH = 160;
 
 const SOURCE_COLLECTIONS = {
     task: SCHEMA_TYPE.TASKS,
@@ -117,7 +118,7 @@ const permissionOf = (sourceType, row) => {
 
 const RECHECK_FIELDS = {
     task: '_id',
-    page: '_id visibility ProjectID',
+    page: '_id visibility ProjectID title updatedAt',
     comment: '_id taskId',
     transcript: '_id',
 };
@@ -134,9 +135,13 @@ const onVisibleTasks = async (set, clauses, comments) => {
     return comments.filter((c) => !c.taskId || visible.has(String(c.taskId)));
 };
 
+const time = (value) => (value ? new Date(value).getTime() || 0 : 0);
+
 /* Re-read the ranked candidates from their live source rows and keep only those the
- * caller may still see, whatever index produced them. Order is preserved. */
-const recheck = async ({ set, passages }) => {
+ * caller may still see, whatever index produced them. Order is preserved. A page edited after
+ * the text a passage came from keeps its place but shows its live title and no excerpt, since
+ * the old excerpt may quote what the edit removed; onStale hears about it. */
+const recheck = async ({ set, passages, onStale }) => {
     const clauses = clausesFor(set);
     const bySource = {};
     passages.forEach((p) => {
@@ -151,12 +156,17 @@ const recheck = async ({ set, passages }) => {
             data: [{ _id: { $in: objectIds(ids) }, ...clauses[sourceType] }, RECHECK_FIELDS[sourceType]],
         }, 'find');
         if (sourceType === 'comment') rows = await onVisibleTasks(set, clauses, rows || []);
-        (rows || []).forEach((row) => { live[`${sourceType}:${row._id}`] = permissionOf(sourceType, row); });
+        (rows || []).forEach((row) => { live[`${sourceType}:${row._id}`] = { row, permission: permissionOf(sourceType, row) }; });
     }));
 
     return passages
         .filter((p) => live[`${p.sourceType}:${p.sourceId}`])
-        .map((p) => ({ ...p, permission: live[`${p.sourceType}:${p.sourceId}`] }));
+        .map((p) => {
+            const { row, permission } = live[`${p.sourceType}:${p.sourceId}`];
+            if (p.sourceType !== 'page' || time(row.updatedAt) <= time(p.updatedAt)) return { ...p, permission };
+            if (onStale) onStale(p);
+            return { ...p, title: String(row.title || '').slice(0, TITLE_LENGTH), excerpt: '', updatedAt: row.updatedAt, permission };
+        });
 };
 
 module.exports = {
