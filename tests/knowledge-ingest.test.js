@@ -73,7 +73,7 @@ beforeEach(() => {
     mockDb.uniqueFromSchema(CHUNKS, knowledgeChunksSchema);
     mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C, knowledgeIndexer: { mode: 'on' } });
     mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: OFF_COMPANY });
-    mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType: 'page', status: 'complete' });
+    mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType: 'page', status: 'complete', lastSeenOnAt: new Date() });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P1, ProjectName: 'One', isPrivateSpace: false, AssigneeUserId: [], deletedStatusKey: 0 });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P2, ProjectName: 'Two', isPrivateSpace: false, AssigneeUserId: [], deletedStatusKey: 0 });
     getRoleType.mockImplementation(async () => 3);

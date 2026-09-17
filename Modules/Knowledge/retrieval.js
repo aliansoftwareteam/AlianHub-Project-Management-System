@@ -1,6 +1,7 @@
 const lexical = require('./adapters/lexical');
 const flag = require('./flag');
-const { pagesIndexed } = require('./ingest/backfill');
+const backfill = require('./ingest/backfill');
+const { INDEXED_SOURCES } = require('./sources');
 const events = require('./ingest/events');
 const { resolveVisibleSet, filterFor, recheck } = require('./visibleSet');
 
@@ -62,11 +63,17 @@ const rechecked = async ({ set, ranked, wanted, onStale }) => {
     return kept.slice(0, wanted);
 };
 
-/* Until a company's backfill completes, the chunk store is missing the pages written before
- * its indexer was switched on, so page rows are searched as before. */
-const readsPageChunks = async (set) => set.sourceTypes.includes('page')
-    && await flag.indexer.enabledFor(set.companyId)
-    && await pagesIndexed(set.companyId).catch(() => false);
+/* Until a company's backfill of a source completes, or while its heartbeat says events may have been
+ * missed and its catch-up has not finished, the chunk store may lack what that source holds, so
+ * that source's rows are searched as before. */
+const chunkSourcesFor = async (set) => {
+    const wanted = set.sourceTypes.filter((sourceType) => INDEXED_SOURCES.includes(sourceType));
+    if (!wanted.length || !(await flag.indexer.enabledFor(set.companyId))) return [];
+    const states = await backfill.readStates(set.companyId, wanted).catch(() => null);
+    if (!states) return [];
+    events.keepAlive(set.companyId, states);
+    return backfill.indexedOf(states, wanted);
+};
 
 const createRetrieve = (adapter) => {
     assertAdapter(adapter);
@@ -81,10 +88,10 @@ const createRetrieve = (adapter) => {
         };
         if (!set.sourceTypes.length || !String(query || '').trim()) return { passages: [], backend: adapter.name, scope: summary };
 
-        const pageChunks = await readsPageChunks(set);
-        const candidates = await adapter.search({ companyId: set.companyId, query: String(query), filter: filterFor(set, { pageChunks }), limit: wanted * RECHECK_HEADROOM });
+        const chunkSources = await chunkSourcesFor(set);
+        const candidates = await adapter.search({ companyId: set.companyId, query: String(query), filter: filterFor(set, { chunkSources }), limit: wanted * RECHECK_HEADROOM });
         const ranked = normaliseScores(candidates || []).sort(byRank);
-        const onStale = pageChunks ? (p) => events.requestSync(set.companyId, p.sourceId) : null;
+        const onStale = chunkSources.length ? (p) => chunkSources.includes(p.sourceType) && events.requestSync(set.companyId, p.sourceId, p.sourceType) : null;
         const passages = await rechecked({ set, ranked, wanted, onStale });
         return { passages, backend: adapter.name, scope: summary };
     };

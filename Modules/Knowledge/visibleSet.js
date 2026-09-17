@@ -6,6 +6,7 @@ const { isPrivileged } = require('../../Config/roleTypes');
 const { visibleProjectIds } = require('../Agents/scope');
 const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
 const { pageVisibilityFilter } = require('../Pages/helpers/pageRules');
+const { COMMENT_TYPES } = require('./sources');
 
 // What one caller may retrieve, resolved on every call and never cached here:
 // a snapshot kept between calls is exactly how a person removed from a project
@@ -14,7 +15,6 @@ const { pageVisibilityFilter } = require('../Pages/helpers/pageRules');
 
 const SOURCE_TYPES = ['task', 'page', 'comment', 'transcript'];
 const CALLER_KINDS = ['user', 'agent', 'mcp'];
-const COMMENT_TYPES = ['text', 'link'];
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const TITLE_LENGTH = 160;
 
@@ -90,19 +90,31 @@ const clausesFor = (set) => {
     };
 };
 
-/* The same page rules over the fields a chunk copies from its page. They narrow the
- * search; recheck() against the live page rows is still what decides. */
-const pageChunkClauseFor = (set) => ({
-    companyId: set.companyId,
-    sourceType: 'page',
-    deleted: { $ne: true },
-    $and: [inProjectOrCompanyWide(set, 'projectId'), pageVisibilityFilter(set.caller.userId)],
-});
+const liveChunk = (set, sourceType) => ({ companyId: set.companyId, sourceType, deleted: { $ne: true } });
 
-const filterFor = (set, { pageChunks = false } = {}) => {
+/* The same rules over the fields a chunk copies from its source. They narrow the search;
+ * recheck() against the live rows is still what decides. */
+const chunkClausesFor = (set) => {
+    const hidden = set.hiddenSprintIds.length ? { sprintId: { $nin: objectIds(set.hiddenSprintIds) } } : {};
+    return {
+        page: { ...liveChunk(set, 'page'), $and: [inProjectOrCompanyWide(set, 'projectId'), pageVisibilityFilter(set.caller.userId)] },
+        comment: { ...liveChunk(set, 'comment'), projectId: { $in: objectIds(set.projectIds) }, ...hidden },
+        transcript: {
+            ...liveChunk(set, 'transcript'),
+            participants: set.caller.userId,
+            ...(set.projectId ? { projectId: { $in: objectIds(set.projectIds) } } : {}),
+        },
+    };
+};
+
+/* chunkSources names the sources whose chunk store is built for this company; the rest are
+ * searched from their rows. */
+const filterFor = (set, { chunkSources = [] } = {}) => {
     const clauses = clausesFor(set);
-    if (pageChunks) clauses.page = pageChunkClauseFor(set);
-    return { sourceTypes: set.sourceTypes, clauses, pageChunks };
+    const chunked = chunkClausesFor(set);
+    const fromChunks = Object.keys(chunked).filter((sourceType) => chunkSources.includes(sourceType));
+    fromChunks.forEach((sourceType) => { clauses[sourceType] = chunked[sourceType]; });
+    return { sourceTypes: set.sourceTypes, clauses, chunkSources: fromChunks };
 };
 
 const permissionOf = (sourceType, row) => {
@@ -119,8 +131,14 @@ const permissionOf = (sourceType, row) => {
 const RECHECK_FIELDS = {
     task: '_id',
     page: '_id visibility ProjectID title updatedAt',
-    comment: '_id taskId',
-    transcript: '_id',
+    comment: '_id taskId message updatedAt',
+    transcript: '_id title updatedAt',
+};
+
+const LIVE_TITLE = {
+    page: (row) => row.title,
+    comment: (row) => String(row.message || '').replace(/\s+/g, ' ').trim(),
+    transcript: (row) => row.title || 'Call notes',
 };
 
 /* A comment is visible where its task is: the task must still pass the task clause. */
@@ -138,9 +156,9 @@ const onVisibleTasks = async (set, clauses, comments) => {
 const time = (value) => (value ? new Date(value).getTime() || 0 : 0);
 
 /* Re-read the ranked candidates from their live source rows and keep only those the
- * caller may still see, whatever index produced them. Order is preserved. A page edited after
- * the text a passage came from keeps its place but shows its live title and no excerpt, since
- * the old excerpt may quote what the edit removed; onStale hears about it. */
+ * caller may still see, whatever index produced them. Order is preserved. A page, comment or
+ * transcript edited after the text a passage came from keeps its place but shows its live title
+ * and no excerpt, since the old excerpt may quote what the edit removed; onStale hears about it. */
 const recheck = async ({ set, passages, onStale }) => {
     const clauses = clausesFor(set);
     const bySource = {};
@@ -163,9 +181,9 @@ const recheck = async ({ set, passages, onStale }) => {
         .filter((p) => live[`${p.sourceType}:${p.sourceId}`])
         .map((p) => {
             const { row, permission } = live[`${p.sourceType}:${p.sourceId}`];
-            if (p.sourceType !== 'page' || time(row.updatedAt) <= time(p.updatedAt)) return { ...p, permission };
+            if (!LIVE_TITLE[p.sourceType] || time(row.updatedAt) <= time(p.updatedAt)) return { ...p, permission };
             if (onStale) onStale(p);
-            return { ...p, title: String(row.title || '').slice(0, TITLE_LENGTH), excerpt: '', updatedAt: row.updatedAt, permission };
+            return { ...p, title: String(LIVE_TITLE[p.sourceType](row) || '').slice(0, TITLE_LENGTH), excerpt: '', updatedAt: row.updatedAt, permission };
         });
 };
 
@@ -176,7 +194,7 @@ module.exports = {
     RetrievalRefused,
     resolveVisibleSet,
     clausesFor,
-    pageChunkClauseFor,
+    chunkClausesFor,
     filterFor,
     permissionOf,
     recheck,

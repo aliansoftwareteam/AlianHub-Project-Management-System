@@ -106,4 +106,26 @@ const chunkPage = (page, { maxChars = MAX_CHUNK_CHARS } = {}) => {
     return pieces.map((piece, ordinal) => ({ ordinal, ...piece, contentHash: contentHashOf(piece.headingPath, piece.text) }));
 };
 
-module.exports = { MAX_CHUNK_CHARS, chunkPage, contentHashOf, htmlOf };
+const MENTION = /\[([^\]]*)\]\([0-9a-fA-F]{24}\)/g;
+
+const piecesOf = (headingPath, lines, maxChars) => pack(lines.filter(Boolean), maxChars)
+    .map((text, ordinal) => ({ ordinal, headingPath, text, contentHash: contentHashOf(headingPath, text) }));
+
+/* A mention is stored as "[Name](userId)"; the name is what a question would use. */
+const chunkComment = (comment, { maxChars = MAX_CHUNK_CHARS } = {}) => {
+    const message = String((comment && comment.message) || '').replace(MENTION, '@$1');
+    return piecesOf([], paragraphsOf(message.replace(/\r?\n/g, '<br>')), maxChars);
+};
+
+const linesOf = (text) => String(text || '').split(/\r?\n/).map((line) => line.replace(/\s+/g, ' ').trim());
+
+const actionItemText = (item) => (item && typeof item === 'object' ? [item.title, item.owner].filter(Boolean).join(' · ') : String(item || ''));
+
+/* No synthetic section headings: a word like "summary" would otherwise match every call. */
+const chunkTranscript = (call, { maxChars = MAX_CHUNK_CHARS } = {}) => {
+    const title = String((call && call.title) || '').trim() || 'Call notes';
+    const items = Array.isArray(call && call.actionItems) ? call.actionItems.map(actionItemText) : [];
+    return piecesOf([title], [title, ...linesOf(call && call.summary), ...items, ...linesOf(call && call.transcript)], maxChars);
+};
+
+module.exports = { MAX_CHUNK_CHARS, chunkPage, chunkComment, chunkTranscript, contentHashOf, htmlOf };

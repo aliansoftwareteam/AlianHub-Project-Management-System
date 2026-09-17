@@ -3,9 +3,10 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { escapeRegex } = require('../../../utils/escapeRegex');
 const logger = require('../../../Config/loggerConfig');
 const { SOURCE_COLLECTIONS, SOURCE_TYPES } = require('../visibleSet');
+const { INDEXED_SOURCES } = require('../sources');
 
 // The lexical backend searches through the tenant's full-text indexes: the source rows
-// themselves, or for pages the chunk store when the filter says the page index is built.
+// themselves, or the chunk store for each source the filter says is built.
 // The chunk store is written by Modules/Knowledge/ingest, so upsert, tombstone and erase
 // stay no-ops here.
 
@@ -44,20 +45,6 @@ const SOURCES = {
         projectId: (row) => row.projectId,
         authorKind: (row) => (row.isAgent || row.actorType === 'agent' ? 'agent' : 'user'),
     },
-    pageChunk: {
-        sourceType: 'page',
-        collection: SCHEMA_TYPE.KNOWLEDGE_CHUNKS,
-        textIndex: true,
-        regexFields: ['text'],
-        fields: ['sourceId', 'title', 'text', 'projectId', 'authorKind', 'sourceUpdatedAt', 'updatedAt'],
-        sourceId: (row) => row.sourceId,
-        title: (row) => row.title,
-        body: (row) => row.text,
-        projectId: (row) => row.projectId,
-        authorKind: (row) => (row.authorKind === 'agent' ? 'agent' : 'user'),
-        updatedAt: (row) => row.sourceUpdatedAt || row.updatedAt || null,
-        chunked: true,
-    },
     transcript: {
         textIndex: false,
         regexFields: ['title', 'summary', 'transcript'],
@@ -68,6 +55,23 @@ const SOURCES = {
         authorKind: () => 'user',
     },
 };
+
+const chunkSource = (sourceType) => ({
+    sourceType,
+    collection: SCHEMA_TYPE.KNOWLEDGE_CHUNKS,
+    textIndex: true,
+    regexFields: ['text'],
+    fields: ['sourceId', 'title', 'text', 'projectId', 'authorKind', 'sourceUpdatedAt', 'updatedAt'],
+    sourceId: (row) => row.sourceId,
+    title: (row) => row.title,
+    body: (row) => row.text,
+    projectId: (row) => row.projectId,
+    authorKind: (row) => (row.authorKind === 'agent' ? 'agent' : 'user'),
+    updatedAt: (row) => row.sourceUpdatedAt || row.updatedAt || null,
+    chunked: true,
+});
+
+INDEXED_SOURCES.forEach((sourceType) => { SOURCES[`${sourceType}Chunk`] = chunkSource(sourceType); });
 
 const words = (query) => [...new Set(String(query == null ? '' : query).toLowerCase().match(/[\p{L}\p{N}]+/gu) || [])];
 
@@ -151,8 +155,8 @@ const searchRows = async (companyId, key, clause, query, limit) => {
     }
 };
 
-/* One row per page, from its best chunk, grouped before the limit: a long page has hundreds of
- * chunks, and limiting chunks first would let one page fill every slot. */
+/* One row per source, from its best chunk, grouped before the limit: a long page or call has
+ * hundreds of chunks, and limiting chunks first would let one of them fill every slot. */
 const bestChunkPerSource = (source, match, withScore, limit) => {
     const order = withScore ? { score: -1, ordinal: 1 } : { sourceUpdatedAt: -1, ordinal: 1 };
     return [
@@ -186,7 +190,7 @@ const searchSource = (companyId, key, clause, query, limit) => (SOURCES[key].chu
     ? searchChunks(companyId, key, clause, query, limit)
     : searchRows(companyId, key, clause, query, limit));
 
-const sourceKeyFor = (sourceType, filter) => (sourceType === 'page' && filter.pageChunks ? 'pageChunk' : sourceType);
+const sourceKeyFor = (sourceType, filter) => ((filter.chunkSources || []).includes(sourceType) ? `${sourceType}Chunk` : sourceType);
 
 const search = async ({ companyId, query, filter, limit }) => {
     if (!textSearch(query)) return [];

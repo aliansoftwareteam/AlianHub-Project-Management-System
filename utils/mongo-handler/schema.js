@@ -1455,6 +1455,9 @@ const schema = {
         sourceId: { type: String, required: true },
         ordinal: { type: Number, required: true },
         projectId: { type: mongoose.Schema.Types.ObjectId, required: false, default: null },
+        sprintId: { type: mongoose.Schema.Types.ObjectId, required: false, default: null },
+        taskId: { type: String, required: false, default: '' },
+        participants: { type: [String], required: false, default: [] },
         visibility: { type: String, required: false, default: 'project' },
         createdBy: { type: String, required: false, default: '' },
         // 'human' | 'agent'
@@ -1466,10 +1469,12 @@ const schema = {
         embeddingModel: { type: String, required: false, default: null },
         deleted: { type: Boolean, required: false, default: false },
         deletedAt: { type: Date, required: false, default: null },
+        // 'task' marks a comment left out because its task is deleted, which is how a restore is told apart from a move.
+        tombstoneReason: { type: String, required: false, default: '' },
         // The source row's updatedAt when it was read, so a slower, older read never overwrites a newer one.
         sourceUpdatedAt: { type: Date, required: false },
     },
-    // What an erasure keeps out of the index for good: one document, or one person's private pages.
+    // What an erasure keeps out of the index for good: one document, or one person's private pages and comments.
     knowledgeExclusions: {
         companyId: { type: String, required: true },
         // 'document' | 'author'
@@ -1483,7 +1488,7 @@ const schema = {
     knowledgeIndexState: {
         companyId: { type: String, required: true },
         sourceType: { type: String, required: true },
-        // 'running' | 'complete' | 'failed'
+        // 'running' | 'catching-up' | 'complete' | 'failed'
         status: { type: String, required: false, default: 'running' },
         cursor: { type: String, required: false, default: '' },
         indexed: { type: Number, required: false, default: 0 },
@@ -1492,6 +1497,10 @@ const schema = {
         finishedAt: { type: Date, required: false, default: null },
         lastRunAt: { type: Date, required: false },
         error: { type: String, required: false, default: '' },
+        // Written while the indexer is on; a stale one means events may have been dropped while it was off.
+        lastSeenOnAt: { type: Date, required: false },
+        catchUpFrom: { type: Date, required: false, default: null },
+        catchUpPass: { type: Number, required: false, default: 0 },
     },
     // Submissions arriving through a public intake form
     intakeItems: {

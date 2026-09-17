@@ -42,7 +42,7 @@ beforeEach(async () => {
     };
     await Promise.all(mockDb.store[SCHEMA_TYPE.PAGES].map((page) => indexer.ingestPage(C, page)));
     mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C, Cst_CompanyName: 'Acme', knowledgeRetrieval: { mode: 'on' }, knowledgeIndexer: { mode: 'on' } });
-    mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType: 'page', status: 'complete' });
+    mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType: 'page', status: 'complete', lastSeenOnAt: new Date() });
     mockDb.calls.length = 0;
 });
 

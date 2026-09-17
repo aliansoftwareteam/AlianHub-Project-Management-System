@@ -26,12 +26,13 @@ const eraseDocument = async (companyId, { sourceType, sourceId } = {}) => {
     return eraseChunks(companyId, { sourceType: type, sourceId: id });
 };
 
-/* A person's private pages only: what they shared stays, as it does when they leave. */
+/* A person's private pages and the comments they wrote (owner, 2026-09-17). Their shared pages stay,
+ * and so do the calls they were on, which hold other participants' words. */
 const erasePerson = async (companyId, userId) => {
     const id = String(userId || '').trim();
     if (!OBJECT_ID.test(id)) throw new Error('erasePerson needs a valid user id.');
     await exclude(companyId, { kind: 'author', sourceType: '', sourceId: '', userId: id });
-    return eraseChunks(companyId, { createdBy: id, visibility: 'private' });
+    return eraseChunks(companyId, { createdBy: id, $or: [{ sourceType: 'page', visibility: 'private' }, { sourceType: 'comment' }] });
 };
 
 module.exports = { eraseDocument, erasePerson };
