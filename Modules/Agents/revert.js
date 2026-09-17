@@ -21,6 +21,13 @@ const actionRows = async (companyId, runId) => auditChain.foldRows(companyId, aw
     type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ 'meta.runId': String(runId), action: audit.ACTION_DONE }, {}, { sort: { createdAt: 1 }, limit: 500 }],
 }, 'find'));
 
+/* Rows an undo row already points at: their inverse ran, even if marking them undone failed. */
+const undoRecorded = async (companyId, auditIds) => {
+    if (!auditIds.length) return new Set();
+    const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ action: audit.ACTION_UNDONE, 'meta.originalAuditId': { $in: auditIds } }, { 'meta.originalAuditId': 1 }] }, 'find');
+    return new Set((rows || []).map((r) => String(r.meta && r.meta.originalAuditId)));
+};
+
 const windowEnd = (run, undoHours) => new Date(new Date(run.finishedAt).getTime() + undoHours * HOUR_MS);
 
 const REASON = Object.freeze({ ...undo.REASON, NOT_PERMITTED: 'not_permitted', RUN_OPEN: 'run_open', ALREADY_REVERTED: 'already_reverted' });
@@ -56,7 +63,7 @@ const revertRun = async (companyId, runId, { actor, isPrivileged, ip }) => {
     const windowEndsAt = new Date(check.undoUntil);
 
     const rows = ((await actionRows(companyId, run._id)) || []).filter((r) => !(r.meta && r.meta.state === audit.STATE.FAILED));
-    const recorded = await audit.undoneOriginals(companyId, rows.map((r) => String(r._id)));
+    const recorded = await undoRecorded(companyId, rows.map((r) => String(r._id)));
     const pending = rows.filter((r) => !(r.meta && r.meta.undoneAt) && !recorded.has(String(r._id)));
     if (!rows.length) return { error: 'This run made no reversible changes.', status: 409 };
 
