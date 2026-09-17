@@ -184,6 +184,9 @@ const FLAGGED_TOOLS = [
             },
             required: ['from', 'to'],
         },
+        // Judged per project inside read(): a company-wide check first would refuse a
+        // member whose grant comes from the project's own rules.
+        authorizesPerProject: true,
         run: (ctx, args) => performanceRead.read({ companyId: ctx.companyId, actor: ctx.actor, args, projectScope: ctx.projectIds, allowedActions: ctx.allowedActions, ip: ctx.ip }),
     },
 ];
@@ -205,7 +208,7 @@ const call = async (ctx, name, args = {}) => {
     if (!tool) throw Object.assign(new Error(`Unknown tool "${name}"`), { code: -32601 });
 
     if (tool.run) {
-        await actions.authorizeRead({
+        if (!tool.authorizesPerProject) await actions.authorizeRead({
             companyId: ctx.companyId, actor: ctx.actor, action: tool.action,
             params: { taskId: args.taskId }, ip: ctx.ip, allowedActions: ctx.allowedActions,
         });
