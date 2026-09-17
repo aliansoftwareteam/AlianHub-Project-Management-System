@@ -9,7 +9,6 @@ const LOG = '[audit-chain]';
 const COMPANY_HEAD_ID = 'head';
 const PAGE_SIZE = 500;
 const LIST_VERIFY_BUDGET = 5000;
-const CHECKPOINT_TTL_MS = 10 * 60 * 1000;
 const MIRROR_INTERVAL_MS = 60 * 1000;
 const ERROR_LOG_INTERVAL_MS = 60 * 1000;
 const APPEND_ATTEMPTS = 100;
@@ -191,14 +190,15 @@ const newestAnchor = async (companyId, key) => {
     return anchor ? { seq: anchor.seq, hash: anchor.hash } : null;
 };
 
-const checkpoints = new Map();
+const cursors = new Map();
 
-/* An in-memory checkpoint is trusted only while the row it names is unchanged and nothing below it is missing. */
-const checkpointHolds = async (companyId, start, point) => {
-    const row = plain(await db(companyId, AUDIT_LOGS, [{ 'chain.seq': point.seq }], 'findOne'));
-    if (!row || !row.chain || row.chain.hash !== point.hash) return false;
-    const count = await db(companyId, AUDIT_LOGS, [{ 'chain.seq': { $gt: start.seq, $lte: point.seq } }], 'countDocuments');
-    return count === point.seq - start.seq;
+/* A remembered position is trusted only while the row it names is unchanged and nothing below it is missing. */
+const positionHolds = async (companyId, start, position) => {
+    if (!position || position.seq <= start.seq) return false;
+    const row = plain(await db(companyId, AUDIT_LOGS, [{ 'chain.seq': position.seq }], 'findOne'));
+    if (!row || !row.chain || row.chain.hash !== position.hash) return false;
+    const count = await db(companyId, AUDIT_LOGS, [{ 'chain.seq': { $gt: start.seq, $lte: position.seq } }], 'countDocuments');
+    return count === position.seq - start.seq;
 };
 
 const headBreak = async (companyId, key, start, last, head) => {
@@ -211,44 +211,66 @@ const headBreak = async (companyId, key, start, last, head) => {
     return hash === head.hash ? null : head.seq;
 };
 
+/* Walks forward from `from`, a page at a time, up to `budget` rows and, when given, no further than `until`. */
+const walkFrom = async (companyId, key, from, { budget, pageSize, until = Infinity }) => {
+    let last = from;
+    let checked = 0;
+    while (checked < budget && last.seq < until) {
+        const want = Math.min(pageSize, budget - checked);
+        const range = until === Infinity ? { $gt: last.seq } : { $gt: last.seq, $lte: until };
+        const rows = ((await db(companyId, AUDIT_LOGS, [{ 'chain.seq': range }, {}, { sort: { 'chain.seq': 1 }, limit: want }], 'find')) || []).map(plain);
+        const step = rules.walkLinks(key, companyId, last, rows);
+        checked += rows.length;
+        last = step.last;
+        if (step.brokenAt != null) return { last, checked, brokenAt: step.brokenAt, complete: false };
+        if (rows.length < want) {
+            return { last, checked, brokenAt: until !== Infinity && last.seq < until ? last.seq + 1 : null, complete: true };
+        }
+    }
+    return { last, checked, brokenAt: null, complete: last.seq >= until };
+};
+
+const report = (start, last, complete, brokenAt, checked) => ({
+    state: brokenAt != null ? 'broken' : (complete ? 'verified' : 'partial'),
+    brokenAt,
+    verifiedThrough: brokenAt != null ? Math.min(brokenAt - 1, last.seq) : last.seq,
+    anchorSeq: start.seq,
+    checked,
+});
+
+/*
+ * Resuming keeps two positions per company in memory: the tip, verified once and then only extended, so new
+ * rows cost one step each; and a re-walk that re-checks the stretch up to the tip a budget at a time, starting
+ * over each time it reaches it. Nothing held in the database can move either of them.
+ */
 const walk = async (companyId, key, { budget, pageSize, resume }) => {
     const [companyHead, globalHead] = await Promise.all([readHead(companyId), readHead(companyId, GOLBAL)]);
     const anchor = await newestAnchor(companyId, key);
     const start = anchor || rules.GENESIS;
-    let last = start;
-    let point = null;
-    if (resume) {
-        const saved = checkpoints.get(companyId);
-        if (saved && saved.anchorSeq === start.seq && Date.now() - saved.at < CHECKPOINT_TTL_MS && await checkpointHolds(companyId, start, saved)) {
-            point = saved;
-            last = { seq: saved.seq, hash: saved.hash };
-        }
+    const headsBreak = async (last) => (await headBreak(companyId, key, start, last, companyHead)) || headBreak(companyId, key, start, last, globalHead);
+
+    if (!resume) {
+        const full = await walkFrom(companyId, key, start, { budget, pageSize });
+        const brokenAt = full.brokenAt != null ? full.brokenAt : (full.complete ? await headsBreak(full.last) : null);
+        return report(start, full.last, full.complete, brokenAt, full.checked);
     }
-    let checked = 0;
-    let brokenAt = null;
-    let complete = false;
-    while (checked < budget) {
-        const want = Math.min(pageSize, budget - checked);
-        const rows = ((await db(companyId, AUDIT_LOGS, [{ 'chain.seq': { $gt: last.seq } }, {}, { sort: { 'chain.seq': 1 }, limit: want }], 'find')) || []).map(plain);
-        const step = rules.walkLinks(key, companyId, last, rows);
-        checked += rows.length;
-        last = step.last;
-        if (step.brokenAt != null) { brokenAt = step.brokenAt; break; }
-        if (rows.length < want) { complete = true; break; }
+
+    const saved = cursors.get(companyId);
+    const cursor = saved && saved.anchorSeq === start.seq && await positionHolds(companyId, start, saved.tip)
+        ? saved
+        : { anchorSeq: start.seq, tip: start, rewalk: null };
+    const ahead = await walkFrom(companyId, key, cursor.tip, { budget: Math.ceil(budget / 2), pageSize });
+    let brokenAt = ahead.brokenAt != null ? ahead.brokenAt : (ahead.complete ? await headsBreak(ahead.last) : null);
+    let checked = ahead.checked;
+    let rewalk = cursor.rewalk;
+    if (brokenAt == null && cursor.tip.seq > start.seq) {
+        const again = await walkFrom(companyId, key, rewalk || start, { budget: Math.max(1, budget - checked), pageSize, until: cursor.tip.seq });
+        checked += again.checked;
+        brokenAt = again.brokenAt;
+        rewalk = again.complete ? null : again.last;
     }
-    if (complete) {
-        brokenAt = await headBreak(companyId, key, start, last, companyHead) || await headBreak(companyId, key, start, last, globalHead);
-    }
-    if (brokenAt == null && last.seq > start.seq && resume) {
-        checkpoints.set(companyId, { seq: last.seq, hash: last.hash, anchorSeq: start.seq, at: point ? point.at : Date.now() });
-    }
-    return {
-        state: brokenAt != null ? 'broken' : (complete ? 'verified' : 'partial'),
-        brokenAt,
-        verifiedThrough: brokenAt != null ? Math.min(brokenAt - 1, last.seq) : last.seq,
-        anchorSeq: start.seq,
-        checked,
-    };
+    if (brokenAt == null) cursors.set(companyId, { anchorSeq: start.seq, tip: ahead.last, rewalk });
+    return report(start, ahead.last, ahead.complete, brokenAt, checked);
 };
 
 /* Verifies a company's chain from its newest anchor, a page at a time, up to `budget` rows. */
