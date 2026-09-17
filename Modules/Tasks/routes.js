@@ -5,7 +5,7 @@ const advanceFilter = require('./helpers/manageGlobalFilter');
 const getTaskCtrl = require('./helpers/getTasksData');
 const { handleEvents } = require('../Company/eventController');
 const logger = require('../../Config/loggerConfig');
-const { requireTaskActionPermission, requireTaskWritePermission, requirePermission } = require('../../Config/permissionGuard');
+const { requireTaskActionPermission, requireTaskWritePermission } = require('../../Config/permissionGuard');
 const { TASK_ACTIONS, PRE_V2_TASK_ACTIONS, RELATION_ACTIONS, TASK_WRITE_ROUTES, actionEntry } = require('../../Config/taskWritePermissions');
 
 exports.init = (app) => {
@@ -36,7 +36,7 @@ exports.init = (app) => {
         });
     });
 
-    app.post('/api/v2/tasks', requirePermission('task.task_create'), (req, res) => {
+    app.post('/api/v2/tasks', requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v2/tasks'].entry), (req, res) => {
         try {
             taskMongo.create(req.body)
             .then((resData) => {

@@ -302,7 +302,7 @@
   },
   "DISABLE_PERMISSION_ENFORCEMENT": {
     "group": "security",
-    "description": "Emergency switch, never for normal running. Set to true to skip the per-key permission checks for API tokens and project edits, and to judge a workspace set to enforce in report mode: recorded, never refused. That covers browser sessions and API tokens on the task actions mapped after the first nine (Config/taskWritePermissions.js). Role guards stay on for API tokens."
+    "description": "Emergency switch, never for normal running. Set to true to skip the per-key permission checks for API tokens and project edits, and to judge a workspace set to enforce in report mode: recorded, never refused. That covers browser sessions and API tokens on the task actions mapped after the first nine (Config/taskWritePermissions.js). Role guards stay on for API tokens, and so does the refusal of a task write body that names another company or an id that cannot be read."
   },
   "EMAIL_IN_DOMAIN": {
     "group": "mail",
@@ -690,7 +690,7 @@
   },
   "PERMISSION_ENFORCEMENT_MODE": {
     "group": "security",
-    "description": "Server-side permission checks for browser sessions: off (they pass as before), report (they pass, and each would-be denial is recorded in permission_decisions) or enforce (they are refused, and a check that cannot complete fails closed). The default for every workspace; a company row's permissionEnforcement.mode overrides it. Anything unrecognised reads as off. API tokens are always enforced on the keys they were refused on before, including nine task actions; on every other task write in Config/taskWritePermissions.js they follow this mode like browser sessions. Also editable under Instance > Settings > Security.",
+    "description": "Server-side permission checks for browser sessions: off (they pass as before), report (they pass, and each would-be denial is recorded in permission_decisions) or enforce (they are refused, and a check that cannot complete fails closed). The default for every workspace; a company row's permissionEnforcement.mode overrides it. Anything unrecognised reads as off. API tokens are always enforced on the keys they were refused on before, including nine task actions; on every other task write in Config/taskWritePermissions.js they follow this mode like browser sessions. A task write body that names another company or an id that cannot be read is refused for API tokens in every mode, and follows this mode for browser sessions. Also editable under Instance > Settings > Security.",
     "default": "off"
   },
   "PORT": {
