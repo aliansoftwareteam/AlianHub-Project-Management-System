@@ -109,7 +109,7 @@ describe('report-only enforcement for browser sessions', () => {
 
     it('builds the TTL and key indexes on permission_decisions', async () => {
         const indexes = await waitFor(async () => {
-            const list = await decisions.indexes();
+            const list = await decisions.indexes().catch(() => []);
             return list.some((index) => index.expireAfterSeconds !== undefined) && list.some((index) => index.unique) ? list : null;
         }, 'the indexes');
         expect(indexes).toContainEqual(expect.objectContaining({ key: { day: 1 }, expireAfterSeconds: 30 * 24 * 60 * 60 }));
