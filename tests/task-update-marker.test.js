@@ -30,6 +30,7 @@ const drop = (updateToken) => new Promise((resolve) => {
     const res = { send: jest.fn(), status: jest.fn(() => res) };
     ctrl.updateTaskIndex({
         headers: { companyid: COMPANY },
+        aud: COMPANY,
         body: {
             companyId: COMPANY,
             projectId: PROJECT,

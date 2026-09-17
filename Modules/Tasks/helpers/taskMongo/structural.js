@@ -20,6 +20,7 @@ const { emitListener } = require("../../../Company/eventController.js");
 const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
+const { taskNotFound } = require('../taskWriteFields');
 module.exports = {
 
     updateArchiveDelete({companyId, projectData, sprintId, task, userData, deletedStatusKey = 0}) {
@@ -355,13 +356,17 @@ module.exports = {
                 }
 
                 MongoDbCrudOpration(companyId, obj, "findOne").then((task) => {
+                    if (!task) {
+                        reject(taskNotFound());
+                        return;
+                    }
 
                     let updateObj = {
                         type: schema,
                         data: [
                             { _id: new mongoose.Types.ObjectId(taskId) },
                             { $set: { deletedStatusKey: 1 } },
-                            { upsert: true, returnDocument: 'after' }
+                            { returnDocument: 'after' }
                         ]
                     }
 
@@ -417,10 +422,11 @@ module.exports = {
                                 data: [
                                     { _id: new mongoose.Types.ObjectId(task.ParentTaskId) },
                                     { $inc: { subTasks: -1 } },
-                                    { upsert: true, returnDocument: 'after' }
+                                    { returnDocument: 'after' }
                                 ]
                             }
                             MongoDbCrudOpration(companyId, updateObj1, "findOneAndUpdate").then((result)=>{
+                                if (!result) return;
                                 socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTasks}, module: 'task' });
                             })
                         }
@@ -472,7 +478,7 @@ module.exports = {
                             });
                         }
                     })
-                });
+                }).catch(reject);
             } catch (error) {
                 reject(error);
             }

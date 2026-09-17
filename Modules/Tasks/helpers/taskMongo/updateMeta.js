@@ -20,6 +20,7 @@ const { emitListener } = require("../../../Company/eventController.js");
 const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
+const { taskNotFound } = require('../taskWriteFields');
 module.exports = {
 
     /* -------------- UPDATE TAGS -----------------*/
@@ -52,14 +53,18 @@ module.exports = {
                     data: [
                         queryFilter,
                         queryObj,
-                        { upsert: true, returnDocument: 'after' }
+                        { returnDocument: 'after' }
                     ]
                 }
 
                 MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((response) => {
+                    if (!response) {
+                        reject(taskNotFound());
+                        return;
+                    }
                     socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'task' });
                     resolve({status: true, statusText: `Tag updated successfully`});
-                });
+                }).catch(reject);
 
             } catch (error) {
                 reject(error);
@@ -128,7 +133,6 @@ module.exports = {
                     queryObj.$push = { attachments: data };
                     queryFilter = { _id: new mongoose.Types.ObjectId(taskId) };
                 } else {
-                    // Update the 'name' of the specific object in the 'settings' array matching the given 'key'
                     queryFilter = { 
                         _id: new mongoose.Types.ObjectId(taskId),
                     };
@@ -140,11 +144,15 @@ module.exports = {
                     data: [
                         queryFilter,
                         queryObj,
-                        { upsert: true, returnDocument: 'after' }
+                        { returnDocument: 'after' }
                     ]
                 }
 
                 MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((response) => {
+                    if (!response) {
+                        reject(taskNotFound());
+                        return;
+                    }
                     socketEmitter.emit('update', { type: "update", data: response , updatedFields: {attachments: response.attachments}, module: 'task' });
                     resolve({status: true, statusText: "Attachment updated successfully"});
 

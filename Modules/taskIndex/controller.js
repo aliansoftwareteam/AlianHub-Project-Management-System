@@ -8,6 +8,7 @@ const { getCompanyDataFun } = require("../Company/controller/updateCompany");
 const socketEmitter = require("../../event/socketEventEmitter");
 const { pinSessionTenant } = require("../../Config/tenant");
 const { keepTabMarkerOnly } = require("./helpers/updateMarker");
+const { TASK_INDEX_FIELDS, TASK_INDEX_ONLOAD_FIELDS, prepareOrRefuse } = require("../Tasks/helpers/taskWriteFields");
 
 const projectQueues = {};
 const processingProjects = new Set();
@@ -19,6 +20,9 @@ exports.updateTaskIndex = (req,res) => {
     try {
         // Hoisted above the checks below: those answer without returning, so they cannot stop the handler.
         if (!pinSessionTenant(req, res)) return;
+        const payload = prepareOrRefuse(req, res, TASK_INDEX_FIELDS, 'taskIndex');
+        if (!payload) return;
+        req.body = payload;
         if (!req.body&& req.body.isFirst === undefined) {
             res.send({
                 status: false,
@@ -339,6 +343,9 @@ exports.updateTaskIndexWhenLoad = (req,res) => {
             return;
         }
         if (!pinSessionTenant(req, res)) return;
+        const payload = prepareOrRefuse(req, res, TASK_INDEX_ONLOAD_FIELDS, 'updateTaskIndexOnload');
+        if (!payload) return;
+        req.body = payload;
         let obj = {
             type: dbCollections.TASKS,
             data: [
