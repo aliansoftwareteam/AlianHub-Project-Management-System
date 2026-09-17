@@ -109,6 +109,41 @@ const buildEnvelope = ({ companyId, type, doc, changedFields, previous, actor, d
     changedFields: Array.from(changedFields || []),
 });
 
+/* Pages, projects and members have no field-level classification: an envelope names what
+ * happened to the entity, and its data is the few fields a consumer needs to act on it. */
+const buildEntityEnvelope = ({ companyId, type, entity, scope = {}, data = {}, actor, depth }) => ({
+    id: ulid(),
+    companyId: String(companyId),
+    type,
+    occurredAt: new Date().toISOString(),
+    traceId: telemetry.traceIdNow() || telemetry.newTraceId(),
+    actor: resolveActor({ actor }),
+    depth: Number(depth) || 0,
+    scope: {
+        projectId: scope.projectId ? String(scope.projectId) : null,
+        sprintId: scope.sprintId ? String(scope.sprintId) : null,
+    },
+    entity,
+    data,
+    previous: null,
+    changedFields: [],
+});
+
+/* A page delete is one emit for the whole subtree it took, carrying every id in `ids`. */
+const classifyPageEvent = (emitType, doc) => {
+    if (Number(doc.deletedStatusKey) === 1) return 'page.deleted';
+    return emitType === 'insert' ? 'page.created' : 'page.updated';
+};
+
+const trimPage = (doc) => ({
+    _id: String(doc._id),
+    ids: Array.isArray(doc.ids) && doc.ids.length ? doc.ids.map(String) : [String(doc._id)],
+    ProjectID: doc.ProjectID ? String(doc.ProjectID) : null,
+    visibility: doc.visibility || null,
+    createdByAgent: doc.createdByAgent === true,
+    deletedStatusKey: Number(doc.deletedStatusKey) || 0,
+});
+
 // Mongo rejects with strings, plain objects and sometimes nothing at all.
 const failureText = (error) => (error && error.message) || String(error);
 
@@ -218,6 +253,44 @@ function onTaskEvent(emitType) {
     };
 }
 
+function publishEntityEvent(input) {
+    const envelope = buildEntityEnvelope(input);
+    publish(envelope);
+    return envelope;
+}
+
+/* A page row carries no company id, so page emits carry it beside the row
+ * (Modules/Pages/helpers/pageEvents.js); one without it is dropped, never guessed. */
+function onPageEvent(emitType) {
+    return (payload) => {
+        try {
+            const doc = payload?.data;
+            if (!payload?.companyId || !doc || !doc._id) return;
+            const data = trimPage(doc);
+            publishEntityEvent({
+                companyId: payload.companyId,
+                type: classifyPageEvent(emitType, doc),
+                entity: { kind: 'page', id: data._id },
+                scope: { projectId: data.ProjectID },
+                data,
+                actor: payload.actor,
+            });
+        } catch (error) {
+            logger.error(`${LOG_PREFIX} page event handling failed: ${failureText(error)}`);
+        }
+    };
+}
+
+let listeningForPages = false;
+
+function listenForPages() {
+    if (listeningForPages) return;
+    listeningForPages = true;
+    socketEmitter.on('pages:insert', onPageEvent('insert'));
+    socketEmitter.on('pages:update', onPageEvent('update'));
+    logger.info(`${LOG_PREFIX} listening for page events`);
+}
+
 function start() {
     if (started) return;
     started = true;
@@ -228,6 +301,8 @@ function start() {
 
 module.exports = {
     start,
+    listenForPages,
+    publishEntityEvent,
     bus,
     isRecording,
     setRecording,
@@ -240,5 +315,8 @@ module.exports = {
     trimTask,
     resolveActor,
     buildEnvelope,
+    buildEntityEnvelope,
+    classifyPageEvent,
+    trimPage,
     supersedesPending,
 };

@@ -3,8 +3,9 @@ const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-h
 const {removeCache} = require('../../../utils/commonFunctions');
 const { resolveProjectSkills } = require('../../settings/ProjectSkills/helper');
 const { PROJECT_SOURCES, normaliseSource, sourceOrDefault, cleanProposalId, numericProposalId, validateProposalId } = require('../helpers/projectSourceRules');
-const { quotaStatus, syncProjectQuota } = require('../helpers/projectQuota');
+const { TRASHED, quotaStatus, syncProjectQuota } = require('../helpers/projectQuota');
 const logger = require('../../../Config/loggerConfig');
+const knowledgeEvents = require('../../Knowledge/ingest/events');
 
 exports.updateProjectInternal = async (companyId, projectId, updateObject, key, arrayFilters) => {
     // Trashing and restoring a project are the only writes that change what a company
@@ -12,9 +13,14 @@ exports.updateProjectInternal = async (companyId, projectId, updateObject, key, 
     // the delete: a stuck count is recoverable, a project nobody can remove is not.
     const nextStatus = quotaStatus(updateObject, key);
     if (nextStatus !== null && companyId && validateObjectId(projectId)) {
-        await syncProjectQuota(companyId, projectId, nextStatus).catch((error) => {
+        const crossed = await syncProjectQuota(companyId, projectId, nextStatus).catch((error) => {
             logger.error(`syncProjectQuota ${projectId}: ${error && error.message ? error.message : error}`);
+            return null;
         });
+        if (crossed) {
+            if (nextStatus === TRASHED) knowledgeEvents.publishProjectTrashed(companyId, projectId);
+            else knowledgeEvents.publishProjectRestored(companyId, projectId);
+        }
     }
 
     return new Promise((resolve, reject) => {

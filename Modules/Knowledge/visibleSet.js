@@ -64,17 +64,22 @@ const resolveVisibleSet = async ({ companyId, caller, scope } = {}) => {
     };
 };
 
+/* A page with no project is the company's, unless the caller scoped to one project. */
+const inProjectOrCompanyWide = (set, field) => {
+    const projects = objectIds(set.projectIds);
+    return set.projectId
+        ? { [field]: { $in: projects } }
+        : { $or: [{ [field]: { $in: projects } }, { [field]: { $in: [null, undefined] } }] };
+};
+
 /* Access control as plain match clauses, one per source, that a backend puts beside
  * its own search at the top level of the query: MongoDB refuses $text inside $or. */
 const clausesFor = (set) => {
     const projects = objectIds(set.projectIds);
     const sprintClause = set.hiddenSprintIds.length ? { sprintId: { $nin: objectIds(set.hiddenSprintIds) } } : {};
-    const pageProject = set.projectId
-        ? { ProjectID: { $in: projects } }
-        : { $or: [{ ProjectID: { $in: projects } }, { ProjectID: { $in: [null, undefined] } }] };
     return {
         task: { ProjectID: { $in: projects }, deletedStatusKey: { $ne: 1 }, ...sprintClause },
-        page: { deletedStatusKey: { $ne: 1 }, $and: [pageProject, pageVisibilityFilter(set.caller.userId)] },
+        page: { deletedStatusKey: { $ne: 1 }, $and: [inProjectOrCompanyWide(set, 'ProjectID'), pageVisibilityFilter(set.caller.userId)] },
         comment: { projectId: { $in: projects }, isDeleted: { $ne: true }, type: { $in: COMMENT_TYPES }, ...sprintClause },
         transcript: {
             participants: set.caller.userId,
@@ -84,7 +89,20 @@ const clausesFor = (set) => {
     };
 };
 
-const filterFor = (set) => ({ sourceTypes: set.sourceTypes, clauses: clausesFor(set) });
+/* The same page rules over the fields a chunk copies from its page. They narrow the
+ * search; recheck() against the live page rows is still what decides. */
+const pageChunkClauseFor = (set) => ({
+    companyId: set.companyId,
+    sourceType: 'page',
+    deleted: { $ne: true },
+    $and: [inProjectOrCompanyWide(set, 'projectId'), pageVisibilityFilter(set.caller.userId)],
+});
+
+const filterFor = (set, { pageChunks = false } = {}) => {
+    const clauses = clausesFor(set);
+    if (pageChunks) clauses.page = pageChunkClauseFor(set);
+    return { sourceTypes: set.sourceTypes, clauses, pageChunks };
+};
 
 const permissionOf = (sourceType, row) => {
     if (sourceType === 'page') {
@@ -148,6 +166,7 @@ module.exports = {
     RetrievalRefused,
     resolveVisibleSet,
     clausesFor,
+    pageChunkClauseFor,
     filterFor,
     permissionOf,
     recheck,

@@ -299,12 +299,19 @@ projectInvoicesSchema.index({ ProjectID: 1, deletedStatusKey: 1, issuedDate: -1 
 // contract), so uniqueness is per project too — a company-wide unique index
 // would collide the moment a second project raised its first invoice.
 projectInvoicesSchema.index({ ProjectID: 1, number: 1 }, { unique: true });
+const knowledgeChunksSchema = new Schema(schema.knowledgeChunks, {strict: true, timestamps: true});
+knowledgeChunksSchema.index({ sourceType: 1, sourceId: 1, ordinal: 1 }, { unique: true });
+knowledgeChunksSchema.index({ projectId: 1, deleted: 1 });
+knowledgeChunksSchema.index({ createdBy: 1, visibility: 1 });
+const knowledgeIndexStateSchema = new Schema(schema.knowledgeIndexState, {strict: true, timestamps: true});
+knowledgeIndexStateSchema.index({ sourceType: 1 }, { unique: true });
 
 // One combined text index per collection, for global search and knowledge retrieval.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
 commentSchema.index({ message: 'text' });
 pagesSchema.index({ title: 'text', rawText: 'text' });
+knowledgeChunksSchema.index({ text: 'text' });
 
 // BUG-021 / #75 — Indexes for the hottest query paths. Each company has its
 // own MongoDB database, so `companyId` itself is the database name and need
@@ -427,6 +434,8 @@ module.exports = {
     formSubmissionsSchema,
     projectContractsSchema,
     projectInvoicesSchema,
+    knowledgeChunksSchema,
+    knowledgeIndexStateSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

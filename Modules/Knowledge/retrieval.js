@@ -1,4 +1,6 @@
 const lexical = require('./adapters/lexical');
+const flag = require('./flag');
+const { pagesIndexed } = require('./ingest/backfill');
 const { resolveVisibleSet, filterFor, recheck } = require('./visibleSet');
 
 // One way in to what the workspace knows. The backend behind it is an adapter;
@@ -31,6 +33,21 @@ const byRank = (a, b) => (b.score - a.score)
     || ((a.authorKind === 'agent') - (b.authorKind === 'agent'))
     || (time(b.updatedAt) - time(a.updatedAt));
 
+/* A full-text score grows with how often the words occur and has no ceiling, while the
+ * regular-expression fallback scores at most 1, so raw scores cannot be compared across
+ * sources. Each source is scaled by its own best score before they are merged. */
+const normaliseScores = (candidates) => {
+    const best = {};
+    candidates.forEach((p) => { best[p.sourceType] = Math.max(best[p.sourceType] || 0, Number(p.score) || 0); });
+    return candidates.map((p) => ({ ...p, score: best[p.sourceType] ? (Number(p.score) || 0) / best[p.sourceType] : 0 }));
+};
+
+/* Until a company's backfill completes, the chunk store is missing the pages written before
+ * its indexer was switched on, so page rows are searched as before. */
+const readsPageChunks = async (set) => set.sourceTypes.includes('page')
+    && await flag.indexer.enabledFor(set.companyId)
+    && await pagesIndexed(set.companyId).catch(() => false);
+
 const createRetrieve = (adapter) => {
     assertAdapter(adapter);
     return async ({ companyId, caller, query, scope, limit } = {}) => {
@@ -44,8 +61,9 @@ const createRetrieve = (adapter) => {
         };
         if (!set.sourceTypes.length || !String(query || '').trim()) return { passages: [], backend: adapter.name, scope: summary };
 
-        const candidates = await adapter.search({ companyId: set.companyId, query: String(query), filter: filterFor(set), limit: wanted * RECHECK_HEADROOM });
-        const ranked = [...(candidates || [])].sort(byRank).slice(0, wanted * RECHECK_HEADROOM);
+        const pageChunks = await readsPageChunks(set);
+        const candidates = await adapter.search({ companyId: set.companyId, query: String(query), filter: filterFor(set, { pageChunks }), limit: wanted * RECHECK_HEADROOM });
+        const ranked = normaliseScores(candidates || []).sort(byRank);
         const passages = (await recheck({ set, passages: ranked })).slice(0, wanted);
         return { passages, backend: adapter.name, scope: summary };
     };
@@ -53,4 +71,4 @@ const createRetrieve = (adapter) => {
 
 const retrieve = createRetrieve(lexical);
 
-module.exports = { ADAPTER_METHODS, DEFAULT_LIMIT, assertAdapter, createRetrieve, retrieve };
+module.exports = { ADAPTER_METHODS, DEFAULT_LIMIT, assertAdapter, normaliseScores, createRetrieve, retrieve };

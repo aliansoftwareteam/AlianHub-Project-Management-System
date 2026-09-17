@@ -9,6 +9,7 @@ const permissions = require('./permissions');
 const audit = require('./agentAudit');
 const { attribution, isAgent } = require('./actor');
 const completionStore = require('../Tasks/helpers/completionStore');
+const { emitPageChange } = require('../Pages/helpers/pageEvents');
 
 // The single place an agent's action is executed. MCP tools, approved proposals
 // and workspace-agent runs all call perform(): registry check → pending audit
@@ -234,6 +235,7 @@ const executors = {
                     createdBy: String(actor.userId || a.actorId), linkedTasks: linked, visibility: 'project',
                     createdByAgent: true, agentName: a.label, agentStatus: 'draft', deletedStatusKey: 0 },
         }, 'save');
+        emitPageChange(companyId, 'insert', saved);
         return { result: { pageId: String(saved._id) }, undo: { kind: 'page', pageId: String(saved._id) }, entityType: 'page', entityId: saved._id, entityName: title };
     },
 

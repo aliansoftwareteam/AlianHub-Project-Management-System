@@ -7,6 +7,8 @@ const socketEmitter = require('../../../event/socketEventEmitter');
 const reportingLine = require('../../Users/helpers/reportingLine');
 const { getRoleType, isPrivileged, invalidateRoleCache, ROLE_OWNER } = require('../../../Config/permissionGuard');
 const { judgeMemberUpdate, judgeInvitationAcceptance } = require('./membershipGuard');
+const { SEAT_CANCELLED } = require('../../../Config/seatStatus');
+const knowledgeEvents = require('../../Knowledge/ingest/events');
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const ACTIVE = 2;
@@ -324,6 +326,10 @@ exports.updateMember = async (req, res) => {
             for (const move of moves) {
                 if (move.docId) await setMemberFields(companyId, move.docId, { managerId: move.managerId });
             }
+        }
+        // A guest is still in the workspace and can still read their own private pages.
+        if (data.isDelete === true || Number(data.status) === SEAT_CANCELLED) {
+            knowledgeEvents.publishMemberDeparted(companyId, subject.userId);
         }
 
         clearMemberCaches(companyId, response.userId);

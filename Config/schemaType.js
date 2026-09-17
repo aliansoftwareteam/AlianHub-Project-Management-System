@@ -109,6 +109,8 @@ const SCHEMA_TYPE = {
     FORM_SUBMISSIONS: "form_submissions",
     PROJECT_CONTRACTS: "project_contracts",
     PROJECT_INVOICES: "project_invoices",
+    KNOWLEDGE_CHUNKS: "knowledge_chunks",
+    KNOWLEDGE_INDEX_STATE: "knowledge_index_state",
     SCHEMA_VERSIONS: "schema_versions",
     INSTANCE_SETTINGS: "instance_settings",
 }
