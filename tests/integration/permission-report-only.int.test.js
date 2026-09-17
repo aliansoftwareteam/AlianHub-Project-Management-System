@@ -91,7 +91,7 @@ describe('report-only enforcement for browser sessions', () => {
         const res = await updatePriority(target, marker);
         expect(shape(res)).toEqual(today);
 
-        const row = await waitFor(() => decisions.findOne({ mode: 'report', scope: target.project._id, permission: 'task.task_priority' }), 'a report row');
+        const row = await waitFor(() => decisions.findOne({ mode: 'report', scope: target.project._id, permission: 'task.task_priority', userIds: member.uid }), 'a report row');
         expect(row).toMatchObject({
             method: 'PATCH',
             route: '/api/v2/tasks',
@@ -105,7 +105,7 @@ describe('report-only enforcement for browser sessions', () => {
 
         expect(shape(await updatePriority(target, marker))).toEqual(today);
         await waitFor(async () => ((await decisions.findOne({ _id: row._id })).count === 2), 'the second count');
-        expect(await audits.countDocuments({ action: 'permission.refused' })).toBe(0);
+        expect(await audits.countDocuments({ action: 'permission.refused', entityId: 'task.task_priority' })).toBe(0);
     });
 
     it('builds the TTL and key indexes on permission_decisions', async () => {
@@ -124,7 +124,7 @@ describe('report-only enforcement for browser sessions', () => {
         expect(res.body).toMatchObject({ status: false, error: 'Forbidden', permission: 'task.task_priority' });
 
         await waitFor(() => decisions.findOne({ mode: 'enforce', scope: target.project._id, permission: 'task.task_priority' }), 'an enforce row');
-        const audit = await waitFor(() => audits.findOne({ action: 'permission.refused', actorId: member.uid }), 'the audit row');
+        const audit = await waitFor(() => audits.findOne({ action: 'permission.refused', actorId: member.uid, entityId: 'task.task_priority' }), 'the audit row');
         expect(audit).toMatchObject({ entityType: 'permission', entityId: 'task.task_priority', meta: expect.objectContaining({ route: '/api/v2/tasks', mode: 'enforce' }) });
     });
 
