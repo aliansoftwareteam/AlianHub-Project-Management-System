@@ -15,6 +15,7 @@ const team = require('./team');
 const scope = require('./scope');
 const shipping = require('./shipping');
 const agentAudit = require('./agentAudit');
+const auditChain = require('../Audit/chain');
 const { inputsOf } = require('./taskInputs');
 const revert = require('./revert');
 const undo = require('./undo');
@@ -379,7 +380,8 @@ exports.getRun = async (req, res) => {
         const caller = await callerOf(req, companyId);
         const visible = await visibleProjectIdsFor(companyId, caller);
         if (visible && !visible.includes(String(run.projectId || ''))) return fail(res, 'Run not found.', 404);
-        const auditRows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ 'meta.runId': String(run._id) }, {}, { sort: { createdAt: 1 }, limit: 200 }] }, 'find').catch(() => []);
+        const auditRows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ 'meta.runId': String(run._id) }, {}, { sort: { createdAt: 1 }, limit: 200 }] }, 'find')
+            .then((rows) => auditChain.foldRows(companyId, rows)).catch(() => []);
         const plain = typeof run.toObject === 'function' ? run.toObject() : { ...run };
         const pinned = await revisions.forRun(companyId, plain);
         plain.agentRevision = Number(pinned.n);

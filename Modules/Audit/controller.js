@@ -4,10 +4,13 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 const logger = require("../../Config/loggerConfig");
 const { csvRow } = require('../../utils/csv');
+const chain = require('./chain');
+const { AMENDED_ACTION } = require('./helpers/chainRules');
 
 const AUDIT_EXPORT_HARD_CAP = 100000;
 const AUDIT_EXPORT_PAGE_SIZE = 1000;
 const AUDIT_CSV_HEADER = ['time', 'actorType', 'actor', 'agent', 'run', 'event', 'entity', 'reason', 'cost_usd', 'undone_at'];
+const PERMISSION_REFUSED = 'permission.refused';
 
 const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId);
 
@@ -61,23 +64,26 @@ exports.undoAuditLog = async (req, res) => {
     }
 };
 
-/* The stream is one collection, so the agent filters are meta lookups rather than a separate log. */
-const auditMatch = (q) => {
-    const match = {};
-    if (q.actorId) match.actorId = String(q.actorId);
-    if (q.entityType) match.entityType = String(q.entityType);
-    if (q.entityId) match.entityId = String(q.entityId);
-    if (q.action) match.action = String(q.action);
-    if (q.actorType === 'agent') match['meta.actorType'] = 'agent';
-    if (q.actorType === 'human') match['meta.actorType'] = { $ne: 'agent' };
-    if (q.gated === 'true') match.action = 'agent.action_refused';
-    if (q.undone === 'true') match['meta.undoneAt'] = { $ne: null };
-    if (q.agentId) match['meta.agentId'] = String(q.agentId);
-    if (q.runId) match['meta.runId'] = String(q.runId);
-    if (q.projectId) match.$or = [{ 'meta.params.projectId': String(q.projectId) }, { projectId: String(q.projectId) }];
+/* The stream is one collection, so the agent filters are meta lookups rather than a separate log.
+ * `current` holds the conditions on fields an appended change can set; they are matched after the fold. */
+const auditFilters = (q) => {
+    const base = { $and: [{ action: { $ne: AMENDED_ACTION } }] };
+    const current = {};
+    if (q.actorId) base.actorId = String(q.actorId);
+    if (q.entityType) current.entityType = String(q.entityType);
+    if (q.entityId) current.entityId = String(q.entityId);
+    if (q.action) base.action = String(q.action);
+    if (q.actorType === 'agent') base['meta.actorType'] = 'agent';
+    if (q.actorType === 'human') base['meta.actorType'] = { $ne: 'agent' };
+    if (q.gated === 'true') base.action = 'agent.action_refused';
+    if (q.refused === 'true') base.action = PERMISSION_REFUSED;
+    if (q.undone === 'true') current['meta.undoneAt'] = { $ne: null };
+    if (q.agentId) base['meta.agentId'] = String(q.agentId);
+    if (q.runId) base['meta.runId'] = String(q.runId);
+    if (q.projectId) base.$or = [{ 'meta.params.projectId': String(q.projectId) }, { projectId: String(q.projectId) }];
     if (q.q) {
         const term = String(q.q).slice(0, 120).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        match.$and = [...(match.$and || []), { $or: [
+        current.$and = [{ $or: [
             { entityName: { $regex: term, $options: 'i' } },
             { actorName: { $regex: term, $options: 'i' } },
             { 'meta.action': { $regex: term, $options: 'i' } },
@@ -85,17 +91,24 @@ const auditMatch = (q) => {
         ] }];
     }
     if (q.from || q.to) {
-        match.createdAt = {};
-        if (q.from) match.createdAt.$gte = new Date(q.from);
-        if (q.to) match.createdAt.$lte = new Date(q.to);
+        base.createdAt = {};
+        if (q.from) base.createdAt.$gte = new Date(q.from);
+        if (q.to) base.createdAt.$lte = new Date(q.to);
     }
-    return match;
+    return { base, current: Object.keys(current).length ? current : null };
+};
+
+const filterStages = async (companyId, q) => {
+    const { base, current } = auditFilters(q);
+    if (!current) return [{ $match: base }];
+    const folding = await chain.hasAmendments(companyId);
+    return [{ $match: base }, ...(folding ? chain.foldStages() : []), { $match: current }];
 };
 
 const NEWEST_FIRST = { $sort: { createdAt: -1, _id: -1 } };
 
-// GET /api/v1/audit-logs?actorId=&entityType=&entityId=&action=&from=&to=&page=&limit=
-// Owner/admin only. Filterable + paginated, newest first.
+// GET /api/v1/audit-logs?actorId=&entityType=&entityId=&action=&refused=&from=&to=&page=&limit=
+// Owner/admin only. Filterable + paginated, newest first, each row with its integrity state.
 exports.listAuditLogs = async (req, res) => {
     try {
         const companyId = companyOf(req);
@@ -107,14 +120,15 @@ exports.listAuditLogs = async (req, res) => {
         const page = Math.max(1, Number(q.page) || 1);
         const limit = Math.min(100, Math.max(1, Number(q.limit) || 25));
         const pipeline = [
-            { $match: auditMatch(q) },
+            ...(await filterStages(companyId, q)),
             NEWEST_FIRST,
-            { $facet: { data: [{ $skip: (page - 1) * limit }, { $limit: limit }], meta: [{ $count: 'total' }] } },
+            { $facet: { data: [{ $skip: (page - 1) * limit }, { $limit: limit }, { $project: { _id: 1 } }], meta: [{ $count: 'total' }] } },
         ];
         const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [pipeline] }, 'aggregate');
-        const data = await withUndoState(companyId, req.uid, (rows && rows[0] && rows[0].data) || []);
+        const ids = ((rows && rows[0] && rows[0].data) || []).map((r) => r._id);
+        const data = await withUndoState(companyId, req.uid, await chain.readForList(companyId, ids));
         const total = (rows && rows[0] && rows[0].meta && rows[0].meta[0] && rows[0].meta[0].total) || 0;
-        return res.send({ status: true, data, metadata: { total, page, totalPages: Math.ceil(total / limit) } });
+        return res.send({ status: true, data, metadata: { total, page, totalPages: Math.ceil(total / limit), chain: { on: chain.isOn() } } });
     } catch (error) {
         logger.error(`listAuditLogs: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
@@ -145,12 +159,12 @@ exports.exportAuditCsv = async (req, res) => {
         const roleType = await getRoleType(companyId, req.uid);
         if (!isPrivileged(roleType)) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
 
-        const match = auditMatch(req.query || {});
+        const stages = await filterStages(companyId, req.query || {});
         const cap = exports.auditExportCap();
-        const readPage = async (skip, limit) => (await MongoDbCrudOpration(companyId, {
+        const readPage = async (skip, limit) => chain.foldRows(companyId, (await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AUDIT_LOGS,
-            data: [[{ $match: match }, NEWEST_FIRST, { $skip: skip }, { $limit: limit }]],
-        }, 'aggregate')) || [];
+            data: [[...stages, NEWEST_FIRST, { $skip: skip }, { $limit: limit }]],
+        }, 'aggregate')) || []);
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="audit-${new Date().toISOString().slice(0, 10)}.csv"`);

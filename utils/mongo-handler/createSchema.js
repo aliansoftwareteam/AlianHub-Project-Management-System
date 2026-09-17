@@ -145,6 +145,12 @@ auditLogsSchema.index({ action: 1, createdAt: -1 });
 // Action-level idempotency (028): a replayed step opens no second row, so the
 // row's own state is what says whether the effect already happened.
 auditLogsSchema.index({ 'meta.idempotencyKey': 1 }, { unique: true, partialFilterExpression: { 'meta.idempotencyKey': { $type: 'string' } } });
+// Two servers appending the same sequence number: the second insert fails and retries on the new tip.
+auditLogsSchema.index({ 'chain.seq': 1 }, { unique: true, name: 'audit_chain_seq', partialFilterExpression: { 'chain.seq': { $type: 'number' } } });
+auditLogsSchema.index({ 'meta.amends': 1 }, { name: 'audit_amends', partialFilterExpression: { 'meta.amends': { $type: 'string' } } });
+const auditChainHeadsSchema = new Schema(schema.auditChainHeads, {strict: true, timestamps: false});
+const auditChainAnchorsSchema = new Schema(schema.auditChainAnchors, {strict: true, timestamps: true});
+auditChainAnchorsSchema.index({ seq: -1 }, { unique: true, name: 'audit_anchor_seq' });
 const scimConfigsSchema = new Schema(schema.scimConfigs, {strict: true, timestamps: true});
 const ptoEntriesSchema = new Schema(schema.ptoEntries, {strict: true, timestamps: true});
 ptoEntriesSchema.index({ userId: 1, startDate: 1 });
@@ -444,6 +450,8 @@ module.exports = {
     knowledgeIndexStateSchema,
     knowledgeExclusionsSchema,
     permissionDecisionsSchema,
+    auditChainHeadsSchema,
+    auditChainAnchorsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,
