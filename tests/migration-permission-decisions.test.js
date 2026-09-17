@@ -19,7 +19,7 @@ const TTL_INDEX = { name: 'day_1', key: { day: 1 }, expireAfterSeconds: THIRTY_D
 const KEY_INDEX = { name: 'decision_key', key: { day: 1, mode: 1, method: 1, route: 1, permission: 1, role: 1, scope: 1, reason: 1 }, unique: true };
 const logger = { info: jest.fn(), error: jest.fn() };
 
-const tenants = ({ broken = [], builds = [TTL_INDEX, KEY_INDEX] } = {}) => {
+const tenants = ({ broken = [], builds = [TTL_INDEX, KEY_INDEX], globalBuilds = [TTL_INDEX, KEY_INDEX] } = {}) => {
     const db = fakeMongo.create();
     const indexes = {};
     const methods = [];
@@ -27,7 +27,7 @@ const tenants = ({ broken = [], builds = [TTL_INDEX, KEY_INDEX] } = {}) => {
         methods.push([companyId, q.type, method]);
         if (method === 'createIndexes') {
             if (broken.includes(companyId)) throw new Error('Index with name: day_1 already exists with different options');
-            indexes[companyId] = [ID_INDEX, ...builds];
+            indexes[companyId] = [ID_INDEX, ...(companyId === 'global' ? globalBuilds : builds)];
             return undefined;
         }
         if (method === 'listIndexes') return indexes[companyId] || [ID_INDEX];
@@ -65,11 +65,11 @@ describe('the permission_decisions collection', () => {
         const now = new Date();
         const row = {
             day: now, mode: 'report', method: 'POST', route: '/api/v1/createproject', permission: 'project.project_create',
-            role: 3, scope: 'global', reason: 'denied', count: 2, firstSeen: now, lastSeen: now, userIds: ['6f0000000000000000000003'],
+            role: 3, scope: 'global', reason: 'denied', count: 2, firstSeen: now, lastSeen: now, lastAuditedAt: now, userIds: ['6f0000000000000000000003'],
         };
         const doc = new Model({ ...row, body: { secret: 1 }, query: 'a=1', url: '/api/v1/createproject?a=1' }).toObject();
         expect(doc).toMatchObject(row);
-        expect(Object.keys(doc).sort()).toEqual(['_id', 'count', 'day', 'firstSeen', 'lastSeen', 'method', 'mode', 'permission', 'reason', 'role', 'route', 'scope', 'userIds'].sort());
+        expect(Object.keys(doc).sort()).toEqual(['_id', 'count', 'day', 'firstSeen', 'lastAuditedAt', 'lastSeen', 'method', 'mode', 'permission', 'reason', 'role', 'route', 'scope', 'userIds'].sort());
     });
 });
 
@@ -81,19 +81,20 @@ describe(ID, () => {
         expect(ids.indexOf(ID)).toBe(ids.indexOf('028-clear-task-update-tokens') + 1);
     });
 
-    test('builds the declared indexes on every tenant without dropping any, and records the TTL index it found', async () => {
+    test('builds the declared indexes in the instance bucket and on every tenant without dropping any, and records the TTL index it found', async () => {
         const db = tenants();
         const ctx = contextFor(db, ['c1', 'c2']);
 
         await migration.up(ctx);
 
+        expect(db.methods.filter(([, , method]) => method === 'createIndexes').map(([companyId]) => companyId)).toEqual(['global', 'c1', 'c2']);
+        expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('029 global'));
         expect(ctx.companies).toEqual({
             c1: { ok: true, ttlIndex: 'day_1', expireAfterSeconds: THIRTY_DAYS },
             c2: { ok: true, ttlIndex: 'day_1', expireAfterSeconds: THIRTY_DAYS },
         });
         expect(db.methods.every(([, type]) => type === SCHEMA_TYPE.PERMISSION_DECISIONS)).toBe(true);
         expect(db.methods.map(([, , method]) => method)).not.toContain('syncIndexes');
-        expect(db.methods.filter(([, , method]) => method === 'createIndexes').map(([companyId]) => companyId)).toEqual(['c1', 'c2']);
         expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('029 c1'));
     });
 
@@ -113,6 +114,14 @@ describe(ID, () => {
 
         expect(ctx.companies.c1).toMatchObject({ ok: false, error: expect.stringContaining('different options') });
         expect(ctx.companies.c2).toEqual({ ok: true, ttlIndex: 'day_1', expireAfterSeconds: THIRTY_DAYS });
+    });
+
+    test('fails, before touching any tenant, when the instance bucket cannot be indexed', async () => {
+        const db = tenants({ broken: ['global'] });
+        const ctx = contextFor(db, ['c1']);
+
+        await expect(migration.up(ctx)).rejects.toThrow(/different options/);
+        expect(db.methods.map(([companyId]) => companyId)).not.toContain('c1');
     });
 
     test('fails a tenant whose TTL index is still missing after the build', async () => {

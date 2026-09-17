@@ -1,6 +1,7 @@
 const { MongoClient, ObjectId } = require('mongodb');
 const { resolveMongoUrl } = require('../../e2e/support/env');
-const { createProject, createTask, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
+const { createApiClient } = require('../../e2e/support/api');
+const { createProject, createTask, login, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 
 /* Sprint 8 slice 2. The server runs with PERMISSION_ENFORCEMENT_CACHE_TTL_SECONDS=0, so a
  * workspace mode written here applies to the next request. */
@@ -146,5 +147,59 @@ describe('report-only enforcement for browser sessions', () => {
         expect(shape(await updatePriority(target, `off-${uniqueSuffix()}`))).toEqual(today);
         await new Promise((resolve) => setTimeout(resolve, 300));
         expect(await decisions.countDocuments({})).toBe(before);
+    });
+});
+
+describe('with the instance default set in the Instance console', () => {
+    let globalDecisions;
+
+    const setInstanceMode = async (mode) => {
+        const saved = await owner.api.put('/api/v2/instance/settings', { PERMISSION_ENFORCEMENT_MODE: mode });
+        expect(saved.status).toBe(200);
+        expect(saved.body.data.applied).toEqual(['PERMISSION_ENFORCEMENT_MODE']);
+    };
+
+    /* The calls Invitation.vue makes; the accept is sent without a companyid header, as the page sends it. */
+    const invitee = async () => {
+        const email = `invitee.enforce.${uniqueSuffix()}@e2e.alianhub.test`;
+        const sent = await owner.api.post('/api/v2/sendInvitationEmail', { email, companyId: state.companyId, companyName: 'E2E Workspace', role: MEMBER_ROLE, designation: 0 });
+        expect(sent.status).toBe(200);
+        const created = await createApiClient({ baseURL: state.baseURL }).post('/api/v2/createUser', {
+            firstName: 'Ivy', lastName: 'Invitee', email, password: state.password, isInvitation: true, assignCompany: state.companyId,
+        });
+        expect(created.body.status).toBe(true);
+        const session = await login(state.baseURL, email, state.password);
+        return { rowId: String(sent.body.data._id), uid: session.uid, api: createApiClient({ baseURL: state.baseURL, accessToken: session.accessToken }) };
+    };
+
+    beforeAll(() => {
+        globalDecisions = client.db('global').collection('permission_decisions');
+    });
+
+    afterAll(async () => {
+        if (owner) await owner.api.put('/api/v2/instance/settings', { PERMISSION_ENFORCEMENT_MODE: '' });
+    });
+
+    it('under enforce, an invited user still accepts the invitation', async () => {
+        const { rowId, uid, api } = await invitee();
+        await setInstanceMode('enforce');
+        const accepted = await api.put('/api/v1/root-members', { id: rowId, data: { userId: uid, status: 2 }, companyId: state.companyId });
+        expect(accepted.status).toBe(200);
+        expect(accepted.body).toMatchObject({ status: true, data: { status: 2, userId: uid } });
+    });
+
+    it('under report, a would-be denial with no company header is recorded in the instance bucket', async () => {
+        const { rowId, uid, api } = await invitee();
+        const body = { id: rowId, data: { userId: uid, roleType: 1 }, companyId: state.companyId };
+        await setInstanceMode('');
+        const today = await api.put('/api/v1/root-members', body);
+
+        await setInstanceMode('report');
+        const res = await api.put('/api/v1/root-members', body);
+        expect(shape(res)).toEqual(shape(today));
+
+        const row = await waitFor(() => globalDecisions.findOne({ mode: 'report', route: '/api/v1/root-members', userIds: uid }), 'an instance-bucket row');
+        expect(row).toMatchObject({ method: 'PUT', permission: 'settings.settings_member_list', scope: 'global', reason: 'no_seat', role: null });
+        expect(JSON.stringify(row)).not.toContain(state.companyId);
     });
 });

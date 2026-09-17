@@ -94,15 +94,31 @@ describe('a workspace', () => {
         expect(enforcement.normaliseCompanyMode(stored)).toBe(expected);
     });
 
-    test('whose row cannot be read inherits the instance default, logs, and is read again next time', async () => {
+    test('whose row cannot be read inherits the instance default, and the failure is held briefly and logged once', async () => {
         process.env.PERMISSION_ENFORCEMENT_MODE = 'report';
         storeCompany('enforce');
         mockFailing.companies = true;
-        expect(await enforcement.resolveMode(CID)).toBe('report');
-        expect(logger.error).toHaveBeenCalled();
+        for (let i = 0; i < 5; i += 1) expect(await enforcement.resolveMode(CID)).toBe('report');
+        expect(companyReads()).toBe(1);
+        expect(logger.error).toHaveBeenCalledTimes(1);
+
+        const held = myCache.getTtl(`permissionEnforcement:${CID}`) - Date.now();
+        expect(held).toBeGreaterThan(0);
+        expect(held).toBeLessThanOrEqual(enforcement.FAILED_READ_TTL_SECONDS * 1000);
+        expect(enforcement.FAILED_READ_TTL_SECONDS).toBeLessThanOrEqual(10);
 
         mockFailing.companies = false;
+        enforcement.invalidateEnforcementMode(CID);
         expect(await enforcement.resolveMode(CID)).toBe('enforce');
+    });
+
+    test('whose row cannot be read is held briefly even when the cache TTL is 0', async () => {
+        process.env.PERMISSION_ENFORCEMENT_CACHE_TTL_SECONDS = '0';
+        mockFailing.companies = true;
+        await enforcement.resolveMode(CID);
+        await enforcement.resolveMode(CID);
+        expect(companyReads()).toBe(1);
+        expect(logger.error).toHaveBeenCalledTimes(1);
     });
 
     test('with a malformed id inherits without reading the company row', async () => {

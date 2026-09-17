@@ -1,11 +1,12 @@
 const { EventEmitter } = require('events');
 
 const mockDb = require('./fixtures/fakeMongo').create();
-const mockFailing = { rules: false, decisions: false, decisionsThrow: false };
+const mockFailing = { rules: false, seats: false, decisions: false, decisionsThrow: false };
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     MongoDbCrudOpration: (companyId, q, method) => {
         if (mockFailing.rules && q.type === 'rules') return Promise.reject(new Error('rules unreadable'));
+        if (mockFailing.seats && q.type === 'company_users') return Promise.reject(new Error('seats unreadable'));
         if (q.type === 'permission_decisions') {
             if (mockFailing.decisionsThrow) throw new Error('decisions store exploded');
             if (mockFailing.decisions) return Promise.reject(new Error('decisions store down'));
@@ -16,7 +17,12 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
 }));
 jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0 } }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
+jest.mock('../Modules/settings/Members/controller', () => {
+    const reached = (req, res) => res.status(200).json({ status: true, reached: true });
+    return new Proxy({}, { get: () => reached });
+});
 
+const express = require('express');
 const logger = require('../Config/loggerConfig');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { requireRole, requirePermission, requireTaskActionPermission } = require('../Config/permissionGuard');
@@ -27,6 +33,10 @@ const OWNER = '6f0000000000000000000001';
 const MEMBER = '6f0000000000000000000003';
 const GUEST = '6f0000000000000000000004';
 const OUTSIDER = '6f0000000000000000000009';
+const INVITEE = '6f000000000000000000000a';
+const OWNER_SEAT = '6f0000000000000000000c01';
+const MEMBER_SEAT = '6f0000000000000000000c03';
+const INVITE_SEAT = '6f0000000000000000000c0a';
 const GLOBAL_PROJECT = '6f0000000000000000000a01';
 const OWN_RULES_PROJECT = '6f0000000000000000000a02';
 const NULL_FLAG_PROJECT = '6f0000000000000000000a03';
@@ -98,8 +108,9 @@ beforeEach(() => {
     ENV_KEYS.forEach((k) => { delete process.env[k]; });
     jest.clearAllMocks();
     setWorkspaceMode(undefined);
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: 3, status: 2, isDelete: false });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { _id: OWNER_SEAT, userId: OWNER, roleType: 1, status: 2, isDelete: false });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { _id: MEMBER_SEAT, userId: MEMBER, roleType: 3, status: 2, isDelete: false });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { _id: INVITE_SEAT, userId: '', userEmail: 'invitee@example.test', roleType: 3, status: 1, isDelete: false });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: GUEST, roleType: 0, status: 2, isDelete: false });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: GLOBAL_PROJECT, isGlobalPermission: true, isPrivateSpace: false, AssigneeUserId: [MEMBER] });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: OWN_RULES_PROJECT, isGlobalPermission: false });
@@ -115,6 +126,7 @@ beforeEach(() => {
         task_status: [{ key: 3, permission: null }],
         task_priority: [{ key: 3, permission: true }],
         settings_security_permissions: [{ key: 3, permission: false }],
+        settings_member_list: [{ key: 3, permission: null }],
     });
     seedRules(SCHEMA_TYPE.PROJECT_RULES, { task_priority: [{ key: 3, permission: false }] }, { projectId: OWN_RULES_PROJECT });
     seedRules(SCHEMA_TYPE.PROJECT_RULES, { task_status: [{ key: 3, permission: true }] }, { projectId: NULL_FLAG_PROJECT });
@@ -402,6 +414,195 @@ describe('the mode a workspace resolves to', () => {
 
         expect(decisions()).toEqual([expect.objectContaining({ mode: 'report', count: 2 })]);
         expect(audits()).toEqual([]);
+    });
+});
+
+const routesOf = (modulePath) => {
+    const table = {};
+    const register = (method) => (routePath, ...handlers) => { table[`${method} ${routePath}`] = handlers; };
+    require(modulePath).init({ get: register('GET'), post: register('POST'), put: register('PUT'), patch: register('PATCH'), delete: register('DELETE'), use: register('USE') });
+    return table;
+};
+const memberRoutes = routesOf('../Modules/settings/Members/routes');
+const routeGuard = (key) => memberRoutes[key][0];
+const withoutCompany = (req) => ({ ...req, headers: {} });
+
+const acceptInvitation = (uid, data = { userId: uid, status: 2 }) => withoutCompany(session(uid, {
+    method: 'PUT', route: '/api/v1/root-members', body: { id: INVITE_SEAT, data, companyId: CID },
+}));
+const updateMember = (uid, id, data) => session(uid, { method: 'PUT', route: '/api/v1/members', body: { id, data } });
+
+describe('accepting an invitation (PUT /api/v1/root-members, sent without a company header)', () => {
+    test.each(['off', 'report', 'enforce'])('passes under an instance default of %s and records nothing', async (mode) => {
+        setInstanceMode(mode);
+        const result = await run(routeGuard('PUT /api/v1/root-members'), acceptInvitation(INVITEE));
+        expect(result.passed).toBe(true);
+        expect(decisions()).toEqual([]);
+    });
+
+    test.each([
+        ['another account', { userId: MEMBER, status: 2 }],
+        ['a role', { userId: INVITEE, roleType: 1 }],
+        ['a status other than active', { userId: INVITEE, status: 3 }],
+    ])('is not exempt when the body links %s', async (_, data) => {
+        setInstanceMode('enforce');
+        const result = await run(routeGuard('PUT /api/v1/root-members'), acceptInvitation(INVITEE, data));
+        expect(result.passed).toBe(false);
+        expect(result.code).toBe(403);
+    });
+
+    test('an invited seat gets no exemption on other member routes', async () => {
+        setInstanceMode('enforce');
+        const result = await run(routeGuard('PUT /api/v1/members'), withoutCompany(updateMember(INVITEE, INVITE_SEAT, { userId: INVITEE, status: 2 })));
+        expect(result.passed).toBe(false);
+    });
+
+    test('API tokens are judged as before', async () => {
+        const req = { ...acceptInvitation(INVITEE), apiToken: { _id: 't' } };
+        for (const mode of ['off', 'report', 'enforce']) {
+            setInstanceMode(mode);
+            const result = await run(routeGuard('PUT /api/v1/root-members'), req);
+            expect(result).toMatchObject({ passed: false, code: 403 });
+        }
+    });
+});
+
+describe('a decision with no resolvable company', () => {
+    const globalWrites = () => mockDb.calls.filter((call) => call.type === 'permission_decisions' && call.method === 'updateOne').map((call) => call.companyId);
+
+    test.each([['no company header', {}], ['a malformed company header', { companyid: 'not-a-company' }]])('is recorded in the instance bucket in report mode (%s)', async (_, headers) => {
+        setInstanceMode('report');
+        const req = { ...acceptInvitation(INVITEE, { userId: MEMBER, status: 2 }), headers };
+        const result = await run(routeGuard('PUT /api/v1/root-members'), req);
+        expect(result.passed).toBe(true);
+        expect(decisions()).toEqual([expect.objectContaining({ mode: 'report', route: '/api/v1/root-members', permission: 'settings.settings_member_list', role: null, scope: 'global', reason: 'no_seat', count: 1 })]);
+        expect(new Set(globalWrites())).toEqual(new Set(['global']));
+        expect(JSON.stringify(decisions())).not.toContain('not-a-company');
+    });
+
+    test('is refused and recorded in the instance bucket in enforce mode, with no tenant audit row', async () => {
+        setInstanceMode('enforce');
+        const result = await run(routeGuard('PUT /api/v1/root-members'), acceptInvitation(INVITEE, { userId: MEMBER, status: 2 }));
+        expect(result.code).toBe(403);
+        expect(decisions()).toEqual([expect.objectContaining({ mode: 'enforce', reason: 'no_seat' })]);
+        expect(new Set(globalWrites())).toEqual(new Set(['global']));
+        expect(mockDb.store.audit_logs || []).toEqual([]);
+    });
+});
+
+describe('a member changing their own preferences (PUT /api/v1/members, Home.vue dashboard lock)', () => {
+    test.each(['off', 'report', 'enforce'])('may lock their own dashboard in %s without the member list permission', async (mode) => {
+        setInstanceMode(mode);
+        const result = await run(routeGuard('PUT /api/v1/members'), updateMember(MEMBER, MEMBER_SEAT, { dashboardLocked: true }));
+        expect(result.passed).toBe(true);
+        expect(decisions()).toEqual([]);
+    });
+
+    test('still needs the permission to change another member, in report and in enforce', async () => {
+        setInstanceMode('report');
+        expect((await run(routeGuard('PUT /api/v1/members'), updateMember(MEMBER, OWNER_SEAT, { dashboardLocked: true }))).passed).toBe(true);
+        expect(decisions()).toEqual([expect.objectContaining({ permission: 'settings.settings_member_list', reason: 'denied' })]);
+
+        setInstanceMode('enforce');
+        const result = await run(routeGuard('PUT /api/v1/members'), updateMember(MEMBER, OWNER_SEAT, { dashboardLocked: true }));
+        expect(result).toMatchObject({ passed: false, code: 403 });
+    });
+
+    test.each([
+        ['a field that is not a preference', { roleType: 1 }],
+        ['a preference and a field that is not', { dashboardLocked: true, managerId: OWNER }],
+        ['an update operator', { $set: { dashboardLocked: true } }],
+    ])('still needs the permission for %s on their own row', async (_, data) => {
+        setInstanceMode('enforce');
+        const result = await run(routeGuard('PUT /api/v1/members'), updateMember(MEMBER, MEMBER_SEAT, data));
+        expect(result).toMatchObject({ passed: false, code: 403 });
+    });
+
+    test('API tokens are judged as before', async () => {
+        for (const mode of ['off', 'report', 'enforce']) {
+            setInstanceMode(mode);
+            const result = await run(routeGuard('PUT /api/v1/members'), { ...updateMember(MEMBER, MEMBER_SEAT, { dashboardLocked: true }), apiToken: { _id: 't' } });
+            expect(result).toMatchObject({ passed: false, code: 403 });
+        }
+    });
+});
+
+describe('a role lookup that fails is a failed check, not a missing seat', () => {
+    test('report records check_failed and lets the request through', async () => {
+        setInstanceMode('report');
+        mockFailing.seats = true;
+        expect((await run(createProject(), session(MEMBER))).passed).toBe(true);
+        expect((await run(requireRole(), session(MEMBER))).passed).toBe(true);
+        expect(decisions().map((row) => `${row.permission}|${row.reason}`).sort()).toEqual(['project.project_create|check_failed', 'role:1,2|check_failed']);
+    });
+
+    test('enforce fails closed with "Permission check failed."', async () => {
+        setInstanceMode('enforce');
+        mockFailing.seats = true;
+        const result = await run(createProject(), session(MEMBER));
+        expect(result).toMatchObject({ passed: false, code: 403, body: { status: false, statusText: 'Permission check failed.', permission: 'project.project_create' } });
+        expect((await run(requireRole(), session(MEMBER))).body).toMatchObject({ statusText: 'Permission check failed.' });
+    });
+
+    test('API tokens keep today\'s answer', async () => {
+        setInstanceMode('enforce');
+        mockFailing.seats = true;
+        const result = await run(createProject(), token(MEMBER));
+        expect(result.body).toMatchObject({ statusText: 'You do not have permission to perform this action.' });
+    });
+});
+
+describe('refusal audit rows', () => {
+    beforeEach(() => setInstanceMode('enforce'));
+
+    test('are written at most once a minute per decision key', async () => {
+        for (let i = 0; i < 3; i += 1) await run(createProject(), session(MEMBER));
+        expect(decisions()).toEqual([expect.objectContaining({ count: 3 })]);
+        expect(audits()).toHaveLength(1);
+
+        await run(requirePermission('settings.settings_security_permissions'), session(MEMBER, { method: 'PUT', route: '/api/v1/securityPermissions' }));
+        expect(audits()).toHaveLength(2);
+
+        const row = decisions().find((r) => r.permission === 'project.project_create');
+        row.lastAuditedAt = new Date(Date.now() - 61000);
+        await run(createProject(), session(MEMBER));
+        expect(audits()).toHaveLength(3);
+        await run(createProject(), session(MEMBER));
+        expect(audits()).toHaveLength(3);
+    });
+});
+
+describe('the stored route', () => {
+    const serve = async (app) => {
+        const server = app.listen(0, '127.0.0.1');
+        await new Promise((resolve) => server.once('listening', resolve));
+        return { base: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((resolve) => server.close(resolve)) };
+    };
+
+    test('is the pattern Express matched, never the concrete path or its query string', async () => {
+        setInstanceMode('report');
+        const app = express();
+        app.use(express.json());
+        app.use((req, res, next) => { req.uid = MEMBER; next(); });
+        app.put('/api/v1/x/:id', createProject(), (req, res) => res.json({ status: true }));
+        const router = express.Router();
+        router.patch('/items/:itemId/notes/:noteId', createProject(), (req, res) => res.json({ status: true }));
+        app.use('/api/v2/things', router);
+        const { base, close } = await serve(app);
+        try {
+            const headers = { 'content-type': 'application/json', companyid: CID };
+            const first = await fetch(`${base}/api/v1/x/${GLOBAL_PROJECT}?probe=${QUERY_MARKER}`, { method: 'PUT', headers, body: JSON.stringify({ note: BODY_MARKER }) });
+            expect(first.status).toBe(200);
+            const second = await fetch(`${base}/api/v2/things/items/abc/notes/42?probe=${QUERY_MARKER}`, { method: 'PATCH', headers, body: '{}' });
+            expect(second.status).toBe(200);
+            const deadline = Date.now() + 2000;
+            while (decisions().length < 2 && Date.now() < deadline) await settle();
+        } finally {
+            await close();
+        }
+        expect(decisions().map((row) => row.route).sort()).toEqual(['/api/v1/x/:id', '/api/v2/things/items/:itemId/notes/:noteId']);
+        const stored = JSON.stringify(decisions());
+        [GLOBAL_PROJECT, 'abc', '/42', QUERY_MARKER, BODY_MARKER, '?'].forEach((value) => expect(stored).not.toContain(value));
     });
 });
 
