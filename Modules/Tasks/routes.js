@@ -7,11 +7,14 @@ const { handleEvents } = require('../Company/eventController');
 const logger = require('../../Config/loggerConfig');
 const { requireTaskActionPermission, requireTaskWritePermission } = require('../../Config/permissionGuard');
 const { TASK_ACTIONS, PRE_V2_TASK_ACTIONS, RELATION_ACTIONS, TASK_WRITE_ROUTES, actionEntry } = require('../../Config/taskWritePermissions');
+const { TASK_ACTION_FIELDS, PRE_V2_ACTION_FIELDS, specFor, prepareOrRefuse, sendFailure } = require('./helpers/taskWriteFields');
 
 exports.init = (app) => {
     app.post('/api/tasks', requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/tasks'].entry), (req, res) => {
         try {
-            task.create(req.body)
+            const payload = prepareOrRefuse(req, res, TASK_ACTION_FIELDS.create, 'POST /api/tasks');
+            if (!payload) return;
+            task.create(payload)
             .then(() => {
                 res.send({status: true, statusText: 'Task created successfully.'});
             })
@@ -26,19 +29,24 @@ exports.init = (app) => {
     });
 
     app.patch('/api/tasks/', requireTaskActionPermission(PRE_V2_TASK_ACTIONS), (req, res) => {
-        task[req.body.action](req.body)
+        const action = req.body && req.body.action;
+        const payload = prepareOrRefuse(req, res, specFor(PRE_V2_ACTION_FIELDS, action), `PATCH /api/tasks/ ${action}`);
+        if (!payload) return;
+        task[action](payload)
         .then((response) => {
             res.send({status: true, statusText: 'Task updated successfully.',data:response});
         })
         .catch((error) => {
             logger.error(`ERROR: ${error}`);
-            res.send({status: false, statusText: error.message});
+            sendFailure(res, error);
         });
     });
 
     app.post('/api/v2/tasks', requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v2/tasks'].entry), (req, res) => {
         try {
-            taskMongo.create(req.body)
+            const payload = prepareOrRefuse(req, res, TASK_ACTION_FIELDS.create, 'create');
+            if (!payload) return;
+            taskMongo.create(payload)
             .then((resData) => {
                 if(resData.status){
                     res.send({status: true, statusText: 'Task created successfully.', id: resData.id});
@@ -57,7 +65,10 @@ exports.init = (app) => {
     });
 
     app.patch('/api/v2/tasks', requireTaskActionPermission(), (req, res) => {
-        taskMongo[req.body.action](req.body)
+        const action = req.body && req.body.action;
+        const payload = prepareOrRefuse(req, res, specFor(TASK_ACTION_FIELDS, action), action);
+        if (!payload) return;
+        taskMongo[action](payload)
         .then((response) => {
             // A handler that matched no document resolves {status:false}; without this the
             // envelope below would report a write that never happened as a success.
@@ -69,11 +80,10 @@ exports.init = (app) => {
         })
         .catch((error) => {
             logger.error(`ERROR: ${error}`);
-            res.send({status: false, statusText: error.message});
+            sendFailure(res, error);
         });
     });
 
-    // CompanyId comes from the verified header; it overrides anything the client put in the body to prevent spoofing.
     app.post('/api/v2/tasks/bulk', requireTaskActionPermission(TASK_ACTIONS), (req, res) => {
         try {
             const action = req.body && req.body.action;
@@ -83,8 +93,8 @@ exports.init = (app) => {
             if (typeof taskMongo[action] !== 'function') {
                 return res.send({ status: false, statusText: `Unknown bulk action: ${action}` });
             }
-            const headerCompanyId = req.headers['companyid'] || '';
-            const payload = { ...req.body, companyId: headerCompanyId };
+            const payload = prepareOrRefuse(req, res, specFor(TASK_ACTION_FIELDS, action), action);
+            if (!payload) return;
 
             taskMongo[action](payload)
             .then((response) => {
@@ -107,8 +117,8 @@ exports.init = (app) => {
                 return res.send({ status: false, statusText: 'Invalid relation action' });
             }
             const { method } = relation;
-            const headerCompanyId = req.headers['companyid'] || '';
-            const payload = { ...req.body, companyId: headerCompanyId };
+            const payload = prepareOrRefuse(req, res, specFor(TASK_ACTION_FIELDS, method), method);
+            if (!payload) return;
 
             taskMongo[method](payload)
             .then((response) => {
@@ -125,7 +135,9 @@ exports.init = (app) => {
     });
 
     app.patch('/api/v1/importTasks', requireTaskWritePermission(TASK_WRITE_ROUTES['PATCH /api/v1/importTasks'].entry), (req, res) => {
-        taskMongo.createMultipleTasks(req.body)
+        const payload = prepareOrRefuse(req, res, TASK_ACTION_FIELDS.createMultipleTasks, 'createMultipleTasks');
+        if (!payload) return;
+        taskMongo.createMultipleTasks(payload)
         .then((response) => {
             res.send({status: true, statusText: 'Task updated successfully.',data:response});
         })
