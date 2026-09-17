@@ -224,7 +224,7 @@ describe('writing the chain', () => {
         expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified', verifiedThrough: 2 });
     });
 
-    it('mirrors the newest head to the global database within a minute of a burst', async () => {
+    it('mirrors the newest head to the global database within five seconds of a burst', async () => {
         jest.useFakeTimers(FAKE_CLOCK);
         const mirror = () => heads().find((h) => h._id === CID);
         const globalWrites = () => mockDb.calls.filter((c) => c.companyId === 'global' && c.type === SCHEMA_TYPE.AUDIT_CHAIN_HEADS && c.method === 'updateOne');
@@ -233,10 +233,47 @@ describe('writing the chain', () => {
         expect(mirror()).toMatchObject({ seq: 1, hash: bySeq(1).chain.hash });
         expect(globalWrites()).toHaveLength(1);
 
-        jest.advanceTimersByTime(60 * 1000);
+        jest.advanceTimersByTime(5 * 1000);
         await flush();
         expect(mirror()).toMatchObject({ seq: 50, hash: bySeq(50).chain.hash });
         expect(globalWrites()).toHaveLength(2);
+    });
+
+    it.each(['SIGTERM', 'SIGINT'])('flushes the head this process wrote on %s, then lets the signal go on', async (signal) => {
+        jest.useFakeTimers(FAKE_CLOCK);
+        const mirror = () => heads().find((h) => h._id === CID);
+        await Promise.all(range(20).map((i) => chain.saveAuditRow(CID, entry(i))));
+        await flush();
+        expect(mirror()).toMatchObject({ seq: 1 });
+
+        const onSignal = jest.fn();
+        const uninstall = chain.installShutdownFlush({ onSignal });
+        try {
+            process.emit(signal, signal);
+            await flush();
+            expect(mirror()).toMatchObject({ seq: 20, hash: bySeq(20).chain.hash });
+            expect(onSignal).toHaveBeenCalledWith(signal);
+        } finally {
+            uninstall();
+        }
+    });
+
+    it('flushes the head this process wrote before a fatal exit', async () => {
+        const guards = require('../Config/processGuards');
+        const registered = [];
+        const spy = jest.spyOn(guards, 'onFatal').mockImplementation((name, fn) => { registered.push([name, fn]); return () => {}; });
+        try {
+            const uninstall = chain.installShutdownFlush({ onSignal: jest.fn() });
+            uninstall();
+        } finally {
+            spy.mockRestore();
+        }
+        jest.useFakeTimers(FAKE_CLOCK);
+        await Promise.all(range(5).map((i) => chain.saveAuditRow(CID, entry(i))));
+        await flush();
+        expect(registered.map(([name]) => name)).toEqual(['audit-chain-mirror']);
+        await registered[0][1]();
+        expect(heads().find((h) => h._id === CID)).toMatchObject({ seq: 5 });
     });
 
     it('mirrors the head this process wrote, even when the tenant head is removed before the flush', async () => {
@@ -306,6 +343,27 @@ describe('the write queue', () => {
         expect(seen.map((c) => c.method)).toEqual(['createIndex', 'createIndex', 'save', 'save']);
         expect(seen.slice(0, 2).map((c) => Object.keys(c.data[0]))).toEqual([['chain.seq'], ['meta.amends']]);
         expect(seen[0].data[1]).toMatchObject({ unique: true, name: 'audit_chain_seq' });
+    });
+
+    it('tries the index build again after a conflict, so dropping the old index takes effect without a restart', async () => {
+        let conflict = true;
+        let now = Date.now();
+        const clock = jest.spyOn(Date, 'now').mockImplementation(() => now);
+        try {
+            await withCrud(async (companyId, query, method, real) => {
+                if (conflict && method === 'createIndex') throw Object.assign(new Error('index conflict'), { code: 85, codeName: 'IndexOptionsConflict' });
+                return real();
+            }, async () => {
+                await chain.saveAuditRow(CID, entry(1));
+                conflict = false;
+                await chain.saveAuditRow(CID, entry(2));
+                now += 5 * 60 * 1000;
+                await chain.saveAuditRow(CID, entry(3));
+            });
+        } finally {
+            clock.mockRestore();
+        }
+        expect(auditRows().map((r) => [r.meta.n, rules.isChained(r)])).toEqual([[1, false], [2, false], [3, true]]);
     });
 
     it('keeps a company unchained, without failing agent actions, when an old index conflicts', async () => {
@@ -388,6 +446,30 @@ describe('the write queue', () => {
         });
         expect(chained().map((r) => [r.chain.seq, r.meta.n])).toEqual([[1, 1], [2, 2]]);
         expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified', verifiedThrough: 2 });
+    });
+
+    it('marks a row abandoned when its write lands after a timeout was reported, so it never reads as pending', async () => {
+        jest.useFakeTimers(FAKE_CLOCK);
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        await withCrud(async (companyId, query, method, real) => {
+            if (method === 'save' && query.data.action === 'agent.action') await gate;
+            return real();
+        }, async () => {
+            const opened = agentAudit.openAction(CID, actor, { action: 'task.comment', params: { taskId: TASK }, entityId: TASK });
+            const refused = expect(opened).rejects.toMatchObject({ reason: 'audit_unavailable' });
+            await flush();
+            jest.advanceTimersByTime(chain.WRITE_TIMEOUT_MS * 2);
+            await flush();
+            await refused;
+            release();
+            await waitFor(() => auditRows().some((r) => r.action === 'audit.amended'));
+        });
+        jest.useRealTimers();
+        const landedRow = auditRows().find((r) => r.action === 'agent.action');
+        const row = await agentAudit.findById(CID, String(landedRow._id));
+        expect(row.meta).toMatchObject({ state: 'failed', abandoned: true, undoable: false });
+        expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified' });
     });
 
     it('refuses a write once a company\'s queue is full', async () => {
@@ -753,6 +835,55 @@ describe('agent audit rows under the chain', () => {
             mockDb.crud.mockImplementation(real);
         }
         expect(auditRows().filter((r) => r.action === agentAudit.ACTION_UNDONE)).toHaveLength(1);
+    });
+});
+
+describe('the filtered audit log', () => {
+    const OWNER = '6f0000000000000000000001';
+    const list = async (query) => {
+        const res = { status: () => res, json: (b) => { res.body = b; return res; }, send: (b) => { res.body = b; return res; } };
+        await require('../Modules/Audit/controller').listAuditLogs({ uid: OWNER, headers: { companyid: CID }, query, body: {} }, res);
+        return res.body;
+    };
+    const inLists = (value, found = []) => {
+        if (Array.isArray(value)) value.forEach((item) => inLists(item, found));
+        else if (value && typeof value === 'object' && !(value instanceof Date) && !value._bsontype) {
+            Object.entries(value).forEach(([k, v]) => { if (k === '$in' && Array.isArray(v)) found.push(v.length); else inLists(v, found); });
+        }
+        return found;
+    };
+
+    beforeEach(() => {
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
+    });
+
+    it('reads one aggregate and only the page\'s changes, however many rows a change moved into the filter', async () => {
+        const ids = [];
+        for (const i of range(60)) ids.push(String((await chain.saveAuditRow(CID, entry(i)))._id));
+        for (const id of ids) await chain.amend(CID, id, { 'meta.undoneAt': new Date(), 'meta.undoneBy': 'u2' });
+        mockDb.calls.length = 0;
+
+        const body = await list({ undone: 'true', limit: '10' });
+
+        expect(body.status).toBe(true);
+        expect(body.data).toHaveLength(10);
+        expect(body.metadata).toMatchObject({ total: 60, totalPages: 6 });
+        expect(body.metadata.approximate).toBeUndefined();
+        const auditCalls = mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.AUDIT_LOGS);
+        expect(auditCalls.filter((c) => c.method === 'aggregate')).toHaveLength(1);
+        expect(Math.max(0, ...inLists(auditCalls.map((c) => c.data)))).toBeLessThanOrEqual(10);
+    });
+
+    it('drops a page row whose verified state does not match, and says the total is approximate', async () => {
+        const [undone, forged, plainRow] = [await chain.saveAuditRow(CID, entry(1)), await chain.saveAuditRow(CID, entry(2)), await chain.saveAuditRow(CID, entry(3))].map((r) => String(r._id));
+        await chain.amend(CID, undone, { 'meta.undoneAt': new Date(), 'meta.undoneBy': 'u2' });
+        await mockDb.crud(CID, { type: SCHEMA_TYPE.AUDIT_LOGS, data: { action: 'audit.amended', actorId: '', meta: { amends: forged, set: { undoneAt: new Date() } }, chain: { seq: 5, prevHash: 'x', hash: 'f'.repeat(64) } } }, 'save');
+
+        const body = await list({ undone: 'true' });
+
+        expect(body.data.map((r) => String(r._id))).toEqual([undone]);
+        expect(body.data.map((r) => String(r._id))).not.toContain(plainRow);
+        expect(body.metadata).toMatchObject({ total: 2, approximate: true });
     });
 });
 

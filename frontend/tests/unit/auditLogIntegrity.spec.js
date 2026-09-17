@@ -88,6 +88,20 @@ describe('the audit log integrity indicator', () => {
     });
 });
 
+describe('an approximate total', () => {
+    it('says so when the server could not count a filter exactly', async () => {
+        apiRequest.mockResolvedValue({ data: { status: true, data: [row('a', { integrity: { state: 'verified' } })], metadata: { total: 3, page: 1, totalPages: 1, chain: { on: true }, approximate: true } } });
+        const wrapper = mount(AuditLog, { global: { mocks: { $t: t } } });
+        await flushPromises();
+        expect(wrapper.find('[data-test="total-approximate"]').text()).toBe(t('Audit.total_approximate'));
+    });
+
+    it('says nothing when the count is exact', async () => {
+        const wrapper = await open([row('a', { integrity: { state: 'verified' } })]);
+        expect(wrapper.find('[data-test="total-approximate"]').exists()).toBe(false);
+    });
+});
+
 describe('the integrity labels', () => {
     it('describe the states the server reports', () => {
         expect(t('Audit.integrity_unchained_hint')).toMatch(/before the audit chain started/);
