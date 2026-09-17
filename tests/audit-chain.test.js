@@ -124,6 +124,35 @@ describe('canonical serialisation', () => {
         expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified', verifiedThrough: 3 });
     });
 
+    describe('hashes what BSON stores for values JSON has no answer for', () => {
+        const { Decimal128, Long } = require('bson');
+        const mongoose = require('mongoose');
+        const Probe = mongoose.models.S8s5AuditProbe || mongoose.model('S8s5AuditProbe', new mongoose.Schema({ name: String, tags: [String] }));
+        const sparse = [1, 2, 3];
+        delete sparse[1];
+        const cases = [
+            ['an invalid date', new Date('not a date')],
+            ['a Buffer', Buffer.from('audit')],
+            ['a Uint8Array', new Uint8Array([1, 2, 3])],
+            ['a BigInt', 2n ** 70n],
+            ['a Decimal128', Decimal128.fromString('12.50')],
+            ['a Long', Long.fromString('9007199254740993')],
+            ['a function', () => 'ignored'],
+            ['a symbol', Symbol('ignored')],
+            ['a sparse array', sparse],
+            ['a Mongoose document', new Probe({ name: 'probe', tags: ['a'] })],
+            ['a Map', new Map([['k', 'v']])],
+            ['a RegExp', /audit/i],
+        ];
+        it.each(cases)('%s', async (label, value) => {
+            const { serialize, deserialize } = require('bson');
+            await chain.saveAuditRow(CID, entry(1, { meta: { value, nested: [value, { value }] } }));
+            await writeRows(2, 3);
+            mockDb.store[SCHEMA_TYPE.AUDIT_LOGS] = auditRows().map((row) => deserialize(serialize(row)));
+            expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified', verifiedThrough: 3 });
+        });
+    });
+
     it('pins the row hash: HMAC-SHA256 over the canonical hashed content, a newline and the previous hash', () => {
         const row = {
             _id: '6f0000000000000000000001', createdAt: new Date('2026-09-17T00:00:00.000Z'), updatedAt: new Date(), __v: 0,
@@ -207,6 +236,48 @@ describe('writing the chain', () => {
         expect(globalWrites()).toHaveLength(2);
     });
 
+    it('mirrors the head this process wrote, even when the tenant head is removed before the flush', async () => {
+        jest.useFakeTimers(FAKE_CLOCK);
+        const mirror = () => heads().find((h) => h._id === CID);
+        await Promise.all(range(50).map((i) => chain.saveAuditRow(CID, entry(i))));
+        await flush();
+        expect(mirror()).toMatchObject({ seq: 1 });
+
+        removeAudit((r) => r.chain.seq >= 2);
+        mockDb.store[SCHEMA_TYPE.AUDIT_CHAIN_HEADS] = heads().filter((h) => h._id !== 'head');
+        jest.advanceTimersByTime(60 * 1000);
+        await flush();
+        expect(mirror()).toMatchObject({ seq: 50 });
+        jest.useRealTimers();
+
+        await chain.saveAuditRow(CID, entry(51));
+        expect(chained().map((r) => r.chain.seq)).toEqual([1, 51]);
+        expect(await chain.verifyChain(CID)).toMatchObject({ state: 'broken', brokenAt: 2 });
+    });
+
+    it('flushes the head this process wrote from the cron, even when the tenant head was rolled back', async () => {
+        jest.useFakeTimers(FAKE_CLOCK);
+        const mirror = () => heads().find((h) => h._id === CID);
+        await Promise.all(range(10).map((i) => chain.saveAuditRow(CID, entry(i))));
+        await flush();
+        const head = heads().find((h) => h._id === 'head');
+        Object.assign(head, { seq: 1, hash: bySeq(1).chain.hash, mac: rules.markMac(KEY, 'head', CID, { seq: 1, hash: bySeq(1).chain.hash }) });
+        removeAudit((r) => r.chain.seq >= 2);
+
+        await chain.flushMirrors();
+        expect(mirror()).toMatchObject({ seq: 10 });
+        jest.useRealTimers();
+        expect(await chain.verifyChain(CID)).toMatchObject({ state: 'broken', brokenAt: 2 });
+    });
+
+    it('never allocates below the last sequence number this process wrote', async () => {
+        await writeRows(1, 5);
+        removeAudit((r) => r.chain.seq >= 3);
+        mockDb.store[SCHEMA_TYPE.AUDIT_CHAIN_HEADS] = [];
+        await chain.saveAuditRow(CID, entry(6));
+        expect(chained().map((r) => r.chain.seq)).toEqual([1, 2, 6]);
+    });
+
     it('never reuses a sequence number below the mirrored head, and reports the rows missing up to it', async () => {
         jest.useFakeTimers(FAKE_CLOCK);
         await Promise.all(range(50).map((i) => chain.saveAuditRow(CID, entry(i))));
@@ -224,16 +295,31 @@ describe('writing the chain', () => {
 });
 
 describe('the write queue', () => {
-    it('builds the unique sequence index before a company\'s first chained write', async () => {
+    it('builds only the chain indexes, before a company\'s first chained write', async () => {
         await writeRows(1, 2);
-        const seen = mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.AUDIT_LOGS && ['createIndexes', 'save'].includes(c.method)).map((c) => c.method);
-        expect(seen).toEqual(['createIndexes', 'save', 'save']);
+        const seen = mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.AUDIT_LOGS && ['createIndex', 'createIndexes', 'save'].includes(c.method));
+        expect(seen.map((c) => c.method)).toEqual(['createIndex', 'createIndex', 'save', 'save']);
+        expect(seen.slice(0, 2).map((c) => Object.keys(c.data[0]))).toEqual([['chain.seq'], ['meta.amends']]);
+        expect(seen[0].data[1]).toMatchObject({ unique: true, name: 'audit_chain_seq' });
+    });
+
+    it('keeps a company unchained, without failing agent actions, when an old index conflicts', async () => {
+        await withCrud(async (companyId, query, method, real) => {
+            if (method === 'createIndex' || method === 'createIndexes') throw Object.assign(new Error('An existing index has the same name as the requested index but different options'), { code: 85, codeName: 'IndexOptionsConflict' });
+            return real();
+        }, async () => {
+            await chain.saveAuditRow(CID, entry(1));
+            const id = await agentAudit.recordAction(CID, actor, { action: 'task.comment', params: { taskId: TASK }, undo: { kind: 'comment', commentId: 'c1', taskId: TASK }, entityId: TASK });
+            expect(auditRows().find((r) => String(r._id) === id).meta).toMatchObject({ state: 'applied', undoable: true });
+        });
+        expect(auditRows().every((r) => r.chain === undefined)).toBe(true);
+        expect(logger.error).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`${CID}.*audit_chain_seq|audit_chain_seq.*${CID}`)));
     });
 
     it('writes nothing while the index cannot be built, and tries again on the next write', async () => {
         let failures = 1;
         await withCrud(async (companyId, query, method, real) => {
-            if (method === 'createIndexes' && failures > 0) { failures -= 1; throw new Error('index build failed'); }
+            if (method === 'createIndex' && failures > 0) { failures -= 1; throw new Error('index build failed'); }
             return real();
         }, async () => {
             await expect(chain.saveAuditRow(CID, entry(1))).rejects.toThrow('index build failed');
@@ -278,6 +364,25 @@ describe('the write queue', () => {
             await next;
         });
         expect(chained().map((r) => r.meta.n)).toEqual([2]);
+    });
+
+    it('treats a write that lands after its timeout as written, and does not write it again', async () => {
+        jest.useFakeTimers(FAKE_CLOCK);
+        await withCrud(async (companyId, query, method, real) => {
+            if (method === 'save' && query.data.meta && query.data.meta.n === 1) {
+                await real();
+                return new Promise(() => {});
+            }
+            return real();
+        }, async () => {
+            const slow = chain.saveAuditRow(CID, entry(1));
+            await flush();
+            jest.advanceTimersByTime(chain.WRITE_TIMEOUT_MS);
+            await expect(slow).resolves.toMatchObject({ chain: { seq: 1 } });
+            await chain.saveAuditRow(CID, entry(2));
+        });
+        expect(chained().map((r) => [r.chain.seq, r.meta.n])).toEqual([[1, 1], [2, 2]]);
+        expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified', verifiedThrough: 2 });
     });
 
     it('refuses a write once a company\'s queue is full', async () => {
@@ -449,6 +554,16 @@ describe('verifying the chain', () => {
 
         const listed = await chain.readForList(CID, auditRows().map((r) => String(r._id)));
         expect(listed.map((r) => r.integrity)).toEqual([{ state: 'unchained' }, { state: 'verified' }, { state: 'verified' }, { state: 'broken', brokenAt: null }]);
+    });
+
+    it('counts only a bounded, indexed stretch below the remembered position on each read', async () => {
+        await writeRows(1, 12);
+        const page = () => [11, 12].map((seq) => ({ row: bySeq(seq), amendments: [] }));
+        await chain.annotateIntegrity(CID, page(), { countWindow: 4 });
+        mockDb.calls.length = 0;
+        await chain.annotateIntegrity(CID, page(), { countWindow: 4 });
+        const counts = mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.AUDIT_LOGS && c.method === 'countDocuments');
+        expect(counts.map((c) => c.data[0]['chain.seq'])).toEqual([{ $gt: 8, $lte: 12 }]);
     });
 
     it('reports rows as unverified when the key is not available to check them', async () => {

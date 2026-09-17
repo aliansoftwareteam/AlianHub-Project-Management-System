@@ -22,7 +22,11 @@ const DAY = 24 * 60 * 60 * 1000;
 const actor = { kind: 'agent', userId: 'u1', agentId: '6f0000000000000000000a01', agentName: 'Reviewer', runId: '6f0000000000000000000c01', viaAccount: 'workspace' };
 const CHAINED_ONLY_READS = [SCHEMA_TYPE.AUDIT_CHAIN_HEADS, SCHEMA_TYPE.AUDIT_CHAIN_ANCHORS];
 
-const calls = () => mockDb.calls.map(({ companyId, type, method, data }) => ({ companyId, type, method, data }));
+/* The cached check for a company's chained history, which decides whether appended changes are read. */
+const isHistoryProbe = (c) => (c.type === SCHEMA_TYPE.AUDIT_CHAIN_HEADS && c.method === 'findOne')
+    || (c.type === SCHEMA_TYPE.AUDIT_LOGS && c.method === 'findOne' && JSON.stringify(c.data[0]) === JSON.stringify({ 'chain.seq': { $gte: 0 } }));
+const calls = () => mockDb.calls.map(({ companyId, type, method, data }) => ({ companyId, type, method, data })).filter((c) => !isHistoryProbe(c));
+const probes = () => mockDb.calls.filter(isHistoryProbe);
 const auditCalls = () => calls().filter((c) => c.type === SCHEMA_TYPE.AUDIT_LOGS || CHAINED_ONLY_READS.includes(c.type));
 const amendmentReads = () => calls().filter((c) => JSON.stringify(c.data || '').includes('audit.amended') || JSON.stringify(c.data || '').includes('meta.amends'));
 const waitFor = async (check) => {
@@ -107,7 +111,7 @@ describe('with AUDIT_CHAIN off and a key set', () => {
         expect(logger.error).toHaveBeenCalledWith('markUndone: disk full');
     });
 
-    it('reads rows with no query for appended changes', async () => {
+    it('reads rows with no query for appended changes while the company has no chained history', async () => {
         const id = await agentAudit.openAction(CID, actor, { action: 'task.update', params: { taskId: TASK }, idempotencyKey: 'wf:run:step' });
         mockDb.calls.length = 0;
 
@@ -118,6 +122,7 @@ describe('with AUDIT_CHAIN off and a key set', () => {
 
         expect(calls().map((c) => [c.type, c.method])).toEqual([[SCHEMA_TYPE.AUDIT_LOGS, 'findOne'], [SCHEMA_TYPE.AUDIT_LOGS, 'findOne']]);
         expect(amendmentReads()).toEqual([]);
+        expect(probes().length).toBeLessThanOrEqual(2);
     });
 
     it('lists and exports rows in beta\'s shape: one aggregate, no integrity, no chain metadata', async () => {
@@ -147,7 +152,7 @@ describe('with AUDIT_CHAIN off and a key set', () => {
         expect(amendmentReads()).toEqual([]);
     });
 
-    it('sweeps with one deleteMany on createdAt that leaves chained rows alone, reads nothing, and does not clamp', async () => {
+    it('sweeps with one deleteMany on createdAt that leaves chained rows alone, says how many it kept, and does not clamp', async () => {
         mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: CID });
         mockDb.seed(SCHEMA_TYPE.AUDIT_LOGS, { action: 'member.update', createdAt: new Date(Date.now() - 40 * DAY), meta: {} });
         mockDb.seed(SCHEMA_TYPE.AUDIT_LOGS, { action: 'member.update', createdAt: new Date(Date.now() - 40 * DAY), meta: {}, chain: { seq: 1, prevHash: '', hash: 'h' } });
@@ -159,11 +164,13 @@ describe('with AUDIT_CHAIN off and a key set', () => {
         const seen = calls();
         expect(seen.map((c) => [c.companyId, c.type, c.method])).toEqual([
             ['global', SCHEMA_TYPE.COMPANIES, 'find'],
+            [CID, SCHEMA_TYPE.AUDIT_LOGS, 'countDocuments'],
             [CID, SCHEMA_TYPE.AUDIT_LOGS, 'deleteMany'],
         ]);
-        expect(seen[1].data).toEqual([{ createdAt: { $lt: expect.any(Date) }, 'chain.seq': { $exists: false } }]);
-        expect(Math.round((Date.now() - seen[1].data[0].createdAt.$lt.getTime()) / DAY)).toBe(30);
+        expect(seen[2].data).toEqual([{ createdAt: { $lt: expect.any(Date) }, 'chain.seq': { $exists: false } }]);
+        expect(Math.round((Date.now() - seen[2].data[0].createdAt.$lt.getTime()) / DAY)).toBe(30);
         expect(mockDb.store[SCHEMA_TYPE.AUDIT_LOGS].map((r) => Boolean(r.chain))).toEqual([true, false]);
-        expect(logger.warn).not.toHaveBeenCalled();
+        expect(logger.warn).toHaveBeenCalledTimes(1);
+        expect(logger.warn).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`${CID}.*kept 1 chained row`)));
     });
 });

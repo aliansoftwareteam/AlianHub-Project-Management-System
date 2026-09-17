@@ -88,6 +88,14 @@ describe('the audit log integrity indicator', () => {
     });
 });
 
+describe('the integrity labels', () => {
+    it('describe the states the server reports', () => {
+        expect(t('Audit.integrity_unchained_hint')).toMatch(/before the audit chain started/);
+        expect(t('Audit.integrity_unchained_hint')).not.toMatch(/\boff\b/);
+        expect(t('Audit.integrity_broken_row_hint')).toMatch(/while the audit chain was off/);
+    });
+});
+
 describe('the refusals filter', () => {
     it('asks for permission refusals only and marks them as refused', async () => {
         const wrapper = await open([row('a')]);

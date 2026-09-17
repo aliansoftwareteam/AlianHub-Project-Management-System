@@ -21,6 +21,7 @@ let audits;
 let owner;
 let startedAt;
 let agentId;
+let actionRow;
 
 const waitFor = async (read, what) => {
     const deadline = Date.now() + ROW_DEADLINE_MS;
@@ -73,7 +74,6 @@ afterAll(async () => {
 }, BOOT_TIMEOUT_MS);
 
 describe('the audit hash chain through real routes', () => {
-    let actionRow;
 
     let agentApi;
 
@@ -219,6 +219,71 @@ describe('the audit hash chain through real routes', () => {
         } finally {
             await audits.deleteOne({ _id: forged.insertedId });
         }
+    });
+
+    it('exports only verified changes, whatever the filter, with an integrity column', async () => {
+        const [first] = await scimRows();
+        const at = new Date(first.createdAt).toISOString();
+        const forged = await audits.insertOne({
+            action: 'audit.amended', actorId: '', entityType: 'scim', entityId: '',
+            meta: { amends: String(first._id), set: { undoneAt: new Date(), undoneBy: 'forged' }, setRow: { entityId: 'forged-entity', entityName: 'forged-name' } },
+            chain: { seq: 999999, prevHash: 'x', hash: 'f'.repeat(64) }, createdAt: new Date(), updatedAt: new Date(),
+        });
+        const csv = async (query) => {
+            const res = await owner.get('/api/v1/audit-logs/export', { query });
+            expect(res.status).toBe(200);
+            return String(res.body);
+        };
+        try {
+            const [header, ...lines] = (await csv({ action: 'scim.config_update' })).split('\n');
+            expect(header).toBe('time,actorType,actor,agent,run,event,entity,reason,cost_usd,undone_at,integrity');
+            const line = lines.find((l) => l.startsWith(at));
+            expect(line).toBeTruthy();
+            expect(line).not.toContain('forged-');
+            expect(line).toMatch(/,,broken(:\d+)?$/);
+
+            expect(await csv({ action: 'scim.config_update', undone: 'true' })).not.toContain(at);
+            expect((await csv({ entityId: 'forged-entity' })).split('\n')).toHaveLength(1);
+            expect(await csv({ action: 'scim.config_update', q: 'forged-name' })).not.toContain(at);
+        } finally {
+            await audits.deleteOne({ _id: forged.insertedId });
+        }
+    });
+});
+
+describe('a server with AUDIT_CHAIN turned off after the chain was used', () => {
+    let offServer;
+    let offOwner;
+
+    beforeAll(async () => {
+        offServer = await startServer({
+            mongoUrl: resolveMongoUrl(),
+            logFile: path.join(STATE_DIR, 'audit-chain-off-server.log'),
+            env: { AUDIT_CHAIN: 'false', AUDIT_CHAIN_KEY: KEY },
+        });
+        const session = await login(offServer.baseURL, emailFor('owner'));
+        offOwner = createApiClient({ baseURL: offServer.baseURL, accessToken: session.accessToken, companyId: state.companyId });
+    }, BOOT_TIMEOUT_MS);
+
+    afterAll(async () => {
+        if (offServer) await offServer.stop();
+    }, BOOT_TIMEOUT_MS);
+
+    it('still reads an action undone under the chain as undone, and refuses to undo it again', async () => {
+        const res = await offOwner.get('/api/v1/audit-logs', { query: { limit: 100, action: 'agent.action' } });
+        expect(res.body.status).toBe(true);
+        expect(res.body.metadata).not.toHaveProperty('chain');
+        const row = res.body.data.find((r) => r._id === String(actionRow._id));
+        expect(row).not.toHaveProperty('integrity');
+        expect(row.meta).toMatchObject({ state: 'applied' });
+        expect(row.meta.undoneAt).toBeTruthy();
+
+        const undone = await offOwner.get('/api/v1/audit-logs', { query: { limit: 100, undone: 'true' } });
+        expect(undone.body.data.map((r) => r._id)).toContain(String(actionRow._id));
+
+        const again = await offOwner.post(`/api/v1/audit-logs/${actionRow._id}/undo`, {});
+        expect(again.body.status).toBe(false);
+        expect(again.body.reason).toBe('already_undone');
     });
 });
 
