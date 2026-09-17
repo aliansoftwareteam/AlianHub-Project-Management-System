@@ -132,23 +132,25 @@ describe('canonical serialisation', () => {
         const sparse = [1, 2, 3];
         delete sparse[1];
         const cases = [
-            ['an invalid date', new Date('not a date')],
-            ['a Buffer', Buffer.from('audit')],
-            ['a Uint8Array', new Uint8Array([1, 2, 3])],
-            ['a BigInt', 2n ** 70n],
-            ['a Decimal128', Decimal128.fromString('12.50')],
-            ['a Long', Long.fromString('9007199254740993')],
-            ['a function', () => 'ignored'],
-            ['a symbol', Symbol('ignored')],
-            ['a sparse array', sparse],
-            ['a Mongoose document', new Probe({ name: 'probe', tags: ['a'] })],
-            ['a Map', new Map([['k', 'v']])],
-            ['a RegExp', /audit/i],
+            ['an invalid date', new Date('not a date'), null],
+            ['a Buffer', Buffer.from('audit'), 'YXVkaXQ='],
+            ['a Uint8Array', new Uint8Array([1, 2, 3]), 'AQID'],
+            ['a BigInt', 2n ** 70n, '1180591620717411303424'],
+            ['a Decimal128', Decimal128.fromString('12.50'), '12.50'],
+            ['a Long', Long.fromString('9007199254740993'), '9007199254740993'],
+            ['a function', () => 'ignored', undefined],
+            ['a symbol', Symbol('ignored'), undefined],
+            ['a sparse array', sparse, [1, null, 3]],
+            ['a Mongoose document', new Probe({ name: 'probe', tags: ['a'] }), expect.objectContaining({ name: 'probe', tags: ['a'] })],
+            ['a Map', new Map([['k', 'v']]), { k: 'v' }],
+            ['a RegExp', /audit/i, '/audit/i'],
         ];
-        it.each(cases)('%s', async (label, value) => {
+        it.each(cases)('%s', async (label, value, stored) => {
             const { serialize, deserialize } = require('bson');
             await chain.saveAuditRow(CID, entry(1, { meta: { value, nested: [value, { value }] } }));
             await writeRows(2, 3);
+            expect(bySeq(1).meta.value).toEqual(stored);
+            expect(bySeq(1).meta.nested[0]).toEqual(stored === undefined ? null : stored);
             mockDb.store[SCHEMA_TYPE.AUDIT_LOGS] = auditRows().map((row) => deserialize(serialize(row)));
             expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified', verifiedThrough: 3 });
         });
