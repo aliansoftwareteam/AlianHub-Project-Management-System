@@ -48,4 +48,5 @@ None directly.
 - A departed member's private pages leave the index; their shared tasks, comments and pages stay searchable (owner, 2026-09-16).
 - Pages drafted by agents are indexed and always ranked below pages people wrote (owner, 2026-09-16).
 - Erasure redacts personal fields in audit rows, which sit outside the hash, so the audit chain still verifies (owner, 2026-09-16).
-- Open until their slices come up: where hosted vectors live (7), the embedding provider (6), who an agent retrieves as (agent use of 1, and 8), and the held-out question set with its pass score (11 and the flag default).
+- Embeddings come from OpenAI (`text-embedding-3-small`) with an instance key; per-workspace keys follow Sprint 8's secrets store (owner, 2026-09-17).
+- Open until their slices come up: where hosted vectors live (7), who an agent retrieves as (agent use of 1, and 8), and the held-out question set with its pass score (11 and the flag default).
