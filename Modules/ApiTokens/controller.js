@@ -139,7 +139,7 @@ exports.listTokens = async (req, res) => {
         const now = new Date();
         const policy = {
             strict, minExpiryDays: MIN_EXPIRY_DAYS, maxExpiryDays: MAX_EXPIRY_DAYS, scopes: [...SCOPES], graceDays: STRICT_GRACE_DAYS,
-            strictSince: since, graceEndsAt: graceStanding({}, { strict, strictSince: since, now }).deadline,
+            strictSince: since,
         };
         const data = (tokens || []).map((doc) => maskToken(doc, graceStanding(doc, { strict, strictSince: since, now })));
         return res.send({ status: true, statusText: 'Tokens fetched.', data, policy });
@@ -258,7 +258,8 @@ exports.resolveToken = async (companyId, rawToken) => {
         if (isStrict() && !doc.expiresAt) {
             const standing = graceStanding(doc, { strict: true, strictSince: await strictSince(now), now });
             if (standing.state === 'stopped') {
-                return { token: null, refusal: `This API token has no expiry and stopped working on ${ymd(standing.deadline)}. Create a new token with an expiry.` };
+                const when = standing.deadline ? `stopped working on ${ymd(standing.deadline)}` : 'cannot be checked against its grace period right now';
+                return { token: null, refusal: `This API token has no expiry and ${when}. Create a new token with an expiry.` };
             }
         }
         recordLastUsed(companyId, doc, now);

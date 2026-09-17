@@ -66,11 +66,15 @@ const hasScope = (tokenDoc, scope, { strict = isStrict() } = {}) => {
     return (!strict && scopes.length === 0) || scopes.includes(scope);
 };
 
-/* The grace is counted from when this instance first ran strict, not from the
- * token's age, so every token without an expiry shares one deadline. */
+/* The grace runs from the later of when this instance first ran strict and when the
+ * token was made, so a token minted while strict was off still gets its days. An
+ * unknown start (the settings could not be read) counts as stopped: fail closed. */
 const graceStanding = (tokenDoc, { strict = isStrict(), strictSince, now = new Date() } = {}) => {
-    if (!strict || tokenDoc?.expiresAt || !strictSince) return { state: 'ok', deadline: null };
-    const deadline = new Date(new Date(strictSince).getTime() + STRICT_GRACE_DAYS * DAY_MS);
+    if (!strict || tokenDoc?.expiresAt) return { state: 'ok', deadline: null };
+    if (!strictSince) return { state: 'stopped', deadline: null };
+    const createdAt = tokenDoc?.createdAt ? new Date(tokenDoc.createdAt).getTime() : 0;
+    const start = Math.max(new Date(strictSince).getTime(), Number.isFinite(createdAt) ? createdAt : 0);
+    const deadline = new Date(start + STRICT_GRACE_DAYS * DAY_MS);
     return { state: now.getTime() < deadline.getTime() ? 'grace' : 'stopped', deadline };
 };
 

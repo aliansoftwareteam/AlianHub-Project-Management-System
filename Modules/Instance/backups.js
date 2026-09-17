@@ -14,6 +14,8 @@ const { state } = require('../../Config/instanceState');
 const { myCache } = require('../../Config/config');
 const logger = require('../../Config/loggerConfig');
 const { STORAGE_ROOT } = require('./probes');
+const { DOC_ID: INSTANCE_SETTINGS_ID } = require('../../Config/instanceSettings');
+const apiTokenStrictSince = require('../ApiTokens/helpers/strictSince');
 
 const BACKUP_DIR = path.resolve(process.env.BACKUP_DIR || 'backups');
 const FORMAT = 'alianhub-backup';
@@ -22,6 +24,7 @@ const NAME_RX = /^[a-z0-9.-]+-\d{8}-\d{6}\.tar\.gz$/;
 const DB_RX = /^(global|[a-f0-9]{24})$/;
 const ENTRY_RX = /^(global|[a-f0-9]{24})\/([A-Za-z0-9_.-]+)\.jsonl$/;
 const INSERT_BATCH = 500;
+const FIRST_SEEN_FIELDS = [apiTokenStrictSince.FIELD];
 
 const stamp = (date = new Date()) => { const iso = date.toISOString(); return `${iso.slice(0, 10).replace(/-/g, '')}-${iso.slice(11, 19).replace(/:/g, '')}`; };
 const backupName = (prefix = 'alianhub', date = new Date()) => `${prefix}-${buildInfo.get().version}-${stamp(date)}.tar.gz`.toLowerCase().replace(/[^a-z0-9.-]/g, '-');
@@ -186,6 +189,23 @@ async function restoreFile(relative, stream) {
     return true;
 }
 
+async function readFirstSeen(globalDb) {
+    const doc = await globalDb.collection(SCHEMA_TYPE.INSTANCE_SETTINGS).findOne({ _id: INSTANCE_SETTINGS_ID });
+    return Object.fromEntries(FIRST_SEEN_FIELDS.map((field) => [field, doc && doc[field] ? new Date(doc[field]) : null]));
+}
+
+/* A grace period counts from the first time a rule was on. An archive taken before
+ * that would erase the moment and the next boot would start the count again, so a
+ * restore keeps whichever of the live and restored moments is earlier. */
+async function keepEarliestFirstSeen(globalDb, before) {
+    const after = await readFirstSeen(globalDb);
+    const earlier = Object.fromEntries(FIRST_SEEN_FIELDS
+        .filter((field) => before[field] && (!after[field] || before[field] < after[field]))
+        .map((field) => [field, before[field]]));
+    if (!Object.keys(earlier).length) return;
+    await globalDb.collection(SCHEMA_TYPE.INSTANCE_SETTINGS).updateOne({ _id: INSTANCE_SETTINGS_ID }, { $set: earlier }, { upsert: true });
+}
+
 function resetMongoConnections() {
     for (const entry of connectionRegistry.connections.splice(0)) {
         try { entry.connection.close(); } catch (e) { /* already closed */ }
@@ -207,6 +227,7 @@ async function restoreBackup({ name, confirm }) {
     state.maintenance = true;
     const counters = { databases: 0, collections: 0, documents: 0, files: 0, droppedCollections: 0 };
     try {
+        const firstSeen = await readFirstSeen(await nativeDb('global'));
         const dbs = new Map();
         const dbFor = async (dbName) => { if (!dbs.has(dbName)) { dbs.set(dbName, await nativeDb(dbName)); counters.databases += 1; } return dbs.get(dbName); };
         for (const [dbName, listed] of Object.entries(manifest.databases)) {
@@ -227,6 +248,8 @@ async function restoreBackup({ name, confirm }) {
             }
             return true;
         });
+        await keepEarliestFirstSeen(await nativeDb('global'), firstSeen);
+        apiTokenStrictSince.forget();
         myCache.flushAll();
         resetMongoConnections();
         const migrations = require('../../migrations');
@@ -247,5 +270,5 @@ function deleteBackup(name) {
 
 module.exports = {
     BACKUP_DIR, FORMAT, FORMAT_VERSION, NAME_RX, ENTRY_RX, backupName, buildManifest, validateManifest, staleCollections, isValidName, resolveBackup,
-    createBackup, listBackups, readManifest, walkArchive, restoreBackup, deleteBackup, resetMongoConnections,
+    createBackup, listBackups, readManifest, walkArchive, restoreBackup, deleteBackup, resetMongoConnections, readFirstSeen, keepEarliestFirstSeen,
 };

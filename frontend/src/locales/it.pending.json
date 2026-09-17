@@ -1,7 +1,7 @@
 {
   "locale": "it",
   "machineTranslated": false,
-  "updatedAt": "2026-09-17T03:37:27.448Z",
+  "updatedAt": "2026-09-17T05:39:53.494Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5974,8 +5974,8 @@
     "Accounts.token_scope_write_effect": "Make the changes your own role allows.",
     "Accounts.token_expiry_required": "Choose when the token expires. Tokens without an expiry are no longer issued.",
     "Accounts.token_scope_required": "Tick read, write or both.",
-    "Accounts.strict_note": "Every new token needs an expiry and at least one scope. A token made without an expiry stops working on {d}, {n} days after this rule was turned on. Replace it before then.",
-    "Accounts.replace_by": "no expiry · replace by {d}",
-    "Accounts.stopped_on": "no expiry · stopped {d}"
+    "Accounts.grace_works_until": "no expiry · works until {d}",
+    "Accounts.grace_stopped_on": "no expiry · stopped on {d}",
+    "Accounts.strict_note": "Every new token needs an expiry and at least one scope. A token without an expiry keeps working for {n} days from when this rule was turned on, or from when the token was made if that is later. Replace it before then."
   }
 }

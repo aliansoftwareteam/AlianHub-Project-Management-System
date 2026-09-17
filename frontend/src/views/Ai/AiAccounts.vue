@@ -307,7 +307,7 @@
                                     </template>
 
                                     <p v-if="tokenPolicy.strict" class="acct-note" style="margin-top:10px" data-test="token-strict-note">
-                                        {{ $t('Accounts.strict_note', { n: tokenPolicy.graceDays, d: dayOf(tokenPolicy.graceEndsAt) }) }}
+                                        {{ $t('Accounts.strict_note', { n: tokenPolicy.graceDays }) }}
                                     </p>
 
                                     <div style="margin-top:12px">
@@ -317,8 +317,8 @@
                                                 <div class="acct-token__name">{{ tk.name }}</div>
                                                 <div class="acct-token__meta">{{ tokenMeta(tk) }}</div>
                                                 <div v-if="tokenPolicy.strict && tk.active && tk.graceState" class="acct-token__flags">
-                                                    <span v-if="tk.graceState === 'grace'" class="ah-chip ah-chip--warn ah-chip--mono" data-test="token-grace">{{ $t('Accounts.replace_by', { d: dayOf(tk.graceEndsAt) }) }}</span>
-                                                    <span v-else-if="tk.graceState === 'stopped'" class="ah-chip ah-chip--danger ah-chip--mono" data-test="token-stopped">{{ $t('Accounts.stopped_on', { d: dayOf(tk.graceEndsAt) }) }}</span>
+                                                    <span v-if="tk.graceState === 'grace'" class="ah-chip ah-chip--warn ah-chip--mono" data-test="token-grace">{{ $t('Accounts.grace_works_until', { d: dayOf(tk.graceEndsAt) }) }}</span>
+                                                    <span v-else-if="tk.graceState === 'stopped'" class="ah-chip ah-chip--danger ah-chip--mono" data-test="token-stopped">{{ $t('Accounts.grace_stopped_on', { d: dayOf(tk.graceEndsAt) }) }}</span>
                                                 </div>
                                             </div>
                                             <button v-if="tk.active" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="revoking === tk._id" @click="onRevoke(tk)">

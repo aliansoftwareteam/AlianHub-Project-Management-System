@@ -39,8 +39,6 @@ const mockCrud = async (companyId, query, method) => {
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...args) => mockCrud(...args) }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 
-const logger = require('../Config/loggerConfig');
-
 const DAY = 24 * 60 * 60 * 1000;
 const MINUTE = 60 * 1000;
 const T0 = Date.UTC(2026, 8, 17, 9, 0, 0);
@@ -110,7 +108,6 @@ beforeEach(() => {
     mockHooks.afterInstanceRead = null;
     mockHooks.afterTokenRead = null;
     mockHooks.instanceReadError = false;
-    logger.error.mockClear();
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask'] });
     clock(T0);
     Object.keys(mockDb.store).forEach((key) => { delete mockDb.store[key]; });
@@ -456,7 +453,7 @@ describe('when the grace start cannot be read', () => {
         clock(T0 + 20 * 1000);
         await ctrl.verifyToken(COMPANY, legacy.raw);
         expect(instanceReads()).toHaveLength(1);
-        expect(logger.error).toHaveBeenCalledTimes(1);
+        expect(require('../Config/loggerConfig').error).toHaveBeenCalledTimes(1);
 
         clock(T0 + 61 * 1000);
         mockHooks.instanceReadError = false;

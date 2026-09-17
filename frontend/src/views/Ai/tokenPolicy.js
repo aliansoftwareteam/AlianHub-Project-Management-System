@@ -2,7 +2,7 @@
 
 export const TOKEN_SCOPES = ["read", "write"];
 export const EXPIRY_CHOICES = [7, 30, 90, 180, 365];
-export const DEFAULT_TOKEN_POLICY = { strict: false, scopes: TOKEN_SCOPES, minExpiryDays: 1, maxExpiryDays: 365, graceDays: 30, strictSince: null, graceEndsAt: null };
+export const DEFAULT_TOKEN_POLICY = { strict: false, scopes: TOKEN_SCOPES, minExpiryDays: 1, maxExpiryDays: 365, graceDays: 30, strictSince: null };
 
 /* { field, key } for the first thing that stops the form being sent, or null. */
 export const tokenFormProblem = (form, policy) => {

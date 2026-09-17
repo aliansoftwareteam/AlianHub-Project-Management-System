@@ -166,7 +166,7 @@ Backend variables: 186. Frontend build-time variables: 23.
 
 | Variable | Required | Default | Description | Read by |
 |---|---|---|---|---|
-| `API_TOKEN_STRICT` |  | `false` | Set to true to require an expiry and at least one scope on every new API token, and to allow a token without an expiry only to be revoked. Tokens without an expiry keep working for 30 days from when this was first on for the instance (recorded once as apiTokenStrictSince on the instance settings document), then stop. Unset or false keeps the old rules. | `Modules/ApiTokens/helpers/apiTokenRules.js` |
+| `API_TOKEN_STRICT` |  | `false` | Set to true to require an expiry and at least one scope on every new API token, and to allow a token without an expiry only to be revoked. A token without an expiry keeps working for 30 days from the later of its creation and when this was first on for the instance (recorded once as apiTokenStrictSince on the instance settings document and kept across backup restores), then stops. Unset or false keeps the old rules. | `Modules/ApiTokens/helpers/apiTokenRules.js` |
 | `AUDIT_EXPORT_MAX_ROWS` |  | `100000` | Most rows one audit-log CSV export streams; a last row says when the filter held more. Can only lower the hard cap. | `Modules/Audit/controller.js` |
 | `AUDIT_RETENTION_DAYS` |  |  | Days to keep audit-log entries before the recorder prunes them. | `Modules/Audit/recorder.js` |
 | `AUTH_RATE_LIMIT_BLOCK_MS` |  | `1800000` | How long an IP stays blocked after too many failed logins. | `Modules/Auth/helper.js` |
