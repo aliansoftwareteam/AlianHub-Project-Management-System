@@ -90,7 +90,7 @@ const mirrorAtMostOncePerInterval = (companyId, key, mark = null) => {
 };
 
 const newestChained = async (companyId) => {
-    const [row] = (await db(companyId, AUDIT_LOGS, [{ 'chain.seq': { $type: 'number' } }, { chain: 1 }, { sort: { 'chain.seq': -1 }, limit: 1 }], 'find')) || [];
+    const [row] = (await db(companyId, AUDIT_LOGS, [{ 'chain.seq': { $gte: 0 } }, { chain: 1 }, { sort: { 'chain.seq': -1 }, limit: 1 }], 'find')) || [];
     return row ? plain(row).chain : null;
 };
 
@@ -287,7 +287,7 @@ const readForList = async (companyId, ids) => {
 const anchorBeforePrune = async (companyId, cutoff) => {
     const cfg = config();
     if (!cfg.keyValid) return null;
-    const [row] = (await db(companyId, AUDIT_LOGS, [{ 'chain.seq': { $type: 'number' }, createdAt: { $lt: cutoff } }, { chain: 1 }, { sort: { createdAt: -1, 'chain.seq': -1 }, limit: 1 }], 'find')) || [];
+    const [row] = (await db(companyId, AUDIT_LOGS, [{ 'chain.seq': { $gte: 0 }, createdAt: { $lt: cutoff } }, { chain: 1 }, { sort: { createdAt: -1, 'chain.seq': -1 }, limit: 1 }], 'find')) || [];
     if (!row) return null;
     const { _id, chain: link } = plain(row);
     const mark = { seq: link.seq, hash: link.hash };
