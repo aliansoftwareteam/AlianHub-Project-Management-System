@@ -24,99 +24,113 @@ const { canSeeSprint, sprintIdentities } = require('../Sprints/helpers/sprintVis
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
+const MAX_LIMIT = 50;
+
+const closedAt = (sprint) => (sprint.closeReport && sprint.closeReport.at) || sprint.endDate || null;
+
+const closedWithin = (sprint, from, to) => {
+    if (!from && !to) return true;
+    const when = closedAt(sprint);
+    const ms = when ? new Date(when).getTime() : NaN;
+    return Number.isFinite(ms) && (!from || ms >= from.getTime()) && (!to || ms <= to.getTime());
+};
+
+/* The chart's numbers for `uid`, who must already be allowed to open the project.
+ * `closedFrom`/`closedTo` keep only sprints closed inside that window. */
+const velocityFor = async (companyId, uid, projectId, { limit = 10, closedFrom = null, closedTo = null } = {}) => {
+    const projectObjId = new mongoose.Types.ObjectId(projectId);
+
+    const sprints = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.SPRINTS,
+        data: [
+            {
+                projectId: projectObjId,
+                deletedStatusKey: { $ne: 1 },
+                isScrum: true,
+                state: 'closed',
+                mainChat: { $ne: true },
+                isBacklog: { $ne: true },
+            },
+            '_id name createdAt startDate endDate commitment closeReport private AssigneeUserId',
+        ],
+    }, 'find');
+
+    /* A private sprint is not on the chart for someone it was not shared with. */
+    const identities = await sprintIdentities(companyId, uid);
+    const visible = (isPrivileged(await getRoleType(companyId, uid))
+        ? (sprints || [])
+        : (sprints || []).filter((sprint) => canSeeSprint(sprint, identities)))
+        .filter((sprint) => closedWithin(sprint, closedFrom, closedTo));
+
+    const measurable = visible.filter((s) => s.commitment && s.commitment.at);
+
+    if (!measurable.length) return { sprints: [], skipped: visible.length };
+
+    // By when the sprint ran, not when its container happened to be made.
+    const ordered = measurable
+        .slice()
+        .sort((a, b) => new Date(a.startDate || a.createdAt) - new Date(b.startDate || b.createdAt))
+        .slice(-limit);
+
+    const sprintIds = ordered.map((s) => s._id);
+    const tasks = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [
+            { sprintId: { $in: sprintIds }, deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true },
+            '_id sprintId points statusType completion',
+        ],
+    }, 'find');
+
+    // 29c — the same points, split by who did the work. completedHuman +
+    // completedAgent always equals completed, so the human-only line on the
+    // chart is a reading of the same series, not a second number.
+    const splitBySprint = provenance.bySprint(tasks || [], sprintIds);
+
+    const rows = ordered.map((s) => {
+        const split = splitBySprint[String(s._id)] || provenance.velocitySplit([]);
+        return {
+            sprintId: String(s._id),
+            name: s.name || 'Sprint',
+            startDate: s.startDate || null,
+            endDate: s.endDate || null,
+            committed: Number(s.commitment.points) || 0,
+            completed: split.completed,
+            completedHuman: split.completedHuman,
+            completedAgent: split.completedAgent,
+            unchecked: split.unchecked,
+            byPattern: split.byPattern,
+        };
+    });
+
+    const withAvg = rows.map((row, i) => {
+        const window = rows.slice(Math.max(0, i - 2), i + 1);
+        const avg = window.reduce((sum, r) => sum + r.completed, 0) / window.length;
+        return { ...row, rollingAvg: Math.round(avg * 10) / 10 };
+    });
+
+    return { sprints: withAvg, skipped: visible.length - measurable.length };
+};
 
 /* GET /api/v1/agile/velocity?projectId=&limit=10  (companyId from header) */
 exports.getVelocity = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
         const projectId = String((req.query && req.query.projectId) || '');
-        const limit = Math.min(50, Math.max(1, Number(req.query && req.query.limit) || 10));
+        const limit = Math.min(MAX_LIMIT, Math.max(1, Number(req.query && req.query.limit) || 10));
         if (!companyId || !OBJECT_ID_PATTERN.test(projectId)) {
             return res.send({ status: false, statusText: 'companyId and a valid projectId are required.' });
         }
-        const projectObjId = new mongoose.Types.ObjectId(projectId);
-
-        const sprints = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.SPRINTS,
-            data: [
-                {
-                    projectId: projectObjId,
-                    deletedStatusKey: { $ne: 1 },
-                    isScrum: true,
-                    state: 'closed',
-                    mainChat: { $ne: true },
-                    isBacklog: { $ne: true },
-                },
-                '_id name createdAt startDate endDate commitment closeReport private AssigneeUserId',
-            ],
-        }, 'find');
-
-        /* A private sprint is not on the chart for someone it was not shared with. */
-        const identities = await sprintIdentities(companyId, req.uid);
-        const visible = isPrivileged(await getRoleType(companyId, req.uid))
-            ? (sprints || [])
-            : (sprints || []).filter((sprint) => canSeeSprint(sprint, identities));
-
-        const measurable = visible.filter((s) => s.commitment && s.commitment.at);
-
-        if (!measurable.length) {
-            return res.send({
-                status: true,
-                statusText: 'No completed sprints yet.',
-                data: { sprints: [], skipped: visible.length },
-            });
-        }
-
-        // By when the sprint ran, not when its container happened to be made.
-        const ordered = measurable
-            .slice()
-            .sort((a, b) => new Date(a.startDate || a.createdAt) - new Date(b.startDate || b.createdAt))
-            .slice(-limit);
-
-        const sprintIds = ordered.map((s) => s._id);
-        const tasks = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS,
-            data: [
-                { sprintId: { $in: sprintIds }, deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true },
-                '_id sprintId points statusType completion',
-            ],
-        }, 'find');
-
-        // 29c — the same points, split by who did the work. completedHuman +
-        // completedAgent always equals completed, so the human-only line on the
-        // chart is a reading of the same series, not a second number.
-        const splitBySprint = provenance.bySprint(tasks || [], sprintIds);
-
-        const rows = ordered.map((s) => {
-            const split = splitBySprint[String(s._id)] || provenance.velocitySplit([]);
-            return {
-                sprintId: String(s._id),
-                name: s.name || 'Sprint',
-                startDate: s.startDate || null,
-                endDate: s.endDate || null,
-                committed: Number(s.commitment.points) || 0,
-                completed: split.completed,
-                completedHuman: split.completedHuman,
-                completedAgent: split.completedAgent,
-                unchecked: split.unchecked,
-                byPattern: split.byPattern,
-            };
-        });
-
-        // Rolling-3 average of completed points.
-        const withAvg = rows.map((row, i) => {
-            const window = rows.slice(Math.max(0, i - 2), i + 1);
-            const avg = window.reduce((sum, r) => sum + r.completed, 0) / window.length;
-            return { ...row, rollingAvg: Math.round(avg * 10) / 10 };
-        });
-
+        const data = await velocityFor(companyId, req.uid, projectId, { limit });
         return res.send({
             status: true,
-            statusText: 'Velocity computed.',
-            data: { sprints: withAvg, skipped: visible.length - measurable.length },
+            statusText: data.sprints.length ? 'Velocity computed.' : 'No completed sprints yet.',
+            data,
         });
     } catch (error) {
         logger.error(`ERROR in agile velocity: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };
+
+exports.velocityFor = velocityFor;
+exports.MAX_LIMIT = MAX_LIMIT;
