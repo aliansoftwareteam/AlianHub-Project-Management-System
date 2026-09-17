@@ -442,7 +442,7 @@ describe('an update never creates the task it names', () => {
         expect(mockDb.calls.filter((c) => c.data && c.data[2] && c.data[2].upsert)).toEqual([]);
     });
 
-    test.each([['updateWatcher'], ['updateTags'], ['updateAttachments']])('%s on an existing task still writes it', async (action) => {
+    test.each([['updateWatcher'], ['updateTags'], ['updateAttachments'], ['convertToList']])('%s on an existing task still writes it', async (action) => {
         const result = await call(PATCH, bodyFor(PATCH, action));
         expect(result).toMatchObject({ code: 200, body: { status: true } });
         expect(mockDb.calls.filter((c) => c.data && c.data[2] && c.data[2].upsert)).toEqual([]);
