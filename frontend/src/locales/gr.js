@@ -5747,7 +5747,8 @@ export default {
         "integrity_unchained_hint": "Written before the audit chain started, so it cannot be verified.",
         "integrity_broken_row": "Broken",
         "integrity_broken_row_hint": "This row is outside the chain but was written after the chain started, for example while the audit chain was off, or it carries a change that is not part of the chain.",
-        "names_not_checked": "Names aren't covered by the integrity check. The ids beside them are."
+        "names_not_checked": "Names aren't covered by the integrity check. The ids beside them are.",
+        "total_approximate": "The count is approximate: some rows it includes no longer match this filter once their recorded changes are checked."
     },
     "Offline": {
         "offline_msg": "You're offline — changes are saved and will sync when you reconnect.",

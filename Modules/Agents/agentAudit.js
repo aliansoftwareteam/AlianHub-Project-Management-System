@@ -231,6 +231,21 @@ const markUndone = async (companyId, auditId, byActorId) => {
     return appendUndone();
 };
 
+/* An undo row for it, or an undone mark on the row as it reads now, means its inverse already ran. */
+const undoneBefore = async (companyId, row) => {
+    const current = await findById(companyId, row._id);
+    if (current && current.meta && current.meta.undoneAt) return true;
+    return Boolean(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ action: ACTION_UNDONE, 'meta.originalAuditId': String(row._id) }, { _id: 1 }] }, 'findOne'));
+};
+
+const undoneOriginals = async (companyId, auditIds) => {
+    if (!auditIds.length) return new Set();
+    const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ action: ACTION_UNDONE, 'meta.originalAuditId': { $in: auditIds.map(String) } }, { 'meta.originalAuditId': 1 }] }, 'find');
+    return new Set((rows || []).map((r) => String(r.meta && r.meta.originalAuditId)));
+};
+
+const canRecordChange = (companyId, row) => chain.canRecordChange(companyId, row);
+
 /* The unique partial index on meta.idempotencyKey makes this the one row for an
  * action key; its state says whether the effect already happened. */
 const findByIdempotencyKey = async (companyId, idempotencyKey) => chain.foldOne(companyId, await MongoDbCrudOpration(companyId, {
@@ -247,4 +262,5 @@ module.exports = {
     ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED, AGENT_DELETED, RUN_REVERTED, REVISION_PROMOTED, REVISION_ROLLED_BACK, STATE, AUDIT_UNAVAILABLE, AUDIT_UNMARKED,
     AuditUnavailableError, AuditUnmarkedError,
     openAction, applyAction, failAction, recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentDeleted, recordRunReverted, recordRevisionChange, markUndone, findById, findByIdempotencyKey,
+    undoneBefore, undoneOriginals, canRecordChange,
 };

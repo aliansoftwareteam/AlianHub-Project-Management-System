@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const rules = require('./helpers/chainRules');
@@ -9,7 +10,9 @@ const COMPANY_HEAD_ID = 'head';
 const PAGE_SIZE = 500;
 const LIST_VERIFY_BUDGET = 5000;
 const COUNT_WINDOW = 5000;
-const MIRROR_INTERVAL_MS = 60 * 1000;
+const MIRROR_INTERVAL_MS = 5 * 1000;
+const SHUTDOWN_FLUSH_MS = 3 * 1000;
+const INDEX_RETRY_MS = 5 * 60 * 1000;
 const ERROR_LOG_INTERVAL_MS = 60 * 1000;
 const HISTORY_RECHECK_MS = 5 * 60 * 1000;
 const APPEND_ATTEMPTS = 20;
@@ -106,7 +109,7 @@ const mirrorHead = async (companyId, key = config().key, mark = null) => {
 
 const mirrors = new Map();
 
-/* At most one global write a minute per company, and the newest head always lands by the end of that minute. */
+/* At most one global write every five seconds per company, and the newest head always lands by the end of that window. */
 const mirrorSoon = (companyId, key, mark = null) => {
     const id = String(companyId);
     const slot = mirrors.get(id) || { at: 0, timer: null, key };
@@ -138,6 +141,25 @@ const flushMirrors = async () => {
     }));
 };
 
+/*
+ * A crash can still lose the last window's mirror; a graceful stop or a fatal error flushes it first. The signal
+ * then carries on as it would have without this listener.
+ */
+const installShutdownFlush = ({ onSignal = (signal) => process.kill(process.pid, signal) } = {}) => {
+    const listeners = ['SIGTERM', 'SIGINT'].map((signal) => {
+        const listener = () => {
+            Promise.race([flushMirrors(), sleep(SHUTDOWN_FLUSH_MS)]).finally(() => onSignal(signal));
+        };
+        process.once(signal, listener);
+        return [signal, listener];
+    });
+    const removeFatal = require('../../Config/processGuards').onFatal('audit-chain-mirror', () => flushMirrors());
+    return () => {
+        listeners.forEach(([signal, listener]) => process.removeListener(signal, listener));
+        removeFatal();
+    };
+};
+
 const newestChained = async (companyId) => {
     const [row] = (await db(companyId, AUDIT_LOGS, [{ 'chain.seq': { $gte: 0 } }, { chain: 1 }, { sort: { 'chain.seq': -1 }, limit: 1 }], 'find')) || [];
     return row ? plain(row).chain : null;
@@ -156,26 +178,30 @@ const indexes = new Map();
 /*
  * Builds only the chain's own indexes, and waits for them, since Mongoose builds in the background and two
  * servers could both write seq 1 first. An existing index that conflicts leaves the company unchained rather
- * than failing every audited action; it is never dropped here.
+ * than failing every audited action; it is never dropped here, and the build is tried again every few minutes.
  */
 const chainIndexesReady = async (companyId) => {
     const id = String(companyId);
-    if (!indexes.has(id)) {
-        indexes.set(id, (async () => {
+    const cached = indexes.get(id);
+    if (!cached || (cached.conflict && Date.now() - cached.at >= INDEX_RETRY_MS)) {
+        const build = { at: Date.now(), conflict: false };
+        build.promise = (async () => {
             for (const [keys, options] of rules.CHAIN_INDEXES) {
                 try {
                     await db(id, AUDIT_LOGS, [{ ...keys }, { ...options }], 'createIndex');
                 } catch (error) {
                     if (!INDEX_CONFLICT_CODES.includes(error && error.code)) throw error;
+                    build.conflict = true;
                     logger.error(`${LOG} company ${id} stays unchained: its ${options.name} index conflicts with an existing index (${error.message}). Drop or rename that index to chain this company's audit rows.`);
                     return false;
                 }
             }
             return true;
-        })());
+        })();
+        indexes.set(id, build);
     }
     try {
-        return await withTimeout(indexes.get(id), `building the audit chain indexes for company ${id}`);
+        return await withTimeout(indexes.get(id).promise, `building the audit chain indexes for company ${id}`);
     } catch (error) {
         indexes.delete(id);
         throw error;
@@ -214,16 +240,28 @@ const landed = async (companyId, key, _id) => {
     }
 };
 
+/* A write reported as failed that lands later is marked abandoned, so it never reads as pending work. */
+const abandonIfItLands = (companyId, attempt, entry) => {
+    attempt.then((saved) => {
+        const row = plain(saved);
+        const $set = { 'meta.abandoned': true };
+        if (row.meta && row.meta.state === 'pending') Object.assign($set, { 'meta.state': 'failed', 'meta.failed': 'abandoned: the audit write landed after it was reported failed', 'meta.undoable': false });
+        return amend(companyId, String(row._id), $set);
+    }, () => null).catch((error) => logger.error(`${LOG} a late ${entry.action} row in company ${companyId} could not be marked abandoned: ${error.message}`));
+};
+
 /* The insert is the reservation: a sequence number exists only once its row does, so a failed write leaves no gap. */
 const append = (companyId, key, entry, createdAt = new Date()) => serially(companyId, async () => {
     for (let attempt = 1; ; attempt += 1) {
         const _id = new mongoose.Types.ObjectId();
+        const write = appendOnce(companyId, key, entry, createdAt, _id);
         try {
-            return await withTimeout(appendOnce(companyId, key, entry, createdAt, _id), 'an audit write');
+            return await withTimeout(write, 'an audit write');
         } catch (error) {
             if (!isSeqConflict(error)) {
                 const row = await landed(companyId, key, _id);
                 if (row) return row;
+                abandonIfItLands(companyId, write, entry);
                 throw error;
             }
             if (attempt >= APPEND_ATTEMPTS) {
@@ -267,6 +305,19 @@ const amend = async (companyId, auditId, $set) => {
     return append(companyId, cfg.key, rules.amendmentOf(original, $set), createdAt);
 };
 
+/* Whether a change to this row can be recorded now: a chained row needs the key and the chain's indexes. */
+const canRecordChange = async (companyId, row) => {
+    const cfg = config();
+    const chained = rules.isChained(row);
+    if (!chained && !cfg.on) return true;
+    if (!cfg.keyValid) return !chained;
+    try {
+        return (await chainIndexesReady(companyId)) || !chained;
+    } catch (error) {
+        return false;
+    }
+};
+
 /* A company that has ever had a chained row keeps reading its appended changes, whatever AUDIT_CHAIN says now. */
 const hasChainHistory = async (companyId) => {
     const id = String(companyId);
@@ -308,17 +359,24 @@ const foldOne = async (companyId, row) => (row ? (await foldRows(companyId, [row
 
 const hasAmendments = async (companyId) => Boolean(await db(companyId, AUDIT_LOGS, [{ action: rules.AMENDED_ACTION }, { _id: 1 }], 'findOne'));
 
-/* Rows a chained change could have moved into a filter; the caller re-checks each one on its verified state. */
-const amendedIdsMatching = async (companyId, { entityType, entityId, undone, term }) => {
+/*
+ * Marks each row with the chained changes that set a filtered field, so a filter can take rows a change moved
+ * into it. The lookup runs in the database, one indexed read per row; the caller re-checks what it returns.
+ */
+const touchingStages = ({ entityType, entityId, undone, term }) => {
     const or = [];
     if (entityType) or.push({ 'meta.setRow.entityType': entityType });
     if (entityId) or.push({ 'meta.setRow.entityId': entityId });
     if (undone) or.push({ 'meta.set.undoneAt': { $exists: true, $ne: null } });
     if (term) or.push({ 'meta.setRow.entityName': { $regex: term, $options: 'i' } });
     if (!or.length) return [];
-    const found = (await db(companyId, AUDIT_LOGS, [{ action: rules.AMENDED_ACTION, 'chain.seq': { $gte: 0 }, $or: or }, { 'meta.amends': 1 }], 'find')) || [];
-    const ids = [...new Set(found.map(plain).map((a) => String(a.meta && a.meta.amends)))];
-    return ids.filter((value) => /^[0-9a-fA-F]{24}$/.test(value)).map((value) => new mongoose.Types.ObjectId(value));
+    return [
+        { $addFields: { _auditId: { $toString: '$_id' } } },
+        { $lookup: {
+            from: dbCollections.AUDIT_LOGS, localField: '_auditId', foreignField: 'meta.amends', as: '_touching',
+            pipeline: [{ $match: { action: rules.AMENDED_ACTION, 'chain.seq': { $gte: 0 }, $or: or } }, { $project: { _id: 1 } }],
+        } },
+    ];
 };
 
 const newestAnchor = async (companyId, key) => {
@@ -504,6 +562,6 @@ const pruneFilter = (anchor, cutoff) => (anchor
 
 module.exports = {
     QUEUE_LIMIT, WRITE_TIMEOUT_MS,
-    isOn, config, logBootState, saveAuditRow, amend, folding, hasChainHistory, foldRows, foldOne, hasAmendments, amendedIdsMatching,
-    verifyChain, annotateIntegrity, annotateRows, readForList, mirrorHead, flushMirrors, reportKeptWhileOff, anchorBeforePrune, pruneFilter,
+    isOn, config, logBootState, saveAuditRow, amend, canRecordChange, folding, hasChainHistory, foldRows, foldOne, hasAmendments, touchingStages,
+    verifyChain, annotateIntegrity, annotateRows, readForList, mirrorHead, flushMirrors, installShutdownFlush, reportKeptWhileOff, anchorBeforePrune, pruneFilter,
 };

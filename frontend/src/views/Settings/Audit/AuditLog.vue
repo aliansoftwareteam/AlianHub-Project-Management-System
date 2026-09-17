@@ -98,6 +98,7 @@
             </div>
             <p v-if="rows.length" class="al__note ah-small">{{ $t('Audit.retention') }}</p>
             <p v-if="rows.length && chainOn" class="al__note ah-small">{{ $t('Audit.names_not_checked') }}</p>
+            <p v-if="rows.length && approximate" class="al__note ah-small" data-test="total-approximate">{{ $t('Audit.total_approximate') }}</p>
         </div>
     </div>
 </template>
@@ -130,6 +131,7 @@ const scope = ref("all");
 const search = ref("");
 const undoingId = ref("");
 const chainOn = ref(false);
+const approximate = ref(false);
 const projectFilter = ref(route.query.projectId ? { id: route.query.projectId, name: route.query.projectName || t("Audit.this_project") } : null);
 
 const tabs = [
@@ -185,6 +187,7 @@ const load = async ({ append = false } = {}) => {
         rows.value = append ? [...rows.value, ...(res.data.data || [])] : res.data.data || [];
         const meta = res.data.metadata || {};
         chainOn.value = Boolean(meta.chain && meta.chain.on);
+        approximate.value = (append && approximate.value) || Boolean(meta.approximate);
         totalPages.value = meta.totalPages || 1;
         total.value = meta.total || rows.value.length;
     } catch (e) {

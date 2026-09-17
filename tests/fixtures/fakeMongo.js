@@ -1,7 +1,7 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
 // language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type, $set/$inc/$push,
 // conditional findOneAndUpdate, updateOne and findOneAndUpdate with upsert and $setOnInsert, findOneAndDelete, deleteOne, deleteMany,
-// sort/limit on find, $match/$project/$addFields/$group/$replaceRoot/$count/$facet aggregate with a word-count textScore, declared unique indexes that
+// sort/limit on find, $match/$project/$addFields ($toString)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000) so a test can assert on what was written.
 
 let seq = 1;
@@ -129,6 +129,7 @@ const group = (docs, spec) => {
 
 const computed = (doc, value, search) => {
     if (value && typeof value === 'object' && value.$meta === 'textScore') return textScoreOf(doc, search);
+    if (value && typeof value === 'object' && value.$toString !== undefined) return String(hex(fieldOf(doc, value.$toString)));
     return fieldOf(doc, value);
 };
 
@@ -208,6 +209,10 @@ const create = () => {
                 if (stage.$limit) return docs.slice(0, stage.$limit);
                 if (stage.$count) return docs.length ? [{ [stage.$count]: docs.length }] : [];
                 if (stage.$facet) return [Object.fromEntries(Object.entries(stage.$facet).map(([name, sub]) => [name, run(docs, sub)]))];
+                if (stage.$lookup) {
+                    const { from, localField, foreignField, as, pipeline: inner = [] } = stage.$lookup;
+                    return docs.map((d) => ({ ...d, [as]: run(rows(from).filter((f) => String(hex(read(f, foreignField))) === String(hex(read(d, localField)))), inner) }));
+                }
                 return docs;
             }, input);
             return run(list, pipeline).map(clone);

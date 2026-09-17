@@ -56,7 +56,8 @@ const revertRun = async (companyId, runId, { actor, isPrivileged, ip }) => {
     const windowEndsAt = new Date(check.undoUntil);
 
     const rows = ((await actionRows(companyId, run._id)) || []).filter((r) => !(r.meta && r.meta.state === audit.STATE.FAILED));
-    const pending = rows.filter((r) => !(r.meta && r.meta.undoneAt));
+    const recorded = await audit.undoneOriginals(companyId, rows.map((r) => String(r._id)));
+    const pending = rows.filter((r) => !(r.meta && r.meta.undoneAt) && !recorded.has(String(r._id)));
     if (!rows.length) return { error: 'This run made no reversible changes.', status: 409 };
 
     const failed = [];

@@ -875,7 +875,8 @@ describe('the filtered audit log', () => {
     });
 
     it('drops a page row whose verified state does not match, and says the total is approximate', async () => {
-        const [undone, forged, plainRow] = [await chain.saveAuditRow(CID, entry(1)), await chain.saveAuditRow(CID, entry(2)), await chain.saveAuditRow(CID, entry(3))].map((r) => String(r._id));
+        const pending = (i) => entry(i, { meta: { n: i, undoneAt: null } });
+        const [undone, forged, plainRow] = [await chain.saveAuditRow(CID, pending(1)), await chain.saveAuditRow(CID, pending(2)), await chain.saveAuditRow(CID, pending(3))].map((r) => String(r._id));
         await chain.amend(CID, undone, { 'meta.undoneAt': new Date(), 'meta.undoneBy': 'u2' });
         await mockDb.crud(CID, { type: SCHEMA_TYPE.AUDIT_LOGS, data: { action: 'audit.amended', actorId: '', meta: { amends: forged, set: { undoneAt: new Date() } }, chain: { seq: 5, prevHash: 'x', hash: 'f'.repeat(64) } } }, 'save');
 

@@ -116,9 +116,9 @@ const matchesFolded = (row, q) => {
 
 /*
  * How to read the rows a filter asks for. A company with chained history reads rows folded from their verified
- * changes. When a filter names a field a change can set, the database only narrows to candidates (rows that
- * match as stored, or that a chained change touching that field points at) and each candidate is re-checked on
- * its verified state, so a change that does not verify can neither add a row to the result nor alter one in it.
+ * changes. When a filter names a field a change can set, the database narrows to candidates (rows that match as
+ * stored, or that a chained change touching that field points at) and each row read back is re-checked on its
+ * verified state, so a change that does not verify can neither add a row to the result nor alter one in it.
  */
 const auditPlan = async (companyId, q) => {
     if (!(await chain.folding(companyId))) return { folding: false, exact: true, stages: [{ $match: auditMatch(q) }] };
@@ -134,14 +134,14 @@ const auditPlan = async (companyId, q) => {
         const { $and: search = [], ...rest } = current;
         return { folding: true, exact: true, stages: [{ $match: { ...base, ...rest, $and: [notAmendment, ...search] } }] };
     }
-    const amendedIds = await chain.amendedIdsMatching(companyId, {
+    const touching = chain.touchingStages({
         entityType: q.entityType ? String(q.entityType) : '',
         entityId: q.entityId ? String(q.entityId) : '',
         undone: q.undone === 'true',
         term: q.q ? searchTerm(q.q) : '',
     });
-    const candidates = { $or: [current, ...(amendedIds.length ? [{ _id: { $in: amendedIds } }] : [])] };
-    return { folding: true, exact: false, stages: [{ $match: { ...base, $and: [notAmendment, candidates] } }] };
+    const candidates = touching.length ? { $or: [current, { '_touching.0': { $exists: true } }] } : current;
+    return { folding: true, exact: false, stages: [{ $match: { ...base, $and: [notAmendment] } }, ...touching, { $match: candidates }] };
 };
 
 const NEWEST_FIRST = { $sort: { createdAt: -1, _id: -1 } };
@@ -173,26 +173,20 @@ exports.listAuditLogs = async (req, res) => {
         const page = Math.max(1, Number(q.page) || 1);
         const limit = Math.min(100, Math.max(1, Number(q.limit) || 25));
         const plan = await auditPlan(companyId, q);
-        let listed;
-        let total;
-        if (plan.exact) {
-            const pipeline = [
-                ...plan.stages,
-                NEWEST_FIRST,
-                { $facet: { data: [{ $skip: (page - 1) * limit }, { $limit: limit }, ...(plan.folding ? [{ $project: { _id: 1 } }] : [])], meta: [{ $count: 'total' }] } },
-            ];
-            const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [pipeline] }, 'aggregate');
-            const pageRows = (rows && rows[0] && rows[0].data) || [];
-            listed = plan.folding ? await chain.readForList(companyId, pageRows.map((r) => r._id)) : pageRows;
-            total = (rows && rows[0] && rows[0].meta && rows[0].meta[0] && rows[0].meta[0].total) || 0;
-        } else {
-            const ids = [];
-            for await (const row of plannedRows(companyId, q, plan, { integrity: false })) ids.push(row._id);
-            total = ids.length;
-            listed = await chain.readForList(companyId, ids.slice((page - 1) * limit, page * limit));
-        }
+        const pipeline = [
+            ...plan.stages,
+            NEWEST_FIRST,
+            { $facet: { data: [{ $skip: (page - 1) * limit }, { $limit: limit }, ...(plan.folding ? [{ $project: { _id: 1 } }] : [])], meta: [{ $count: 'total' }] } },
+        ];
+        const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [pipeline] }, 'aggregate');
+        const pageRows = (rows && rows[0] && rows[0].data) || [];
+        const read = plan.folding ? await chain.readForList(companyId, pageRows.map((r) => r._id)) : pageRows;
+        const listed = plan.exact ? read : read.filter((row) => matchesFolded(row, q));
+        // The total counts candidates, so once a page drops one the total may count rows that do not match.
+        const approximate = listed.length !== read.length;
+        const total = (rows && rows[0] && rows[0].meta && rows[0].meta[0] && rows[0].meta[0].total) || 0;
         const data = await withUndoState(companyId, req.uid, listed);
-        const metadata = { total, page, totalPages: Math.ceil(total / limit), ...(chain.isOn() ? { chain: { on: true } } : {}) };
+        const metadata = { total, page, totalPages: Math.ceil(total / limit), ...(approximate ? { approximate: true } : {}), ...(chain.isOn() ? { chain: { on: true } } : {}) };
         return res.send({ status: true, data, metadata });
     } catch (error) {
         logger.error(`listAuditLogs: ${error.message}`);
