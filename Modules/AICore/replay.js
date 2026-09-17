@@ -113,6 +113,49 @@ function rowFor({ context, opts, adapter, result, error, durationMs, decision })
     };
 }
 
+const TOOL_KIND = 'tool';
+
+/* A registry read an agent called, kept beside the model calls of the same run so a
+ * number in an answer traces back to the query that produced it. The query is ids,
+ * dates and metric names and the result is numbers, so neither carries text to redact.
+ * promptHash is the hash of the query, so the same query matches across runs. */
+async function recordToolStep({ companyId, runId, agentId, action, args, scope, result, durationMs }) {
+    if (!shouldRecord(FEATURES.AGENT_RUN)) return null;
+    const query = { action, args, scope };
+    const createdAt = new Date();
+    try {
+        return await MongoDbCrudOpration(companyId || dbCollections.GLOBAL, {
+            type: SCHEMA_TYPE.AI_REPLAYS,
+            data: {
+                feature: FEATURES.AGENT_RUN,
+                kind: TOOL_KIND,
+                runId: runId || null,
+                agentId: agentId ? String(agentId) : null,
+                model: null,
+                provider: null,
+                promptHash: crypto.createHash('sha256').update(JSON.stringify(query)).digest('hex'),
+                messages: [],
+                retrievedChunkIds: [],
+                query,
+                result,
+                truncated: false,
+                usage: { inputTokens: 0, outputTokens: 0 },
+                costUsd: null,
+                durationMs: Number(durationMs) || 0,
+                decision: null,
+                status: 'ok',
+                errorCode: null,
+                traceId: currentTraceId(),
+                createdAt,
+                expiresAt: new Date(createdAt.getTime() + retentionDays() * DAY_MS),
+            },
+        }, 'save');
+    } catch (e) {
+        logger.warn(`${LOG_PREFIX} ${companyId}: ${action}${runId ? ` in run ${runId}` : ''} not recorded: ${e.message}`);
+        return null;
+    }
+}
+
 async function record(call) {
     const { context } = call;
     if (!shouldRecord(context.feature)) return null;
@@ -124,4 +167,4 @@ async function record(call) {
     }
 }
 
-module.exports = { record, mode, retentionDays, shouldRecord, promptHashOf, MAX_BYTES };
+module.exports = { record, recordToolStep, mode, retentionDays, shouldRecord, promptHashOf, MAX_BYTES, TOOL_KIND };
