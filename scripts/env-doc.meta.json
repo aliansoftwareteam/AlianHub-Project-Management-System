@@ -492,7 +492,7 @@
   },
   "KNOWLEDGE_INDEXER": {
     "group": "ai",
-    "description": "Knowledge page indexer: \"off\" subscribes to nothing and reads or writes no chunk; \"tenant\" ingests page events into knowledge_chunks (split on headings, tombstoned on delete, project trash and a member's departure), backfills existing pages, and lets retrieval read page passages from the chunks once the backfill is complete, for a company whose knowledgeIndexer.mode is \"on\"; \"all\" does so for every company except one set to \"off\".",
+    "description": "Knowledge indexer: \"off\" subscribes to nothing and reads or writes no chunk; \"tenant\" ingests page, comment and call-notes events into knowledge_chunks (pages split on headings; tombstoned on delete, on a deleted task for comments, on project trash for pages and comments, and on a member's departure for private pages), backfills each source separately, and lets retrieval read a source's passages from the chunks once that source's backfill is complete, for a company whose knowledgeIndexer.mode is \"on\"; \"all\" does so for every company except one set to \"off\".",
     "default": "off"
   },
   "LLM_MAX_TOKENS_CLARIFY": {

@@ -303,6 +303,7 @@ const knowledgeChunksSchema = new Schema(schema.knowledgeChunks, {strict: true, 
 knowledgeChunksSchema.index({ sourceType: 1, sourceId: 1, ordinal: 1 }, { unique: true });
 knowledgeChunksSchema.index({ projectId: 1, deleted: 1 });
 knowledgeChunksSchema.index({ createdBy: 1, visibility: 1 });
+knowledgeChunksSchema.index({ sourceType: 1, taskId: 1 });
 const knowledgeIndexStateSchema = new Schema(schema.knowledgeIndexState, {strict: true, timestamps: true});
 knowledgeIndexStateSchema.index({ sourceType: 1 }, { unique: true });
 const knowledgeExclusionsSchema = new Schema(schema.knowledgeExclusions, {strict: true, timestamps: true});
@@ -340,6 +341,8 @@ taskSchema.index({ TaskKey: 1 });
 commentSchema.index({ 'objId.taskId': 1, deletedStatusKey: 1 });
 commentSchema.index({ 'objId.sprintId': 1 });
 commentSchema.index({ 'objId.projectId': 1 });
+// Comments are stored with a top-level taskId; the objId.* keys above index nothing.
+commentSchema.index({ taskId: 1 });
 
 // history: by task and by project (timeline display).
 historySchema.index({ TaskId: 1, createdAt: -1 });

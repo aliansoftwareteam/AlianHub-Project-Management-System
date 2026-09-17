@@ -149,7 +149,7 @@ exports.postClientMessage = async (req, res) => {
             },
         }, 'save');
 
-        socketEmitter.emit('update', { type: 'add', data: saved, module: 'comments' });
+        socketEmitter.emit('update', { type: 'add', data: saved, module: 'comments', companyId });
         return res.send({ status: true, statusText: 'Message sent.', data: { _id: String(saved && saved._id) } });
     } catch (error) {
         if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });

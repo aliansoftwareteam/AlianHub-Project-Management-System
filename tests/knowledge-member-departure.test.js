@@ -55,7 +55,7 @@ beforeEach(async () => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     mockDb.uniqueFromSchema(CHUNKS, knowledgeChunksSchema);
     mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C });
-    mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType: 'page', status: 'complete' });
+    mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType: 'page', status: 'complete', lastSeenOnAt: new Date() });
     member(OWNER, 1);
     member(LEAVER, 3);
     pagesOf = {

@@ -1,5 +1,5 @@
 const { MongoClient, ObjectId } = require('mongodb');
-const { loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
+const { createProject, createTask, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 const { resolveMongoUrl } = require('../../e2e/support/env');
 
 /* Sprint 7 exit gate, at the API: a private page reaches its owner's answers and nobody
@@ -178,7 +178,10 @@ describe('knowledge retrieval reading the page index', () => {
         return String(res.body.data._id);
     };
 
-    const liveChunks = (pageId) => tenant.collection('knowledge_chunks').find({ sourceType: 'page', sourceId: pageId, deleted: false }).toArray();
+    const liveSourceChunks = (sourceType, sourceId) => tenant.collection('knowledge_chunks').find({ sourceType, sourceId, deleted: false }).toArray();
+    const liveChunks = (pageId) => liveSourceChunks('page', pageId);
+    const found = (session, word, id) => poll(async () => (await sourceIds(session, word)).includes(id));
+    const gone = (session, word, id) => poll(async () => !(await sourceIds(session, word)).includes(id));
 
     beforeAll(async () => {
         client = await MongoClient.connect(resolveMongoUrl());
@@ -188,7 +191,9 @@ describe('knowledge retrieval reading the page index', () => {
 
         const owner = await loginAs('owner');
         await createPage(owner, { title: `[QA knowledge index] warm-up ${uniqueSuffix()}`, body: 'Starts the backfill.', visibility: 'project', projectId: state.projects.shared._id });
-        expect(await poll(() => tenant.collection('knowledge_index_state').findOne({ sourceType: 'page', status: 'complete' }))).toBeTruthy();
+        const built = await poll(async () => (await tenant.collection('knowledge_index_state')
+            .countDocuments({ sourceType: { $in: ['page', 'comment', 'transcript'] }, status: 'complete' })) === 3);
+        expect(built).toBe(true);
     });
 
     afterAll(async () => {
@@ -232,5 +237,85 @@ describe('knowledge retrieval reading the page index', () => {
 
         expect(await poll(async () => !(await sourceIds(owner, word)).includes(pageId))).toBe(true);
         expect(await poll(async () => (await liveChunks(pageId)).length === 0)).toBe(true);
+    });
+
+    it('answers from a comment for someone who can open its task, never for someone who cannot, and drops it within a minute of its deletion', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const word = token();
+        const project = await createProject(owner.api, { name: `[QA knowledge index] vault ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid, isPrivate: true });
+        const task = await createTask(owner.api, { project, name: `[QA knowledge index] vault task ${uniqueSuffix()}`, user: state.users.owner, companyOwnerId: owner.uid });
+        const saved = await owner.api.post('/api/v1/comments', {
+            data: { message: `The vault code is ${word}.`, type: 'text', project: false, taskId: task._id, projectId: project._id, sprintId: task.sprintId },
+        });
+        expect(saved.body.status).toBe(true);
+        const commentId = String(saved.body.data._id);
+
+        expect(await poll(async () => (await liveSourceChunks('comment', commentId)).length > 0)).toBe(true);
+        const [chunk] = await liveSourceChunks('comment', commentId);
+        expect(chunk).toMatchObject({ companyId: state.companyId, visibility: 'project', taskId: task._id, createdBy: owner.uid, authorKind: 'human' });
+        expect(String(chunk.projectId)).toBe(String(project._id));
+
+        expect(await found(owner, word, commentId)).toBe(true);
+        expect(await sourceIds(member, word)).not.toContain(commentId);
+
+        const removed = await owner.api.put('/api/v1/comments', { id: commentId, data: { isDeleted: true } });
+        expect(removed.body.status).toBe(true);
+        expect(await gone(owner, word, commentId)).toBe(true);
+        expect(await poll(async () => (await liveSourceChunks('comment', commentId)).length === 0)).toBe(true);
+    });
+
+    it('answers from call notes for the people on the call and not for an admin, and drops them within a minute of being discarded', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const admin = await loginAs('admin');
+        const word = token();
+        const saved = await owner.api.post('/api/v2/calls/notes', {
+            callId: `s7s3-${uniqueSuffix()}`,
+            title: '[QA knowledge index] call',
+            participants: [member.uid],
+            transcript: `We agreed the ${word} rollout.`,
+            durationSec: 60,
+        });
+        expect(saved.body.status).toBe(true);
+        const callId = String(saved.body.data._id);
+
+        expect(await poll(async () => (await liveSourceChunks('transcript', callId)).length > 0)).toBe(true);
+        const [chunk] = await liveSourceChunks('transcript', callId);
+        expect(chunk).toMatchObject({ companyId: state.companyId, visibility: 'participants' });
+        expect([...chunk.participants].sort()).toEqual([owner.uid, member.uid].sort());
+
+        expect(await found(owner, word, callId)).toBe(true);
+        expect(await sourceIds(member, word)).toContain(callId);
+        expect(await sourceIds(admin, word)).not.toContain(callId);
+
+        const discarded = await owner.api.patch(`/api/v2/calls/notes/${callId}`, { status: 'discarded' });
+        expect(discarded.body.status).toBe(true);
+        expect(await gone(member, word, callId)).toBe(true);
+        expect(await poll(async () => (await liveSourceChunks('transcript', callId)).length === 0)).toBe(true);
+    });
+
+    it('answers from a private workspace page for its author only, not an admin, from a company-wide one for everyone, and drops a deleted one within a minute', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const admin = await loginAs('admin');
+        const word = token();
+        const privateId = await createPage(member, { title: `[QA knowledge index] workspace private ${uniqueSuffix()}`, body: `Locker ${word} holds my notes.`, visibility: 'private' });
+        const sharedId = await createPage(owner, { title: `[QA knowledge index] workspace handbook ${uniqueSuffix()}`, body: `Locker ${word} holds the life jackets.`, visibility: 'project' });
+
+        expect(await poll(async () => (await liveChunks(privateId)).length > 0 && (await liveChunks(sharedId)).length > 0)).toBe(true);
+        (await liveChunks(privateId)).forEach((chunk) => expect(chunk).toMatchObject({ projectId: null, visibility: 'private', createdBy: member.uid }));
+        (await liveChunks(sharedId)).forEach((chunk) => expect(chunk).toMatchObject({ projectId: null, visibility: 'project' }));
+
+        expect(await found(member, word, privateId)).toBe(true);
+        expect(await found(admin, word, sharedId)).toBe(true);
+        expect(await sourceIds(member, word)).toContain(sharedId);
+        expect(await sourceIds(admin, word)).not.toContain(privateId);
+        expect(await sourceIds(owner, word)).not.toContain(privateId);
+
+        const removed = await owner.api.delete(`/api/v2/pages/${sharedId}`);
+        expect(removed.body.status).toBe(true);
+        expect(await gone(member, word, sharedId)).toBe(true);
+        expect(await poll(async () => (await liveChunks(sharedId)).length === 0)).toBe(true);
     });
 });

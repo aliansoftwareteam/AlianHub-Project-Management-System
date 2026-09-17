@@ -3,6 +3,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { recordAudit } = require('../../Audit/recorder');
 const socketEmitter = require('../../../event/socketEventEmitter');
+const knowledgeEvents = require('../../Knowledge/ingest/events');
 
 // The only way an action is allowed to touch data.
 //
@@ -121,6 +122,8 @@ const addComment = async (companyId, taskId, body, context = {}) => {
             ...(context.actorType ? { actorType: context.actorType, agentId: context.agentId || null, viaAccount: context.viaAccount || null, runId: context.runId || null } : {}),
         },
     }, 'save');
+
+    if (saved && saved._id) knowledgeEvents.publishCommentChanged(companyId, saved._id, 'created');
 
     recordAutomationAudit(companyId, context, {
         action: 'automation.task.comment',

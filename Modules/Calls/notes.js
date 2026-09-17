@@ -8,9 +8,9 @@ const logger = require('../../Config/loggerConfig');
 const companyOf = (req) => req.headers['companyid'];
 const isObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id || ''));
 
-const emitNotes = (type, data) => {
+const emitNotes = (companyId, type, data) => {
     try {
-        socketEmitter.emit(type, { type, data, module: 'calls' });
+        socketEmitter.emit(type, { type, data, module: 'calls', companyId: String(companyId) });
     } catch (error) {
         logger.error(`calls notes emit: ${error.message}`);
     }
@@ -82,7 +82,7 @@ exports.createNotes = async (req, res) => {
         };
 
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CALLS, data }, 'save');
-        emitNotes('insert', saved);
+        emitNotes(companyId, 'insert', saved);
         return res.send({ status: true, statusText: aiError, data: saved });
     } catch (error) {
         logger.error(`createNotes: ${error.message}`);
@@ -147,7 +147,7 @@ exports.updateNotes = async (req, res) => {
             data: [ownNotesFilter(req, req.params.id), { $set: patch }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
         if (!updated) return res.send({ status: false, statusText: 'Notes not found.' });
-        emitNotes('update', updated);
+        emitNotes(companyId, 'update', updated);
         return res.send({ status: true, data: updated });
     } catch (error) {
         logger.error(`updateNotes: ${error.message}`);

@@ -86,14 +86,15 @@ exports.save = async (req, res) => {
             }
         }
 
-        const response = await MongoDbCrudOpration(req.headers['companyid'], query, "save");
+        const companyId = req.headers['companyid'];
+        const response = await MongoDbCrudOpration(companyId, query, "save");
         if (data?.objId?.projectId && data?.objId?.taskId && data?.objId?.sprintId) {
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments' });
+            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments', companyId });
         } else if(data?.taskId === "default"){
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments' });
+            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments', companyId });
         }
         else {
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments_project' });
+            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments_project', companyId });
         }
         if (mentionIds.length && response && response._id) {
             notifyMentions(req.headers['companyid'], response, mentionIds)
@@ -173,11 +174,12 @@ exports.update = async (req, res) => {
             ]
         }
 
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'findOneAndUpdate');
+        const companyId = req.headers['companyid'];
+        const response = await MongoDbCrudOpration(companyId, params, 'findOneAndUpdate');
         if(!isProjectComment){
-            socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'comments' });
+            socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'comments', companyId });
         }else{
-            socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'comments_project' });
+            socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'comments_project', companyId });
         }
         if (response) {
             return res.status(200).json({ status: true,data: response || {} });

@@ -6,6 +6,7 @@ const audit = require('./agentAudit');
 const budget = require('./budget');
 const scope = require('./scope');
 const { emitPageChange } = require('../Pages/helpers/pageEvents');
+const knowledgeEvents = require('../Knowledge/ingest/events');
 
 // Undo replays the inverse action and logs it as the person who pressed Undo.
 // Only the descriptors perform() wrote are understood; anything else is
@@ -43,6 +44,7 @@ const setTask = async (companyId, taskId, set, unset) => {
 const inverses = {
     async comment(companyId, u) {
         await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: oid(u.commentId) }, { $set: { isDeleted: true } }] }, 'updateOne');
+        knowledgeEvents.publishCommentChanged(companyId, u.commentId, 'deleted');
         return { commentId: u.commentId, deleted: true };
     },
     async status(companyId, u) {
