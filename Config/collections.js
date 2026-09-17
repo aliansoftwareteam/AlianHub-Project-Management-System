@@ -110,6 +110,7 @@ const dbCollections = {
     FORM_SUBMISSIONS: "form_submissions",
     PROJECT_CONTRACTS: "project_contracts",
     PROJECT_INVOICES: "project_invoices",
+    PERMISSION_DECISIONS: "permission_decisions",
     SCHEMA_VERSIONS: "schema_versions",
     INSTANCE_SETTINGS: "instance_settings",
 }
