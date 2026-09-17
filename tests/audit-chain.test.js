@@ -425,15 +425,21 @@ describe('verifying the chain', () => {
 
     it('never applies an appended change that is not a verified part of the chain, and reports its row broken', async () => {
         const id = await agentAudit.recordAction(CID, actor, { action: 'task.comment', params: { taskId: TASK }, undo: { kind: 'comment', commentId: 'c1', taskId: TASK }, entityId: TASK, idempotencyKey: 'wf:run:step' });
-        await mockDb.crud(CID, { type: SCHEMA_TYPE.AUDIT_LOGS, data: { action: 'audit.amended', actorId: '', meta: { amends: id, set: { state: 'failed', undoneAt: new Date(), undoneBy: 'someone' } } } }, 'save');
-        await mockDb.crud(CID, { type: SCHEMA_TYPE.AUDIT_LOGS, data: { action: 'audit.amended', actorId: '', meta: { amends: id, set: { undoable: false } }, chain: { seq: 3, prevHash: bySeq(2).chain.hash, hash: 'f'.repeat(64) } } }, 'save');
+        const expectUntouched = async () => {
+            for (const row of [await agentAudit.findById(CID, id), await agentAudit.findByIdempotencyKey(CID, 'wf:run:step')]) {
+                expect(row.meta).toMatchObject({ state: 'applied', undoable: true, undoneAt: null });
+            }
+            const [listed] = await chain.readForList(CID, [id]);
+            expect(listed.meta).toMatchObject({ state: 'applied', undoable: true, undoneAt: null });
+            return listed.integrity;
+        };
 
-        for (const row of [await agentAudit.findById(CID, id), await agentAudit.findByIdempotencyKey(CID, 'wf:run:step')]) {
-            expect(row.meta).toMatchObject({ state: 'applied', undoable: true, undoneAt: null });
-        }
-        const [listed] = await chain.readForList(CID, [id]);
-        expect(listed.meta).toMatchObject({ state: 'applied', undoable: true, undoneAt: null });
-        expect(listed.integrity).toMatchObject({ state: 'broken' });
+        const outside = await mockDb.crud(CID, { type: SCHEMA_TYPE.AUDIT_LOGS, data: { action: 'audit.amended', actorId: '', meta: { amends: id, set: { state: 'failed', undoneAt: new Date(), undoneBy: 'someone' } } } }, 'save');
+        expect(await expectUntouched()).toEqual({ state: 'broken', brokenAt: null });
+        removeAudit((r) => String(r._id) === String(outside._id));
+
+        await mockDb.crud(CID, { type: SCHEMA_TYPE.AUDIT_LOGS, data: { action: 'audit.amended', actorId: '', meta: { amends: id, set: { undoable: false } }, chain: { seq: 3, prevHash: bySeq(2).chain.hash, hash: 'f'.repeat(64) } } }, 'save');
+        expect(await expectUntouched()).toEqual({ state: 'broken', brokenAt: 3 });
     });
 
     it('reads a row without a chain as broken when it was written after the chain started', async () => {
