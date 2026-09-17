@@ -64,26 +64,24 @@ exports.undoAuditLog = async (req, res) => {
     }
 };
 
-/* The stream is one collection, so the agent filters are meta lookups rather than a separate log.
- * `current` holds the conditions on fields an appended change can set; they are matched after the fold. */
-const auditFilters = (q) => {
-    const base = { $and: [{ action: { $ne: AMENDED_ACTION } }] };
-    const current = {};
-    if (q.actorId) base.actorId = String(q.actorId);
-    if (q.entityType) current.entityType = String(q.entityType);
-    if (q.entityId) current.entityId = String(q.entityId);
-    if (q.action) base.action = String(q.action);
-    if (q.actorType === 'agent') base['meta.actorType'] = 'agent';
-    if (q.actorType === 'human') base['meta.actorType'] = { $ne: 'agent' };
-    if (q.gated === 'true') base.action = 'agent.action_refused';
-    if (q.refused === 'true') base.action = PERMISSION_REFUSED;
-    if (q.undone === 'true') current['meta.undoneAt'] = { $ne: null };
-    if (q.agentId) base['meta.agentId'] = String(q.agentId);
-    if (q.runId) base['meta.runId'] = String(q.runId);
-    if (q.projectId) base.$or = [{ 'meta.params.projectId': String(q.projectId) }, { projectId: String(q.projectId) }];
+/* The stream is one collection, so the agent filters are meta lookups rather than a separate log. */
+const auditMatch = (q) => {
+    const match = {};
+    if (q.actorId) match.actorId = String(q.actorId);
+    if (q.entityType) match.entityType = String(q.entityType);
+    if (q.entityId) match.entityId = String(q.entityId);
+    if (q.action) match.action = String(q.action);
+    if (q.actorType === 'agent') match['meta.actorType'] = 'agent';
+    if (q.actorType === 'human') match['meta.actorType'] = { $ne: 'agent' };
+    if (q.gated === 'true') match.action = 'agent.action_refused';
+    if (q.refused === 'true') match.action = PERMISSION_REFUSED;
+    if (q.undone === 'true') match['meta.undoneAt'] = { $ne: null };
+    if (q.agentId) match['meta.agentId'] = String(q.agentId);
+    if (q.runId) match['meta.runId'] = String(q.runId);
+    if (q.projectId) match.$or = [{ 'meta.params.projectId': String(q.projectId) }, { projectId: String(q.projectId) }];
     if (q.q) {
         const term = String(q.q).slice(0, 120).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        current.$and = [{ $or: [
+        match.$and = [...(match.$and || []), { $or: [
             { entityName: { $regex: term, $options: 'i' } },
             { actorName: { $regex: term, $options: 'i' } },
             { 'meta.action': { $regex: term, $options: 'i' } },
@@ -91,16 +89,27 @@ const auditFilters = (q) => {
         ] }];
     }
     if (q.from || q.to) {
-        base.createdAt = {};
-        if (q.from) base.createdAt.$gte = new Date(q.from);
-        if (q.to) base.createdAt.$lte = new Date(q.to);
+        match.createdAt = {};
+        if (q.from) match.createdAt.$gte = new Date(q.from);
+        if (q.to) match.createdAt.$lte = new Date(q.to);
     }
-    return { base, current: Object.keys(current).length ? current : null };
+    return match;
 };
 
+/* Fields an appended change can set; under the chain they are matched after the fold. */
+const FOLDED_FIELDS = ['entityType', 'entityId', 'meta.undoneAt', '$and'];
+
 const filterStages = async (companyId, q) => {
-    const { base, current } = auditFilters(q);
-    if (!current) return [{ $match: base }];
+    if (!chain.isOn()) return [{ $match: auditMatch(q) }];
+    const base = auditMatch(q);
+    const current = {};
+    FOLDED_FIELDS.forEach((field) => {
+        if (base[field] === undefined) return;
+        current[field] = base[field];
+        delete base[field];
+    });
+    base.$and = [{ action: { $ne: AMENDED_ACTION } }];
+    if (!Object.keys(current).length) return [{ $match: base }];
     const folding = await chain.hasAmendments(companyId);
     return [{ $match: base }, ...(folding ? chain.foldStages() : []), { $match: current }];
 };
@@ -108,7 +117,7 @@ const filterStages = async (companyId, q) => {
 const NEWEST_FIRST = { $sort: { createdAt: -1, _id: -1 } };
 
 // GET /api/v1/audit-logs?actorId=&entityType=&entityId=&action=&refused=&from=&to=&page=&limit=
-// Owner/admin only. Filterable + paginated, newest first, each row with its integrity state.
+// Owner/admin only. Filterable + paginated, newest first; under AUDIT_CHAIN each row carries its integrity state.
 exports.listAuditLogs = async (req, res) => {
     try {
         const companyId = companyOf(req);
@@ -119,16 +128,18 @@ exports.listAuditLogs = async (req, res) => {
         const q = req.query || {};
         const page = Math.max(1, Number(q.page) || 1);
         const limit = Math.min(100, Math.max(1, Number(q.limit) || 25));
+        const chained = chain.isOn();
         const pipeline = [
             ...(await filterStages(companyId, q)),
             NEWEST_FIRST,
-            { $facet: { data: [{ $skip: (page - 1) * limit }, { $limit: limit }, { $project: { _id: 1 } }], meta: [{ $count: 'total' }] } },
+            { $facet: { data: [{ $skip: (page - 1) * limit }, { $limit: limit }, ...(chained ? [{ $project: { _id: 1 } }] : [])], meta: [{ $count: 'total' }] } },
         ];
         const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [pipeline] }, 'aggregate');
-        const ids = ((rows && rows[0] && rows[0].data) || []).map((r) => r._id);
-        const data = await withUndoState(companyId, req.uid, await chain.readForList(companyId, ids));
+        const pageRows = (rows && rows[0] && rows[0].data) || [];
+        const data = await withUndoState(companyId, req.uid, chained ? await chain.readForList(companyId, pageRows.map((r) => r._id)) : pageRows);
         const total = (rows && rows[0] && rows[0].meta && rows[0].meta[0] && rows[0].meta[0].total) || 0;
-        return res.send({ status: true, data, metadata: { total, page, totalPages: Math.ceil(total / limit), chain: { on: chain.isOn() } } });
+        const metadata = { total, page, totalPages: Math.ceil(total / limit), ...(chained ? { chain: { on: true } } : {}) };
+        return res.send({ status: true, data, metadata });
     } catch (error) {
         logger.error(`listAuditLogs: ${error.message}`);
         return res.send({ status: false, statusText: error.message });

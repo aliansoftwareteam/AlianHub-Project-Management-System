@@ -52,7 +52,7 @@ const retentionDaysFor = (requested) => {
 };
 
 const pruneCompany = async (companyId, cutoff) => {
-    const anchor = await chain.anchorBeforePrune(companyId, cutoff);
+    const anchor = chain.config().requested ? await chain.anchorBeforePrune(companyId, cutoff) : null;
     await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [chain.pruneFilter(anchor, cutoff)] }, 'deleteMany');
     if (anchor) await chain.mirrorHead(companyId);
 };

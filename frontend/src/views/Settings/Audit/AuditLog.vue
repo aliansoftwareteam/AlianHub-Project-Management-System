@@ -57,6 +57,7 @@
                                 <span class="al__actor-name">{{ actorName(row) }}</span>
                                 <span v-if="isAgent(row)" class="ah-chip ah-chip--agent ah-chip--mono">{{ $t('Audit.agent') }}</span>
                             </span>
+                            <div v-if="showsHashedIds(row)" class="ah-mono ah-small al__id" data-test="actor-id" :title="$t('Audit.names_not_checked')">{{ row.actorId }}</div>
                         </td>
                         <td>
                             <div class="al__event">
@@ -64,6 +65,7 @@
                                 <span class="ah-mono al__action">{{ eventAction(row) }}</span>
                                 <span v-if="row.entityName || row.entityId" class="al__entity">{{ row.entityName || row.entityId }}</span>
                             </div>
+                            <div v-if="showsHashedIds(row) && row.entityId" class="ah-mono ah-small al__id" data-test="entity-id" :title="$t('Audit.names_not_checked')">{{ row.entityId }}</div>
                             <div v-if="row.meta && row.meta.cost && (row.meta.cost.tokens || row.meta.cost.usd)" class="al__cost ah-mono">
                                 {{ $t('Audit.cost', { tokens: row.meta.cost.tokens || 0, usd: Number(row.meta.cost.usd || 0).toFixed(2) }) }}
                             </div>
@@ -95,6 +97,7 @@
                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="loadMore">{{ $t('Audit.load_more') }}</button>
             </div>
             <p v-if="rows.length" class="al__note ah-small">{{ $t('Audit.retention') }}</p>
+            <p v-if="rows.length && chainOn" class="al__note ah-small">{{ $t('Audit.names_not_checked') }}</p>
         </div>
     </div>
 </template>
@@ -151,9 +154,11 @@ const actorName = (row) => (isAgent(row) ? row.meta.agentName || t("Audit.an_age
 const initial = (row) => actorName(row).charAt(0).toUpperCase();
 const eventAction = (row) => (row.meta && row.meta.action) || row.action;
 const isRefusal = (row) => REFUSALS.includes(row.action);
-const showsIntegrity = (row) => Boolean(row.integrity && row.integrity.state in INTEGRITY_CHIPS && (chainOn.value || row.integrity.state !== "unchained"));
-const integrityLabel = (row) => t("Audit.integrity_" + row.integrity.state, { seq: row.integrity.brokenAt });
-const integrityHint = (row) => t("Audit.integrity_" + row.integrity.state + "_hint", { seq: row.integrity.brokenAt });
+const showsIntegrity = (row) => Boolean(chainOn.value && row.integrity && row.integrity.state in INTEGRITY_CHIPS);
+const showsHashedIds = (row) => Boolean(chainOn.value && row.chain && typeof row.chain.seq === "number");
+const integrityKey = (row) => (row.integrity.state === "broken" && row.integrity.brokenAt == null ? "Audit.integrity_broken_row" : "Audit.integrity_" + row.integrity.state);
+const integrityLabel = (row) => t(integrityKey(row), { seq: row.integrity.brokenAt });
+const integrityHint = (row) => t(integrityKey(row) + "_hint", { seq: row.integrity.brokenAt });
 const time = (at) => (at ? moment(at).format("HH:mm") : "");
 const deadline = (at) => (at ? moment(at).format("D MMM HH:mm") : "");
 
@@ -249,6 +254,7 @@ onMounted(load);
 .al__event { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .al__action { color: var(--ink); }
 .al__entity { color: var(--ink-2); }
+.al__id { color: var(--ink-3); margin-top: 3px; }
 .al__blocked { color: var(--danger-ink); font-weight: 600; }
 .al__cost { color: var(--ink-3); margin-top: 3px; }
 .al__reason { color: var(--ink-2); }

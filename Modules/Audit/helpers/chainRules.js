@@ -29,8 +29,14 @@ const chainConfig = (env = process.env) => {
 const isObjectId = (v) => Boolean(v) && typeof v === 'object' && (v._bsontype === 'ObjectId' || v._bsontype === 'ObjectID');
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date) && !isObjectId(v) && !Buffer.isBuffer(v);
 
-/* What Mongoose stores for a value: undefined properties and empty objects dropped, undefined array items as null. */
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+/* BSON writes strings as UTF-8, which has no encoding for a lone surrogate, so Mongo stores U+FFFD in its place. */
+const wellFormed = (text) => text.replace(LONE_SURROGATE, '\uFFFD');
+
+/* What Mongo stores for a value: undefined properties and empty objects dropped, undefined array items as null. */
 const clean = (value) => {
+    if (typeof value === 'string') return wellFormed(value);
     if (Array.isArray(value)) return value.map((item) => (item === undefined ? null : clean(item)));
     if (!isPlainObject(value)) return value;
     const out = {};
@@ -38,7 +44,7 @@ const clean = (value) => {
         if (v === undefined) return;
         const c = clean(v);
         if (isPlainObject(c) && !Object.keys(c).length) return;
-        out[k] = c;
+        out[wellFormed(k)] = c;
     });
     return out;
 };
@@ -119,6 +125,9 @@ const amendmentOf = (original, $set) => {
 const seqOf = (row) => (isChained(row) ? row.chain.seq : Number.MAX_SAFE_INTEGER);
 const inChainOrder = (rows) => [...rows].sort((a, b) => (seqOf(a) - seqOf(b)) || (new Date(a.createdAt) - new Date(b.createdAt)));
 
+/* Only a change that is in the chain and hashes under the key may alter what a row reads as. */
+const trustedAmendments = (key, companyId, amendments = []) => amendments.filter((a) => Boolean(key) && hashMatches(key, companyId, a));
+
 const applyAmendments = (row, amendments = []) => {
     if (!row || !amendments.length) return row;
     const out = { ...row, meta: { ...(row.meta || {}) } };
@@ -141,21 +150,35 @@ const walkLinks = (key, companyId, last, rows) => {
     return { last: prev, brokenAt: null };
 };
 
-/* A row is only as sound as the chain below it, so a break at n marks every row from n on. */
-const pageIntegrity = ({ key, companyId, report }, entries) => {
+/*
+ * A row is only as sound as the chain below it, so a break at n marks every row from n on. A row that stands
+ * outside the chain when it should not (written after the chain started, or carrying a change that is not a
+ * valid part of it) is broken on its own, with no sequence number to name.
+ */
+const pageIntegrity = ({ key, companyId, report, chainStartedAt = null }, entries) => {
+    const started = chainStartedAt ? new Date(chainStartedAt).getTime() : null;
     const chainedOf = ({ row, amendments = [] }) => [row, ...amendments].filter(isChained);
+    const rowBroken = { state: INTEGRITY.BROKEN, brokenAt: null };
     let brokenAt = report && report.brokenAt != null ? report.brokenAt : null;
-    entries.forEach((entry) => {
-        if (!isChained(entry.row) || !key) return;
-        chainedOf(entry).forEach((r) => {
-            if (!hashMatches(key, companyId, r)) brokenAt = brokenAt == null ? r.chain.seq : Math.min(brokenAt, r.chain.seq);
+    if (key) {
+        entries.forEach((entry) => {
+            chainedOf(entry).forEach((r) => {
+                if (!hashMatches(key, companyId, r)) brokenAt = brokenAt == null ? r.chain.seq : Math.min(brokenAt, r.chain.seq);
+            });
         });
-    });
+    }
     return entries.map((entry) => {
-        if (!isChained(entry.row)) return { state: INTEGRITY.UNCHAINED };
-        if (!key || !report) return { state: INTEGRITY.UNVERIFIED };
+        const amendments = entry.amendments || [];
+        const outside = amendments.some((a) => !isChained(a));
+        if (!isChained(entry.row)) {
+            const late = started != null && new Date(entry.row.createdAt).getTime() > started;
+            const forged = Boolean(key) && amendments.some((a) => isChained(a) && !hashMatches(key, companyId, a));
+            return outside || late || forged ? rowBroken : { state: INTEGRITY.UNCHAINED };
+        }
+        if (!key || !report) return outside ? rowBroken : { state: INTEGRITY.UNVERIFIED };
         const top = Math.max(...chainedOf(entry).map((r) => r.chain.seq));
         if (brokenAt != null && top >= brokenAt) return { state: INTEGRITY.BROKEN, brokenAt };
+        if (outside) return rowBroken;
         if (report.verifiedThrough != null && top <= report.verifiedThrough) return { state: INTEGRITY.VERIFIED };
         return { state: INTEGRITY.UNVERIFIED };
     });
@@ -164,5 +187,5 @@ const pageIntegrity = ({ key, companyId, report }, entries) => {
 module.exports = {
     AMENDED_ACTION, MIN_KEY_LENGTH, PERSONAL_FIELDS, AMENDABLE_ROW_FIELDS, INTEGRITY, GENESIS,
     chainConfig, clean, canonical, hashedContent, rowHash, hashMatches, isChained, markMac, macMatches,
-    amendmentOf, applyAmendments, inChainOrder, walkLinks, pageIntegrity,
+    amendmentOf, trustedAmendments, applyAmendments, inChainOrder, walkLinks, pageIntegrity,
 };

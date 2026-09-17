@@ -15,8 +15,9 @@ const chain = require('../Audit/chain');
 // An action row is opened `pending` before the mutation and marked `applied`
 // (with its undo descriptor) after it, so an action can never happen without
 // a row: a failed open aborts the action, a failed mark fails its result.
-// Under AUDIT_CHAIN a mark is an appended row that references the action row,
-// and the finders below fold those rows back into the state they describe.
+// Under AUDIT_CHAIN, and on any row that carries a chain whatever the flag says, a
+// mark is an appended row that references the action row; the finders below fold
+// those rows back into the state they describe while the chain is on.
 
 const ACTION_DONE = 'agent.action';
 const ACTION_REFUSED = 'agent.action_refused';
@@ -74,6 +75,8 @@ const writeQuietly = async (companyId, entry) => {
 
 const rowFilter = (auditId) => (/^[0-9a-fA-F]{24}$/.test(String(auditId)) ? { _id: new mongoose.Types.ObjectId(String(auditId)) } : null);
 
+const unchained = (filter) => ({ ...filter, chain: { $exists: false } });
+
 const setRow = async (companyId, auditId, $set) => {
     const filter = rowFilter(auditId);
     if (!filter) throw new Error(`invalid audit id ${auditId}`);
@@ -81,8 +84,9 @@ const setRow = async (companyId, auditId, $set) => {
         await chain.amend(companyId, auditId, $set);
         return;
     }
-    const r = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [filter, { $set }] }, 'updateOne');
-    if (!r || !(r.matchedCount > 0 || r.modifiedCount > 0)) throw new Error(`audit row ${auditId} not found`);
+    const r = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [unchained(filter), { $set }] }, 'updateOne');
+    if (r && (r.matchedCount > 0 || r.modifiedCount > 0)) return;
+    await chain.amend(companyId, auditId, $set);
 };
 
 const baseMeta = (actor) => {
@@ -211,17 +215,20 @@ const markUndone = async (companyId, auditId, byActorId) => {
     const filter = rowFilter(auditId);
     if (!filter) return;
     const $set = { 'meta.undoneAt': new Date(), 'meta.undoneBy': String(byActorId || '') };
-    if (chain.isOn()) {
+    const appendUndone = async () => {
         try { await chain.amend(companyId, auditId, $set); } catch (e) {
+            if (e.notFound && !chain.isOn()) return;
             logger.error(`agent audit: ${AUDIT_UNMARKED} — row ${auditId} was undone but could not be marked undone, reconcile it: ${e.message}`);
             throw new AuditUnmarkedError(auditId, e.message, 'undone');
         }
-        return;
-    }
-    await MongoDbCrudOpration(companyId, {
+    };
+    if (chain.isOn()) return appendUndone();
+    const r = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AUDIT_LOGS,
-        data: [filter, { $set }],
-    }, 'updateOne').catch((e) => logger.error(`markUndone: ${e.message}`));
+        data: [unchained(filter), { $set }],
+    }, 'updateOne').catch((e) => { logger.error(`markUndone: ${e.message}`); return null; });
+    if (!r || r.matchedCount > 0 || r.modifiedCount > 0) return undefined;
+    return appendUndone();
 };
 
 /* The unique partial index on meta.idempotencyKey makes this the one row for an
