@@ -1,0 +1,184 @@
+const crypto = require('node:crypto');
+const path = require('node:path');
+const { MongoClient } = require('mongodb');
+const { createApiClient } = require('../../e2e/support/api');
+const { STATE_DIR, resolveMongoUrl } = require('../../e2e/support/env');
+const { emailFor, login, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
+const { startServer } = require('../../e2e/support/server');
+const { generateToken, hashToken, tokenPrefixOf } = require('../../Modules/ApiTokens/helpers/apiTokenRules');
+
+/* Sprint 8 slice 5. A second server runs with AUDIT_CHAIN on against the harness database, so every
+ * row it writes is chained while the harness server keeps writing unchained rows beside them. */
+
+const state = readState();
+const BOOT_TIMEOUT_MS = 180000;
+const ROW_DEADLINE_MS = 10000;
+const KEY = crypto.randomBytes(32).toString('hex');
+
+let server;
+let client;
+let audits;
+let owner;
+let startedAt;
+
+const waitFor = async (read, what) => {
+    const deadline = Date.now() + ROW_DEADLINE_MS;
+    for (;;) {
+        const found = await read();
+        if (found) return found;
+        if (Date.now() > deadline) throw new Error(`${what} did not appear within ${ROW_DEADLINE_MS}ms`);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+};
+
+const list = async (query) => {
+    const res = await owner.get('/api/v1/audit-logs', { query: { limit: 100, ...query } });
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe(true);
+    return res.body;
+};
+
+const scimRows = () => audits.find({ action: 'scim.config_update', 'chain.seq': { $type: 'number' }, createdAt: { $gte: startedAt } }).sort({ 'chain.seq': 1 }).toArray();
+
+async function agentToken(agentId) {
+    const raw = generateToken();
+    await client.db(state.companyId).collection('apiTokens').insertOne({
+        name: `[QA chain] ${agentId}`, tokenHash: hashToken(raw), prefix: tokenPrefixOf(raw), scopes: ['read', 'write'],
+        userId: state.users.owner.userId, active: true, kind: 'agent', agentId: String(agentId), projectIds: [], createdAt: new Date(), updatedAt: new Date(),
+    });
+    return createApiClient({ baseURL: server.baseURL, accessToken: raw, companyId: state.companyId });
+}
+
+beforeAll(async () => {
+    client = await MongoClient.connect(resolveMongoUrl());
+    audits = client.db(state.companyId).collection('audit_logs');
+    startedAt = new Date();
+    server = await startServer({
+        mongoUrl: resolveMongoUrl(),
+        logFile: path.join(STATE_DIR, 'audit-chain-server.log'),
+        env: { AUDIT_CHAIN: 'true', AUDIT_CHAIN_KEY: KEY },
+    });
+    const session = await login(server.baseURL, emailFor('owner'));
+    owner = createApiClient({ baseURL: server.baseURL, accessToken: session.accessToken, companyId: state.companyId });
+}, BOOT_TIMEOUT_MS);
+
+afterAll(async () => {
+    if (server) await server.stop();
+    if (client) {
+        await client.db(state.companyId).collection('apiTokens').deleteMany({ name: /^\[QA chain\]/ });
+        await client.close();
+    }
+}, BOOT_TIMEOUT_MS);
+
+describe('the audit hash chain through real routes', () => {
+    let actionRow;
+
+    beforeAll(async () => {
+        for (const isEnabled of [false, false, false]) {
+            const res = await owner.put('/api/v2/scim/config', { isEnabled });
+            expect(res.body.status).toBe(true);
+        }
+        await waitFor(async () => (await scimRows()).length === 3, 'three chained scim rows');
+
+        const agent = (await owner.post('/api/v2/agents', {
+            name: `[QA chain] ${uniqueSuffix()}`, description: 'audit chain', autonomy: 1, spendCapUsd: 1,
+            projectIds: [state.projects.shared._id], skills: [], allowedActions: ['task.comment'],
+        })).body.data;
+        const taskId = state.tasks[0]._id;
+        const proposal = (await (await agentToken(agent._id)).post('/api/v2/agents/proposals', {
+            agentId: agent._id, taskId, projectId: state.projects.shared._id, what: '[QA chain] proposal', why: 'integration',
+            changes: [{ action: 'task.comment', params: { taskId, body: `[QA chain] comment ${uniqueSuffix()}` }, label: 'Comment' }],
+        })).body.data;
+        const approved = await owner.post(`/api/v2/agents/proposals/${proposal._id}/approve`);
+        expect(approved.body.data.applied).toEqual([expect.objectContaining({ action: 'task.comment', ok: true })]);
+
+        actionRow = await waitFor(() => audits.findOne({ action: 'agent.action', 'meta.agentId': String(agent._id) }), 'the agent action row');
+        const undone = await owner.post(`/api/v1/audit-logs/${actionRow._id}/undo`, {});
+        expect(undone.body.status).toBe(true);
+        await waitFor(() => audits.findOne({ action: 'agent.action_undone', 'meta.originalAuditId': String(actionRow._id) }), 'the undo row');
+    }, 60000);
+
+    it('chains every row the server writes, with contiguous sequence numbers', async () => {
+        const written = await audits.find({ createdAt: { $gte: startedAt }, 'chain.seq': { $type: 'number' } }).sort({ 'chain.seq': 1 }).toArray();
+        expect(written.length).toBeGreaterThanOrEqual(7);
+        const seqs = written.map((r) => r.chain.seq);
+        expect(seqs).toEqual(seqs.map((_, i) => seqs[0] + i));
+        written.slice(1).forEach((row, i) => expect(row.chain.prevHash).toBe(written[i].chain.hash));
+        expect(written.every((r) => /^[0-9a-f]{64}$/.test(r.chain.hash))).toBe(true);
+    });
+
+    it('never edits the action row: its changes are appended rows that reference it', async () => {
+        const stored = await audits.findOne({ _id: actionRow._id });
+        expect(stored.meta).toMatchObject({ state: 'pending', undo: null, undoneAt: null });
+        const amendments = await audits.find({ action: 'audit.amended', 'meta.amends': String(actionRow._id) }).sort({ 'chain.seq': 1 }).toArray();
+        expect(amendments.map((a) => Object.keys(a.meta.set).sort())).toEqual([
+            ['settledAt', 'state', 'undo', 'undoable'],
+            ['undoneAt', 'undoneBy'],
+        ]);
+        expect(amendments.every((a) => a.chain.seq > stored.chain.seq)).toBe(true);
+    });
+
+    it('lists the folded state with an integrity state per row and hides the appended changes', async () => {
+        const body = await list({});
+        expect(body.metadata.chain).toEqual({ on: true });
+        expect(body.data.some((r) => r.action === 'audit.amended')).toBe(false);
+
+        const action = body.data.find((r) => r._id === String(actionRow._id));
+        expect(action.meta).toMatchObject({ state: 'applied', undoable: true, undoneBy: state.users.owner.userId });
+        expect(action.meta.undoneAt).toBeTruthy();
+        expect(action.entityName).toBeTruthy();
+        expect(action.integrity).toEqual({ state: 'verified' });
+
+        const chainedRows = body.data.filter((r) => r.chain);
+        expect(chainedRows.length).toBeGreaterThanOrEqual(5);
+        chainedRows.forEach((r) => expect(r.integrity).toEqual({ state: 'verified' }));
+        body.data.filter((r) => !r.chain).forEach((r) => expect(r.integrity).toEqual({ state: 'unchained' }));
+
+        const undoneTab = await list({ undone: 'true' });
+        expect(undoneTab.data.map((r) => r._id)).toContain(String(actionRow._id));
+        const searched = await list({ q: action.entityName });
+        expect(searched.data.map((r) => r._id)).toContain(String(actionRow._id));
+        const byEntity = await list({ entityId: action.entityId });
+        expect(byEntity.data.map((r) => r._id)).toContain(String(actionRow._id));
+    });
+
+    it('reports a row changed in Mongo as broken from its sequence number, and verified once restored', async () => {
+        const [first, second, third] = await scimRows();
+        await audits.updateOne({ _id: second._id }, { $set: { 'meta.isEnabled': true } });
+        try {
+            const body = await list({ action: 'scim.config_update' });
+            const byId = new Map(body.data.map((r) => [r._id, r]));
+            expect(byId.get(String(first._id)).integrity).toEqual({ state: 'verified' });
+            expect(byId.get(String(second._id)).integrity).toEqual({ state: 'broken', brokenAt: second.chain.seq });
+            expect(byId.get(String(third._id)).integrity).toEqual({ state: 'broken', brokenAt: second.chain.seq });
+        } finally {
+            await audits.updateOne({ _id: second._id }, { $set: { meta: second.meta } });
+        }
+        const restored = await list({ action: 'scim.config_update' });
+        expect(restored.data.find((r) => r._id === String(second._id)).integrity).toEqual({ state: 'verified' });
+    });
+
+    it('reports a deleted middle row as a break for every later row', async () => {
+        const [first, second, third] = await scimRows();
+        await audits.deleteOne({ _id: second._id });
+        try {
+            const body = await list({ action: 'scim.config_update' });
+            const byId = new Map(body.data.map((r) => [r._id, r]));
+            expect(byId.get(String(first._id)).integrity).toEqual({ state: 'verified' });
+            expect(byId.get(String(third._id)).integrity).toEqual({ state: 'broken', brokenAt: second.chain.seq });
+        } finally {
+            await audits.insertOne(second);
+        }
+        const restored = await list({ action: 'scim.config_update' });
+        expect(restored.data.find((r) => r._id === String(third._id)).integrity).toEqual({ state: 'verified' });
+    });
+
+    it('filters to permission refusals', async () => {
+        const marker = `[QA chain] ${uniqueSuffix()}`;
+        await audits.insertOne({ action: 'permission.refused', actorId: state.users.member.userId, actorName: '', entityType: 'permission', entityId: 'task.task_priority', entityName: marker, meta: { mode: 'enforce', reason: 'denied' }, ip: '', createdAt: new Date(), updatedAt: new Date() });
+        const body = await list({ refused: 'true' });
+        expect(body.data.length).toBeGreaterThanOrEqual(1);
+        expect(body.data.every((r) => r.action === 'permission.refused')).toBe(true);
+        expect(body.data.find((r) => r.entityName === marker).integrity).toEqual({ state: 'unchained' });
+    });
+});
