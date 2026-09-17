@@ -109,7 +109,8 @@ const {
     formsSchema,
     formSubmissionsSchema,
     projectContractsSchema,
-    projectInvoicesSchema
+    projectInvoicesSchema,
+    permissionDecisionsSchema
 } = require('./createSchema');
 
 
@@ -333,6 +334,8 @@ exports.checkType = (type) => {
             return projectContractsSchema
         case SCHEMA_TYPE.PROJECT_INVOICES:
             return projectInvoicesSchema
+        case SCHEMA_TYPE.PERMISSION_DECISIONS:
+            return permissionDecisionsSchema
         default:
             return ""
     }
@@ -559,6 +562,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.PROJECT_CONTRACTS}`
         case SCHEMA_TYPE.PROJECT_INVOICES:
                 return `${dbCollections.PROJECT_INVOICES}`
+        case SCHEMA_TYPE.PERMISSION_DECISIONS:
+                return `${dbCollections.PERMISSION_DECISIONS}`
         default:
             return ""
     }

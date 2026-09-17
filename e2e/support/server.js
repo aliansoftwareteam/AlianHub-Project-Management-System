@@ -48,6 +48,8 @@ function serverEnv({ port, mongoUrl, workDir }) {
         GLOBAL_RATE_LIMIT_PER_MIN: 'off',
         AUTH_RATE_LIMIT_MAX_ATTEMPTS: '10000',
         MEMBERSHIP_CACHE_TTL_SECONDS: '0',
+        // A workspace enforcement mode a test writes to the company row applies to the next request.
+        PERMISSION_ENFORCEMENT_CACHE_TTL_SECONDS: '0',
         // Port 9 (discard) refuses at once, so invite mail fails fast instead of timing out.
         NODEMAILER_HOST: '127.0.0.1',
         NODEMAILER_PORT: '9',
