@@ -46,6 +46,7 @@ function serverEnv({ port, mongoUrl, workDir }) {
         // Retrieval and the page indexer turn on only for a company whose own switch is "on".
         KNOWLEDGE_RETRIEVAL: 'tenant',
         KNOWLEDGE_INDEXER: 'tenant',
+        AGENT_PERFORMANCE_READ: 'on',
         GLOBAL_RATE_LIMIT_PER_MIN: 'off',
         AUTH_RATE_LIMIT_MAX_ATTEMPTS: '10000',
         MEMBERSHIP_CACHE_TTL_SECONDS: '0',

@@ -902,6 +902,8 @@ const schema = {
     // One per model call (Modules/AICore/replay.js); system, messages and response are redacted and capped
     aiReplays: {
         feature: { type: String, required: true },
+        // 'tool' for a registry read an agent called; absent on a model call
+        kind: { type: String, required: false },
         runId: { type: String, required: false },
         agentId: { type: String, required: false },
         agentRevision: { type: Number, required: false },
@@ -916,12 +918,15 @@ const schema = {
         },
         // the routing decision for this call (Modules/AICore/decision.js)
         decision: { type: Object, required: false },
-        // sha256 of the unredacted { system, messages }
+        // sha256 of the unredacted { system, messages }, or of the query on a tool row
         promptHash: { type: String, required: true },
         system: { type: String, required: false },
         // [{ role, content }]
         messages: { type: Array, default: [], required: false },
         retrievedChunkIds: { type: [String], default: [], required: false },
+        // tool rows: { action, args, scope } and the numbers the action returned
+        query: { type: Object, required: false },
+        result: { type: Object, required: false },
         response: { type: String, required: false },
         truncated: { type: Boolean, default: false, required: false },
         usage: {

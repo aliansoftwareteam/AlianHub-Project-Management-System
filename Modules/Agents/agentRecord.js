@@ -11,7 +11,7 @@ const DEFAULTS = Object.freeze({ autonomy: 0, spendCapUsd: 30, paused: false, ac
 const createAgentRecord = async (companyId, fields, { ownerId } = {}) => {
     const name = String((fields && fields.name) || '').trim().slice(0, 80);
     if (!name) throw new Error('name is required.');
-    const allowedActions = Array.isArray(fields.allowedActions) ? fields.allowedActions.filter((a) => registry.has(a)) : [];
+    const allowedActions = Array.isArray(fields.allowedActions) ? registry.allowedActionsToStore(fields.allowedActions) : [];
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENTS,
         data: { ...DEFAULTS, ...fields, name, allowedActions, ownerId: ownerId ? String(ownerId) : undefined },
