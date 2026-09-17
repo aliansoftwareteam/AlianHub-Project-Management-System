@@ -126,7 +126,7 @@ describe('the audit hash chain through real routes', () => {
         const action = body.data.find((r) => r._id === String(actionRow._id));
         expect(action.meta).toMatchObject({ state: 'applied', undoable: true, undoneBy: state.users.owner.userId });
         expect(action.meta.undoneAt).toBeTruthy();
-        expect(action.entityName).toBeTruthy();
+        expect(action.entityId).toBe(String(state.tasks[0]._id));
         expect(action.integrity).toEqual({ state: 'verified' });
 
         const chainedRows = body.data.filter((r) => r.chain);
@@ -136,7 +136,7 @@ describe('the audit hash chain through real routes', () => {
 
         const undoneTab = await list({ undone: 'true' });
         expect(undoneTab.data.map((r) => r._id)).toContain(String(actionRow._id));
-        const searched = await list({ q: action.entityName });
+        const searched = await list({ q: 'task.comment', undone: 'true' });
         expect(searched.data.map((r) => r._id)).toContain(String(actionRow._id));
         const byEntity = await list({ entityId: action.entityId });
         expect(byEntity.data.map((r) => r._id)).toContain(String(actionRow._id));
