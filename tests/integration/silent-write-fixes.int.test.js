@@ -231,14 +231,14 @@ describe('bulk project task update answers with the response envelope', () => {
 
         const res = await owner.api.put(`/api/v1/project/allTask/${project._id}`, {
             findObject: { deletedStatusKey: 0 },
-            updateObject: { Task_Priority: 'LOW' },
+            updateObject: { deletedStatusKey: 8 },
         });
 
         expect(res.status).toBe(200);
         expect(res.body).toMatchObject({ status: true });
         expect(res.body.statusText).toEqual(expect.any(String));
         expect(res.body.data.matched).toBeGreaterThan(0);
-        expect((await readTask(owner, task._id)).Task_Priority).toBe('LOW');
+        expect((await readTask(owner, task._id)).deletedStatusKey).toBe(8);
     });
 
     it('SNW-09 reports a zero match instead of an empty body', async () => {
@@ -246,8 +246,8 @@ describe('bulk project task update answers with the response envelope', () => {
         const { project } = await projectWithTask(owner);
 
         const res = await owner.api.put(`/api/v1/project/allTask/${project._id}`, {
-            findObject: { TaskKey: `SNW-none-${uniqueSuffix()}` },
-            updateObject: { Task_Priority: 'LOW' },
+            findObject: { deletedStatusKey: 5 },
+            updateObject: { deletedStatusKey: 0 },
         });
 
         expect(res.status).toBe(200);

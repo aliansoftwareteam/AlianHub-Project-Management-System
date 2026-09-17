@@ -33,6 +33,7 @@ const { ROLE_GUEST, ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER, isPrivileged } = requir
 const { ACTIVE_SEAT, INVITED_SEAT } = require("./seatStatus");
 const { resolveMode, OFF, ENFORCE } = require("./permissionEnforcement");
 const { recordDecision, REASONS, GLOBAL_SCOPE } = require("./permissionDecisions");
+const { TASK_ACTIONS, BODY_COMPANY_PATHS, requirementsOf, actionEntry } = require("./taskWritePermissions");
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const ROLE_CACHE_TTL_SECONDS = 60;
@@ -41,8 +42,8 @@ const PROJECT_RULES_TTL_SECONDS = 604800;
 // A project's own rules never hold these two keys, and checkPermission(path, false) grants them.
 const PROJECT_CONTEXT_GRANTED = ['project.project_list', 'project.public_projects'];
 
-// Project rules are seeded from the project and task sections only, and the web app never checks a settings key against them.
-const isCompanyWideKey = (path) => String(path).startsWith('settings.');
+// Project rules are seeded from the project and task sections only, and the web app never checks a settings or chat key against them.
+const isCompanyWideKey = (path) => ['settings.', 'chat.'].some((prefix) => String(path).startsWith(prefix));
 
 // Runbook kill switch (DISABLE_PERMISSION_ENFORCEMENT=true): API tokens and project edits skip the per-key
 // checks, and a browser session set to enforce is judged in report mode instead. Role guards stay on for tokens.
@@ -53,20 +54,6 @@ const fineGrainedEnforced = () => process.env.DISABLE_PERMISSION_ENFORCEMENT !==
 const isApiTokenRequest = (req) => Boolean(req && req.apiToken);
 
 const ALLOWED = Object.freeze({ allowed: true });
-
-// PATCH /api/v2/tasks dispatches many actions; actions not listed pass
-// through (structural ops like moveTask/convert have no single key).
-const TASK_ACTION_PERMISSION = {
-    updateStatus: 'task.task_status',
-    updatePriority: 'task.task_priority',
-    updateAssignee: 'task.task_assignee',
-    updateDueDate: 'task.task_due_date',
-    updateStartDate: 'task.task_due_date',
-    updateTaskType: 'task.task_type',
-    updateDescription: 'task.task_description',
-    updateTaskTotalEstimate: 'task.task_estimated_hours',
-    updatePoints: 'task.task_estimated_hours',
-};
 
 const toObjectId = (value) => (OBJECT_ID_PATTERN.test(String(value || '')) ? new mongoose.Types.ObjectId(String(value)) : null);
 
@@ -187,12 +174,51 @@ const evaluatePermission = async (companyId, uid, path, { projectId, strict = fa
 const TASK_ID_FIELDS = [['taskData', '_id'], ['task', '_id']];
 const PROJECT_ID_FIELDS = [['data', 'ProjectID'], ['projectData', '_id'], ['project', '_id'], ['projectId']];
 
-// Stored ids stringify in lower case, and a client may send upper-case hex that Mongo still matches.
-const idAt = (body, fields) => {
-    const value = fields.reduce((node, field) => (node && typeof node === 'object' ? node[field] : undefined), body);
-    return OBJECT_ID_PATTERN.test(String(value || '')) ? String(value).toLowerCase() : null;
+const ABSENT = Object.freeze({ absent: true });
+const UNREADABLE = Object.freeze({ unreadable: true });
+
+/*
+ * The one id a value names, read as the task handlers read it: ObjectId takes hex in any case or { id }, a
+ * Mongo filter also casts { _id }, and the bulk handlers trim. Stored ids stringify in lower case. A missing
+ * or empty value names nothing; anything else a handler could still act on (an operator, a list) is unreadable.
+ */
+const readId = (value) => {
+    if (value === undefined || value === null) return ABSENT;
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return ABSENT;
+        return OBJECT_ID_PATTERN.test(trimmed) ? { id: trimmed.toLowerCase() } : UNREADABLE;
+    }
+    const keys = typeof value === 'object' && !Array.isArray(value) ? Object.keys(value) : [];
+    if (keys.length === 1 && ['id', '_id'].includes(keys[0]) && typeof value[keys[0]] === 'string') {
+        const inner = readId(value[keys[0]]);
+        return inner.id ? inner : UNREADABLE;
+    }
+    return UNREADABLE;
 };
-const idsAt = (body, paths) => [...new Set(paths.map((fields) => idAt(body, fields)).filter(Boolean))];
+
+/* Every id at the paths; '*' reads each element of a list, and a value there that is not a list cannot be read. */
+const readIdsAt = (body, paths) => {
+    const ids = new Set();
+    let unreadable = false;
+    paths.forEach((fields) => {
+        const values = fields.reduce((nodes, field) => nodes.flatMap((node) => {
+            if (field !== '*') return node && typeof node === 'object' && !Array.isArray(node) ? [node[field]] : [];
+            if (Array.isArray(node)) return node;
+            if (!readId(node).absent) unreadable = true;
+            return [];
+        }), [body]);
+        values.forEach((value) => {
+            const read = readId(value);
+            if (read.id) ids.add(read.id);
+            if (read.unreadable) unreadable = true;
+        });
+    });
+    return { ids: [...ids], unreadable };
+};
+
+const idAt = (body, fields) => readIdsAt(body, [fields]).ids[0] || null;
+const idsAt = (body, paths) => readIdsAt(body, paths).ids;
 
 /*
  * The projects whose rules judge a request, from every body shape the web app sends to a guarded route
@@ -200,10 +226,12 @@ const idsAt = (body, paths) => [...new Set(paths.map((fields) => idAt(body, fiel
  * them must allow, so a client cannot borrow a more permissive project's rules. `unresolved` marks a body
  * whose tasks all failed to resolve. `legacyProjectId` is what this lookup returned before it covered the
  * task and project shapes; the enforced API-token path still allows what that project allowed.
+ * A `lookup` from Config/taskWritePermissions.js names the task and project ids its handler writes
+ * through instead, and every project either reaches is judged.
  */
-const projectsForRequest = async (companyId, req) => {
+const projectsForRequest = async (companyId, req, lookup = null) => {
     const body = (req && req.body) || {};
-    const taskIds = idsAt(body, TASK_ID_FIELDS);
+    const taskIds = idsAt(body, lookup ? (lookup.tasks || []) : TASK_ID_FIELDS);
     const projectOfTask = new Map();
     if (taskIds.length) {
         const tasks = await MongoDbCrudOpration(companyId, {
@@ -212,14 +240,15 @@ const projectsForRequest = async (companyId, req) => {
         }, 'find');
         (tasks || []).forEach((task) => { if (task.ProjectID) projectOfTask.set(String(task._id).toLowerCase(), String(task.ProjectID).toLowerCase()); });
     }
-    const projectIds = taskIds.length
-        ? [...new Set(taskIds.map((id) => projectOfTask.get(id)).filter(Boolean))]
-        : idsAt(body, PROJECT_ID_FIELDS);
+    const taskProjectIds = [...new Set(taskIds.map((id) => projectOfTask.get(id)).filter(Boolean))];
+    const projectIds = lookup
+        ? [...new Set([...taskProjectIds, ...idsAt(body, lookup.projects || [])])]
+        : (taskIds.length ? taskProjectIds : idsAt(body, PROJECT_ID_FIELDS));
     const legacyTaskId = idAt(body, ['taskData', '_id']);
     const legacyProjectId = legacyTaskId
         ? (projectOfTask.get(legacyTaskId) || null)
         : (idAt(body, ['data', 'ProjectID']) || idAt(body, ['projectId']));
-    return { projectIds, unresolved: taskIds.length > 0 && projectIds.length === 0, legacyProjectId };
+    return { projectIds, unresolved: taskIds.length > 0 && taskProjectIds.length === 0, legacyProjectId };
 };
 
 /**
@@ -284,15 +313,18 @@ const refusingScope = async (companyId, uid, path, write, projectIds, strict) =>
  * A body whose tasks do not exist is judged on the company rules rather than passed through: the task
  * handlers write through the ids and the company the body names, so it could reach a task this check never saw.
  * `strict` makes a failed role read throw instead of reading as no seat; the API-token path keeps the old answer.
+ * A `lookup` gets no legacy fallback: nothing it judges was refused before, so there is nothing to keep allowing.
  */
-const requestVerdict = async (companyId, uid, req, path, write, { strict = false } = {}) => {
+const requestVerdict = async (companyId, uid, req, path, write, { strict = false, lookup = null } = {}) => {
     if (isCompanyWideKey(path)) {
         return passes(await evaluatePermission(companyId, uid, path, { strict }), write) ? ALLOWED : { allowed: false, scope: GLOBAL_SCOPE };
     }
-    const { projectIds, unresolved, legacyProjectId } = await projectsForRequest(companyId, req);
+    const { projectIds, unresolved, legacyProjectId } = await projectsForRequest(companyId, req, lookup);
     if (unresolved) logger.warn(`permission guard ${path}: the tasks named in the body were not found; judged on the company rules`);
-    const scope = await refusingScope(companyId, uid, path, write, projectIds, strict);
+    const scopes = unresolved && projectIds.length ? [...projectIds, null] : projectIds;
+    const scope = await refusingScope(companyId, uid, path, write, scopes, strict);
     if (!scope) return ALLOWED;
+    if (lookup) return { allowed: false, scope, unresolved };
     const sameContext = projectIds.length <= 1 && (projectIds[0] || null) === legacyProjectId;
     if (sameContext || !passes(await evaluatePermission(companyId, uid, path, { projectId: legacyProjectId, strict }), write)) {
         return { allowed: false, scope, unresolved };
@@ -318,10 +350,10 @@ const denialReason = async (companyId, uid, path, write, { scope, unresolved }) 
     return { role, reason: REASONS.DENIED };
 };
 
-const sessionPermissionVerdict = async (req, path, write, sessionAllows) => {
+const sessionPermissionVerdict = async (req, path, write, sessionAllows, lookup = null) => {
     if (sessionAllows && await sessionAllows(req)) return ALLOWED;
     const companyId = req.headers["companyid"] || "";
-    const verdict = await requestVerdict(companyId, req.uid, req, path, write, { strict: true });
+    const verdict = await requestVerdict(companyId, req.uid, req, path, write, { strict: true, lookup });
     return verdict.allowed ? verdict : { ...verdict, ...(await denialReason(companyId, req.uid, path, write, verdict)) };
 };
 
@@ -342,11 +374,11 @@ const judgeSession = async (req, res, next, { permission, check, refuse }) => {
     }
     if (verdict.allowed) return next();
     recordDecision(req, res, {
-        companyId, mode, permission, uid: req.uid, role: verdict.role, scope: verdict.scope,
+        companyId, mode, permission: verdict.permission || permission, uid: req.uid, role: verdict.role, scope: verdict.scope,
         reason: verdict.failed ? REASONS.CHECK_FAILED : verdict.reason,
     });
     if (mode !== ENFORCE) return next();
-    return refuse(verdict.failed ? "Permission check failed." : "You do not have permission to perform this action.");
+    return refuse(verdict.failed ? "Permission check failed." : "You do not have permission to perform this action.", verdict);
 };
 
 /**
@@ -355,7 +387,7 @@ const judgeSession = async (req, res, next, { permission, check, refuse }) => {
  * `sessionAllows(req)` names the browser-session requests the route's handler allows without the key,
  * such as a member changing their own preferences; API tokens are judged on the key alone.
  */
-const requirePermission = (path, { write = true, sessionAllows = null } = {}) => async (req, res, next) => {
+const requirePermission = (path, { write = true, sessionAllows = null } = {}) => Object.assign(async (req, res, next) => {
     const forbid = (statusText) => res.status(403).json({ status: false, statusText, error: "Forbidden", permission: path });
     if (!isApiTokenRequest(req)) {
         return judgeSession(req, res, next, { permission: path, refuse: forbid, check: () => sessionPermissionVerdict(req, path, write, sessionAllows) });
@@ -369,18 +401,95 @@ const requirePermission = (path, { write = true, sessionAllows = null } = {}) =>
         logger.error(`requirePermission error (${path}): ${error.message || error}`);
         return forbid("Permission check failed.");
     }
+}, { permission: path });
+
+const needLabel = (need) => (need.anyOf ? need.anyOf.map((option) => option.key).join('|') : need.key);
+
+const needVerdict = async (req, need, lookup) => {
+    if (need.anyOf) {
+        let refusal = null;
+        for (const option of need.anyOf) {
+            const verdict = await needVerdict(req, option, lookup);
+            if (verdict.allowed) return ALLOWED;
+            refusal = refusal || verdict;
+        }
+        return { ...refusal, permission: needLabel(need) };
+    }
+    const verdict = await sessionPermissionVerdict(req, need.key, need.write, null, lookup);
+    return verdict.allowed ? ALLOWED : { ...verdict, permission: need.key };
 };
 
-const requireTaskActionPermission = () => async (req, res, next) => {
-    const action = req.body && req.body.action;
-    if (!isApiTokenRequest(req)) {
-        return Object.hasOwn(TASK_ACTION_PERMISSION, action) ? requirePermission(TASK_ACTION_PERMISSION[action])(req, res, next) : next();
+const taskWriteVerdict = async (req, taskEntry, needs) => {
+    const own = { tasks: taskEntry.tasks || [], projects: taskEntry.projects || [] };
+    for (const need of needs) {
+        const verdict = await needVerdict(req, need, need.lookup || own);
+        if (!verdict.allowed) return verdict;
     }
-    if (!fineGrainedEnforced()) return next();
-    const key = action && TASK_ACTION_PERMISSION[action];
-    if (!key) return next();
-    return requirePermission(key, { write: true })(req, res, next);
+    return ALLOWED;
 };
+
+const PROBLEM_TEXT = Object.freeze({
+    [REASONS.COMPANY_MISMATCH]: "The request names a company other than the one it was sent for.",
+    [REASONS.UNRESOLVABLE_ID]: "The request names a task or project id that cannot be read.",
+});
+
+const DEFAULT_LOOKUP = Object.freeze({ tasks: TASK_ID_FIELDS, projects: PROJECT_ID_FIELDS });
+
+const valueAt = (body, fields) => fields.reduce((node, field) => (node && typeof node === 'object' ? node[field] : undefined), body);
+
+/* The handlers pick the database from these body fields, while the mode and the rules come from the header. */
+const namesOtherCompany = (req, body) => {
+    const companyId = String(req.headers["companyid"] || "");
+    return BODY_COMPANY_PATHS.some((fields) => {
+        const value = valueAt(body, fields);
+        return value !== undefined && value !== null && value !== '' && value !== companyId;
+    });
+};
+
+const taskWriteProblem = (req, taskEntry, needs) => {
+    const body = (req && req.body) || {};
+    if (namesOtherCompany(req, body)) return REASONS.COMPANY_MISMATCH;
+    const lookups = [taskEntry.tokenEnforced ? DEFAULT_LOOKUP : taskEntry, ...needs.filter((need) => need.lookup).map((need) => need.lookup)];
+    const paths = lookups.flatMap((lookup) => [...(lookup.tasks || []), ...(lookup.projects || [])]);
+    return readIdsAt(body, paths).unreadable ? REASONS.UNRESOLVABLE_ID : null;
+};
+
+const problemVerdict = async (req, reason) => ({
+    allowed: false,
+    reason,
+    scope: GLOBAL_SCOPE,
+    statusText: PROBLEM_TEXT[reason],
+    role: await getRoleType(req.headers["companyid"] || "", req.uid, { throwOnError: true }),
+});
+
+/*
+ * API tokens are refused a body naming another company or an unreadable id in every mode. Otherwise the nine
+ * token-enforced actions keep the token path they had, and every other task write goes through the workspace's
+ * mode for tokens and sessions alike, so a new mapping refuses nothing until a workspace enforces.
+ */
+const requireTaskWritePermission = (taskEntry) => Object.assign(async (req, res, next) => {
+    const needs = requirementsOf(taskEntry, req.body);
+    const label = needs.map(needLabel).join('+');
+    const problem = taskWriteProblem(req, taskEntry, needs);
+    const refuse = (statusText, verdict = {}) => res.status(403).json({ status: false, statusText: verdict.statusText || statusText, error: "Forbidden", permission: verdict.permission || label });
+    if (isApiTokenRequest(req)) {
+        if (problem) {
+            logger.warn(`permission guard ${label}: API token refused, ${problem}`);
+            return refuse(PROBLEM_TEXT[problem]);
+        }
+        if (taskEntry.tokenEnforced) return requirePermission(needs[0].key)(req, res, next);
+    }
+    const check = () => {
+        if (problem) return problemVerdict(req, problem);
+        return taskEntry.tokenEnforced ? sessionPermissionVerdict(req, needs[0].key, needs[0].write, null) : taskWriteVerdict(req, taskEntry, needs);
+    };
+    return judgeSession(req, res, next, { permission: label, refuse, check });
+}, { taskWrites: taskEntry });
+
+const requireTaskActionPermission = (actions = TASK_ACTIONS) => Object.assign(async (req, res, next) => {
+    const taskEntry = actionEntry(actions, req.body && req.body.action);
+    return taskEntry ? requireTaskWritePermission(taskEntry)(req, res, next) : next();
+}, { taskWrites: actions });
 
 /** The permission keys the MCP server enforces (one per tool/field). */
 const MCP_PERMISSION_KEYS = [
@@ -459,6 +568,7 @@ module.exports = {
     requireCompanyAdmin,
     requirePermission,
     requireTaskActionPermission,
+    requireTaskWritePermission,
     evaluateMany,
     MCP_PERMISSION_KEYS,
     invalidateRoleCache,

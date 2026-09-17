@@ -389,7 +389,7 @@ describe('PRJ-04: PUT /api/v1/project/allTask/:id', () => {
     it('scopes the update to the URL project whatever else findObject says', async () => {
         const projectId = oid();
         const res = response();
-        await projectAlltaskUpdate(request({ uid: OWNER, params: { id: projectId }, body: { findObject: { ProjectID: projectId, _id: oid() }, updateObject: { TaskName: 'x' } } }), res);
+        await projectAlltaskUpdate(request({ uid: OWNER, params: { id: projectId }, body: { findObject: { ProjectID: projectId, deletedStatusKey: 0 }, updateObject: { deletedStatusKey: 8 } } }), res);
         const [update] = mockDb.calls.filter((c) => c.method === 'updateMany');
         expect(String(update.data[0].ProjectID)).toBe(projectId);
     });
