@@ -98,9 +98,9 @@ describe('performance.read over MCP', () => {
         expect(numbers.time.totalMinutes).toBe(await projectTimesheetMinutes(member, String(project._id)));
         expect(numbers.variance).toMatchObject({ tasks: 1, totalActual: 40 });
 
-        const flow = await member.api.get('/api/v1/agile/cfd', { query: { projectId: String(project._id), from: FROM, to: TO } });
-        expect(numbers.flow.days).toEqual(flow.body.data.days);
-        expect(numbers.flow.days).toHaveLength(7);
+        expect(numbers.flow.days.map((d) => d.date)).toEqual(Array.from({ length: 7 }, (_, i) => isoDay(Date.parse(`${FROM}T00:00:00Z`) + i * DAY_MS)));
+        const today = numbers.flow.days[6];
+        expect(today.open + today.inprogress + today.onhold + today.close).toBe(1);
 
         const replay = await db.collection('ai_replays').findOne({ _id: new ObjectId(out.replayId) });
         expect(replay).toMatchObject({
@@ -135,5 +135,80 @@ describe('performance.read over MCP', () => {
         const token = await tokenFor(member, [String(project._id)]);
         const out = payloadOf(await mcpCall(token, 'performance.read', { projectId: String(project._id), from: isoDay(Date.now() - 130 * DAY_MS), to: TO }));
         expect(out).toMatchObject({ refused: true, reason: expect.stringMatching(/at most 120 days/) });
+    });
+});
+
+describe('performance.read over MCP keeps a private sprint to the people it is shared with', () => {
+    let client;
+    let db;
+    let owner;
+    let member;
+    let project;
+    let sprintId;
+    const tokens = [];
+
+    beforeAll(async () => {
+        client = await MongoClient.connect(resolveMongoUrl());
+        db = client.db(state.companyId);
+        owner = await loginAs('owner');
+        member = await loginAs('member');
+        const everyone = Object.values(state.users).map((u) => u.userId);
+        project = await createProject(owner.api, { assigneeIds: everyone, createdBy: owner.uid });
+        const open = await createTask(owner.api, { project, user: state.users.owner, companyOwnerId: state.users.owner.userId });
+        const hidden = await createTask(owner.api, { project, user: state.users.owner, companyOwnerId: state.users.owner.userId });
+
+        const closedAt = new Date(Date.now() - DAY_MS);
+        const inserted = await db.collection('sprints').insertOne({
+            name: `[QA perf] private ${uniqueSuffix()}`, projectId: new ObjectId(String(project._id)), private: true, AssigneeUserId: [state.users.owner.userId],
+            isScrum: true, state: 'closed', deletedStatusKey: 0, startDate: new Date(Date.now() - 5 * DAY_MS), endDate: closedAt,
+            commitment: { points: 3, tasks: 1, at: new Date(Date.now() - 5 * DAY_MS) }, closeReport: { at: closedAt },
+        });
+        sprintId = inserted.insertedId;
+        await db.collection('tasks').updateOne({ _id: new ObjectId(hidden._id) }, { $set: { sprintId, sprintArray: { id: String(sprintId), name: 'private' } } });
+
+        const row = (userId, taskId, minutes) => ({
+            LogDescription: '[QA perf] log', Loggeduser: userId, TicketID: taskId, ProjectId: String(project._id),
+            LogStartTime: LOGGED_AT, LogEndTime: LOGGED_AT + minutes * 60, LogTimeDuration: minutes, logAddType: 1, trackShots: [], billable: true,
+        });
+        await db.collection('timesheets').insertMany([
+            row(state.users.member.userId, open._id, 30),
+            row(state.users.member.userId, hidden._id, 15),
+        ]);
+    });
+
+    afterAll(async () => {
+        for (const { session, id } of tokens) await session.api.delete(`/api/v2/api-tokens/${id}`);
+        await db.collection('timesheets').deleteMany({ ProjectId: String(project._id) });
+        await db.collection('sprints').deleteOne({ _id: sprintId });
+        await client.close();
+    });
+
+    const readAs = async (session, args) => {
+        const minted = await mintToken(session, [String(project._id)]);
+        tokens.push({ session, id: minted._id });
+        const res = await mcpCall(minted.token, 'performance.read', { projectId: String(project._id), from: FROM, to: TO, ...args });
+        expect(res.body.result.isError).toBeFalsy();
+        return payloadOf(res).projects[0];
+    };
+
+    const tasksOn = (day) => day.open + day.inprogress + day.onhold + day.close;
+
+    it('leaves the sprint, its task and the time logged on it out for a member who is not on it', async () => {
+        const mine = await readAs(member, {});
+        expect(mine.time).toMatchObject({ totalMinutes: 30, whose: 'self' });
+        expect(mine.variance.tasks).toBe(1);
+        expect(mine.velocity.sprints.map((s) => s.sprintId)).not.toContain(String(sprintId));
+        expect(tasksOn(mine.flow.days[mine.flow.days.length - 1])).toBe(1);
+
+        const replay = await db.collection('ai_replays').findOne({ 'query.scope.userId': state.users.member.userId, 'query.args.projectIds': String(project._id) });
+        expect(replay.query.scope.hiddenSprintIds[String(project._id)]).toEqual([String(sprintId)]);
+    });
+
+    it('keeps them for the owner', async () => {
+        const all = await readAs(owner, {});
+        expect(all.time).toMatchObject({ totalMinutes: 45, whose: 'company' });
+        expect(all.variance.tasks).toBe(2);
+        expect(all.velocity.sprints.map((s) => s.sprintId)).toContain(String(sprintId));
+        expect(tasksOn(all.flow.days[all.flow.days.length - 1])).toBe(2);
     });
 });

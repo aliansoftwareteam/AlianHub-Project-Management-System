@@ -18,6 +18,12 @@ const variance = require('../Modules/VarianceReport/controller');
 const velocity = require('../Modules/AgileReports/velocity');
 const cfd = require('../Modules/AgileReports/cfd');
 const { aiReplaysSchema } = require('../utils/mongo-handler/createSchema');
+const { spawnSync } = require('child_process');
+const path = require('path');
+const ctrl = require('../Modules/Agents/controller');
+const { createAgentRecord } = require('../Modules/Agents/agentRecord');
+const REGISTRY_ON_BETA = require('./fixtures/agentRegistry.beta.json');
+const AGILE_ON_BETA = require('./fixtures/agileReports.beta.json');
 
 const ACTION = 'performance.read';
 const C = '6f0000000000000000000c01';
@@ -38,6 +44,10 @@ const MEMBER_ROLE = 3;
 
 const FROM = '2026-08-01';
 const TO = '2026-08-31';
+// The chart reads local days; local midnight names the same calendar days in any zone,
+// and every task event sits at noon UTC, inside the same day from -11 to +11.
+const LOCAL_FROM = `${FROM}T00:00:00`;
+const LOCAL_TO = `${TO}T00:00:00`;
 const at = (iso) => new Date(iso);
 const seconds = (iso) => Math.floor(Date.parse(iso) / 1000);
 
@@ -92,12 +102,12 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.SPRINTS, sprint({ _id: OPEN_SPRINT, name: 'Sprint 4', startDate: at('2026-07-28'), endDate: at('2026-08-10'), closeReport: { at: at('2026-08-11T10:00:00Z') } }));
     mockDb.seed(SCHEMA_TYPE.SPRINTS, sprint({ _id: PRIVATE_SPRINT, name: 'Security', private: true, AssigneeUserId: [OTHER], startDate: at('2026-08-12'), endDate: at('2026-08-25'), closeReport: { at: at('2026-08-26T10:00:00Z') } }));
 
-    const task = (over) => ({ ProjectID: P1, isParentTask: true, deletedStatusKey: 0, createdAt: at('2026-07-29T08:00:00Z'), updatedAt: at('2026-08-09T08:00:00Z'), ...over });
+    const task = (over) => ({ ProjectID: P1, isParentTask: true, deletedStatusKey: 0, createdAt: at('2026-07-29T12:00:00Z'), updatedAt: at('2026-08-09T12:00:00Z'), ...over });
     mockDb.seed(SCHEMA_TYPE.TASKS, task({ _id: T1, TaskName: 'Pricing page', sprintId: OPEN_SPRINT, statusType: 'close', points: 3, totalEstimatedTime: 120 }));
     mockDb.seed(SCHEMA_TYPE.TASKS, task({ _id: T2, TaskName: 'Checkout copy', sprintId: OPEN_SPRINT, statusType: 'inprogress', points: 2, totalEstimatedTime: 60 }));
     mockDb.seed(SCHEMA_TYPE.TASKS, task({ _id: T3, TaskName: 'Pen test fixes', sprintId: PRIVATE_SPRINT, statusType: 'close', points: 5, totalEstimatedTime: 90 }));
-    mockDb.seed(SCHEMA_TYPE.HISTORY, { Key: 'Task_Status', TaskId: T1, createdAt: at('2026-08-09T08:00:00Z') });
-    mockDb.seed(SCHEMA_TYPE.HISTORY, { Key: 'Task_Status', TaskId: T3, createdAt: at('2026-08-20T08:00:00Z') });
+    mockDb.seed(SCHEMA_TYPE.HISTORY, { Key: 'Task_Status', TaskId: T1, createdAt: at('2026-08-09T12:00:00Z') });
+    mockDb.seed(SCHEMA_TYPE.HISTORY, { Key: 'Task_Status', TaskId: T3, createdAt: at('2026-08-20T12:00:00Z') });
 
     const log = (over) => ({ ProjectId: P1, LogStartTime: seconds('2026-08-05T09:00:00Z'), billable: true, ...over });
     mockDb.seed(SCHEMA_TYPE.TIMESHEET, log({ Loggeduser: MEMBER, TicketID: T1, LogTimeDuration: 60 }));
@@ -125,6 +135,16 @@ describe('with AGENT_PERFORMANCE_READ off', () => {
         expect(mcp.names()).not.toContain(ACTION);
         expect(mcp.manifest().map((t) => t.name)).toEqual(mcp.TOOLS.map((t) => t.name));
         expect(registry.evaluate(ACTION, {})).toMatchObject({ allowed: false });
+    });
+
+    it('leaves the registry, the ratings, the MCP tool list and both manifests exactly as beta had them', () => {
+        const plain = (value) => JSON.parse(JSON.stringify(value));
+        expect(registry.keys()).toEqual(REGISTRY_ON_BETA.registryKeys);
+        expect(plain(registry.manifest())).toEqual(REGISTRY_ON_BETA.registryManifest);
+        expect(plain(actions.manifest())).toEqual(REGISTRY_ON_BETA.actionsManifest);
+        expect(plain(actions.ratings())).toEqual(REGISTRY_ON_BETA.ratings);
+        expect(mcp.names()).toEqual(REGISTRY_ON_BETA.toolNames);
+        expect(plain(mcp.manifest())).toEqual(REGISTRY_ON_BETA.toolManifest);
     });
 
     it('answers an MCP call as an unknown tool and reads nothing', async () => {
@@ -190,7 +210,7 @@ describe('the numbers are the ones the existing reports compute on the same data
 
     it('cumulative flow matches the flow chart', async () => {
         const out = await call(OWNER, { ...ALL, metrics: ['flow'] });
-        const report = await handler(cfd.getCFD, OWNER, { query: { projectId: P1, from: FROM, to: TO } });
+        const report = await handler(cfd.getCFD, OWNER, { query: { projectId: P1, from: LOCAL_FROM, to: LOCAL_TO } });
         expect(report.data.days).toHaveLength(31);
         expect(project(out).flow).toEqual({ days: report.data.days });
     });
@@ -237,6 +257,30 @@ describe('access follows the person behind the agent and the projects it is narr
 
     it('refuses when no person stands behind the agent', async () => {
         await expect(call('', ALL)).rejects.toMatchObject({ name: 'RefusedError', message: expect.stringMatching(/permission_denied/) });
+    });
+
+    it('refuses a guest whose role holds no project_details', async () => {
+        const GUEST = '6f0000000000000000000004';
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: GUEST, roleType: 0, status: 2, isDelete: false });
+        await expect(call(GUEST, ALL)).rejects.toMatchObject({ name: 'RefusedError', message: expect.stringMatching(/permission_denied: project\.project_details/) });
+        expect(timesheetReads()).toHaveLength(0);
+    });
+
+    it('refuses a member who has been removed from the company', async () => {
+        const GONE = '6f0000000000000000000005';
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: GONE, roleType: MEMBER_ROLE, status: 2, isDelete: true });
+        await expect(call(GONE, ALL)).rejects.toMatchObject({ name: 'RefusedError', message: expect.stringMatching(/permission_denied/) });
+        expect(timesheetReads()).toHaveLength(0);
+    });
+
+    it('refuses a token holder who has since lost access to the project the token names', async () => {
+        const PRIVATE_PROJECT = '6f0000000000000000000d04';
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PRIVATE_PROJECT, ProjectName: 'Pilot', isPrivateSpace: false, AssigneeUserId: [OWNER], deletedStatusKey: 0 });
+        const token = { projectScope: [PRIVATE_PROJECT] };
+        await expect(call(MEMBER, { ...ALL, projectId: PRIVATE_PROJECT, metrics: ['time'] }, token)).resolves.toMatchObject({ action: ACTION });
+
+        mockDb.store[SCHEMA_TYPE.PROJECTS].find((p) => p._id === PRIVATE_PROJECT).isPrivateSpace = true;
+        await expect(call(MEMBER, { ...ALL, projectId: PRIVATE_PROJECT, metrics: ['time'] }, token)).rejects.toMatchObject({ name: 'RefusedError', message: expect.stringMatching(PRIVATE_PROJECT) });
     });
 
     it('refuses a member whose role holds no project_details', async () => {
@@ -320,7 +364,7 @@ describe('a private sprint the person is not on stays out of every metric', () =
     it('agrees with the velocity and flow charts the member sees', async () => {
         const out = await call(MEMBER, { ...ALL, metrics: ['velocity', 'flow'] });
         const chart = await handler(velocity.getVelocity, MEMBER, { query: { projectId: P1, limit: 50 } });
-        const flow = await handler(cfd.getCFD, MEMBER, { query: { projectId: P1, from: FROM, to: TO } });
+        const flow = await handler(cfd.getCFD, MEMBER, { query: { projectId: P1, from: LOCAL_FROM, to: LOCAL_TO } });
         expect(project(out).velocity.sprints.map((s) => s.sprintId)).toEqual(chart.data.sprints.map((s) => s.sprintId));
         expect(project(out).flow.days).toEqual(flow.data.days);
     });
@@ -378,6 +422,22 @@ describe('the replay record holds the query and the numbers', () => {
         expect(replays()[0].runId).toBeNull();
     });
 
+    it('does not attach a run that has finished', async () => {
+        mockDb.store[SCHEMA_TYPE.AGENT_RUNS].find((r) => r._id === RUN_ID).status = 'done';
+        await call(MEMBER, { ...ALL, metrics: ['time'] }, inRun);
+        expect(replays()[0].runId).toBeNull();
+    });
+
+    it('does not attach a run of another agent, even one the same person started', async () => {
+        await call(MEMBER, { ...ALL, metrics: ['time'] }, { actor: { runId: RUN_ID, agentId: '6f0000000000000000000a02' } });
+        expect(replays()[0].runId).toBeNull();
+    });
+
+    it('does not attach a run to a token that belongs to no agent', async () => {
+        await call(MEMBER, { ...ALL, metrics: ['time'] }, { actor: { runId: RUN_ID, agentId: null } });
+        expect(replays()[0]).toMatchObject({ runId: null, agentId: null });
+    });
+
     it('writes nothing when replay is off, and still answers', async () => {
         process.env.AI_REPLAY = 'off';
         const out = await call(MEMBER, { ...ALL, metrics: ['time'] }, inRun);
@@ -392,5 +452,99 @@ describe('over MCP', () => {
         const out = await mcp.call(ctx, ACTION, { ...ALL, metrics: ['time'] });
         expect(project(out).time.whose).toBe('self');
         await expect(mcp.call(ctx, ACTION, { projectId: P2, from: FROM, to: TO })).rejects.toMatchObject({ name: 'RefusedError' });
+    });
+});
+
+describe('over MCP, the permission is judged in the project it is asked for', () => {
+    const memberToken = { companyId: C, userId: MEMBER, actor: actorFor(MEMBER), projectIds: [P1], ip: '' };
+
+    const projectRules = (roles) => {
+        mockDb.store[SCHEMA_TYPE.PROJECTS].find((p) => p._id === P1).isGlobalPermission = false;
+        mockDb.store[SCHEMA_TYPE.RULES].find((r) => r.key === 'project_details').roles = [];
+        const parent = mockDb.seed(SCHEMA_TYPE.PROJECT_RULES, { key: 'project', name: 'Project', isParent: true, projectId: P1 });
+        mockDb.seed(SCHEMA_TYPE.PROJECT_RULES, { key: 'project_details', name: 'project_details', isParent: false, parentId: parent._id, projectId: P1, roles });
+    };
+
+    it('answers a member whose project rules grant project_details where the company rules do not', async () => {
+        projectRules([{ key: MEMBER_ROLE, permission: false }]);
+        await expect(mcp.call(memberToken, ACTION, { ...ALL, metrics: ['time'] })).resolves.toMatchObject({ action: ACTION });
+        expect(refusals()).toHaveLength(0);
+    });
+
+    it('still refuses and audits a member whose project rules withhold it', async () => {
+        projectRules([]);
+        await expect(mcp.call(memberToken, ACTION, { ...ALL, metrics: ['time'] })).rejects.toMatchObject({ name: 'RefusedError', message: expect.stringMatching(/project\.project_details/) });
+        expect(refusals()).toHaveLength(1);
+        expect(timesheetReads()).toHaveLength(0);
+    });
+});
+
+describe('every metric counts the same UTC days the query names', () => {
+    const PROBE = path.join(__dirname, 'fixtures', 'performanceReadProbe.js');
+    const AUGUST = Array.from({ length: 31 }, (_, i) => `2026-08-${String(i + 1).padStart(2, '0')}`);
+
+    it.each([['America/New_York'], ['Pacific/Auckland'], ['UTC']])('under TZ=%s', (zone) => {
+        const child = spawnSync(process.execPath, [PROBE], { env: { ...process.env, TZ: zone }, encoding: 'utf8' });
+        expect(child.stderr).toBe('');
+        const { zone: ran, out, replayArgs } = JSON.parse(child.stdout);
+        expect(ran).toBe(zone);
+        expect(replayArgs).toMatchObject({ from: '2026-08-01', to: '2026-08-31' });
+        const [numbers] = out.projects;
+        expect(numbers.time.totalMinutes).toBe(10);
+        expect(numbers.flow.days.map((d) => d.date)).toEqual(AUGUST);
+        expect(numbers.flow.days).toEqual(AGILE_ON_BETA.flow['owner, August'].data.days.slice(0, 31));
+    });
+
+    it('in this process too', async () => {
+        const out = await call(OWNER, { ...ALL, metrics: ['flow'] });
+        expect(project(out).flow.days.map((d) => d.date)).toEqual(AUGUST);
+    });
+});
+
+describe('an allowed-action list is never emptied by a save while the flag is off', () => {
+    const AGENT = '6f0000000000000000000a09';
+    const saved = () => mockDb.store[SCHEMA_TYPE.AGENTS].find((a) => String(a._id) === AGENT);
+
+    beforeEach(() => {
+        delete process.env.AGENT_PERFORMANCE_READ;
+        mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: AGENT, name: 'Analyst', ownerId: OWNER, autonomy: 1, allowedActions: ['performance.read'], paused: false, deletedStatusKey: 0 });
+    });
+
+    it('keeps performance.read on an update, so the agent stays narrowed to it', async () => {
+        const r = res();
+        await ctrl.updateAgent(req(OWNER, { params: { id: AGENT }, body: { name: 'Analyst', allowedActions: ['performance.read'] } }), r);
+        expect(r.body.status).toBe(true);
+        expect(saved().allowedActions).toEqual(['performance.read']);
+        expect(registry.evaluate('task.comment', {}, { allowedActions: saved().allowedActions })).toMatchObject({ allowed: false });
+        expect(policy.decide({ agent: saved(), action: 'task.comment', params: { taskId: T1 }, rating: actions.rating('task.comment') }).decision).toBe('refuse');
+    });
+
+    it('keeps it on a create through the API and through createAgentRecord', async () => {
+        const r = res();
+        await ctrl.createAgent(req(OWNER, { body: { name: 'Second analyst', allowedActions: ['performance.read'] } }), r);
+        expect(r.body.data.allowedActions).toEqual(['performance.read']);
+        const record = await createAgentRecord(C, { name: 'Third analyst', allowedActions: ['performance.read'] }, { ownerId: OWNER });
+        expect(record.allowedActions).toEqual(['performance.read']);
+    });
+
+    it('refuses a save whose list names nothing the registry knows, instead of storing an empty list', async () => {
+        const r = res();
+        await ctrl.updateAgent(req(OWNER, { params: { id: AGENT }, body: { allowedActions: ['sprint.close'] } }), r);
+        expect(r.code).toBe(400);
+        expect(saved().allowedActions).toEqual(['performance.read']);
+
+        const created = res();
+        await ctrl.createAgent(req(OWNER, { body: { name: 'Nothing', allowedActions: ['sprint.close'] } }), created);
+        expect(created.code).toBe(400);
+        await expect(createAgentRecord(C, { name: 'Nothing either', allowedActions: ['sprint.close'] }, { ownerId: OWNER })).rejects.toThrow(/allowedActions/);
+        expect(mockDb.store[SCHEMA_TYPE.AGENTS]).toHaveLength(1);
+    });
+
+    it('still drops an unknown name next to a known one, and still stores an empty list that was sent empty', async () => {
+        const r = res();
+        await ctrl.updateAgent(req(OWNER, { params: { id: AGENT }, body: { allowedActions: ['sprint.close', 'task.get'] } }), r);
+        expect(saved().allowedActions).toEqual(['task.get']);
+        await ctrl.updateAgent(req(OWNER, { params: { id: AGENT }, body: { allowedActions: [] } }), res());
+        expect(saved().allowedActions).toEqual([]);
     });
 });
