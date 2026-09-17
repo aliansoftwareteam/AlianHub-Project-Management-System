@@ -1,7 +1,7 @@
 {
   "locale": "ru",
   "machineTranslated": false,
-  "updatedAt": "2026-09-15T03:46:32.718Z",
+  "updatedAt": "2026-09-17T03:37:27.474Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5854,7 +5854,6 @@
     "Ai.l2_preview_lead": "Read off this agent's allowed actions and each action's risk rating. Reads always run. A write runs on its own only when this agent is scoped to the project and the change can be undone, stays inside one task and moves no money; everything else goes to the AI Inbox first.",
     "Parity.no_project_scope": "No project scope",
     "Instance.built_at": "Updated {at}",
-    "Ai.scope_all": "All projects",
     "Ai.nav_home": "Home",
     "Ai.nav_analytics": "Analytics",
     "Ai.group_setup": "Setup",
@@ -5940,6 +5939,28 @@
     "AiLanding.agents_note": "Every write an agent proposes waits for a person.",
     "AiLanding.read_line_capped": "Your {n} most recently updated open tasks — {parts}.",
     "AiLanding.rest_line": "{n} more {work}, so no agent is offered for them. Give one a brief and it joins the work above.",
-    "AiLanding.why_mixed": "for more than one reason — each task says which"
+    "AiLanding.why_mixed": "for more than one reason — each task says which",
+    "Ask.why_open": "Why this answer",
+    "Ask.why_title": "Why this answer",
+    "Ask.why_close": "Close",
+    "Ask.why_lead": "The passages Ask retrieved for your question. The answer may cite these and nothing else.",
+    "Ask.why_empty": "Ask retrieved no passages for this question, so the answer has nothing to cite.",
+    "Ask.why_no_permission": "No permission detail was recorded for these passages. Each one comes from a project you can already open.",
+    "Ask.why_cited": "Cited",
+    "Ask.why_updated": "Updated {date}",
+    "Ask.why_no_project": "No project",
+    "Ask.kind_task": "Task",
+    "Ask.kind_page": "Page",
+    "Ask.kind_comment": "Comment",
+    "Ask.kind_transcript": "Call transcript",
+    "Ask.reason_project_member": "You can see this as a member of the project.",
+    "Ask.reason_private_owner": "Private page, visible only to you.",
+    "Ask.reason_company_page": "Company-wide page, visible to everyone in the workspace.",
+    "Ask.reason_call_participant": "You can see this because you took part in the call.",
+    "Ask.reason_owner_admin": "You can see this as an owner or admin of the workspace.",
+    "Ask.empty_no_match": "Nothing in the projects you can open matches that. Try naming the project or the task.",
+    "Ask.note_scope": "Only projects you can already open. Ask never widens what you can see.",
+    "Ask.error_question_required": "Ask a question first.",
+    "Ask.error_unauthenticated": "Ask needs a signed-in member of this workspace."
   }
 }

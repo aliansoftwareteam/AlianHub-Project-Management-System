@@ -95,29 +95,14 @@
                         </div>
 
                         <p class="land__note">
-                            <span>{{ sources.note || $t('Parity.scope_note') }}</span>
+                            <span>{{ coded(sources.noteCode, sources.note) || $t('Ask.note_scope') }}</span>
                             <span v-if="!modelReady" class="ah-chip ah-chip--warn ah-chip--sm">{{ $t('AiLanding.no_model_note') }}</span>
                         </p>
                         <p v-if="error" class="ah-field__error">{{ error }}</p>
 
-                        <section v-if="answer.answer" class="ah-card">
-                            <div class="ah-card__head">
-                                <span class="ah-h3">{{ answer.mode === 'research' ? $t('Parity.report') : $t('Parity.answer') }}</span>
-                                <span v-if="answer.usage" class="parity-count">{{ answer.usage.model }}</span>
-                            </div>
-                            <div class="ah-card__body">
-                                <div class="ask__answer">{{ answer.answer }}</div>
-                                <div v-if="(answer.cited || []).length" class="ask__cites">
-                                    <div class="ah-label">{{ $t('Parity.cited') }}</div>
-                                    <div v-for="source in answer.cited" :key="source.id" class="ask__cite">
-                                        <span class="ask__cite-ref">{{ source.ref }}</span>
-                                        <span>{{ source.title }}<span v-if="source.project" class="ah-muted"> · {{ source.project }}</span></span>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
+                        <AskAnswer v-if="answer.answer" :answer="answer" />
                         <p v-else-if="answer.configured === false" class="ah-empty">{{ $t('AiLanding.no_model_note') }}</p>
-                        <p v-else-if="answer.empty" class="ah-empty">{{ answer.empty }}</p>
+                        <p v-else-if="answer.empty || answer.emptyCode" class="ah-empty">{{ coded(answer.emptyCode, answer.empty) }}</p>
 
                         <div v-if="loading" class="ah-empty">{{ $t('Parity.loading') }}</div>
 
@@ -273,12 +258,14 @@ import * as env from "@/config/env";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import MainChatRecorder from "@/components/organisms/MainChat/MainChatRecorder.vue";
 import AiSidebar from "./AiSidebar.vue";
+import AskAnswer from "./AskAnswer.vue";
 import { useParity } from "./useParity";
 import { useAgents, reasonOf, autonomyOf } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
 import { routeTasks, routingTotals } from "./agentFit";
 import { refusalText } from "./fitText";
 import { backlogRead, skillReach } from "./backlogRead";
+import { messageKey } from "./askWhy";
 
 defineOptions({ name: "AskPage" });
 
@@ -389,6 +376,8 @@ const spendLine = (agent) => {
     return row && row.runs ? t("Ai.month_runs", { runs: row.runs, usd: Number(row.usd || 0).toFixed(2) }) : t("Ai.no_runs_month");
 };
 
+const coded = (code, sentence) => (messageKey(code) ? t(messageKey(code)) : sentence || "");
+
 const toggle = (which) => { pop.value = pop.value === which ? "" : which; };
 const closePops = () => { pop.value = ""; };
 
@@ -412,7 +401,7 @@ const submit = async () => {
         const body = { question: question.value.trim(), mode: mode.value };
         if (projectId.value) body.projectId = projectId.value;
         const res = await apiRequest("post", env.AI_ASK, body);
-        if (!res?.data?.status) { error.value = res?.data?.statusText || t("Parity.ask_failed"); return; }
+        if (!res?.data?.status) { error.value = coded(res?.data?.code, res?.data?.statusText) || t("Parity.ask_failed"); return; }
         answer.value = res.data.data || {};
     } catch (e) {
         error.value = reasonOf(e, "Parity.ask_failed");

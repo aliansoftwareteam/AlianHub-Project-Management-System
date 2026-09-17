@@ -134,8 +134,9 @@ const ask = async (req, res) => {
         const companyId = req.headers['companyid'] || '';
         const uid = req.uid;
         const { question, mode, projectId } = req.body || {};
-        if (!companyId || !uid) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
-        if (!String(question || '').trim()) return res.send({ status: false, statusText: 'Ask a question first.' });
+        // Each displayed sentence keeps its English text for older clients; the screen translates the code beside it.
+        if (!companyId || !uid) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.', code: 'unauthenticated' });
+        if (!String(question || '').trim()) return res.send({ status: false, statusText: 'Ask a question first.', code: 'question_required' });
 
         const research = mode === 'research';
         const gathered = await gather(companyId, uid, { question, projectId, limit: research ? MAX_PER_TYPE * 2 : MAX_PER_TYPE });
@@ -164,6 +165,7 @@ const ask = async (req, res) => {
                 data: {
                     configured: true, answer: '', sources: [], mode: research ? 'research' : 'ask',
                     empty: 'Nothing in the projects you can open matches that. Try naming the project or the task.',
+                    emptyCode: 'no_match',
                     scope: { projects: gathered.projects.length, privileged: isPrivileged(roleType) },
                 },
             });
@@ -205,7 +207,7 @@ const sources = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
         const uid = req.uid;
-        if (!companyId || !uid) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        if (!companyId || !uid) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.', code: 'unauthenticated' });
         const projects = await visibleProjects(companyId, uid);
         const connections = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data: [{ deletedStatusKey: { $ne: 1 }, enabled: true }, 'type name'],
@@ -221,6 +223,7 @@ const sources = async (req, res) => {
                 ],
                 connected: (connections || []).map((c) => ({ type: c.type, name: c.name || c.type })),
                 note: 'Only projects you can already open. Ask never widens what you can see.',
+                noteCode: 'scope',
             },
         });
     } catch (error) {
