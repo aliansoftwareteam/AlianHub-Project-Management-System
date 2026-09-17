@@ -33,6 +33,7 @@ const { ROLE_GUEST, ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER, isPrivileged } = requir
 const { ACTIVE_SEAT, INVITED_SEAT } = require("./seatStatus");
 const { resolveMode, OFF, ENFORCE } = require("./permissionEnforcement");
 const { recordDecision, REASONS, GLOBAL_SCOPE } = require("./permissionDecisions");
+const { TASK_ACTIONS, requirementsOf, actionEntry } = require("./taskWritePermissions");
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const ROLE_CACHE_TTL_SECONDS = 60;
@@ -54,19 +55,9 @@ const isApiTokenRequest = (req) => Boolean(req && req.apiToken);
 
 const ALLOWED = Object.freeze({ allowed: true });
 
-// PATCH /api/v2/tasks dispatches many actions; actions not listed pass
-// through (structural ops like moveTask/convert have no single key).
-const TASK_ACTION_PERMISSION = {
-    updateStatus: 'task.task_status',
-    updatePriority: 'task.task_priority',
-    updateAssignee: 'task.task_assignee',
-    updateDueDate: 'task.task_due_date',
-    updateStartDate: 'task.task_due_date',
-    updateTaskType: 'task.task_type',
-    updateDescription: 'task.task_description',
-    updateTaskTotalEstimate: 'task.task_estimated_hours',
-    updatePoints: 'task.task_estimated_hours',
-};
+const TASK_ACTION_PERMISSION = Object.fromEntries(Object.entries(TASK_ACTIONS)
+    .filter(([, taskEntry]) => taskEntry.tokenEnforced)
+    .map(([action, taskEntry]) => [action, taskEntry.needs[0].key]));
 
 const toObjectId = (value) => (OBJECT_ID_PATTERN.test(String(value || '')) ? new mongoose.Types.ObjectId(String(value)) : null);
 
@@ -194,16 +185,26 @@ const idAt = (body, fields) => {
 };
 const idsAt = (body, paths) => [...new Set(paths.map((fields) => idAt(body, fields)).filter(Boolean))];
 
+const valuesAt = (body, fields) => fields.reduce((nodes, field) => nodes.flatMap((node) => {
+    if (field === '*') return Array.isArray(node) ? node : [];
+    return node && typeof node === 'object' ? [node[field]] : [];
+}), [body]);
+const everyIdAt = (body, paths) => [...new Set(paths.flatMap((fields) => valuesAt(body, fields))
+    .map((value) => (OBJECT_ID_PATTERN.test(String(value || '')) ? String(value).toLowerCase() : null))
+    .filter(Boolean))];
+
 /*
  * The projects whose rules judge a request, from every body shape the web app sends to a guarded route
  * (tests/permission-request-project.test.js). Named tasks decide over named projects and every one of
  * them must allow, so a client cannot borrow a more permissive project's rules. `unresolved` marks a body
  * whose tasks all failed to resolve. `legacyProjectId` is what this lookup returned before it covered the
  * task and project shapes; the enforced API-token path still allows what that project allowed.
+ * A `lookup` from Config/taskWritePermissions.js names the task and project ids its handler writes
+ * through instead, and every project either reaches is judged.
  */
-const projectsForRequest = async (companyId, req) => {
+const projectsForRequest = async (companyId, req, lookup = null) => {
     const body = (req && req.body) || {};
-    const taskIds = idsAt(body, TASK_ID_FIELDS);
+    const taskIds = lookup ? everyIdAt(body, lookup.tasks || []) : idsAt(body, TASK_ID_FIELDS);
     const projectOfTask = new Map();
     if (taskIds.length) {
         const tasks = await MongoDbCrudOpration(companyId, {
@@ -212,14 +213,15 @@ const projectsForRequest = async (companyId, req) => {
         }, 'find');
         (tasks || []).forEach((task) => { if (task.ProjectID) projectOfTask.set(String(task._id).toLowerCase(), String(task.ProjectID).toLowerCase()); });
     }
-    const projectIds = taskIds.length
-        ? [...new Set(taskIds.map((id) => projectOfTask.get(id)).filter(Boolean))]
-        : idsAt(body, PROJECT_ID_FIELDS);
+    const taskProjectIds = [...new Set(taskIds.map((id) => projectOfTask.get(id)).filter(Boolean))];
+    const projectIds = lookup
+        ? [...new Set([...taskProjectIds, ...everyIdAt(body, lookup.projects || [])])]
+        : (taskIds.length ? taskProjectIds : idsAt(body, PROJECT_ID_FIELDS));
     const legacyTaskId = idAt(body, ['taskData', '_id']);
     const legacyProjectId = legacyTaskId
         ? (projectOfTask.get(legacyTaskId) || null)
         : (idAt(body, ['data', 'ProjectID']) || idAt(body, ['projectId']));
-    return { projectIds, unresolved: taskIds.length > 0 && projectIds.length === 0, legacyProjectId };
+    return { projectIds, unresolved: taskIds.length > 0 && taskProjectIds.length === 0, legacyProjectId };
 };
 
 /**
@@ -284,15 +286,18 @@ const refusingScope = async (companyId, uid, path, write, projectIds, strict) =>
  * A body whose tasks do not exist is judged on the company rules rather than passed through: the task
  * handlers write through the ids and the company the body names, so it could reach a task this check never saw.
  * `strict` makes a failed role read throw instead of reading as no seat; the API-token path keeps the old answer.
+ * A `lookup` gets no legacy fallback: nothing it judges was refused before, so there is nothing to keep allowing.
  */
-const requestVerdict = async (companyId, uid, req, path, write, { strict = false } = {}) => {
+const requestVerdict = async (companyId, uid, req, path, write, { strict = false, lookup = null } = {}) => {
     if (isCompanyWideKey(path)) {
         return passes(await evaluatePermission(companyId, uid, path, { strict }), write) ? ALLOWED : { allowed: false, scope: GLOBAL_SCOPE };
     }
-    const { projectIds, unresolved, legacyProjectId } = await projectsForRequest(companyId, req);
+    const { projectIds, unresolved, legacyProjectId } = await projectsForRequest(companyId, req, lookup);
     if (unresolved) logger.warn(`permission guard ${path}: the tasks named in the body were not found; judged on the company rules`);
-    const scope = await refusingScope(companyId, uid, path, write, projectIds, strict);
+    const scopes = unresolved && projectIds.length ? [...projectIds, null] : projectIds;
+    const scope = await refusingScope(companyId, uid, path, write, scopes, strict);
     if (!scope) return ALLOWED;
+    if (lookup) return { allowed: false, scope, unresolved };
     const sameContext = projectIds.length <= 1 && (projectIds[0] || null) === legacyProjectId;
     if (sameContext || !passes(await evaluatePermission(companyId, uid, path, { projectId: legacyProjectId, strict }), write)) {
         return { allowed: false, scope, unresolved };
@@ -318,10 +323,10 @@ const denialReason = async (companyId, uid, path, write, { scope, unresolved }) 
     return { role, reason: REASONS.DENIED };
 };
 
-const sessionPermissionVerdict = async (req, path, write, sessionAllows) => {
+const sessionPermissionVerdict = async (req, path, write, sessionAllows, lookup = null) => {
     if (sessionAllows && await sessionAllows(req)) return ALLOWED;
     const companyId = req.headers["companyid"] || "";
-    const verdict = await requestVerdict(companyId, req.uid, req, path, write, { strict: true });
+    const verdict = await requestVerdict(companyId, req.uid, req, path, write, { strict: true, lookup });
     return verdict.allowed ? verdict : { ...verdict, ...(await denialReason(companyId, req.uid, path, write, verdict)) };
 };
 
@@ -342,11 +347,11 @@ const judgeSession = async (req, res, next, { permission, check, refuse }) => {
     }
     if (verdict.allowed) return next();
     recordDecision(req, res, {
-        companyId, mode, permission, uid: req.uid, role: verdict.role, scope: verdict.scope,
+        companyId, mode, permission: verdict.permission || permission, uid: req.uid, role: verdict.role, scope: verdict.scope,
         reason: verdict.failed ? REASONS.CHECK_FAILED : verdict.reason,
     });
     if (mode !== ENFORCE) return next();
-    return refuse(verdict.failed ? "Permission check failed." : "You do not have permission to perform this action.");
+    return refuse(verdict.failed ? "Permission check failed." : "You do not have permission to perform this action.", verdict);
 };
 
 /**
@@ -355,7 +360,7 @@ const judgeSession = async (req, res, next, { permission, check, refuse }) => {
  * `sessionAllows(req)` names the browser-session requests the route's handler allows without the key,
  * such as a member changing their own preferences; API tokens are judged on the key alone.
  */
-const requirePermission = (path, { write = true, sessionAllows = null } = {}) => async (req, res, next) => {
+const requirePermission = (path, { write = true, sessionAllows = null } = {}) => Object.assign(async (req, res, next) => {
     const forbid = (statusText) => res.status(403).json({ status: false, statusText, error: "Forbidden", permission: path });
     if (!isApiTokenRequest(req)) {
         return judgeSession(req, res, next, { permission: path, refuse: forbid, check: () => sessionPermissionVerdict(req, path, write, sessionAllows) });
@@ -369,10 +374,29 @@ const requirePermission = (path, { write = true, sessionAllows = null } = {}) =>
         logger.error(`requirePermission error (${path}): ${error.message || error}`);
         return forbid("Permission check failed.");
     }
+}, { permission: path });
+
+const taskWriteVerdict = async (req, taskEntry) => {
+    const lookup = { tasks: taskEntry.tasks || [], projects: taskEntry.projects || [] };
+    for (const need of requirementsOf(taskEntry, req.body)) {
+        const verdict = await sessionPermissionVerdict(req, need.key, need.write, null, lookup);
+        if (!verdict.allowed) return { ...verdict, permission: need.key };
+    }
+    return ALLOWED;
 };
 
-const requireTaskActionPermission = () => async (req, res, next) => {
+/* API tokens and browser sessions alike go through the workspace's mode, so a new mapping refuses nothing until a workspace enforces. */
+const requireTaskWritePermission = (taskEntry) => Object.assign(async (req, res, next) => {
+    const label = requirementsOf(taskEntry, req.body).map((need) => need.key).join('+');
+    const refuse = (statusText, verdict = {}) => res.status(403).json({ status: false, statusText, error: "Forbidden", permission: verdict.permission || label });
+    return judgeSession(req, res, next, { permission: label, refuse, check: () => taskWriteVerdict(req, taskEntry) });
+}, { taskWrites: taskEntry });
+
+const requireTaskActionPermission = (actions = TASK_ACTIONS) => Object.assign(async (req, res, next) => {
     const action = req.body && req.body.action;
+    const taskEntry = actionEntry(actions, action);
+    if (taskEntry && !taskEntry.tokenEnforced) return requireTaskWritePermission(taskEntry)(req, res, next);
+    if (actions !== TASK_ACTIONS) return next();
     if (!isApiTokenRequest(req)) {
         return Object.hasOwn(TASK_ACTION_PERMISSION, action) ? requirePermission(TASK_ACTION_PERMISSION[action])(req, res, next) : next();
     }
@@ -380,7 +404,7 @@ const requireTaskActionPermission = () => async (req, res, next) => {
     const key = action && TASK_ACTION_PERMISSION[action];
     if (!key) return next();
     return requirePermission(key, { write: true })(req, res, next);
-};
+}, { taskWrites: actions });
 
 /** The permission keys the MCP server enforces (one per tool/field). */
 const MCP_PERMISSION_KEYS = [
@@ -459,6 +483,7 @@ module.exports = {
     requireCompanyAdmin,
     requirePermission,
     requireTaskActionPermission,
+    requireTaskWritePermission,
     evaluateMany,
     MCP_PERMISSION_KEYS,
     invalidateRoleCache,
