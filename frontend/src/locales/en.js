@@ -5901,7 +5901,16 @@ export default {
         undo_window_passed: "The undo window has passed.",
         export_failed: "The export did not download.",
         load_more: "Load more",
-        retention: "Retained 400 days. Undo replays the inverse action and logs it as you."
+        retention: "Retained 400 days. Undo replays the inverse action and logs it as you.",
+        tab_refusals: "Refusals",
+        integrity_verified: "Verified",
+        integrity_verified_hint: "This row and every chained row before it are intact.",
+        integrity_broken: "Broken at #{seq}",
+        integrity_broken_hint: "The chain does not verify from row #{seq} on: a row was changed, removed or reordered.",
+        integrity_unverified: "Not verified yet",
+        integrity_unverified_hint: "Not checked yet. It is checked the next time the audit log opens, once the chain key is available.",
+        integrity_unchained: "Unchained",
+        integrity_unchained_hint: "Written before the audit chain was on, or while it was off, so it cannot be verified."
     },
     Offline: {
         offline_msg: "You're offline — changes are saved and will sync when you reconnect.",

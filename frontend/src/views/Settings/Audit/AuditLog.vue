@@ -40,8 +40,17 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="row in rows" :key="row._id" class="al__row" :class="{ 'al__row--undone': row.meta && row.meta.undoneAt, 'al__row--refused': row.action === 'agent.action_refused' }">
-                        <td class="ah-mono al__time">{{ time(row.createdAt) }}</td>
+                    <tr v-for="row in rows" :key="row._id" class="al__row" :class="{ 'al__row--undone': row.meta && row.meta.undoneAt, 'al__row--refused': isRefusal(row) }">
+                        <td class="al__time">
+                            <span class="ah-mono">{{ time(row.createdAt) }}</span>
+                            <span
+                                v-if="showsIntegrity(row)"
+                                class="ah-chip ah-chip--sm al__integrity"
+                                :class="INTEGRITY_CHIPS[row.integrity.state]"
+                                :data-test="'integrity-' + row.integrity.state"
+                                :title="integrityHint(row)"
+                            >{{ integrityLabel(row) }}</span>
+                        </td>
                         <td>
                             <span class="al__actor">
                                 <span class="ah-avatar ah-avatar--sm" :class="{ 'ah-avatar--agent': isAgent(row) }">{{ initial(row) }}</span>
@@ -51,7 +60,7 @@
                         </td>
                         <td>
                             <div class="al__event">
-                                <span v-if="row.action === 'agent.action_refused'" class="al__blocked">{{ $t('Audit.blocked_by_policy') }}</span>
+                                <span v-if="isRefusal(row)" class="al__blocked">{{ $t('Audit.blocked_by_policy') }}</span>
                                 <span class="ah-mono al__action">{{ eventAction(row) }}</span>
                                 <span v-if="row.entityName || row.entityId" class="al__entity">{{ row.entityName || row.entityId }}</span>
                             </div>
@@ -75,7 +84,7 @@
                                     <span v-if="row.undoable === false" class="ah-small">{{ $t('Audit.undo_window_passed') }}</span>
                                     <span v-else-if="row.undoUntil" class="ah-small">{{ $t('Audit.undo_until', { t: deadline(row.undoUntil) }) }}</span>
                                 </template>
-                                <span v-else-if="row.action === 'agent.action_refused'" class="ah-small">{{ $t('Audit.nothing_ran') }}</span>
+                                <span v-else-if="isRefusal(row)" class="ah-small">{{ $t('Audit.nothing_ran') }}</span>
                             </div>
                         </td>
                     </tr>
@@ -117,14 +126,19 @@ const error = ref("");
 const scope = ref("all");
 const search = ref("");
 const undoingId = ref("");
+const chainOn = ref(false);
 const projectFilter = ref(route.query.projectId ? { id: route.query.projectId, name: route.query.projectName || t("Audit.this_project") } : null);
 
 const tabs = [
     { key: "all", label: "Audit.tab_all" },
     { key: "agent", label: "Audit.tab_agents" },
     { key: "gated", label: "Audit.tab_gated" },
-    { key: "undone", label: "Audit.tab_undone" }
+    { key: "undone", label: "Audit.tab_undone" },
+    { key: "refused", label: "Audit.tab_refusals" }
 ];
+
+const REFUSALS = ["agent.action_refused", "permission.refused"];
+const INTEGRITY_CHIPS = { verified: "ah-chip--ok", broken: "ah-chip--danger", unverified: "ah-chip--warn", unchained: "" };
 
 const todayCount = computed(() => rows.value.filter((r) => moment(r.createdAt).isSame(moment(), "day")).length || total.value);
 const todayLabel = computed(() => t("Audit.today_events", {
@@ -136,6 +150,10 @@ const isAgent = (row) => row.meta && row.meta.actorType === "agent";
 const actorName = (row) => (isAgent(row) ? row.meta.agentName || t("Audit.an_agent") : row.actorName || getUser(row.actorId)?.Employee_Name || t("Audit.someone"));
 const initial = (row) => actorName(row).charAt(0).toUpperCase();
 const eventAction = (row) => (row.meta && row.meta.action) || row.action;
+const isRefusal = (row) => REFUSALS.includes(row.action);
+const showsIntegrity = (row) => Boolean(row.integrity && row.integrity.state in INTEGRITY_CHIPS && (chainOn.value || row.integrity.state !== "unchained"));
+const integrityLabel = (row) => t("Audit.integrity_" + row.integrity.state, { seq: row.integrity.brokenAt });
+const integrityHint = (row) => t("Audit.integrity_" + row.integrity.state + "_hint", { seq: row.integrity.brokenAt });
 const time = (at) => (at ? moment(at).format("HH:mm") : "");
 const deadline = (at) => (at ? moment(at).format("D MMM HH:mm") : "");
 
@@ -144,6 +162,7 @@ const query = (extra = {}) => {
     if (scope.value === "agent") q.actorType = "agent";
     if (scope.value === "gated") q.gated = "true";
     if (scope.value === "undone") q.undone = "true";
+    if (scope.value === "refused") q.refused = "true";
     if (search.value) q.q = search.value;
     if (projectFilter.value) q.projectId = projectFilter.value.id;
     return Object.entries(q).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
@@ -160,6 +179,7 @@ const load = async ({ append = false } = {}) => {
         }
         rows.value = append ? [...rows.value, ...(res.data.data || [])] : res.data.data || [];
         const meta = res.data.metadata || {};
+        chainOn.value = Boolean(meta.chain && meta.chain.on);
         totalPages.value = meta.totalPages || 1;
         total.value = meta.total || rows.value.length;
     } catch (e) {
@@ -223,6 +243,7 @@ onMounted(load);
 .al__row--undone { opacity: .66; }
 .al__row--refused { background: var(--danger-bg); }
 .al__time { color: var(--ink-2); white-space: nowrap; }
+.al__integrity { display: table; margin-top: 4px; }
 .al__actor { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
 .al__actor-name { font-weight: 500; }
 .al__event { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
