@@ -211,7 +211,6 @@ const headBreak = async (companyId, key, start, last, head) => {
     return hash === head.hash ? null : head.seq;
 };
 
-/* Walks forward from `from`, a page at a time, up to `budget` rows and, when given, no further than `until`. */
 const walkFrom = async (companyId, key, from, { budget, pageSize, until = Infinity }) => {
     let last = from;
     let checked = 0;
@@ -273,7 +272,6 @@ const walk = async (companyId, key, { budget, pageSize, resume }) => {
     return report(start, ahead.last, ahead.complete, brokenAt, checked);
 };
 
-/* Verifies a company's chain from its newest anchor, a page at a time, up to `budget` rows. */
 const verifyChain = async (companyId, { budget = Infinity, pageSize = PAGE_SIZE, resume = false } = {}) => {
     const cfg = config();
     if (!cfg.keyValid) return { state: 'unavailable', brokenAt: null, verifiedThrough: null, anchorSeq: null, checked: 0 };
@@ -293,7 +291,6 @@ const annotateIntegrity = async (companyId, entries) => {
     return rules.pageIntegrity({ key: cfg.key, companyId: String(companyId), report }, entries);
 };
 
-/* Reads rows by id in the given order, with their integrity, folded to their current state. */
 const readForList = async (companyId, ids) => {
     if (!ids.length) return [];
     const found = ((await db(companyId, AUDIT_LOGS, [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(String(id))) } }], 'find')) || []).map(plain);

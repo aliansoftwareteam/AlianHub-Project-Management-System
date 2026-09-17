@@ -130,7 +130,6 @@ const applyAmendments = (row, amendments = []) => {
     return out;
 };
 
-/* Walks rows in sequence order from `last`; the first gap, wrong link or wrong hash is where the chain breaks. */
 const walkLinks = (key, companyId, last, rows) => {
     let prev = last;
     for (const row of rows) {
@@ -142,7 +141,7 @@ const walkLinks = (key, companyId, last, rows) => {
     return { last: prev, brokenAt: null };
 };
 
-/* One state per listed row. A row is only as sound as the chain below it, so a break at n marks every row from n on. */
+/* A row is only as sound as the chain below it, so a break at n marks every row from n on. */
 const pageIntegrity = ({ key, companyId, report }, entries) => {
     const chainedOf = ({ row, amendments = [] }) => [row, ...amendments].filter(isChained);
     let brokenAt = report && report.brokenAt != null ? report.brokenAt : null;
