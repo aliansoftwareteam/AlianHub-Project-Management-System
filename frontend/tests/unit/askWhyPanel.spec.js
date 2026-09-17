@@ -18,9 +18,9 @@ const COMMENT = { kind: 'comment', id: 'c1', ref: 'comment:0000c1', title: 'On b
 const CALL = { kind: 'transcript', id: 'k1', ref: 'transcript:0000k1', title: 'Budget sync', project: 'Ops', projectId: 'pr1', detail: 'we cut travel', updatedAt: '2026-09-04T12:00:00Z', permission: { visibility: 'participants', via: 'participant' } };
 
 const LinkStub = defineComponent({ name: 'RouterLink', props: { to: { type: [Object, String], required: true } }, setup: (props, { slots }) => () => h('a', { href: '#' }, slots.default && slots.default()) });
-const global = { mocks: { $t: echo }, stubs: { teleport: true, RouterLink: LinkStub } };
+const withStubs = { mocks: { $t: echo }, stubs: { teleport: true, RouterLink: LinkStub } };
 
-const mountPanel = (props) => mount(AskWhyPanel, { props: { sources: [], cited: [], privileged: false, ...props }, global });
+const mountPanel = (props) => mount(AskWhyPanel, { props: { sources: [], cited: [], privileged: false, ...props }, global: withStubs });
 const rowsOf = (wrapper) => wrapper.findAll('[data-test="why-row"]');
 const reasonOf = (row) => row.find('[data-test="why-reason"]');
 
@@ -73,7 +73,7 @@ describe('AskWhyPanel', () => {
     });
 
     it('omits the reason line when the sources carry no permission, and says why', () => {
-        const strip = ({ permission, ...rest }) => rest;
+        const strip = (source) => Object.fromEntries(Object.entries(source).filter(([key]) => key !== 'permission'));
         const wrapper = mountPanel({ sources: [strip(TASK), { ...strip(PAGE), detail: '' }] });
         const rows = rowsOf(wrapper);
         expect(rows).toHaveLength(2);
@@ -110,14 +110,14 @@ describe('AskAnswer', () => {
     };
 
     it('cites only passages that are in the retrieved list', () => {
-        const wrapper = mount(AskAnswer, { props: { answer }, global });
+        const wrapper = mount(AskAnswer, { props: { answer }, global: withStubs });
         const cites = wrapper.findAll('.ask__cite');
         expect(cites).toHaveLength(1);
         expect(cites[0].text()).toContain('page:0000p1');
     });
 
     it('opens the panel from the answer, focuses its close control and closes with Escape', async () => {
-        mounted = mount(AskAnswer, { props: { answer }, global, attachTo: document.body });
+        mounted = mount(AskAnswer, { props: { answer }, global: withStubs, attachTo: document.body });
         const opener = mounted.find('[data-test="why-open"]');
         expect(mounted.find('[data-test="why-panel"]').exists()).toBe(false);
         expect(opener.attributes('aria-expanded')).toBe('false');
@@ -138,7 +138,7 @@ describe('AskAnswer', () => {
     });
 
     it('closes from the close control and keeps Tab inside the dialog', async () => {
-        mounted = mount(AskAnswer, { props: { answer }, global, attachTo: document.body });
+        mounted = mount(AskAnswer, { props: { answer }, global: withStubs, attachTo: document.body });
         await mounted.find('[data-test="why-open"]').trigger('click');
         await nextTick();
 
