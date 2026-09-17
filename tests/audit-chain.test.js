@@ -287,6 +287,8 @@ describe('writing the chain', () => {
         jest.advanceTimersByTime(60 * 1000);
         await flush();
         jest.useRealTimers();
+        await chain.flushMirrors();
+        load();
 
         removeAudit((r) => r.chain.seq >= 2);
         mockDb.store[SCHEMA_TYPE.AUDIT_CHAIN_HEADS] = heads().filter((h) => h._id !== 'head');
