@@ -91,6 +91,11 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 63 | The workspace's `project_tab_components` catalogue holds only 3 of 20 rows, so Board, Table, Calendar, Comments, Activity, Workload, Docs and Forms are permanently absent from that workspace's "+ View" menu. Cause unknown; no application code deletes from that collection. | UI programme sweep |
 | 65 | SSO sign-in (`Modules/SSO/ssoSession.js:16`) inserts the session row before `generateTokenV2Fun` checks the account, so an SSO match on an existing unverified account still leaves a session row behind its refusal. #733 moved the check ahead of the session only in `finalizeSession`. | review of #733 (build 208) |
 | 66 | Desktop-tracker sign-in (`loginAuthTracker`, `Modules/Auth/controller/loginSession.js:203`) inserts its session before `generateTokenV2Fun` checks the account. Low risk: its sign-in code is issued from an existing session. | review of #733 (build 208) |
+| 67 | `TagChip.vue` (about lines 161-164) passes a Boolean prop that defaults to false into `checkPermission`, so its tag edit and delete controls don't follow a project's own rules. | review of #740 (build 214) |
+| 68 | The vitest permission parity scan misses settings keys held in variables, so a web-app check written that way escapes the parity fixture. | review of #740 (build 214) |
+| 69 | A bulk task update route applies the fields a request sends without an allowlist; details are in the owner's notes. Candidate for Sprint 8 slice 3. | #738 (build 213) |
+| 70 | `tests/fixtures/fakeMongo.js` implements `$text` by matching every string field rather than the indexed ones, so a unit test can find matches MongoDB would not return. | review of #739 (build 215) |
+| 71 | With `KNOWLEDGE_RETRIEVAL` on, Ask source refs read `kind:id` instead of the task key, and task keys are not in the text index, so a question naming a key such as OPS-12 does not match that task. | #739 (build 215) |
 
 ## Owner decisions recorded
 

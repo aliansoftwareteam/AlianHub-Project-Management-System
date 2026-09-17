@@ -49,4 +49,8 @@ Authorization is enforced where the data is, and a leaked credential buys minute
 - Shared with Sprint 7 (2026-09-16): migrations 028 onward belong to this sprint and 024–027 to Sprint 7. `Config/permissionGuard.js` belongs to this sprint; `Modules/Agents/scope.js` and `Config/contentAccess.js` are called, not changed, by either sprint without the integrator's agreement. Each sprint keeps its own i18n namespaces.
 - Enforcement mode is set per workspace, with the instance value as the default; a workspace moves to enforce once its would-be-denial log is clean (owner, 2026-09-16).
 - Erasure redacts personal fields in audit rows, which sit outside the hash, so the audit chain still verifies (owner, 2026-09-16).
-- Open until their slices come up: what counts as a clean would-be-denial log (2, 4), how in-place audit updates are chained and whether the chain hash is keyed (5), a deadline for existing tokens without expiry (7), the secrets key (9), and in-app egress or a proxy container plus what an empty allowlist means (10).
+- Slice 1 (#740) dropped its migration, so slice 2 takes migration 029 (2026-09-17).
+- An audit row that changes after it is written is recorded as a new chained row; rows are never edited in place (owner, 2026-09-17).
+- The audit chain hash is keyed with a new `AUDIT_CHAIN_KEY` secret, so someone with database write access cannot recompute the chain (owner, 2026-09-17).
+- Existing API tokens without an expiry keep working for 30 days after mandatory expiry turns on, and owners are shown which tokens need replacing (owner, 2026-09-17).
+- Open until their slices come up: what counts as a clean would-be-denial log (2, 4), a maximum token lifetime if the architecture document names none (7), the secrets key (9), and in-app egress or a proxy container plus what an empty allowlist means (10).
