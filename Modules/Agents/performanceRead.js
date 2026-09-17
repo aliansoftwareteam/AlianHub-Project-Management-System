@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const registry = require('./registry');
 const actions = require('./actions');
 const scope = require('./scope');
+const runs = require('./runs');
 const { ACTION } = require('./performanceFlag');
 const replay = require('../AICore/replay');
 const { resolveSheetScope, scopedTimeMatch, SHEET_PERMISSION } = require('../TimeSheet/helpers/timeScope');
@@ -36,7 +37,8 @@ const dayOf = (value) => {
     return Number.isNaN(start.getTime()) || start.toISOString().slice(0, 10) !== value ? null : start;
 };
 
-/* { query } or { reason }. The query is what the replay record keeps as the arguments. */
+/* { query, window } or { reason }. The query is what the replay record keeps as the
+ * arguments; the window is its UTC day bounds, the one reading every metric uses. */
 const parseArgs = (args = {}) => {
     const projectIds = [...new Set([...listOf(args.projectIds), ...listOf(args.projectId)].map(String))];
     if (!projectIds.length) return { reason: 'projectId is required' };
@@ -58,7 +60,9 @@ const parseArgs = (args = {}) => {
     if (unknown) return { reason: `unknown metric "${unknown.slice(0, 40)}" (have: ${METRICS.join(', ')})` };
     const metrics = asked.length ? METRICS.filter((m) => asked.includes(m)) : [...METRICS];
 
-    return { query: { projectIds, from: args.from, to: args.to, metrics } };
+    const end = new Date(to.getTime() + DAY_MS - 1);
+    const window = { from, to: end, fromSeconds: Math.floor(from.getTime() / 1000), toSeconds: Math.floor(end.getTime() / 1000) };
+    return { query: { projectIds, from: args.from, to: args.to, metrics }, window };
 };
 
 const refuse = (companyId, actor, { params, reason, ip, entityType, entityId }) => actions.refusal(companyId, actor, { action: ACTION, params, reason: `${ACTION}: ${reason}`, ip, entityType, entityId });
@@ -69,11 +73,16 @@ const outsideScope = async (companyId, uid, projectIds, projectScope) => {
     return projectIds.filter((id) => !visible.has(id) || (narrowed && !narrowed.has(id)));
 };
 
-/* A run id the actor did not start is not theirs to write into. */
+/* The run id comes from the caller (an MCP header), so the row is filed under it only
+ * when that run is still open, belongs to this agent and was started by this person. */
 const ownRunId = async (companyId, actor) => {
     const runId = String((actor && actor.runId) || '');
-    if (!OBJECT_ID.test(runId)) return null;
-    const run = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(runId), startedBy: String(actor.userId) }, { _id: 1 }] }, 'findOne').catch(() => null);
+    const agentId = String((actor && actor.agentId) || '');
+    if (!OBJECT_ID.test(runId) || !agentId) return null;
+    const run = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENT_RUNS,
+        data: [{ _id: oid(runId), agentId, startedBy: String(actor.userId), status: { $in: runs.OPEN } }, { _id: 1 }],
+    }, 'findOne').catch(() => null);
     return run ? runId : null;
 };
 
@@ -150,7 +159,7 @@ const read = async ({ companyId, actor, args = {}, projectScope = [], allowedAct
 
     const parsed = parseArgs(args);
     if (!parsed.query) throw await refuse(companyId, actor, { params: args, reason: parsed.reason, ip });
-    const { query } = parsed;
+    const { query, window } = parsed;
 
     for (const projectId of query.projectIds) {
         await actions.authorizeRead({ companyId, actor, action: ACTION, params: { projectId }, ip, allowedActions });
@@ -161,9 +170,6 @@ const read = async ({ companyId, actor, args = {}, projectScope = [], allowedAct
         throw await refuse(companyId, actor, { params: query, reason: `project ${outside.join(', ')} is not one this agent may read`, ip, entityType: 'project', entityId: outside[0] });
     }
 
-    const from = new Date(`${query.from}T00:00:00.000Z`);
-    const to = new Date(`${query.to}T23:59:59.999Z`);
-    const window = { from, to, fromSeconds: Math.floor(from.getTime() / 1000), toSeconds: Math.floor(to.getTime() / 1000) };
     const wants = (metric) => query.metrics.includes(metric);
 
     const [sheetScope, names] = await Promise.all([
@@ -179,7 +185,7 @@ const read = async ({ companyId, actor, args = {}, projectScope = [], allowedAct
             if (wants('variance')) entry.variance = await varianceOf(companyId, projectId, entries);
         }
         if (wants('velocity')) entry.velocity = await velocityOf(companyId, uid, projectId, window);
-        if (wants('flow')) entry.flow = { days: (await cfd.flowFor(companyId, uid, projectId, { from: query.from, to: query.to })).days };
+        if (wants('flow')) entry.flow = { days: (await cfd.flowFor(companyId, uid, projectId, { from: window.from, to: window.to, utc: true })).days };
         return { entry, hidden };
     };
     const computed = await Promise.all(query.projectIds.map(numbersFor));

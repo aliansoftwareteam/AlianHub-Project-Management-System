@@ -15,16 +15,26 @@ const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 const MAX_DAYS = 120;
 const BANDS = ['open', 'inprogress', 'onhold', 'close'];
 
-const endOfDay = (date) => { const d = new Date(date); d.setHours(23, 59, 59, 999); return d; };
-const startOfDay = (date) => { const d = new Date(date); d.setHours(0, 0, 0, 0); return d; };
-const dayKey = (date) => {
-    const d = new Date(date);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
+const LOCAL_DAYS = Object.freeze({
+    endOfDay: (date) => { const d = new Date(date); d.setHours(23, 59, 59, 999); return d; },
+    startOfDay: (date) => { const d = new Date(date); d.setHours(0, 0, 0, 0); return d; },
+    dayKey: (date) => {
+        const d = new Date(date);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    },
+});
+
+const UTC_DAYS = Object.freeze({
+    endOfDay: (date) => { const d = new Date(date); d.setUTCHours(23, 59, 59, 999); return d; },
+    startOfDay: (date) => { const d = new Date(date); d.setUTCHours(0, 0, 0, 0); return d; },
+    dayKey: (date) => new Date(date).toISOString().slice(0, 10),
+});
 
 /* Per-day band counts for `uid`, who must already be allowed to open the project.
- * `from` and `to` are read the way the chart's query string is. */
-const flowFor = async (companyId, uid, projectId, { from, to } = {}) => {
+ * The chart counts the server's local days; a caller whose other numbers use UTC
+ * days passes `utc` so every figure covers the same days whatever the server's zone. */
+const flowFor = async (companyId, uid, projectId, { from, to, utc = false } = {}) => {
+    const { startOfDay, endOfDay, dayKey } = utc ? UTC_DAYS : LOCAL_DAYS;
     const projectObjId = new mongoose.Types.ObjectId(projectId);
 
     const rangeEnd = endOfDay(to ? new Date(to) : new Date());
