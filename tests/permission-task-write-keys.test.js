@@ -1,4 +1,5 @@
-const { EventEmitter } = require('events');
+const fs = require('fs');
+const path = require('path');
 
 const mockDb = require('./fixtures/fakeMongo').create();
 
@@ -13,109 +14,60 @@ jest.mock('../Modules/Sprints/controller', () => mockStub());
 jest.mock('../Modules/Tasks/helpers/mongo_helper', () => mockStub());
 jest.mock('../Modules/Tasks/helpers/handleNotification', () => mockStub());
 jest.mock('../Modules/Company/eventController', () => mockStub());
+jest.mock('../Modules/Company/controller/updateCompany', () => mockStub());
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 jest.mock('../common-storage/common-server.js', () => mockStub());
 process.env.STORAGE_TYPE = 'server';
 
-const { SCHEMA_TYPE } = require('../Config/schemaType');
-const guard = require('../Config/permissionGuard');
-const tables = require('../Config/taskWritePermissions');
+const { projectsForRequest, requireTaskActionPermission, requireTaskWritePermission } = require('../Config/permissionGuard');
+const { TASK_ACTIONS, PRE_V2_TASK_ACTIONS, RELATION_ACTIONS, TASK_WRITE_ROUTES, JUDGED, requirementsOf } = require('../Config/taskWritePermissions');
 const WEB_APP_BODIES = require('./fixtures/taskWriteBodies');
+const {
+    CID, OWNER, MEMBER, OPEN_PROJECT, LOCKED_PROJECT, PARITY_PROJECT, OPEN_TASK, OPEN_TASK_2, LOCKED_TASK, LOCKED_TASK_2, PARITY_TASK, MISSING_TASK,
+    ENV_KEYS, ids, settle, response, run, session, token, setMode, create,
+} = require('./fixtures/taskWriteGuard');
 
-const { projectsForRequest, requireTaskActionPermission } = guard;
-const { TASK_ACTIONS, PRE_V2_TASK_ACTIONS, RELATION_ACTIONS, TASK_WRITE_ROUTES, JUDGED, requirementsOf } = tables;
+const world = create(mockDb);
+const { decisions, audits, permissionReads, setRule } = world;
 
-const CID = '6f00000000000000000000c1';
-const OWNER = '6f0000000000000000000001';
-const MEMBER = '6f0000000000000000000003';
-const OPEN_PROJECT = '6f0000000000000000000a01';
-const LOCKED_PROJECT = '6f0000000000000000000a02';
-const PARITY_PROJECT = '6f0000000000000000000a03';
-const OPEN_TASK = '6f0000000000000000000b01';
-const OPEN_TASK_2 = '6f0000000000000000000b02';
-const LOCKED_TASK = '6f0000000000000000000b03';
-const LOCKED_TASK_2 = '6f0000000000000000000b04';
-const PARITY_TASK = '6f0000000000000000000b05';
-const PARITY_TASK_2 = '6f0000000000000000000b06';
-const MISSING_TASK = '6f0000000000000000000bff';
-
-const ENV_KEYS = ['PERMISSION_ENFORCEMENT_MODE', 'DISABLE_PERMISSION_ENFORCEMENT', 'PERMISSION_ENFORCEMENT_CACHE_TTL_SECONDS'];
-
-const TASK_KEYS = ['task_create', 'task_status', 'task_priority', 'task_assignee', 'task_due_date', 'task_start_date', 'task_type', 'task_description',
-    'task_estimated_hours', 'task_name_edit', 'task_tag', 'task_checklist', 'task_checklist_assign_remove', 'task_attachments', 'task_custom_field',
-    'task_comment', 'queue_list', 'task_delete', 'task_archive', 'task_convert_to_subtask', 'sub_task_create', 'convert_to_task',
-    'task_convert_to_list', 'task_move', 'task_merge', 'task_duplicate', 'task_list'];
-
-const seedRules = (type, grant, extra = {}) => {
-    const parents = {};
-    ['project', 'task'].forEach((key) => { parents[key] = mockDb.seed(type, { key, name: key, isParent: true, roles: [], ...extra }); });
-    [...TASK_KEYS.map((k) => `task.${k}`), 'project.project_sprint_create'].forEach((path) => {
-        const [parent, key] = path.split('.');
-        mockDb.seed(type, { key, name: key, isParent: false, parentId: String(parents[parent]._id), roles: [{ key: 3, permission: grant(path) }], ...extra });
-    });
-};
-
-const decisions = () => mockDb.store.permission_decisions || [];
-const audits = () => (mockDb.store.audit_logs || []).filter((row) => row.action === 'permission.refused');
-const settle = async () => { for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
-const permissionReads = () => mockDb.calls.map((call) => call.type).filter((type) => type !== 'companies');
-
-const response = () => {
-    const res = new EventEmitter();
-    res.statusCode = 200;
-    res.status = (code) => { res.statusCode = code; return res; };
-    res.json = (body) => { res.body = body; res.emit('finish'); return res; };
-    return res;
-};
-
-const run = async (middleware, req) => {
-    const res = response();
-    let passed = false;
-    await middleware(req, res, () => { passed = true; });
-    if (passed) res.emit('finish');
-    await settle();
-    return { passed, code: res.statusCode, body: res.body };
-};
-
-const session = (uid, body, route = '/api/v2/tasks', method = 'PATCH') => ({
-    uid, method, baseUrl: '', route: { path: route }, originalUrl: route, url: route, query: {}, headers: { companyid: CID }, body,
-});
-const token = (uid, body, route, method) => ({ ...session(uid, body, route, method), apiToken: { _id: 't' } });
-
-const ids = (project) => ({
-    [OPEN_PROJECT]: { taskId: OPEN_TASK, otherTaskId: OPEN_TASK_2, projectId: OPEN_PROJECT },
-    [LOCKED_PROJECT]: { taskId: LOCKED_TASK, otherTaskId: LOCKED_TASK_2, projectId: LOCKED_PROJECT },
-    [PARITY_PROJECT]: { taskId: PARITY_TASK, otherTaskId: PARITY_TASK_2, projectId: PARITY_PROJECT },
-}[project]);
-
-const setMode = (mode) => { process.env.PERMISSION_ENFORCEMENT_MODE = mode; };
-
-beforeEach(() => {
-    Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
-    mockDb.calls.length = 0;
-    ENV_KEYS.forEach((k) => { delete process.env[k]; });
-    mockDb.store.companies = [{ _id: CID }];
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: 3, status: 2, isDelete: false });
-    mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: OPEN_PROJECT, isGlobalPermission: true });
-    mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: LOCKED_PROJECT, isGlobalPermission: false });
-    mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PARITY_PROJECT, isGlobalPermission: false });
-    [[OPEN_TASK, OPEN_PROJECT], [OPEN_TASK_2, OPEN_PROJECT], [LOCKED_TASK, LOCKED_PROJECT], [LOCKED_TASK_2, LOCKED_PROJECT], [PARITY_TASK, PARITY_PROJECT], [PARITY_TASK_2, PARITY_PROJECT]]
-        .forEach(([_id, ProjectID]) => mockDb.seed(SCHEMA_TYPE.TASKS, { _id, ProjectID }));
-    seedRules(SCHEMA_TYPE.RULES, () => true);
-    // The member may see tasks in the locked project and do nothing else there.
-    seedRules(SCHEMA_TYPE.PROJECT_RULES, (path) => (path === 'task.task_list' ? false : null), { projectId: LOCKED_PROJECT });
-    seedRules(SCHEMA_TYPE.PROJECT_RULES, () => true, { projectId: PARITY_PROJECT });
-});
-
+beforeEach(() => world.reset());
 afterAll(() => ENV_KEYS.forEach((k) => { delete process.env[k]; }));
+
+const ROOT = path.join(__dirname, '..');
 
 const routesOf = (modulePath) => {
     const table = {};
-    const register = (method) => (path, ...handlers) => { table[`${method} ${path}`] = handlers; };
-    const app = { get: register('GET'), post: register('POST'), put: register('PUT'), patch: register('PATCH'), delete: register('DELETE'), use: register('USE') };
+    const register = (method) => (routePath, ...handlers) => { table[`${method} ${routePath}`] = handlers; };
+    const app = { get: register('GET'), post: register('POST'), put: register('PUT'), patch: register('PATCH'), delete: register('DELETE'), all: register('ALL'), use: register('USE') };
     require(modulePath).init(app);
     return table;
+};
+
+const sourceFiles = (dir, out = []) => {
+    fs.readdirSync(dir).forEach((name) => {
+        const full = path.join(dir, name);
+        if (fs.statSync(full).isDirectory()) {
+            if (name !== 'node_modules') sourceFiles(full, out);
+        } else if (name.endsWith('.js')) {
+            out.push(full);
+        }
+    });
+    return out;
+};
+
+const ROUTE_CALL = /\b(app|router|[A-Za-z_$][\w$]*Router)\.(post|put|patch|delete|all|use)\(\s*(['"`])(\/[^'"`]*)\3/g;
+
+/* Every write verb or app.use mount, in any router, whose path names tasks. */
+const taskRoutesIn = (source) => [...source.matchAll(ROUTE_CALL)]
+    .filter((match) => /task/i.test(match[4]))
+    .map((match) => `${match[2].toUpperCase()} ${match[4]}`);
+
+const scannedRoutes = () => {
+    const found = new Map();
+    sourceFiles(path.join(ROOT, 'Modules')).forEach((file) => {
+        taskRoutesIn(fs.readFileSync(file, 'utf8')).forEach((route) => found.set(route, path.relative(ROOT, file)));
+    });
+    return found;
 };
 
 const methodsOf = (instance) => Object.getOwnPropertyNames(Object.getPrototypeOf(instance))
@@ -123,13 +75,14 @@ const methodsOf = (instance) => Object.getOwnPropertyNames(Object.getPrototypeOf
 
 /* What a route or dispatchable method is missing, so a new one cannot ship without a key. */
 const unmappedTaskWrites = ({ routes, routeTable, dispatch }) => [
-    ...Object.keys(routes).filter((route) => !route.startsWith('GET ') && !route.startsWith('USE ') && !Object.hasOwn(routeTable, route)).map((route) => `route ${route}`),
+    ...routes.filter((route) => !Object.hasOwn(routeTable, route)).map((route) => `route ${route}`),
     ...dispatch.flatMap(({ label, methods, actions }) => methods.filter((method) => !Object.hasOwn(actions, method)).map((method) => `${label} ${method}`)),
 ];
 
+const needLabel = (need) => (need.anyOf ? need.anyOf.map((option) => option.key).join('|') : need.key);
+
 describe('every task write route and action has a permission mapping', () => {
-    const taskRoutes = routesOf('../Modules/Tasks/routes');
-    const projectRoutes = routesOf('../Modules/Project/routes');
+    const scanned = scannedRoutes();
     const { taskMongo } = require('../Modules/Tasks/helpers/task_class_Mongo');
     const { task: legacyTask } = require('../Modules/Tasks/helpers/task_class');
     const dispatch = [
@@ -137,41 +90,50 @@ describe('every task write route and action has a permission mapping', () => {
         { label: 'PATCH /api/tasks/ dispatch', methods: methodsOf(legacyTask), actions: PRE_V2_TASK_ACTIONS },
     ];
 
-    test('the scan finds the routes and the methods (it is not vacuous)', () => {
-        expect(Object.keys(taskRoutes).filter((route) => !route.startsWith('GET ')).length).toBeGreaterThanOrEqual(12);
+    test('the scan finds the task routes of every router and the dispatchable methods (it is not vacuous)', () => {
+        expect([...scanned.keys()]).toEqual(expect.arrayContaining([
+            'PATCH /api/v2/tasks', 'POST /api/v2/tasks/bulk', 'PUT /api/v1/project/allTask/:id', 'POST /api/v1/taskIndex', 'POST /api/v1/recurring-tasks',
+        ]));
+        expect(new Set(scanned.values()).size).toBeGreaterThan(8);
         expect(methodsOf(taskMongo).length).toBeGreaterThan(60);
         expect(methodsOf(legacyTask)).toEqual(expect.arrayContaining(['updateStatus', 'updatePriority', 'updateTaskName']));
     });
 
-    test('nothing in Modules/Tasks is unmapped', () => {
-        expect(unmappedTaskWrites({ routes: taskRoutes, routeTable: TASK_WRITE_ROUTES, dispatch })).toEqual([]);
+    test('nothing in Modules is unmapped', () => {
+        expect(unmappedTaskWrites({ routes: [...scanned.keys()], routeTable: TASK_WRITE_ROUTES, dispatch })).toEqual([]);
     });
 
-    test('the project route that rewrites a project\'s tasks is in the table', () => {
-        expect(projectRoutes['PUT /api/v1/project/allTask/:id']).toBeDefined();
-        expect(TASK_WRITE_ROUTES['PUT /api/v1/project/allTask/:id']).toMatchObject({ judged: JUDGED.HANDLER });
+    test('every table row names a route that still exists', () => {
+        expect(Object.keys(TASK_WRITE_ROUTES).filter((route) => !scanned.has(route))).toEqual([]);
     });
 
-    test('the scan reports a route or a method added without a mapping', () => {
+    test('the scan reports a route, an app.use mount or a method added without a mapping', () => {
+        const source = [
+            "app.post('/api/v2/tasks/new-thing', handler);",
+            "app.use('/api/v2/task-extras', extrasRouter);",
+            "router.patch(`/api/v1/task/other`, handler);",
+            "app.post('/api/v1/projects', handler);",
+        ].join('\n');
         const reported = unmappedTaskWrites({
-            routes: { ...taskRoutes, 'POST /api/v2/tasks/new-thing': [] },
+            routes: taskRoutesIn(source),
             routeTable: TASK_WRITE_ROUTES,
             dispatch: [{ label: 'dispatch', methods: [...methodsOf(taskMongo), 'updateSomethingNew'], actions: TASK_ACTIONS }],
         });
-        expect(reported).toEqual(['route POST /api/v2/tasks/new-thing', 'dispatch updateSomethingNew']);
+        expect(reported).toEqual([
+            'route POST /api/v2/tasks/new-thing',
+            'route USE /api/v2/task-extras',
+            'route PATCH /api/v1/task/other',
+            'dispatch updateSomethingNew',
+        ]);
     });
 
     test.each(Object.entries(TASK_WRITE_ROUTES).filter(([, spec]) => [JUDGED.ACTIONS, JUDGED.ROUTE].includes(spec.judged)))('%s puts its guard in front of the handler', (route, spec) => {
-        const [first] = (route.includes('/project/') ? projectRoutes : taskRoutes)[route];
-        if (spec.tokenEnforced) {
-            expect(first.permission).toBe(spec.entry.needs[0].key);
-        } else {
-            expect(first.taskWrites).toBe(spec.judged === JUDGED.ACTIONS ? spec.actions : spec.entry);
-        }
+        const [first] = routesOf(path.join(ROOT, scanned.get(route)).replace(/\.js$/, ''))[route];
+        expect(first.taskWrites).toBe(spec.judged === JUDGED.ACTIONS ? spec.actions : spec.entry);
     });
 
     test('every relation action names a task method, and the route dispatches through the table', async () => {
-        const handler = taskRoutes['POST /api/v2/tasks/relations'].slice(-1)[0];
+        const handler = routesOf('../Modules/Tasks/routes')['POST /api/v2/tasks/relations'].slice(-1)[0];
         for (const [action, { method }] of Object.entries(RELATION_ACTIONS)) {
             expect(typeof taskMongo[method]).toBe('function');
             const spy = jest.spyOn(taskMongo, method).mockResolvedValue({ status: true, reached: method });
@@ -193,7 +155,7 @@ describe('every task write route and action has a permission mapping', () => {
         everyEntry.forEach((taskEntry) => bodies.forEach((body) => {
             const needs = requirementsOf(taskEntry, body);
             expect(needs.length).toBeGreaterThan(0);
-            needs.forEach((need) => expect(need.key).toMatch(/^(task|project)\.[a-z_]+$/));
+            needs.flatMap((need) => need.anyOf || [need]).forEach((need) => expect(need.key).toMatch(/^(task|project|chat)\.[a-z_]+$/));
         }));
     });
 
@@ -210,6 +172,7 @@ describe('every task write route and action has a permission mapping', () => {
             updateTaskTotalEstimate: 'task.task_estimated_hours',
             updatePoints: 'task.task_estimated_hours',
         });
+        expect(TASK_WRITE_ROUTES['POST /api/v2/tasks'].entry).toMatchObject({ tokenEnforced: true, needs: [{ key: 'task.task_create' }] });
     });
 });
 
@@ -217,8 +180,13 @@ const entryFor = ({ route, action }) => {
     const spec = TASK_WRITE_ROUTES[route];
     return spec.judged === JUDGED.ACTIONS ? spec.actions[action] : spec.entry;
 };
+const guardFor = ({ route }) => {
+    const spec = TASK_WRITE_ROUTES[route];
+    return spec.judged === JUDGED.ACTIONS ? requireTaskActionPermission(spec.actions) : requireTaskWritePermission(spec.entry);
+};
 const lookupOf = (taskEntry) => (taskEntry.tokenEnforced ? undefined : { tasks: taskEntry.tasks || [], projects: taskEntry.projects || [] });
 const label = ({ route, action, source }) => `${route}${action ? ` ${action}` : ''} (${source})`;
+const bodyIds = (project, destinationProjectId = PARITY_PROJECT) => ({ ...ids[project], destinationProjectId });
 
 describe('every body the web app sends resolves to a project and a key', () => {
     const rows = WEB_APP_BODIES.map((row) => [label(row), row]);
@@ -232,26 +200,40 @@ describe('every body the web app sends resolves to a project and a key', () => {
         ['bulkUpdateStatus', 'bulkUpdatePriority', 'bulkUpdateAssignee', 'bulkUpdateDueDate', 'bulkUpdateTags', 'bulkArchive', 'bulkDelete', 'bulkTrash',
             'bulkMove', 'bulkConvertToSubTask', 'bulkConvertToTask'].forEach((action) => expect(covered).toContain(`POST /api/v2/tasks/bulk ${action}`));
         ['add', 'remove', 'list'].forEach((action) => expect(covered).toContain(`POST /api/v2/tasks/relations ${action}`));
+        ['POST /api/v1/taskIndex', 'POST /api/v1/updateTaskIndexOnload'].forEach((route) => expect(covered).toContain(route));
     });
 
     test.each(rows)('%s', async (_, row) => {
         const taskEntry = entryFor(row);
         expect(taskEntry).toBeTruthy();
-        const body = row.body(ids(LOCKED_PROJECT));
-        expect(requirementsOf(taskEntry, body).map((need) => need.key)).toEqual(row.keys);
+        const body = row.body(bodyIds(LOCKED_PROJECT));
+        const needs = requirementsOf(taskEntry, body);
+        expect(needs.filter((need) => !need.lookup).map(needLabel)).toEqual(row.keys);
+        expect(needs.filter((need) => need.lookup).map(needLabel)).toEqual(row.destination || []);
         expect(await projectsForRequest(CID, { body }, lookupOf(taskEntry))).toMatchObject({ projectIds: [LOCKED_PROJECT], unresolved: false });
+        for (const need of needs.filter((n) => n.lookup)) {
+            expect(await projectsForRequest(CID, { body }, need.lookup)).toMatchObject({ projectIds: [PARITY_PROJECT], unresolved: false });
+        }
     });
 
-    const namesLockedTask = (row) => [LOCKED_TASK, LOCKED_TASK_2].some((id) => JSON.stringify(row.body({ ...ids(LOCKED_PROJECT), projectId: OPEN_PROJECT })).includes(id));
+    test.each(rows)('%s: an owner\'s API token passes every check in enforce', async (_, row) => {
+        setMode('enforce');
+        const [method, route] = row.route.split(' ');
+        const result = await run(guardFor(row), token(OWNER, row.body(bodyIds(OPEN_PROJECT, OPEN_PROJECT)), route, method));
+        expect(result).toMatchObject({ passed: true, code: 200 });
+        expect(decisions()).toEqual([]);
+    });
+
+    const namesLockedTask = (row) => [LOCKED_TASK, LOCKED_TASK_2].some((id) => JSON.stringify(row.body({ ...bodyIds(LOCKED_PROJECT), projectId: OPEN_PROJECT })).includes(id));
 
     test.each(rows.filter(([, row]) => namesLockedTask(row)))('%s: the tasks decide, not a project the body names', async (_, row) => {
-        const body = row.body({ ...ids(LOCKED_PROJECT), projectId: OPEN_PROJECT });
+        const body = row.body({ ...bodyIds(LOCKED_PROJECT), projectId: OPEN_PROJECT });
         const found = await projectsForRequest(CID, { body }, lookupOf(entryFor(row)));
         expect(found.projectIds).toContain(LOCKED_PROJECT);
     });
 
     test('a bulk body naming tasks in two projects is judged in both', async () => {
-        const found = await projectsForRequest(CID, { body: { taskIds: [OPEN_TASK, LOCKED_TASK.toUpperCase(), 'not-an-id'] } }, lookupOf(TASK_ACTIONS.bulkDelete));
+        const found = await projectsForRequest(CID, { body: { taskIds: [OPEN_TASK, LOCKED_TASK.toUpperCase()] } }, lookupOf(TASK_ACTIONS.bulkDelete));
         expect([...found.projectIds].sort()).toEqual([OPEN_PROJECT, LOCKED_PROJECT]);
     });
 
@@ -274,7 +256,7 @@ const OLD_ACTION_CASES = [
     ['a claimed project id does not rescue the task\'s own project', { action: 'updatePriority', projectId: OPEN_PROJECT, taskData: { _id: LOCKED_TASK } }, false],
 ];
 
-describe('API tokens on the actions mapped before this change behave as on beta', () => {
+describe('API tokens on the actions mapped before this change keep their judgement', () => {
     describe.each(MODES)('with the workspace in %s', (mode) => {
         beforeEach(() => setMode(mode));
 
@@ -285,7 +267,7 @@ describe('API tokens on the actions mapped before this change behave as on beta'
             expect(decisions()).toEqual([]);
         });
 
-        test('the kill switch still skips the check', async () => {
+        test('the kill switch still skips the key check', async () => {
             process.env.DISABLE_PERMISSION_ENFORCEMENT = 'true';
             const result = await run(requireTaskActionPermission(), token(MEMBER, { action: 'updatePriority', taskData: { _id: LOCKED_TASK } }));
             expect(result.passed).toBe(true);
@@ -295,7 +277,7 @@ describe('API tokens on the actions mapped before this change behave as on beta'
 });
 
 /* A newly mapped action in the locked project: the member's key there is None. */
-const NEW_ACTION = { action: 'moveTask', moveTaskId: LOCKED_TASK, projectData: { id: OPEN_PROJECT } };
+const NEW_ACTION = { action: 'moveTask', moveTaskId: LOCKED_TASK, projectData: { id: LOCKED_PROJECT } };
 
 describe.each([
     ['API tokens', token],
@@ -327,14 +309,14 @@ describe.each([
 
     test('enforce lets through a member whose project grants the key, and an owner', async () => {
         setMode('enforce');
-        expect((await run(requireTaskActionPermission(), as(MEMBER, { ...NEW_ACTION, moveTaskId: PARITY_TASK }))).passed).toBe(true);
+        expect((await run(requireTaskActionPermission(), as(MEMBER, { ...NEW_ACTION, moveTaskId: PARITY_TASK, projectData: { id: PARITY_PROJECT } }))).passed).toBe(true);
         expect((await run(requireTaskActionPermission(), as(OWNER, NEW_ACTION))).passed).toBe(true);
         expect(decisions()).toEqual([]);
     });
 
     test('enforce names the key that refused when an action needs two', async () => {
         setMode('enforce');
-        mockDb.store[SCHEMA_TYPE.PROJECT_RULES].filter((rule) => rule.projectId === LOCKED_PROJECT && rule.key === 'task_convert_to_subtask').forEach((rule) => { rule.roles = [{ key: 3, permission: true }]; });
+        setRule(LOCKED_PROJECT, 'task_convert_to_subtask', true);
         const result = await run(requireTaskActionPermission(), as(MEMBER, { action: 'convertToSubTask', selectedTaskId: LOCKED_TASK, taskId: LOCKED_TASK_2 }));
         expect(result).toMatchObject({ code: 403, body: { permission: 'task.sub_task_create' } });
         expect(decisions()[0]).toMatchObject({ permission: 'task.sub_task_create' });
@@ -359,7 +341,7 @@ describe.each([
 
     test('enforce judges a body whose tasks do not exist on the company rules and says so', async () => {
         setMode('enforce');
-        mockDb.store[SCHEMA_TYPE.RULES].filter((rule) => rule.key === 'task_merge').forEach((rule) => { rule.roles = [{ key: 3, permission: null }]; });
+        setRule(null, 'task_merge', null);
         const result = await run(requireTaskActionPermission(), as(MEMBER, { action: 'mergeTask', taskId: MISSING_TASK, mergeTaskId: MISSING_TASK }));
         expect(result.code).toBe(403);
         expect(decisions()[0]).toMatchObject({ scope: 'global', reason: 'tasks_not_found' });
@@ -375,11 +357,21 @@ describe.each([
 
     test('enforce still reads the company rules when a named parent is missing but a project is named', async () => {
         setMode('enforce');
-        mockDb.store[SCHEMA_TYPE.RULES].filter((rule) => rule.key === 'sub_task_create').forEach((rule) => { rule.roles = [{ key: 3, permission: null }]; });
+        setRule(null, 'sub_task_create', null);
         const body = { action: 'createSubTaskWithAi', type: 'subTask', parentTask: { id: MISSING_TASK, ProjectID: PARITY_PROJECT } };
         const result = await run(requireTaskActionPermission(), as(MEMBER, body));
         expect(result).toMatchObject({ code: 403, body: { permission: 'task.sub_task_create' } });
         expect(decisions()[0]).toMatchObject({ scope: 'global', reason: 'tasks_not_found' });
+    });
+
+    test('a direct-message preview is judged on the chat key the Chat page checks, read from the company rules', async () => {
+        setMode('enforce');
+        const preview = { action: 'updateLastMessageTime', companyId: CID, taskId: LOCKED_TASK, msgObj: {} };
+        expect((await run(requireTaskActionPermission(), as(MEMBER, preview))).passed).toBe(true);
+        setRule(null, 'one_to_one_chat', false);
+        const readOnly = await run(requireTaskActionPermission(), as(MEMBER, preview));
+        expect(readOnly).toMatchObject({ code: 403, body: { permission: 'chat.one_to_one_chat' } });
+        expect(decisions()[0]).toMatchObject({ permission: 'chat.one_to_one_chat', scope: 'global' });
     });
 });
 
@@ -393,16 +385,26 @@ describe('the other task write routes use the same judgement', () => {
         ['PATCH /api/v1/importTasks', { tasks: [], projectData: { _id: LOCKED_PROJECT } }, 'task.task_create', false],
         ['POST /api/tasks', { data: { ProjectID: LOCKED_PROJECT } }, 'task.task_create', false],
     ])('%s', async (route, body, key, readable) => {
-        const [method, path] = route.split(' ');
+        const [method, routePath] = route.split(' ');
         setMode('off');
-        expect((await run(guardOf(route), token(MEMBER, body, path, method))).passed).toBe(true);
+        expect((await run(guardOf(route), token(MEMBER, body, routePath, method))).passed).toBe(true);
         setMode('enforce');
-        const result = await run(guardOf(route), token(MEMBER, body, path, method));
+        const result = await run(guardOf(route), token(MEMBER, body, routePath, method));
         if (readable) {
             expect(result.passed).toBe(true);
         } else {
             expect(result).toMatchObject({ code: 403, body: { permission: key } });
         }
+    });
+
+    test('the task index routes need the task to be visible', async () => {
+        const indexRoutes = routesOf('../Modules/taskIndex/routes');
+        setMode('enforce');
+        const reorder = { taskId: LOCKED_TASK, projectId: LOCKED_PROJECT, companyId: CID, sprintId: 's1' };
+        expect((await run(indexRoutes['POST /api/v1/taskIndex'][0], session(MEMBER, reorder, '/api/v1/taskIndex', 'POST'))).passed).toBe(true);
+        setRule(LOCKED_PROJECT, 'task_list', null);
+        const refused = await run(indexRoutes['POST /api/v1/updateTaskIndexOnload'][0], session(MEMBER, { taskUpdate: { data: LOCKED_TASK }, companyId: CID }, '/api/v1/updateTaskIndexOnload', 'POST'));
+        expect(refused).toMatchObject({ code: 403, body: { permission: 'task.task_list' } });
     });
 
     test('the token-enforced keys stay on PATCH /api/v2/tasks and the bulk route, and do not reach the pre-v2 route', async () => {
@@ -411,9 +413,18 @@ describe('the other task write routes use the same judgement', () => {
         expect((await run(guardOf('POST /api/v2/tasks/bulk'), token(MEMBER, body, '/api/v2/tasks/bulk', 'POST'))).code).toBe(403);
     });
 
+    test('POST /api/v2/tasks keeps judging API tokens on task.task_create in every mode', async () => {
+        const body = { data: { ProjectID: LOCKED_PROJECT }, projectData: { _id: LOCKED_PROJECT, CompanyId: CID } };
+        for (const mode of MODES) {
+            setMode(mode);
+            expect(await run(guardOf('POST /api/v2/tasks'), token(MEMBER, body, '/api/v2/tasks', 'POST'))).toMatchObject({ code: 403, body: { permission: 'task.task_create' } });
+        }
+        expect(decisions()).toEqual([]);
+    });
+
     test('a relation needs the task to be visible in both projects', async () => {
         setMode('enforce');
-        mockDb.store[SCHEMA_TYPE.PROJECT_RULES].filter((rule) => rule.projectId === LOCKED_PROJECT && rule.key === 'task_list').forEach((rule) => { rule.roles = [{ key: 3, permission: null }]; });
+        setRule(LOCKED_PROJECT, 'task_list', null);
         const result = await run(guardOf('POST /api/v2/tasks/relations'), session(MEMBER, { action: 'add', taskId: OPEN_TASK, relatedTaskId: LOCKED_TASK }, '/api/v2/tasks/relations', 'POST'));
         expect(result).toMatchObject({ code: 403, body: { permission: 'task.task_list' } });
     });

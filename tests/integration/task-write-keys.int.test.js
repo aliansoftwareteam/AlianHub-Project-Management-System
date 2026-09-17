@@ -37,28 +37,33 @@ async function tokenClientFor(session) {
     return createApiClient({ baseURL: state.baseURL, accessToken: res.body.data.token, companyId: state.companyId });
 }
 
-/* A project with its own rules where the member's task rename is None, and a task in it. */
+/* A project with its own rules where the member's task rename and priority are None, and a task in it. */
 async function taskWhereRenameIsNone() {
     const project = await createProject(owner.api, { assigneeIds: [owner.uid, member.uid], createdBy: owner.uid });
     const imported = await owner.api.post('/api/v1/importSettingsProjectFunction', { companyId: state.companyId, type: 'project', projectId: project._id });
     expect(imported.body.status).toBe(true);
     expect((await owner.api.put(`/api/v1/project/${project._id}`, { updateObject: { isGlobalPermission: false } })).status).toBe(200);
-    const rule = (await owner.api.get(`/api/v1/projectRules/${project._id}`)).body.find((r) => r.key === 'task_name_edit');
-    const roles = [...rule.roles.filter((r) => r.key !== MEMBER_ROLE), { key: MEMBER_ROLE, permission: null }];
-    expect((await owner.api.put('/api/v1/projectRules/update', { updateObject: { roles }, key: '$set', id: rule._id, projectId: project._id })).status).toBe(200);
+    const rules = (await owner.api.get(`/api/v1/projectRules/${project._id}`)).body;
+    for (const key of ['task_name_edit', 'task_priority']) {
+        const rule = rules.find((r) => r.key === key);
+        const roles = [...rule.roles.filter((r) => r.key !== MEMBER_ROLE), { key: MEMBER_ROLE, permission: null }];
+        expect((await owner.api.put('/api/v1/projectRules/update', { updateObject: { roles }, key: '$set', id: rule._id, projectId: project._id })).status).toBe(200);
+    }
     const task = await createTask(owner.api, { project, user: owner, companyOwnerId: owner.uid });
     return { project, task };
 }
 
 /* The body TaskDetailPanel.vue sends through TaskOperations updateTaskName. */
-const rename = (api, { project, task }, name) => api.patch('/api/v2/tasks', {
+const rename = (api, { project, task }, name, { taskId = task._id, companyId = state.companyId } = {}) => api.patch('/api/v2/tasks', {
     action: 'updateTaskName',
     firebaseObj: { TaskName: name },
-    projectData: { _id: project._id, CompanyId: state.companyId, ProjectName: project.ProjectName, ProjectCode: project.ProjectCode },
-    taskData: { _id: task._id, ProjectID: project._id, sprintId: task.sprintId, TaskName: 'before' },
+    projectData: { _id: project._id, CompanyId: companyId, ProjectName: project.ProjectName, ProjectCode: project.ProjectCode },
+    taskData: { _id: taskId, ProjectID: project._id, sprintId: task.sprintId, TaskName: 'before' },
     obj: { previousTaskName: 'before', userName: 'Member' },
     userData: { id: member.uid, Employee_Name: 'Member', companyOwnerId: owner.uid },
 });
+
+const OTHER_COMPANY = '0123456789abcdef01234567';
 
 const storedName = async (taskId) => (await client.db(state.companyId).collection('tasks').findOne({ _id: new ObjectId(taskId) }, { projection: { TaskName: 1 } })).TaskName;
 
@@ -123,6 +128,52 @@ describe('an API token without the key on a newly mapped task action', () => {
         const res = await rename(owner.api, target, name);
         expect(res.status).toBe(200);
         expect(await storedName(target.task._id)).toBe(name);
+    });
+});
+
+describe('what a task write body names is read the way the handlers read it', () => {
+    let target;
+
+    beforeAll(async () => {
+        await setWorkspaceMode(null);
+        target = await taskWhereRenameIsNone();
+    });
+
+    afterAll(() => setWorkspaceMode(null));
+
+    it('refuses an API token whose body names another company, with the workspace off', async () => {
+        const before = await storedName(target.task._id);
+        const res = await rename(memberToken, target, `other company ${uniqueSuffix()}`, { companyId: OTHER_COMPANY });
+        expect(res.status).toBe(403);
+        expect(res.body).toMatchObject({ status: false, error: 'Forbidden' });
+        expect(await storedName(target.task._id)).toBe(before);
+    });
+
+    it('refuses an API token whose task id is an operator, with the workspace off', async () => {
+        const before = await storedName(target.task._id);
+        const res = await rename(memberToken, target, `operator ${uniqueSuffix()}`, { taskId: { $in: [target.task._id] } });
+        expect(res.status).toBe(403);
+        expect(await storedName(target.task._id)).toBe(before);
+    });
+
+    it('judges an API token on a mapping from before this change by the task a { id } names', async () => {
+        const res = await memberToken.patch('/api/v2/tasks', {
+            action: 'updatePriority',
+            firebaseObj: { Task_Priority: 'HIGH' },
+            projectData: { _id: target.project._id, CompanyId: state.companyId },
+            taskData: { _id: { id: target.task._id }, sprintId: target.task.sprintId },
+            priorityObj: {},
+            isUpdateTask: true,
+        });
+        expect(res.status).toBe(403);
+        expect(res.body).toMatchObject({ permission: 'task.task_priority' });
+    });
+
+    it('records a browser session naming another company in report, and lets it through', async () => {
+        await setWorkspaceMode('report');
+        const res = await rename(owner.api, target, `session ${uniqueSuffix()}`, { companyId: OTHER_COMPANY });
+        expect(res.status).toBe(200);
+        await waitFor(() => decisions.findOne({ mode: 'report', reason: 'company_mismatch', route: '/api/v2/tasks', userIds: owner.uid }), 'a company_mismatch row');
     });
 });
 
