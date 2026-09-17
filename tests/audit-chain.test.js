@@ -5,6 +5,7 @@ const mockDb = require('./fixtures/fakeMongo').create();
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
+jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0 } }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 
@@ -748,6 +749,39 @@ describe('agent audit rows under the chain', () => {
             mockDb.crud.mockImplementation(real);
         }
         expect(auditRows().filter((r) => r.action === agentAudit.ACTION_UNDONE)).toHaveLength(1);
+    });
+});
+
+describe('the audit log export', () => {
+    const OWNER = '6f0000000000000000000001';
+    const exportCsv = async (query) => {
+        const chunks = [];
+        const res = { setHeader: () => {}, write: (b) => { chunks.push(String(b)); return true; }, end: () => {} };
+        res.status = () => res;
+        res.json = (b) => { chunks.push(JSON.stringify(b)); return res; };
+        await require('../Modules/Audit/controller').exportAuditCsv({ uid: OWNER, headers: { companyid: CID }, query, body: {} }, res);
+        return chunks.join('').split('\n');
+    };
+
+    it('writes only verified changes, re-checks every filtered row on them, and adds an integrity column', async () => {
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
+        const undoneId = await agentAudit.recordAction(CID, actor, { action: 'task.comment', params: { taskId: TASK }, undo: { kind: 'comment', commentId: 'c1', taskId: TASK }, entityId: TASK });
+        await agentAudit.markUndone(CID, undoneId, 'u2');
+        const plainId = await agentAudit.recordAction(CID, actor, { action: 'task.assign', params: { taskId: TASK }, undo: { kind: 'assign', taskId: TASK, previous: [] }, entityId: TASK });
+        const forgedSeq = chained().length + 1;
+        await mockDb.crud(CID, { type: SCHEMA_TYPE.AUDIT_LOGS, data: { action: 'audit.amended', actorId: '', meta: { amends: plainId, set: { undoneAt: new Date(), undoneBy: 'forged' }, setRow: { entityId: 'forged-entity', entityName: 'forged-name' } }, chain: { seq: forgedSeq, prevHash: 'x', hash: 'f'.repeat(64) } } }, 'save');
+        const lineOf = (lines, id) => lines.find((l) => l.startsWith(new Date(auditRows().find((r) => String(r._id) === id).createdAt).toISOString()));
+
+        const all = await exportCsv({ action: 'agent.action' });
+        expect(all[0]).toBe('time,actorType,actor,agent,run,event,entity,reason,cost_usd,undone_at,integrity');
+        expect(lineOf(all, plainId)).not.toContain('forged');
+        expect(lineOf(all, plainId)).toMatch(new RegExp(`,,broken:${forgedSeq}$`));
+
+        const undone = await exportCsv({ undone: 'true' });
+        expect(undone).toHaveLength(2);
+        expect(lineOf(undone, undoneId)).toBeTruthy();
+        expect(await exportCsv({ entityId: 'forged-entity' })).toHaveLength(1);
+        expect(await exportCsv({ q: 'forged-name' })).toHaveLength(1);
     });
 });
 
