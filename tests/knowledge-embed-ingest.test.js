@@ -23,7 +23,7 @@ const { knowledgeChunksSchema } = require('../utils/mongo-handler/createSchema')
 const llmProvider = require('../Modules/AICore/llmProvider');
 const indexer = require('../Modules/Knowledge/ingest/indexer');
 const backfill = require('../Modules/Knowledge/ingest/backfill');
-const { eraseDocument } = require('../Modules/Knowledge/ingest/erase');
+const { eraseDocument, erasePerson } = require('../Modules/Knowledge/ingest/erase');
 const embeddings = require('../Modules/Knowledge/embeddings');
 const vectorStore = require('../Modules/Knowledge/vectorStore');
 const { createInMemoryVectorAdapter } = require('../Modules/Knowledge/adapters/vector');
@@ -73,6 +73,7 @@ beforeEach(() => {
     llmProvider.isEmbeddingConfigured.mockReturnValue(true);
     answering();
     indexer.clearEmbedRetries();
+    embeddings.resetBreaker();
     vectorStore.reset();
     mockDb.uniqueFromSchema(CHUNKS, knowledgeChunksSchema);
     mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C, knowledgeIndexer: { mode: 'on' }, knowledgeRetrieval: { mode: 'hybrid' } });
@@ -361,7 +362,129 @@ describe('the vector store seam', () => {
         expect(adapter.tombstone).toHaveBeenCalledWith({ companyId: C, sourceType: 'page', sourceIds: [String(page._id)] });
 
         await eraseDocument(C, { sourceType: 'page', sourceId: String(page._id) });
-        expect(adapter.erase).toHaveBeenCalledWith({ companyId: C, sourceType: 'page', sourceId: String(page._id) });
+        expect(adapter.erase).toHaveBeenCalledWith({ companyId: C, sources: [{ sourceType: 'page', sourceId: String(page._id) }] });
+    });
+
+    it("tells the store exactly which sources an erasure by person removed: the person's private pages and comments, never their shared pages or calls", async () => {
+        const shared = seedPage(C, { title: 'Shared' });
+        const secret = seedPage(C, { title: 'Secret', visibility: 'private' });
+        const comment = seedComment();
+        const call = mockDb.seed(SCHEMA_TYPE.CALLS, { callId: 'c1', title: 'Standup', participants: [OWNER], createdBy: OWNER, transcript: 'We agreed the rollout.', deletedStatusKey: 0, updatedAt: new Date('2026-09-01T00:00:00Z') });
+        await indexer.ingestPage(C, shared);
+        await indexer.ingestPage(C, secret);
+        await indexer.syncComment(C, String(comment._id));
+        await indexer.syncTranscript(C, String(call._id));
+
+        await erasePerson(C, OWNER);
+
+        expect(adapter.erase).toHaveBeenCalledTimes(1);
+        const [{ companyId, sources }] = adapter.erase.mock.calls[0];
+        expect(companyId).toBe(C);
+        expect(sources.map((s) => `${s.sourceType}:${s.sourceId}`).sort()).toEqual([`comment:${comment._id}`, `page:${secret._id}`].sort());
+        const kept = chunksOf(shared._id).length + chunksOf(call._id).length;
+        expect(kept).toBe(3);
+        expect((await adapter.stats({ companyId: C })).embedded).toEqual({ [SMALL]: kept });
+    });
+});
+
+describe('a bad key cannot pay for a corpus of refusals', () => {
+    const refusing = (over = {}) => embed.mockRejectedValue(Object.assign(new Error('Invalid OpenAI API key. Check the API key configuration.'), { type: 'auth', code: 'invalid_api_key', retryable: false, retryAfterMs: null, ...over }));
+    const paused = () => logger.warn.mock.calls.filter(([message]) => /paused/.test(message));
+
+    it('stops embedding for the company after a run of consecutive failures, keeps writing the text, and says so once', async () => {
+        refusing();
+        const pages = Array.from({ length: embeddings.BREAKER_FAILURES + 3 }, (_, i) => seedPage(C, { title: `Page ${i}` }));
+        for (const page of pages) await indexer.ingestPage(C, page);
+
+        expect(embed).toHaveBeenCalledTimes(embeddings.BREAKER_FAILURES);
+        pages.forEach((page) => {
+            expect(chunksOf(page._id)).toHaveLength(2);
+            chunksOf(page._id).forEach((chunk) => expect(chunk.embeddingModel).toBeNull());
+        });
+        expect(paused()).toHaveLength(1);
+        expect(embeddings.breakerState(C)).toMatchObject({ open: true, reason: 'failures' });
+
+        await indexer.flushEmbedRetries();
+        expect(embed).toHaveBeenCalledTimes(embeddings.BREAKER_FAILURES);
+        expect(indexer.embedRetries()).toEqual([]);
+    });
+
+    it('resumes after the cooldown, and a success closes the run of failures', async () => {
+        jest.useFakeTimers();
+        try {
+            jest.setSystemTime(new Date('2026-09-18T10:00:00Z'));
+            refusing();
+            for (let i = 0; i < embeddings.BREAKER_FAILURES; i += 1) await indexer.ingestPage(C, seedPage(C, { title: `Page ${i}` }));
+            answering();
+            await indexer.ingestPage(C, seedPage(C, { title: 'Still paused' }));
+            expect(embed).toHaveBeenCalledTimes(embeddings.BREAKER_FAILURES);
+
+            jest.setSystemTime(new Date('2026-09-18T10:10:01Z'));
+            const page = seedPage(C, { title: 'Resumed' });
+            await indexer.ingestPage(C, page);
+            expect(embed).toHaveBeenCalledTimes(embeddings.BREAKER_FAILURES + 1);
+            chunksOf(page._id).forEach((chunk) => expect(chunk.embeddingModel).toBe(SMALL));
+            expect(embeddings.breakerState(C)).toMatchObject({ open: false, failures: 0 });
+            expect(embeddings.BREAKER_COOLDOWN_MS).toBe(10 * 60 * 1000);
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
+    it('honours the wait the vendor asked for as the cooldown', async () => {
+        jest.useFakeTimers();
+        try {
+            jest.setSystemTime(new Date('2026-09-18T10:00:00Z'));
+            refusing({ type: 'rate_limit', code: 'rate_limit', retryable: true, retryAfterMs: 5000 });
+            for (let i = 0; i < embeddings.BREAKER_FAILURES; i += 1) await indexer.ingestPage(C, seedPage(C, { title: `Page ${i}` }));
+            expect(embeddings.breakerState(C)).toMatchObject({ open: true, until: new Date('2026-09-18T10:00:05Z').getTime() });
+
+            answering();
+            jest.setSystemTime(new Date('2026-09-18T10:00:06Z'));
+            await indexer.ingestPage(C, seedPage(C, { title: 'Resumed' }));
+            expect(embed).toHaveBeenCalledTimes(embeddings.BREAKER_FAILURES + 1);
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
+    it('pauses at once on a budget refusal, queues no retry, and never counts it as a provider failure', async () => {
+        embed.mockRejectedValue(Object.assign(new Error('ai_budget_exhausted: this call is estimated at $0.0000'), { code: 'ai_budget_exhausted' }));
+        const page = seedPage(C);
+
+        const result = await indexer.ingestPage(C, page);
+
+        expect(result).toMatchObject({ written: 2, embedded: 0, embedFailed: true, embedRefused: true });
+        chunksOf(page._id).forEach((chunk) => expect(chunk).toMatchObject({ embedding: [], embeddingModel: null }));
+        expect(indexer.embedRetries()).toEqual([]);
+        expect(embeddings.breakerState(C)).toMatchObject({ open: true, reason: 'budget' });
+        expect(logger.error).not.toHaveBeenCalled();
+
+        await indexer.ingestPage(C, seedPage(C, { title: 'Second' }));
+        expect(embed).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps one company\'s pause from touching another', async () => {
+        refusing();
+        for (let i = 0; i < embeddings.BREAKER_FAILURES; i += 1) await indexer.ingestPage(C, seedPage(C, { title: `Page ${i}` }));
+        const other = '6f0000000000000000000c03';
+        mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: other, knowledgeIndexer: { mode: 'on' }, knowledgeRetrieval: { mode: 'hybrid' } });
+        answering();
+        const page = seedPage(other);
+        await indexer.ingestPage(other, page);
+        expect(embed).toHaveBeenCalledTimes(embeddings.BREAKER_FAILURES + 1);
+        chunksOf(page._id).forEach((chunk) => expect(chunk.embeddingModel).toBe(SMALL));
+    });
+});
+
+describe('the vector store seam, continued', () => {
+    it('is not told about writes the store cannot use', async () => {
+        const adapter = createInMemoryVectorAdapter();
+        jest.spyOn(adapter, 'upsert');
+        vectorStore.use(adapter);
+        embed.mockRejectedValue(Object.assign(new Error('ai_budget_exhausted'), { code: 'ai_budget_exhausted' }));
+        await indexer.ingestPage(C, seedPage(C));
+        expect(adapter.upsert).not.toHaveBeenCalled();
     });
 
     it('falls back to the in-database store, whose vectors ride on the chunk rows', () => {

@@ -112,7 +112,7 @@ describe('the contract', () => {
         mockDb.calls.length = 0;
         await expect(db.upsert({ companyId: C, chunks: [chunk()] })).resolves.toMatchObject({ backend: 'vector-db', skipped: true });
         await expect(db.tombstone({ companyId: C, sourceType: 'page', sourceIds: ['x'] })).resolves.toMatchObject({ backend: 'vector-db', skipped: true });
-        await expect(db.erase({ companyId: C, sourceType: 'page', sourceId: 'x' })).resolves.toMatchObject({ backend: 'vector-db', skipped: true });
+        await expect(db.erase({ companyId: C, sources: [{ sourceType: 'page', sourceId: 'x' }] })).resolves.toMatchObject({ backend: 'vector-db', skipped: true });
         expect(mockDb.calls).toEqual([]);
         expect(await db.stats({ companyId: C })).toEqual({ backend: 'vector-db', candidateBound: CANDIDATE_CHUNKS_PER_SOURCE, embedded: { [MODEL]: 1, 'text-embedding-3-large': 1 }, unembedded: 1 });
     });
@@ -126,9 +126,46 @@ describe('the contract', () => {
         await memory.tombstone({ companyId: C, sourceType: 'page', sourceIds: [rows[0].sourceId] });
         expect(await ranked(memory, ME)).toEqual([[rows[1].sourceId, 1]]);
 
-        await memory.erase({ companyId: C, sourceType: 'page', sourceId: rows[1].sourceId });
+        await memory.erase({ companyId: C, sources: [{ sourceType: 'page', sourceId: rows[1].sourceId }] });
         expect(await ranked(memory, ME)).toEqual([]);
         expect(await memory.stats({ companyId: C })).toEqual({ backend: 'vector-memory', embedded: {}, unembedded: 0 });
+    });
+
+    it("erases exactly the sources it is told, so a person's shared pages and calls survive an erasure by person", async () => {
+        const { memory } = adapters();
+        const rows = {
+            secret: chunk({ embedding: [1, 0, 0], visibility: 'private', createdBy: OTHER, title: 'secret' }),
+            shared: chunk({ embedding: [1, 0, 0], createdBy: OTHER, title: 'shared' }),
+            comment: chunk({ sourceType: 'comment', embedding: [1, 0, 0], createdBy: OTHER, sprintId: OPEN_SPRINT, title: 'comment' }),
+            call: chunk({ sourceType: 'transcript', embedding: [1, 0, 0], createdBy: OTHER, participants: [OTHER], visibility: 'participants', title: 'call' }),
+        };
+        await memory.upsert({ companyId: C, chunks: Object.values(rows) });
+
+        await memory.erase({ companyId: C, sources: [{ sourceType: 'page', sourceId: rows.secret.sourceId }, { sourceType: 'comment', sourceId: rows.comment.sourceId }] });
+
+        const passages = await memory.search({ companyId: C, queryEmbedding: Q, model: MODEL, filter: await filterAs(OTHER), limit: 10 });
+        expect(passages.map((p) => p.title).sort()).toEqual(['call', 'shared']);
+        expect(await memory.stats({ companyId: C })).toEqual({ backend: 'vector-memory', embedded: { [MODEL]: 2 }, unembedded: 0 });
+    });
+
+    it('fails the whole search when the candidates of any one source cannot be read, rather than answering from the rest', async () => {
+        const { db, memory } = adapters();
+        seedRows([chunk({ embedding: [1, 0, 0] })]);
+        const crud = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async (companyId, q, method) => {
+            if (q.type === CHUNKS && method === 'aggregate' && q.data[0][0].$match.sourceType === 'comment') throw new Error('comment candidates unavailable');
+            return crud(companyId, q, method);
+        });
+        try {
+            await expect(db.search({ companyId: C, queryEmbedding: Q, model: MODEL, filter: await filterAs(ME), limit: 5 })).rejects.toThrow(/comment candidates unavailable/);
+        } finally {
+            mockDb.crud.mockImplementation(crud);
+        }
+
+        await memory.upsert({ companyId: C, chunks: [chunk({ embedding: [1, 0, 0] }), chunk({ sourceType: 'comment', embedding: [1, 0, 0], sprintId: OPEN_SPRINT })] });
+        const filter = await filterAs(ME);
+        filter.clauses.comment = { projectId: { $regex: 'x' } };
+        await expect(memory.search({ companyId: C, queryEmbedding: Q, model: MODEL, filter, limit: 5 })).rejects.toThrow(/unsupported operator/);
     });
 });
 
