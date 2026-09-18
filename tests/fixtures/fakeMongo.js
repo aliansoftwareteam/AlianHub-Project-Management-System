@@ -114,11 +114,12 @@ const groupKeyOf = (doc, id) => (id && typeof id === 'object' ? Object.fromEntri
 const ACCUMULATORS = {
     $sum: (prev, v) => (prev || 0) + (typeof v === 'number' ? v : 0),
     $max: (prev, v) => (v == null || (prev != null && sortable(prev) >= sortable(v)) ? prev : v),
+    $min: (prev, v) => (v == null || (prev != null && sortable(prev) <= sortable(v)) ? prev : v),
     $first: (prev, v, seen) => (seen ? prev : v),
     $push: (prev, v) => [...(prev || []), v],
 };
 
-/* $group with a field or compound _id and $sum / $max / $first / $push; a group naming no accumulator counts into `n`. */
+/* $group with a field or compound _id and $sum / $max / $min / $first / $push; a group naming no accumulator counts into `n`. */
 const group = (docs, spec) => {
     const fields = Object.entries(spec).filter(([name]) => name !== '_id');
     const out = new Map();
