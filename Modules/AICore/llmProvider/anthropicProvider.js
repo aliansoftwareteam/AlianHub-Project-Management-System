@@ -18,7 +18,7 @@ try {
 // ANTHROPIC_TIMEOUT_MS overrides the shared model timeout; the job lock is
 // derived from the same module, so raising it here raises the lock too.
 const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
-const { AIProviderError, TYPES, isProviderError, requestIdOf, retryAfterMsOf, vendorRaw, typeOfStatus, fromTransport, CONTEXT_LENGTH, QUOTA_MESSAGE } = require('../providerError');
+const { AIProviderError, TYPES, isProviderError, noEmbeddings, requestIdOf, retryAfterMsOf, vendorRaw, typeOfStatus, fromTransport, CONTEXT_LENGTH, QUOTA_MESSAGE } = require('../providerError');
 const { normaliseRequest, STRUCTURED_OUTPUT, JSON_ONLY_INSTRUCTION } = require('./normalise');
 
 const PROVIDER = 'anthropic';
@@ -74,6 +74,10 @@ function toProviderError(err, model = process.env.ANTHROPIC_MODEL || null) {
 
 const anthropicProvider = {
     name: 'anthropic',
+    embeddingsConfigured: false,
+    async embed() {
+        throw noEmbeddings(PROVIDER);
+    },
     get isConfigured() {
         return Boolean(process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_MODEL && AnthropicSdk);
     },

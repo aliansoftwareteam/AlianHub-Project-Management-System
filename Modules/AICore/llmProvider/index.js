@@ -2,8 +2,22 @@ const registry = require('./registry');
 const { ADAPTERS, PROVIDER_NAMES, adapterFor, configuredNames, isAnyConfigured, describe, list } = registry;
 const { routerEnabled } = require('./normalise');
 const { resilient } = require('./router');
+const { noEmbeddings } = require('../providerError');
 const health = require('./health');
 const rateLimit = require('./rateLimit');
+
+/* Embeddings come from OpenAI with the instance key (owner, 2026-09-17), whichever provider
+ * answers chat; per-workspace keys follow Sprint 8's secrets store. */
+const EMBEDDING_PROVIDER = 'openai';
+
+const isEmbeddingConfigured = () => Boolean(ADAPTERS[EMBEDDING_PROVIDER].embeddingsConfigured);
+
+/** The embedding adapter behind the spend meter and the health window. */
+function embeddingProvider() {
+    const adapter = ADAPTERS[EMBEDDING_PROVIDER];
+    if (!adapter.embeddingsConfigured) throw noEmbeddings(adapter.name, 'has no embeddings until AI_API_KEY is set');
+    return resilient(adapter, registry);
+}
 
 function configuredAdapter() {
     const selected = (process.env.LLM_PROVIDER || '').trim().toLowerCase();
@@ -64,6 +78,9 @@ function providerStatus() {
 module.exports = {
     getProvider,
     isAnyProviderConfigured,
+    embeddingProvider,
+    isEmbeddingConfigured,
+    EMBEDDING_PROVIDER,
     selectAdapter,
     routerEnabled,
     adapterFor,

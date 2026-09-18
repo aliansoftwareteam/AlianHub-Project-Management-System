@@ -143,6 +143,22 @@ function metered(adapter) {
             await alert(context);
             return result;
         },
+        /* Embeddings carry no prompt to replay and cost a fraction of a cent a batch, so they are
+         * priced, booked and alerted on like a chat call but hold no reservation. */
+        async embed(opts) {
+            const context = contextOf(opts);
+            const model = String((opts && opts.model) || '').trim() || adapter.model;
+            ensurePriced(model, context);
+            const result = await adapter.embed(opts);
+            try {
+                await record(context, result, adapter, model);
+            } catch (e) {
+                if (strict()) throw e;
+                logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} spent ${usage.usageFromResult(result).totalTokens} tokens that could not be booked: ${e.message}`);
+            }
+            await alert(context);
+            return result;
+        },
     };
     wrapped.set(adapter, provider);
     return provider;

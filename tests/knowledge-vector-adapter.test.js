@@ -34,6 +34,7 @@ const Q = [1, 0, 0];
 
 const CHUNKS = SCHEMA_TYPE.KNOWLEDGE_CHUNKS;
 const PROJECTS = { [ME]: [SHARED], [OTHER]: [SHARED, SECRET] };
+const chunkSearches = () => mockDb.calls.filter((c) => c.type === CHUNKS && c.method === 'aggregate');
 
 let seq = 0;
 const sourceId = () => `6f00000000000000000${String(++seq).padStart(5, '0')}`;
@@ -138,13 +139,15 @@ describe('both adapters rank a fixture the same way', () => {
             chunk({ sourceId: a, ordinal: 0, embedding: [0.5, 0.5, 0], text: 'Harbour intro', title: 'Harbour guide' }),
             chunk({ sourceId: a, ordinal: 1, embedding: [1, 0, 0], text: 'Harbour appendix', title: 'Harbour guide' }),
             chunk({ embedding: [0.7, 0.7, 0], authorKind: 'agent' }),
-            chunk({ embedding: [0, 1, 0] }),
+            chunk({ embedding: [0.1, 1, 0] }),
+            chunk({ embedding: [0, 1, 0], title: 'orthogonal' }),
+            chunk({ embedding: [-1, 0, 0], title: 'opposite' }),
         ];
         const { both } = await loaded(rows);
 
         for (const [, adapter] of both) {
             const passages = await adapter.search({ companyId: C, queryEmbedding: Q, model: MODEL, filter: await filterAs(ME), limit: 10 });
-            expect(passages.map((p) => [p.sourceId, Number(p.score.toFixed(6))])).toEqual([[a, 1], [rows[2].sourceId, 0.707107], [rows[3].sourceId, 0]]);
+            expect(passages.map((p) => [p.sourceId, Number(p.score.toFixed(6))])).toEqual([[a, 1], [rows[2].sourceId, 0.707107], [rows[3].sourceId, 0.099504]]);
             expect(passages[0]).toEqual({
                 id: `page:${a}`, sourceType: 'page', sourceId: a, projectId: SHARED, title: 'Harbour guide', excerpt: 'Harbour appendix', score: 1, authorKind: 'user', updatedAt: day(10),
             });
@@ -177,7 +180,7 @@ describe('both adapters rank a fixture the same way', () => {
         }
         mockDb.calls.length = 0;
         await ranked(db, ME, { chunkSources: ['comment'] });
-        expect(mockDb.calls.map((c) => c.data[0][0].$match.sourceType)).toEqual(['comment']);
+        expect(chunkSearches().map((c) => c.data[0][0].$match.sourceType)).toEqual(['comment']);
     });
 });
 
@@ -249,7 +252,7 @@ describe('the access filter is the visible set, exactly as the lexical adapter a
         mockDb.calls.length = 0;
         const filter = await filterAs(ME);
         await db.search({ companyId: C, queryEmbedding: Q, model: MODEL, filter, limit: 5 });
-        const pipelines = Object.fromEntries(mockDb.calls.map((c) => [c.data[0][0].$match.sourceType, c.data[0]]));
+        const pipelines = Object.fromEntries(chunkSearches().map((c) => [c.data[0][0].$match.sourceType, c.data[0]]));
         expect(Object.keys(pipelines).sort()).toEqual(ALL.slice().sort());
         ALL.forEach((sourceType) => {
             const [match, sort, limit] = pipelines[sourceType];

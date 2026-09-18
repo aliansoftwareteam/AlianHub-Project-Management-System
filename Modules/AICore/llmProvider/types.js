@@ -26,6 +26,19 @@
  * @property {number} totalTokens
  * @property {string} model                    - Model id actually used (for logging).
  *
+ * @typedef {Object} EmbedOptions
+ * @property {string[]} texts                  - Texts to embed, answered in the same order.
+ * @property {string} model                    - Embedding model id; priced by the spend meter like any other.
+ * @property {{feature:string, companyId:string, userId?:string}} spend
+ *
+ * @typedef {Object} EmbedResult
+ * @property {number[][]} embeddings           - One vector per text.
+ * @property {string} model                    - Model id the vendor billed, which may be a dated alias.
+ * @property {number} inputTokens
+ * @property {number} outputTokens             - Always 0.
+ * @property {number} totalTokens
+ * @property {number} dimensions
+ *
  * @typedef {Object} ProviderCapabilities
  * @property {string} structuredOutput         - How this vendor is asked for JSON: see normalise.STRUCTURED_OUTPUT.
  * @property {number} defaultMaxTokens         - Output ceiling used when the caller names none.
@@ -38,6 +51,8 @@
  * @property {boolean} isConfigured                                          - Both key + model set.
  * @property {ProviderCapabilities} capabilities                             - What normalise.js reads to shape one request.
  * @property {(opts: ChatOptions) => Promise<ChatResult>} chat               - Non-streaming chat.
+ * @property {boolean} embeddingsConfigured                                  - Can embed now: OpenAI with the instance key; false elsewhere.
+ * @property {(opts: EmbedOptions) => Promise<EmbedResult>} embed            - Rejects with code `no_embeddings` where the vendor has none.
  */
 
 module.exports = {};

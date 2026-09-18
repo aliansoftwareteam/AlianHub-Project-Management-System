@@ -5,6 +5,7 @@ const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 const { ROOT } = require('./env');
+const { startEmbeddingsStub } = require('./embeddings');
 
 const HEALTH_TIMEOUT_MS = Number(process.env.E2E_HEALTH_TIMEOUT_MS) || 120000;
 const STOP_TIMEOUT_MS = 10000;
@@ -21,7 +22,7 @@ function freePort() {
     });
 }
 
-function serverEnv({ port, mongoUrl, workDir }) {
+function serverEnv({ port, mongoUrl, workDir, embeddingsUrl }) {
     const baseURL = `http://127.0.0.1:${port}`;
     return {
         PATH: process.env.PATH,
@@ -43,9 +44,11 @@ function serverEnv({ port, mongoUrl, workDir }) {
         CRON_ENABLED: 'false',
         AUTOMATION_ENGINE: 'true',
         AUTOMATION_QUEUE_DRIVER: 'inline',
-        // Retrieval and the page indexer turn on only for a company whose own switch is "on".
+        // Retrieval and the page indexer turn on only for a company whose own switch is "on" or "hybrid".
         KNOWLEDGE_RETRIEVAL: 'tenant',
         KNOWLEDGE_INDEXER: 'tenant',
+        // Embeddings go to the harness stub; they only happen once a suite sets AI_API_KEY through the instance settings.
+        OPENAI_EMBEDDINGS_URL: embeddingsUrl,
         AGENT_PERFORMANCE_READ: 'on',
         GLOBAL_RATE_LIMIT_PER_MIN: 'off',
         AUTH_RATE_LIMIT_MAX_ATTEMPTS: '10000',
@@ -99,9 +102,10 @@ async function startServer({ mongoUrl, logFile, env = {} }) {
         tail.splice(0, Math.max(0, tail.length - 60));
     };
 
+    const embeddings = await startEmbeddingsStub();
     const child = spawn(process.execPath, ['-r', path.join(__dirname, 'ignore-dotenv.js'), 'index.js'], {
         cwd: ROOT,
-        env: { ...serverEnv({ port, mongoUrl, workDir }), ...env },
+        env: { ...serverEnv({ port, mongoUrl, workDir, embeddingsUrl: embeddings.url }), ...env },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
     child.stdout.on('data', record);
@@ -109,6 +113,7 @@ async function startServer({ mongoUrl, logFile, env = {} }) {
 
     const stop = async ({ companyIds = [] } = {}) => {
         await stopChild(child);
+        await embeddings.stop();
         log.end();
         fs.rmSync(workDir, { recursive: true, force: true });
         // Local storage has no configurable root: company files land in <repo>/storage/<companyId>.
@@ -123,7 +128,7 @@ async function startServer({ mongoUrl, logFile, env = {} }) {
         await stop();
         throw error;
     }
-    return { baseURL, port, logFile, logDir: path.join(workDir, 'log'), pid: child.pid, stop };
+    return { baseURL, port, logFile, logDir: path.join(workDir, 'log'), pid: child.pid, embeddingsUrl: embeddings.url, stop };
 }
 
 module.exports = { startServer };
