@@ -1,0 +1,269 @@
+const crypto = require('crypto');
+const { SCHEMA_TYPE } = require('./schemaType');
+const logger = require('./loggerConfig');
+
+/*
+ * Sprint 8 slice 9: per-company secrets referenced by handle. A value is AES-256-GCM ciphertext under a key
+ * derived from SECRETS_KEY, bound to its company and handle through the authenticated data, so a row copied
+ * into another company's database or under another handle will not open. Each row records the fingerprint
+ * of the key that sealed it; SECRETS_KEY_PREVIOUS keeps old rows readable while reencryptAll moves them.
+ */
+
+const LOG = '[secrets]';
+const FLAG_ON = ['true', '1', 'on', 'yes'];
+const MIN_KEY_LENGTH = 32;
+const MAX_NAME_LENGTH = 120;
+const MAX_KIND_LENGTH = 60;
+const MAX_VALUE_LENGTH = 8192;
+const HANDLE = /^sec_[a-f0-9]{24}$/;
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const ERROR_LOG_INTERVAL_MS = 60 * 1000;
+const STATUS_BY_CODE = { store_off: 404, key_invalid: 503, invalid_input: 400, not_found: 404, revoked: 409 };
+
+class SecretsStoreError extends Error {
+    constructor(code, message) {
+        super(message);
+        this.name = 'SecretsStoreError';
+        this.code = code;
+        this.statusCode = STATUS_BY_CODE[code] || 500;
+    }
+}
+
+const keyIdOf = (key) => `k${crypto.createHash('sha256').update(`alianhub-secrets-key-id:${key}`).digest('hex').slice(0, 16)}`;
+
+const keyProblem = (key) => (key ? (key.length >= MIN_KEY_LENGTH ? '' : `shorter than ${MIN_KEY_LENGTH} characters`) : 'missing');
+
+const storeConfig = (env = process.env) => {
+    const requested = FLAG_ON.includes(String(env.SECRETS_STORE || '').trim().toLowerCase());
+    const key = String(env.SECRETS_KEY || '');
+    const previous = String(env.SECRETS_KEY_PREVIOUS || '');
+    const problem = keyProblem(key);
+    const keyValid = !problem;
+    const previousValid = previous.length >= MIN_KEY_LENGTH;
+    const error = requested && !keyValid
+        ? `SECRETS_STORE is on but SECRETS_KEY is ${problem}, so the secrets store refuses every read and write until a key of at least ${MIN_KEY_LENGTH} characters is set`
+        : '';
+    return { requested, on: requested && keyValid, keyValid, keyId: keyValid ? keyIdOf(key) : '', previousKeyId: previousValid ? keyIdOf(previous) : '', error };
+};
+
+let lastErrorLoggedAt = 0;
+
+const config = () => {
+    const cfg = storeConfig();
+    if (cfg.error && Date.now() - lastErrorLoggedAt >= ERROR_LOG_INTERVAL_MS) {
+        lastErrorLoggedAt = Date.now();
+        logger.error(`${LOG} ${cfg.error}`);
+    }
+    return cfg;
+};
+
+const isOn = () => config().on;
+
+const logBootState = () => {
+    lastErrorLoggedAt = 0;
+    const cfg = config();
+    if (cfg.on) logger.info(`${LOG} secrets store on: integration and webhook secrets are kept by handle under key ${cfg.keyId}${cfg.previousKeyId ? `, reading ${cfg.previousKeyId} too` : ''}`);
+};
+
+/* The key material for a recorded key id, read from the environment at call time and never kept on the config. */
+const keyMaterial = (keyId, env = process.env) => [env.SECRETS_KEY, env.SECRETS_KEY_PREVIOUS]
+    .map((key) => String(key || ''))
+    .find((key) => key.length >= MIN_KEY_LENGTH && keyIdOf(key) === keyId) || '';
+
+const derived = new Map();
+const derivedKey = (material) => {
+    if (!derived.has(material)) derived.set(material, crypto.scryptSync(material, 'alianhub-secrets-store', 32));
+    return derived.get(material);
+};
+
+const boundTo = (companyId, handle) => Buffer.from(`${companyId}:${handle}`, 'utf8');
+
+const seal = ({ material, companyId, handle, value }) => {
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', derivedKey(material), iv);
+    cipher.setAAD(boundTo(companyId, handle));
+    const body = Buffer.concat([cipher.update(String(value), 'utf8'), cipher.final()]);
+    return { iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), ciphertext: body.toString('base64') };
+};
+
+const open = ({ material, companyId, handle, iv, tag, ciphertext }) => {
+    try {
+        const decipher = crypto.createDecipheriv('aes-256-gcm', derivedKey(material), Buffer.from(String(iv), 'base64'));
+        decipher.setAAD(boundTo(companyId, handle));
+        decipher.setAuthTag(Buffer.from(String(tag), 'base64'));
+        return Buffer.concat([decipher.update(Buffer.from(String(ciphertext), 'base64')), decipher.final()]).toString('utf8');
+    } catch (error) {
+        return null;
+    }
+};
+
+const invalid = (message) => new SecretsStoreError('invalid_input', message);
+
+const companyOf = (companyId) => {
+    const id = String(companyId || '');
+    if (!OBJECT_ID.test(id)) throw invalid('A company id is required.');
+    return id;
+};
+
+const textOf = (value, max, field) => {
+    const text = typeof value === 'string' ? value.trim() : '';
+    if (!text) throw invalid(`A ${field} is required.`);
+    if (text.length > max) throw invalid(`The ${field} is longer than ${max} characters.`);
+    return text;
+};
+
+const valueOf = (value) => {
+    const text = typeof value === 'string' ? value.trim() : '';
+    if (!text) throw invalid('A secret value is required.');
+    if (text.length > MAX_VALUE_LENGTH) throw invalid(`The secret value is longer than ${MAX_VALUE_LENGTH} characters.`);
+    return text;
+};
+
+const requireKey = () => {
+    const cfg = config();
+    if (!cfg.keyValid) throw new SecretsStoreError('key_invalid', cfg.error || `The secrets store has no usable SECRETS_KEY: it is ${keyProblem(String(process.env.SECRETS_KEY || ''))}.`);
+    return cfg;
+};
+
+const requireOn = () => {
+    const cfg = config();
+    if (!cfg.requested) throw new SecretsStoreError('store_off', 'The secrets store is off (SECRETS_STORE).');
+    return requireKey();
+};
+
+const db = (companyId, data, method) => {
+    const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
+    return MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.SECRETS, data }, method);
+};
+
+const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
+
+const actorOf = (actor) => (actor && typeof actor === 'object' ? actor : { id: actor });
+
+const audit = (companyId, actor, entry) => {
+    const { recordAudit } = require('../Modules/Audit/recorder');
+    const who = actorOf(actor);
+    recordAudit(companyId, {
+        actorId: String(who.id || 'system'),
+        actorName: String(who.name || ''),
+        ...(who.ip ? { ip: String(who.ip) } : {}),
+        entityType: 'secret',
+        ...entry,
+    });
+};
+
+const metadata = (row) => ({
+    handle: row.handle,
+    name: row.name,
+    kind: row.kind,
+    keyId: row.keyId,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt,
+    rotatedAt: row.rotatedAt || null,
+    revokedAt: row.revokedAt || null,
+    lastResolvedAt: row.lastResolvedAt || null,
+});
+
+const findRow = async (companyId, handle) => {
+    const id = String(handle || '');
+    if (!HANDLE.test(id)) return null;
+    return plain(await db(companyId, [{ handle: id }], 'findOne'));
+};
+
+const requireRow = async (companyId, handle) => {
+    const row = await findRow(companyId, handle);
+    if (!row) throw new SecretsStoreError('not_found', 'No such secret in this company.');
+    if (row.revokedAt) throw new SecretsStoreError('revoked', 'This secret is revoked.');
+    return row;
+};
+
+async function create({ companyId, name, kind, value, actor }) {
+    const cfg = requireOn();
+    const id = companyOf(companyId);
+    const row = {
+        handle: `sec_${crypto.randomBytes(12).toString('hex')}`,
+        name: textOf(name, MAX_NAME_LENGTH, 'name'),
+        kind: textOf(kind, MAX_KIND_LENGTH, 'kind'),
+        keyId: cfg.keyId,
+        createdBy: String(actorOf(actor).id || ''),
+        createdAt: new Date(),
+        rotatedAt: null,
+        revokedAt: null,
+        lastResolvedAt: null,
+    };
+    Object.assign(row, seal({ material: keyMaterial(cfg.keyId), companyId: id, handle: row.handle, value: valueOf(value) }));
+    const saved = plain(await db(id, row, 'save')) || row;
+    audit(id, actor, { action: 'secret.create', entityId: row.handle, entityName: row.name, meta: { kind: row.kind, keyId: cfg.keyId } });
+    return metadata(saved);
+}
+
+/* Server-internal: the only path that yields a value. Every failure is audited with its reason and answers null. */
+async function resolve({ companyId, handle }) {
+    requireKey();
+    const id = companyOf(companyId);
+    const refused = (reason, row) => {
+        audit(id, null, { action: 'secret.resolve_failed', entityId: String(handle || ''), entityName: (row && row.name) || '', meta: { reason } });
+        return null;
+    };
+    const row = await findRow(id, handle);
+    if (!row) return refused('not_found');
+    if (row.revokedAt) return refused('revoked', row);
+    const material = keyMaterial(row.keyId);
+    if (!material) return refused('unknown_key', row);
+    const value = open({ material, companyId: id, handle: row.handle, iv: row.iv, tag: row.tag, ciphertext: row.ciphertext });
+    if (value === null) return refused('undecryptable', row);
+    await db(id, [{ _id: row._id }, { $set: { lastResolvedAt: new Date() } }], 'updateOne');
+    return value;
+}
+
+async function rotate({ companyId, handle, value, actor }) {
+    const cfg = requireOn();
+    const id = companyOf(companyId);
+    const row = await requireRow(id, handle);
+    const set = { keyId: cfg.keyId, rotatedAt: new Date(), ...seal({ material: keyMaterial(cfg.keyId), companyId: id, handle: row.handle, value: valueOf(value) }) };
+    const updated = plain(await db(id, [{ _id: row._id }, { $set: set }, { returnDocument: 'after' }], 'findOneAndUpdate'));
+    audit(id, actor, { action: 'secret.rotate', entityId: row.handle, entityName: row.name, meta: { kind: row.kind, keyId: cfg.keyId } });
+    return metadata(updated || { ...row, ...set });
+}
+
+/* The ciphertext goes with the revocation, so a later key leak cannot recover a secret nobody may use. */
+async function revoke({ companyId, handle, actor }) {
+    requireOn();
+    const id = companyOf(companyId);
+    const row = await requireRow(id, handle);
+    const set = { revokedAt: new Date(), ciphertext: '', iv: '', tag: '' };
+    const updated = plain(await db(id, [{ _id: row._id }, { $set: set }, { returnDocument: 'after' }], 'findOneAndUpdate'));
+    audit(id, actor, { action: 'secret.revoke', entityId: row.handle, entityName: row.name, meta: { kind: row.kind } });
+    return metadata(updated || { ...row, ...set });
+}
+
+async function list({ companyId }) {
+    requireOn();
+    const rows = await db(companyOf(companyId), [{}, { ciphertext: 0, iv: 0, tag: 0 }, { sort: { createdAt: -1 } }], 'find');
+    return (rows || []).map(plain).map(metadata);
+}
+
+/* Key rotation: every live row sealed under another readable key is resealed under the current one. */
+async function reencryptAll({ companyId }) {
+    const cfg = requireOn();
+    const id = companyOf(companyId);
+    const rows = ((await db(id, [{ revokedAt: null }], 'find')) || []).map(plain);
+    const counts = { moved: 0, kept: 0, failed: 0 };
+    for (const row of rows) {
+        if (row.keyId === cfg.keyId) { counts.kept += 1; continue; }
+        const material = keyMaterial(row.keyId);
+        const value = material ? open({ material, companyId: id, handle: row.handle, iv: row.iv, tag: row.tag, ciphertext: row.ciphertext }) : null;
+        if (value === null) { counts.failed += 1; continue; }
+        const set = { keyId: cfg.keyId, ...seal({ material: keyMaterial(cfg.keyId), companyId: id, handle: row.handle, value }) };
+        await db(id, [{ _id: row._id }, { $set: set }], 'updateOne');
+        counts.moved += 1;
+    }
+    if (counts.failed) logger.error(`${LOG} ${counts.failed} secret(s) in company ${id} are sealed under a key that is neither SECRETS_KEY nor SECRETS_KEY_PREVIOUS`);
+    return counts;
+}
+
+module.exports = {
+    SecretsStoreError, HANDLE, MIN_KEY_LENGTH, MAX_VALUE_LENGTH, MAX_NAME_LENGTH, MAX_KIND_LENGTH,
+    storeConfig, config, isOn, logBootState, keyIdOf,
+    create, resolve, rotate, revoke, list, reencryptAll,
+};

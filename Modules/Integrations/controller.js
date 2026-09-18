@@ -6,8 +6,9 @@ const logger = require('../../Config/loggerConfig');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const R = require('./helpers/integrationsRules');
 const S = require('./helpers/slackRules');
+const H = require('./helpers/secretHandles');
 
-// Secrets are sealed on every write (R.sealConfig) and stripped from every read (R.redact).
+// Secrets go to the store by handle or are sealed into config on every write (H.storeSecrets) and are stripped from every read (R.redact).
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
@@ -15,6 +16,10 @@ const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.com
 const oid = (id) => (OBJECT_ID.test(String(id || '')) ? new mongoose.Types.ObjectId(String(id)) : null);
 
 const refuse = (res, code, statusText, extra = {}) => res.status(code).send({ status: false, statusText, message: statusText, ...extra });
+
+const actorOf = (req) => ({ id: String(req.uid || ''), ip: String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0] });
+
+const withHandles = (kept) => (kept.secretHandles ? { config: kept.config, secretHandles: kept.secretHandles } : { config: kept.config });
 
 // Integrations hold company-wide credentials and data egress, so every write is
 // an owner or admin act; the role is read from company_users, never the body.
@@ -49,22 +54,24 @@ exports.connect = async (req, res) => {
         const check = R.validateConnection(req.body || {});
         if (!check.valid) return refuse(res, 400, check.reason, { field: check.field });
         const item = R.byKey(check.value.type);
-        const config = R.sealConfig(check.value.type, check.value.config);
+        const actor = actorOf(req);
         if (item && !item.multiple) {
             const existing = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data: [{ type: check.value.type, deletedStatusKey: { $ne: 1 } }],
             }, 'findOne');
             if (existing) {
+                const kept = await H.storeSecrets({ companyId, type: check.value.type, config: check.value.config, existing, actor });
                 const upd = await MongoDbCrudOpration(companyId, {
                     type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS,
-                    data: [{ _id: existing._id }, { $set: { config, name: check.value.name, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: String(req.uid || '') } }, { returnDocument: 'after' }],
+                    data: [{ _id: existing._id }, { $set: { ...withHandles(kept), name: check.value.name, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: String(req.uid || '') } }, { returnDocument: 'after' }],
                 }, 'findOneAndUpdate');
                 removeCache(`integration_connections:${companyId}`);
                 return res.send({ status: true, statusText: 'Updated.', data: R.redact(upd) });
             }
         }
+        const kept = await H.storeSecrets({ companyId, type: check.value.type, config: check.value.config, actor });
         const data = {
-            _id: new mongoose.Types.ObjectId(), type: check.value.type, name: check.value.name, config, secretsVersion: R.SECRETS_VERSION,
+            _id: new mongoose.Types.ObjectId(), type: check.value.type, name: check.value.name, ...withHandles(kept), secretsVersion: R.SECRETS_VERSION,
             status: 'connected', enabled: true, createdBy: String(req.uid || ''), connectedAt: new Date(), deletedStatusKey: 0,
         };
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data }, 'save');
@@ -103,6 +110,7 @@ exports.disconnect = async (req, res) => {
             data: [{ _id, deletedStatusKey: { $ne: 1 } }, { $set: { deletedStatusKey: 1, enabled: false, status: 'disconnected', updatedBy: String(req.uid || '') } }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
         if (!removed) return refuse(res, 404, 'Not found.');
+        await H.revokeSecrets({ companyId, row: removed, actor: actorOf(req) });
         removeCache(`integration_connections:${companyId}`);
         return res.send({ status: true, statusText: 'Disconnected.' });
     } catch (e) { logger.error(`disconnect: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
@@ -116,7 +124,7 @@ exports.slackCommand = async (req, res) => {
         const conn = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data: [{ type: 'slack', deletedStatusKey: { $ne: 1 } }],
         }, 'findOne').catch(() => null);
-        const verificationToken = conn && conn.config ? R.openConfig('slack', conn.config).verification_token : null;
+        const verificationToken = conn ? (await H.openSecrets({ companyId, row: conn })).verification_token : null;
         if (!conn || conn.enabled === false || !verificationToken) {
             return res.json(S.ephemeral('Slack isn’t connected for this workspace yet — add it in AlianHub → Integrations → Marketplace.'));
         }

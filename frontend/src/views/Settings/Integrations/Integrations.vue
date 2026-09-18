@@ -162,6 +162,8 @@
             </div>
         </section>
 
+        <StoredSecrets v-if="privileged" />
+
         <div class="ah-card ig__note">
             <ShellIcon name="agent" :size="16" class="ig__note-icon" />
             <span>{{ $t('Settings.integrations_agent_note') }}</span>
@@ -177,10 +179,13 @@ import { ref, computed, onMounted } from 'vue';
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import AhSwitch from '@/components/molecules/Setting/AhSwitch.vue';
+import StoredSecrets from './StoredSecrets.vue';
 import { useRouter } from 'vue-router';
 import { inject } from 'vue';
+import { useStore } from 'vuex';
 import { apiRequest } from '../../../services';
 import { useI18n } from 'vue-i18n';
+import { isOwnerOrAdmin } from '@/utils/roles';
 import {
     fetchCloudSettings,
     saveCloudSettings,
@@ -199,6 +204,8 @@ const newSecret = ref('');
 const showWebhookForm = ref(false);
 const router = useRouter();
 const companyId = inject('$companyId');
+const { getters } = useStore();
+const privileged = computed(() => isOwnerOrAdmin((getters['settings/companyUserDetail'] || {}).roleType));
 const apiTokensRoute = computed(() => (router.hasRoute('ApiTokens') ? { name: 'ApiTokens', params: { cid: companyId.value } } : null));
 const toggleWebhookForm = (format) => {
     if (format) { form.value.format = format; showWebhookForm.value = true; return; }

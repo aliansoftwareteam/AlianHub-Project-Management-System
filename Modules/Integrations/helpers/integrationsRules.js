@@ -87,8 +87,10 @@ const redact = (conn) => {
     if (!conn) return conn;
     const o = conn.toObject ? conn.toObject() : { ...conn };
     const cfg = { ...(o.config || {}) };
+    const handles = o.secretHandles || {};
     const secrets = {};
-    for (const k of secretKeys(o.type)) { secrets[k] = !!cfg[k]; delete cfg[k]; }
+    for (const k of secretKeys(o.type)) { secrets[k] = !!cfg[k] || !!handles[k]; delete cfg[k]; }
+    delete o.secretHandles;
     return { ...o, config: cfg, secrets };
 };
 

@@ -134,6 +134,8 @@ module.exports.SSO_DISCOVER = '/api/v2/sso/discover';
 // Webhooks / integrations (Modules/Webhooks)
 module.exports.WEBHOOKS = '/api/v2/webhooks';
 module.exports.WEBHOOK_EVENTS = '/api/v2/webhooks/events';
+// Workspace secrets by handle (Modules/Secrets): metadata only, owner or admin
+module.exports.SECRETS = '/api/v2/secrets';
 module.exports.AUTH = '/api/v2/auth';
 module.exports.DELETE_SESSION = '/api/v2/session/delete';
 module.exports.UPDATE_SESSION = '/api/v2/session/update';
