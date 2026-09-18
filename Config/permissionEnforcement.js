@@ -10,6 +10,7 @@ const ENFORCE = 'enforce';
 const MODES = [OFF, REPORT, ENFORCE];
 const COMPANY_FIELD = 'permissionEnforcement';
 const INHERIT = 'inherit';
+const INSTANCE_ENV_KEY = 'PERMISSION_ENFORCEMENT_MODE';
 const CACHE_PREFIX = 'permissionEnforcement:';
 const DEFAULT_CACHE_TTL_SECONDS = 30;
 const FAILED_READ_TTL_SECONDS = 5;
@@ -23,8 +24,8 @@ const asMode = (raw) => {
 
 const instanceMode = () => asMode(process.env.PERMISSION_ENFORCEMENT_MODE) || OFF;
 
-/* Until the enforcement console writes it, the row is edited by hand, so a mode may arrive as a bare
- * string or as { mode } in any case. Anything else inherits: a typo never picks a mode of its own. */
+/* The console writes { mode, since, updatedBy }; a row edited by hand may hold a bare string or
+ * { mode } in any case. Anything else inherits: a typo never picks a mode of its own. */
 const normaliseCompanyMode = (stored) => asMode(stored !== null && typeof stored === 'object' ? stored.mode : stored);
 
 const cacheTtlSeconds = () => {
@@ -58,17 +59,22 @@ const companyMode = async (companyId) => {
 
 const killSwitchOn = () => process.env.DISABLE_PERMISSION_ENFORCEMENT === 'true';
 
+/* What a workspace with this own mode (null inherits) runs under, kill switch applied. */
+const effectiveMode = (ownMode) => {
+    const mode = ownMode || instanceMode();
+    return mode === ENFORCE && killSwitchOn() ? REPORT : mode;
+};
+
 /* off | report | enforce for a browser session in this workspace. Never throws. */
 const resolveMode = async (companyId) => {
     const id = String(companyId || '');
-    let mode;
+    let own = null;
     try {
-        mode = (OBJECT_ID.test(id) && await companyMode(id)) || instanceMode();
+        own = OBJECT_ID.test(id) ? await companyMode(id) : null;
     } catch (error) {
         logger.error(`permission enforcement: resolving ${id}: ${error.message || error}`);
-        mode = instanceMode();
     }
-    return mode === ENFORCE && killSwitchOn() ? REPORT : mode;
+    return effectiveMode(own);
 };
 
 const invalidateEnforcementMode = (companyId) => {
@@ -80,12 +86,16 @@ module.exports = {
     REPORT,
     ENFORCE,
     MODES,
+    INHERIT,
+    INSTANCE_ENV_KEY,
     COMPANY_FIELD,
     DEFAULT_CACHE_TTL_SECONDS,
     FAILED_READ_TTL_SECONDS,
     instanceMode,
     normaliseCompanyMode,
     cacheTtlSeconds,
+    killSwitchOn,
+    effectiveMode,
     resolveMode,
     invalidateEnforcementMode,
 };

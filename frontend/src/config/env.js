@@ -222,6 +222,7 @@ module.exports.WORKFLOW_RUNS = '/api/v2/workflows/runs';
 module.exports.WORKFLOW_APPROVALS = '/api/v2/workflows/approvals';
 module.exports.API_TOKENS = '/api/v2/api-tokens';
 module.exports.MCP_TOKENS = '/api/v2/api-tokens/mcp';
+module.exports.API_TOKENS_NEEDING_EXPIRY = '/api/v2/api-tokens/needing-expiry';
 module.exports.MCP_MANIFEST = '/mcp/manifest';
 module.exports.AGENT_TEAM = '/api/v2/agents/team';
 module.exports.AGENT_ROUTABLE = '/api/v2/agents/routable';
@@ -377,6 +378,7 @@ module.exports.APP_VERSION = '/version';
 module.exports.REPO_URL = 'https://github.com/aliansoftwareteam/AlianHub-Project-Management-System';
 module.exports.INSTANCE_COMPANIES = '/api/v2/instance/companies';
 module.exports.INSTANCE_AUDIT_EXPORT = '/api/v2/instance/audit-export';
+module.exports.INSTANCE_ENFORCEMENT = '/api/v2/instance/enforcement';
 
 // The storage flag is decided by the server at runtime; build-time VUE_APP_STORAGE_TYPE is only the fallback
 module.exports.setRuntimeConfig = (cfg) => { if (cfg && cfg.storageType) module.exports.STORAGE_TYPE = cfg.storageType; };

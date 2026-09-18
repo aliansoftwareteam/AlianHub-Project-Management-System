@@ -183,6 +183,7 @@ export default [
                 children: [
                     { path: "health", name: "InstanceHealth", meta: { title: "Instance health", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceHealth.vue') },
                     { path: "settings", name: "InstanceSettings", meta: { title: "Instance settings", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceSettings.vue') },
+                    { path: "enforcement", name: "InstanceEnforcement", meta: { title: "Enforcement", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceEnforcement.vue') },
                     { path: "backups", name: "InstanceBackups", meta: { title: "Backups", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceBackups.vue') },
                     { path: "upgrade", name: "InstanceUpgrade", meta: { title: "Upgrade", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceUpgrade.vue') },
                     { path: "logs", name: "InstanceLogs", meta: { title: "Logs", requiresAuth: true }, component: () => import(/* webpackChunkName: "instance" */ '@/views/Settings/Instance/InstanceLogs.vue') },

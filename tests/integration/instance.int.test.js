@@ -93,6 +93,10 @@ const INSTANCE_ROUTES = [
     ['get', '/api/v2/instance/stats'],
     ['get', '/api/v2/instance/companies'],
     ['get', `/api/v2/instance/audit-export?companyId=${state.companyId}`],
+    ['get', '/api/v2/instance/enforcement'],
+    ['get', `/api/v2/instance/enforcement/${state.companyId}/decisions`],
+    ['put', `/api/v2/instance/enforcement/${state.companyId}/mode`, { mode: 'enforce' }],
+    ['put', '/api/v2/instance/enforcement/default', { mode: 'enforce' }],
 ];
 
 describe('instance console refusals', () => {
