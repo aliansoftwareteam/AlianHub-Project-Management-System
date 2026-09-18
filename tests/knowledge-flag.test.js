@@ -7,6 +7,7 @@ jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async () =>
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 jest.mock('../Modules/Knowledge/retrieval', () => ({ retrieve: jest.fn() }));
 
+const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { visibleProjects } = require('../Modules/Agents/scope');
 const { retrieve } = require('../Modules/Knowledge/retrieval');
@@ -20,12 +21,15 @@ const ME = '6f0000000000000000000001';
 const ENV = process.env.KNOWLEDGE_RETRIEVAL;
 
 const companyWith = (mode) => mockDb.seed(SCHEMA_TYPE.COMPANIES, mode === undefined ? { _id: C } : { _id: C, knowledgeRetrieval: { mode } });
+const companyReads = () => mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.COMPANIES && c.method === 'findOne');
 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     mockDb.calls.length = 0;
     jest.clearAllMocks();
+    myCache.flushAll();
     delete process.env.KNOWLEDGE_RETRIEVAL;
+    delete process.env.KNOWLEDGE_FLAG_CACHE_TTL_SECONDS;
 });
 
 afterAll(() => {
@@ -307,5 +311,63 @@ describe('the hybrid mode of KNOWLEDGE_RETRIEVAL', () => {
         retrieve.mockResolvedValue({ passages: [] });
         await gather(C, ME, { question: 'budget' });
         expect(retrieve).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('the company row is read once per window for both switches', () => {
+    const INDEXER_ENV = process.env.KNOWLEDGE_INDEXER;
+
+    beforeEach(() => {
+        process.env.KNOWLEDGE_RETRIEVAL = 'tenant';
+        process.env.KNOWLEDGE_INDEXER = 'tenant';
+    });
+    afterAll(() => {
+        if (INDEXER_ENV === undefined) delete process.env.KNOWLEDGE_INDEXER;
+        else process.env.KNOWLEDGE_INDEXER = INDEXER_ENV;
+    });
+
+    it('serves every switch from one read for 30 seconds by default', async () => {
+        mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C, knowledgeRetrieval: { mode: 'hybrid' }, knowledgeIndexer: { mode: 'on' } });
+        expect(await flag.modeFor(C)).toBe('hybrid');
+        expect(await flag.enabledFor(C)).toBe(true);
+        expect(await flag.hybridFor(C)).toBe(true);
+        expect(await flag.indexer.enabledFor(C)).toBe(true);
+        expect(companyReads()).toHaveLength(1);
+        expect(flag.CACHE_TTL_SECONDS_DEFAULT).toBe(30);
+    });
+
+    it('keeps serving the old mode within the window, and the new one after the entry is dropped', async () => {
+        companyWith('on');
+        expect(await flag.modeFor(C)).toBe('on');
+        mockDb.store[SCHEMA_TYPE.COMPANIES][0].knowledgeRetrieval = { mode: 'hybrid' };
+        expect(await flag.modeFor(C)).toBe('on');
+        flag.forget(C);
+        expect(await flag.modeFor(C)).toBe('hybrid');
+        expect(companyReads()).toHaveLength(2);
+    });
+
+    it('reads the row every time with the window set to 0, as the e2e harness does', async () => {
+        process.env.KNOWLEDGE_FLAG_CACHE_TTL_SECONDS = '0';
+        companyWith('on');
+        expect(await flag.modeFor(C)).toBe('on');
+        mockDb.store[SCHEMA_TYPE.COMPANIES][0].knowledgeRetrieval = { mode: 'off' };
+        expect(await flag.modeFor(C)).toBe('off');
+        expect(companyReads()).toHaveLength(2);
+    });
+
+    it('holds an unreadable row as off for a few seconds instead of asking again on every call', async () => {
+        companyWith('on');
+        const crud = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async () => { throw new Error('down'); });
+        try {
+            expect(await flag.modeFor(C)).toBe('off');
+        } finally {
+            mockDb.crud.mockImplementation(crud);
+        }
+        expect(await flag.modeFor(C)).toBe('off');
+        expect(await flag.indexer.enabledFor(C)).toBe(false);
+        expect(companyReads()).toHaveLength(0);
+        flag.forget(C);
+        expect(await flag.modeFor(C)).toBe('on');
     });
 });

@@ -16,6 +16,8 @@ const axios = require('axios');
 const { AxiosError, AxiosHeaders } = jest.requireActual('axios');
 const config = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
+const { dbCollections } = require('../Config/collections');
+const reservation = require('../Modules/AICore/reservation');
 const registry = require('../Modules/AICore/llmProvider/registry');
 const llmProvider = require('../Modules/AICore/llmProvider');
 const health = require('../Modules/AICore/llmProvider/health');
@@ -118,6 +120,13 @@ describe('the OpenAI adapter embeds', () => {
         expect(axios.post.mock.calls[0][0]).toBe('http://127.0.0.1:9/v1/embeddings');
     });
 
+    it("sends the caller's timeout to the vendor when given one, and the provider timeout otherwise", async () => {
+        await openai.embed({ texts: ['a'], model: MODEL, timeoutMs: 2000 });
+        expect(axios.post.mock.calls[0][2].timeout).toBe(2000);
+        await openai.embed({ texts: ['a'], model: MODEL });
+        expect(axios.post.mock.calls[1][2].timeout).toBeGreaterThan(2000);
+    });
+
     it('makes no request for no texts', async () => {
         const result = await openai.embed({ texts: [], model: MODEL });
         expect(result).toMatchObject({ embeddings: [], model: MODEL, inputTokens: 0, totalTokens: 0 });
@@ -210,6 +219,42 @@ describe('the spend meter around embed()', () => {
         answering();
         await llmProvider.embeddingProvider().embed({ texts: ['a'], model: MODEL, spend: SPEND });
         expect(health.snapshot('openai', MODEL)).toMatchObject({ calls: 2, successes: 1 });
+    });
+
+    describe('holds the workspace budget as a chat call does', () => {
+        const holds = () => mockDb.store[SCHEMA_TYPE.AI_RESERVATIONS] || [];
+        const spent = (usd) => mockDb.seed(SCHEMA_TYPE.AI_USAGE, { companyId: C, feature: 'ask', model: 'gpt-4.1', costUsd: usd, totalTokens: 1, billedToWorkspace: true, at: new Date() });
+
+        beforeEach(() => { process.env.AI_MODEL_ROUTER = 'on'; });
+        afterEach(() => { delete process.env.AI_MODEL_ROUTER; });
+
+        it('refuses before any request once the month is spent, releases the hold and books nothing', async () => {
+            mockDb.seed(dbCollections.COMPANIES, { _id: C, agentMonthlyBudgetUsd: 1 });
+            spent(1.5);
+            const failure = await llmProvider.embeddingProvider().embed({ texts: ['a'], model: MODEL, spend: SPEND }).catch((e) => e);
+            expect(failure.code).toBe(reservation.BUDGET_EXHAUSTED);
+            expect(failure.message).toContain('ai_budget_exhausted');
+            expect(axios.post).not.toHaveBeenCalled();
+            expect(ledger()).toHaveLength(1);
+            expect(holds().map((h) => h.state)).toEqual(['released']);
+        });
+
+        it('holds the estimate while the request runs and settles it to the real cost after', async () => {
+            mockDb.seed(dbCollections.COMPANIES, { _id: C, agentMonthlyBudgetUsd: 1 });
+            await llmProvider.embeddingProvider().embed({ texts: ['alpha', 'beta'], model: MODEL, spend: SPEND });
+            expect(holds()).toHaveLength(1);
+            expect(holds()[0]).toMatchObject({ state: 'settled', feature: 'knowledge_embed', model: MODEL, provider: 'openai', estimatedOutputTokens: 0, actualInputTokens: 6 });
+            expect(holds()[0].estimatedInputTokens).toBeGreaterThan(0);
+            expect(ledger()).toHaveLength(1);
+        });
+
+        it('releases the hold when the vendor refuses', async () => {
+            mockDb.seed(dbCollections.COMPANIES, { _id: C, agentMonthlyBudgetUsd: 1 });
+            axios.post.mockRejectedValue(vendorError(500, { error: { message: 'boom', type: 'server_error' } }));
+            await expect(llmProvider.embeddingProvider().embed({ texts: ['a'], model: MODEL, spend: SPEND })).rejects.toMatchObject({ type: 'server' });
+            expect(holds().map((h) => h.state)).toEqual(['released']);
+            expect(ledger()).toEqual([]);
+        });
     });
 
     it('is the OpenAI adapter whatever LLM_PROVIDER says, and refuses with no_embeddings when no instance key is set', async () => {
