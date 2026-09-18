@@ -138,7 +138,7 @@ describe('every task write route and action has a permission mapping', () => {
             expect(typeof taskMongo[method]).toBe('function');
             const spy = jest.spyOn(taskMongo, method).mockResolvedValue({ status: true, reached: method });
             const res = response();
-            await handler({ headers: { companyid: CID }, body: { action } }, Object.assign(res, { send: (body) => { res.body = body; } }));
+            await handler({ headers: { companyid: CID }, aud: CID, body: { action } }, Object.assign(res, { send: (body) => { res.body = body; } }));
             await settle();
             expect(res.body).toEqual({ status: true, reached: method });
             spy.mockRestore();
