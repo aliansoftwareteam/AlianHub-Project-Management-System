@@ -339,6 +339,31 @@
                                 </div>
                             </section>
 
+                            <section v-if="showExpiryList" class="ah-card" data-test="expiry-list" aria-labelledby="expiry-list-title">
+                                <div class="ah-card__head">
+                                    <span id="expiry-list-title" class="ah-h3">{{ $t('Accounts.expiry_list_title') }}</span>
+                                    <span class="ah-mono acct-note">{{ $t('Accounts.expiry_list_count', { n: tokensNeedingExpiry.length }) }}</span>
+                                </div>
+                                <div class="ah-card__body">
+                                    <p class="acct-note">{{ $t('Accounts.expiry_list_lead') }}</p>
+                                    <ul v-if="tokensNeedingExpiry.length" class="acct-token-list">
+                                        <li v-for="tk in tokensNeedingExpiry" :key="tk._id" class="acct-token" data-test="expiry-row">
+                                            <div class="acct-token__text">
+                                                <div class="acct-token__name">{{ tk.name }}</div>
+                                                <div class="acct-token__meta">{{ expiryRowMeta(tk) }}</div>
+                                                <div class="acct-token__flags">
+                                                    <span v-if="tk.stopped" class="ah-chip ah-chip--danger ah-chip--mono" data-test="expiry-stopped">
+                                                        {{ tk.deadline ? $t('Accounts.grace_stopped_on', { d: dayOf(tk.deadline) }) : $t('Accounts.expiry_list_unchecked') }}
+                                                    </span>
+                                                    <span v-else class="ah-chip ah-chip--warn ah-chip--mono" data-test="expiry-grace">{{ $t('Accounts.grace_works_until', { d: dayOf(tk.deadline) }) }}</span>
+                                                </div>
+                                            </div>
+                                        </li>
+                                    </ul>
+                                    <p v-else class="ah-empty" style="margin-top:10px" data-test="expiry-empty">{{ $t('Accounts.expiry_list_empty') }}</p>
+                                </div>
+                            </section>
+
                             <div class="acct-callout acct-callout--brand">{{ $t('Accounts.self_hosted_note') }}</div>
                         </div>
                     </div>
@@ -464,9 +489,9 @@ const { getUser } = useGetterFunctions();
 const companyId = inject("$companyId");
 
 const {
-    account, policy, summary, tokens, tokenPolicy, manifest, runs, peopleHours,
+    account, policy, summary, tokens, tokenPolicy, tokensNeedingExpiry, manifest, runs, peopleHours,
     mode, allowed, isAllowed,
-    loadAccount, loadTokens, loadManifest, loadRuns, loadPeopleHours,
+    loadAccount, loadTokens, loadTokensNeedingExpiry, loadManifest, loadRuns, loadPeopleHours,
     savePolicy, linkAccount, unlinkAccount, mintToken, revokeToken
 } = useAccounts();
 
@@ -503,6 +528,8 @@ const tokenForm = reactive({ name: "", mode: "personal", provider: "claude-code"
 
 const companyUser = computed(() => getters["settings/companyUserDetail"] || {});
 const privileged = computed(() => isOwnerOrAdmin(companyUser.value.roleType));
+const showExpiryList = computed(() => privileged.value && Boolean(tokenPolicy.value.strict));
+const refreshExpiryList = () => (showExpiryList.value ? loadTokensNeedingExpiry() : Promise.resolve());
 const projects = computed(() => (getters["projectData/projects"]?.data || []).filter((p) => !p.deletedStatusKey));
 
 const policyDirty = computed(() => draftModes.value.slice().sort().join() !== (policy.value.allowedModes || []).slice().sort().join());
@@ -550,6 +577,12 @@ const tokenMeta = (tk) => [
     tk.lastUsedAt ? t("Accounts.used_on", { d: new Date(tk.lastUsedAt).toLocaleString() }) : t("Accounts.never_used"),
     tk.agentAccount && tk.agentAccount.mode ? t(`Accounts.mode_${tk.agentAccount.mode}`) : "",
     tk.projectIds && tk.projectIds.length ? t("Accounts.scoped_projects", { n: tk.projectIds.length }) : ""
+].filter(Boolean).join(" · ");
+
+const expiryRowMeta = (tk) => [
+    tk.owner && tk.owner.name ? tk.owner.name : t("Accounts.expiry_list_owner_unknown"),
+    tk.createdAt ? t("Accounts.created_on", { d: new Date(tk.createdAt).toLocaleDateString() }) : "",
+    tk.lastUsedAt ? t("Accounts.used_on", { d: new Date(tk.lastUsedAt).toLocaleString() }) : t("Accounts.never_used")
 ].filter(Boolean).join(" · ");
 
 const personNameOf = (id) => (id ? (getUser(String(id)) || {}).Employee_Name || "" : "");
@@ -709,6 +742,7 @@ const onRevoke = async (tk) => {
     revokeError.value = "";
     try {
         await revokeToken(tk._id);
+        await refreshExpiryList();
     } catch (error) {
         revokeError.value = error.message;
     } finally {
@@ -731,6 +765,7 @@ const load = async () => {
     loadError.value = "";
     try {
         await Promise.all([loadAccount(), loadTokens(), loadManifest(), loadRuns()]);
+        await refreshExpiryList();
         /* No runs means no bar, so the people total is never asked for — an
            unbounded timesheet read for a card that will not render. */
         const charted = runWindow.value;
