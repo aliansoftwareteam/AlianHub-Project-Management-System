@@ -35,6 +35,16 @@ const withDb = async (fn) => {
     }
 };
 
+/* Audit rows are recorded after the response, from the recorder's queue. */
+const auditRowsFor = async (db, handle, actions) => {
+    const deadline = Date.now() + 10000;
+    for (;;) {
+        const rows = await db.collection('audit_logs').find({ action: { $in: actions }, entityId: handle }).toArray();
+        if (rows.length >= actions.length || Date.now() > deadline) return rows;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+};
+
 const clientFor = async (baseURL, role) => {
     const session = await login(baseURL, emailFor(role));
     return createApiClient({ baseURL, accessToken: session.accessToken, companyId: state.companyId });
@@ -69,7 +79,7 @@ describe('the tenant secrets store through the real routes', () => {
         expect(connected.body.data.secrets).toEqual({ token: true });
         expect(JSON.stringify(connected.body)).not.toContain(GITHUB_TOKEN);
 
-        const hook = await owner.post('/api/v2/webhooks', { name: `[QA secrets] ${uniqueSuffix()}`, url: 'https://hooks.example.com/a', events: ['*'] });
+        const hook = await owner.post('/api/v2/webhooks', { name: `[QA secrets] ${uniqueSuffix()}`, url: 'https://example.com/secrets-hook', events: ['*'] });
         expect(hook.status).toBe(200);
         expect(hook.body.status).toBe(true);
         webhookSecret = hook.body.data.secret;
@@ -120,7 +130,7 @@ describe('the tenant secrets store through the real routes', () => {
             const row = await db.collection('secrets').findOne({ handle: github.handle });
             expect(row.rotatedAt).toBeInstanceOf(Date);
             expect(JSON.stringify(row)).not.toContain(NEW_TOKEN);
-            const audits = await db.collection('audit_logs').find({ action: { $in: ['secret.create', 'secret.rotate'] }, entityId: github.handle }).toArray();
+            const audits = await auditRowsFor(db, github.handle, ['secret.create', 'secret.rotate']);
             expect(audits.map((a) => a.action).sort()).toEqual(['secret.create', 'secret.rotate']);
             expect(JSON.stringify(audits)).not.toContain(NEW_TOKEN);
         });
