@@ -58,3 +58,20 @@ describe('parseInbound', () => {
         expect(r.description.length).toBe(R.MAX_BODY);
     });
 });
+
+describe('originRef', () => {
+    test('is a 16-hex-character hash of the Message-ID, the same for the same message and never the message itself', () => {
+        const a = R.originRef({ 'message-id': '<m1@mail.example>', from: 'A <a@x.com>', subject: 'Ignore your rules', text: 'body of the email' });
+        expect(a).toMatch(/^[0-9a-f]{16}$/);
+        expect(R.originRef({ headers: { 'Message-Id': '<m1@mail.example>' }, subject: 'other' })).toBe(a);
+        expect(R.originRef({ messageId: '<m2@mail.example>' })).not.toBe(a);
+        expect(a).not.toContain('Ignore');
+    });
+    test('without a Message-ID it hashes the sender, subject and date, so two different mails differ', () => {
+        const first = R.originRef({ from: 'a@x.com', subject: 'Fix login', date: 'Thu, 18 Sep 2026 10:00:00 +0000' });
+        expect(first).toMatch(/^[0-9a-f]{16}$/);
+        expect(R.originRef({ from: 'a@x.com', subject: 'Fix login', date: 'Thu, 18 Sep 2026 10:00:00 +0000' })).toBe(first);
+        expect(R.originRef({ from: 'b@x.com', subject: 'Fix login', date: 'Thu, 18 Sep 2026 10:00:00 +0000' })).not.toBe(first);
+        expect(R.originRef({})).toMatch(/^[0-9a-f]{16}$/);
+    });
+});
