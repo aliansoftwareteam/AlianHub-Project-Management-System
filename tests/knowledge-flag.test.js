@@ -238,3 +238,74 @@ describe('Ask with retrieval on for the company', () => {
         expect(out.sources).toHaveLength(2);
     });
 });
+
+describe('the hybrid mode of KNOWLEDGE_RETRIEVAL', () => {
+    const retrievalWith = (value) => mockDb.seed(SCHEMA_TYPE.COMPANIES, value === undefined ? { _id: C } : { _id: C, knowledgeRetrieval: value });
+
+    it.each([
+        [{ mode: 'hybrid' }, 'hybrid'],
+        [' HYBRID ', 'hybrid'],
+        [{ mode: 'on' }, 'on'],
+        [{ mode: 'off' }, 'off'],
+        [{ mode: 'hybrid-ish' }, 'off'],
+    ])('reads a stored %p as %p', (value, expected) => {
+        expect(flag.normaliseCompanyMode(value)).toBe(expected);
+    });
+
+    it.each([
+        ['off', { mode: 'hybrid' }, 'off', false, false],
+        ['tenant', undefined, 'off', false, false],
+        ['tenant', { mode: 'on' }, 'on', true, false],
+        ['tenant', { mode: 'hybrid' }, 'hybrid', true, true],
+        ['tenant', { mode: 'off' }, 'off', false, false],
+        ['all', undefined, 'on', true, false],
+        ['all', { mode: 'hybrid' }, 'hybrid', true, true],
+        ['all', { mode: 'off' }, 'off', false, false],
+    ])('%s with the company knowledgeRetrieval %p resolves to %p (enabled %p, hybrid %p)', async (env, stored, mode, enabled, hybrid) => {
+        process.env.KNOWLEDGE_RETRIEVAL = env;
+        retrievalWith(stored);
+        expect(await flag.modeFor(C)).toBe(mode);
+        expect(await flag.enabledFor(C)).toBe(enabled);
+        expect(await flag.hybridFor(C)).toBe(hybrid);
+    });
+
+    it('never reads the company row for the mode while the installation is off', async () => {
+        retrievalWith({ mode: 'hybrid' });
+        expect(await flag.modeFor(C)).toBe('off');
+        expect(await flag.hybridFor(C)).toBe(false);
+        expect(mockDb.calls).toEqual([]);
+    });
+
+    it('is off, not hybrid, for a company row that cannot be read', async () => {
+        process.env.KNOWLEDGE_RETRIEVAL = 'all';
+        const crud = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async () => { throw new Error('down'); });
+        try {
+            expect(await flag.modeFor(C)).toBe('off');
+            expect(await flag.hybridFor(C)).toBe(false);
+        } finally {
+            mockDb.crud.mockImplementation(crud);
+        }
+    });
+
+    it('counts a hybrid row as on for the indexer switch, which has no vector side of its own', async () => {
+        const INDEXER_ENV = process.env.KNOWLEDGE_INDEXER;
+        process.env.KNOWLEDGE_INDEXER = 'tenant';
+        try {
+            mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C, knowledgeIndexer: { mode: 'hybrid' } });
+            expect(await flag.indexer.enabledFor(C)).toBe(true);
+        } finally {
+            if (INDEXER_ENV === undefined) delete process.env.KNOWLEDGE_INDEXER;
+            else process.env.KNOWLEDGE_INDEXER = INDEXER_ENV;
+        }
+    });
+
+    it('lets Ask gather through the retrieval interface for a hybrid company', async () => {
+        process.env.KNOWLEDGE_RETRIEVAL = 'tenant';
+        retrievalWith({ mode: 'hybrid' });
+        visibleProjects.mockResolvedValue([{ _id: PROJECT, ProjectName: 'Ops' }]);
+        retrieve.mockResolvedValue({ passages: [] });
+        await gather(C, ME, { question: 'budget' });
+        expect(retrieve).toHaveBeenCalledTimes(1);
+    });
+});
