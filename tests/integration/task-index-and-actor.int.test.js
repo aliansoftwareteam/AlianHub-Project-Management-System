@@ -277,3 +277,67 @@ describe('the web app flows still work', () => {
         for (const id of [one._id, two._id]) expect((await stored(id)).Task_Priority).toBe('HIGH');
     });
 });
+
+describe('a write must name its task', () => {
+    it('leaves every task alone when the index routes name none', async () => {
+        const first = await db().collection('tasks').findOne({}, { sort: { _id: 1 } });
+        const drag = dragBody({ sprintId: String(target.sprint._id || target.sprint.id) }, target.project, { updateData: { Task_Priority: 'HIGH', Updated_At: new Date().toISOString() } });
+        delete drag.taskId;
+        const dragged = await member.api.post('/api/v1/taskIndex', drag);
+        const loaded = await member.api.post('/api/v1/updateTaskIndexOnload', { taskUpdate: { item: { indexName: 'groupByStatusIndex', searchKey: 'statusKey', searchValue: 1 }, taskKey: 'X-1' }, companyId: state.companyId });
+        expect([dragged.status, loaded.status]).toEqual([400, 400]);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        expect(await db().collection('tasks').findOne({ _id: first._id })).toEqual(first);
+    });
+
+    it('answers 404 for a task in a private space the caller is not assigned to', async () => {
+        const hidden = await createProject(owner.api, { name: `TIA Hidden ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid, isPrivate: true });
+        const task = await createTask(owner.api, { project: hidden, user: state.users.owner, companyOwnerId: owner.uid });
+        const asMember = await member.api.patch('/api/v2/tasks', priorityBody(hidden, task));
+        expect([asMember.status, asMember.body.status]).toEqual([404, false]);
+        expect((await stored(task._id)).Task_Priority).toBe('MEDIUM');
+        const asOwner = await owner.api.patch('/api/v2/tasks', priorityBody(hidden, task));
+        expect([asOwner.status, asOwner.body.status]).toEqual([200, true]);
+    });
+});
+
+describe('history follows the written task', () => {
+    const statusBody = (written, other, extra = {}) => {
+        const status = target.project.taskStatusData.find((s) => s.type === 'close') || target.project.taskStatusData[0];
+        return {
+            action: 'updateStatus',
+            newStatus: { status: { text: status.name, key: status.key, value: status.value, type: status.type }, statusKey: status.key, statusType: status.type },
+            prevStatus: { taskId: other._id, taskName: 'somebody else', statusName: 'To Do', name: 'To Do', updatedTaskName: '<b onmouseover=alert(1)>Done</b>' },
+            projectData: projectSlice(target.project), task: { _id: written._id, sprintId: written.sprintId }, isUpdateTask: true,
+            userData: { id: member.uid, Employee_Name: 'Max Member' }, ...extra,
+        };
+    };
+
+    it('records the task the status change wrote, with the shown name escaped', async () => {
+        const written = await freshTask();
+        const other = await freshTask();
+        const res = await member.api.patch('/api/v2/tasks', statusBody(written, other));
+        expect([res.status, res.body.status]).toEqual([200, true]);
+        const rows = await waitFor(async () => { const found = await historyOf(written._id); return found.some((row) => row.Key === 'Task_Status') ? found : null; }, 'the status history');
+        const row = rows.find((entry) => entry.Key === 'Task_Status');
+        expect(row.Message).toContain('&lt;b onmouseover=alert&#40;1&#41;&gt;Done&lt;/b&gt;');
+        expect(row.Message).not.toContain('<b onmouseover');
+        expect((await historyOf(other._id)).some((entry) => entry.Key === 'Task_Status')).toBe(false);
+        expect((await stored(other._id)).statusKey).toBe((await stored(other._id)).statusKey);
+
+        const noWrite = await member.api.patch('/api/v2/tasks', statusBody(written, other, { isUpdateTask: false }));
+        expect(noWrite.status).toBe(400);
+    });
+
+    it('refuses a move into a project that does not exist', async () => {
+        const task = await freshTask();
+        const res = await member.api.patch('/api/v2/tasks', {
+            action: 'moveTask', companyId: state.companyId, projectData: { id: String(new ObjectId()), ProjectCode: 'NOPE', ProjectName: 'Nope' },
+            sprintObj: { id: String(target.sprint._id || target.sprint.id), name: target.sprint.name, folderId: null }, moveTaskId: task._id,
+            oldSprintObj: { id: task.sprintId, folderId: null, name: target.sprint.name, folderName: '' }, oldProject: { id: target.project._id, taskTypeCounts: target.project.taskTypeCounts, taskStatusData: target.project.taskStatusData },
+            isSubTask: false, assignee: [], watcher: [], userData: { id: member.uid, Employee_Name: 'Max Member' },
+        });
+        expect([res.status, res.body.status]).toEqual([404, false]);
+        expect(String((await stored(task._id)).ProjectID)).toBe(target.project._id);
+    });
+});

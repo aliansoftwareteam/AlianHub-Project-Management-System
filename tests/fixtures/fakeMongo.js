@@ -156,7 +156,8 @@ const project = (doc, spec, search) => {
 
 const duplicateKey = (fields) => Object.assign(new Error(`E11000 duplicate key error collection: fake index: ${fields.join('_1_')}_1`), { code: 11000 });
 
-const create = () => {
+/* With `mongooseCasting`, an undefined value is dropped from a filter the way the driver drops it, so { _id: undefined } matches every row. */
+const create = ({ mongooseCasting = false } = {}) => {
     const store = {};
     const calls = [];
     const uniques = {};
@@ -174,8 +175,13 @@ const create = () => {
         return inserted;
     };
 
-    const crud = jest.fn(async (companyId, { type, data }, method) => {
-        calls.push({ companyId, type, method, data });
+    const castFilter = (filter) => (mongooseCasting && filter && typeof filter === 'object' && !Array.isArray(filter)
+        ? Object.fromEntries(Object.entries(filter).filter(([, value]) => value !== undefined))
+        : filter);
+
+    const crud = jest.fn(async (companyId, { type, data: sent }, method) => {
+        calls.push({ companyId, type, method, data: sent });
+        const data = Array.isArray(sent) && method !== 'aggregate' ? [castFilter(sent[0]), ...sent.slice(1)] : sent;
         const list = rows(type);
         if (method === 'save') {
             const doc = { _id: data._id ? String(data._id) : nextId(), createdAt: new Date(), ...data };

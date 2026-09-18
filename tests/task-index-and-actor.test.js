@@ -1,4 +1,4 @@
-const mockDb = require('./fixtures/fakeMongo').create();
+const mockDb = require('./fixtures/fakeMongo').create({ mongooseCasting: true });
 const mockHooks = { rejectWhen: null };
 
 // Mongoose treats an update without operators as a $set; fakeMongo only applies operators.
@@ -141,6 +141,8 @@ const reset = () => {
     [OPEN_PROJECT, OTHER_PROJECT].forEach((_id) => mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id, ProjectName: 'Parity', ProjectCode: 'PAR', CompanyId: CID, lastTaskId: 4, taskStatusData: STATUS_LIST, taskTypeCounts: TYPE_LIST }));
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: OWNER, Employee_Name: OWNER_NAME });
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: MEMBER, Employee_Name: 'Max Member' });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: 3, status: 2, isDelete: false });
     mockDb.seed(SCHEMA_TYPE.TASKS, taskDoc(OPEN_TASK));
     mockDb.seed(SCHEMA_TYPE.TASKS, taskDoc(OPEN_TASK_2));
 };
@@ -667,5 +669,162 @@ describe('an index object must be an object', () => {
     test('the import refuses an indexObj that is a string', async () => {
         const result = await call('PATCH /api/v1/importTasks', { ...bodyFor('PATCH /api/v1/importTasks', null), indexObj: 'groupByStatusIndex' });
         expect(result.code).toBe(400);
+    });
+});
+
+const emptyIdWrites = () => writes().filter((c) => c.type === SCHEMA_TYPE.TASKS && c.data && c.data[0] && typeof c.data[0] === 'object' && Object.hasOwn(c.data[0], '_id') && [undefined, null, ''].includes(c.data[0]._id));
+
+describe('a write must name its task', () => {
+    const PRIVATE_PROJECT = '6f0000000000000000000a09';
+    const HIDDEN_TASK = '6f0000000000000000000b0a';
+    const ORPHAN_TASK = '6f0000000000000000000b0b';
+
+    test('a list drag without a task id changes no task and sends no empty filter', async () => {
+        const before = snapshot();
+        const body = indexBody(OPEN_TASK, { updateData: { Task_Priority: 'HIGH' } });
+        delete body.taskId;
+        const result = await call(INDEX, body);
+        expect(result.code).toBe(400);
+        expect(result.body).toMatchObject({ status: false });
+        expect(snapshot()).toBe(before);
+        expect(emptyIdWrites()).toEqual([]);
+        expect(writes()).toEqual([]);
+    });
+
+    test.each([['null', null], ['an empty string', ''], ['a blank string', '  ']])('a list drag whose task id is %s is refused', async (_, taskId) => {
+        await refused(INDEX, indexBody(taskId, { updateData: { Task_Priority: 'HIGH' } }));
+    });
+
+    test.each([['relevantKey'], ['searchKey'], ['taskKey'], ['relevantIndex'], ['updateData']])('a list drag without %s is answered once and never queued', async (field) => {
+        const body = indexBody(OPEN_TASK, { updateData: { Task_Priority: 'HIGH' } });
+        delete body[field];
+        await refused(INDEX, body);
+        expect(mockDb.calls.filter((c) => c.method === 'aggregate')).toEqual([]);
+    });
+
+    test('a board load without a task id is refused', async () => {
+        const body = onloadBody();
+        delete body.taskUpdate.data;
+        await refused(ONLOAD, body);
+    });
+
+    const requiredRows = () => {
+        const rows = [];
+        Object.entries(TASK_ACTION_FIELDS).filter(([, spec]) => spec.task).forEach(([method, spec]) => rows.push([...routeOf(method), spec.task]));
+        Object.entries(PRE_V2_ACTION_FIELDS).filter(([, spec]) => spec.task).forEach(([action, spec]) => rows.push([PRE_V2, action, spec.task]));
+        return rows;
+    };
+
+    test.each(requiredRows())('%s %s without %j is refused with 400', async (route, action, path) => {
+        const body = bodyFor(route, action);
+        const parent = path.slice(0, -1).reduce((node, key) => node[key], body);
+        delete parent[path[path.length - 1]];
+        await refused(route, body);
+    });
+
+    test('a task in a private space the caller is not assigned to answers 404', async () => {
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PRIVATE_PROJECT, ProjectName: 'Hidden', ProjectCode: 'HID', CompanyId: CID, isPrivateSpace: true, AssigneeUserId: [OWNER], lastTaskId: 1, taskStatusData: STATUS_LIST, taskTypeCounts: TYPE_LIST });
+        mockDb.seed(SCHEMA_TYPE.TASKS, taskDoc(HIDDEN_TASK, { ProjectID: PRIVATE_PROJECT }));
+        const body = { ...bodyFor(PATCH, 'updatePriority'), taskData: { _id: HIDDEN_TASK, sprintId: SPRINT } };
+
+        const asMember = await call(PATCH, clone(body), { uid: MEMBER });
+        expect(asMember.code).toBe(404);
+        expect(asMember.body).toMatchObject({ status: false });
+        expect(storedTask(HIDDEN_TASK).Task_Priority).toBe('MEDIUM');
+        expect(writes()).toEqual([]);
+
+        const asOwner = await call(PATCH, clone(body));
+        expect(asOwner).toMatchObject({ code: 200, body: { status: true } });
+        expect(storedTask(HIDDEN_TASK).Task_Priority).toBe('HIGH');
+    });
+
+    test('a task whose project is gone answers 404', async () => {
+        mockDb.seed(SCHEMA_TYPE.TASKS, taskDoc(ORPHAN_TASK, { ProjectID: '6f0000000000000000000aee' }));
+        const result = await call(PATCH, { ...bodyFor(PATCH, 'updatePriority'), taskData: { _id: ORPHAN_TASK, sprintId: SPRINT } });
+        expect(result.code).toBe(404);
+        expect(writes()).toEqual([]);
+    });
+});
+
+describe('history and notifications follow the written task', () => {
+    const CLOSE = { status: { key: 3, text: '<i>Done</i>', type: 'close' }, statusKey: 3, statusType: 'close' };
+    const SHOWN = '&lt;b onmouseover=alert&#40;1&#41;&gt;Done&lt;/b&gt;';
+
+    test('a status change records the task it wrote, whatever prevStatus names', async () => {
+        const body = bodyFor(PATCH, 'updateStatus');
+        body.newStatus = CLOSE;
+        body.prevStatus = { taskId: OPEN_TASK_2, taskName: 'somebody else', statusName: 'To Do', name: 'To Do', updatedTaskName: '<b onmouseover=alert(1)>Done</b>', backColor: '"><script>' };
+        const result = await call(PATCH, body);
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(storedTask().statusKey).toBe(3);
+        expect(storedTask(OPEN_TASK_2).statusKey).toBe(1);
+        const rows = historyRows();
+        expect(rows.map((row) => row.TaskId)).toEqual([OPEN_TASK]);
+        expect(rows[0].Message).toContain(SHOWN);
+        expect(rows[0].Message).not.toContain('<b onmouseover');
+        expect(notifications().map((sent) => sent.taskId)).toEqual([OPEN_TASK]);
+        const sent = notifications()[0].object.message;
+        expect(sent).toContain('Task 01');
+        expect(sent).not.toContain('<i>Done</i>');
+        expect(sent).not.toContain('"><script>');
+    });
+
+    test('a priority change records the task it wrote, whatever priorityObj names', async () => {
+        const body = bodyFor(PATCH, 'updatePriority');
+        body.priorityObj = { taskId: OPEN_TASK_2, taskName: 'somebody else', priorityName: 'MEDIUM', newPriorityName: '<img src=x onerror=alert(1)>', statusImage: '" onerror="alert(1)' };
+        const result = await call(PATCH, body);
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(storedTask().Task_Priority).toBe('HIGH');
+        expect(storedTask(OPEN_TASK_2).Task_Priority).toBe('MEDIUM');
+        const rows = historyRows();
+        expect(rows.map((row) => row.TaskId)).toEqual([OPEN_TASK]);
+        expect(rows[0].Message).toContain('&lt;img src=x onerror=alert&#40;1&#41;&gt;');
+        expect(rows[0].Message).not.toContain('<img');
+        expect(notifications().map((sent) => sent.taskId)).toEqual([OPEN_TASK]);
+        const sent = notifications()[0].object.message;
+        expect(sent).toContain('Task 01');
+        expect(sent).not.toContain('<img src=x');
+        expect(sent).not.toContain('" onerror="');
+    });
+
+    test('the pre-v2 status route records the task it wrote', async () => {
+        const body = bodyFor(PRE_V2, 'updateStatus');
+        body.newStatus = CLOSE;
+        body.task = { _id: OPEN_TASK_2, sprintArray: { id: SPRINT } };
+        body.prevStatus = { taskId: OPEN_TASK, taskName: 'somebody else', statusName: 'To Do', name: 'To Do', updatedTaskName: '<b onmouseover=alert(1)>Done</b>' };
+        const result = await call(PRE_V2, body);
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(storedTask().statusKey).toBe(3);
+        expect(storedTask(OPEN_TASK_2).statusKey).toBe(1);
+        expect(historyRows().map((row) => row.TaskId)).toEqual([OPEN_TASK]);
+        expect(historyRows()[0].Message).toContain(SHOWN);
+    });
+
+    test.each([['updateStatus'], ['updatePriority'], ['updateAssignee'], ['updateDueDate'], ['updateTaskLeader'], ['updateTaskType']])('%s asking for history without a write is refused', async (action) => {
+        await refused(PATCH, { ...bodyFor(PATCH, action), isUpdateTask: false });
+        expect(historyRows()).toEqual([]);
+        expect(notifications()).toEqual([]);
+    });
+});
+
+describe('a move or copy needs its destination project', () => {
+    const MISSING_PROJECT = '6f0000000000000000000aff';
+    const MOVES = [[PATCH, 'moveTask'], [PATCH, 'duplicateTask'], [PATCH, 'convertToTask'], [PATCH, 'convertToList'], [BULK, 'bulkMove'], [BULK, 'bulkConvertToTask'], [BULK, 'bulkDuplicate']];
+
+    test.each(MOVES)('%s %s into a project that does not exist answers 404 and changes nothing', async (route, action) => {
+        const body = bodyFor(route, action);
+        body.projectData = { ...(body.projectData || {}), id: MISSING_PROJECT };
+        const before = snapshot();
+        const result = await call(route, body);
+        expect(result.code).toBe(404);
+        expect(result.body).toMatchObject({ status: false });
+        expect(snapshot()).toBe(before);
+        expect(writes()).toEqual([]);
+    });
+
+    test.each(MOVES)('%s %s without a destination is refused', async (route, action) => {
+        const body = bodyFor(route, action);
+        delete body.projectData.id;
+        await refused(route, body);
     });
 });

@@ -8,10 +8,11 @@ const { getCompanyDataFun } = require("../Company/controller/updateCompany");
 const socketEmitter = require("../../event/socketEventEmitter");
 const { pinSessionTenant } = require("../../Config/tenant");
 const { keepTabMarkerOnly } = require("./helpers/updateMarker");
-const { TASK_INDEX_FIELDS, TASK_INDEX_ONLOAD_FIELDS, prepareOrRefuse } = require("../Tasks/helpers/taskWriteFields");
+const { TASK_INDEX_FIELDS, TASK_INDEX_ONLOAD_FIELDS, prepareOrRefuse, taskFilterOf } = require("../Tasks/helpers/taskWriteFields");
 
 const projectQueues = {};
 const processingProjects = new Set();
+const REQUIRED_FIELDS = ['isFirst', 'isFirstWithRecord', 'taskId', 'projectId', 'sprintId', 'relevantIndex', 'indexName', 'relevantKey', 'searchKey', 'taskKey', 'updateData'];
 /**
  * Update TaskIndex Of Task For Drag And Drop
  * @param {Objcet} 
@@ -22,71 +23,10 @@ exports.updateTaskIndex = async (req,res) => {
         const payload = await prepareOrRefuse(req, res, TASK_INDEX_FIELDS, 'taskIndex');
         if (!payload) return;
         req.body = payload;
-        if (!req.body&& req.body.isFirst === undefined) {
-            res.send({
-                status: false,
-                statusText: `isFirst is required`
-            })
-        }
-        if (!req.body&& req.body.isFirstWithRecord === undefined) {
-            res.send({
-                status: false,
-                statusText: `isFirstWithRecord is required`
-            })
-        }
-        if (!(req.body && req.body.taskId)) {
-            res.send({
-                status: false,
-                statusText: `taskId is required`
-            })
-        }
-        if (!(req.body && req.body.projectId)) {
-            res.send({
-                status: false,
-                statusText: `projectId is required`
-            })
-        }
-        if (!(req.body && req.body.sprintId)) {
-            res.send({
-                status: false,
-                statusText: `sprintId is required`
-            })
-        }
-        if (!req.body&& req.body.relevantIndex === undefined) {
-            res.send({
-                status: false,
-                statusText: `relevantIndex is required`
-            })
-        }
-        if (!req.body&& req.body.indexName === undefined) {
-            res.send({
-                status: false,
-                statusText: `indexName is required`
-            })
-        }
-        if (!req.body&& req.body.relevantKey === undefined) {
-            res.send({
-                status: false,
-                statusText: `relevantKey is required`
-            })
-        }
-        if (!req.body&& req.body.searchKey === undefined) {
-            res.send({
-                status: false,
-                statusText: `searchKey is required`
-            })
-        }
-        if (!req.body&& req.body.taskKey === undefined) {
-            res.send({
-                status: false,
-                statusText: `taskKey is required`
-            })
-        }
-        if (!req.body&& req.body.updateData === undefined) {
-            res.send({
-                status: false,
-                statusText: `updateData is required`
-            })
+        const missing = REQUIRED_FIELDS.find((field) => req.body[field] === undefined || req.body[field] === '');
+        if (missing) {
+            res.status(400).send({ status: false, statusText: `${missing} is required` });
+            return;
         }
         let taskData = {
             relevantIndex: req.body.relevantIndex,
@@ -201,7 +141,7 @@ exports.processTask = async (projectId, taskData) => {
     }
     const upobj = {
         type: dbCollections.TASKS,
-        data: [{ _id: taskData.taskId }, update, { returnDocument: 'after' }],
+        data: [taskFilterOf(taskData.taskId), update, { returnDocument: 'after' }],
     };
     const result = await MongoDbCrudOpration(taskData.companyId, upobj, "findOneAndUpdate");
     if (!result) return;

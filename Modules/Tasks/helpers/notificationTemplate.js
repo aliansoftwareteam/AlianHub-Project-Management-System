@@ -224,6 +224,31 @@ exports.taskTotalEstimate = (taskObj) => {
     return `In <strong>${sanitizeInput(taskObj.TaskName)}</strong> Task, ${taskObj.UserName} added ${taskObj.message} total Estimate of task.</strong>`;
 }
 
+const escapeText = (value) => sanitizeInput(String(value === undefined || value === null ? '' : value));
+
+/* The template escapes the task name itself; everything else it places in HTML or an attribute is escaped here. */
+exports.shownStatus = (prevStatus = {}, newStatus = {}) => ({
+    template: {
+        backColor: escapeText(prevStatus.backColor),
+        color: escapeText(prevStatus.color),
+        statusName: escapeText(prevStatus.statusName),
+        bgColor: escapeText(prevStatus.bgColor),
+        textColor: escapeText(prevStatus.textColor),
+        newStatusName: escapeText(newStatus.status && newStatus.status.text),
+    },
+    updatedTaskName: escapeText(prevStatus.updatedTaskName),
+});
+
+exports.shownPriority = (priorityObj = {}) => ({
+    template: {
+        statusImage: escapeText(priorityObj.statusImage),
+        priorityName: escapeText(priorityObj.priorityName),
+        newStatusImage: escapeText(priorityObj.newStatusImage),
+        newPriorityName: escapeText(priorityObj.newPriorityName),
+    },
+    newPriorityName: escapeText(priorityObj.newPriorityName),
+});
+
 // For Task Status Change //
 exports.taskStatusChange = (obj) => {
     return `<p>In <strong>${sanitizeInput(obj.ProjectName)}</strong> Project, Status of <strong>${sanitizeInput(obj.taskName)
