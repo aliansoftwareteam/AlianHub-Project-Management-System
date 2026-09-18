@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { recordAudit } = require('../../Audit/recorder');
+const { ACTOR_SERVICE, serviceStamp } = require('../../Agents/serviceIdentity');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
 
@@ -42,12 +43,18 @@ const getTask = async (companyId, taskId) => {
     return task;
 };
 
+/* Under STEP_CREDENTIALS a row the runner writes for a rule names the worker as
+ * its service identity; an agent's context already carries its own actor type. */
+const workerIdentity = (context) => (context.actorType ? {} : serviceStamp('worker', 'serviceId'));
+
 const recordAutomationAudit = (companyId, context, entry) => {
     if (context.auditedByCaller) return;
+    const worker = workerIdentity(context);
     recordAudit(companyId, {
         actorId: context.ruleId ? `rule:${context.ruleId}` : 'automation',
         actorName: context.ruleName || 'Automation',
         ...entry,
+        ...(worker.serviceId ? { meta: { ...(entry.meta || {}), actorType: ACTOR_SERVICE, service: 'worker', ...worker } } : {}),
     });
 };
 

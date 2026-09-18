@@ -5,6 +5,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const logger = require('../../../Config/loggerConfig');
 const flag = require('../flag');
 const { INDEXED_SOURCES, COMMENT_TYPES } = require('../sources');
+const { serviceStamp } = require('../../Agents/serviceIdentity');
 const indexer = require('./indexer');
 
 // Indexes what a company already had before its indexer was switched on, one source at a time.
@@ -61,7 +62,7 @@ const readStates = async (companyId, sourceTypes = INDEXED_SOURCES) => {
 
 const saveState = (companyId, sourceType, set) => indexState(companyId, [
     { sourceType },
-    { $set: { companyId: String(companyId), sourceType, lastSeenOnAt: new Date(), ...set } },
+    { $set: { companyId: String(companyId), sourceType, lastSeenOnAt: new Date(), ...serviceStamp('indexer', 'lastRunBy'), ...set } },
     { upsert: true, returnDocument: 'after', lean: true },
 ], 'findOneAndUpdate');
 

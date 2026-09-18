@@ -370,6 +370,39 @@ The depth reaches `runs.canStart` as the same `depth` argument a rule-started ru
 passes, so an agent hop inside a workflow is refused by the guard that already
 existed rather than by a second one.
 
+## Service identities and step credentials
+
+Behind `STEP_CREDENTIALS`, off by default. Off is today's behaviour exactly: no
+credential is minted, no credential field is written, and every row is
+attributed as before.
+
+On, the platform's own components act as themselves. `Modules/Agents/actor.js`
+has a third actor kind, `service`, named from a fixed list: `engine`, `worker`,
+`indexer`, `router`. The engine records each step's audit row as
+`service:engine`, on behalf of whoever started the run; the automation runner's
+rows name the worker; the knowledge backfill stamps its state row and the model
+router its decision. A service identity is built in process by
+`serviceActor()`, is never resolved from a request, and is refused as a bearer
+value by `Config/jwt.js`.
+
+When the engine claims a step it mints a credential for it
+(`stepCredential.js`): a JWT signed with a key derived from
+`STEP_CREDENTIAL_SECRET` (or `JWT_SECRET`), carrying the company, the run, the
+step, the fencing token the claim won, the run's agent and starter, and the
+actions the step may perform, expiring with the lease. The row keeps only its id
+and expiry; the credential travels in the executor context and rides on the
+actor of the agent run. `Modules/Agents/actions.js` checks it against the live
+step row on every action: the step must exist, be running, hold the same fencing
+token, be inside its lease and grant the action, or the action is refused and
+audited before the registry and the holder's permissions are even asked. The
+credential narrows only; it grants nothing the run's actor could not already do.
+The engine's own lifecycle writes (claim, heartbeat, settle) are fenced by the
+token and made under the engine identity, never under the credential.
+
+`GET /api/v2/api-tokens/step-credentials` lists the live ones as `step_scoped`
+rows, every run's for an owner or admin and only the runs they started for
+anyone else, never the credential.
+
 ## What these slices do not do
 
 Per the task's out-of-scope: no Temporal. The queue stays behind

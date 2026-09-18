@@ -1183,6 +1183,10 @@ const schema = {
         budgetUsd: { type: Number, required: false },
         costUsd: { type: Number, required: false },
         depth: { type: Number, required: false },
+        /* Sprint 8 slice 8. The id and expiry of the step-scoped credential the engine
+         * minted on claim (STEP_CREDENTIALS); never the credential itself. */
+        credentialId: { type: String, required: false },
+        credentialExpiresAt: { type: Date, required: false },
     },
     /* Task 028 sprint 5 step 2. One row per human approval step: who owns the
      * decision, when it escalates, when it expires and what happened. The step
@@ -1520,6 +1524,8 @@ const schema = {
         startedAt: { type: Date, required: false },
         finishedAt: { type: Date, required: false, default: null },
         lastRunAt: { type: Date, required: false },
+        // The service identity the last run was recorded under (STEP_CREDENTIALS), e.g. service:indexer.
+        lastRunBy: { type: String, required: false },
         error: { type: String, required: false, default: '' },
         // Written while the indexer is on; a stale one means events may have been dropped while it was off.
         lastSeenOnAt: { type: Date, required: false },

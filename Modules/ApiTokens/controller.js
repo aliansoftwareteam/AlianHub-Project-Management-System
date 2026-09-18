@@ -210,6 +210,36 @@ exports.listTokensNeedingExpiry = async (req, res) => {
     }
 };
 
+/* GET /api/v2/api-tokens/step-credentials — the live step-scoped credentials of the
+ * workspace's workflow runs, as their own kind: every run's for an owner or admin,
+ * only the runs they started for anyone else. The run, the step and the expiry;
+ * never the credential, which is not stored, nor its id. */
+exports.listStepCredentials = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const userId = actingUserId(req);
+        if (!companyId || !userId) {
+            return res.send({ status: false, statusText: 'companyId and userId are required.' });
+        }
+        if (req.apiToken) return res.status(403).send({ status: false, statusText: 'API tokens cannot list credentials.' });
+        const stepCredential = require('../Workflows/stepCredential');
+        const policy = { stepCredentials: stepCredential.enabled() };
+        if (!policy.stepCredentials) return res.send({ status: true, statusText: 'Credentials fetched.', data: [], policy });
+        const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+        const roleType = await getRoleType(companyId, userId);
+        if (roleType === null || roleType === undefined) {
+            return res.status(403).send({ status: false, statusText: 'Only a member of this workspace can see its step-scoped credentials.' });
+        }
+        const rows = await stepCredential.listActive(companyId, { userId, privileged: isPrivileged(roleType) });
+        const names = await displayNamesOf(rows.map((row) => row.startedBy.id));
+        const data = rows.map((row) => ({ ...row, startedBy: { ...row.startedBy, name: names[row.startedBy.id] || '' } }));
+        return res.send({ status: true, statusText: 'Credentials fetched.', data, policy });
+    } catch (error) {
+        logger.error(`ERROR in list step credentials: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
 /* PUT /api/v2/api-tokens/:id  body: { name?, active? }. Under strict mode a token
  * without an expiry may only be revoked, so it is replaced rather than kept. */
 exports.updateToken = async (req, res) => {

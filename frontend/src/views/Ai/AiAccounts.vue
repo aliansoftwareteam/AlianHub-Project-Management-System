@@ -364,6 +364,26 @@
                                 </div>
                             </section>
 
+                            <section v-if="stepCredentialPolicy.stepCredentials" class="ah-card" data-test="step-credential-list" aria-labelledby="step-credential-list-title">
+                                <div class="ah-card__head">
+                                    <span id="step-credential-list-title" class="ah-h3">{{ $t('Accounts.step_scoped_title') }}</span>
+                                    <span class="ah-mono acct-note">{{ $t('Accounts.step_scoped_count', { n: stepCredentials.length }) }}</span>
+                                </div>
+                                <div class="ah-card__body">
+                                    <p class="acct-note">{{ $t('Accounts.step_scoped_lead') }}</p>
+                                    <ul v-if="stepCredentials.length" class="acct-token-list">
+                                        <li v-for="sc in stepCredentials" :key="sc._id" class="acct-token" data-test="step-credential-row">
+                                            <div class="acct-token__text">
+                                                <div class="acct-token__name">{{ sc.runName || sc.runId }}</div>
+                                                <div class="acct-token__meta">{{ stepCredentialMeta(sc) }}</div>
+                                            </div>
+                                            <span class="ah-chip ah-chip--brand ah-chip--mono" data-test="step-credential-kind">{{ $t('Accounts.step_scoped') }}</span>
+                                        </li>
+                                    </ul>
+                                    <p v-else class="ah-empty" style="margin-top:10px" data-test="step-credential-empty">{{ $t('Accounts.step_scoped_empty') }}</p>
+                                </div>
+                            </section>
+
                             <div class="acct-callout acct-callout--brand">{{ $t('Accounts.self_hosted_note') }}</div>
                         </div>
                     </div>
@@ -489,9 +509,9 @@ const { getUser } = useGetterFunctions();
 const companyId = inject("$companyId");
 
 const {
-    account, policy, summary, tokens, tokenPolicy, tokensNeedingExpiry, manifest, runs, peopleHours,
+    account, policy, summary, tokens, tokenPolicy, tokensNeedingExpiry, stepCredentials, stepCredentialPolicy, manifest, runs, peopleHours,
     mode, allowed, isAllowed,
-    loadAccount, loadTokens, loadTokensNeedingExpiry, loadManifest, loadRuns, loadPeopleHours,
+    loadAccount, loadTokens, loadTokensNeedingExpiry, loadStepCredentials, loadManifest, loadRuns, loadPeopleHours,
     savePolicy, linkAccount, unlinkAccount, mintToken, revokeToken
 } = useAccounts();
 
@@ -583,6 +603,14 @@ const expiryRowMeta = (tk) => [
     tk.owner && tk.owner.name ? tk.owner.name : t("Accounts.expiry_list_owner_unknown"),
     tk.createdAt ? t("Accounts.created_on", { d: new Date(tk.createdAt).toLocaleDateString() }) : "",
     tk.lastUsedAt ? t("Accounts.used_on", { d: new Date(tk.lastUsedAt).toLocaleString() }) : t("Accounts.never_used")
+].filter(Boolean).join(" · ");
+
+const stepCredentialMeta = (sc) => [
+    t("Accounts.step_scoped_step", { s: sc.stepId }),
+    sc.stepType || "",
+    sc.startedBy && sc.startedBy.name ? t("Accounts.step_scoped_started_by", { who: sc.startedBy.name }) : "",
+    sc.issuedAt ? t("Accounts.step_scoped_issued", { d: new Date(sc.issuedAt).toLocaleString() }) : "",
+    sc.expiresAt ? t("Accounts.step_scoped_expires", { d: new Date(sc.expiresAt).toLocaleString() }) : ""
 ].filter(Boolean).join(" · ");
 
 const personNameOf = (id) => (id ? (getUser(String(id)) || {}).Employee_Name || "" : "");
@@ -764,7 +792,7 @@ const load = async () => {
     loading.value = true;
     loadError.value = "";
     try {
-        await Promise.all([loadAccount(), loadTokens(), loadManifest(), loadRuns()]);
+        await Promise.all([loadAccount(), loadTokens(), loadStepCredentials(), loadManifest(), loadRuns()]);
         await refreshExpiryList();
         /* No runs means no bar, so the people total is never asked for — an
            unbounded timesheet read for a card that will not render. */

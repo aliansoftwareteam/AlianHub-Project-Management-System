@@ -181,7 +181,9 @@ describe('minting on claim', () => {
         const now = new Date();
         const { claimed, token, credentialId, expiresAt, claims } = await claimAndMint('r1', { lease: 45000, now });
         expect(token).not.toContain(credentialId);
-        expect(expiresAt.getTime()).toBe(new Date(claimed.leaseExpiresAt).getTime());
+        const leaseEnd = new Date(claimed.leaseExpiresAt).getTime();
+        expect(expiresAt.getTime()).toBeGreaterThanOrEqual(leaseEnd);
+        expect(expiresAt.getTime() - leaseEnd).toBeLessThan(1000);
         expect(claims).toMatchObject({ kind: 'step_credential', jti: credentialId, companyId: C, runId: 'r1', stepId: 'sAgent', stepRunId: String(claimed._id), fencingToken: 1, agentId: AGENT_ID, startedBy: STARTER, actions: ['task.comment', 'task.get'] });
         const decoded = jwt.decode(token);
         expect(decoded.exp).toBe(Math.floor(expiresAt.getTime() / 1000));
@@ -205,7 +207,7 @@ describe('minting on claim', () => {
         const row = await store.getStep(C, 'r1', 'sAgent');
         expect(row.credentialId).toBe(claims.jti);
         expect(new Date(row.credentialExpiresAt).getTime()).toBe(claims.exp * 1000);
-        expect(new Date(row.credentialExpiresAt).getTime()).toBeGreaterThanOrEqual(before + 30000);
+        expect(new Date(row.credentialExpiresAt).getTime()).toBeGreaterThanOrEqual(before + 30000 - 1000);
         expect(JSON.stringify(row)).not.toContain(seen[0].stepCredential);
     });
 

@@ -133,6 +133,18 @@ const blockRun = (companyId, runId, { code, reason, stepId }) => call(companyId,
 
 const listSteps = (companyId, runId) => call(companyId, STEPS, [{ runId: String(runId) }, null, { sort: { index: 1 } }], 'find');
 
+/* The steps holding a live claim under a credential, which is what the tokens
+ * screen lists. Served by the { status, leaseExpiresAt } index. */
+const listCredentialedSteps = (companyId, now = new Date()) => call(companyId, STEPS, [
+    { status: 'running', leaseExpiresAt: { $gt: now }, credentialId: { $exists: true, $ne: null } },
+    null,
+    { sort: { leaseExpiresAt: 1 } },
+], 'find');
+
+const listRunsById = (companyId, runIds) => (runIds.length
+    ? call(companyId, RUNS, [{ _id: { $in: runIds.map(String) } }], 'find')
+    : Promise.resolve([]));
+
 const getStep = (companyId, runId, stepId) => call(companyId, STEPS, [{ runId: String(runId), stepId: String(stepId) }], 'findOne');
 
 /* Claim a step, or discover somebody else holds it.
@@ -420,7 +432,7 @@ const outputsOf = async (companyId, runId) => {
 
 module.exports = {
     RUNS, STEPS, TERMINAL, STEP_TERMINAL, StaleLeaseError, isDuplicateKey, stepRowsFor,
-    createRun, getRun, findRunByDedupeKey, listRuns, patchRun, spendOnRun, blockRun, listSteps, getStep,
+    createRun, getRun, findRunByDedupeKey, listRuns, listRunsById, patchRun, spendOnRun, blockRun, listSteps, listCredentialedSteps, getStep,
     retryStep, operatorSkipStep, resumeStep, recordCompensation, reopenRun,
     claimStep, heartbeat, settleStep, noteStep, succeedStep, failStep, deferStep, releaseStep, skipStep,
     childRowsFor, addSteps, listChildren, resetSteps, wakeStep, outputsOf,

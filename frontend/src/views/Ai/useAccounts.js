@@ -16,6 +16,8 @@ const summary = ref({});
 const tokens = ref([]);
 const tokenPolicy = ref({ ...DEFAULT_TOKEN_POLICY });
 const tokensNeedingExpiry = ref([]);
+const stepCredentials = ref([]);
+const stepCredentialPolicy = ref({ stepCredentials: false });
 const manifest = ref({ protocolVersion: "", tools: [], never: [] });
 const runs = ref([]);
 const peopleHours = ref(null);
@@ -57,6 +59,19 @@ export function useAccounts() {
             tokensNeedingExpiry.value = ok(res) ? res.data.data || [] : [];
         } catch (error) {
             tokensNeedingExpiry.value = [];
+        }
+    };
+
+    /* Everyone asks; the server keeps a member to the runs they started and answers
+     * an empty list, with the policy off, while step credentials are not minted. */
+    const loadStepCredentials = async () => {
+        try {
+            const res = await apiRequest("get", env.API_TOKENS_STEP_CREDENTIALS);
+            stepCredentials.value = ok(res) ? res.data.data || [] : [];
+            stepCredentialPolicy.value = { stepCredentials: Boolean(ok(res) && res.data.policy && res.data.policy.stepCredentials) };
+        } catch (error) {
+            stepCredentials.value = [];
+            stepCredentialPolicy.value = { stepCredentials: false };
         }
     };
 
@@ -152,9 +167,9 @@ export function useAccounts() {
     };
 
     return {
-        account, policy, summary, tokens, tokenPolicy, tokensNeedingExpiry, manifest, runs, peopleHours,
+        account, policy, summary, tokens, tokenPolicy, tokensNeedingExpiry, stepCredentials, stepCredentialPolicy, manifest, runs, peopleHours,
         mode, allowed, isAllowed,
-        loadAccount, loadPolicy, loadTokens, loadTokensNeedingExpiry, loadManifest, loadRuns, loadPeopleHours,
+        loadAccount, loadPolicy, loadTokens, loadTokensNeedingExpiry, loadStepCredentials, loadManifest, loadRuns, loadPeopleHours,
         savePolicy, linkAccount, unlinkAccount, mintToken, revokeToken
     };
 }

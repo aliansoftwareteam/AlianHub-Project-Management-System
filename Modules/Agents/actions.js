@@ -8,6 +8,7 @@ const registry = require('./registry');
 const permissions = require('./permissions');
 const audit = require('./agentAudit');
 const { attribution, isAgent } = require('./actor');
+const stepCredential = require('../Workflows/stepCredential');
 const completionStore = require('../Tasks/helpers/completionStore');
 const { emitPageChange } = require('../Pages/helpers/pageEvents');
 
@@ -257,10 +258,21 @@ const refusal = async (companyId, actor, { action, params, reason, ip, entityTyp
     return new RefusedError(reason, auditId);
 };
 
+/* An actor acting under a step credential is only as live as its step: the row
+ * is read on every action, and a settled, released, reclaimed or lapsed step
+ * refuses the credential before anything else is looked at. The credential
+ * grants nothing on its own — the registry and the holder's permissions follow. */
+const liveStep = async (companyId, actor, { action, params, ip }) => {
+    if (!actor || !actor.stepCredential) return;
+    const live = await stepCredential.check(companyId, actor.stepCredential, { action });
+    if (!live.ok) throw await refusal(companyId, actor, { action, params, reason: live.reason, ip });
+};
+
 /* Run one action for an actor. Refusals are audited and thrown as RefusedError.
  * A policy `decision` of refuse is honoured before the registry check, so a
  * policy refusal leaves the same audit row as a registry one. */
 const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0 }) => {
+    await liveStep(companyId, actor, { action, params, ip });
     if (decision && decision.decision === 'refuse') throw await refusal(companyId, actor, { action, params, reason: decision.reason, ip });
     const check = registry.evaluate(action, params, { allowedActions });
     if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip });
@@ -287,6 +299,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
 
 /* Reads still go through the registry so a refusal is logged the same way. */
 const authorizeRead = async ({ companyId, actor, action, params = {}, ip = '', allowedActions }) => {
+    await liveStep(companyId, actor, { action, params, ip });
     const check = registry.evaluate(action, params, { allowedActions });
     if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip });
     const holder = await permissions.holderMay(companyId, actor, action, params);

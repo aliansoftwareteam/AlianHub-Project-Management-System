@@ -51,6 +51,15 @@ const taskFor = async (companyId, taskId) => {
     return task;
 };
 
+/* The agent an agent step will run, read when the engine claims the step so the
+ * step's credential can carry what that agent may do. Null for any other step. */
+const agentFor = async (companyId, run, step) => {
+    if (!step || String(step.type) !== 'agent_run') return null;
+    const agentId = (step.config && step.config.agentId) || run.agentId;
+    if (!agentId) return null;
+    return runs.getAgent(companyId, agentId).catch(() => null);
+};
+
 const startFor = async (companyId, { workflowRunId, stepId, agentId, taskId, skill, note, spendCapUsd, budgetUsd, startedBy, traceId, depth }) => {
     const agent = await runs.getAgent(companyId, agentId);
     if (!agent) throw permanent(`agent ${agentId} was not found`);
@@ -81,8 +90,9 @@ const startFor = async (companyId, { workflowRunId, stepId, agentId, taskId, ski
     return run;
 };
 
-/* The run itself, through the same graph a person's run executes on. */
-const executeAgentRun = async (companyId, agentRun) => {
+/* The run itself, through the same graph a person's run executes on. The step's
+ * credential rides on the actor, which is what every action is performed as. */
+const executeAgentRun = async (companyId, agentRun, { stepCredential = null } = {}) => {
     const agent = await runs.getAgent(companyId, agentRun.agentId);
     if (!agent) throw permanent(`agent ${agentRun.agentId} was not found`);
     const task = await taskFor(companyId, agentRun.taskId);
@@ -94,6 +104,7 @@ const executeAgentRun = async (companyId, agentRun) => {
         runId: String(agentRun._id),
         viaAccount: agentRun.viaAccount,
         tokenId: null,
+        ...(stepCredential ? { stepCredential } : {}),
     };
     const state = await runs.executeSkill(companyId, agentRun, agent, task, { proposals, actions, actor });
     const finished = (await runs.get(companyId, agentRun._id)) || agentRun;
@@ -108,7 +119,7 @@ const executeAgentRun = async (companyId, agentRun) => {
 };
 
 /* What `context.runAgent` is. The step type calls this and nothing else. */
-const runAgent = async ({ companyId, workflowRunId, stepId, agentRunId, agentId, taskId, skill, note, spendCapUsd, budgetUsd, startedBy, traceId, depth, noteOutput }) => {
+const runAgent = async ({ companyId, workflowRunId, stepId, agentRunId, agentId, taskId, skill, note, spendCapUsd, budgetUsd, startedBy, traceId, depth, noteOutput, stepCredential = null }) => {
     const existing = agentRunId ? await runs.get(companyId, agentRunId) : null;
     if (agentRunId && !existing) throw permanent(`agent run ${agentRunId} no longer exists`);
     if (!existing && !agentId) throw permanent('an agent run step needs an agentId or an agentRunId');
@@ -119,7 +130,7 @@ const runAgent = async ({ companyId, workflowRunId, stepId, agentRunId, agentId,
     if (typeof noteOutput === 'function') await noteOutput({ agentRunId: String(agentRun._id), status: agentRun.status });
     if (runs.TERMINAL.includes(agentRun.status)) return resultOf(agentRun);
     if (agentRun.status === runs.STATUS.WAITING) throw transient(`agent run ${agentRun._id} is waiting for approval`);
-    return executeAgentRun(companyId, agentRun);
+    return executeAgentRun(companyId, agentRun, { stepCredential });
 };
 
 /* The context every tick hands the executors, so a step type never has to know
@@ -129,4 +140,4 @@ const contextFor = (companyId, claim) => ({
     noteOutput: claim ? (output) => store.noteStep(companyId, claim, { output }) : null,
 });
 
-module.exports = { TRIGGER, runAgent, executeAgentRun, contextFor, idempotencyKeyFor, AgentStepError };
+module.exports = { TRIGGER, runAgent, executeAgentRun, agentFor, contextFor, idempotencyKeyFor, AgentStepError };
