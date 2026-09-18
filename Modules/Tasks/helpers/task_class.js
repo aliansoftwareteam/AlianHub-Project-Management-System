@@ -299,7 +299,7 @@ class Task {
                     }
                     let historyObj = {
                         key: "task_name_edit",
-                        message : `<b>${obj.userName}</b> has changed <b> Task name</b> from <b>${obj.previousTaskName}</b> to <b>${firebaseObj.TaskName}</b>.`,
+                        message : `<b>${userData.Employee_Name}</b> has changed <b> Task name</b> from <b>${obj.previousTaskName}</b> to <b>${firebaseObj.TaskName}</b>.`,
                         sprintId: taskData.sprintArray.id
                     };
                     HandleHistory('task',projectData.CompanyId, projectData._id,taskData._id,historyObj, userData).then(async () => {});

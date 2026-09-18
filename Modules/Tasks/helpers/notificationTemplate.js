@@ -221,7 +221,7 @@ exports.taskNameEdit = (taskObj) => {
 }
 
 exports.taskTotalEstimate = (taskObj) => {
-    return `In <strong>${sanitizeInput(taskObj.TaskName)}</strong> Task, ${sanitizeInput(taskObj.UserName)} added ${taskObj.message} total Estimate of task.</strong>`;
+    return `In <strong>${sanitizeInput(taskObj.TaskName)}</strong> Task, ${taskObj.UserName} added ${taskObj.message} total Estimate of task.</strong>`;
 }
 
 // For Task Status Change //

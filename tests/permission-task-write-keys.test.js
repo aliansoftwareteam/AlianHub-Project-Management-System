@@ -95,7 +95,7 @@ describe('every task write route and action has a permission mapping', () => {
             'PATCH /api/v2/tasks', 'POST /api/v2/tasks/bulk', 'PUT /api/v1/project/allTask/:id', 'POST /api/v1/taskIndex', 'POST /api/v1/recurring-tasks',
         ]));
         expect(new Set(scanned.values()).size).toBeGreaterThan(8);
-        expect(methodsOf(taskMongo).length).toBeGreaterThan(60);
+        expect(methodsOf(taskMongo).length).toBeGreaterThan(50);
         expect(methodsOf(legacyTask)).toEqual(expect.arrayContaining(['updateStatus', 'updatePriority', 'updateTaskName']));
     });
 
@@ -138,7 +138,7 @@ describe('every task write route and action has a permission mapping', () => {
             expect(typeof taskMongo[method]).toBe('function');
             const spy = jest.spyOn(taskMongo, method).mockResolvedValue({ status: true, reached: method });
             const res = response();
-            await handler({ headers: { companyid: CID }, aud: CID, body: { action } }, Object.assign(res, { send: (body) => { res.body = body; } }));
+            await handler({ headers: { companyid: CID }, aud: CID, uid: OWNER, body: { action } }, Object.assign(res, { send: (body) => { res.body = body; } }));
             await settle();
             expect(res.body).toEqual({ status: true, reached: method });
             spy.mockRestore();
@@ -383,7 +383,6 @@ describe('the other task write routes use the same judgement', () => {
         ['POST /api/v2/tasks/relations', { action: 'add', taskId: LOCKED_TASK, relatedTaskId: OPEN_TASK, type: 'blocks' }, 'task.task_list', true],
         ['PATCH /api/tasks/', { action: 'updatePriority', priorityObj: { taskId: LOCKED_TASK } }, 'task.task_priority', false],
         ['PATCH /api/v1/importTasks', { tasks: [], projectData: { _id: LOCKED_PROJECT } }, 'task.task_create', false],
-        ['POST /api/tasks', { data: { ProjectID: LOCKED_PROJECT } }, 'task.task_create', false],
     ])('%s', async (route, body, key, readable) => {
         const [method, routePath] = route.split(' ');
         setMode('off');

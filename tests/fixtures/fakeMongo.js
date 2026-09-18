@@ -1,5 +1,5 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
-// language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type, $set/$inc/$push,
+// language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type/$size, $set/$inc/$push/$addToSet/$pull,
 // conditional findOneAndUpdate, updateOne and findOneAndUpdate with upsert and $setOnInsert, findOneAndDelete, deleteOne, deleteMany,
 // sort/limit on find, $match/$project/$addFields/$group/$replaceRoot aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000) so a test can assert on what was written.
@@ -43,6 +43,7 @@ const matches = (doc, filter = {}) => Object.entries(filter).every(([key, cond])
             if (op === '$lte') return value <= want;
             if (op === '$lt') return value < want;
             if (op === '$exists') return (value !== undefined) === arg;
+            if (op === '$size') return Array.isArray(value) && value.length === arg;
             if (op === '$type') return arg === 'string' ? typeof value === 'string' : typeof value === arg;
             if (op === '$regex') return new RegExp(arg, cond.$options || '').test(String(value));
             if (op === '$options') return true;
@@ -66,6 +67,15 @@ const apply = (doc, update = {}) => {
     Object.entries(update.$inc || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = Number(t[l] || 0) + v; }));
     Object.entries(update.$push || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = [...(t[l] || []), ...(v && Array.isArray(v.$each) ? v.$each : [v])]; }));
     Object.entries(update.$unset || {}).forEach(([k]) => write(doc, k, (t, l) => { delete t[l]; }));
+    Object.entries(update.$addToSet || {}).forEach(([k, v]) => write(doc, k, (t, l) => {
+        const list = Array.isArray(t[l]) ? t[l] : [];
+        (v && Array.isArray(v.$each) ? v.$each : [v]).forEach((item) => { if (!list.some((have) => hex(have) === hex(item))) list.push(item); });
+        t[l] = list;
+    }));
+    Object.entries(update.$pull || {}).forEach(([k, v]) => write(doc, k, (t, l) => {
+        const gone = (item) => (isOperatorObject(v) ? matches({ it: item }, { it: v }) : (v && typeof v === 'object' && !Array.isArray(v) ? matches(item, v) : hex(item) === hex(v)));
+        t[l] = (Array.isArray(t[l]) ? t[l] : []).filter((item) => !gone(item));
+    }));
     return doc;
 };
 
@@ -105,9 +115,10 @@ const ACCUMULATORS = {
     $sum: (prev, v) => (prev || 0) + (typeof v === 'number' ? v : 0),
     $max: (prev, v) => (v == null || (prev != null && sortable(prev) >= sortable(v)) ? prev : v),
     $first: (prev, v, seen) => (seen ? prev : v),
+    $push: (prev, v) => [...(prev || []), v],
 };
 
-/* $group with a field or compound _id and $sum / $max / $first; a group naming no accumulator counts into `n`. */
+/* $group with a field or compound _id and $sum / $max / $first / $push; a group naming no accumulator counts into `n`. */
 const group = (docs, spec) => {
     const fields = Object.entries(spec).filter(([name]) => name !== '_id');
     const out = new Map();

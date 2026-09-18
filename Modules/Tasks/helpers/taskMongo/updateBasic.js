@@ -580,7 +580,7 @@ module.exports = {
                     }
                     let historyObj = {
                         key: "task_name_edit",
-                        message : `<b>${obj.userName}</b> has changed <b> Task name</b> from <b>${sanitizedOldTaskName}</b> to <b>${sanitizedNewTaskName}</b>.`,
+                        message : `<b>${userData.Employee_Name}</b> has changed <b> Task name</b> from <b>${sanitizedOldTaskName}</b> to <b>${sanitizedNewTaskName}</b>.`,
                         sprintId: taskData.sprintId
                     };
                     HandleHistory('task',projectData.CompanyId, projectData._id,taskData._id,historyObj, userData).then(async () => {});
