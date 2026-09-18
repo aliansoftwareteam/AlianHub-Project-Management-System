@@ -27,6 +27,8 @@ const REASONS = Object.freeze({
     COMPANY_MISMATCH: 'company_mismatch',
 });
 
+const KNOWN_DIFFERENCE_REASONS = Object.freeze([REASONS.NULL_GLOBAL_FLAG]);
+
 const utcDay = (date) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 
 /* The pattern Express matched, never the URL, which carries ids and the query string. */
@@ -112,4 +114,4 @@ const recordDecision = (req, res, decision) => {
     }
 };
 
-module.exports = { REASONS, GLOBAL_SCOPE, recordDecision };
+module.exports = { REASONS, KNOWN_DIFFERENCE_REASONS, GLOBAL_SCOPE, recordDecision };
