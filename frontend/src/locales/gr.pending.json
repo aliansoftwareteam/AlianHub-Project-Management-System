@@ -1,7 +1,7 @@
 {
   "locale": "gr",
   "machineTranslated": false,
-  "updatedAt": "2026-09-17T13:44:50.113Z",
+  "updatedAt": "2026-09-18T11:25:17.314Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5991,6 +5991,14 @@
     "Audit.names_not_checked": "Names aren't covered by the integrity check. The ids beside them are.",
     "Audit.integrity_unchained_hint": "Written before the audit chain started, so it cannot be verified.",
     "Audit.integrity_broken_row_hint": "This row is outside the chain but was written after the chain started, for example while the audit chain was off, or it carries a change that is not part of the chain.",
-    "Audit.total_approximate": "The count is approximate: some rows it includes no longer match this filter once their recorded changes are checked."
+    "Audit.total_approximate": "The count is approximate: some rows it includes no longer match this filter once their recorded changes are checked.",
+    "Audit.tainted": "Read external content",
+    "Audit.tainted_reason": "This run took in content from outside the workspace, so its risky changes need a person's approval.",
+    "Audit.taint_kind_fetch": "Web page",
+    "Audit.taint_kind_email": "Email",
+    "Audit.taint_kind_form": "Form submission",
+    "Audit.taint_kind_webhook": "Webhook",
+    "Audit.taint_kind_file": "Uploaded file",
+    "Audit.taint_kind_passage": "Knowledge passage"
   }
 }

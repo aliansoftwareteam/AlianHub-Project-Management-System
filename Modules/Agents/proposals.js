@@ -11,6 +11,7 @@ const findingMemory = require('./engine/findingMemory');
 const persistence = require('../AICore/persistence');
 const logger = require('../../Config/loggerConfig');
 const access = require('./access');
+const taint = require('./taint');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
 // actions it would run. Approving applies them through perform() — so they are
@@ -115,7 +116,7 @@ const projectOfTask = async (companyId, taskId) => {
     return task && task.ProjectID ? String(task.ProjectID) : null;
 };
 
-const create = async (companyId, { agent, runId, taskId, projectId, what, why, changes, gate, priority, cost }) => {
+const create = async (companyId, { agent, runId, taskId, projectId, what, why, changes, gate, priority, cost, taint: marker }) => {
     if (typeof what !== 'string' || !what.trim()) throw Object.assign(new Error('what is required: say in one sentence what the proposal does.'), { status: 400 });
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
@@ -127,6 +128,7 @@ const create = async (companyId, { agent, runId, taskId, projectId, what, why, c
             what: what.trim().slice(0, 300), why: String(why || '').slice(0, 2000),
             changes: changes.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
+            ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
         },
     }, 'save');
     emit(companyId, saved);
@@ -209,13 +211,14 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     if (!claimed) return alreadyDecided(companyId, id);
 
     const runTrace = run && run.traceId ? { traceId: run.traceId } : {};
+    const marker = taint.record(run);
     const agentActor = { kind: 'agent', userId: decider.userId, agentId: p.agentId, agentName: p.agentName, runId: p.runId, viaAccount: 'workspace', tokenId: null, ...runTrace };
     const auditIds = [];
     const applied = [];
     for (const c of changes) {
         try {
             // eslint-disable-next-line no-await-in-loop
-            const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth });
+            const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, ...(marker ? { taint: marker } : {}) });
             if (out.auditId) auditIds.push(out.auditId);
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {

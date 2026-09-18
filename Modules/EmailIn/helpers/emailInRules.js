@@ -58,4 +58,12 @@ const parseInbound = ({ from, subject, text, html } = {}) => {
     return { senderEmail, taskName, description };
 };
 
-module.exports = { generateInboxToken, isInboxToken, inboxAddress, extractToken, extractEmail, stripHtml, parseInbound, MAX_NAME, MAX_BODY };
+/* Identifies the message without keeping any of it: a hash of its Message-ID, or of the sender and subject when the provider sent none. */
+const originRef = (body = {}) => {
+    const headers = body.headers && typeof body.headers === 'object' ? body.headers : {};
+    const messageId = body['message-id'] || body['Message-Id'] || body['Message-ID'] || body.messageId || headers['message-id'] || headers['Message-Id'] || headers['Message-ID'] || '';
+    const seed = String(messageId).trim() || `${body.from || ''}|${body.subject || ''}|${body.date || body.Date || ''}`;
+    return crypto.createHash('sha256').update(seed).digest('hex').slice(0, 16);
+};
+
+module.exports = { generateInboxToken, isInboxToken, inboxAddress, extractToken, extractEmail, stripHtml, parseInbound, originRef, MAX_NAME, MAX_BODY };

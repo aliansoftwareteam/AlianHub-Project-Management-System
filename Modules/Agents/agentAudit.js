@@ -39,6 +39,9 @@ const safeParams = (params) => {
 };
 
 const STATE = Object.freeze({ PENDING: 'pending', APPLIED: 'applied', FAILED: 'failed' });
+
+/* The taint marker of the run behind the action (Agents/taint.js); absent on a clean run. */
+const taintMeta = (taint) => (taint && taint.tainted ? { tainted: true, taintSources: Array.isArray(taint.taintSources) ? taint.taintSources : [] } : {});
 const AUDIT_UNAVAILABLE = 'audit_unavailable';
 const AUDIT_UNMARKED = 'audit_unmarked';
 
@@ -105,7 +108,7 @@ const baseMeta = (actor) => {
 
 /* Opens the row for an allowed agent call before anything is mutated. Throws
  * AuditUnavailableError, and the caller must not act. */
-const openAction = async (companyId, actor, { action, reason, params, cost, entityType, entityId, entityName, ip, idempotencyKey }) => {
+const openAction = async (companyId, actor, { action, reason, params, cost, entityType, entityId, entityName, ip, idempotencyKey, taint }) => {
     const a = attribution(actor);
     try {
         return await write(companyId, {
@@ -114,7 +117,7 @@ const openAction = async (companyId, actor, { action, reason, params, cost, enti
             entityType: entityType || 'task', entityId: entityId ? String(entityId) : '', entityName: entityName || '',
             meta: { ...baseMeta(actor), action, reason: reason || '', params: safeParams(params), cost: cost || null,
                     state: STATE.PENDING, undo: null, undoable: false, undoneAt: null, undoneBy: null,
-                    ...(idempotencyKey ? { idempotencyKey: String(idempotencyKey) } : {}) },
+                    ...(idempotencyKey ? { idempotencyKey: String(idempotencyKey) } : {}), ...taintMeta(taint) },
         });
     } catch (e) {
         logger.error(`agent audit: ${AUDIT_UNAVAILABLE} for ${action}: ${e.message}`);
@@ -149,13 +152,13 @@ const recordAction = async (companyId, actor, entry) => {
 };
 
 /* A refused call — logged with what was attempted and why, and nothing ran. */
-const recordRefusal = async (companyId, actor, { action, reason, params, entityType, entityId, path, ip }) => {
+const recordRefusal = async (companyId, actor, { action, reason, params, entityType, entityId, path, ip, taint }) => {
     const a = attribution(actor);
     return writeQuietly(companyId, {
         actorId: a.actorId, actorName: a.label, ip,
         action: ACTION_REFUSED,
         entityType: entityType || 'task', entityId: entityId ? String(entityId) : '',
-        meta: { ...baseMeta(actor), action, reason, params: safeParams(params), path: path || null, ran: false },
+        meta: { ...baseMeta(actor), action, reason, params: safeParams(params), path: path || null, ran: false, ...taintMeta(taint) },
     });
 };
 

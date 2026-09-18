@@ -74,6 +74,7 @@
                             <div class="al__reason">{{ (row.meta && row.meta.reason) || '—' }}</div>
                             <div class="al__meta">
                                 <span v-if="row.meta && row.meta.runId" class="ah-mono al__run">{{ $t('Audit.run_n', { n: String(row.meta.runId).slice(-4) }) }}</span>
+                                <span v-if="row.meta && row.meta.tainted" class="ah-chip ah-chip--warn" :title="taintTitle(row)" data-test="tainted">{{ $t('Audit.tainted') }}</span>
                                 <span v-if="row.meta && row.meta.undoneAt" class="ah-chip ah-chip--warn">{{ $t('Audit.undone_at', { t: time(row.meta.undoneAt) }) }}</span>
                                 <template v-else-if="row.meta && row.meta.undoable && row.undoReason !== 'project_not_visible'">
                                     <button
@@ -113,6 +114,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequest } from "@/services";
 import { useGetterFunctions } from "@/composable";
 import * as env from "@/config/env";
+import { taintSourcesLine, taintSourcesOf } from "@/views/Ai/taintText";
 
 defineOptions({ name: "AuditLogPage" });
 
@@ -156,6 +158,7 @@ const actorName = (row) => (isAgent(row) ? row.meta.agentName || t("Audit.an_age
 const initial = (row) => actorName(row).charAt(0).toUpperCase();
 const eventAction = (row) => (row.meta && row.meta.action) || row.action;
 const isRefusal = (row) => REFUSALS.includes(row.action);
+const taintTitle = (row) => taintSourcesLine(t, taintSourcesOf(row.meta));
 const showsIntegrity = (row) => Boolean(chainOn.value && row.integrity && row.integrity.state in INTEGRITY_CHIPS);
 const showsHashedIds = (row) => Boolean(chainOn.value && row.chain && typeof row.chain.seq === "number");
 const integrityKey = (row) => (row.integrity.state === "broken" && row.integrity.brokenAt == null ? "Audit.integrity_broken_row" : "Audit.integrity_" + row.integrity.state);
