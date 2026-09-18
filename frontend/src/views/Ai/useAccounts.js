@@ -15,6 +15,7 @@ const policy = ref({ allowedModes: [...MODES], requireCheckBeforeDone: false });
 const summary = ref({});
 const tokens = ref([]);
 const tokenPolicy = ref({ ...DEFAULT_TOKEN_POLICY });
+const tokensNeedingExpiry = ref([]);
 const manifest = ref({ protocolVersion: "", tools: [], never: [] });
 const runs = ref([]);
 const peopleHours = ref(null);
@@ -46,6 +47,17 @@ export function useAccounts() {
         const res = await apiRequest("get", env.API_TOKENS);
         tokens.value = ok(res) ? res.data.data || [] : [];
         tokenPolicy.value = { ...DEFAULT_TOKEN_POLICY, ...((ok(res) && res.data.policy) || {}) };
+    };
+
+    /* Owners and admins only: the server refuses anyone else, and answers an empty
+     * list while strict mode is off. A refusal leaves the list empty rather than failing the page. */
+    const loadTokensNeedingExpiry = async () => {
+        try {
+            const res = await apiRequest("get", env.API_TOKENS_NEEDING_EXPIRY);
+            tokensNeedingExpiry.value = ok(res) ? res.data.data || [] : [];
+        } catch (error) {
+            tokensNeedingExpiry.value = [];
+        }
     };
 
     // Public and secret-free: the tool list and the never-list come from the
@@ -140,9 +152,9 @@ export function useAccounts() {
     };
 
     return {
-        account, policy, summary, tokens, tokenPolicy, manifest, runs, peopleHours,
+        account, policy, summary, tokens, tokenPolicy, tokensNeedingExpiry, manifest, runs, peopleHours,
         mode, allowed, isAllowed,
-        loadAccount, loadPolicy, loadTokens, loadManifest, loadRuns, loadPeopleHours,
+        loadAccount, loadPolicy, loadTokens, loadTokensNeedingExpiry, loadManifest, loadRuns, loadPeopleHours,
         savePolicy, linkAccount, unlinkAccount, mintToken, revokeToken
     };
 }

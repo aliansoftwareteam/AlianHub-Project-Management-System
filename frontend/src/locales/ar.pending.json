@@ -8201,6 +8201,12 @@
     "Audit.names_not_checked": "Names aren't covered by the integrity check. The ids beside them are.",
     "Audit.integrity_unchained_hint": "Written before the audit chain started, so it cannot be verified.",
     "Audit.integrity_broken_row_hint": "This row is outside the chain but was written after the chain started, for example while the audit chain was off, or it carries a change that is not part of the chain.",
-    "Audit.total_approximate": "The count is approximate: some rows it includes no longer match this filter once their recorded changes are checked."
+    "Audit.total_approximate": "The count is approximate: some rows it includes no longer match this filter once their recorded changes are checked.",
+    "Accounts.expiry_list_title": "Tokens that still need an expiry",
+    "Accounts.expiry_list_count": "{n} TO REPLACE",
+    "Accounts.expiry_list_lead": "Every active token in this workspace that has no expiry, with the day it stops working. Only the owner of a token can replace it: ask them to create a new token with an expiry, then revoke this one.",
+    "Accounts.expiry_list_empty": "Every active token in this workspace has an expiry.",
+    "Accounts.expiry_list_owner_unknown": "owner unknown",
+    "Accounts.expiry_list_unchecked": "no expiry · grace cannot be checked right now"
   }
 }
