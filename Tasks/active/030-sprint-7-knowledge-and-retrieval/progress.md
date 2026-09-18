@@ -3,13 +3,13 @@
 ## Checklist
 One pull request per step; tick with the merge commit.
 
-- [ ] Step 1: One retrieval interface with hybrid lexical and vector search; the lexical implementation ships first on the f
-- [ ] Step 2: Ingestion off the event bus, extended to page, comment, attachment and memory events: extract, chunk on struct
-- [ ] Step 3: Sources brought in order of value: page bodies, comments, meeting transcripts, uploaded files through text ext
+- [ ] Step 1: One retrieval interface with hybrid lexical and vector search; the lexical implementation ships first on the f — lexical done in #739 `45f20831` (build 215); hybrid is slice 6
+- [ ] Step 2: Ingestion off the event bus, extended to page, comment, attachment and memory events: extract, chunk on struct — pages #745 `3a9a16a8` (build 221), comments and transcripts #747 `f8d489f6` (223); attachments are slice 4, memory events slice 8
+- [ ] Step 3: Sources brought in order of value: page bodies, comments, meeting transcripts, uploaded files through text ext — page bodies, comments, transcripts and workspace pages done (#745, #747); the performance read action #746 `9988dbf7` (build 220); files and project guides are slice 4
 - [ ] Step 4: The vector adapter for hosted deployments behind the interface; agent-scoped memory as a distinct scope in the
 - [ ] Step 5: The regular-expression path in Ask is retired.
 - [ ] Interface: Instance console → knowledge sources (new)
-- [ ] Interface: Ask → citations (extend)
+- [x] Interface: Ask → citations (extend) — #742 `fea5e063` (build 217); owner and member sweep still to record
 - [ ] Exit gate met and gates green
 
 ## Log
@@ -19,6 +19,8 @@ One pull request per step; tick with the merge commit.
 | 2026-09-16 | Started, in parallel with Sprint 8. Planned against `beta` at `cb9ce0e9` into the twelve pull requests listed under Decisions in task.md; none of the five steps existed. The owner settled three questions (departed members, agent drafts, erasure and the audit chain). Slices 0 (Ask private-sprint sources) and 1 (retrieval interface) started, each in its own worktree. |
 | 2026-09-16 | Slice 0 merged: #735 `ff21c84c` (build 210), Ask's task sources apply the private-sprint rule through the shared `hiddenSprintFilter`. Slice 1 merged: #739 `45f20831` (build 215), `Modules/Knowledge` adds the retrieval interface, a per-caller visible set re-checked against live rows after ranking, and a MongoDB text-index adapter with an escaped-regex fallback, behind `KNOWLEDGE_RETRIEVAL` (off by default; with it off Ask runs exactly as before); migration 024 adds the pages text index. An independent review found no access defects, but rule tests that still passed with their rule removed and a malformed company opt-out that read as on under `all`; both were fixed before merge, each rule test proven to fail without its rule. |
 | 2026-09-17 | Owner decision: embeddings come from OpenAI, which unblocks slice 6 once slice 2 merges. Slice 2 (chunk store and page ingestion off the event bus, `KNOWLEDGE_INDEXER` off by default, migration 025) and slice 9 (Ask "why this answer" panel) started. |
+| 2026-09-17 | Slice 9 merged: #742 `fea5e063` (build 217), Ask's "why this answer" panel with a reason per passage. Slice 5 merged: #746 `9988dbf7` (build 220), `performance.read` behind `AGENT_PERFORMANCE_READ`, every metric on the same UTC days after its review. Slice 2 merged: #745 `3a9a16a8` (build 221), the chunk store and page ingestion with migration 025; its review found no access widening but five result-loss defects (agent drafts indexed by title only, a backfill racing a restore, departures and erasures not sticking, long pages crowding others), all fixed first. Slice 3 merged: #747 `f8d489f6` (build 223), comments, transcripts and workspace pages with migration 026; its review's load and robustness findings fixed first, and the owner's erasure decision applied (a person's private pages and their comments leave the index; transcripts stay). |
+| 2026-09-18 | Owner decisions: an agent retrieves as the run's starter limited to the agent's projects; hosted vectors live in MongoDB Atlas Vector Search inside each tenant's database; the owner writes the held-out question set. Every Sprint 7 decision is settled. Slice 6 (embeddings and hybrid retrieval) started. |
 
 ## Last step
-Slices 0 and 1 merged (builds 210 and 215). Slices 2 and 9 in progress; after slice 2: 3, 4, 6, 8 and 10.
+Slices 0, 1, 2, 3, 5 and 9 merged (builds 210–223). Slice 6 in progress; then 4 (files and guides), 8 (agent memory), 10 (knowledge console), 7 (Atlas adapter) and 11 (retire the regex path, after the question-set comparison).
