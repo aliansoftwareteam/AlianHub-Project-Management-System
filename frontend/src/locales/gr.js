@@ -5741,7 +5741,20 @@ export default {
         "undo_window_passed": "The undo window has passed.",
         "export_failed": "The export did not download.",
         "load_more": "Load more",
-        "retention": "Retained 400 days. Undo replays the inverse action and logs it as you."
+        "retention": "Retained 400 days. Undo replays the inverse action and logs it as you.",
+        "tab_refusals": "Refusals",
+        "integrity_verified": "Verified",
+        "integrity_verified_hint": "This row and every chained row before it are intact.",
+        "integrity_broken": "Broken at #{seq}",
+        "integrity_broken_hint": "The chain does not verify from row #{seq} on: a row was changed, removed or reordered.",
+        "integrity_unverified": "Not verified yet",
+        "integrity_unverified_hint": "Not checked yet. It is checked the next time the audit log opens, once the chain key is available.",
+        "integrity_unchained": "Unchained",
+        "integrity_unchained_hint": "Written before the audit chain started, so it cannot be verified.",
+        "integrity_broken_row": "Broken",
+        "integrity_broken_row_hint": "This row is outside the chain but was written after the chain started, for example while the audit chain was off, or it carries a change that is not part of the chain.",
+        "names_not_checked": "Names aren't covered by the integrity check. The ids beside them are.",
+        "total_approximate": "The count is approximate: some rows it includes no longer match this filter once their recorded changes are checked."
     },
     "Offline": {
         "offline_msg": "You're offline — changes are saved and will sync when you reconnect.",
