@@ -1,7 +1,7 @@
 {
   "locale": "gu",
   "machineTranslated": false,
-  "updatedAt": "2026-09-18T10:48:57.859Z",
+  "updatedAt": "2026-09-18T11:49:54.410Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -6065,6 +6065,31 @@
     "Accounts.expiry_list_lead": "Every active token in this workspace that has no expiry, with the day it stops working. Only the owner of a token can replace it: ask them to create a new token with an expiry, then revoke this one.",
     "Accounts.expiry_list_empty": "Every active token in this workspace has an expiry.",
     "Accounts.expiry_list_owner_unknown": "owner unknown",
-    "Accounts.expiry_list_unchecked": "no expiry · grace cannot be checked right now"
+    "Accounts.expiry_list_unchecked": "no expiry · grace cannot be checked right now",
+    "Egress.nav": "Egress",
+    "Egress.title": "Agent egress allowlist",
+    "Egress.lead": "The hosts each workspace's agents may fetch. A workspace with no hosts listed fetches as before: public hosts allowed, private, metadata and link-local hosts refused. Once a host is listed, its agents fetch listed hosts only, on every redirect hop, and a listed name that resolves to a private address is still refused.",
+    "Egress.flag_on": "The gateway is on:",
+    "Egress.flag_off": "The gateway is off, so agents fetch as before and there is no list to show. Set this and restart the server:",
+    "Egress.format_help": "An exact hostname such as docs.example.com, or *.example.com for every subdomain, with an optional port such as api.example.com:8443. Addresses, private names, schemes and paths are refused.",
+    "Egress.cache_note": "A change applies on this server at once and on every other server within {seconds} seconds.",
+    "Egress.hosts_title": "Allowed hosts",
+    "Egress.no_hosts": "No hosts listed: this workspace fetches as before.",
+    "Egress.add_label": "Add a host",
+    "Egress.add_placeholder": "docs.example.com or *.example.com",
+    "Egress.add": "Add",
+    "Egress.remove_host": "Remove this host",
+    "Egress.refused_count": "{n} refused in the last {days} days",
+    "Egress.updated": "Last set by",
+    "Egress.saved": "Egress allowlist for {name} saved.",
+    "Egress.error_invalid": "That is not a hostname.",
+    "Egress.error_address": "List a hostname, not an address.",
+    "Egress.error_private": "Private, local and internal hosts cannot be listed.",
+    "Egress.error_scheme": "Leave the scheme off: agents fetch http and https only.",
+    "Egress.error_path": "List the host only, without a path, a query or a range.",
+    "Egress.error_wildcard": "A pattern is *.example.com: one leading wildcard on a domain with at least two labels.",
+    "Egress.error_port": "A port is between 1 and 65535.",
+    "Egress.error_too_many": "A workspace can list at most {max} hosts.",
+    "Egress.error_duplicate": "That host is already listed."
   }
 }

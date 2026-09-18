@@ -2,6 +2,7 @@ const { emptyUsage } = require('../../AICore/usage');
 const { askModel, parseModelJson } = require('../../AICore/modelCall');
 const { FEATURES } = require('../../AICore/features');
 const { audit, extractUrl } = require('./pageAudit');
+const egressContext = require('./egressContext');
 const { isBlockedHostname } = require('./safeFetch');
 const skillIndex = require('../skills');
 const skillRecord = require('../skillRecord');
@@ -96,7 +97,7 @@ async function gather({ skillSlug = 'qa-review', task, companyId, memory, starte
     const skill = await requireSkill(companyId, skillSlug);
     const started = Date.now();
     if (skill.kind === 'generic') {
-        const context = await skill.gather({ task, companyId, memory, startedBy });
+        const context = await egressContext.run({ companyId, actor: startedBy }, () => skill.gather({ task, companyId, memory, startedBy }));
         if (!context || context.skip) return skipped(skill, (context && context.skip) || 'nothing to work on', started);
         return { status: GATHERED, skill: skill.slug, context };
     }
@@ -130,12 +131,12 @@ async function analyseGeneric(skill, { task, context, budget, spend, agent }) {
 
 /* The page audit: ground → analyse → verify → emit. The caller writes; this
  * only decides WHAT. */
-async function analyseAudit(skill, { task, context, budget, spend }) {
+async function analyseAudit(skill, { task, context, budget, spend, companyId }) {
     const started = Date.now();
     const { url } = context;
     let auditResult;
     try {
-        auditResult = await audit(url);
+        auditResult = await egressContext.run({ companyId, actor: spend && spend.userId }, () => audit(url));
     } catch (error) {
         return { status: 'failed', reason: `could not fetch ${url}: ${error.message}`, skill: skill.slug, url, findings: [], usage: emptyUsage(), durationMs: Date.now() - started };
     }
@@ -173,8 +174,9 @@ async function analyseAudit(skill, { task, context, budget, spend }) {
 
 /* PHASES 2–5 on a gathered context. */
 async function analyse({ skillSlug = 'qa-review', task, context, budget = {}, spend, companyId, agent }) {
-    const skill = await requireSkill(companyId || (spend && spend.companyId), skillSlug);
-    return skill.kind === 'generic' ? analyseGeneric(skill, { task, context, budget, spend, agent }) : analyseAudit(skill, { task, context, budget, spend });
+    const tenant = companyId || (spend && spend.companyId);
+    const skill = await requireSkill(tenant, skillSlug);
+    return skill.kind === 'generic' ? analyseGeneric(skill, { task, context, budget, spend, agent }) : analyseAudit(skill, { task, context, budget, spend, companyId: tenant });
 }
 
 async function run({ skillSlug = 'qa-review', task, companyId, budget = {}, spend, agent }) {

@@ -1,6 +1,8 @@
 const dns = require('dns');
 const net = require('net');
 const axios = require('axios');
+const egressContext = require('./egressContext');
+const { hostMatches } = require('./egressRules');
 
 /* Outbound fetches driven by task text. The URL is untrusted, so the rule is
  * applied to the RESOLVED address (which defeats numeric and alternate hostname
@@ -125,11 +127,48 @@ async function readCapped(stream, { maxBytes, remainingMs }) {
  * 301/302 for anything but GET/HEAD; 307/308 replay the original method and body. */
 const methodAfterRedirect = (status, method) => (status === 303 || ((status === 301 || status === 302) && method !== 'get' && method !== 'head') ? 'get' : method);
 
+const portOf = (u) => Number(u.port || (u.protocol === 'https:' ? 443 : 80));
+
+const REFUSAL = Object.freeze({ PRIVATE_HOST: 'private_host', UNLISTED: 'unlisted', PRIVATE_ADDRESS: 'private_address' });
+
+/* The workspace egress gateway. Off, with no workspace behind the fetch, or
+ * with an empty list, every rule above applies unchanged. With a list, each hop
+ * must name a listed host, and the private-host and resolved-address rules still
+ * run first and last: a listed private host is refused, and so is a listed name
+ * that resolves to a private address. The store is required lazily so a fetch
+ * outside the gateway loads nothing new. */
+async function egressGate({ companyId, actor }) {
+    if (!egressContext.isOn() || !companyId) return null;
+    const store = require('./egressAllowlist');
+    const hosts = await store.hostsFor(companyId);
+    if (!hosts.length) return null;
+    const refuse = (u, hop, reason) => {
+        const host = stripBrackets(u.hostname);
+        store.recordRefusal(companyId, { actor, host, port: portOf(u), reason, hop });
+        if (reason === REFUSAL.UNLISTED) throw new Error(`${host} is not on this workspace's egress allowlist — the instance owner can allow it under Instance > Egress`);
+        throw new Error(`${host} is a private, local or internal host — agents do not fetch it, listed or not`);
+    };
+    return {
+        check(url, hop) {
+            const u = parseHttpUrl(url);
+            if (isBlockedHostname(u.hostname)) refuse(u, hop, REFUSAL.PRIVATE_HOST);
+            if (!hostMatches(hosts, u.hostname, portOf(u))) refuse(u, hop, REFUSAL.UNLISTED);
+        },
+        resolved(url, hop, error) {
+            if (!/private|reserved/i.test(error.message || '')) return;
+            let u;
+            try { u = parseHttpUrl(url); } catch (e) { return; }
+            store.recordRefusal(companyId, { actor, host: stripBrackets(u.hostname), port: portOf(u), reason: REFUSAL.PRIVATE_ADDRESS, hop });
+        },
+    };
+}
+
 /* Follows redirects by hand so every hop is validated and pinned. `opts.resolve`
  * exists for tests that need a "public" name to land on a local server. */
 async function safeFetch(url, opts = {}) {
     const { timeoutMs, maxBytes, maxRedirects } = { ...DEFAULTS, ...opts };
     const resolve = opts.resolve || ((target) => resolvePublic(target, { allowlist: opts.allowlist }));
+    const gate = await egressGate({ ...(egressContext.get() || {}), ...(opts.companyId ? { companyId: opts.companyId, actor: opts.actor } : {}) });
     const deadline = Date.now() + timeoutMs;
     const remaining = () => {
         const left = deadline - Date.now();
@@ -141,7 +180,14 @@ async function safeFetch(url, opts = {}) {
     let method = String(opts.method || 'get').toLowerCase();
     let data = opts.data;
     for (let hop = 0; ; hop += 1) {
-        const target = await resolve(current);
+        if (gate) gate.check(current, hop);
+        let target;
+        try {
+            target = await resolve(current);
+        } catch (error) {
+            if (gate) gate.resolved(current, hop, error);
+            throw error;
+        }
         const controller = new AbortController();
         const abortTimer = setTimeout(() => controller.abort(), remaining());
         let res;
