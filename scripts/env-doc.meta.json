@@ -500,6 +500,16 @@
     "description": "Knowledge retrieval for Ask: \"off\" gathers sources exactly as before (task fields and page titles by regular expression); \"tenant\" searches tasks, page bodies and comments through the full-text indexes, and the caller's own call transcripts, with access control applied at query time, for a company whose knowledgeRetrieval.mode is \"on\" or \"hybrid\"; \"all\" does so for every company except one set to \"off\". A company in \"hybrid\" also has its chunks embedded as they are indexed (KNOWLEDGE_EMBEDDING_MODEL, with the OpenAI instance key) and each question embedded once, and its answers fuse the lexical and vector candidates by reciprocal rank under the same access filter; \"on\" stays lexical.",
     "default": "off"
   },
+  "KNOWLEDGE_EMBED_QUERY_TIMEOUT_MS": {
+    "group": "ai",
+    "description": "How long a question waits for its embedding before Ask answers from the lexical side alone (the backend then reads \"lexical (embed timed out)\"). Embedding at ingest keeps the provider's own timeout.",
+    "default": "2000"
+  },
+  "KNOWLEDGE_FLAG_CACHE_TTL_SECONDS": {
+    "group": "ai",
+    "description": "Seconds a company's knowledgeRetrieval and knowledgeIndexer modes are kept after one read, so a question, a sync and a retry share it; 0 reads the row on every call, which the e2e harness sets so a test sees a switch it just flipped.",
+    "default": "30"
+  },
   "KNOWLEDGE_EMBEDDING_MODEL": {
     "group": "ai",
     "description": "The OpenAI embedding model a hybrid company's chunks and questions are embedded with. It must have a price on file (text-embedding-3-small and text-embedding-3-large do; LLM_PRICING adds another); a change re-embeds each chunk on its next write and, a batch per run, from the recurring knowledge.backfill job.",

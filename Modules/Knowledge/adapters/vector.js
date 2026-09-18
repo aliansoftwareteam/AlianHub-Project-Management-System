@@ -1,6 +1,5 @@
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
-const logger = require('../../../Config/loggerConfig');
 
 // The vector side of retrieval, behind the same contract as the lexical adapter. Two
 // implementations: one in memory, for tests and as the reference for the contract, and one
@@ -72,6 +71,8 @@ const clampLimit = (limit) => {
 const searchableSources = (filter) => ((filter && filter.sourceTypes) || [])
     .filter((sourceType) => (filter.chunkSources || []).includes(sourceType) && filter.clauses && filter.clauses[sourceType]);
 
+/* A source whose candidates cannot be read fails the whole search: an answer that quietly came
+ * from the sources that happened to work would look complete and not be. */
 const searchWith = (candidatesOf) => async ({ companyId, queryEmbedding, model, filter, limit }) => {
     const vector = Array.isArray(queryEmbedding) ? queryEmbedding : [];
     const wanted = clampLimit(limit);
@@ -80,8 +81,7 @@ const searchWith = (candidatesOf) => async ({ companyId, queryEmbedding, model, 
         try {
             return rank(sourceType, await candidatesOf(String(companyId), sourceType, model, filter.clauses[sourceType]), vector, wanted);
         } catch (error) {
-            logger.error(`knowledge vector: ${sourceType} search failed for ${companyId}: ${error.message}`);
-            return [];
+            throw new Error(`${sourceType} candidates unavailable for ${companyId}: ${error.message}`);
         }
     }));
     return results.flat();
@@ -165,12 +165,13 @@ const createInMemoryVectorAdapter = ({ matches = matchesClause } = {}) => {
             });
             return { backend: 'vector-memory', tombstoned };
         },
-        async erase({ companyId, sourceType, sourceId, userId }) {
+        /* Exactly the sources the erasure names: which of a person's sources leave is the indexer's
+         * rule (private pages and comments, not shared pages or calls), decided there and handed here. */
+        async erase({ companyId, sources }) {
+            const wanted = new Set((sources || []).map((s) => `${s.sourceType}:${s.sourceId}`));
             let erased = 0;
             [...rows.entries()].forEach(([key, row]) => {
-                const bySource = sourceType && sourceId ? row.sourceType === sourceType && row.sourceId === String(sourceId) : false;
-                const byAuthor = userId ? row.createdBy === String(userId) : false;
-                if (row.companyId === String(companyId) && (bySource || byAuthor)) { rows.delete(key); erased += 1; }
+                if (row.companyId === String(companyId) && wanted.has(`${row.sourceType}:${row.sourceId}`)) { rows.delete(key); erased += 1; }
             });
             return { backend: 'vector-memory', erased };
         },

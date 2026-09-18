@@ -94,6 +94,8 @@ const openaiProvider = {
         const model = String((opts && opts.model) || '').trim();
         if (!model) throw new Error('embed() needs the embedding model to send');
         const texts = (Array.isArray(opts.texts) ? opts.texts : []).map((text) => (text === undefined || text === null ? '' : String(text)));
+        // A question waits a couple of seconds for its vector; a batch at ingest may take the provider's own timeout.
+        const timeout = Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : providerTimeoutMs('openai', { reasoning: false });
         const embeddings = [];
         let inputTokens = 0;
         let billedModel = model;
@@ -103,7 +105,7 @@ const openaiProvider = {
             try {
                 response = await axios.post(embeddingsUrl(), { model, input }, {
                     headers: { Authorization: `Bearer ${config.AI_API_KEY}`, 'Content-Type': 'application/json' },
-                    timeout: providerTimeoutMs('openai', { reasoning: false }),
+                    timeout,
                 });
             } catch (error) {
                 throw fromOpenAiCompatible('openai', model, error);

@@ -5,7 +5,8 @@ const vectorStore = require('../vectorStore');
 
 // Erasure removes chunk rows outright, where a tombstone only hides them, and records an
 // exclusion first so no later sync, re-index or backfill writes them back. Audit rows are not
-// touched here: redacting their personal fields belongs to the audit chain.
+// touched here: redacting their personal fields belongs to the audit chain. The vector store is
+// told the exact sources that left, so it never has to know the rule.
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
@@ -14,16 +15,23 @@ const exclude = (companyId, rule) => MongoDbCrudOpration(String(companyId), {
     data: [rule, { $set: { companyId: String(companyId), ...rule, reason: 'erased' } }, { upsert: true }],
 }, 'updateOne');
 
+const sourcesOf = async (companyId, where) => {
+    const rows = await MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.KNOWLEDGE_CHUNKS, data: [where, 'sourceType sourceId', { lean: true }] }, 'find');
+    const seen = new Map();
+    (rows || []).forEach((row) => seen.set(`${row.sourceType}:${row.sourceId}`, { sourceType: row.sourceType, sourceId: String(row.sourceId) }));
+    return [...seen.values()];
+};
+
 const eraseChunks = async (companyId, where) => {
     const result = await MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.KNOWLEDGE_CHUNKS, data: [where] }, 'deleteMany');
     return { erased: (result && result.deletedCount) || 0 };
 };
 
-const eraseVectors = async (args) => {
+const eraseVectors = async (companyId, sources) => {
     try {
-        await vectorStore.current().erase(args);
+        await vectorStore.current().erase({ companyId: String(companyId), sources });
     } catch (error) {
-        logger.error(`[knowledge-erase] vector store erase failed for ${args.companyId}: ${error.message}`);
+        logger.error(`[knowledge-erase] vector store erase failed for ${companyId}: ${error.message}`);
     }
 };
 
@@ -34,7 +42,7 @@ const eraseDocument = async (companyId, { sourceType, sourceId } = {}) => {
     if (!id) throw new Error('eraseDocument needs a sourceId.');
     await exclude(companyId, { kind: 'document', sourceType: type, sourceId: id, userId: '' });
     const result = await eraseChunks(companyId, { sourceType: type, sourceId: id });
-    await eraseVectors({ companyId: String(companyId), sourceType: type, sourceId: id });
+    await eraseVectors(companyId, [{ sourceType: type, sourceId: id }]);
     return result;
 };
 
@@ -44,8 +52,10 @@ const erasePerson = async (companyId, userId) => {
     const id = String(userId || '').trim();
     if (!OBJECT_ID.test(id)) throw new Error('erasePerson needs a valid user id.');
     await exclude(companyId, { kind: 'author', sourceType: '', sourceId: '', userId: id });
-    const result = await eraseChunks(companyId, { createdBy: id, $or: [{ sourceType: 'page', visibility: 'private' }, { sourceType: 'comment' }] });
-    await eraseVectors({ companyId: String(companyId), userId: id });
+    const where = { createdBy: id, $or: [{ sourceType: 'page', visibility: 'private' }, { sourceType: 'comment' }] };
+    const sources = await sourcesOf(companyId, where);
+    const result = await eraseChunks(companyId, where);
+    await eraseVectors(companyId, sources);
     return result;
 };
 

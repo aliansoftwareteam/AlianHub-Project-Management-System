@@ -191,9 +191,10 @@ const reusable = (stored, piece, wantedModel) => Boolean(stored)
     && stored.embeddingModel === wantedModel;
 
 /* One provider call for every chunk of the source that needs a vector. A failure leaves the
- * text write to go ahead without vectors; the caller queues the retry. */
+ * text write to go ahead without vectors; the caller queues the retry. A budget refusal is
+ * not a failure of the provider: nothing was tried, and nothing is retried until the cap allows. */
 const embedPieces = async (companyId, sourceType, sourceId, pieces, byOrdinal, wantedModel) => {
-    const vectors = { byOrdinal: new Map(), failed: false };
+    const vectors = { byOrdinal: new Map(), failed: false, refused: false };
     if (!wantedModel) return vectors;
     const todo = pieces.filter((piece) => !reusable(byOrdinal.get(piece.ordinal), piece, wantedModel));
     if (!todo.length) return vectors;
@@ -202,7 +203,8 @@ const embedPieces = async (companyId, sourceType, sourceId, pieces, byOrdinal, w
         todo.forEach((piece, i) => { if (Array.isArray(found[i]) && found[i].length) vectors.byOrdinal.set(piece.ordinal, found[i]); });
     } catch (error) {
         vectors.failed = true;
-        logger.error(`${LOG_PREFIX} ${companyId}: ${sourceType} ${sourceId} stored without vectors: ${error.message}`);
+        vectors.refused = embeddings.isBudgetRefusal(error);
+        if (!vectors.refused) logger.error(`${LOG_PREFIX} ${companyId}: ${sourceType} ${sourceId} stored without vectors: ${error.message}`);
     }
     return vectors;
 };
@@ -277,7 +279,7 @@ const removeDepartedMember = async (companyId, userId) => {
  * version still moves forward: a chunk left at an older version would let a late read of a
  * version between the two overwrite it. */
 const ingest = async (companyId, sourceType, row, context = {}) => {
-    const result = { written: 0, unchanged: 0, stamped: 0, tombstoned: 0, stale: 0, embedded: 0, embedFailed: false };
+    const result = { written: 0, unchanged: 0, stamped: 0, tombstoned: 0, stale: 0, embedded: 0, embedFailed: false, embedRefused: false };
     if (!row || !row._id) return result;
     const rules = RULES[sourceType];
     const sourceUpdatedAt = rules.versionOf(row, context);
@@ -289,6 +291,7 @@ const ingest = async (companyId, sourceType, row, context = {}) => {
     const byOrdinal = new Map((existing || []).map((chunk) => [Number(chunk.ordinal), chunk]));
     const vectors = await embedPieces(companyId, sourceType, metadata.sourceId, pieces, byOrdinal, wantedModel);
     result.embedFailed = vectors.failed;
+    result.embedRefused = vectors.refused;
 
     const embeddedChunks = [];
     let behind = false;
@@ -309,7 +312,7 @@ const ingest = async (companyId, sourceType, row, context = {}) => {
         }
     }
     if (embeddedChunks.length) await tellStore('upsert', { companyId: String(companyId), chunks: embeddedChunks });
-    if (vectors.failed) queueEmbedRetry(companyId, sourceType, metadata.sourceId);
+    if (vectors.failed && !vectors.refused) queueEmbedRetry(companyId, sourceType, metadata.sourceId);
 
     if (behind) {
         result.stamped = modified(await chunkStore(companyId, [
