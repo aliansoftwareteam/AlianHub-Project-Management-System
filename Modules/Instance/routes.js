@@ -1,4 +1,5 @@
 const ctrl = require('./controller');
+const enforcement = require('./enforcement');
 const { requireInstanceAdmin } = require('./guard');
 const agentMetrics = require('../Agents/metricsController');
 
@@ -29,4 +30,8 @@ exports.init = (app) => {
     app.get(`${admin}/stats`, ctrl.stats);
     app.get(`${admin}/companies`, ctrl.companies);
     app.get(`${admin}/audit-export`, ctrl.auditExport);
+    app.get(`${admin}/enforcement`, enforcement.summary);
+    app.put(`${admin}/enforcement/default`, enforcement.setDefault);
+    app.get(`${admin}/enforcement/:companyId/decisions`, enforcement.decisions);
+    app.put(`${admin}/enforcement/:companyId/mode`, enforcement.setMode);
 };
