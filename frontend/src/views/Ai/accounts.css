@@ -95,6 +95,7 @@
 .acct-token__meta { font: var(--text-data); color: var(--ink-2); word-break: break-all; }
 .acct-token__flags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .acct-token.is-revoked { opacity: .6; }
+.acct-token-list { list-style: none; margin: 10px 0 0; padding: 0; }
 
 .acct-secret {
     border: 1.5px solid var(--brand); background: var(--brand-tint);

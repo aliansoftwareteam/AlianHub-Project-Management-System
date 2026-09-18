@@ -149,6 +149,67 @@ exports.listTokens = async (req, res) => {
     }
 };
 
+const byDeadline = (a, b) => {
+    const x = a.deadline ? new Date(a.deadline).getTime() : 0;
+    const y = b.deadline ? new Date(b.deadline).getTime() : 0;
+    return x - y || String(a.name).localeCompare(String(b.name));
+};
+
+const displayNamesOf = async (userIds) => {
+    const ids = [...new Set(userIds.filter((id) => /^[0-9a-fA-F]{24}$/.test(id)))];
+    if (!ids.length) return {};
+    const users = await MongoDbCrudOpration(dbCollections.GLOBAL, {
+        type: SCHEMA_TYPE.USERS,
+        data: [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }, { Employee_Name: 1, Employee_Email: 1 }],
+    }, 'find').catch(() => []);
+    return Object.fromEntries((users || []).map((user) => [String(user._id), user.Employee_Name || user.Employee_Email || '']));
+};
+
+/* GET /api/v2/api-tokens/needing-expiry — every active token in the company with no
+ * expiry, for owners and admins, so they can see who has to replace what before the
+ * grace ends. Never the token, its hash or its prefix: only its owner can replace it. */
+exports.listTokensNeedingExpiry = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const userId = actingUserId(req);
+        if (!companyId || !userId) {
+            return res.send({ status: false, statusText: 'companyId and userId are required.' });
+        }
+        if (req.apiToken) return res.status(403).send({ status: false, statusText: 'API tokens cannot list tokens.' });
+        const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+        if (!isPrivileged(await getRoleType(companyId, userId))) {
+            return res.status(403).send({ status: false, statusText: 'Only an owner or an admin can see which tokens still need an expiry.' });
+        }
+        const strict = isStrict();
+        const policy = { strict, graceDays: STRICT_GRACE_DAYS, strictSince: null };
+        if (!strict) return res.send({ status: true, statusText: 'Tokens fetched.', data: [], policy });
+        const now = new Date();
+        policy.strictSince = await strictSince(now);
+        const tokens = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.API_TOKENS,
+            data: [{ active: true, $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }] }, { name: 1, userId: 1, kind: 1, createdAt: 1, lastUsedAt: 1 }],
+        }, 'find');
+        const names = await displayNamesOf((tokens || []).map((doc) => String(doc.userId || '')));
+        const data = (tokens || []).map((doc) => {
+            const standing = graceStanding(doc, { strict, strictSince: policy.strictSince, now });
+            return {
+                _id: doc._id,
+                name: doc.name,
+                kind: doc.kind || 'personal',
+                owner: { id: String(doc.userId || ''), name: names[String(doc.userId)] || '' },
+                createdAt: doc.createdAt,
+                lastUsedAt: doc.lastUsedAt || null,
+                deadline: standing.deadline,
+                stopped: standing.state === 'stopped',
+            };
+        }).sort(byDeadline);
+        return res.send({ status: true, statusText: 'Tokens fetched.', data, policy });
+    } catch (error) {
+        logger.error(`ERROR in list api tokens needing expiry: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
 /* PUT /api/v2/api-tokens/:id  body: { name?, active? }. Under strict mode a token
  * without an expiry may only be revoked, so it is replaced rather than kept. */
 exports.updateToken = async (req, res) => {

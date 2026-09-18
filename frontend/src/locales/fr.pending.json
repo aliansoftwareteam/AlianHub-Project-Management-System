@@ -1,7 +1,7 @@
 {
   "locale": "fr",
   "machineTranslated": false,
-  "updatedAt": "2026-09-17T05:39:53.370Z",
+  "updatedAt": "2026-09-18T10:36:32.580Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -5985,6 +5985,12 @@
     "Accounts.token_scope_required": "Tick read, write or both.",
     "Accounts.grace_works_until": "no expiry · works until {d}",
     "Accounts.grace_stopped_on": "no expiry · stopped on {d}",
-    "Accounts.strict_note": "Every new token needs an expiry and at least one scope. A token without an expiry keeps working for {n} days from when this rule was turned on, or from when the token was made if that is later. Replace it before then."
+    "Accounts.strict_note": "Every new token needs an expiry and at least one scope. A token without an expiry keeps working for {n} days from when this rule was turned on, or from when the token was made if that is later. Replace it before then.",
+    "Accounts.expiry_list_title": "Tokens that still need an expiry",
+    "Accounts.expiry_list_count": "{n} TO REPLACE",
+    "Accounts.expiry_list_lead": "Every active token in this workspace that has no expiry, with the day it stops working. Only the owner of a token can replace it: ask them to create a new token with an expiry, then revoke this one.",
+    "Accounts.expiry_list_empty": "Every active token in this workspace has an expiry.",
+    "Accounts.expiry_list_owner_unknown": "owner unknown",
+    "Accounts.expiry_list_unchecked": "no expiry · grace cannot be checked right now"
   }
 }
