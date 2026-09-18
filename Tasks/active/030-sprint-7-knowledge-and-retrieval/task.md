@@ -49,4 +49,7 @@ None directly.
 - Pages drafted by agents are indexed and always ranked below pages people wrote (owner, 2026-09-16).
 - Erasure redacts personal fields in audit rows, which sit outside the hash, so the audit chain still verifies (owner, 2026-09-16).
 - Embeddings come from OpenAI (`text-embedding-3-small`) with an instance key; per-workspace keys follow Sprint 8's secrets store (owner, 2026-09-17).
-- Open until their slices come up: where hosted vectors live (7), who an agent retrieves as (agent use of 1, and 8), and the held-out question set with its pass score (11 and the flag default).
+- Erasure by person removes the person's private pages and the comments they wrote from the knowledge index; transcripts stay, since they hold other participants' words; the app's own records are untouched (owner, 2026-09-17).
+- An agent retrieving knowledge during a run sees only what the person who started the run can see, further limited to the agent's own projects (owner, 2026-09-18).
+- Hosted deployments keep vectors in MongoDB Atlas Vector Search inside each tenant's database; self-hosted installs keep the in-database cosine adapter (owner, 2026-09-18).
+- The held-out question set is about thirty real questions the owner writes, each with its expected source, kept in the owner's private notes; retrieval defaults on only after the comparison passes (owner, 2026-09-18).
