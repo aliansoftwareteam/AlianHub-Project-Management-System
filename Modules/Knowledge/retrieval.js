@@ -14,7 +14,7 @@ const { resolveVisibleSet, filterFor, recheck } = require('./visibleSet');
 // to it as the filter, and its ranked results are rechecked against the live
 // rows before they are returned, so an index that lags a permission change or a
 // deletion cannot leak past it. A company in hybrid mode is also searched by
-// vector under the same filter, and the two sides are fused by rank.
+// vector under the same filter, and the two sides are fused.
 
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 50;
@@ -22,7 +22,10 @@ const RECHECK_HEADROOM = 2;
 const RECHECK_WINDOWS = 4;
 const SCORE_FLOOR = 1;
 const AGENT_WEIGHT = 0.5;
+const LEXICAL_WEIGHT = 0.5;
+const VECTOR_WEIGHT = 0.5;
 const RRF_K = 60;
+const TIE = 1e-6;
 
 const clampLimit = (limit) => {
     const n = Math.floor(Number(limit));
@@ -33,9 +36,9 @@ const time = (value) => (value ? new Date(value).getTime() || 0 : 0);
 
 /* Machine-written passages rank below human-written ones at equal score, so the
  * corpus cannot amplify its own inferences. */
-const byRank = (a, b) => (b.score - a.score)
-    || ((a.authorKind === 'agent') - (b.authorKind === 'agent'))
-    || (time(b.updatedAt) - time(a.updatedAt));
+const agentLast = (a, b) => (a.authorKind === 'agent') - (b.authorKind === 'agent');
+
+const byRank = (a, b) => (b.score - a.score) || agentLast(a, b) || (time(b.updatedAt) - time(a.updatedAt));
 
 /* A full-text score grows with how often the words occur and has no ceiling, while the
  * regular-expression fallback scores at most 1, so raw scores cannot be compared across
@@ -52,26 +55,33 @@ const weighAgents = (candidates) => candidates.map((p) => (p.authorKind === 'age
 
 const normaliseScores = (candidates) => weighAgents(scaleScores(candidates));
 
-/* Reciprocal rank fusion: each list adds 1/(k + rank) for a passage it holds, so a passage both
- * sides found rises above one only one side found, and neither side's scores need to be on the
- * other's scale. The passage kept is the one from the list that ranked it higher, so a lexical
- * excerpt, cut around the words asked for, wins a tie. */
-const fuseByRank = (lists) => {
+/* The two sides on one scale: the lexical side scaled against its floor, the vector side by
+ * cosine, each at most 1, added with their weights. So a lone weak lexical hit keeps its weak
+ * score beside a strong vector hit, and a passage both sides found gets both. Reciprocal rank
+ * over both lists breaks an equal sum. The passage kept is the one from the list that ranked
+ * it higher, so a lexical excerpt, cut around the words asked for, wins a tie. */
+const fuse = (lists, weights = [LEXICAL_WEIGHT, VECTOR_WEIGHT]) => {
     const fused = new Map();
-    lists.forEach((list) => (list || []).forEach((p, at) => {
+    lists.forEach((list, side) => (list || []).forEach((p, at) => {
         const rank = at + 1;
-        const seen = fused.get(p.id);
-        if (!seen) {
-            fused.set(p.id, { passage: p, score: 1 / (RRF_K + rank), bestRank: rank });
-            return;
+        const entry = fused.get(p.id) || { passage: p, score: 0, rrf: 0, bestRank: Infinity };
+        entry.score += (weights[side] || 0) * (Number(p.score) || 0);
+        entry.rrf += 1 / (RRF_K + rank);
+        if (rank < entry.bestRank) {
+            entry.passage = p;
+            entry.bestRank = rank;
         }
-        seen.score += 1 / (RRF_K + rank);
-        if (rank < seen.bestRank) {
-            seen.passage = p;
-            seen.bestRank = rank;
-        }
+        fused.set(p.id, entry);
     }));
-    return [...fused.values()].sort((a, b) => b.score - a.score).map(({ passage, score }) => ({ ...passage, score }));
+    return [...fused.values()].sort((a, b) => (b.score - a.score) || (b.rrf - a.rrf)).map(({ passage, score, rrf }) => ({ ...passage, score, rrf }));
+};
+
+/* The agent rule on fused scores is a rank rule, not a weight: an agent passage loses a tie
+ * (within float noise) to a human passage and wins a clear margin, so a draft is neither halved
+ * out of every answer nor able to edge a person out by rounding. */
+const byFusedRank = (a, b) => {
+    if (Math.abs(a.score - b.score) > TIE) return b.score - a.score;
+    return agentLast(a, b) || ((b.rrf || 0) - (a.rrf || 0)) || (time(b.updatedAt) - time(a.updatedAt));
 };
 
 /* Rechecked a window at a time, so a list whose top candidates were deleted still fills, while
@@ -97,16 +107,28 @@ const chunkSourcesFor = async (set) => {
     return backfill.indexedOf(states, wanted);
 };
 
+const fallbackReason = (error) => {
+    if (embeddings.isBudgetRefusal(error)) return 'budget exhausted';
+    if (error && error.code === embeddings.EMBED_TIMED_OUT) return 'embed timed out';
+    return 'embed failed';
+};
+
 /* The question is embedded once, booked to the asker, and only for a company in hybrid mode.
- * Whatever fails on this side, the lexical side still answers. */
+ * Whatever fails on this side, the lexical side still answers, and the reason travels back
+ * on the backend name. A vector side that fails for any one source is dropped whole, so an
+ * answer never quietly comes from the sources that happened to work. */
 const vectorSide = async (set, query, filter, limit) => {
-    if (!(await flag.hybridFor(set.companyId)) || !embeddings.configured()) return null;
+    if (!(await flag.hybridFor(set.companyId))) return null;
+    const readiness = embeddings.readiness(set.companyId);
+    if (readiness === 'unconfigured') return null;
+    if (readiness === 'paused') return { fallback: 'embedding paused' };
     let question;
     try {
         question = await embeddings.embedQuery(set.companyId, query, { userId: set.caller.userId });
     } catch (error) {
-        logger.warn(`knowledge retrieval: the question was not embedded for ${set.companyId}; answering from the lexical side: ${error.message}`);
-        return null;
+        const reason = fallbackReason(error);
+        logger.warn(`knowledge retrieval: ${reason} for ${set.companyId}; answering from the lexical side: ${error.message}`);
+        return { fallback: reason };
     }
     const store = vectorStore.current();
     try {
@@ -114,8 +136,14 @@ const vectorSide = async (set, query, filter, limit) => {
         return { backend: store.name, passages: [...(passages || [])].sort(byRank) };
     } catch (error) {
         logger.error(`knowledge retrieval: vector search failed for ${set.companyId}; answering from the lexical side: ${error.message}`);
-        return null;
+        return { fallback: 'vector failed' };
     }
+};
+
+const backendName = (adapter, vector) => {
+    if (vector && vector.passages) return `${adapter.name}+${vector.backend}`;
+    if (vector && vector.fallback) return `${adapter.name} (${vector.fallback})`;
+    return adapter.name;
 };
 
 const createRetrieve = (adapter) => {
@@ -139,15 +167,15 @@ const createRetrieve = (adapter) => {
             chunkSources.length ? vectorSide(set, String(query), filter, headroom) : null,
         ]);
         const lexicalRanked = scaleScores(found || []).sort(byRank);
-        const ranked = vector
-            ? normaliseScores(fuseByRank([lexicalRanked, vector.passages])).sort(byRank)
+        const ranked = vector && vector.passages
+            ? fuse([lexicalRanked, vector.passages]).sort(byFusedRank)
             : weighAgents(lexicalRanked).sort(byRank);
         const onStale = chunkSources.length ? (p) => chunkSources.includes(p.sourceType) && events.requestSync(set.companyId, p.sourceId, p.sourceType) : null;
         const passages = await rechecked({ set, ranked, wanted, onStale });
-        return { passages, backend: vector ? `${adapter.name}+${vector.backend}` : adapter.name, scope: summary };
+        return { passages, backend: backendName(adapter, vector), scope: summary };
     };
 };
 
 const retrieve = createRetrieve(lexical);
 
-module.exports = { ADAPTER_METHODS, DEFAULT_LIMIT, RRF_K, assertAdapter, normaliseScores, fuseByRank, createRetrieve, retrieve };
+module.exports = { ADAPTER_METHODS, DEFAULT_LIMIT, RRF_K, LEXICAL_WEIGHT, VECTOR_WEIGHT, assertAdapter, normaliseScores, fuse, createRetrieve, retrieve };
