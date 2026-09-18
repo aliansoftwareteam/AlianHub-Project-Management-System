@@ -35,6 +35,7 @@ job('aiRequestCountReset', '0 0 * * *', () => aiRef.resetAiRequestCount());
 job('screenshotRetention', '30 0 * * *', () => screenshotRetention.runRetentionForAllCompanies());
 job('autoArchive', '0 1 * * *', () => autoArchive.runAutoArchiveForAllCompanies());
 job('auditRetention', '0 2 * * *', () => auditRecorder.runAuditRetentionForAllCompanies());
+job('auditChainMirror', '* * * * *', () => require('./Modules/Audit/chain').flushMirrors());
 job('projectAutoClose', '0 3 * * *', () => projectClose.runAutoCloseForAllCompanies());
 job('taskIndex', '0 * * * *', () => taskIndexRef.createUnIndexTask());
 job('scheduledReports', '0 * * * *', () => scheduledReports.runScheduledReportsForAllCompanies());

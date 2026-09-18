@@ -1,7 +1,7 @@
 {
   "locale": "ge",
   "machineTranslated": false,
-  "updatedAt": "2026-09-17T05:39:53.394Z",
+  "updatedAt": "2026-09-17T13:44:50.078Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -6057,6 +6057,19 @@
     "Accounts.token_scope_required": "Tick read, write or both.",
     "Accounts.grace_works_until": "no expiry · works until {d}",
     "Accounts.grace_stopped_on": "no expiry · stopped on {d}",
-    "Accounts.strict_note": "Every new token needs an expiry and at least one scope. A token without an expiry keeps working for {n} days from when this rule was turned on, or from when the token was made if that is later. Replace it before then."
+    "Accounts.strict_note": "Every new token needs an expiry and at least one scope. A token without an expiry keeps working for {n} days from when this rule was turned on, or from when the token was made if that is later. Replace it before then.",
+    "Audit.tab_refusals": "Refusals",
+    "Audit.integrity_verified": "Verified",
+    "Audit.integrity_verified_hint": "This row and every chained row before it are intact.",
+    "Audit.integrity_broken": "Broken at #{seq}",
+    "Audit.integrity_broken_hint": "The chain does not verify from row #{seq} on: a row was changed, removed or reordered.",
+    "Audit.integrity_unverified": "Not verified yet",
+    "Audit.integrity_unverified_hint": "Not checked yet. It is checked the next time the audit log opens, once the chain key is available.",
+    "Audit.integrity_unchained": "Unchained",
+    "Audit.integrity_broken_row": "Broken",
+    "Audit.names_not_checked": "Names aren't covered by the integrity check. The ids beside them are.",
+    "Audit.integrity_unchained_hint": "Written before the audit chain started, so it cannot be verified.",
+    "Audit.integrity_broken_row_hint": "This row is outside the chain but was written after the chain started, for example while the audit chain was off, or it carries a change that is not part of the chain.",
+    "Audit.total_approximate": "The count is approximate: some rows it includes no longer match this filter once their recorded changes are checked."
   }
 }
