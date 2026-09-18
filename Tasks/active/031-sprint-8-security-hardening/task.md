@@ -53,4 +53,8 @@ Authorization is enforced where the data is, and a leaked credential buys minute
 - An audit row that changes after it is written is recorded as a new chained row; rows are never edited in place (owner, 2026-09-17).
 - The audit chain hash is keyed with a new `AUDIT_CHAIN_KEY` secret, so someone with database write access cannot recompute the chain (owner, 2026-09-17).
 - Existing API tokens without an expiry keep working for 30 days after mandatory expiry turns on, and owners are shown which tokens need replacing (owner, 2026-09-17).
-- Open until their slices come up: what counts as a clean would-be-denial log (2, 4), a maximum token lifetime if the architecture document names none (7), the secrets key (9), and in-app egress or a proxy container plus what an empty allowlist means (10).
+- A workspace shows as ready to move from report-only to enforce once its would-be-denial log has had no rows for 14 days in a row; the owner still switches the mode (owner, 2026-09-17).
+- Workspace owners and admins see a workspace-wide list of tokens that still need an expiry: name, owner, deadline and last use, never the token (owner, 2026-09-17; slice 7b).
+- Slice 3 grew two follow-on slices from its reviews: 3b (#751) keeps task writes in the authorised company and to their own fields, and 3c validates the task index queries and takes the actor and counts from stored data (2026-09-18).
+- Migration numbers used so far: 028 (#738), 029 (#743), 030 (#750); the next free one is 031.
+- Open until their slices come up: a maximum token lifetime if the architecture document names none (7), the secrets key (9), and in-app egress or a proxy container plus what an empty allowlist means (10).

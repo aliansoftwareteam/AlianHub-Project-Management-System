@@ -6045,6 +6045,19 @@
     "Enforcement.role_member": "Member",
     "Enforcement.role_none": "No seat",
     "Enforcement.mode_saved": "Mode set for {name}. Other servers pick it up within {seconds} seconds.",
-    "Enforcement.default_saved": "Instance default set. Other servers apply it when they next start."
+    "Enforcement.default_saved": "Instance default set. Other servers apply it when they next start.",
+    "Audit.tab_refusals": "Refusals",
+    "Audit.integrity_verified": "Verified",
+    "Audit.integrity_verified_hint": "This row and every chained row before it are intact.",
+    "Audit.integrity_broken": "Broken at #{seq}",
+    "Audit.integrity_broken_hint": "The chain does not verify from row #{seq} on: a row was changed, removed or reordered.",
+    "Audit.integrity_unverified": "Not verified yet",
+    "Audit.integrity_unverified_hint": "Not checked yet. It is checked the next time the audit log opens, once the chain key is available.",
+    "Audit.integrity_unchained": "Unchained",
+    "Audit.integrity_broken_row": "Broken",
+    "Audit.names_not_checked": "Names aren't covered by the integrity check. The ids beside them are.",
+    "Audit.integrity_unchained_hint": "Written before the audit chain started, so it cannot be verified.",
+    "Audit.integrity_broken_row_hint": "This row is outside the chain but was written after the chain started, for example while the audit chain was off, or it carries a change that is not part of the chain.",
+    "Audit.total_approximate": "The count is approximate: some rows it includes no longer match this filter once their recorded changes are checked."
   }
 }

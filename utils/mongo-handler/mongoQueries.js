@@ -113,7 +113,9 @@ const {
     knowledgeChunksSchema,
     knowledgeIndexStateSchema,
     knowledgeExclusionsSchema,
-    permissionDecisionsSchema
+    permissionDecisionsSchema,
+    auditChainHeadsSchema,
+    auditChainAnchorsSchema
 } = require('./createSchema');
 
 
@@ -345,6 +347,10 @@ exports.checkType = (type) => {
             return knowledgeExclusionsSchema
         case SCHEMA_TYPE.PERMISSION_DECISIONS:
             return permissionDecisionsSchema
+        case SCHEMA_TYPE.AUDIT_CHAIN_HEADS:
+            return auditChainHeadsSchema
+        case SCHEMA_TYPE.AUDIT_CHAIN_ANCHORS:
+            return auditChainAnchorsSchema
         default:
             return ""
     }
@@ -579,6 +585,10 @@ exports.tableType = (type) => {
                 return `${dbCollections.KNOWLEDGE_EXCLUSIONS}`
         case SCHEMA_TYPE.PERMISSION_DECISIONS:
                 return `${dbCollections.PERMISSION_DECISIONS}`
+        case SCHEMA_TYPE.AUDIT_CHAIN_HEADS:
+                return `${dbCollections.AUDIT_CHAIN_HEADS}`
+        case SCHEMA_TYPE.AUDIT_CHAIN_ANCHORS:
+                return `${dbCollections.AUDIT_CHAIN_ANCHORS}`
         default:
             return ""
     }
@@ -612,6 +622,10 @@ exports.MongoDbCrudOpration = (companyId, data, method) => {
                     }).catch((err) => {
                         reject(err)
                     });
+                }
+                else if (method === 'createIndex') {
+                    const model = database.model(table, myVariable, table)
+                    model.collection.createIndex(...data.data).then(resolve).catch(reject)
                 }
                 else if (method == "find") {
                     const model = database.model(table, myVariable, table)
