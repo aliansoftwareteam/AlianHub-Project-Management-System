@@ -17,7 +17,7 @@ const knowledgeEvents = require('../Knowledge/ingest/events');
 const HOUR_MS = 60 * 60 * 1000;
 const REASON = Object.freeze({
     WINDOW_PASSED: 'undo_window_passed', NOT_VISIBLE: 'project_not_visible', ALREADY_UNDONE: 'already_undone', NOT_UNDOABLE: 'not_undoable',
-    PENDING: 'action_pending', FAILED: 'action_failed',
+    PENDING: 'action_pending', FAILED: 'action_failed', UNRECORDABLE: 'undo_unrecordable',
 });
 const MESSAGES = {
     [REASON.WINDOW_PASSED]: (s) => `The undo window closed at ${s.undoUntil}.`,
@@ -26,8 +26,9 @@ const MESSAGES = {
     [REASON.NOT_UNDOABLE]: () => 'not undoable',
     [REASON.PENDING]: () => 'The action was never confirmed in the audit log; reconcile it by hand before undoing.',
     [REASON.FAILED]: () => 'The action failed and changed nothing.',
+    [REASON.UNRECORDABLE]: () => 'This undo could not be recorded in the audit log right now, so it was not run.',
 };
-const STATUS_OF = { [REASON.WINDOW_PASSED]: 410, [REASON.NOT_VISIBLE]: 403 };
+const STATUS_OF = { [REASON.WINDOW_PASSED]: 410, [REASON.NOT_VISIBLE]: 403, [REASON.UNRECORDABLE]: 503 };
 
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
@@ -161,11 +162,16 @@ const refuse = async (companyId, actor, state, { entityType, entityId, action, i
 const undoAuditRow = async (companyId, row, actor, ip, ctx) => {
     if (!row || row.action !== audit.ACTION_DONE) return { ok: false, reason: 'Only agent actions can be undone.' };
     const state = await undoStateOf(companyId, row, actor, ctx);
-    if (!state.undoable) return refuse(companyId, actor, state, { entityType: row.entityType, entityId: row.entityId, action: row.meta && row.meta.action, ip });
+    const refusal = { entityType: row.entityType, entityId: row.entityId, action: row.meta && row.meta.action, ip };
+    if (!state.undoable) return refuse(companyId, actor, state, refusal);
+    // An inverse that ran before a failed mark must not run again, and one that could not be marked must not run at all.
+    if (await audit.undoneBefore(companyId, row)) return refuse(companyId, actor, { ...state, undoable: false, reason: REASON.ALREADY_UNDONE }, refusal);
+    if (!(await audit.canRecordChange(companyId, row))) return refuse(companyId, actor, { ...state, undoable: false, reason: REASON.UNRECORDABLE }, refusal);
     const u = row.meta.undo;
     const result = await inverses[u.kind](companyId, u);
-    await audit.markUndone(companyId, row._id, actor.userId);
+    const unmarked = await audit.markUndone(companyId, row._id, actor.userId).then(() => null, (error) => error);
     await audit.recordUndo(companyId, actor, { originalId: row._id, action: row.meta.action, entityType: row.entityType, entityId: row.entityId, ip });
+    if (unmarked) throw unmarked;
     return { ok: true, reason: '', result, undoUntil: state.undoUntil };
 };
 

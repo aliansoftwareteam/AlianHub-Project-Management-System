@@ -4,6 +4,8 @@ const publicApi = require('./publicApi');
 exports.init = (app) => {
     // whoami — the one api-tokens route PAT auth may call (see Config/jwt.js).
     app.get('/api/v2/api-tokens/me', ctrl.whoami);
+    // Owners and admins only; the handler checks the seat itself, whatever the enforcement mode.
+    app.get('/api/v2/api-tokens/needing-expiry', ctrl.listTokensNeedingExpiry);
     app.get('/api/v2/api-tokens/:id/logs', ctrl.listTokenLogs);
     // Mints the scoped token a CLI agent pastes into its MCP client. Before /:id
     // so "mcp" is never read as a token id.

@@ -609,6 +609,30 @@ const schema = {
         entityName: { type: String, required: false },
         meta: { type: Object, required: false },
         ip: { type: String, required: false },
+        // Only on rows written while AUDIT_CHAIN is on (Modules/Audit/chain.js). The hash is taken before save,
+        // so no auditLogs field may have a default: a value Mongoose adds on save would fail verification.
+        chain: {
+            seq: { type: Number, required: false },
+            prevHash: { type: String, required: false },
+            hash: { type: String, required: false },
+        },
+    },
+    // One document per chain head: _id "head" in a company database, the company id in the global mirror.
+    auditChainHeads: {
+        _id: { type: String, required: true },
+        seq: { type: Number, required: true },
+        hash: { type: String, required: true },
+        rowId: { type: String, required: false },
+        mac: { type: String, required: true },
+        at: { type: Date, required: false },
+    },
+    // The last chained row a retention sweep deleted; verification starts after the newest one.
+    auditChainAnchors: {
+        seq: { type: Number, required: true },
+        hash: { type: String, required: true },
+        rowId: { type: String, required: false },
+        cutoff: { type: Date, required: false },
+        mac: { type: String, required: true },
     },
     // Per-company SCIM 2.0 provisioning config — managed by Modules/Scim (SEC-05).
     // The IdP-held bearer token is stored only as a bcrypt hash; the company is

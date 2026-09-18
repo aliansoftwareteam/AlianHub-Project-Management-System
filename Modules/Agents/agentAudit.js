@@ -5,6 +5,7 @@ const { normalizeAuditEntry } = require('../Audit/helpers/auditRules');
 const logger = require('../../Config/loggerConfig');
 const { isAgent, attribution } = require('./actor');
 const { traceIdNow } = require('../../Config/telemetry');
+const chain = require('../Audit/chain');
 
 // One audit log for people and agents (11b). Agent rows carry
 // { actorType, agentId, runId, action, reason, params, cost, undo, viaAccount }
@@ -14,6 +15,9 @@ const { traceIdNow } = require('../../Config/telemetry');
 // An action row is opened `pending` before the mutation and marked `applied`
 // (with its undo descriptor) after it, so an action can never happen without
 // a row: a failed open aborts the action, a failed mark fails its result.
+// Under AUDIT_CHAIN, and on any row that carries a chain whatever the flag says, a
+// mark is an appended row that references the action row; the finders below fold
+// those rows back into the state they describe while the chain is on.
 
 const ACTION_DONE = 'agent.action';
 const ACTION_REFUSED = 'agent.action_refused';
@@ -46,8 +50,8 @@ class AuditUnavailableError extends Error {
 }
 
 class AuditUnmarkedError extends Error {
-    constructor(auditId, detail) {
-        super(`${AUDIT_UNMARKED}: the action ran but its audit row ${auditId} could not be marked applied (${detail})`);
+    constructor(auditId, detail, state = STATE.APPLIED) {
+        super(`${AUDIT_UNMARKED}: the action ran but its audit row ${auditId} could not be marked ${state} (${detail})`);
         this.name = 'AuditUnmarkedError'; this.reason = AUDIT_UNMARKED; this.status = 500; this.auditId = auditId;
     }
 }
@@ -57,7 +61,7 @@ const write = async (companyId, entry) => {
     const n = normalizeAuditEntry({ ...entry, meta: { ...meta, traceId: meta.traceId || traceIdNow() || null } });
     if (!n.valid) throw new Error(n.reason || 'invalid audit entry');
     if (!companyId) throw new Error('companyId is required');
-    const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: n.entry }, 'save');
+    const saved = await chain.saveAuditRow(companyId, n.entry);
     if (!saved || !saved._id) throw new Error('no row id returned');
     return String(saved._id);
 };
@@ -71,11 +75,18 @@ const writeQuietly = async (companyId, entry) => {
 
 const rowFilter = (auditId) => (/^[0-9a-fA-F]{24}$/.test(String(auditId)) ? { _id: new mongoose.Types.ObjectId(String(auditId)) } : null);
 
+const unchained = (filter) => ({ ...filter, chain: { $exists: false } });
+
 const setRow = async (companyId, auditId, $set) => {
     const filter = rowFilter(auditId);
     if (!filter) throw new Error(`invalid audit id ${auditId}`);
-    const r = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [filter, { $set }] }, 'updateOne');
-    if (!r || !(r.matchedCount > 0 || r.modifiedCount > 0)) throw new Error(`audit row ${auditId} not found`);
+    if (chain.isOn()) {
+        await chain.amend(companyId, auditId, $set);
+        return;
+    }
+    const r = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [unchained(filter), { $set }] }, 'updateOne');
+    if (r && (r.matchedCount > 0 || r.modifiedCount > 0)) return;
+    await chain.amend(companyId, auditId, $set);
 };
 
 const baseMeta = (actor) => {
@@ -203,26 +214,47 @@ const recordRevisionChange = async (companyId, actor, { kind, agentId, agentName
 const markUndone = async (companyId, auditId, byActorId) => {
     const filter = rowFilter(auditId);
     if (!filter) return;
-    await MongoDbCrudOpration(companyId, {
+    const $set = { 'meta.undoneAt': new Date(), 'meta.undoneBy': String(byActorId || '') };
+    const appendUndone = async () => {
+        try { await chain.amend(companyId, auditId, $set); } catch (e) {
+            if (e.notFound && !chain.isOn()) return;
+            logger.error(`agent audit: ${AUDIT_UNMARKED} — row ${auditId} was undone but could not be marked undone, reconcile it: ${e.message}`);
+            throw new AuditUnmarkedError(auditId, e.message, 'undone');
+        }
+    };
+    if (chain.isOn()) return appendUndone();
+    const r = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AUDIT_LOGS,
-        data: [filter, { $set: { 'meta.undoneAt': new Date(), 'meta.undoneBy': String(byActorId || '') } }],
-    }, 'updateOne').catch((e) => logger.error(`markUndone: ${e.message}`));
+        data: [unchained(filter), { $set }],
+    }, 'updateOne').catch((e) => { logger.error(`markUndone: ${e.message}`); return null; });
+    if (!r || r.matchedCount > 0 || r.modifiedCount > 0) return undefined;
+    return appendUndone();
 };
+
+/* An undo row for it, or an undone mark on the row as it reads now, means its inverse already ran. */
+const undoneBefore = async (companyId, row) => {
+    const current = await findById(companyId, row._id);
+    if (current && current.meta && current.meta.undoneAt) return true;
+    return Boolean(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ action: ACTION_UNDONE, 'meta.originalAuditId': String(row._id) }, { _id: 1 }] }, 'findOne'));
+};
+
+const canRecordChange = (companyId, row) => chain.canRecordChange(companyId, row);
 
 /* The unique partial index on meta.idempotencyKey makes this the one row for an
  * action key; its state says whether the effect already happened. */
-const findByIdempotencyKey = (companyId, idempotencyKey) => MongoDbCrudOpration(companyId, {
+const findByIdempotencyKey = async (companyId, idempotencyKey) => chain.foldOne(companyId, await MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ 'meta.idempotencyKey': String(idempotencyKey) }],
-}, 'findOne');
+}, 'findOne'));
 
 const findById = async (companyId, auditId) => {
     const filter = rowFilter(auditId);
     if (!filter) return null;
-    return MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [filter] }, 'findOne');
+    return chain.foldOne(companyId, await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [filter] }, 'findOne'));
 };
 
 module.exports = {
     ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED, AGENT_DELETED, RUN_REVERTED, REVISION_PROMOTED, REVISION_ROLLED_BACK, STATE, AUDIT_UNAVAILABLE, AUDIT_UNMARKED,
     AuditUnavailableError, AuditUnmarkedError,
     openAction, applyAction, failAction, recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentDeleted, recordRunReverted, recordRevisionChange, markUndone, findById, findByIdempotencyKey,
+    undoneBefore, canRecordChange,
 };

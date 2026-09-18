@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const audit = require('./agentAudit');
+const auditChain = require('../Audit/chain');
 const undo = require('./undo');
 const runs = require('./runs');
 const budget = require('./budget');
@@ -16,9 +17,16 @@ const logger = require('../../Config/loggerConfig');
 const HOUR_MS = 60 * 60 * 1000;
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
-const actionRows = (companyId, runId) => MongoDbCrudOpration(companyId, {
+const actionRows = async (companyId, runId) => auditChain.foldRows(companyId, await MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ 'meta.runId': String(runId), action: audit.ACTION_DONE }, {}, { sort: { createdAt: 1 }, limit: 500 }],
-}, 'find');
+}, 'find'));
+
+/* Rows an undo row already points at: their inverse ran, even if marking them undone failed. */
+const undoRecorded = async (companyId, auditIds) => {
+    if (!auditIds.length) return new Set();
+    const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ action: audit.ACTION_UNDONE, 'meta.originalAuditId': { $in: auditIds } }, { 'meta.originalAuditId': 1 }] }, 'find');
+    return new Set((rows || []).map((r) => String(r.meta && r.meta.originalAuditId)));
+};
 
 const windowEnd = (run, undoHours) => new Date(new Date(run.finishedAt).getTime() + undoHours * HOUR_MS);
 
@@ -55,7 +63,8 @@ const revertRun = async (companyId, runId, { actor, isPrivileged, ip }) => {
     const windowEndsAt = new Date(check.undoUntil);
 
     const rows = ((await actionRows(companyId, run._id)) || []).filter((r) => !(r.meta && r.meta.state === audit.STATE.FAILED));
-    const pending = rows.filter((r) => !(r.meta && r.meta.undoneAt));
+    const recorded = await undoRecorded(companyId, rows.map((r) => String(r._id)));
+    const pending = rows.filter((r) => !(r.meta && r.meta.undoneAt) && !recorded.has(String(r._id)));
     if (!rows.length) return { error: 'This run made no reversible changes.', status: 409 };
 
     const failed = [];
@@ -68,10 +77,16 @@ const revertRun = async (companyId, runId, { actor, isPrivileged, ip }) => {
     }
 
     const result = { reverted, alreadyUndone: rows.length - pending.length, failed, windowEndsAt, undoUntil: check.undoUntil };
-    await runs.patch(companyId, run._id, { revertedAt: new Date(), revertedBy: String(actor.userId), revert: { reverted, failed }, 'episode.reverted': true });
+    // A run with an action still in place is not reverted, so it can be reverted again once the cause is fixed.
+    const complete = failed.length === 0;
+    await runs.patch(companyId, run._id, complete
+        ? { revertedAt: new Date(), revertedBy: String(actor.userId), revert: { reverted, failed }, 'episode.reverted': true }
+        : { revert: { reverted, failed } });
     await audit.recordRunReverted(companyId, actor, { runId: String(run._id), agentId: run.agentId, agentName: run.agentName, reverted, failed, ip });
-    try { await memory.recordEpisode({ companyId, projectId: String(run.projectId || ''), runId: String(run._id), patch: { reverted: true } }); }
-    catch (e) { logger.error(`[agent-revert] ${run._id}: episode not updated: ${e.message}`); }
+    if (complete) {
+        try { await memory.recordEpisode({ companyId, projectId: String(run.projectId || ''), runId: String(run._id), patch: { reverted: true } }); }
+        catch (e) { logger.error(`[agent-revert] ${run._id}: episode not updated: ${e.message}`); }
+    }
     return result;
 };
 
