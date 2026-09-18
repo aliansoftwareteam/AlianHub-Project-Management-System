@@ -1,5 +1,7 @@
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
+const logger = require('../../../Config/loggerConfig');
+const vectorStore = require('../vectorStore');
 
 // Erasure removes chunk rows outright, where a tombstone only hides them, and records an
 // exclusion first so no later sync, re-index or backfill writes them back. Audit rows are not
@@ -17,13 +19,23 @@ const eraseChunks = async (companyId, where) => {
     return { erased: (result && result.deletedCount) || 0 };
 };
 
+const eraseVectors = async (args) => {
+    try {
+        await vectorStore.current().erase(args);
+    } catch (error) {
+        logger.error(`[knowledge-erase] vector store erase failed for ${args.companyId}: ${error.message}`);
+    }
+};
+
 const eraseDocument = async (companyId, { sourceType, sourceId } = {}) => {
     const type = String(sourceType || '').trim();
     const id = String(sourceId || '').trim();
     if (!type) throw new Error('eraseDocument needs a sourceType.');
     if (!id) throw new Error('eraseDocument needs a sourceId.');
     await exclude(companyId, { kind: 'document', sourceType: type, sourceId: id, userId: '' });
-    return eraseChunks(companyId, { sourceType: type, sourceId: id });
+    const result = await eraseChunks(companyId, { sourceType: type, sourceId: id });
+    await eraseVectors({ companyId: String(companyId), sourceType: type, sourceId: id });
+    return result;
 };
 
 /* A person's private pages and the comments they wrote (owner, 2026-09-17). Their shared pages stay,
@@ -32,7 +44,9 @@ const erasePerson = async (companyId, userId) => {
     const id = String(userId || '').trim();
     if (!OBJECT_ID.test(id)) throw new Error('erasePerson needs a valid user id.');
     await exclude(companyId, { kind: 'author', sourceType: '', sourceId: '', userId: id });
-    return eraseChunks(companyId, { createdBy: id, $or: [{ sourceType: 'page', visibility: 'private' }, { sourceType: 'comment' }] });
+    const result = await eraseChunks(companyId, { createdBy: id, $or: [{ sourceType: 'page', visibility: 'private' }, { sourceType: 'comment' }] });
+    await eraseVectors({ companyId: String(companyId), userId: id });
+    return result;
 };
 
 module.exports = { eraseDocument, erasePerson };

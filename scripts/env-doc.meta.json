@@ -497,8 +497,18 @@
   },
   "KNOWLEDGE_RETRIEVAL": {
     "group": "ai",
-    "description": "Knowledge retrieval for Ask: \"off\" gathers sources exactly as before (task fields and page titles by regular expression); \"tenant\" searches tasks, page bodies and comments through the full-text indexes, and the caller's own call transcripts, with access control applied at query time, for a company whose knowledgeRetrieval.mode is \"on\"; \"all\" does so for every company except one set to \"off\".",
+    "description": "Knowledge retrieval for Ask: \"off\" gathers sources exactly as before (task fields and page titles by regular expression); \"tenant\" searches tasks, page bodies and comments through the full-text indexes, and the caller's own call transcripts, with access control applied at query time, for a company whose knowledgeRetrieval.mode is \"on\" or \"hybrid\"; \"all\" does so for every company except one set to \"off\". A company in \"hybrid\" also has its chunks embedded as they are indexed (KNOWLEDGE_EMBEDDING_MODEL, with the OpenAI instance key) and each question embedded once, and its answers fuse the lexical and vector candidates by reciprocal rank under the same access filter; \"on\" stays lexical.",
     "default": "off"
+  },
+  "KNOWLEDGE_EMBEDDING_MODEL": {
+    "group": "ai",
+    "description": "The OpenAI embedding model a hybrid company's chunks and questions are embedded with. It must have a price on file (text-embedding-3-small and text-embedding-3-large do; LLM_PRICING adds another); a change re-embeds each chunk on its next write and, a batch per run, from the recurring knowledge.backfill job.",
+    "default": "text-embedding-3-small"
+  },
+  "OPENAI_EMBEDDINGS_URL": {
+    "group": "ai",
+    "description": "The endpoint the OpenAI provider posts embeddings to. Point it at an Azure deployment, a proxy or a self-hosted server that speaks the same API; the e2e harness points it at a stub. Chat completions are unaffected.",
+    "default": "https://api.openai.com/v1/embeddings"
   },
   "KNOWLEDGE_INDEXER": {
     "group": "ai",

@@ -217,8 +217,10 @@ describe('the spend meter around embed()', () => {
         try {
             expect(llmProvider.embeddingProvider().name).toBe('openai');
             config.AI_API_KEY = '';
-            expect(() => llmProvider.embeddingProvider()).toThrow(expect.objectContaining({ code: NO_EMBEDDINGS }));
-            expect(() => llmProvider.embeddingProvider()).toThrow(/AI_API_KEY/);
+            let refused = null;
+            try { llmProvider.embeddingProvider(); } catch (error) { refused = error; }
+            expect(refused).toMatchObject({ code: NO_EMBEDDINGS, provider: 'openai', retryable: false });
+            expect(refused.message).toMatch(/AI_API_KEY/);
         } finally {
             delete process.env.LLM_PROVIDER;
         }
