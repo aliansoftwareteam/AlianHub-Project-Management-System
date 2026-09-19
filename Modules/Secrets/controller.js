@@ -7,8 +7,10 @@ const { rotateProblem } = require('./helpers/rotateRules');
 const refuse = (res, code, statusText) => res.status(code).send({ status: false, statusText });
 
 /* The tenant is the verified header, the role the live seat, and a token never manages secrets; only then
- * does the store's own state matter, so a member learns nothing about whether it is on. */
-const managerOrRefuse = async (req, res) => {
+ * does the store's own state matter, so a member learns nothing about whether it is on. The list is what the
+ * Integrations screen probes on every load for an owner or admin, so an off store answers it with 200 and
+ * status false: a 404 there is a console error in the browser of every default install. */
+const managerOrRefuse = async (req, res, { probe = false } = {}) => {
     let companyId;
     try {
         companyId = tenantOf(req);
@@ -20,6 +22,7 @@ const managerOrRefuse = async (req, res) => {
     if (req.apiToken) { refuse(res, 403, 'An API token cannot manage secrets.'); return ''; }
     if (!isPrivileged(await getRoleType(companyId, req.uid))) { refuse(res, 403, 'Only an owner or admin can manage secrets.'); return ''; }
     const cfg = store.config();
+    if (!cfg.requested && probe) { res.send({ status: false, statusText: 'The secrets store is off.', storeOff: true }); return ''; }
     if (!cfg.requested) { refuse(res, 404, 'The secrets store is off.'); return ''; }
     if (!cfg.keyValid) { refuse(res, 503, cfg.error); return ''; }
     return companyId;
@@ -35,7 +38,7 @@ const failed = (res, error, what) => {
 
 exports.listSecrets = async (req, res) => {
     try {
-        const companyId = await managerOrRefuse(req, res);
+        const companyId = await managerOrRefuse(req, res, { probe: true });
         if (!companyId) return undefined;
         const data = await store.list({ companyId });
         return res.send({ status: true, statusText: 'Secrets fetched.', data, keyId: store.config().keyId });
