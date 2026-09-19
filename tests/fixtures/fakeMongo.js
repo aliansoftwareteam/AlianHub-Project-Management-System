@@ -185,10 +185,10 @@ const create = () => {
         }
         if (method === 'updateOne') {
             const doc = list.find((d) => matches(d, data[0]));
-            if (doc) { apply(doc, data[1]); return { modifiedCount: 1 }; }
-            if (!(data[2] && data[2].upsert)) return { modifiedCount: 0 };
+            if (doc) { apply(doc, data[1]); return { matchedCount: 1, modifiedCount: 1 }; }
+            if (!(data[2] && data[2].upsert)) return { matchedCount: 0, modifiedCount: 0 };
             const inserted = insertUpserted(type, data[0], data[1]);
-            return { modifiedCount: 0, upsertedCount: 1, upsertedId: inserted._id };
+            return { matchedCount: 0, modifiedCount: 0, upsertedCount: 1, upsertedId: inserted._id };
         }
         if (method === 'updateMany') { const hit = list.filter((d) => matches(d, data[0])); hit.forEach((d) => apply(d, data[1])); return { modifiedCount: hit.length }; }
         if (method === 'findOneAndDelete') { const at = list.findIndex((d) => matches(d, data[0])); return at === -1 ? null : clone(list.splice(at, 1)[0]); }
