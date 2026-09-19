@@ -2,6 +2,7 @@ const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
+jest.mock('../common-storage/readStoredFile', () => ({ readStoredFile: jest.fn() }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { knowledgeChunksSchema } = require('../utils/mongo-handler/createSchema');
@@ -212,5 +213,24 @@ describe('erasing comments and transcripts', () => {
         await events.drain();
 
         expect(storedOf('comment', comment._id)).toEqual([]);
+    });
+
+    it('erasing a person keeps the files they attached and the guides of their projects: both are shared task and project content', async () => {
+        const { readStoredFile } = require('../common-storage/readStoredFile');
+        readStoredFile.mockResolvedValue({ buffer: Buffer.from('The quay survey, attached by Alice.'), size: 35 });
+        const attached = { id: 'erase000000000001', filename: 'survey.txt', extension: 'txt', size: 35, userId: ALICE, url: `Project/${PROJECT}/Sprint/${TASK}/Attachment/survey.txt` };
+        mockDb.store[SCHEMA_TYPE.TASKS].find((t) => t._id === TASK).attachments = [attached];
+        Object.assign(mockDb.store[SCHEMA_TYPE.PROJECTS].find((p) => p._id === PROJECT), { ProjectName: 'Quay', aiGuide: { markdown: '## Stages\n1. Survey the quay' }, createdBy: ALICE });
+        await indexer.syncTaskFiles(C, TASK);
+        await indexer.syncGuide(C, PROJECT);
+        const fileId = indexer.fileSourceId(TASK, attached.id);
+        expect(storedOf('file', fileId)[0]).toMatchObject({ createdBy: ALICE, deleted: false });
+
+        await erasePerson(C, ALICE);
+        await indexer.syncFile(C, fileId);
+        await indexer.syncGuide(C, PROJECT);
+
+        expect(storedOf('file', fileId).filter((c) => !c.deleted)).toHaveLength(1);
+        expect(storedOf('guide', PROJECT).filter((c) => !c.deleted).length).toBeGreaterThan(0);
     });
 });
