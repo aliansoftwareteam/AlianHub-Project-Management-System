@@ -609,8 +609,8 @@ const stepCredentialMeta = (sc) => [
     t("Accounts.step_scoped_step", { s: sc.stepId }),
     sc.stepType || "",
     sc.startedBy && sc.startedBy.name ? t("Accounts.step_scoped_started_by", { who: sc.startedBy.name }) : "",
-    sc.issuedAt ? t("Accounts.step_scoped_issued", { d: new Date(sc.issuedAt).toLocaleString() }) : "",
-    sc.expiresAt ? t("Accounts.step_scoped_expires", { d: new Date(sc.expiresAt).toLocaleString() }) : ""
+    sc.issuedAt ? t("Accounts.step_scoped_first_issued", { d: new Date(sc.issuedAt).toLocaleString() }) : "",
+    sc.expiresAt ? t("Accounts.step_scoped_current_expires", { d: new Date(sc.expiresAt).toLocaleString() }) : ""
 ].filter(Boolean).join(" · ");
 
 const personNameOf = (id) => (id ? (getUser(String(id)) || {}).Employee_Name || "" : "");
@@ -792,8 +792,8 @@ const load = async () => {
     loading.value = true;
     loadError.value = "";
     try {
-        await Promise.all([loadAccount(), loadTokens(), loadStepCredentials(), loadManifest(), loadRuns()]);
-        await refreshExpiryList();
+        await Promise.all([loadAccount(), loadTokens(), loadManifest(), loadRuns()]);
+        await Promise.all([refreshExpiryList(), loadStepCredentials()]);
         /* No runs means no bar, so the people total is never asked for — an
            unbounded timesheet read for a card that will not render. */
         const charted = runWindow.value;

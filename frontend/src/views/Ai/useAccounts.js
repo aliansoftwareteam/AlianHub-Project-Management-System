@@ -62,9 +62,15 @@ export function useAccounts() {
         }
     };
 
-    /* Everyone asks; the server keeps a member to the runs they started and answers
-     * an empty list, with the policy off, while step credentials are not minted. */
+    /* Asked for only once the tokens list has said step credentials are on, so with
+     * them off the page sends what it always sent. Then everyone asks: the server
+     * keeps a member to the runs they started. */
     const loadStepCredentials = async () => {
+        if (!tokenPolicy.value.stepCredentials) {
+            stepCredentials.value = [];
+            stepCredentialPolicy.value = { stepCredentials: false };
+            return;
+        }
         try {
             const res = await apiRequest("get", env.API_TOKENS_STEP_CREDENTIALS);
             stepCredentials.value = ok(res) ? res.data.data || [] : [];
