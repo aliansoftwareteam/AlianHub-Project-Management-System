@@ -102,6 +102,12 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 75 | Removing a member through SCIM sends no departure or rejoin event, so the knowledge index is only corrected by the next re-check; tombstoned chunks are never purged and an erasure cannot be lifted yet. | #745, #747 (builds 221, 223) |
 | 76 | Audit chain: changing `AUDIT_CHAIN_KEY` is not supported (older rows read broken); verification progress is per server; the `meta.idempotencyKey` index is never used for lookups; the head mirror has a crash-only window of at most 5 s. | #750 (build 225) |
 | 77 | Sprint 7 and 8 screens still to sweep as owner and member: Ask's "why this answer" panel with retrieval on and off (#742), Accounts → tokens under strict mode (#744), the audit log's integrity states and refusals filter (#750). | interface rows |
+| 78 | Three unit files fail now and then when the machine is loaded and pass alone: `workflow-step-types`, `telemetry` and `session-token-access`. Each needs its timing assumption found and removed. | Sprint 8 gate runs (2026-09-19) |
+| 79 | The instruction guard's patterns (#757) are a first list. They need review against real inbound mail and form text, with a way to add patterns without a release. | Sprint 8 slice 6 (#757) |
+| 80 | History and notification text for task changes is composed in the web app. Compose it on the server from typed fields instead; the detail is in the owner's private notes. | Sprint 8 slice 3c review (#756) |
+| 81 | A task created by `form.submitted` can reach the workflow trigger before it has an `_id`; the trigger should wait for the stored task. | Sprint 8 slice 6 review (#757) |
+| 82 | Replay rows written by tool calls, as opposed to model calls, do not carry the tainted-run marker yet. | Sprint 8 slice 6 review (#757) |
+| 83 | Sprint 8 screens still to sweep as owner: Instance console → Enforcement (#754), the workspace token-expiry list (#753), the run view's "Read external content" mark (#757). | interface rows |
 
 ## Owner decisions recorded
 
