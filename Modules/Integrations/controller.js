@@ -7,6 +7,7 @@ const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const R = require('./helpers/integrationsRules');
 const S = require('./helpers/slackRules');
 const H = require('./helpers/secretHandles');
+const { SecretsStoreError } = require('../../Config/secrets');
 
 // Secrets go to the store by handle or are sealed into config on every write (H.storeSecrets) and are stripped from every read (R.redact).
 
@@ -19,7 +20,11 @@ const refuse = (res, code, statusText, extra = {}) => res.status(code).send({ st
 
 const actorOf = (req) => ({ id: String(req.uid || ''), ip: String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0] });
 
-const withHandles = (kept) => (kept.secretHandles ? { config: kept.config, secretHandles: kept.secretHandles } : { config: kept.config });
+const failed = (res, e, what) => {
+    logger.error(`${what}: ${e.message}`);
+    if (e instanceof SecretsStoreError) return refuse(res, e.statusCode, e.message);
+    return res.send({ status: false, statusText: e.message });
+};
 
 // Integrations hold company-wide credentials and data egress, so every write is
 // an owner or admin act; the role is read from company_users, never the body.
@@ -63,21 +68,22 @@ exports.connect = async (req, res) => {
                 const kept = await H.storeSecrets({ companyId, type: check.value.type, config: check.value.config, existing, actor });
                 const upd = await MongoDbCrudOpration(companyId, {
                     type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS,
-                    data: [{ _id: existing._id }, { $set: { ...withHandles(kept), name: check.value.name, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: String(req.uid || '') } }, { returnDocument: 'after' }],
+                    data: [{ _id: existing._id }, { $set: { ...kept.set, name: check.value.name, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: String(req.uid || '') }, ...(kept.unset ? { $unset: kept.unset } : {}) }, { returnDocument: 'after' }],
                 }, 'findOneAndUpdate');
+                await H.retireSecrets({ companyId, handles: kept.stale, actor });
                 removeCache(`integration_connections:${companyId}`);
                 return res.send({ status: true, statusText: 'Updated.', data: R.redact(upd) });
             }
         }
         const kept = await H.storeSecrets({ companyId, type: check.value.type, config: check.value.config, actor });
         const data = {
-            _id: new mongoose.Types.ObjectId(), type: check.value.type, name: check.value.name, ...withHandles(kept), secretsVersion: R.SECRETS_VERSION,
+            _id: new mongoose.Types.ObjectId(), type: check.value.type, name: check.value.name, ...kept.set, secretsVersion: R.SECRETS_VERSION,
             status: 'connected', enabled: true, createdBy: String(req.uid || ''), connectedAt: new Date(), deletedStatusKey: 0,
         };
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data }, 'save');
         removeCache(`integration_connections:${companyId}`);
         return res.send({ status: true, statusText: 'Connected.', data: R.redact(saved) });
-    } catch (e) { logger.error(`connect: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, e, 'connect'); }
 };
 
 exports.updateConnection = async (req, res) => {

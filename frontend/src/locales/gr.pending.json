@@ -1,7 +1,7 @@
 {
   "locale": "gr",
   "machineTranslated": false,
-  "updatedAt": "2026-09-18T11:51:06.707Z",
+  "updatedAt": "2026-09-19T03:46:36.165Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -6095,6 +6095,8 @@
     "Secrets.err_value": "A new value is required.",
     "Secrets.confirm_revoke": "Revoke {name}? Anything that uses it stops working at once, and it cannot be undone.",
     "Secrets.rotated_toast": "{name} rotated.",
-    "Secrets.revoked_toast": "{name} revoked."
+    "Secrets.revoked_toast": "{name} revoked.",
+    "Integrations.needs_attention": "Needs attention",
+    "Integrations.needs_attention_hint": "The signing secret is revoked or unavailable, so nothing is delivered. Delete this webhook and add it again."
   }
 }

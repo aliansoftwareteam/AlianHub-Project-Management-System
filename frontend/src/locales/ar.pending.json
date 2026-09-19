@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-18T11:51:06.593Z",
+  "updatedAt": "2026-09-19T03:46:36.040Z",
   "keys": {
     "Scrum.stranded_head": "These {count} will stay in this sprint",
     "Scrum.stranded_hint": "They are unfinished, but their parent task is done — and a subtask moves with its parent. Finish them, or reopen the parent task, before completing the sprint.",
@@ -8235,6 +8235,8 @@
     "Secrets.err_value": "A new value is required.",
     "Secrets.confirm_revoke": "Revoke {name}? Anything that uses it stops working at once, and it cannot be undone.",
     "Secrets.rotated_toast": "{name} rotated.",
-    "Secrets.revoked_toast": "{name} revoked."
+    "Secrets.revoked_toast": "{name} revoked.",
+    "Integrations.needs_attention": "Needs attention",
+    "Integrations.needs_attention_hint": "The signing secret is revoked or unavailable, so nothing is delivered. Delete this webhook and add it again."
   }
 }

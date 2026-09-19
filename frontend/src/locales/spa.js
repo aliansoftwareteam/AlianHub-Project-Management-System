@@ -6054,6 +6054,8 @@ export default {
         "retry": "retry",
         "last": "Last",
         "no_deliveries": "No deliveries yet",
+        "needs_attention": "Needs attention",
+        "needs_attention_hint": "The signing secret is revoked or unavailable, so nothing is delivered. Delete this webhook and add it again.",
         "err_name": "A name is required.",
         "err_url": "A valid http(s) URL is required.",
         "err_events": "Select at least one event.",

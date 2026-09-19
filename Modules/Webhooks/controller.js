@@ -70,6 +70,7 @@ const maskHook = (hook) => ({
     createdBy: hook.createdBy || '',
     lastStatus: hook.lastStatus,
     lastDeliveredAt: hook.lastDeliveredAt,
+    needsAttention: hook.needsAttention || '',
     createdAt: hook.createdAt,
 });
 

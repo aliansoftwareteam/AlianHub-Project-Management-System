@@ -641,6 +641,8 @@ const schema = {
         rotatedAt: { type: Date, required: false },
         revokedAt: { type: Date, required: false },
         lastResolvedAt: { type: Date, required: false },
+        // No document points at the handle any more, and no key was set to revoke it with (Config/secrets.js retire).
+        orphanedAt: { type: Date, required: false },
     },
     // The last chained row a retention sweep deleted; verification starts after the newest one.
     auditChainAnchors: {
@@ -1585,6 +1587,11 @@ const schema = {
             required: false,
         },
         secretHandle: {
+            type: String,
+            required: false,
+        },
+        // Set by the dispatcher while the signing secret will not resolve, cleared by the next delivery it can sign.
+        needsAttention: {
             type: String,
             required: false,
         },

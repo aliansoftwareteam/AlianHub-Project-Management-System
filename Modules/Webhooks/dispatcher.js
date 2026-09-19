@@ -6,7 +6,7 @@ const socketEmitter = require('../../event/socketEventEmitter');
 const { createSnapshotStore } = require('../../utils/entityEvents');
 const { safeFetch } = require('../Agents/engine/safeFetch');
 const { webhookAllowlist } = require('./helpers/privateHostAllowlist');
-const { signingSecretOf } = require('./helpers/signingSecret');
+const { signingSecretOf, NEEDS_ATTENTION } = require('./helpers/signingSecret');
 const { subscribesTo, classifyTaskEvent, shouldDeliverTask, normalizeChangedFields, trimTaskForDelivery, signPayload, formatForTarget } = require('./helpers/webhookRules');
 
 // Webhook dispatcher. Piggybacks on the namespaced socketEmitter events that
@@ -74,6 +74,13 @@ async function logDelivery(companyId, webhookId, entry) {
     }
 }
 
+async function markAttention(companyId, hook, needsAttention) {
+    if ((hook.needsAttention || '') === needsAttention) return;
+    const change = needsAttention ? { $set: { needsAttention } } : { $unset: { needsAttention: '' } };
+    await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.WEBHOOKS, data: [{ _id: hook._id }, change] }, 'updateOne').catch(() => {});
+    invalidateCompanyCache(companyId);
+}
+
 async function deliverToHook(companyId, hook, body, attempt) {
     // Shape the payload for the hook's target (raw json / Slack / Discord).
     // The signature covers exactly what we send; body.event is kept for logging.
@@ -88,8 +95,10 @@ async function deliverToHook(companyId, hook, body, attempt) {
             attempt,
             error: 'The signing secret is revoked or unavailable, so the delivery was not sent.',
         });
+        await markAttention(companyId, hook, NEEDS_ATTENTION);
         return;
     }
+    await markAttention(companyId, hook, '');
     try {
         // A stored url was checked at save time, but DNS and the owner's allowlist can
         // change since: safeFetch resolves again and revalidates every redirect.

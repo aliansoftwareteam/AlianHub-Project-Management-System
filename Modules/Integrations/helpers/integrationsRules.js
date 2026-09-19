@@ -54,6 +54,18 @@ const FORMATS = {
 
 const invalid = (field, reason) => ({ valid: false, field, reason });
 
+const fieldProblem = (field, value) => {
+    if (value.length > MAX_FIELD_LENGTH) return `${field.label} is too long.`;
+    const format = FORMATS[field.format];
+    return format && !format.test(value) ? `${field.label} ${format.message}` : '';
+};
+
+/* The same length and format check connect applies, for a secret replaced on its own (the stored-secrets rotate route). */
+const secretFieldProblem = (type, key, value) => {
+    const field = ((byKey(type) || {}).fields || []).find((f) => f.secret && f.key === key);
+    return field ? fieldProblem(field, String(value).trim()) : 'Unknown secret field.';
+};
+
 const validateConnection = ({ type, config } = {}) => {
     const item = byKey(type);
     if (!item) return invalid('type', 'Unknown integration type.');
@@ -69,9 +81,8 @@ const validateConnection = ({ type, config } = {}) => {
             if (field.required) return invalid(field.key, `${field.label} is required.`);
             continue;
         }
-        if (value.length > MAX_FIELD_LENGTH) return invalid(field.key, `${field.label} is too long.`);
-        const format = FORMATS[field.format];
-        if (format && !format.test(value)) return invalid(field.key, `${field.label} ${format.message}`);
+        const problem = fieldProblem(field, value);
+        if (problem) return invalid(field.key, problem);
         out[field.key] = value;
     }
     const name = item.multiple ? (out.name || item.name) : item.name;
@@ -94,4 +105,4 @@ const redact = (conn) => {
     return { ...o, config: cfg, secrets };
 };
 
-module.exports = { CATALOG, SECRETS_VERSION: secretField.VERSION, byKey, getCatalog, validateConnection, redact, isEmbeddableUrl, secretKeys, sealConfig, openConfig };
+module.exports = { CATALOG, SECRETS_VERSION: secretField.VERSION, byKey, getCatalog, validateConnection, secretFieldProblem, redact, isEmbeddableUrl, secretKeys, sealConfig, openConfig };

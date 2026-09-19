@@ -93,7 +93,7 @@
                 <div class="ig__row-main">
                     <span class="ig__mark ig__mark--hook" :class="'is-' + (hook.format || 'json')" aria-hidden="true">{{ (hook.format || 'json').slice(0, 1).toUpperCase() }}</span>
                     <div class="ig__row-text">
-                        <div class="ig__row-name">{{ hook.name }} <span class="ah-chip ah-chip--mono">{{ (hook.format || 'json').toUpperCase() }}</span></div>
+                        <div class="ig__row-name">{{ hook.name }} <span class="ah-chip ah-chip--mono">{{ (hook.format || 'json').toUpperCase() }}</span> <span v-if="hook.needsAttention" class="ah-chip ah-chip--danger" data-test="webhook-attention" :title="$t('Integrations.needs_attention_hint')">{{ $t('Integrations.needs_attention') }}</span></div>
                         <div class="ah-small" :title="hook.url">{{ shortUrl(hook.url) }} · {{ eventsSummary(hook.events) }} · {{ lastDeliveryLabel(hook) }}</div>
                     </div>
                     <span class="ig__status ah-small">

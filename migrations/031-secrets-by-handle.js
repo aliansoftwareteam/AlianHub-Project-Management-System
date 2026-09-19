@@ -10,16 +10,14 @@ const ACTOR = { id: `migration:${ID}` };
 const deps = () => ({
     store: require('../Config/secrets'),
     R: require('../Modules/Integrations/helpers/integrationsRules'),
-    secretName: require('../Modules/Integrations/helpers/secretHandles').secretName,
+    H: require('../Modules/Integrations/helpers/secretHandles'),
     secretField: require('../utils/secretField'),
 });
 
-const revokeQuietly = (store, companyId, handle) => store.revoke({ companyId, handle, actor: ACTOR }).catch((error) => {
-    if (!['revoked', 'not_found', 'store_off'].includes(error.code)) throw error;
-});
-
+/* A sealed value beside a handle was saved after the handle (a write by handle always removes the sealed copy),
+ * so it is the current one: up moves it onto that handle, down keeps it. */
 async function moveConnections(ctx, companyId, counts) {
-    const { store, R, secretName, secretField } = deps();
+    const { R, H, secretField } = deps();
     const type = ctx.SCHEMA_TYPE.INTEGRATION_CONNECTIONS;
     const rows = await ctx.company(companyId, { type, data: [{}] }, 'find') || [];
     for (const row of rows) {
@@ -30,11 +28,10 @@ async function moveConnections(ctx, companyId, counts) {
         let moved = 0;
         for (const field of (item.fields || []).filter((f) => f.secret)) {
             const stored = config[field.key];
-            if (!stored || handles[field.key]) continue;
+            if (!stored) continue;
             const value = secretField.decrypt(stored);
             if (value === null || value === '') { counts.unreadable += 1; continue; }
-            const made = await store.create({ companyId, name: secretName(item, field), kind: 'integration', value, actor: ACTOR });
-            handles[field.key] = made.handle;
+            handles[field.key] = await H.keep({ companyId, handle: handles[field.key], name: H.secretName(item, field), value, actor: ACTOR });
             delete config[field.key];
             moved += 1;
         }
@@ -45,13 +42,13 @@ async function moveConnections(ctx, companyId, counts) {
 }
 
 async function moveWebhooks(ctx, companyId, counts) {
-    const { store } = deps();
+    const { H } = deps();
     const type = ctx.SCHEMA_TYPE.WEBHOOKS;
-    const hooks = await ctx.company(companyId, { type, data: [{ secretHandle: { $exists: false }, secret: { $type: 'string' } }] }, 'find') || [];
+    const hooks = await ctx.company(companyId, { type, data: [{ secret: { $type: 'string' } }] }, 'find') || [];
     for (const hook of hooks) {
         if (!hook.secret) { counts.skipped += 1; continue; }
-        const made = await store.create({ companyId, name: `Webhook: ${hook.name}`, kind: 'webhook', value: hook.secret, actor: ACTOR });
-        await ctx.company(companyId, { type, data: [{ _id: hook._id }, { $set: { secretHandle: made.handle }, $unset: { secret: '' } }] }, 'updateOne');
+        const secretHandle = await H.keep({ companyId, handle: hook.secretHandle, name: `Webhook: ${hook.name}`, kind: 'webhook', value: hook.secret, actor: ACTOR });
+        await ctx.company(companyId, { type, data: [{ _id: hook._id }, { $set: { secretHandle }, $unset: { secret: '' } }] }, 'updateOne');
         counts.webhooks += 1;
     }
 }
@@ -63,11 +60,12 @@ async function restoreConnections(ctx, companyId, counts) {
     for (const row of rows) {
         const config = { ...(row.config || {}) };
         const handles = Object.entries(row.secretHandles || {});
-        const values = await Promise.all(handles.map(([, handle]) => store.resolve({ companyId, handle })));
+        const missing = handles.filter(([key]) => !config[key]);
+        const values = await Promise.all(missing.map(([, handle]) => store.resolve({ companyId, handle })));
         if (values.some((value) => value === null)) { counts.unresolved += 1; continue; }
-        handles.forEach(([key], i) => { config[key] = values[i]; });
+        missing.forEach(([key], i) => { config[key] = values[i]; });
         await ctx.company(companyId, { type, data: [{ _id: row._id }, { $set: { config: R.sealConfig(row.type, config), secretsVersion: R.SECRETS_VERSION }, $unset: { secretHandles: '' } }] }, 'updateOne');
-        for (const [, handle] of handles) await revokeQuietly(store, companyId, handle);
+        for (const [, handle] of handles) await store.retire({ companyId, handle, actor: ACTOR });
         counts.connections += 1;
     }
 }
@@ -77,10 +75,10 @@ async function restoreWebhooks(ctx, companyId, counts) {
     const type = ctx.SCHEMA_TYPE.WEBHOOKS;
     const hooks = await ctx.company(companyId, { type, data: [{ secretHandle: { $exists: true } }] }, 'find') || [];
     for (const hook of hooks) {
-        const value = await store.resolve({ companyId, handle: hook.secretHandle });
+        const value = hook.secret || await store.resolve({ companyId, handle: hook.secretHandle });
         if (value === null) { counts.unresolved += 1; continue; }
         await ctx.company(companyId, { type, data: [{ _id: hook._id }, { $set: { secret: value }, $unset: { secretHandle: '' } }] }, 'updateOne');
-        await revokeQuietly(store, companyId, hook.secretHandle);
+        await store.retire({ companyId, handle: hook.secretHandle, actor: ACTOR });
         counts.webhooks += 1;
     }
 }
@@ -100,7 +98,8 @@ module.exports = {
         }
         await ctx.forEachCompany(async (companyId) => {
             await ctx.company(companyId, { type: ctx.SCHEMA_TYPE.SECRETS, data: [] }, 'createIndexes');
-            const counts = { connections: 0, webhooks: 0, skipped: 0, unreadable: 0 };
+            const counts = { connections: 0, webhooks: 0, skipped: 0, unreadable: 0, orphansRevoked: 0 };
+            counts.orphansRevoked = await deps().store.revokeOrphans({ companyId, actor: ACTOR });
             await moveConnections(ctx, companyId, counts);
             await moveWebhooks(ctx, companyId, counts);
             ctx.logger.info(`[migrations] 031 ${companyId}: ${JSON.stringify(counts)}`);
