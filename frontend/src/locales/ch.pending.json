@@ -1,7 +1,7 @@
 {
   "locale": "ch",
   "machineTranslated": false,
-  "updatedAt": "2026-09-18T11:25:17.199Z",
+  "updatedAt": "2026-09-19T03:44:58.272Z",
   "keys": {
     "errorPage.card_name": "card name",
     "Auth.welcome_back": "Welcome back",
@@ -6073,6 +6073,15 @@
     "Audit.taint_kind_form": "Form submission",
     "Audit.taint_kind_webhook": "Webhook",
     "Audit.taint_kind_file": "Uploaded file",
-    "Audit.taint_kind_passage": "Knowledge passage"
+    "Audit.taint_kind_passage": "Knowledge passage",
+    "Accounts.step_scoped": "step-scoped",
+    "Accounts.step_scoped_title": "Step-scoped credentials",
+    "Accounts.step_scoped_count": "{n} LIVE",
+    "Accounts.step_scoped_lead": "Credentials the workflow engine minted for steps that are running right now. Each one is tied to one step of one run, is replaced by a fresh one each time the engine extends the step's lease, and stops working when that step settles or its lease runs out. The credential itself is never shown or stored; owners and admins see every run, everyone else the runs they started.",
+    "Accounts.step_scoped_empty": "No step is running under a credential right now.",
+    "Accounts.step_scoped_step": "step {s}",
+    "Accounts.step_scoped_started_by": "started by {who}",
+    "Accounts.step_scoped_first_issued": "first issued {d}",
+    "Accounts.step_scoped_current_expires": "current credential expires {d}, renewed while the step keeps running"
   }
 }
