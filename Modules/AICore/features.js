@@ -19,6 +19,7 @@ const FEATURES = Object.freeze({
     PAGE_COMPOSE: 'page_compose',
     GUIDE: 'guide',
     MCP_BRIEF: 'mcp_brief',
+    KNOWLEDGE_EMBED: 'knowledge_embed',
 });
 
 const UNKNOWN_FEATURE = 'unknown';

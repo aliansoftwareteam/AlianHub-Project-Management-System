@@ -143,6 +143,35 @@ function metered(adapter) {
             await alert(context);
             return result;
         },
+        /* Embeddings are priced, held against the workspace budget, booked and alerted on like a
+         * chat call. They carry no prompt to replay, so no replay row is written. */
+        async embed(opts) {
+            const context = contextOf(opts);
+            const model = String((opts && opts.model) || '').trim() || adapter.model;
+            ensurePriced(model, context);
+            const texts = Array.isArray(opts && opts.texts) ? opts.texts : [];
+            const estimate = preflight({ messages: texts.map((content) => ({ role: 'user', content })), maxTokens: 0, model, feature: context.feature });
+            const ticket = await reservation.reserve(context, estimate, adapter.name);
+            if (!ticket.ok) throw Object.assign(new Error(ticket.reason), { code: ticket.code, feature: context.feature });
+            let result;
+            try {
+                result = await adapter.embed(opts);
+            } catch (error) {
+                await reservation.release(ticket);
+                if (isProviderError(error)) logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} failed [${error.groupKey()}]${error.requestId ? ` request ${error.requestId}` : ''}: ${error.message}`);
+                throw error;
+            }
+            const spent = usage.summarize(usage.usageFromResult(result), (result && result.model) || model);
+            try {
+                await record(context, result, adapter, model);
+            } catch (e) {
+                if (strict()) throw e;
+                logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} spent ${spent.totalTokens} tokens that could not be booked: ${e.message}`);
+            }
+            await reservation.reconcile(ticket, spent);
+            await alert(context);
+            return result;
+        },
     };
     wrapped.set(adapter, provider);
     return provider;
