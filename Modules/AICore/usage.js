@@ -62,6 +62,9 @@ const DEFAULT_PRICING = {
     'gpt-4o': { input: 2.5, output: 10 },
     'o3': { input: 2, output: 8 },
     'o4-mini': { input: 1.1, output: 4.4 },
+    // Embedding models return no tokens, so their output price is a genuine zero.
+    'text-embedding-3-small': { input: 0.02, output: 0 },
+    'text-embedding-3-large': { input: 0.13, output: 0 },
 
     // deepseek-v4-flash is a retired alias served and billed as deepseek-flash;
     // deepseek-v4-pro keeps its own price until DeepSeek routes it to Flash too.

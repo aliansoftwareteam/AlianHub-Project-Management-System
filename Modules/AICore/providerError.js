@@ -75,6 +75,14 @@ class AIProviderError extends Error {
 
 const isProviderError = (error) => error instanceof AIProviderError;
 
+const NO_EMBEDDINGS = 'no_embeddings';
+
+/* A vendor with no embeddings endpoint, or one reached without a key: the caller's problem
+ * rather than an outage, so it is never retried and never counts against the provider. */
+const noEmbeddings = (provider, detail = 'offers no embeddings') => new AIProviderError({
+    provider, type: TYPES.INVALID_REQUEST, code: NO_EMBEDDINGS, retryable: false, message: `${LABEL[provider] || provider} ${detail}.`,
+});
+
 const failureOf = (error) => (isProviderError(error) ? error.toFailure() : null);
 
 /* Works on fetch Headers (the Anthropic SDK), axios headers and plain objects. */
@@ -215,4 +223,4 @@ const fromGoogle = (model, error) => {
     });
 };
 
-module.exports = { AIProviderError, TYPES, TYPE_LIST, isProviderError, failureOf, headerValue, requestIdOf, retryAfterMsOf, vendorRaw, typeOfStatus, fromTransport, fromOpenAiCompatible, fromGoogle, redact, CONTEXT_LENGTH, QUOTA_MESSAGE };
+module.exports = { AIProviderError, TYPES, TYPE_LIST, NO_EMBEDDINGS, isProviderError, noEmbeddings, failureOf, headerValue, requestIdOf, retryAfterMsOf, vendorRaw, typeOfStatus, fromTransport, fromOpenAiCompatible, fromGoogle, redact, CONTEXT_LENGTH, QUOTA_MESSAGE };

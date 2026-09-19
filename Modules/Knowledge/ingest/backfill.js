@@ -239,17 +239,25 @@ const runOnce = async (companyId, options) => {
     }
 };
 
+/* Each run also re-embeds a batch of what a hybrid company's chunks still lack, so a failed
+ * embed or a model change is caught up without anyone touching the source. */
 const backfillAll = async (options) => {
-    if (flag.indexer.mode() === 'off') return { companies: 0 };
+    if (flag.indexer.mode() === 'off') return { companies: 0, reembedded: {} };
     const companies = await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.COMPANIES, data: [{}, '_id'] }, 'find');
     let ran = 0;
+    const reembedded = {};
     for (const company of companies || []) {
         const companyId = String(company._id);
         if (!(await flag.indexer.enabledFor(companyId))) continue;
         await keepAlive(companyId).catch((error) => logger.error(`${LOG_PREFIX} ${companyId}: heartbeat: ${error.message}`));
         if (await runOnce(companyId, options)) ran += 1;
+        const count = await indexer.reembedMissing(companyId).catch((error) => {
+            logger.error(`${LOG_PREFIX} ${companyId}: re-embedding sweep: ${error.message}`);
+            return null;
+        });
+        if (count !== null) reembedded[companyId] = count;
     }
-    return { companies: ran };
+    return { companies: ran, reembedded };
 };
 
 /* Started by the first event a switched-on company sends, so its index is built without

@@ -1,7 +1,7 @@
 const axios = require('axios');
 const config = require('../../../Config/config');
 const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
-const { fromOpenAiCompatible } = require('../providerError');
+const { fromOpenAiCompatible, noEmbeddings } = require('../providerError');
 const { normaliseRequest, STRUCTURED_OUTPUT } = require('./normalise');
 
 // DeepSeek exposes an OpenAI-compatible Chat Completions API, so this
@@ -51,6 +51,10 @@ function getBaseUrl() {
 
 const deepseekProvider = {
     name: 'deepseek',
+    embeddingsConfigured: false,
+    async embed() {
+        throw noEmbeddings('deepseek');
+    },
     get isConfigured() {
         return Boolean(config.DEEPSEEK_API_KEY && config.DEEPSEEK_MODEL);
     },

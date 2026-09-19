@@ -37,7 +37,7 @@ const DEFINITIONS = Object.freeze({
         qualityFloor: QUALITY.BASIC,
         latencyTargetMs: 3000,
         inputBudgetTokens: 4000,
-        features: Object.freeze([FEATURES.TASK_CATEGORY, FEATURES.TASK_ESTIMATE, FEATURES.CLARIFIER, FEATURES.DESCRIPTION]),
+        features: Object.freeze([FEATURES.TASK_CATEGORY, FEATURES.TASK_ESTIMATE, FEATURES.CLARIFIER, FEATURES.DESCRIPTION, FEATURES.KNOWLEDGE_EMBED]),
     }),
     [TASK_CLASS.ASSIST]: Object.freeze({
         key: TASK_CLASS.ASSIST,
