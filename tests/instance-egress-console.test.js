@@ -184,6 +184,7 @@ describe('with the flag on', () => {
                 actorId: OWNER, actorName: 'Olivia Owner', entityType: 'company', entityId: CID_A, entityName: 'Acme',
                 meta: { added: ['*.new.example.com'], removed: ['old.example.com'], count: 2 },
             });
+            expect(changeAudits(CID_A)[0].meta).not.toHaveProperty('emptied');
         });
 
         it('creates the document for a workspace that had none', async () => {
@@ -194,14 +195,15 @@ describe('with the flag on', () => {
             expect(changeAudits(CID_A)[0].meta).toEqual({ added: ['docs.example.com'], removed: [], count: 1 });
         });
 
-        it('an empty list clears the workspace back to today\'s behaviour', async () => {
+        it('an empty list clears the workspace back to today\'s behaviour, and the audit row says the list was emptied', async () => {
             seedList(CID_A, ['docs.example.com']);
             const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: [] });
             expect(res.status).toBe(200);
             expect(res.body.data.hosts).toEqual([]);
             expect(listOf(CID_A).hosts).toEqual([]);
             await settle();
-            expect(changeAudits(CID_A)[0].meta).toEqual({ added: [], removed: ['docs.example.com'], count: 0 });
+            expect(changeAudits(CID_A)).toHaveLength(1);
+            expect(changeAudits(CID_A)[0].meta).toEqual({ added: [], removed: ['docs.example.com'], count: 0, emptied: true });
         });
 
         it('the same list again writes nothing and no audit row', async () => {
@@ -218,7 +220,7 @@ describe('with the flag on', () => {
             [['10.0.0.1'], 'address'], [['169.254.169.254'], 'address'], [['[::1]'], 'address'], [['0x7f000001'], 'address'],
             [['localhost'], 'private'], [['printer.local'], 'private'], [['vault.internal'], 'private'],
             [['https://docs.example.com'], 'scheme'], [['docs.example.com/api'], 'path'], [['192.168.0.0/16'], 'address'],
-            [['*.com'], 'wildcard'], [['docs.example.com:99999'], 'port'], [['docs.example.com', 'not a host'], 'invalid'],
+            [['*.com'], 'wildcard'], [['*.co.uk'], 'public_suffix'], [['*.github.io'], 'public_suffix'], [['*.s3.amazonaws.com'], 'public_suffix'], [['docs.example.com:99999'], 'port'], [['docs.example.com', 'not a host'], 'invalid'],
         ])('refuses %j as %s and leaves the list alone', async (hosts, reason) => {
             seedList(CID_A, ['docs.example.com']);
             const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts });

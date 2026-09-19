@@ -99,7 +99,7 @@ describe('the workspace egress allowlist', () => {
     });
 
     it('refuses an address, a private name, a scheme and a path, and keeps the list', async () => {
-        for (const [entry, reason] of [['10.0.0.1', 'address'], ['169.254.169.254', 'address'], ['localhost', 'private'], ['vault.internal', 'private'], ['https://docs.example.com', 'scheme'], ['docs.example.com/api', 'path'], ['*.com', 'wildcard']]) {
+        for (const [entry, reason] of [['10.0.0.1', 'address'], ['169.254.169.254', 'address'], ['localhost', 'private'], ['vault.internal', 'private'], ['https://docs.example.com', 'scheme'], ['docs.example.com/api', 'path'], ['*.com', 'wildcard'], ['*.co.uk', 'public_suffix'], ['*.github.io', 'public_suffix']]) {
             const res = await owner.api.put(`${BASE}/${state.companyId}`, { hosts: ['docs.example.com', entry] });
             expect([entry, res.status]).toEqual([entry, 400]);
             expect(res.body.data.errors).toEqual([{ entry, reason }]);
@@ -117,7 +117,8 @@ describe('the workspace egress allowlist', () => {
         expect(res.status).toBe(200);
         expect(res.body.data.hosts).toEqual([]);
         expect((await listRow()).hosts).toEqual([]);
-        const audit = await waitFor(() => audits.findOne({ action: 'agent.egress_allowlist', actorId: owner.uid, 'meta.count': 0 }), 'the clearing audit row');
-        expect(audit.meta.removed).toEqual(['docs.example.com', '*.api.example.com']);
+        const audit = await waitFor(() => audits.findOne({ action: 'agent.egress_allowlist', actorId: owner.uid, 'meta.emptied': true }), 'the clearing audit row');
+        expect(audit.meta).toMatchObject({ removed: ['docs.example.com', '*.api.example.com'], count: 0, emptied: true });
+        expect(await audits.countDocuments({ action: 'agent.egress_allowlist', actorId: owner.uid, 'meta.emptied': true })).toBe(1);
     });
 });

@@ -14,17 +14,19 @@ jest.mock('../Config/config', () => {
 });
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 jest.mock('../Modules/Agents/skillRecord', () => ({ getSkill: jest.fn(), SOURCE: { CODE: 'code' } }));
-jest.mock('../Modules/Agents/engine/pageAudit', () => ({ audit: jest.fn(), extractUrl: (text) => (String(text || '').match(/https?:\/\/\S+/) || [null])[0] }));
+jest.mock('../Modules/Agents/engine/pageAudit', () => ({ audit: jest.fn(), fetchPage: jest.fn(), extractUrl: (text) => (String(text || '').match(/https?:\/\/\S+/) || [null])[0] }));
 
 const http = require('http');
 const dns = require('dns');
 const { myCache } = require('../Config/config');
 const rules = require('../Modules/Agents/engine/egressRules');
 const egressContext = require('../Modules/Agents/engine/egressContext');
-const { safeFetch, resolvePublic, isBlockedHostname } = require('../Modules/Agents/engine/safeFetch');
+const { safeFetch, resolvePublic, isBlockedHostname, isPrivateAddress } = require('../Modules/Agents/engine/safeFetch');
 const store = require('../Modules/Agents/engine/egressAllowlist');
 const skillRecord = require('../Modules/Agents/skillRecord');
 const pageAudit = require('../Modules/Agents/engine/pageAudit');
+const agentFetch = require('../Modules/Agents/engine/agentFetch');
+const logger = require('../Config/loggerConfig');
 const orchestrator = require('../Modules/Agents/engine/orchestrator');
 
 const ENV_KEY = 'AGENT_EGRESS_ALLOWLIST';
@@ -75,6 +77,26 @@ describe('egress allowlist entries', () => {
         const out = valid([entry]);
         expect(out.hosts).toEqual([]);
         expect(out.errors).toEqual([{ entry: entry.trim(), reason }]);
+    });
+
+    it.each([
+        ['*.co.uk'], ['*.com.au'], ['*.co.in'], ['*.github.io'], ['*.herokuapp.com'], ['*.pages.dev'], ['*.amazonaws.com'], ['*.s3.amazonaws.com'],
+        ['*.s3.eu-west-1.amazonaws.com'], ['*.blob.core.windows.net'], ['*.a.run.app'], ['*.co.uk:8443'], ['*.GitHub.io.'],
+    ])('refuses the wildcard %s: its base is a suffix anyone can register under', (entry) => {
+        const out = valid([entry]);
+        expect(out.hosts).toEqual([]);
+        expect(out.errors).toEqual([{ entry, reason: 'public_suffix' }]);
+    });
+
+    it('still accepts an exact host, or a wildcard on a registered name, under a shared suffix', () => {
+        const list = ['acme.github.io', 'bbc.co.uk', '*.acme.co.uk', 'bucket.s3.amazonaws.com', '*.acme.pages.dev', '*.example.com'];
+        expect(valid(list)).toEqual({ hosts: list, errors: [] });
+        expect(rules.validateHosts(['*.github.io']).errors).toEqual([{ entry: '*.github.io', reason: 'public_suffix' }]);
+    });
+
+    it('a stored wildcard on a shared suffix matches nothing', () => {
+        expect(rules.hostMatches(['*.github.io'], 'attacker.github.io', 443)).toBe(false);
+        expect(rules.hostMatches(['*.co.uk'], 'attacker.co.uk', 443)).toBe(false);
     });
 
     it('drops empty entries and refuses a list over the cap', () => {
@@ -273,6 +295,33 @@ describe('the gateway', () => {
             expect(audits(CID_A)[0].meta).toMatchObject({ reason: 'private_address', host: 'internal.example.com' });
         });
 
+        it.each([
+            ['the lookup fails', () => Promise.reject(Object.assign(new Error('getaddrinfo ENOTFOUND private-registry.example.com'), { code: 'ENOTFOUND' }))],
+            ['the lookup answers nothing', () => Promise.resolve([])],
+        ])('a DNS failure for a listed host is not a refusal when %s: no audit row, nothing counted', async (_, answer) => {
+            seedList(CID_A, ['private-registry.example.com']);
+            const lookup = jest.spyOn(dns.promises, 'lookup').mockImplementation(answer);
+            try {
+                await expect(inContext(CID_A, () => safeFetch('https://private-registry.example.com/v2/', { timeoutMs: 3000 }))).rejects.toMatchObject({ code: 'dns_failed', message: expect.stringMatching(/could not resolve private-registry\.example\.com/) });
+            } finally {
+                lookup.mockRestore();
+            }
+            await settle();
+            expect(audits(CID_A)).toEqual([]);
+            expect(await store.refusedSince(CID_A, new Date(Date.now() - 60000))).toBe(0);
+        });
+
+        it('decides the refusal on the error code, never on its text', async () => {
+            seedList(CID_A, ['api.public.test']);
+            const failing = (error) => () => Promise.reject(error);
+            await expect(fetchAs(CID_A, `http://api.public.test:${port}/page`, { resolve: failing(new Error('the private reserved resolver is down')) })).rejects.toThrow(/resolver is down/);
+            await settle();
+            expect(audits(CID_A)).toEqual([]);
+            await expect(fetchAs(CID_A, `http://api.public.test:${port}/page`, { resolve: failing(Object.assign(new Error('no'), { code: 'private_address' })) })).rejects.toThrow('no');
+            await settle();
+            expect(audits(CID_A).map((row) => row.meta.reason)).toEqual(['private_address']);
+        });
+
         it('applies the list of the workspace in context and never another workspace\'s', async () => {
             seedList(CID_A, ['docs.example.com']);
             seedList(CID_B, ['api.public.test']);
@@ -297,6 +346,142 @@ describe('the gateway', () => {
             db.crud.mockImplementationOnce(async () => { throw new Error('mongo down'); });
             await expect(fetchAs(CID_A, `http://api.public.test:${port}/page`)).rejects.toThrow(/allowlist.*read|could not read/i);
             expect(hits).toEqual([]);
+        });
+
+        const failNextListRead = (companyId) => {
+            store.invalidate(companyId);
+            mockDbFor(companyId).crud.mockImplementationOnce(async () => { throw new Error('mongo down'); });
+        };
+
+        it('an unreadable list still refuses a workspace whose last known list had hosts', async () => {
+            seedList(CID_A, ['api.public.test']);
+            expect((await fetchAs(CID_A, `http://api.public.test:${port}/page`)).status).toBe(200);
+            failNextListRead(CID_A);
+            await expect(fetchAs(CID_A, `http://api.public.test:${port}/page`)).rejects.toThrow(/allowlist.*read/i);
+            expect(hits).toHaveLength(1);
+        });
+
+        it('an unreadable list keeps today\'s behaviour for a workspace last known to have none, and is read again next time', async () => {
+            expect((await fetchAs(CID_A, `http://api.public.test:${port}/page`)).status).toBe(200);
+            expect(listReads(CID_A)).toBe(1);
+            failNextListRead(CID_A);
+            expect((await fetchAs(CID_A, `http://other.public.test:${port}/page`)).status).toBe(200);
+            await expect(fetchAs(CID_A, `http://127.0.0.1:${port}/secret`)).rejects.toThrow(/private|reserved/i);
+            expect(listReads(CID_A)).toBe(2);
+            expect(hits).toHaveLength(2);
+        });
+
+        it('a write is the last known state: a first host closes the workspace, removing the last one reopens it', async () => {
+            expect((await fetchAs(CID_A, `http://api.public.test:${port}/page`)).status).toBe(200);
+            await store.replaceHosts(CID_A, ['docs.example.com'], ACTOR);
+            failNextListRead(CID_A);
+            await expect(fetchAs(CID_A, `http://api.public.test:${port}/page`)).rejects.toThrow(/allowlist.*read/i);
+            await store.replaceHosts(CID_A, [], ACTOR);
+            failNextListRead(CID_A);
+            expect((await fetchAs(CID_A, `http://api.public.test:${port}/page`)).status).toBe(200);
+        });
+
+        it('counts the list read against the fetch deadline', async () => {
+            mockDbFor(CID_A).crud.mockImplementationOnce(() => new Promise((resolve) => { setTimeout(() => resolve(null), 700); }));
+            const started = Date.now();
+            await expect(fetchAs(CID_A, `http://api.public.test:${port}/page`, { timeoutMs: 200 })).rejects.toThrow(/time budget/);
+            expect(Date.now() - started).toBeLessThan(600);
+            expect(hits).toEqual([]);
+            await new Promise((resolve) => { setTimeout(resolve, 600); });
+        });
+    });
+});
+
+describe('resolvePublic', () => {
+    const resolving = async (answers, url = 'https://name.example.com/') => {
+        const lookup = jest.spyOn(dns.promises, 'lookup').mockImplementation(answers);
+        try { return await resolvePublic(url).then(() => null, (error) => error); } finally { lookup.mockRestore(); }
+    };
+
+    it('types its errors, so a caller never has to read the message', async () => {
+        expect(await resolving(() => Promise.reject(Object.assign(new Error('x'), { code: 'EAI_AGAIN' })))).toMatchObject({ code: 'dns_failed', message: expect.stringContaining('EAI_AGAIN') });
+        expect(await resolving(() => Promise.resolve([]))).toMatchObject({ code: 'dns_failed' });
+        expect(await resolving(() => Promise.resolve([{ address: '10.0.0.7', family: 4 }]))).toMatchObject({ code: 'private_address', message: expect.stringContaining('10.0.0.7') });
+        expect(await resolving(() => Promise.resolve([]), 'http://localhost/')).toMatchObject({ code: 'private_host' });
+    });
+});
+
+describe('IPv6 transition addresses', () => {
+    const CARRYING_PRIVATE = ['64:ff9b::a00:1', '64:ff9b::7f00:1', '64:ff9b::10.0.0.1', '64:ff9b::a9fe:a9fe', '2002:a00:1::1', '2002:7f00:1::', '2002:c0a8:101::5', '::a00:1', '::10.0.0.1', '::169.254.169.254'];
+    const CARRYING_PUBLIC = ['64:ff9b::808:808', '2002:808:808::1', '::8.8.8.8'];
+
+    it.each(CARRYING_PRIVATE)('with the flag off %s passes the private rule, as it does today', (ip) => {
+        expect(isPrivateAddress(ip)).toBe(false);
+        expect(isBlockedHostname(`[${ip}]`)).toBe(false);
+    });
+
+    describe('with the flag on', () => {
+        beforeEach(() => { process.env[ENV_KEY] = 'true'; });
+
+        it.each(CARRYING_PRIVATE)('%s is private: the IPv4 address it carries is', (ip) => {
+            expect(isPrivateAddress(ip)).toBe(true);
+            expect(isBlockedHostname(`[${ip}]`)).toBe(true);
+        });
+
+        it.each(CARRYING_PUBLIC)('%s stays public, so a DNS64 network still reaches IPv4 sites', (ip) => {
+            expect(isPrivateAddress(ip)).toBe(false);
+        });
+
+        it('leaves every other answer as it was', () => {
+            expect(['::', '::1', '::ffff:10.0.0.1', 'fc00::1', 'fe80::1', 'ff02::1', '10.0.0.1'].map(isPrivateAddress)).toEqual([true, true, true, true, true, true, true]);
+            expect(['2606:4700::1111', '2001:4860:4860::8888', '::ffff:8.8.8.8', '8.8.8.8'].map(isPrivateAddress)).toEqual([false, false, false, false]);
+        });
+
+        it('refuses and audits a listed name that resolves to one', async () => {
+            seedList(CID_A, ['nat64.example.com']);
+            const lookup = jest.spyOn(dns.promises, 'lookup').mockResolvedValue([{ address: '64:ff9b::a9fe:a9fe', family: 6 }]);
+            try {
+                await expect(egressContext.run({ companyId: CID_A, actor: ACTOR }, () => safeFetch('https://nat64.example.com/', { timeoutMs: 3000 }))).rejects.toMatchObject({ code: 'private_address' });
+            } finally {
+                lookup.mockRestore();
+            }
+            await settle();
+            expect(audits(CID_A).map((row) => row.meta)).toEqual([expect.objectContaining({ reason: 'private_address', host: 'nat64.example.com' })]);
+        });
+    });
+});
+
+describe('the agent-facing fetch', () => {
+    const PAGE = { status: 200, html: '<html></html>', bytes: 13 };
+    const URL_WITH_SECRET = `https://docs.example.com/pricing?token=${SECRET}`;
+    beforeEach(() => {
+        pageAudit.fetchPage.mockResolvedValue(PAGE);
+        pageAudit.audit.mockResolvedValue({ ok: true, facts: [] });
+    });
+
+    it('with the flag off reads with or without a workspace, as before', async () => {
+        expect(await agentFetch.fetchPage(URL_WITH_SECRET)).toBe(PAGE);
+        expect(await agentFetch.audit(URL_WITH_SECRET)).toEqual({ ok: true, facts: [] });
+        expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    describe('with the flag on', () => {
+        beforeEach(() => { process.env[ENV_KEY] = 'true'; });
+
+        it.each([
+            ['no egress context', (fn) => fn()],
+            ['a context with no company id', (fn) => egressContext.run({ actor: ACTOR }, fn)],
+        ])('refuses a read with %s before anything is fetched, and logs the host only', async (_, within) => {
+            await expect(within(() => agentFetch.fetchPage(URL_WITH_SECRET))).rejects.toMatchObject({ code: 'no_workspace', message: expect.stringMatching(/workspace/i) });
+            await expect(within(() => agentFetch.audit(URL_WITH_SECRET))).rejects.toMatchObject({ code: 'no_workspace' });
+            expect(pageAudit.fetchPage).not.toHaveBeenCalled();
+            expect(pageAudit.audit).not.toHaveBeenCalled();
+            expect(logger.error).toHaveBeenCalledTimes(2);
+            expect(logger.error.mock.calls[0][0]).toContain('docs.example.com');
+            expect(JSON.stringify(logger.error.mock.calls)).not.toContain(SECRET);
+            expect(JSON.stringify(logger.error.mock.calls)).not.toContain('/pricing');
+        });
+
+        it('reads inside a workspace context', async () => {
+            const within = (fn) => egressContext.run({ companyId: CID_A, actor: ACTOR }, fn);
+            expect(await within(() => agentFetch.fetchPage(URL_WITH_SECRET))).toBe(PAGE);
+            expect(await within(() => agentFetch.audit(URL_WITH_SECRET))).toEqual({ ok: true, facts: [] });
+            expect(pageAudit.fetchPage).toHaveBeenCalledWith(URL_WITH_SECRET);
         });
     });
 });

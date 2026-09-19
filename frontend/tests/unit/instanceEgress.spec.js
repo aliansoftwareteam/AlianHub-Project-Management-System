@@ -90,11 +90,38 @@ describe('InstanceEgress', () => {
         expect(wrapper.find(`input[data-test="host-input-${CID_A}"]`).element.value).toBe('');
     });
 
-    it('removes a host by sending the list without it', async () => {
+    it('removes a host by sending the list without it, and asks nothing while hosts remain', async () => {
+        const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
         const wrapper = await mountWith();
         await wrapper.find(`button[data-test="remove-${CID_A}-docs.example.com"]`).trigger('click');
         await flushPromises();
+        expect(confirm).not.toHaveBeenCalled();
         expect(calls('put')).toEqual([['put', `${BASE}/${CID_A}`, { hosts: ['*.api.example.com'] }]]);
+    });
+
+    describe('removing the last host', () => {
+        const oneHost = () => summary({ workspaces: [ws(CID_A, 'Acme', { hosts: ['docs.example.com'] })] });
+        const removeLast = async (wrapper) => {
+            await wrapper.find(`button[data-test="remove-${CID_A}-docs.example.com"]`).trigger('click');
+            await flushPromises();
+        };
+
+        it('asks first, saying the workspace reopens to every public host, and sends nothing when declined', async () => {
+            const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+            const wrapper = await mountWith({ summaryData: oneHost() });
+            await removeLast(wrapper);
+            expect(confirm).toHaveBeenCalledTimes(1);
+            expect(confirm).toHaveBeenCalledWith('Egress.clear_confirm');
+            expect(calls('put')).toEqual([]);
+            expect(wrapper.findAll(`[data-test="host-${CID_A}"]`)).toHaveLength(1);
+        });
+
+        it('sends the empty list once confirmed', async () => {
+            vi.spyOn(window, 'confirm').mockReturnValue(true);
+            const wrapper = await mountWith({ summaryData: oneHost() });
+            await removeLast(wrapper);
+            expect(calls('put')).toEqual([['put', `${BASE}/${CID_A}`, { hosts: [] }]]);
+        });
     });
 
     it.each([
@@ -105,6 +132,8 @@ describe('InstanceEgress', () => {
         ['https://docs.example.com', 'Egress.error_scheme'],
         ['docs.example.com/api', 'Egress.error_path'],
         ['*.com', 'Egress.error_wildcard'],
+        ['*.co.uk', 'Egress.error_public_suffix'],
+        ['*.github.io', 'Egress.error_public_suffix'],
         ['docs.example.com:99999', 'Egress.error_port'],
         ['not a host', 'Egress.error_invalid'],
     ])('refuses %s in the browser before asking the server', async (entry, message) => {
