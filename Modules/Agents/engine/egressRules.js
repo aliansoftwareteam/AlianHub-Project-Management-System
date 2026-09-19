@@ -13,6 +13,7 @@ const REASON = Object.freeze({
     SCHEME: 'scheme',
     PATH: 'path',
     WILDCARD: 'wildcard',
+    PUBLIC_SUFFIX: 'public_suffix',
     PORT: 'port',
     TOO_MANY: 'too_many',
 });
@@ -20,6 +21,34 @@ const REASON = Object.freeze({
 const LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const NUMERIC_LABELS = /^(0x[0-9a-f]+|\d+)(\.(0x[0-9a-f]+|\d+)){0,3}$/;
 const PRIVATE_NAMES = ['localhost', 'local', 'internal'];
+
+/* Suffixes anyone can register a name under, so `*.suffix` would admit every tenant of it, an attacker's
+ * included. The tree has no public-suffix package and the browser bundles this file, so this is a short list
+ * of the well-known ones, not the Public Suffix List: a wildcard on a suffix missing here is accepted. An
+ * exact host under any of them is always accepted.
+ *
+ * - country-code second levels, by shape: one of the registry labels below on a two-letter TLD (co.uk, com.au);
+ * - hosting platforms that hand out one label under the suffix (acme.github.io). A wildcard below a tenant's own
+ *   name (*.acme.pages.dev, the preview deployments) stays accepted;
+ * - cloud suffixes whose deeper levels are shared too (s3.amazonaws.com, blob.core.windows.net, a.run.app):
+ *   a wildcard anywhere at or under them is refused. */
+const REGISTRY_LABELS = ['ac', 'co', 'com', 'edu', 'gov', 'ltd', 'me', 'mil', 'ne', 'net', 'nom', 'or', 'org', 'plc', 'sch'];
+const SHARED_SUFFIXES = [
+    'github.io', 'gitlab.io', 'pages.dev', 'workers.dev', 'vercel.app', 'netlify.app', 'herokuapp.com', 'onrender.com', 'fly.dev',
+    'web.app', 'firebaseapp.com', 'azurewebsites.net', 'blogspot.com', 'wordpress.com', 'glitch.me', 'replit.app', 'replit.dev',
+    'ngrok.io', 'ngrok.app', 'ngrok-free.app', 'trycloudflare.com', 'deno.dev', 'surge.sh', 'uk.com', 'us.com', 'eu.org',
+];
+const SHARED_AT_ANY_DEPTH = [
+    'amazonaws.com', 'amazonaws.com.cn', 'cloudfront.net', 'elasticbeanstalk.com', 'windows.net', 'azureedge.net', 'cloudapp.azure.com',
+    'appspot.com', 'run.app', 'cloudfunctions.net', 'googleusercontent.com', 'digitaloceanspaces.com', 'r2.dev',
+];
+
+const isPublicSuffix = (host) => {
+    const labels = host.split('.');
+    if (labels.length === 2 && labels[1].length === 2 && REGISTRY_LABELS.includes(labels[0])) return true;
+    if (SHARED_SUFFIXES.includes(host)) return true;
+    return SHARED_AT_ANY_DEPTH.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
+};
 
 const normalizeHost = (host) => String(host || '').trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
 
@@ -61,6 +90,7 @@ function parseEntry(raw, { isBlockedHostname } = {}) {
     if (isPrivateName(bare) || (typeof isBlockedHostname === 'function' && isBlockedHostname(bare))) return { reason: REASON.PRIVATE };
     // A single label resolves through the local search domain, and a suffix on one would cover a whole top-level domain.
     if (!bare.includes('.')) return { reason: suffix ? REASON.WILDCARD : REASON.PRIVATE };
+    if (suffix && isPublicSuffix(bare)) return { reason: REASON.PUBLIC_SUFFIX };
 
     return { entry: { text: `${suffix ? '*.' : ''}${bare}${port ? `:${port}` : ''}`, host: bare, suffix, port } };
 }

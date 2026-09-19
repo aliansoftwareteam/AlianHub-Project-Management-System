@@ -122,7 +122,9 @@ exports.setHosts = async (req, res) => {
         const saved = changed
             ? await store.replaceHosts(id, hosts, req.uid || req.instanceAdmin || '')
             : { hosts: before, updatedAt: (current && current.updatedAt) || null, updatedBy: (current && current.updatedBy) || '' };
-        if (changed) auditListChange(req, id, company, { added, removed, count: hosts.length });
+        // An emptied list reopens the workspace to every public host, so the row says so rather than leaving it to count: 0.
+        const emptied = before.length > 0 && hosts.length === 0;
+        if (changed) auditListChange(req, id, company, { added, removed, count: hosts.length, ...(emptied ? { emptied: true } : {}) });
         return ok(res, changed ? 'Egress allowlist set.' : 'Egress allowlist unchanged.', {
             companyId: id, ...saved, cacheTtlSeconds: store.CACHE_TTL_SECONDS,
         });

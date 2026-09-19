@@ -121,7 +121,11 @@ const add = (w) => {
     return save(w, [...w.hosts, hosts[0]]);
 };
 
-const remove = (w, host) => save(w, w.hosts.filter((h) => h !== host));
+const remove = (w, host) => {
+    const hosts = w.hosts.filter((h) => h !== host);
+    if (!hosts.length && !window.confirm(t("Egress.clear_confirm", { name: w.name || w.companyId }))) return;
+    return save(w, hosts);
+};
 
 onMounted(load);
 </script>

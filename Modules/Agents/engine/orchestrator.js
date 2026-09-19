@@ -1,7 +1,8 @@
 const { emptyUsage } = require('../../AICore/usage');
 const { askModel, parseModelJson } = require('../../AICore/modelCall');
 const { FEATURES } = require('../../AICore/features');
-const { audit, extractUrl } = require('./pageAudit');
+const { extractUrl } = require('./pageAudit');
+const { audit } = require('./agentFetch');
 const egressContext = require('./egressContext');
 const { isBlockedHostname } = require('./safeFetch');
 const skillIndex = require('../skills');

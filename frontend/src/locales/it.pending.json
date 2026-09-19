@@ -1,7 +1,7 @@
 {
   "locale": "it",
   "machineTranslated": false,
-  "updatedAt": "2026-09-18T11:49:54.464Z",
+  "updatedAt": "2026-09-19T04:01:39.423Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -6090,6 +6090,8 @@
     "Egress.error_wildcard": "A pattern is *.example.com: one leading wildcard on a domain with at least two labels.",
     "Egress.error_port": "A port is between 1 and 65535.",
     "Egress.error_too_many": "A workspace can list at most {max} hosts.",
-    "Egress.error_duplicate": "That host is already listed."
+    "Egress.error_duplicate": "That host is already listed.",
+    "Egress.clear_confirm": "This is the last host on the list for {name}. With no hosts listed, its agents can fetch every public host again, as they did before the list existed. Remove it?",
+    "Egress.error_public_suffix": "That suffix is shared: anyone can register a name under it, so a wildcard there would allow every site on it. List the exact hosts, or a wildcard on your own name such as *.acme.co.uk."
   }
 }
