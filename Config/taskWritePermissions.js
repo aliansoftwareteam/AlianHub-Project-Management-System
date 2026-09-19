@@ -64,8 +64,7 @@ const TASK_ACTIONS = Object.freeze({
     // The web app sends this only for direct-message previews, which Chat.vue offers behind this key.
     updateLastMessageTime: entry([write('chat.one_to_one_chat')], { tasks: TASK_ID }),
     updateQueueList: entry([write('task.queue_list')], { tasks: TASK_ID }),
-    updateSupportTicket: entry([write('task.task_status')], { tasks: TASK_ID }),
-    updateArchiveDelete: entry((body) => archiveDeleteNeeds(body.deletedStatusKey), { tasks: [['task', '_id'], ['task', 'ParentTaskId']] }),
+updateArchiveDelete: entry((body) => archiveDeleteNeeds(body.deletedStatusKey), { tasks: [['task', '_id'], ['task', 'ParentTaskId']] }),
 
     convertToSubTask: entry([write('task.task_convert_to_subtask'), write('task.sub_task_create')], { tasks: [['selectedTaskId'], ['taskId']] }),
     convertToTask: entry([write('task.convert_to_task'), write('task.task_create'), inProject(DESTINATION, write('task.task_create'))], { tasks: [['taskId'], ['parentTaskId']] }),
@@ -134,8 +133,7 @@ const notATaskWrite = (by) => Object.freeze({ judged: NOT_A_TASK_WRITE, by });
 
 /* Every route in Modules whose path names tasks, with a write verb or as an app.use mount. */
 const TASK_WRITE_ROUTES = Object.freeze({
-    'POST /api/tasks': { judged: ROUTE, entry: entry([write('task.task_create')], { projects: [['data', 'ProjectID']] }) },
-    'PATCH /api/tasks/': { judged: ACTIONS, actions: PRE_V2_TASK_ACTIONS },
+'PATCH /api/tasks/': { judged: ACTIONS, actions: PRE_V2_TASK_ACTIONS },
     'POST /api/v2/tasks': { judged: ROUTE, entry: tokenEnforcedEntry('task.task_create') },
     'PATCH /api/v2/tasks': { judged: ACTIONS, actions: TASK_ACTIONS },
     'POST /api/v2/tasks/bulk': { judged: ACTIONS, actions: TASK_ACTIONS },

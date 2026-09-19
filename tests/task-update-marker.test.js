@@ -18,6 +18,7 @@ const ctrl = require('../Modules/taskIndex/controller');
 const COMPANY = '6f00000000000000000a5001';
 const PROJECT = '6f00000000000000000a5011';
 const SPRINT = '6f00000000000000000a5021';
+const OWNER = '6f00000000000000000a5031';
 const TAB_ID = `tab-${'0123456789abcdef'.repeat(2)}`;
 const JWT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiJ1c2VyLTEifQ.c2lnbmF0dXJlLXZhbHVl';
 const API_TOKEN = `ahp_${'x'.repeat(40)}`;
@@ -31,6 +32,7 @@ const drop = (updateToken) => new Promise((resolve) => {
     ctrl.updateTaskIndex({
         headers: { companyid: COMPANY },
         aud: COMPANY,
+        uid: OWNER,
         body: {
             companyId: COMPANY,
             projectId: PROJECT,
@@ -60,6 +62,10 @@ const expectNoCredential = (doc) => {
 
 beforeEach(() => {
     mockDb.store[SCHEMA_TYPE.TASKS] = [];
+    mockDb.store[SCHEMA_TYPE.PROJECTS] = [];
+    mockDb.store[SCHEMA_TYPE.COMPANY_USERS] = [];
+    mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: 'Drag' });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
     task = mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Drag me', TaskKey: 'AH-1', ProjectID: PROJECT, sprintId: SPRINT, Task_Priority: 'LOW' });
 });
 

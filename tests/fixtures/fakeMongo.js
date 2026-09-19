@@ -1,5 +1,5 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
-// language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type, $set/$inc/$push,
+// language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type/$size, $set/$inc/$push/$addToSet/$pull,
 // conditional findOneAndUpdate, updateOne and findOneAndUpdate with upsert and $setOnInsert, findOneAndDelete, deleteOne, deleteMany,
 // sort/limit on find, $match/$project/$addFields ($toString)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000) so a test can assert on what was written.
@@ -43,6 +43,7 @@ const matches = (doc, filter = {}) => Object.entries(filter).every(([key, cond])
             if (op === '$lte') return value <= want;
             if (op === '$lt') return value < want;
             if (op === '$exists') return (value !== undefined) === arg;
+            if (op === '$size') return Array.isArray(value) && value.length === arg;
             if (op === '$type') return arg === 'string' ? typeof value === 'string' : typeof value === arg;
             if (op === '$regex') return new RegExp(arg, cond.$options || '').test(String(value));
             if (op === '$options') return true;
@@ -66,6 +67,15 @@ const apply = (doc, update = {}) => {
     Object.entries(update.$inc || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = Number(t[l] || 0) + v; }));
     Object.entries(update.$push || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = [...(t[l] || []), ...(v && Array.isArray(v.$each) ? v.$each : [v])]; }));
     Object.entries(update.$unset || {}).forEach(([k]) => write(doc, k, (t, l) => { delete t[l]; }));
+    Object.entries(update.$addToSet || {}).forEach(([k, v]) => write(doc, k, (t, l) => {
+        const list = Array.isArray(t[l]) ? t[l] : [];
+        (v && Array.isArray(v.$each) ? v.$each : [v]).forEach((item) => { if (!list.some((have) => hex(have) === hex(item))) list.push(item); });
+        t[l] = list;
+    }));
+    Object.entries(update.$pull || {}).forEach(([k, v]) => write(doc, k, (t, l) => {
+        const gone = (item) => (isOperatorObject(v) ? matches({ it: item }, { it: v }) : (v && typeof v === 'object' && !Array.isArray(v) ? matches(item, v) : hex(item) === hex(v)));
+        t[l] = (Array.isArray(t[l]) ? t[l] : []).filter((item) => !gone(item));
+    }));
     return doc;
 };
 
@@ -106,9 +116,10 @@ const ACCUMULATORS = {
     $max: (prev, v) => (v == null || (prev != null && sortable(prev) >= sortable(v)) ? prev : v),
     $min: (prev, v) => (v == null || (prev != null && sortable(prev) <= sortable(v)) ? prev : v),
     $first: (prev, v, seen) => (seen ? prev : v),
+    $push: (prev, v) => [...(prev || []), v],
 };
 
-/* $group with a field or compound _id and $sum / $max / $min / $first; a group naming no accumulator counts into `n`. */
+/* $group with a field or compound _id and $sum / $max / $min / $first / $push; a group naming no accumulator counts into `n`. */
 const group = (docs, spec) => {
     const fields = Object.entries(spec).filter(([name]) => name !== '_id');
     const out = new Map();
@@ -145,7 +156,8 @@ const project = (doc, spec, search) => {
 
 const duplicateKey = (fields) => Object.assign(new Error(`E11000 duplicate key error collection: fake index: ${fields.join('_1_')}_1`), { code: 11000 });
 
-const create = () => {
+/* With `mongooseCasting`, an undefined value is dropped from a filter the way the driver drops it, so { _id: undefined } matches every row. */
+const create = ({ mongooseCasting = false } = {}) => {
     const store = {};
     const calls = [];
     const uniques = {};
@@ -163,8 +175,13 @@ const create = () => {
         return inserted;
     };
 
-    const crud = jest.fn(async (companyId, { type, data }, method) => {
-        calls.push({ companyId, type, method, data });
+    const castFilter = (filter) => (mongooseCasting && filter && typeof filter === 'object' && !Array.isArray(filter)
+        ? Object.fromEntries(Object.entries(filter).filter(([, value]) => value !== undefined))
+        : filter);
+
+    const crud = jest.fn(async (companyId, { type, data: sent }, method) => {
+        calls.push({ companyId, type, method, data: sent });
+        const data = Array.isArray(sent) && method !== 'aggregate' ? [castFilter(sent[0]), ...sent.slice(1)] : sent;
         const list = rows(type);
         if (method === 'save') {
             const doc = { _id: data._id ? String(data._id) : nextId(), createdAt: new Date(), ...data };

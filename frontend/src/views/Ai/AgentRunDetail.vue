@@ -48,6 +48,19 @@
                 <span v-if="skillIdentity" class="ah-mono ah-small" data-test="skill-identity">{{ skillIdentity }}</span>
             </div>
 
+            <div v-if="run.tainted" class="run-detail__taint" data-test="tainted">
+                <div class="run-detail__taint-head">
+                    <span class="ah-chip ah-chip--warn" data-test="tainted-chip">{{ $t('Audit.tainted') }}</span>
+                    <span class="ah-small" data-test="tainted-reason">{{ $t('Audit.tainted_reason') }}</span>
+                </div>
+                <ul class="run-detail__taint-sources">
+                    <li v-for="s in taintSources" :key="`${s.kind}-${s.ref}`" class="ah-small" data-test="taint-source">
+                        <span>{{ taintKind(s.kind) }}</span>
+                        <span class="ah-mono">{{ s.ref }}</span>
+                    </li>
+                </ul>
+            </div>
+
             <AgentRunTrace :run="run" :can-view-replay="privileged" @view-replay="viewReplay" />
 
             <div class="run-detail__head">
@@ -94,6 +107,7 @@ import { useAgentAccess } from "./agentAccess";
 import { normaliseEpisode, declinedLine as declinedText } from "./episodeText";
 import AgentRunReplay from "./AgentRunReplay.vue";
 import AgentRunTrace from "./AgentRunTrace.vue";
+import { taintKindLabel, taintSourcesOf } from "./taintText";
 
 defineOptions({ name: "AgentRunDetail" });
 
@@ -122,6 +136,8 @@ const skillIdentity = computed(() => {
 
 const replayPanel = ref(null);
 const viewReplay = (id) => replayPanel.value?.focus(id);
+const taintSources = computed(() => taintSourcesOf(run.value));
+const taintKind = (kind) => taintKindLabel(t, kind);
 const decisions = computed(() => (Array.isArray(run.value?.decisions) ? run.value.decisions : []));
 const deadline = computed(() => undoDeadlineOf(run.value));
 const windowOpen = computed(() => !deadline.value || new Date(deadline.value).getTime() > Date.now());
@@ -187,6 +203,10 @@ onMounted(load);
 .run-failure__meta dd { margin: 0; color: var(--ink); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .run-detail__pin { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .run-detail__revision { text-decoration: none; }
+.run-detail__taint { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--hairline); }
+.run-detail__taint-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--ink-2); }
+.run-detail__taint-sources { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--ink); }
+.run-detail__taint-sources li { display: flex; align-items: center; gap: 6px; }
 .run-episode { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--hairline); }
 .run-episode__stats { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font: var(--text-small); color: var(--ink); }
 .run-detail__waiting { margin: 0 0 10px; }

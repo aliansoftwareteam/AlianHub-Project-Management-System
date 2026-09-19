@@ -2,7 +2,7 @@ const { dbCollections } = require('../../../../Config/collections')
 const { sanitizeInput } = require("../../../serviceFunction");
 const { HandleHistory,HandleTask,convertToSubTaskFunction, moveTaskFunction, convertToListSubTask,mergeSubTask, duplicateSubTaskFunction, addHistoryCollection, removeCommentCount,updateHistoryCollection, updateTimesheetCollection, updateEstimatedTimeCollection} = require("../mongo_helper")
 
-const { createTask, taskAssigneeAdd, taskAssigneeRemove,taskAssigneeReplace, taskNameEdit, taskPriorityChange, taskStatusChange, taskAttachmentAdd, taskAttachmentRemove, taskTypeChage, taskTotalEstimate } = require('../notificationTemplate')
+const { createTask, taskAssigneeAdd, taskAssigneeRemove,taskAssigneeReplace, taskNameEdit, taskPriorityChange, taskStatusChange, taskAttachmentAdd, taskAttachmentRemove, taskTypeChage, taskTotalEstimate, shownTaskType } = require('../notificationTemplate')
 const { HandleBothNotification } = require("../handleNotification")
 const logger = require("../../../../Config/loggerConfig")
 const { addSprintFun, updateSprintFun } = require("../../../Sprints/controller")
@@ -20,19 +20,22 @@ const { emitListener } = require("../../../Company/eventController.js");
 const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
-const { taskNotFound } = require('../taskWriteFields');
+const { taskNotFound, escapeText } = require('../taskWriteFields');
+
+const shownName = (employeeName) => (Array.isArray(employeeName) ? employeeName.map(escapeText).join(',') : escapeText(employeeName));
 module.exports = {
 
     /* -------------- UPDATE ASSIGNEE ADD OR ASSIGNEE REMOVE FUNCTION FOR TASK -----------------*/
 
-    updateAssignee({firebaseObj,projectData ,taskData,employeeName,type,userData,isUpdateTask}) {
+    updateAssignee({firebaseObj,projectData ,taskData,employeeName: sentName,type,userData,isUpdateTask}) {
         return new Promise((resolve,reject) => {
             try {
+                const employeeName = shownName(sentName);
                 if (isUpdateTask === false) {
                     let obj = {
                         'ProjectName' : projectData.ProjectName,
                         'TaskName' : taskData.TaskName,
-                        'Employee_Name' : (type === 'replace') ? employeeName && Array.isArray(employeeName) ? employeeName.join(",") : employeeName : employeeName
+                        'Employee_Name' : employeeName
                     }
                     var notificationObject = {};
                     var historyObj = {};
@@ -108,7 +111,8 @@ module.exports = {
                     MongoDbCrudOpration(projectData.CompanyId,object, "findOne").then((response) => {
                         let updateTask = true;
                         if (!response) {
-                            throw new Error("Task document does not exist!");
+                            reject(taskNotFound());
+                            return false;
                         }
                         let assigneeUserId = response.AssigneeUserId || [];
 
@@ -146,7 +150,7 @@ module.exports = {
                                 socketEmitter.emit('update', { type: "update", data: result , updatedFields: mongoUpdateObj, module: 'task' });
                                 resolve({status: true, statusText: "Assignee updated successfully"});
                                 try {
-                                    this.updateWatcher({companyId : projectData.CompanyId, projectId: projectData._id, sprintId: taskData.sprintId, taskId: taskData._id, userId: uid, add: type === "assigneeAdd", type: type,userData:userData,employeeName:employeeName})
+                                    this.updateWatcher({companyId : projectData.CompanyId, projectId: projectData._id, sprintId: taskData.sprintId, taskId: taskData._id, userId: uid, add: type === "assigneeAdd", type: type,userData:userData,employeeName:sentName})
                                     .catch((error) => {
                                         logger.error("ERROR in update watcher:", error);
                                     })
@@ -156,7 +160,7 @@ module.exports = {
                                 let obj = {
                                     'ProjectName' : projectData.ProjectName,
                                     'TaskName' : taskData.TaskName,
-                                    'Employee_Name' : (type === 'replace') ? employeeName && Array.isArray(employeeName) ? employeeName.join(",") : employeeName : employeeName
+                                    'Employee_Name' : employeeName
                                 }
                                 var notificationObject = {};
                                 var historyObj = {};
@@ -213,12 +217,12 @@ module.exports = {
                                 .catch((error) => {
                                     logger.error(`ERROR in history: ${error.message}`);
                                 });
-                            })
+                            }).catch(reject);
                             return assigneeUserId;
                         } else {
                             return false;
                         }
-                    })
+                    }).catch(reject);
                 }
             } catch (error) {
                 reject(error)
@@ -228,9 +232,10 @@ module.exports = {
 
     /* -------------- UPDATE TASK LEADER (CREATED BY) FUNCTION FOR TASK -----------------*/
 
-    updateTaskLeader({firebaseObj, projectData, taskData, employeeName, userData, isUpdateTask}) {
+    updateTaskLeader({firebaseObj, projectData, taskData, employeeName: sentName, userData, isUpdateTask}) {
         return new Promise((resolve, reject) => {
             try {
+                const employeeName = shownName(sentName);
                 const newLeaderId = firebaseObj && firebaseObj.Task_Leader;
                 if (!newLeaderId) {
                     reject(new Error("Task_Leader is required"));
@@ -259,7 +264,8 @@ module.exports = {
                 };
                 MongoDbCrudOpration(projectData.CompanyId, findObj, "findOne").then((response) => {
                     if (!response) {
-                        throw new Error("Task document does not exist!");
+                        reject(taskNotFound());
+                        return;
                     }
 
                     const mongoUpdateObj = { $set: { Task_Leader: newLeaderId } };
@@ -297,9 +303,10 @@ module.exports = {
     },
 
     /* -------------- UPDATE TASK WATCHER -----------------*/
-    updateWatcher({companyId, projectId, sprintId, taskId, userId, add, userData, employeeName}) {
+    updateWatcher({companyId, projectId, sprintId, taskId, userId, add, userData, employeeName: sentName}) {
         return new Promise((resolve, reject) => {
             try {
+                const employeeName = shownName(sentName);
                 const schema = SCHEMA_TYPE.TASKS
                 let queryObj = {};
                 let queryFilter;
@@ -354,14 +361,8 @@ module.exports = {
             try {
                 if (isUpdateTask === false) {
                     resolve({status: true, statusText: "Tasktype updated successfully"});
-                    let notificationObj = {
-                        'ProjectName' : projectData?.ProjectName,
-                        'taskName' : taskData?.TaskName,
-                        'oldTaskTypeImage' : prevStatus?.taskImage,
-                        'oldTaskTypeName' : prevStatus?.name,
-                        'newTaskTypeImage' : newStatus?.taskTypeImage,
-                        'newTaskTypeName' : newStatus?.taskTypeName
-                    };
+                    const shown = shownTaskType(prevStatus || {}, newStatus || {});
+                    let notificationObj = { 'ProjectName' : projectData?.ProjectName, 'taskName' : taskData?.TaskName, ...shown.template };
                     let notificationObject = {
                         key: "task_type",
                         message : taskTypeChage(notificationObj),
@@ -386,7 +387,7 @@ module.exports = {
 
                     let historyObj = {};
                     historyObj.key = "Task_TYPE";
-                    historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Task Type</b> as <b>${newStatus?.taskTypeName}</b>.`;
+                    historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Task Type</b> as <b>${shown.newTaskTypeName}</b>.`;
                     historyObj.sprintId = taskData.sprintId;
                     
                     if (historyObj !== null && Object.keys(historyObj).length > 0) {
@@ -423,14 +424,8 @@ module.exports = {
                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: updatedTaskObj, module: 'task' });
                         resolve({status: true, statusText: "Tasktype updated successfully"});
 
-                        let notificationObj = {
-                            'ProjectName' : projectData?.ProjectName,
-                            'taskName' : taskData?.TaskName,
-                            'oldTaskTypeImage' : prevStatus?.taskImage,
-                            'oldTaskTypeName' : prevStatus?.name,
-                            'newTaskTypeImage' : newStatus?.taskTypeImage,
-                            'newTaskTypeName' : newStatus?.taskTypeName
-                        };
+                        const shown = shownTaskType(prevStatus || {}, newStatus || {});
+                        let notificationObj = { 'ProjectName' : projectData?.ProjectName, 'taskName' : taskData?.TaskName, ...shown.template };
                         let notificationObject = {
                             key: "task_type",
                             message : taskTypeChage(notificationObj),
@@ -455,7 +450,7 @@ module.exports = {
     
                         let historyObj = {};
                         historyObj.key = "Task_TYPE";
-                        historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Tasktype</b> as <b>${newStatus?.taskTypeName}</b>.`;
+                        historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Tasktype</b> as <b>${shown.newTaskTypeName}</b>.`;
                         historyObj.sprintId = taskData.sprintId;
                         
                         if (historyObj !== null && Object.keys(historyObj).length > 0) {

@@ -5763,7 +5763,15 @@ export default {
         "integrity_broken_row": "Broken",
         "integrity_broken_row_hint": "This row is outside the chain but was written after the chain started, for example while the audit chain was off, or it carries a change that is not part of the chain.",
         "names_not_checked": "Names aren't covered by the integrity check. The ids beside them are.",
-        "total_approximate": "The count is approximate: some rows it includes no longer match this filter once their recorded changes are checked."
+        "total_approximate": "The count is approximate: some rows it includes no longer match this filter once their recorded changes are checked.",
+        "tainted": "Read external content",
+        "tainted_reason": "This run took in content from outside the workspace, so its risky changes need a person's approval.",
+        "taint_kind_fetch": "Web page",
+        "taint_kind_email": "Email",
+        "taint_kind_form": "Form submission",
+        "taint_kind_webhook": "Webhook",
+        "taint_kind_file": "Uploaded file",
+        "taint_kind_passage": "Knowledge passage"
     },
     "Offline": {
         "offline_msg": "You're offline — changes are saved and will sync when you reconnect.",

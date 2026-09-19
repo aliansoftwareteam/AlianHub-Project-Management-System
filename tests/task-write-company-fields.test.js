@@ -35,6 +35,7 @@ const { TASK_ACTIONS, PRE_V2_TASK_ACTIONS, RELATION_ACTIONS, BODY_COMPANY_PATHS 
 const WEB_APP_BODIES = require('./fixtures/taskWriteBodies');
 const { TASK_ACTION_FIELDS, TASK_INDEX_FIELDS, TASK_INDEX_ONLOAD_FIELDS, prepareTaskWrite } = require('../Modules/Tasks/helpers/taskWriteFields');
 const { CID, OTHER_COMPANY, OWNER, MEMBER, OPEN_PROJECT, PARITY_PROJECT, OPEN_TASK, OPEN_TASK_2, MISSING_TASK } = require('./fixtures/taskWriteGuard');
+const { SCHEMA_TYPE } = require('../Config/schemaType');
 
 mongoHelper.getTotalSprintCount = async () => true;
 
@@ -115,7 +116,9 @@ const reset = () => {
     mockDb.calls.length = 0;
     logger.warn.mockClear();
     [OPEN_PROJECT, OTHER_PROJECT_ID].forEach((_id) => mockDb.seed('projects', { _id, ProjectName: 'Parity', ProjectCode: 'PAR', CompanyId: CID, lastTaskId: 4, taskStatusData: STATUS_LIST, taskTypeCounts: TYPE_LIST }));
-    mockDb.seed('tasks', taskDoc(OPEN_TASK));
+    mockDb.seed(SCHEMA_TYPE.USERS, { _id: OWNER, Employee_Name: 'Olivia Owner' });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
+mockDb.seed('tasks', taskDoc(OPEN_TASK));
     mockDb.seed('tasks', taskDoc(OPEN_TASK_2));
 };
 
@@ -123,9 +126,12 @@ beforeEach(reset);
 
 const storedTask = (id = OPEN_TASK) => clone(mockDb.store.tasks.find((task) => String(task._id) === id) || null);
 const taskIds = () => (mockDb.store.tasks || []).map((task) => String(task._id)).sort();
-const companiesWritten = () => [...new Set(mockDb.calls.map((c) => (typeof c.companyId === 'string' ? c.companyId : JSON.stringify(c.companyId))))];
+const READS = ['find', 'findOne', 'aggregate', 'countDocuments'];
+const companiesWritten = () => [...new Set(mockDb.calls.filter((c) => !READS.includes(c.method)).map((c) => (typeof c.companyId === 'string' ? c.companyId : JSON.stringify(c.companyId))))];
 
 const USER = { Employee_Name: 'Max Member', id: MEMBER, companyOwnerId: OWNER };
+/* What the routes hand the handlers for the signed-in owner: the body's userData is not the actor. */
+const ACTOR = { id: OWNER, Employee_Name: 'Olivia Owner' };
 const projectData = () => ({ _id: OPEN_PROJECT, id: OPEN_PROJECT, CompanyId: CID, ProjectName: 'Parity', ProjectCode: 'PAR', lastTaskId: 4, taskTypeCounts: TYPE_LIST, taskStatusData: STATUS_LIST });
 const sprintObj = () => ({ id: SPRINT, name: 'Sprint 1', folderId: null });
 
@@ -145,7 +151,6 @@ const fixtureBody = (route, action) => {
 };
 
 const CRAFTED = {
-    updateSupportTicket: () => ({ action: 'updateSupportTicket', companyId: CID, taskId: OPEN_TASK, updateObj: { statusKey: 2 } }),
     addTaskRelation: () => ({ action: 'addTaskRelation', companyId: CID, taskId: OPEN_TASK, relatedTaskId: OPEN_TASK_2, type: 'blocks', userData: USER }),
     removeTaskRelation: () => ({ action: 'removeTaskRelation', companyId: CID, taskId: OPEN_TASK, relatedTaskId: OPEN_TASK_2, userData: USER }),
     getTaskRelations: () => ({ action: 'getTaskRelations', companyId: CID, taskId: OPEN_TASK }),
@@ -195,7 +200,6 @@ const WRITES = [
     ...Object.entries(RELATION_ACTIONS).map(([action, entry]) => [RELATIONS, action, entry.method]),
     ...Object.keys(PRE_V2_TASK_ACTIONS).map((action) => [PRE_V2, action, null]),
     ['POST /api/v2/tasks', null, 'create'],
-    ['POST /api/tasks', null, 'create'],
     ['PATCH /api/v1/importTasks', null, 'createMultipleTasks'],
     ['POST /api/v1/taskIndex', null, null],
     ['POST /api/v1/updateTaskIndexOnload', null, null],
@@ -276,7 +280,9 @@ const COPIED_OBJECTS = [
     [PATCH, 'updateTaskTotalEstimate', 'firebaseObj'],
     [PATCH, 'updatePoints', 'firebaseObj'],
     [PATCH, 'updateTaskType', 'newStatus'],
-    [PATCH, 'updateSupportTicket', 'updateObj'],
+    [PATCH, 'updateDates', 'firebaseObj'],
+    [PATCH, 'updateAssignee', 'firebaseObj'],
+    [PATCH, 'updateTaskLeader', 'firebaseObj'],
     [PATCH, 'bulkUpdateStatus', 'newStatus'],
     [BULK, 'bulkUpdateStatus', 'newStatus'],
     [BULK, 'bulkUpdatePriority', 'firebaseObj'],
@@ -346,7 +352,7 @@ describe('an action changes only the fields it is built to change', () => {
         expect(stored.status).toEqual(taskDoc(OPEN_TASK).status);
     });
 
-    test('unknown fields are logged once per action, not on every request', () => {
+    test('unknown fields are logged once a minute per action, not on every request', () => {
         jest.isolateModules(() => {
             const freshLogger = require('../Config/loggerConfig');
             const fields = require('../Modules/Tasks/helpers/taskWriteFields');
@@ -463,8 +469,9 @@ const taskWrites = () => normalise(mockDb.calls
     .map((row) => JSON.stringify(row))
     .sort();
 
-/* What beta's routes handed the handler for the same body. */
-const directly = async (route, body) => {
+/* What the routes hand the handler for the same body: the session's actor in place of the body's. */
+const directly = async (route, sent) => {
+    const body = { ...sent, ...(route === 'POST /api/v2/tasks' ? { user: ACTOR } : { userData: ACTOR }) };
     if (route === BULK) return taskMongo[body.action]({ ...body, companyId: CID });
     if (route === RELATIONS) return taskMongo[RELATION_ACTIONS[body.action].method]({ ...body, companyId: CID });
     if (route === 'POST /api/v2/tasks') return taskMongo.create(body);
