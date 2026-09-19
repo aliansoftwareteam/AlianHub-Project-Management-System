@@ -35,14 +35,19 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let client;
 let agentId;
 const credentials = {};
+const renewed = {};
 
 const actorFor = (token) => ({ kind: 'agent', userId: STARTER, agentId, agentName: 'Reviewer', runId: 'agentrun', viaAccount: 'workspace', tokenId: null, stepCredential: token });
 
 /* Stands in for the agent runner: checks its credential the way perform() does, then reports a finished run. */
-const runAgent = async ({ stepId, stepCredential: token }) => {
-    credentials[stepId] = token;
-    const live = await stepCredential.check(COMPANY, token, { action: 'task.get' });
+const runAgent = async ({ stepId, stepCredential: current, keepAlive }) => {
+    credentials[stepId] = current();
+    const live = await stepCredential.check(COMPANY, credentials[stepId], { action: 'task.get', actor: actorFor(credentials[stepId]) });
     if (!live.ok) throw Object.assign(new Error(`credential refused inside the step: ${live.reason}`), { deterministic: true });
+    if (stepId === 'sTwo') {
+        await keepAlive();
+        renewed[stepId] = current();
+    }
     return { runId: `agentrun-${stepId}`, status: 'done', costUsd: 0, findings: [] };
 };
 
@@ -113,13 +118,24 @@ describe('a two-step workflow run under step-scoped credentials', () => {
             // eslint-disable-next-line no-await-in-loop
             const step = await row(run._id, stepId);
             const claims = jwt.decode(credentials[stepId]);
+            const onTheRow = jwt.decode(renewed[stepId] || credentials[stepId]);
             expect(step.status).toBe('success');
-            expect(step.credentialId).toBe(claims.jti);
-            expect(new Date(step.credentialExpiresAt).getTime()).toBe(claims.exp * 1000);
+            expect(step.credentialId).toBe(onTheRow.jti);
+            expect(new Date(step.credentialExpiresAt).getTime()).toBe(onTheRow.exp * 1000);
             expect(claims).toMatchObject({ kind: 'step_credential', companyId: COMPANY, runId: String(run._id), stepId, fencingToken: step.fencingToken, agentId, startedBy: STARTER, actions: ['task.get', 'task.comment'] });
             expect(new Date(step.credentialExpiresAt).getTime() - new Date(step.claimedAt).getTime()).toBeGreaterThanOrEqual(19000);
         }
         expect(credentials.sOne).not.toBe(credentials.sTwo);
+    });
+
+    it('re-mints a step\'s credential when its lease is extended, under the same fencing token, and keeps only the new id on the row', async () => {
+        const [first, second] = [jwt.decode(credentials.sTwo), jwt.decode(renewed.sTwo)];
+        expect(second.jti).not.toBe(first.jti);
+        expect(second).toMatchObject({ runId: first.runId, stepId: 'sTwo', stepRunId: first.stepRunId, fencingToken: first.fencingToken, agentId, startedBy: STARTER });
+        expect(second.exp).toBeGreaterThanOrEqual(first.exp);
+        const step = await row(run._id, 'sTwo');
+        expect(step.credentialId).toBe(second.jti);
+        expect(JSON.stringify(step)).not.toContain(renewed.sTwo);
     });
 
     it('records each step under the engine service identity, on behalf of the person who started the run', async () => {
@@ -145,15 +161,19 @@ describe('a two-step workflow run under step-scoped credentials', () => {
         expect(late.meta.ran).toBe(false);
     });
 
-    it('refuses a credential whose step was reclaimed by a later attempt', async () => {
+    /* The first claim is dated a minute ago, so by the time the step is reclaimed both its lease
+     * and its credential have run out: no sleep, and no whole-second boundary to land on. */
+    it('refuses a credential whose step was reclaimed by a later attempt, as reclaimed even though it has also expired', async () => {
         const second = await startRun([agentStep('sRetry')]);
-        const claimed = await store.claimStep(COMPANY, { runId: second._id, stepId: 'sRetry', workerId: 'w1', lease: 500 });
-        const first = stepCredential.mint({ companyId: COMPANY, run: second, step: claimed, actions: ['task.get'] });
-        expect((await stepCredential.check(COMPANY, first.token, { action: 'task.get' })).ok).toBe(true);
-        await sleep(600);
+        const then = new Date(Date.now() - 60000);
+        const claimed = await store.claimStep(COMPANY, { runId: second._id, stepId: 'sRetry', workerId: 'w1', lease: 500, now: then });
+        const first = stepCredential.mint({ companyId: COMPANY, run: second, step: claimed, actions: ['task.get'], now: then });
+        const presented = { action: 'task.get', actor: actorFor(first.token) };
+        expect((await stepCredential.check(COMPANY, first.token, { ...presented, now: then })).ok).toBe(true);
+        expect(jwt.decode(first.token).exp * 1000).toBeLessThan(Date.now());
         const reclaimed = await store.claimStep(COMPANY, { runId: second._id, stepId: 'sRetry', workerId: 'w2', lease: 20000 });
         expect(reclaimed.fencingToken).toBe(claimed.fencingToken + 1);
-        const verdict = await stepCredential.check(COMPANY, first.token, { action: 'task.get' });
+        const verdict = await stepCredential.check(COMPANY, first.token, presented);
         expect(verdict).toMatchObject({ ok: false, code: stepCredential.REFUSAL.STEP_RECLAIMED });
     });
 });

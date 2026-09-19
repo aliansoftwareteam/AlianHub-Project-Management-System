@@ -25,9 +25,10 @@ const expiresAt = new Date(Date.now() + 15 * MINUTE).toISOString();
 
 const row = (over) => ({ _id: over.stepId, kind: 'step_scoped', runId: 'run-1', runName: 'Nightly review', stepId: 'sAgent', stepType: 'agent_run', issuedAt, expiresAt, startedBy: { id: 'u1', name: 'Olivia Owner' }, ...over });
 
+/* The tokens list names the flag in its policy only while it is on, which is what the screen reads before asking for the list. */
 const serve = ({ on, rows = [] }) => {
     apiRequest.mockImplementation((method, url) => {
-        if (method === 'get' && url === '/api/v2/api-tokens') return Promise.resolve({ data: { status: true, data: [], policy: { strict: false } } });
+        if (method === 'get' && url === '/api/v2/api-tokens') return Promise.resolve({ data: { status: true, data: [], policy: { strict: false, ...(on ? { stepCredentials: true } : {}) } } });
         if (method === 'get' && url === ROUTE) return Promise.resolve({ data: { status: true, data: rows, policy: { stepCredentials: on } } });
         if (method === 'get' && url === '/api/v2/agents/account') return Promise.resolve({ data: { status: true, data: { account: null, policy: { allowedModes: ['workspace', 'personal', 'local'] }, summary: {} } } });
         return Promise.resolve({ data: { status: true, data: [] } });
@@ -78,7 +79,12 @@ describe('step-scoped credentials on the tokens screen', () => {
         expect(rows[0].find('.acct-token__name').text()).toBe('Campaign build');
         expect(rows[0].text()).toContain('sResearch');
         expect(rows[0].text()).toContain('Max Member');
-        expect(rows[0].text()).toContain(t('Accounts.step_scoped_expires', { d: new Date(expiresAt).toLocaleString() }));
+        expect(rows[0].text()).toContain(t('Accounts.step_scoped_first_issued', { d: new Date(issuedAt).toLocaleString() }));
+        expect(rows[0].text()).toContain(t('Accounts.step_scoped_current_expires', { d: new Date(expiresAt).toLocaleString() }));
+        expect(t('Accounts.step_scoped_current_expires', { d: 'x' })).toMatch(/renewed/i);
+        expect(t('Accounts.step_scoped_lead')).toMatch(/extends the step's lease/i);
+        expect(en.Accounts.step_scoped_expires).toBeUndefined();
+        expect(en.Accounts.step_scoped_issued).toBeUndefined();
         expect(rows[1].find('.acct-token__name').text()).toBe('Nightly review');
         expect(rows[1].text()).toContain('Olivia Owner');
         expect(section.text()).not.toMatch(/eyJ|credentialId|ahp_/);
@@ -98,8 +104,19 @@ describe('step-scoped credentials on the tokens screen', () => {
         expect(wrapper.findAll('[data-test="step-credential-row"]')).toHaveLength(1);
     });
 
-    it('hides the section while step credentials are off', async () => {
+    it('hides the section and never asks for the list while step credentials are off', async () => {
         const wrapper = await openTokens({ on: false, rows: [row({ stepId: 'sAgent' })] }, 2);
         expect(wrapper.find('[data-test="step-credential-list"]').exists()).toBe(false);
+        expect(listCalls()).toHaveLength(0);
+    });
+
+    it('forgets the rows of an earlier visit once the policy says off', async () => {
+        const before = await openTokens({ on: true, rows: [row({ stepId: 'sAgent' })] }, 2);
+        expect(before.findAll('[data-test="step-credential-row"]')).toHaveLength(1);
+        before.unmount();
+        apiRequest.mockReset();
+        const after = await openTokens({ on: false }, 2);
+        expect(after.find('[data-test="step-credential-list"]').exists()).toBe(false);
+        expect(listCalls()).toHaveLength(0);
     });
 });

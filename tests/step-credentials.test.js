@@ -38,6 +38,10 @@ const agentAudit = require('../Modules/Agents/agentAudit');
 const store = require('../Modules/Workflows/store');
 const engine = require('../Modules/Workflows/engine');
 const stepCredential = require('../Modules/Workflows/stepCredential');
+const agentRunner = require('../Modules/Workflows/agentRun');
+const agentRuns = require('../Modules/Agents/runs');
+const automationTools = require('../Modules/Automations/engine/tools');
+const automationRegistry = require('../Modules/Automations/engine/registry');
 require('../Modules/Workflows/stepTypes');
 
 const C = '6f0000000000000000000c01';
@@ -46,7 +50,8 @@ const AGENT_ID = '6f0000000000000000000a01';
 const STARTER = '6f0000000000000000000101';
 const OTHER_STARTER = '6f0000000000000000000102';
 const TASK_ID = '6f0000000000000000000701';
-const ENV_KEYS = ['STEP_CREDENTIALS', 'STEP_CREDENTIAL_SECRET', 'WORKFLOW_ENGINE', 'WORKFLOW_LEASE_MS', 'WORKFLOW_TENANT_CONCURRENCY'];
+const AGENT_RUN_ID = '6f0000000000000000000b01';
+const ENV_KEYS = ['STEP_CREDENTIALS', 'STEP_CREDENTIAL_SECRET', 'WORKFLOW_ENGINE', 'WORKFLOW_LEASE_MS', 'WORKFLOW_HEARTBEAT_MS', 'WORKFLOW_TENANT_CONCURRENCY'];
 const saved = {};
 
 const rows = (type) => mockDb.store[type] || [];
@@ -77,6 +82,10 @@ const claimAndMint = async (runId = 'r1', { lease = 60000, actionsGranted = ['ta
     return { run, claimed, claim: { runId, stepId: 'sAgent', fencingToken: Number(claimed.fencingToken) }, ...minted };
 };
 
+const ONLY_THE_CLOCK = ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance'];
+const freezeClockAt = (now) => jest.useFakeTimers({ doNotFake: ONLY_THE_CLOCK, now });
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const performWith = (token, over = {}) => actions.perform({ companyId: C, actor: agentActor({ stepCredential: token }), action: 'task.comment', params: { body: 'hello' }, ...over });
 
 const response = () => {
@@ -101,6 +110,7 @@ beforeEach(() => {
     mockDb.seed(dbCollections.USERS, { _id: STARTER, Employee_Name: 'Olivia Owner' });
     mockDb.seed(dbCollections.USERS, { _id: OTHER_STARTER, Employee_Name: 'Max Member' });
 });
+afterEach(() => { jest.useRealTimers(); jest.restoreAllMocks(); });
 afterAll(() => { ENV_KEYS.forEach((k) => { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }); });
 
 describe('with STEP_CREDENTIALS off, nothing changes', () => {
@@ -108,13 +118,17 @@ describe('with STEP_CREDENTIALS off, nothing changes', () => {
         flag(false);
         const run = seedRun('r1');
         const seen = [];
-        const result = await engine.runStep(C, run, (await store.listSteps(C, 'r1'))[0], {
-            context: { runAgent: async (args) => { seen.push(args); return { runId: 'ar1', status: 'done', costUsd: 0, findings: [] }; } },
-            steps: await store.listSteps(C, 'r1'),
+        const pending = (await store.listSteps(C, 'r1'))[0];
+        const steps = await store.listSteps(C, 'r1');
+        mockDb.calls.length = 0;
+        const result = await engine.runStep(C, run, pending, {
+            context: { runAgent: async (args) => { seen.push(args); await args.keepAlive(); return { runId: 'ar1', status: 'done', costUsd: 0, findings: [] }; } },
+            steps,
         });
         expect(result.outcome).toBe('success');
         expect(seen).toHaveLength(1);
         expect(seen[0].stepCredential).toBeFalsy();
+        expect(mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.AGENTS)).toEqual([]);
         const row = await store.getStep(C, 'r1', 'sAgent');
         expect('credentialId' in row).toBe(false);
         expect('credentialExpiresAt' in row).toBe(false);
@@ -123,6 +137,27 @@ describe('with STEP_CREDENTIALS off, nothing changes', () => {
         const [stepRow] = auditRows(agentAudit.ACTION_DONE);
         expect(stepRow).toMatchObject({ actorId: STARTER, meta: { actorType: 'agent', action: 'workflow.agent_run' } });
         expect(stepRow.meta.service).toBeUndefined();
+    });
+
+    it('keeps the tokens list policy as it is, and names the flag there only while it is on', async () => {
+        const policy = async () => {
+            const res = response();
+            await apiTokenCtrl.listTokens({ headers: { companyid: C }, body: {}, params: {}, query: {}, uid: STARTER }, res);
+            return res.body.policy;
+        };
+        flag(false);
+        expect(Object.keys(await policy()).sort()).toEqual(['graceDays', 'maxExpiryDays', 'minExpiryDays', 'scopes', 'strict', 'strictSince']);
+        flag(true);
+        expect((await policy()).stepCredentials).toBe(true);
+    });
+
+    it.each(actor.SERVICES)('answers service:%s as a bearer exactly as any other value that is not a token', async (service) => {
+        flag(false);
+        const raw = `service:${service}`;
+        const res = response();
+        await verifyJWTTokenV2({ headers: { authorization: `Bearer ${raw}`, companyid: C }, originalUrl: '/api/v2/tasks' }, res, jest.fn());
+        expect(res.statusCode).toBe(401);
+        expect(res.body).toEqual({ status: false, error: 'jwt malformed', statusText: 'Unauthorized', isJwtError: true });
     });
 
     it('is off for every spelling that is not on', () => {
@@ -160,6 +195,7 @@ describe('service identities', () => {
     });
 
     it.each(actor.SERVICES)('%s cannot be presented as a bearer token', async (service) => {
+        flag(true);
         const raw = `service:${service}`;
         expect(looksLikeToken(raw)).toBe(false);
         expect(actor.looksLikeServiceIdentity(raw)).toBe(true);
@@ -201,14 +237,15 @@ describe('minting on claim', () => {
             steps: await store.listSteps(C, 'r1'),
         });
         expect(result.outcome).toBe('success');
-        expect(typeof seen[0].stepCredential).toBe('string');
-        const claims = jwt.decode(seen[0].stepCredential);
+        const credential = seen[0].stepCredential();
+        expect(typeof credential).toBe('string');
+        const claims = jwt.decode(credential);
         expect(claims).toMatchObject({ kind: 'step_credential', companyId: C, runId: 'r1', stepId: 'sAgent', fencingToken: 1, agentId: AGENT_ID, startedBy: STARTER, actions: ['task.comment', 'task.get'] });
         const row = await store.getStep(C, 'r1', 'sAgent');
         expect(row.credentialId).toBe(claims.jti);
         expect(new Date(row.credentialExpiresAt).getTime()).toBe(claims.exp * 1000);
         expect(new Date(row.credentialExpiresAt).getTime()).toBeGreaterThanOrEqual(before + 30000 - 1000);
-        expect(JSON.stringify(row)).not.toContain(seen[0].stepCredential);
+        expect(JSON.stringify(row)).not.toContain(credential);
     });
 
     it('grants every registry action to an agent that narrows nothing, and one tool to a tool call', async () => {
@@ -234,10 +271,10 @@ describe('minting on claim', () => {
         seedRun('r1');
         const { token } = await claimAndMint('r1');
         process.env.STEP_CREDENTIAL_SECRET = 'a-dedicated-secret-for-step-credentials';
-        expect((await stepCredential.check(C, token, { action: 'task.get' })).code).toBe(stepCredential.REFUSAL.INVALID);
+        expect((await stepCredential.check(C, token, { action: 'task.get', actor: agentActor() })).code).toBe(stepCredential.REFUSAL.INVALID);
         seedRun('r2');
         const fresh = await claimAndMint('r2');
-        expect((await stepCredential.check(C, fresh.token, { action: 'task.get' })).ok).toBe(true);
+        expect((await stepCredential.check(C, fresh.token, { action: 'task.get', actor: agentActor() })).ok).toBe(true);
     });
 });
 
@@ -283,6 +320,58 @@ describe('an action under a step credential', () => {
         const reclaimed = await store.claimStep(C, { runId: 'r1', stepId: 'sAgent', workerId: 'w2', lease: 60000, now: later });
         expect(reclaimed.fencingToken).toBe(2);
         await refused(token, stepCredential.REFUSAL.STEP_RECLAIMED);
+    });
+
+    it('reads as reclaimed, not as expired, once the reclaimed step\'s credential has also run out', async () => {
+        seedRun('r1');
+        const past = new Date(Date.now() - 120000);
+        const { token, claimed } = await claimAndMint('r1', { lease: 1000, now: past });
+        expect(jwt.decode(token).exp * 1000).toBeLessThan(Date.now());
+        const reclaimed = await store.claimStep(C, { runId: 'r1', stepId: 'sAgent', workerId: 'w2', lease: 60000 });
+        expect(reclaimed.fencingToken).toBe(claimed.fencingToken + 1);
+        await refused(token, stepCredential.REFUSAL.STEP_RECLAIMED);
+    });
+
+    it('reads as finished, not as expired, once the settled step\'s credential has also run out', async () => {
+        seedRun('r1');
+        const past = new Date(Date.now() - 120000);
+        const { token, claim } = await claimAndMint('r1', { lease: 1000, now: past });
+        await store.succeedStep(C, claim, { output: {} });
+        await refused(token, stepCredential.REFUSAL.STEP_FINISHED);
+    });
+
+    it('is refused when another agent presents it', async () => {
+        seedRun('r1');
+        const { token } = await claimAndMint('r1');
+        const other = '6f0000000000000000000a02';
+        await expect(actions.perform({ companyId: C, actor: agentActor({ agentId: other, stepCredential: token }), action: 'task.comment', params: { body: 'x' } }))
+            .rejects.toMatchObject({ name: 'RefusedError', message: expect.stringContaining(stepCredential.REFUSAL.AGENT_MISMATCH) });
+        const [row] = auditRows(agentAudit.ACTION_REFUSED);
+        expect(row).toMatchObject({ actorId: other, meta: { ran: false } });
+        expect(row.meta.reason).toContain(stepCredential.REFUSAL.AGENT_MISMATCH);
+    });
+
+    it('is refused when the step row names another agent than the credential', async () => {
+        seedRun('r1');
+        const { token } = await claimAndMint('r1');
+        rows(SCHEMA_TYPE.WORKFLOW_STEP_RUNS)[0].config.agentId = '6f0000000000000000000a02';
+        await refused(token, stepCredential.REFUSAL.AGENT_MISMATCH);
+    });
+
+    it('is refused when it is presented on behalf of someone other than the run\'s starter', async () => {
+        seedRun('r1');
+        const { token } = await claimAndMint('r1');
+        await expect(actions.perform({ companyId: C, actor: agentActor({ userId: OTHER_STARTER, stepCredential: token }), action: 'task.comment', params: { body: 'x' } }))
+            .rejects.toMatchObject({ name: 'RefusedError', message: expect.stringContaining(stepCredential.REFUSAL.STARTER_MISMATCH) });
+        const [row] = auditRows(agentAudit.ACTION_REFUSED);
+        expect(row.meta).toMatchObject({ ran: false, onBehalfOf: OTHER_STARTER });
+        expect(row.meta.reason).toContain(stepCredential.REFUSAL.STARTER_MISMATCH);
+    });
+
+    it('is refused when nobody is named as presenting it', async () => {
+        seedRun('r1');
+        const { token } = await claimAndMint('r1');
+        expect(await stepCredential.check(C, token, { action: 'task.get' })).toMatchObject({ ok: false, code: stepCredential.REFUSAL.AGENT_MISMATCH });
     });
 
     it('is refused once the lease has run out, even before the credential itself expires', async () => {
@@ -350,6 +439,137 @@ describe('an action under a step credential', () => {
             expect(res.body.error).toMatch(/step-scoped credential/i);
         }
         expect(apiTokenCtrl.resolveToken).not.toHaveBeenCalled();
+    });
+});
+
+describe('a heartbeat that extends the lease', () => {
+    const T0 = Date.UTC(2030, 0, 1, 12, 0, 0);
+    const until = async (condition) => { for (let i = 0; i < 200 && !condition(); i++) await sleep(5); }; // eslint-disable-line no-await-in-loop
+
+    beforeEach(() => {
+        flag(true);
+        process.env.WORKFLOW_LEASE_MS = '30000';
+    });
+
+    it('re-mints the credential under the same fencing token, moves the row to it and hands it to the running step', async () => {
+        freezeClockAt(T0);
+        const run = seedRun('r1');
+        const held = {};
+        const presented = { action: 'task.get', actor: agentActor() };
+        const result = await engine.runStep(C, run, (await store.listSteps(C, 'r1'))[0], {
+            context: {
+                runAgent: async (args) => {
+                    held.first = args.stepCredential();
+                    jest.setSystemTime(T0 + 20000);
+                    held.kept = await args.keepAlive();
+                    held.second = args.stepCredential();
+                    held.row = { ...(await store.getStep(C, 'r1', 'sAgent')) };
+                    held.firstInsideItsOwnExpiry = await stepCredential.check(C, held.first, presented);
+                    jest.setSystemTime(T0 + 40000);
+                    held.firstPastItsOwnExpiry = await stepCredential.check(C, held.first, presented);
+                    held.secondThen = await stepCredential.check(C, held.second, presented);
+                    return { runId: 'ar1', status: 'done', costUsd: 0, findings: [] };
+                },
+            },
+            steps: await store.listSteps(C, 'r1'),
+        });
+        expect(result.outcome).toBe('success');
+        expect(held.kept).toBe(true);
+        const [first, second] = [jwt.decode(held.first), jwt.decode(held.second)];
+        expect(second.jti).not.toBe(first.jti);
+        expect(second).toMatchObject({ kind: 'step_credential', companyId: C, runId: 'r1', stepId: 'sAgent', stepRunId: first.stepRunId, fencingToken: first.fencingToken, agentId: AGENT_ID, startedBy: STARTER, actions: first.actions });
+        expect(first.exp * 1000).toBe(T0 + 30000);
+        expect(second.exp * 1000).toBe(T0 + 50000);
+        expect(held.row.credentialId).toBe(second.jti);
+        expect(new Date(held.row.credentialExpiresAt).getTime()).toBe(T0 + 50000);
+        expect(new Date(held.row.leaseExpiresAt).getTime()).toBe(T0 + 50000);
+        expect(JSON.stringify(held.row)).not.toContain(held.second);
+        expect(held.firstInsideItsOwnExpiry.ok).toBe(true);
+        expect(held.firstPastItsOwnExpiry).toMatchObject({ ok: false, code: stepCredential.REFUSAL.EXPIRED });
+        expect(held.secondThen.ok).toBe(true);
+    });
+
+    it('lets an agent step that outlives its first credential act under the re-minted one', async () => {
+        freezeClockAt(T0);
+        process.env.WORKFLOW_HEARTBEAT_MS = '5';
+        mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { _id: AGENT_RUN_ID, agentId: AGENT_ID, taskId: TASK_ID, startedBy: STARTER, status: 'running', viaAccount: 'workspace', skill: 'qa-review' });
+        const run = seedRun('r1', { steps: [{ id: 'sAgent', type: 'agent_run', dependsOn: [], config: { agentRunId: AGENT_RUN_ID, agentId: AGENT_ID, taskId: TASK_ID }, maxAttempts: 3 }] });
+        jest.spyOn(automationTools, 'getTask').mockResolvedValue({ _id: TASK_ID, ProjectID: 'p1' });
+        const acted = {};
+        jest.spyOn(agentRuns, 'executeSkill').mockImplementation(async (companyId, agentRun, agent, task, deps) => {
+            acted.first = deps.actor.stepCredential;
+            jest.setSystemTime(T0 + 20000);
+            await until(() => deps.actor.stepCredential !== acted.first);
+            jest.setSystemTime(T0 + 40000);
+            acted.firstVerdict = await stepCredential.check(companyId, acted.first, { action: 'task.comment', actor: deps.actor });
+            acted.out = await deps.actions.perform({ companyId, actor: deps.actor, action: 'task.comment', params: { taskId: TASK_ID, body: 'late, and still live' }, allowedActions: agent.allowedActions });
+            return { status: 'done' };
+        });
+        const result = await engine.runStep(C, run, (await store.listSteps(C, 'r1'))[0], { steps: await store.listSteps(C, 'r1') });
+        expect(result.outcome).toBe('success');
+        expect(acted.firstVerdict).toMatchObject({ ok: false, code: stepCredential.REFUSAL.EXPIRED });
+        expect(acted.out.auditId).toBeTruthy();
+        expect(auditRows(agentAudit.ACTION_REFUSED)).toHaveLength(0);
+    });
+
+    it('builds the run\'s actor so that it always presents the credential the step holds now', async () => {
+        let current = 'first';
+        const built = agentRunner.actorFor({ _id: AGENT_RUN_ID, startedBy: STARTER, viaAccount: 'workspace' }, { _id: AGENT_ID, name: 'Reviewer' }, () => current);
+        expect(built).toMatchObject({ kind: 'agent', userId: STARTER, agentId: AGENT_ID, runId: AGENT_RUN_ID, stepCredential: 'first' });
+        current = 'second';
+        expect(built.stepCredential).toBe('second');
+        expect({ ...built }.stepCredential).toBe('second');
+        expect('stepCredential' in agentRunner.actorFor({ _id: AGENT_RUN_ID, startedBy: STARTER, viaAccount: 'workspace' }, { _id: AGENT_ID, name: 'Reviewer' }, null)).toBe(false);
+    });
+});
+
+describe('a tool call step', () => {
+    it('hands its tool a context without the credential', async () => {
+        flag(true);
+        const seen = {};
+        jest.spyOn(automationRegistry, 'getAction').mockReturnValue({ key: 'probe', schema: {}, run: async ({ context }) => { seen.context = context; return { changed: false }; } });
+        const run = seedRun('r1', { steps: [{ id: 'sTool', type: 'tool_call', dependsOn: [], config: { tool: 'probe', params: {} }, maxAttempts: 1 }] });
+        const result = await engine.runStep(C, run, (await store.listSteps(C, 'r1'))[0], { steps: await store.listSteps(C, 'r1') });
+        expect(result.outcome).toBe('success');
+        expect((await store.getStep(C, 'r1', 'sTool')).credentialId).toBeTruthy();
+        expect(seen.context).toMatchObject({ runId: 'r1', action: 'workflow.probe' });
+        expect(Object.keys(seen.context)).not.toContain('stepCredential');
+        expect(Object.values(seen.context).filter((value) => typeof value === 'string' && value.startsWith('eyJ'))).toEqual([]);
+    });
+});
+
+describe('a malformed bearer value', () => {
+    const b64 = (text) => Buffer.from(text).toString('base64url');
+    const NOT_JSON = `${b64(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))}.${b64('not json')}.sig`;
+    const VALUES = [NOT_JSON, 'a.b.c', 'garbage'];
+    const asBetaSays = (raw) => { try { jwt.verify(raw, process.env.JWT_SECRET); return null; } catch (error) { return error.message; } };
+    const request = (raw) => ({ headers: { authorization: `Bearer ${raw}`, companyid: C }, originalUrl: '/api/v2/tasks', body: {}, query: {}, params: {} });
+
+    describe.each([['on', true], ['off', false]])('with STEP_CREDENTIALS %s', (label, on) => {
+        beforeEach(() => flag(on));
+
+        it.each(VALUES)('gets the session verifier\'s 401 with the parser\'s message: %s', async (raw) => {
+            const res = response();
+            const next = jest.fn();
+            await verifyJWTTokenV2(request(raw), res, next);
+            expect(next).not.toHaveBeenCalled();
+            expect(res.statusCode).toBe(401);
+            expect(res.body).toEqual({ status: false, error: asBetaSays(raw), statusText: 'Unauthorized', isJwtError: true });
+        });
+
+        it.each(VALUES)('gets the company verifier\'s 401: %s', async (raw) => {
+            const res = response();
+            const next = jest.fn();
+            await verifyJWTTokenWithCV2(request(raw), res, next);
+            expect(next).not.toHaveBeenCalled();
+            expect(res.statusCode).toBe(401);
+            expect(res.body).toEqual({ status: false, error: 'Unauthorized', statusText: 'Unauthorized', isJwtError: true });
+        });
+    });
+
+    it('never reads as a step credential', () => {
+        const { looksLikeStepCredential } = require('../Modules/ApiTokens/helpers/bearerRules');
+        VALUES.forEach((raw) => expect(looksLikeStepCredential(raw)).toBe(false));
     });
 });
 
