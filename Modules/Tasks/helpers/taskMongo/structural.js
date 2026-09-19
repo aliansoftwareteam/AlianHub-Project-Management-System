@@ -20,177 +20,188 @@ const { emitListener } = require("../../../Company/eventController.js");
 const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
-const { taskNotFound } = require('../taskWriteFields');
+const { taskNotFound, plainIdOf, TaskWriteRefusal } = require('../taskWriteFields');
 module.exports = {
 
-    updateArchiveDelete({companyId, projectData, sprintId, task, userData, deletedStatusKey = 0}) {
+    /* The counts, the parent and the current state come from the stored task; the body only says which task and which state it goes to. */
+    updateArchiveDelete({companyId, projectData, task, userData, deletedStatusKey = 0}) {
         return new Promise((resolve, reject) => {
             try {
-                const query = {
-                    type: dbCollections.TASKS,
-                    data: [
-                        {
-                            _id: new mongoose.Types.ObjectId(task._id)
-                        }, {
-                            $set: {
-                                deletedStatusKey
-                            },
-                        }, {
-                            returnDocument: 'after'
-                        }
-                    ]
+                const taskId = plainIdOf(task && task._id).id;
+                if (!taskId) {
+                    reject(new TaskWriteRefusal(400, 'task._id must be an id.'));
+                    return;
                 }
-                MongoDbCrudOpration(companyId, query, "findOneAndUpdate")
-                .then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey}, module: 'task' });
-                    try {
-                        if(task?.ParentTaskId) {
-                            if(!deletedStatusKey || (!task?.deletedStatusKey && deletedStatusKey) ) {
-                                this.updateParentCount(
-                                    companyId,
-                                    task.ParentTaskId,
-                                    !deletedStatusKey ? 1 : -1
-                                );
-                            }
-                        }
-                        if(task?.isParentTask) {
-                            let filterBy = {ParentTaskId: task._id};
-                            let taskDeleteStatusKey = 0;
-                            if(!deletedStatusKey) {
-                                filterBy = {...filterBy, deletedStatusKey :{$eq: 3}};
-                                taskDeleteStatusKey = 0;
-                            } else {
-                                filterBy = {...filterBy, deletedStatusKey :{$eq: 0}};
-                                if(deletedStatusKey === 2) {
-                                    taskDeleteStatusKey = 3
-                                } else if(deletedStatusKey === 1) {
-                                    taskDeleteStatusKey = 1
+                if (![0, 1, 2].includes(deletedStatusKey)) {
+                    reject(new TaskWriteRefusal(400, 'deletedStatusKey must be 0, 1 or 2.'));
+                    return;
+                }
+                const filter = { _id: new mongoose.Types.ObjectId(taskId) };
+                MongoDbCrudOpration(companyId, { type: dbCollections.TASKS, data: [filter] }, "findOne").then((before) => {
+                    if (!before) {
+                        reject(taskNotFound());
+                        return;
+                    }
+                    const projectId = String(before.ProjectID);
+                    const sprintId = String(before.sprintId);
+                    const query = {
+                        type: dbCollections.TASKS,
+                        data: [filter, { $set: { deletedStatusKey } }, { returnDocument: 'after' }]
+                    }
+                    return MongoDbCrudOpration(companyId, query, "findOneAndUpdate").then((result) => {
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey}, module: 'task' });
+                        try {
+                            if(before.ParentTaskId) {
+                                if(!deletedStatusKey || (!before.deletedStatusKey && deletedStatusKey) ) {
+                                    this.updateParentCount(
+                                        companyId,
+                                        before.ParentTaskId,
+                                        !deletedStatusKey ? 1 : -1
+                                    );
                                 }
                             }
-
-                            const batchQyery = {
-                                type: dbCollections.TASKS,
-                                data: [
-                                    {
-                                        ...filterBy
-                                    }, {
-                                        $set: {
-                                            deletedStatusKey: taskDeleteStatusKey
-                                        },
+                            if(before.isParentTask) {
+                                let filterBy = {ParentTaskId: taskId};
+                                let taskDeleteStatusKey = 0;
+                                if(!deletedStatusKey) {
+                                    filterBy = {...filterBy, deletedStatusKey :{$eq: 3}};
+                                    taskDeleteStatusKey = 0;
+                                } else {
+                                    filterBy = {...filterBy, deletedStatusKey :{$eq: 0}};
+                                    if(deletedStatusKey === 2) {
+                                        taskDeleteStatusKey = 3
+                                    } else if(deletedStatusKey === 1) {
+                                        taskDeleteStatusKey = 1
                                     }
-                                ]
-                            }
-                            MongoDbCrudOpration(companyId, batchQyery, "updateMany")
-                            .catch((error) => {
-                                logger.error(`ERORR in update parent count: ${error.message}`);
-                            })
-
-                            if(taskDeleteStatusKey !== 0) {
-                                const countResetData = {
-                                    companyId : companyId,
-                                    projectId: projectData._id,
-                                    userIds: [...(result.AssigneeUserId || [])],
-                                    "read": true,
-                                    key: 2,
-                                    taskId: task._id,
-                                    sprintId: sprintId
                                 }
-                                updateUnReadCommentsCountFun(countResetData)
+
+                                const batchQyery = {
+                                    type: dbCollections.TASKS,
+                                    data: [
+                                        {
+                                            ...filterBy
+                                        }, {
+                                            $set: {
+                                                deletedStatusKey: taskDeleteStatusKey
+                                            },
+                                        }
+                                    ]
+                                }
+                                MongoDbCrudOpration(companyId, batchQyery, "updateMany")
                                 .catch((error) => {
-                                    logger.error(`ERORR in update parent count: ${error?.message}`);
+                                    logger.error(`ERORR in update parent count: ${error.message}`);
                                 })
+
+                                if(taskDeleteStatusKey !== 0) {
+                                    const countResetData = {
+                                        companyId : companyId,
+                                        projectId,
+                                        userIds: [...(result.AssigneeUserId || [])],
+                                        "read": true,
+                                        key: 2,
+                                        taskId,
+                                        sprintId
+                                    }
+                                    updateUnReadCommentsCountFun(countResetData)
+                                    .catch((error) => {
+                                        logger.error(`ERORR in update parent count: ${error?.message}`);
+                                    })
+                                }
+                            }
+                        } catch (error) {
+                            logger.error(`ERORR in update parent count: ${error.message}`);
+                        }
+                        resolve({status: true, statusText: "deleteStatus updated successfully"});
+                        const subTaskCount = (before.subTasks || 0) + 1;
+                        let updateObject = {};
+
+                        if(deletedStatusKey === 2) {
+                            updateObject = { $inc: { archiveTaskCount : before.isParentTask ? subTaskCount : 1, tasks : before.isParentTask ? -1 * subTaskCount : -1} }
+                        } else if (deletedStatusKey === 0) {
+                            updateObject= { $inc: { archiveTaskCount: before.isParentTask ? -1 * subTaskCount : -1, tasks : before.isParentTask ? subTaskCount : 1}
+                            }
+                        } else if (deletedStatusKey === 1) {
+                            if(before.deletedStatusKey === 2){
+                                updateObject= { $inc: { archiveTaskCount: before.isParentTask ? -1 * subTaskCount : -1} }
+                            }else{
+                                updateObject= { $inc: { tasks : before.isParentTask ? -1 * subTaskCount : -1} }
                             }
                         }
-                    } catch (error) {
-                        logger.error(`ERORR in update parent count: ${error.message}`);
-                    }
-                    resolve({status: true, statusText: "deleteStatus updated successfully"});
-                    let updateObject = {};
-
-                    if(deletedStatusKey === 2) {
-                        updateObject = { $inc: { archiveTaskCount : task.isParentTask ? (task.subTasks || 0) + 1 : 1, tasks : task.isParentTask ? -1 * ((task.subTasks || 0) + 1) : -1} }
-                    } else if (deletedStatusKey === 0) {
-                        updateObject= { $inc: { archiveTaskCount: task.isParentTask ? -1 * ((task.subTasks || 0) + 1) : -1, tasks : task.isParentTask ? (task.subTasks || 0) + 1 : 1}
-                        }
-                    } else if (deletedStatusKey === 1) {
-                        if(task.deletedStatusKey === 2){
-                            updateObject= { $inc: { archiveTaskCount: task.isParentTask ? -1 * ((task.subTasks || 0) + 1) : -1} }
-                        }else{
-                            updateObject= { $inc: { tasks : task.isParentTask ? -1 * ((task.subTasks || 0) + 1) : -1} }
-                        }
-                    }
-                    const countObj = {
-                        body: {
-                            companyId: companyId,
-                            projectId: projectData._id,
-                            updateObject :updateObject
-                        },
-                        params : {
-                            id : sprintId
-                        }
-                    }
-                    if(task.folderObjId){
-                        countObj.body.folder = {
-                            folderId: task.folderObjId,
-                            folderName: task.sprintArray.folderName || ""
-                        }
-                    }
-
-                    updateSprintFun(countObj).catch((error) => {
-                        logger.error(`error in update task count : ${error}`)
-                    });
-                    removeCommentCount(companyId,task.ProjectID,task.sprintId,task._id,task.ParentTaskId).catch((error) => {
-                        logger.error(`${error} ERROR IN REMOVE COMMENT COUNT`);
-                    })
-
-                    if(task?.subTasks > 0){
-                        let data = [
-                            {
-                                isParentTask: false,
-                                ParentTaskId: task._id
+                        const countObj = {
+                            body: {
+                                companyId: companyId,
+                                projectId,
+                                updateObject :updateObject
+                            },
+                            params : {
+                                id : sprintId
                             }
-                        ]
-                        MongoDbCrudOpration(companyId, {type: dbCollections.TASKS,data: data}, "find").then(async(result) => {
-                            result.forEach((subTask) => {
-                                removeCommentCount(companyId,subTask.ProjectID,subTask.sprintId,subTask._id).catch((error) => {
-                                    logger.error(`${error} ERROR IN REMOVE COMMENT COUNT`);
-                                })
-                            })
+                        }
+                        if(before.folderObjId){
+                            countObj.body.folder = {
+                                folderId: before.folderObjId,
+                                folderName: (before.sprintArray && before.sprintArray.folderName) || ""
+                            }
+                        }
+
+                        updateSprintFun(countObj).catch((error) => {
+                            logger.error(`error in update task count : ${error}`)
+                        });
+                        removeCommentCount(companyId,before.ProjectID,before.sprintId,before._id,before.ParentTaskId).catch((error) => {
+                            logger.error(`${error} ERROR IN REMOVE COMMENT COUNT`);
                         })
-                    }
 
-                    try {
-                        let historyObj = {
-                            message: `<b>${userData.Employee_Name}</b> has ${deletedStatusKey === 0 ? 'restored' : deletedStatusKey === 1 ? 'deleted' : 'archieved'} <b>${sanitizeInput(task.TaskName)}</b> task in <b>${sanitizeInput(projectData.ProjectName)}</b> project.`,
-                            key: "task_delete",
-                            sprintId: task.sprintId,
-                        }
-
-                        let notificationObject = {
-                            'type': 'task',
-                            'key': 'task_delete',
-                            'message': `<strong>${userData.Employee_Name}</strong> has ${deletedStatusKey === 0 ? 'restored' : deletedStatusKey === 1 ? 'deleted' : 'archieved'} <strong>${sanitizeInput(task.TaskName)}</strong> task in <strong>${sanitizeInput(projectData.ProjectName)}</strong> project.`,
-                        }
-
-                        if(historyObj && Object.keys(historyObj).length) {
-                            HandleHistory('task', companyId, projectData._id, task._id, historyObj, userData)
-                            .catch((error) => {
-                                logger.error(`ERROR in history: ${error.message}`);
-                            });
-                            HandleHistory('project', companyId, projectData._id, null, historyObj, userData)
-                            .catch((error) => {
-                                logger.error(`ERROR in history: ${error.message}`);
-                            });
-                        }
-                        if(notificationObject && Object.keys(notificationObject).length) {
-                            HandleBothNotification({type: 'tasks', companyId, projectId: projectData._id, taskId: task._id, folderId: task?.folderObjId || '', sprintId: task?.sprintId || '',  object: notificationObject, userData})
-                            .catch((error) => {
-                                logger.error(`ERROR in add notification: ${error.message}`);
+                        if(before.subTasks > 0){
+                            let data = [
+                                {
+                                    isParentTask: false,
+                                    ParentTaskId: taskId
+                                }
+                            ]
+                            MongoDbCrudOpration(companyId, {type: dbCollections.TASKS,data: data}, "find").then(async(result) => {
+                                result.forEach((subTask) => {
+                                    removeCommentCount(companyId,subTask.ProjectID,subTask.sprintId,subTask._id).catch((error) => {
+                                        logger.error(`${error} ERROR IN REMOVE COMMENT COUNT`);
+                                    })
+                                })
                             })
                         }
-                    } catch(error) {
-                        logger.error(`ERROR: ${error.message}`);
-                    }
+
+                        try {
+                            const verb = deletedStatusKey === 0 ? 'restored' : deletedStatusKey === 1 ? 'deleted' : 'archieved';
+                            const projectName = sanitizeInput(String((projectData && projectData.ProjectName) || ''));
+                            let historyObj = {
+                                message: `<b>${userData.Employee_Name}</b> has ${verb} <b>${sanitizeInput(before.TaskName)}</b> task in <b>${projectName}</b> project.`,
+                                key: "task_delete",
+                                sprintId: before.sprintId,
+                            }
+
+                            let notificationObject = {
+                                'type': 'task',
+                                'key': 'task_delete',
+                                'message': `<strong>${userData.Employee_Name}</strong> has ${verb} <strong>${sanitizeInput(before.TaskName)}</strong> task in <strong>${projectName}</strong> project.`,
+                            }
+
+                            if(historyObj && Object.keys(historyObj).length) {
+                                HandleHistory('task', companyId, projectId, taskId, historyObj, userData)
+                                .catch((error) => {
+                                    logger.error(`ERROR in history: ${error.message}`);
+                                });
+                                HandleHistory('project', companyId, projectId, null, historyObj, userData)
+                                .catch((error) => {
+                                    logger.error(`ERROR in history: ${error.message}`);
+                                });
+                            }
+                            if(notificationObject && Object.keys(notificationObject).length) {
+                                HandleBothNotification({type: 'tasks', companyId, projectId, taskId, folderId: before.folderObjId || '', sprintId: before.sprintId || '',  object: notificationObject, userData})
+                                .catch((error) => {
+                                    logger.error(`ERROR in add notification: ${error.message}`);
+                                })
+                            }
+                        } catch(error) {
+                            logger.error(`ERROR: ${error.message}`);
+                        }
+                    })
                 })
                 .catch((error) => {
                     logger.error(`Archive Delete Error:${error.message}`)
@@ -205,6 +216,7 @@ module.exports = {
 
     convertToSubTask({companyId, projectData, sprintId,selectedTaskId, taskId,oldProject,isSubTask,userData}) {
         return new Promise(async(resolve, reject) => {
+            try {
             let convertTaskArray = [];
             let isMainSubTask = false;
             let object = {
@@ -212,6 +224,10 @@ module.exports = {
                 data: [{ _id : new mongoose.Types.ObjectId(selectedTaskId)}]
             }
             await MongoDbCrudOpration(companyId,object, "findOne").then(async(tasData) => {
+                if (!tasData) {
+                    reject(taskNotFound());
+                    return;
+                }
                 if(tasData.isParentTask === false) {
                     isMainSubTask = true;
                 }
@@ -234,9 +250,13 @@ module.exports = {
                 convertTaskArray = convertTaskArray.concat(subTasks);
                 let object = {
                     type: dbCollections.TASKS,
-                    data: [{ _id : taskId}]
+                    data: [{ _id : new mongoose.Types.ObjectId(taskId)}]
                 }
                 await MongoDbCrudOpration(companyId,object, "findOne").then((task) => {
+                    if (!task) {
+                        reject(taskNotFound());
+                        return;
+                    }
                     let promisesArr = [];
                     convertTaskArray.forEach((ctask) => {
                         promisesArr.push(
@@ -261,7 +281,10 @@ module.exports = {
                     })
                 })
             })
-        }) 
+            } catch (error) {
+                reject(error);
+            }
+        })
     },
 
     moveTask({companyId, projectData, sprintObj,moveTaskId ,oldSprintObj,oldProject,isSubTask,assignee,watcher,userData}) {
@@ -272,11 +295,15 @@ module.exports = {
                     type: dbCollections.TASKS,
                     data: [
                         {
-                            _id : moveTaskId
+                            _id : new mongoose.Types.ObjectId(moveTaskId)
                         }
                     ]
                 }
                 MongoDbCrudOpration(companyId,object, "findOne").then(async(move) => {
+                    if (!move) {
+                        reject(taskNotFound());
+                        return;
+                    }
                     moveTaskArray.push(move);
                     let subMove = [];
                     if(isSubTask === true){
@@ -335,10 +362,11 @@ module.exports = {
                     }).catch((error) => {
                         reject(error);
                     })
-                })
-            }) 
+                }).catch(reject);
+            })
         } catch (error) {
             logger.error(`${error} Error in move task.`)
+            return Promise.reject(error);
         }
     },
 

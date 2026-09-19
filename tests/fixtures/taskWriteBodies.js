@@ -16,7 +16,7 @@ const RELATIONS = 'POST /api/v2/tasks/relations';
 
 const bulk = (action, payload) => ({ taskId, otherTaskId }) => ({ action, taskIds: [taskId, otherTaskId], userData: USER, ...payload });
 
-module.exports = [
+const WEB_APP_BODIES = [
     { route: 'POST /api/v2/tasks', source: 'utils/TaskOperations create', keys: ['task.task_create'], body: ({ projectId }) => ({ data: { ProjectID: projectId, sprintId: 's1', TaskName: 'New' }, user: USER, projectData: projectSlice(projectId), indexObj: {} }) },
 
     { route: PATCH, action: 'updateStatus', source: 'utils/TaskOperations updateStatus', keys: ['task.task_status'], body: ({ taskId, projectId }) => ({ action: 'updateStatus', newStatus: STATUS, prevStatus: { taskId }, projectData: projectSlice(projectId), task: { _id: taskId, sprintId: 's1' }, isUpdateTask: true, userData: USER }) },
@@ -77,3 +77,64 @@ module.exports = [
 
     { route: 'PATCH /api/v1/importTasks', source: 'utils/TaskOperations createMultipleTasks', keys: ['task.task_create'], body: ({ projectId }) => ({ action: 'createMultipleTasks', tasks: [], userData: USER, projectData: projectSlice(projectId), indexObj: {}, statusArray: [], sprint: { id: 's1' }, eventId: 'e1' }) },
 ];
+
+/*
+ * A drag between groups sends two requests. views/Projects/helper.js updateTaskByGroup builds the action; its isUpdateTask
+ * argument defaults to true, which every caller leaves or passes, so the action writes the field as well. The list
+ * (useListDragDrop.js) and the board (KanbanBoard.vue) post the index route with the group value in `updateData`.
+ * `action` takes that argument, so a test can also send the history-only form the helper builds when it is false.
+ */
+const MARKER = { user: `tab-${'0'.repeat(32)}`, timeStamp: 1760000000000 };
+const DUE = '2026-10-01T00:00:00.000Z';
+const START = '2026-09-28T00:00:00.000Z';
+const draggedTask = ({ taskId, projectId }) => ({ _id: taskId, ProjectID: projectId, CompanyId: CID, sprintId: 's1', folderObjId: '', TaskName: 'Task 01', TaskKey: 'PAR-1', statusKey: 1, Task_Priority: 'MEDIUM', AssigneeUserId: [], dueDateDeadLine: [] });
+const indexWrite = ({ taskId, projectId }, indexName, searchKey, relevantKey, updateData) => ({ relevantIndex: 0, projectId, companyId: CID, taskId, isFirst: true, isFirstWithRecord: false, indexName, sprintId: 's1', relevantKey, searchKey, taskKey: 'PAR-1', updateData: { ...updateData, updateToken: MARKER, islocalSnapStop: true } });
+const dueDateNotification = ({ taskId, projectId }) => ({ key: 'task_due_date', projectId, taskId, sprintId: 's1', message: '<p>In <strong>Parity</strong> Project, Due Date of <strong>Task 01</strong> is added as <strong>01/10/2026</strong>.</p>' });
+
+const GROUP_DRAGS = [
+    {
+        source: 'group by status',
+        holds: { statusKey: 3 },
+        historyKey: 'Task_Status',
+        index: (ids) => indexWrite(ids, 'groupByStatusIndex', 'statusKey', 3, { status: { text: 'Done', key: 3, type: 'close' }, statusType: 'close', statusKey: 3 }),
+        action: (ids, isUpdateTask) => ({ action: 'updateStatus', newStatus: { status: { text: 'Done', key: 3, type: 'close' }, statusType: 'close', statusKey: 3 }, prevStatus: { backColor: '#eee', color: '#111', statusName: 'To Do', taskName: 'Task 01', bgColor: '#dfd', textColor: '#060', taskId: ids.taskId, updatedTaskName: 'Done' }, projectData: projectSlice(ids.projectId), task: draggedTask(ids), userData: USER, isUpdateTask }),
+    },
+    {
+        source: 'group by assignee',
+        holds: { AssigneeUserId: [USER.id] },
+        historyKey: 'Assignee_Changed',
+        index: (ids) => indexWrite(ids, 'groupByAssigneeIndex', 'AssigneeUserId', USER.id, { AssigneeUserId: [USER.id] }),
+        action: (ids, isUpdateTask) => ({ action: 'updateAssignee', firebaseObj: { AssigneeUserId: [USER.id] }, projectData: projectSlice(ids.projectId), taskData: draggedTask(ids), employeeName: ['Max Member'], type: 'replace', userData: USER, isUpdateTask }),
+    },
+    {
+        source: 'group by priority',
+        holds: { Task_Priority: 'HIGH' },
+        historyKey: 'task_priority',
+        index: (ids) => indexWrite(ids, 'groupByPriorityIndex', 'Task_Priority', 'HIGH', { Task_Priority: 'HIGH', Updated_At: DUE }),
+        action: (ids, isUpdateTask) => ({ action: 'updatePriority', firebaseObj: { Task_Priority: 'HIGH' }, projectData: { _id: ids.projectId, ProjectName: 'Parity', CompanyId: CID }, taskData: draggedTask(ids), priorityObj: { statusImage: '', priorityName: 'MEDIUM', taskId: ids.taskId, taskName: 'Task 01', userName: USER.Employee_Name, newStatusImage: '', newPriorityName: 'HIGH' }, userData: USER, isUpdateTask }),
+    },
+    {
+        source: 'group by due date',
+        holds: { DueDate: DUE },
+        historyKey: 'Project_DueDate',
+        index: (ids) => indexWrite(ids, 'groupByDueDateIndex', 'DueDate', Date.parse(DUE) / 1000, { DueDate: DUE, Updated_At: DUE }),
+        action: (ids, isUpdateTask) => ({ action: 'updateDueDate', commonDateFormatString: 'DD/MM/YYYY', firebaseObj: { DueDate: DUE, dueDateDeadLine: [{ date: DUE }] }, project: projectSlice(ids.projectId), task: draggedTask(ids), obj: dueDateNotification(ids), userData: USER, isUpdateTask }),
+    },
+];
+
+/*
+ * CalendarViewComponent.vue updateDueDate. A resize sends updateDueDate without isUpdateTask. A drop sets isUpdateTask to
+ * false on the body it has built, sends updateStartDateAndDueDate from that body's parts and returns; `historyOnly` is
+ * that built body, which the drop leaves unsent.
+ */
+const calendarTask = ({ taskId }) => ({ sprintId: 's1', _id: taskId, sprintArray: { id: 's1', name: 'Sprint 1' } });
+const calendarBody = (ids) => ({ commonDateFormatString: 'DD/MM/YYYY', firebaseObj: { DueDate: DUE, dueDateDeadLine: [{ date: DUE }] }, project: projectSlice(ids.projectId), task: calendarTask(ids), obj: dueDateNotification(ids), userData: USER });
+const CALENDAR_DRAG = {
+    resize: (ids) => ({ action: 'updateDueDate', ...calendarBody(ids) }),
+    drop: (ids) => ({ action: 'updateStartDateAndDueDate', commonDateFormatString: 'DD/MM/YYYY', userData: USER, notificationObj: dueDateNotification(ids), firebaseObj: { ...calendarBody(ids).firebaseObj, startDate: START }, task: calendarTask(ids), project: projectSlice(ids.projectId) }),
+    historyOnly: (ids) => ({ action: 'updateDueDate', ...calendarBody(ids), isUpdateTask: false }),
+};
+
+module.exports = WEB_APP_BODIES;
+module.exports.GROUP_DRAGS = GROUP_DRAGS;
+module.exports.CALENDAR_DRAG = CALENDAR_DRAG;
