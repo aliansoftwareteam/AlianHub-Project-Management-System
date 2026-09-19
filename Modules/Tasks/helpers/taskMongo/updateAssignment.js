@@ -2,7 +2,7 @@ const { dbCollections } = require('../../../../Config/collections')
 const { sanitizeInput } = require("../../../serviceFunction");
 const { HandleHistory,HandleTask,convertToSubTaskFunction, moveTaskFunction, convertToListSubTask,mergeSubTask, duplicateSubTaskFunction, addHistoryCollection, removeCommentCount,updateHistoryCollection, updateTimesheetCollection, updateEstimatedTimeCollection} = require("../mongo_helper")
 
-const { createTask, taskAssigneeAdd, taskAssigneeRemove,taskAssigneeReplace, taskNameEdit, taskPriorityChange, taskStatusChange, taskAttachmentAdd, taskAttachmentRemove, taskTypeChage, taskTotalEstimate } = require('../notificationTemplate')
+const { createTask, taskAssigneeAdd, taskAssigneeRemove,taskAssigneeReplace, taskNameEdit, taskPriorityChange, taskStatusChange, taskAttachmentAdd, taskAttachmentRemove, taskTypeChage, taskTotalEstimate, shownTaskType } = require('../notificationTemplate')
 const { HandleBothNotification } = require("../handleNotification")
 const logger = require("../../../../Config/loggerConfig")
 const { addSprintFun, updateSprintFun } = require("../../../Sprints/controller")
@@ -361,14 +361,8 @@ module.exports = {
             try {
                 if (isUpdateTask === false) {
                     resolve({status: true, statusText: "Tasktype updated successfully"});
-                    let notificationObj = {
-                        'ProjectName' : projectData?.ProjectName,
-                        'taskName' : taskData?.TaskName,
-                        'oldTaskTypeImage' : prevStatus?.taskImage,
-                        'oldTaskTypeName' : prevStatus?.name,
-                        'newTaskTypeImage' : newStatus?.taskTypeImage,
-                        'newTaskTypeName' : newStatus?.taskTypeName
-                    };
+                    const shown = shownTaskType(prevStatus || {}, newStatus || {});
+                    let notificationObj = { 'ProjectName' : projectData?.ProjectName, 'taskName' : taskData?.TaskName, ...shown.template };
                     let notificationObject = {
                         key: "task_type",
                         message : taskTypeChage(notificationObj),
@@ -393,7 +387,7 @@ module.exports = {
 
                     let historyObj = {};
                     historyObj.key = "Task_TYPE";
-                    historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Task Type</b> as <b>${newStatus?.taskTypeName}</b>.`;
+                    historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Task Type</b> as <b>${shown.newTaskTypeName}</b>.`;
                     historyObj.sprintId = taskData.sprintId;
                     
                     if (historyObj !== null && Object.keys(historyObj).length > 0) {
@@ -430,14 +424,8 @@ module.exports = {
                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: updatedTaskObj, module: 'task' });
                         resolve({status: true, statusText: "Tasktype updated successfully"});
 
-                        let notificationObj = {
-                            'ProjectName' : projectData?.ProjectName,
-                            'taskName' : taskData?.TaskName,
-                            'oldTaskTypeImage' : prevStatus?.taskImage,
-                            'oldTaskTypeName' : prevStatus?.name,
-                            'newTaskTypeImage' : newStatus?.taskTypeImage,
-                            'newTaskTypeName' : newStatus?.taskTypeName
-                        };
+                        const shown = shownTaskType(prevStatus || {}, newStatus || {});
+                        let notificationObj = { 'ProjectName' : projectData?.ProjectName, 'taskName' : taskData?.TaskName, ...shown.template };
                         let notificationObject = {
                             key: "task_type",
                             message : taskTypeChage(notificationObj),
@@ -462,7 +450,7 @@ module.exports = {
     
                         let historyObj = {};
                         historyObj.key = "Task_TYPE";
-                        historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Tasktype</b> as <b>${newStatus?.taskTypeName}</b>.`;
+                        historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Tasktype</b> as <b>${shown.newTaskTypeName}</b>.`;
                         historyObj.sprintId = taskData.sprintId;
                         
                         if (historyObj !== null && Object.keys(historyObj).length > 0) {

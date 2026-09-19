@@ -148,6 +148,7 @@ module.exports = {
                             logger.error(`ERROR in update Start Date update hostory : ${error.message}`);
                         });
                     }
+                    resolve({status: true, statusText: "Start Date updated successfully"});
                 } else {
                     firebaseObj.startDate = new Date(firebaseObj.startDate);
 

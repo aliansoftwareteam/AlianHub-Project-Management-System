@@ -63,17 +63,46 @@ const plainIdOf = (value) => {
 
 const STATUS_FIELDS = ['status', 'statusKey', 'statusType'];
 
+const valueAt = (body, path) => path.reduce((node, key) => (isPlainObject(node) ? node[key] : undefined), body);
+
+const sameValue = (claimed, stored) => isScalar(claimed) && claimed !== null && stored !== undefined && stored !== null && String(claimed) === String(stored);
+
+const instantOf = (value) => (value === undefined || value === null ? null : new Date(value).getTime());
+
+/* An unreadable date is NaN on either side and never equal. */
+const sameInstant = (claimed, stored) => (claimed === null || ['string', 'number'].includes(typeof claimed)) && instantOf(claimed) === instantOf(stored);
+
+const holdsField = (path, field, same = sameValue) => (payload, stored) => same(valueAt(payload, path), stored[field]);
+
+const holdsAssignees = (payload, stored) => {
+    const claimed = valueAt(payload, ['firebaseObj', 'AssigneeUserId']);
+    const named = Array.isArray(claimed) ? claimed : [claimed];
+    if (named.some((id) => typeof id !== 'string' || !id)) return false;
+    const assigned = new Set((stored.AssigneeUserId || []).map(String));
+    if (payload.type === 'replace') return Array.isArray(claimed) && new Set(named).size === assigned.size && named.every((id) => assigned.has(id));
+    if (payload.type === 'assigneeAdd') return named.every((id) => assigned.has(id));
+    if (payload.type === 'assigneRemove') return named.every((id) => !assigned.has(id));
+    return false;
+};
+
+const holdsTaskType = (payload, stored) => {
+    const claimed = ['TaskType', 'TaskTypeKey'].filter((field) => valueAt(payload, ['newStatus', field]) !== undefined);
+    return claimed.length > 0 && claimed.every((field) => sameValue(payload.newStatus[field], stored[field]));
+};
+
 /*
  * `params` are the body keys the handler and the web app use; any other key is dropped. `writes` names the body objects
  * the handler copies into the task update, with the fields each may carry. `owns` are the protected fields the action is
  * built to set. `company` are the paths the handler picks its database from. `fieldNames` are values naming a task field.
  * `ids` must each resolve to one plain id, `scalars` and `numbers` are values a query compares against, `searchKeys` name
  * the field a query matches on, `objects` must be objects when sent. `task` is the task the action writes: it is required,
- * must exist and be visible, its project is written to the `project` paths and its id to the `taskIds` paths. `destination`
- * names the project a move or copy writes into, which must exist. `actor` are the params that receive the signed-in user.
+ * must exist and be visible, its project is written to the `project` paths, its id to the `taskIds` paths and its name to
+ * the `taskNames` paths. `held` tells whether the stored task already has the value the body names; an action that takes
+ * isUpdateTask records history without writing only when it does. `destination` names the project a move or copy writes
+ * into, which must exist. `actor` are the params that receive the signed-in user.
  */
-const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, project = [], taskIds = [], destination = null, actor }) => Object.freeze({
-    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, project, taskIds, destination,
+const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, project = [], taskIds = [], taskNames = [], held = null, destination = null, actor }) => Object.freeze({
+    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, project, taskIds, taskNames, held, destination,
     actor: actor || (params.includes('userData') ? ['userData'] : []),
 });
 
@@ -84,6 +113,7 @@ const projectCompany = [['projectData', 'CompanyId']];
 const TASK_ID = [['taskId']];
 const TASK = [['task', '_id']];
 const TASK_DATA = [['taskData', '_id']];
+const TASK_NAME = [['taskData', 'TaskName']];
 const TASK_IDS = [['taskIds', '*']];
 const PROJECT_DATA = [['projectData', '_id']];
 const PROJECT = [['project', '_id']];
@@ -108,18 +138,18 @@ const TASK_ACTION_FIELDS = Object.freeze({
     createSubTaskWithAi: spec({ params: ['companyId', 'userId', 'subTitles', 'sprintObj', 'projectData', 'userData', 'parentTask', 'type'], owns: PLACEMENT_FIELDS, company: [...companyId, ...projectCompany], ids: [['parentTask', 'id'], ['parentTask', 'ProjectID']] }),
     createMultipleTasks: spec({ params: ['tasks', 'userData', 'projectData', 'indexObj', 'statusArray', 'sprint', 'eventId'], owns: PLACEMENT_FIELDS, company: projectCompany, fieldNames: [['indexObj', 'indexName']], ids: PROJECT_DATA, objects: [['indexObj']] }),
 
-    updateStatus: spec({ params: ['newStatus', 'prevStatus', 'projectData', 'task', 'isUpdateTask', ...HISTORY_USER], writes: { newStatus: STATUS_FIELDS }, company: projectCompany, ids: [...TASK, ['prevStatus', 'taskId']], task: TASK[0], project: PROJECT_DATA, taskIds: [...TASK, ['prevStatus', 'taskId']] }),
-    updatePriority: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'priorityObj', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['Task_Priority', 'Updated_At'] }, company: projectCompany, ids: [...TASK_DATA, ['priorityObj', 'taskId']], task: TASK_DATA[0], project: PROJECT_DATA, taskIds: [...TASK_DATA, ['priorityObj', 'taskId']] }),
-    updateDueDate: spec({ params: ['commonDateFormatString', 'firebaseObj', 'project', 'task', 'obj', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['DueDate', 'dueDateDeadLine'] }, company: [['project', 'CompanyId']], ids: TASK, task: TASK[0], project: PROJECT }),
-    updateStartDate: spec({ params: ['commonDateFormatString', 'firebaseObj', 'project', 'task', 'obj', 'isUpdateTask', 'isHistory', ...HISTORY_USER], writes: { firebaseObj: ['startDate'] }, company: [['project', 'CompanyId']], ids: TASK, task: TASK[0], project: PROJECT }),
+    updateStatus: spec({ params: ['newStatus', 'prevStatus', 'projectData', 'task', 'isUpdateTask', ...HISTORY_USER], writes: { newStatus: STATUS_FIELDS }, company: projectCompany, ids: [...TASK, ['prevStatus', 'taskId']], task: TASK[0], project: PROJECT_DATA, taskIds: [...TASK, ['prevStatus', 'taskId']], taskNames: [['prevStatus', 'taskName']], held: holdsField(['newStatus', 'statusKey'], 'statusKey') }),
+    updatePriority: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'priorityObj', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['Task_Priority', 'Updated_At'] }, company: projectCompany, ids: [...TASK_DATA, ['priorityObj', 'taskId']], task: TASK_DATA[0], project: PROJECT_DATA, taskIds: [...TASK_DATA, ['priorityObj', 'taskId']], taskNames: [['priorityObj', 'taskName']], held: holdsField(['firebaseObj', 'Task_Priority'], 'Task_Priority') }),
+    updateDueDate: spec({ params: ['commonDateFormatString', 'firebaseObj', 'project', 'task', 'obj', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['DueDate', 'dueDateDeadLine'] }, company: [['project', 'CompanyId']], ids: TASK, task: TASK[0], project: PROJECT, held: holdsField(['firebaseObj', 'DueDate'], 'DueDate', sameInstant) }),
+    updateStartDate: spec({ params: ['commonDateFormatString', 'firebaseObj', 'project', 'task', 'obj', 'isUpdateTask', 'isHistory', ...HISTORY_USER], writes: { firebaseObj: ['startDate'] }, company: [['project', 'CompanyId']], ids: TASK, task: TASK[0], project: PROJECT, held: holdsField(['firebaseObj', 'startDate'], 'startDate', sameInstant) }),
     updateStartDateAndDueDate: spec({ params: ['commonDateFormatString', 'notificationObj', 'firebaseObj', 'task', 'project', ...HISTORY_USER], writes: { firebaseObj: ['DueDate', 'dueDateDeadLine', 'startDate'] }, company: [['project', 'CompanyId']], ids: TASK, task: TASK[0], project: PROJECT }),
     updateTaskName: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'obj', ...HISTORY_USER], writes: { firebaseObj: ['TaskName'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA }),
     updateTaskTotalEstimate: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'obj', ...HISTORY_USER], writes: { firebaseObj: ['totalEstimatedTime'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA }),
     updatePoints: spec({ params: ['firebaseObj', 'projectData', 'taskData', ...HISTORY_USER], writes: { firebaseObj: ['points'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA }),
     updateDates: spec({ params: ['firebaseObj', 'projectData', 'taskData', ...HISTORY_USER], writes: { firebaseObj: ['startDate', 'DueDate'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA }),
-    updateAssignee: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'employeeName', 'type', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['AssigneeUserId'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA }),
-    updateTaskLeader: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'employeeName', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['Task_Leader'] }, company: projectCompany, ids: [...TASK_DATA, ['firebaseObj', 'Task_Leader']], task: TASK_DATA[0], project: PROJECT_DATA }),
-    updateTaskType: spec({ params: ['newStatus', 'prevStatus', 'projectData', 'taskData', 'isUpdateTask', ...HISTORY_USER], writes: { newStatus: ['TaskType', 'TaskTypeKey', 'taskTypeImage', 'oldTaskTypeImage', 'taskTypeName'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA }),
+    updateAssignee: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'employeeName', 'type', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['AssigneeUserId'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA, taskNames: TASK_NAME, held: holdsAssignees }),
+    updateTaskLeader: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'employeeName', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['Task_Leader'] }, company: projectCompany, ids: [...TASK_DATA, ['firebaseObj', 'Task_Leader']], task: TASK_DATA[0], project: PROJECT_DATA, held: holdsField(['firebaseObj', 'Task_Leader'], 'Task_Leader') }),
+    updateTaskType: spec({ params: ['newStatus', 'prevStatus', 'projectData', 'taskData', 'isUpdateTask', ...HISTORY_USER], writes: { newStatus: ['TaskType', 'TaskTypeKey', 'taskTypeImage', 'oldTaskTypeImage', 'taskTypeName'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA, taskNames: TASK_NAME, held: holdsTaskType }),
 
     updateWatcher: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'userId', 'add', 'employeeName', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['userId']], task: TASK_ID[0], project: PROJECT_ID }),
     updateTags: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'tagId', 'operation'], company: companyId, ids: TASK_ID, scalars: [['tagId']], task: TASK_ID[0], project: PROJECT_ID }),
@@ -191,8 +221,6 @@ const TASK_INDEX_ONLOAD_FIELDS = spec({
 });
 
 const specFor = (table, action) => (typeof action === 'string' && Object.hasOwn(table, action) ? table[action] : null);
-
-const valueAt = (body, path) => path.reduce((node, key) => (isPlainObject(node) ? node[key] : undefined), body);
 
 const setAt = (target, [key, ...rest], value) => {
     if (!rest.length) {
@@ -333,7 +361,8 @@ const prepareTaskWrite = (req, taskSpec, label) => {
     taskSpec.scalars.forEach((path) => checkScalar(path, valueAt(payload, path)));
     taskSpec.numbers.forEach((path) => checkNumber(path, valueAt(payload, path)));
     taskSpec.ids.forEach((path) => resolveIds(payload, path));
-    if (taskSpec.params.includes('isUpdateTask') && payload.isUpdateTask === false) refuse(400, 'A history-only update is not accepted; the task must be written.');
+    /* updateStartDate reads the flag loosely; only a literal false may skip the write, because only that is checked against the stored task. */
+    if (taskSpec.params.includes('isUpdateTask')) payload.isUpdateTask = payload.isUpdateTask !== false;
 
     BODY_COMPANY_PATHS.forEach((path) => {
         if (valueAt(payload, path) !== undefined) setAt(payload, path, company);
@@ -405,6 +434,8 @@ const prepareTaskRequest = async (req, taskSpec, label) => {
         prepared.task = stored;
         taskSpec.project.forEach((path) => setAt(payload, path, String(stored.ProjectID)));
         taskSpec.taskIds.forEach((path) => setAt(payload, path, String(stored._id)));
+        taskSpec.taskNames.forEach((path) => setAt(payload, path, stored.TaskName));
+        if (payload.isUpdateTask === false && !(taskSpec.held && taskSpec.held(payload, stored))) refuse(409, 'The task does not hold the change this request records.');
     }
     if (taskSpec.destination) {
         const projectId = valueAt(payload, taskSpec.destination);

@@ -249,6 +249,16 @@ exports.shownPriority = (priorityObj = {}) => ({
     newPriorityName: escapeText(priorityObj.newPriorityName),
 });
 
+exports.shownTaskType = (prevStatus = {}, newStatus = {}) => ({
+    template: {
+        oldTaskTypeImage: escapeText(prevStatus.taskImage),
+        oldTaskTypeName: escapeText(prevStatus.name),
+        newTaskTypeImage: escapeText(newStatus.taskTypeImage),
+        newTaskTypeName: escapeText(newStatus.taskTypeName),
+    },
+    newTaskTypeName: escapeText(newStatus.taskTypeName),
+});
+
 // For Task Status Change //
 exports.taskStatusChange = (obj) => {
     return `<p>In <strong>${sanitizeInput(obj.ProjectName)}</strong> Project, Status of <strong>${sanitizeInput(obj.taskName)
