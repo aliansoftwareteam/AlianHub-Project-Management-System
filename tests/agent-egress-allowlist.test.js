@@ -436,7 +436,7 @@ describe('IPv6 transition addresses', () => {
             seedList(CID_A, ['nat64.example.com']);
             const lookup = jest.spyOn(dns.promises, 'lookup').mockResolvedValue([{ address: '64:ff9b::a9fe:a9fe', family: 6 }]);
             try {
-                await expect(egressContext.run({ companyId: CID_A, actor: ACTOR }, () => safeFetch('https://nat64.example.com/', { timeoutMs: 3000 }))).rejects.toMatchObject({ code: 'private_address' });
+                await expect(egressContext.run({ companyId: CID_A, actor: ACTOR }, () => safeFetch('http://nat64.example.com/', { timeoutMs: 1000 }))).rejects.toMatchObject({ code: 'private_address' });
             } finally {
                 lookup.mockRestore();
             }
