@@ -54,8 +54,10 @@ test.describe('reports screens as the owner', () => {
 
     test('the settings integrations page renders the webhook panel', async ({ page, state }) => {
         const errors = trackConsoleErrors(page);
+        const secretsProbe = page.waitForResponse((response) => response.url().includes('/api/v2/secrets'));
         await page.goto(`/#/${state.companyId}/settings/integrations`);
         await expect(page.getByText('Integrations', { exact: true }).first()).toBeVisible();
+        expect((await secretsProbe).status()).toBe(200);
         expect(errors).toEqual([]);
     });
 

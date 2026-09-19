@@ -38,6 +38,7 @@ const CREDENTIAL_COLLECTIONS = deepFreeze([
     dbCollections.PUBLIC_SHARE_INDEX,
     dbCollections.GLOBALSETTING,
     dbCollections.INSTANCE_SETTINGS,
+    dbCollections.SECRETS,
 ]);
 
 const SERVER_SIDE_EVALUATION = deepFreeze(['$where', '$function', '$accumulator']);
