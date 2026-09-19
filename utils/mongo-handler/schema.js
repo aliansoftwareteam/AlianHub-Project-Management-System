@@ -241,7 +241,9 @@ const schema = {
             type: Number,
             default: null,
             required: false
-        }
+        },
+        // { kind: email | form | webhook, ref } — set by the inbound path that created the task; an agent run on it is tainted
+        origin: { type: Object, required: false },
     },
     timesheet: {
         LogDescription: {
@@ -886,6 +888,10 @@ const schema = {
         traceId: { type: String, required: false },
         // [{ node, startedAt, endedAt, durationMs, spanId, traceId, status: ok | error | interrupted, tokens, costUsd }], one per node execution
         steps: { type: Array, default: [], required: false },
+        // Set once the run took in content from outside the workspace (Modules/Agents/taint.js); absent on a clean run
+        tainted: { type: Boolean, required: false },
+        // [{ kind: fetch | email | form | webhook | file | passage, ref, at }] — where it came from, never the content
+        taintSources: { type: Array, default: undefined, required: false },
     },
     agentRevisions: {
         agentId: { type: String, required: true },
@@ -948,6 +954,9 @@ const schema = {
         // [{ role, content }]
         messages: { type: Array, default: [], required: false },
         retrievedChunkIds: { type: [String], default: [], required: false },
+        // the run's taint marker at the time of the call (agentRuns.tainted / taintSources); absent on a clean run
+        tainted: { type: Boolean, required: false },
+        taintSources: { type: Array, default: undefined, required: false },
         // tool rows: { action, args, scope } and the numbers the action returned
         query: { type: Object, required: false },
         result: { type: Object, required: false },
@@ -1059,6 +1068,8 @@ const schema = {
         cost: { type: Object, required: false },
         // a canned Inbox key (too_many_changes | wrong_tone | needs_person | not_now) or free text, ≤ 200 chars
         declineReason: { type: String, required: false },
+        // { sources: [{ kind, ref, at }], reason } — set when the run behind it read external content
+        taint: { type: Object, required: false },
     },
     automationRuns: {
         ruleId: { type: String, required: true },
@@ -1307,6 +1318,8 @@ const schema = {
         // 'draft' until a person approves an agent-written page.
         agentStatus: { type: String, required: false },
         approvedBy: { type: String, required: false },
+        // Same contract as tasks.origin, for a page an inbound path creates; a member's or an agent's page has none
+        origin: { type: Object, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     pageVersions: {

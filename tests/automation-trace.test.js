@@ -44,6 +44,13 @@ describe('automation runs carry the envelope trace id', () => {
         expect(MongoDbCrudOpration).toHaveBeenCalled();
     });
 
+    it('a step hears which event fired the rule', async () => {
+        const seen = [];
+        registry.getAction.mockReturnValue({ run: async ({ context }) => { seen.push(context.eventType); return { ok: true }; } });
+        await runner.runOnce('c1', { _id: 'auto1', cursor: 0, steps: [], outputs: {} }, { _id: 'rule1', name: 'On submit', steps: [{ id: 's1', type: 'action', action: 'run_agent' }] }, envelope({ type: 'form.submitted' }));
+        expect(seen).toEqual(['form.submitted']);
+    });
+
     it('run_agent starts the agent run on that trace id', async () => {
         const traceId = telemetry.newTraceId();
         const agentRow = { _id: '6f0000000000000000000a01', name: 'Reviewer', account: 'workspace', projectIds: [] };

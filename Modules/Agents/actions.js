@@ -252,25 +252,25 @@ const executors = {
     },
 };
 
-const refusal = async (companyId, actor, { action, params, reason, ip, entityType, entityId }) => {
-    const auditId = await audit.recordRefusal(companyId, actor, { action, reason, params, entityType, entityId: entityId || params.taskId, ip });
+const refusal = async (companyId, actor, { action, params, reason, ip, entityType, entityId, taint }) => {
+    const auditId = await audit.recordRefusal(companyId, actor, { action, reason, params, entityType, entityId: entityId || params.taskId, ip, taint });
     return new RefusedError(reason, auditId);
 };
 
 /* Run one action for an actor. Refusals are audited and thrown as RefusedError.
  * A policy `decision` of refuse is honoured before the registry check, so a
  * policy refusal leaves the same audit row as a registry one. */
-const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0 }) => {
-    if (decision && decision.decision === 'refuse') throw await refusal(companyId, actor, { action, params, reason: decision.reason, ip });
+const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0, taint = null }) => {
+    if (decision && decision.decision === 'refuse') throw await refusal(companyId, actor, { action, params, reason: decision.reason, ip, taint });
     const check = registry.evaluate(action, params, { allowedActions });
-    if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip });
+    if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip, taint });
     const holder = await permissions.holderMay(companyId, actor, action, params);
-    if (!holder.allowed) throw await refusal(companyId, actor, { action, params, reason: holder.reason, ip });
+    if (!holder.allowed) throw await refusal(companyId, actor, { action, params, reason: holder.reason, ip, taint });
     if (!check.action.write) return { result: null, auditId: null, undo: null };
     const exec = executors[action];
     if (!exec) throw new tools.DeterministicError(`${action} has no executor`);
 
-    const auditId = await audit.openAction(companyId, actor, { action, reason, params, cost, ip, entityId: params.taskId });
+    const auditId = await audit.openAction(companyId, actor, { action, reason, params, cost, ip, entityId: params.taskId, taint });
     let out;
     try {
         out = await exec({ companyId, actor, params, depth: clampDepth(depth) });

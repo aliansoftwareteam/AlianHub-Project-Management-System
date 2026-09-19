@@ -35,9 +35,11 @@ RUN ln -sf /app/brandSettings.json /app/frontend/brandSettings.json
 #   "Can't resolve '../../../../../package.json'"
 COPY package.json /app/package.json
 
-# vue.config.js aliases @pageContent to this backend helper so the block
-# editor and the API share one content model.
+# vue.config.js aliases these backend modules into the bundle so the app and the
+# API share one copy. tests/conventions/docker-frontend-aliases.test.js fails when
+# an alias is added without its COPY line here.
 COPY Modules/Pages/helpers/pageContent.js /app/Modules/Pages/helpers/pageContent.js
+COPY Modules/Agents/workKinds.js /app/Modules/Agents/workKinds.js
 
 # Build the SPA bundle. webpack needs more than Node's default ~2 GB heap for
 # this bundle (same setting as ci.yml).

@@ -57,6 +57,7 @@
                         <div class="ai-item__top">
                             <span class="ai-item__agent">{{ p.agentName }}</span>
                             <span v-if="p.gate" class="ah-chip ah-chip--warn ah-chip--mono">{{ $t('Ai.gated') }}</span>
+                            <span v-if="p.taint" class="ah-chip ah-chip--warn ah-chip--mono" data-test="proposal-tainted">{{ $t('Audit.tainted') }}</span>
                             <span v-if="p.status !== 'pending'" class="ah-chip ah-chip--mono">{{ $t(`Ai.status_${p.status}`) }}</span>
                             <span class="ai-item__time ah-mono">{{ shortTime(p.createdAt) }}</span>
                         </div>
@@ -111,6 +112,11 @@
                         <span>{{ canDecide ? $t('Ai.gate_note') : $t('Ai.gate_locked') }}</span>
                     </div>
 
+                    <div v-if="selected.taint" class="auth__banner auth__banner--warn" style="margin-top:14px" data-test="taint-reason">
+                        <ShellIcon name="alert" :size="15" />
+                        <span>{{ $t('Audit.tainted_reason') }} <span class="ah-small" data-test="taint-sources">{{ taintLine(selected.taint) }}</span></span>
+                    </div>
+
                     <div v-if="error" class="ah-field__error" style="margin-top:12px">{{ error }}</div>
 
                     <div v-if="selected.status === 'pending' && canDecide && !declining" class="ai-actions">
@@ -155,6 +161,7 @@ import WorkflowApprovalDetail from "./WorkflowApprovalDetail.vue";
 import { useWorkflowApprovals } from "./useWorkflowApprovals";
 import { useAgents, reasonOf } from "./useAgents";
 import { DECLINE_REASONS } from "./episodeText";
+import { taintSourcesLine, taintSourcesOf } from "./taintText";
 import { useAgentAccess } from "./agentAccess";
 
 defineOptions({ name: "AiInboxPage" });
@@ -199,6 +206,7 @@ const pickReason = (key) => {
 const declineReasonValue = computed(() => declineReason.value || declineNote.value.slice(0, 200));
 
 const canDecide = computed(() => !selected.value || selected.value.gate !== GATE_OWNER_ADMIN || canManage.value);
+const taintLine = (marker) => taintSourcesLine(t, taintSourcesOf(marker));
 
 const tabs = computed(() => [
     { key: "pending", label: "Ai.waiting", count: counts.value.waiting || 0 },

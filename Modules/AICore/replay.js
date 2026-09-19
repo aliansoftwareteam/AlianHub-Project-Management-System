@@ -68,6 +68,9 @@ const revisionOf = (value) => {
 
 const skillRevisionOf = (ref) => (ref && ref.key ? { key: String(ref.key), hash: orNull(ref.hash), n: orNull(ref.n) } : null);
 
+/* Set only on a call from a tainted run (Agents/taint.js): where the run's external content came from, never the content. */
+const taintOf = (given) => (given.tainted ? { tainted: true, taintSources: (Array.isArray(given.taintSources) ? given.taintSources : []).map(({ kind, ref, at }) => ({ kind: String(kind), ref: String(ref), at })) } : {});
+
 const currentTraceId = () => {
     try {
         return require('../../Config/telemetry').traceIdNow() || null;
@@ -99,6 +102,7 @@ function rowFor({ context, opts, adapter, result, error, durationMs, decision })
         system: prompt.system,
         messages: prompt.messages,
         retrievedChunkIds: Array.isArray(given.retrievedChunkIds) ? given.retrievedChunkIds.map(String) : [],
+        ...taintOf(given),
         response: response ? response.text : null,
         truncated: prompt.truncated || Boolean(response && response.cut),
         usage: { inputTokens: tally.inputTokens, outputTokens: tally.outputTokens },

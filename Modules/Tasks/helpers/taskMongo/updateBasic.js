@@ -2,7 +2,7 @@ const { dbCollections } = require('../../../../Config/collections')
 const { sanitizeInput } = require("../../../serviceFunction");
 const { HandleHistory,HandleTask,convertToSubTaskFunction, moveTaskFunction, convertToListSubTask,mergeSubTask, duplicateSubTaskFunction, addHistoryCollection, removeCommentCount,updateHistoryCollection, updateTimesheetCollection, updateEstimatedTimeCollection} = require("../mongo_helper")
 
-const { createTask, taskAssigneeAdd, taskAssigneeRemove,taskAssigneeReplace, taskNameEdit, taskPriorityChange, taskStatusChange, taskAttachmentAdd, taskAttachmentRemove, taskTypeChage, taskTotalEstimate } = require('../notificationTemplate')
+const { createTask, taskAssigneeAdd, taskAssigneeRemove,taskAssigneeReplace, taskNameEdit, taskPriorityChange, taskStatusChange, taskAttachmentAdd, taskAttachmentRemove, taskTypeChage, taskTotalEstimate, shownStatus, shownPriority } = require('../notificationTemplate')
 const { HandleBothNotification } = require("../handleNotification")
 const logger = require("../../../../Config/loggerConfig")
 const { addSprintFun, updateSprintFun } = require("../../../Sprints/controller")
@@ -148,6 +148,7 @@ module.exports = {
                             logger.error(`ERROR in update Start Date update hostory : ${error.message}`);
                         });
                     }
+                    resolve({status: true, statusText: "Start Date updated successfully"});
                 } else {
                     firebaseObj.startDate = new Date(firebaseObj.startDate);
 
@@ -214,16 +215,8 @@ module.exports = {
             try {
                 if (isUpdateTask === false) {
                     resolve({status: true, statusText: "Status updated successfully"});
-                    let obj = {
-                        'ProjectName': projectData.ProjectName,
-                        'taskName': prevStatus.taskName,
-                        'backColor': prevStatus.backColor,
-                        'color': prevStatus.color,
-                        'statusName': prevStatus.statusName,
-                        'bgColor': prevStatus.bgColor,
-                        'textColor': prevStatus.textColor,
-                        'newStatusName': newStatus.status.text
-                    }
+                    const shown = shownStatus(prevStatus, newStatus);
+                    let obj = { 'ProjectName': projectData.ProjectName, 'taskName': prevStatus.taskName, ...shown.template }
                     let notificationObject = {
                         message: taskStatusChange(obj),
                         key: "task_status",
@@ -251,7 +244,7 @@ module.exports = {
 
                     let historyObj = {};
                     historyObj.key = "Task_Status";
-                    historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Status</b> as <b>${prevStatus.updatedTaskName}</b>.`;
+                    historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Status</b> as <b>${shown.updatedTaskName}</b>.`;
                     historyObj.sprintId = task.sprintId;
                     if (historyObj !== null && Object.keys(historyObj).length > 0) {
                         HandleHistory('task',projectData.CompanyId, projectData._id,prevStatus.taskId,historyObj, userData).then(async () => {})
@@ -294,16 +287,8 @@ module.exports = {
                         resolve({status: true, statusText: "Status updated successfully"});
                         recordCompletion({ companyId: projectData.CompanyId, taskId, task, newStatus, userData });
 
-                        let obj = {
-                            'ProjectName': projectData.ProjectName,
-                            'taskName': prevStatus.taskName,
-                            'backColor': prevStatus.backColor,
-                            'color': prevStatus.color,
-                            'statusName': prevStatus.statusName,
-                            'bgColor': prevStatus.bgColor,
-                            'textColor': prevStatus.textColor,
-                            'newStatusName': newStatus.status.text
-                        }
+                        const shown = shownStatus(prevStatus, newStatus);
+                        let obj = { 'ProjectName': projectData.ProjectName, 'taskName': result.TaskName, ...shown.template }
                         let notificationObject = {
                             message: taskStatusChange(obj),
                             key: "task_status",
@@ -331,7 +316,7 @@ module.exports = {
     
                         let historyObj = {};
                         historyObj.key = "Task_Status";
-                        historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Status</b> as <b>${prevStatus.updatedTaskName}</b>.`;
+                        historyObj.message = `<b>${userData.Employee_Name}</b> has changed <b> Status</b> as <b>${shown.updatedTaskName}</b>.`;
                         historyObj.sprintId = task.sprintId;
                         if (historyObj !== null && Object.keys(historyObj).length > 0) {
                             HandleHistory('task',projectData.CompanyId, projectData._id,prevStatus.taskId,historyObj, userData).then(async () => {})
@@ -359,14 +344,8 @@ module.exports = {
             try {
                 if (isUpdateTask === false) {
                     resolve({status: true, statusText: "Priority updated successfully"});
-                    let notificationObj = {
-                        'ProjectName' : projectData?.ProjectName,
-                        'taskName' : priorityObj?.taskName,
-                        'statusImage' : priorityObj?.statusImage,
-                        'priorityName' : priorityObj?.priorityName,
-                        'newStatusImage' : priorityObj?.newStatusImage,
-                        'newPriorityName' : priorityObj?.newPriorityName
-                    };
+                    const shown = shownPriority(priorityObj);
+                    let notificationObj = { 'ProjectName' : projectData?.ProjectName, 'taskName' : priorityObj?.taskName, ...shown.template };
                     let notificationObject = {
                         key: "task_priority",
                         message : taskPriorityChange(notificationObj),
@@ -392,7 +371,7 @@ module.exports = {
 
                     let historyObj = {
                         key: "task_priority",
-                        message : `<b>${userData.Employee_Name}</b> has changed <b> Priority</b> as <b>${priorityObj.newPriorityName}</b>.`,
+                        message : `<b>${userData.Employee_Name}</b> has changed <b> Priority</b> as <b>${shown.newPriorityName}</b>.`,
                         sprintId: taskData.sprintId
                     };
                     HandleHistory('task',projectData.CompanyId, projectData._id,priorityObj.taskId,historyObj, userData).then(async () => {});
@@ -429,14 +408,8 @@ module.exports = {
 
                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
                         resolve({status: true, statusText: "Priority updated successfully"});
-                        let notificationObj = {
-                            'ProjectName' : projectData?.ProjectName,
-                            'taskName' : priorityObj?.taskName,
-                            'statusImage' : priorityObj?.statusImage,
-                            'priorityName' : priorityObj?.priorityName,
-                            'newStatusImage' : priorityObj?.newStatusImage,
-                            'newPriorityName' : priorityObj?.newPriorityName
-                        };
+                        const shown = shownPriority(priorityObj);
+                        let notificationObj = { 'ProjectName' : projectData?.ProjectName, 'taskName' : result.TaskName, ...shown.template };
                         let notificationObject = {
                             key: "task_priority",
                             message : taskPriorityChange(notificationObj),
@@ -462,7 +435,7 @@ module.exports = {
 
                         let historyObj = {
                             key: "task_priority",
-                            message : `<b>${userData.Employee_Name}</b> has changed <b> Priority</b> as <b>${priorityObj.newPriorityName}</b>.`,
+                            message : `<b>${userData.Employee_Name}</b> has changed <b> Priority</b> as <b>${shown.newPriorityName}</b>.`,
                             sprintId: taskData.sprintId
                         };
                         HandleHistory('task',projectData.CompanyId, projectData._id,priorityObj.taskId,historyObj, userData).then(async () => {});
@@ -580,7 +553,7 @@ module.exports = {
                     }
                     let historyObj = {
                         key: "task_name_edit",
-                        message : `<b>${obj.userName}</b> has changed <b> Task name</b> from <b>${sanitizedOldTaskName}</b> to <b>${sanitizedNewTaskName}</b>.`,
+                        message : `<b>${userData.Employee_Name}</b> has changed <b> Task name</b> from <b>${sanitizedOldTaskName}</b> to <b>${sanitizedNewTaskName}</b>.`,
                         sprintId: taskData.sprintId
                     };
                     HandleHistory('task',projectData.CompanyId, projectData._id,taskData._id,historyObj, userData).then(async () => {});

@@ -25,6 +25,7 @@ const socketEmitter = require('../../../../event/socketEventEmitter');
 const { HandleHistory } = require('../mongo_helper');
 const { HandleBothNotification } = require('../handleNotification');
 const { recordCompletion } = require('./recordCompletion.js');
+const { escapeText } = require('../taskWriteFields');
 const {
     taskAssigneeAdd, taskAssigneeRemove, taskAssigneeReplace,
     taskStatusChange, taskPriorityChange,
@@ -497,10 +498,11 @@ module.exports = {
     // updateAssignee helper turned out to be unreliable here because its
     // chained-promise structure resolves with success even when the inner
     // findOneAndUpdate matched no documents.
-    bulkUpdateAssignee({ companyId, userData, taskIds, employeeName, employeeId, type }) {
+    bulkUpdateAssignee({ companyId, userData, taskIds, employeeName: sentName, employeeId, type }) {
         return new Promise(async (resolve, reject) => {
             try {
                 if (!companyId) return reject(new Error('companyId required'));
+                const employeeName = Array.isArray(sentName) ? sentName.map(escapeText).join(',') : escapeText(sentName);
                 if (!['assigneeAdd', 'assigneRemove', 'replace'].includes(type)) {
                     return reject(new Error('invalid type'));
                 }
@@ -616,7 +618,7 @@ module.exports = {
                                         add: true,
                                         type,
                                         userData,
-                                        employeeName,
+                                        employeeName: sentName,
                                     }).catch(() => {});
                                 } catch (_) { /* updateWatcher is fire-and-forget */ }
                             }

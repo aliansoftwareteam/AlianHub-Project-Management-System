@@ -1,4 +1,5 @@
 const { safeFetch, isBlockedHostname } = require('./safeFetch');
+const taint = require('../taint');
 
 // Deterministic static-HTML audit — the EVIDENCE layer.
 //
@@ -39,6 +40,7 @@ const attrs = (tag) => {
 };
 const tagsOf = (html, name) => html.match(new RegExp(`<${name}\\b[^>]*>`, 'gi')) || [];
 
+/* The one way an agent fetches: a page that was read is noted for the run it was read in. */
 async function fetchPage(url) {
     const res = await safeFetch(url, {
         timeoutMs: TIMEOUT_MS,
@@ -46,6 +48,7 @@ async function fetchPage(url) {
         maxRedirects: 5,
         headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' },
     });
+    taint.note(taint.fetched(url));
     return { status: res.status, html: res.body, bytes: res.bytes };
 }
 

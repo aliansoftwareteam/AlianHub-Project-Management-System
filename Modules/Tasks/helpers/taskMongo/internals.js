@@ -20,6 +20,7 @@ const { emitListener } = require("../../../Company/eventController.js");
 const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
+const { taskNotFound } = require('../taskWriteFields');
 module.exports = {
 
     /* -------------- (AUTO RUN ON TASK CREATE) UPDATE TASK KEY -----------------*/
@@ -231,7 +232,7 @@ module.exports = {
     },
 
     // UPDATE TASK FOR QUEUE LIST
-    updateQueueList({CompanyId, projectId, sprintId, taskId,userId,actionType,taskName,userData}) {
+    updateQueueList({CompanyId, projectId, sprintId, taskId,userId,actionType,userData}) {
         return new Promise((resolve,reject) => {
             try {
                 const query = {
@@ -249,8 +250,13 @@ module.exports = {
                 }
                 MongoDbCrudOpration(CompanyId, query, "findOneAndUpdate")
                 .then((result) => {
+                    if (!result) {
+                        reject(taskNotFound());
+                        return;
+                    }
                     socketEmitter.emit('update', { type: "update", data: result , updatedFields: {queueListArray: result.queueListArray}, module: 'task' });
                     resolve({status: true, statusText: "updateQueueList updated successfully"});
+                    const taskName = sanitizeInput(String(result.TaskName || ''));
                     let historyObj = {};
                     historyObj.key = "Task_Queue";
                     if(actionType === "add"){

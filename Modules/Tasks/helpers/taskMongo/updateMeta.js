@@ -20,7 +20,17 @@ const { emitListener } = require("../../../Company/eventController.js");
 const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
-const { taskNotFound } = require('../taskWriteFields');
+const { taskNotFound, escapeText, TaskWriteRefusal } = require('../taskWriteFields');
+
+const isPlainItemId = (value) => (typeof value === 'string' && value.trim() !== '' && !value.startsWith('$')) || (typeof value === 'number' && Number.isFinite(value));
+
+/* The ids a checklist operation filters or pulls by; each must be one plain id, never a condition. */
+const checklistItemIds = (operation, data, history) => {
+    if (operation === 'checklistedit') return [history.updatedId];
+    if (['checklistassignee', 'assigneeremove'].includes(operation)) return [history.updateCheckListId, history.assigneeId];
+    if (operation === 'checklistremove') return Array.isArray(data) ? data : [data];
+    return [];
+};
 module.exports = {
 
     /* -------------- UPDATE TAGS -----------------*/
@@ -73,14 +83,27 @@ module.exports = {
     },
 
     /* -------------- UPDATE CHECKLISTS -----------------*/
-    updateChecklists({ companyId, projectId, sprintId, taskId, operation, data = {}, historyObj: historyObject, taskData }) {
+    updateChecklists({ companyId, projectId, sprintId, taskId, operation, data = {}, historyObj: sentHistory, userData }) {
         return new Promise((resolve, reject) => {
             try {
+                const historyObject = { ...(sentHistory || {}), userId: userData.id, Employee_Name: userData.Employee_Name };
+                if (operation === 'checklistremove' && !Array.isArray(data)) {
+                    reject(new TaskWriteRefusal(400, 'data must list the checklist item ids to remove.'));
+                    return;
+                }
+                if (!checklistItemIds(operation, data, historyObject).filter((value) => value !== undefined && value !== null).every(isPlainItemId)) {
+                    reject(new TaskWriteRefusal(400, 'Checklist item ids must be plain ids.'));
+                    return;
+                }
                 const schema = SCHEMA_TYPE.TASKS;
                 let queryObj = buildQueryObject(operation, taskId, data, historyObject);
                 let obj = { type: schema, data: queryObj };
 
                 MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((response)=>{
+                    if (!response) {
+                        reject(taskNotFound());
+                        return;
+                    }
                     socketEmitter.emit('update', { type: "update", data: response , updatedFields: {checklistArray: response.checklistArray}, module: 'task' });
                     resolve({ status: true, statusText: "Checklist updated successfully" });
 
@@ -92,26 +115,11 @@ module.exports = {
                             message: historyData.message,
                             key: historyData.key,
                             sprintId: sprintId
-                        }, { id: historyObject.userId }).catch(err => {
+                        }, userData).catch(err => {
                             logger.error(`ERROR in history checklist: ${err}`);
                         });
                     }
-
-                    // if (notificationObject && Object.keys(notificationObject).length > 0) {
-                    //     HandleBothNotification({
-                    //         type: 'tasks',
-                    //         companyId,
-                    //         projectId,
-                    //         taskId,
-                    //         folderId: taskData.folderObjId || "",
-                    //         sprintId: taskData.sprintId,
-                    //         object: notificationObject,
-                    //         userData: { id: historyObject.userId }
-                    //     }).catch((error)=>{
-                    //         logger.error(`ERROR in notification checklist: ${error.message}`);
-                    //     });
-                    // }
-                })
+                }).catch(reject);
 
             } catch (error) {
                 logger.error(`ERROR in update Checklist: ${JSON.stringify(error)}`);
@@ -160,7 +168,7 @@ module.exports = {
                     let notificationObject = {};
                     if(operation === "add") {
                         historyObj = {
-                            message: `<b>${userData.name}</b> has attached <b>${data.filename}</b> on <b>${sanitizeInput(taskData.TaskName)}</b>.`,
+                            message: `<b>${userData.Employee_Name}</b> has attached <b>${data.filename}</b> on <b>${sanitizeInput(taskData.TaskName)}</b>.`,
                             key: "Task_Attachment",
                             sprintId: taskData.sprintId,
                         }
@@ -240,44 +248,16 @@ module.exports = {
                 }
 
                 MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((result) => {
+                    if (!result) {
+                        reject(taskNotFound());
+                        return;
+                    }
                     socketEmitter.emit('update', { type: "update", data: result , updatedFields: updateObj, module: 'task' });
                     resolve({status: true, statusText: "Description updated successfully"});
-                })
+                }).catch(reject);
             } catch (error) {
                 logger.error(`Update Discription Error:${error.message}`)
                 reject(error);
-            }
-        })
-    },
-
-    updateSupportTicket({companyId,updateObj,taskId}) {
-        return new Promise((resolve,reject) => {
-            try {
-                const query = {
-                    type: dbCollections.TASKS,
-                    data: [
-                        {
-                            _id: new mongoose.Types.ObjectId(taskId)
-                        }, 
-                        {
-                            $set: {
-                                ...updateObj,
-                            },
-                        }
-                    ]
-                }
-
-                MongoDbCrudOpration(companyId, query, "updateOne")
-                .then(() => {
-                    resolve({status: true, statusText: "Ticket Update Successfully"});
-                })
-                .catch((error) => {
-                    logger.error(`ERROR in task status: ${error.message}`);
-                    reject(error)
-                })
-            } catch (error) {
-                logger.error(`ERROR in task status : ${error.message}`);
-                reject(error)
             }
         })
     },
@@ -413,21 +393,27 @@ module.exports = {
                     ]
                 }
                 MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((response) => {
+                    if (!response) {
+                        reject(taskNotFound());
+                        return;
+                    }
                     resolve({status: true, statusText: "Checklist added successfully"});
                     socketEmitter.emit('update', { type: "update", data: response , updatedFields: {checklistArray: checklistArray}, module: 'task' });
+                    const names = escapeText(checklistArray.map(item => item.name).join(", "));
+
+                    let historyObj = {
+                        key: "task_checklist",
+                        message: `<b>${userData.Employee_Name}</b> has created new checklist item <b class="text-ellipsis vertical-middle d-inline-block" style="max-width:150px" title="${names}">${names}</b>`,
+                        sprintId: sprintId
+                    };
+                    HandleHistory('task',companyId,projectId,taskId,historyObj,userData).catch((error) => {
+                        logger.error(`ERROR in checklist history: ${error.message}`);
+                    });
                 })
                 .catch((error) => {
                     logger.error(`Error in Adding Checklist: ${error.message}`);
                     reject(error)
                 })
-                const names = checklistArray.map(item => item.name).join(", ");
-
-                let historyObj = {
-                    key: "task_checklist",
-                    message: `<b>${userData.Employee_Name}</b> has created new checklist item <b class="text-ellipsis vertical-middle d-inline-block" style="max-width:150px" title="${names}">${names}</b>`,
-                    sprintId: sprintId
-                };
-                HandleHistory('task',companyId,projectId,taskId,historyObj,userData)
 
             } catch (error) {
                 logger.error(`ERROR in Adding Checklist: ${JSON.stringify(error)}`);
@@ -499,7 +485,7 @@ module.exports = {
                         : '';
                     let historyObj = {
                         key: "task_total_estimate",
-                        message : `<b>${obj.userName}</b> has updated total estimated time from <b>${previousDisplayText}</b> to <b>${updatedDisplayText}</b>.${reasonText}`,
+                        message : `<b>${userData.Employee_Name}</b> has updated total estimated time from <b>${previousDisplayText}</b> to <b>${updatedDisplayText}</b>.${reasonText}`,
                         sprintId: taskData.sprintId
                     };
                     HandleHistory('task',projectData.CompanyId, projectData._id,taskData._id,historyObj, userData).then(async () => {});
