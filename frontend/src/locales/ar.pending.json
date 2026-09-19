@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-18T11:25:17.154Z",
+  "updatedAt": "2026-09-19T04:01:39.209Z",
   "keys": {
     "Scrum.stranded_head": "These {count} will stay in this sprint",
     "Scrum.stranded_hint": "They are unfinished, but their parent task is done — and a subtask moves with its parent. Finish them, or reopen the parent task, before completing the sprint.",
@@ -8215,6 +8215,33 @@
     "Audit.taint_kind_form": "Form submission",
     "Audit.taint_kind_webhook": "Webhook",
     "Audit.taint_kind_file": "Uploaded file",
-    "Audit.taint_kind_passage": "Knowledge passage"
+    "Audit.taint_kind_passage": "Knowledge passage",
+    "Egress.nav": "Egress",
+    "Egress.title": "Agent egress allowlist",
+    "Egress.lead": "The hosts each workspace's agents may fetch. A workspace with no hosts listed fetches as before: public hosts allowed, private, metadata and link-local hosts refused. Once a host is listed, its agents fetch listed hosts only, on every redirect hop, and a listed name that resolves to a private address is still refused.",
+    "Egress.flag_on": "The gateway is on:",
+    "Egress.flag_off": "The gateway is off, so agents fetch as before and there is no list to show. Set this and restart the server:",
+    "Egress.format_help": "An exact hostname such as docs.example.com, or *.example.com for every subdomain, with an optional port such as api.example.com:8443. Addresses, private names, schemes and paths are refused.",
+    "Egress.cache_note": "A change applies on this server at once and on every other server within {seconds} seconds.",
+    "Egress.hosts_title": "Allowed hosts",
+    "Egress.no_hosts": "No hosts listed: this workspace fetches as before.",
+    "Egress.add_label": "Add a host",
+    "Egress.add_placeholder": "docs.example.com or *.example.com",
+    "Egress.add": "Add",
+    "Egress.remove_host": "Remove this host",
+    "Egress.refused_count": "{n} refused in the last {days} days",
+    "Egress.updated": "Last set by",
+    "Egress.saved": "Egress allowlist for {name} saved.",
+    "Egress.error_invalid": "That is not a hostname.",
+    "Egress.error_address": "List a hostname, not an address.",
+    "Egress.error_private": "Private, local and internal hosts cannot be listed.",
+    "Egress.error_scheme": "Leave the scheme off: agents fetch http and https only.",
+    "Egress.error_path": "List the host only, without a path, a query or a range.",
+    "Egress.error_wildcard": "A pattern is *.example.com: one leading wildcard on a domain with at least two labels.",
+    "Egress.error_port": "A port is between 1 and 65535.",
+    "Egress.error_too_many": "A workspace can list at most {max} hosts.",
+    "Egress.error_duplicate": "That host is already listed.",
+    "Egress.clear_confirm": "This is the last host on the list for {name}. With no hosts listed, its agents can fetch every public host again, as they did before the list existed. Remove it?",
+    "Egress.error_public_suffix": "That suffix is shared: anyone can register a name under it, so a wildcard there would allow every site on it. List the exact hosts, or a wildcard on your own name such as *.acme.co.uk."
   }
 }

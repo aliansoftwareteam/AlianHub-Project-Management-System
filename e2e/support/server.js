@@ -56,6 +56,8 @@ function serverEnv({ port, mongoUrl, workDir, embeddingsUrl }) {
         // A workspace enforcement mode or knowledge switch a test writes to the company row applies to the next request.
         PERMISSION_ENFORCEMENT_CACHE_TTL_SECONDS: '0',
         KNOWLEDGE_FLAG_CACHE_TTL_SECONDS: '0',
+        // With no list set, every workspace fetches as it does with the flag off.
+        AGENT_EGRESS_ALLOWLIST: 'true',
         // Port 9 (discard) refuses at once, so invite mail fails fast instead of timing out.
         NODEMAILER_HOST: '127.0.0.1',
         NODEMAILER_PORT: '9',

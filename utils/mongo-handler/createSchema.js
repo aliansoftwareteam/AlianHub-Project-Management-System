@@ -319,6 +319,7 @@ knowledgeExclusionsSchema.index({ kind: 1, sourceType: 1, sourceId: 1, userId: 1
 const permissionDecisionsSchema = new Schema(schema.permissionDecisions, {strict: true, timestamps: false});
 permissionDecisionsSchema.index({ day: 1, mode: 1, method: 1, route: 1, permission: 1, role: 1, scope: 1, reason: 1 }, { unique: true, name: 'decision_key' });
 permissionDecisionsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+const egressAllowlistsSchema = new Schema(schema.egressAllowlists, {strict: true, timestamps: false});
 
 // One combined text index per collection, for global search and knowledge retrieval.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
@@ -456,6 +457,7 @@ module.exports = {
     permissionDecisionsSchema,
     auditChainHeadsSchema,
     auditChainAnchorsSchema,
+    egressAllowlistsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,
