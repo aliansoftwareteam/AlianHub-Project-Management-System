@@ -2,6 +2,7 @@ const { tenantOf, TenantError } = require('../../Config/tenant');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const store = require('../../Config/secrets');
 const logger = require('../../Config/loggerConfig');
+const { rotateProblem } = require('./helpers/rotateRules');
 
 const refuse = (res, code, statusText) => res.status(code).send({ status: false, statusText });
 
@@ -49,6 +50,9 @@ exports.rotateSecret = async (req, res) => {
         if (!companyId) return undefined;
         const value = req.body && req.body.value;
         if (typeof value !== 'string' || !value.trim()) return refuse(res, 400, 'A new value is required.');
+        const secret = await store.describe({ companyId, handle: req.params.handle });
+        const problem = await rotateProblem({ companyId, secret, value });
+        if (problem) return refuse(res, problem.statusCode, problem.message);
         const data = await store.rotate({ companyId, handle: req.params.handle, value, actor: actorOf(req) });
         return res.send({ status: true, statusText: 'Secret rotated.', data });
     } catch (error) {
