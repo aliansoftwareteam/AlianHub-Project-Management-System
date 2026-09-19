@@ -26,7 +26,7 @@ const escalations = (rating) => [
     rating.money ? 'touches money' : '',
 ].filter(Boolean);
 
-const decide = ({ agent = {}, action, params = {}, rating = null, run = null, task = null }) => {
+const decide = ({ agent = {}, action, params = {}, rating = null, run = null, task = null, targetProjectId = null }) => {
     const key = String(action || '');
     const out = (decision, reason) => ({ decision, reason, rating: isComplete(rating) ? { ...rating } : null });
     const refuse = (reason) => out(DECISION.REFUSE, reason);
@@ -57,7 +57,9 @@ const decide = ({ agent = {}, action, params = {}, rating = null, run = null, ta
     const routed = taint.routes(run);
     const risky = escalations(rating);
     if (risky.length) return out(DECISION.PROPOSE, `${key} ${risky.join(', ')}${routed ? `; ${taint.reasonFor(run)}` : ''}`);
-    if (routed && run.projectId && projectId !== String(run.projectId)) return out(DECISION.PROPOSE, `${key} writes outside the run's project; ${taint.reasonFor(run)}`);
+    // Null is the run's own task; a named task whose project could not be read is ''.
+    const target = targetProjectId === null || targetProjectId === undefined ? projectId : String(targetProjectId);
+    if (routed && run.projectId && target !== String(run.projectId)) return out(DECISION.PROPOSE, `${key} writes outside the run's project; ${taint.reasonFor(run)}`);
     return out(DECISION.ACT, `${key} is a reversible task-scoped write with no money in it`);
 };
 

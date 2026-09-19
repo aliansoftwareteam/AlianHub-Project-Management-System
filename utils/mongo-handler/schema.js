@@ -1318,6 +1318,8 @@ const schema = {
         // 'draft' until a person approves an agent-written page.
         agentStatus: { type: String, required: false },
         approvedBy: { type: String, required: false },
+        // Same contract as tasks.origin, for a page an inbound path creates; a member's or an agent's page has none
+        origin: { type: Object, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     pageVersions: {

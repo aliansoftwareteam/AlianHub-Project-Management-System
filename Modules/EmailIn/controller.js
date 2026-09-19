@@ -188,7 +188,7 @@ exports.receiveEmail = async (req, res) => {
             TaskKey: '-',
             TaskName: parsed.taskName,
             rawDescription: parsed.description,
-            origin: { kind: 'email', ref: R.originRef(req.body || {}) },
+            origin: { kind: 'email', ref: R.originRef(req.body || {}, new Date()) },
             ProjectID: inbox.ProjectID,
             CompanyId: inbox.companyId,
             sprintId: inbox.sprintId,

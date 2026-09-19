@@ -85,9 +85,13 @@ async function gather(state, config) {
     const block = wantsMemory(slugOf(run))
         ? (await quietly(run._id, 'memory unavailable', () => memory.contextFor({ companyId, projectId: task.ProjectID, userId: run.startedBy }))) || ''
         : '';
-    const gathered = await orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block, startedBy: run.startedBy });
+    const { out: gathered, found } = await taint.collect(() => orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block, startedBy: run.startedBy }));
     if (gathered.status === 'skipped') return { result: gathered };
-    const marked = await taint.mark(companyId, run, [...taint.fromTask({ origin: await taint.originOf(companyId, task) }), ...taint.fromContext(gathered.context)]);
+    const marked = await taint.mark(companyId, run, [
+        ...taint.fromTask({ origin: await taint.originOf(companyId, task) }),
+        ...taint.fromContext(gathered.context, { skill: skillIndex.getSkill(slugOf(run)) }),
+        ...found,
+    ]);
     return { run: marked, context: { ...gathered.context, memory: block } };
 }
 
@@ -112,7 +116,10 @@ async function analyse(state, config) {
         run = await taint.mark(companyId, run, [found]);
         Object.assign(spendContext, taint.record(run) || {});
     };
-    const result = state.result || await orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: { ...MODEL_BUDGET, guard }, spend: spendContext, companyId, agent, onExternal });
+    const { out: result, found } = state.result
+        ? { out: state.result, found: [] }
+        : await taint.collect(() => orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: { ...MODEL_BUDGET, guard }, spend: spendContext, companyId, agent, onExternal }));
+    run = await taint.mark(companyId, run, found);
     const spend = await runs.recordSpend(companyId, run, result.usage, result.model);
     if (result.status !== 'success') {
         const { error, ...kept } = result;
@@ -122,6 +129,21 @@ async function analyse(state, config) {
     if (cap && spend.usd >= cap) return { run, result, spend, outcome: `Run spend cap reached ($${spend.usd.toFixed(2)} of $${cap})`, finalStatus: STATUS.STOPPED };
     return { run, result, spend };
 }
+
+const namedTaskOf = (change) => (change.params && change.params.taskId ? String(change.params.taskId) : '');
+
+/* The project of every other task the changes name, so a tainted run's write
+ * outside its own project is seen as such. */
+const targetProjectsOf = async (companyId, run, changes) => {
+    const targets = new Map();
+    for (const change of changes) {
+        const taskId = namedTaskOf(change);
+        if (!taskId || taskId === String(run.taskId) || targets.has(taskId)) continue;
+        // eslint-disable-next-line no-await-in-loop
+        targets.set(taskId, (await taint.targetProjectOf(companyId, taskId)) || '');
+    }
+    return targets;
+};
 
 /* Below the review level every change is proposed and no decision is recorded,
  * as before; from it, the policy reviews each change and a refusal still goes
@@ -138,8 +160,9 @@ async function review(state, config) {
     const decisions = [];
     const toAct = [];
     const toPropose = [];
+    const targets = taint.routes(run) ? await targetProjectsOf(companyId, run, changes) : new Map();
     for (const change of changes) {
-        const verdict = policy.decide({ agent, action: change.action, params: change.params, rating: change.rating, run, task });
+        const verdict = policy.decide({ agent, action: change.action, params: change.params, rating: change.rating, run, task, targetProjectId: targets.has(namedTaskOf(change)) ? targets.get(namedTaskOf(change)) : null });
         decisions.push({ action: change.action, decision: verdict.decision, reason: verdict.reason, rating: verdict.rating, at: new Date() });
         if (verdict.decision === policy.DECISION.PROPOSE) toPropose.push(change); else toAct.push({ change, verdict });
     }

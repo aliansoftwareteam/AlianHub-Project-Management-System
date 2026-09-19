@@ -58,11 +58,23 @@ const parseInbound = ({ from, subject, text, html } = {}) => {
     return { senderEmail, taskName, description };
 };
 
-/* Identifies the message without keeping any of it: a hash of its Message-ID, or of the sender and subject when the provider sent none. */
-const originRef = (body = {}) => {
-    const headers = body.headers && typeof body.headers === 'object' ? body.headers : {};
-    const messageId = body['message-id'] || body['Message-Id'] || body['Message-ID'] || body.messageId || headers['message-id'] || headers['Message-Id'] || headers['Message-ID'] || '';
-    const seed = String(messageId).trim() || `${body.from || ''}|${body.subject || ''}|${body.date || body.Date || ''}`;
+const MESSAGE_ID_HEADER = /^message-id:\s*(.+?)\s*$/im;
+
+/* Providers send the headers as an object or, like SendGrid, as one raw block. */
+const messageIdOf = (body) => {
+    const direct = body['message-id'] || body['Message-Id'] || body['Message-ID'] || body.messageId;
+    if (direct) return String(direct).trim();
+    const headers = body.headers;
+    if (headers && typeof headers === 'object') return String(headers['message-id'] || headers['Message-Id'] || headers['Message-ID'] || '').trim();
+    const match = typeof headers === 'string' ? MESSAGE_ID_HEADER.exec(headers) : null;
+    return match ? match[1].trim() : '';
+};
+
+/* Identifies the message without keeping any of it: a hash of its Message-ID, or of the
+ * sender, subject and receipt time when the provider sent none, so a repeat sender is
+ * a new source each time. */
+const originRef = (body = {}, receivedAt = new Date()) => {
+    const seed = messageIdOf(body) || `${body.from || ''}|${body.subject || ''}|${new Date(receivedAt).toISOString()}`;
     return crypto.createHash('sha256').update(seed).digest('hex').slice(0, 16);
 };
 
