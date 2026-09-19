@@ -16,6 +16,8 @@ const ROUTE = '/api/v2/secrets';
 const KEY = crypto.randomBytes(32).toString('hex');
 const GITHUB_TOKEN = `ghp_${crypto.randomBytes(20).toString('hex')}`;
 const NEW_TOKEN = `ghp_${crypto.randomBytes(20).toString('hex')}`;
+const ROLLBACK_TOKEN = `ghp_${crypto.randomBytes(20).toString('hex')}`;
+const RETURN_TOKEN = `ghp_${crypto.randomBytes(20).toString('hex')}`;
 
 let server;
 let client;
@@ -145,6 +147,46 @@ describe('the tenant secrets store through the real routes', () => {
         expect((await owner.post(`${ROUTE}/${hook.handle}/revoke`, {})).status).toBe(409);
         const after = await owner.get(ROUTE);
         expect(after.body.data.find((s) => s.handle === hook.handle).revokedAt).toEqual(expect.any(String));
+    });
+
+    it('refuses a rotated value that fails the format the connect form checks', async () => {
+        const list = await owner.get(ROUTE);
+        const github = list.body.data.find((s) => s.name === 'GitHub: Personal access token');
+        const refused = await owner.post(`${ROUTE}/${github.handle}/rotate`, { value: 'not-a-github-token' });
+        expect(refused.status).toBe(400);
+        expect(refused.body.status).toBe(false);
+        await withDb(async (db) => {
+            const row = await db.collection('secrets').findOne({ handle: github.handle });
+            expect(row.revokedAt).toBeNull();
+        });
+    });
+
+    it('lets a reconnect through the server with the flag off win over the stale handle, then returns to a handle', async () => {
+        const { api } = await loginAs('owner');
+        const stale = await withDb(async (db) => (await db.collection('integration_connections').findOne({ _id: connectionId })).secretHandles.token);
+
+        const rolledBack = await api.post('/api/v1/integrations/connections', { type: 'github', config: { token: ROLLBACK_TOKEN, repo: 'acme/app' } });
+        expect(rolledBack.body.status).toBe(true);
+        await withDb(async (db) => {
+            const connection = await db.collection('integration_connections').findOne({ _id: connectionId });
+            expect(connection.secretHandles).toBeUndefined();
+            expect(connection.config.token).toMatch(/^enc:v1:/);
+            const copy = await db.collection('secrets').findOne({ handle: stale });
+            expect(copy.revokedAt).toBeNull();
+            expect(copy.orphanedAt).toBeInstanceOf(Date);
+        });
+
+        const back = await owner.post('/api/v1/integrations/connections', { type: 'github', config: { token: RETURN_TOKEN, repo: 'acme/app' } });
+        expect(back.body.status).toBe(true);
+        await withDb(async (db) => {
+            const connection = await db.collection('integration_connections').findOne({ _id: connectionId });
+            expect(connection.config).toEqual({ repo: 'acme/app' });
+            expect(connection.secretHandles.token).toMatch(/^sec_[a-f0-9]{24}$/);
+            expect(connection.secretHandles.token).not.toBe(stale);
+            const text = JSON.stringify(await db.collection('secrets').find({}).toArray());
+            expect(text).not.toContain(ROLLBACK_TOKEN);
+            expect(text).not.toContain(RETURN_TOKEN);
+        });
     });
 
     it('refuses a member on every route', async () => {

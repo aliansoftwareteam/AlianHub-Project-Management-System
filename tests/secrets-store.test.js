@@ -1,10 +1,16 @@
+const crypto = require('crypto');
 const { create } = require('./fixtures/fakeMongo');
 
 /* Sprint 8 slice 9: the tenant secrets store. One fake database per company, so a handle written in one
  * company can only be read back through that company's database. */
 const mockDbs = {};
 const mockDbFor = (companyId) => (mockDbs[companyId] = mockDbs[companyId] || create());
-const mockCrud = (companyId, query, method) => mockDbFor(String(companyId)).crud(companyId, query, method);
+let mockAfterCall = null;
+const mockCrud = async (companyId, query, method) => {
+    const out = await mockDbFor(String(companyId)).crud(companyId, query, method);
+    if (mockAfterCall) await mockAfterCall({ companyId: String(companyId), query, method });
+    return out;
+};
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...args) => mockCrud(...args) }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
@@ -14,9 +20,12 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 
 const COMPANY = '6f0000000000000000000c01';
 const OTHER = '6f0000000000000000000c02';
-const KEY = 'current-secrets-key-0123456789abcdef0123456789';
-const PREVIOUS = 'previous-secrets-key-fedcba9876543210fedcba98';
-const VALUE = 'ghp_TheOnlyCopyOfThisTokenValue000000000';
+const KEY = crypto.randomBytes(24).toString('hex');
+const PREVIOUS = crypto.randomBytes(24).toString('hex');
+const VALUE = `ghp_${crypto.randomBytes(20).toString('hex')}`;
+const ROTATED = `glpat-${crypto.randomBytes(12).toString('hex')}`;
+const HOUR_MS = 60 * 60 * 1000;
+const plainHashIdOf = (key) => `k${crypto.createHash('sha256').update(`alianhub-secrets-key-id:${key}`).digest('hex').slice(0, 16)}`;
 const actor = { id: '6f0000000000000000000a01', name: 'Olivia Owner' };
 
 let store;
@@ -45,8 +54,13 @@ const everythingWritten = () => JSON.stringify({
 
 beforeEach(() => {
     Object.keys(mockDbs).forEach((key) => { delete mockDbs[key]; });
+    mockAfterCall = null;
     jest.clearAllMocks();
     env();
+});
+
+afterEach(() => {
+    jest.restoreAllMocks();
 });
 
 afterAll(() => {
@@ -87,6 +101,18 @@ describe('configuration', () => {
         expect(keyId).not.toBe(previousKeyId);
         expect(KEY).not.toContain(keyId.slice(1));
         expect(store.keyIdOf(KEY)).toBe(keyId);
+    });
+
+    it('takes the key id from the stretched key, so it is no fast test for a guessed SECRETS_KEY', async () => {
+        env({ key: KEY, previous: PREVIOUS });
+        expect(store.config().keyId).not.toBe(plainHashIdOf(KEY));
+        expect(store.config().previousKeyId).not.toBe(plainHashIdOf(PREVIOUS));
+        store.logBootState();
+        await store.create({ companyId: COMPANY, name: 'X', kind: 'integration', value: VALUE, actor });
+        const text = everythingWritten();
+        expect(text).toContain(store.config().keyId);
+        expect(text).not.toContain(plainHashIdOf(KEY));
+        expect(text).not.toContain(plainHashIdOf(PREVIOUS));
     });
 });
 
@@ -153,13 +179,13 @@ describe('rotate and revoke', () => {
     it('rotate keeps the handle, changes the ciphertext and stamps rotatedAt; the old value no longer resolves', async () => {
         const made = await store.create({ companyId: COMPANY, name: 'GitLab: Access token', kind: 'integration', value: VALUE, actor });
         const before = { ...rows()[0] };
-        const rotated = await store.rotate({ companyId: COMPANY, handle: made.handle, value: 'glpat-NewValueAfterRotation0000000', actor });
+        const rotated = await store.rotate({ companyId: COMPANY, handle: made.handle, value: ROTATED, actor });
         expect(rotated.handle).toBe(made.handle);
         expect(rotated.rotatedAt).toBeInstanceOf(Date);
         expect(rows()).toHaveLength(1);
         expect(rows()[0].ciphertext).not.toBe(before.ciphertext);
         expect(rows()[0].iv).not.toBe(before.iv);
-        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe('glpat-NewValueAfterRotation0000000');
+        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe(ROTATED);
         expect(audits().map((a) => a.action)).toEqual(['secret.create', 'secret.rotate']);
     });
 
@@ -198,6 +224,16 @@ describe('tenant scope', () => {
         expect(audits().pop()).toMatchObject({ companyId: OTHER, action: 'secret.resolve_failed', meta: { reason: 'undecryptable' } });
     });
 
+    it('refuses a ciphertext copied onto another handle in the same company', async () => {
+        const a = await store.create({ companyId: COMPANY, name: 'A', kind: 'integration', value: VALUE, actor });
+        const b = await store.create({ companyId: COMPANY, name: 'B', kind: 'integration', value: ROTATED, actor });
+        const [ra, rb] = [rows().find((r) => r.handle === a.handle), rows().find((r) => r.handle === b.handle)];
+        Object.assign(rb, { ciphertext: ra.ciphertext, iv: ra.iv, tag: ra.tag });
+        expect(await store.resolve({ companyId: COMPANY, handle: b.handle })).toBeNull();
+        expect(audits().pop()).toMatchObject({ action: 'secret.resolve_failed', entityId: b.handle, meta: { reason: 'undecryptable' } });
+        expect(await store.resolve({ companyId: COMPANY, handle: a.handle })).toBe(VALUE);
+    });
+
     it('lists metadata only, newest first, without any ciphertext or value', async () => {
         await store.create({ companyId: COMPANY, name: 'First', kind: 'integration', value: VALUE, actor });
         await store.create({ companyId: COMPANY, name: 'Second', kind: 'webhook', value: VALUE, actor });
@@ -223,7 +259,7 @@ describe('key rotation', () => {
         expect(fresh.keyId).toBe(store.config().keyId);
 
         const moved = await store.reencryptAll({ companyId: COMPANY });
-        expect(moved).toEqual({ moved: 1, kept: 1, failed: 0 });
+        expect(moved).toMatchObject({ moved: 1, kept: 1, failed: 0 });
         expect(rows().every((r) => r.keyId === store.config().keyId)).toBe(true);
         expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe(VALUE);
 
@@ -237,7 +273,195 @@ describe('key rotation', () => {
         env({ key: KEY });
         expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBeNull();
         expect(audits().pop()).toMatchObject({ action: 'secret.resolve_failed', meta: { reason: 'unknown_key' } });
-        expect(await store.reencryptAll({ companyId: COMPANY })).toEqual({ moved: 0, kept: 0, failed: 1 });
+        expect(await store.reencryptAll({ companyId: COMPANY })).toMatchObject({ moved: 0, kept: 0, failed: 1, onPreviousKey: 0, onUnknownKey: 1 });
+    });
+
+    it('still resolves a row recorded under the old plain-hash key id, and restamps it with the current id', async () => {
+        const made = await store.create({ companyId: COMPANY, name: 'Old id', kind: 'integration', value: VALUE, actor });
+        rows()[0].keyId = plainHashIdOf(KEY);
+        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe(VALUE);
+        expect(rows()[0].keyId).toBe(store.config().keyId);
+        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe(VALUE);
+    });
+
+    it('reencryptAll moves a row recorded under the previous key\'s old plain-hash id', async () => {
+        env({ key: PREVIOUS });
+        const made = await store.create({ companyId: COMPANY, name: 'Old id, old key', kind: 'integration', value: VALUE, actor });
+        rows()[0].keyId = plainHashIdOf(PREVIOUS);
+        env({ key: KEY, previous: PREVIOUS });
+        expect(await store.reencryptAll({ companyId: COMPANY })).toMatchObject({ moved: 1, failed: 0, onPreviousKey: 0 });
+        expect(rows()[0].keyId).toBe(store.config().keyId);
+        env({ key: KEY });
+        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe(VALUE);
+    });
+});
+
+describe('resealing under a new key', () => {
+    const underPrevious = async (names) => {
+        env({ key: PREVIOUS });
+        const made = [];
+        for (const name of names) made.push(await store.create({ companyId: COMPANY, name, kind: 'integration', value: `${VALUE}${name}`, actor }));
+        return made;
+    };
+
+    /* Another process changes the row between reencryptAll reading it and writing it back. */
+    const whileResealing = (change) => {
+        let done = false;
+        mockAfterCall = async ({ query, method }) => {
+            if (done || method !== 'find' || query.type !== SCHEMA_TYPE.SECRETS) return;
+            done = true;
+            await change();
+        };
+    };
+
+    it('never overwrites a secret rotated while it was being resealed', async () => {
+        const [made] = await underPrevious(['Raced']);
+        env({ key: KEY, previous: PREVIOUS });
+        whileResealing(() => store.rotate({ companyId: COMPANY, handle: made.handle, value: ROTATED, actor }));
+        const counts = await store.reencryptAll({ companyId: COMPANY });
+        expect(counts).toMatchObject({ moved: 0, raced: 1, onPreviousKey: 0 });
+        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe(ROTATED);
+    });
+
+    it('counts a row that changed underneath it and is still on the previous key as remaining', async () => {
+        const [made] = await underPrevious(['Raced, still old']);
+        env({ key: KEY, previous: PREVIOUS });
+        /* A process that still runs on the old configuration rotates the row. */
+        whileResealing(async () => {
+            process.env.SECRETS_KEY = PREVIOUS;
+            delete process.env.SECRETS_KEY_PREVIOUS;
+            await store.rotate({ companyId: COMPANY, handle: made.handle, value: ROTATED, actor });
+            process.env.SECRETS_KEY = KEY;
+            process.env.SECRETS_KEY_PREVIOUS = PREVIOUS;
+        });
+        const counts = await store.reencryptAll({ companyId: COMPANY });
+        expect(counts).toMatchObject({ moved: 0, raced: 1, onPreviousKey: 1 });
+        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe(ROTATED);
+    });
+
+    it('reports revoked rows apart from live ones, so what remains on the previous key can reach zero', async () => {
+        const [live, gone] = await underPrevious(['Live', 'Gone']);
+        await store.revoke({ companyId: COMPANY, handle: gone.handle, actor });
+        env({ key: KEY, previous: PREVIOUS });
+        const counts = await store.reencryptAll({ companyId: COMPANY });
+        expect(counts).toEqual({ moved: 1, kept: 0, failed: 0, raced: 0, revoked: 1, onPreviousKey: 0, onUnknownKey: 0 });
+        expect(rows().find((r) => r.handle === live.handle).keyId).toBe(store.config().keyId);
+        expect(rows().find((r) => r.handle === gone.handle).ciphertext).toBe('');
+    });
+
+    it('writes one audit row per company with the counts and the key id, never a value', async () => {
+        await underPrevious(['One', 'Two']);
+        env({ key: KEY, previous: PREVIOUS });
+        recordAudit.mockClear();
+        const counts = await store.reencryptAll({ companyId: COMPANY, actor: { id: 'script:secrets-reencrypt' }, run: 'run-1' });
+        expect(audits()).toEqual([{
+            companyId: COMPANY, actorId: 'script:secrets-reencrypt', actorName: '', action: 'secret.reencrypt', entityType: 'secret',
+            entityId: COMPANY, entityName: 'Secrets store key rotation', meta: { ...counts, keyId: store.config().keyId, run: 'run-1' },
+        }]);
+        expect(everythingWritten()).not.toContain(VALUE);
+        expect(everythingWritten()).not.toContain(KEY);
+        expect(everythingWritten()).not.toContain(PREVIOUS);
+    });
+
+    it('reseals while the flag is off, as long as the key is set', async () => {
+        const [made] = await underPrevious(['Flag off']);
+        env({ on: false, key: KEY, previous: PREVIOUS });
+        expect(await store.reencryptAll({ companyId: COMPANY })).toMatchObject({ moved: 1, onPreviousKey: 0 });
+        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe(`${VALUE}Flag off`);
+    });
+});
+
+describe('what a stored row must look like to open', () => {
+    const sealedByHand = ({ handle, ivBytes }) => {
+        const iv = crypto.randomBytes(ivBytes);
+        const cipher = crypto.createCipheriv('aes-256-gcm', crypto.scryptSync(KEY, 'alianhub-secrets-store', 32), iv);
+        cipher.setAAD(Buffer.from(`${COMPANY}:${handle}`, 'utf8'));
+        const body = Buffer.concat([cipher.update(VALUE, 'utf8'), cipher.final()]);
+        return { iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), ciphertext: body.toString('base64') };
+    };
+
+    it('opens a row sealed by hand the way the store seals it', async () => {
+        const made = await store.create({ companyId: COMPANY, name: 'By hand', kind: 'integration', value: ROTATED, actor });
+        Object.assign(rows()[0], sealedByHand({ handle: made.handle, ivBytes: 12 }));
+        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe(VALUE);
+    });
+
+    it.each([4, 8, 12, 15])('refuses an auth tag cut to %i bytes', async (bytes) => {
+        const made = await store.create({ companyId: COMPANY, name: 'Short tag', kind: 'integration', value: VALUE, actor });
+        rows()[0].tag = Buffer.from(rows()[0].tag, 'base64').subarray(0, bytes).toString('base64');
+        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBeNull();
+        expect(audits().pop()).toMatchObject({ action: 'secret.resolve_failed', meta: { reason: 'undecryptable' } });
+    });
+
+    it('refuses a row whose iv is not 12 bytes, even when it authenticates', async () => {
+        const made = await store.create({ companyId: COMPANY, name: 'Long iv', kind: 'integration', value: ROTATED, actor });
+        Object.assign(rows()[0], sealedByHand({ handle: made.handle, ivBytes: 16 }));
+        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBeNull();
+        expect(audits().pop()).toMatchObject({ action: 'secret.resolve_failed', meta: { reason: 'undecryptable' } });
+    });
+});
+
+describe('letting go of a handle', () => {
+    it('revokes with the flag off while the key is set, so a rollback leaves no live copy', async () => {
+        const made = await store.create({ companyId: COMPANY, name: 'X', kind: 'integration', value: VALUE, actor });
+        env({ on: false });
+        expect(await store.retire({ companyId: COMPANY, handle: made.handle, actor })).toBe('revoked');
+        expect(rows()[0].revokedAt).toBeInstanceOf(Date);
+        expect(rows()[0].ciphertext).toBe('');
+        expect(audits().pop()).toMatchObject({ action: 'secret.revoke', entityId: made.handle });
+    });
+
+    it('marks the row as orphaned when there is no key, and revokes it once there is one', async () => {
+        const made = await store.create({ companyId: COMPANY, name: 'X', kind: 'integration', value: VALUE, actor });
+        const kept = await store.create({ companyId: COMPANY, name: 'Still used', kind: 'integration', value: VALUE, actor });
+        env({ on: false, key: null });
+        expect(await store.retire({ companyId: COMPANY, handle: made.handle, actor })).toBe('orphaned');
+        const row = () => rows().find((r) => r.handle === made.handle);
+        expect(row().orphanedAt).toBeInstanceOf(Date);
+        expect(row().revokedAt).toBeNull();
+        expect(row().ciphertext).not.toBe('');
+        expect(audits().pop()).toMatchObject({ action: 'secret.orphan', entityId: made.handle, actorId: actor.id });
+
+        env();
+        expect(await store.revokeOrphans({ companyId: COMPANY, actor })).toBe(1);
+        expect(row().revokedAt).toBeInstanceOf(Date);
+        expect(row().ciphertext).toBe('');
+        expect(rows().find((r) => r.handle === kept.handle).revokedAt).toBeNull();
+        expect(await store.revokeOrphans({ companyId: COMPANY, actor })).toBe(0);
+    });
+
+    it('answers gone for a handle that is already revoked or was never there', async () => {
+        const made = await store.create({ companyId: COMPANY, name: 'X', kind: 'integration', value: VALUE, actor });
+        await store.revoke({ companyId: COMPANY, handle: made.handle, actor });
+        expect(await store.retire({ companyId: COMPANY, handle: made.handle, actor })).toBe('gone');
+        expect(await store.retire({ companyId: COMPANY, handle: 'sec_000000000000000000000000', actor })).toBe('gone');
+        expect(await store.retire({ companyId: COMPANY, handle: 'not-a-handle', actor })).toBe('gone');
+    });
+});
+
+describe('a secret that keeps failing to resolve', () => {
+    it('is audited once per handle per hour, not once per lookup', async () => {
+        const now = jest.spyOn(Date, 'now');
+        const start = 1750000000000;
+        now.mockReturnValue(start);
+        const a = await store.create({ companyId: COMPANY, name: 'A', kind: 'webhook', value: VALUE, actor });
+        const b = await store.create({ companyId: COMPANY, name: 'B', kind: 'webhook', value: VALUE, actor });
+        await store.revoke({ companyId: COMPANY, handle: a.handle, actor });
+        await store.revoke({ companyId: COMPANY, handle: b.handle, actor });
+        const failures = () => audits().filter((x) => x.action === 'secret.resolve_failed').map((x) => x.entityId);
+
+        for (let i = 0; i < 5; i += 1) expect(await store.resolve({ companyId: COMPANY, handle: a.handle })).toBeNull();
+        expect(failures()).toEqual([a.handle]);
+        expect(await store.resolve({ companyId: COMPANY, handle: b.handle })).toBeNull();
+        expect(failures()).toEqual([a.handle, b.handle]);
+
+        now.mockReturnValue(start + HOUR_MS - 1);
+        await store.resolve({ companyId: COMPANY, handle: a.handle });
+        expect(failures()).toEqual([a.handle, b.handle]);
+
+        now.mockReturnValue(start + HOUR_MS);
+        await store.resolve({ companyId: COMPANY, handle: a.handle });
+        expect(failures()).toEqual([a.handle, b.handle, a.handle]);
     });
 });
 
@@ -268,7 +492,6 @@ describe('a missing or short key', () => {
         env({ on: false });
         await expect(store.create({ companyId: COMPANY, name: 'Y', kind: 'integration', value: VALUE, actor })).rejects.toMatchObject({ code: 'store_off' });
         await expect(store.rotate({ companyId: COMPANY, handle: made.handle, value: VALUE, actor })).rejects.toMatchObject({ code: 'store_off' });
-        await expect(store.revoke({ companyId: COMPANY, handle: made.handle, actor })).rejects.toMatchObject({ code: 'store_off' });
         await expect(store.list({ companyId: COMPANY })).rejects.toMatchObject({ code: 'store_off' });
         expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe(VALUE);
     });

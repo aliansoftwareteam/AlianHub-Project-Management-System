@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { create } = require('./fixtures/fakeMongo');
 
 /* Sprint 8 slice 9: the workspace's stored-secrets routes. Owners and admins see metadata, never a value;
@@ -19,8 +20,9 @@ const OWNER = '6f0000000000000000000a01';
 const ADMIN = '6f0000000000000000000a02';
 const MEMBER = '6f0000000000000000000a03';
 const GUEST = '6f0000000000000000000a04';
-const KEY = 'current-secrets-key-0123456789abcdef0123456789';
-const VALUE = 'ghp_TheOnlyCopyOfThisTokenValue000000000';
+const KEY = crypto.randomBytes(24).toString('hex');
+const VALUE = `ghp_${crypto.randomBytes(20).toString('hex')}`;
+const NEW_VALUE = `ghp_${crypto.randomBytes(20).toString('hex')}`;
 const actor = { id: OWNER, name: 'Olivia Owner' };
 
 let ctrl;
@@ -47,6 +49,13 @@ const ask = async (handler, uid, { body = {}, params = {}, headers = {}, ...over
     const res = response();
     await handler({ headers: { companyid: COMPANY, ...headers }, body, params, query: {}, uid, ip: '10.0.0.1', ...over }, res);
     return res;
+};
+
+/* A stored integration secret the way connect leaves it: the row in the store and the connection that holds its handle. */
+const connected = async ({ type = 'github', field = 'token', value = VALUE, companyId = COMPANY, config = { repo: 'acme/app' } } = {}) => {
+    const made = await store.create({ companyId, name: `${type}: ${field}`, kind: 'integration', value, actor });
+    mockDbFor(companyId).seed(SCHEMA_TYPE.INTEGRATION_CONNECTIONS, { type, name: type, config, secretHandles: { [field]: made.handle }, enabled: true, deletedStatusKey: 0 });
+    return made;
 };
 
 const seat = (userId, roleType, companyId = COMPANY) => mockDbFor(companyId).seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false });
@@ -127,18 +136,18 @@ describe('who may see the workspace secrets', () => {
 
 describe('rotate and revoke through the routes', () => {
     it('rotates with a new value, keeps the handle, audits the owner as the actor and never echoes the value', async () => {
-        const made = await store.create({ companyId: COMPANY, name: 'X', kind: 'integration', value: VALUE, actor });
-        const res = await ask(ctrl.rotateSecret, ADMIN, { params: { handle: made.handle }, body: { value: 'glpat-NewValueAfterRotation0000000' } });
+        const made = await connected();
+        const res = await ask(ctrl.rotateSecret, ADMIN, { params: { handle: made.handle }, body: { value: NEW_VALUE } });
         expect(res.statusCode).toBe(200);
         expect(res.body.status).toBe(true);
         expect(res.body.data).toMatchObject({ handle: made.handle, rotatedAt: expect.any(Date) });
-        expect(JSON.stringify(res.body)).not.toContain('glpat-NewValueAfterRotation0000000');
-        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe('glpat-NewValueAfterRotation0000000');
+        expect(JSON.stringify(res.body)).not.toContain(NEW_VALUE);
+        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe(NEW_VALUE);
         expect(recordAudit.mock.calls.pop()[1]).toMatchObject({ action: 'secret.rotate', actorId: ADMIN, entityId: made.handle, ip: '10.0.0.1' });
     });
 
     it('refuses an empty or non-string value with 400 and leaves the secret alone', async () => {
-        const made = await store.create({ companyId: COMPANY, name: 'X', kind: 'integration', value: VALUE, actor });
+        const made = await connected();
         const before = rows()[0].ciphertext;
         for (const value of ['', undefined, 12, { nested: true }, '   ']) {
             // eslint-disable-next-line no-await-in-loop
@@ -148,19 +157,63 @@ describe('rotate and revoke through the routes', () => {
         expect(rows()[0].ciphertext).toBe(before);
     });
 
+    it('holds a rotated integration secret to the format its connect form checks', async () => {
+        const github = await connected();
+        const teams = await connected({ type: 'microsoft_teams', field: 'webhook_url', value: 'https://teams.example.com/hook/1', config: {} });
+        const before = rows().map((r) => r.ciphertext);
+        const refused = [
+            [github.handle, 'not-a-github-token'],
+            [github.handle, `${NEW_VALUE} `.repeat(60)],
+            [teams.handle, 'http://teams.example.com/hook/2'],
+            [teams.handle, 'https://127.0.0.1/hook'],
+            [teams.handle, 'https://user:pass@teams.example.com/hook'],
+        ];
+        for (const [handle, value] of refused) {
+            // eslint-disable-next-line no-await-in-loop
+            const res = await ask(ctrl.rotateSecret, OWNER, { params: { handle }, body: { value } });
+            expect(res.statusCode).toBe(400);
+            expect(res.body.status).toBe(false);
+            expect(JSON.stringify(res.body)).not.toContain(value.trim());
+        }
+        expect(await ask(ctrl.rotateSecret, OWNER, { params: { handle: github.handle }, body: { value: 'not-a-github-token' } })).toMatchObject({ body: { statusText: expect.stringMatching(/GitHub token/) } });
+        expect(rows().map((r) => r.ciphertext)).toEqual(before);
+        expect(recordAudit.mock.calls.map(([, e]) => e.action)).toEqual(['secret.create', 'secret.create']);
+
+        expect((await ask(ctrl.rotateSecret, OWNER, { params: { handle: teams.handle }, body: { value: 'https://teams.example.com/hook/2' } })).statusCode).toBe(200);
+    });
+
+    it('holds a rotated webhook signing secret to 32 to 256 characters without spaces', async () => {
+        const made = await store.create({ companyId: COMPANY, name: 'Webhook: Team Slack', kind: 'webhook', value: crypto.randomBytes(24).toString('hex'), actor });
+        for (const value of ['short', 'has a space in it, though it is long enough', 'x'.repeat(257)]) {
+            // eslint-disable-next-line no-await-in-loop
+            expect((await ask(ctrl.rotateSecret, OWNER, { params: { handle: made.handle }, body: { value } })).statusCode).toBe(400);
+        }
+        const next = crypto.randomBytes(24).toString('hex');
+        expect((await ask(ctrl.rotateSecret, OWNER, { params: { handle: made.handle }, body: { value: next } })).statusCode).toBe(200);
+        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe(next);
+    });
+
+    it('refuses to rotate an integration secret that no connection uses any more', async () => {
+        const made = await store.create({ companyId: COMPANY, name: 'GitHub: Personal access token', kind: 'integration', value: VALUE, actor });
+        const res = await ask(ctrl.rotateSecret, OWNER, { params: { handle: made.handle }, body: { value: NEW_VALUE } });
+        expect(res.statusCode).toBe(409);
+        expect(res.body.statusText).toMatch(/no connected integration/i);
+        expect(await store.resolve({ companyId: COMPANY, handle: made.handle })).toBe(VALUE);
+    });
+
     it('revokes, then refuses a second revoke and a rotate with 409', async () => {
         const made = await store.create({ companyId: COMPANY, name: 'X', kind: 'integration', value: VALUE, actor });
         const res = await ask(ctrl.revokeSecret, OWNER, { params: { handle: made.handle } });
         expect(res.statusCode).toBe(200);
         expect(res.body.data).toMatchObject({ handle: made.handle, revokedAt: expect.any(Date) });
         expect((await ask(ctrl.revokeSecret, OWNER, { params: { handle: made.handle } })).statusCode).toBe(409);
-        expect((await ask(ctrl.rotateSecret, OWNER, { params: { handle: made.handle }, body: { value: 'v2' } })).statusCode).toBe(409);
+        expect((await ask(ctrl.rotateSecret, OWNER, { params: { handle: made.handle }, body: { value: NEW_VALUE } })).statusCode).toBe(409);
     });
 
     it('answers 404 for a handle from another company and for a malformed handle', async () => {
         seat(OWNER, 1, OTHER);
         const theirs = await store.create({ companyId: OTHER, name: 'Theirs', kind: 'integration', value: VALUE, actor });
-        expect((await ask(ctrl.rotateSecret, OWNER, { params: { handle: theirs.handle }, body: { value: 'v2' } })).statusCode).toBe(404);
+        expect((await ask(ctrl.rotateSecret, OWNER, { params: { handle: theirs.handle }, body: { value: NEW_VALUE } })).statusCode).toBe(404);
         expect((await ask(ctrl.revokeSecret, OWNER, { params: { handle: theirs.handle } })).statusCode).toBe(404);
         expect((await ask(ctrl.revokeSecret, OWNER, { params: { handle: 'not-a-handle' } })).statusCode).toBe(404);
         expect(rows(OTHER)[0].revokedAt).toBeNull();
