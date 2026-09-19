@@ -238,6 +238,7 @@ describe('tenant scope', () => {
         await store.create({ companyId: COMPANY, name: 'First', kind: 'integration', value: VALUE, actor });
         await store.create({ companyId: COMPANY, name: 'Second', kind: 'webhook', value: VALUE, actor });
         await store.create({ companyId: OTHER, name: 'Theirs', kind: 'webhook', value: VALUE, actor });
+        rows()[0].createdAt = new Date(rows()[1].createdAt.getTime() - 1000);
         const listed = await store.list({ companyId: COMPANY });
         expect(listed.map((s) => s.name)).toEqual(['Second', 'First']);
         expect(Object.keys(listed[0]).sort()).toEqual(['createdAt', 'createdBy', 'handle', 'keyId', 'kind', 'lastResolvedAt', 'name', 'revokedAt', 'rotatedAt']);
