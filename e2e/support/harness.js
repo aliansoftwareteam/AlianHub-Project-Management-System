@@ -17,7 +17,7 @@ async function startHarness({ name }) {
     };
 
     try {
-        const state = await createFixtures(server.baseURL);
+        const state = { ...(await createFixtures(server.baseURL)), embeddingsUrl: server.embeddingsUrl };
         writeState(state);
         process.env.E2E_BASE_URL = server.baseURL;
         process.env.E2E_STATE_FILE = STATE_FILE;
