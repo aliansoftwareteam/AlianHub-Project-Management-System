@@ -90,12 +90,11 @@ const startFor = async (companyId, { workflowRunId, stepId, agentId, taskId, ski
     return run;
 };
 
-/* The run itself, through the same graph a person's run executes on. The step's
- * credential rides on the actor, which is what every action is performed as. */
-const executeAgentRun = async (companyId, agentRun, { stepCredential = null } = {}) => {
-    const agent = await runs.getAgent(companyId, agentRun.agentId);
-    if (!agent) throw permanent(`agent ${agentRun.agentId} was not found`);
-    const task = await taskFor(companyId, agentRun.taskId);
+/* Who the run acts as. The step's credential rides on the actor, which is what
+ * every action is performed as, and is read each time it is presented: a heartbeat
+ * re-mints it while the run is still going. Enumerable, so a copy of the actor
+ * carries the credential it was copied with rather than none, and is still checked. */
+const actorFor = (agentRun, agent, stepCredential = null) => {
     const actor = {
         kind: 'agent',
         userId: agentRun.startedBy || '',
@@ -104,8 +103,17 @@ const executeAgentRun = async (companyId, agentRun, { stepCredential = null } = 
         runId: String(agentRun._id),
         viaAccount: agentRun.viaAccount,
         tokenId: null,
-        ...(stepCredential ? { stepCredential } : {}),
     };
+    if (typeof stepCredential === 'function') Object.defineProperty(actor, 'stepCredential', { enumerable: true, get: stepCredential });
+    return actor;
+};
+
+/* The run itself, through the same graph a person's run executes on. */
+const executeAgentRun = async (companyId, agentRun, { stepCredential = null } = {}) => {
+    const agent = await runs.getAgent(companyId, agentRun.agentId);
+    if (!agent) throw permanent(`agent ${agentRun.agentId} was not found`);
+    const task = await taskFor(companyId, agentRun.taskId);
+    const actor = actorFor(agentRun, agent, stepCredential);
     const state = await runs.executeSkill(companyId, agentRun, agent, task, { proposals, actions, actor });
     const finished = (await runs.get(companyId, agentRun._id)) || agentRun;
     if (state.status === runs.STATUS.FAILED) throw permanent(`agent run ${agentRun._id} failed: ${state.error || state.outcome || 'no reason given'}`);
@@ -140,4 +148,4 @@ const contextFor = (companyId, claim) => ({
     noteOutput: claim ? (output) => store.noteStep(companyId, claim, { output }) : null,
 });
 
-module.exports = { TRIGGER, runAgent, executeAgentRun, agentFor, contextFor, idempotencyKeyFor, AgentStepError };
+module.exports = { TRIGGER, runAgent, executeAgentRun, actorFor, agentFor, contextFor, idempotencyKeyFor, AgentStepError };

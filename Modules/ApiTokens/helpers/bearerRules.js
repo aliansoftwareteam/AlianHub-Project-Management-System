@@ -1,18 +1,26 @@
 const jwt = require('jsonwebtoken');
-const { STEP_CREDENTIAL_KIND, looksLikeServiceIdentity } = require('../../Agents/serviceIdentity');
+const { STEP_CREDENTIAL_KIND, looksLikeServiceIdentity, stepCredentialsEnabled } = require('../../Agents/serviceIdentity');
 
 // What a presented bearer value must never be taken for. A step credential is
 // signed with a key of its own and a service identity is never a token at all,
 // so both would fail the session check anyway; naming them here means the
 // refusal says why instead of "invalid signature".
 
+/* jwt.decode throws on a header that says JWT over a payload that is not JSON.
+ * Whatever cannot be decoded is not a step credential, and the verifier that
+ * asked goes on to answer it the way it answers any other bad token. */
 const looksLikeStepCredential = (raw) => {
     if (typeof raw !== 'string' || raw.split('.').length !== 3) return false;
-    const payload = jwt.decode(raw);
-    return Boolean(payload && typeof payload === 'object' && payload.kind === STEP_CREDENTIAL_KIND);
+    try {
+        const payload = jwt.decode(raw);
+        return Boolean(payload && typeof payload === 'object' && payload.kind === STEP_CREDENTIAL_KIND);
+    } catch (error) {
+        return false;
+    }
 };
 
 const bearerRefusal = (raw) => {
+    if (!stepCredentialsEnabled()) return null;
     if (looksLikeStepCredential(raw)) return 'A step-scoped credential cannot be presented as a bearer token.';
     if (looksLikeServiceIdentity(raw)) return 'A service identity cannot be presented as a bearer token.';
     return null;

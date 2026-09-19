@@ -9,6 +9,7 @@ const {
     generateToken, hashToken, tokenPrefixOf, looksLikeToken, isStrict, validateCreateInput, isExpired, effectiveScopes, graceStanding, lastUsedIsStale,
 } = require('./helpers/apiTokenRules');
 const { strictSince } = require('./helpers/strictSince');
+const { stepCredentialsEnabled } = require('../Agents/serviceIdentity');
 
 // Resolve the acting user. These routes now sit behind the JWT middleware
 // (Config/setMiddleware.js) which populates req.uid; the body userData
@@ -137,9 +138,12 @@ exports.listTokens = async (req, res) => {
         const strict = isStrict();
         const since = strict ? await strictSince() : null;
         const now = new Date();
+        // The flag is named only while it is on, so the answer with it off is the one
+        // given before it existed; the screen asks for the credential list on seeing it.
         const policy = {
             strict, minExpiryDays: MIN_EXPIRY_DAYS, maxExpiryDays: MAX_EXPIRY_DAYS, scopes: [...SCOPES], graceDays: STRICT_GRACE_DAYS,
             strictSince: since,
+            ...(stepCredentialsEnabled() ? { stepCredentials: true } : {}),
         };
         const data = (tokens || []).map((doc) => maskToken(doc, graceStanding(doc, { strict, strictSince: since, now })));
         return res.send({ status: true, statusText: 'Tokens fetched.', data, policy });

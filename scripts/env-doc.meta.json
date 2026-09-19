@@ -781,7 +781,7 @@
   },
   "STEP_CREDENTIALS": {
     "group": "security",
-    "description": "Set to on to give the platform its own service identities and mint a step-scoped credential per workflow step: the workflow engine, its worker, the knowledge indexer and the model router record their rows as service:<name> instead of a borrowed user, and when the engine claims a step it signs a short-lived credential carrying the company, run, step, fencing token, actor context and allowed actions that expires with the lease and is checked against the live step row on every action. The tokens screen lists live credentials as step-scoped. Unset or off keeps today's behaviour: no credential is minted and rows are attributed as before.",
+    "description": "Set to on to give the platform its own service identities and mint a step-scoped credential per workflow step: the workflow engine, its worker, the knowledge indexer and the model router record their rows as service:<name> instead of a borrowed user, and when the engine claims a step it signs a short-lived credential carrying the company, run, step, fencing token, actor context and allowed actions that expires one lease after it was minted, is re-minted whenever a heartbeat extends the lease, and is checked against the live step row whenever an agent step's actor presents it to perform an action. The tokens screen lists live credentials as step-scoped. Unset or off keeps today's behaviour: no credential is minted and rows are attributed as before.",
     "default": "off"
   },
   "STEP_CREDENTIAL_SECRET": {

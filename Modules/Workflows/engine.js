@@ -49,11 +49,11 @@ const stepActor = (run, workerId = WORKER_ID) => (stepCredential.enabled()
 /* Renews the lease while a slow step runs. A false answer means the lease was
  * taken; the executor is told so it can stop, and the settle would refuse the
  * write anyway. */
-const startHeartbeat = (companyId, claim, lost) => {
+const startHeartbeat = (claim, lost, beat) => {
     const every = heartbeatMs();
     const timer = setInterval(async () => {
         try {
-            const held = await store.heartbeat(companyId, claim);
+            const held = await beat();
             if (!held) {
                 lost.value = true;
                 clearInterval(timer);
@@ -122,9 +122,13 @@ const runStep = async (companyId, run, pending, { workerId = WORKER_ID, context 
 
     const claim = claimOf(claimed);
     // The credential the step acts under, minted from this claim so it carries the
-    // fencing token the claim won and dies with the lease. Only its id and expiry
+    // fencing token the claim won and dies one lease later. Only its id and expiry
     // reach the row; the credential itself travels in the context and nowhere else.
-    const credential = stepCredential.issue({ companyId, run, step: claimed, agent: await agentRunner.agentFor(companyId, run, claimed) });
+    const credential = await stepCredential.issue({ companyId, run, step: claimed, agentOf: () => agentRunner.agentFor(companyId, run, claimed) });
+    // Under a credential every heartbeat re-mints it with the lease it extends, so
+    // a step that outruns its first lease is not refused at its last action.
+    const held = credential ? stepCredential.hold(companyId, claim, credential) : null;
+    const beat = held ? held.renew : () => store.heartbeat(companyId, claim);
     // What this hop was given out of what the run had left, on the row before it
     // runs: the answer to "why did this step only get ninety seconds" has to
     // outlive the tick that decided it.
@@ -133,7 +137,7 @@ const runStep = async (companyId, run, pending, { workerId = WORKER_ID, context 
         ...(credential ? { credentialId: credential.credentialId, credentialExpiresAt: credential.expiresAt } : {}),
     });
     const lost = { value: false };
-    const stopHeartbeat = startHeartbeat(companyId, claim, lost);
+    const stopHeartbeat = startHeartbeat(claim, lost, beat);
     const key = idempotency.keyFor({ runId: run._id, stepId: claimed.stepId, action: claimed.action });
 
     try {
@@ -167,9 +171,10 @@ const runStep = async (companyId, run, pending, { workerId = WORKER_ID, context 
                     deadlineAt: permit.grant.deadlineAt,
                     budgetUsd: permit.grant.budgetUsd,
                     depth: permit.depth,
-                    keepAlive: () => store.heartbeat(companyId, claim),
+                    keepAlive: () => beat(),
                     leaseLost: () => lost.value,
-                    ...(credential ? { stepCredential: credential.token } : {}),
+                    // Asked for, not handed over: what it answers changes when a heartbeat re-mints.
+                    ...(held ? { stepCredential: held.token } : {}),
                 },
             }),
         )));

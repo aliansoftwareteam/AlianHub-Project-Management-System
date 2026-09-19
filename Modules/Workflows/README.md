@@ -379,29 +379,51 @@ attributed as before.
 On, the platform's own components act as themselves. `Modules/Agents/actor.js`
 has a third actor kind, `service`, named from a fixed list: `engine`, `worker`,
 `indexer`, `router`. The engine records each step's audit row as
-`service:engine`, on behalf of whoever started the run; the automation runner's
-rows name the worker; the knowledge backfill stamps its state row and the model
-router its decision. A service identity is built in process by
-`serviceActor()`, is never resolved from a request, and is refused as a bearer
-value by `Config/jwt.js`.
+`service:engine`, on behalf of whoever started the run; the rows the automation
+runner writes while it executes a run name the worker (a row written for a
+person's apply request carries no run and is left as it was); the knowledge
+backfill stamps its state row and the model router its decision. A service
+identity is built in process by `serviceActor()`, is never resolved from a
+request, and is refused as a bearer value by `Config/jwt.js`.
 
 When the engine claims a step it mints a credential for it
 (`stepCredential.js`): a JWT signed with a key derived from
 `STEP_CREDENTIAL_SECRET` (or `JWT_SECRET`), carrying the company, the run, the
 step, the fencing token the claim won, the run's agent and starter, and the
-actions the step may perform, expiring with the lease. The row keeps only its id
-and expiry; the credential travels in the executor context and rides on the
-actor of the agent run. `Modules/Agents/actions.js` checks it against the live
-step row on every action: the step must exist, be running, hold the same fencing
-token, be inside its lease and grant the action, or the action is refused and
-audited before the registry and the holder's permissions are even asked. The
+actions the step may perform, expiring one lease after it was minted. Every
+heartbeat that extends the lease re-mints it in the same write (same fencing
+token, new id and expiry) and the running step is handed the fresh one, so a
+step that outruns its first lease is not refused at its last action. The
+replaced credential is not revoked; it runs out at its own expiry, so no single
+credential is good for longer than one lease (`WORKFLOW_LEASE_MS`, 17 minutes by
+default), and for less once its step settles, is handed back or is reclaimed.
+The row keeps only the current id and expiry; the credential travels in the
+executor context as something a step asks for, rides on the actor of the agent
+run, and is stripped from the context a `tool_call` hands its tool.
+
+`Modules/Agents/actions.js` checks it whenever the actor performing an action or
+an authorised read carries one, which today is the act phase of an `agent_run`
+step. In order: the signature and kind, the company, the agent and the starter
+it was minted for against the actor presenting it, then the live row (it must
+exist, name the same agent, be running, hold the same fencing token), then the
+credential's own expiry, the lease, and the action. The first failure is refused
+and audited before the registry and the holder's permissions are even asked. The
 credential narrows only; it grants nothing the run's actor could not already do.
 The engine's own lifecycle writes (claim, heartbeat, settle) are fenced by the
 token and made under the engine identity, never under the credential.
 
+Not under a credential yet: `automation_rule` steps, `tool_call` steps (including
+`run_agent`, whose nested agent performs registry actions as an actor without
+one), changes a low-autonomy agent proposes and a person approves
+(`Modules/Agents/proposals.js` applies them as the decider's actor), and the
+reads an agent makes while it gathers. No HTTP surface accepts a credential.
+
 `GET /api/v2/api-tokens/step-credentials` lists the live ones as `step_scoped`
 rows, every run's for an owner or admin and only the runs they started for
-anyone else, never the credential.
+anyone else, never the credential. `issuedAt` is when the step was claimed and
+`expiresAt` the expiry of the credential it holds now, which moves with every
+heartbeat. `GET /api/v2/api-tokens` names `policy.stepCredentials` only while
+the flag is on, and the Accounts page asks for the list only on seeing it.
 
 ## What these slices do not do
 

@@ -259,12 +259,13 @@ const refusal = async (companyId, actor, { action, params, reason, ip, entityTyp
 };
 
 /* An actor acting under a step credential is only as live as its step: the row
- * is read on every action, and a settled, released, reclaimed or lapsed step
- * refuses the credential before anything else is looked at. The credential
- * grants nothing on its own — the registry and the holder's permissions follow. */
+ * is read on every action it presents the credential for, and a settled, released,
+ * reclaimed or lapsed step, or a credential minted for another agent or starter,
+ * is refused before anything else is looked at. The credential grants nothing on
+ * its own — the registry and the holder's permissions follow. */
 const liveStep = async (companyId, actor, { action, params, ip }) => {
     if (!actor || !actor.stepCredential) return;
-    const live = await stepCredential.check(companyId, actor.stepCredential, { action });
+    const live = await stepCredential.check(companyId, actor.stepCredential, { action, actor });
     if (!live.ok) throw await refusal(companyId, actor, { action, params, reason: live.reason, ip });
 };
 
