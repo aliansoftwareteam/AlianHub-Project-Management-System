@@ -1,7 +1,7 @@
 {
   "locale": "hi",
   "machineTranslated": false,
-  "updatedAt": "2026-09-18T10:48:57.894Z",
+  "updatedAt": "2026-09-18T11:25:17.384Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -6066,6 +6066,14 @@
     "Accounts.expiry_list_lead": "Every active token in this workspace that has no expiry, with the day it stops working. Only the owner of a token can replace it: ask them to create a new token with an expiry, then revoke this one.",
     "Accounts.expiry_list_empty": "Every active token in this workspace has an expiry.",
     "Accounts.expiry_list_owner_unknown": "owner unknown",
-    "Accounts.expiry_list_unchecked": "no expiry · grace cannot be checked right now"
+    "Accounts.expiry_list_unchecked": "no expiry · grace cannot be checked right now",
+    "Audit.tainted": "Read external content",
+    "Audit.tainted_reason": "This run took in content from outside the workspace, so its risky changes need a person's approval.",
+    "Audit.taint_kind_fetch": "Web page",
+    "Audit.taint_kind_email": "Email",
+    "Audit.taint_kind_form": "Form submission",
+    "Audit.taint_kind_webhook": "Webhook",
+    "Audit.taint_kind_file": "Uploaded file",
+    "Audit.taint_kind_passage": "Knowledge passage"
   }
 }

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../../utils/mongo-handler/mongoQueries');
 const skillIndex = require('../../../Agents/skills');
+const taint = require('../../../Agents/taint');
 const logger = require('../../../../Config/loggerConfig');
 
 // The bridge between the two engines (ADR 002): an agent is one more automation
@@ -78,7 +79,9 @@ module.exports = {
             return { ...base, changed: false, verdict: 'deduplicated', reason: 'A run for this agent and task is already in progress.' };
         }
         const actor = { kind: 'agent', userId: startedBy, agentId: String(agent._id), agentName: agent.name, runId: String(run._id), viaAccount: run.viaAccount, tokenId: null };
-        const out = await runs.executeSkill(companyId, run, agent, task, { proposals, actions, actor, keepAlive: context.keepAlive });
+        // A form event's task is the submission it filed: the run is tainted by the event itself.
+        const origin = task.origin || (taint.enabled() ? taint.fromEvent({ type: context.eventType, data: task }) : null);
+        const out = await runs.executeSkill(companyId, run, agent, origin ? { ...task, origin } : task, { proposals, actions, actor, keepAlive: context.keepAlive });
         base.status = out.status;
         if (out.status === runs.STATUS.SKIPPED) return { ...base, changed: false, verdict: 'skipped', reason: out.outcome };
         if (out.status === runs.STATUS.FAILED) throw refuse(out.error || out.outcome || 'agent run failed');

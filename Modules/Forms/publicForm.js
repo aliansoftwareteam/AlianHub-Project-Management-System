@@ -472,6 +472,7 @@ exports.submitForm = async (req, res) => {
             // Declared on the tasks schema as an untyped Array, so the descriptor's
             // own keys survive; an undeclared sibling field would not.
             attachments: mapped.attachments || [],
+            origin: { kind: 'form', ref: String((stored && stored._id) || form._id) },
             rawDescription: answerText,
             // The editor reads this one; rawDescription alone showed an empty
             // description on the task.

@@ -10,6 +10,7 @@ const { rating: ratingOf } = require('../actions');
 const runs = require('../runs');
 const spendGuard = require('../spendGuard');
 const revisions = require('../revisions');
+const taint = require('../taint');
 const { FEATURES } = require('../../AICore/features');
 const { failureOf } = require('../../AICore/providerError');
 const telemetry = require('../../../Config/telemetry');
@@ -84,9 +85,14 @@ async function gather(state, config) {
     const block = wantsMemory(slugOf(run))
         ? (await quietly(run._id, 'memory unavailable', () => memory.contextFor({ companyId, projectId: task.ProjectID, userId: run.startedBy }))) || ''
         : '';
-    const gathered = await orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block, startedBy: run.startedBy });
+    const { out: gathered, found } = await taint.collect(() => orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block, startedBy: run.startedBy }));
     if (gathered.status === 'skipped') return { result: gathered };
-    return { context: { ...gathered.context, memory: block } };
+    const marked = await taint.mark(companyId, run, [
+        ...taint.fromTask({ origin: await taint.originOf(companyId, task) }),
+        ...taint.fromContext(gathered.context, { skill: skillIndex.getSkill(slugOf(run)) }),
+        ...found,
+    ]);
+    return { run: marked, context: { ...gathered.context, memory: block } };
 }
 
 const statusAfter = (result) => {
@@ -100,19 +106,44 @@ const statusAfter = (result) => {
 async function analyse(state, config) {
     await renewLock(state, config);
     const { companyId, deps } = config.context;
-    const { run, task, agent } = state;
+    const { task, agent } = state;
+    let { run } = state;
     const guard = spendGuard.forRun({ companyId, run, actor: deps && deps.actor });
-    const spendContext = { feature: FEATURES.AGENT_RUN, companyId, runId: String(run._id), userId: run.startedBy || null, account: run.viaAccount || 'workspace', agentId: String(run.agentId), agentRevision: run.agentRevision, skillRevision: run.skillRevision };
-    const result = state.result || await orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: { ...MODEL_BUDGET, guard }, spend: spendContext, companyId, agent });
+    const spendContext = { feature: FEATURES.AGENT_RUN, companyId, runId: String(run._id), userId: run.startedBy || null, account: run.viaAccount || 'workspace', agentId: String(run.agentId), agentRevision: run.agentRevision, skillRevision: run.skillRevision, ...(taint.record(run) || {}) };
+    // The skill reports a fetch before its model call, so the marker lands on
+    // the spend context that call's replay row is written from.
+    const onExternal = async (found) => {
+        run = await taint.mark(companyId, run, [found]);
+        Object.assign(spendContext, taint.record(run) || {});
+    };
+    const { out: result, found } = state.result
+        ? { out: state.result, found: [] }
+        : await taint.collect(() => orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: { ...MODEL_BUDGET, guard }, spend: spendContext, companyId, agent, onExternal }));
+    run = await taint.mark(companyId, run, found);
     const spend = await runs.recordSpend(companyId, run, result.usage, result.model);
     if (result.status !== 'success') {
         const { error, ...kept } = result;
-        return { result: kept, spend, outcome: result.reason || null, finalStatus: statusAfter(result), failure: failureOf(error) };
+        return { run, result: kept, spend, outcome: result.reason || null, finalStatus: statusAfter(result), failure: failureOf(error) };
     }
     const cap = Number(run.spendCapUsd) > 0 ? Number(run.spendCapUsd) : 0;
-    if (cap && spend.usd >= cap) return { result, spend, outcome: `Run spend cap reached ($${spend.usd.toFixed(2)} of $${cap})`, finalStatus: STATUS.STOPPED };
-    return { result, spend };
+    if (cap && spend.usd >= cap) return { run, result, spend, outcome: `Run spend cap reached ($${spend.usd.toFixed(2)} of $${cap})`, finalStatus: STATUS.STOPPED };
+    return { run, result, spend };
 }
+
+const namedTaskOf = (change) => (change.params && change.params.taskId ? String(change.params.taskId) : '');
+
+/* The project of every other task the changes name, so a tainted run's write
+ * outside its own project is seen as such. */
+const targetProjectsOf = async (companyId, run, changes) => {
+    const targets = new Map();
+    for (const change of changes) {
+        const taskId = namedTaskOf(change);
+        if (!taskId || taskId === String(run.taskId) || targets.has(taskId)) continue;
+        // eslint-disable-next-line no-await-in-loop
+        targets.set(taskId, (await taint.targetProjectOf(companyId, taskId)) || '');
+    }
+    return targets;
+};
 
 /* Below the review level every change is proposed and no decision is recorded,
  * as before; from it, the policy reviews each change and a refusal still goes
@@ -129,8 +160,9 @@ async function review(state, config) {
     const decisions = [];
     const toAct = [];
     const toPropose = [];
+    const targets = taint.routes(run) ? await targetProjectsOf(companyId, run, changes) : new Map();
     for (const change of changes) {
-        const verdict = policy.decide({ agent, action: change.action, params: change.params, rating: change.rating, run, task });
+        const verdict = policy.decide({ agent, action: change.action, params: change.params, rating: change.rating, run, task, targetProjectId: targets.has(namedTaskOf(change)) ? targets.get(namedTaskOf(change)) : null });
         decisions.push({ action: change.action, decision: verdict.decision, reason: verdict.reason, rating: verdict.rating, at: new Date() });
         if (verdict.decision === policy.DECISION.PROPOSE) toPropose.push(change); else toAct.push({ change, verdict });
     }
@@ -142,6 +174,7 @@ async function act(state, config) {
     await renewLock(state, config);
     const { companyId, deps } = config.context;
     const { run, agent } = state;
+    const marker = taint.record(run);
     let applied = 0;
     let refusals = 0;
     for (const { change, verdict } of state.toAct) {
@@ -149,7 +182,7 @@ async function act(state, config) {
         if (!(await runs.isRunning(companyId, run._id))) return { applied, refusals, abandoned: true };
         try {
             // eslint-disable-next-line no-await-in-loop
-            const out = await deps.actions.perform({ companyId, actor: deps.actor, action: change.action, params: change.params, reason: `${run.skill} finding`, allowedActions: agent.allowedActions, decision: verdict, depth: runs.originDepth(run) });
+            const out = await deps.actions.perform({ companyId, actor: deps.actor, action: change.action, params: change.params, reason: `${run.skill} finding`, allowedActions: agent.allowedActions, decision: verdict, depth: runs.originDepth(run), ...(marker ? { taint: marker } : {}) });
             // eslint-disable-next-line no-await-in-loop
             await runs.patch(companyId, run._id, {}, { $push: { actions: { action: change.action, auditId: out.auditId, ok: true, at: new Date() } } });
             applied += 1;
@@ -188,6 +221,7 @@ async function propose(state, config) {
         why: [result.summary, dropped].filter(Boolean).join('\n\n'),
         changes: toPropose,
         cost: { tokens: result.usage && result.usage.totalTokens, model: result.model, usd: spend && spend.usd },
+        ...(taint.isTainted(run) ? { taint: taint.forProposal(run) } : {}),
     });
     const waiting = await runs.patch(companyId, run._id, { status: STATUS.WAITING, ...(state.outcome ? { outcome: state.outcome } : {}) }, { $push: { proposals: String(proposal._id) } }, { onlyIf: STATUS.RUNNING });
     return waiting ? { proposalId: String(proposal._id) } : { abandoned: true };

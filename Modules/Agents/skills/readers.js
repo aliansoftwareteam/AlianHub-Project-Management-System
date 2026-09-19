@@ -7,6 +7,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { DONE_STATUS_TYPES } = require('../registry');
 const memoryStore = require('../memory');
+const taint = require('../taint');
 const { READER_CATALOGUE, plain } = require('./catalogues');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -77,7 +78,7 @@ const READERS = Object.freeze({
         const tasks = (await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
             data: [{ ProjectID: projectId, deletedStatusKey: { $ne: 1 }, isParentTask: true },
-                   { TaskKey: 1, TaskName: 1, status: 1, statusType: 1, DueDate: 1, AssigneeUserId: 1, updatedAt: 1, sprintArray: 1 },
+                   { TaskKey: 1, TaskName: 1, status: 1, statusType: 1, DueDate: 1, AssigneeUserId: 1, updatedAt: 1, sprintArray: 1, origin: 1 },
                    { limit: 400, sort: { DueDate: 1 } }],
         }, 'find')) || [];
         if (!tasks.length && params.requireTasks) return { skip: 'the project has no tasks yet' };
@@ -113,6 +114,7 @@ const READERS = Object.freeze({
             next: nextOpen(open),
             keys: [...new Set(singledOut.map((t) => String(t.TaskKey || '')).filter(Boolean))],
             counts: Object.values(counted).map(String),
+            taint: taint.fromRows(tasks),
         };
     },
 
@@ -126,10 +128,11 @@ const READERS = Object.freeze({
         if (!taskId) return { skip: 'the task has no id' };
         const page = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
-            data: [{ linkedTasks: taskId, visibility: 'project', deletedStatusKey: { $ne: 1 } }, { title: 1, rawText: 1 }, { sort: { updatedAt: -1 } }],
+            data: [{ linkedTasks: taskId, visibility: 'project', deletedStatusKey: { $ne: 1 } }, { title: 1, rawText: 1, origin: 1 }, { sort: { updatedAt: -1 } }],
         }, 'findOne');
         if (!page) return { skip: 'no document is attached to this task' };
-        return { title: page.title || '', text: plain(page.rawText || '').slice(0, params.maxChars) };
+        // A page a member or an agent wrote is the workspace's own; only an inbound origin marks the run.
+        return { title: page.title || '', text: plain(page.rawText || '').slice(0, params.maxChars), taint: taint.fromTask(page) };
     },
 });
 
