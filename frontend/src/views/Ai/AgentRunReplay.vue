@@ -14,6 +14,7 @@
                     <span class="ah-small" data-test="replay-cost">{{ costOf(call) }}</span>
                     <span class="ah-small" data-test="replay-duration">{{ $t('Ai.replay_duration', { ms: Number(call.durationMs || 0) }) }}</span>
                     <span class="ah-chip" :class="call.status === 'error' ? 'ah-chip--danger' : 'ah-chip--ok'" data-test="replay-status">{{ $t(call.status === 'error' ? 'Ai.replay_status_error' : 'Ai.replay_status_ok') }}</span>
+                    <span v-if="call.tainted" class="ah-chip ah-chip--warn" :title="taintLine(call)" data-test="replay-tainted">{{ $t('Audit.tainted') }}</span>
                 </button>
                 <div v-if="open === i" class="run-replay__body" data-test="replay-body">
                     <p v-if="call.errorCode" class="ah-small" data-test="replay-error-code">{{ $t('Ai.replay_error_code', { code: call.errorCode }) }}</p>
@@ -51,6 +52,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAgents } from "./useAgents";
 import { REPLAY_SECTION_ID, replayAnchorId, replayIdFromHash } from "./replayAnchor";
+import { taintSourcesLine, taintSourcesOf } from "./taintText";
 
 defineOptions({ name: "AgentRunReplay" });
 
@@ -71,6 +73,7 @@ const tokensOf = (call) => ({ input: Number(call?.usage?.inputTokens || 0), outp
 const costOf = (call) => (typeof call?.costUsd === "number" ? t("Ai.replay_cost", { usd: `$${call.costUsd.toFixed(4)}` }) : t("Ai.replay_cost_unpriced"));
 const messagesOf = (call) => (Array.isArray(call?.messages) ? call.messages : []);
 const passagesOf = (call) => (Array.isArray(call?.retrievedChunkIds) ? call.retrievedChunkIds : []);
+const taintLine = (call) => taintSourcesLine(t, taintSourcesOf(call));
 const toggle = (i) => { open.value = open.value === i ? -1 : i; };
 
 const wanted = ref("");

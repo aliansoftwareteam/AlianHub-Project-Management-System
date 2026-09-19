@@ -10,27 +10,9 @@ const { TASK_ACTIONS, PRE_V2_TASK_ACTIONS, RELATION_ACTIONS, TASK_WRITE_ROUTES, 
 const { TASK_ACTION_FIELDS, PRE_V2_ACTION_FIELDS, specFor, prepareOrRefuse, sendFailure } = require('./helpers/taskWriteFields');
 
 exports.init = (app) => {
-    app.post('/api/tasks', requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/tasks'].entry), (req, res) => {
-        try {
-            const payload = prepareOrRefuse(req, res, TASK_ACTION_FIELDS.create, 'POST /api/tasks');
-            if (!payload) return;
-            task.create(payload)
-            .then(() => {
-                res.send({status: true, statusText: 'Task created successfully.'});
-            })
-            .catch((error) => {
-                logger.error(`ERROR: ${error.message}`);
-                res.send({status: false, statusText: error.message});
-            });
-        } catch (error) {
-            logger.error(`ERROR: ${error.message}`);
-            res.send({status: false, statusText: error.message});
-        }
-    });
-
-    app.patch('/api/tasks/', requireTaskActionPermission(PRE_V2_TASK_ACTIONS), (req, res) => {
+    app.patch('/api/tasks/', requireTaskActionPermission(PRE_V2_TASK_ACTIONS), async (req, res) => {
         const action = req.body && req.body.action;
-        const payload = prepareOrRefuse(req, res, specFor(PRE_V2_ACTION_FIELDS, action), `PATCH /api/tasks/ ${action}`);
+        const payload = await prepareOrRefuse(req, res, specFor(PRE_V2_ACTION_FIELDS, action), `PATCH /api/tasks/ ${action}`);
         if (!payload) return;
         task[action](payload)
         .then((response) => {
@@ -42,9 +24,9 @@ exports.init = (app) => {
         });
     });
 
-    app.post('/api/v2/tasks', requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v2/tasks'].entry), (req, res) => {
+    app.post('/api/v2/tasks', requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v2/tasks'].entry), async (req, res) => {
         try {
-            const payload = prepareOrRefuse(req, res, TASK_ACTION_FIELDS.create, 'create');
+            const payload = await prepareOrRefuse(req, res, TASK_ACTION_FIELDS.create, 'create');
             if (!payload) return;
             taskMongo.create(payload)
             .then((resData) => {
@@ -64,9 +46,9 @@ exports.init = (app) => {
         }
     });
 
-    app.patch('/api/v2/tasks', requireTaskActionPermission(), (req, res) => {
+    app.patch('/api/v2/tasks', requireTaskActionPermission(), async (req, res) => {
         const action = req.body && req.body.action;
-        const payload = prepareOrRefuse(req, res, specFor(TASK_ACTION_FIELDS, action), action);
+        const payload = await prepareOrRefuse(req, res, specFor(TASK_ACTION_FIELDS, action), action);
         if (!payload) return;
         taskMongo[action](payload)
         .then((response) => {
@@ -84,7 +66,7 @@ exports.init = (app) => {
         });
     });
 
-    app.post('/api/v2/tasks/bulk', requireTaskActionPermission(TASK_ACTIONS), (req, res) => {
+    app.post('/api/v2/tasks/bulk', requireTaskActionPermission(TASK_ACTIONS), async (req, res) => {
         try {
             const action = req.body && req.body.action;
             if (!action || typeof action !== 'string' || !action.startsWith('bulk')) {
@@ -93,7 +75,7 @@ exports.init = (app) => {
             if (typeof taskMongo[action] !== 'function') {
                 return res.send({ status: false, statusText: `Unknown bulk action: ${action}` });
             }
-            const payload = prepareOrRefuse(req, res, specFor(TASK_ACTION_FIELDS, action), action);
+            const payload = await prepareOrRefuse(req, res, specFor(TASK_ACTION_FIELDS, action), action);
             if (!payload) return;
 
             taskMongo[action](payload)
@@ -110,14 +92,14 @@ exports.init = (app) => {
         }
     });
 
-    app.post('/api/v2/tasks/relations', requireTaskActionPermission(RELATION_ACTIONS), (req, res) => {
+    app.post('/api/v2/tasks/relations', requireTaskActionPermission(RELATION_ACTIONS), async (req, res) => {
         try {
             const relation = actionEntry(RELATION_ACTIONS, req.body && req.body.action);
             if (!relation) {
                 return res.send({ status: false, statusText: 'Invalid relation action' });
             }
             const { method } = relation;
-            const payload = prepareOrRefuse(req, res, specFor(TASK_ACTION_FIELDS, method), method);
+            const payload = await prepareOrRefuse(req, res, specFor(TASK_ACTION_FIELDS, method), method);
             if (!payload) return;
 
             taskMongo[method](payload)
@@ -134,8 +116,8 @@ exports.init = (app) => {
         }
     });
 
-    app.patch('/api/v1/importTasks', requireTaskWritePermission(TASK_WRITE_ROUTES['PATCH /api/v1/importTasks'].entry), (req, res) => {
-        const payload = prepareOrRefuse(req, res, TASK_ACTION_FIELDS.createMultipleTasks, 'createMultipleTasks');
+    app.patch('/api/v1/importTasks', requireTaskWritePermission(TASK_WRITE_ROUTES['PATCH /api/v1/importTasks'].entry), async (req, res) => {
+        const payload = await prepareOrRefuse(req, res, TASK_ACTION_FIELDS.createMultipleTasks, 'createMultipleTasks');
         if (!payload) return;
         taskMongo.createMultipleTasks(payload)
         .then((response) => {

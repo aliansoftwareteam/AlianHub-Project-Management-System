@@ -1,9 +1,11 @@
 const registry = require('./registry');
+const taint = require('./taint');
 
 // The rule-based review an L2 run puts every change through. No model is
 // consulted: the same agent, action, params and rating always give the same
 // decision, and the reason is written so a person reading the run can check it.
-// The never-list and allowedActions are absolute at every autonomy level.
+// The never-list and allowedActions are absolute at every autonomy level. A
+// tainted run (taint.js) proposes its risky and out-of-project writes.
 
 const DECISION = Object.freeze({ ACT: 'act', PROPOSE: 'propose', REFUSE: 'refuse' });
 const SCOPES = Object.freeze(['task', 'project', 'workspace']);
@@ -24,7 +26,7 @@ const escalations = (rating) => [
     rating.money ? 'touches money' : '',
 ].filter(Boolean);
 
-const decide = ({ agent = {}, action, params = {}, rating = null, run = null, task = null }) => {
+const decide = ({ agent = {}, action, params = {}, rating = null, run = null, task = null, targetProjectId = null }) => {
     const key = String(action || '');
     const out = (decision, reason) => ({ decision, reason, rating: isComplete(rating) ? { ...rating } : null });
     const refuse = (reason) => out(DECISION.REFUSE, reason);
@@ -52,8 +54,12 @@ const decide = ({ agent = {}, action, params = {}, rating = null, run = null, ta
 
     const entry = registry.get(key);
     if (entry.proposeOnly || entry.gate) return out(DECISION.PROPOSE, `${key} must be proposed${entry.gate === 'owner_admin' ? ' to an owner or admin' : ''}`);
+    const routed = taint.routes(run);
     const risky = escalations(rating);
-    if (risky.length) return out(DECISION.PROPOSE, `${key} ${risky.join(', ')}`);
+    if (risky.length) return out(DECISION.PROPOSE, `${key} ${risky.join(', ')}${routed ? `; ${taint.reasonFor(run)}` : ''}`);
+    // Null is the run's own task; a named task whose project could not be read is ''.
+    const target = targetProjectId === null || targetProjectId === undefined ? projectId : String(targetProjectId);
+    if (routed && run.projectId && target !== String(run.projectId)) return out(DECISION.PROPOSE, `${key} writes outside the run's project; ${taint.reasonFor(run)}`);
     return out(DECISION.ACT, `${key} is a reversible task-scoped write with no money in it`);
 };
 

@@ -19,6 +19,11 @@
     "description": "Minutes an agent proposal may sit in 'applying' before the reaper fails it.",
     "default": "10"
   },
+  "AGENT_TAINT_ROUTING": {
+    "group": "security",
+    "description": "Set to on (or true) to mark an agent run as tainted once its context takes in content from outside the workspace's own members (a fetched page, an email-in body, a form submission, a webhook payload, uploaded file text or a retrieved passage whose origin is external), and to route a tainted run's risky writes (any escalation under the risk rating, or a write outside the run's own project) to approval with a reason that names the taint. The run, its replay rows, its audit rows and its proposals record where the content came from (a host, an id or a hash), never the content. Unset or off leaves runs, decisions and records exactly as they were.",
+    "default": "off"
+  },
   "AI_API_KEY": {
     "group": "ai",
     "description": "API key for the configured LLM provider (LLM_PROVIDER).",

@@ -110,7 +110,7 @@ async function runOnce(companyId, run, rule, envelope, keepAlive = null) {
     const steps = Array.isArray(rule.steps) ? rule.steps.slice(0, MAX_STEPS) : [];
     const outputs = { ...(run.outputs || {}) };
     const recorded = Array.isArray(run.steps) ? run.steps.slice() : [];
-    const context = { runId: String(run._id), ruleId: String(rule._id), ruleName: rule.name, depth: envelope.depth, eventId: envelope.id, keepAlive, traceId: run.traceId || envelope.traceId || null };
+    const context = { runId: String(run._id), ruleId: String(rule._id), ruleName: rule.name, depth: envelope.depth, eventId: envelope.id, eventType: envelope.type, keepAlive, traceId: run.traceId || envelope.traceId || null };
 
     // Resume point. Everything before the cursor already ran and already mutated.
     for (let i = Number(run.cursor) || 0; i < steps.length; i++) {

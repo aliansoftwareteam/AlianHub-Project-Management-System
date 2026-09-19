@@ -607,9 +607,17 @@ exports.tableType = (type) => {
  * @returns {Promise<String>} A Promise that resolves with the Response from db.
  *                            Rejects with an error message if any issues occur during the Process.
  */
+const TASK_WRITES = ['findOneAndUpdate', 'updateOne', 'updateMany', 'deleteOne', 'deleteMany', 'findOneAndDelete', 'findOneAndReplace', 'replaceOne'];
+/* Mongoose drops an undefined id from a filter, so a write whose filter reads { _id: undefined } would land on the first task. */
+const namesNoTask = (filter) => filter && typeof filter === 'object' && !Array.isArray(filter) && Object.hasOwn(filter, '_id') && (filter._id === undefined || filter._id === null || filter._id === '');
+
 exports.MongoDbCrudOpration = (companyId, data, method) => {
     return new Promise(async (resolve, reject) => {
         try {
+            if (data && data.type === SCHEMA_TYPE.TASKS && TASK_WRITES.includes(method) && Array.isArray(data.data) && namesNoTask(data.data[0])) {
+                reject(new Error('A task write must name the task: the filter has an empty _id.'));
+                return;
+            }
             var res = await handleConnection(companyId)
             if (res?.status) {
                 let { database } = res
