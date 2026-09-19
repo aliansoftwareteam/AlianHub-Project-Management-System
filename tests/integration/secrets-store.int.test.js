@@ -211,7 +211,8 @@ describe('the tenant secrets store through the real routes', () => {
     it('keeps the routes closed on the default server, where the flag is off', async () => {
         const { api } = await loginAs('owner');
         const res = await api.get(ROUTE);
-        expect(res.status).toBe(404);
-        expect(res.body.status).toBe(false);
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ status: false, statusText: 'The secrets store is off.', storeOff: true });
+        expect((await api.post(`${ROUTE}/sec_000000000000000000000000/revoke`, {})).status).toBe(404);
     });
 });

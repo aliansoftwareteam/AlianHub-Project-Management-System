@@ -222,14 +222,22 @@ describe('rotate and revoke through the routes', () => {
 });
 
 describe('with the flag off', () => {
-    it('answers 404 on every route, even for the owner, and reads nothing', async () => {
+    it('answers 404 to rotate and revoke, even for the owner, and reads nothing', async () => {
         boot({ on: false });
-        for (const [handler, over] of [[ctrl.listSecrets, {}], [ctrl.rotateSecret, { params: { handle: 'sec_000000000000000000000000' }, body: { value: 'v' } }], [ctrl.revokeSecret, { params: { handle: 'sec_000000000000000000000000' } }]]) {
+        for (const [handler, over] of [[ctrl.rotateSecret, { params: { handle: 'sec_000000000000000000000000' }, body: { value: 'v' } }], [ctrl.revokeSecret, { params: { handle: 'sec_000000000000000000000000' } }]]) {
             // eslint-disable-next-line no-await-in-loop
             const res = await ask(handler, OWNER, over);
             expect(res.statusCode).toBe(404);
             expect(res.body.status).toBe(false);
         }
+        expect(secretReads()).toEqual([]);
+    });
+
+    it('tells the screen\'s probe that the store is off without an HTTP error, so a default install logs nothing in the browser', async () => {
+        boot({ on: false });
+        const res = await ask(ctrl.listSecrets, OWNER);
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toEqual({ status: false, statusText: 'The secrets store is off.', storeOff: true });
         expect(secretReads()).toEqual([]);
     });
 
