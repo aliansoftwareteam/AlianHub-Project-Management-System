@@ -325,8 +325,39 @@ describe('history follows the written task', () => {
         expect((await historyOf(other._id)).some((entry) => entry.Key === 'Task_Status')).toBe(false);
         expect((await stored(other._id)).statusKey).toBe((await stored(other._id)).statusKey);
 
-        const noWrite = await member.api.patch('/api/v2/tasks', statusBody(written, other, { isUpdateTask: false }));
-        expect(noWrite.status).toBe(400);
+        const historyOnly = await member.api.patch('/api/v2/tasks', statusBody(written, other, { isUpdateTask: false }));
+        expect([historyOnly.status, historyOnly.body.status]).toEqual([200, true]);
+        await waitFor(async () => (await historyOf(written._id)).filter((entry) => entry.Key === 'Task_Status').length === 2, 'the history-only row');
+        expect((await historyOf(other._id)).some((entry) => entry.Key === 'Task_Status')).toBe(false);
+    });
+
+    it('records a drag to another status group once: the index write, then the history-only status update', async () => {
+        const task = await freshTask();
+        const { newStatus } = statusBody(task, task);
+        expect((await stored(task._id)).statusKey).not.toBe(newStatus.statusKey);
+
+        const drag = await member.api.post('/api/v1/taskIndex', dragBody(task, target.project, { relevantKey: newStatus.statusKey, updateData: { ...newStatus, islocalSnapStop: true } }));
+        expect([drag.status, drag.body.status]).toEqual([200, true]);
+        await waitFor(async () => (await stored(task._id)).statusKey === newStatus.statusKey, 'the drag');
+
+        const historyOnly = await member.api.patch('/api/v2/tasks', statusBody(task, task, { isUpdateTask: false }));
+        expect([historyOnly.status, historyOnly.body.status]).toEqual([200, true]);
+        await waitFor(async () => (await historyOf(task._id)).some((entry) => entry.Key === 'Task_Status'), 'the status history');
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const rows = (await historyOf(task._id)).filter((entry) => entry.Key === 'Task_Status');
+        expect(rows.map((entry) => [entry.UserId, String(entry.ProjectId)])).toEqual([[member.uid, target.project._id]]);
+    });
+
+    it('answers 409 for a history-only status update the task does not hold and records nothing', async () => {
+        const task = await freshTask();
+        const other = await freshTask();
+        const before = await stored(task._id);
+        const res = await member.api.patch('/api/v2/tasks', statusBody(task, other, { isUpdateTask: false }));
+        expect([res.status, res.body.status]).toEqual([409, false]);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        expect(await stored(task._id)).toEqual(before);
+        expect((await historyOf(task._id)).some((entry) => entry.Key === 'Task_Status')).toBe(false);
+        expect((await historyOf(other._id)).some((entry) => entry.Key === 'Task_Status')).toBe(false);
     });
 
     it('refuses a move into a project that does not exist', async () => {

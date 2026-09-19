@@ -800,10 +800,194 @@ describe('history and notifications follow the written task', () => {
         expect(historyRows()[0].Message).toContain(SHOWN);
     });
 
-    test.each([['updateStatus'], ['updatePriority'], ['updateAssignee'], ['updateDueDate'], ['updateTaskLeader'], ['updateTaskType']])('%s asking for history without a write is refused', async (action) => {
-        await refused(PATCH, { ...bodyFor(PATCH, action), isUpdateTask: false });
+});
+
+describe('a history-only update records what the stored task already holds', () => {
+    const CLOSE = { status: { key: 3, text: '<i>Done</i>', type: 'close' }, statusKey: 3, statusType: 'close' };
+    const DUE = '2026-10-01T00:00:00.000Z';
+    const ATTRIBUTE = '" onerror="alert(1)';
+    const hold = (fields, id = OPEN_TASK) => Object.assign(mockDb.store[SCHEMA_TYPE.TASKS].find((task) => task._id === id), fields);
+
+    const ROWS = [
+        { action: 'updateStatus', key: 'Task_Status', holds: { statusKey: 3, statusType: 'close', status: { key: 3, text: 'Done', type: 'close' } }, notified: true, named: true,
+            change: (body) => { body.newStatus = clone(CLOSE); body.prevStatus = { taskId: OPEN_TASK_2, taskName: HTML, statusName: 'To Do', name: 'To Do', updatedTaskName: HTML, backColor: ATTRIBUTE }; } },
+        { action: 'updatePriority', key: 'task_priority', holds: { Task_Priority: 'HIGH' }, notified: true, named: true,
+            change: (body) => { body.priorityObj = { taskId: OPEN_TASK_2, taskName: HTML, priorityName: 'MEDIUM', newPriorityName: HTML, statusImage: ATTRIBUTE }; } },
+        { action: 'updateDueDate', key: 'Project_DueDate', holds: { DueDate: new Date(DUE) }, notified: true,
+            change: (body) => { body.firebaseObj = { DueDate: DUE, dueDateDeadLine: [{ date: DUE }] }; body.obj = { key: 'task_due_date', message: '<p>due</p>' }; } },
+        { action: 'updateStartDate', key: 'Project_DueDate', holds: { startDate: new Date(DUE) }, notified: true,
+            change: (body) => { body.firebaseObj = { startDate: Date.parse(DUE) }; body.obj = { key: 'task_start_date', message: '<p>start</p>' }; } },
+        { action: 'updateAssignee', key: 'Assignee_Changed', holds: { AssigneeUserId: [MEMBER, OWNER] }, notified: true, named: true,
+            change: (body) => { body.firebaseObj = { AssigneeUserId: [OWNER, MEMBER] }; body.type = 'replace'; body.employeeName = [HTML, 'Max']; body.taskData.TaskName = HTML; } },
+        { action: 'updateTaskLeader', key: 'TaskLeader_Changed', holds: { Task_Leader: MEMBER }, notified: false,
+            change: (body) => { body.firebaseObj = { Task_Leader: MEMBER }; body.employeeName = HTML; } },
+        { action: 'updateTaskType', key: 'Task_TYPE', holds: { TaskType: 'bug', TaskTypeKey: 2 }, notified: true, named: true,
+            change: (body) => { body.newStatus = { TaskType: 'bug', TaskTypeKey: 2, taskTypeName: HTML, taskTypeImage: ATTRIBUTE }; body.prevStatus = { name: '<i>Task</i>', taskImage: ATTRIBUTE }; body.taskData.TaskName = HTML; } },
+    ];
+
+    /* The pre-v2 route reads its task from prevStatus / priorityObj, so there the other task is named in task / taskData. */
+    const historyOnly = (row, route = PATCH) => {
+        const body = bodyFor(route, row.action);
+        row.change(body);
+        setAt(body, TASK_ACTION_FIELDS[row.action].project[0], OTHER_PROJECT);
+        if (route === PRE_V2) {
+            const spec = PRE_V2_ACTION_FIELDS[row.action];
+            spec.taskIds.forEach((path) => setAt(body, path, OPEN_TASK_2));
+            setAt(body, spec.task, OPEN_TASK);
+        }
+        return { ...body, isUpdateTask: false };
+    };
+
+    const nothingRecorded = async (route, body) => {
+        const before = snapshot();
+        const result = await call(route, body);
+        expect(result.code).toBe(409);
+        expect(result.body).toMatchObject({ status: false });
+        expect(snapshot()).toBe(before);
+        expect(writes()).toEqual([]);
         expect(historyRows()).toEqual([]);
         expect(notifications()).toEqual([]);
+    };
+
+    test('every action that takes isUpdateTask is covered', () => {
+        const taking = Object.keys(TASK_ACTION_FIELDS).filter((action) => TASK_ACTION_FIELDS[action].params.includes('isUpdateTask'));
+        expect(ROWS.map((row) => row.action).sort()).toEqual(taking.sort());
+    });
+
+    test.each(ROWS.map((row) => [row.action, row]))('%s records the stored task when it holds the claimed value', async (_, row) => {
+        hold(row.holds);
+        const before = snapshot();
+        const result = await call(PATCH, historyOnly(row));
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(snapshot()).toBe(before);
+        expect(writes().map((c) => c.type)).toEqual([SCHEMA_TYPE.HISTORY]);
+
+        const rows = historyRows();
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ TaskId: OPEN_TASK, ProjectId: OPEN_PROJECT, Key: row.key, UserId: OWNER });
+        expect(rows[0].Message).toContain(OWNER_SHOWN);
+        expect(rows[0].Message).not.toContain(HTML);
+        expect(rows[0].Message).not.toContain('<i>');
+
+        const sent = notifications();
+        expect(sent.map((n) => [n.taskId, n.projectId])).toEqual(row.notified ? [[OPEN_TASK, OPEN_PROJECT]] : []);
+        sent.forEach((n) => {
+            expect(n.object.message).not.toContain(HTML);
+            expect(n.object.message).not.toContain('<i>');
+            expect(n.object.message).not.toContain(ATTRIBUTE);
+            if (row.named) expect(n.object.message).toContain('Task 01');
+        });
+    });
+
+    test.each(ROWS.map((row) => [row.action, row]))('%s answers 409 and records nothing when the stored task holds another value', async (_, row) => {
+        await nothingRecorded(PATCH, historyOnly(row));
+    });
+
+    test.each([
+        ['a status the body does not name', 'updateStatus', { statusKey: 3 }, (body) => { body.newStatus = {}; }],
+        ['a due date that cannot be read', 'updateDueDate', { DueDate: new Date(DUE) }, (body) => { body.firebaseObj = { DueDate: 'soon' }; }],
+        ['a due date the body does not name', 'updateDueDate', {}, (body) => { body.firebaseObj = {}; }],
+        ['an empty due date on a task that has none', 'updateDueDate', { DueDate: null }, (body) => { body.firebaseObj = { DueDate: '' }; }],
+        ['a due date that is not a date value', 'updateDueDate', { DueDate: new Date(1) }, (body) => { body.firebaseObj = { DueDate: true }; }],
+        ['an assignee the task does not have', 'updateAssignee', { AssigneeUserId: [OWNER] }, (body) => { body.firebaseObj = { AssigneeUserId: MEMBER }; body.type = 'assigneeAdd'; }],
+        ['an assignee the task still has', 'updateAssignee', { AssigneeUserId: [OWNER, MEMBER] }, (body) => { body.firebaseObj = { AssigneeUserId: MEMBER }; body.type = 'assigneRemove'; }],
+        ['part of the assignees', 'updateAssignee', { AssigneeUserId: [OWNER, MEMBER] }, (body) => { body.firebaseObj = { AssigneeUserId: [MEMBER] }; body.type = 'replace'; }],
+        ['an assignee that is not an id', 'updateAssignee', { AssigneeUserId: [OWNER] }, (body) => { body.firebaseObj = { AssigneeUserId: { user: MEMBER } }; body.type = 'assigneRemove'; }],
+        ['an assignee change of no known kind', 'updateAssignee', { AssigneeUserId: [MEMBER] }, (body) => { body.firebaseObj = { AssigneeUserId: [MEMBER] }; body.type = 'swap'; }],
+        ['a task type key the task does not have', 'updateTaskType', { TaskType: 'bug', TaskTypeKey: 2 }, (body) => { body.newStatus = { TaskType: 'bug', TaskTypeKey: 1 }; }],
+    ])('a history-only body claiming %s answers 409', async (_, action, holds, change) => {
+        hold(holds);
+        const body = bodyFor(PATCH, action);
+        change(body);
+        await nothingRecorded(PATCH, { ...body, isUpdateTask: false });
+    });
+
+    test.each([
+        ['one assignee the task has', { AssigneeUserId: [OWNER, MEMBER] }, MEMBER, 'assigneeAdd', 'Assignee_Changed'],
+        ['one assignee the task no longer has', { AssigneeUserId: [OWNER] }, MEMBER, 'assigneRemove', 'Assignee_Removed'],
+        ['no assignees on a task that has none', { AssigneeUserId: [] }, [], 'replace', 'Assignee_Removed'],
+    ])('a history-only assignee update naming %s is recorded', async (_, holds, claimed, type, key) => {
+        hold(holds);
+        const result = await call(PATCH, { ...bodyFor(PATCH, 'updateAssignee'), firebaseObj: { AssigneeUserId: claimed }, type, isUpdateTask: false });
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(historyRows().map((row) => [row.TaskId, row.Key])).toEqual([[OPEN_TASK, key]]);
+    });
+
+    test('a cleared due date is recorded for a task that has none', async () => {
+        hold({ DueDate: null });
+        const result = await call(PATCH, { ...bodyFor(PATCH, 'updateDueDate'), firebaseObj: { DueDate: null, dueDateDeadLine: [] }, isUpdateTask: false });
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(historyRows().map((row) => row.TaskId)).toEqual([OPEN_TASK]);
+    });
+
+    test.each([['updateStatus'], ['updatePriority']])('the pre-v2 %s records the stored task only when it holds the claimed value', async (action) => {
+        const row = ROWS.find((entry) => entry.action === action);
+        await nothingRecorded(PRE_V2, historyOnly(row, PRE_V2));
+
+        hold(row.holds);
+        const result = await call(PRE_V2, historyOnly(row, PRE_V2));
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(historyRows().map((entry) => [entry.TaskId, entry.ProjectId, entry.Key])).toEqual([[OPEN_TASK, OPEN_PROJECT, row.key]]);
+        expect(historyRows()[0].Message).not.toContain(HTML);
+        expect(notifications().map((n) => n.taskId)).toEqual([OPEN_TASK]);
+    });
+
+    test.each([['0', 0], ['an empty string', ''], ['null', null], ['the string false', 'false']])('only false skips the write: a start date update flagged %s writes the task', async (_, flag) => {
+        const result = await call(PATCH, { ...bodyFor(PATCH, 'updateStartDate'), firebaseObj: { startDate: DUE }, isUpdateTask: flag });
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(storedTask().startDate).toBe(DUE);
+    });
+});
+
+describe('the drags the web app sends', () => {
+    const ids = { taskId: OPEN_TASK, otherTaskId: OPEN_TASK_2, projectId: OPEN_PROJECT, destinationProjectId: OPEN_PROJECT };
+    const drags = WEB_APP_BODIES.GROUP_DRAGS.map((drag) => [drag.source, drag]);
+    const calendar = WEB_APP_BODIES.CALENDAR_DRAG;
+
+    test.each(drags)('%s: the index write, then the action as its callers send it', async (_, drag) => {
+        const index = await call(INDEX, withSprintIds(drag.index(ids)));
+        expect(index).toMatchObject({ code: 200, body: { status: true } });
+        expect(storedTask()).toMatchObject(drag.holds);
+
+        const action = await call(PATCH, withSprintIds(drag.action(ids, true)));
+        expect(action).toMatchObject({ code: 200, body: { status: true } });
+        expect(storedTask()).toMatchObject(drag.holds);
+        expect(historyRows().map((row) => row.TaskId)).toEqual(historyRows().map(() => OPEN_TASK));
+        expect(historyRows().map((row) => row.Key)).toContain(drag.historyKey);
+    });
+
+    test.each(drags)('%s: the index write, then the history-only action', async (_, drag) => {
+        const index = await call(INDEX, withSprintIds(drag.index(ids)));
+        expect(index).toMatchObject({ code: 200, body: { status: true } });
+        const before = snapshot();
+
+        const action = await call(PATCH, withSprintIds(drag.action(ids, false)));
+        expect(action).toMatchObject({ code: 200, body: { status: true } });
+        expect(snapshot()).toBe(before);
+        expect(historyRows().map((row) => [row.TaskId, row.Key])).toEqual([[OPEN_TASK, drag.historyKey]]);
+    });
+
+    test.each(drags)('%s: the history-only action before the index write has landed answers 409', async (_, drag) => {
+        const action = await call(PATCH, withSprintIds(drag.action(ids, false)));
+        expect(action.code).toBe(409);
+        expect(historyRows()).toEqual([]);
+    });
+
+    test('a calendar resize writes the due date', async () => {
+        const result = await call(PATCH, withSprintIds(calendar.resize(ids)));
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(storedTask().DueDate).toBe('2026-10-01T00:00:00.000Z');
+    });
+
+    test('a calendar drop writes both dates, and the history-only body it builds is accepted afterwards', async () => {
+        const drop = await call(PATCH, withSprintIds(calendar.drop(ids)));
+        expect(drop).toMatchObject({ code: 200, body: { status: true } });
+        expect(storedTask()).toMatchObject({ DueDate: '2026-10-01T00:00:00.000Z', startDate: '2026-09-28T00:00:00.000Z' });
+        const rowsAfterDrop = historyRows().length;
+
+        const historyOnly = await call(PATCH, withSprintIds(calendar.historyOnly(ids)));
+        expect(historyOnly).toMatchObject({ code: 200, body: { status: true } });
+        expect(historyRows().slice(rowsAfterDrop).map((row) => [row.TaskId, row.Key])).toEqual([[OPEN_TASK, 'Project_DueDate']]);
     });
 });
 
