@@ -65,6 +65,22 @@ async function runOnce(adapter, opts, probe) {
 /* One adapter, one attempt, no breaker and no bucket: the flag-off path. */
 const observedCache = new WeakMap();
 
+/* Recorded under the model asked for, not the dated alias the vendor bills, so one
+ * embedding model keeps one health window. */
+async function observedEmbed(adapter, metre, opts) {
+    const model = String((opts && opts.model) || '').trim() || adapter.model;
+    const startedAt = Date.now();
+    try {
+        const result = await metre.embed(opts);
+        health.record({ provider: adapter.name, model, ok: true, durationMs: Date.now() - startedAt });
+        return result;
+    } catch (error) {
+        const type = typeOf(error);
+        if (type !== null) health.record({ provider: adapter.name, model, ok: false, durationMs: Date.now() - startedAt, errorType: type });
+        throw error;
+    }
+}
+
 function observed(adapter) {
     const cached = observedCache.get(adapter);
     if (cached) return cached;
@@ -74,6 +90,7 @@ function observed(adapter) {
         get isConfigured() { return adapter.isConfigured; },
         get model() { return adapter.model; },
         get capabilities() { return adapter.capabilities; },
+        embed: (opts) => observedEmbed(adapter, metre, opts),
         async chat(opts) {
             const model = resolveModel(adapter, opts);
             const forThis = { ...opts, [decision.KEY]: decision.begin({ routerEnabled: false, provider: adapter.name, model: null }) };
@@ -154,6 +171,8 @@ function routed(primary, registry) {
         get isConfigured() { return primary.isConfigured; },
         get model() { return primary.model; },
         get capabilities() { return primary.capabilities; },
+        /* No failover: one vendor embeds, and a vector space cannot mix models. */
+        embed: (opts) => observed(primary).embed(opts),
         async chat(opts) {
             const reasons = [];
             const call = decision.begin({ routerEnabled: true, provider: primary.name, model: opts && opts.model });

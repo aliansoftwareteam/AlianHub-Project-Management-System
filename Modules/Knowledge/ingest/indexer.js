@@ -2,11 +2,16 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
+const logger = require('../../../Config/loggerConfig');
 const { COMMENT_TYPES } = require('../sources');
+const embeddings = require('../embeddings');
+const vectorStore = require('../vectorStore');
 const { chunkPage, chunkComment, chunkTranscript, contentHashOf } = require('./chunker');
 
 // Writes source chunks into the store. Callers check KNOWLEDGE_INDEXER first; nothing here
-// reads the flag, so the backfill, the event handlers and a re-index share one write path.
+// reads that flag, so the backfill, the event handlers and a re-index share one write path.
+// The retrieval switch's hybrid mode is read here, since it decides whether a chunk is
+// embedded as it is written.
 
 const SOURCE = 'page';
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -15,8 +20,14 @@ const TRASHED = 1;
 const MAX_SYNC_ROUNDS = 3;
 const TITLE_LENGTH = 160;
 const TASK_DELETED = 'task';
-const EXISTING_FIELDS = 'ordinal contentHash deleted companyId projectId sprintId taskId participants visibility createdBy authorKind sourceUpdatedAt';
+const LOG_PREFIX = '[knowledge-indexer]';
+const EXISTING_FIELDS = 'ordinal contentHash deleted companyId projectId sprintId taskId participants visibility createdBy authorKind embeddingModel sourceUpdatedAt';
 const COMPARED_FIELDS = ['companyId', 'projectId', 'sprintId', 'taskId', 'participants', 'visibility', 'createdBy', 'authorKind'];
+const EMBED_RETRY_ATTEMPTS = 3;
+const EMBED_RETRY_BASE_MS = 30 * 1000;
+/* Sources the recurring job re-embeds per run, so a run stays short and a bad key cannot pay
+ * for a whole corpus of refusals. */
+const REEMBED_BATCH = 50;
 
 const store = (companyId, type, data, method) => MongoDbCrudOpration(String(companyId), { type, data }, method);
 const chunkStore = (companyId, data, method) => store(companyId, SCHEMA_TYPE.KNOWLEDGE_CHUNKS, data, method);
@@ -167,10 +178,52 @@ const sameValue = (a, b) => (Array.isArray(a) || Array.isArray(b)
     ? JSON.stringify((a || []).map(asText)) === JSON.stringify((b || []).map(asText))
     : asText(a) === asText(b));
 
-const unchanged = (existing, row) => Boolean(existing)
+const unchanged = (existing, row, wantedModel = null) => Boolean(existing)
     && existing.deleted !== true
     && existing.contentHash === row.contentHash
+    && (!wantedModel || existing.embeddingModel === wantedModel)
     && COMPARED_FIELDS.every((field) => sameValue(existing[field], row[field]));
+
+/* A stored vector still describes the chunk while its text and the model are the ones wanted. */
+const reusable = (stored, piece, wantedModel) => Boolean(stored)
+    && stored.deleted !== true
+    && stored.contentHash === piece.contentHash
+    && stored.embeddingModel === wantedModel;
+
+/* One provider call for every chunk of the source that needs a vector. A failure leaves the
+ * text write to go ahead without vectors; the caller queues the retry. A budget refusal is
+ * not a failure of the provider: nothing was tried, and nothing is retried until the cap allows. */
+const embedPieces = async (companyId, sourceType, sourceId, pieces, byOrdinal, wantedModel) => {
+    const vectors = { byOrdinal: new Map(), failed: false, refused: false };
+    if (!wantedModel) return vectors;
+    const todo = pieces.filter((piece) => !reusable(byOrdinal.get(piece.ordinal), piece, wantedModel));
+    if (!todo.length) return vectors;
+    try {
+        const { vectors: found } = await embeddings.embedTexts(companyId, todo.map((piece) => piece.text));
+        todo.forEach((piece, i) => { if (Array.isArray(found[i]) && found[i].length) vectors.byOrdinal.set(piece.ordinal, found[i]); });
+    } catch (error) {
+        vectors.failed = true;
+        vectors.refused = embeddings.isBudgetRefusal(error);
+        if (!vectors.refused) logger.error(`${LOG_PREFIX} ${companyId}: ${sourceType} ${sourceId} stored without vectors: ${error.message}`);
+    }
+    return vectors;
+};
+
+/* A fresh vector is written with the text; a reusable one is left where it is by leaving the
+ * fields out of the $set; anything else is cleared, so a stale vector never describes new text. */
+const vectorFields = (stored, piece, vectors, wantedModel) => {
+    if (vectors.byOrdinal.has(piece.ordinal)) return { embedding: vectors.byOrdinal.get(piece.ordinal), embeddingModel: wantedModel };
+    if (wantedModel && reusable(stored, piece, wantedModel)) return {};
+    return { embedding: [], embeddingModel: null };
+};
+
+const tellStore = async (method, args) => {
+    try {
+        await vectorStore.current()[method](args);
+    } catch (error) {
+        logger.error(`${LOG_PREFIX} vector store ${method} failed for ${args.companyId}: ${error.message}`);
+    }
+};
 
 /* Conditional on the stored version being no newer: when it is, the filter misses, the
  * upsert collides with the unique source key, and the older read is dropped. */
@@ -203,8 +256,11 @@ const stampForward = async (companyId, where, at) => modified(await chunkStore(c
 const tombstoneSource = async (companyId, sourceType, ids, { sourceUpdatedAt } = {}) => {
     const unique = [...new Set((ids || []).map(asText).filter(Boolean))];
     if (!unique.length) return 0;
-    if (!sourceUpdatedAt) return tombstone(companyId, { sourceType, sourceId: { $in: unique } });
-    return tombstone(companyId, { sourceType, sourceId: { $in: unique }, ...notNewerThan(sourceUpdatedAt) }, { sourceUpdatedAt });
+    const count = sourceUpdatedAt
+        ? await tombstone(companyId, { sourceType, sourceId: { $in: unique }, ...notNewerThan(sourceUpdatedAt) }, { sourceUpdatedAt })
+        : await tombstone(companyId, { sourceType, sourceId: { $in: unique } });
+    await tellStore('tombstone', { companyId: String(companyId), sourceType, sourceIds: unique });
+    return count;
 };
 
 const tombstonePages = (companyId, pageIds, options) => tombstoneSource(companyId, SOURCE, pageIds, options);
@@ -223,28 +279,40 @@ const removeDepartedMember = async (companyId, userId) => {
  * version still moves forward: a chunk left at an older version would let a late read of a
  * version between the two overwrite it. */
 const ingest = async (companyId, sourceType, row, context = {}) => {
-    const result = { written: 0, unchanged: 0, stamped: 0, tombstoned: 0, stale: 0 };
+    const result = { written: 0, unchanged: 0, stamped: 0, tombstoned: 0, stale: 0, embedded: 0, embedFailed: false, embedRefused: false };
     if (!row || !row._id) return result;
     const rules = RULES[sourceType];
     const sourceUpdatedAt = rules.versionOf(row, context);
     const metadata = rules.metadata(companyId, row, context);
     const pieces = rules.chunk(row);
+    const plan = await embeddings.planFor(companyId);
+    const wantedModel = plan ? plan.model : null;
     const existing = await chunkStore(companyId, [{ sourceType, sourceId: metadata.sourceId }, EXISTING_FIELDS, { lean: true }], 'find');
     const byOrdinal = new Map((existing || []).map((chunk) => [Number(chunk.ordinal), chunk]));
+    const vectors = await embedPieces(companyId, sourceType, metadata.sourceId, pieces, byOrdinal, wantedModel);
+    result.embedFailed = vectors.failed;
+    result.embedRefused = vectors.refused;
 
+    const embeddedChunks = [];
     let behind = false;
     for (const piece of pieces) {
-        const chunk = { ...metadata, ...piece, embeddingModel: null, deleted: false, deletedAt: null, tombstoneReason: '', sourceUpdatedAt };
         const stored = byOrdinal.get(piece.ordinal);
-        if (unchanged(stored, chunk)) {
+        const chunk = { ...metadata, ...piece, ...vectorFields(stored, piece, vectors, wantedModel), deleted: false, deletedAt: null, tombstoneReason: '', sourceUpdatedAt };
+        if (unchanged(stored, chunk, wantedModel)) {
             result.unchanged += 1;
             behind = behind || time(stored.sourceUpdatedAt) < time(sourceUpdatedAt);
         } else if (await upsertChunk(companyId, chunk)) {
             result.written += 1;
+            if (vectors.byOrdinal.has(piece.ordinal)) {
+                result.embedded += 1;
+                embeddedChunks.push(chunk);
+            }
         } else {
             result.stale += 1;
         }
     }
+    if (embeddedChunks.length) await tellStore('upsert', { companyId: String(companyId), chunks: embeddedChunks });
+    if (vectors.failed && !vectors.refused) queueEmbedRetry(companyId, sourceType, metadata.sourceId);
 
     if (behind) {
         result.stamped = modified(await chunkStore(companyId, [
@@ -277,6 +345,7 @@ const markLeftOut = async (companyId, sourceType, decision) => {
         headingPath: [],
         text: '',
         contentHash: contentHashOf([], ''),
+        embedding: [],
         embeddingModel: null,
         deleted: true,
         deletedAt: new Date(),
@@ -460,10 +529,87 @@ const reindexTask = (companyId, taskId, { moved = false } = {}) => {
     });
 };
 
+const embedRetryQueue = new Map();
+
+const runEmbedRetry = async (key) => {
+    const entry = embedRetryQueue.get(key);
+    if (!entry) return null;
+    entry.timer = null;
+    try {
+        const result = await sync(entry.companyId, entry.sourceType, entry.id);
+        if (!(result && result.embedFailed)) embedRetryQueue.delete(key);
+        return result;
+    } catch (error) {
+        logger.error(`${LOG_PREFIX} embedding retry of ${entry.sourceType} ${entry.id} in company ${entry.companyId} failed: ${error.message}`);
+        embedRetryQueue.delete(key);
+        return null;
+    }
+};
+
+/* One waiting retry per source, each wait twice the last; after the last attempt the recurring
+ * job's sweep is what brings the vectors back, so a process restart loses nothing for good. */
+const queueEmbedRetry = (companyId, sourceType, id) => {
+    const key = `${companyId}:${sourceType}:${id}`;
+    const entry = embedRetryQueue.get(key) || { companyId: String(companyId), sourceType, id: String(id), attempt: 0, timer: null };
+    if (entry.timer) return;
+    if (entry.attempt >= EMBED_RETRY_ATTEMPTS) {
+        embedRetryQueue.delete(key);
+        return;
+    }
+    entry.attempt += 1;
+    entry.timer = setTimeout(() => { runEmbedRetry(key); }, EMBED_RETRY_BASE_MS * (2 ** (entry.attempt - 1)));
+    if (entry.timer.unref) entry.timer.unref();
+    embedRetryQueue.set(key, entry);
+};
+
+const embedRetries = () => [...embedRetryQueue.keys()].sort();
+
+const flushEmbedRetries = async () => {
+    for (const [key, entry] of [...embedRetryQueue.entries()]) {
+        if (entry.timer) clearTimeout(entry.timer);
+        await runEmbedRetry(key);
+    }
+};
+
+const clearEmbedRetries = () => {
+    embedRetryQueue.forEach((entry) => { if (entry.timer) clearTimeout(entry.timer); });
+    embedRetryQueue.clear();
+};
+
+/* Sources of a hybrid company whose live chunks carry no vector for the current model: what a
+ * failed embed left behind, and everything indexed before the model changed. Stops at the first
+ * failure, since the next source would fail the same way. */
+const reembedMissing = async (companyId) => {
+    const plan = await embeddings.planFor(companyId);
+    if (!plan) return null;
+    const rows = await chunkStore(companyId, [[
+        { $match: { companyId: String(companyId), deleted: { $ne: true }, embeddingModel: { $ne: plan.model } } },
+        { $group: { _id: { sourceType: '$sourceType', sourceId: '$sourceId' } } },
+        { $limit: REEMBED_BATCH },
+    ]], 'aggregate');
+    let count = 0;
+    for (const row of rows || []) {
+        const { sourceType, sourceId } = row._id || {};
+        const result = await sync(companyId, sourceType, sourceId).catch((error) => {
+            logger.error(`${LOG_PREFIX} ${companyId}: re-embedding ${sourceType} ${sourceId} failed: ${error.message}`);
+            return null;
+        });
+        if (result && result.embedFailed) break;
+        count += 1;
+    }
+    return count;
+};
+
 module.exports = {
     SOURCE,
     SOURCES,
     RULES,
+    EMBED_RETRY_ATTEMPTS,
+    REEMBED_BATCH,
+    embedRetries,
+    flushEmbedRetries,
+    clearEmbedRetries,
+    reembedMissing,
     ingestPage,
     ingestComment,
     ingestTranscript,

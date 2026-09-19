@@ -20,6 +20,7 @@ const pages = require('../Modules/Pages/controller');
 const comments = require('../Modules/Comments/controller');
 const notes = require('../Modules/Calls/notes');
 const { retrieve } = require('../Modules/Knowledge/retrieval');
+const flag = require('../Modules/Knowledge/flag');
 const backfill = require('../Modules/Knowledge/ingest/backfill');
 const indexer = require('../Modules/Knowledge/ingest/indexer');
 const events = require('../Modules/Knowledge/ingest/events');
@@ -87,7 +88,9 @@ beforeEach(() => {
 
 describe('a company whose indexer was switched off and on again', () => {
     it('writes nothing while off, then serves rows and catches up on what changed in between for pages, comments and transcripts', async () => {
+        // The row is edited by hand here, so the cached modes are dropped as a console write would.
         mockDb.store[SCHEMA_TYPE.COMPANIES][0].knowledgeIndexer = { mode: 'off' };
+        flag.forget(C);
         const page = await call(pages.createPage, { body: { title: 'Mooring rules', projectId: PROJECT, contentBlocks: [{ type: 'paragraph', data: { text: 'Moor bow first, always.' } }] } });
         const comment = await call(comments.save, { body: { data: { message: 'The bollard is loose.', type: 'text', project: false, taskId: String(task._id), projectId: PROJECT, sprintId: SPRINT } } });
         const callNotes = await call(notes.createNotes, { body: { callId: 'gap-call', participants: [], transcript: 'We repainted the lighthouse.' } });
@@ -96,6 +99,7 @@ describe('a company whose indexer was switched off and on again', () => {
         const ids = { page: stamped(SCHEMA_TYPE.PAGES, page.body.data._id), comment: stamped(SCHEMA_TYPE.COMMENTS, comment.body.data._id), transcript: stamped(SCHEMA_TYPE.CALLS, callNotes.body.data._id) };
 
         mockDb.store[SCHEMA_TYPE.COMPANIES][0].knowledgeIndexer = { mode: 'on' };
+        flag.forget(C);
         mockDb.calls.length = 0;
 
         const first = await ask('bow bollard lighthouse', ['page', 'comment', 'transcript']);

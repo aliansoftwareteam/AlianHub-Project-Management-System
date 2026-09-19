@@ -1503,6 +1503,8 @@ const schema = {
         headingPath: { type: [String], required: false, default: [] },
         text: { type: String, required: false, default: '' },
         contentHash: { type: String, required: true },
+        // The vector for `text` under `embeddingModel`; empty until a hybrid company embeds it.
+        embedding: { type: [Number], required: false, default: [] },
         embeddingModel: { type: String, required: false, default: null },
         deleted: { type: Boolean, required: false, default: false },
         deletedAt: { type: Date, required: false, default: null },

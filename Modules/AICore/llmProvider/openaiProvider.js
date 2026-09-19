@@ -1,10 +1,24 @@
 const axios = require('axios');
 const config = require('../../../Config/config');
 const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
-const { fromOpenAiCompatible } = require('../providerError');
+const { fromOpenAiCompatible, noEmbeddings } = require('../providerError');
 const { normaliseRequest, STRUCTURED_OUTPUT } = require('./normalise');
 
 const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
+/* Overridable so an Azure deployment, a proxy or a self-hosted server that speaks the same
+ * API can answer embeddings; the e2e harness points it at a stub. */
+const embeddingsUrl = () => process.env.OPENAI_EMBEDDINGS_URL || 'https://api.openai.com/v1/embeddings';
+/* The endpoint takes up to 2048 inputs; a hundred keeps each request small enough that a
+ * retry after a network blip costs little. */
+const EMBED_BATCH_SIZE = 100;
+
+const asVectorRows = (response, model, expected) => {
+    const rows = response && response.data && Array.isArray(response.data.data) ? response.data.data : [];
+    if (rows.length !== expected || rows.some((row) => !Array.isArray(row.embedding))) {
+        throw new Error(`OpenAI embeddings (${model}) answered ${rows.length} vectors for ${expected} texts`);
+    }
+    return [...rows].sort((a, b) => a.index - b.index).map((row) => row.embedding);
+};
 
 /**
  * OpenAI's reasoning models (the `o-series` and `gpt-5-*` family) accept a
@@ -58,13 +72,51 @@ const openaiProvider = {
     get model() {
         return config.AI_MODEL || null;
     },
+    /* Embeddings need the instance key and their own model, never the chat model. */
+    get embeddingsConfigured() {
+        return Boolean(config.AI_API_KEY);
+    },
     capabilities: Object.freeze({
         structuredOutput: STRUCTURED_OUTPUT.JSON_OBJECT,
         defaultMaxTokens: 32000,
         maxOutputTokens: openaiMaxOutputTokens,
         isReasoningModel,
         omitTemperatureWhenReasoning: true,
+        embeddings: true,
     }),
+
+    /**
+     * @param {import('./types').EmbedOptions} opts
+     * @returns {Promise<import('./types').EmbedResult>}
+     */
+    async embed(opts) {
+        if (!openaiProvider.embeddingsConfigured) throw noEmbeddings('openai', 'has no embeddings until AI_API_KEY is set');
+        const model = String((opts && opts.model) || '').trim();
+        if (!model) throw new Error('embed() needs the embedding model to send');
+        const texts = (Array.isArray(opts.texts) ? opts.texts : []).map((text) => (text === undefined || text === null ? '' : String(text)));
+        // A question waits a couple of seconds for its vector; a batch at ingest may take the provider's own timeout.
+        const timeout = Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : providerTimeoutMs('openai', { reasoning: false });
+        const embeddings = [];
+        let inputTokens = 0;
+        let billedModel = model;
+        for (let at = 0; at < texts.length; at += EMBED_BATCH_SIZE) {
+            const input = texts.slice(at, at + EMBED_BATCH_SIZE);
+            let response;
+            try {
+                response = await axios.post(embeddingsUrl(), { model, input }, {
+                    headers: { Authorization: `Bearer ${config.AI_API_KEY}`, 'Content-Type': 'application/json' },
+                    timeout,
+                });
+            } catch (error) {
+                throw fromOpenAiCompatible('openai', model, error);
+            }
+            embeddings.push(...asVectorRows(response, model, input.length));
+            const billed = response.data && response.data.usage;
+            inputTokens += (billed && billed.prompt_tokens) || 0;
+            if (response.data && response.data.model) billedModel = String(response.data.model);
+        }
+        return { embeddings, model: billedModel, inputTokens, outputTokens: 0, totalTokens: inputTokens, dimensions: embeddings.length ? embeddings[0].length : 0 };
+    },
 
     /**
      * @param {import('./types').ChatOptions} opts

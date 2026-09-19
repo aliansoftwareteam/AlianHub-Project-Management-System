@@ -1,6 +1,6 @@
 const axios = require('axios');
 const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
-const { fromGoogle } = require('../providerError');
+const { fromGoogle, noEmbeddings } = require('../providerError');
 const { normaliseRequest, STRUCTURED_OUTPUT, JSON_ONLY_INSTRUCTION } = require('./normalise');
 
 // Google's generative-language REST API. Nothing here needs @google/generative-ai,
@@ -42,6 +42,10 @@ const textOf = (candidate) => {
 
 const googleProvider = {
     name: 'google',
+    embeddingsConfigured: false,
+    async embed() {
+        throw noEmbeddings('google');
+    },
     get isConfigured() {
         return Boolean(process.env.GOOGLE_API_KEY && process.env.GOOGLE_MODEL);
     },
