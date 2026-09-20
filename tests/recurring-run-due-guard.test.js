@@ -1,5 +1,7 @@
 const mockDb = require('./fixtures/fakeMongo').create();
 
+process.env.STORAGE_TYPE = 'server';
+
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 jest.mock('../Modules/Sprints/controller', () => ({ addSprintFun: jest.fn() }));
