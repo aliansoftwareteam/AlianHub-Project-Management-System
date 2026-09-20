@@ -8,6 +8,7 @@ const {myCache} = require('./config');
 // circular dependency risk. The controller is lazy-required inside
 // verifyApiTokenRequest below.
 const { looksLikeToken, hasScope } = require('../Modules/ApiTokens/helpers/apiTokenRules');
+const { bearerRefusal } = require('../Modules/ApiTokens/helpers/bearerRules');
 const { sessionTokenQuery, readAccessSession, sessionCacheKey } = require('../Modules/Auth/helpers/refreshTokenRules');
 
 // Mongo ObjectId pattern — used to reject regex/control characters in the
@@ -419,6 +420,10 @@ const verifyJWTTokenWithCV2 = async (req, res, next) => {
             if (looksLikeToken(token)) {
                 return verifyApiTokenRequest(req, res, next, companyId, token);
             }
+            const refusedBearer = bearerRefusal(token);
+            if (refusedBearer) {
+                return res.status(401).json({ status: false, error: refusedBearer, statusText: 'Unauthorized', isJwtError: true });
+            }
             const isValid = jwt.verify(token, process.env.JWT_SECRET);
             if (!isCompanyInAudience(isValid.aud, companyId)) {
                 res.clearCookie('accessToken');
@@ -527,6 +532,10 @@ const verifyJWTTokenV2 = (req, res, next) => {
                 });
             }
             return verifyApiTokenRequest(req, res, next, companyId, token);
+        }
+        const refusedBearer = bearerRefusal(token);
+        if (refusedBearer) {
+            return res.status(401).json({ status: false, error: refusedBearer, statusText: 'Unauthorized', isJwtError: true });
         }
 
         try {

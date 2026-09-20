@@ -9,6 +9,7 @@ const {
     generateToken, hashToken, tokenPrefixOf, looksLikeToken, isStrict, validateCreateInput, isExpired, effectiveScopes, graceStanding, lastUsedIsStale,
 } = require('./helpers/apiTokenRules');
 const { strictSince } = require('./helpers/strictSince');
+const { stepCredentialsEnabled } = require('../Agents/serviceIdentity');
 
 // Resolve the acting user. These routes now sit behind the JWT middleware
 // (Config/setMiddleware.js) which populates req.uid; the body userData
@@ -137,9 +138,12 @@ exports.listTokens = async (req, res) => {
         const strict = isStrict();
         const since = strict ? await strictSince() : null;
         const now = new Date();
+        // The flag is named only while it is on, so the answer with it off is the one
+        // given before it existed; the screen asks for the credential list on seeing it.
         const policy = {
             strict, minExpiryDays: MIN_EXPIRY_DAYS, maxExpiryDays: MAX_EXPIRY_DAYS, scopes: [...SCOPES], graceDays: STRICT_GRACE_DAYS,
             strictSince: since,
+            ...(stepCredentialsEnabled() ? { stepCredentials: true } : {}),
         };
         const data = (tokens || []).map((doc) => maskToken(doc, graceStanding(doc, { strict, strictSince: since, now })));
         return res.send({ status: true, statusText: 'Tokens fetched.', data, policy });
@@ -206,6 +210,36 @@ exports.listTokensNeedingExpiry = async (req, res) => {
         return res.send({ status: true, statusText: 'Tokens fetched.', data, policy });
     } catch (error) {
         logger.error(`ERROR in list api tokens needing expiry: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* GET /api/v2/api-tokens/step-credentials — the live step-scoped credentials of the
+ * workspace's workflow runs, as their own kind: every run's for an owner or admin,
+ * only the runs they started for anyone else. The run, the step and the expiry;
+ * never the credential, which is not stored, nor its id. */
+exports.listStepCredentials = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const userId = actingUserId(req);
+        if (!companyId || !userId) {
+            return res.send({ status: false, statusText: 'companyId and userId are required.' });
+        }
+        if (req.apiToken) return res.status(403).send({ status: false, statusText: 'API tokens cannot list credentials.' });
+        const stepCredential = require('../Workflows/stepCredential');
+        const policy = { stepCredentials: stepCredential.enabled() };
+        if (!policy.stepCredentials) return res.send({ status: true, statusText: 'Credentials fetched.', data: [], policy });
+        const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+        const roleType = await getRoleType(companyId, userId);
+        if (roleType === null || roleType === undefined) {
+            return res.status(403).send({ status: false, statusText: 'Only a member of this workspace can see its step-scoped credentials.' });
+        }
+        const rows = await stepCredential.listActive(companyId, { userId, privileged: isPrivileged(roleType) });
+        const names = await displayNamesOf(rows.map((row) => row.startedBy.id));
+        const data = rows.map((row) => ({ ...row, startedBy: { ...row.startedBy, name: names[row.startedBy.id] || '' } }));
+        return res.send({ status: true, statusText: 'Credentials fetched.', data, policy });
+    } catch (error) {
+        logger.error(`ERROR in list step credentials: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };

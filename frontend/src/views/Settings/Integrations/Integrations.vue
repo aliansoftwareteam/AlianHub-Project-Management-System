@@ -93,7 +93,7 @@
                 <div class="ig__row-main">
                     <span class="ig__mark ig__mark--hook" :class="'is-' + (hook.format || 'json')" aria-hidden="true">{{ (hook.format || 'json').slice(0, 1).toUpperCase() }}</span>
                     <div class="ig__row-text">
-                        <div class="ig__row-name">{{ hook.name }} <span class="ah-chip ah-chip--mono">{{ (hook.format || 'json').toUpperCase() }}</span></div>
+                        <div class="ig__row-name">{{ hook.name }} <span class="ah-chip ah-chip--mono">{{ (hook.format || 'json').toUpperCase() }}</span> <span v-if="hook.needsAttention" class="ah-chip ah-chip--danger" data-test="webhook-attention" :title="$t('Integrations.needs_attention_hint')">{{ $t('Integrations.needs_attention') }}</span></div>
                         <div class="ah-small" :title="hook.url">{{ shortUrl(hook.url) }} · {{ eventsSummary(hook.events) }} · {{ lastDeliveryLabel(hook) }}</div>
                     </div>
                     <span class="ig__status ah-small">
@@ -162,6 +162,8 @@
             </div>
         </section>
 
+        <StoredSecrets v-if="privileged" />
+
         <div class="ah-card ig__note">
             <ShellIcon name="agent" :size="16" class="ig__note-icon" />
             <span>{{ $t('Settings.integrations_agent_note') }}</span>
@@ -177,10 +179,13 @@ import { ref, computed, onMounted } from 'vue';
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import AhSwitch from '@/components/molecules/Setting/AhSwitch.vue';
+import StoredSecrets from './StoredSecrets.vue';
 import { useRouter } from 'vue-router';
 import { inject } from 'vue';
+import { useStore } from 'vuex';
 import { apiRequest } from '../../../services';
 import { useI18n } from 'vue-i18n';
+import { isOwnerOrAdmin } from '@/utils/roles';
 import {
     fetchCloudSettings,
     saveCloudSettings,
@@ -199,6 +204,8 @@ const newSecret = ref('');
 const showWebhookForm = ref(false);
 const router = useRouter();
 const companyId = inject('$companyId');
+const { getters } = useStore();
+const privileged = computed(() => isOwnerOrAdmin((getters['settings/companyUserDetail'] || {}).roleType));
 const apiTokensRoute = computed(() => (router.hasRoute('ApiTokens') ? { name: 'ApiTokens', params: { cid: companyId.value } } : null));
 const toggleWebhookForm = (format) => {
     if (format) { form.value.format = format; showWebhookForm.value = true; return; }

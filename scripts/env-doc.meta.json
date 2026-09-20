@@ -179,6 +179,21 @@
     "description": "Secret of at least 32 characters that keys the audit chain hash, so someone who can write to the database cannot recompute it. Rows chained under one key only verify under that key; keep it out of the database and its backups.",
     "secret": true
   },
+  "SECRETS_STORE": {
+    "group": "security",
+    "description": "Set to true to keep integration and webhook secrets in a per-company secrets store, referenced by handle: a new or updated secret is sealed with AES-256-GCM under SECRETS_KEY and bound to its company and handle, the integration or webhook document keeps only the handle, every create, rotation, revocation and failed lookup is audited, and owners and admins see each secret's name, kind, key id and dates under Settings → Integrations, where they can rotate or revoke it. Migration 031 moves existing secrets in when this is on while it runs. Needs SECRETS_KEY; with a missing or short key the store refuses every read and write, connecting an integration or adding a webhook is refused rather than saved outside the store, and an error is logged. Unset or false keeps secrets sealed on their documents as before; a handle already written still resolves while a key is set, and a secret saved while this is off replaces the handle on its document, so the newest value is always the one in use. Turning this off again: the old store copy is revoked when SECRETS_KEY is still set, and otherwise marked, then revoked by `npm run secrets:reencrypt` (or by migration 031 when it runs again) once a key is set.",
+    "default": "false"
+  },
+  "SECRETS_KEY": {
+    "group": "security",
+    "description": "Key of at least 32 characters that seals the secrets store, separate from JWT_SECRET. Each stored secret records the id of the key that sealed it (derived from the stretched key, so it is no shortcut for guessing the key); keep the key out of the database and its backups. To rotate, move the old value to SECRETS_KEY_PREVIOUS, set the new one here, restart, and run `npm run secrets:reencrypt`.",
+    "secret": true
+  },
+  "SECRETS_KEY_PREVIOUS": {
+    "group": "security",
+    "description": "The previous SECRETS_KEY during a key rotation: secrets sealed under it still resolve, and `npm run secrets:reencrypt` reseals every company under SECRETS_KEY, writes an audit row per company and prints how many live secrets are still on this key. Unset it only when that command says it is safe to.",
+    "secret": true
+  },
   "AUDIT_EXPORT_MAX_ROWS": {
     "group": "security",
     "description": "Most rows one audit-log CSV export streams; a last row says when the filter held more. Can only lower the hard cap.",
@@ -808,6 +823,16 @@
     "group": "security",
     "description": "Username for the Socket.IO admin UI; the UI stays off while unset.",
     "default": "alian"
+  },
+  "STEP_CREDENTIALS": {
+    "group": "security",
+    "description": "Set to on to give the platform its own service identities and mint a step-scoped credential per workflow step: the workflow engine, its worker, the knowledge indexer and the model router record their rows as service:<name> instead of a borrowed user, and when the engine claims a step it signs a short-lived credential carrying the company, run, step, fencing token, actor context and allowed actions that expires one lease after it was minted, is re-minted whenever a heartbeat extends the lease, and is checked against the live step row whenever an agent step's actor presents it to perform an action. The tokens screen lists live credentials as step-scoped. Unset or off keeps today's behaviour: no credential is minted and rows are attributed as before.",
+    "default": "off"
+  },
+  "STEP_CREDENTIAL_SECRET": {
+    "group": "security",
+    "description": "Key material for signing step-scoped credentials (STEP_CREDENTIALS). Derived with scrypt, never used as-is; falls back to JWT_SECRET, so set a dedicated secret in production so rotating JWT_SECRET does not invalidate credentials of steps in flight, and keep it out of the database and its backups.",
+    "secret": true
   },
   "STORAGEBUCKET": {
     "group": "integrations",

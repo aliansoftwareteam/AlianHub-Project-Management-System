@@ -134,6 +134,8 @@ module.exports.SSO_DISCOVER = '/api/v2/sso/discover';
 // Webhooks / integrations (Modules/Webhooks)
 module.exports.WEBHOOKS = '/api/v2/webhooks';
 module.exports.WEBHOOK_EVENTS = '/api/v2/webhooks/events';
+// Workspace secrets by handle (Modules/Secrets): metadata only, owner or admin
+module.exports.SECRETS = '/api/v2/secrets';
 module.exports.AUTH = '/api/v2/auth';
 module.exports.DELETE_SESSION = '/api/v2/session/delete';
 module.exports.UPDATE_SESSION = '/api/v2/session/update';
@@ -223,6 +225,7 @@ module.exports.WORKFLOW_APPROVALS = '/api/v2/workflows/approvals';
 module.exports.API_TOKENS = '/api/v2/api-tokens';
 module.exports.MCP_TOKENS = '/api/v2/api-tokens/mcp';
 module.exports.API_TOKENS_NEEDING_EXPIRY = '/api/v2/api-tokens/needing-expiry';
+module.exports.API_TOKENS_STEP_CREDENTIALS = '/api/v2/api-tokens/step-credentials';
 module.exports.MCP_MANIFEST = '/mcp/manifest';
 module.exports.AGENT_TEAM = '/api/v2/agents/team';
 module.exports.AGENT_ROUTABLE = '/api/v2/agents/routable';

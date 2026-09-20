@@ -120,6 +120,7 @@
     "setup:reset": "node scripts/dev.js --force",
     "migrate": "node scripts/migrate.js up",
     "migrate:status": "node scripts/migrate.js status",
+    "secrets:reencrypt": "node scripts/secrets-reencrypt.js",
     "demo:seed": "node scripts/demo/seedDemoTeam.js",
     "demo:unseed": "node scripts/demo/unseedDemoTeam.js",
     "demo:token": "node scripts/demo/sessionToken.js",
