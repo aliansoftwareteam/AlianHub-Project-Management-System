@@ -98,17 +98,25 @@ async function setKey({ companyId, provider, value, actor }) {
     if (!id) throw invalid('A workspace id is required.');
     const mapping = await readMapping(id);
     const handle = mapping[name];
-    let kept;
+    let kept = null;
+    let fresh = false;
     if (handle) {
         try {
             kept = (await store.rotate({ companyId: id, handle, value, actor })).handle;
         } catch (error) {
             if (!['revoked', 'not_found'].includes(error.code)) throw error;
-            kept = null;
         }
     }
-    if (!kept) kept = (await store.create({ companyId: id, name: labelOf(name), kind: SECRET_KIND, value, actor })).handle;
-    await writeMapping(id, { ...mapping, [name]: kept });
+    if (!kept) {
+        kept = (await store.create({ companyId: id, name: labelOf(name), kind: SECRET_KIND, value, actor })).handle;
+        fresh = true;
+    }
+    try {
+        await writeMapping(id, { ...mapping, [name]: kept });
+    } catch (error) {
+        if (fresh) await store.retire({ companyId: id, handle: kept, actor }).catch(() => {});
+        throw error;
+    }
     return describeKey({ companyId: id, provider: name });
 }
 

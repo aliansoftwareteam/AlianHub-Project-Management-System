@@ -201,6 +201,14 @@ describe('management', () => {
         boot({ storeOn: false });
         await expect(keys.setKey({ companyId: COMPANY, provider: 'openai', value: WORKSPACE_VALUE, actor })).rejects.toThrow('SECRETS_STORE');
     });
+
+    it('leaves no live secret behind when the mapping write fails', async () => {
+        const unknown = '6f0000000000000000000c99';
+        await expect(keys.setKey({ companyId: unknown, provider: 'openai', value: WORKSPACE_VALUE, actor })).rejects.toThrow('No such workspace');
+        const rows = mockDbFor(unknown).store[SCHEMA_TYPE.SECRETS] || [];
+        expect(rows).toHaveLength(1);
+        expect(rows[0].revokedAt).toBeTruthy();
+    });
 });
 
 describe('the provider sends the resolved key', () => {
