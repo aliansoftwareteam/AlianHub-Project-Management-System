@@ -8,7 +8,9 @@ import { socketHelper } from '@/composable/socketHelper';
 
 beforeEach(() => {
     io.mockReset();
-    io.mockImplementation(() => ({ on: vi.fn() }));
+    io.mockImplementation(() => ({
+        on: (event, cb) => { if (event === 'connect') cb(); },
+    }));
 });
 
 describe('socketHelper', () => {

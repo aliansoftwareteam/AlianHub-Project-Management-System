@@ -6,7 +6,10 @@ const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
-jest.mock('../Modules/Auth/helpers/refreshSession', () => ({ resolveRefreshSession: jest.fn(), rotateRefreshSession: jest.fn() }));
+jest.mock('../Modules/Auth/helpers/refreshSession', () => {
+    const actual = jest.requireActual('../Modules/Auth/helpers/refreshSession');
+    return { resolveRefreshSession: jest.fn(), rotateRefreshSession: jest.fn(), newSessionCredentials: actual.newSessionCredentials };
+});
 jest.mock('../Modules/Auth/controller/authHelpers', () => {
     const actual = jest.requireActual('../Modules/Auth/controller/authHelpers');
     return { ...actual, generateTokenV2Fun: jest.fn((uid, refreshToken, cb) => cb({ status: true, token: 'access-token' })) };

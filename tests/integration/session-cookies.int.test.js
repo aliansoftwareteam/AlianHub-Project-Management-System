@@ -75,12 +75,21 @@ describe('httpOnly session cookies through the real routes', () => {
         expect(cleared).toMatch(/accessToken=deleted|accessToken=;/i);
     });
 
-    it('keeps readable cookies on the default server', async () => {
-        const anon = createApiClient({ baseURL: state.baseURL });
-        const login = await anon.post('/api/v2/auth/login', { email: emailFor('member'), password: state.password });
-        expect(login.status).toBe(200);
-        const setCookies = setCookiesOf(login).join(';');
-        expect(setCookies).toContain('accessToken=');
-        expect(setCookies).not.toMatch(/httponly/i);
+    it('keeps readable cookies on a server with the flag off', async () => {
+        const plain = await startServer({
+            mongoUrl: resolveMongoUrl(),
+            logFile: path.join(STATE_DIR, 'session-cookies-off-server.log'),
+            env: { SESSION_COOKIE_HTTPONLY: 'off' },
+        });
+        try {
+            const anon = createApiClient({ baseURL: plain.baseURL });
+            const login = await anon.post('/api/v2/auth/login', { email: emailFor('member'), password: state.password });
+            expect(login.status).toBe(200);
+            const setCookies = setCookiesOf(login).join(';');
+            expect(setCookies).toContain('accessToken=');
+            expect(setCookies).not.toMatch(/httponly/i);
+        } finally {
+            await plain.stop();
+        }
     });
 });
