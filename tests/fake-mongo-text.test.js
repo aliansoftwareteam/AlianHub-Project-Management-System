@@ -1,12 +1,13 @@
-const mockDb = require('./fixtures/fakeMongo').create();
+const { create } = require('./fixtures/fakeMongo');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { taskSchema } = require('../utils/mongo-handler/createSchema');
 
 const C = '7f0000000000000000000001';
 
+let mockDb;
+
 beforeEach(() => {
-    Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
-    mockDb.calls.length = 0;
+    mockDb = create();
 });
 
 describe('fakeMongo bounds $text to the declared text index', () => {
