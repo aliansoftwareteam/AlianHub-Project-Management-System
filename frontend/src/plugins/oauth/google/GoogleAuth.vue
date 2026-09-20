@@ -10,7 +10,6 @@
 import { publicConfig } from "@/config/publicConfig";
 /* global google */
 import { onMounted, ref, defineProps } from "vue";
-import Cookies from 'js-cookie';
 import { useToast } from 'vue-toast-notification';
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from "vue-i18n";
@@ -128,8 +127,6 @@ const login = async (userInfo) => {
         userData.value = userResponse?.data?.data.userData;
         if (userResponse.data.status == false) {
             localStorage.removeItem("updateToken");
-            Cookies.remove('refreshToken');
-            Cookies.remove('accessToken');
             throw new Error('MongoDB Error from Api')
         }
 
@@ -137,8 +134,6 @@ const login = async (userInfo) => {
         let cid = localStorage.getItem("selectedCompany") ?? companyID;
         if (!uData.isEmailVerified) {
             localStorage.removeItem("updateToken");
-            Cookies.remove('refreshToken');
-            Cookies.remove('accessToken');
             throw new Error("Verify your email and try again");
         }
 
@@ -199,8 +194,6 @@ const login = async (userInfo) => {
             $toast.error(t("Toast.something_went_wrong"), { position: 'top-right' });
         }
         
-        Cookies.remove('refreshToken');
-        Cookies.remove('accessToken');
         localStorage.removeItem("updateToken");
         localStorage.removeItem("userId");
         localStorage.removeItem("isLogging");

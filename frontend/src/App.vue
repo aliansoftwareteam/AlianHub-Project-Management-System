@@ -145,7 +145,6 @@ import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import { initOffline } from '@/offline';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
-import Cookies from 'js-cookie'
 const {tabSync} = tabSyncHelper();
 const mainTour = ref();
 
@@ -210,15 +209,15 @@ watch(() => getters['settings/rules'], (val) => {
 	rules.value = val;
 })
 watch(route, (newVal) => {
-	const token = Cookies.get('accessToken') || '';
+	const hasSession = !!localStorage.getItem("userId");
     if(newVal?.name === 'Support'){
-        if(token && !companyId.value){
+        if(hasSession && !companyId.value){
             return router.push({name : 'Create_Company'});
         }
         return;
     } else if(newVal.params.cid && newVal.params.cid !== companyId.value){
         changeCompany(newVal.params.cid);
-    } else if(!companyId.value && token){
+    } else if(!companyId.value && hasSession){
         router.push({name : 'Create_Company'});
     }
 })
@@ -563,8 +562,7 @@ async function changeCompany(cid) {
     try {
         const uid = userId.value || localStorage.getItem("userId");
         const companyDetail = getters['settings/companies'].find((x) => x._id === cid)
-		const token = Cookies.get('accessToken') || '';
-        if(!companyDetail && !getters['settings/companies'].length && token){
+        if(!companyDetail && !getters['settings/companies'].length && uid){
             router.push({name : 'Create_Company'});
             return;
         }

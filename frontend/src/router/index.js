@@ -143,7 +143,6 @@ router.beforeEach(async(to, _, next) => {
 		// CHECK META FOR AUTH REQUIRED
 		// const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
 		const requiresAuth = to.meta.requiresAuth;
-		const token = Cookies.get('accessToken') || '';
 		// SET PAGE TITLE
 		setTitle({title: to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
 
@@ -155,7 +154,7 @@ router.beforeEach(async(to, _, next) => {
 			// IF USER IS LOGGED IN AND REQUESTS NO AUTH REQUIRED PAGE
 			if(to.meta.title === 'Support'){
 				next();
-			}else if(token && !user?.AssignCompany?.length){
+			}else if(!user?.AssignCompany?.length){
 				next({name: "Create_Company", query: query});
 			}else{
 				next({name: "Home", params: {

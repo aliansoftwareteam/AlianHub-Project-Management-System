@@ -135,7 +135,6 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import Cookies from "js-cookie";
 import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutSecure, getAuth } from "@/services";
@@ -241,10 +240,8 @@ async function submit() {
     }
 }
 
-async function enter({ userId, companyId, accessToken, refreshToken, session }) {
+async function enter({ userId, companyId, session }) {
     if (!session) { router.replace({ name: "Log-in" }); return; }
-    if (accessToken) Cookies.set("accessToken", accessToken);
-    if (refreshToken) Cookies.set("refreshToken", refreshToken);
     localStorage.setItem("userId", userId);
     localStorage.setItem("selectedCompany", companyId);
     localStorage.setItem("isLogging", "true");

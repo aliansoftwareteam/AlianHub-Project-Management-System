@@ -166,7 +166,6 @@
 </template>
 
 <script setup>
-import Cookies from "js-cookie";
 
 defineOptions({ name: "LoginPage" });
 import { computed, inject, onMounted, onUnmounted, reactive, ref } from "vue";
@@ -214,8 +213,6 @@ const validate = ({ password = true } = {}) => {
 
 const clearSession = () => {
     localStorage.removeItem("updateToken");
-    Cookies.remove("refreshToken");
-    Cookies.remove("accessToken");
 };
 const rememberEmail = () => localStorage.setItem("ForgotEmail", form.email);
 const encode = (str) => Array.from(str).map((c) => c.charCodeAt(0)).join(", ");

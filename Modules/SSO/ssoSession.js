@@ -2,6 +2,7 @@ const sesstionCtr = require("../Auth/session.js");
 const { generateTokenV2Fun, sessionRefusalFor } = require("../Auth/controller/authHelpers");
 const config = require("../../Config/config");
 const logger = require("../../Config/loggerConfig");
+const { httpOnlyCookies } = require("../../Config/cookies");
 const serviceCtr = require("../serviceFunction.js");
 
 // SEC-02 — establish a real session for an SSO-authenticated user, then REDIRECT
@@ -21,7 +22,7 @@ const finalizeSsoSession = (req, res, uid, redirectPath) => {
             generateTokenV2Fun(uid, sData.data.refreshToken, (gData) => {
                 if (!(gData && gData.status)) return fail('token');
                 const setCookie = {
-                    httpOnly: false,
+                    httpOnly: httpOnlyCookies(),
                     secure: config.NODE_ENV === 'production',
                     sameSite: 'Lax',
                     domain: process.env.NODE_ENV === 'production' ? req.hostname : undefined,
