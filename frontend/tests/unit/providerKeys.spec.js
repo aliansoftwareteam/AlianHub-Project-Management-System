@@ -97,10 +97,13 @@ describe('the workspace provider keys panel', () => {
         expect(wrapper.find('[data-test="provider-openai"] [data-test="key-state"]').text()).toBe(t('ProviderKeys.status_instance'));
     });
 
-    it('shows the off note while the flag is off and hides everything from a member', async () => {
+    it('shows the off note while the flag is off', async () => {
         const off = await open({ off: true });
         expect(off.find('[data-test="keys-off"]').exists()).toBe(true);
         expect(off.find('[data-test="key-form"]').exists()).toBe(false);
+    });
+
+    it('hides everything from a member without probing', async () => {
         const member = await open({ roleType: 3, rows: [row({})] });
         expect(member.find('[data-test="provider-keys"]').exists()).toBe(false);
         expect(apiRequest).not.toHaveBeenCalled();

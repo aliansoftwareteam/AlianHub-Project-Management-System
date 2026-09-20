@@ -6,13 +6,13 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { removeCache } = require('../../utils/commonFunctions');
 const store = require('../../Config/secrets');
 const providerContext = require('./providerContext');
-const registry = require('./llmProvider/registry');
 
 const COMPANY_FIELD = 'aiProviderKeys';
 const SECRET_KIND = 'provider';
 const LOG = '[provider-keys]';
 
-const providerNames = () => registry.PROVIDER_NAMES;
+/* Read late: the adapters require this module, so requiring the registry at load would hand back its unfinished exports. */
+const providerNames = () => require('./llmProvider/registry').PROVIDER_NAMES;
 
 /* The instance key each adapter reads today; the workspace key replaces exactly this read. */
 const instanceKeyOf = (provider) => {
