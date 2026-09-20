@@ -85,6 +85,8 @@ describe('apiKeyFor', () => {
         boot({ tenant: false });
         const made = await store.create({ companyId: COMPANY, name: 'OpenAI API key', kind: 'provider', value: WORKSPACE_VALUE, actor });
         seedMapping(COMPANY, { openai: made.handle });
+        mockDbFor(COMPANY).calls.length = 0;
+        mockDbFor(dbCollections.GLOBAL).calls.length = 0;
         const key = await inCompany(COMPANY, () => keys.apiKeyFor(provider));
         expect(key).toBe(instanceKey);
         expect(mappingReads()).toEqual([]);
