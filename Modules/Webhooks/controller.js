@@ -8,6 +8,7 @@ const { validateWebhookInput, isObjectIdString, generateSecret, EVENT_TYPES } = 
 const { invalidateCompanyCache } = require('./dispatcher');
 const { resolvePublic } = require('../Agents/engine/safeFetch');
 const { webhookAllowlist } = require('./helpers/privateHostAllowlist');
+const { storeSigningSecret, revokeSigningSecret } = require('./helpers/signingSecret');
 
 const PRIVATE_DESTINATION = 'The webhook url must resolve to a public address, or to a private host the instance owner allows.';
 
@@ -40,6 +41,8 @@ const resolvesPublicly = async (url, allowlist) => {
  */
 const callerId = (req) => String((req && req.uid) || '');
 
+const actorOf = (req) => ({ id: callerId(req), ip: String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0] });
+
 /**
  * Match only what this caller owns.
  *
@@ -67,6 +70,7 @@ const maskHook = (hook) => ({
     createdBy: hook.createdBy || '',
     lastStatus: hook.lastStatus,
     lastDeliveredAt: hook.lastDeliveredAt,
+    needsAttention: hook.needsAttention || '',
     createdAt: hook.createdAt,
 });
 
@@ -97,13 +101,14 @@ exports.createWebhook = async (req, res) => {
         }
 
         const secret = generateSecret();
+        const kept = await storeSigningSecret({ companyId, name: String(name).trim(), secret, actor: actorOf(req) });
         const created = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.WEBHOOKS,
             data: {
                 name: String(name).trim(),
                 url: String(url).trim(),
                 events,
-                secret,
+                ...kept,
                 active: true,
                 format: format || 'json',
                 createdBy: uid,
@@ -220,6 +225,7 @@ exports.deleteWebhook = async (req, res) => {
             type: SCHEMA_TYPE.WEBHOOK_LOGS,
             data: [{ webhookId }],
         }, 'deleteMany').catch(() => {});
+        await revokeSigningSecret({ companyId, hook: owned, actor: actorOf(req) });
         invalidateCompanyCache(companyId);
         return res.send({ status: true, statusText: 'Webhook deleted.' });
     } catch (error) {

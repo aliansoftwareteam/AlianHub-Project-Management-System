@@ -628,6 +628,24 @@ const schema = {
         mac: { type: String, required: true },
         at: { type: Date, required: false },
     },
+    // Per-company secrets by handle (Config/secrets.js): AES-256-GCM ciphertext under the key whose
+    // fingerprint is keyId. Revocation blanks the ciphertext and keeps the row as a record.
+    secrets: {
+        handle: { type: String, required: true },
+        name: { type: String, required: true },
+        kind: { type: String, required: true },
+        keyId: { type: String, required: true },
+        ciphertext: { type: String, required: false },
+        iv: { type: String, required: false },
+        tag: { type: String, required: false },
+        createdBy: { type: String, required: false },
+        createdAt: { type: Date, required: true },
+        rotatedAt: { type: Date, required: false },
+        revokedAt: { type: Date, required: false },
+        lastResolvedAt: { type: Date, required: false },
+        // No document points at the handle any more, and no key was set to revoke it with (Config/secrets.js retire).
+        orphanedAt: { type: Date, required: false },
+    },
     // The last chained row a retention sweep deleted; verification starts after the newest one.
     auditChainAnchors: {
         seq: { type: Number, required: true },
@@ -1259,6 +1277,8 @@ const schema = {
         name: { type: String, required: false },
         config: { type: Object, default: {}, required: false },
         secretsVersion: { type: Number, default: 0, required: false },
+        // { [secret field key]: 'sec_…' } when SECRETS_STORE keeps the value in `secrets`; the field is then absent from config.
+        secretHandles: { type: Object, required: false },
         status: { type: String, default: 'connected', required: false },
         enabled: { type: Boolean, default: true, required: false },
         createdBy: { type: String, required: false },
@@ -1581,10 +1601,20 @@ const schema = {
             default: [],
             required: true,
         },
-        // HMAC secret — generated server-side, returned once on create.
+        // HMAC secret — generated server-side, returned once on create. Absent when
+        // secretHandle names the row in `secrets` that holds it (SECRETS_STORE).
         secret: {
             type: String,
-            required: true,
+            required: false,
+        },
+        secretHandle: {
+            type: String,
+            required: false,
+        },
+        // Set by the dispatcher while the signing secret will not resolve, cleared by the next delivery it can sign.
+        needsAttention: {
+            type: String,
+            required: false,
         },
         active: {
             type: Boolean,

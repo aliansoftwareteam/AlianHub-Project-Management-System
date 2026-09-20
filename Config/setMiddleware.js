@@ -341,6 +341,8 @@ const verifyJWTTokenWithCRoute = [
     // the list now filtered by owner, that would have been a way to read someone else's
     // integrations rather than merely to mislabel one.
     '/api/v2/webhooks',
+    // Workspace secrets by handle (Modules/Secrets): owner or admin only, never an API token; metadata only.
+    '/api/v2/secrets',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

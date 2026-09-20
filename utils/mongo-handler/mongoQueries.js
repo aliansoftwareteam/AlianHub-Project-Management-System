@@ -115,7 +115,8 @@ const {
     knowledgeExclusionsSchema,
     permissionDecisionsSchema,
     auditChainHeadsSchema,
-    auditChainAnchorsSchema
+    auditChainAnchorsSchema,
+    secretsSchema
 } = require('./createSchema');
 
 
@@ -351,6 +352,8 @@ exports.checkType = (type) => {
             return auditChainHeadsSchema
         case SCHEMA_TYPE.AUDIT_CHAIN_ANCHORS:
             return auditChainAnchorsSchema
+        case SCHEMA_TYPE.SECRETS:
+            return secretsSchema
         default:
             return ""
     }
@@ -589,6 +592,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AUDIT_CHAIN_HEADS}`
         case SCHEMA_TYPE.AUDIT_CHAIN_ANCHORS:
                 return `${dbCollections.AUDIT_CHAIN_ANCHORS}`
+        case SCHEMA_TYPE.SECRETS:
+                return `${dbCollections.SECRETS}`
         default:
             return ""
     }
