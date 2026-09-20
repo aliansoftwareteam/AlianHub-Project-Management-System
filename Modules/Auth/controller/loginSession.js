@@ -198,6 +198,12 @@ exports.loginAuthTracker = async (req, res) => {
         const sessionUserId = redeemed.userId;
         if (userId && String(userId) !== sessionUserId) return invalid();
 
+        const refusal = await sessionRefusalFor(sessionUserId).catch((error) => {
+            logger.error(`loginAuthTracker: ${error.message || error}`);
+            return { message: 'unauthorize user' };
+        });
+        if (refusal) return invalid();
+
         const forwarded = req?.headers['x-forwarded-for'] || req.ip;
         const clientIp = forwarded ? forwarded?.split(',')[0] : req?.connection?.remoteAddress;
         sesstionCtr.insertSessionFun({userId: sessionUserId}, req.headers['user-agent'] || "", clientIp, (sData) => {
