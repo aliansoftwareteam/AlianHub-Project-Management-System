@@ -160,7 +160,7 @@ const props = defineProps({
     },
     prjectGlobalPermission: {
         type: Boolean,
-        default: false,
+        default: true,
     }
 });
 
