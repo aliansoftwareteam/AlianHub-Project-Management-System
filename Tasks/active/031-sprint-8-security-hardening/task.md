@@ -60,4 +60,5 @@ Authorization is enforced where the data is, and a leaked credential buys minute
 - The secrets store is keyed with a new `SECRETS_KEY` environment variable, separate from `JWT_SECRET` and `AUDIT_CHAIN_KEY` (owner, 2026-09-19; slice 9).
 - Agent egress is checked by an in-app gateway rather than a proxy container, and an empty allowlist keeps today's behaviour (owner, 2026-09-19; slice 10).
 - Slice 6 (#757) defines `origin` on retrieved passages (`member`, `agent`, `external`; absent reads as not external); Sprint 7's slice 4 is the first to set it (2026-09-19).
+- Slice 9b: a workspace key wins for that workspace with the instance key as fallback; a set key that will not open refuses the call rather than billing the instance owner; keys only, provider selection unchanged, so a workspace with its own key but no instance provider configured still reports unconfigured (async selection is the follow-up); management is owners/admins, interactive only (owner, 2026-09-20).
 - Still open: a maximum token lifetime, if the architecture document names none (slice 7).
