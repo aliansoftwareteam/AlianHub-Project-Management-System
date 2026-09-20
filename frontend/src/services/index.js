@@ -16,6 +16,7 @@ export const axiosInstanceWithoutSecureWithFormData = axios.create({ baseURL: ap
 
 
 axiosInstance.interceptors.request.use((req) => {
+    // Unreadable under httpOnly cookies, when the server reads the cookie instead; readable installs keep sending the header.
     const token = Cookies.get('accessToken') || '';
     const companyId = localStorage.getItem('selectedCompany') || "";
     const headers = {
@@ -95,33 +96,26 @@ axiosInstanceWithoutSecureWithFormData.interceptors.request.use((req) => {
 
 let pendingAuth = null;
 
-const adoptRefreshCookie = (refreshToken) => {
-    if (!refreshToken || Cookies.get('refreshToken') === refreshToken) return;
-    // A host-only cookie written client-side (setup wizard) shadows the domain cookie the server just replaced.
-    Cookies.remove('refreshToken');
-    if (Cookies.get('refreshToken') !== refreshToken) Cookies.set('refreshToken', refreshToken);
-};
-
 const requestAuth = (id, retried = false) => new Promise((resolve, reject) => {
-    const refreshToken = Cookies.get('refreshToken') || '';
-    if (!refreshToken) {
-        logOut();
-        return;
-    }
     const headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'refresh-token': refreshToken
     };
+    const readable = Cookies.get('refreshToken') || '';
+    const sentHeader = Boolean(readable);
+    if (sentHeader) headers['refresh-token'] = readable;
     axios.post(apiHost + env.GENERATETOKEN_V2, { uid: id }, { headers }).then((result) => {
-        adoptRefreshCookie(result.data.refreshToken);
         resolve(result.data);
     }).catch((error) => {
         const data = error?.response?.data;
-        // Another tab exchanged this token first and its reply already updated the shared cookie.
-        if (data?.isRotated && !retried && (Cookies.get('refreshToken') || '') !== refreshToken) {
+        // Another tab exchanged this token first; the server's reuse grace covers the race.
+        if (data?.isRotated && !retried) {
             requestAuth(id, true).then(resolve, reject);
             return;
+        }
+        // Nothing to refresh with and the server has nothing to read: the session is gone.
+        if (!sentHeader && error?.response?.status === 400) {
+            logOut();
         }
         console.error('error', data);
         reject(data);
@@ -321,8 +315,6 @@ export function useAuth() {
         localStorage.removeItem("webTokens");
         localStorage.removeItem("updateToken");
         localStorage.removeItem('logged');
-        Cookies.remove('refreshToken');
-        Cookies.remove('accessToken');
         try { offline.clearOffline(); } catch (e) { /* offline cleanup best-effort */ }
         if(value?.withOutRefresh !== true){
             window.location.reload();
@@ -331,7 +323,6 @@ export function useAuth() {
 
     async function logOut(data) {
         try {
-            const refreshToken = Cookies.get('refreshToken') || '';
             const userId = localStorage.getItem('userId') || '';
             
             const cleanup = async (value) => {
@@ -342,7 +333,7 @@ export function useAuth() {
                 removeLocalValue(value);
             };
     
-            if (userId && refreshToken && data?.islogOut === true) {
+            if (userId && data?.islogOut === true) {
                 try {
                     await apiRequestWithoutCompnay("post", env.LOGOUT, { id: userId });
                 } catch (error) {

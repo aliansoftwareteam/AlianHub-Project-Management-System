@@ -201,7 +201,6 @@ import { ref, inject, computed, onMounted, reactive } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
-import Cookies from "js-cookie";
 import * as env from "@/config/env";
 import timeZoneOption from "./timezoneArray.js";
 import languageOptions from "@/utils/languagesName.json";
@@ -228,7 +227,6 @@ const { selectedLanguageCode, changeLanguage } = languageTranslateHelper();
 const userId = inject("$userId");
 
 const DEFAULT_HOURS = { days: [1, 2, 3, 4, 5], start: "09:30", end: "18:00", capacity: 8 };
-const TOKEN_TAIL = 6;
 
 const isSpinner = ref(false);
 const savedAt = ref(0);
@@ -371,15 +369,12 @@ async function saveChanges() {
     }
 }
 
-const myTokenTail = () => (Cookies.get("refreshToken") || "").slice(-TOKEN_TAIL);
-
 async function loadSessions() {
     sessionsLoading.value = true;
     sessionsError.value = "";
     try {
         const res = await apiRequestWithoutCompnay("get", env.USER_SESSIONS);
-        const tail = myTokenTail();
-        sessions.value = (res?.data?.data || []).map((s) => ({ ...s, current: !!tail && s.tokenTail === tail }));
+        sessions.value = (res?.data?.data || []).map((s) => ({ ...s, current: s.current === true }));
     } catch (error) {
         sessionsError.value = error?.response?.data?.message || t("Settings.sessions_error");
     } finally {

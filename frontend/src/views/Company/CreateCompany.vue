@@ -160,8 +160,7 @@ const openExistingCompany = (cid) => {
 onMounted(async () => {
     try {
         const localUserId = localStorage.getItem("userId");
-        const token = Cookies.get("accessToken") || "";
-        if (companyId.value && token && openExistingCompany(companyId.value)) return;
+        if (companyId.value && localUserId && openExistingCompany(companyId.value)) return;
         if (!localUserId) { router.push({ name: "Log-in" }); return; }
         userId.value = localUserId;
         const result = await apiRequestWithoutCompnay("get", `${env.USER_UPATE}/${userId.value}`).catch(() => null);

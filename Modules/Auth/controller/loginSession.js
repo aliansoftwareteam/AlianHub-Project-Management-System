@@ -6,6 +6,7 @@ const logger = require("../../../Config/loggerConfig");
 const serviceCtr = require("../../serviceFunction.js")
 const sendMail = require("../../service.js");
 const { removeCacheAndCookie } = require("../../../Config/jwt.js");
+const { readCookie, clearOptions, httpOnlyCookies } = require("../../../Config/cookies");
 const helperCtr = require("../helper.js");
 const sesstionCtr = require("../session.js");
 const refreshSession = require("../helpers/refreshSession");
@@ -100,12 +101,9 @@ const finalizeSession = async (req, res, uid, next, onSuccess) => {
                 next();
                 return;
             }
-            // TODO(P1-SEC-09): see matching comment near login.
-            // Set httpOnly: true once the frontend no longer
-            // reads these cookies with js-cookie.
             const setCookie = {
                 maxAge: serviceCtr.convertToSeconds(process.env.JWT_EXP)*1000,
-                httpOnly: false,
+                httpOnly: httpOnlyCookies(),
                 secure: config.NODE_ENV === "production",
                 sameSite: config.NODE_ENV === "production" ? "Strict" : "Lax",
                 domain: process.env.NODE_ENV === "production" ? req.hostname : undefined,
@@ -281,13 +279,13 @@ const refuseRefresh = (res, reason) => {
             isRotated: true
         });
     }
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    res.clearCookie('accessToken', clearOptions(res.req));
+    res.clearCookie('refreshToken', clearOptions(res.req));
     return res.status(400).json({ message: "Your session is expired", isLogout: true });
 };
 
 exports.generateTokenV2 = async (req, res) => {
-    const refreshToken = req.headers['refresh-token'] || "";
+    const refreshToken = req.headers['refresh-token'] || readCookie(req, 'refreshToken') || "";
     if (!refreshToken) {
         res.status(400).json({
             status: false,
@@ -307,9 +305,8 @@ exports.generateTokenV2 = async (req, res) => {
                 res.status(400).json(gData);
                 return;
             }
-            // Not httpOnly: the frontend still reads both cookies with js-cookie (P1-SEC-09).
             const setCookie = {
-                httpOnly: false,
+                httpOnly: httpOnlyCookies(),
                 secure: config.NODE_ENV === "production",
                 sameSite: config.NODE_ENV === "production" ? "Strict" : "Lax",
                 domain: process.env.NODE_ENV === "production" ? req.hostname : undefined

@@ -813,6 +813,10 @@
     "description": "Idle time after which a login session expires.",
     "default": "172800"
   },
+  "SESSION_COOKIE_HTTPONLY": {
+    "group": "auth",
+    "description": "Set to on to mark the session cookies httpOnly so page JavaScript can no longer read them: the server reads the access token from the cookie when no Authorization header is sent, the socket handshake and the refresh endpoint do the same, and the web app authenticates by cookie instead of copying tokens into headers. Tracker, CLI and API-token clients are unaffected (they send headers and bodies, never cookies). Unset or off keeps readable cookies as before."
+  },
   "SOCKETIO_ADMIN_PASSWORD_HASH": {
     "group": "security",
     "description": "bcrypt hash of the Socket.IO admin UI password; the UI stays off while unset.",

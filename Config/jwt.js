@@ -10,6 +10,7 @@ const {myCache} = require('./config');
 const { looksLikeToken, hasScope } = require('../Modules/ApiTokens/helpers/apiTokenRules');
 const { bearerRefusal } = require('../Modules/ApiTokens/helpers/bearerRules');
 const { sessionTokenQuery, readAccessSession, sessionCacheKey } = require('../Modules/Auth/helpers/refreshTokenRules');
+const { readCookie, clearOptions } = require('./cookies');
 
 // Mongo ObjectId pattern — used to reject regex/control characters in the
 // `companyid` request header before any token-membership check.
@@ -199,14 +200,22 @@ const generateJWTToken = (obj) => {
     });
 };
 
+/* The presented access token: an explicit header wins, the session cookie fills
+ * in when the client sent none (the web app after the httpOnly migration). */
+const bearerFrom = (req) => {
+    let token = req.headers['x-access-token'] || req.headers['authorization'];
+    if (token && token.startsWith('Bearer ')) token = token.slice(7);
+    return token || readCookie(req, 'accessToken') || '';
+};
+
 const removeCacheAndCookie = (key, cacheKey, res, refreshToken) => {
     if (key === "accessToken") {
-        res.clearCookie('accessToken');
+        res.clearCookie('accessToken', clearOptions(res.req));
         return;
     }
     myCache.del(cacheKey);
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    res.clearCookie('accessToken', clearOptions(res.req));
+    res.clearCookie('refreshToken', clearOptions(res.req));
     if (typeof refreshToken === 'string' && refreshToken) {
         let obj = {
             type: dbCollections.SESSIONS,
@@ -235,8 +244,8 @@ const refuseForRefresh = (res) => res.status(401).json({
 });
 
 const refuseSession = (res, error, statusText = 'Unauthorized') => {
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    res.clearCookie('accessToken', clearOptions(res.req));
+    res.clearCookie('refreshToken', clearOptions(res.req));
     return res.status(401).json({
         status: false,
         error,
@@ -300,7 +309,7 @@ const checkToken = async (isValid, req, res, next) => {
     if (session.ok) return next();
     if (session.reason === 'legacy' || session.reason === 'rotated') return refuseForRefresh(res);
     if (session.reason === 'invalid') {
-        res.clearCookie('accessToken');
+        res.clearCookie('accessToken', clearOptions(req));
         return res.status(401).json({
             status: false,
             error: "Your session is expired",
@@ -393,7 +402,7 @@ const verifyJWTTokenWithC = async (req, res, next) => {
 }
 
 const verifyJWTTokenWithCV2 = async (req, res, next) => {
-    let token = req.headers['x-access-token'] || req.headers['authorization']; // Express headers are auto converted to lowercase
+    let token = bearerFrom(req);
     const companyId = req.headers['companyid'] || "";
     if (!companyId) {
         return res.status(401).json({
@@ -428,7 +437,7 @@ const verifyJWTTokenWithCV2 = async (req, res, next) => {
             }
             const isValid = jwt.verify(token, process.env.JWT_SECRET);
             if (!isCompanyInAudience(isValid.aud, companyId)) {
-                res.clearCookie('accessToken');
+                res.clearCookie('accessToken', clearOptions(req));
                 return res.status(401).json({
                     status: false,
                     error: 'Unauthorized',
@@ -440,7 +449,7 @@ const verifyJWTTokenWithCV2 = async (req, res, next) => {
             // BUG-013 / #67 fix: live membership re-check (cached).
             const isMember = await verifyCompanyMembership(isValid.uid, companyId);
             if (!isMember) {
-                res.clearCookie('accessToken');
+                res.clearCookie('accessToken', clearOptions(req));
                 return res.status(403).json({
                     status: false,
                     error: 'You are no longer a member of this company',
@@ -452,7 +461,7 @@ const verifyJWTTokenWithCV2 = async (req, res, next) => {
 
             checkToken(isValid, req, res, next);
         } catch (error) {
-            res.clearCookie('accessToken');
+            res.clearCookie('accessToken', clearOptions(req));
             return res.status(401).json({
                 status: false,
                 error: 'Unauthorized',
@@ -514,7 +523,7 @@ const verifyJWTToken = (req, res, next) => {
 }
 
 const verifyJWTTokenV2 = (req, res, next) => {
-    let token = req.headers['x-access-token'] || req.headers['authorization']; // Express headers are auto converted to lowercase
+    let token = bearerFrom(req);
     
     if (token) {
         if (token.startsWith('Bearer ')) {
@@ -544,7 +553,7 @@ const verifyJWTTokenV2 = (req, res, next) => {
             const isValid = jwt.verify(token, process.env.JWT_SECRET);
             checkToken(isValid, req, res, next);
         } catch (error) {
-            res.clearCookie('accessToken');
+            res.clearCookie('accessToken', clearOptions(req));
             return res.status(401).json({
                 status: false,
                 error: error.message,
