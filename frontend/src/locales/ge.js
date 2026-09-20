@@ -8616,5 +8616,27 @@ export default {
         "confirm_revoke": "Revoke {name}? Anything that uses it stops working at once, and it cannot be undone.",
         "rotated_toast": "{name} rotated.",
         "revoked_toast": "{name} revoked."
+    },
+    "ProviderKeys": {
+        "title": "Workspace provider keys",
+        "lead": "Each provider bills this workspace's own key while one is set, or the instance key otherwise. A value is never shown; set it again to replace it, or clear it to go back to the instance key.",
+        "loading": "Loading…",
+        "load_failed": "Could not load provider keys.",
+        "flag_off": "Workspace provider keys are off for this install, so every call bills the instance key.",
+        "resolved": "last used {when}",
+        "never": "Never",
+        "status_instance": "Instance key",
+        "status_stale": "Needs attention",
+        "set": "Set",
+        "replace": "Replace",
+        "clear": "Clear",
+        "save": "Save key",
+        "cancel": "Cancel",
+        "new_value": "New {name} key",
+        "new_value_ph": "Paste the provider key",
+        "err_value": "A key value is required.",
+        "confirm_clear": "Clear the {name} key? Calls bill the instance key again.",
+        "saved_toast": "{name} key saved.",
+        "cleared_toast": "{name} key cleared."
     }
 };

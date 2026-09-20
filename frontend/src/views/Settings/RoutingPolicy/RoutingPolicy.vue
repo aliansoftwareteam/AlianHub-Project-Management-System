@@ -45,6 +45,7 @@
                     </div>
                 </template>
             </section>
+            <ProviderKeys />
         </div>
     </div>
 </template>
@@ -55,6 +56,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import ProviderKeys from "./ProviderKeys.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { reasonOf } from "@/views/Ai/useAgents";

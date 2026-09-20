@@ -5,6 +5,7 @@ const runner = require('./runner');
 const { createInlineDriver } = require('./queue');
 const { createAgendaDriver } = require('./queue/agendaDriver');
 const workflows = require('../../Workflows');
+const providerContext = require('../../AICore/providerContext');
 
 // Wires the five stages together: ingest (the bus) → match → enqueue → execute → record.
 //
@@ -112,11 +113,13 @@ async function start() {
     driver.define(JOB_NAME, async (job) => {
         const { companyId, runId, ruleId, workflowRunId } = job.attrs.data || {};
         const keepAlive = typeof job.touch === 'function' ? () => job.touch() : null;
-        if (workflowRunId && workflows.enabled()) {
-            await workflows.tick(companyId, workflowRunId, { enqueue: enqueueRun, context: { keepAlive } });
-            return;
-        }
-        await runner.execute({ companyId, runId, ruleId, enqueue: enqueueRun, keepAlive });
+        await providerContext.run({ companyId }, async () => {
+            if (workflowRunId && workflows.enabled()) {
+                await workflows.tick(companyId, workflowRunId, { enqueue: enqueueRun, context: { keepAlive } });
+                return;
+            }
+            await runner.execute({ companyId, runId, ruleId, enqueue: enqueueRun, keepAlive });
+        });
     });
     await driver.start();
     domainEventBus.bus.on('domain.event', dispatch);

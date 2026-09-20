@@ -1958,6 +1958,12 @@ const schema = {
             type: Object,
             required: false
         },
+        // { <provider>: 'sec_…' } — per-workspace LLM API keys by secrets-store handle
+        // (Modules/AICore/providerKeys.js); read only while TENANT_PROVIDER_KEYS is on
+        aiProviderKeys: {
+            type: Object,
+            required: false
+        },
         // { mode: 'on' | 'off' } — read by Modules/Knowledge/flag.js while KNOWLEDGE_RETRIEVAL is
         // "tenant" or "all"; absent is off under "tenant". An Object, not a nested path: a nested
         // path makes the company document a getter node-cache cannot clone, and every company read fails.
