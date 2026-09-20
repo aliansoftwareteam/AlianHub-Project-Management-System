@@ -2,7 +2,7 @@
 
 Updated 2026-09-20. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (2e186c56, `14.36.0-beta.236`)
+## State of `beta` (7cb35c2a, `14.36.0-beta.244`)
 
 - **Sprints 7 and 8 run in parallel** (tasks 030 and 031). Each `task.md` holds the slice plan in merge order, the ownership split between the two sprints, and every owner decision; each `progress.md` ticks the merged slices with their build numbers.
   - **Sprint 7 merged:** slices 0 (#735, build 210), 1 (#739, 215), 9 (#742, 217), 5 (#746, 220), 2 (#745, 221), 3 (#747, 223) and 6 (#761, 229). Ask applies the private-sprint rule; the retrieval interface, the chunk store and pages, comments, transcripts and workspace pages sit behind `KNOWLEDGE_RETRIEVAL` and `KNOWLEDGE_INDEXER`, both off by default; embeddings and hybrid search run only for a workspace whose mode is `hybrid` and need an OpenAI key; `performance.read` sits behind `AGENT_PERFORMANCE_READ`, off.
@@ -21,10 +21,10 @@ Updated 2026-09-20. Read this first, then `Tasks/index.md`. Overwrite this file 
 
 ## Next up
 
-1. **Merge the two remaining in-flight slices**, each after an independent review: Sprint 8 slice 12 (CSP) and Sprint 7 slice 4 (files and guides). Slices 8, 9 and 10 merged 2026-09-20 (#760 build 234, #759 build 235, #758 build 236) after an independent review found no blocking defects; every slice this week that changed who may see or do what had real defects found by review after green CI (see "Things learned").
+1. **Merge the two remaining in-flight slices**, each after an independent review: Sprint 8 slice 12 (CSP) and Sprint 7 slice 4 (files and guides). Slices 8, 9 and 10 merged 2026-09-20 (#760 build 234, #759 build 235, #758 build 236) after an independent review found no blocking defects; every slice this week that changed who may see or do what had real defects found by review after green CI (see "Things learned"). #773 (follow-up 74 parts a+b: merge/convert destination judgment, run-due role gate) is implemented, green and awaiting its independent review — merge it after review, then close item 74.
 2. **Owner decisions still open:** a maximum token lifetime (Sprint 8); the older follow-ups 32, 35, 37 and 56.
 3. **Owner writes the held-out question set** for Sprint 7 slice 11: about thirty real questions with their expected source, in the private notes folder.
-4. **Remaining follow-ups:** 14, 26, 55–64 and 65–71 and 73–83 in `Tasks/active/034-end-to-end-qa-programme/followups.md`. Item 72 fixed by #766 (build 238).
+4. **Remaining follow-ups:** 14, 32, 35, 37, 56, 57, 59, 64, 69, 75, 76 (partly), 78, 79, 80, 81 in `Tasks/active/034-end-to-end-qa-programme/followups.md`. Closed 2026-09-20: 16, 17, 26, 55, 58, 60–63, 65–68, 70, 72, 73, 74 (parts c+d) and 82 (#766, #768–#772, builds 238–244). Item 74 parts a+b are implemented in #773, green, open for independent review.
 5. **Owner checks still open:** the sweeps listed in follow-ups 77 and 83 (Ask's panel, the tokens screen under strict, the audit log's integrity states, the Enforcement tab, the token-expiry list, the run view's outside-content mark); the Sprint 5 workflow screens (task 028); Stats and Upgrade and the Docker label (task 033); the `/ai` and trust-layer member sweeps (014, 016); the day-to-day screens at 1280 and 800 px (013); every new interface row as it lands (now also: the Egress tab, the step-scoped credentials card, the stored-secrets list).
 6. **Owner actions — an agent cannot do these:** Sprint 6's end-to-end skill run (needs `AI_API_KEY`) and its browser sweeps; the quota recompute; the duplicate migration 021 decision; rotating the two API keys named in the owner's local notes; `AI_API_KEY` is empty in `.env`.
 
@@ -38,6 +38,8 @@ Updated 2026-09-20. Read this first, then `Tasks/index.md`. Overwrite this file 
 
 - **Review every PR that changes access, then re-review the fixes.** This week every such PR had defects after green CI: #740 (ids compared by case), #743 (two refusals enforce would have added), #744 (MCP reads ignoring the read scope), #745 (five result-loss bugs), #746 (a time-zone window), #747 (a full-collection scan on every task move), #749 (id shapes the guard skipped), #750 (five defects, then more in the fixes; three rounds). Ask reviewers to prove each rule's test fails without the rule, and re-review the fix round, not only the first version.
 - **Agents stop while their own runs are still going, and can stall outright.** Brief them to run `gh pr checks --watch` in the foreground and not end the turn before it finishes. If one stops anyway, read its worktree and scratchpad logs, watch the run yourself, then resume it with `SendMessage`. If it stalls (no progress for ten minutes), start a fresh agent on the same worktree rather than reviving it.
+- **Agents share one scratchpad: prompts must require a unique file prefix** (follow-up 26) so parallel agents stop overwriting each other's `pr-body.md`.
+- **A unit spec that transitively requires `Modules/Sprints/controller.js` fails to parse** (`private` as a parameter name is fine in sloppy Node but not under jest's parser). Mock `../Modules/Sprints/controller` (and MainChats) like `role-catalogue.test.js` does; set `STORAGE_TYPE=server` before anything reaches `task_class_Mongo`.
 - **A new frontend alias onto a backend module needs a `COPY` line in the Dockerfile's frontend stage**; `tests/conventions/docker-frontend-aliases.test.js` fails without it (#762). Any open PR that adds such an alias must add its line after merging `beta`.
 - **Trace call sites before claiming what the web app sends.** A grep hit is not a caller: `git grep -E` has no `\s`, and a field set on an object is not proof the object is sent.
 - **A commit subject over 100 characters fails commitlint and cannot be fixed on a pushed branch without a force-push.** Brief agents to keep subjects at 100 characters or fewer; if it happens, move the identical commits to a new branch and PR and close the old one.
