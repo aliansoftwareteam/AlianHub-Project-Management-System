@@ -66,7 +66,9 @@ const verifyCompanyMembership = async (uid, companyId) => {
         };
         const resData = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, 'findOne');
         const isMember = !!(resData && resData._id);
-        myCache.set(cacheKey, isMember, getMembershipCacheTtlSeconds());
+        const ttl = getMembershipCacheTtlSeconds();
+        // node-cache keeps a value set with a TTL of 0 forever.
+        if (ttl > 0) myCache.set(cacheKey, isMember, ttl);
         return isMember;
     } catch (error) {
         logger.error(`verifyCompanyMembership error for uid=${uid} companyId=${companyId}: ${error.message || error}`);

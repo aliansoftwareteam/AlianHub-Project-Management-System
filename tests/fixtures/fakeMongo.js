@@ -2,7 +2,7 @@
 // language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type/$size, $set/$inc/$push/$addToSet/$pull,
 // conditional findOneAndUpdate, updateOne and findOneAndUpdate with upsert and $setOnInsert, findOneAndDelete, deleteOne, deleteMany,
 // sort/limit on find, $match/$project/$addFields ($toString)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
-// reject a duplicate save or upsert with E11000) so a test can assert on what was written.
+// reject a duplicate save or upsert with E11000, declared text indexes that bound $text to their fields) so a test can assert on what was written.
 
 let seq = 1;
 const nextId = () => String(seq++).padStart(24, '0');
@@ -13,22 +13,27 @@ const read = (doc, key) => key.split('.').reduce((v, k) => (v == null ? undefine
 
 const words = (s) => String(s == null ? '' : s).toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
 
-/* No stemming, stop words or score: a row matches when any searched word is a word of one of its string fields. */
-const textMatches = (doc, search) => {
-    const have = new Set(Object.values(doc).filter((v) => typeof v === 'string').flatMap(words));
+/* No stemming, stop words or score: a row matches when any searched word is a word of one of its string fields.
+ * With declared text fields only those are read, the way MongoDB searches the text index and nothing else. */
+const textStrings = (doc, fields) => (Array.isArray(fields) && fields.length
+    ? fields.map((field) => read(doc, field)).filter((v) => typeof v === 'string')
+    : Object.values(doc).filter((v) => typeof v === 'string'));
+
+const textMatches = (doc, search, fields) => {
+    const have = new Set(textStrings(doc, fields).flatMap(words));
     return words(search).some((w) => have.has(w));
 };
 
-/* How often the searched words occur in a row's string fields: enough to rank a row that repeats a word above one that says it once. */
-const textScoreOf = (doc, search) => {
+/* How often the searched words occur in a row's searched fields: enough to rank a row that repeats a word above one that says it once. */
+const textScoreOf = (doc, search, fields) => {
     const wanted = new Set(words(search));
-    return Object.values(doc).filter((v) => typeof v === 'string').flatMap(words).filter((w) => wanted.has(w)).length;
+    return textStrings(doc, fields).flatMap(words).filter((w) => wanted.has(w)).length;
 };
 
-const matches = (doc, filter = {}) => Object.entries(filter).every(([key, cond]) => {
-    if (key === '$or') return cond.some((f) => matches(doc, f));
-    if (key === '$and') return cond.every((f) => matches(doc, f));
-    if (key === '$text') return textMatches(doc, cond.$search);
+const matches = (doc, filter = {}, textFields) => Object.entries(filter).every(([key, cond]) => {
+    if (key === '$or') return cond.some((f) => matches(doc, f, textFields));
+    if (key === '$and') return cond.every((f) => matches(doc, f, textFields));
+    if (key === '$text') return textMatches(doc, cond.$search, textFields);
     const raw = read(doc, key);
     const value = raw === undefined ? undefined : (raw instanceof Date ? raw.getTime() : (key === '_id' ? String(raw) : hex(raw)));
     if (cond instanceof RegExp) return cond.test(String(value));
@@ -139,16 +144,16 @@ const group = (docs, spec) => {
     return [...out.values()];
 };
 
-const computed = (doc, value, search) => {
-    if (value && typeof value === 'object' && value.$meta === 'textScore') return textScoreOf(doc, search);
+const computed = (doc, value, search, textFields) => {
+    if (value && typeof value === 'object' && value.$meta === 'textScore') return textScoreOf(doc, search, textFields);
     if (value && typeof value === 'object' && value.$toString !== undefined) return String(hex(fieldOf(doc, value.$toString)));
     return fieldOf(doc, value);
 };
 
-const project = (doc, spec, search) => {
+const project = (doc, spec, search, textFields) => {
     const out = spec._id === 0 ? {} : { _id: doc._id };
     Object.entries(spec).filter(([key]) => key !== '_id').forEach(([key, value]) => {
-        const kept = value === 1 || value === true ? read(doc, key) : computed(doc, value, search);
+        const kept = value === 1 || value === true ? read(doc, key) : computed(doc, value, search, textFields);
         if (kept !== undefined) write(out, key, (target, last) => { target[last] = kept; });
     });
     return out;
@@ -161,6 +166,7 @@ const create = ({ mongooseCasting = false } = {}) => {
     const store = {};
     const calls = [];
     const uniques = {};
+    const texts = {};
     const rows = (type) => { store[type] = store[type] || []; return store[type]; };
     const clone = (d) => (d ? { ...d } : d);
     const covered = (index, doc) => (index.partial ? matches(doc, index.partial) : true);
@@ -182,6 +188,7 @@ const create = ({ mongooseCasting = false } = {}) => {
     const crud = jest.fn(async (companyId, { type, data: sent }, method) => {
         calls.push({ companyId, type, method, data: sent });
         const data = Array.isArray(sent) && method !== 'aggregate' ? [castFilter(sent[0]), ...sent.slice(1)] : sent;
+        const textFields = texts[type];
         const list = rows(type);
         if (method === 'save') {
             const doc = { _id: data._id ? String(data._id) : nextId(), createdAt: new Date(), ...data };
@@ -190,36 +197,36 @@ const create = ({ mongooseCasting = false } = {}) => {
             list.push(doc);
             return clone(doc);
         }
-        if (method === 'find') return ordered(list.filter((d) => matches(d, data[0])), data[2]).map(clone);
-        if (method === 'findOne') return clone(list.find((d) => matches(d, data[0])) || null);
-        if (method === 'countDocuments') return list.filter((d) => matches(d, data[0])).length;
-        if (method === 'deleteOne') { const index = list.findIndex((d) => matches(d, data[0])); if (index !== -1) list.splice(index, 1); return { deletedCount: index === -1 ? 0 : 1 }; }
-        if (method === 'deleteMany') { const kept = list.filter((d) => !matches(d, data[0])); store[type] = kept; return { deletedCount: list.length - kept.length }; }
+        if (method === 'find') return ordered(list.filter((d) => matches(d, data[0], textFields)), data[2]).map(clone);
+        if (method === 'findOne') return clone(list.find((d) => matches(d, data[0], textFields)) || null);
+        if (method === 'countDocuments') return list.filter((d) => matches(d, data[0], textFields)).length;
+        if (method === 'deleteOne') { const index = list.findIndex((d) => matches(d, data[0], textFields)); if (index !== -1) list.splice(index, 1); return { deletedCount: index === -1 ? 0 : 1 }; }
+        if (method === 'deleteMany') { const kept = list.filter((d) => !matches(d, data[0], textFields)); store[type] = kept; return { deletedCount: list.length - kept.length }; }
         if (method === 'findOneAndUpdate') {
-            const doc = list.find((d) => matches(d, data[0]));
+            const doc = list.find((d) => matches(d, data[0], textFields));
             if (doc) { apply(doc, data[1]); return clone(doc); }
             return data[2] && data[2].upsert ? clone(insertUpserted(type, data[0], data[1])) : null;
         }
         if (method === 'updateOne') {
-            const doc = list.find((d) => matches(d, data[0]));
+            const doc = list.find((d) => matches(d, data[0], textFields));
             if (doc) { apply(doc, data[1]); return { matchedCount: 1, modifiedCount: 1 }; }
             if (!(data[2] && data[2].upsert)) return { matchedCount: 0, modifiedCount: 0 };
             const inserted = insertUpserted(type, data[0], data[1]);
             return { matchedCount: 0, modifiedCount: 0, upsertedCount: 1, upsertedId: inserted._id };
         }
-        if (method === 'updateMany') { const hit = list.filter((d) => matches(d, data[0])); hit.forEach((d) => apply(d, data[1])); return { modifiedCount: hit.length }; }
-        if (method === 'findOneAndDelete') { const at = list.findIndex((d) => matches(d, data[0])); return at === -1 ? null : clone(list.splice(at, 1)[0]); }
-        if (method === 'deleteOne') { const at = list.findIndex((d) => matches(d, data[0])); if (at !== -1) list.splice(at, 1); return { deletedCount: at === -1 ? 0 : 1 }; }
+        if (method === 'updateMany') { const hit = list.filter((d) => matches(d, data[0], textFields)); hit.forEach((d) => apply(d, data[1])); return { modifiedCount: hit.length }; }
+        if (method === 'findOneAndDelete') { const at = list.findIndex((d) => matches(d, data[0], textFields)); return at === -1 ? null : clone(list.splice(at, 1)[0]); }
+        if (method === 'deleteOne') { const at = list.findIndex((d) => matches(d, data[0], textFields)); if (at !== -1) list.splice(at, 1); return { deletedCount: at === -1 ? 0 : 1 }; }
         if (method === 'aggregate') {
             const [pipeline] = data;
             let search = '';
             const run = (input, stages) => stages.reduce((docs, stage) => {
                 if (stage.$match) {
                     if (stage.$match.$text) search = stage.$match.$text.$search;
-                    return docs.filter((d) => matches(d, stage.$match));
+                    return docs.filter((d) => matches(d, stage.$match, textFields));
                 }
-                if (stage.$project) return docs.map((d) => project(d, stage.$project, search));
-                if (stage.$addFields) return docs.map((d) => ({ ...d, ...Object.fromEntries(Object.entries(stage.$addFields).map(([k, v]) => [k, computed(d, v, search)])) }));
+                if (stage.$project) return docs.map((d) => project(d, stage.$project, search, textFields));
+                if (stage.$addFields) return docs.map((d) => ({ ...d, ...Object.fromEntries(Object.entries(stage.$addFields).map(([k, v]) => [k, computed(d, v, search, textFields)])) }));
                 if (stage.$replaceRoot) return docs.map((d) => ({ ...fieldOf(d, stage.$replaceRoot.newRoot) }));
                 if (stage.$group) return group(docs, stage.$group);
                 if (stage.$sort) return ordered(docs, { sort: stage.$sort });
@@ -246,7 +253,15 @@ const create = ({ mongooseCasting = false } = {}) => {
         schema.indexes().forEach(([fields, options]) => { if (options && options.unique) unique(type, Object.keys(fields), options.partialFilterExpression); });
     };
 
-    return { crud, store, calls, unique, uniqueFromSchema, seed: (type, doc) => { const d = { _id: nextId(), ...doc }; rows(type).push(d); return d; } };
+    /* Mirror a collection's text index so $text searches its fields and no others, as MongoDB does. */
+    const textFromSchema = (type, schema) => {
+        schema.indexes().forEach(([fields]) => {
+            const text = Object.keys(fields || {}).filter((field) => fields[field] === 'text');
+            if (text.length) texts[type] = [...new Set([...(texts[type] || []), ...text])];
+        });
+    };
+
+    return { crud, store, calls, unique, uniqueFromSchema, textFromSchema, seed: (type, doc) => { const d = { _id: nextId(), ...doc }; rows(type).push(d); return d; } };
 };
 
 module.exports = { create, matches };

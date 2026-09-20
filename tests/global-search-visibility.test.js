@@ -6,6 +6,7 @@ jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(), isPrivil
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn() }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
+const { taskSchema, projectsSchema, commentSchema, pagesSchema } = require('../utils/mongo-handler/createSchema');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
 const { getRoleType } = require('../Config/permissionGuard');
 const { globalSearch } = require('../Modules/GlobalSearch/controller');
@@ -39,6 +40,11 @@ beforeEach(() => {
     jest.clearAllMocks();
     getRoleType.mockResolvedValue(3);
     visibleProjectIds.mockResolvedValue([MINE]);
+
+    mockDb.textFromSchema(SCHEMA_TYPE.TASKS, taskSchema);
+    mockDb.textFromSchema(SCHEMA_TYPE.PROJECTS, projectsSchema);
+    mockDb.textFromSchema(SCHEMA_TYPE.COMMENTS, commentSchema);
+    mockDb.textFromSchema(SCHEMA_TYPE.PAGES, pagesSchema);
 
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: MINE, ProjectName: 'Budget ops', deletedStatusKey: 0 });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: THEIRS, ProjectName: 'Budget board', deletedStatusKey: 0 });
