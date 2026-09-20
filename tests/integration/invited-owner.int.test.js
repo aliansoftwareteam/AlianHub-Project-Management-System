@@ -11,6 +11,12 @@ let client;
 let ownerSession;
 let originalOwnerId;
 
+/* Every owner this suite makes. The company-owner pointer is restored in
+ * afterAll, but these company_users rows keep roleType 1 until they are
+ * demoted: while one exists the harness owner is not the last owner, so a
+ * suite running later (instance-fixes) can delete them (follow-up 72). */
+const createdOwnerEmails = [];
+
 const owner = async () => {
     if (!ownerSession) ownerSession = await loginAs('owner');
     return ownerSession;
@@ -67,17 +73,32 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    if (client) {
-        if (originalOwnerId) {
-            await companies().updateOne({ _id: new ObjectId(state.companyId) }, { $set: { userId: new ObjectId(originalOwnerId) } });
+    if (!client) return;
+    try {
+        const { api } = await owner();
+        for (const email of createdOwnerEmails) {
+            const row = await companyUsers().findOne({ userEmail: String(email).toLowerCase() });
+            if (row && Number(row.roleType) === ROLE_OWNER) {
+                const demoted = await api.put('/api/v1/members', { id: String(row._id), data: { roleType: 3 } });
+                if (!demoted.body || demoted.body.status !== true) {
+                    throw new Error(`could not demote ${email}: ${demoted.status} ${JSON.stringify(demoted.body).slice(0, 200)}`);
+                }
+            }
         }
-        await client.close();
+    } finally {
+        if (client) {
+            if (originalOwnerId) {
+                await companies().updateOne({ _id: new ObjectId(state.companyId) }, { $set: { userId: new ObjectId(originalOwnerId) } });
+            }
+            await client.close();
+        }
     }
 });
 
 describe('QA-47 an invited owner is recorded as the company owner however they accept', () => {
     it('records the owner when an existing account accepts through /verify-invitation', async () => {
         const email = `invited.owner.verify.${uniqueSuffix()}@e2e.alianhub.test`;
+        createdOwnerEmails.push(email);
         const created = await anonymous.post('/api/v2/createUser', {
             firstName: 'Vera', lastName: 'Verify', email, password: state.password,
         });
@@ -101,6 +122,7 @@ describe('QA-47 an invited owner is recorded as the company owner however they a
     ])('records the owner when they sign up through %s', async (path, idField) => {
         const suffix = uniqueSuffix();
         const email = `invited.owner.${idField.toLowerCase()}.${suffix}@e2e.alianhub.test`;
+        createdOwnerEmails.push(email);
         const row = await inviteOwner(email);
 
         const signup = await anonymous.post(path, {
