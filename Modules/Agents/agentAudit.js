@@ -233,7 +233,7 @@ const markUndone = async (companyId, auditId, byActorId) => {
     const r = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AUDIT_LOGS,
         data: [unchained(filter), { $set }],
-    }, 'updateOne').catch((e) => { logger.error(`markUndone: ${e.message}`); return null; });
+    }, 'updateOne').catch((e) => { logger.error(`markUndone: ${e.message}`); throw e; });
     if (!r || r.matchedCount > 0 || r.modifiedCount > 0) return undefined;
     return appendUndone();
 };
