@@ -1,5 +1,6 @@
 const axios = require('axios');
 const config = require('../../../Config/config');
+const { apiKeyFor } = require('../providerKeys');
 const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
 const { fromOpenAiCompatible, noEmbeddings } = require('../providerError');
 const { normaliseRequest, STRUCTURED_OUTPUT } = require('./normalise');
@@ -113,7 +114,7 @@ const deepseekProvider = {
         try {
             response = await axios.post(chatUrl, body, {
                 headers: {
-                    Authorization: `Bearer ${config.DEEPSEEK_API_KEY}`,
+                    Authorization: `Bearer ${await apiKeyFor('deepseek')}`,
                     'Content-Type': 'application/json',
                 },
                 timeout: timeoutMs,

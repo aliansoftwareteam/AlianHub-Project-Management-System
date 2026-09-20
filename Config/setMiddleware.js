@@ -1,4 +1,5 @@
 const jwt = require('./jwt');
+const providerContext = require('../Modules/AICore/providerContext');
 const verifyJWTTokenWithCRoute = [
     "/api/v1/verifyToken",
     "/api/v1/createproject",
@@ -343,6 +344,8 @@ const verifyJWTTokenWithCRoute = [
     '/api/v2/webhooks',
     // Workspace secrets by handle (Modules/Secrets): owner or admin only, never an API token; metadata only.
     '/api/v2/secrets',
+    // Workspace provider keys by handle (Modules/ProviderKeys): owner or admin only, never an API token; metadata only.
+    '/api/v2/provider-keys',
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",
@@ -411,6 +414,10 @@ const verifyJWTToken = [
  */
 exports.setMiddlewareWithCV2 = (app) => {
     app.use(verifyJWTTokenWithCRoute, jwt.verifyJWTTokenWithCV2)
+    // Runs the rest of the request inside the verified tenant so model calls it
+    // triggers can resolve that workspace's own provider key. Unauthenticated
+    // requests run without one and read the instance keys, as before.
+    app.use(verifyJWTTokenWithCRoute, providerContext.middleware)
 };
 
 
@@ -424,4 +431,8 @@ exports.setMiddlewareV2 = (app) => {
     // (body/params/query/header), enforce it matches the JWT audience.
     // Routes without a companyId scope pass through unchanged.
     app.use(verifyJWTToken, jwt.requireCompanyAud)
+    // Runs the rest of the request inside the verified tenant so model calls it
+    // triggers can resolve that workspace's own provider key. Unauthenticated
+    // requests run without one and read the instance keys, as before.
+    app.use(verifyJWTToken, providerContext.middleware)
 };

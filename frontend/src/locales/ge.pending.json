@@ -1,7 +1,7 @@
 {
   "locale": "ge",
   "machineTranslated": false,
-  "updatedAt": "2026-09-19T04:01:39.295Z",
+  "updatedAt": "2026-09-20T10:51:24.202Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6220,6 +6220,26 @@
     "settingslider.SCIM": "SCIM",
     "settingslider.SSO": "SSO",
     "settingslider.Time Off": "Time Off",
-    "settingslider.Two-Factor Authentication": "Two-Factor Authentication"
+    "settingslider.Two-Factor Authentication": "Two-Factor Authentication",
+    "ProviderKeys.title": "Workspace provider keys",
+    "ProviderKeys.lead": "Each provider bills this workspace's own key while one is set, or the instance key otherwise. A value is never shown; set it again to replace it, or clear it to go back to the instance key.",
+    "ProviderKeys.loading": "Loading…",
+    "ProviderKeys.load_failed": "Could not load provider keys.",
+    "ProviderKeys.flag_off": "Workspace provider keys are off for this install, so every call bills the instance key.",
+    "ProviderKeys.resolved": "last used {when}",
+    "ProviderKeys.never": "Never",
+    "ProviderKeys.status_instance": "Instance key",
+    "ProviderKeys.status_stale": "Needs attention",
+    "ProviderKeys.set": "Set",
+    "ProviderKeys.replace": "Replace",
+    "ProviderKeys.clear": "Clear",
+    "ProviderKeys.save": "Save key",
+    "ProviderKeys.cancel": "Cancel",
+    "ProviderKeys.new_value": "New {name} key",
+    "ProviderKeys.new_value_ph": "Paste the provider key",
+    "ProviderKeys.err_value": "A key value is required.",
+    "ProviderKeys.confirm_clear": "Clear the {name} key? Calls bill the instance key again.",
+    "ProviderKeys.saved_toast": "{name} key saved.",
+    "ProviderKeys.cleared_toast": "{name} key cleared."
   }
 }

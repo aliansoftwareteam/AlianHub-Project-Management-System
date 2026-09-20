@@ -1,5 +1,6 @@
 const axios = require('axios');
 const config = require('../../../Config/config');
+const { apiKeyFor } = require('../providerKeys');
 const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
 const { fromOpenAiCompatible, noEmbeddings } = require('../providerError');
 const { normaliseRequest, STRUCTURED_OUTPUT } = require('./normalise');
@@ -104,7 +105,7 @@ const openaiProvider = {
             let response;
             try {
                 response = await axios.post(embeddingsUrl(), { model, input }, {
-                    headers: { Authorization: `Bearer ${config.AI_API_KEY}`, 'Content-Type': 'application/json' },
+                    headers: { Authorization: `Bearer ${await apiKeyFor('openai')}`, 'Content-Type': 'application/json' },
                     timeout,
                 });
             } catch (error) {
@@ -156,7 +157,7 @@ const openaiProvider = {
         try {
             response = await axios.post(OPENAI_CHAT_URL, body, {
                 headers: {
-                    Authorization: `Bearer ${config.AI_API_KEY}`,
+                    Authorization: `Bearer ${await apiKeyFor('openai')}`,
                     'Content-Type': 'application/json',
                 },
                 timeout: timeoutMs,

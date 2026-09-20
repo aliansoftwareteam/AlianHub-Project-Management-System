@@ -844,6 +844,10 @@
     "required": true,
     "default": "wasabi"
   },
+  "TENANT_PROVIDER_KEYS": {
+    "group": "ai",
+    "description": "Set to on to let each workspace pay for model calls with its own provider keys: owners and admins set one key per provider under Settings, kept in the secrets store by handle with only the handle on the company row, and every model call and embedding run for that workspace is billed to its key, or to the instance key while none is set. A set key that will not open refuses the call rather than billing the instance owner. Needs SECRETS_STORE with SECRETS_KEY; unset or off keeps every call on the instance keys."
+  },
   "TRACKER_PKCE_LEGACY_UNTIL": {
     "group": "auth",
     "description": "ISO date from which desktop tracker builds that sign in without a PKCE verifier are refused. Unset (the default) keeps those builds working; an unparseable value reads as unset."

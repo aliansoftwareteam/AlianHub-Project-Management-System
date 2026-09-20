@@ -11,6 +11,7 @@ const agentRunner = require('./agentRun');
 const hop = require('./hop');
 const typed = require('./typed');
 const stepCredential = require('./stepCredential');
+const providerContext = require('../AICore/providerContext');
 const { serviceActor } = require('../Agents/actor');
 const { leaseMs, heartbeatMs } = require('./flag');
 
@@ -236,7 +237,7 @@ const finish = async (companyId, run, steps, blocked = null) => {
 /* Drives one run as far as it can go right now: the ready set, then whatever
  * that unblocked, until nothing is ready. A step that asked to come back later
  * schedules one more job for itself and nothing else. */
-const tick = async (companyId, runId, { enqueue = null, workerId = WORKER_ID, context = {}, maxSteps = 50 } = {}) => {
+const tickInner = async (companyId, runId, { enqueue = null, workerId = WORKER_ID, context = {}, maxSteps = 50 } = {}) => {
     const run = await store.getRun(companyId, runId);
     if (!run || !run._id) { logger.error(`${LOG_PREFIX} workflow run ${runId} vanished`); return { status: 'missing' }; }
     if (store.TERMINAL.includes(run.status)) return { status: run.status };
@@ -292,5 +293,7 @@ const tick = async (companyId, runId, { enqueue = null, workerId = WORKER_ID, co
 
     return { status: status || 'running', executed, retryInMs, ...(blocked ? { blocked } : {}) };
 };
+
+const tick = (companyId, runId, opts) => providerContext.run({ companyId }, () => tickInner(companyId, runId, opts));
 
 module.exports = { tick, runStep, finish, skipBlocked, failUnclaimed, WORKER_ID, CAPACITY_RETRY_MS, stepActor };

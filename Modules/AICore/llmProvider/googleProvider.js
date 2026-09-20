@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { apiKeyFor } = require('../providerKeys');
 const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
 const { fromGoogle, noEmbeddings } = require('../providerError');
 const { normaliseRequest, STRUCTURED_OUTPUT, JSON_ONLY_INSTRUCTION } = require('./normalise');
@@ -81,7 +82,7 @@ const googleProvider = {
         let response;
         try {
             response = await axios.post(url, body, {
-                headers: { 'x-goog-api-key': process.env.GOOGLE_API_KEY, 'Content-Type': 'application/json' },
+                headers: { 'x-goog-api-key': await apiKeyFor('google'), 'Content-Type': 'application/json' },
                 timeout: providerTimeoutMs('google', { reasoning: request.reasoning }),
             });
         } catch (error) {
