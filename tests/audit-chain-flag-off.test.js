@@ -96,7 +96,7 @@ describe('with AUDIT_CHAIN off and a key set', () => {
         expect(rows[0].meta).toMatchObject({ state: 'applied', undoneBy: 'u2' });
     });
 
-    it('still only logs a markUndone failure', async () => {
+    it('throws a markUndone failure after logging it', async () => {
         const id = await agentAudit.openAction(CID, actor, { action: 'task.comment', params: { taskId: TASK } });
         const real = mockDb.crud.getMockImplementation();
         mockDb.crud.mockImplementation(async (companyId, query, method) => {
@@ -104,7 +104,7 @@ describe('with AUDIT_CHAIN off and a key set', () => {
             return real(companyId, query, method);
         });
         try {
-            await expect(agentAudit.markUndone(CID, id, 'u2')).resolves.toBeUndefined();
+            await expect(agentAudit.markUndone(CID, id, 'u2')).rejects.toThrow('disk full');
         } finally {
             mockDb.crud.mockImplementation(real);
         }
