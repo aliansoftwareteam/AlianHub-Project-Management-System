@@ -48,7 +48,11 @@ const through = async (uid, over = {}) => {
 describe('recurring run-due is an owner/admin act', () => {
     it('wires a role guard in front of the handler', () => {
         const posts = [];
-        routes.init({ post: (path, ...handlers) => posts.push({ path, handlers }) });
+        const app = {};
+        ['get', 'post', 'patch', 'put', 'delete'].forEach((method) => {
+            app[method] = (path, ...handlers) => { if (method === 'post') posts.push({ path, handlers }); };
+        });
+        routes.init(app);
         const runDue = posts.find((route) => route.path === '/api/v1/recurring-tasks/run-due');
         expect(runDue.handlers.length).toBe(2);
     });
