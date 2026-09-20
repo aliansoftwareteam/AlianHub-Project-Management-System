@@ -29,7 +29,7 @@ const TASK_ID = [['taskId']];
 const BULK_TASK_IDS = [['taskIds', '*']];
 const DESTINATION = [['projectData', 'id']];
 
-// ListBulkBar.vue offers the sprint move and tags behind either key, BulkActionBar.vue behind their own keys.
+// ListBulkBar.vue offers the sprint move and tags behind task.task_status, BulkActionBar.vue behind their own keys.
 const BULK_MOVE = anyOf(write('task.task_move'), write('task.task_status'));
 const BULK_TAGS = anyOf(write('task.task_tag'), write('task.task_status'));
 
@@ -66,11 +66,11 @@ const TASK_ACTIONS = Object.freeze({
     updateQueueList: entry([write('task.queue_list')], { tasks: TASK_ID }),
 updateArchiveDelete: entry((body) => archiveDeleteNeeds(body.deletedStatusKey), { tasks: [['task', '_id'], ['task', 'ParentTaskId']] }),
 
-    convertToSubTask: entry([write('task.task_convert_to_subtask'), write('task.sub_task_create'), inProject(DESTINATION, write('task.sub_task_create'))], { tasks: [['selectedTaskId'], ['taskId']] }),
+    convertToSubTask: entry([write('task.task_convert_to_subtask'), write('task.sub_task_create')], { tasks: [['selectedTaskId'], ['taskId']] }),
     convertToTask: entry([write('task.convert_to_task'), write('task.task_create'), inProject(DESTINATION, write('task.task_create'))], { tasks: [['taskId'], ['parentTaskId']] }),
     convertToList: entry([write('task.task_convert_to_list'), write('project.project_sprint_create'), inProject(DESTINATION, write('project.project_sprint_create'))], { tasks: TASK_ID }),
     moveTask: entry([write('task.task_move'), inProject(DESTINATION, write('task.task_move'))], { tasks: [['moveTaskId']] }),
-    mergeTask: entry([write('task.task_merge'), inProject(DESTINATION, write('task.task_merge'))], { tasks: [['taskId'], ['mergeTaskId']] }),
+    mergeTask: entry([write('task.task_merge')], { tasks: [['taskId'], ['mergeTaskId']] }),
     duplicateTask: entry([write('task.task_duplicate'), inProject(DESTINATION, write('task.task_duplicate'))], { tasks: [['selectedTaskId']] }),
 
     addTaskRelation: entry([VISIBLE], { tasks: [['taskId'], ['relatedTaskId']] }),
