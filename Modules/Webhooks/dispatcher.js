@@ -3,6 +3,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { supersedesPending } = require('../../event/domainEventBus');
 const { createSnapshotStore } = require('../../utils/entityEvents');
 const { safeFetch } = require('../Agents/engine/safeFetch');
 const { webhookAllowlist } = require('./helpers/privateHostAllowlist');
@@ -242,13 +243,21 @@ function onTaskEvent(type) {
             if (!event) return;
 
             const key = `${companyId}:${String(doc._id)}:${event}`;
+            const changedNow = normalizeChangedFields(payload?.updatedFields);
             const existing = pending.get(key);
             if (existing) clearTimeout(existing.timer);
+            if (supersedesPending(existing, doc, changedNow)) {
+                pending.delete(key);
+                flush(companyId, event, existing.doc, existing.changed).catch((error) => {
+                    logger.error(`${LOG_PREFIX} flush failed: ${error.message}`);
+                });
+            }
             // Accumulate the changed field names across every emit collapsed into
             // this debounce window, so the delivered notification reflects the
             // whole burst (e.g. status then priority changed back to back).
-            const changed = new Set(existing ? existing.changed : []);
-            normalizeChangedFields(payload?.updatedFields).forEach((field) => changed.add(field));
+            const carried = pending.get(key);
+            const changed = new Set(carried ? carried.changed : []);
+            changedNow.forEach((field) => changed.add(field));
             pending.set(key, {
                 doc,
                 changed,

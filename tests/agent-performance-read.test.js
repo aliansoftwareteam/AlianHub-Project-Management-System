@@ -438,6 +438,14 @@ describe('the replay record holds the query and the numbers', () => {
         expect(replays()[0]).toMatchObject({ runId: null, agentId: null });
     });
 
+    it('marks the tool row when its run has read outside content', async () => {
+        const run = mockDb.store[SCHEMA_TYPE.AGENT_RUNS].find((r) => r._id === RUN_ID);
+        run.tainted = true;
+        run.taintSources = [{ kind: 'page', ref: 'p1', at: new Date('2026-09-01T00:00:00Z') }];
+        await call(MEMBER, { ...ALL, metrics: ['time'] }, inRun);
+        expect(replays()[0]).toMatchObject({ runId: RUN_ID, tainted: true, taintSources: [{ kind: 'page', ref: 'p1', at: expect.any(Date) }] });
+    });
+
     it('writes nothing when replay is off, and still answers', async () => {
         process.env.AI_REPLAY = 'off';
         const out = await call(MEMBER, { ...ALL, metrics: ['time'] }, inRun);

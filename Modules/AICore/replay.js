@@ -123,7 +123,7 @@ const TOOL_KIND = 'tool';
  * number in an answer traces back to the query that produced it. The query is ids,
  * dates and metric names and the result is numbers, so neither carries text to redact.
  * promptHash is the hash of the query, so the same query matches across runs. */
-async function recordToolStep({ companyId, runId, agentId, action, args, scope, result, durationMs }) {
+async function recordToolStep({ companyId, runId, agentId, action, args, scope, result, durationMs, tainted, taintSources }) {
     if (!shouldRecord(FEATURES.AGENT_RUN)) return null;
     const query = { action, args, scope };
     const createdAt = new Date();
@@ -140,6 +140,7 @@ async function recordToolStep({ companyId, runId, agentId, action, args, scope, 
                 promptHash: crypto.createHash('sha256').update(JSON.stringify(query)).digest('hex'),
                 messages: [],
                 retrievedChunkIds: [],
+                ...taintOf({ tainted, taintSources }),
                 query,
                 result,
                 truncated: false,
