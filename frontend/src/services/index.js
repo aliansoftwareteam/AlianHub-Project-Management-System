@@ -16,13 +16,13 @@ export const axiosInstanceWithoutSecureWithFormData = axios.create({ baseURL: ap
 
 
 axiosInstance.interceptors.request.use((req) => {
-    // Unreadable under httpOnly cookies, when the server reads the cookie instead; readable installs keep sending the header.
+    // Unreadable under httpOnly cookies, so no header is sent and the server reads the cookie instead.
     const token = Cookies.get('accessToken') || '';
     const companyId = localStorage.getItem('selectedCompany') || "";
     const headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token,
+        ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
         'companyId': companyId
     }
     req.headers = headers;
@@ -36,7 +36,7 @@ axiosInstanceWithFormData.interceptors.request.use((req) => {
     const companyId = localStorage.getItem('selectedCompany') || "";
     const headers = {
         'Content-Type': 'multipart/form-data',
-        'Authorization': 'Bearer ' + token,
+        ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
         'companyId': companyId
     }
     req.headers = headers;
@@ -50,7 +50,7 @@ axiosInstanceWithoutCompany.interceptors.request.use((req) => {
     const headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token
+        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
     }
     req.headers = headers;
     return req;
@@ -62,7 +62,7 @@ axiosInstanceWithoutCompanyWithFormData.interceptors.request.use((req) => {
     const token = Cookies.get('accessToken') || '';
     const headers = {
         'Content-Type': 'multipart/form-data',
-        'Authorization': 'Bearer ' + token
+        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
     }
     req.headers = headers;
     return req;

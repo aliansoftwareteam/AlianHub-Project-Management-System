@@ -201,11 +201,14 @@ const generateJWTToken = (obj) => {
 };
 
 /* The presented access token: an explicit header wins, the session cookie fills
- * in when the client sent none (the web app after the httpOnly migration). */
+ * in when the client sent none (the web app after the httpOnly migration). A
+ * bare 'Bearer' is an emptied header with its whitespace trimmed away, not a
+ * token, so it falls through to the cookie like an absent header does. */
 const bearerFrom = (req) => {
-    let token = req.headers['x-access-token'] || req.headers['authorization'];
-    if (token && token.startsWith('Bearer ')) token = token.slice(7);
-    return token || readCookie(req, 'accessToken') || '';
+    let token = req.headers['x-access-token'] || req.headers['authorization'] || '';
+    if (token.startsWith('Bearer ')) token = token.slice(7);
+    if (!token.trim() || token.trim() === 'Bearer') return readCookie(req, 'accessToken') || '';
+    return token;
 };
 
 const removeCacheAndCookie = (key, cacheKey, res, refreshToken) => {

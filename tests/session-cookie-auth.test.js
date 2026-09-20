@@ -56,6 +56,13 @@ describe.each([
         expect(req.uid).toBe(U2);
     });
 
+    it('ignores an emptied Bearer header trimmed to bare Bearer', async () => {
+        const token = sign(U1);
+        const { req, passed } = await through(middleware, { authorization: 'Bearer', cookie: `accessToken=${token}`, companyid: COMPANY });
+        expect(passed).toBe(true);
+        expect(req.uid).toBe(U1);
+    });
+
     it('still refuses with neither a header nor a cookie', async () => {
         const { passed, res: out } = await through(middleware, { companyid: COMPANY });
         expect(passed).toBe(false);
