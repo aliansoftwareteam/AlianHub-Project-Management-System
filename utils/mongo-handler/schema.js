@@ -1476,6 +1476,14 @@ const schema = {
         lastAuditedAt: { type: Date, required: false },
         userIds: { type: [String], required: false },
     },
+    // One document per workspace (_id "workspace"): the hosts its agents may fetch when
+    // AGENT_EGRESS_ALLOWLIST is on (Modules/Agents/engine/egressAllowlist.js).
+    egressAllowlists: {
+        _id: { type: String, required: true },
+        hosts: { type: [String], required: false },
+        updatedBy: { type: String, required: false },
+        updatedAt: { type: Date, required: false },
+    },
     // Client invoices raised against a project (handoff 19c). Distinct from the
     // global `invoices` collection, which is AlianHub's own subscription billing.
     // Every line keeps the ids it was drafted from so a client question about a
