@@ -50,6 +50,7 @@ const execute = async ({ companyId, run, step, context = {} }) => {
         traceId: run.traceId || null,
         keepAlive: context.keepAlive,
         noteOutput: context.noteOutput,
+        stepCredential: context.stepCredential || null,
     });
 
     return {

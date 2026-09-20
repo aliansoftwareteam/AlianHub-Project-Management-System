@@ -225,6 +225,7 @@ module.exports.WORKFLOW_APPROVALS = '/api/v2/workflows/approvals';
 module.exports.API_TOKENS = '/api/v2/api-tokens';
 module.exports.MCP_TOKENS = '/api/v2/api-tokens/mcp';
 module.exports.API_TOKENS_NEEDING_EXPIRY = '/api/v2/api-tokens/needing-expiry';
+module.exports.API_TOKENS_STEP_CREDENTIALS = '/api/v2/api-tokens/step-credentials';
 module.exports.MCP_MANIFEST = '/mcp/manifest';
 module.exports.AGENT_TEAM = '/api/v2/agents/team';
 module.exports.AGENT_ROUTABLE = '/api/v2/agents/routable';
