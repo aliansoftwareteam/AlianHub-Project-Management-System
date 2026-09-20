@@ -74,7 +74,7 @@ const CATALOG = [
         default: 'off',
         options: ['off', 'report', 'enforce'],
         label: 'Permission checks for browser sessions',
-        help: 'The default for every workspace; a workspace can set its own. Off lets browser sessions through as before, report lets them through and records what would be refused, enforce refuses. API tokens are always enforced.',
+        help: 'The default for every workspace; a workspace can set its own. Off lets browser sessions through as before, report lets them through and records what would be refused, enforce refuses. API tokens stay enforced on the keys they always were; on other task writes they follow this mode like browser sessions.',
     }),
 ];
 
