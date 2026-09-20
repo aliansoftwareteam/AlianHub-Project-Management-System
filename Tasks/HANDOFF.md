@@ -2,7 +2,7 @@
 
 Updated 2026-09-20. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (7cb35c2a, `14.36.0-beta.244`)
+## State of `beta` (c6536202, `14.36.0-beta.247`)
 
 - **Sprints 7 and 8 run in parallel** (tasks 030 and 031). Each `task.md` holds the slice plan in merge order, the ownership split between the two sprints, and every owner decision; each `progress.md` ticks the merged slices with their build numbers.
   - **Sprint 7 merged:** slices 0 (#735, build 210), 1 (#739, 215), 9 (#742, 217), 5 (#746, 220), 2 (#745, 221), 3 (#747, 223) and 6 (#761, 229). Ask applies the private-sprint rule; the retrieval interface, the chunk store and pages, comments, transcripts and workspace pages sit behind `KNOWLEDGE_RETRIEVAL` and `KNOWLEDGE_INDEXER`, both off by default; embeddings and hybrid search run only for a workspace whose mode is `hybrid` and need an OpenAI key; `performance.read` sits behind `AGENT_PERFORMANCE_READ`, off.
@@ -21,10 +21,10 @@ Updated 2026-09-20. Read this first, then `Tasks/index.md`. Overwrite this file 
 
 ## Next up
 
-1. **Merge the two remaining in-flight slices**, each after an independent review: Sprint 8 slice 12 (CSP) and Sprint 7 slice 4 (files and guides). Slices 8, 9 and 10 merged 2026-09-20 (#760 build 234, #759 build 235, #758 build 236) after an independent review found no blocking defects; every slice this week that changed who may see or do what had real defects found by review after green CI (see "Things learned"). #773 (follow-up 74 parts a+b: merge/convert destination judgment, run-due role gate) is implemented, green and awaiting its independent review — merge it after review, then close item 74.
+1. **Merge the two remaining in-flight slices**, each after an independent review: Sprint 8 slice 12 (CSP) and Sprint 7 slice 4 (files and guides). Slices 8, 9 and 10 merged 2026-09-20 (#760 build 234, #759 build 235, #758 build 236) after an independent review found no blocking defects; every slice this week that changed who may see or do what had real defects found by review after green CI (see "Things learned"). Follow-up 74 (merge/convert destination judgment, run-due role gate) merged as #773 (build 247) on the owner's instruction with rule-removal proof on #775.
 2. **Owner decisions still open:** a maximum token lifetime (Sprint 8); the older follow-ups 32, 35, 37 and 56.
 3. **Owner writes the held-out question set** for Sprint 7 slice 11: about thirty real questions with their expected source, in the private notes folder.
-4. **Remaining follow-ups:** 14, 32, 35, 37, 56, 57, 59, 64, 69, 75, 76 (partly), 78, 79, 80, 81 in `Tasks/active/034-end-to-end-qa-programme/followups.md`. Closed 2026-09-20: 16, 17, 26, 55, 58, 60–63, 65–68, 70, 72, 73, 74 (parts c+d) and 82 (#766, #768–#772, builds 238–244). Item 74 parts a+b are implemented in #773, green, open for independent review.
+4. **Remaining follow-ups:** 14, 32, 35, 37, 56, 57, 59, 64, 69, 75, 76 (partly), 78, 79, 80, 81 in `Tasks/active/034-end-to-end-qa-programme/followups.md`. Closed 2026-09-20: 16, 17, 26, 55, 58, 60–63, 65–68, 70, 72–74 and 82 (#766, #768–#773, builds 238–247).
 5. **Owner checks still open:** the sweeps listed in follow-ups 77 and 83 (Ask's panel, the tokens screen under strict, the audit log's integrity states, the Enforcement tab, the token-expiry list, the run view's outside-content mark); the Sprint 5 workflow screens (task 028); Stats and Upgrade and the Docker label (task 033); the `/ai` and trust-layer member sweeps (014, 016); the day-to-day screens at 1280 and 800 px (013); every new interface row as it lands (now also: the Egress tab, the step-scoped credentials card, the stored-secrets list).
 6. **Owner actions — an agent cannot do these:** Sprint 6's end-to-end skill run (needs `AI_API_KEY`) and its browser sweeps; the quota recompute; the duplicate migration 021 decision; rotating the two API keys named in the owner's local notes; `AI_API_KEY` is empty in `.env`.
 
