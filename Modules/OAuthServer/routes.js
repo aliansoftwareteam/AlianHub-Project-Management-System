@@ -17,6 +17,7 @@ const limiter = (env) => rateLimit({
  * every one of these paths answers as it does on beta. */
 exports.init = (app, env = process.env) => {
     if (!config.isOn(env)) return;
+    config.assertIssuer(env);
     const { verifyJWTTokenWithCV2 } = require('../../Config/jwt');
     const authorizeLimit = limiter(env);
     const tokenLimit = limiter(env);

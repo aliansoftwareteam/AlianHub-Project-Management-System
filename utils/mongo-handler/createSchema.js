@@ -332,6 +332,7 @@ oauthClientsSchema.index({ companyId: 1, createdAt: -1 });
 const oauthGrantsSchema = new Schema(schema.oauthGrants, {strict: true, timestamps: false});
 oauthGrantsSchema.index({ grantId: 1 }, { unique: true, name: 'grant_id' });
 oauthGrantsSchema.index({ companyId: 1, userId: 1 });
+oauthGrantsSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0, name: 'purge_at' });
 const oauthTokensSchema = new Schema(schema.oauthTokens, {strict: true, timestamps: false});
 oauthTokensSchema.index({ tokenHash: 1 }, { unique: true, name: 'token_hash' });
 oauthTokensSchema.index({ grantId: 1 });

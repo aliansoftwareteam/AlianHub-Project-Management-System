@@ -5,9 +5,12 @@ const config = require('./config');
 /* OAuth Client ID Metadata Documents (draft-ietf-oauth-client-id-metadata-document-00), as the MCP
  * 2025-11-25 authorization spec adopts them: the client_id is an https URL and the document behind it
  * is the registration. The URL comes from whoever calls /oauth/authorize, so it is fetched through the
- * agents' SSRF-safe fetch: resolved address checked and pinned, every redirect hop checked again. */
+ * agents' SSRF-safe fetch (resolved address checked and pinned), and never through a redirect: the URL is
+ * the client's identity, so a document that is not served at it is not that client's document. */
 
-const FETCH = Object.freeze({ timeoutMs: 5000, maxBytes: 5 * 1024, maxRedirects: 2 });
+const FETCH = Object.freeze({ timeoutMs: 5000, maxBytes: 5 * 1024, maxRedirects: 0 });
+// Anyone can call /oauth/authorize with any URL: one fetch per URL at a time, and a failed URL rests briefly.
+const FAILURE_BACKOFF_MS = 5000;
 const MAX_CACHE_MS = 24 * 60 * 60 * 1000;
 const MAX_CACHED = 1000;
 const MAX_NAME_LENGTH = 200;
@@ -48,6 +51,11 @@ const remember = (clientId, client, ms) => {
     cache.set(clientId, { client, until: Date.now() + ms });
 };
 
+// RFC 7591 section 2 "scope". A document serves many servers, so names this one does not define are ignored.
+const scopesOf = (value) => (typeof value === 'string'
+    ? [...new Set(value.split(' ').filter((scope) => config.SCOPES.includes(scope)))]
+    : []);
+
 const clientOf = (clientId, doc) => {
     if (!doc || typeof doc !== 'object' || Array.isArray(doc)) refuse('the client metadata document is not a JSON object');
     if (doc.client_id !== clientId) refuse('the client metadata document names another client_id');
@@ -64,17 +72,21 @@ const clientOf = (clientId, doc) => {
         name: doc.client_name.trim(),
         redirectUris: [...doc.redirect_uris],
         tokenEndpointAuthMethod: 'none',
-        scopes: [],
+        scopes: scopesOf(doc.scope),
         companyId: null,
         revokedAt: null,
     };
 };
 
-async function load(clientId) {
-    if (!isMetadataDocumentId(clientId)) refuse('client_id is not an https URL with a path');
-    const hit = cache.get(clientId);
-    if (hit && hit.until > Date.now()) return hit.client;
-    cache.delete(clientId);
+const inFlight = new Map();
+const failures = new Map();
+
+const noteFailure = (clientId, message) => {
+    if (failures.size >= MAX_CACHED) failures.delete(failures.keys().next().value);
+    failures.set(clientId, { message, until: Date.now() + FAILURE_BACKOFF_MS });
+};
+
+async function fetchDocument(clientId) {
     let res;
     try {
         res = await safeFetch(clientId, { ...FETCH, headers: { accept: 'application/json' } });
@@ -82,6 +94,7 @@ async function load(clientId) {
         return refuse(`the client metadata document could not be fetched: ${error.message}`);
     }
     if (res.status !== 200) refuse(`the client metadata document answered ${res.status}`);
+    if (res.url !== clientId) refuse('the client metadata document was not served at its client_id');
     let doc;
     try { doc = JSON.parse(res.body); } catch (error) { return refuse('the client metadata document is not JSON'); }
     const client = clientOf(clientId, doc);
@@ -89,6 +102,29 @@ async function load(clientId) {
     return client;
 }
 
-const forget = () => cache.clear();
+async function load(clientId) {
+    if (!isMetadataDocumentId(clientId)) refuse('client_id is not an https URL with a path');
+    const hit = cache.get(clientId);
+    if (hit && hit.until > Date.now()) return hit.client;
+    cache.delete(clientId);
+    const failed = failures.get(clientId);
+    if (failed && failed.until > Date.now()) refuse(failed.message);
+    failures.delete(clientId);
+    if (!inFlight.has(clientId)) {
+        const pending = fetchDocument(clientId)
+            .catch((error) => {
+                if (error instanceof MetadataDocumentError) noteFailure(clientId, error.message);
+                throw error;
+            })
+            .finally(() => inFlight.delete(clientId));
+        inFlight.set(clientId, pending);
+    }
+    return inFlight.get(clientId);
+}
 
-module.exports = { load, isMetadataDocumentId, cacheMsOf, forget, MetadataDocumentError, FETCH };
+const forget = () => {
+    cache.clear();
+    failures.clear();
+};
+
+module.exports = { load, isMetadataDocumentId, cacheMsOf, forget, MetadataDocumentError, FETCH, FAILURE_BACKOFF_MS };

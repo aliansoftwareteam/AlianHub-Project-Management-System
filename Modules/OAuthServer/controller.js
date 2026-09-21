@@ -52,6 +52,14 @@ const parseScopes = (value) => {
     return list.every((scope) => config.SCOPES.includes(scope)) ? list : null;
 };
 
+/* MCP 2025-11-25 "Scope Selection Strategy" lets a client leave scope out. It then gets read access only:
+ * the read scopes it registered or its metadata document names, or every read scope when it named none.
+ * Writing always takes an explicit request, and later the consent screen (S3). */
+const defaultScopes = (client) => {
+    const named = Array.isArray(client.scopes) ? client.scopes : [];
+    return named.length ? named.filter((scope) => config.READ_SCOPES.includes(scope)) : [...config.READ_SCOPES];
+};
+
 /* OAuth 2.1 section 4.1.2.1: until the client and its redirect URI are known good, an error is shown to
  * the user and never sent to the URI; after that, it goes back to the client with its state. */
 exports.authorize = async (req, res) => {
@@ -78,8 +86,8 @@ exports.authorize = async (req, res) => {
         if (q.code_challenge_method !== 'S256') return refuse('invalid_request', 'PKCE with code_challenge_method S256 is required');
         if (typeof q.code_challenge !== 'string' || !CHALLENGE_PATTERN.test(q.code_challenge)) return refuse('invalid_request', 'code_challenge must be a base64url SHA-256 digest');
         if (!config.canonicalResource(q.resource)) return refuse('invalid_target', `resource must be ${config.resource()}`);
-        const scopes = parseScopes(q.scope);
-        if (!scopes) return refuse('invalid_scope', `scope must be drawn from: ${config.SCOPES.join(' ')}`);
+        const scopes = q.scope === undefined ? defaultScopes(client) : parseScopes(q.scope);
+        if (!scopes || !scopes.length) return refuse('invalid_scope', `scope must be drawn from: ${config.SCOPES.join(' ')}`);
         if (client.scopes && client.scopes.length && !scopes.every((scope) => client.scopes.includes(scope))) return refuse('invalid_scope', 'this client may not ask for that scope');
 
         const answer = await consent.testConsent(req, res);
@@ -111,9 +119,9 @@ exports.token = async (req, res) => {
         req.body = body;
         const client = await clients.authenticate(req);
         const resource = config.canonicalResource(single(body.resource));
-        if (!resource) return oauthError(res, 400, 'invalid_target', `resource must be ${config.resource()}`);
         let issued;
         if (body.grant_type === 'authorization_code') {
+            if (!resource) return oauthError(res, 400, 'invalid_target', `resource must be ${config.resource()}`);
             issued = await grants.exchangeCode({
                 client, code: single(body.code), codeVerifier: single(body.code_verifier), redirectUri: single(body.redirect_uri), resource,
             });

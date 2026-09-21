@@ -1511,6 +1511,8 @@ const schema = {
         resource: { type: String, required: true },
         createdAt: { type: Date, required: true },
         expiresAt: { type: Date, required: true },
+        // The TTL index removes a grant this long after its cap, revoked or not, so the collection stays bounded.
+        purgeAt: { type: Date, required: true },
         revokedAt: { type: Date, required: false },
         revokedReason: { type: String, required: false },
     },

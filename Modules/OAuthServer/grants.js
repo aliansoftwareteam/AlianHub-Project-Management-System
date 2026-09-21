@@ -24,6 +24,8 @@ const REVOKED = Object.freeze({
     CLIENT_REVOKED: 'client_revoked',
 });
 
+const GRANT_PURGE_GRACE_MS = 30 * 24 * 60 * 60 * 1000;
+
 const earlier = (a, b) => new Date(Math.min(a.getTime(), new Date(b).getTime()));
 
 const audit = (grant, action, meta = {}) => {
@@ -82,6 +84,7 @@ async function issueCode({ client, companyId, userId, scopes, redirectUri, codeC
         resource: config.resource(),
         createdAt: now,
         expiresAt: new Date(now.getTime() + life.grantMs),
+        purgeAt: new Date(now.getTime() + life.grantMs + GRANT_PURGE_GRACE_MS),
         revokedAt: null,
     };
     await store.grants.save(grant);
@@ -117,11 +120,13 @@ async function issueTokens(grant, { scopes = grant.scopes, now = new Date() } = 
     };
 }
 
-/* The code is spent before anything about it is checked (the tracker sign-in pattern): a wrong verifier
- * cannot be retried against the same code. A spent code presented again means it leaked, so the grant and
- * every token issued under it are revoked (OAuth 2.1 section 4.1.3). */
+/* The code is spent before it is checked against anything (the tracker sign-in pattern): a wrong verifier
+ * cannot be retried against the same code. Only a verifier that is not one at all is refused first, since
+ * it cannot match any code. A spent code presented again means it leaked, so the grant and every token
+ * issued under it are revoked (OAuth 2.1 section 4.1.3). */
 async function exchangeCode({ client, code, codeVerifier, redirectUri, resource, now = new Date() }) {
     if (!tokenHash.looksLike('code', code)) throw invalidGrant('the authorization code is not valid');
+    if (typeof codeVerifier !== 'string' || !CODE_VERIFIER_PATTERN.test(codeVerifier)) throw invalidGrant('code_verifier must be 43 to 128 unreserved characters (RFC 7636 section 4.1)');
     const hash = tokenHash.hashOf(code);
     const row = await store.tokens.spend(hash, 'code', now);
     if (!row) {
@@ -136,8 +141,7 @@ async function exchangeCode({ client, code, codeVerifier, redirectUri, resource,
     if (row.clientId !== client.clientId) return rejected(invalidGrant('the authorization code was issued to another client'));
     if (new Date(row.expiresAt).getTime() <= now.getTime()) return rejected(invalidGrant('the authorization code has expired'));
     if (typeof redirectUri !== 'string' || redirectUri !== row.redirectUri) return rejected(invalidGrant('redirect_uri does not match the authorization request'));
-    if (typeof codeVerifier !== 'string' || !CODE_VERIFIER_PATTERN.test(codeVerifier) || !row.codeChallenge
-        || !tokenHash.sameSecret(challengeOf(codeVerifier), row.codeChallenge)) {
+    if (!row.codeChallenge || !tokenHash.sameSecret(challengeOf(codeVerifier), row.codeChallenge)) {
         return rejected(invalidGrant('code_verifier does not match the code challenge'));
     }
     if (resource !== row.resource) return rejected(new GrantError('invalid_target', 'resource does not match the authorization request'));
@@ -147,23 +151,28 @@ async function exchangeCode({ client, code, codeVerifier, redirectUri, resource,
 }
 
 /* Rotation (OAuth 2.1 section 4.3.1): every refresh spends the presented token and issues a new pair. A
- * spent refresh token presented again means two parties hold the family, so the whole grant goes. */
+ * spent refresh token presented again means two parties hold the family, so the whole grant goes, and
+ * that is decided before anything else about the request, which a replay may well get wrong. */
 async function refresh({ client, refreshToken, scope, resource, now = new Date() }) {
     if (!tokenHash.looksLike('refresh', refreshToken)) throw invalidGrant('the refresh token is not valid');
     const hash = tokenHash.hashOf(refreshToken);
     const existing = await store.tokens.find(hash, 'refresh');
     if (!existing) throw invalidGrant('the refresh token is not valid');
+    if (existing.spentAt) {
+        await revokeGrant(existing.grantId, REVOKED.REFRESH_REUSE, now);
+        throw invalidGrant('the refresh token is not valid');
+    }
     if (existing.clientId !== client.clientId) {
         await revokeGrant(existing.grantId, REVOKED.REFRESH_WRONG_CLIENT, now);
         throw invalidGrant('the refresh token was issued to another client');
     }
-    if (resource !== existing.resource) throw new GrantError('invalid_target', 'resource does not match the grant');
+    if (!resource || resource !== existing.resource) throw new GrantError('invalid_target', `resource must be ${existing.resource}`);
     if (new Date(existing.expiresAt).getTime() <= now.getTime()) throw invalidGrant('the refresh token has expired');
     const requested = scope === undefined || scope === '' ? existing.scopes : String(scope).split(' ').filter(Boolean);
     if (!requested.length || !requested.every((s) => existing.scopes.includes(s))) throw new GrantError('invalid_scope', 'a refresh may only narrow the granted scopes');
     const row = await store.tokens.spend(hash, 'refresh', now);
     if (!row) {
-        if (existing.spentAt || (await store.tokens.find(hash, 'refresh') || {}).spentAt) await revokeGrant(existing.grantId, REVOKED.REFRESH_REUSE, now);
+        if ((await store.tokens.find(hash, 'refresh') || {}).spentAt) await revokeGrant(existing.grantId, REVOKED.REFRESH_REUSE, now);
         throw invalidGrant('the refresh token is not valid');
     }
     const grant = await liveGrant(row.grantId, now);
