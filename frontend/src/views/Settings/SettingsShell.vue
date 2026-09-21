@@ -85,6 +85,7 @@ import paddleRouter from "@/plugins/paddle/router.js";
 import { apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 import { ROLE_OWNER, isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
+import { oauthAvailable } from "@/views/OAuth/oauthShared";
 
 defineOptions({ name: "SettingsShell" });
 
@@ -125,7 +126,9 @@ const hasBilling = computed(() => !!(chargebeeRouter.upgradeTab || paddleRouter.
 // The Instance group belongs to the account that set the instance up (users.isProductOwner),
 // which the server decides; a member never sees it. null = answer not in yet.
 const instanceAdmin = ref(null);
+const oauthOn = ref(null);
 onMounted(() => {
+    oauthAvailable().then((on) => { oauthOn.value = on; });
     apiRequestWithoutCompnay("get", env.INSTANCE_ACCESS)
         .then((res) => { instanceAdmin.value = res?.data?.data?.allowed === true; })
         .catch(() => { instanceAdmin.value = false; });
@@ -158,6 +161,7 @@ const rawGroups = computed(() => [
             { key: "routing-policy", text: t("Routing.nav"), icon: "ai", to: to("RoutingPolicy"), names: ["RoutingPolicy"], show: isOwnerOrAdmin.value },
             { key: "sso", text: t("Settings.nav_signin_sso"), icon: "key", to: to("SsoSettings"), names: ["SsoSettings"], show: isOwnerOrAdmin.value },
             { key: "scim", text: label("settingslider.SCIM"), icon: "integrations", to: to("ScimSettings"), names: ["ScimSettings"], show: isOwnerOrAdmin.value },
+            { key: "agent-clients", text: t("Settings.nav_agent_clients"), icon: "key", to: to("AgentClients"), names: ["AgentClients"], show: isOwnerOrAdmin.value && oauthOn.value === true },
             { key: "integrations", text: label("settingslider.Integrations"), icon: "integrations", to: to("Integrations"), names: ["Integrations"], show: true },
             { key: "templates", text: label("settingslider.Templates"), icon: "template", to: to("Template"), names: ["Template"], show: true },
             { key: "timeoff", text: label("settingslider.Time Off"), icon: "planner", to: to("TimeOff"), names: ["TimeOff"], show: true },
@@ -188,7 +192,8 @@ const groups = computed(() => rawGroups.value
 const currentItem = computed(() => rawGroups.value
     .flatMap((g) => g.items.map((i) => ({ ...i, group: g.key })))
     .find((i) => i.names.includes(route.name)));
-const accessPending = computed(() => currentItem.value?.group === "instance" && instanceAdmin.value === null);
+const accessPending = computed(() => (currentItem.value?.group === "instance" && instanceAdmin.value === null)
+    || (currentItem.value?.key === "agent-clients" && oauthOn.value === null));
 
 const pageTitle = computed(() => {
     if (route.name === "changePassword") return label("settingslider.Change Password");
@@ -203,7 +208,7 @@ function guardRoute() {
 }
 
 onMounted(guardRoute);
-watch([() => route.name, instanceAdmin], guardRoute);
+watch([() => route.name, instanceAdmin, oauthOn], guardRoute);
 watch(narrow, (v) => { if (!v) drawer.value = false; });
 </script>
 

@@ -3,6 +3,7 @@ const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { recordAudit } = require('../Audit/recorder');
 const clients = require('./clients');
 const grants = require('./grants');
+const approvals = require('./approvals');
 const store = require('./store');
 const logger = require('../../Config/loggerConfig');
 
@@ -74,6 +75,8 @@ exports.create = async (req, res) => {
             createdBy: req.uid,
         });
         audit(companyId, req, 'oauth.client_registered', client);
+        // Registering it is the owner or admin letting it in, so the workspace approves it for what it was registered with.
+        await approvals.approve({ companyId, client, actor: actorOf(req) });
         return res.status(201).send({ status: true, statusText: 'OAuth client registered.', data: { ...clients.publicView(client), ...(secret ? { clientSecret: secret } : {}) } });
     } catch (error) {
         return failed(res, error, 'register oauth client');
@@ -88,9 +91,13 @@ exports.revoke = async (req, res) => {
         const client = await store.clients.revoke({ clientId: req.params.clientId, companyId, by: req.uid, at: now });
         if (!client) return refuse(res, 404, 'No such OAuth client in this workspace.');
         await grants.revokeClientGrants(client.clientId, now);
+        await store.approvals.revokeForClient(client.clientId, req.uid, now);
         audit(companyId, req, 'oauth.client_revoked', client);
         return res.send({ status: true, statusText: 'OAuth client revoked.', data: clients.publicView({ ...client, revokedAt: now }) });
     } catch (error) {
         return failed(res, error, 'revoke oauth client');
     }
 };
+
+exports.managerOrRefuse = managerOrRefuse;
+exports.actorOf = actorOf;

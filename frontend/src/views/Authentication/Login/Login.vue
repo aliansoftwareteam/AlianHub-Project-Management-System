@@ -329,7 +329,7 @@ const finishLogin = async (cid) => {
         if (redirect === "/") await router.replace(`/${cid}`);
         else {
             const tmpcid = redirect.split("/")[1];
-            const ok = (tmpcid && userData.value?.AssignCompany?.includes(tmpcid)) || tmpcid === "oauth2";
+            const ok = (tmpcid && userData.value?.AssignCompany?.includes(tmpcid)) || tmpcid === "oauth2" || redirect === "/oauth/consent";
             await router.replace(ok ? redirect : `/${cid}`);
         }
     }

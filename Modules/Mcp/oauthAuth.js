@@ -50,6 +50,26 @@ const clientApprovedInWorkspace = async (companyId, clientId) => {
     }
 };
 
+/* The scopes the workspace still allows the client, read on every request so a narrowed approval narrows tokens
+ * already issued. Every scope while the approval module is not installed; null (refuse) for anything else short
+ * of a list. */
+const approvalCeiling = async (companyId, clientId) => {
+    let approvals;
+    try {
+        approvals = approvalsHook.load();
+    } catch (error) {
+        return refuseApproval(clientId, `the approval module failed to load (${error.message})`) || null;
+    }
+    if (!approvals) return mcpOAuth.SCOPES;
+    if (typeof approvals.approvedScopes !== 'function') return refuseApproval(clientId, 'the approval module has no approvedScopes') || null;
+    try {
+        const ceiling = await approvals.approvedScopes(companyId, clientId);
+        return Array.isArray(ceiling) ? ceiling : null;
+    } catch (error) {
+        return refuseApproval(clientId, `approvedScopes failed (${error.message})`) || null;
+    }
+};
+
 const taintOf = (clientId, at = new Date()) => ({ tainted: true, taintSources: [{ kind: taint.KINDS.CLIENT, ref: String(clientId).slice(0, 200), at }] });
 
 /* The audience must be exactly this server's canonical /mcp resource (MCP 2025-11-25 "Token Audience
@@ -60,12 +80,15 @@ const authenticate = async (req, raw, { namedCompanies = [], now = new Date() } 
     const client = await clientStanding(token.clientId);
     if (!client.ok) return null;
     if (!(await clientApprovedInWorkspace(token.companyId, token.clientId))) return null;
+    const ceiling = await approvalCeiling(token.companyId, token.clientId);
+    if (!ceiling) return null;
 
     if (namedCompanies.some((asked) => asked !== String(token.companyId))) return { wrongWorkspace: true };
     const userId = String(token.userId || '');
     if (!(await verifyCompanyMembership(userId, String(token.companyId)))) return { forbidden: true };
 
-    const scopes = mcpOAuth.SCOPES.filter((scope) => (token.scopes || []).includes(scope));
+    const scopes = mcpOAuth.SCOPES.filter((scope) => (token.scopes || []).includes(scope) && ceiling.includes(scope));
+    if (!scopes.length) return null;
     req.uid = userId;
     req.mcp = true;
     return {

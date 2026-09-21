@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { approveInWorkspace } = require('./fixtures/oauthApproval');
 const path = require('path');
 
 const mockDb = require('./fixtures/fakeMongo').create();
@@ -41,6 +42,7 @@ const challengeParams = (header) => Object.fromEntries([...String(header).matchA
 
 const mint = async () => {
     const { client } = await clients.register({ kind: 'dynamic', name: 'S10S4 Approvals', redirectUris: [REDIRECT], tokenEndpointAuthMethod: 'none' });
+    approveInWorkspace(mockDb, C, client.clientId);
     const verifier = crypto.randomBytes(32).toString('base64url');
     const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
     const { code } = await grants.issueCode({ client, companyId: C, userId: USER, scopes: ['tasks:read'], redirectUri: REDIRECT, codeChallenge: challenge });
@@ -100,6 +102,7 @@ describe('loading the approval module', () => {
 describe('/mcp and the approval module', () => {
     it('lets an OAuth token through while the module is not installed', async () => {
         const { raw } = await mint();
+        approvalsHook.load.mockImplementation(() => jest.requireActual('../Modules/Mcp/approvalsHook').load(path.join(FIXTURES, 'absent', 'approvals')));
         expect((await post(raw)).statusCode).toBe(200);
     });
 
@@ -124,7 +127,7 @@ describe('/mcp and the approval module', () => {
     it('refuses anything but a plain yes', async () => {
         const { raw, client } = await mint();
         const isClientApproved = jest.fn(async () => 'yes');
-        approvalsHook.load.mockReturnValue({ isClientApproved });
+        approvalsHook.load.mockReturnValue({ isClientApproved, approvedScopes: async () => ['tasks:read'] });
         expect((await post(raw)).statusCode).toBe(401);
         expect(isClientApproved).toHaveBeenCalledWith(C, client.clientId);
         isClientApproved.mockResolvedValue(true);

@@ -7,7 +7,7 @@ const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/cli
 const { STATE_DIR, resolveMongoUrl } = require('../../e2e/support/env');
 const { emailFor, login, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 const { startServer } = require('../../e2e/support/server');
-const { answerAuthorization, authorizeWithSdk, memoryProvider, sdkAuth } = require('../support/mcpOAuthClient');
+const { answerAuthorization, approveClient, authorizeWithSdk, memoryProvider, sdkAuth } = require('../support/mcpOAuthClient');
 
 /* Sprint 10 slice S9: the MCP 2025-11-25 authorization flow end to end, driven by the official SDK's
  * client auth where it has a piece for the step and by plain HTTP where the step is an attack. Each
@@ -95,7 +95,7 @@ beforeAll(async () => {
         logFile: path.join(STATE_DIR, 'mcp-authorization-server.log'),
         env: {
             MCP_OAUTH: 'both',
-            NODE_ENV: 'test',
+            NODE_ENV: 'development',
             MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000',
             MCP_TEST_CLIENT_METADATA_HOSTS: `${DOCUMENT_HOST}=127.0.0.1:${documentServer.address().port}`,
             NODE_OPTIONS: `--require "${SHIM}"`,
@@ -104,6 +104,7 @@ beforeAll(async () => {
     base = server.baseURL;
     mcpUrl = `${base}/mcp`;
     session = { ...(await login(base, emailFor('owner'))), companyId: state.companyId };
+    await approveClient(base, session, DOCUMENT_ID, ['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write']);
 }, BOOT_TIMEOUT_MS);
 
 afterAll(async () => {

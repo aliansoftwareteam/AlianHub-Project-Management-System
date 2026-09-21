@@ -351,7 +351,8 @@ const verifyJWTTokenWithCRoute = [
     '/api/v2/provider-keys',
     // Not listed, on purpose (Modules/OAuthServer, MCP_OAUTH): /.well-known/oauth-authorization-server and /oauth/* are
     // public by design, since a client reaches them before anyone holds a token and the token endpoint authenticates
-    // the client itself; /api/v2/oauth-clients checks the session inline, so with the flag off no path answers differently.
+    // the client itself; /api/v2/oauth-clients, /api/v2/oauth-client-approvals and /api/v2/oauth-grants check the
+    // session inline, so with the flag off no path answers differently.
 ];
 const verifyJWTToken = [
     "/api/v2/company/delete",

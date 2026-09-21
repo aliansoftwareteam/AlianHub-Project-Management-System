@@ -77,6 +77,17 @@ export default [
         }
     },
     {
+        path: '/oauth/consent',
+        name: 'OAuth_Consent',
+        component: () => import(/* webpackChunkName: "OAuth_Consent" */ '../../views/OAuth/Consent.vue'),
+        meta: {
+            title: 'Authorize_application',
+            requiresAuth: true,
+            hideHeader: true,
+            preventAdvanceSearch: true
+        }
+    },
+    {
         path: '/business',
         name: 'Create_Company',
         component: () => import(/* webpackChunkName: "Create_Company" */ '../../views/Company/CreateCompany.vue'),
