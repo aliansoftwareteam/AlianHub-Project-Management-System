@@ -1565,6 +1565,7 @@ const schema = {
         // The source row's updatedAt when it was read, so a slower, older read never overwrites a newer one.
         sourceUpdatedAt: { type: Date, required: false },
         embedLeaseUntil: { type: Date, required: false },
+        embedLeaseOwner: { type: String, required: false },
     },
     // What an erasure keeps out of the index for good: one document, one task's comments and files, or one person's private pages and comments.
     knowledgeExclusions: {
@@ -1575,6 +1576,9 @@ const schema = {
         sourceId: { type: String, required: false, default: '' },
         userId: { type: String, required: false, default: '' },
         reason: { type: String, required: false, default: 'erased' },
+        erasedAt: { type: Date, required: false },
+        erasedBy: { type: String, required: false, default: '' },
+        erasedChunks: { type: Number, required: false, default: 0 },
     },
     // Backfill progress per source type, one row per tenant database.
     knowledgeIndexState: {

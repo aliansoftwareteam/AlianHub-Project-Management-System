@@ -1,3 +1,5 @@
+const os = require('os');
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
@@ -55,6 +57,7 @@ const EMBED_RETRY_BASE_MS = 30 * 1000;
 const REEMBED_BATCH = 50;
 /* Long enough for one source's embedding call; a server that dies holding a claim frees it after. */
 const EMBED_LEASE_MS = 10 * 60 * 1000;
+const SERVER = `${os.hostname()}:${process.pid}:${crypto.randomBytes(4).toString('hex')}`;
 
 const store = (companyId, type, data, method) => MongoDbCrudOpration(String(companyId), { type, data }, method);
 const chunkStore = (companyId, data, method) => store(companyId, SCHEMA_TYPE.KNOWLEDGE_CHUNKS, data, method);
@@ -963,17 +966,22 @@ const clearEmbedRetries = () => {
 const leaseFree = (now) => ({ $or: [{ embedLeaseUntil: { $exists: false } }, { embedLeaseUntil: null }, { embedLeaseUntil: { $lte: new Date(now) } }] });
 
 /* A source is claimed on its first chunk before it is embedded, so a second server sweeping at the
- * same time (the recurring job, a console re-embed) passes it over instead of paying for it again. */
+ * same time (the recurring job, a console re-embed) passes it over instead of paying for it again.
+ * Neither the claim nor its release moves `updatedAt`, which says when the chunk was indexed. */
 const claimForEmbed = async (companyId, sourceType, sourceId) => {
     const now = Date.now();
     return Boolean(await chunkStore(companyId, [
         { sourceType, sourceId, ordinal: 0, ...leaseFree(now) },
-        { $set: { embedLeaseUntil: new Date(now + EMBED_LEASE_MS) } },
-        { projection: { _id: 1 }, returnDocument: 'after', lean: true },
+        { $set: { embedLeaseUntil: new Date(now + EMBED_LEASE_MS), embedLeaseOwner: SERVER } },
+        { projection: { _id: 1 }, returnDocument: 'after', lean: true, timestamps: false },
     ], 'findOneAndUpdate'));
 };
 
-const releaseEmbed = (companyId, sourceType, sourceId) => chunkStore(companyId, [{ sourceType, sourceId, ordinal: 0 }, { $unset: { embedLeaseUntil: '' } }], 'updateOne');
+const releaseEmbed = (companyId, sourceType, sourceId) => chunkStore(companyId, [
+    { sourceType, sourceId, ordinal: 0, embedLeaseOwner: SERVER },
+    { $unset: { embedLeaseUntil: '', embedLeaseOwner: '' } },
+    { timestamps: false },
+], 'updateOne');
 
 /* Sources of a hybrid company whose live chunks carry no vector for the current model: what a
  * failed embed left behind, and everything indexed before the model changed. Stops at the first

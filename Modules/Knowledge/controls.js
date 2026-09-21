@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
@@ -64,6 +65,41 @@ const countsBySource = async (companyId, where) => {
     return Object.fromEntries((rows || []).filter((row) => row.n > 0).map((row) => [row._id, row.n]));
 };
 
+const rowExists = async (companyId, type, id) => OBJECT_ID.test(id)
+    && Boolean(await MongoDbCrudOpration(String(companyId), { type, data: [{ _id: new mongoose.Types.ObjectId(id) }, '_id', { lean: true }] }, 'findOne'));
+
+const hasChunks = async (companyId, where) => Boolean(await chunkStore(companyId, [where, '_id', { lean: true }], 'findOne'));
+
+const taskChunks = (taskId) => ({ sourceType: { $in: INDEXED_SOURCES }, taskId });
+
+const fileExists = async (companyId, id) => {
+    const at = id.indexOf(':');
+    const taskId = id.slice(0, at);
+    const attachmentId = id.slice(at + 1);
+    const task = await MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(taskId) }, 'attachments', { lean: true }] }, 'findOne');
+    return Boolean(task) && (Array.isArray(task.attachments) ? task.attachments : []).some((item) => item && String(item.id) === attachmentId);
+};
+
+/* An exclusion is kept for good, so one is only written for something that exists here: its row, or
+ * chunks still indexed under it (a row deleted outright can leave those behind). */
+const documentExists = async (companyId, sourceType, id) => {
+    if (sourceType === TASK) return (await rowExists(companyId, SCHEMA_TYPE.TASKS, id)) || hasChunks(companyId, taskChunks(id));
+    if (sourceType === 'file' && await fileExists(companyId, id)) return true;
+    const rules = indexer.RULES[sourceType];
+    if (rules && rules.collection && await rowExists(companyId, rules.collection, id)) return true;
+    return hasChunks(companyId, { sourceType, sourceId: id });
+};
+
+/* A seat in any state counts, so a departed member can still be erased. */
+const personExists = async (companyId, userId) => {
+    const company = String(companyId);
+    const seat = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+        type: SCHEMA_TYPE.COMPANY_USERS,
+        data: [{ userId: { $in: [userId, new mongoose.Types.ObjectId(userId)] }, companyId: { $in: [company, new mongoose.Types.ObjectId(company)] } }, '_id', { lean: true }],
+    }, 'findOne');
+    return Boolean(seat) || hasChunks(company, { createdBy: userId });
+};
+
 const totalOf = (removed) => Object.values(removed).reduce((sum, n) => sum + n, 0);
 
 const reembed = async (companyId) => {
@@ -98,32 +134,36 @@ const retryFiles = async (companyId) => {
 
 /* `progress.removed` grows as each source goes, so a caller whose erasure throws partway can still
  * say what was removed before it did. Ids are expected in their canonical form. */
-const eraseDocument = async (companyId, { sourceType, sourceId }, progress = { removed: {} }) => {
+const eraseOptions = (progress, by) => ({ by, onExcluded: () => { progress.excluded = true; } });
+
+const eraseDocument = async (companyId, { sourceType, sourceId }, progress = { removed: {} }, { by = '' } = {}) => {
     const company = String(companyId);
+    const options = eraseOptions(progress, by);
     const add = (type, n) => { if (n) progress.removed[type] = (progress.removed[type] || 0) + n; };
     if (sourceType !== TASK) {
-        const { erased } = await erase.eraseDocument(company, { sourceType, sourceId });
+        const { erased } = await erase.eraseDocument(company, { sourceType, sourceId }, options);
         add(sourceType, erased);
     } else {
-        await erase.excludeTask(company, sourceId);
-        const rows = await chunkStore(company, [{ taskId: sourceId }, 'sourceType sourceId', { lean: true }], 'find');
+        const rule = await erase.excludeTask(company, sourceId, options);
+        const rows = await chunkStore(company, [taskChunks(sourceId), 'sourceType sourceId', { lean: true }], 'find');
         const sources = new Map((rows || []).map((row) => [`${row.sourceType}:${row.sourceId}`, row]));
         for (const row of sources.values()) {
-            const { erased } = await erase.eraseDocument(company, { sourceType: row.sourceType, sourceId: String(row.sourceId) });
+            const { erased } = await erase.eraseDocument(company, { sourceType: row.sourceType, sourceId: String(row.sourceId) }, options);
             add(row.sourceType, erased);
         }
+        await erase.recordErased(company, rule, totalOf(progress.removed));
     }
     return { removed: progress.removed, total: totalOf(progress.removed) };
 };
 
-const erasePerson = async (companyId, userId, progress = { removed: {} }) => {
+const erasePerson = async (companyId, userId, progress = { removed: {} }, { by = '' } = {}) => {
     const company = String(companyId);
     const counts = await countsBySource(company, erase.personWhere(userId));
-    await erase.erasePerson(company, userId);
+    await erase.erasePerson(company, userId, eraseOptions(progress, by));
     Object.assign(progress.removed, counts);
     return { removed: progress.removed, total: totalOf(progress.removed) };
 };
 
 module.exports = {
-    documentTypes, validDocumentId, canonicalDocumentId, canonicalObjectId, totalOf, reembed, retryFiles, eraseDocument, erasePerson, settled,
+    documentTypes, validDocumentId, canonicalDocumentId, canonicalObjectId, documentExists, personExists, totalOf, reembed, retryFiles, eraseDocument, erasePerson, settled,
 };

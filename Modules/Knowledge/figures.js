@@ -8,14 +8,11 @@ const { INDEXED_SOURCES } = require('./sources');
 const { FEATURES } = require('../AICore/features');
 const backfill = require('./ingest/backfill');
 const indexer = require('./ingest/indexer');
-const fileSweep = require('./ingest/fileSweep');
+const { figuresPipeline } = require('./figuresPipeline');
 
 // What the instance console shows of one workspace's index: counts, sizes, times, states and
 // reasons. Nothing here reads or returns a chunk's text, title or file key.
 
-/* Markers the indexer writes for its own bookkeeping, not reasons a file was left out. */
-const NOT_A_REASON = ['', 'task'];
-const LIVE = { deleted: { $ne: true } };
 const BACKFILL_STATUS = { running: 'running', 'catching-up': 'catching_up', complete: 'complete', failed: 'failed' };
 const MAX_TIME_MS_DEFAULT = 10000;
 const CACHE_SECONDS = 60;
@@ -36,35 +33,8 @@ const chunkRows = (companyId, pipeline) => MongoDbCrudOpration(String(companyId)
 const count = (companyId, type, where) => MongoDbCrudOpration(String(companyId), { type, data: [where, { maxTimeMS: maxTimeMS() }] }, 'countDocuments').then((n) => Number(n) || 0);
 const chunkSourceTypes = (companyId) => MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.KNOWLEDGE_CHUNKS, data: ['sourceType'] }, 'distinct');
 
-/* The source types come from the distinct scan of the unique index, so the pass can start with a
- * match that index serves. Text size is estimated from the text alone: a chunk's vector never enters
- * the pipeline. */
 const chunkFacets = async (companyId, sourceTypes, retried, maxAttempts) => {
-    const [facets] = (await chunkRows(companyId, [
-        { $match: { sourceType: { $in: sourceTypes } } },
-        {
-            $project: {
-                sourceType: 1, sourceId: 1, deleted: 1, embeddingModel: 1, updatedAt: 1, ordinal: 1, tombstoneReason: 1, extractAttempts: 1, extractDueAt: 1,
-                textBytes: { $strLenBytes: { $ifNull: ['$text', ''] } },
-            },
-        },
-        {
-            $facet: {
-                bySource: [{ $group: { _id: { sourceType: '$sourceType', deleted: '$deleted' }, chunks: { $sum: 1 }, textBytes: { $sum: '$textBytes' }, lastAt: { $max: '$updatedAt' } } }],
-                sources: [{ $match: LIVE }, { $group: { _id: { sourceType: '$sourceType', sourceId: '$sourceId' } } }, { $group: { _id: '$_id.sourceType', sources: { $sum: 1 } } }],
-                byModel: [{ $match: LIVE }, { $group: { _id: '$embeddingModel', chunks: { $sum: 1 } } }],
-                fileReasons: [
-                    { $match: { sourceType: 'file', ordinal: 0, deleted: true, tombstoneReason: { $nin: NOT_A_REASON, $type: 'string' } } },
-                    { $group: { _id: '$tombstoneReason', count: { $sum: 1 } } },
-                ],
-                fileExhausted: [
-                    { $match: { sourceType: 'file', ordinal: 0, deleted: true, tombstoneReason: { $in: retried }, extractAttempts: { $gte: maxAttempts } } },
-                    { $group: { _id: '$tombstoneReason', count: { $sum: 1 } } },
-                ],
-                filesPending: [{ $match: fileSweep.pendingFilter() }, { $count: 'n' }],
-            },
-        },
-    ])) || [];
+    const [facets] = (await chunkRows(companyId, figuresPipeline(sourceTypes, retried, maxAttempts))) || [];
     return facets || {};
 };
 

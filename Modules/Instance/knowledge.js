@@ -11,6 +11,7 @@ const reindex = require('../Knowledge/reindex');
 const ENV_KEY = 'KNOWLEDGE_INDEXER';
 const ADMIN_KEY_ACTOR = 'instance-admin-key';
 const DEFAULT_PAGE_SIZE = 20;
+const EXCLUSION_LIMIT = 200;
 const MAX_PAGE_SIZE = 100;
 const COMPANY_BATCH = 10;
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -22,6 +23,7 @@ const ACTIONS = Object.freeze({
     ERASE_DOCUMENT: 'knowledge.erase_document',
     ERASE_PERSON: 'knowledge.erase_person',
     REINDEX_CANCEL: 'knowledge.reindex_cancel',
+    EXCLUSION_REMOVE: 'knowledge.exclusion_remove',
 });
 
 // The screen translates these; statusText is the English fallback for scripts and for a code it does not know.
@@ -43,6 +45,8 @@ const CODE = Object.freeze({
     REEMBED_RUNNING: 'reembed_running',
     REINDEX_NOT_RUNNING: 'reindex_not_running',
     NOTHING_ERASED: 'nothing_erased',
+    NOT_FOUND: 'not_found',
+    INVALID_EXCLUSION_ID: 'invalid_exclusion_id',
     FIGURES_TIMED_OUT: 'figures_timed_out',
     SERVER_ERROR: 'server_error',
 });
@@ -85,11 +89,14 @@ const findCompany = (id) => MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
     data: [{ _id: new mongoose.Types.ObjectId(id) }, 'Cst_CompanyName'],
 }, 'findOne');
 
-const userName = async (id) => {
-    if (!OBJECT_ID.test(id)) return '';
-    const user = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.USERS, data: [{ _id: id }, { Employee_Name: 1 }] }, 'findOne');
-    return (user && user.Employee_Name) || '';
+const userNames = async (ids) => {
+    const wanted = [...new Set(ids.map(String).filter((id) => OBJECT_ID.test(id)))];
+    if (!wanted.length) return new Map();
+    const users = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.USERS, data: [{ _id: { $in: wanted } }, { Employee_Name: 1 }] }, 'find');
+    return new Map((users || []).map((user) => [String(user._id), user.Employee_Name || '']));
 };
+
+const userName = async (id) => (await userNames([id])).get(String(id)) || '';
 
 const clientIp = (req) => {
     const forwarded = req.headers['x-forwarded-for'] || req.ip;
@@ -235,8 +242,12 @@ exports.retryFiles = control({ needsIndexer: true }, async (req, res, workspace)
 
 /* The audit row is written however the erasure ends: one that throws partway is recorded as partial,
  * with what it removed before it did. */
-const erasing = async (req, res, workspace, entry, run) => {
-    const progress = { removed: {} };
+const erasing = async (req, res, workspace, entry, exists, run) => {
+    if (!(await exists())) {
+        audit(req, workspace.id, { ...entry, meta: { ...entry.meta, removed: {}, total: 0, notFound: true } });
+        return fail(res, 404, CODE.NOT_FOUND, 'Nothing by that id exists in this workspace, so nothing was erased and no exclusion was recorded.');
+    }
+    const progress = { removed: {}, excluded: false };
     let failure = null;
     try {
         await run(progress);
@@ -244,10 +255,9 @@ const erasing = async (req, res, workspace, entry, run) => {
         failure = error;
     } finally {
         const total = controls.totalOf(progress.removed);
-        audit(req, workspace.id, {
-            ...entry,
-            meta: { ...entry.meta, removed: progress.removed, total, ...(failure ? { partial: true, error: CODE.SERVER_ERROR } : {}) },
-        });
+        const changed = progress.excluded || total > 0;
+        const outcome = failure ? { [changed ? 'partial' : 'failed']: true, error: CODE.SERVER_ERROR } : {};
+        audit(req, workspace.id, { ...entry, meta: { ...entry.meta, removed: progress.removed, total, ...outcome } });
     }
     if (failure) {
         logger.error(`knowledge console erasure in ${workspace.id}: ${failure.message || failure}`);
@@ -269,7 +279,8 @@ exports.eraseDocument = control({ needsIndexer: false }, async (req, res, worksp
     if (!id) return fail(res, 400, CODE.INVALID_DOCUMENT_ID, `That is not a ${sourceType} id.`);
     if (controls.canonicalDocumentId(sourceType, confirm) !== id) return fail(res, 400, CODE.CONFIRMATION_MISMATCH, 'Type the document id to confirm the erasure.');
     return erasing(req, res, workspace, { action: ACTIONS.ERASE_DOCUMENT, entityType: sourceType, entityId: id, meta: { sourceType } },
-        (progress) => controls.eraseDocument(workspace.id, { sourceType, sourceId: id }, progress));
+        () => controls.documentExists(workspace.id, sourceType, id),
+        (progress) => controls.eraseDocument(workspace.id, { sourceType, sourceId: id }, progress, { by: actorOf(req) }));
 });
 
 exports.erasePerson = control({ needsIndexer: false }, async (req, res, workspace) => {
@@ -278,7 +289,51 @@ exports.erasePerson = control({ needsIndexer: false }, async (req, res, workspac
     if (!id) return fail(res, 400, CODE.INVALID_USER_ID, 'userId must be a user id.');
     if (controls.canonicalObjectId(confirm) !== id) return fail(res, 400, CODE.CONFIRMATION_MISMATCH, "Type the person's user id to confirm the erasure.");
     return erasing(req, res, workspace, { action: ACTIONS.ERASE_PERSON, entityType: 'user', entityId: id, meta: {} },
-        (progress) => controls.erasePerson(workspace.id, id, progress));
+        () => controls.personExists(workspace.id, id),
+        (progress) => controls.erasePerson(workspace.id, id, progress, { by: actorOf(req) }));
+});
+
+const exclusionStore = (companyId, data, method) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS, data }, method);
+
+exports.exclusions = control({ needsIndexer: false }, async (req, res, workspace) => {
+    const [rows, total] = await Promise.all([
+        exclusionStore(workspace.id, [{}, 'kind sourceType sourceId userId erasedAt erasedBy erasedChunks', { sort: { erasedAt: -1, _id: -1 }, limit: EXCLUSION_LIMIT, lean: true }], 'find'),
+        exclusionStore(workspace.id, [{}], 'countDocuments'),
+    ]);
+    const names = await userNames((rows || []).map((row) => row.erasedBy || ''));
+    return ok(res, 'Knowledge exclusions.', {
+        total: Number(total) || 0,
+        limit: EXCLUSION_LIMIT,
+        exclusions: (rows || []).map((row) => ({
+            id: String(row._id),
+            kind: row.kind,
+            sourceType: row.sourceType || '',
+            sourceId: row.sourceId || '',
+            userId: row.userId || '',
+            erasedAt: row.erasedAt || null,
+            erasedBy: row.erasedBy || '',
+            erasedByName: names.get(String(row.erasedBy || '')) || '',
+            erasedChunks: Number(row.erasedChunks) || 0,
+        })),
+    });
+});
+
+const leadingIdLowered = (value) => String(value).replace(/^[a-f0-9]{24}/i, (hex) => hex.toLowerCase());
+
+exports.removeExclusion = control({ needsIndexer: false }, async (req, res, workspace) => {
+    const id = controls.canonicalObjectId(req.params.exclusionId);
+    if (!id) return fail(res, 400, CODE.INVALID_EXCLUSION_ID, 'exclusionId must be an exclusion id.');
+    const row = await exclusionStore(workspace.id, [{ _id: new mongoose.Types.ObjectId(id) }, null, { lean: true }], 'findOne');
+    if (!row) return fail(res, 404, CODE.NOT_FOUND, 'No such exclusion in this workspace.');
+    const expected = row.kind === 'author' ? row.userId : row.sourceId;
+    const confirm = req.body && req.body.confirm;
+    if (typeof confirm !== 'string' || leadingIdLowered(confirm) !== leadingIdLowered(expected)) {
+        return fail(res, 400, CODE.CONFIRMATION_MISMATCH, 'Type the id the exclusion names to confirm its removal.');
+    }
+    await exclusionStore(workspace.id, [{ _id: new mongoose.Types.ObjectId(id) }], 'deleteOne');
+    const named = Object.fromEntries(['sourceType', 'sourceId', 'userId'].filter((field) => row[field]).map((field) => [field, row[field]]));
+    audit(req, workspace.id, { action: ACTIONS.EXCLUSION_REMOVE, entityType: 'knowledge_exclusion', entityId: id, meta: { kind: row.kind, ...named } });
+    return ok(res, 'Exclusion removed; the item is indexed again at its next change or re-index.', { removed: true });
 });
 
 module.exports.ACTIONS = ACTIONS;

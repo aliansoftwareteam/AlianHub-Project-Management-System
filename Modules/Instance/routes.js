@@ -48,4 +48,6 @@ exports.init = (app) => {
     app.post(`${admin}/knowledge/:companyId/retry-files`, knowledge.retryFiles);
     app.post(`${admin}/knowledge/:companyId/erase/document`, knowledge.eraseDocument);
     app.post(`${admin}/knowledge/:companyId/erase/person`, knowledge.erasePerson);
+    app.get(`${admin}/knowledge/:companyId/exclusions`, knowledge.exclusions);
+    app.post(`${admin}/knowledge/:companyId/exclusions/:exclusionId/remove`, knowledge.removeExclusion);
 };

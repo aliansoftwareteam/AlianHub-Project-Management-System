@@ -109,14 +109,15 @@ const runSource = async (companyId, sourceType, { batchSize = backfill.BATCH_SIZ
     let cursor = state.reindexCursor || '';
     let synced = Number(state.reindexSynced) || 0;
     let renewedAt = Date.now();
-    const renew = async () => {
-        if (Date.now() - renewedAt < LEASE_MS / 3) return true;
+    const hold = async () => {
         renewedAt = Date.now();
         const held = await indexState(company, [mine, { $set: { reindexLeaseUntil: new Date(renewedAt + LEASE_MS) } }], 'updateOne');
         return Boolean(held && held.matchedCount);
     };
+    const renew = () => (Date.now() - renewedAt < LEASE_MS / 3 ? true : hold());
     try {
         for (let batch = 0; batch < maxBatches; batch += 1) {
+            if (batch > 0 && !(await hold())) return null;
             const rows = (await batchOf(company, candidate, cursor, batchSize)) || [];
             for (const row of rows) {
                 await candidate.apply(company, String(row._id));
