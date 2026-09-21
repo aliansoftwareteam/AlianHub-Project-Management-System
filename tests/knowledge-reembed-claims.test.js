@@ -2,7 +2,7 @@
  * re-embed on another) must not both pay for the same source. Each server is its own copy of the
  * indexer module, sharing one database and one provider. */
 const mockDb = require('./fixtures/fakeMongo').create();
-const mockEmbed = { model: 'model-old', calls: 0 };
+const mockEmbed = { model: 'model-old', calls: 0, during: null };
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
@@ -14,6 +14,7 @@ jest.mock('../Modules/Knowledge/embeddings', () => ({
     isBudgetRefusal: () => false,
     embedTexts: async (companyId, texts) => {
         mockEmbed.calls += 1;
+        if (mockEmbed.during) await mockEmbed.during(companyId);
         await new Promise((resolve) => setTimeout(resolve, 20));
         return { vectors: texts.map(() => [1, 0, 0]), model: mockEmbed.model };
     },
@@ -69,4 +70,30 @@ it('passes over a source another server has claimed, and takes it once that clai
     await serverA.reembedMissing(C);
     expect(mockEmbed.calls).toBe(3);
     expect(live().every((c) => c.embeddingModel === 'model-new')).toBe(true);
+});
+
+it('releases only a claim it still holds', async () => {
+    let taken = null;
+    mockEmbed.during = () => {
+        if (taken) return;
+        taken = live().find((c) => c.ordinal === 0 && c.embedLeaseUntil);
+        taken.embedLeaseOwner = 'another-server';
+        taken.embedLeaseUntil = new Date(Date.now() + 60 * 1000);
+    };
+    try {
+        await serverA.reembedMissing(C);
+    } finally {
+        mockEmbed.during = null;
+    }
+    expect(taken).toBeTruthy();
+    expect(taken.embedLeaseOwner).toBe('another-server');
+    expect(taken.embedLeaseUntil).toBeInstanceOf(Date);
+});
+
+it('claims and releases without touching the chunk timestamps', async () => {
+    mockDb.calls.length = 0;
+    await serverA.reembedMissing(C);
+    const leaseWrites = mockDb.calls.filter((c) => c.type === CHUNKS && ['findOneAndUpdate', 'updateOne'].includes(c.method) && JSON.stringify(c.data[1] || {}).includes('embedLease'));
+    expect(leaseWrites.length).toBe(6);
+    leaseWrites.forEach((c) => expect(c.data[2]).toEqual(expect.objectContaining({ timestamps: false })));
 });

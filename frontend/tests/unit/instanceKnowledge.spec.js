@@ -78,10 +78,17 @@ const figures = (over = {}) => ({
 const ok = (data) => Promise.resolve({ data: { status: true, data } });
 const refused = (status, code, statusText = 'Refused.') => Promise.reject({ response: { status, data: { status: false, statusText, code } } });
 
-const serve = ({ summaryData = summary(), figuresData = figures(), post = () => ok({}) } = {}) => {
+const EXCLUSION_ID = '6f0000000000000000000e01';
+const exclusions = () => ({
+    total: 1,
+    exclusions: [{ id: EXCLUSION_ID, kind: 'document', sourceType: 'page', sourceId: PAGE, userId: '', erasedAt: WHEN, erasedBy: 'u1', erasedByName: 'Olivia Owner', erasedChunks: 2 }],
+});
+
+const serve = ({ summaryData = summary(), figuresData = figures(), exclusionsData = exclusions(), post = () => ok({}) } = {}) => {
     apiRequestWithoutCompnay.mockImplementation((type, url, body) => {
         const path = url.split('?')[0];
         if (type === 'get' && path === BASE) return ok(typeof summaryData === 'function' ? summaryData(url) : summaryData);
+        if (type === 'get' && path.endsWith('/exclusions')) return ok(exclusionsData);
         if (type === 'get' && path.startsWith(`${BASE}/`)) return ok(typeof figuresData === 'function' ? figuresData(url) : figuresData);
         if (type === 'post') return post(url, body);
         return Promise.reject(new Error(`unexpected ${type} ${url}`));
@@ -177,6 +184,7 @@ describe('InstanceKnowledge', () => {
         await flushPromises();
         apiRequestWithoutCompnay.mockImplementation((type, url) => {
             if (type === 'get' && url.split('?')[0] === BASE) return ok(summary());
+            if (url.endsWith('/exclusions')) return ok(exclusions());
             calls += 1;
             return calls === 1 ? refused(503, 'figures_timed_out') : ok(figures());
         });
@@ -316,6 +324,44 @@ describe('InstanceKnowledge', () => {
         await wrapper.find('[data-test="erase-confirm-button"]').trigger('click');
         await flushPromises();
         expect(wrapper.find('[data-test="action-error"]').text()).toBe('Knowledge.code_confirmation_mismatch');
+    });
+
+    it('lists the exclusions of an opened workspace: ids, kind, when, who and chunks kept out', async () => {
+        const wrapper = await opened();
+        const row = wrapper.find(`[data-test="exclusion-${EXCLUSION_ID}"]`);
+        expect(row.text()).toContain(PAGE);
+        expect(row.text()).toContain('Olivia Owner');
+        expect(row.text()).toContain('2');
+        expect(row.text()).toContain('Knowledge.exclusion_kind_document');
+    });
+
+    it('removes an exclusion only once its id is typed back', async () => {
+        const wrapper = await opened({ post: () => ok({ removed: true }) });
+        await wrapper.find(`[data-test="remove-exclusion-${EXCLUSION_ID}"]`).trigger('click');
+        await flushPromises();
+        expect(wrapper.find('[data-test="erase-confirm"]').text()).toContain('Knowledge.exclusion_remove_confirm');
+        await wrapper.find('[data-test="erase-confirm-input"]').setValue('nope');
+        expect(wrapper.find('[data-test="erase-confirm-button"]').attributes('disabled')).toBeDefined();
+        await wrapper.find('[data-test="erase-confirm-input"]').setValue(PAGE);
+        await wrapper.find('[data-test="erase-confirm-button"]').trigger('click');
+        await flushPromises();
+        expect(posts()).toEqual([['post', `${BASE}/${CID_A}/exclusions/${EXCLUSION_ID}/remove`, { confirm: PAGE }]]);
+        expect(toast.success).toHaveBeenCalledWith('Knowledge.exclusion_removed');
+    });
+
+    it('says when there are no exclusions', async () => {
+        const wrapper = await opened({ exclusionsData: { total: 0, exclusions: [] } });
+        expect(wrapper.find('[data-test="no-exclusions"]').text()).toBe('Knowledge.no_exclusions');
+    });
+
+    it('translates not_found for an erasure of something that is not there', async () => {
+        const wrapper = await opened({ post: () => refused(404, 'not_found') });
+        await wrapper.find('[data-test="erase-id"]').setValue(PAGE);
+        await wrapper.find('[data-test="erase-document"]').trigger('submit');
+        await wrapper.find('[data-test="erase-confirm-input"]').setValue(PAGE);
+        await wrapper.find('[data-test="erase-confirm-button"]').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('[data-test="action-error"]').text()).toBe('Knowledge.code_not_found');
     });
 
     describe('paging', () => {

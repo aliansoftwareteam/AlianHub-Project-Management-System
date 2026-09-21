@@ -550,3 +550,51 @@ describe('who walks a re-index', () => {
         expect(await reindex.cancel(C, 'page')).toEqual({ ok: false, code: 'reindex_not_running' });
     });
 });
+
+describe('a walk that loses its hold', () => {
+    const indexer = require('../Modules/Knowledge/ingest/indexer');
+    const buildPages = async (n) => {
+        Array.from({ length: n }, (_, i) => seedPage({ title: `Harbour ${i}` }));
+        await backfill.backfillSource(C, 'page');
+    };
+
+    it('stops, saving nothing, when another server has taken its lease', async () => {
+        await buildPages(2);
+        await reindex.request(C, 'page', {});
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        const real = indexer.sync;
+        const spy = jest.spyOn(indexer, 'sync').mockImplementation(async (...args) => {
+            await gate;
+            return real(...args);
+        });
+        const walk = reindex.runSource(C, 'page', { owner: 'server-a' });
+        for (let i = 0; i < 200 && !spy.mock.calls.length; i += 1) await new Promise((resolve) => setImmediate(resolve));
+        stateOf('page').reindexOwner = 'server-b';
+        release();
+        await walk;
+        spy.mockRestore();
+        expect(stateOf('page')).toMatchObject({ reindexStatus: 'running', reindexOwner: 'server-b', reindexSynced: 0, reindexCursor: '' });
+    });
+
+    it('checks its lease at every batch, so a walk cancelled between batches syncs nothing more', async () => {
+        await buildPages(3);
+        await reindex.request(C, 'page', {});
+        const real = db().crud.getMockImplementation();
+        let cut = false;
+        db().crud.mockImplementation(async (c, q, method) => {
+            const out = await real(c, q, method);
+            const set = q.type === STATE && method === 'findOneAndUpdate' && q.data[1] && q.data[1].$set;
+            if (!cut && set && set.reindexCursor) {
+                cut = true;
+                stateOf('page').reindexStatus = 'cancelled';
+            }
+            return out;
+        });
+        const spy = jest.spyOn(indexer, 'sync');
+        await reindex.runSource(C, 'page', { owner: 'server-a', batchSize: 1 });
+        expect(spy).toHaveBeenCalledTimes(1);
+        spy.mockRestore();
+        expect(stateOf('page')).toMatchObject({ reindexStatus: 'cancelled', reindexSynced: 1 });
+    });
+});

@@ -465,6 +465,7 @@ describe('ids in another case', () => {
 
 describe('an erasure that matches nothing', () => {
     it('says so with its own code, still records the exclusion, and is audited', async () => {
+        mockDbFor(CID_A).seed(SCHEMA_TYPE.PAGES, { _id: PAGE, title: 'Not indexed yet' });
         const res = await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'page', sourceId: PAGE, confirm: PAGE });
         expect(res.status).toBe(200);
         expect(res.body).toMatchObject({ code: CODE.NOTHING_ERASED, data: { removed: {}, total: 0 } });
@@ -590,5 +591,140 @@ describe('the cost of the figures', () => {
         expect(Object.keys(pipeline[0])).toEqual(['$match']);
         expect(pipeline[0].$match).toEqual({ sourceType: { $in: expect.arrayContaining(['page']) } });
         expect(JSON.stringify(pipeline)).not.toMatch(/\$\$ROOT|\$bsonSize|"embedding"|"\$embedding"/);
+    });
+});
+
+const EXCLUSIONS_PATH = `${BASE}/${CID_A}/exclusions`;
+
+describe('an erasure naming nothing that exists', () => {
+    it('answers not_found, audits it, and records no exclusion', async () => {
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'page', sourceId: PAGE, confirm: PAGE });
+        expect(res.status).toBe(404);
+        expect(res.body.code).toBe(CODE.NOT_FOUND);
+        expect(mockDbFor(CID_A).store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS] || []).toEqual([]);
+        await settle();
+        expect(audits(CID_A)).toEqual([expect.objectContaining({ action: ACTIONS.ERASE_DOCUMENT, entityId: PAGE, meta: expect.objectContaining({ notFound: true, total: 0 }) })]);
+    });
+
+    it.each([
+        ['task', TASK],
+        ['comment', '6f0000000000000000000e01'],
+        ['file', `${TASK}:a1`],
+        ['guide', '6f0000000000000000000a09'],
+        ['transcript', '6f0000000000000000000f01'],
+    ])('answers not_found for a %s that is nowhere', async (sourceType, sourceId) => {
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType, sourceId, confirm: sourceId });
+        expect(res.body.code).toBe(CODE.NOT_FOUND);
+        expect(mockDbFor(CID_A).store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS] || []).toEqual([]);
+    });
+
+    it('answers not_found for a person who never held a seat here and wrote nothing indexed', async () => {
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: ALICE });
+        expect(res.status).toBe(404);
+        expect(res.body.code).toBe(CODE.NOT_FOUND);
+        expect(mockDbFor(CID_A).store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS] || []).toEqual([]);
+    });
+
+    it('erases a person who holds or held a seat here even with nothing indexed, recording the exclusion', async () => {
+        g().seed('company_users', { userId: ALICE, companyId: CID_A, roleType: 3, status: 2 });
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: ALICE });
+        expect(res.body.code).toBe(CODE.NOTHING_ERASED);
+        expect(mockDbFor(CID_A).store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS]).toHaveLength(1);
+    });
+
+    it.each([
+        ['task', TASK, SCHEMA_TYPE.TASKS, { _id: TASK }],
+        ['page', PAGE, SCHEMA_TYPE.PAGES, { _id: PAGE }],
+        ['file', `${TASK}:a1`, SCHEMA_TYPE.TASKS, { _id: TASK, attachments: [{ id: 'a1' }] }],
+    ])('takes a %s whose row exists as existing, even with no chunks', async (sourceType, sourceId, type, row) => {
+        mockDbFor(CID_A).seed(type, row);
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType, sourceId, confirm: sourceId });
+        expect(res.body.code).toBe(CODE.NOTHING_ERASED);
+    });
+
+    it('does not take a file as existing when its task has no such attachment', async () => {
+        mockDbFor(CID_A).seed(SCHEMA_TYPE.TASKS, { _id: TASK, attachments: [{ id: 'other' }] });
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'file', sourceId: `${TASK}:a1`, confirm: `${TASK}:a1` });
+        expect(res.body.code).toBe(CODE.NOT_FOUND);
+    });
+});
+
+describe('an erasure whose first write fails', () => {
+    it('is audited as failed, not partial', async () => {
+        seedChunk(CID_A);
+        const db = mockDbFor(CID_A);
+        const real = db.crud.getMockImplementation();
+        db.crud.mockImplementation((c, q, method) => (method === 'updateOne' && q.type === SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS
+            ? Promise.reject(new Error('disk gone'))
+            : real(c, q, method)));
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'page', sourceId: PAGE, confirm: PAGE });
+        expect(res.status).toBe(500);
+        await settle();
+        const [row] = audits(CID_A);
+        expect(row.meta).toEqual({ sourceType: 'page', removed: {}, total: 0, failed: true, error: CODE.SERVER_ERROR });
+    });
+});
+
+describe('the task erasure query', () => {
+    it('names the source types, so the index on source type and task is used', async () => {
+        seedChunk(CID_A, { sourceType: 'comment', sourceId: 'c1', taskId: TASK });
+        await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'task', sourceId: TASK, confirm: TASK });
+        const reads = mockDbFor(CID_A).calls.filter((c) => c.type === CHUNKS && c.method === 'find' && c.data[0] && c.data[0].taskId === TASK);
+        expect(reads.length).toBeGreaterThan(0);
+        reads.forEach((c) => expect(c.data[0].sourceType).toEqual({ $in: expect.arrayContaining(['comment', 'file']) }));
+    });
+});
+
+describe('exclusions', () => {
+    const EXCLUSIONS = `${BASE}/${CID_A}/exclusions`;
+    const stored = () => mockDbFor(CID_A).store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS] || [];
+
+    it('are listed with kind, ids, when, who and the chunks kept out, never text', async () => {
+        seedChunk(CID_A, { ordinal: 0 });
+        seedChunk(CID_A, { ordinal: 1 });
+        await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'page', sourceId: PAGE, confirm: PAGE });
+        seedChunk(CID_A, { sourceType: 'comment', sourceId: 'c9', visibility: 'project' });
+        await asOwner('POST', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: ALICE });
+
+        const res = await asOwner('GET', EXCLUSIONS);
+        expect(res.status).toBe(200);
+        expect(res.body.data.total).toBe(2);
+        expect(res.body.data.exclusions).toEqual(expect.arrayContaining([
+            expect.objectContaining({ kind: 'document', sourceType: 'page', sourceId: PAGE, erasedBy: OWNER, erasedByName: 'Olivia Owner', erasedChunks: 2, erasedAt: expect.any(String), id: expect.any(String) }),
+            expect.objectContaining({ kind: 'author', userId: ALICE, erasedChunks: 1 }),
+        ]));
+        expect(JSON.stringify(res.body)).not.toMatch(/Hidden words/);
+    });
+
+    it('can be removed with the id typed back, audited, so a wrong one is undone', async () => {
+        seedChunk(CID_A);
+        await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'page', sourceId: PAGE, confirm: PAGE });
+        const [exclusion] = stored();
+        const id = String(exclusion._id);
+
+        const wrong = await asOwner('POST', `${EXCLUSIONS}/${id}/remove`, { confirm: 'nope' });
+        expect(wrong.status).toBe(400);
+        expect(wrong.body.code).toBe(CODE.CONFIRMATION_MISMATCH);
+        expect(stored()).toHaveLength(1);
+
+        const res = await asOwner('POST', `${EXCLUSIONS}/${id}/remove`, { confirm: PAGE.toUpperCase() });
+        expect(res.status).toBe(200);
+        expect(stored()).toEqual([]);
+        await settle();
+        expect(audits(CID_A).map((row) => row.action)).toEqual([ACTIONS.ERASE_DOCUMENT, ACTIONS.EXCLUSION_REMOVE]);
+        expect(audits(CID_A)[1]).toMatchObject({ actorId: OWNER, entityId: id, meta: { kind: 'document', sourceType: 'page', sourceId: PAGE } });
+    });
+
+    it('refuses an id that is not one, and one that is not there', async () => {
+        expect((await asOwner('POST', `${EXCLUSIONS}/nope/remove`, { confirm: 'x' })).body.code).toBe(CODE.INVALID_EXCLUSION_ID);
+        const missing = await asOwner('POST', `${EXCLUSIONS}/${MISSING_CID}/remove`, { confirm: 'x' });
+        expect(missing.status).toBe(404);
+        expect(missing.body.code).toBe(CODE.NOT_FOUND);
+    });
+
+    it.each([['GET', EXCLUSIONS_PATH, undefined], ['POST', `${EXCLUSIONS_PATH}/${MISSING_CID}/remove`, { confirm: 'x' }]])('refuse a member on %s %s', async (method, path, body) => {
+        expect((await call(method, path, { uid: MEMBER, body })).status).toBe(403);
+        expect((await call(method, path, { uid: ADMIN, body })).status).toBe(403);
+        expect((await call(method, path, { uid: OWNER, apiToken: 't', body })).status).toBe(403);
     });
 });
