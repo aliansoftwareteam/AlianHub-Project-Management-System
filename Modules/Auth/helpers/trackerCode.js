@@ -6,7 +6,8 @@ const { dbCollections } = require('../../../Config/collections');
 const TRACKER_CODE_TTL_MS = 2 * 60 * 1000;
 const TRACKER_CODE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const CODE_CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-const CODE_VERIFIER_PATTERN = /^[A-Za-z0-9_-]{43,128}$/;
+// RFC 7636 section 4.1: unreserved characters, 43 to 128 of them.
+const CODE_VERIFIER_PATTERN = /^[A-Za-z0-9._~-]{43,128}$/;
 const SPENT_AT = new Date(0);
 
 const sessionsCrud = (data, method) => mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.SESSIONS, data }, method);
@@ -74,4 +75,4 @@ const redeemTrackerCode = async (code, codeVerifier) => {
     return { ok: true, userId: String(session.userId) };
 };
 
-module.exports = { issueTrackerCode, redeemTrackerCode, isCodeChallenge, challengeOf, TRACKER_CODE_TTL_MS };
+module.exports = { issueTrackerCode, redeemTrackerCode, isCodeChallenge, challengeOf, sameSecret, CODE_VERIFIER_PATTERN, TRACKER_CODE_TTL_MS };
