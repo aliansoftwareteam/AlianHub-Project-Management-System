@@ -1586,6 +1586,15 @@ const schema = {
         catchUpPass: { type: Number, required: false, default: 0 },
         // When the source's chunks were given their origin, so the fill runs once.
         originFilledAt: { type: Date, required: false },
+        // A re-index asked for from the instance console walks the source beside `status`, which it
+        // never changes, so the chunks stay readable until the walk is done.
+        reindexStatus: { type: String, required: false, default: '' },
+        reindexCursor: { type: String, required: false, default: '' },
+        reindexSynced: { type: Number, required: false, default: 0 },
+        reindexRequestedAt: { type: Date, required: false },
+        reindexRequestedBy: { type: String, required: false },
+        reindexFinishedAt: { type: Date, required: false },
+        reindexError: { type: String, required: false, default: '' },
     },
     // Submissions arriving through a public intake form
     intakeItems: {

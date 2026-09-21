@@ -983,6 +983,7 @@ module.exports = {
     RULES,
     EMBED_RETRY_ATTEMPTS,
     FILE_EXTRACT_ATTEMPTS,
+    RETRIED_FILE_REASONS: RETRIED,
     REEMBED_BATCH,
     embedRetries,
     flushEmbedRetries,

@@ -332,6 +332,7 @@ module.exports = {
     JOB_NAME,
     INTERVAL_MS,
     BATCH_SIZE,
+    CANDIDATES,
     HEARTBEAT_MS,
     STALE_AFTER_MS,
     readState,

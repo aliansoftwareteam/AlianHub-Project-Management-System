@@ -46,17 +46,19 @@ const eraseDocument = async (companyId, { sourceType, sourceId } = {}) => {
     return result;
 };
 
+const personWhere = (userId) => ({ createdBy: String(userId), $or: [{ sourceType: 'page', visibility: 'private' }, { sourceType: 'comment' }] });
+
 /* A person's private pages and the comments they wrote (owner, 2026-09-17). Their shared pages stay,
  * and so do the calls they were on, which hold other participants' words. */
 const erasePerson = async (companyId, userId) => {
     const id = String(userId || '').trim();
     if (!OBJECT_ID.test(id)) throw new Error('erasePerson needs a valid user id.');
     await exclude(companyId, { kind: 'author', sourceType: '', sourceId: '', userId: id });
-    const where = { createdBy: id, $or: [{ sourceType: 'page', visibility: 'private' }, { sourceType: 'comment' }] };
+    const where = personWhere(id);
     const sources = await sourcesOf(companyId, where);
     const result = await eraseChunks(companyId, where);
     await eraseVectors(companyId, sources);
     return result;
 };
 
-module.exports = { eraseDocument, erasePerson };
+module.exports = { eraseDocument, erasePerson, personWhere };
