@@ -118,7 +118,10 @@ const {
     auditChainHeadsSchema,
     auditChainAnchorsSchema,
     egressAllowlistsSchema,
-    secretsSchema
+    secretsSchema,
+    oauthClientsSchema,
+    oauthGrantsSchema,
+    oauthTokensSchema
 } = require('./createSchema');
 
 
@@ -360,6 +363,12 @@ exports.checkType = (type) => {
             return egressAllowlistsSchema
         case SCHEMA_TYPE.SECRETS:
             return secretsSchema
+        case SCHEMA_TYPE.OAUTH_CLIENTS:
+            return oauthClientsSchema
+        case SCHEMA_TYPE.OAUTH_GRANTS:
+            return oauthGrantsSchema
+        case SCHEMA_TYPE.OAUTH_TOKENS:
+            return oauthTokensSchema
         default:
             return ""
     }
@@ -604,6 +613,12 @@ exports.tableType = (type) => {
                 return `${dbCollections.EGRESS_ALLOWLISTS}`
         case SCHEMA_TYPE.SECRETS:
                 return `${dbCollections.SECRETS}`
+        case SCHEMA_TYPE.OAUTH_CLIENTS:
+                return `${dbCollections.OAUTH_CLIENTS}`
+        case SCHEMA_TYPE.OAUTH_GRANTS:
+                return `${dbCollections.OAUTH_GRANTS}`
+        case SCHEMA_TYPE.OAUTH_TOKENS:
+                return `${dbCollections.OAUTH_TOKENS}`
         default:
             return ""
     }
