@@ -6,6 +6,7 @@ const {
     findRoomsByPrefixes,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { onJoin, roomFor, prefixOfOwnRoom, isSelf, canOpenTask, canOpenSprintBoard } = require('../roomAccess');
 
 function setEventName(type) {
     switch (type) {
@@ -75,36 +76,36 @@ const handleTaskChange = (changeData, includeUpdatedFields = false) => {
     });
 };
 
+const leaveOwnRoom = (socket, roomName) => {
+    if (!prefixOfOwnRoom(socket, roomName)) return;
+    removeRoom(roomName);
+    leaveRoom(socket, roomName);
+};
+
 exports.taskSocketHandler = ({ socket, namespace }) => {
-    socket.on('joinProjectSprintForTask', (data) => {
-        const roomName = `project_sprint_${data.projectId}_${data.sprintId}**${data.socketId}`;
-        joinRoom(socket, roomName);
-        // SOCKET-PERFORMANCE-PLAN #7 (Phase 2): upsertRoom is idempotent on
-        // (roomName) — tab refresh / reconnect no longer produces duplicate
-        // entries that would have caused the same event to fire multiple
-        // times to the same room.
-        upsertRoom({
-            roomName,
-            socketId: data.socketId,
-            namespace,
-            socket,
-            isUserIdCheck: data.userId ? true : false,
-            userId: data.userId,
+    onJoin(socket, 'joinProjectSprintForTask',
+        (data, identity) => (!data.userId || isSelf(identity, data.userId)) && canOpenSprintBoard(identity, data.projectId, data.sprintId),
+        (data) => {
+            const roomName = roomFor(socket, `project_sprint_${data.projectId}_${data.sprintId}`);
+            joinRoom(socket, roomName);
+            upsertRoom({
+                roomName,
+                socketId: socket.id,
+                namespace,
+                socket,
+                isUserIdCheck: data.userId ? true : false,
+                userId: data.userId,
+            });
         });
-    });
-    socket.on('leaveProjectSprintForTask', (roomName) => {
-        removeRoom(roomName);
-        leaveRoom(socket, roomName);
-    });
-    socket.on('joinTaskDetail', (data) => {
-        const roomName = `taskDetail_${data.taskId}**${data.socketId}`;
-        joinRoom(socket, roomName);
-        upsertRoom({ roomName, socketId: data.socketId, namespace, socket });
-    });
-    socket.on('leaveTaskDetail', (roomName) => {
-        removeRoom(roomName);
-        leaveRoom(socket, roomName);
-    });
+    socket.on('leaveProjectSprintForTask', (roomName) => leaveOwnRoom(socket, roomName));
+    onJoin(socket, 'joinTaskDetail',
+        (data, identity) => canOpenTask(identity, data.taskId),
+        (data) => {
+            const roomName = roomFor(socket, `taskDetail_${data.taskId}`);
+            joinRoom(socket, roomName);
+            upsertRoom({ roomName, socketId: socket.id, namespace, socket });
+        });
+    socket.on('leaveTaskDetail', (roomName) => leaveOwnRoom(socket, roomName));
 };
 
 // SOCKET-PERFORMANCE-PLAN #2: subscribe to module-scoped events only. The

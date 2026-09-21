@@ -6,18 +6,20 @@ const {
     findRoomsByPrefix,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { onJoin, roomFor, prefixOfOwnRoom, canOpenComments } = require('../roomAccess');
 
 exports.commentSocketHandler = ({ socket, namespace }) => {
-    socket.on('joinCommentRoom', (data) => {
-        const roomName = data.roomName;
-        joinRoom(socket, roomName);
-        // SOCKET-PERFORMANCE-PLAN #7 (Phase 2): upsertRoom replaces the
-        // hand-rolled findIndex / push-or-replace dedup that used to live
-        // inline here. The Map-based index keys on roomName, so re-joining
-        // is naturally idempotent.
-        upsertRoom({ roomName, socketId: data.socketId, namespace, socket });
-    });
+    onJoin(socket, 'joinCommentRoom',
+        (data, identity) => {
+            const prefix = prefixOfOwnRoom(socket, data.roomName);
+            return Boolean(prefix) && canOpenComments(identity, prefix);
+        },
+        (data) => {
+            joinRoom(socket, data.roomName);
+            upsertRoom({ roomName: data.roomName, socketId: socket.id, namespace, socket });
+        });
     socket.on('leaveCommentRoom', (roomName) => {
+        if (!prefixOfOwnRoom(socket, roomName)) return;
         removeRoom(roomName);
         leaveRoom(socket, roomName);
     });
@@ -35,7 +37,7 @@ exports.commentSocketHandler = ({ socket, namespace }) => {
      * inheriting that failure mode.
      */
     socket.on('commentTyping', (data) => {
-        if (!data || !data.roomPrefix) return;
+        if (!data || !data.roomPrefix || !socket.rooms.has(roomFor(socket, data.roomPrefix))) return;
 
         const payload = {
             roomPrefix: data.roomPrefix,

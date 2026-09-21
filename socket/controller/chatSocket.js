@@ -6,6 +6,9 @@ const {
     findRoomsByPrefixes,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { onJoin, roomFor, prefixOfOwnRoom, isSelf, projectReadable } = require('../roomAccess');
+
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 function setEventName(type) {
     switch (type) {
@@ -40,12 +43,15 @@ const handleTaskChange = (changeData, includeUpdatedFields = false) => {
 };
 
 exports.chatSocketHandler = ({ socket, namespace }) => {
-    socket.on('joinChats', (data) => {
-        const roomName = `chat_${data.projectId}_${data.userId}**${data.socketId}`;
-        joinRoom(socket, roomName);
-        upsertRoom({ roomName, socketId: data.socketId, namespace, socket });
-    });
+    onJoin(socket, 'joinChats',
+        (data, identity) => isSelf(identity, data.userId) && OBJECT_ID.test(String(data.projectId || '')) && projectReadable(identity, data.projectId),
+        (data) => {
+            const roomName = roomFor(socket, `chat_${data.projectId}_${data.userId}`);
+            joinRoom(socket, roomName);
+            upsertRoom({ roomName, socketId: socket.id, namespace, socket });
+        });
     socket.on('leaveChats', (roomName) => {
+        if (!prefixOfOwnRoom(socket, roomName)) return;
         removeRoom(roomName);
         leaveRoom(socket, roomName);
     });
