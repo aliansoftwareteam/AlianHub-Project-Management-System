@@ -298,6 +298,15 @@ describe('destructive calls open a proposal', () => {
         expect(proposals.create).not.toHaveBeenCalled();
     });
 
+    it('refuses to file a proposal for an OAuth grant, which approval cannot re-check yet', async () => {
+        const t = seedTask();
+        irreversible('task.comment');
+        const oauth = ctxFor({ token: { oauth: true, scopes: ['tasks:read', 'tasks:write'] }, oauth: { clientId: 'cli', grantId: 'g1', scopes: ['tasks:write'] } });
+        await expect(tools.call(oauth, 'task.comment', { taskId: t._id, body: 'x' })).rejects.toMatchObject({ refused: true, message: expect.stringMatching(/personal access token/) });
+        expect(proposals.create).not.toHaveBeenCalled();
+        expect(actions.perform).not.toHaveBeenCalled();
+    });
+
     it('lets a non-destructive write act as today', async () => {
         const t = seedTask();
         const out = await tools.call(ctxFor(), 'task.comment', { taskId: t._id, body: 'hi' });
