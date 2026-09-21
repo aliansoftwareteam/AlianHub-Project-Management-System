@@ -60,3 +60,4 @@ None directly.
 - Settled (owner, 2026-09-21), replacing the fail-closed defaults: an agent with no projects retrieves no project-scoped content; agent runs do not reach content outside any project (company-level pages, calls with no project); agent notes stay out of Ask.
 - The redaction of personal fields in audit rows on erasure (owner, 2026-09-16) was not built; it ships as its own slice (owner, 2026-09-21).
 - Slice 7 merged: #791 `67e52c0e` (build 261), the Atlas Vector Search adapter behind `KNOWLEDGE_VECTOR_STORE` (2026-09-21).
+- Audit redaction of a person is its own instance-owner action, not a side effect of knowledge erasure, because knowledge erasure leaves the app's own records untouched (2026-09-21).
