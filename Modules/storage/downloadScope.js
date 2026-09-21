@@ -9,10 +9,9 @@ const { visibleProjectIds } = require('../Agents/scope');
 const { resolveSheetScope, scopedTimeMatch, SHEET_PERMISSION } = require('../TimeSheet/helpers/timeScope');
 const { isTaskOwnKey } = require('../../common-storage/taskFileKeys');
 const { safeRelativePath } = require('../../utils/uploadConfig');
+const { REPORT, scopeMode: mode, countReported: countCategory, reportedCounts } = require('../../common-storage/storedFileScope');
 const logger = require('../../Config/loggerConfig');
 
-const ENFORCE = 'enforce';
-const REPORT = 'report';
 const SERVER_STORAGE = 'server';
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const ID = '([a-f0-9]{24})';
@@ -29,8 +28,6 @@ const NO_ACCESS = 'no_access';
 const layout = (pattern) => new RegExp(`^${pattern}$`, 'i');
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
 const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
-
-const mode = () => (String(process.env.STORAGE_DOWNLOAD_SCOPE || '').trim().toLowerCase() === ENFORCE ? ENFORCE : REPORT);
 
 const find = (ctx, type, query, fields, method = 'findOne') => MongoDbCrudOpration(ctx.companyId, {
     type,
@@ -202,16 +199,9 @@ const judge = async ({ companyId, uid, key, storage = process.env.STORAGE_TYPE }
         : { allowed: false, type: found.entry.type, reason: typeof outcome === 'string' ? outcome : NO_ACCESS };
 };
 
-const reportedRefusals = new Map();
+const countReported = (type, reason) => countCategory(`download:${type}:${reason}`);
 
-const countReported = (type, reason) => {
-    const label = `${type}:${reason}`;
-    const count = (reportedRefusals.get(label) || 0) + 1;
-    reportedRefusals.set(label, count);
-    return count;
-};
-
-const refusalCounts = () => Object.fromEntries(reportedRefusals);
+const refusalCounts = reportedCounts;
 
 const refuse = (res) => res.status(404).json({ status: false, statusText: REFUSAL_TEXT, message: REFUSAL_TEXT, code: REFUSAL_CODE });
 

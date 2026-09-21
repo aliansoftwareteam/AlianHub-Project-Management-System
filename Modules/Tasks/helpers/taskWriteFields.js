@@ -7,7 +7,8 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { sanitizeInput } = require('../../serviceFunction');
 const { BODY_COMPANY_PATHS } = require('../../../Config/taskWritePermissions');
 const { canReadProject } = require('../../../Config/projectAccess');
-const { mayAttachKey } = require('../../../common-storage/taskFileKeys');
+const { mayAttachKey, taskAttachmentKey, formUploadKey, clipKey } = require('../../../common-storage/taskFileKeys');
+const { REPORT, scopeMode, countReported } = require('../../../common-storage/storedFileScope');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
@@ -436,6 +437,13 @@ const attachmentsWritten = (taskSpec, { payload, task }) => {
     return null;
 };
 
+const refusedKeyReason = (key) => {
+    if (taskAttachmentKey(key)) return 'other_task';
+    if (formUploadKey(key)) return 'form_upload';
+    if (clipKey(key)) return 'clip';
+    return 'unknown';
+};
+
 const checkAttachmentKeys = async (taskSpec, prepared) => {
     const written = attachmentsWritten(taskSpec, prepared);
     if (!written) return;
@@ -444,7 +452,9 @@ const checkAttachmentKeys = async (taskSpec, prepared) => {
         const key = isPlainObject(record) ? record.url : undefined;
         if (key !== undefined && key !== null && typeof key !== 'string') throw new TaskWriteRefusal(400, 'An attachment url must be text.', ATTACHMENT_KEY_REFUSED);
         if (!(await mayAttachKey(prepared.companyId, written.task, key, actorId))) {
-            throw new TaskWriteRefusal(400, 'An attachment can only name a file stored for this task.', ATTACHMENT_KEY_REFUSED);
+            if (scopeMode() !== REPORT) throw new TaskWriteRefusal(400, 'An attachment can only name a file stored for this task.', ATTACHMENT_KEY_REFUSED);
+            const reason = refusedKeyReason(key);
+            logger.warn(`attachment write would be refused (reason: ${reason}, reported so far for this reason: ${countReported(`attachment_write:${reason}`)})`);
         }
     }
 };
