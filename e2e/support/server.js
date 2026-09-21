@@ -52,6 +52,7 @@ function serverEnv({ port, mongoUrl, workDir, embeddingsUrl }) {
         // Embeddings go to the harness stub; they only happen once a suite sets AI_API_KEY through the instance settings.
         OPENAI_EMBEDDINGS_URL: embeddingsUrl,
         AGENT_PERFORMANCE_READ: 'on',
+        SKILL_EXTERNAL_READS: 'on',
         GLOBAL_RATE_LIMIT_PER_MIN: 'off',
         AUTH_RATE_LIMIT_MAX_ATTEMPTS: '10000',
         MEMBERSHIP_CACHE_TTL_SECONDS: '0',

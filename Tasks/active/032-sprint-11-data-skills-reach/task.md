@@ -1,7 +1,7 @@
 ---
 id: 032
 title: Sprint 11 — data skills reach outside (ADR 003 phase 4)
-status: backlog
+status: active
 priority: medium
 depends_on: [029, 031]
 created: 2026-09-10
@@ -9,7 +9,7 @@ created: 2026-09-10
 
 # 032 — Sprint 11 — data skills reach outside (ADR 003 phase 4)
 
-Status: backlog · depends on 029, 031 · sprint 11 · two weeks · branch `feat/sprint-11-data-skills-reach` (from `beta`)
+Status: active · started 2026-09-21 · depends on 029, 031 · sprint 11 · two weeks · branch `feat/sprint-11-data-skills-reach` (from `beta`)
 
 Source: `docs/AI-PLATFORM-ARCHITECTURE.md`, "Development and integration plan", Sprint 11. Filed 2026-09-10.
 
@@ -40,3 +40,11 @@ None directly.
 ## Decisions
 - Added 2026-09-10: ADR 003 phase 4 had no sprint in the architecture document's plan; the document gains this sprint in the same change.
 - Branch from `beta`, one slice per pull request, checks green before merge. New behaviour behind a flag whose default reproduces today. Schema fields declared before the first write; any shape change ships its migration in the same pull request. Deviations from the plan and their reasons recorded here.
+- Plan (2026-09-21), six pull requests: S0 drop credentials on cross-origin redirects and taint every hop; S1 `url` and `api` readers with declared hosts checked against the workspace allowlist at save (`SKILL_EXTERNAL_READS`); S2 run-time reads rechecked against the live list, credentials only by secret handle; S3 fetches in the replay record; S4 declared reads in the Skill editor; S5 `pr.summary` as a data seed (`PR_SUMMARY_AS_DATA`). Migrations for this sprint start at 036.
+- The PR-review skill makes no GitHub or GitLab API calls today; it fetches the public `.diff` page without credentials, so private repositories already fail. Authenticated reads for private pull requests are new scope for later (2026-09-21).
+- A declared read's host must always be on the workspace allowlist, even when the list is empty; an empty list keeps today's open behaviour for agent page fetches only (owner, 2026-09-21).
+- The workspace list is the only source; there is no instance-wide override (owner, 2026-09-21).
+- The replay keeps the first 32 KB of a fetched body after redaction, plus a hash of the whole body, under the existing replay retention (owner, 2026-09-21).
+- Credentials are per skill, as a handle to a workspace secret of kind `skill_read` chosen by an admin, and a secret may only be sent to the hosts it names (owner, 2026-09-21).
+- A dry run fetches through the same checks and writes no replay (owner, 2026-09-21).
+- The allowlist is edited only in the instance console; the Skill editor links to it (owner, 2026-09-21).

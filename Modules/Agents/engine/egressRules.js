@@ -142,4 +142,4 @@ function hostMatches(hosts, hostname, port) {
     });
 }
 
-module.exports = { MAX_HOSTS, REASON, normalizeHost, parseEntry, validateHosts, hostMatches };
+module.exports = { MAX_HOSTS, REASON, normalizeHost, parseEntry, validateHosts, hostMatches, underWildcardDns };
