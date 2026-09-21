@@ -2,7 +2,7 @@
 // language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type/$size, $set/$inc/$push/$addToSet/$pull,
 // conditional findOneAndUpdate answering the old document unless asked for the new one (null after an upsert insert, as
 // the driver does), updateOne and findOneAndUpdate with upsert and $setOnInsert and a unique _id, findOneAndDelete, deleteOne, deleteMany,
-// sort/skip/limit on find, sort on findOneAndUpdate, $type 'date', $match/$project/$addFields ($toString)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
+// sort/skip/limit on find, sort on findOneAndUpdate, $type 'date', $match/$project/$addFields ($toString, $bsonSize)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000, declared text indexes that bound $text to their fields) so a test can assert on what was written.
 
 let seq = 1;
@@ -149,6 +149,8 @@ const group = (docs, spec) => {
 const computed = (doc, value, search, textFields) => {
     if (value && typeof value === 'object' && value.$meta === 'textScore') return textScoreOf(doc, search, textFields);
     if (value && typeof value === 'object' && value.$toString !== undefined) return String(hex(fieldOf(doc, value.$toString)));
+    // Only an approximation of the BSON size, though it grows and shrinks with the document as the real one does.
+    if (value && typeof value === 'object' && value.$bsonSize !== undefined) return Buffer.byteLength(JSON.stringify(fieldOf(doc, value.$bsonSize)));
     return fieldOf(doc, value);
 };
 
