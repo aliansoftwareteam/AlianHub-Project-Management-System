@@ -55,3 +55,5 @@ None directly.
 - The held-out question set is about thirty real questions the owner writes, each with its expected source, kept in the owner's private notes; retrieval defaults on only after the comparison passes (owner, 2026-09-18).
 - Slice 4 sets `origin` (`member`, `agent`, `external`) on every chunk and returned passage, the contract Sprint 8's #757 reads; chunks without it read as not external until the backfill fills it in (2026-09-19).
 - Migrations 024–027 are used, so slice 4 takes 032 if it needs indexes: 031 is held by Sprint 8's secrets store (#759) and 033 by its content security policy slice (2026-09-19).
+- Retrieval for agent runs fails closed where the owner has not decided: an agent with no projects retrieves no project-scoped content, agent runs reach no content outside any project, and agent notes stay out of Ask. Each is one named function (`Modules/Knowledge/agentScope.js`), so the owner's decision is a one-line change (2026-09-21).
+- Erasure from the knowledge console works while the indexer is off, since it only removes; an erasure that matches nothing records no exclusion, and exclusions can be listed and removed (2026-09-21).
