@@ -45,6 +45,15 @@ const callerCanReview = async (req) => {
     return { ok: canReview({ roleType }) || isPrivileged(roleType), roleType };
 };
 
+/* Only a timesheet reviewer may read another user's approvals; anyone else reads their own, whatever the query names. */
+const readTargetOf = async (req) => {
+    const uid = actorId(req);
+    const named = req.query && req.query.userId ? String(req.query.userId) : '';
+    if (!named || named === uid) return uid;
+    const { ok } = await callerCanReview(req);
+    return ok ? named : uid;
+};
+
 /* POST /api/v2/timesheet-approval/submit
  * body: { periodStart, periodEnd, periodType?, note?, userId?, userData } */
 exports.submitTimesheet = async (req, res) => {
@@ -112,7 +121,7 @@ exports.submitTimesheet = async (req, res) => {
 exports.getStatus = async (req, res) => {
     try {
         const companyId = sessionTenantOf(req);
-        const userId = req.query && req.query.userId ? String(req.query.userId) : actorId(req);
+        const userId = await readTargetOf(req);
         const period = parsePeriod({ periodStart: req.query && req.query.periodStart, periodEnd: req.query && req.query.periodEnd });
         if (!period.valid) return res.send({ status: false, statusText: period.reason });
         const doc = await MongoDbCrudOpration(companyId, {
@@ -131,7 +140,7 @@ exports.getStatus = async (req, res) => {
 exports.listMine = async (req, res) => {
     try {
         const companyId = sessionTenantOf(req);
-        const userId = req.query && req.query.userId ? String(req.query.userId) : actorId(req);
+        const userId = await readTargetOf(req);
         const docs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
             data: [{ userId, deletedStatusKey: 0 }, null, { sort: { periodStart: -1 } }],

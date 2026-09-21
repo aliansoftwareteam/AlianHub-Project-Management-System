@@ -2,12 +2,15 @@ const { handleProfileGetForUser, handleTaskTypeImageGet } = require(`../../../co
 const ctrl = require('./controller');
 const multer = require("multer");
 const { DEFAULT_LIMITS } = require('../../../utils/uploadConfig');
+const { requireStoredFileRead } = require('../downloadScope');
 const { USER_PROFILES_BUCKET, isProfileUpload, refuseBeforeWrite, refuseUpload, requireOwnBucket, requireProfileImageRead, requireSafeObjectPath, uploadRefusal, bodyField, paramField } = require('../bucketAccess');
 
 const wasabiUploadRefusal = (req) => {
     const body = req.body || {};
     return uploadRefusal(req, isProfileUpload(body) ? USER_PROFILES_BUCKET : body.companyId, body.path);
 };
+
+const signedRead = [requireOwnBucket(bodyField('companyId')), requireStoredFileRead(bodyField('companyId'), bodyField('path'), { storage: 'wasabi' })];
 
 const upload = multer({
     dest: "wasabiUploads/",
@@ -56,10 +59,10 @@ exports.init = (app) => {
     /**
      * get presigned url of the wasabi object
      */
-	app.post("/api/v1/wasabi/retriveObject", ctrl.getPresignedUrl);
+	app.post("/api/v1/wasabi/retriveObject", ...signedRead, ctrl.getPresignedUrl);
 
 
-    app.post("/api/v1/admin/wasabi/retriveObject", ctrl.getPresignedUrl);
+    app.post("/api/v1/admin/wasabi/retriveObject", ...signedRead, ctrl.getPresignedUrl);
     
     /**
     * @swagger
@@ -221,5 +224,5 @@ exports.init = (app) => {
      */
 	app.post("/api/v1/wasabi/deleteFile", ctrl.deleteFileWasabi);
     app.post("/api/v1/getUserProfile", requireSafeObjectPath(bodyField('path')), requireProfileImageRead(bodyField('path')), handleProfileGetForUser);
-    app.post("/api/v1/getTaskTypeImage", requireOwnBucket(bodyField("companyId")), handleTaskTypeImageGet);
+    app.post("/api/v1/getTaskTypeImage", ...signedRead, handleTaskTypeImageGet);
 }

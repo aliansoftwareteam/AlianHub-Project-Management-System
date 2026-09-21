@@ -9,6 +9,7 @@ const { updateSprintCount } = require('../../notification-count/controller');
 const { updateSprintFun } = require('../../Sprints/controller');
 const { dbCollections } = require('../../../Config/collections');
 const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
+const { isTaskStoredFile } = require('../../../common-storage/taskFileKeys');
 const { getCachedCompanyData } = require('../../../utils/planHelper');
 const serviceFun = require("../../serviceFunction");
 const socketEmitter = require('../../../event/socketEventEmitter');
@@ -819,15 +820,14 @@ exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, 
                 exports.HandleTask(companyId, obj, false, null, userData).then((taskResult) => {
                     if(duplicateData.includes('Attachments')){
                         if(subtask.attachments.length > 0) {
-                            let promises = [];
-
-                            subtask.attachments.forEach((x) => {
+                            /* Only a file stored for the source task is copied; any other key stays as it was, read under its own owner. */
+                            const promises = subtask.attachments.map(async (x) => {
                                 const previousUrl = x.url;
+                                if (!(await isTaskStoredFile(companyId, subtask, previousUrl))) return;
                                 let lastSlashIndex = previousUrl.lastIndexOf('/');
                                 let fileName = previousUrl.substring(lastSlashIndex + 1);
                                 x.url = `Project/${projectData.id}/Sprint/${taskResult.id}/Attachment/${fileName}`;
-
-                                promises.push(handleTaskAttachmentsDuplicateFunctionality(companyId, previousUrl, x.url));
+                                await handleTaskAttachmentsDuplicateFunctionality(companyId, previousUrl, x.url);
                             });
                             Promise.allSettled(promises).then(() => {
                                 let updateObj = {

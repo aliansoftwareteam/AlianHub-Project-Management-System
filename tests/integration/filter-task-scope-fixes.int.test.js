@@ -47,18 +47,35 @@ describe('saved project filters belong to their owner', () => {
         expect(after.some((f) => sameId(f._id, filter._id))).toBe(false);
     });
 
-    it('saves a project filter for the caller even when the body names someone else', async () => {
+    it('refuses with 403 to create a project filter for someone else, as task filters do, and stores nothing', async () => {
         const owner = await loginAs('owner');
         const member = await loginAs('member');
         const name = `SCOPE Planted ${uniqueSuffix()}`;
-        const res = await member.api.post('/api/v1/project/filter/create', { name, userId: owner.uid, filter: 'projectFilter', typeFilter: 'projects' });
-        expect(res.status).toBe(200);
+        const project = await member.api.post('/api/v1/project/filter/create', { name, userId: owner.uid, filter: 'projectFilter', typeFilter: 'projects' });
+        expect(project.status).toBe(403);
+        expect(project.body.status).toBe(false);
+        const task = await member.api.post('/api/v1/task/filter/create', { name, userId: owner.uid, filter: 'taskFilter', typeFilter: 'projectTask' });
+        expect(task.status).toBe(403);
+        expect(project.body.statusText).toBe(task.body.statusText);
+        const ownerList = (await owner.api.get(`/api/v1/project/filter/${owner.uid}`)).body.data;
+        const memberList = (await member.api.get(`/api/v1/project/filter/${member.uid}`)).body.data;
+        expect([...ownerList, ...memberList].some((f) => f.name === name)).toBe(false);
+    });
+
+    it('refuses with 403 to update a project filter into someone else\'s, while the owner still renames it', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const filter = await ownerProjectFilter(owner);
         try {
-            expect(sameId(res.body.data.userId, member.uid)).toBe(true);
-            const ownerList = (await owner.api.get(`/api/v1/project/filter/${owner.uid}`)).body.data;
-            expect(ownerList.some((f) => f.name === name)).toBe(false);
+            const moved = await owner.api.put('/api/v1/project/filter/update', { id: filter._id, name: 'Moved', userId: member.uid });
+            expect(moved.status).toBe(403);
+            const renamed = await owner.api.put('/api/v1/project/filter/update', { id: filter._id, name: `${filter.name} renamed` });
+            expect(renamed.status).toBe(200);
+            const mine = (await owner.api.get(`/api/v1/project/filter/${owner.uid}`)).body.data.find((f) => sameId(f._id, filter._id));
+            expect(mine).toMatchObject({ name: `${filter.name} renamed` });
+            expect(sameId(mine.userId, owner.uid)).toBe(true);
         } finally {
-            await member.api.delete(`/api/v1/project/filter/delete/${state.companyId}/${res.body.data._id}`);
+            await owner.api.delete(`/api/v1/project/filter/delete/${owner.companyId}/${filter._id}`);
         }
     });
 });

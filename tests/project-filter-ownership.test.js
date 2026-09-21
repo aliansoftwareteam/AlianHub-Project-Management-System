@@ -46,11 +46,37 @@ describe('saved project filters are bound to their owner', () => {
         expect(JSON.stringify(res.body)).not.toContain('Active');
     });
 
-    it('never plants a project filter in another user\'s list, whatever user the body names', async () => {
-        expect((await call(projectFilters.saveFilter, { body: { name: 'Planted', userId: OTHER, filter: 'projectFilter', typeFilter: 'projects' } })).statusCode).toBe(200);
+    it('refuses with 403 to create a project filter for another user, as task filters do', async () => {
+        const planted = await call(projectFilters.saveFilter, { body: { name: 'Planted', userId: OTHER, filter: 'projectFilter', typeFilter: 'projects' } });
+        expect(planted.statusCode).toBe(403);
+        expect(planted.body.status).toBe(false);
+        expect(stored()).toEqual([]);
+
+        expect((await call(projectFilters.saveFilter, { body: { name: 'Named', userId: ME, filter: 'projectFilter', typeFilter: 'projects' } })).statusCode).toBe(200);
         expect((await call(projectFilters.saveFilter, { body: { name: 'Plain', filter: 'projectFilter', typeFilter: 'projects' } })).statusCode).toBe(200);
         expect(stored().map((f) => f.userId)).toEqual([ME, ME]);
         expect((await call(projectFilters.getFilter, { uid: OTHER, params: { userId: OTHER } })).body.data).toEqual([]);
+    });
+
+    it('answers a create for another user with the same refusal as the task-filter side', async () => {
+        const savedFilters = require('../Modules/AdvancedGlobalFilter/helpers/savedFilters');
+        const body = { name: 'Planted', userId: OTHER, filter: 'projectFilter', typeFilter: 'projects' };
+        const project = await call(projectFilters.saveFilter, { body });
+        const task = await call(savedFilters.saveFilter, { body: { ...body, filter: 'taskFilter', typeFilter: 'projectTask' } });
+        expect(project.statusCode).toBe(task.statusCode);
+        expect(project.body.statusText).toBe(task.body.statusText);
+    });
+
+    it('refuses with 403 to update a project filter into another user\'s, and leaves it unchanged', async () => {
+        const mine = seedFilter({ name: 'Mine' });
+        const res = await call(projectFilters.updateFilter, { body: { id: String(mine._id), name: 'Moved', userId: OTHER } });
+        expect(res.statusCode).toBe(403);
+        expect(res.body.status).toBe(false);
+        expect(stored()[0]).toMatchObject({ name: 'Mine', userId: ME });
+
+        const own = await call(projectFilters.updateFilter, { body: { id: String(mine._id), name: 'Renamed', userId: ME } });
+        expect(own.statusCode).toBe(200);
+        expect(stored()[0]).toMatchObject({ name: 'Renamed', userId: ME });
     });
 
     it('refuses to delete another user\'s project filter and leaves it in place', async () => {
