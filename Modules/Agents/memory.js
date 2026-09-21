@@ -638,9 +638,7 @@ const refsOf = (list) => {
     const given = Array.isArray(list) ? list : (list == null ? [] : [list]);
     const unknown = given.find((ref) => !parseRef(ref));
     if (unknown !== undefined) throw invalid(`derivedFrom names a source of unknown type: "${String(unknown).slice(0, 80)}"`);
-    const refs = [...new Map(given.map(parseRef).map((ref) => [ref.ref, ref])).values()];
-    if (refs.length > DERIVED_MAX) throw invalid(`A note can name at most ${DERIVED_MAX} sources.`);
-    return refs;
+    return [...new Map(given.map(parseRef).map((ref) => [ref.ref, ref])).values()];
 };
 
 const gone = (row) => !row || Number(row.deletedStatusKey) === 1 || row.isDeleted === true;
@@ -727,7 +725,6 @@ async function rememberForAgent({ companyId, runId, text, derivedFrom }) {
     const refs = refsOf(derivedFrom);
     if (skipInstruction(`rememberForAgent ${run.agentId}`, clean)) return null;
     const external = refs.filter((ref) => ref.external);
-    const projects = idsOf([run.projectId, ...(await projectsOfRefs(companyId, refs))]);
     const tainted = run.tainted || external.length > 0;
     const taintSources = mergeTaint(run.taintSources, external.map((ref) => ({ kind: ref.external, ref: ref.id })));
     const ns = agentNamespaceOf(run.agentId);
@@ -737,6 +734,7 @@ async function rememberForAgent({ companyId, runId, text, derivedFrom }) {
     const prev = existing && existing.value ? existing.value : null;
     const derived = union(prev && prev.derivedFrom, refs.map((ref) => ref.ref));
     if (derived.length > DERIVED_MAX) throw invalid(`A note can name at most ${DERIVED_MAX} sources.`);
+    const projects = idsOf([run.projectId, ...(await projectsOfRefs(companyId, refs))]);
     const now = isoNow();
     const row = prev
         ? {
