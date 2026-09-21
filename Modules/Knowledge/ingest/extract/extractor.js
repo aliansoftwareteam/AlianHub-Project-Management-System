@@ -12,6 +12,8 @@ const MAX_WORKERS = 2;
 const PER_COMPANY_WHEN_OTHERS_WAIT = 1;
 const WORKER_HEAP_MB = 512;
 const MEMORY_SAMPLE_MS = 20;
+/* What starting a thread costs in resident memory before its parser holds anything. */
+const THREAD_OVERHEAD = 64 * 1024 * 1024;
 const MAX_ZIP_ENTRIES = 5000;
 const WORKER_PATH = path.join(__dirname, 'parseWorker.js');
 const OWN_REASONS = ['inflated_too_large', 'too_much_memory'];
@@ -119,7 +121,8 @@ const inSlot = ({ companyId = '', priority = 'live' } = {}, run) => new Promise(
 
 /* The thread judges its own memory where its parser yields (parseWorker.js). A parser that never
  * yields cannot, so the process's resident growth is watched as well, allowing each running parse
- * its cap: with two running, either may be stopped past twice the cap, and the file is retried. */
+ * its cap and a thread's own start-up cost: with two running, either may be stopped once both
+ * together pass that, and the file is retried. */
 const parseInThread = (buffer, kind, limits, workerPath) => new Promise((resolve, reject) => {
     const bytes = new Uint8Array(buffer.byteLength);
     bytes.set(buffer);
@@ -141,7 +144,7 @@ const parseInThread = (buffer, kind, limits, workerPath) => new Promise((resolve
     };
     const timer = setTimeout(() => settle(reject, refusal('timed_out', `Abandoned after ${limits.timeoutMs} ms.`)), limits.timeoutMs);
     const watchdog = setInterval(() => {
-        if (process.memoryUsage.rss() - baseline > limits.maxParseMemoryBytes * Math.max(active, 1)) settle(reject, refusal('too_much_memory', `Stopped past ${limits.maxParseMemoryBytes} bytes of memory.`));
+        if (process.memoryUsage.rss() - baseline > (limits.maxParseMemoryBytes + THREAD_OVERHEAD) * Math.max(active, 1)) settle(reject, refusal('too_much_memory', `Stopped past ${limits.maxParseMemoryBytes} bytes of memory.`));
     }, MEMORY_SAMPLE_MS);
     worker.once('message', (message) => (message && message.ok
         ? settle(resolve, { text: message.text, truncated: message.truncated })
