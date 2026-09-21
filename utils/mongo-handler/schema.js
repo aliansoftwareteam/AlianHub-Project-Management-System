@@ -628,6 +628,24 @@ const schema = {
         mac: { type: String, required: true },
         at: { type: Date, required: false },
     },
+    // Per-company secrets by handle (Config/secrets.js): AES-256-GCM ciphertext under the key whose
+    // fingerprint is keyId. Revocation blanks the ciphertext and keeps the row as a record.
+    secrets: {
+        handle: { type: String, required: true },
+        name: { type: String, required: true },
+        kind: { type: String, required: true },
+        keyId: { type: String, required: true },
+        ciphertext: { type: String, required: false },
+        iv: { type: String, required: false },
+        tag: { type: String, required: false },
+        createdBy: { type: String, required: false },
+        createdAt: { type: Date, required: true },
+        rotatedAt: { type: Date, required: false },
+        revokedAt: { type: Date, required: false },
+        lastResolvedAt: { type: Date, required: false },
+        // No document points at the handle any more, and no key was set to revoke it with (Config/secrets.js retire).
+        orphanedAt: { type: Date, required: false },
+    },
     // The last chained row a retention sweep deleted; verification starts after the newest one.
     auditChainAnchors: {
         seq: { type: Number, required: true },
@@ -1194,6 +1212,10 @@ const schema = {
         budgetUsd: { type: Number, required: false },
         costUsd: { type: Number, required: false },
         depth: { type: Number, required: false },
+        /* Sprint 8 slice 8. The id and expiry of the step-scoped credential the engine
+         * minted on claim (STEP_CREDENTIALS); never the credential itself. */
+        credentialId: { type: String, required: false },
+        credentialExpiresAt: { type: Date, required: false },
     },
     /* Task 028 sprint 5 step 2. One row per human approval step: who owns the
      * decision, when it escalates, when it expires and what happened. The step
@@ -1255,6 +1277,8 @@ const schema = {
         name: { type: String, required: false },
         config: { type: Object, default: {}, required: false },
         secretsVersion: { type: Number, default: 0, required: false },
+        // { [secret field key]: 'sec_…' } when SECRETS_STORE keeps the value in `secrets`; the field is then absent from config.
+        secretHandles: { type: Object, required: false },
         status: { type: String, default: 'connected', required: false },
         enabled: { type: Boolean, default: true, required: false },
         createdBy: { type: String, required: false },
@@ -1462,6 +1486,14 @@ const schema = {
         count: { type: Number, required: false },
         lastSeen: { type: Date, required: false },
     },
+    // One document per workspace (_id "workspace"): the hosts its agents may fetch when
+    // AGENT_EGRESS_ALLOWLIST is on (Modules/Agents/engine/egressAllowlist.js).
+    egressAllowlists: {
+        _id: { type: String, required: true },
+        hosts: { type: [String], required: false },
+        updatedBy: { type: String, required: false },
+        updatedAt: { type: Date, required: false },
+    },
     // Client invoices raised against a project (handoff 19c). Distinct from the
     // global `invoices` collection, which is AlianHub's own subscription billing.
     // Every line keeps the ids it was drafted from so a client question about a
@@ -1545,6 +1577,8 @@ const schema = {
         startedAt: { type: Date, required: false },
         finishedAt: { type: Date, required: false, default: null },
         lastRunAt: { type: Date, required: false },
+        // The service identity the last run was recorded under (STEP_CREDENTIALS), e.g. service:indexer.
+        lastRunBy: { type: String, required: false },
         error: { type: String, required: false, default: '' },
         // Written while the indexer is on; a stale one means events may have been dropped while it was off.
         lastSeenOnAt: { type: Date, required: false },
@@ -1585,10 +1619,20 @@ const schema = {
             default: [],
             required: true,
         },
-        // HMAC secret — generated server-side, returned once on create.
+        // HMAC secret — generated server-side, returned once on create. Absent when
+        // secretHandle names the row in `secrets` that holds it (SECRETS_STORE).
         secret: {
             type: String,
-            required: true,
+            required: false,
+        },
+        secretHandle: {
+            type: String,
+            required: false,
+        },
+        // Set by the dispatcher while the signing secret will not resolve, cleared by the next delivery it can sign.
+        needsAttention: {
+            type: String,
+            required: false,
         },
         active: {
             type: Boolean,
@@ -1921,6 +1965,12 @@ const schema = {
         // { classes: { <task class>: { model?, qualityFloor?, latencyTargetMs? } }, updatedAt, updatedBy }
         // — the routing policy (Modules/AICore/routingPolicy.js); read only while AI_MODEL_ROUTER is on
         aiRoutingPolicy: {
+            type: Object,
+            required: false
+        },
+        // { <provider>: 'sec_…' } — per-workspace LLM API keys by secrets-store handle
+        // (Modules/AICore/providerKeys.js); read only while TENANT_PROVIDER_KEYS is on
+        aiProviderKeys: {
             type: Object,
             required: false
         },

@@ -1,200 +1,203 @@
 <template>
-    <div class="ah-page wb">
-        <div class="ah-toolbar">
-            <div class="ah-toolbar__title">{{ $t('WorkflowBuilder.title') }}</div>
-            <span v-if="!engineOff" class="parity-count">{{ $t('WorkflowBuilder.n_on', { n: enabledCount }) }}</span>
-            <div class="ah-toolbar__spacer"></div>
-            <button v-if="!building && canManage && !engineOff" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="startNew">
-                <ShellIcon name="plus" :size="14" />{{ $t('WorkflowBuilder.new') }}
-            </button>
-            <button v-else-if="building" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="cancel">{{ $t('WorkflowBuilder.cancel') }}</button>
-        </div>
-
-        <div class="wb__body ah-scroll">
-            <div v-if="engineOff" class="ah-empty wb__off" data-test="engine-off">
-                <h2 class="ah-h2">{{ $t('WorkflowBuilder.engine_off_title') }}</h2>
-                <p>{{ engineOff }}</p>
+    <div class="ah-page ai-page wb">
+        <AiSidebar />
+        <div class="ai-page__main">
+            <div class="ah-toolbar">
+                <div class="ah-toolbar__title">{{ $t('WorkflowBuilder.title') }}</div>
+                <span v-if="!engineOff" class="parity-count">{{ $t('WorkflowBuilder.n_on', { n: enabledCount }) }}</span>
+                <div class="ah-toolbar__spacer"></div>
+                <button v-if="!building && canManage && !engineOff" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="startNew">
+                    <ShellIcon name="plus" :size="14" />{{ $t('WorkflowBuilder.new') }}
+                </button>
+                <button v-else-if="building" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="cancel">{{ $t('WorkflowBuilder.cancel') }}</button>
             </div>
 
-            <p v-else-if="!canManage" class="ah-small wb__readonly">{{ $t('WorkflowBuilder.manage_owner_admin') }}</p>
+            <div class="wb__body ah-scroll">
+                <div v-if="engineOff" class="ah-empty wb__off" data-test="engine-off">
+                    <h2 class="ah-h2">{{ $t('WorkflowBuilder.engine_off_title') }}</h2>
+                    <p>{{ engineOff }}</p>
+                </div>
 
-            <template v-else>
-                <p v-if="loadError" class="ah-field__error">{{ loadError }}</p>
+                <p v-else-if="!canManage" class="ah-small wb__readonly">{{ $t('WorkflowBuilder.manage_owner_admin') }}</p>
 
-                <template v-if="building">
-                    <div class="wb__compiled">
-                        <div class="wb__slots">
-                            <span class="wb__kw">{{ $t('WorkflowBuilder.called') }}</span>
-                            <input v-model="draft.name" class="wb__slot wb__slot--text" :placeholder="$t('WorkflowBuilder.name_placeholder')" />
-                            <span class="wb__kw">{{ $t('WorkflowBuilder.within') }}</span>
-                            <input v-model.number="draft.deadlineMinutes" type="number" min="0" class="wb__slot wb__slot--num" :placeholder="$t('WorkflowBuilder.unbounded')" />
-                            <span class="wb__kw">{{ $t('WorkflowBuilder.minutes') }}</span>
-                            <span class="wb__kw">{{ $t('WorkflowBuilder.spending_at_most') }}</span>
-                            <input v-model.number="draft.budgetUsd" type="number" min="0" step="0.5" class="wb__slot wb__slot--num" :placeholder="$t('WorkflowBuilder.unbounded')" />
-                            <span class="wb__kw">{{ $t('WorkflowBuilder.usd') }}</span>
-                        </div>
+                <template v-else>
+                    <p v-if="loadError" class="ah-field__error">{{ loadError }}</p>
 
-                        <div v-for="(step, i) in draft.steps" :key="step.id" class="wb__step" :data-step="step.id">
+                    <template v-if="building">
+                        <div class="wb__compiled">
                             <div class="wb__slots">
-                                <span class="wb__kw">{{ i === 0 ? $t('WorkflowBuilder.first') : $t('WorkflowBuilder.then') }}</span>
-                                <select v-model="step.type" class="wb__slot" data-test="step-type" @change="resetConfig(step)">
-                                    <option v-for="type in manifest.stepTypes" :key="type.key" :value="type.key">{{ type.label }}</option>
-                                </select>
+                                <span class="wb__kw">{{ $t('WorkflowBuilder.called') }}</span>
+                                <input v-model="draft.name" class="wb__slot wb__slot--text" :placeholder="$t('WorkflowBuilder.name_placeholder')" />
+                                <span class="wb__kw">{{ $t('WorkflowBuilder.within') }}</span>
+                                <input v-model.number="draft.deadlineMinutes" type="number" min="0" class="wb__slot wb__slot--num" :placeholder="$t('WorkflowBuilder.unbounded')" />
+                                <span class="wb__kw">{{ $t('WorkflowBuilder.minutes') }}</span>
+                                <span class="wb__kw">{{ $t('WorkflowBuilder.spending_at_most') }}</span>
+                                <input v-model.number="draft.budgetUsd" type="number" min="0" step="0.5" class="wb__slot wb__slot--num" :placeholder="$t('WorkflowBuilder.unbounded')" />
+                                <span class="wb__kw">{{ $t('WorkflowBuilder.usd') }}</span>
+                            </div>
 
-                                <template v-for="(spec, field) in configOf(step.type)" :key="field">
-                                    <span class="wb__kw wb__kw--field">{{ spec.label }}</span>
-
-                                    <select v-if="spec.options" v-model="step.config[field]" class="wb__slot">
-                                        <option value="">{{ $t('WorkflowBuilder.unset') }}</option>
-                                        <option v-for="option in spec.options" :key="option" :value="option">{{ option }}</option>
-                                    </select>
-
-                                    <select v-else-if="spec.type === 'agent'" v-model="step.config[field]" class="wb__slot">
-                                        <option value="">{{ $t('WorkflowBuilder.unset') }}</option>
-                                        <option v-for="agent in agents" :key="agent._id" :value="String(agent._id)">{{ agent.name }}</option>
-                                    </select>
-
-                                    <select v-else-if="spec.type === 'user'" v-model="step.config[field]" class="wb__slot">
-                                        <option value="">{{ $t('WorkflowBuilder.unset') }}</option>
-                                        <option v-for="user in users" :key="user._id" :value="String(user._id)">{{ user.Employee_Name }}</option>
-                                    </select>
-
-                                    <select v-else-if="spec.type === 'action'" v-model="step.config[field]" class="wb__slot">
-                                        <option value="">{{ $t('WorkflowBuilder.unset') }}</option>
-                                        <option v-for="action in actions" :key="action.key" :value="action.key">{{ action.label }}</option>
-                                    </select>
-
-                                    <select v-else-if="spec.type === 'step_type'" v-model="step.config[field]" class="wb__slot">
-                                        <option value="">{{ $t('WorkflowBuilder.unset') }}</option>
+                            <div v-for="(step, i) in draft.steps" :key="step.id" class="wb__step" :data-step="step.id">
+                                <div class="wb__slots">
+                                    <span class="wb__kw">{{ i === 0 ? $t('WorkflowBuilder.first') : $t('WorkflowBuilder.then') }}</span>
+                                    <select v-model="step.type" class="wb__slot" data-test="step-type" @change="resetConfig(step)">
                                         <option v-for="type in manifest.stepTypes" :key="type.key" :value="type.key">{{ type.label }}</option>
                                     </select>
 
-                                    <select v-else-if="spec.type === 'step'" v-model="step.config[field]" class="wb__slot">
-                                        <option value="">{{ $t('WorkflowBuilder.unset') }}</option>
-                                        <option v-for="other in otherSteps(step)" :key="other.id" :value="other.id">{{ other.id }}</option>
-                                    </select>
+                                    <template v-for="(spec, field) in configOf(step.type)" :key="field">
+                                        <span class="wb__kw wb__kw--field">{{ spec.label }}</span>
 
-                                    <select v-else-if="spec.type === 'steps'" v-model="step.config[field]" class="wb__slot wb__slot--multi" multiple>
-                                        <option v-for="other in otherSteps(step)" :key="other.id" :value="other.id">{{ other.id }}</option>
-                                    </select>
+                                        <select v-if="spec.options" v-model="step.config[field]" class="wb__slot">
+                                            <option value="">{{ $t('WorkflowBuilder.unset') }}</option>
+                                            <option v-for="option in spec.options" :key="option" :value="option">{{ option }}</option>
+                                        </select>
 
-                                    <template v-else-if="spec.type === 'duration'">
-                                        <input
-                                            class="wb__slot wb__slot--num"
-                                            type="number"
-                                            min="0"
-                                            :value="toMinutes(step.config[field])"
-                                            :placeholder="$t('WorkflowBuilder.unbounded')"
-                                            @input="step.config[field] = fromMinutes($event.target.value)"
-                                        />
-                                        <span class="wb__kw">{{ $t('WorkflowBuilder.minutes') }}</span>
+                                        <select v-else-if="spec.type === 'agent'" v-model="step.config[field]" class="wb__slot">
+                                            <option value="">{{ $t('WorkflowBuilder.unset') }}</option>
+                                            <option v-for="agent in agents" :key="agent._id" :value="String(agent._id)">{{ agent.name }}</option>
+                                        </select>
+
+                                        <select v-else-if="spec.type === 'user'" v-model="step.config[field]" class="wb__slot">
+                                            <option value="">{{ $t('WorkflowBuilder.unset') }}</option>
+                                            <option v-for="user in users" :key="user._id" :value="String(user._id)">{{ user.Employee_Name }}</option>
+                                        </select>
+
+                                        <select v-else-if="spec.type === 'action'" v-model="step.config[field]" class="wb__slot">
+                                            <option value="">{{ $t('WorkflowBuilder.unset') }}</option>
+                                            <option v-for="action in actions" :key="action.key" :value="action.key">{{ action.label }}</option>
+                                        </select>
+
+                                        <select v-else-if="spec.type === 'step_type'" v-model="step.config[field]" class="wb__slot">
+                                            <option value="">{{ $t('WorkflowBuilder.unset') }}</option>
+                                            <option v-for="type in manifest.stepTypes" :key="type.key" :value="type.key">{{ type.label }}</option>
+                                        </select>
+
+                                        <select v-else-if="spec.type === 'step'" v-model="step.config[field]" class="wb__slot">
+                                            <option value="">{{ $t('WorkflowBuilder.unset') }}</option>
+                                            <option v-for="other in otherSteps(step)" :key="other.id" :value="other.id">{{ other.id }}</option>
+                                        </select>
+
+                                        <select v-else-if="spec.type === 'steps'" v-model="step.config[field]" class="wb__slot wb__slot--multi" multiple>
+                                            <option v-for="other in otherSteps(step)" :key="other.id" :value="other.id">{{ other.id }}</option>
+                                        </select>
+
+                                        <template v-else-if="spec.type === 'duration'">
+                                            <input
+                                                class="wb__slot wb__slot--num"
+                                                type="number"
+                                                min="0"
+                                                :value="toMinutes(step.config[field])"
+                                                :placeholder="$t('WorkflowBuilder.unbounded')"
+                                                @input="step.config[field] = fromMinutes($event.target.value)"
+                                            />
+                                            <span class="wb__kw">{{ $t('WorkflowBuilder.minutes') }}</span>
+                                        </template>
+
+                                        <input v-else-if="spec.type === 'number'" v-model.number="step.config[field]" type="number" class="wb__slot wb__slot--num" />
+
+                                        <input v-else-if="spec.type === 'datetime'" v-model="step.config[field]" type="datetime-local" class="wb__slot" />
+
+                                        <textarea
+                                            v-else-if="isStructured(spec.type)"
+                                            class="wb__slot wb__slot--json"
+                                            :value="rawOf(step, field)"
+                                            :placeholder="spec.type === 'list' ? '[]' : '{}'"
+                                            @input="onStructured(step, field, $event.target.value)"
+                                        ></textarea>
+
+                                        <input v-else v-model="step.config[field]" class="wb__slot wb__slot--text" :placeholder="spec.label" />
                                     </template>
 
-                                    <input v-else-if="spec.type === 'number'" v-model.number="step.config[field]" type="number" class="wb__slot wb__slot--num" />
+                                    <button type="button" class="wb__x" :title="$t('WorkflowBuilder.remove')" @click="removeStep(i)">×</button>
+                                </div>
 
-                                    <input v-else-if="spec.type === 'datetime'" v-model="step.config[field]" type="datetime-local" class="wb__slot" />
-
-                                    <textarea
-                                        v-else-if="isStructured(spec.type)"
-                                        class="wb__slot wb__slot--json"
-                                        :value="rawOf(step, field)"
-                                        :placeholder="spec.type === 'list' ? '[]' : '{}'"
-                                        @input="onStructured(step, field, $event.target.value)"
-                                    ></textarea>
-
-                                    <input v-else v-model="step.config[field]" class="wb__slot wb__slot--text" :placeholder="spec.label" />
-                                </template>
-
-                                <button type="button" class="wb__x" :title="$t('WorkflowBuilder.remove')" @click="removeStep(i)">×</button>
+                                <div class="wb__slots wb__slots--after">
+                                    <span class="wb__kw">{{ $t('WorkflowBuilder.after') }}</span>
+                                    <select v-model="step.dependsOn" class="wb__slot wb__slot--multi" data-test="depends-on" multiple>
+                                        <option v-for="other in otherSteps(step)" :key="other.id" :value="other.id">{{ other.id }}</option>
+                                    </select>
+                                    <span class="wb__kw wb__kw--id ah-mono">{{ step.id }}</span>
+                                </div>
                             </div>
 
-                            <div class="wb__slots wb__slots--after">
-                                <span class="wb__kw">{{ $t('WorkflowBuilder.after') }}</span>
-                                <select v-model="step.dependsOn" class="wb__slot wb__slot--multi" data-test="depends-on" multiple>
-                                    <option v-for="other in otherSteps(step)" :key="other.id" :value="other.id">{{ other.id }}</option>
+                            <button type="button" class="wb__add" @click="addStep">{{ $t('WorkflowBuilder.add_step') }}</button>
+
+                            <ul v-if="errors.length" class="wb__errors" data-test="errors">
+                                <li v-for="(error, i) in errors" :key="i">{{ error }}</li>
+                            </ul>
+
+                            <div class="wb__try">
+                                <span class="wb__kw">{{ $t('WorkflowBuilder.try_against') }}</span>
+                                <select v-model="tryProjectId" class="wb__slot" data-test="try-project" @change="loadTasks">
+                                    <option value="">{{ $t('WorkflowBuilder.no_input') }}</option>
+                                    <option v-for="project in projects" :key="project._id" :value="String(project._id)">{{ project.ProjectName || '—' }}</option>
                                 </select>
-                                <span class="wb__kw wb__kw--id ah-mono">{{ step.id }}</span>
+                                <select v-if="tryProjectId" v-model="tryTaskId" class="wb__slot" data-test="try-task">
+                                    <option value="">{{ $t('WorkflowBuilder.whole_project') }}</option>
+                                    <option v-for="task in tasks" :key="task._id" :value="String(task._id)">{{ task.TaskName }}</option>
+                                </select>
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="trying" data-test="dry-run" @click="dryRun">
+                                    {{ trying ? $t('WorkflowBuilder.dry_running') : $t('WorkflowBuilder.dry_run') }}
+                                </button>
+                            </div>
+
+                            <div v-if="plan" class="wb__plan" data-test="plan">
+                                <div class="ah-label">{{ $t('WorkflowBuilder.plan_title') }}</div>
+                                <p class="ah-small">{{ $t('WorkflowBuilder.plan_nothing_written') }}</p>
+                                <p v-if="plan.input && plan.input.kind !== 'none'" class="ah-small">
+                                    {{ plan.input.found ? $t('WorkflowBuilder.plan_input', { name: plan.input.name }) : $t('WorkflowBuilder.plan_input_missing') }}
+                                </p>
+                                <p v-if="plan.summary" class="ah-small wb__plan-sum">
+                                    {{ $t('WorkflowBuilder.plan_summary', {
+                                        steps: plan.summary.stepCount,
+                                        waves: plan.summary.waveCount,
+                                        writes: plan.summary.writeCount,
+                                        asks: plan.summary.approvalCount,
+                                    }) }}
+                                </p>
+                                <ol class="wb__plan-steps">
+                                    <li v-for="step in plan.steps" :key="step.stepId" class="wb__plan-step" :class="{ 'is-refused': step.refused }">
+                                        <span class="ah-mono">{{ step.stepId }}</span>
+                                        <span>{{ step.label }}</span>
+                                        <span class="wb__plan-wave">{{ step.wave ? $t('WorkflowBuilder.plan_wave', { n: step.wave }) : $t('WorkflowBuilder.plan_unreachable') }}</span>
+                                        <span class="wb__plan-effect">{{ $t(`WorkflowBuilder.effect_${step.effect}`) }}</span>
+                                        <span v-if="step.refused" class="wb__plan-refused">{{ step.refused.reason }}</span>
+                                    </li>
+                                </ol>
+                            </div>
+
+                            <div class="wb__save">
+                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="saving" data-test="save" @click="save">
+                                    {{ saving ? $t('WorkflowBuilder.saving') : $t('WorkflowBuilder.save') }}
+                                </button>
+                                <span class="ah-small">{{ $t('WorkflowBuilder.saved_off_note') }}</span>
                             </div>
                         </div>
+                    </template>
 
-                        <button type="button" class="wb__add" @click="addStep">{{ $t('WorkflowBuilder.add_step') }}</button>
-
-                        <ul v-if="errors.length" class="wb__errors" data-test="errors">
-                            <li v-for="(error, i) in errors" :key="i">{{ error }}</li>
-                        </ul>
-
-                        <div class="wb__try">
-                            <span class="wb__kw">{{ $t('WorkflowBuilder.try_against') }}</span>
-                            <select v-model="tryProjectId" class="wb__slot" data-test="try-project" @change="loadTasks">
-                                <option value="">{{ $t('WorkflowBuilder.no_input') }}</option>
-                                <option v-for="project in projects" :key="project._id" :value="String(project._id)">{{ project.ProjectName || '—' }}</option>
-                            </select>
-                            <select v-if="tryProjectId" v-model="tryTaskId" class="wb__slot" data-test="try-task">
-                                <option value="">{{ $t('WorkflowBuilder.whole_project') }}</option>
-                                <option v-for="task in tasks" :key="task._id" :value="String(task._id)">{{ task.TaskName }}</option>
-                            </select>
-                            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="trying" data-test="dry-run" @click="dryRun">
-                                {{ trying ? $t('WorkflowBuilder.dry_running') : $t('WorkflowBuilder.dry_run') }}
-                            </button>
+                    <template v-else>
+                        <p v-if="loading" class="ah-empty">{{ $t('WorkflowBuilder.loading') }}</p>
+                        <div v-else-if="!workflows.length" class="ah-empty wb__empty">
+                            <h2 class="ah-h2">{{ $t('WorkflowBuilder.empty_title') }}</h2>
+                            <p>{{ $t('WorkflowBuilder.empty_sub') }}</p>
+                            <button type="button" class="ah-btn ah-btn--primary" @click="startNew">{{ $t('WorkflowBuilder.new') }}</button>
                         </div>
 
-                        <div v-if="plan" class="wb__plan" data-test="plan">
-                            <div class="ah-label">{{ $t('WorkflowBuilder.plan_title') }}</div>
-                            <p class="ah-small">{{ $t('WorkflowBuilder.plan_nothing_written') }}</p>
-                            <p v-if="plan.input && plan.input.kind !== 'none'" class="ah-small">
-                                {{ plan.input.found ? $t('WorkflowBuilder.plan_input', { name: plan.input.name }) : $t('WorkflowBuilder.plan_input_missing') }}
-                            </p>
-                            <p v-if="plan.summary" class="ah-small wb__plan-sum">
-                                {{ $t('WorkflowBuilder.plan_summary', {
-                                    steps: plan.summary.stepCount,
-                                    waves: plan.summary.waveCount,
-                                    writes: plan.summary.writeCount,
-                                    asks: plan.summary.approvalCount,
-                                }) }}
-                            </p>
-                            <ol class="wb__plan-steps">
-                                <li v-for="step in plan.steps" :key="step.stepId" class="wb__plan-step" :class="{ 'is-refused': step.refused }">
-                                    <span class="ah-mono">{{ step.stepId }}</span>
-                                    <span>{{ step.label }}</span>
-                                    <span class="wb__plan-wave">{{ step.wave ? $t('WorkflowBuilder.plan_wave', { n: step.wave }) : $t('WorkflowBuilder.plan_unreachable') }}</span>
-                                    <span class="wb__plan-effect">{{ $t(`WorkflowBuilder.effect_${step.effect}`) }}</span>
-                                    <span v-if="step.refused" class="wb__plan-refused">{{ step.refused.reason }}</span>
-                                </li>
-                            </ol>
+                        <div v-for="workflow in workflows" :key="workflow._id" class="wb__row" :class="{ 'wb__row--off': !workflow.enabled }">
+                            <button
+                                type="button"
+                                class="wb__toggle"
+                                :class="{ 'is-on': workflow.enabled }"
+                                :aria-label="workflow.enabled ? $t('WorkflowBuilder.turn_off') : $t('WorkflowBuilder.turn_on')"
+                                @click="toggle(workflow)"
+                            ><span class="wb__knob"></span></button>
+                            <span class="wb__row-name">{{ workflow.name }}</span>
+                            <span class="wb__row-count ah-mono">{{ $t('WorkflowBuilder.n_steps', { n: (workflow.steps || []).length }) }}</span>
+                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="edit(workflow)">{{ $t('WorkflowBuilder.edit') }}</button>
+                            <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm wb__delete" @click="remove(workflow)">{{ $t('WorkflowBuilder.delete') }}</button>
                         </div>
-
-                        <div class="wb__save">
-                            <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="saving" data-test="save" @click="save">
-                                {{ saving ? $t('WorkflowBuilder.saving') : $t('WorkflowBuilder.save') }}
-                            </button>
-                            <span class="ah-small">{{ $t('WorkflowBuilder.saved_off_note') }}</span>
-                        </div>
-                    </div>
+                    </template>
                 </template>
-
-                <template v-else>
-                    <p v-if="loading" class="ah-empty">{{ $t('WorkflowBuilder.loading') }}</p>
-                    <div v-else-if="!workflows.length" class="ah-empty wb__empty">
-                        <h2 class="ah-h2">{{ $t('WorkflowBuilder.empty_title') }}</h2>
-                        <p>{{ $t('WorkflowBuilder.empty_sub') }}</p>
-                        <button type="button" class="ah-btn ah-btn--primary" @click="startNew">{{ $t('WorkflowBuilder.new') }}</button>
-                    </div>
-
-                    <div v-for="workflow in workflows" :key="workflow._id" class="wb__row" :class="{ 'wb__row--off': !workflow.enabled }">
-                        <button
-                            type="button"
-                            class="wb__toggle"
-                            :class="{ 'is-on': workflow.enabled }"
-                            :aria-label="workflow.enabled ? $t('WorkflowBuilder.turn_off') : $t('WorkflowBuilder.turn_on')"
-                            @click="toggle(workflow)"
-                        ><span class="wb__knob"></span></button>
-                        <span class="wb__row-name">{{ workflow.name }}</span>
-                        <span class="wb__row-count ah-mono">{{ $t('WorkflowBuilder.n_steps', { n: (workflow.steps || []).length }) }}</span>
-                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="edit(workflow)">{{ $t('WorkflowBuilder.edit') }}</button>
-                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm wb__delete" @click="remove(workflow)">{{ $t('WorkflowBuilder.delete') }}</button>
-                    </div>
-                </template>
-            </template>
+            </div>
         </div>
     </div>
 </template>
@@ -207,6 +210,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { isOwnerOrAdmin } from '@/utils/roles';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import AiSidebar from '@/views/Ai/AiSidebar.vue';
 
 // The workflow builder (task 028, interface row C Orchestration). It is the
 // automation sentence builder one level up: the slots come from the step-type
@@ -463,4 +467,5 @@ onMounted(async () => {
 
 <style>
 @import "./style.css";
+@import "../Ai/style.css";
 </style>

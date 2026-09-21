@@ -10,6 +10,9 @@ const retry = require('./retry');
 const agentRunner = require('./agentRun');
 const hop = require('./hop');
 const typed = require('./typed');
+const stepCredential = require('./stepCredential');
+const providerContext = require('../AICore/providerContext');
+const { serviceActor } = require('../Agents/actor');
 const { leaseMs, heartbeatMs } = require('./flag');
 
 // The engine: check the step may run at all, claim it, hold it under a lease,
@@ -31,23 +34,27 @@ const LOG_PREFIX = '[workflow-engine]';
 const CAPACITY_RETRY_MS = 5000;
 const WORKER_ID = `${process.pid}:${crypto.randomBytes(4).toString('hex')}`;
 
-const stepActor = (run) => ({
-    kind: 'agent',
-    userId: run.startedBy || '',
-    agentId: null,
-    agentName: run.name || run.ruleName || 'Workflow',
-    viaAccount: 'workspace',
-    traceId: run.traceId || null,
-});
+/* Under STEP_CREDENTIALS the engine records its own steps as itself, on behalf
+ * of whoever started the run; off, it borrows the starter as before. */
+const stepActor = (run, workerId = WORKER_ID) => (stepCredential.enabled()
+    ? serviceActor('engine', { runId: run._id, userId: run.startedBy, traceId: run.traceId, workerId })
+    : {
+        kind: 'agent',
+        userId: run.startedBy || '',
+        agentId: null,
+        agentName: run.name || run.ruleName || 'Workflow',
+        viaAccount: 'workspace',
+        traceId: run.traceId || null,
+    });
 
 /* Renews the lease while a slow step runs. A false answer means the lease was
  * taken; the executor is told so it can stop, and the settle would refuse the
  * write anyway. */
-const startHeartbeat = (companyId, claim, lost) => {
+const startHeartbeat = (claim, lost, beat) => {
     const every = heartbeatMs();
     const timer = setInterval(async () => {
         try {
-            const held = await store.heartbeat(companyId, claim);
+            const held = await beat();
             if (!held) {
                 lost.value = true;
                 clearInterval(timer);
@@ -115,12 +122,23 @@ const runStep = async (companyId, run, pending, { workerId = WORKER_ID, context 
     }
 
     const claim = claimOf(claimed);
+    // The credential the step acts under, minted from this claim so it carries the
+    // fencing token the claim won and dies one lease later. Only its id and expiry
+    // reach the row; the credential itself travels in the context and nowhere else.
+    const credential = await stepCredential.issue({ companyId, run, step: claimed, agentOf: () => agentRunner.agentFor(companyId, run, claimed) });
+    // Under a credential every heartbeat re-mints it with the lease it extends, so
+    // a step that outruns its first lease is not refused at its last action.
+    const held = credential ? stepCredential.hold(companyId, claim, credential) : null;
+    const beat = held ? held.renew : () => store.heartbeat(companyId, claim);
     // What this hop was given out of what the run had left, on the row before it
     // runs: the answer to "why did this step only get ninety seconds" has to
     // outlive the tick that decided it.
-    await store.noteStep(companyId, claim, { deadlineAt: permit.grant.deadlineAt, budgetUsd: permit.grant.budgetUsd, depth: permit.depth });
+    await store.noteStep(companyId, claim, {
+        deadlineAt: permit.grant.deadlineAt, budgetUsd: permit.grant.budgetUsd, depth: permit.depth,
+        ...(credential ? { credentialId: credential.credentialId, credentialExpiresAt: credential.expiresAt } : {}),
+    });
     const lost = { value: false };
-    const stopHeartbeat = startHeartbeat(companyId, claim, lost);
+    const stopHeartbeat = startHeartbeat(claim, lost, beat);
     const key = idempotency.keyFor({ runId: run._id, stepId: claimed.stepId, action: claimed.action });
 
     try {
@@ -129,7 +147,7 @@ const runStep = async (companyId, run, pending, { workerId = WORKER_ID, context 
             companyId,
             {
                 key,
-                actor: stepActor(run),
+                actor: stepActor(run, workerId),
                 entry: {
                     action: `workflow.${claimed.type}`,
                     reason: run.ruleName || run.name || '',
@@ -154,8 +172,10 @@ const runStep = async (companyId, run, pending, { workerId = WORKER_ID, context 
                     deadlineAt: permit.grant.deadlineAt,
                     budgetUsd: permit.grant.budgetUsd,
                     depth: permit.depth,
-                    keepAlive: () => store.heartbeat(companyId, claim),
+                    keepAlive: () => beat(),
                     leaseLost: () => lost.value,
+                    // Asked for, not handed over: what it answers changes when a heartbeat re-mints.
+                    ...(held ? { stepCredential: held.token } : {}),
                 },
             }),
         )));
@@ -217,7 +237,7 @@ const finish = async (companyId, run, steps, blocked = null) => {
 /* Drives one run as far as it can go right now: the ready set, then whatever
  * that unblocked, until nothing is ready. A step that asked to come back later
  * schedules one more job for itself and nothing else. */
-const tick = async (companyId, runId, { enqueue = null, workerId = WORKER_ID, context = {}, maxSteps = 50 } = {}) => {
+const tickInner = async (companyId, runId, { enqueue = null, workerId = WORKER_ID, context = {}, maxSteps = 50 } = {}) => {
     const run = await store.getRun(companyId, runId);
     if (!run || !run._id) { logger.error(`${LOG_PREFIX} workflow run ${runId} vanished`); return { status: 'missing' }; }
     if (store.TERMINAL.includes(run.status)) return { status: run.status };
@@ -273,5 +293,7 @@ const tick = async (companyId, runId, { enqueue = null, workerId = WORKER_ID, co
 
     return { status: status || 'running', executed, retryInMs, ...(blocked ? { blocked } : {}) };
 };
+
+const tick = (companyId, runId, opts) => providerContext.run({ companyId }, () => tickInner(companyId, runId, opts));
 
 module.exports = { tick, runStep, finish, skipBlocked, failUnclaimed, WORKER_ID, CAPACITY_RETRY_MS, stepActor };

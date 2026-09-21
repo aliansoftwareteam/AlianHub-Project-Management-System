@@ -13,6 +13,8 @@
  */
 'use strict';
 
+const { serviceStamp } = require('../Agents/serviceIdentity');
+
 /* Why a candidate did not answer. The first four are the router's; `unpriced`
  * is the meter's, and `pin_dropped` says the caller's pinned model could not
  * travel to this candidate because a model id belongs to one vendor. */
@@ -130,6 +132,7 @@ function begin({ routerEnabled = false, provider = null, model = null } = {}) {
                 actual: state.actual ? { ...state.actual } : null,
                 drift,
                 reservation: { ...state.reservation },
+                ...serviceStamp('router', 'decidedBy'),
             };
         },
         attributes() {

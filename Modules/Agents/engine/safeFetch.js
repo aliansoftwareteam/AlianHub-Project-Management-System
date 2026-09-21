@@ -1,6 +1,8 @@
 const dns = require('dns');
 const net = require('net');
 const axios = require('axios');
+const egressContext = require('./egressContext');
+const { hostMatches } = require('./egressRules');
 
 /* Outbound fetches driven by task text. The URL is untrusted, so the rule is
  * applied to the RESOLVED address (which defeats numeric and alternate hostname
@@ -39,6 +41,20 @@ const mappedV4 = (ip) => {
     return null;
 };
 
+const dottedTailAsWords = (ip) => ip.replace(/(\d+)\.(\d+)\.(\d+)\.(\d+)$/, (m, a, b, c, d) => `${((Number(a) << 8) | Number(b)).toString(16)}:${((Number(c) << 8) | Number(d)).toString(16)}`);
+const v4From = (hi, lo) => [hi >> 8, hi & 0xff, lo >> 8, lo & 0xff].join('.');
+
+/* NAT64 (64:ff9b::/96), 6to4 (2002::/16) and IPv4-compatible (::/96) addresses are delivered to the IPv4
+ * address they carry, so that address decides. Judging the whole range private instead would refuse every
+ * IPv4-only site on a DNS64 network. */
+const carriedV4 = (ip) => {
+    const words = expandV6(dottedTailAsWords(ip));
+    if (words[0] === 0x64 && words[1] === 0xff9b && words.slice(2, 6).every((w) => w === 0)) return v4From(words[6], words[7]);
+    if (words[0] === 0x2002) return v4From(words[1], words[2]);
+    if (words.slice(0, 6).every((w) => w === 0)) return v4From(words[6], words[7]);
+    return null;
+};
+
 const isPrivateV6 = (ip) => {
     const bare = ip.replace(/%.*$/, '');
     const mapped = mappedV4(bare);
@@ -46,6 +62,9 @@ const isPrivateV6 = (ip) => {
     const words = expandV6(bare);
     if (words.every((w) => w === 0)) return true;
     if (words.slice(0, 7).every((w) => w === 0) && words[7] === 1) return true;
+    // Flag off keeps the rule as it shipped: these ranges passed it, and closing them changes what is fetched today.
+    const carried = egressContext.isOn() ? carriedV4(bare) : null;
+    if (carried) return isPrivateV4(carried);
     const top = words[0];
     if ((top & 0xfe00) === 0xfc00) return true;
     if ((top & 0xffc0) === 0xfe80) return true;
@@ -84,21 +103,26 @@ const parseHttpUrl = (url) => {
     return u;
 };
 
+const RESOLVE_ERROR = Object.freeze({ PRIVATE_HOST: 'private_host', DNS_FAILED: 'dns_failed', PRIVATE_ADDRESS: 'private_address' });
+
+// The messages carry the hostname, which can itself say "private", so a caller reads the code.
+const resolveError = (code, message) => Object.assign(new Error(message), { code });
+
 /* `allowlist` (Webhooks/helpers/privateHostAllowlist) re-admits private hosts an
  * instance owner chose; the resolved address is still checked and pinned. */
 async function resolvePublic(url, { allowlist } = {}) {
     const u = parseHttpUrl(url);
     const host = stripBrackets(u.hostname);
-    if (isBlockedHostname(host) && !(allowlist && allowlist.allowsHost(host))) throw new Error(`${u.hostname} is a private, local or internal host — agents do not fetch it`);
+    if (isBlockedHostname(host) && !(allowlist && allowlist.allowsHost(host))) throw resolveError(RESOLVE_ERROR.PRIVATE_HOST, `${u.hostname} is a private, local or internal host — agents do not fetch it`);
     let answers;
     try {
         answers = await dns.promises.lookup(host, { all: true, verbatim: true });
     } catch (e) {
-        throw new Error(`could not resolve ${u.hostname}: ${e.code || e.message}`);
+        throw resolveError(RESOLVE_ERROR.DNS_FAILED, `could not resolve ${u.hostname}: ${e.code || e.message}`);
     }
-    if (!answers || !answers.length) throw new Error(`could not resolve ${u.hostname}`);
+    if (!answers || !answers.length) throw resolveError(RESOLVE_ERROR.DNS_FAILED, `could not resolve ${u.hostname}`);
     const bad = answers.find((a) => isPrivateAddress(a.address) && !(allowlist && allowlist.allowsAddress(host, a.address)));
-    if (bad) throw new Error(`${u.hostname} resolves to a private or reserved address (${bad.address}) — agents do not fetch it`);
+    if (bad) throw resolveError(RESOLVE_ERROR.PRIVATE_ADDRESS, `${u.hostname} resolves to a private or reserved address (${bad.address}) — agents do not fetch it`);
     return { url: u, address: answers[0].address, family: answers[0].family || net.isIP(answers[0].address) };
 }
 
@@ -125,6 +149,46 @@ async function readCapped(stream, { maxBytes, remainingMs }) {
  * 301/302 for anything but GET/HEAD; 307/308 replay the original method and body. */
 const methodAfterRedirect = (status, method) => (status === 303 || ((status === 301 || status === 302) && method !== 'get' && method !== 'head') ? 'get' : method);
 
+const portOf = (u) => Number(u.port || (u.protocol === 'https:' ? 443 : 80));
+
+const REFUSAL = Object.freeze({ PRIVATE_HOST: 'private_host', UNLISTED: 'unlisted', PRIVATE_ADDRESS: 'private_address' });
+
+/* The workspace egress gateway. Off, with no workspace behind the fetch, or
+ * with an empty list, every rule above applies unchanged. With a list, each hop
+ * must name a listed host, and the private-host and resolved-address rules still
+ * run first and last: a listed private host is refused, and so is a listed name
+ * that resolves to a private address. The store is required lazily so a fetch
+ * outside the gateway loads nothing new. */
+async function egressGate({ companyId, actor }) {
+    const store = require('./egressAllowlist');
+    const hosts = await store.hostsFor(companyId);
+    if (!hosts.length) return null;
+    const refuse = (u, hop, reason) => {
+        const host = stripBrackets(u.hostname);
+        store.recordRefusal(companyId, { actor, host, port: portOf(u), reason, hop });
+        if (reason === REFUSAL.UNLISTED) throw new Error(`${host} is not on this workspace's egress allowlist — the instance owner can allow it under Instance > Egress`);
+        throw new Error(`${host} is a private, local or internal host — agents do not fetch it, listed or not`);
+    };
+    return {
+        check(url, hop) {
+            const u = parseHttpUrl(url);
+            if (isBlockedHostname(u.hostname)) refuse(u, hop, REFUSAL.PRIVATE_HOST);
+            if (!hostMatches(hosts, u.hostname, portOf(u))) refuse(u, hop, REFUSAL.UNLISTED);
+        },
+        resolved(url, hop, error) {
+            if (error.code !== RESOLVE_ERROR.PRIVATE_ADDRESS) return;
+            let u;
+            try { u = parseHttpUrl(url); } catch (e) { return; }
+            store.recordRefusal(companyId, { actor, host: stripBrackets(u.hostname), port: portOf(u), reason: REFUSAL.PRIVATE_ADDRESS, hop });
+        },
+    };
+}
+
+const withinBudget = (promise, ms) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('fetch exceeded its time budget')), ms);
+    promise.then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
+});
+
 /* Follows redirects by hand so every hop is validated and pinned. `opts.resolve`
  * exists for tests that need a "public" name to land on a local server. */
 async function safeFetch(url, opts = {}) {
@@ -136,12 +200,21 @@ async function safeFetch(url, opts = {}) {
         if (left <= 0) throw new Error('fetch exceeded its time budget');
         return left;
     };
+    const workspace = { ...(egressContext.get() || {}), ...(opts.companyId ? { companyId: opts.companyId, actor: opts.actor } : {}) };
+    const gate = egressContext.isOn() && workspace.companyId ? await withinBudget(egressGate(workspace), remaining()) : null;
 
     let current = String(url);
     let method = String(opts.method || 'get').toLowerCase();
     let data = opts.data;
     for (let hop = 0; ; hop += 1) {
-        const target = await resolve(current);
+        if (gate) gate.check(current, hop);
+        let target;
+        try {
+            target = await resolve(current);
+        } catch (error) {
+            if (gate) gate.resolved(current, hop, error);
+            throw error;
+        }
         const controller = new AbortController();
         const abortTimer = setTimeout(() => controller.abort(), remaining());
         let res;

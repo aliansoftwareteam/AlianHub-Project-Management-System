@@ -33,6 +33,7 @@ module.exports = defineConfig({
       alias: {
         '@pageContent': path.resolve(__dirname, '../Modules/Pages/helpers/pageContent.js'),
         '@agentWork': path.resolve(__dirname, '../Modules/Agents/workKinds.js'),
+        '@egressRules': path.resolve(__dirname, '../Modules/Agents/engine/egressRules.js'),
       },
     },
     plugins: [

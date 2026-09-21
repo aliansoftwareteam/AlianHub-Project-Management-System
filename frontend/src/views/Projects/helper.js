@@ -882,29 +882,18 @@ export function taskListHelper() {
             } else if(type === 1) {
                 indexKey.value = "assigneeIndex";
 
-                // await getCollectionData({
-                //     collectionName: `${companyId.value}_${dbCollections.TASKS}`,
-                //     search: {
-                //         q:"*",
-                //         "group_by": "AssigneeUserId",
-                //         "filter_by": `ProjectID:=${project.value._id}`,
-                //         "group_limit": 1,
-                //         "per_page": 250
-                //     }
-                // })
-                // .then((result) => {
-                    let assigneeGroups = [].grouped_hits.map((x) => x.group_key[0]).map((x) => x.sort((a,b) => a > b ? 1 : -1));
-                    assigneeGroups.forEach((group => {
-                        let assignees = group.sort((a,b) => a > b ? 1 : -1)
-                        if(!arr.filter((x) => x.value === assignees.join("_")).length) {
-                            arr.push({
-                                isExpanded: true,
-                                name: "Assignee",
-                                users: assignees.length ? assignees.map((x) => getUser(x)) : [],
-                                value: assignees.join("_")
-                            })
-                        }
-                    }))
+                // Groups used to come from a typesense group_by; with search gone they come from the company seats instead.
+                const memberIds = [...new Set((getters["settings/companyUsers"] || []).filter((member) => member && member.userId && member.isDelete !== true && Number(member.status) !== 3).map((member) => String(member.userId)))];
+                memberIds.forEach((id) => {
+                    if(!arr.filter((x) => x.value === id).length) {
+                        arr.push({
+                            isExpanded: true,
+                            name: "Assignee",
+                            users: [getUser(id)],
+                            value: id
+                        })
+                    }
+                })
 
                     if(!arr.length) {
                         arr.push({
@@ -942,12 +931,6 @@ export function taskListHelper() {
                         // sprint.items = tmp.filter((x) => x.tasksArray.length || !x.users.length).sort((a, b) => a.users.length < b.users.length ? 1 : -1);
                         sprint.items = tmp;
                     })
-                    return;
-                // })
-                // .catch((error) => {
-                //     console.error("ERROR in get groups: ", error);
-                //     return;
-                // })
             } else if(type === 2) {
                 // PRIOTITIES
                 indexKey.value = "priorityIndex";

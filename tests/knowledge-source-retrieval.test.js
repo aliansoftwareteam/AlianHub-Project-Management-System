@@ -9,7 +9,7 @@ const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
 const { getRoleType } = require('../Config/permissionGuard');
-const { knowledgeChunksSchema } = require('../utils/mongo-handler/createSchema');
+const { knowledgeChunksSchema, commentSchema } = require('../utils/mongo-handler/createSchema');
 const lexical = require('../Modules/Knowledge/adapters/lexical');
 const { retrieve } = require('../Modules/Knowledge/retrieval');
 const { resolveVisibleSet, filterFor } = require('../Modules/Knowledge/visibleSet');
@@ -76,6 +76,8 @@ beforeEach(() => {
     jest.clearAllMocks();
     myCache.flushAll();
     mockDb.uniqueFromSchema(CHUNKS, knowledgeChunksSchema);
+    mockDb.textFromSchema(CHUNKS, knowledgeChunksSchema);
+    mockDb.textFromSchema(SCHEMA_TYPE.COMMENTS, commentSchema);
     getRoleType.mockImplementation(async (companyId, uid) => ROLES[uid]);
     visibleProjectIds.mockImplementation(async (companyId, uid) => PROJECTS[uid] || []);
     mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C, knowledgeIndexer: { mode: 'on' } });

@@ -10,6 +10,7 @@ const { resolveModel, routerEnabled } = require('./llmProvider/normalise');
 const { preflight } = require('./estimate');
 const decision = require('./decision');
 const reservation = require('./reservation');
+const providerContext = require('./providerContext');
 const telemetry = require('../../Config/telemetry');
 
 /* The spend ledger: one row per model call, written here and nowhere else, so
@@ -84,6 +85,13 @@ const alert = async (context) => {
 
 const wrapped = new WeakMap();
 
+/* The key payer is the ledger payer: the call runs inside the company the spend
+ * is booked to, falling back to whatever context already surrounds it. */
+const asCompany = (context, fn) => providerContext.run(
+    { companyId: providerContext.companyIdOf({ companyId: context.companyId }) || providerContext.companyIdOf() },
+    fn,
+);
+
 function metered(adapter) {
     if (wrapped.has(adapter)) return wrapped.get(adapter);
     const provider = {
@@ -118,7 +126,7 @@ function metered(adapter) {
             const startedAt = Date.now();
             let result;
             try {
-                result = await adapter.chat(opts);
+                result = await asCompany(context, () => adapter.chat(opts));
             } catch (error) {
                 await reservation.release(ticket);
                 call.settled(ticket.id ? decision.RESERVATION.RELEASED : ticket.state);
@@ -155,7 +163,7 @@ function metered(adapter) {
             if (!ticket.ok) throw Object.assign(new Error(ticket.reason), { code: ticket.code, feature: context.feature });
             let result;
             try {
-                result = await adapter.embed(opts);
+                result = await asCompany(context, () => adapter.embed(opts));
             } catch (error) {
                 await reservation.release(ticket);
                 if (isProviderError(error)) logger.error(`${LOG_PREFIX} ${context.companyId}: ${context.feature} failed [${error.groupKey()}]${error.requestId ? ` request ${error.requestId}` : ''}: ${error.message}`);

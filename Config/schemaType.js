@@ -116,6 +116,8 @@ const SCHEMA_TYPE = {
     CSP_REPORTS: "csp_reports",
     AUDIT_CHAIN_HEADS: "audit_chain_heads",
     AUDIT_CHAIN_ANCHORS: "audit_chain_anchors",
+    EGRESS_ALLOWLISTS: "egress_allowlists",
+    SECRETS: "secrets",
     SCHEMA_VERSIONS: "schema_versions",
     INSTANCE_SETTINGS: "instance_settings",
 }

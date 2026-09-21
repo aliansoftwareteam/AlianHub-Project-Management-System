@@ -18,6 +18,10 @@ const { deterministic } = require('./graph');
 
 const TYPE = 'tool_call';
 
+/* A tool is handed what it needs to write its rows, never the step's credential:
+ * tools are a catalogue anyone may add to, and none of them presents it. */
+const forTool = ({ stepCredential, ...shared }) => shared;
+
 const missing = (schema, params) => Object.entries(schema || {})
     .filter(([field, spec]) => spec.required && (params[field] === undefined || params[field] === null || params[field] === ''))
     .map(([field]) => field);
@@ -37,7 +41,7 @@ const execute = async ({ companyId, run, step, context = {} }) => {
         entity,
         config: params,
         context: {
-            ...context,
+            ...forTool(context),
             task: entity.data || {},
             runId: String(run._id),
             ruleId: run.ruleId || null,

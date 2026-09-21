@@ -22,7 +22,8 @@ export default defineConfig({
         alias: {
             '@': path.resolve(__dirname, 'src'),
             '@pageContent': path.resolve(__dirname, '../Modules/Pages/helpers/pageContent.js'),
-            '@agentWork': path.resolve(__dirname, '../Modules/Agents/workKinds.js')
+            '@agentWork': path.resolve(__dirname, '../Modules/Agents/workKinds.js'),
+            '@egressRules': path.resolve(__dirname, '../Modules/Agents/engine/egressRules.js')
         }
     },
     test: {

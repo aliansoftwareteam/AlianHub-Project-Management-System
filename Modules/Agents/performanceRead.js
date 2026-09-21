@@ -5,6 +5,7 @@ const registry = require('./registry');
 const actions = require('./actions');
 const scope = require('./scope');
 const runs = require('./runs');
+const taint = require('./taint');
 const { ACTION } = require('./performanceFlag');
 const replay = require('../AICore/replay');
 const { resolveSheetScope, scopedTimeMatch, SHEET_PERMISSION } = require('../TimeSheet/helpers/timeScope');
@@ -78,12 +79,13 @@ const outsideScope = async (companyId, uid, projectIds, projectScope) => {
 const ownRunId = async (companyId, actor) => {
     const runId = String((actor && actor.runId) || '');
     const agentId = String((actor && actor.agentId) || '');
-    if (!OBJECT_ID.test(runId) || !agentId) return null;
+    if (!OBJECT_ID.test(runId) || !agentId) return { runId: null, taint: null };
     const run = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_RUNS,
-        data: [{ _id: oid(runId), agentId, startedBy: String(actor.userId), status: { $in: runs.OPEN } }, { _id: 1 }],
+        data: [{ _id: oid(runId), agentId, startedBy: String(actor.userId), status: { $in: runs.OPEN } }, { _id: 1, tainted: 1, taintSources: 1 }],
     }, 'findOne').catch(() => null);
-    return run ? runId : null;
+    if (!run) return { runId: null, taint: null };
+    return { runId, taint: taint.record(run) };
 };
 
 const tasksInSprints = async (companyId, projectId, sprintIds) => {
@@ -192,12 +194,14 @@ const read = async ({ companyId, actor, args = {}, projectScope = [], allowedAct
     const projects = computed.map((c) => c.entry);
     const hiddenSprintIds = Object.fromEntries(computed.map((c) => [c.entry.projectId, c.hidden]));
 
+    const own = await ownRunId(companyId, actor);
     const saved = await replay.recordToolStep({
         companyId,
-        runId: await ownRunId(companyId, actor),
+        runId: own.runId,
         agentId: actor.agentId || null,
         action: ACTION,
         args: query,
+        ...(own.taint || {}),
         scope: {
             userId: uid,
             projectIds: query.projectIds,

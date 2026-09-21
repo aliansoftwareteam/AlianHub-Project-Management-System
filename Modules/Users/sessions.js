@@ -10,7 +10,7 @@ const TOKEN_TAIL = 6;
 // client can recognise its own device without ever seeing another session's token.
 const label = (v) => (v && typeof v === "object" ? v.name || v.type || "" : v || "");
 
-const toPublicSession = (s) => ({
+const toPublicSession = (s, currentId) => ({
     _id: s._id,
     ip: s.ip || "",
     browser: label(s.info?.browser),
@@ -18,7 +18,8 @@ const toPublicSession = (s) => ({
     device: label(s.info?.device),
     lastActive: s.lastActive || s.updatedAt || s.createdAt,
     createdAt: s.createdAt,
-    tokenTail: s.tokenTail || String(s.refreshToken || "").slice(-TOKEN_TAIL)
+    tokenTail: s.tokenTail || String(s.refreshToken || "").slice(-TOKEN_TAIL),
+    current: Boolean(currentId) && String(s._id) === String(currentId)
 });
 
 exports.listOwnSessions = async (req, res) => {
@@ -29,7 +30,7 @@ exports.listOwnSessions = async (req, res) => {
             data: [{ userId: String(req.uid) }]
         }, "find");
         const list = (sessions || [])
-            .map(toPublicSession)
+            .map((s) => toPublicSession(s, req.sessionId))
             .sort((a, b) => new Date(b.lastActive || 0) - new Date(a.lastActive || 0));
         return res.status(200).json({ status: true, statusText: "OK", data: list });
     } catch (error) {

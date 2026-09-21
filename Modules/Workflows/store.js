@@ -133,6 +133,18 @@ const blockRun = (companyId, runId, { code, reason, stepId }) => call(companyId,
 
 const listSteps = (companyId, runId) => call(companyId, STEPS, [{ runId: String(runId) }, null, { sort: { index: 1 } }], 'find');
 
+/* The steps holding a live claim under a credential, which is what the tokens
+ * screen lists. Served by the { status, leaseExpiresAt } index. */
+const listCredentialedSteps = (companyId, now = new Date()) => call(companyId, STEPS, [
+    { status: 'running', leaseExpiresAt: { $gt: now }, credentialId: { $exists: true, $ne: null } },
+    null,
+    { sort: { leaseExpiresAt: 1 } },
+], 'find');
+
+const listRunsById = (companyId, runIds) => (runIds.length
+    ? call(companyId, RUNS, [{ _id: { $in: runIds.map(String) } }], 'find')
+    : Promise.resolve([]));
+
 const getStep = (companyId, runId, stepId) => call(companyId, STEPS, [{ runId: String(runId), stepId: String(stepId) }], 'findOne');
 
 /* Claim a step, or discover somebody else holds it.
@@ -155,11 +167,12 @@ const claimStep = async (companyId, { runId, stepId, workerId, now = new Date(),
 };
 
 /* Extends the lease of a step this worker still holds. False means the lease was
- * taken: the caller has lost the step and must stop touching it. */
-const heartbeat = async (companyId, { runId, stepId, fencingToken, now = new Date(), lease = leaseMs() }) => {
+ * taken: the caller has lost the step and must stop touching it. `set` is what
+ * has to move with the lease in the same write (the re-minted credential's id). */
+const heartbeat = async (companyId, { runId, stepId, fencingToken, now = new Date(), lease = leaseMs(), set = {} }) => {
     const result = await call(companyId, STEPS, [
         { runId: String(runId), stepId: String(stepId), status: 'running', fencingToken: Number(fencingToken) },
-        { $set: { leaseExpiresAt: new Date(now.getTime() + lease) } },
+        { $set: { ...set, leaseExpiresAt: new Date(now.getTime() + lease) } },
     ], 'updateOne');
     return Boolean(result && result.matchedCount > 0);
 };
@@ -420,7 +433,7 @@ const outputsOf = async (companyId, runId) => {
 
 module.exports = {
     RUNS, STEPS, TERMINAL, STEP_TERMINAL, StaleLeaseError, isDuplicateKey, stepRowsFor,
-    createRun, getRun, findRunByDedupeKey, listRuns, patchRun, spendOnRun, blockRun, listSteps, getStep,
+    createRun, getRun, findRunByDedupeKey, listRuns, listRunsById, patchRun, spendOnRun, blockRun, listSteps, listCredentialedSteps, getStep,
     retryStep, operatorSkipStep, resumeStep, recordCompensation, reopenRun,
     claimStep, heartbeat, settleStep, noteStep, succeedStep, failStep, deferStep, releaseStep, skipStep,
     childRowsFor, addSteps, listChildren, resetSteps, wakeStep, outputsOf,

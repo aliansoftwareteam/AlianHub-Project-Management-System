@@ -4,6 +4,7 @@ try {
 } catch (_e) {
     AnthropicSdk = null;
 }
+const { apiKeyFor } = require('../providerKeys');
 
 // Anthropic's SDK officially recommends streaming for any messages call
 // with max_tokens > 4096 — long non-streaming requests get throttled and
@@ -103,7 +104,7 @@ const anthropicProvider = {
         const Anthropic = AnthropicSdk.default || AnthropicSdk.Anthropic || AnthropicSdk;
         const timeoutMs = providerTimeoutMs('anthropic');
         const client = new Anthropic({
-            apiKey: process.env.ANTHROPIC_API_KEY,
+            apiKey: await apiKeyFor('anthropic'),
             timeout: timeoutMs,
         });
 

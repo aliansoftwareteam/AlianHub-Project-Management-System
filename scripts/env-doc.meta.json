@@ -9,6 +9,11 @@
     "description": "Minutes between runs of the agent rate-alert evaluator (error rate, approval rate, cost forecast, queue age).",
     "default": "15"
   },
+  "AGENT_EGRESS_ALLOWLIST": {
+    "group": "security",
+    "description": "Set to true to route every agent fetch through the workspace egress gateway: a workspace whose list under Instance > Egress names hosts lets its agents fetch those hosts only (exact hostnames or *.suffix patterns, optional port, http and https), checked on every redirect hop and again against the resolved address, with each refusal audited as agent.egress_refused naming the host. A workspace with no list, and every workspace while this is unset or false, fetches as before: public hosts allowed, private, metadata and link-local hosts refused. Private hosts stay refused even when listed.",
+    "default": "false"
+  },
   "AGENT_PERFORMANCE_READ": {
     "group": "ai",
     "description": "The performance.read agent action: \"on\" registers it and offers it over MCP, so an agent can read logged time, estimate against actual, sprint velocity and cumulative flow for up to 5 projects over at most 120 days, as the person behind the agent and with each query and its numbers kept in the replay record; default \"off\" leaves the registry and the MCP tool list as they were.",
@@ -172,6 +177,21 @@
   "AUDIT_CHAIN_KEY": {
     "group": "security",
     "description": "Secret of at least 32 characters that keys the audit chain hash, so someone who can write to the database cannot recompute it. Rows chained under one key only verify under that key; keep it out of the database and its backups.",
+    "secret": true
+  },
+  "SECRETS_STORE": {
+    "group": "security",
+    "description": "Set to true to keep integration and webhook secrets in a per-company secrets store, referenced by handle: a new or updated secret is sealed with AES-256-GCM under SECRETS_KEY and bound to its company and handle, the integration or webhook document keeps only the handle, every create, rotation, revocation and failed lookup is audited, and owners and admins see each secret's name, kind, key id and dates under Settings → Integrations, where they can rotate or revoke it. Migration 031 moves existing secrets in when this is on while it runs. Needs SECRETS_KEY; with a missing or short key the store refuses every read and write, connecting an integration or adding a webhook is refused rather than saved outside the store, and an error is logged. Unset or false keeps secrets sealed on their documents as before; a handle already written still resolves while a key is set, and a secret saved while this is off replaces the handle on its document, so the newest value is always the one in use. Turning this off again: the old store copy is revoked when SECRETS_KEY is still set, and otherwise marked, then revoked by `npm run secrets:reencrypt` (or by migration 031 when it runs again) once a key is set.",
+    "default": "false"
+  },
+  "SECRETS_KEY": {
+    "group": "security",
+    "description": "Key of at least 32 characters that seals the secrets store, separate from JWT_SECRET. Each stored secret records the id of the key that sealed it (derived from the stretched key, so it is no shortcut for guessing the key); keep the key out of the database and its backups. To rotate, move the old value to SECRETS_KEY_PREVIOUS, set the new one here, restart, and run `npm run secrets:reencrypt`.",
+    "secret": true
+  },
+  "SECRETS_KEY_PREVIOUS": {
+    "group": "security",
+    "description": "The previous SECRETS_KEY during a key rotation: secrets sealed under it still resolve, and `npm run secrets:reencrypt` reseals every company under SECRETS_KEY, writes an audit row per company and prints how many live secrets are still on this key. Unset it only when that command says it is safe to.",
     "secret": true
   },
   "AUDIT_EXPORT_MAX_ROWS": {
@@ -838,6 +858,10 @@
     "description": "Idle time after which a login session expires.",
     "default": "172800"
   },
+  "SESSION_COOKIE_HTTPONLY": {
+    "group": "auth",
+    "description": "Set to on to mark the session cookies httpOnly so page JavaScript can no longer read them: the server reads the access token from the cookie when no Authorization header is sent, the socket handshake and the refresh endpoint do the same, and the web app authenticates by cookie instead of copying tokens into headers. Tracker, CLI and API-token clients are unaffected (they send headers and bodies, never cookies). Unset or off keeps readable cookies as before."
+  },
   "SOCKETIO_ADMIN_PASSWORD_HASH": {
     "group": "security",
     "description": "bcrypt hash of the Socket.IO admin UI password; the UI stays off while unset.",
@@ -849,6 +873,16 @@
     "description": "Username for the Socket.IO admin UI; the UI stays off while unset.",
     "default": "alian"
   },
+  "STEP_CREDENTIALS": {
+    "group": "security",
+    "description": "Set to on to give the platform its own service identities and mint a step-scoped credential per workflow step: the workflow engine, its worker, the knowledge indexer and the model router record their rows as service:<name> instead of a borrowed user, and when the engine claims a step it signs a short-lived credential carrying the company, run, step, fencing token, actor context and allowed actions that expires one lease after it was minted, is re-minted whenever a heartbeat extends the lease, and is checked against the live step row whenever an agent step's actor presents it to perform an action. The tokens screen lists live credentials as step-scoped. Unset or off keeps today's behaviour: no credential is minted and rows are attributed as before.",
+    "default": "off"
+  },
+  "STEP_CREDENTIAL_SECRET": {
+    "group": "security",
+    "description": "Key material for signing step-scoped credentials (STEP_CREDENTIALS). Derived with scrypt, never used as-is; falls back to JWT_SECRET, so set a dedicated secret in production so rotating JWT_SECRET does not invalidate credentials of steps in flight, and keep it out of the database and its backups.",
+    "secret": true
+  },
   "STORAGEBUCKET": {
     "group": "integrations",
     "description": "Firebase storage bucket."
@@ -858,6 +892,10 @@
     "description": "wasabi | server",
     "required": true,
     "default": "wasabi"
+  },
+  "TENANT_PROVIDER_KEYS": {
+    "group": "ai",
+    "description": "Set to on to let each workspace pay for model calls with its own provider keys: owners and admins set one key per provider under Settings, kept in the secrets store by handle with only the handle on the company row, and every model call and embedding run for that workspace is billed to its key, or to the instance key while none is set. A set key that will not open refuses the call rather than billing the instance owner. Needs SECRETS_STORE with SECRETS_KEY; unset or off keeps every call on the instance keys."
   },
   "TRACKER_PKCE_LEGACY_UNTIL": {
     "group": "auth",
