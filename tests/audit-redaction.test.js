@@ -297,6 +297,23 @@ describe('redacting a person under AUDIT_CHAIN', () => {
         expect(markers()[0].finishedAt).toBeInstanceOf(Date);
     });
 
+    it('stops a run whose lease another run has taken, and records nothing', async () => {
+        await writeRows();
+        let taken = false;
+        const failed = await withCrud(CID, async (id, query, method, real) => {
+            const answer = await real();
+            if (!taken && query.type === SCHEMA_TYPE.AUDIT_LOGS && method === 'updateOne') {
+                taken = true;
+                markers()[0].owner = 'another-server';
+            }
+            return answer;
+        }, () => redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' }).catch((e) => e));
+
+        expect(failed).toMatchObject({ code: 'redaction_running', status: 409 });
+        expect(byAction(redact.REDACTED_ACTION)).toHaveLength(0);
+        expect(markers()[0]).toMatchObject({ owner: 'another-server', rows: 0 });
+    });
+
     it('leaves a row that changed after it was read, and counts only what it wrote', async () => {
         await writeRows();
         let changed = false;
