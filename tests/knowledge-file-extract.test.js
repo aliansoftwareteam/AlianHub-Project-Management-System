@@ -106,7 +106,7 @@ describe('what is never done', () => {
     });
 
     it('never hands a parser a file whose bytes are not its type', async () => {
-        await expect(extractor.extractText({ buffer: Buffer.from('not a pdf at all'), kind: 'pdf' })).rejects.toMatchObject({ code: 'failed' });
+        await expect(extractor.extractText({ buffer: Buffer.from('not a pdf at all'), kind: 'pdf' })).rejects.toMatchObject({ code: 'failed', message: 'The file is not a PDF.' });
         await expect(extractor.extractText({ buffer: Buffer.from('not a zip at all'), kind: 'docx' })).rejects.toMatchObject({ code: 'failed' });
         await expect(extractor.extractText({ buffer: Buffer.from('not a zip at all'), kind: 'xlsx' })).rejects.toMatchObject({ code: 'failed' });
     });

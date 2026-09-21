@@ -55,6 +55,14 @@ describe('server storage', () => {
         }
     });
 
+    it('refuses a link inside the bucket that leads out of it', async () => {
+        put(OTHER, KEY, 'Their notes.');
+        const link = path.join(STORAGE_ROOT, COMPANY, 'Project', 'escape');
+        fs.mkdirSync(path.dirname(link), { recursive: true });
+        fs.symlinkSync(path.join(STORAGE_ROOT, OTHER, 'Project'), link);
+        await expect(readStoredFile({ companyId: COMPANY, key: `Project/escape/${KEY.slice('Project/'.length)}`, maxBytes: 1024 })).rejects.toMatchObject({ code: 'invalid_key' });
+    });
+
     it('refuses a company id that is not one', async () => {
         for (const companyId of ['', '..', 'USER_PROFILES', `${COMPANY}/..`]) {
             await expect(readStoredFile({ companyId, key: KEY, maxBytes: 1024 })).rejects.toMatchObject({ code: 'invalid_key' });
