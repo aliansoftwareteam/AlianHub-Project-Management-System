@@ -196,6 +196,19 @@ describe('the url and api readers (flag on)', () => {
         ['{{input.pr_link}}', 'invalid'],
         ['api.{{input.brief}}.com', 'invalid'],
         ['api.github.com:0', 'port'],
+        ['127.0.0.1.nip.io', 'wildcard_dns'],
+        ['169.254.169.254.nip.io', 'wildcard_dns'],
+        ['10.0.0.1.sslip.io', 'wildcard_dns'],
+        ['localtest.me', 'wildcard_dns'],
+        ['foo.lvh.me', 'wildcard_dns'],
+        ['nas.home.arpa', 'private'],
+        ['router.lan', 'private'],
+        ['git.corp', 'private'],
+        ['wiki.intranet', 'private'],
+        ['db.localdomain', 'private'],
+        ['api.test', 'private'],
+        ['www.example', 'private'],
+        ['host.invalid', 'private'],
     ])('refuses the declared host %s (%s)', (host, reason) => {
         const checked = validateSkill(skillBody({ gather: [readStep({ host })] }));
         expect(checked.errors).toEqual([expect.objectContaining({ field: 'gather[0].params.host', code: 'host_not_allowed', reason })]);
@@ -210,6 +223,13 @@ describe('the url and api readers (flag on)', () => {
         ['/a#frag', '"#"'],
         ['{{input.pr_link}}/x', 'must start with a single "/"'],
         ['https://evil.com/x', 'must start with a single "/"'],
+        [`/${'a'.repeat(externalReads.MAX_PATH)}`, `${externalReads.MAX_PATH} characters`],
+        ['/v1/../secret', 'dot segments'],
+        ['/v1/./items', 'dot segments'],
+        ['/v1/%2e%2e/secret', 'dot segments'],
+        ['/v1/.%2E/secret', 'dot segments'],
+        ['/v1/items/..', 'dot segments'],
+        ['/v1/%2E?x=1', 'dot segments'],
     ])('refuses the path %j', (path, message) => {
         const checked = validateSkill(skillBody({ gather: [readStep({ path })] }));
         expect(checked.errors).toEqual([expect.objectContaining({ field: 'gather[0].params.path', code: 'invalid_path' })]);
@@ -224,6 +244,14 @@ describe('the url and api readers (flag on)', () => {
         ['/x{{#input.pr_link}}/y{{/input.pr_link}}', 'invalid_path'],
     ])('lets a path placeholder read only the task and declared inputs (%s)', (path, code) => {
         expect(codes(validateSkill(skillBody({ gather: [readStep({ path })] })))).toContain(code);
+    });
+
+    it('accepts a path of the longest allowed length', () => {
+        expect(validateSkill(skillBody({ gather: [readStep({ path: `/${'a'.repeat(externalReads.MAX_PATH - 1)}` })] })).ok).toBe(true);
+    });
+
+    it('accepts dots inside a segment', () => {
+        expect(validateSkill(skillBody({ gather: [readStep({ path: '/v1/app.json/...x/.well-known/a..b' })] })).ok).toBe(true);
     });
 
     it('accepts a placeholder in the path and the query', () => {
@@ -275,6 +303,38 @@ describe('placeholders reach only the path and the query, never the host, scheme
         expect(url.username + url.password).toBe('');
         expect(url.hash).toBe('');
         expect(out.startsWith(`https://${HOST}/`)).toBe(true);
+    });
+
+    const DOTS = ['', '.', '..', '%2e', '%2E', '%2e%2e', '%2E%2E', '.%2e', '%2e.', '.%2E', '%2E.', '%252e%252e'];
+
+    it.each(DOTS)('refuses a value %j that would empty or climb a path segment', (value) => {
+        expect(() => externalReads.buildUrl({ host: HOST, path: '/v1/items/{{input.pr_link}}/secret' }, { task: TASK, input: { pr_link: value } })).toThrow(/segment/);
+    });
+
+    it('lets a dot value through in the query', () => {
+        expect(externalReads.buildUrl({ host: HOST, path: '/v1/items?q={{input.pr_link}}' }, { task: TASK, input: { pr_link: '..' } })).toBe(`https://${HOST}/v1/items?q=..`);
+    });
+
+    it.each(EVIL)('%j keeps every declared literal segment in place', (value) => {
+        const url = new URL(externalReads.buildUrl({ host: HOST, path: '/v1/items/{{input.pr_link}}/secret' }, { task: TASK, input: { pr_link: value } }));
+        const segments = url.pathname.split('/');
+        expect(segments).toHaveLength(5);
+        expect([segments[1], segments[2], segments[4]]).toEqual(['v1', 'items', 'secret']);
+        expect(decodeURIComponent(segments[3])).toBe(value);
+    });
+
+    it.each([
+        ['another host', 'https://evil.com/v1', '/v1'],
+        ['another port', `https://${HOST}:444/v1`, '/v1'],
+        ['another scheme', `http://${HOST}/v1`, '/v1'],
+        ['userinfo', `https://user:pass@${HOST}/v1`, '/v1'],
+        ['a lost segment', `https://${HOST}/v1/secret`, '/v1/items/x/secret'],
+    ])('refuses a built url with %s', (what, href, pathname) => {
+        expect(() => externalReads.assertBuilt(new URL(href), { origin: `https://${HOST}`, pathname })).toThrow(/left its declared origin|path changed/);
+    });
+
+    it('accepts a built url that kept its origin and path', () => {
+        expect(() => externalReads.assertBuilt(new URL(`https://${HOST}/v1/a%7Cb`), { origin: `https://${HOST}`, pathname: '/v1/a|b' })).not.toThrow();
     });
 
     it('fills task fields and inputs, encoded', () => {
@@ -399,10 +459,25 @@ describe('a credential is a handle to a skill_read secret in this workspace', ()
         expect(errors).toEqual([expect.objectContaining({ field: 'gather[0].params.credential', code: 'credential_wrong_kind' })]);
     });
 
-    it('refuses a revoked handle', async () => {
+    it('refuses a revoked handle as revoked', async () => {
         const { handle } = await credential();
         await secrets.revoke({ companyId: C, handle, actor: ACTOR });
-        expect((await errorsOf(skillRecord.createSkill(C, skillBody({ gather: [readStep({ credential: handle })] })))).map((e) => e.code)).toEqual(['credential_not_found']);
+        expect((await errorsOf(skillRecord.createSkill(C, skillBody({ gather: [readStep({ credential: handle })] })))).map((e) => e.code)).toEqual(['credential_revoked']);
+    });
+
+    it('refuses the save as retryable when the store key is unusable, without claiming the handle is gone', async () => {
+        const { handle } = await credential();
+        process.env.SECRETS_KEY = 'short';
+        const errors = await errorsOf(skillRecord.createSkill(C, skillBody({ gather: [readStep({ credential: handle })] })));
+        expect(errors).toEqual([expect.objectContaining({ field: 'gather[0].params.credential', code: 'credential_store_unavailable', retryable: true })]);
+    });
+
+    it('refuses the save as retryable when the store cannot be read', async () => {
+        const { handle } = await credential();
+        const spy = jest.spyOn(secrets, 'describe').mockRejectedValueOnce(new Error('connection reset'));
+        const errors = await errorsOf(skillRecord.createSkill(C, skillBody({ gather: [readStep({ credential: handle })] })));
+        spy.mockRestore();
+        expect(errors).toEqual([expect.objectContaining({ code: 'credential_store_unavailable', retryable: true })]);
     });
 
     it('refuses a handle from another workspace', async () => {
@@ -413,7 +488,7 @@ describe('a credential is a handle to a skill_read secret in this workspace', ()
     it('refuses any handle while the secrets store is off', async () => {
         const { handle } = await credential();
         delete process.env.SECRETS_STORE;
-        expect((await errorsOf(skillRecord.createSkill(C, skillBody({ gather: [readStep({ credential: handle })] })))).map((e) => e.code)).toEqual(['credential_not_found']);
+        expect((await errorsOf(skillRecord.createSkill(C, skillBody({ gather: [readStep({ credential: handle })] })))).map((e) => e.code)).toEqual(['credential_store_off']);
     });
 });
 
@@ -433,6 +508,16 @@ describe('a raw secret anywhere in the skill body is refused', () => {
         ['a bearer header', 'Authorization: Bearer 3f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c'],
         ['credentials in a URL', 'https://deploy:hunter2secret@example.com/x'],
         ['a keyed query value', '/v1/items?api_key=Zx81kQp02LmN73vB&x=1'],
+        ['a HuggingFace token', tok('hf', '_', 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789')],
+        ['an npm token', tok('npm', '_', 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8')],
+        ['a GitLab trigger token', tok('gl', 'ptt-', '0123456789abcdef0123456789abcdef01234567')],
+        ['a Slack app token', tok('xa', 'pp-', '1-A0123456789-0123456789012-abcdef0123456789abcdef0123456789')],
+        ['a Slack webhook', tok('https://hooks.slack', '.com/services/', 'T0123ABCD/B0123ABCD/', 'abcdefGHIJKL0123456789xy')],
+        ['a SendGrid key', tok('S', 'G.', 'abcdEFGH0123ijklMNOP45', '.', 'qrstUVWX6789yzABCDEF0123ghijKLMN4567opqrST')],
+        ['a Google OAuth token', tok('ya', '29.', 'a0AfH6SMBx1234567890abcdefGHIJKLmnop')],
+        ['a basic auth header', 'Authorization: Basic ZGVwbG95Omh1bnRlcjJzZWNyZXQ='],
+        ['a presigned AWS url', `https://bucket.s3.amazonaws.com/f?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=${'0a1b2c3d'.repeat(8)}`],
+        ['a bare token pair', 'token=Zx81kQp02LmN73vB'],
     ];
 
     it.each(SECRETS)('refuses %s in the prompt', (what, secret) => {
@@ -466,6 +551,16 @@ describe('a raw secret anywhere in the skill body is refused', () => {
         'task-management, sprint-planning, sk-8 build, eyJ alone',
         'user@example.com wrote the brief',
         '-----BEGIN CERTIFICATE-----',
+        'Hugging Face tokens start with hf_ and npm tokens with npm_; never paste either.',
+        'The npm_modules folder and hf_hub are not secrets.',
+        'GitLab trigger tokens start with glptt- and Slack app tokens with xapp-.',
+        'Post to hooks.slack.com through the Slack integration instead.',
+        'SG. Pepper and ya29 are prefixes, not keys.',
+        'Basic authentication is required on the staging server.',
+        'Basic plan users get 5 projects.',
+        'Put X-Amz-Signature= in the query only when presigning.',
+        'Set token= to your value in the settings page.',
+        'The token=abc pair is too short to be one.',
     ])('lets ordinary text through: %s', (textValue) => {
         expect(findSecrets({ prompt: { instructions: textValue } })).toEqual([]);
         expect(validateSkill(plainSkill({ description: textValue.slice(0, 1000) })).errors.filter((e) => e.code === 'secret_in_body')).toEqual([]);
