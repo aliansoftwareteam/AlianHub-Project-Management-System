@@ -1,3 +1,4 @@
+/* eslint-env browser */
 const path = require('node:path');
 const { test, expect } = require('@playwright/test');
 const { STATE_DIR, resolveMongoUrl } = require('../support/env');

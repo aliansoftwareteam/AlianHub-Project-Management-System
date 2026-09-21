@@ -154,7 +154,6 @@ describe('the Google Drive picker opens in its own popup page', () => {
         deliver({ type: 'drive-picker:picked', nonce: first.nonce, files: [pickedDoc] }, { source: first.popup });
         await settle();
         expect(first.result.value).toHaveLength(1);
-        vi.restoreAllMocks();
 
         const second = await open();
         expect(second.nonce).not.toBe(first.nonce);

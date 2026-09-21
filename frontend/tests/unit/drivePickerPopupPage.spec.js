@@ -105,10 +105,14 @@ describe('the Drive picker popup page', () => {
     it('takes the first settings only', async () => {
         boot();
         deliver({ type: 'drive-picker:config', nonce: NONCE, config: CONFIG }, { source: opener });
-        deliver({ type: 'drive-picker:config', nonce: 'b'.repeat(32), config: { ...CONFIG, token: 'ya29.other' } }, { source: opener });
+        deliver({ type: 'drive-picker:config', nonce: 'b'.repeat(32), config: { ...CONFIG, token: 'ya29.other', labels: { loading: 'other' } } }, { source: opener });
+        expect(document.querySelectorAll('script[src="https://apis.google.com/js/api.js"]')).toHaveLength(1);
+        expect(document.getElementById('status').textContent).toBe('Opening Google Drive');
         const calls = await loadGoogle();
         expect(calls.token).toBe(CONFIG.token);
         expect(calls.built).toBe(1);
+        calls.callback({ action: 'cancel' });
+        expect(opener.postMessage).toHaveBeenLastCalledWith({ type: 'drive-picker:cancel', nonce: NONCE }, ORIGIN);
     });
 
     it('sends the picked files with the nonce to its opener and closes', async () => {
