@@ -395,7 +395,11 @@ const schema = {
     },
     // Per-call audit of token-authenticated API requests
     apiActivityLogs: {
-        tokenId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        // An MCP call made with an OAuth access token has no personal token: it names the client and grant instead.
+        tokenId: { type: mongoose.Schema.Types.ObjectId, required() { return !this.clientId; } },
+        clientId: { type: String, required: false },
+        grantId: { type: String, required: false },
+        userId: { type: String, required: false },
         method: { type: String, required: true },
         path: { type: String, required: true },
         statusCode: { type: Number, required: false },
