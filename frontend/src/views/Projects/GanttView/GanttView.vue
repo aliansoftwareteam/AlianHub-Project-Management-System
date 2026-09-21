@@ -466,6 +466,9 @@ onMounted(async () => {
     if (!ganttEl.value || !gantt) { loading.value = false; return; }
 
     try {
+        // 'auto' probes with new Function and, where nothing blocks it, builds its date formatters with it,
+        // so a report-only content security policy would log an eval on every Gantt view.
+        gantt.config.csp = true;
         gantt.config.date_format = '%Y-%m-%d %H:%i';
         gantt.config.readonly = readOnly.value;
         gantt.config.drag_move = !readOnly.value;

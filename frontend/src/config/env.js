@@ -383,6 +383,7 @@ module.exports.REPO_URL = 'https://github.com/aliansoftwareteam/AlianHub-Project
 module.exports.INSTANCE_COMPANIES = '/api/v2/instance/companies';
 module.exports.INSTANCE_AUDIT_EXPORT = '/api/v2/instance/audit-export';
 module.exports.INSTANCE_ENFORCEMENT = '/api/v2/instance/enforcement';
+module.exports.INSTANCE_CSP = '/api/v2/instance/csp';
 module.exports.INSTANCE_EGRESS = '/api/v2/instance/egress';
 
 // The storage flag is decided by the server at runtime; build-time VUE_APP_STORAGE_TYPE is only the fallback

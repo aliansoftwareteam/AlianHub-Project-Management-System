@@ -1476,6 +1476,16 @@ const schema = {
         lastAuditedAt: { type: Date, required: false },
         userIds: { type: [String], required: false },
     },
+    // Global only. One row per day, directive, blocked host and document path shape (Modules/CspReport):
+    // a violation report's URLs, referrer and sample are never stored.
+    cspReports: {
+        day: { type: Date, required: true },
+        directive: { type: String, required: true },
+        blockedHost: { type: String, required: true },
+        documentPath: { type: String, required: true },
+        count: { type: Number, required: false },
+        lastSeen: { type: Date, required: false },
+    },
     // One document per workspace (_id "workspace"): the hosts its agents may fetch when
     // AGENT_EGRESS_ALLOWLIST is on (Modules/Agents/engine/egressAllowlist.js).
     egressAllowlists: {
