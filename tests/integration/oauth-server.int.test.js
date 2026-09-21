@@ -140,7 +140,7 @@ describe('with MCP_OAUTH on in a test process', () => {
         secrets.push(refreshed.body.access_token, refreshed.body.refresh_token);
 
         const rows = await globalDb.collection('oauth_tokens').find({ clientId }).toArray();
-        expect(rows.map((row) => row.kind).sort()).toEqual(['access', 'access', 'code', 'refresh', 'refresh']);
+        expect(rows.map((row) => row.kind).sort()).toEqual(['access', 'access', 'code', 'consent', 'refresh', 'refresh']);
         const codeRow = rows.find((row) => row.kind === 'code');
         expect(codeRow).toMatchObject({ redirectUri: REDIRECT, codeChallenge: challengeOf(verifier), resource: `${server.baseURL}/mcp`, companyId: state.companyId, userId: owner.uid });
         expect(codeRow.spentAt).toBeInstanceOf(Date);
