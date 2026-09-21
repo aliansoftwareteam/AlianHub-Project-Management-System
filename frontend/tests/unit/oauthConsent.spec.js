@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 
-const { apiRequestWithoutCompnay } = vi.hoisted(() => ({ apiRequestWithoutCompnay: vi.fn() }));
+const { apiRequestWithoutCompnay, logOut } = vi.hoisted(() => ({ apiRequestWithoutCompnay: vi.fn(), logOut: vi.fn() }));
 
-vi.mock('@/services', () => ({ apiRequestWithoutCompnay }));
+vi.mock('@/services', () => ({ apiRequestWithoutCompnay, useAuth: () => ({ logOut }) }));
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', render: () => null } }));
 vi.mock('@/components/templates/AuthShell/AuthShell.vue', () => ({ default: { name: 'AuthShell', template: '<div><slot /></div>' } }));
 
@@ -17,6 +17,7 @@ const GAMMA = '6f00000000000000000000c3';
 
 const details = (over = {}) => ({
     client: { clientId: 'ahc_0123456789abcdef01234567', name: 'Claude Code', kind: 'dynamic', clientHost: '', redirectUri: 'http://127.0.0.1:33418/callback', redirectHost: '127.0.0.1', loopback: true },
+    person: { name: 'Max Member', email: 'max@example.test' },
     scopes: ['tasks:read', 'tasks:write'],
     csrf: CSRF,
     workspaces: [
@@ -59,6 +60,15 @@ describe('the OAuth consent screen', () => {
         expect(wrapper.find('[data-test="loopback-warning"]').text()).toBe('OAuthConsent.loopback_warning');
         expect(wrapper.findAll('[data-test^="scope-"]').map((row) => row.text())).toEqual(['OAuthConsent.scope_tasks_read', 'OAuthConsent.scope_tasks_write']);
         expect(wrapper.find('[data-test="client-host"]').exists()).toBe(false);
+    });
+
+    it('says who is signed in and offers to switch account', async () => {
+        const wrapper = await mountWith();
+        const who = wrapper.find('[data-test="signed-in-as"]');
+        expect(who.text()).toContain('OAuthConsent.signed_in_as');
+        expect(who.text()).toContain('Max Member (max@example.test)');
+        await who.find('button[data-test="switch-account"]').trigger('click');
+        expect(logOut).toHaveBeenCalledWith({ islogOut: true });
     });
 
     it('names the host of a metadata document client and gives no loopback warning for an https redirect', async () => {

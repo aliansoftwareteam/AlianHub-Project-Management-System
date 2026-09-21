@@ -9,14 +9,12 @@ const flow = require('./fixtures/oauthConsent');
 
 let mockDb;
 const mockSeats = {};
-const mockNotified = [];
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...args) => mockDb.crud(...args) }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../Modules/Audit/recorder', () => ({ recordAudit: jest.fn() }));
-jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({
-    handleNotificationtFun: jest.fn(async (req) => { mockNotified.push(req.body); return { status: true }; }),
-}));
+jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
+jest.mock('../Modules/notification-count/controller', () => ({ updateUnReadCommentsCountFun: jest.fn(async () => ({ status: true })) }));
 jest.mock('../Config/jwt', () => {
     const who = (req) => {
         const header = /^Bearer user:([a-f0-9]{24})$/.exec(String(req.headers.authorization || ''));
@@ -101,10 +99,9 @@ beforeEach(() => {
         [GAMMA]: { [ADMIN]: 1 },
     });
     const users = [[OWNER, [ALPHA, BETA]], [ADMIN, [ALPHA, GAMMA]], [MEMBER, [ALPHA, BETA]], [GUEST, [ALPHA]]];
-    for (const [uid, companies] of users) mockDb.seed(SCHEMA_TYPE.USERS, { _id: uid, AssignCompany: companies });
+    for (const [uid, companies] of users) mockDb.seed(SCHEMA_TYPE.USERS, { _id: uid, AssignCompany: companies, Employee_Name: `Person ${uid.slice(-2)}`, Employee_Email: `p${uid.slice(-2)}@s10s3.test` });
     for (const [id, name] of [[ALPHA, 'Alpha Works'], [BETA, 'Beta Labs'], [GAMMA, 'Gamma Corp']]) mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: id, Cst_CompanyName: name });
     for (const [uid, roleType] of [[OWNER, 1], [ADMIN, 2], [MEMBER, 3], [GUEST, 0]]) mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: uid, roleType, status: 2, isDelete: false });
-    mockNotified.length = 0;
     metadataDocument.forget();
     jest.clearAllMocks();
     delete process.env.CSP_MODE;
@@ -122,6 +119,10 @@ afterAll(() => {
 });
 
 const rows = (type) => mockDb.store[type] || [];
+// The rows written to the workspace's own notifications (the global copy is written to the global database).
+const notices = (companyId = ALPHA) => mockDb.calls.filter((c) => c.method === 'save' && c.type === SCHEMA_TYPE.NOTIFICATIONS && c.companyId === companyId).map((c) => c.data);
+// One per approval request: the owner of Alpha receives every one of them.
+const mockNotified = { get length() { return notices().filter((row) => row.receiverID === OWNER).length; } };
 const audited = (action) => recordAudit.mock.calls.filter(([, entry]) => entry.action === action);
 
 const registerPublicClient = async (overrides = {}) => {
@@ -341,8 +342,8 @@ describe('per-workspace client approval', () => {
         const [row] = rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS);
         expect(row).toMatchObject({ companyId: ALPHA, clientId: client.clientId, clientName: 'S10S3 agent', status: 'pending', requestedBy: MEMBER, requestedScopes: ['tasks:read', 'projects:read'], privateSprints: false });
         expect(mockNotified).toHaveLength(1);
-        expect(mockNotified[0]).toMatchObject({ companyId: ALPHA, changeType: 'oauth_client_approval' });
-        expect([...mockNotified[0].assigneeUsers].sort()).toEqual([OWNER, ADMIN].sort());
+        expect(notices().map((row) => row.receiverID).sort()).toEqual([OWNER, ADMIN].sort());
+        expect(notices().every((row) => row.companyId === ALPHA && row.changeType === 'oauth_client_approval' && row.changeData.clientId === client.clientId)).toBe(true);
         expect(audited('oauth.client_approval_requested')).toEqual([[ALPHA, expect.objectContaining({ actorId: MEMBER, entityId: client.clientId })]]);
     });
 
@@ -679,5 +680,110 @@ describe('a person\'s own grants', () => {
     it('refuses an API token', async () => {
         await start();
         expect((await mine(MEMBER, { 'x-test-api-token': '1' })).status).toBe(403);
+    });
+});
+
+describe('the approval request notification', () => {
+    it('carries the client name as data, never inside the message text', async () => {
+        await start();
+        const name = 'Zq <img src=x onerror=alert(1)> <b>Zq</b>';
+        const client = await registerPublicClient({ name });
+        const { consent } = await flow.startAuthorization(authorizeUrl(client.clientId));
+        await flow.requestApproval(consent, { session: session(MEMBER), workspace: ALPHA });
+        const stored = notices();
+        expect(stored).toHaveLength(2);
+        for (const row of stored) {
+            expect(row.changeData).toMatchObject({ clientId: client.clientId, clientName: name });
+            expect(row.message).not.toMatch(/Zq|<img|<b>/);
+        }
+    });
+});
+
+describe('approval request limits', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const ask = async (client, uid = MEMBER, workspace = ALPHA) => {
+        const { consent } = await flow.startAuthorization(authorizeUrl(client.clientId));
+        return flow.requestApproval(consent, { session: session(uid), workspace });
+    };
+
+    it('does not let a denied request be raised again within a day, then lets it, notifying once', async () => {
+        await start();
+        const client = await registerPublicClient();
+        expect((await ask(client)).status).toBe(200);
+        await approvals.deny(ADMIN, { clientId: client.clientId });
+        const again = await ask(client);
+        expect(again.status).toBe(429);
+        expect(rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS)[0]).toMatchObject({ status: 'denied' });
+        expect(mockNotified).toHaveLength(1);
+        rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS)[0].decidedAt = new Date(Date.now() - DAY - 1000);
+        expect((await ask(client)).status).toBe(200);
+        expect(rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS)[0]).toMatchObject({ status: 'pending' });
+        expect(mockNotified).toHaveLength(2);
+    });
+
+    it('keeps one pending request per client per workspace and notifies once however often it is raised', async () => {
+        await start();
+        const client = await registerPublicClient();
+        for (const uid of [MEMBER, MEMBER, OWNER, GUEST]) expect((await ask(client, uid)).status).toBe(200);
+        expect(rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS)).toHaveLength(1);
+        expect(mockNotified).toHaveLength(1);
+    });
+
+    it('caps the new pending requests one person can raise in a day', async () => {
+        await start();
+        const { MAX_REQUESTS_PER_PERSON_PER_DAY } = require('../Modules/OAuthServer/approvals');
+        expect(MAX_REQUESTS_PER_PERSON_PER_DAY).toBeGreaterThan(0);
+        for (let i = 0; i < MAX_REQUESTS_PER_PERSON_PER_DAY; i += 1) {
+            expect((await ask(await registerPublicClient({ name: `S10S3 agent ${i}` }))).status).toBe(200);
+        }
+        const over = await ask(await registerPublicClient({ name: 'S10S3 one too many' }));
+        expect(over.status).toBe(429);
+        expect(rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS)).toHaveLength(MAX_REQUESTS_PER_PERSON_PER_DAY);
+        expect(mockNotified).toHaveLength(MAX_REQUESTS_PER_PERSON_PER_DAY);
+        expect((await ask(await registerPublicClient({ name: 'S10S3 someone else' }), OWNER)).status).toBe(200);
+    });
+
+    it('applies the cap to a refused answer too, without creating a request', async () => {
+        await start();
+        const { MAX_REQUESTS_PER_PERSON_PER_DAY } = require('../Modules/OAuthServer/approvals');
+        for (let i = 0; i < MAX_REQUESTS_PER_PERSON_PER_DAY; i += 1) await ask(await registerPublicClient({ name: `S10S3 agent ${i}` }));
+        const client = await registerPublicClient({ name: 'S10S3 over the cap' });
+        const { consent } = await flow.startAuthorization(authorizeUrl(client.clientId));
+        expect((await flow.answer(consent, { session: session(MEMBER), workspace: ALPHA })).status).toBe(403);
+        expect(rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS).some((r) => r.clientId === client.clientId)).toBe(false);
+    });
+});
+
+describe('who is consenting', () => {
+    it('names the signed-in person on the consent screen', async () => {
+        await start();
+        const client = await registerPublicClient();
+        const { consent } = await flow.startAuthorization(authorizeUrl(client.clientId));
+        const { data } = (await flow.details(consent, { session: session(MEMBER) })).body;
+        expect(data.person).toEqual({ name: 'Person 03', email: 'p03@s10s3.test' });
+    });
+});
+
+describe('a consent request is answered once', () => {
+    it('issues one code and one grant for two approvals posted at once', async () => {
+        await start();
+        const client = await registerPublicClient();
+        await approve(client.clientId);
+        const { consent } = await flow.startAuthorization(authorizeUrl(client.clientId));
+        const answers = await Promise.all([1, 2].map(() => flow.answer(consent, { session: session(OWNER), workspace: ALPHA })));
+        expect(answers.filter((a) => a.status === 303 && a.location.searchParams.get('code'))).toHaveLength(1);
+        expect(answers.filter((a) => a.status === 400)).toHaveLength(1);
+        expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)).toHaveLength(1);
+        expect(rows(SCHEMA_TYPE.OAUTH_TOKENS).filter((r) => r.kind === 'code')).toHaveLength(1);
+    });
+
+    it('refuses a second answer after a first one, deny included', async () => {
+        await start();
+        const client = await registerPublicClient();
+        await approve(client.clientId);
+        const { consent } = await flow.startAuthorization(authorizeUrl(client.clientId));
+        expect((await flow.answer(consent, { session: session(OWNER), decision: 'deny' })).status).toBe(303);
+        expect((await flow.answer(consent, { session: session(OWNER), workspace: ALPHA })).status).toBe(400);
+        expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)).toHaveLength(0);
     });
 });
