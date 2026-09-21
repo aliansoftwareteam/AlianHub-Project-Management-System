@@ -43,6 +43,7 @@ exports.init = (app) => {
     app.get(`${admin}/knowledge`, knowledge.summary);
     app.get(`${admin}/knowledge/:companyId`, knowledge.workspace);
     app.post(`${admin}/knowledge/:companyId/reindex`, knowledge.reindex);
+    app.post(`${admin}/knowledge/:companyId/reindex/cancel`, knowledge.cancelReindex);
     app.post(`${admin}/knowledge/:companyId/reembed`, knowledge.reembed);
     app.post(`${admin}/knowledge/:companyId/retry-files`, knowledge.retryFiles);
     app.post(`${admin}/knowledge/:companyId/erase/document`, knowledge.eraseDocument);

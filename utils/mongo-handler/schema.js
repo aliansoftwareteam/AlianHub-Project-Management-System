@@ -1564,11 +1564,12 @@ const schema = {
         extractDueAt: { type: Date, required: false },
         // The source row's updatedAt when it was read, so a slower, older read never overwrites a newer one.
         sourceUpdatedAt: { type: Date, required: false },
+        embedLeaseUntil: { type: Date, required: false },
     },
-    // What an erasure keeps out of the index for good: one document, or one person's private pages and comments.
+    // What an erasure keeps out of the index for good: one document, one task's comments and files, or one person's private pages and comments.
     knowledgeExclusions: {
         companyId: { type: String, required: true },
-        // 'document' | 'author'
+        // 'document' | 'task' | 'author'
         kind: { type: String, required: true },
         sourceType: { type: String, required: false, default: '' },
         sourceId: { type: String, required: false, default: '' },
@@ -1596,8 +1597,6 @@ const schema = {
         catchUpPass: { type: Number, required: false, default: 0 },
         // When the source's chunks were given their origin, so the fill runs once.
         originFilledAt: { type: Date, required: false },
-        // A re-index asked for from the instance console walks the source beside `status`, which it
-        // never changes, so the chunks stay readable until the walk is done.
         reindexStatus: { type: String, required: false, default: '' },
         reindexCursor: { type: String, required: false, default: '' },
         reindexSynced: { type: Number, required: false, default: 0 },
@@ -1605,6 +1604,9 @@ const schema = {
         reindexRequestedBy: { type: String, required: false },
         reindexFinishedAt: { type: Date, required: false },
         reindexError: { type: String, required: false, default: '' },
+        reindexFailures: { type: Number, required: false, default: 0 },
+        reindexOwner: { type: String, required: false, default: '' },
+        reindexLeaseUntil: { type: Date, required: false, default: null },
     },
     // Submissions arriving through a public intake form
     intakeItems: {

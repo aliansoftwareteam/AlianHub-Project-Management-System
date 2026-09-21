@@ -46,11 +46,25 @@ const validDocumentId = (sourceType, id) => {
     return rules && rules.validId ? rules.validId(id) : OBJECT_ID.test(id);
 };
 
+const canonicalObjectId = (id) => (typeof id === 'string' && OBJECT_ID.test(id) ? id.toLowerCase() : null);
+
+/* The form the indexer writes and checks: ObjectIds in lower-case hex, and in a file id only the
+ * task half, since the attachment half is whatever the client made up and is matched as written. */
+const canonicalDocumentId = (sourceType, id) => {
+    if (!validDocumentId(sourceType, id)) return null;
+    if (sourceType === 'file') {
+        const at = id.indexOf(':');
+        return `${id.slice(0, at).toLowerCase()}${id.slice(at)}`;
+    }
+    return OBJECT_ID.test(id) ? id.toLowerCase() : id;
+};
+
 const countsBySource = async (companyId, where) => {
     const rows = await chunkStore(companyId, [[{ $match: where }, { $group: { _id: '$sourceType', n: { $sum: 1 } } }]], 'aggregate');
-    const removed = Object.fromEntries((rows || []).filter((row) => row.n > 0).map((row) => [row._id, row.n]));
-    return { removed, total: Object.values(removed).reduce((sum, n) => sum + n, 0) };
+    return Object.fromEntries((rows || []).filter((row) => row.n > 0).map((row) => [row._id, row.n]));
 };
+
+const totalOf = (removed) => Object.values(removed).reduce((sum, n) => sum + n, 0);
 
 const reembed = async (companyId) => {
     const company = String(companyId);
@@ -82,26 +96,34 @@ const retryFiles = async (companyId) => {
     return { ok: true, reset, byReason };
 };
 
-const eraseDocument = async (companyId, { sourceType, sourceId }) => {
+/* `progress.removed` grows as each source goes, so a caller whose erasure throws partway can still
+ * say what was removed before it did. Ids are expected in their canonical form. */
+const eraseDocument = async (companyId, { sourceType, sourceId }, progress = { removed: {} }) => {
     const company = String(companyId);
+    const add = (type, n) => { if (n) progress.removed[type] = (progress.removed[type] || 0) + n; };
     if (sourceType !== TASK) {
-        const counts = await countsBySource(company, { sourceType, sourceId });
-        await erase.eraseDocument(company, { sourceType, sourceId });
-        return { ok: true, ...counts };
+        const { erased } = await erase.eraseDocument(company, { sourceType, sourceId });
+        add(sourceType, erased);
+    } else {
+        await erase.excludeTask(company, sourceId);
+        const rows = await chunkStore(company, [{ taskId: sourceId }, 'sourceType sourceId', { lean: true }], 'find');
+        const sources = new Map((rows || []).map((row) => [`${row.sourceType}:${row.sourceId}`, row]));
+        for (const row of sources.values()) {
+            const { erased } = await erase.eraseDocument(company, { sourceType: row.sourceType, sourceId: String(row.sourceId) });
+            add(row.sourceType, erased);
+        }
     }
-    const where = { taskId: sourceId };
-    const counts = await countsBySource(company, where);
-    const rows = await chunkStore(company, [where, 'sourceType sourceId', { lean: true }], 'find');
-    const seen = new Map((rows || []).map((row) => [`${row.sourceType}:${row.sourceId}`, row]));
-    for (const row of seen.values()) await erase.eraseDocument(company, { sourceType: row.sourceType, sourceId: String(row.sourceId) });
-    return { ok: true, ...counts };
+    return { removed: progress.removed, total: totalOf(progress.removed) };
 };
 
-const erasePerson = async (companyId, userId) => {
+const erasePerson = async (companyId, userId, progress = { removed: {} }) => {
     const company = String(companyId);
     const counts = await countsBySource(company, erase.personWhere(userId));
     await erase.erasePerson(company, userId);
-    return { ok: true, ...counts };
+    Object.assign(progress.removed, counts);
+    return { removed: progress.removed, total: totalOf(progress.removed) };
 };
 
-module.exports = { documentTypes, validDocumentId, reembed, retryFiles, eraseDocument, erasePerson, settled };
+module.exports = {
+    documentTypes, validDocumentId, canonicalDocumentId, canonicalObjectId, totalOf, reembed, retryFiles, eraseDocument, erasePerson, settled,
+};

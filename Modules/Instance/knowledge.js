@@ -21,6 +21,7 @@ const ACTIONS = Object.freeze({
     RETRY_FILES: 'knowledge.retry_files',
     ERASE_DOCUMENT: 'knowledge.erase_document',
     ERASE_PERSON: 'knowledge.erase_person',
+    REINDEX_CANCEL: 'knowledge.reindex_cancel',
 });
 
 // The screen translates these; statusText is the English fallback for scripts and for a code it does not know.
@@ -40,6 +41,9 @@ const CODE = Object.freeze({
     EMBEDDING_UNCONFIGURED: 'embedding_unconfigured',
     EMBEDDING_PAUSED: 'embedding_paused',
     REEMBED_RUNNING: 'reembed_running',
+    REINDEX_NOT_RUNNING: 'reindex_not_running',
+    NOTHING_ERASED: 'nothing_erased',
+    FIGURES_TIMED_OUT: 'figures_timed_out',
     SERVER_ERROR: 'server_error',
 });
 
@@ -51,6 +55,7 @@ const REFUSALS = {
     [CODE.EMBEDDING_UNCONFIGURED]: [409, 'No embedding key is configured for the instance.'],
     [CODE.EMBEDDING_PAUSED]: [409, 'Embedding is paused for this workspace: its budget is spent or the provider kept failing.'],
     [CODE.REEMBED_RUNNING]: [409, 'A re-embed of this workspace is already running.'],
+    [CODE.REINDEX_NOT_RUNNING]: [409, 'No re-index of this source is running.'],
 };
 
 const ok = (res, statusText, data, status = 200) => res.status(status).send({ status: true, statusText, data });
@@ -60,7 +65,6 @@ const serverError = (res) => fail(res, 500, CODE.SERVER_ERROR, 'The knowledge in
 
 const indexerState = () => ({ mode: flag.indexer.mode(), envKey: ENV_KEY });
 
-/* A whole number within [min, max], from a query value that may be anything; 1e308 and Infinity land on max. */
 const within = (value, fallback, min, max) => {
     const n = Number(value);
     if (Number.isNaN(n) || n === 0) return Math.min(max, Math.max(min, fallback));
@@ -113,7 +117,8 @@ const audit = (req, companyId, { action, entityType, entityId, meta }) => {
         }));
 };
 
-/* The workspace named in the path, checked and read; answers the refusal itself when there is none. */
+/* Every read and write after the lookup uses the id as the lookup returned it: the path may name the
+ * workspace in capitals, and the id is also the name of its database. */
 const workspaceOf = async (req, res) => {
     const id = String(req.params.companyId || '');
     if (!OBJECT_ID.test(id)) {
@@ -125,21 +130,24 @@ const workspaceOf = async (req, res) => {
         fail(res, 404, CODE.UNKNOWN_WORKSPACE, 'No such workspace.');
         return null;
     }
-    return { id, name: company.Cst_CompanyName || '' };
+    return { id: String(company._id).toLowerCase(), name: company.Cst_CompanyName || '' };
 };
 
 const indexerOff = (res) => fail(res, 409, CODE.INDEXER_OFF, `${ENV_KEY} is off, so nothing is indexed and nothing here can be changed. Set it and restart.`);
 
-/* Re-index, re-embed and retry only queue work the indexer does, so they need it on for the workspace. */
-const control = ({ needsWorkspaceIndexer }, handler) => async (req, res) => {
-    if (flag.indexer.mode() === 'off') return indexerOff(res);
+/* Re-index, re-embed and retry queue work the indexer does, so they need it on. Erasure and a cancel
+ * only remove or stop, and what was indexed before the indexer went off must stay erasable. */
+const control = ({ needsIndexer }, handler) => async (req, res) => {
+    if (needsIndexer && flag.indexer.mode() === 'off') return indexerOff(res);
     try {
         const workspace = await workspaceOf(req, res);
         if (!workspace) return undefined;
-        if (needsWorkspaceIndexer && !(await flag.indexer.enabledFor(workspace.id))) {
+        if (needsIndexer && !(await flag.indexer.enabledFor(workspace.id))) {
             return fail(res, 409, CODE.WORKSPACE_INDEXER_OFF, 'The indexer is off for this workspace, so there is nothing to run.');
         }
-        return await handler(req, res, workspace);
+        const answered = await handler(req, res, workspace);
+        figures.forget(workspace.id);
+        return answered;
     } catch (error) {
         logger.error(`knowledge console ${req.method} ${req.path}: ${error.message || error}`);
         return serverError(res);
@@ -176,19 +184,26 @@ exports.workspace = async (req, res) => {
     try {
         const workspace = await workspaceOf(req, res);
         if (!workspace) return undefined;
-        const data = await figures.workspaceFigures(workspace.id);
+        const refresh = ['1', 'true'].includes(String(req.query.refresh || ''));
+        const data = await figures.workspaceFigures(workspace.id, { refresh });
         return ok(res, 'Knowledge sources of one workspace.', { ...data, name: workspace.name, indexer: indexerState() });
     } catch (error) {
+        if (error && error.code === figures.TIMED_OUT) return fail(res, 503, CODE.FIGURES_TIMED_OUT, error.message);
         logger.error(`knowledge console workspace ${req.params.companyId}: ${error.message || error}`);
         return serverError(res);
     }
 };
 
-exports.reindex = control({ needsWorkspaceIndexer: true }, async (req, res, workspace) => {
+const reindexableType = (req, res) => {
     const sourceType = req.body && req.body.sourceType;
-    if (typeof sourceType !== 'string' || !reindex.reindexable().includes(sourceType)) {
-        return fail(res, 400, CODE.INVALID_SOURCE_TYPE, `sourceType must be one of ${reindex.reindexable().join(', ')}.`);
-    }
+    if (typeof sourceType === 'string' && reindex.reindexable().includes(sourceType)) return sourceType;
+    fail(res, 400, CODE.INVALID_SOURCE_TYPE, `sourceType must be one of ${reindex.reindexable().join(', ')}.`);
+    return null;
+};
+
+exports.reindex = control({ needsIndexer: true }, async (req, res, workspace) => {
+    const sourceType = reindexableType(req, res);
+    if (!sourceType) return undefined;
     const asked = await reindex.request(workspace.id, sourceType, { requestedBy: actorOf(req) });
     if (!asked.ok) return refuse(res, asked.code);
     reindex.kick(workspace.id, sourceType);
@@ -196,38 +211,74 @@ exports.reindex = control({ needsWorkspaceIndexer: true }, async (req, res, work
     return ok(res, 'Re-index started.', { sourceType, requestedAt: asked.state.reindexRequestedAt }, 202);
 });
 
-exports.reembed = control({ needsWorkspaceIndexer: true }, async (req, res, workspace) => {
+exports.cancelReindex = control({ needsIndexer: false }, async (req, res, workspace) => {
+    const sourceType = reindexableType(req, res);
+    if (!sourceType) return undefined;
+    const result = await reindex.cancel(workspace.id, sourceType);
+    if (!result.ok) return refuse(res, result.code);
+    audit(req, workspace.id, { action: ACTIONS.REINDEX_CANCEL, entityType: 'knowledge_source', entityId: sourceType, meta: { sourceType } });
+    return ok(res, 'Re-index cancelled.', { sourceType });
+});
+
+exports.reembed = control({ needsIndexer: true }, async (req, res, workspace) => {
     const result = await controls.reembed(workspace.id);
     if (!result.ok) return refuse(res, result.code);
     audit(req, workspace.id, { action: ACTIONS.REEMBED, entityType: 'knowledge_embeddings', entityId: result.model, meta: { model: result.model, pendingChunks: result.pendingChunks } });
     return ok(res, 'Re-embed started.', { model: result.model, pendingChunks: result.pendingChunks }, 202);
 });
 
-exports.retryFiles = control({ needsWorkspaceIndexer: true }, async (req, res, workspace) => {
+exports.retryFiles = control({ needsIndexer: true }, async (req, res, workspace) => {
     const { reset, byReason } = await controls.retryFiles(workspace.id);
     audit(req, workspace.id, { action: ACTIONS.RETRY_FILES, entityType: 'knowledge_source', entityId: 'file', meta: { reset, byReason } });
     return ok(res, 'Failed files queued again.', { reset, byReason });
 });
 
-exports.eraseDocument = control({ needsWorkspaceIndexer: false }, async (req, res, workspace) => {
+/* The audit row is written however the erasure ends: one that throws partway is recorded as partial,
+ * with what it removed before it did. */
+const erasing = async (req, res, workspace, entry, run) => {
+    const progress = { removed: {} };
+    let failure = null;
+    try {
+        await run(progress);
+    } catch (error) {
+        failure = error;
+    } finally {
+        const total = controls.totalOf(progress.removed);
+        audit(req, workspace.id, {
+            ...entry,
+            meta: { ...entry.meta, removed: progress.removed, total, ...(failure ? { partial: true, error: CODE.SERVER_ERROR } : {}) },
+        });
+    }
+    if (failure) {
+        logger.error(`knowledge console erasure in ${workspace.id}: ${failure.message || failure}`);
+        return serverError(res);
+    }
+    const data = { removed: progress.removed, total: controls.totalOf(progress.removed) };
+    if (!data.total) {
+        return res.send({ status: true, code: CODE.NOTHING_ERASED, statusText: 'Nothing in the index matched. The exclusion is recorded, so it stays out if it is indexed later.', data });
+    }
+    return ok(res, 'Erased from the knowledge index.', data);
+};
+
+exports.eraseDocument = control({ needsIndexer: false }, async (req, res, workspace) => {
     const { sourceType, sourceId, confirm } = req.body || {};
     if (typeof sourceType !== 'string' || !controls.documentTypes().includes(sourceType)) {
         return fail(res, 400, CODE.INVALID_SOURCE_TYPE, `sourceType must be one of ${controls.documentTypes().join(', ')}.`);
     }
-    if (!controls.validDocumentId(sourceType, sourceId)) return fail(res, 400, CODE.INVALID_DOCUMENT_ID, `That is not a ${sourceType} id.`);
-    if (confirm !== sourceId) return fail(res, 400, CODE.CONFIRMATION_MISMATCH, 'Type the document id to confirm the erasure.');
-    const { removed, total } = await controls.eraseDocument(workspace.id, { sourceType, sourceId });
-    audit(req, workspace.id, { action: ACTIONS.ERASE_DOCUMENT, entityType: sourceType, entityId: sourceId, meta: { sourceType, removed, total } });
-    return ok(res, 'Erased from the knowledge index.', { removed, total });
+    const id = controls.canonicalDocumentId(sourceType, sourceId);
+    if (!id) return fail(res, 400, CODE.INVALID_DOCUMENT_ID, `That is not a ${sourceType} id.`);
+    if (controls.canonicalDocumentId(sourceType, confirm) !== id) return fail(res, 400, CODE.CONFIRMATION_MISMATCH, 'Type the document id to confirm the erasure.');
+    return erasing(req, res, workspace, { action: ACTIONS.ERASE_DOCUMENT, entityType: sourceType, entityId: id, meta: { sourceType } },
+        (progress) => controls.eraseDocument(workspace.id, { sourceType, sourceId: id }, progress));
 });
 
-exports.erasePerson = control({ needsWorkspaceIndexer: false }, async (req, res, workspace) => {
+exports.erasePerson = control({ needsIndexer: false }, async (req, res, workspace) => {
     const { userId, confirm } = req.body || {};
-    if (typeof userId !== 'string' || !OBJECT_ID.test(userId)) return fail(res, 400, CODE.INVALID_USER_ID, 'userId must be a user id.');
-    if (confirm !== (workspace.name || workspace.id)) return fail(res, 400, CODE.CONFIRMATION_MISMATCH, 'Type the workspace name to confirm the erasure.');
-    const { removed, total } = await controls.erasePerson(workspace.id, userId);
-    audit(req, workspace.id, { action: ACTIONS.ERASE_PERSON, entityType: 'user', entityId: userId, meta: { removed, total } });
-    return ok(res, 'Erased from the knowledge index.', { removed, total });
+    const id = controls.canonicalObjectId(userId);
+    if (!id) return fail(res, 400, CODE.INVALID_USER_ID, 'userId must be a user id.');
+    if (controls.canonicalObjectId(confirm) !== id) return fail(res, 400, CODE.CONFIRMATION_MISMATCH, "Type the person's user id to confirm the erasure.");
+    return erasing(req, res, workspace, { action: ACTIONS.ERASE_PERSON, entityType: 'user', entityId: id, meta: {} },
+        (progress) => controls.erasePerson(workspace.id, id, progress));
 });
 
 module.exports.ACTIONS = ACTIONS;

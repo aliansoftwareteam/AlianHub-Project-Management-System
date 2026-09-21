@@ -46,6 +46,10 @@ const eraseDocument = async (companyId, { sourceType, sourceId } = {}) => {
     return result;
 };
 
+/* A task is no source of its own: its exclusion keeps out every comment and file indexed under it,
+ * including ones written after the erasure. */
+const excludeTask = (companyId, taskId) => exclude(companyId, { kind: 'task', sourceType: '', sourceId: String(taskId).toLowerCase(), userId: '' });
+
 const personWhere = (userId) => ({ createdBy: String(userId), $or: [{ sourceType: 'page', visibility: 'private' }, { sourceType: 'comment' }] });
 
 /* A person's private pages and the comments they wrote (owner, 2026-09-17). Their shared pages stay,
@@ -61,4 +65,4 @@ const erasePerson = async (companyId, userId) => {
     return result;
 };
 
-module.exports = { eraseDocument, erasePerson, personWhere };
+module.exports = { eraseDocument, erasePerson, excludeTask, personWhere };
