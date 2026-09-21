@@ -414,6 +414,12 @@ describe.each(ROUTE_NAMES)('%s, files a task lists outside its own folder', (rou
         expect(signed(await ask(OWNER, key.privateSprintComment))).toBe(true);
     });
 
+    it('refuses a clip filed under another company even when a task here lists it', async () => {
+        const foreignClip = `Clips/${OTHER_COMPANY}/${OTHER_MEMBER}/clip-9.webm`;
+        mockDb.rows.tasks.find((row) => row._id === OPEN_TASK).attachments.push({ url: foreignClip, userId: OTHER_MEMBER });
+        expect((await ask(MEMBER, foreignClip)).status).toBe(404);
+    });
+
     it.each([
         ['a clip filed under another company', `Clips/${OTHER_COMPANY}/${MEMBER}/clip-1.webm`],
         ['a reminder attachment filed under another company', `Reminders/${OTHER_COMPANY}/${MEMBER}/note.pdf`],
@@ -436,6 +442,8 @@ describe('paths', () => {
         ['a . segment', `Project/${OPEN_PROJECT}/./ProjectAttachment/brief.pdf`],
         ['an empty segment', `Project/${OPEN_PROJECT}//ProjectAttachment/brief.pdf`],
         ['an absolute key', `/Project/${OPEN_PROJECT}/ProjectAttachment/brief.pdf`],
+        ['a .. name in a task folder the caller may open', `Project/${OPEN_PROJECT}/Sprint/${OPEN_TASK}/Attachment/..`],
+        ['a . name in a project folder the caller may open', `Project/${OPEN_PROJECT}/ProjectAttachment/.`],
     ])('refuses a Wasabi key with %s', async (_label, path) => {
         expect((await wasabi(OWNER, path)).status).toBe(404);
     });
