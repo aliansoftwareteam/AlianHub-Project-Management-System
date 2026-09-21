@@ -102,15 +102,17 @@ const thinResults = () => positiveInt(process.env.KNOWLEDGE_ATLAS_THIN_RESULTS, 
 const indexTimeoutMs = () => positiveInt(process.env.KNOWLEDGE_ATLAS_INDEX_TIMEOUT_MS, DEFAULT_INDEX_TIMEOUT_MS);
 
 /* The search-index commands take no maxTimeMS through Mongoose, so each is raced with a timer; a
- * late answer or failure of the losing call is dropped. */
+ * late answer or failure of the losing call is dropped. A Mongoose query runs on every `then`, so
+ * it is started exactly once here. */
 const within = (work, ms, what) => {
     let timer;
-    Promise.resolve(work).catch(() => {});
+    const running = Promise.resolve(work);
+    running.catch(() => {});
     const timeout = new Promise((resolve, reject) => {
         timer = setTimeout(() => reject(Object.assign(new Error(`${what} took longer than ${ms} ms`), { code: TIMED_OUT })), ms);
         if (timer.unref) timer.unref();
     });
-    return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
+    return Promise.race([running, timeout]).finally(() => clearTimeout(timer));
 };
 
 /* Atlas scores cosine similarity as (1 + cos) / 2; retrieval fuses on the cosine itself. */
