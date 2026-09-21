@@ -1,7 +1,7 @@
 {
   "locale": "it",
   "machineTranslated": false,
-  "updatedAt": "2026-09-21T03:53:28.919Z",
+  "updatedAt": "2026-09-21T06:45:18.721Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6213,7 +6213,6 @@
     "Knowledge.col_source": "Source",
     "Knowledge.col_chunks": "Chunks",
     "Knowledge.col_sources": "Sources",
-    "Knowledge.col_size": "Stored size",
     "Knowledge.col_last_indexed": "Last indexed",
     "Knowledge.col_backfill": "Backfill",
     "Knowledge.col_freshness": "Freshness",
@@ -6268,7 +6267,6 @@
     "Knowledge.erase_document_confirm": "Erase {type} {id} from the knowledge index? This cannot be undone.",
     "Knowledge.erase_person_confirm": "Erase the private pages and comments of {id} from the knowledge index of {name}? This cannot be undone.",
     "Knowledge.erase_type_id": "Type the document id to confirm",
-    "Knowledge.erase_type_name": "Type the workspace name to confirm",
     "Knowledge.erase_now": "Erase for good",
     "Knowledge.cancel": "Cancel",
     "Knowledge.erased": "Erased {n} chunks from the knowledge index.",
@@ -6307,6 +6305,18 @@
     "Knowledge.code_embedding_unconfigured": "No embedding key is configured for the instance.",
     "Knowledge.code_embedding_paused": "Embedding is paused for this workspace: its budget is spent or the provider kept failing.",
     "Knowledge.code_reembed_running": "A re-embed of this workspace is already running.",
-    "Knowledge.code_server_error": "The index could not be read or changed. Try again; if it keeps failing, the server log has the cause."
+    "Knowledge.code_server_error": "The index could not be read or changed. Try again; if it keeps failing, the server log has the cause.",
+    "Knowledge.reindex_failed": "last re-index given up after repeated failures",
+    "Knowledge.reindex_cancelled": "last re-index cancelled",
+    "Knowledge.cancel_reindex": "Cancel re-index",
+    "Knowledge.cancel_reindex_confirm": "Cancel the re-index of {source} in {name}? What it has already rewritten stays; everything else stays as it was.",
+    "Knowledge.reindex_cancel_done": "Re-index of {source} cancelled.",
+    "Knowledge.cached_at": "Figures from {at}",
+    "Knowledge.refresh_figures": "Read again",
+    "Knowledge.erase_type_user_id": "Type the person's user id to confirm",
+    "Knowledge.code_reindex_not_running": "No re-index of this source is running.",
+    "Knowledge.code_nothing_erased": "Nothing in the index matched, so nothing was removed. The exclusion is recorded, so it stays out if it is indexed later.",
+    "Knowledge.code_figures_timed_out": "Reading the figures took too long. Try again later, or raise KNOWLEDGE_FIGURES_MAX_TIME_MS.",
+    "Knowledge.col_size": "Text size"
   }
 }

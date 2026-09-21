@@ -6,6 +6,7 @@
             <div v-if="indexerOff" class="in-banner in-banner--warn" data-test="indexer-off"><ShellIcon name="alert" :size="15" /><span>{{ $t('Knowledge.indexer_off') }} <code class="ah-mono">{{ `${summary.indexer.envKey}=tenant` }}</code></span></div>
             <div v-else class="in-banner in-banner--ok" data-test="indexer-on"><ShellIcon name="check" :size="15" /><span>{{ $t('Knowledge.indexer_on') }} <code class="ah-mono">{{ `${summary.indexer.envKey}=${summary.indexer.mode}` }}</code></span></div>
             <div v-if="actionError" class="in-banner in-banner--danger" data-test="action-error"><ShellIcon name="alert" :size="15" /><span>{{ actionError }}</span></div>
+            <div v-if="nothingErased" class="in-banner in-banner--warn" data-test="erase-nothing"><ShellIcon name="alert" :size="15" /><span>{{ $t('Knowledge.code_nothing_erased') }}</span></div>
 
             <section class="ah-card in-card">
                 <div class="in-card__head">
@@ -36,7 +37,14 @@
                 </div>
 
                 <div v-if="openId === w.companyId" class="kn-figures" :data-test="`figures-${w.companyId}`">
-                    <div v-if="!detail" class="ah-empty">{{ $t('Instance.loading') }}</div>
+                    <div class="in-actions">
+                        <span v-if="detail" class="ah-small" data-test="figures-cached">{{ $t('Knowledge.cached_at', { at: formatWhen(detail.cachedAt) }) }}</span>
+                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="refresh-figures" :disabled="busy" @click="loadDetail({ refresh: true })">
+                            <ShellIcon name="refresh" :size="14" />{{ $t('Knowledge.refresh_figures') }}
+                        </button>
+                    </div>
+                    <div v-if="detailError" class="in-banner in-banner--warn" data-test="figures-error"><span>{{ detailError }}</span></div>
+                    <div v-else-if="!detail" class="ah-empty">{{ $t('Instance.loading') }}</div>
                     <template v-else>
                         <div class="kn-scroll">
                             <table class="in-table">
@@ -57,7 +65,7 @@
                                         <td><strong>{{ sourceLabel(s.sourceType) }}</strong></td>
                                         <td>{{ s.chunks }}<span v-if="s.tombstones" class="ah-small">{{ $t('Knowledge.tombstones', { n: s.tombstones }) }}</span></td>
                                         <td>{{ s.sources }}</td>
-                                        <td>{{ formatBytes(s.bytes) }}</td>
+                                        <td>{{ formatBytes(s.textBytes) }}</td>
                                         <td>{{ formatWhen(s.lastIndexedAt) }}</td>
                                         <td :data-test="`backfill-${s.sourceType}`">
                                             {{ $t(`Knowledge.backfill_${s.backfill.status}`) }}
@@ -74,8 +82,11 @@
                                                 <template v-if="s.reindex.progress"> · {{ $t('Knowledge.progress', s.reindex.progress) }}</template>
                                                 <template v-if="s.reindex.failing"> · {{ $t('Knowledge.reindex_failing') }}</template>
                                             </span>
-                                            <button v-if="canWrite && summary.reindexable.includes(s.sourceType)" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :data-test="`reindex-${s.sourceType}`" :disabled="busy || s.reindex.status === 'running'" @click="reindex(s.sourceType)">
+                                            <button v-if="canRun && summary.reindexable.includes(s.sourceType)" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :data-test="`reindex-${s.sourceType}`" :disabled="busy || s.reindex.status === 'running'" @click="reindex(s.sourceType)">
                                                 {{ $t('Knowledge.reindex') }}
+                                            </button>
+                                            <button v-if="canRun && s.reindex.status === 'running'" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :data-test="`cancel-reindex-${s.sourceType}`" :disabled="busy" @click="cancelReindex(s.sourceType)">
+                                                {{ $t('Knowledge.cancel_reindex') }}
                                             </button>
                                         </td>
                                     </tr>
@@ -85,7 +96,7 @@
                                         <td><strong>{{ $t('Knowledge.total') }}</strong></td>
                                         <td>{{ detail.totals.chunks }}</td>
                                         <td>{{ detail.totals.sources }}</td>
-                                        <td>{{ formatBytes(detail.totals.bytes) }}</td>
+                                        <td>{{ formatBytes(detail.totals.textBytes) }}</td>
                                         <td colspan="4"></td>
                                     </tr>
                                 </tfoot>
@@ -111,7 +122,7 @@
                                     <span v-else class="ah-chip">{{ $t('Knowledge.breaker_closed') }}</span>
                                 </dd>
                             </dl>
-                            <div v-if="canWrite && detail.modes.retrieval === 'hybrid'" class="in-actions">
+                            <div v-if="canRun && detail.modes.retrieval === 'hybrid'" class="in-actions">
                                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="reembed" :disabled="busy" @click="reembed">{{ $t('Knowledge.reembed') }}</button>
                                 <span class="ah-small">{{ $t('Knowledge.reembed_help') }}</span>
                             </div>
@@ -131,13 +142,13 @@
                                 </tbody>
                             </table>
                             <p v-else class="ah-small">{{ $t('Knowledge.no_file_reasons') }}</p>
-                            <div v-if="canWrite && retryable" class="in-actions">
+                            <div v-if="canRun && retryable" class="in-actions">
                                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="retry-files" :disabled="busy" @click="retryFiles">{{ $t('Knowledge.retry_files') }}</button>
                                 <span class="ah-small">{{ $t('Knowledge.retry_help') }}</span>
                             </div>
                         </div>
 
-                        <div v-if="canWrite" class="kn-section">
+                        <div class="kn-section">
                             <div class="in-card__head"><span class="in-card__title">{{ $t('Knowledge.erase_title') }}</span></div>
                             <p class="ah-small">{{ $t('Knowledge.erase_lead') }}</p>
                             <form class="in-actions" data-test="erase-document" @submit.prevent="askErase('document')">
@@ -160,11 +171,11 @@
                             <div v-if="pendingErase" class="in-banner in-banner--danger kn-confirm" data-test="erase-confirm">
                                 <span>{{ pendingErase.kind === 'document'
                                     ? $t('Knowledge.erase_document_confirm', { type: sourceLabel(pendingErase.sourceType), id: pendingErase.expected })
-                                    : $t('Knowledge.erase_person_confirm', { id: pendingErase.userId, name: pendingErase.expected }) }}</span>
-                                <label class="ah-small" for="knowledge-erase-confirm">{{ pendingErase.kind === 'document' ? $t('Knowledge.erase_type_id') : $t('Knowledge.erase_type_name') }}</label>
+                                    : $t('Knowledge.erase_person_confirm', { id: pendingErase.expected, name: openName || openId }) }}</span>
+                                <label class="ah-small" for="knowledge-erase-confirm">{{ pendingErase.kind === 'document' ? $t('Knowledge.erase_type_id') : $t('Knowledge.erase_type_user_id') }}</label>
                                 <input id="knowledge-erase-confirm" v-model="eraseTyped" type="text" class="ah-input kn-input ah-mono" autocomplete="off" spellcheck="false" data-test="erase-confirm-input" />
                                 <div class="in-actions">
-                                    <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" data-test="erase-confirm-button" :disabled="busy || eraseTyped !== pendingErase.expected" @click="erase">{{ $t('Knowledge.erase_now') }}</button>
+                                    <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" data-test="erase-confirm-button" :disabled="busy || !typedMatches" @click="erase">{{ $t('Knowledge.erase_now') }}</button>
                                     <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="erase-cancel" @click="cancelErase">{{ $t('Knowledge.cancel') }}</button>
                                 </div>
                             </div>
@@ -200,11 +211,14 @@ const FILE_ID = /^[a-f0-9]{24}:[A-Za-z0-9_-]{1,64}$/i;
 const TRANSLATED_CODES = [
     "indexer_off", "workspace_indexer_off", "invalid_company_id", "unknown_workspace", "invalid_source_type", "invalid_document_id", "invalid_user_id",
     "confirmation_mismatch", "backfill_pending", "backfill_running", "reindex_running", "not_hybrid", "embedding_unconfigured", "embedding_paused", "reembed_running", "server_error",
+    "reindex_not_running", "figures_timed_out",
 ];
 const STATE_CHIP = { failed: "ah-chip--danger", running: "ah-chip--warn", catching_up: "ah-chip--warn", not_started: "" };
 
 const summary = ref(null);
 const detail = ref(null);
+const detailError = ref("");
+const nothingErased = ref(false);
 const openId = ref("");
 const error = ref("");
 const actionError = ref("");
@@ -216,7 +230,7 @@ const pendingErase = ref(null);
 const eraseTyped = ref("");
 
 const indexerOff = computed(() => summary.value?.indexer?.mode === "off");
-const canWrite = computed(() => !indexerOff.value && detail.value?.indexer?.mode !== "off");
+const canRun = computed(() => !indexerOff.value && detail.value?.indexer?.mode !== "off" && detail.value?.modes?.indexer !== "off");
 const openName = computed(() => summary.value?.workspaces.find((w) => w.companyId === openId.value)?.name || "");
 const retryable = computed(() => (detail.value?.files.reasons || []).some((r) => r.retryable && r.count > 0));
 const pages = computed(() => {
@@ -247,14 +261,16 @@ const load = async () => {
     }
 };
 
-const loadDetail = async () => {
+async function loadDetail({ refresh = false } = {}) {
     if (!openId.value) return;
     try {
-        detail.value = await get(`${env.INSTANCE_KNOWLEDGE}/${openId.value}`);
+        detail.value = await get(`${env.INSTANCE_KNOWLEDGE}/${openId.value}${refresh ? "?refresh=1" : ""}`);
+        detailError.value = "";
     } catch (e) {
-        showError(e);
+        const code = e?.response?.data?.code;
+        detailError.value = TRANSLATED_CODES.includes(code) ? t(`Knowledge.code_${code}`) : message(e);
     }
-};
+}
 
 const refresh = async () => {
     await load();
@@ -263,6 +279,8 @@ const refresh = async () => {
 
 const toggle = async (w) => {
     actionError.value = "";
+    detailError.value = "";
+    nothingErased.value = false;
     cancelErase();
     detail.value = null;
     if (openId.value === w.companyId) {
@@ -283,9 +301,11 @@ const goTo = (next) => {
 const run = async (url, body, success) => {
     busy.value = true;
     actionError.value = "";
+    nothingErased.value = false;
     try {
         const data = await post(url, body);
-        $toast.success(success(data));
+        const said = success(data);
+        if (said) $toast.success(said);
         return true;
     } catch (e) {
         showError(e);
@@ -308,12 +328,32 @@ const reembed = () => {
     return run(`${base()}/reembed`, {}, (data) => t("Knowledge.reembed_started", { n: data.pendingChunks }));
 };
 
+const cancelReindex = (sourceType) => {
+    if (!window.confirm(t("Knowledge.cancel_reindex_confirm", { source: sourceLabel(sourceType), name: openName.value }))) return undefined;
+    return run(`${base()}/reindex/cancel`, { sourceType }, () => t("Knowledge.reindex_cancel_done", { source: sourceLabel(sourceType) }));
+};
+
 const retryFiles = () => {
     if (!window.confirm(t("Knowledge.retry_confirm", { name: openName.value }))) return undefined;
     return run(`${base()}/retry-files`, {}, (data) => t("Knowledge.retry_done", { n: data.reset }));
 };
 
 const validId = (sourceType, id) => (sourceType === "file" ? FILE_ID.test(id) : OBJECT_ID.test(id));
+
+/* The form the server compares, so a confirmation in the other case still matches. */
+const canonical = (kind, sourceType, id) => {
+    const value = String(id || "");
+    if (kind === "document" && sourceType === "file") {
+        const at = value.indexOf(":");
+        return at < 0 ? value : `${value.slice(0, at).toLowerCase()}${value.slice(at)}`;
+    }
+    return OBJECT_ID.test(value) ? value.toLowerCase() : value;
+};
+
+const typedMatches = computed(() => {
+    const pending = pendingErase.value;
+    return Boolean(pending) && canonical(pending.kind, pending.sourceType, eraseTyped.value) === pending.expected;
+});
 
 const askErase = (kind) => {
     eraseInputError.value = "";
@@ -324,14 +364,15 @@ const askErase = (kind) => {
             eraseInputError.value = t("Knowledge.code_invalid_document_id");
             return;
         }
-        pendingErase.value = { kind, sourceType, sourceId, expected: sourceId };
+        pendingErase.value = { kind, sourceType, sourceId, expected: canonical(kind, sourceType, sourceId) };
         return;
     }
     if (!OBJECT_ID.test(eraseDraft.userId)) {
         eraseInputError.value = t("Knowledge.code_invalid_user_id");
         return;
     }
-    pendingErase.value = { kind, userId: eraseDraft.userId, expected: openName.value || openId.value };
+    const userId = canonical(kind, "", eraseDraft.userId);
+    pendingErase.value = { kind, userId, expected: userId };
 };
 
 function cancelErase() {
@@ -341,11 +382,15 @@ function cancelErase() {
 
 const erase = async () => {
     const pending = pendingErase.value;
-    if (!pending || eraseTyped.value !== pending.expected) return;
+    if (!pending || !typedMatches.value) return;
     const [url, body] = pending.kind === "document"
-        ? [`${base()}/erase/document`, { sourceType: pending.sourceType, sourceId: pending.sourceId, confirm: eraseTyped.value }]
-        : [`${base()}/erase/person`, { userId: pending.userId, confirm: eraseTyped.value }];
-    const done = await run(url, body, (data) => t("Knowledge.erased", { n: data.total }));
+        ? [`${base()}/erase/document`, { sourceType: pending.sourceType, sourceId: pending.expected, confirm: pending.expected }]
+        : [`${base()}/erase/person`, { userId: pending.userId, confirm: pending.expected }];
+    const done = await run(url, body, (data) => {
+        if (data && data.total) return t("Knowledge.erased", { n: data.total });
+        nothingErased.value = true;
+        return "";
+    });
     if (done) {
         cancelErase();
         eraseDraft.sourceId = "";
