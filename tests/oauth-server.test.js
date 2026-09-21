@@ -289,6 +289,7 @@ describe('/oauth/authorize', () => {
         ['a non-loopback https port change', 'https://app.s10s2.test/cb', 'https://app.s10s2.test:8443/cb'],
         ['https://localhost, which gets no exception', 'https://localhost:33418/cb', 'https://localhost:33419/cb'],
         ['http on a loopback host registered as https', 'https://localhost/cb', 'http://localhost/cb'],
+        ['https presented against an http loopback registration', 'http://localhost:33418/cb', 'https://localhost:33419/cb'],
     ])('keeps exact matching for %s', async (label, registered, presented) => {
         await start();
         const client = await registerPublicClient({ redirectUris: [registered] });
