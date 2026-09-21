@@ -151,6 +151,7 @@ describe('agent fetches go through the workspace egress gateway', () => {
             ['axios handed in', 'module.exports = ({ axios }) => (u) => axios.post(u, {});', 'axios'],
             ['https request', "const https = require('https');\nmodule.exports = (u) => https.request(u);", 'http'],
             ['http get', "const http = require('node:http');\nmodule.exports = (u) => http.get(u);", 'http'],
+            ['https handed in', 'module.exports = ({ https }) => (u) => https.get(u);', 'http'],
             ['https destructured', "const { request } = require('https');\nmodule.exports = (u) => request(u);", 'http'],
             ['undici', "const { request } = require('undici');\nmodule.exports = (u) => request(u);", 'undici'],
             ['node-fetch', "const fetch = require('node-fetch');\nmodule.exports = (u) => fetch(u);", 'node-fetch'],
