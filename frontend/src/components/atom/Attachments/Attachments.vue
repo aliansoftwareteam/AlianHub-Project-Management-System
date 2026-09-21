@@ -240,7 +240,7 @@ const chooseCloudSource = async (provider) => {
     try {
         // The mode is passed in, not just emitted afterwards: Dropbox's Chooser
         // decides which kind of link it returns at the moment it opens.
-        const files = await pickCloudFiles({ provider: provider.provider, multiple: true, mode });
+        const files = await pickCloudFiles({ provider: provider.provider, multiple: true, mode, labels: { loading: t('Attachments.cloud_picker_loading') } });
         closeSourceMenu();
         if (!files || !files.length) return;   // cancelled
         emit('update:cloud-add', { provider: provider.provider, files, mode });
@@ -251,7 +251,8 @@ const chooseCloudSource = async (provider) => {
             // than showing an error the user can do nothing with.
             try { await connectCloudProvider(provider.provider); return; } catch (_e) { /* fall through */ }
         }
-        $toast.error(error?.message || t('Attachments.cloud_attach_failed'), { position: 'top-right' });
+        const coded = { popup_blocked: 'Attachments.cloud_popup_blocked', picker_failed: 'Attachments.cloud_picker_failed' }[error?.code];
+        $toast.error(coded ? t(coded) : (error?.message || t('Attachments.cloud_attach_failed')), { position: 'top-right' });
     } finally {
         cloudBusy.value = '';
     }
