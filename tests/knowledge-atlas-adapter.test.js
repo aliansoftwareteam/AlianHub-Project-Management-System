@@ -51,7 +51,9 @@ const SMALL = 'text-embedding-3-small';
 const AT = new Date('2026-09-01T00:00:00Z');
 const Q = [1, 0, 0];
 const CHUNKS = SCHEMA_TYPE.KNOWLEDGE_CHUNKS;
-const ENV_KEYS = ['KNOWLEDGE_INDEXER', 'KNOWLEDGE_RETRIEVAL', 'KNOWLEDGE_VECTOR_STORE', 'KNOWLEDGE_ATLAS_NUM_CANDIDATES', 'KNOWLEDGE_ATLAS_VECTOR_LIMIT', 'KNOWLEDGE_EMBEDDING_DIMENSIONS', 'KNOWLEDGE_EMBEDDING_MODEL'];
+const TUNING_KEYS = ['KNOWLEDGE_VECTOR_STORE', 'KNOWLEDGE_ATLAS_NUM_CANDIDATES', 'KNOWLEDGE_ATLAS_VECTOR_LIMIT', 'KNOWLEDGE_ATLAS_CANDIDATE_RATIO', 'KNOWLEDGE_ATLAS_THIN_RESULTS',
+    'KNOWLEDGE_ATLAS_INDEX_TIMEOUT_MS', 'KNOWLEDGE_ATLAS_INDEX_BUDGET_MS', 'KNOWLEDGE_EMBEDDING_DIMENSIONS', 'KNOWLEDGE_EMBEDDING_MODEL'];
+const ENV_KEYS = ['KNOWLEDGE_INDEXER', 'KNOWLEDGE_RETRIEVAL', ...TUNING_KEYS];
 const ENV = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
 const embed = llmProvider.__embed;
@@ -74,6 +76,12 @@ const ready = () => ['page', 'comment', 'transcript'].forEach((sourceType) => mo
 const lexicalStub = (candidates = []) => ({ name: 'lexical', search: jest.fn(async () => candidates), upsert: async () => {}, tombstone: async () => {}, erase: async () => {}, stats: async () => ({}) });
 
 const useAtlas = (options = {}) => vectorStore.use(createAtlasVectorAdapter({ crud: fakeAtlas.crud, ...options }));
+const atlasReady = async (options) => {
+    const store = useAtlas(options);
+    await store.prepare({ companyId: C });
+    return store;
+};
+const settle = () => new Promise((resolve) => setImmediate(resolve));
 const ask = (lexical = lexicalStub(), { userId = ME } = {}) => createRetrieve(lexical)({ companyId: C, caller: { kind: 'user', userId }, query: 'harbour' });
 const ids = (result) => result.passages.map((p) => p.sourceId);
 
@@ -102,7 +110,7 @@ beforeEach(() => {
     myCache.flushAll();
     vectorStore.reset();
     embeddings.resetBreaker();
-    ['KNOWLEDGE_VECTOR_STORE', 'KNOWLEDGE_ATLAS_NUM_CANDIDATES', 'KNOWLEDGE_ATLAS_VECTOR_LIMIT', 'KNOWLEDGE_EMBEDDING_DIMENSIONS', 'KNOWLEDGE_EMBEDDING_MODEL'].forEach((key) => delete process.env[key]);
+    TUNING_KEYS.forEach((key) => delete process.env[key]);
     llmProvider.isEmbeddingConfigured.mockReturnValue(true);
     embed.mockImplementation(async ({ texts, model }) => ({ embeddings: texts.map(() => Q), model, inputTokens: texts.length, outputTokens: 0, totalTokens: texts.length }));
     visibleProjectIds.mockImplementation(async () => [PROJECT]);
@@ -181,12 +189,14 @@ describe('the index', () => {
     });
 
     it('takes its dimensions from KNOWLEDGE_EMBEDDING_DIMENSIONS, then a stored vector of the model, then the model it knows', async () => {
+        process.env.KNOWLEDGE_EMBEDDING_MODEL = 'custom-model';
         process.env.KNOWLEDGE_EMBEDDING_DIMENSIONS = '8';
         await createAtlasVectorAdapter({ crud: fakeAtlas.crud }).prepare({ companyId: C });
         expect(fakeAtlas.indexOf(C).latestDefinition.fields[0].numDimensions).toBe(8);
 
         fakeAtlas.reset();
         delete process.env.KNOWLEDGE_EMBEDDING_DIMENSIONS;
+        delete process.env.KNOWLEDGE_EMBEDDING_MODEL;
         indexedPage({}, { embedding: [1, 0, 0] });
         await createAtlasVectorAdapter({ crud: fakeAtlas.crud }).prepare({ companyId: C });
         expect(fakeAtlas.indexOf(C).latestDefinition.fields[0].numDimensions).toBe(3);
@@ -205,6 +215,7 @@ describe('the index', () => {
     });
 
     it('updates an index whose definition no longer matches, rather than leaving the old one', async () => {
+        process.env.KNOWLEDGE_EMBEDDING_MODEL = 'custom-model';
         process.env.KNOWLEDGE_EMBEDDING_DIMENSIONS = '8';
         await createAtlasVectorAdapter({ crud: fakeAtlas.crud }).prepare({ companyId: C });
         process.env.KNOWLEDGE_EMBEDDING_DIMENSIONS = '16';
@@ -243,11 +254,11 @@ describe('the index', () => {
         expect(prepare).toHaveBeenCalledWith({ companyId: C });
 
         prepare.mockClear();
-        let release;
-        prepare.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
-        expect(vectorStore.prepareCompany('6f0000000000000000000c09')).toBeInstanceOf(Promise);
-        expect(prepare).toHaveBeenCalledWith({ companyId: '6f0000000000000000000c09' });
-        release();
+        prepare.mockImplementation(() => new Promise(() => {}));
+        expect(vectorStore.prepareCompany(C)).toBeInstanceOf(Promise);
+        await settle();
+        await settle();
+        expect(prepare).toHaveBeenCalledWith({ companyId: C });
     });
 
     it('is not asked for by the in-database adapter, and a failing check never rejects', async () => {
@@ -260,7 +271,7 @@ describe('the index', () => {
 describe('the query', () => {
     it('runs $vectorSearch on the tenant index with the pre-filter, then the full access clause on the live rows', async () => {
         const id = indexedPage();
-        useAtlas();
+        await atlasReady();
         const result = await ask();
         expect(ids(result)).toEqual([id]);
         expect(result.backend).toBe('lexical+vector-atlas');
@@ -273,15 +284,59 @@ describe('the query', () => {
             { sourceType: { $eq: 'page' } },
             { deleted: { $ne: true } },
         ]));
-        const match = call.data[0][1].$match;
+        const facet = call.data[0].find((stage) => stage.$facet).$facet;
+        const match = facet.kept[0].$match;
         expect(match).toMatchObject({ embeddingModel: SMALL, companyId: C, sourceType: 'page', deleted: { $ne: true } });
         expect(match.$and).toBeDefined();
+    });
+
+    it('takes the score from Atlas and never reads the candidate vectors back', async () => {
+        const near = indexedPage({}, { embedding: [0.8, 0.6, 0] });
+        const store = await atlasReady();
+        const passages = await store.search({ companyId: C, queryEmbedding: Q, model: SMALL, filter: filterFor(set({ sourceTypes: ['page'] }), { chunkSources: ['page'] }), limit: 10 });
+        expect(passages.map((p) => [p.sourceId, Number(p.score.toFixed(6))])).toEqual([[near, 0.8]]);
+        const [call] = searches();
+        expect(call.data[0][1]).toEqual({ $addFields: { score: { $meta: 'vectorSearchScore' } } });
+        const kept = call.data[0].find((stage) => stage.$facet).$facet.kept;
+        const projection = kept.find((stage) => stage.$project).$project;
+        expect(projection.embedding).toBeUndefined();
+        expect(projection.score).toBe(1);
+    });
+
+    it('collapses to the best chunk of each source before the limit, so one long page cannot fill it', async () => {
+        const long = seedPage();
+        Array.from({ length: 30 }, (_, ordinal) => seedChunk(long, { ordinal, embedding: [1, 0.01 * ordinal, 0] }));
+        const other = indexedPage({}, { embedding: [0.5, 0.5, 0] });
+        const store = await atlasReady();
+        const passages = await store.search({ companyId: C, queryEmbedding: Q, model: SMALL, filter: filterFor(set({ sourceTypes: ['page'] }), { chunkSources: ['page'] }), limit: 2 });
+        expect(passages.map((p) => p.sourceId)).toEqual([long, other]);
+        const kept = searches()[0].data[0].find((stage) => stage.$facet).$facet.kept;
+        const at = (name) => kept.findIndex((stage) => stage[name]);
+        expect(at('$group')).toBeGreaterThan(at('$match'));
+        expect(at('$limit')).toBeGreaterThan(at('$group'));
+    });
+
+    it('says the vector side came back thin when access dropped most of what Atlas ranked', async () => {
+        const hidden = seedPage({ ProjectID: SECRET });
+        Array.from({ length: atlas.DEFAULT_LIMIT + 20 }, (_, ordinal) => seedChunk(hidden, { ordinal, projectId: SECRET, embedding: [1, 0.001 * ordinal, 0] }));
+        indexedPage({}, { embedding: [0.2, 1, 0] });
+        await atlasReady();
+        const result = await ask();
+        expect(result.backend).toBe('lexical+vector-atlas(thin)');
+        expect(ids(result)).toEqual([]);
+    });
+
+    it('is not thin when the corpus simply holds little', async () => {
+        const only = indexedPage();
+        Array.from({ length: 4 }, (_, ordinal) => seedChunk(only, { ordinal: ordinal + 1 }));
+        await atlasReady();
+        expect((await ask()).backend).toBe('lexical+vector-atlas');
     });
 
     it('searches only vectors of the current model version', async () => {
         indexedPage({}, { embeddingModel: 'text-embedding-ada-002' });
         const current = indexedPage({}, { embedding: [0.9, 0.1, 0] });
-        useAtlas();
+        await atlasReady();
         expect(ids(await ask())).toEqual([current]);
     });
 
@@ -291,7 +346,13 @@ describe('the query', () => {
         process.env.KNOWLEDGE_ATLAS_VECTOR_LIMIT = '40';
         expect(atlas.searchTuning()).toEqual({ numCandidates: 400, limit: 40 });
         process.env.KNOWLEDGE_ATLAS_NUM_CANDIDATES = '20';
-        expect(atlas.searchTuning()).toEqual({ numCandidates: 40, limit: 40 });
+        expect(atlas.searchTuning()).toEqual({ numCandidates: 400, limit: 40 });
+        process.env.KNOWLEDGE_ATLAS_CANDIDATE_RATIO = '20';
+        expect(atlas.searchTuning()).toEqual({ numCandidates: 800, limit: 40 });
+        process.env.KNOWLEDGE_ATLAS_VECTOR_LIMIT = '2000';
+        expect(atlas.searchTuning()).toEqual({ numCandidates: atlas.MAX_NUM_CANDIDATES, limit: 2000 });
+        delete process.env.KNOWLEDGE_ATLAS_CANDIDATE_RATIO;
+        process.env.KNOWLEDGE_ATLAS_VECTOR_LIMIT = '40';
         process.env.KNOWLEDGE_ATLAS_NUM_CANDIDATES = '50000';
         expect(atlas.searchTuning().numCandidates).toBe(atlas.MAX_NUM_CANDIDATES);
         process.env.KNOWLEDGE_ATLAS_NUM_CANDIDATES = 'lots';
@@ -302,7 +363,7 @@ describe('the query', () => {
     it('asks for at least as many chunks as passages wanted', async () => {
         process.env.KNOWLEDGE_ATLAS_VECTOR_LIMIT = '5';
         indexedPage();
-        useAtlas();
+        await atlasReady();
         await ask();
         expect(stageOf(searches()[0]).limit).toBeGreaterThanOrEqual(24);
     });
@@ -392,7 +453,7 @@ describe('access never rests on the pre-filter', () => {
         const kept = indexedPage();
         const madePrivate = indexedPage({ createdBy: OTHER }, { createdBy: OTHER });
         const deletedPage = indexedPage();
-        useAtlas();
+        await atlasReady();
         mockDb.store[SCHEMA_TYPE.PAGES].find((row) => String(row._id) === madePrivate).visibility = 'private';
         mockDb.store[SCHEMA_TYPE.PAGES].find((row) => String(row._id) === deletedPage).deletedStatusKey = 1;
 
@@ -412,7 +473,7 @@ describe('when the store cannot answer, the lexical side does', () => {
     it('while the index is building, without running a search', async () => {
         indexedPage();
         fakeAtlas.startAs('BUILDING');
-        useAtlas();
+        await atlasReady();
         const { id, lexical } = lexicalOnly();
         const result = await ask(lexical);
         expect(result.backend).toBe('lexical (vector index building)');
@@ -437,7 +498,7 @@ describe('when the store cannot answer, the lexical side does', () => {
     it('when the index failed', async () => {
         indexedPage();
         fakeAtlas.startAs('FAILED');
-        useAtlas();
+        await atlasReady();
         expect((await ask(lexicalOnly().lexical)).backend).toBe('lexical (vector index failed)');
     });
 
@@ -488,6 +549,142 @@ describe('when the store cannot answer, the lexical side does', () => {
         } finally {
             fakeAtlas.crud.mockImplementation(real);
         }
+    });
+});
+
+describe('index checks never hold up a question', () => {
+    it('answers a tenant\'s first question from the lexical side and checks the index in the background', async () => {
+        indexedPage();
+        fakeAtlas.hang(['listSearchIndexes']);
+        const store = useAtlas();
+        const prepare = jest.spyOn(store, 'prepare');
+        const result = await ask();
+        expect(result.backend).toBe('lexical (vector index checking)');
+        expect(prepare).toHaveBeenCalledWith({ companyId: C });
+    });
+
+    it('uses the cached state when it is due a refresh, and refreshes in the background', async () => {
+        const id = indexedPage();
+        let now = Date.now();
+        await atlasReady({ now: () => now });
+        now += atlas.STATUS_TTL_MS + 1;
+        fakeAtlas.hang(['listSearchIndexes']);
+        const listed = fakeAtlas.calls.filter((call) => call.method === 'listSearchIndexes').length;
+        const result = await ask();
+        expect(result.backend).toBe('lexical+vector-atlas');
+        expect(ids(result)).toEqual([id]);
+        expect(fakeAtlas.calls.filter((call) => call.method === 'listSearchIndexes').length).toBe(listed + 1);
+    });
+
+    it.each([['listSearchIndexes'], ['createSearchIndex'], ['findOne']])('gives up on a %s that never answers, and says it timed out', async (method) => {
+        process.env.KNOWLEDGE_ATLAS_INDEX_TIMEOUT_MS = '30';
+        fakeAtlas.hang([method]);
+        const started = Date.now();
+        await expect(createAtlasVectorAdapter({ crud: fakeAtlas.crud }).prepare({ companyId: C })).resolves.toMatchObject({ status: 'timeout', reason: 'timeout' });
+        expect(Date.now() - started).toBeLessThan(2000);
+    });
+
+    it('gives the console a timed-out state rather than waiting on a hung check', async () => {
+        process.env.KNOWLEDGE_ATLAS_INDEX_TIMEOUT_MS = '30';
+        const store = await atlasReady();
+        fakeAtlas.hang(['listSearchIndexes']);
+        await expect(store.health({ companyId: C, refresh: true })).resolves.toMatchObject({ index: { status: 'timeout', reason: 'timeout' } });
+    });
+
+    it('checks tenants a few at a time in the recurring job, within a budget each, so a slow one cannot stall it', async () => {
+        const SLOW = '6f0000000000000000000c05';
+        const OTHERS = ['6f0000000000000000000c06', '6f0000000000000000000c07', '6f0000000000000000000c08'];
+        [SLOW, ...OTHERS].forEach((id) => mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: id, knowledgeIndexer: { mode: 'on' }, knowledgeRetrieval: { mode: 'hybrid' } }));
+        process.env.KNOWLEDGE_VECTOR_STORE = 'atlas';
+        process.env.KNOWLEDGE_ATLAS_INDEX_BUDGET_MS = '50';
+        const store = useAtlas();
+        let running = 0;
+        let most = 0;
+        jest.spyOn(store, 'prepare').mockImplementation(({ companyId }) => {
+            running += 1;
+            most = Math.max(most, running);
+            if (companyId === SLOW) return new Promise(() => {});
+            return new Promise((resolve) => setTimeout(() => { running -= 1; resolve({ status: 'ready' }); }, 5));
+        });
+        const backfill = require('../Modules/Knowledge/ingest/backfill');
+        const started = Date.now();
+        await backfill.backfillAll();
+        expect(Date.now() - started).toBeLessThan(5000);
+        expect(store.prepare.mock.calls.map(([args]) => args.companyId)).toEqual(expect.arrayContaining([C, SLOW, ...OTHERS]));
+        expect(most).toBeGreaterThan(1);
+        expect(most).toBeLessThanOrEqual(vectorStore.PREPARE_CONCURRENCY);
+    });
+});
+
+describe('an index built for other dimensions than the model', () => {
+    it('is not created when the configured size disagrees with the model it knows, and says mismatch', async () => {
+        process.env.KNOWLEDGE_EMBEDDING_DIMENSIONS = '8';
+        await expect(createAtlasVectorAdapter({ crud: fakeAtlas.crud }).prepare({ companyId: C })).resolves.toMatchObject({ status: 'mismatch', reason: 'mismatch' });
+        expect(creates()).toEqual([]);
+    });
+
+    it('is not created when the configured size disagrees with a stored vector of the model', async () => {
+        process.env.KNOWLEDGE_EMBEDDING_MODEL = 'custom-model';
+        process.env.KNOWLEDGE_EMBEDDING_DIMENSIONS = '8';
+        indexedPage({}, { embeddingModel: 'custom-model', embedding: [1, 0, 0] });
+        await expect(createAtlasVectorAdapter({ crud: fakeAtlas.crud }).prepare({ companyId: C })).resolves.toMatchObject({ status: 'mismatch' });
+        expect(creates()).toEqual([]);
+    });
+
+    it('sends questions to the lexical side without tripping the breaker', async () => {
+        indexedPage();
+        process.env.KNOWLEDGE_EMBEDDING_DIMENSIONS = '8';
+        const store = await atlasReady();
+        for (let i = 0; i < atlas.BREAKER_FAILURES + 1; i += 1) expect((await ask()).backend).toBe('lexical (vector index mismatch)');
+        expect(await store.health({ companyId: C })).toMatchObject({ index: { status: 'mismatch' }, breaker: { open: false, failures: 0 } });
+    });
+});
+
+describe('what the console is told', () => {
+    it('is a stable code, never the server\'s own error text, which stays in the log', async () => {
+        fakeAtlas.mode('community');
+        const store = createAtlasVectorAdapter({ crud: fakeAtlas.crud });
+        const health = await store.health({ companyId: C, refresh: true });
+        expect(health.index).toMatchObject({ status: 'unsupported', reason: 'unsupported' });
+        expect(JSON.stringify(health)).not.toMatch(/only allowed on MongoDB Atlas/);
+        expect(logger.error).toHaveBeenCalledWith(expect.stringMatching(/only allowed on MongoDB Atlas/));
+    });
+
+    it.each([
+        ['BUILDING', 'index_building'],
+        ['FAILED', 'index_failed'],
+        ['READY', ''],
+    ])('names an index %s by %s', async (atlasStatus, reason) => {
+        fakeAtlas.startAs(atlasStatus);
+        await expect(createAtlasVectorAdapter({ crud: fakeAtlas.crud }).prepare({ companyId: C })).resolves.toMatchObject({ reason });
+    });
+});
+
+describe('which tenants get an index', () => {
+    it('only a tenant whose retrieval uses vectors, on the Atlas store', async () => {
+        const ON = '6f0000000000000000000c03';
+        mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: ON, knowledgeIndexer: { mode: 'on' }, knowledgeRetrieval: { mode: 'on' } });
+        const store = useAtlas();
+        const prepare = jest.spyOn(store, 'prepare');
+        await expect(vectorStore.prepareCompany(ON)).resolves.toBeNull();
+        expect(prepare).not.toHaveBeenCalled();
+        await vectorStore.prepareCompany(C);
+        expect(prepare).toHaveBeenCalledWith({ companyId: C });
+    });
+
+    it('gets one from the recurring job once it switches to hybrid', async () => {
+        const LATER = '6f0000000000000000000c04';
+        mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: LATER, knowledgeIndexer: { mode: 'on' }, knowledgeRetrieval: { mode: 'on' } });
+        process.env.KNOWLEDGE_VECTOR_STORE = 'atlas';
+        const store = useAtlas();
+        const prepare = jest.spyOn(store, 'prepare');
+        const backfill = require('../Modules/Knowledge/ingest/backfill');
+        await backfill.backfillAll();
+        expect(prepare.mock.calls.map(([args]) => args.companyId)).not.toContain(LATER);
+        mockDb.store[SCHEMA_TYPE.COMPANIES].find((row) => String(row._id) === LATER).knowledgeRetrieval.mode = 'hybrid';
+        myCache.flushAll();
+        await backfill.backfillAll();
+        expect(prepare.mock.calls.map(([args]) => args.companyId)).toContain(LATER);
     });
 });
 

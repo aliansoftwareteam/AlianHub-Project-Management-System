@@ -94,8 +94,9 @@ describe.each(STORES)('the vector store contract: %s', (label, make) => {
 
     beforeEach(() => { store = make(); });
 
-    it('implements every method of the adapter contract', () => {
+    it('implements every method of the adapter contract, and says whether it tracks sources itself', () => {
         expect(() => assertAdapter(store)).not.toThrow();
+        expect(typeof store.tracksSources).toBe('boolean');
     });
 
     it('finds what was written, by cosine, one passage per source from its best chunk', async () => {

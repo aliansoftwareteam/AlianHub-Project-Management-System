@@ -7,12 +7,21 @@ const { matches } = require('./fakeMongo');
 //
 // `lag()` freezes what the index holds, so a filter is judged on the indexed copy of a chunk
 // while the stage returns the live document, the way mongot trails the collection. A deleted
-// document is never returned. `mode('community')` answers as a plain MongoDB server does, and
-// `mode('down')` as an unreachable one.
+// document is never returned. `mode('community')` answers as a plain MongoDB server does,
+// `mode('down')` as an unreachable one, and `hang([...])` never answers the methods named.
 
 const CHUNKS = 'knowledge_chunks';
 const OPERATORS = ['$eq', '$ne', '$in', '$nin', '$gt', '$gte', '$lt', '$lte'];
 const SCRATCH = '__vectorSearch';
+const SCORE_FIELD = '__vectorSearchScore';
+
+/* Atlas scores cosine as (1 + cos) / 2; fakeMongo reads it as a plain field. */
+const withScoreField = (node) => {
+    if (Array.isArray(node)) return node.map(withScoreField);
+    if (!node || typeof node !== 'object' || node instanceof Date || typeof node.toHexString === 'function') return node;
+    if (node.$meta === 'vectorSearchScore') return `$${SCORE_FIELD}`;
+    return Object.fromEntries(Object.entries(node).map(([key, value]) => [key, withScoreField(value)]));
+};
 
 const cosine = (a, b) => {
     let dot = 0; let na = 0; let nb = 0;
@@ -36,6 +45,7 @@ const create = (dbFor) => {
     const calls = [];
     let current = 'atlas';
     let initialStatus = 'READY';
+    let hanging = new Set();
 
     const db = (companyId) => dbFor(String(companyId));
     const liveRows = (companyId) => db(companyId).store[CHUNKS] || [];
@@ -81,7 +91,8 @@ const create = (dbFor) => {
             if (stage.filter && !matches(seen, query)) return;
             scored.push({ live, score: cosine(stage.queryVector, seen[field.path]) });
         });
-        return scored.sort((a, b) => b.score - a.score).slice(0, stage.numCandidates).slice(0, stage.limit).map((s) => s.live);
+        return scored.sort((a, b) => b.score - a.score).slice(0, stage.numCandidates).slice(0, stage.limit)
+            .map((s) => ({ ...s.live, [SCORE_FIELD]: (1 + s.score) / 2 }));
     };
 
     const refuse = (method) => {
@@ -97,6 +108,8 @@ const create = (dbFor) => {
         const searching = type === CHUNKS && method === 'aggregate' && Array.isArray(data[0]) && data[0][0] && data[0][0].$vectorSearch;
         const indexCommand = ['listSearchIndexes', 'createSearchIndex', 'updateSearchIndex'].includes(method);
         if (searching || indexCommand) calls.push({ companyId: String(companyId), method, data });
+        if (indexCommand && hanging.has(method)) return new Promise(() => {});
+        if (type === CHUNKS && method === 'findOne' && hanging.has('findOne')) return new Promise(() => {});
         if (searching || indexCommand) refuse(searching ? 'aggregate' : method);
         if (method === 'listSearchIndexes') {
             const index = indexOf(companyId);
@@ -120,9 +133,9 @@ const create = (dbFor) => {
         const [pipeline, ...rest] = data;
         const found = vectorSearch(companyId, pipeline[0].$vectorSearch);
         const scratch = db(companyId);
-        scratch.store[SCRATCH] = found.map((row) => ({ ...row }));
+        scratch.store[SCRATCH] = found;
         try {
-            return await scratch.crud(companyId, { type: SCRATCH, data: [pipeline.slice(1), ...rest] }, 'aggregate');
+            return await scratch.crud(companyId, { type: SCRATCH, data: [withScoreField(pipeline.slice(1)), ...rest] }, 'aggregate');
         } finally {
             delete scratch.store[SCRATCH];
         }
@@ -134,10 +147,11 @@ const create = (dbFor) => {
         indexOf,
         mode: (next) => { current = next; },
         startAs: (status) => { initialStatus = status; },
+        hang: (methods) => { hanging = new Set(methods); },
         setStatus: (companyId, status, queryable = status === 'READY') => Object.assign(indexOf(companyId), { status, queryable }),
         lag: (companyId) => frozen.set(String(companyId), new Map(liveRows(companyId).map((row) => [String(row._id), JSON.parse(JSON.stringify(row))]))),
         catchUp: (companyId) => frozen.delete(String(companyId)),
-        reset: () => { indexes.clear(); frozen.clear(); calls.length = 0; current = 'atlas'; initialStatus = 'READY'; crud.mockClear(); },
+        reset: () => { indexes.clear(); frozen.clear(); calls.length = 0; current = 'atlas'; initialStatus = 'READY'; hanging = new Set(); crud.mockClear(); },
     };
 };
 

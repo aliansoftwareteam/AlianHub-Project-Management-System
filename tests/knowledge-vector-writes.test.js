@@ -33,7 +33,7 @@ const recording = () => {
         calls.push([method, args]);
         return base[method](args);
     };
-    return { name: 'recording', calls, search: base.search, stats: base.stats, upsert: told('upsert'), tombstone: told('tombstone'), erase: told('erase') };
+    return { name: 'recording', tracksSources: true, calls, search: base.search, stats: base.stats, upsert: told('upsert'), tombstone: told('tombstone'), erase: told('erase') };
 };
 
 const pageRow = (over = {}) => mockDb.seed(SCHEMA_TYPE.PAGES, {
@@ -122,6 +122,36 @@ describe('tombstones tell the store', () => {
         await indexer.tombstoneProject(C, PROJECT);
         await indexer.removeDepartedMember(C, ALICE);
         expect(toldOf(store, 'tombstone')).toEqual([]);
+    });
+});
+
+describe('with a store whose vectors ride on the chunk rows', () => {
+    const chunkCalls = () => mockDb.calls.filter((call) => call.type === CHUNKS).map((call) => call.method);
+
+    it.each([
+        ['the in-database store', () => vectorStore.reset()],
+        ['the Atlas store', () => vectorStore.use(createAtlasVectorAdapter({ crud: fakeAtlas.crud }))],
+    ])('%s: a tombstone issues its write and nothing more', async (label, choose) => {
+        choose();
+        await indexedPage();
+        await indexedPage({ visibility: 'private' });
+        mockDb.calls.length = 0;
+        await indexer.tombstoneProject(C, PROJECT);
+        expect(chunkCalls()).toEqual(['updateMany']);
+        mockDb.calls.length = 0;
+        await indexer.removeDepartedMember(C, ALICE);
+        expect(chunkCalls()).toEqual(['updateMany']);
+        mockDb.calls.length = 0;
+        await indexer.tombstonePages(C, ['6f00000000000000000000f1']);
+        expect(chunkCalls()).toEqual(['updateMany']);
+    });
+
+    it('a shortened page reads no chunk ids for the store', async () => {
+        vectorStore.reset();
+        const page = await indexedPage();
+        mockDb.calls.length = 0;
+        await indexer.ingestPage(C, { ...page, content: { html: '<p>One.</p>' }, updatedAt: new Date('2026-09-02T00:00:00Z') });
+        expect(mockDb.calls.filter((call) => call.type === CHUNKS && call.method === 'find')).toHaveLength(1);
     });
 });
 

@@ -133,6 +133,28 @@ describe('against a MongoDB server without Atlas Search', () => {
         }
     });
 
+    it('keeps a hidden sprint out and a chunk in no sprint in, with $nin and $ne evaluated by Atlas itself', async () => {
+        const OPEN = new mongoose.Types.ObjectId();
+        const HIDDEN = new mongoose.Types.ObjectId();
+        await chunks().insertMany([
+            chunk('no-sprint-comment', { sourceType: 'comment', sprintId: null }),
+            chunk('open-sprint-comment', { sourceType: 'comment', sprintId: OPEN }),
+            chunk('hidden-sprint-comment', { sourceType: 'comment', sprintId: HIDDEN }),
+            chunk('deleted-comment', { sourceType: 'comment', sprintId: null, deleted: true }),
+        ]);
+        const hidden = set(companyId, { sourceTypes: ['comment'], hiddenSprintIds: [String(HIDDEN)] });
+        const { clauses } = filterFor(hidden, { chunkSources: ['comment'] });
+        const filter = prefilterOf({ ...clauses.comment, embeddingModel: MODEL });
+        const raw = () => chunks().aggregate([
+            { $vectorSearch: { index: INDEX_NAME, path: 'embedding', queryVector: [1, 0, 0], numCandidates: 100, limit: 50, filter } },
+            { $project: { sourceId: 1 } },
+        ]).toArray().then((rows) => rows.map((row) => row.sourceId).sort());
+        expect(await poll(async () => (await raw()).length === 2)).toBe(true);
+        expect(await raw()).toEqual(['no-sprint-comment', 'open-sprint-comment']);
+        const passages = await store.search({ companyId, queryEmbedding: [1, 0, 0], model: MODEL, filter: filterFor(hidden, { chunkSources: ['comment'] }), limit: 10 });
+        expect(passages.map((p) => p.sourceId).sort()).toEqual(['no-sprint-comment', 'open-sprint-comment']);
+    });
+
     it('drops a chunk tombstoned or made private after indexing at once, before the index catches up', async () => {
         await chunks().updateOne({ sourceId: 'near' }, { $set: { deleted: true } });
         await chunks().updateOne({ sourceId: 'shared' }, { $set: { visibility: 'private' } });
