@@ -70,23 +70,36 @@ describe('a step row in an answer', () => {
     const document = { ...row, toObject: () => ({ ...row }) };
     const serialised = { ...row, toJSON: () => ({ ...row }), toObject: () => { throw new Error('toJSON is what a response serialises'); } };
 
-    it.each([['a plain row', row], ['a mongoose document', document], ['a document that serialises with toJSON', serialised]])('never carries a credential id: %s', async (label, step) => {
+    const ROUTES_WITH_STEP_ROWS = ['startRun', 'getRun', 'retryStep', 'skipStep', 'resumeStep', 'compensateStep'];
+
+    const serve = (step) => {
+        store.createRun.mockResolvedValue({ _id: RUN_ID, status: 'queued', startedBy: OWNER });
         store.getRun.mockResolvedValue({ _id: RUN_ID, status: 'failed', startedBy: OWNER });
+        store.listRuns.mockResolvedValue([{ _id: RUN_ID, startedBy: OWNER }]);
         store.listSteps.mockResolvedValue([step]);
         store.getStep.mockResolvedValue(step);
-        store.retryStep.mockResolvedValue(step);
-        for (const handler of [controller.getRun, controller.retryStep]) {
+        ['retryStep', 'operatorSkipStep', 'resumeStep', 'recordCompensation'].forEach((fn) => store[fn].mockResolvedValue(step));
+        revert.revertRun.mockResolvedValue({ reverted: 1, failed: [] });
+    };
+
+    /* Every handler the controller exports is called; any answer that carries a step
+     * row must carry it without credential ids, and the routes known to carry one must. */
+    it.each([['a plain row', row], ['a mongoose document', document], ['a document that serialises with toJSON', serialised]])('never carries a credential id, on any route: %s', async (label, step) => {
+        const withOutput = step === row ? { ...row, output: { agentRunId: 'a1' } } : Object.assign(Object.create(Object.getPrototypeOf(step)), step, { output: { agentRunId: 'a1' } });
+        serve(withOutput);
+        const answeredWithSteps = [];
+        const handlers = Object.entries(controller).filter(([, handler]) => typeof handler === 'function');
+        for (const [name, handler] of handlers) {
             const res = resSpy();
             // eslint-disable-next-line no-await-in-loop
-            await handler(reqFor({ params: { id: RUN_ID, stepId: 'sAgent' } }), res);
-            expect(res.body.status).toBe(true);
-            expect(res.body.data.steps).toHaveLength(1);
-            expect(res.body.data.steps[0]).toMatchObject({ stepId: 'sAgent', status: 'running', fencingToken: 1 });
-            const text = JSON.stringify(res.body);
-            expect(text).not.toMatch(/credentialId|previousCredentialId/);
+            await handler(reqFor({ params: { id: RUN_ID, stepId: 'sAgent' }, body: { agentId: AGENT_ID, taskId: TASK_ID } }), res);
+            const text = JSON.stringify(res.body || {});
+            if (text.includes('"fencingToken"')) answeredWithSteps.push(name);
+            expect({ name, credentialFields: /credentialId|previousCredentialId/.test(text) }).toEqual({ name, credentialFields: false });
             expect(text).not.toContain(CREDENTIAL);
             expect(text).not.toContain(PREVIOUS);
         }
+        expect(answeredWithSteps.sort()).toEqual([...ROUTES_WITH_STEP_ROWS].sort());
     });
 });
 

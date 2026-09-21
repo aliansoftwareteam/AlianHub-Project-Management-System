@@ -306,6 +306,26 @@ describe('minting on claim', () => {
         expect(jwt.decode(seen[1].stepCredential())).toMatchObject({ agentId: null, actions: [] });
     });
 
+    it('mints for the agent of the agent run a step names, as the runner executes it, over the run\'s own agent', async () => {
+        const OTHER_AGENT = '6f0000000000000000000a02';
+        mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: OTHER_AGENT, name: 'Writer', allowedActions: ['task.create'], autonomy: 2, deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { _id: AGENT_RUN_ID, agentId: OTHER_AGENT, taskId: TASK_ID, startedBy: STARTER, status: 'running' });
+        const seen = [];
+        await runAgentStep(seedRun('r1', { agentId: AGENT_ID, steps: [{ id: 'sAgent', type: 'agent_run', dependsOn: [], config: { agentRunId: AGENT_RUN_ID }, maxAttempts: 3 }] }), seen);
+        expect(jwt.decode(seen[0].stepCredential())).toMatchObject({ agentId: OTHER_AGENT, actions: ['task.create'] });
+    });
+
+    it('hands the step back when the claim\'s note cannot be written, rather than leaving it claimed for a lease', async () => {
+        jest.spyOn(store, 'noteStep').mockRejectedValueOnce(new Error('write concern timed out'));
+        const seen = [];
+        const result = await runAgentStep(seedRun('r1'), seen);
+        expect(result.outcome).toBe('retrying');
+        expect(seen).toHaveLength(0);
+        const row = await store.getStep(C, 'r1', 'sAgent');
+        expect(row).toMatchObject({ status: 'pending', leaseExpiresAt: null });
+        expect(row.error).toContain('write concern timed out');
+    });
+
     it('records the step under the engine service identity, on behalf of whoever started the run', async () => {
         const run = seedRun('r1');
         await engine.runStep(C, run, (await store.listSteps(C, 'r1'))[0], {
