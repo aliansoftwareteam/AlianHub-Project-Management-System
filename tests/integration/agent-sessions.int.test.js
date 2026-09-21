@@ -7,6 +7,7 @@ const { STATE_DIR, resolveMongoUrl } = require('../../e2e/support/env');
 const { createApiClient } = require('../../e2e/support/api');
 const { createProject, createTask, emailFor, login, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 const { startServer } = require('../../e2e/support/server');
+const consentFlow = require('../fixtures/oauthConsent');
 
 /* Sprint 10 slice S7 on the real app and database: a person delegates a task to an outside OAuth client, the client
  * hears of it by a signed webhook, reports typed activities over /mcp, and the task panel's socket room sees them. */
@@ -48,12 +49,11 @@ const authorize = async (scope) => {
         response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, scope, state: 's10s7',
         code_challenge: challengeOf(verifier), code_challenge_method: 'S256', resource: `${server.baseURL}/mcp`,
     });
-    const authorized = await fetch(`${server.baseURL}/oauth/authorize?${query}`, {
-        redirect: 'manual',
-        headers: { authorization: `Bearer ${owner.accessToken}`, companyid: state.companyId, 'x-oauth-test-consent': 'approve' },
+    const authorized = await consentFlow.consentThrough(`${server.baseURL}/oauth/authorize?${query}`, {
+        session: `accessToken=${owner.accessToken}`, workspace: state.companyId,
     });
-    expect(authorized.status).toBe(302);
-    const code = new URL(authorized.headers.get('location')).searchParams.get('code');
+    expect(authorized.status).toBe(303);
+    const code = authorized.location.searchParams.get('code');
     const res = await fetch(`${server.baseURL}/oauth/token`, {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -128,6 +128,8 @@ beforeAll(async () => {
     });
     expect(registered.status).toBe(201);
     clientId = (await registered.json()).client_id;
+    const approved = await ownerApi.post('/api/v2/oauth-client-approvals/approve', { clientId, scopes: ['tasks:read', 'tasks:write'] });
+    expect(approved.body.status).toBe(true);
 }, BOOT_TIMEOUT_MS);
 
 afterAll(async () => {
