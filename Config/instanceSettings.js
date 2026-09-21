@@ -120,6 +120,7 @@ function publicConfig() {
         appName: env('APP_NAME') || 'AlianHub',
         webUrl: env('WEBURL'),
         storageType: env('STORAGE_TYPE') || 'server',
+        agentSessions: require('../Modules/AgentSessions/config').isOn(process.env),
         auth: {
             google: { enabled: on('GOOGLE_LOGIN_ENABLED') && Boolean(env('GOOGLE_CLIENT_ID')), clientId: env('GOOGLE_CLIENT_ID') },
             github: { enabled: on('GITHUB_LOGIN_ENABLED') && Boolean(env('GITHUB_CLIENT_ID')), clientId: env('GITHUB_CLIENT_ID'), baseUrl: env('GITHUB_BASE_OAUTH_URL') || 'https://github.com/login/oauth' },
@@ -132,6 +133,7 @@ function publicConfig() {
             messagingSenderId: env('MESSAGINGSENDERID'), appId: env('APPID'), measurementId: env('MEASUREMENTID'),
         },
         demoMode: env('DEMO_MODE') === 'true',
+        mcpOAuth: require('../Modules/OAuthServer/config').isOn(process.env),
     };
 }
 

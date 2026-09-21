@@ -67,6 +67,15 @@ export default [
                 component: () => import(/* webpackChunkName: ScimSettings */ '@/views/Settings/Scim/ScimSettings.vue')
             },
             {
+                path: "agent-clients",
+                name: "AgentClients",
+                meta: {
+                    title: "Agent clients",
+                    requiresAuth: true
+                },
+                component: () => import(/* webpackChunkName: "AgentClients" */ '@/views/Settings/AgentClients/AgentClients.vue')
+            },
+            {
                 path: "time-off",
                 name: "TimeOff",
                 meta: {

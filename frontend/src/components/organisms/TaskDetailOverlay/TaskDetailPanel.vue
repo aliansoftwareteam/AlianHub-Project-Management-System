@@ -287,6 +287,7 @@ import { canControlRun } from "@/views/Ai/agentAccess";
 import taskClass from "@/utils/TaskOperations";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
+import { publicConfig } from "@/config/publicConfig";
 import { dbCollections } from "@/utils/Collections";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useUpdateTasks } from "@/views/Projects/helper";
@@ -807,7 +808,17 @@ const STRIP_STATUS = { running: "running", queued: "running", waiting_approval: 
 const AGENT_RUN_POLL_MS = 15000;
 const liveRun = ref(null);
 let agentRunPoll = null;
-const stripRun = computed(() => props.agentRun || liveRun.value);
+const SESSION_STRIP_STATUS = { offered: "running", active: "running", completed: "done", failed: "failed", revoked: "failed", unresponsive: "failed" };
+const OPEN_SESSION_STATES = ["offered", "active"];
+const ENDED_SESSION_SHOWN_MS = 60 * 60 * 1000;
+const liveSession = ref(null);
+let agentSessionPoll = null;
+const sessionRun = computed(() => {
+    const session = liveSession.value;
+    if (!session) return null;
+    return { agentName: session.clientName, status: SESSION_STRIP_STATUS[session.state] || "running", startedAt: session.firstActivityAt || session.createdAt, session, onStop: null };
+});
+const stripRun = computed(() => props.agentRun || liveRun.value || sessionRun.value);
 const mayStopRun = (run) => canControlRun(run, { userId: currentUserId?.value ?? currentUserId, roleType: getters["settings/companyUserDetail"]?.roleType });
 
 async function stopAgentRun(runId) {
@@ -835,9 +846,38 @@ async function loadAgentRun() {
     if (liveRun.value) agentRunPoll = setTimeout(loadAgentRun, AGENT_RUN_POLL_MS);
 }
 
+const shownSession = (rows) => rows.find((row) => OPEN_SESSION_STATES.includes(row.state))
+    || rows.find((row) => row.endedAt && Date.now() - new Date(row.endedAt).getTime() < ENDED_SESSION_SHOWN_MS)
+    || null;
+
+function scheduleSessionPoll() {
+    clearTimeout(agentSessionPoll);
+    if (liveSession.value && OPEN_SESSION_STATES.includes(liveSession.value.state)) agentSessionPoll = setTimeout(loadAgentSessions, AGENT_RUN_POLL_MS);
+}
+
+/* The socket relay pushes each change as it happens; the poll only covers a dropped socket. */
+async function loadAgentSessions() {
+    if (!publicConfig.agentSessions) return;
+    try {
+        const res = await apiRequest("get", `${env.AGENT_SESSIONS}?taskId=${encodeURIComponent(props.taskId)}`);
+        liveSession.value = shownSession(res?.data?.status ? res.data.data || [] : []);
+    } catch (error) {
+        liveSession.value = null;
+    }
+    scheduleSessionPoll();
+}
+
+function onAgentSession(session) {
+    if (!session || String(session.taskId) !== String(props.taskId)) return;
+    liveSession.value = session;
+    scheduleSessionPoll();
+}
+
 onMounted(async () => {
     loadTask();
     loadAgentRun();
+    loadAgentSessions();
+    if (socket?.value?.on) socket.value.on("taskDetail_agentSession", onAgentSession);
     document.addEventListener("visibilitychange", visibilityHandler);
     if (socket?.value?.on) socket.value.on("commentInsert", onCommentInsert);
     dispatch("projectData/getTaskDetailSnapShot", { taskId: props.taskId }).catch((error) => console.error(error));
@@ -848,9 +888,11 @@ onBeforeUnmount(() => {
     commit("projectData/setTaskdetailPayloadId", {});
     ["taskDetail_taskUpdate", "taskDetail_taskDelete", "taskDetail_taskInsert"].forEach((event) => socket?.value?.off?.(event));
     socket?.value?.off?.("commentInsert", onCommentInsert);
+    socket?.value?.off?.("taskDetail_agentSession", onAgentSession);
     socket?.value?.emit?.("leaveTaskDetail", `taskDetail_${props.taskId}**${socket.value.id}`);
     clearTimeout(debounceTimeout);
     clearTimeout(agentRunPoll);
+    clearTimeout(agentSessionPoll);
     document.removeEventListener("visibilitychange", visibilityHandler);
 });
 

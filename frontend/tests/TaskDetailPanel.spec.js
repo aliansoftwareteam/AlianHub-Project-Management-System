@@ -22,12 +22,15 @@ const { updateStatus, stub, projectPayload } = vi.hoisted(() => ({
 }));
 
 const { openRuns } = vi.hoisted(() => ({ openRuns: { rows: [] } }));
+const { sessions, flags } = vi.hoisted(() => ({ sessions: { rows: [] }, flags: { agentSessions: false } }));
+vi.mock('@/config/publicConfig', () => ({ publicConfig: flags }));
 
 vi.mock('@/services', () => ({
     apiRequest: vi.fn((method, url) => {
         if (String(url).includes('/taskData')) return Promise.resolve({ status: 200, data: [projectPayload] });
         if (String(url).includes('/agents/runs?status=open')) return Promise.resolve({ status: 200, data: { status: true, data: openRuns.rows } });
         if (String(url).includes('/agents/runs/') && String(url).endsWith('/stop')) return Promise.resolve({ status: 200, data: { status: true, data: {} } });
+        if (String(url).includes('/agent-sessions?taskId=')) return Promise.resolve({ status: 200, data: { status: true, data: sessions.rows } });
         return Promise.resolve({ status: 200, data: { status: false, data: [] } });
     })
 }));
@@ -61,7 +64,7 @@ vi.mock('@/components/organisms/TaskDetailOverlay/TaskAgentStrip.vue', () => stu
 
 import TaskDetailPanel from '@/components/organisms/TaskDetailOverlay/TaskDetailPanel.vue';
 
-function mountPanel({ roleType = 1, userId = 'u1' } = {}) {
+function mountPanel({ roleType = 1, userId = 'u1', socket = null } = {}) {
     const store = createStore({
         getters: {
             'settings/companyUserDetail': () => ({ roleType }),
@@ -76,7 +79,7 @@ function mountPanel({ roleType = 1, userId = 'u1' } = {}) {
     });
     return mount(TaskDetailPanel, {
         props: { companyId: 'company-1', projectId: 'proj-1', sprintId: 'sprint-1', taskId: 'task-1' },
-        global: { plugins: [store], provide: { $userId: ref(userId) } }
+        global: { plugins: [store], provide: { $userId: ref(userId), ...(socket ? { $socket: ref(socket) } : {}) } }
     });
 }
 
@@ -136,5 +139,54 @@ describe('TaskDetailPanel', () => {
         const run = wrapper.findComponent({ name: 'TaskAgentStrip' }).vm.$attrs.run;
         expect(run.status).toBe('review');
         expect(run.onStop).toBeNull();
+    });
+
+    describe('an outside agent session', () => {
+        const fakeSocket = () => {
+            const handlers = {};
+            return { id: 'sock-1', handlers, on: vi.fn((event, fn) => { handlers[event] = fn; }), off: vi.fn(), emit: vi.fn() };
+        };
+        const activeSession = { id: 's1', taskId: 'task-1', clientName: 'Coder', state: 'active', createdAt: '2026-09-21T10:00:00.000Z', firstActivityAt: '2026-09-21T10:00:03.000Z', activities: [{ type: 'thought', text: 'Reading the brief', at: '2026-09-21T10:00:03.000Z' }] };
+
+        it('asks for no session while the flag is off', async () => {
+            const { apiRequest } = await import('@/services');
+            flags.agentSessions = false;
+            openRuns.rows = [];
+            mountPanel();
+            await flushPromises();
+            expect(apiRequest.mock.calls.some(([, url]) => String(url).includes('/agent-sessions'))).toBe(false);
+        });
+
+        it('feeds the strip from the open session on the task', async () => {
+            flags.agentSessions = true;
+            openRuns.rows = [];
+            sessions.rows = [activeSession];
+            const wrapper = mountPanel();
+            await flushPromises();
+            const run = wrapper.findComponent({ name: 'TaskAgentStrip' }).vm.$attrs.run;
+            expect(run).toMatchObject({ agentName: 'Coder', status: 'running', startedAt: '2026-09-21T10:00:03.000Z', session: { state: 'active' } });
+            flags.agentSessions = false;
+            sessions.rows = [];
+        });
+
+        it('shows an activity pushed over the socket without waiting for the poll', async () => {
+            flags.agentSessions = true;
+            openRuns.rows = [];
+            sessions.rows = [];
+            const socket = fakeSocket();
+            const wrapper = mountPanel({ socket });
+            await flushPromises();
+            expect(wrapper.findComponent({ name: 'TaskAgentStrip' }).exists()).toBe(false);
+            socket.handlers.taskDetail_agentSession({ ...activeSession, activities: [...activeSession.activities, { type: 'action', text: 'Pushed a branch', at: '2026-09-21T10:00:05.000Z' }] });
+            await flushPromises();
+            const run = wrapper.findComponent({ name: 'TaskAgentStrip' }).vm.$attrs.run;
+            expect(run.session.activities.map((a) => a.type)).toEqual(['thought', 'action']);
+            socket.handlers.taskDetail_agentSession({ ...activeSession, taskId: 'task-2', state: 'failed' });
+            await flushPromises();
+            expect(wrapper.findComponent({ name: 'TaskAgentStrip' }).vm.$attrs.run.session.state).toBe('active');
+            wrapper.unmount();
+            expect(socket.off).toHaveBeenCalledWith('taskDetail_agentSession', expect.any(Function));
+            flags.agentSessions = false;
+        });
     });
 });

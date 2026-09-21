@@ -5,9 +5,10 @@ const { MongoClient } = require('mongodb');
 const { STATE_DIR, resolveMongoUrl } = require('../../e2e/support/env');
 const { createProject, emailFor, login, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 const { startServer } = require('../../e2e/support/server');
+const consentFlow = require('../fixtures/oauthConsent');
 
-/* Sprint 10 slice S4: a scripted OAuth client against /mcp on the real app and database. The consent step
- * is the test-only path until slice S3 ships the consent screen, so the server runs with NODE_ENV=test. */
+/* Sprint 10 slice S4: a scripted OAuth client against /mcp on the real app and database. The owner approves the
+ * client for the workspace and consents on the consent screen's endpoints (slice S3). */
 
 const state = readState();
 const BOOT_TIMEOUT_MS = 180000;
@@ -44,12 +45,9 @@ const authorizeAndExchange = async (clientId, scope) => {
         response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, scope, state: 's10s4',
         code_challenge: challengeOf(verifier), code_challenge_method: 'S256', resource: `${server.baseURL}/mcp`,
     });
-    const authorized = await fetch(`${server.baseURL}/oauth/authorize?${query}`, {
-        redirect: 'manual',
-        headers: { authorization: `Bearer ${owner.accessToken}`, companyid: state.companyId, 'x-oauth-test-consent': 'approve' },
-    });
-    expect(authorized.status).toBe(302);
-    const code = new URL(authorized.headers.get('location')).searchParams.get('code');
+    const authorized = await consentFlow.consentThrough(`${server.baseURL}/oauth/authorize?${query}`, { session: `accessToken=${owner.accessToken}`, workspace: state.companyId });
+    expect(authorized.status).toBe(303);
+    const code = authorized.location.searchParams.get('code');
     const res = await fetch(`${server.baseURL}/oauth/token`, {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -118,6 +116,12 @@ describe('an OAuth client on /mcp with MCP_OAUTH=both', () => {
         });
         expect(res.status).toBe(201);
         clientId = (await res.json()).client_id;
+        const approved = await fetch(`${server.baseURL}/api/v2/oauth-client-approvals/approve`, {
+            method: 'POST',
+            headers: { authorization: `Bearer ${owner.accessToken}`, companyid: state.companyId, 'content-type': 'application/json' },
+            body: JSON.stringify({ clientId, scopes: ['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write'] }),
+        });
+        expect(approved.status).toBe(200);
     });
 
     it('reads with tasks:read, is refused a write with insufficient_scope, and writes after stepping up', async () => {
@@ -189,6 +193,45 @@ describe('an OAuth client on /mcp with MCP_OAUTH=both', () => {
         const res = await mcp(reader, call('tasks.search', {}));
         expect(res.status).toBe(401);
         expect(challengeParams(res.headers.get('www-authenticate')).error).toBe('invalid_token');
+    });
+
+    it('follows the workspace approval: a narrowed ceiling refuses a write, a revoked approval refuses the token', async () => {
+        const res = await fetch(`${server.baseURL}/oauth/register`, {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ client_name: 'S10S3 approval on mcp', redirect_uris: [REDIRECT], token_endpoint_auth_method: 'none' }),
+        });
+        const approvedId = (await res.json()).client_id;
+        const approvals = (action, body) => fetch(`${server.baseURL}/api/v2/oauth-client-approvals/${action}`, {
+            method: 'POST', headers: { authorization: `Bearer ${owner.accessToken}`, companyid: state.companyId, 'content-type': 'application/json' }, body: JSON.stringify({ clientId: approvedId, ...body }),
+        });
+        expect((await approvals('approve', { scopes: ['tasks:read', 'tasks:write'] })).status).toBe(200);
+        const writer = await authorizeAndExchange(approvedId, 'tasks:read tasks:write');
+        expect((await mcp(writer, call('tasks.search', {}))).status).toBe(200);
+
+        expect((await approvals('approve', { scopes: ['tasks:read'] })).status).toBe(200);
+        const grant = await mongo.db('global').collection('oauth_grants').findOne({ clientId: approvedId });
+        expect(grant.scopes).toEqual(['tasks:read']);
+        const write = await mcp(writer, call('task.create', { projectId: String(project._id), title: 'S10S3 narrowed' }));
+        expect(write.status).toBe(403);
+        expect(challengeParams(write.headers.get('www-authenticate')).error).toBe('insufficient_scope');
+        expect((await mcp(writer, call('tasks.search', {}))).status).toBe(200);
+
+        expect((await approvals('revoke', {})).status).toBe(200);
+        expect((await mcp(writer, call('tasks.search', {}))).status).toBe(401);
+    });
+
+    it('refuses a token of a client that is not approved in the workspace', async () => {
+        const res = await fetch(`${server.baseURL}/oauth/register`, {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ client_name: 'S10S3 unapproved on mcp', redirect_uris: [REDIRECT], token_endpoint_auth_method: 'none' }),
+        });
+        const otherId = (await res.json()).client_id;
+        await fetch(`${server.baseURL}/api/v2/oauth-client-approvals/approve`, {
+            method: 'POST', headers: { authorization: `Bearer ${owner.accessToken}`, companyid: state.companyId, 'content-type': 'application/json' }, body: JSON.stringify({ clientId: otherId }),
+        });
+        const reader = await authorizeAndExchange(otherId, 'tasks:read');
+        await mongo.db('global').collection('oauth_client_approvals').updateOne({ clientId: otherId, companyId: state.companyId }, { $set: { status: 'pending' } });
+        expect((await mcp(reader, call('tasks.search', {}))).status).toBe(401);
     });
 
     it('still takes a personal access token under both', async () => {

@@ -119,10 +119,13 @@ const {
     auditChainAnchorsSchema,
     auditRedactionsSchema,
     egressAllowlistsSchema,
+    agentSessionsSchema,
+    agentSessionEndpointsSchema,
     secretsSchema,
     oauthClientsSchema,
     oauthGrantsSchema,
-    oauthTokensSchema
+    oauthTokensSchema,
+    oauthClientApprovalsSchema
 } = require('./createSchema');
 
 
@@ -364,6 +367,10 @@ exports.checkType = (type) => {
             return auditRedactionsSchema
         case SCHEMA_TYPE.EGRESS_ALLOWLISTS:
             return egressAllowlistsSchema
+        case SCHEMA_TYPE.AGENT_SESSIONS:
+            return agentSessionsSchema
+        case SCHEMA_TYPE.AGENT_SESSION_ENDPOINTS:
+            return agentSessionEndpointsSchema
         case SCHEMA_TYPE.SECRETS:
             return secretsSchema
         case SCHEMA_TYPE.OAUTH_CLIENTS:
@@ -372,6 +379,8 @@ exports.checkType = (type) => {
             return oauthGrantsSchema
         case SCHEMA_TYPE.OAUTH_TOKENS:
             return oauthTokensSchema
+        case SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS:
+            return oauthClientApprovalsSchema
         default:
             return ""
     }
@@ -616,6 +625,10 @@ exports.tableType = (type) => {
                 return `${dbCollections.AUDIT_REDACTIONS}`
         case SCHEMA_TYPE.EGRESS_ALLOWLISTS:
                 return `${dbCollections.EGRESS_ALLOWLISTS}`
+        case SCHEMA_TYPE.AGENT_SESSIONS:
+                return `${dbCollections.AGENT_SESSIONS}`
+        case SCHEMA_TYPE.AGENT_SESSION_ENDPOINTS:
+                return `${dbCollections.AGENT_SESSION_ENDPOINTS}`
         case SCHEMA_TYPE.SECRETS:
                 return `${dbCollections.SECRETS}`
         case SCHEMA_TYPE.OAUTH_CLIENTS:
@@ -624,6 +637,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.OAUTH_GRANTS}`
         case SCHEMA_TYPE.OAUTH_TOKENS:
                 return `${dbCollections.OAUTH_TOKENS}`
+        case SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS:
+                return `${dbCollections.OAUTH_CLIENT_APPROVALS}`
         default:
             return ""
     }

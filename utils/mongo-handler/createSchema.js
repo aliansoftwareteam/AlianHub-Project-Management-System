@@ -326,6 +326,12 @@ const permissionDecisionsSchema = new Schema(schema.permissionDecisions, {strict
 permissionDecisionsSchema.index({ day: 1, mode: 1, method: 1, route: 1, permission: 1, role: 1, scope: 1, reason: 1 }, { unique: true, name: 'decision_key' });
 permissionDecisionsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 const egressAllowlistsSchema = new Schema(schema.egressAllowlists, {strict: true, timestamps: false});
+const agentSessionsSchema = new Schema(schema.agentSessions, {strict: true, timestamps: false});
+agentSessionsSchema.index({ taskId: 1, createdAt: -1 });
+agentSessionsSchema.index({ state: 1, deliveredAt: 1 });
+agentSessionsSchema.index({ grantId: 1, state: 1 });
+const agentSessionEndpointsSchema = new Schema(schema.agentSessionEndpoints, {strict: true, timestamps: false});
+agentSessionEndpointsSchema.index({ clientId: 1 }, { unique: true, name: 'client_id' });
 
 const oauthClientsSchema = new Schema(schema.oauthClients, {strict: true, timestamps: false});
 oauthClientsSchema.index({ clientId: 1 }, { unique: true, name: 'client_id' });
@@ -338,6 +344,11 @@ const oauthTokensSchema = new Schema(schema.oauthTokens, {strict: true, timestam
 oauthTokensSchema.index({ tokenHash: 1 }, { unique: true, name: 'token_hash' });
 oauthTokensSchema.index({ grantId: 1 });
 oauthTokensSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0, name: 'purge_at' });
+oauthGrantsSchema.index({ clientId: 1, companyId: 1 });
+oauthGrantsSchema.index({ userId: 1, createdAt: -1 });
+const oauthClientApprovalsSchema = new Schema(schema.oauthClientApprovals, {strict: true, timestamps: false});
+oauthClientApprovalsSchema.index({ companyId: 1, clientId: 1 }, { unique: true, name: 'company_client' });
+oauthClientApprovalsSchema.index({ companyId: 1, status: 1 });
 
 const cspReportsSchema = new Schema(schema.cspReports, {strict: true, timestamps: false});
 cspReportsSchema.index({ day: 1, directive: 1, blockedHost: 1, documentPath: 1 }, { unique: true, name: 'report_key' });
@@ -482,10 +493,13 @@ module.exports = {
     auditChainAnchorsSchema,
     auditRedactionsSchema,
     egressAllowlistsSchema,
+    agentSessionsSchema,
+    agentSessionEndpointsSchema,
     secretsSchema,
     oauthClientsSchema,
     oauthGrantsSchema,
     oauthTokensSchema,
+    oauthClientApprovalsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

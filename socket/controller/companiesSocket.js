@@ -6,14 +6,22 @@ const {
     findRoomsByPrefix,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { onJoin, prefixOfOwnRoom, isCompanyMember } = require('../roomAccess');
+
+const COMPANY_ROOM = 'selected_companies_';
 
 exports.companiesSocketHandler = ({ socket, namespace }) => {
-    socket.on('joinCompaniesRoom', (data) => {
-        const roomName = data.roomName;
-        joinRoom(socket, roomName);
-        upsertRoom({ roomName, socketId: data.socketId, namespace, socket });
-    });
+    onJoin(socket, 'joinCompaniesRoom',
+        (data, identity) => {
+            const prefix = prefixOfOwnRoom(socket, data.roomName) || '';
+            return prefix.startsWith(COMPANY_ROOM) && isCompanyMember(identity, prefix.slice(COMPANY_ROOM.length));
+        },
+        (data) => {
+            joinRoom(socket, data.roomName);
+            upsertRoom({ roomName: data.roomName, socketId: socket.id, namespace, socket });
+        });
     socket.on('leaveCompaniesRoom', (roomName) => {
+        if (!prefixOfOwnRoom(socket, roomName)) return;
         removeRoom(roomName);
         leaveRoom(socket, roomName);
     });

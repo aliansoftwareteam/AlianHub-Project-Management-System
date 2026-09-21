@@ -89,7 +89,7 @@ async function main() {
     const server = await startServer({
         mongoUrl,
         logFile: path.join(STATE_DIR, 'conformance-server.log'),
-        env: { MCP_OAUTH: 'both', NODE_ENV: 'test', MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000' },
+        env: { MCP_OAUTH: 'both', NODE_ENV: 'development', MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000' },
     });
     let proxy;
     try {

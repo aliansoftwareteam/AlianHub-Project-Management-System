@@ -439,7 +439,7 @@
                 </template>
 
                 <!-- 27d — the awkward cases, decided in advance -->
-                <template v-else>
+                <template v-else-if="tab === 'rules'">
                     <p class="acct-lead">{{ $t('Accounts.rules_lead') }}</p>
 
                     <section class="ah-card">
@@ -482,6 +482,10 @@
 
                     <div class="acct-callout acct-callout--quiet">{{ $t('Accounts.why_shape_body') }}</div>
                 </template>
+
+                <template v-else-if="tab === 'connected'">
+                    <ConnectedApps />
+                </template>
             </div>
         </div>
     </div>
@@ -496,6 +500,8 @@ import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useGetterFunctions } from "@/composable/index.js";
 import AiSidebar from "./AiSidebar.vue";
 import AccountAttribution from "./AccountAttribution.vue";
+import ConnectedApps from "./ConnectedApps.vue";
+import { oauthAvailable } from "@/views/OAuth/oauthShared";
 import { useAccounts, MODES, PROVIDERS } from "./useAccounts";
 import { EXPIRY_OVER_MAX, TOKEN_SCOPES, expiryChoicesFor, tokenFormProblem } from "./tokenPolicy";
 import { reasonOf } from "./useAgents";
@@ -520,7 +526,9 @@ const {
     savePolicy, linkAccount, unlinkAccount, mintToken, revokeToken
 } = useAccounts();
 
-const tabs = ["modes", "link", "attribution", "rules"];
+const oauthOn = ref(false);
+oauthAvailable().then((on) => { oauthOn.value = on; });
+const tabs = computed(() => ["modes", "link", "attribution", "rules", ...(oauthOn.value ? ["connected"] : [])]);
 const matrixRows = ["pays", "where", "can", "offboarding", "best"];
 const ruleColumns = [
     { key: "people", items: ["leaves", "lapses", "contractor", "two_people"] },

@@ -16,6 +16,7 @@ const cursor = require('./cursor');
 const names = require('./names');
 const { annotationsFor, isDestructive } = require('./annotations');
 const { propose } = require('./propose');
+const sessionTools = require('./sessionTools');
 
 const PAGE_TEXT_MAX = 40000;
 
@@ -255,9 +256,9 @@ const FLAGGED_TOOLS = [
     },
 ];
 
-const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action))];
+const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...sessionTools.offered()];
 
-const registered = () => [...TOOLS, ...FLAGGED_TOOLS];
+const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...sessionTools.TOOLS];
 
 const toolNames = () => offered().map((t) => t.name);
 
@@ -272,7 +273,7 @@ const manifest = () => {
         name: t.name,
         description: t.description,
         inputSchema: t.paginated ? { ...t.input, properties: { ...t.input.properties, ...PAGE_INPUT } } : t.input,
-        annotations: annotationsFor(actions.rating(t.action)),
+        annotations: t.annotations || annotationsFor(actions.rating(t.action)),
     }));
 };
 
@@ -292,6 +293,7 @@ const scopeRefusal = (ctx, tool, write) => {
 /* Run a tool for an MCP caller. Reads are authorised through the registry;
  * writes go through actions.perform, so they are audited and undoable. */
 const call = async (ctx, name, args = {}) => {
+    if (sessionTools.owns(name)) return sessionTools.call(ctx, name, args);
     const tool = offered().find((t) => t.name === String(name));
     if (!tool) throw Object.assign(new Error(`Unknown tool "${name}"`), { code: -32601 });
     if (!['filtered', 'none'].includes(tool.visibility)) throw new Error(`${tool.name} declares no visibility`);

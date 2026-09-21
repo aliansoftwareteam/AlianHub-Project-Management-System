@@ -12,6 +12,7 @@ export const publicConfig = reactive({
     appName: "",
     webUrl: "",
     storageType: process.env.VUE_APP_STORAGE_TYPE || "",
+    agentSessions: false,
     auth: {
         google: { enabled: flag("VUE_APP_IS_GOOGLE_LOGIN"), clientId: process.env.VUE_APP_GOOGLE_CLIENT_ID || "" },
         github: { enabled: flag("VUE_APP_IS_GITHUB_LOGIN"), clientId: process.env.VUE_APP_GITHUB_CLIENT_ID || "", baseUrl: process.env.VUE_APP_GITHUB_BASE_OAUTH_URL || "https://github.com/login/oauth" },
@@ -21,6 +22,7 @@ export const publicConfig = reactive({
     },
     firebase: {},
     demoMode: false,
+    mcpOAuth: false,
 });
 
 export function applyPublicConfig(data = {}) {

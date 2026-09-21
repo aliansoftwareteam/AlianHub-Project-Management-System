@@ -1,30 +1,35 @@
 const sdkAuth = require('@modelcontextprotocol/sdk/client/auth.js');
 
-/* How a scripted client gets the person's yes at /oauth/authorize. Until slice S3 (#805) ships the
- * consent screen, the only way through is the server's test-only consent header (NODE_ENV=test,
- * Modules/OAuthServer/consent.js). Once S3 merges, add a CONSENT_FLOWS.CONSENT_SCREEN branch that
- * answers the screen's own endpoints and make it the default here. */
-const CONSENT_FLOWS = Object.freeze({ TEST_CONSENT_HEADER: 'test-consent-header' });
-const CONSENT_FLOW = process.env.MCP_OAUTH_CONSENT_FLOW || CONSENT_FLOWS.TEST_CONSENT_HEADER;
+const consentFlow = require('../fixtures/oauthConsent');
 
-const consentHeaders = (session, answer = 'approve') => {
-    if (CONSENT_FLOW !== CONSENT_FLOWS.TEST_CONSENT_HEADER) throw new Error(`consent flow "${CONSENT_FLOW}" is not wired into the scripted client`);
-    return { authorization: `Bearer ${session.accessToken}`, companyid: session.companyId, 'x-oauth-test-consent': answer };
-};
-
-/* Plays the browser: follows the authorization URL as the signed-in person and reads where the
- * server sends them back. */
+/* Plays the browser and the person: follows the authorization URL to the consent screen, then answers it the
+ * way the screen's form does, with the request's CSRF cookie and token and the person's session cookie, for
+ * the person's workspace. A refusal before the screen comes back as the server sent it. */
 async function answerAuthorization(authorizationUrl, session, answer = 'approve') {
-    const res = await fetch(authorizationUrl, { redirect: 'manual', headers: consentHeaders(session, answer) });
-    const location = res.headers.get('location');
-    const back = location ? new URL(location) : null;
-    const text = back ? '' : await res.text();
+    const started = await consentFlow.startAuthorization(String(authorizationUrl));
+    const out = started.consent
+        ? await consentFlow.answer(started.consent, { session: `accessToken=${session.accessToken}`, workspace: session.companyId, decision: answer })
+        : started;
+    const back = out.location;
+    const body = out.body && typeof out.body === 'object' ? out.body : null;
     return {
-        status: res.status,
+        status: out.status,
         location: back,
         code: back ? back.searchParams.get('code') : null,
-        error: back ? back.searchParams.get('error') : (text ? JSON.parse(text).error : null),
+        error: back ? back.searchParams.get('error') : (body ? body.error : null),
     };
+}
+
+/* A workspace owner or admin approves the client, as a person's consent needs. */
+async function approveClient(baseURL, session, clientId, scopes) {
+    const res = await fetch(`${baseURL}/api/v2/oauth-client-approvals/approve`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${session.accessToken}`, companyid: session.companyId },
+        body: JSON.stringify({ clientId, ...(scopes ? { scopes } : {}) }),
+    });
+    const body = await res.json();
+    if (res.status !== 200) throw new Error(`approving ${clientId} failed (${res.status}): ${JSON.stringify(body).slice(0, 300)}`);
+    return body.data;
 }
 
 /* An in-memory OAuthClientProvider for the SDK's auth(): the redirect is captured, not opened. */
@@ -62,4 +67,4 @@ async function authorizeWithSdk(provider, { serverUrl, scope, session }) {
     return provider.saved.tokens;
 }
 
-module.exports = { CONSENT_FLOWS, CONSENT_FLOW, consentHeaders, answerAuthorization, memoryProvider, authorizeWithSdk, sdkAuth };
+module.exports = { answerAuthorization, approveClient, memoryProvider, authorizeWithSdk, sdkAuth };
