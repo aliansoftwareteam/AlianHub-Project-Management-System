@@ -4,7 +4,9 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (
 jest.mock('../Modules/Agents/actions', () => ({ authorizeRead: jest.fn(async () => true), perform: jest.fn(async () => ({ auditId: 'a1' })), RefusedError: class RefusedError extends Error {} }));
 jest.mock('../Modules/Automations/engine/tools', () => ({ oid: (id) => (/^[0-9a-fA-F]{24}$/.test(String(id)) ? String(id) : null) }));
 jest.mock('../Modules/Mcp/brief', () => ({ buildBrief: jest.fn(async () => ({ task: 'brief' })) }));
+jest.mock('../Config/permissionGuard', () => ({ ...jest.requireActual('../Config/permissionGuard'), getRoleType: jest.fn(async () => require('../Config/roleTypes').ROLE_OWNER) }));
 
+const { SCHEMA_TYPE } = require('../Config/schemaType');
 const actions = require('../Modules/Agents/actions');
 const tools = require('../Modules/Mcp/tools');
 
@@ -43,6 +45,7 @@ describe.each([['off', undefined], ['on', 'true']])('MCP reads need the read sco
 
     it('still lets a write-only token write', async () => {
         const writeTool = tools.TOOLS.find((tool) => !tool.run);
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK, ProjectID: '6f0000000000000000000a01', deletedStatusKey: 0 });
         const out = await tools.call(ctxFor(['write']), writeTool.name, { taskId: TASK, body: 'hello', reason: 'test' }).catch((error) => error);
         expect(out.code).not.toBe(-32004);
         expect(actions.perform).toHaveBeenCalledTimes(1);

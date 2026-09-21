@@ -4,22 +4,22 @@ const registry = require('../Agents/registry');
 const actions = require('../Agents/actions');
 const { oid } = require('../Automations/engine/tools');
 const { buildBrief } = require('./brief');
-const { htmlToRawText, pageVisibleTo } = require('../Pages/helpers/pageRules');
+const { htmlToRawText } = require('../Pages/helpers/pageRules');
 const { blocksToRawText, contentToEditorData } = require('../Pages/helpers/pageContent');
 const { hasScope } = require('../ApiTokens/helpers/apiTokenRules');
 const performanceRead = require('../Agents/performanceRead');
+const visibility = require('./visibility');
 
 const PAGE_TEXT_MAX = 40000;
 
 const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).slice(0, max);
 const clampLimit = (v, def = 10, max = 50) => Math.min(Math.max(parseInt(v, 10) || def, 1), max);
 
-const projectScope = (ctx, filter) => {
-    if (ctx.projectIds && ctx.projectIds.length) filter.ProjectID = { $in: ctx.projectIds };
-    return filter;
-};
+const taskFilter = (ctx, vis, narrowTo, extra = {}) => ({
+    CompanyId: String(ctx.companyId), deletedStatusKey: { $ne: 1 }, ...extra, ...vis.taskClause(narrowTo),
+});
 
-const scopeFilter = (ctx, extra = {}) => projectScope(ctx, { CompanyId: String(ctx.companyId), deletedStatusKey: { $ne: 1 }, ...extra });
+const taskTarget = (args) => ({ taskId: str(args.taskId, 40) });
 
 /* Stored rawText is a 5000-char search excerpt, so the full body comes from the html. */
 const pageText = (page) => {
@@ -44,16 +44,17 @@ const taskRow = (t) => ({
 });
 
 /* Every tool is one registry action. The registry decides what an agent may do;
- * nothing here widens it. */
+ * nothing here widens it. `visibility: 'filtered'` tools read through the caller's
+ * filter (run's third argument) or name their write target so it is checked first. */
 const TOOLS = [
     {
         name: 'tasks.next',
         action: 'tasks.next',
         description: 'The next task assigned to you, highest priority and nearest due date first. Start here.',
         input: { type: 'object', properties: { projectId: { type: 'string' } } },
-        run: async (ctx, args) => {
-            const filter = scopeFilter(ctx, { AssigneeUserId: String(ctx.userId) });
-            if (args.projectId && oid(args.projectId)) filter.ProjectID = String(args.projectId);
+        visibility: 'filtered',
+        run: async (ctx, args, vis) => {
+            const filter = taskFilter(ctx, vis, args.projectId, { AssigneeUserId: String(ctx.userId) });
             const rows = await MongoDbCrudOpration(ctx.companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [filter, null, { sort: { Task_Priority: 1, DueDate: 1 }, limit: 5 }],
@@ -70,10 +71,10 @@ const TOOLS = [
             type: 'object',
             properties: { query: { type: 'string' }, projectId: { type: 'string' }, status: { type: 'string' }, limit: { type: 'integer' } },
         },
-        run: async (ctx, args) => {
-            const filter = scopeFilter(ctx);
+        visibility: 'filtered',
+        run: async (ctx, args, vis) => {
+            const filter = taskFilter(ctx, vis, args.projectId);
             if (args.query) filter.TaskName = { $regex: str(args.query, 120).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
-            if (args.projectId && oid(args.projectId)) filter.ProjectID = String(args.projectId);
             if (args.status) filter.status = { $regex: `^${str(args.status, 60)}$`, $options: 'i' };
             const rows = await MongoDbCrudOpration(ctx.companyId, {
                 type: SCHEMA_TYPE.TASKS,
@@ -87,11 +88,14 @@ const TOOLS = [
         action: 'task.get',
         description: 'A task as a brief: goal, acceptance criteria, relations, linked docs and what the comment thread has settled. Read this before writing code.',
         input: { type: 'object', properties: { taskId: { type: 'string' } }, required: ['taskId'] },
-        run: (ctx, args) => buildBrief(ctx, str(args.taskId, 40)),
+        visibility: 'filtered',
+        run: (ctx, args, vis) => buildBrief(ctx, str(args.taskId, 40), vis),
     },
     {
         name: 'task.comment',
         action: 'task.comment',
+        visibility: 'filtered',
+        target: taskTarget,
         description: 'Post a comment. Use it to report findings, ask a question, or leave a PR link with context.',
         input: { type: 'object', properties: { taskId: { type: 'string' }, body: { type: 'string' } }, required: ['taskId', 'body'] },
         params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.body, 20000) }),
@@ -99,6 +103,8 @@ const TOOLS = [
     {
         name: 'task.status.set',
         action: 'task.status.set',
+        visibility: 'filtered',
+        target: taskTarget,
         description: 'Move a task to In progress or In review. Done is not available to agents — a person closes the task.',
         input: { type: 'object', properties: { taskId: { type: 'string' }, status: { type: 'string' } }, required: ['taskId', 'status'] },
         params: (args) => ({ taskId: str(args.taskId, 40), status: { name: str(args.status, 60) } }),
@@ -106,6 +112,8 @@ const TOOLS = [
     {
         name: 'task.link',
         action: 'task.link',
+        visibility: 'filtered',
+        target: taskTarget,
         description: 'Attach a pull request, branch or document URL to the task.',
         input: {
             type: 'object',
@@ -117,6 +125,8 @@ const TOOLS = [
     {
         name: 'task.create',
         action: 'task.create',
+        visibility: 'filtered',
+        target: (args) => ({ projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40) }),
         description: 'File a new task in a project, in its opening status and unassigned. Use it for work you found that is not on the board yet; put the goal and acceptance criteria in the description.',
         input: {
             type: 'object',
@@ -128,6 +138,8 @@ const TOOLS = [
     {
         name: 'subtask.create',
         action: 'subtask.create',
+        visibility: 'filtered',
+        target: taskTarget,
         description: 'Break the task down. One subtask per call.',
         input: { type: 'object', properties: { taskId: { type: 'string' }, title: { type: 'string' } }, required: ['taskId', 'title'] },
         params: (args) => ({ taskId: str(args.taskId, 40), title: str(args.title, 250), name: str(args.title, 250) }),
@@ -135,6 +147,8 @@ const TOOLS = [
     {
         name: 'timelog.start',
         action: 'timelog.start',
+        visibility: 'filtered',
+        target: taskTarget,
         description: 'Start the timer on a task so the hours you spend are attributed to you.',
         input: { type: 'object', properties: { taskId: { type: 'string' } }, required: ['taskId'] },
         params: (args) => ({ taskId: str(args.taskId, 40) }),
@@ -142,6 +156,8 @@ const TOOLS = [
     {
         name: 'timelog.stop',
         action: 'timelog.stop',
+        visibility: 'filtered',
+        target: taskTarget,
         description: 'Stop the running timer and write the time log.',
         input: { type: 'object', properties: { taskId: { type: 'string' }, note: { type: 'string' } }, required: ['taskId'] },
         params: (args) => ({ taskId: str(args.taskId, 40), note: str(args.note, 500) }),
@@ -151,13 +167,14 @@ const TOOLS = [
         action: 'docs.read',
         description: 'Read a page linked from a task, by page id.',
         input: { type: 'object', properties: { pageId: { type: 'string' } }, required: ['pageId'] },
-        run: async (ctx, args) => {
+        visibility: 'filtered',
+        run: async (ctx, args, vis) => {
             const _id = oid(str(args.pageId, 40));
             if (!_id) return { error: 'invalid pageId' };
             const page = await MongoDbCrudOpration(ctx.companyId, {
-                type: SCHEMA_TYPE.PAGES, data: [projectScope(ctx, { _id, deletedStatusKey: { $ne: 1 } })],
+                type: SCHEMA_TYPE.PAGES, data: [{ _id, deletedStatusKey: { $ne: 1 } }],
             }, 'findOne');
-            if (!pageVisibleTo(page, ctx.userId)) return { error: 'page not found' };
+            if (!page || !vis.allowsPage(page)) return { error: 'page not found' };
             return {
                 pageId: String(page._id),
                 title: page.title || '',
@@ -188,11 +205,24 @@ const FLAGGED_TOOLS = [
         // Judged per project inside read(): a company-wide check first would refuse a
         // member whose grant comes from the project's own rules.
         authorizesPerProject: true,
-        run: (ctx, args) => performanceRead.read({ companyId: ctx.companyId, actor: ctx.actor, args, projectScope: ctx.projectIds, allowedActions: ctx.allowedActions, ip: ctx.ip }),
+        visibility: 'filtered',
+        run: async (ctx, args, vis) => {
+            const asked = [...(Array.isArray(args.projectIds) ? args.projectIds : []), args.projectId].filter(Boolean).map(String);
+            const outside = asked.filter((id) => !vis.allowsProject(id));
+            if (outside.length) {
+                throw await actions.refusal(ctx.companyId, ctx.actor, {
+                    action: performanceRead.ACTION, params: { projectIds: asked }, ip: ctx.ip, entityType: 'project', entityId: outside[0],
+                    reason: `${visibility.NOT_VISIBLE}: project ${outside.join(', ')} is not one the person behind this token can open`,
+                });
+            }
+            return performanceRead.read({ companyId: ctx.companyId, actor: ctx.actor, args, projectScope: ctx.projectIds, allowedActions: ctx.allowedActions, ip: ctx.ip });
+        },
     },
 ];
 
 const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action))];
+
+const registered = () => [...TOOLS, ...FLAGGED_TOOLS];
 
 const names = () => offered().map((t) => t.name);
 
@@ -207,6 +237,8 @@ const manifest = () => offered().map((t) => ({
 const call = async (ctx, name, args = {}) => {
     const tool = offered().find((t) => t.name === String(name));
     if (!tool) throw Object.assign(new Error(`Unknown tool "${name}"`), { code: -32601 });
+    if (!['filtered', 'none'].includes(tool.visibility)) throw new Error(`${tool.name} declares no visibility`);
+    const filtered = tool.visibility === 'filtered';
 
     if (tool.run) {
         if (!hasScope(ctx.token, 'read')) {
@@ -216,11 +248,19 @@ const call = async (ctx, name, args = {}) => {
             companyId: ctx.companyId, actor: ctx.actor, action: tool.action,
             params: { taskId: args.taskId }, ip: ctx.ip, allowedActions: ctx.allowedActions,
         });
-        return tool.run(ctx, args);
+        return tool.run(ctx, args, filtered ? await visibility.forCaller(ctx) : undefined);
     }
 
     if (!ctx.canWrite) {
         throw Object.assign(new Error('This token is read-only.'), { code: -32004 });
+    }
+    if (filtered) {
+        try {
+            await visibility.assertWritable(ctx.companyId, await visibility.forCaller(ctx), tool.target(args));
+        } catch (error) {
+            if (!error.notVisible) throw error;
+            throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params: tool.params(args), reason: error.message, ip: ctx.ip });
+        }
     }
     const out = await actions.perform({
         companyId: ctx.companyId,
@@ -234,4 +274,4 @@ const call = async (ctx, name, args = {}) => {
     return { ok: true, auditId: out.auditId, result: out.result || null, undoable: Boolean(out.undo) };
 };
 
-module.exports = { TOOLS, names, manifest, call };
+module.exports = { TOOLS, names, manifest, call, registered };
