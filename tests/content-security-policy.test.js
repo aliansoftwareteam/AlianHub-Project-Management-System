@@ -144,9 +144,17 @@ describe('the policy', () => {
         expect(Object.entries(policy).filter(([, sources]) => sources.includes("'unsafe-inline'")).map(([name]) => name)).toEqual(['style-src']);
     });
 
-    it('allows scripts from the app and the four named loaders only', () => {
-        expect(policyFor({})['script-src']).toEqual(["'self'", 'https://accounts.google.com/gsi/client', 'https://apis.google.com', 'https://www.dropbox.com/static/api/2/dropins.js',
-            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/']);
+    it('allows scripts from the app and the exact files or folders the four loaders fetch', () => {
+        expect(policyFor({})['script-src']).toEqual(["'self'", 'https://accounts.google.com/gsi/client', 'https://apis.google.com/js/api.js', 'https://apis.google.com/_/scs/',
+            'https://www.dropbox.com/static/api/2/dropins.js', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/']);
+    });
+
+    it('names every third-party source with the path the app loads, never a bare host', () => {
+        const bareHost = /^(https?|wss?):\/\/[^/]+$/;
+        const configured = ['https://s3.eu-central-1.wasabisys.com', 'https://*.s3.eu-central-1.wasabisys.com', 'wss://hub.example.com'];
+        const bare = Object.entries(policyFor({ ...WASABI, ...FIREBASE, WEBURL: 'https://hub.example.com' }))
+            .flatMap(([name, sources]) => sources.filter((source) => bareHost.test(source) && !configured.includes(source)).map((source) => `${name} ${source}`));
+        expect(bare).toEqual([]);
     });
 
     it('uses a scheme or a wildcard only where the inventory justifies one', () => {
@@ -190,7 +198,7 @@ describe('hosts that come from configuration', () => {
     });
 
     it('adds the Firebase hosts only when push is configured', () => {
-        const hosts = ['https://firebaseinstallations.googleapis.com', 'https://fcmregistrations.googleapis.com'];
+        const hosts = ['https://firebaseinstallations.googleapis.com/v1/', 'https://fcmregistrations.googleapis.com/v1/'];
         expect(policyFor(FIREBASE)['connect-src']).toEqual(expect.arrayContaining(hosts));
         expect(policyFor(FIREBASE)['script-src']).toContain('https://www.gstatic.com/firebasejs/');
         expect(csp.policyOf({ CSP_MODE: 'enforce' })).not.toMatch(/firebase|gstatic\.com\/firebasejs/);
@@ -199,8 +207,9 @@ describe('hosts that come from configuration', () => {
 
     it('always names the sign-in providers, which the console switches on without a restart', () => {
         const policy = policyFor({});
-        expect(policy['connect-src']).toEqual(expect.arrayContaining(['https://api.github.com', 'https://gitlab.com', 'https://accounts.google.com/gsi/']));
-        expect(policy['style-src']).toEqual(["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://accounts.google.com/gsi/style']);
+        expect(policy['connect-src']).toEqual(expect.arrayContaining(['https://api.github.com/user', 'https://api.github.com/user/emails', 'https://gitlab.com/api/v4/user', 'https://accounts.google.com/gsi/']));
+        expect(policy['style-src']).toEqual(["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com/css2', 'https://accounts.google.com/gsi/style']);
+        expect(policy['font-src']).toEqual(["'self'", 'data:', 'https://fonts.gstatic.com/s/']);
     });
 
     it('drops a configured URL that is not one instead of writing it into the header', () => {
@@ -209,13 +218,45 @@ describe('hosts that come from configuration', () => {
         expect(csp.policyOf(env)).not.toMatch(/script-src \*|x'|not a url/);
     });
 
-    it('is read once the server is up, because saved instance settings are applied after the middleware is registered, and never again', async () => {
+    it('reads the restart-only settings once the server is up, because saved instance settings are applied after the middleware is registered', async () => {
         const env = { CSP_MODE: 'report', STORAGE_TYPE: 'server' };
         const get = await serve(env);
         Object.assign(env, WASABI);
         expect((await get('/'))[REPORT_ONLY]).toContain('https://*.s3.eu-central-1.wasabisys.com');
         env.WASABIENDPOINT = 'https://later.example.com';
-        expect((await get('/'))[REPORT_ONLY]).not.toContain('later.example.com');
+        env.APIKEY = 'AIza-later';
+        const later = (await get('/'))[REPORT_ONLY];
+        expect(later).not.toContain('later.example.com');
+        expect(later).not.toContain('firebaseinstallations');
+    });
+
+    it('follows WEBURL and APIURL when the console changes them, without a restart', async () => {
+        const env = { CSP_MODE: 'enforce', WEBURL: 'https://old.example.com', APIURL: 'https://old.example.com/' };
+        const get = await serve(env);
+        expect((await get('/'))[ENFORCED]).toContain('wss://old.example.com');
+        env.WEBURL = 'https://new.example.com';
+        env.APIURL = 'https://api.new.example.com/';
+        const after = (await get('/'))[ENFORCED];
+        expect(after).toContain('wss://new.example.com');
+        expect(after).toContain('wss://api.new.example.com');
+        expect(after).not.toContain('old.example.com');
+    });
+
+    it('gives the console the policy the server is sending, from the same cache', async () => {
+        const env = { CSP_MODE: 'report', WEBURL: 'https://card.example.com', STORAGE_TYPE: 'server' };
+        const get = await serve(env);
+        const sent = (await get('/'))[REPORT_ONLY];
+        Object.assign(env, WASABI);
+        expect(csp.sentPolicy(env)).toBe(sent);
+        env.WEBURL = 'https://card2.example.com';
+        const next = (await get('/'))[REPORT_ONLY];
+        expect(csp.sentPolicy(env)).toBe(next);
+        expect(csp.sentPolicy(env, { reportingApi: true })).toBe(`${next}; report-to csp-endpoint`);
+    });
+
+    it('gives the console the policy it would send while the mode is off', () => {
+        const env = { CSP_MODE: 'off', WEBURL: 'https://off.example.com' };
+        expect(csp.sentPolicy(env)).toBe(csp.policyOf(env));
     });
 
     it('never takes a host from the request', async () => {
@@ -258,6 +299,41 @@ describe('CSP_EXTRA_<DIRECTIVE>', () => {
         const env = { CSP_MODE: 'report', CSP_EXTRA_SCRIPT_SRC: value };
         expect(() => install(express(), env)).toThrow(/CSP_EXTRA_SCRIPT_SRC/);
         expect(() => csp.policyOf(env)).toThrow(/CSP_EXTRA_SCRIPT_SRC/);
+    });
+
+    it.each([
+        ['CSP_EXTRA_IMG_SRC', 'https://*.com', 'a wildcard over a whole top-level domain'],
+        ['CSP_EXTRA_CONNECT_SRC', 'wss://*.io', 'a wildcard over a whole top-level domain'],
+        ['CSP_EXTRA_FRAME_SRC', 'https://*.co.uk', 'a wildcard over a public suffix'],
+        ['CSP_EXTRA_MEDIA_SRC', 'https://*.com.au:8443', 'a wildcard over a public suffix'],
+        ['CSP_EXTRA_IMG_SRC', 'https://*.github.io', 'a wildcard over shared hosting'],
+        ['CSP_EXTRA_FRAME_ANCESTORS', 'https://*.herokuapp.com', 'a wildcard over shared hosting'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'http://cdn.example.com', 'plain http in a script directive'],
+        ['CSP_EXTRA_WORKER_SRC', 'http://cdn.example.com/w.js', 'plain http in a script directive'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://lh3.googleusercontent.com', 'a user-content host in a script directive'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://*.googleusercontent.com', 'a user-content host in a script directive'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://raw.githubusercontent.com/org/repo/', 'a user-content host in a script directive'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://gist.githubusercontent.com', 'a user-content host in a script directive'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://someone.github.io/lib.js', 'a user-content host in a script directive'],
+        ['CSP_EXTRA_WORKER_SRC', 'https://cdn.jsdelivr.net', 'a whole package CDN in a script directive'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://cdn.jsdelivr.net/', 'a whole package CDN in a script directive'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://unpkg.com', 'a whole package CDN in a script directive'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://unpkg.com/', 'a whole package CDN in a script directive'],
+    ])('refuses %s=%s (%s)', (key, value) => {
+        expect(() => csp.policyOf({ CSP_MODE: 'report', [key]: value })).toThrow(new RegExp(key));
+    });
+
+    it.each([
+        ['CSP_EXTRA_IMG_SRC', 'https://*.example.com'],
+        ['CSP_EXTRA_IMG_SRC', 'http://cdn.example.com'],
+        ['CSP_EXTRA_IMG_SRC', 'https://lh3.googleusercontent.com'],
+        ['CSP_EXTRA_FRAME_SRC', 'https://someone.github.io'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://*.cdn.example.com'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://unpkg.com/htmx.org@2.0.0/dist/htmx.min.js'],
+        ['CSP_EXTRA_CONNECT_SRC', 'https://*.example.co.uk'],
+    ])('accepts %s=%s', (key, value) => {
+        expect(() => csp.policyOf({ CSP_MODE: 'report', [key]: value })).not.toThrow();
     });
 
     it('refuses a bad extra even while the policy is off, so turning it on later cannot fail', () => {

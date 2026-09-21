@@ -10,7 +10,7 @@ const express = require('express');
 const logger = require('../Config/loggerConfig');
 const { init } = require('../Modules/CspReport/init');
 const rules = require('../Modules/CspReport/reportRules');
-const { MAX_BODY_BYTES, MAX_ROWS_PER_DAY, REPORTS_PER_MINUTE } = require('../Modules/CspReport/routes');
+const { MAX_BODY_BYTES, MAX_ROWS_PER_DAY, MAX_NEW_KEYS_PER_ADDRESS, REPORTS_PER_MINUTE } = require('../Modules/CspReport/routes');
 
 const ROUTE = '/api/v2/csp-report';
 const LEGACY = 'application/csp-report';
@@ -58,6 +58,7 @@ let consoleSpies;
 
 const startApp = async (env = { CSP_MODE: 'report' }) => {
     const app = express();
+    app.set('trust proxy', true);
     app.use(bodyParser.urlencoded({ extended: true, limit: '2mb' }));
     app.use(bodyParser.json({ limit: '2mb' }));
     app.use(bodyParser.raw({ limit: '2mb' }));
@@ -79,6 +80,8 @@ const written = () => JSON.stringify([mockDb.store, mockDb.calls]);
 const logged = () => JSON.stringify([...Object.values(logger).flatMap((fn) => fn.mock.calls), ...consoleSpies.flatMap((spy) => spy.mock.calls)]);
 
 beforeEach(async () => {
+    const { resetAddressCounts } = require('../Modules/CspReport/controller');
+    if (resetAddressCounts) resetAddressCounts();
     Object.keys(mockDb.store).forEach((key) => delete mockDb.store[key]);
     mockDb.calls.length = 0;
     jest.clearAllMocks();
@@ -146,11 +149,32 @@ describe('POST /api/v2/csp-report', () => {
 
     it.each([
         ['inline', 'inline'], ['eval', 'eval'], ['wasm-eval', 'wasm-eval'], ['data', 'data:'], ['data:image/png;base64,AAAA', 'data:'], ['blob:https://hub.example.com/6c1f', 'blob:'],
-        ['about:blank', 'about:'], ['self', 'self'], ['', 'unknown'], ['myapp://open?taskId=1', 'myapp:'],
+        ['blob', 'blob:'], ['about:blank', 'about:'], ['self', 'self'], ['', 'unknown'], ['chrome-extension://abcdef/content.js', 'chrome-extension:'],
+        ['xn--bcher-kva.example', null], ['https://xn--bcher-kva.example/a', 'xn--bcher-kva.example'], ['https://bücher.example/a', 'xn--bcher-kva.example'],
     ])('names a blocked source that is not a host by its kind (%j)', async (blocked, stored) => {
         await send(legacyReport({ 'blocked-uri': blocked }));
-        expect(rows()).toHaveLength(1);
-        expect(rows()[0].blockedHost).toBe(stored);
+        expect(rows().map((row) => row.blockedHost)).toEqual(stored === null ? [] : [stored]);
+    });
+
+    it.each([
+        ['a bare word', 'secretvalue123'],
+        ['a bare word with digits and dashes', 'invite-9f8e7d6c'],
+        ['a scheme the browser never reports', 'myapp://open?taskId=1'],
+        ['a made-up scheme carrying a value', 'secretvalue123:x'],
+        ['a host longer than 253 characters', `https://${Array.from({ length: 5 }, () => 'a'.repeat(60)).join('.')}/x`],
+        ['a label longer than 63 characters', `https://${'a'.repeat(64)}.example/x`],
+    ])('stores nothing for %s', async (label, blocked) => {
+        expect(blocked.length).toBeGreaterThan(0);
+        await send(legacyReport({ 'blocked-uri': blocked }));
+        expect(rows()).toHaveLength(0);
+        expect(written()).not.toContain('secretvalue123');
+    });
+
+    it('keeps a host of exactly 253 characters', () => {
+        const host = [...Array.from({ length: 3 }, () => 'a'.repeat(63)), 'a'.repeat(61)].join('.');
+        expect(host).toHaveLength(253);
+        expect(rules.blockedHostOf(`https://${host}/x`)).toBe(host);
+        expect(rules.blockedHostOf(`https://${host}a/x`)).toBeNull();
     });
 
     it('reads the directive from violated-directive when the browser sends no effective one', async () => {
@@ -215,6 +239,28 @@ describe('POST /api/v2/csp-report', () => {
         expect(rows()).toHaveLength(MAX_ROWS_PER_DAY);
         await send(legacyReport({ 'blocked-uri': 'https://h0.example/x', 'document-uri': 'https://hub.example.com/' }));
         expect(rows().find((row) => row.blockedHost === 'h0.example').count).toBe(2);
+    });
+
+    it('lets one address add a fixed number of new rows a day, and still counts the rows it has', async () => {
+        expect(MAX_NEW_KEYS_PER_ADDRESS).toBeLessThanOrEqual(100);
+        const from = (ip) => ({ 'x-forwarded-for': ip });
+        const batch = (offset, n) => Array.from({ length: n }, (unused, i) => ({ type: 'csp-violation', body: { documentURL: 'https://h.example/', blockedURL: `https://k${offset + i}.example/`, effectiveDirective: 'img-src' } }));
+        for (let sent = 0; sent < MAX_NEW_KEYS_PER_ADDRESS + 20; sent += 20) await send(batch(sent, 20), REPORTING_API, from('198.51.100.7'));
+        expect(rows()).toHaveLength(MAX_NEW_KEYS_PER_ADDRESS);
+
+        await send(batch(0, 1), REPORTING_API, from('198.51.100.7'));
+        expect(rows().find((row) => row.blockedHost === 'k0.example').count).toBe(2);
+
+        await send(batch(1000, 1), REPORTING_API, from('203.0.113.9'));
+        expect(rows()).toHaveLength(MAX_NEW_KEYS_PER_ADDRESS + 1);
+    });
+
+    it('counts a report whose row exists even once the day is full, from any address', async () => {
+        const today = rules.utcDay(new Date());
+        for (let i = 0; i < MAX_ROWS_PER_DAY; i += 1) mockDb.seed('csp_reports', { day: today, directive: 'img-src', blockedHost: `h${i}.example`, documentPath: '/', count: 1, lastSeen: today });
+        await send(legacyReport({ 'blocked-uri': 'https://h7.example/x', 'document-uri': 'https://hub.example.com/' }), LEGACY, { 'x-forwarded-for': '192.0.2.44' });
+        expect(rows()).toHaveLength(MAX_ROWS_PER_DAY);
+        expect(rows().find((row) => row.blockedHost === 'h7.example').count).toBe(2);
     });
 
     it('answers 204 and logs one short line when the database is down', async () => {
