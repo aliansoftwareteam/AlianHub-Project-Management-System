@@ -100,7 +100,8 @@ describe('POST /api/v1/storage/uploadFile checks access before it writes', () =>
 
     it('stores a member upload into their own company', async () => {
         const member = await loginAs('member');
-        const filePath = `qa-f35d/${uniqueSuffix()}.txt`;
+        const [task] = state.tasks;
+        const filePath = `Project/${task.projectId}/Sprint/${task._id}/Attachment/qa-f35d-${uniqueSuffix()}.txt`;
         const res = await uploadFile(member.accessToken, { companyId: COMPANY_A, path: filePath });
         expect(res.status).toBe(200);
         expect(res.body).toMatchObject({ status: true, statusText: filePath });

@@ -88,7 +88,7 @@ describe('uploads on server storage, with CSP_MODE unset', () => {
     });
 
     it.each(FILES)('serves %s as %s', async (name, bytes, type, download) => {
-        const filepath = `project/${state.projects.shared._id}/${name}`;
+        const filepath = `Project/${state.projects.shared._id}/ProjectAttachment/${name}`;
         const up = await owner.post('/api/v1/storage/uploadFileBase64', { companyId: state.companyId, path: filepath, base64String: bytes.toString('base64') });
         expect(up.status).toBe(200);
         const signed = await owner.get(`/api/v1/generateSignedUrl/${state.companyId}`, { query: { filepath, domainUrl: state.baseURL } });
