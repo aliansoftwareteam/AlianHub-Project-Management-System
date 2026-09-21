@@ -170,7 +170,7 @@ describe('a dry run of the same skill', () => {
 
     it('is refused once the host leaves the workspace allowlist, before any request', async () => {
         seen.length = 0;
-        await setHosts([]);
+        await setHosts(['example.com']);
         const res = await owner.post(`/api/v2/agents/skills/${skillKey}/dry-run`, { taskId: task._id });
         expect(res.body.status).toBe(false);
         expect(JSON.stringify(res.body)).toContain('allowlist');
