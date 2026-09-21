@@ -277,7 +277,7 @@ const eraseTyped = ref("");
 const indexerOff = computed(() => summary.value?.indexer?.mode === "off");
 const canRun = computed(() => !indexerOff.value && detail.value?.indexer?.mode !== "off" && detail.value?.modes?.indexer !== "off");
 const openName = computed(() => summary.value?.workspaces.find((w) => w.companyId === openId.value)?.name || "");
-const VECTOR_INDEX_STATES = ["ready", "building", "missing", "failed", "unsupported", "unreachable"];
+const VECTOR_INDEX_STATES = ["ready", "building", "missing", "failed", "unsupported", "unreachable", "mismatch", "timeout"];
 const vectorIndexStatus = computed(() => {
     const status = detail.value?.vectorStore?.index?.status;
     return VECTOR_INDEX_STATES.includes(status) ? status : "unknown";

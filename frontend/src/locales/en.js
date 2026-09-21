@@ -8518,6 +8518,8 @@ export default {
         vector_index_failed: "index failed to build",
         vector_index_unsupported: "this MongoDB server has no Atlas Search",
         vector_index_unreachable: "Atlas Search cannot be reached",
+        vector_index_mismatch: "index size does not match the embedding model: check KNOWLEDGE_EMBEDDING_DIMENSIONS",
+        vector_index_timeout: "the index check timed out; it is tried again on the next check",
         vector_index_unknown: "index state unknown",
         vector_store_paused: "vector search paused until {until}",
         reembed: "Re-embed",

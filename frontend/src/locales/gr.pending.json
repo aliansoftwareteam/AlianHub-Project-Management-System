@@ -1,7 +1,7 @@
 {
   "locale": "gr",
   "machineTranslated": false,
-  "updatedAt": "2026-09-21T08:04:40.011Z",
+  "updatedAt": "2026-09-21T08:54:47.459Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6350,6 +6350,8 @@
     "Knowledge.vector_index_unsupported": "this MongoDB server has no Atlas Search",
     "Knowledge.vector_index_unreachable": "Atlas Search cannot be reached",
     "Knowledge.vector_index_unknown": "index state unknown",
-    "Knowledge.vector_store_paused": "vector search paused until {until}"
+    "Knowledge.vector_store_paused": "vector search paused until {until}",
+    "Knowledge.vector_index_mismatch": "index size does not match the embedding model: check KNOWLEDGE_EMBEDDING_DIMENSIONS",
+    "Knowledge.vector_index_timeout": "the index check timed out; it is tried again on the next check"
   }
 }
