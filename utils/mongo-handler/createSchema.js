@@ -1,4 +1,5 @@
 const { Schema } = require('mongoose');
+const fileSweep = require('../../Modules/Knowledge/ingest/fileSweep');
 const { schema } = require('./schema');
 // P1-SEC-11 — Core entity schemas hardened to `strict: true`. The
 // field lists in `./schema.js` cover every known write path; unknown
@@ -314,6 +315,7 @@ knowledgeChunksSchema.index({ createdBy: 1, visibility: 1 });
 knowledgeChunksSchema.index({ sourceType: 1, taskId: 1 });
 // The vector search's candidate scan: the newest chunks of a source type under one embedding model.
 knowledgeChunksSchema.index({ sourceType: 1, embeddingModel: 1, sourceUpdatedAt: -1 });
+knowledgeChunksSchema.index(fileSweep.INDEX_KEY, fileSweep.INDEX_OPTIONS);
 const knowledgeIndexStateSchema = new Schema(schema.knowledgeIndexState, {strict: true, timestamps: true});
 knowledgeIndexStateSchema.index({ sourceType: 1 }, { unique: true });
 const knowledgeExclusionsSchema = new Schema(schema.knowledgeExclusions, {strict: true, timestamps: true});

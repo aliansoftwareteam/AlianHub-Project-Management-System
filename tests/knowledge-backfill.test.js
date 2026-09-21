@@ -2,6 +2,7 @@ const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
+jest.mock('../common-storage/readStoredFile', () => ({ readStoredFile: jest.fn() }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { knowledgeChunksSchema } = require('../utils/mongo-handler/createSchema');
@@ -275,5 +276,156 @@ describe('backfilling comments and transcripts beside pages', () => {
         expect(liveIds('comment')).toEqual([kept]);
         expect(stateFor('comment')).toMatchObject({ status: 'complete', indexed: 1, skipped: 1 });
         expect(liveIds('transcript')).toEqual([keptCall]);
+    });
+});
+
+describe('backfilling project guides and task files', () => {
+    const { readStoredFile } = require('../common-storage/readStoredFile');
+    const stateFor = (sourceType) => (mockDb.store[STATE] || []).find((s) => s.companyId === C && s.sourceType === sourceType);
+    const liveIds = (sourceType) => [...new Set((mockDb.store[CHUNKS] || []).filter((c) => c.sourceType === sourceType && !c.deleted).map((c) => c.sourceId))].sort();
+    const batchReads = (type) => mockDb.calls.filter((c) => c.type === type && c.method === 'find' && c.data[2] && c.data[2].sort && c.data[2].sort._id === 1);
+    const SPRINT = '6f00000000000000000000d1';
+
+    let guided;
+    let tasks;
+
+    const attachmentOf = (taskId, n, name = `notes-${n}.txt`) => ({ id: `bf${String(n).padStart(15, '0')}`, filename: name, extension: name.slice(name.lastIndexOf('.') + 1), size: 20, userId: AUTHOR, url: `Project/${PROJECT}/Sprint/${taskId}/Attachment/${name}` });
+
+    beforeEach(() => {
+        mockDb.store[SCHEMA_TYPE.PAGES].length = 0;
+        guided = Array.from({ length: 3 }, (_, i) => String(mockDb.seed(SCHEMA_TYPE.PROJECTS, {
+            _id: `6f00000000000000000d${String(i + 1).padStart(4, '0')}`, ProjectName: `Guided ${i + 1}`, aiGuide: { markdown: `## Stages\n1. Step ${i + 1}` }, deletedStatusKey: 0, updatedAt: new Date('2026-09-01T00:00:00Z'),
+        })._id));
+        tasks = Array.from({ length: 5 }, (_, i) => {
+            const _id = `6f00000000000000000e${String(i + 1).padStart(4, '0')}`;
+            return String(mockDb.seed(SCHEMA_TYPE.TASKS, { _id, TaskName: `Task ${i + 1}`, ProjectID: PROJECT, sprintId: SPRINT, deletedStatusKey: 0, attachments: [attachmentOf(_id, i + 1)], updatedAt: new Date('2026-09-01T00:00:00Z') })._id);
+        });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: '6f00000000000000000e0099', TaskName: 'No files', ProjectID: PROJECT, sprintId: SPRINT, deletedStatusKey: 0, attachments: [] });
+        readStoredFile.mockReset();
+        readStoredFile.mockImplementation(async ({ key }) => ({ buffer: Buffer.from(`Text of ${key}`), size: 20 }));
+    });
+
+
+    it('indexes every guide and every attachment a company already had, and only then says the source is ready', async () => {
+        expect(await backfill.indexedSources(C, ['guide', 'file'])).toEqual([]);
+
+        const done = await backfill.backfillCompany(C, { batchSize: 2 });
+
+        expect(done.status).toBe('complete');
+        expect(liveIds('guide')).toEqual(guided);
+        expect(liveIds('file')).toEqual(tasks.map((taskId, i) => indexer.fileSourceId(taskId, attachmentOf(taskId, i + 1).id)).sort());
+        expect(stateFor('guide')).toMatchObject({ status: 'complete', indexed: 3 });
+        expect(stateFor('file')).toMatchObject({ status: 'complete', indexed: 5 });
+        expect(await backfill.indexedSources(C, ['guide', 'file'])).toEqual(['guide', 'file']);
+    });
+
+    it('walks only the tasks that carry an attachment and the projects that carry a guide', async () => {
+        await backfill.backfillCompany(C, { batchSize: 10 });
+
+        expect(batchReads(SCHEMA_TYPE.TASKS)[0].data[0]).toMatchObject({ 'attachments.0': { $exists: true }, deletedStatusKey: { $ne: 1 } });
+        expect(batchReads(SCHEMA_TYPE.PROJECTS)[0].data[0]).toMatchObject({ 'aiGuide.markdown': { $exists: true }, deletedStatusKey: { $ne: 1 } });
+        expect(readStoredFile).toHaveBeenCalledTimes(5);
+    });
+
+    it('keeps a position per source, resumes each from its own, and reads no file twice', async () => {
+        await backfill.backfillCompany(C, { batchSize: 2, maxBatches: 1 });
+
+        expect(stateFor('guide')).toMatchObject({ status: 'running', cursor: guided[1], indexed: 2 });
+        expect(stateFor('file')).toMatchObject({ status: 'running', cursor: tasks[1], indexed: 2 });
+        expect(await backfill.indexedSources(C, ['guide', 'file'])).toEqual([]);
+        expect(readStoredFile).toHaveBeenCalledTimes(2);
+        mockDb.calls.length = 0;
+
+        await backfill.backfillCompany(C, { batchSize: 2 });
+
+        expect(String(batchReads(SCHEMA_TYPE.PROJECTS)[0].data[0]._id.$gt)).toBe(guided[1]);
+        expect(String(batchReads(SCHEMA_TYPE.TASKS)[0].data[0]._id.$gt)).toBe(tasks[1]);
+        expect(readStoredFile).toHaveBeenCalledTimes(5);
+        expect(stateFor('file')).toMatchObject({ status: 'complete', indexed: 5 });
+    });
+
+    it('counts a file it could not read as skipped and carries on to the next', async () => {
+        mockDb.store[SCHEMA_TYPE.TASKS].find((t) => String(t._id) === tasks[1]).attachments.push(attachmentOf(tasks[1], 77, 'diagram.png'));
+        readStoredFile.mockImplementation(async ({ key }) => {
+            if (key.includes('notes-3')) throw Object.assign(new Error('gone'), { code: 'not_found' });
+            return { buffer: Buffer.from(`Text of ${key}`), size: 20 };
+        });
+
+        const done = await backfill.backfillCompany(C, { batchSize: 10 });
+
+        expect(done.status).toBe('complete');
+        expect(stateFor('file')).toMatchObject({ status: 'complete', indexed: 4, skipped: 2 });
+        expect(liveIds('file')).toHaveLength(4);
+    });
+
+    it('picks up after a crash from the last batch it saved', async () => {
+        const sync = indexer.syncTaskFiles;
+        const spy = jest.spyOn(indexer, 'syncTaskFiles').mockImplementation(async (companyId, taskId) => {
+            if (taskId === tasks[3]) throw new Error('connection reset');
+            return sync(companyId, taskId);
+        });
+
+        await expect(backfill.backfillCompany(C, { batchSize: 2 })).rejects.toThrow('connection reset');
+        expect(stateFor('file')).toMatchObject({ status: 'failed', cursor: tasks[1] });
+        expect(stateFor('guide')).toMatchObject({ status: 'complete' });
+        expect(await backfill.indexedSources(C, ['guide', 'file'])).toEqual(['guide']);
+
+        spy.mockRestore();
+        await backfill.backfillCompany(C, { batchSize: 2 });
+        expect(stateFor('file')).toMatchObject({ status: 'complete' });
+        expect(liveIds('file')).toHaveLength(5);
+    });
+
+    it('leaves out the guide of a trashed project and the files of a deleted task', async () => {
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: '6f00000000000000000d0050', ProjectName: 'Binned', aiGuide: { markdown: 'Binned guide' }, deletedStatusKey: 1 });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: '6f00000000000000000e0050', ProjectID: PROJECT, sprintId: SPRINT, deletedStatusKey: 1, attachments: [attachmentOf('6f00000000000000000e0050', 50)] });
+
+        await backfill.backfillCompany(C, { batchSize: 10 });
+
+        expect(liveIds('guide')).toEqual(guided);
+        expect(liveIds('file')).toHaveLength(5);
+    });
+});
+
+describe('filling in where existing chunks came from', () => {
+    const stateFor = (sourceType) => (mockDb.store[STATE] || []).find((s) => s.companyId === C && s.sourceType === sourceType);
+    const originsOf = (sourceType) => Object.fromEntries((mockDb.store[CHUNKS] || []).filter((c) => c.sourceType === sourceType).map((c) => [c.sourceId, c.origin]));
+    const seedPage = (over) => String(mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Extra', content: { html: '<p>Extra body.</p>' }, visibility: 'project', createdBy: AUTHOR, ProjectID: PROJECT, deletedStatusKey: 0, updatedAt: new Date('2026-09-01T00:00:00Z'), ...over })._id);
+    const forgetOrigins = () => {
+        mockDb.store[CHUNKS].forEach((c) => { delete c.origin; });
+        mockDb.store[STATE].forEach((s) => { delete s.originFilledAt; });
+        mockDb.calls.length = 0;
+    };
+
+    it('gives the chunks of a source indexed before the field existed their origin, once, without walking the source again', async () => {
+        const drafted = seedPage({ _id: '6f00000000000000000b0077', createdByAgent: true });
+        await backfill.backfillCompany(C, { batchSize: 10 });
+        forgetOrigins();
+
+        await backfill.backfillCompany(C, { batchSize: 10 });
+
+        expect(originsOf('page')).toEqual({ ...Object.fromEntries(pages.map((id) => [id, 'member'])), [drafted]: 'agent' });
+        expect(stateFor('page').originFilledAt).toBeInstanceOf(Date);
+        expect(pageReads().filter((c) => c.data[2] && c.data[2].sort)).toEqual([]);
+
+        mockDb.calls.length = 0;
+        await backfill.backfillCompany(C, { batchSize: 10 });
+        expect(mockDb.calls.filter((c) => c.type === CHUNKS && c.method === 'updateMany')).toEqual([]);
+    });
+
+    it('re-syncs a page an inbound path filed, so it reads as external', async () => {
+        const inbound = seedPage({ _id: '6f00000000000000000b0078', origin: { kind: 'email', ref: 'abc' } });
+        await backfill.backfillCompany(C, { batchSize: 10 });
+        forgetOrigins();
+
+        await backfill.backfillCompany(C, { batchSize: 10 });
+
+        expect(originsOf('page')[inbound]).toBe('external');
+    });
+
+    it('records the fill on a source walked from the start, whose chunks were written with their origin', async () => {
+        await backfill.backfillCompany(C, { batchSize: 10 });
+        expect(stateFor('page').originFilledAt).toBeInstanceOf(Date);
+        expect(originsOf('page')).toEqual(Object.fromEntries(pages.map((id) => [id, 'member'])));
     });
 });

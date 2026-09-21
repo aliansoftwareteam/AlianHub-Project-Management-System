@@ -208,7 +208,7 @@ describe('retrieve over any adapter', () => {
         expect(args).toMatchObject({ companyId: C, query: 'budget' });
         expect(args.limit).toBeGreaterThanOrEqual(4);
         expect(args.filter.sourceTypes).toEqual(['task', 'page', 'comment', 'transcript']);
-        expect(Object.keys(args.filter.clauses).sort()).toEqual(['comment', 'page', 'task', 'transcript']);
+        expect(Object.keys(args.filter.clauses).sort()).toEqual(['comment', 'file', 'guide', 'page', 'task', 'transcript']);
     });
 
     it('rechecks the ranked ids against the live rows and drops what the caller may no longer see', async () => {
@@ -217,7 +217,7 @@ describe('retrieve over any adapter', () => {
         expect(result.passages.map((p) => p.sourceId)).toEqual([PAGE_LIVE]);
         expect(result.passages[0].permission).toEqual({ visibility: 'project', via: 'project' });
         expect(result.backend).toBe('stub');
-        expect(result.scope).toMatchObject({ projectId: null, projects: 1, sourceTypes: ['task', 'page', 'comment', 'transcript'] });
+        expect(result.scope).toMatchObject({ projectId: null, projects: 1, sourceTypes: ['task', 'page', 'comment', 'transcript', 'guide', 'file'] });
     });
 
     it('ranks a human-written passage above an agent-written one at equal score, and keeps to the limit', async () => {

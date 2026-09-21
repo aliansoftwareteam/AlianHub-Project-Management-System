@@ -92,7 +92,8 @@ exports.updateProjectInternal = async (companyId, projectId, updateObject, key, 
             data: data
         }
         const project = MongoDbCrudOpration(companyId, mongoObj, 'findOneAndUpdate');
-    
+        if (knowledgeEvents.guideTouched(updateObject)) Promise.resolve(project).then(() => knowledgeEvents.publishGuideSaved(companyId, projectId), () => null);
+
         if (!project) {
             reject("Project not updated");
         }

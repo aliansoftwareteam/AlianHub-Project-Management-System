@@ -1543,6 +1543,8 @@ const schema = {
         createdBy: { type: String, required: false, default: '' },
         // 'human' | 'agent'
         authorKind: { type: String, required: false, default: 'human' },
+        // 'member' | 'agent' | 'external', the taint contract of Modules/Agents/taint.js; absent on chunks older than the field reads as not external.
+        origin: { type: String, required: false },
         title: { type: String, required: false, default: '' },
         headingPath: { type: [String], required: false, default: [] },
         text: { type: String, required: false, default: '' },
@@ -1554,6 +1556,12 @@ const schema = {
         deletedAt: { type: Date, required: false, default: null },
         // 'task' marks a comment left out because its task is deleted, which is how a restore is told apart from a move.
         tombstoneReason: { type: String, required: false, default: '' },
+        // Files only: the storage key the text was extracted from, how many chunks that text made, and how many extractions have failed.
+        fileKey: { type: String, required: false },
+        pieceCount: { type: Number, required: false },
+        extractAttempts: { type: Number, required: false },
+        // Set while a file is owed an extraction (queued, or a retry due then); cleared once its sync is done.
+        extractDueAt: { type: Date, required: false },
         // The source row's updatedAt when it was read, so a slower, older read never overwrites a newer one.
         sourceUpdatedAt: { type: Date, required: false },
     },
@@ -1586,6 +1594,8 @@ const schema = {
         lastSeenOnAt: { type: Date, required: false },
         catchUpFrom: { type: Date, required: false, default: null },
         catchUpPass: { type: Number, required: false, default: 0 },
+        // When the source's chunks were given their origin, so the fill runs once.
+        originFilledAt: { type: Date, required: false },
     },
     // Submissions arriving through a public intake form
     intakeItems: {

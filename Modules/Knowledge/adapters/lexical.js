@@ -4,6 +4,7 @@ const { escapeRegex } = require('../../../utils/escapeRegex');
 const logger = require('../../../Config/loggerConfig');
 const { SOURCE_COLLECTIONS, SOURCE_TYPES } = require('../visibleSet');
 const { INDEXED_SOURCES } = require('../sources');
+const origin = require('../origin');
 
 // The lexical backend searches through the tenant's full-text indexes: the source rows
 // themselves, or the chunk store for each source the filter says is built.
@@ -21,20 +22,22 @@ const SOURCES = {
     task: {
         textIndex: true,
         regexFields: ['TaskName', 'TaskKey', 'rawDescription'],
-        fields: ['TaskName', 'TaskKey', 'rawDescription', 'ProjectID', 'updatedAt'],
+        fields: ['TaskName', 'TaskKey', 'rawDescription', 'ProjectID', 'origin', 'updatedAt'],
         title: (row) => row.TaskName,
         body: (row) => row.rawDescription,
         projectId: (row) => row.ProjectID,
         authorKind: () => 'user',
+        origin: origin.ofTask,
     },
     page: {
         textIndex: true,
         regexFields: ['title', 'rawText'],
-        fields: ['title', 'rawText', 'ProjectID', 'createdByAgent', 'updatedAt'],
+        fields: ['title', 'rawText', 'ProjectID', 'createdByAgent', 'origin', 'updatedAt'],
         title: (row) => row.title,
         body: (row) => row.rawText,
         projectId: (row) => row.ProjectID,
         authorKind: (row) => (row.createdByAgent ? 'agent' : 'user'),
+        origin: origin.ofPage,
     },
     comment: {
         textIndex: true,
@@ -44,6 +47,7 @@ const SOURCES = {
         body: (row) => row.message,
         projectId: (row) => row.projectId,
         authorKind: (row) => (row.isAgent || row.actorType === 'agent' ? 'agent' : 'user'),
+        origin: origin.ofComment,
     },
     transcript: {
         textIndex: false,
@@ -53,6 +57,7 @@ const SOURCES = {
         body: (row) => [row.summary, row.transcript].filter(Boolean).join(' '),
         projectId: (row) => row.projectId,
         authorKind: () => 'user',
+        origin: () => origin.MEMBER,
     },
 };
 
@@ -61,12 +66,13 @@ const chunkSource = (sourceType) => ({
     collection: SCHEMA_TYPE.KNOWLEDGE_CHUNKS,
     textIndex: true,
     regexFields: ['text'],
-    fields: ['sourceId', 'title', 'text', 'projectId', 'authorKind', 'sourceUpdatedAt', 'updatedAt'],
+    fields: ['sourceId', 'title', 'text', 'projectId', 'taskId', 'authorKind', 'origin', 'contentHash', 'sourceUpdatedAt', 'updatedAt'],
     sourceId: (row) => row.sourceId,
     title: (row) => row.title,
     body: (row) => row.text,
     projectId: (row) => row.projectId,
     authorKind: (row) => (row.authorKind === 'agent' ? 'agent' : 'user'),
+    origin: origin.ofChunk,
     updatedAt: (row) => row.sourceUpdatedAt || row.updatedAt || null,
     chunked: true,
 });
@@ -123,6 +129,8 @@ const toPassage = (key, row, score, terms) => {
         excerpt: excerptOf(source.body(row), terms),
         score,
         authorKind: source.authorKind(row),
+        origin: source.origin(row),
+        ...(source.chunked ? { contentHash: row.contentHash || '', ...(row.taskId ? { taskId: String(row.taskId) } : {}) } : {}),
         updatedAt: source.updatedAt ? source.updatedAt(row) : (row.updatedAt || row.createdAt || null),
     };
 };
@@ -195,7 +203,7 @@ const sourceKeyFor = (sourceType, filter) => ((filter.chunkSources || []).includ
 const search = async ({ companyId, query, filter, limit }) => {
     if (!textSearch(query)) return [];
     const sourceTypes = (filter && filter.sourceTypes) || [];
-    const results = await Promise.all(sourceTypes.filter((type) => SOURCES[type] && filter.clauses[type]).map(async (sourceType) => {
+    const results = await Promise.all(sourceTypes.filter((type) => SOURCES[sourceKeyFor(type, filter)] && filter.clauses[type]).map(async (sourceType) => {
         try {
             return await searchSource(companyId, sourceKeyFor(sourceType, filter), filter.clauses[sourceType], query, limit);
         } catch (error) {

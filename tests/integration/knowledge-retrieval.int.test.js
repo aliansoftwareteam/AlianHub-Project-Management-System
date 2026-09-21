@@ -192,7 +192,7 @@ describe('knowledge retrieval reading the page index', () => {
         const owner = await loginAs('owner');
         await createPage(owner, { title: `[QA knowledge index] warm-up ${uniqueSuffix()}`, body: 'Starts the backfill.', visibility: 'project', projectId: state.projects.shared._id });
         const built = await poll(async () => (await tenant.collection('knowledge_index_state')
-            .countDocuments({ sourceType: { $in: ['page', 'comment', 'transcript'] }, status: 'complete' })) === 3);
+            .countDocuments({ sourceType: { $in: ['page', 'comment', 'transcript', 'guide', 'file'] }, status: 'complete' })) === 5);
         expect(built).toBe(true);
     });
 
@@ -317,5 +317,66 @@ describe('knowledge retrieval reading the page index', () => {
         expect(removed.body.status).toBe(true);
         expect(await gone(member, word, sharedId)).toBe(true);
         expect(await poll(async () => (await liveChunks(sharedId)).length === 0)).toBe(true);
+    });
+
+    it('answers from the text of an attachment for someone who can open its task, never for someone who cannot, and drops it within a minute of its removal', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const word = token();
+        const project = await createProject(owner.api, { name: `[QA knowledge index] files ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid, isPrivate: true });
+        const task = await createTask(owner.api, { project, name: `[QA knowledge index] file task ${uniqueSuffix()}`, user: state.users.owner, companyOwnerId: owner.uid });
+
+        const key = `Project/${project._id}/Sprint/${task._id}/Attachment/${Date.now()}_handover.txt`;
+        const form = new FormData();
+        form.append('companyId', state.companyId);
+        form.append('path', key);
+        form.append('file', new Blob([`Handover notes.\nThe safe combination is ${word}.`]), 'handover.txt');
+        const uploaded = await fetch(new URL('/api/v1/storage/uploadFile', state.baseURL), { method: 'POST', headers: { authorization: `Bearer ${owner.accessToken}` }, body: form });
+        expect(uploaded.status).toBe(200);
+        expect((await uploaded.json()).statusText).toBe(key);
+
+        const record = { id: `qa${uniqueSuffix()}`.replace(/[^A-Za-z0-9]/g, '').slice(0, 17), filename: 'handover.txt', extension: 'txt', size: 64, type: 'text', userId: owner.uid, createdAt: new Date().toISOString(), url: key };
+        const attachmentBody = (operation) => ({
+            action: 'updateAttachments', companyId: state.companyId, sprintId: task.sprintId, taskId: task._id,
+            taskData: { _id: task._id, TaskName: task.TaskName, sprintId: task.sprintId, ProjectID: project._id, attachments: [] },
+            id: record.id, operation, data: record, userData: { id: owner.uid, Employee_Name: 'Owner', companyOwnerId: owner.uid }, projectData: { id: project._id, ProjectName: project.ProjectName },
+        });
+        const attached = await owner.api.patch('/api/v2/tasks', attachmentBody('add'));
+        expect(attached.body.status).toBe(true);
+
+        const sourceId = `${task._id}:${record.id}`;
+        expect(await poll(async () => (await liveSourceChunks('file', sourceId)).length > 0)).toBe(true);
+        const [chunk] = await liveSourceChunks('file', sourceId);
+        expect(chunk).toMatchObject({ companyId: state.companyId, visibility: 'project', taskId: task._id, title: 'handover.txt', origin: 'member', fileKey: key, pieceCount: 1 });
+        expect(String(chunk.projectId)).toBe(String(project._id));
+        expect(chunk.text).toContain(word);
+
+        expect(await found(owner, word, sourceId)).toBe(true);
+        const source = (await ask(owner, word)).sources.find((s) => String(s.id) === sourceId);
+        expect(source).toMatchObject({ kind: 'file', taskId: task._id, origin: 'member', permission: { visibility: 'project', via: 'task' } });
+        expect(await sourceIds(member, word)).not.toContain(sourceId);
+
+        const detached = await owner.api.patch('/api/v2/tasks', attachmentBody('remove'));
+        expect(detached.body.status).toBe(true);
+        expect(await gone(owner, word, sourceId)).toBe(true);
+        expect(await poll(async () => (await liveSourceChunks('file', sourceId)).length === 0)).toBe(true);
+    });
+
+    it('answers from a project guide for someone who can open the project and never for someone who cannot', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const word = token();
+        const project = await createProject(owner.api, { name: `[QA knowledge index] guided ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid, isPrivate: true });
+
+        const saved = await owner.api.put(`/api/v1/project/${project._id}`, { updateObject: { aiGuide: { stages: [], markdown: `## Stages\n1. Commission the ${word} pump` } } });
+        expect(saved.status).toBe(200);
+
+        const projectId = String(project._id);
+        expect(await poll(async () => (await liveSourceChunks('guide', projectId)).length > 0)).toBe(true);
+        (await liveSourceChunks('guide', projectId)).forEach((chunk) => expect(chunk).toMatchObject({ companyId: state.companyId, visibility: 'project', authorKind: 'agent', origin: 'agent' }));
+
+        expect(await found(owner, word, projectId)).toBe(true);
+        expect((await ask(owner, word)).sources.find((s) => String(s.id) === projectId)).toMatchObject({ kind: 'guide', origin: 'agent', permission: { visibility: 'project', via: 'project' } });
+        expect(await sourceIds(member, word)).not.toContain(projectId);
     });
 });
