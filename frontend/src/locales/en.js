@@ -6017,6 +6017,7 @@ export default {
         loading: "Loading…",
     },
     Inbox: {
+        agent_session_assigned: "{task} had no assignee, so it is now yours while {agent} works on it for you.",
         title: "Inbox",
         tab_all: "All",
         tab_notifications: "Notifications",
