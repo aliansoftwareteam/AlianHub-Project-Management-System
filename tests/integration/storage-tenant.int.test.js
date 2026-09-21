@@ -125,3 +125,39 @@ describe('own-company flows still work', () => {
         await member.api.delete('/api/v1/storage/removeFile/USER_PROFILES', { query: { filepath: avatar, thubmkey: 'userProfile' } });
     });
 });
+
+describe('signed downloads follow the record that owns the file', () => {
+    const [task, otherTask] = state.tasks;
+    const ownKey = `Project/${task.projectId}/Sprint/${task._id}/Attachment/dl-${crypto.randomBytes(4).toString('hex')}.png`;
+
+    it('a member downloads an attachment of a task they can open', async () => {
+        const { api } = await loginAs('member');
+        expect((await api.post('/api/v1/storage/uploadFileBase64', { companyId: COMPANY_A, path: ownKey, base64String: PNG })).status).toBe(200);
+        const res = await api.get(`/api/v1/generateSignedUrl/${COMPANY_A}`, { query: { filepath: ownKey, domainUrl: state.baseURL } });
+        expect(res.status).toBe(200);
+        expect((await fetch(res.body.url)).status).toBe(200);
+    });
+
+    it.each([
+        ['a file of a private project they are not on', `Project/${state.projects.restricted._id}/ProjectAttachment/dl-brief.pdf`],
+        ['a key outside every layout the app writes', 'dl-backups/company.zip'],
+    ])('a member is refused %s, without a signed link', async (_label, filepath) => {
+        const { api } = await loginAs('member');
+        const res = await api.get(`/api/v1/generateSignedUrl/${COMPANY_A}`, { query: { filepath, domainUrl: state.baseURL } });
+        expect(res.status).toBe(404);
+        expect(res.body).toMatchObject({ status: false, code: 'STORED_FILE_NOT_AVAILABLE' });
+        expect(JSON.stringify(res.body)).not.toContain('token=');
+    });
+
+    it('an attachment naming another task\'s file is refused on write', async () => {
+        const { api } = await loginAs('owner');
+        const res = await api.patch('/api/v2/tasks', {
+            action: 'updateAttachments', companyId: COMPANY_A, sprintId: task.sprintId, taskId: task._id,
+            taskData: { _id: task._id, ProjectID: task.projectId, attachments: [] }, id: '', operation: 'add',
+            data: { id: 'dl1', filename: 'dl.png', url: `Project/${task.projectId}/Sprint/${otherTask._id}/Attachment/dl.png` },
+            projectData: { id: task.projectId, ProjectName: 'E2E Shared Project' },
+        });
+        expect(res.status).toBe(400);
+        expect(res.body).toMatchObject({ status: false, code: 'ATTACHMENT_KEY_NOT_OWN' });
+    });
+});

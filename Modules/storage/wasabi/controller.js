@@ -499,8 +499,12 @@ exports.getPresignedUrl  = async (req,res) => {
             });
             return;
         }
+        const command = new GetObjectCommand({
+            Bucket: req.body.companyId,
+            Key: req.body.path,
+        });
         if (req.body.isCache === true) {
-            const cacheKey = `image:${req.body.companyId}:${req.body.path}`;
+            const cacheKey = `image:${command.input.Bucket}:${command.input.Key}`;
             const value = myCache.get(cacheKey);
             
             if (value) {
@@ -510,10 +514,6 @@ exports.getPresignedUrl  = async (req,res) => {
                     statusText: value,
                 });
             } else {
-                const command = new GetObjectCommand({
-                    Bucket: req.body.companyId,
-                    Key: req.body.path,
-                });
                 const url = await getSignedUrl(s3Client, command, { expiresIn: 86400 });
                 myCache.set( cacheKey, url, 1200 );
                 res.set('Cache-Control', 'public, max-age=43200')
@@ -523,10 +523,6 @@ exports.getPresignedUrl  = async (req,res) => {
                 });
             }
         } else {
-            const command = new GetObjectCommand({
-                Bucket: req.body.companyId,
-                Key: req.body.path,
-            });
             const url = await getSignedUrl(s3Client, command, { expiresIn: 86400 });
             res.send({
                 status: true,

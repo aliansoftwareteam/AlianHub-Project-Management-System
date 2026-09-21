@@ -25,7 +25,7 @@
   "projectSetting/controller.js": 9,
   "storage/server/controller.js": 6,
   "storage/server/helpers/bucket.helper.js": 1,
-  "storage/wasabi/controller.js": 9,
+  "storage/wasabi/controller.js": 8,
   "taskIndex/controller.js": 8,
   "trackerUserPermission/controller.js": 1
 }
