@@ -1,0 +1,29 @@
+# Baseline for @modelcontextprotocol/conformance 0.1.16 in server mode against /mcp (MCP_OAUTH=both).
+# A scenario that starts passing fails the run until its line is removed here.
+server:
+  # The suite calls fixture tools (test_simple_text and the like) that only its reference server has.
+  - tools-call-simple-text # no test_simple_text tool
+  - tools-call-image # no test_image_content tool
+  - tools-call-audio # no test_audio_content tool
+  - tools-call-embedded-resource # no test_embedded_resource tool
+  - tools-call-mixed-content # no test_multiple_content_types tool
+  - tools-call-error # no test_error_handling tool
+  - tools-call-with-progress # no test_tool_with_progress tool; the server sends no progress notifications
+  - tools-call-with-logging # the server does not offer the logging capability
+  - tools-call-sampling # the server never asks the client to sample
+  - tools-call-elicitation # the server never asks the client to elicit
+  - elicitation-sep1034-defaults # the server never asks the client to elicit
+  - elicitation-sep1330-enums # the server never asks the client to elicit
+  - logging-set-level # the server does not offer the logging capability
+  - completion-complete # the server does not offer completions
+  - resources-read-text # resources/list is empty and resources/read is not offered
+  - resources-read-binary # resources/list is empty and resources/read is not offered
+  - resources-templates-read # the server offers no resource templates
+  - resources-subscribe # the server does not offer resource subscriptions
+  - resources-unsubscribe # the server does not offer resource subscriptions
+  - prompts-get-simple # prompts/list is empty and prompts/get is not offered
+  - prompts-get-with-args # prompts/list is empty and prompts/get is not offered
+  - prompts-get-embedded-resource # prompts/list is empty and prompts/get is not offered
+  - prompts-get-with-image # prompts/list is empty and prompts/get is not offered
+  - server-sse-multiple-streams # the server is stateless: it issues no Mcp-Session-Id and answers every request on the POST
+  - dns-rebinding-protection # a foreign Origin is refused by utils/cors.js but answered 200, not 403 (see docs/security/mcp-checklist.md)
