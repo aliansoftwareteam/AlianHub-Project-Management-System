@@ -174,7 +174,7 @@ describe('the url and api readers (flag on)', () => {
     });
 
     it('requires a host and a path', () => {
-        const checked = validateSkill(skillBody({ gather: [{ reader: 'url', as: 'page', params: {} }] }));
+        const checked = validateSkill(skillBody({ gather: [{ reader: 'url', as: 'pr', params: {} }] }));
         expect(checked.errors.map((e) => [e.field, e.code])).toEqual([['gather[0].params.host', 'required'], ['gather[0].params.path', 'required']]);
     });
 
@@ -266,7 +266,8 @@ describe('placeholders reach only the path and the query, never the host, scheme
     const PATHS = ['/{{input.pr_link}}', '/a/{{input.pr_link}}/b', '/a?q={{input.pr_link}}', '/{{input.pr_link}}{{input.pr_link}}'];
 
     it.each(EVIL.flatMap((value) => PATHS.map((path) => [value, path])))('%j in %s stays on the declared origin', (value, path) => {
-        const out = externalReads.buildUrl({ host: HOST, path }, { input: { pr_link: value } });
+        const out = externalReads.buildUrl({ host: HOST, path }, { task: TASK, input: { pr_link: value } });
+        expect(out).toContain(encodeURIComponent(value));
         const url = new URL(out);
         expect(url.protocol).toBe('https:');
         expect(url.hostname).toBe(HOST);
@@ -274,6 +275,11 @@ describe('placeholders reach only the path and the query, never the host, scheme
         expect(url.username + url.password).toBe('');
         expect(url.hash).toBe('');
         expect(out.startsWith(`https://${HOST}/`)).toBe(true);
+    });
+
+    it('fills task fields and inputs, encoded', () => {
+        expect(externalReads.buildUrl({ host: HOST, path: '/search/{{TaskKey}}?q={{input.pr_link}}' }, { task: TASK, input: { pr_link: 'a b/c' } }))
+            .toBe(`https://${HOST}/search/AR-7?q=a%20b%2Fc`);
     });
 
     it('keeps a declared port and nothing else', () => {
@@ -485,6 +491,15 @@ describe('running a skill with a declared read before the run-time slice', () =>
     it('fails with external_reads_not_available and fetches nothing', async () => {
         await expect(orchestrator.gather({ skillSlug: 'pr.fetch', task: TASK, companyId: C, startedBy: ACTOR.id }))
             .rejects.toMatchObject({ code: 'external_reads_not_available', deterministic: true, message: expect.stringContaining('external_reads_not_available') });
+        noFetch();
+    });
+
+    it('fails before any step of the skill reads anything', async () => {
+        mockDbFor(C).store[SCHEMA_TYPE.AGENT_SKILLS].length = 0;
+        mockDbFor(C).seed(SCHEMA_TYPE.AGENT_SKILLS, validateSkill(skillBody({ gather: [{ reader: 'project' }, readStep()] })).value);
+        mockDbFor(C).calls.length = 0;
+        await expect(orchestrator.gather({ skillSlug: 'pr.fetch', task: TASK, companyId: C, startedBy: ACTOR.id })).rejects.toMatchObject({ code: 'external_reads_not_available' });
+        expect(mockDbFor(C).calls.filter((c) => c.type !== SCHEMA_TYPE.AGENT_SKILLS)).toEqual([]);
         noFetch();
     });
 

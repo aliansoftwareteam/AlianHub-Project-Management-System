@@ -912,6 +912,11 @@
     "group": "auth",
     "description": "Set to on to mark the session cookies httpOnly so page JavaScript can no longer read them: the server reads the access token from the cookie when no Authorization header is sent, the socket handshake and the refresh endpoint do the same, and the web app authenticates by cookie instead of copying tokens into headers. Tracker, CLI and API-token clients are unaffected (they send headers and bodies, never cookies). Unset or off keeps readable cookies as before."
   },
+  "SKILL_EXTERNAL_READS": {
+    "group": "ai",
+    "description": "Declared external reads in data skills: \"on\" offers the url and api readers in the Skill Library, each naming one exact host, a path template, GET only, at most 512 KB, 10 s and 3 redirects, and optionally the handle of a skill_read workspace secret. A skill is saved only when every declared host is on the workspace egress allowlist (an empty list refuses them all, and private or reserved hosts are refused even when listed), and a raw secret anywhere in the skill body is refused. Running such a skill fails with external_reads_not_available until the run-time slice lands; nothing is fetched. Default \"off\" hides the readers, refuses them on save and leaves every skill as it was.",
+    "default": "off"
+  },
   "SOCKETIO_ADMIN_PASSWORD_HASH": {
     "group": "security",
     "description": "bcrypt hash of the Socket.IO admin UI password; the UI stays off while unset.",

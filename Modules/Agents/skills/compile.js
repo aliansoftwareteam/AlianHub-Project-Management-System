@@ -5,6 +5,7 @@
 
 const registry = require('../registry');
 const readers = require('./readers');
+const externalReads = require('./externalReads');
 const { riskOf } = require('./validateSkill');
 const { ground } = require('./grounding');
 const { INPUT_CATALOGUE, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, plain } = require('./catalogues');
@@ -108,6 +109,7 @@ const compile = (doc) => ({
     systemPrompt: systemPromptOf(doc),
 
     async gather({ task, companyId, memory, startedBy }) {
+        if (doc.gather.some((step) => externalReads.isExternal(step.reader))) throw externalReads.notAvailable(doc.key);
         const input = {};
         for (const key of doc.inputs) {
             const value = INPUT_CATALOGUE[key].value(task);

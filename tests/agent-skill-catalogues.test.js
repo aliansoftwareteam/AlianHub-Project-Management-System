@@ -58,7 +58,7 @@ describe('the skill vocabulary is closed', () => {
         const m = C.catalogues();
         expect(JSON.parse(JSON.stringify(m))).toEqual(m);
         expect(m.inputs.map((i) => i.key)).toEqual(Object.keys(C.INPUT_CATALOGUE));
-        expect(m.readers.map((r) => r.key)).toEqual(Object.keys(C.READER_CATALOGUE));
+        expect(m.readers.map((r) => r.key)).toEqual(Object.keys(C.READER_CATALOGUE).filter((key) => !C.READER_CATALOGUE[key].external));
         expect(m.partials.map((p) => p.key)).toEqual(Object.keys(C.PROMPT_PARTIALS));
         expect(m.actions.map((a) => a.key)).toEqual([...C.EMIT_ACTIONS]);
         expect(m.filters.map((f) => f.key)).toEqual(Object.keys(C.FILTERS));
