@@ -314,6 +314,7 @@ knowledgeChunksSchema.index({ createdBy: 1, visibility: 1 });
 knowledgeChunksSchema.index({ sourceType: 1, taskId: 1 });
 // The vector search's candidate scan: the newest chunks of a source type under one embedding model.
 knowledgeChunksSchema.index({ sourceType: 1, embeddingModel: 1, sourceUpdatedAt: -1 });
+knowledgeChunksSchema.index({ sourceType: 1, extractDueAt: 1 }, { partialFilterExpression: { extractDueAt: { $type: 'date' } } });
 const knowledgeIndexStateSchema = new Schema(schema.knowledgeIndexState, {strict: true, timestamps: true});
 knowledgeIndexStateSchema.index({ sourceType: 1 }, { unique: true });
 const knowledgeExclusionsSchema = new Schema(schema.knowledgeExclusions, {strict: true, timestamps: true});

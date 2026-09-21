@@ -1548,6 +1548,8 @@ const schema = {
         fileKey: { type: String, required: false },
         pieceCount: { type: Number, required: false },
         extractAttempts: { type: Number, required: false },
+        // Set while a file is owed an extraction (queued, or a retry due then); cleared once its sync is done.
+        extractDueAt: { type: Date, required: false },
         // The source row's updatedAt when it was read, so a slower, older read never overwrites a newer one.
         sourceUpdatedAt: { type: Date, required: false },
     },

@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
-const { getRoleType } = require('../../Config/permissionGuard');
+const permissionGuard = require('../../Config/permissionGuard');
 const { isPrivileged } = require('../../Config/roleTypes');
 const { visibleProjectIds } = require('../Agents/scope');
 const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
@@ -17,6 +17,7 @@ const { chunkGuide, guideMarkdown, guideTitle } = require('./ingest/chunker');
 const SOURCE_TYPES = ['task', 'page', 'comment', 'transcript', 'guide', 'file'];
 const CALLER_KINDS = ['user', 'agent', 'mcp'];
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const ATTACHMENTS_PERMISSION = 'task.task_attachments';
 const TITLE_LENGTH = 160;
 
 const SOURCE_COLLECTIONS = {
@@ -38,6 +39,20 @@ class RetrievalRefused extends Error {
 
 const objectIds = (ids) => ids.filter((id) => OBJECT_ID.test(String(id))).map((id) => new mongoose.Types.ObjectId(String(id)));
 
+/* A file is read where the web app would show the task's attachments: the same permission, judged
+ * per project, since a project can carry its own rules. Rules that cannot be read grant nothing. */
+const attachmentProjects = async (companyId, uid, privileged, projectIds) => {
+    if (privileged) return projectIds;
+    const granted = await Promise.all(projectIds.map(async (projectId) => {
+        try {
+            return permissionGuard.isReadable(await permissionGuard.evaluatePermission(companyId, uid, ATTACHMENTS_PERMISSION, { projectId }));
+        } catch (error) {
+            return false;
+        }
+    }));
+    return projectIds.filter((projectId, at) => granted[at]);
+};
+
 const resolveVisibleSet = async ({ companyId, caller, scope } = {}) => {
     const company = String(companyId || '');
     const { kind, userId, agentId = null, runId = null } = caller || {};
@@ -46,7 +61,7 @@ const resolveVisibleSet = async ({ companyId, caller, scope } = {}) => {
     if (!CALLER_KINDS.includes(kind)) throw new RetrievalRefused(`Unknown caller kind: ${kind}.`);
     if (!OBJECT_ID.test(uid)) throw new RetrievalRefused('A caller retrieves as a user of the company.');
 
-    const roleType = await getRoleType(company, uid);
+    const roleType = await permissionGuard.getRoleType(company, uid);
     if (roleType === null || roleType === undefined) throw new RetrievalRefused('The caller holds no role in this company.');
     const privileged = isPrivileged(roleType);
 
@@ -55,6 +70,7 @@ const resolveVisibleSet = async ({ companyId, caller, scope } = {}) => {
     const projectIds = projectId ? visible.filter((id) => id === projectId) : visible;
     const hidden = privileged || !projectIds.length ? [] : await hiddenSprintIds(company, uid, projectIds);
     const wanted = scope && Array.isArray(scope.sourceTypes) ? scope.sourceTypes : SOURCE_TYPES;
+    const fileProjectIds = wanted.includes('file') ? await attachmentProjects(company, uid, privileged, projectIds) : [];
 
     return {
         companyId: company,
@@ -64,6 +80,7 @@ const resolveVisibleSet = async ({ companyId, caller, scope } = {}) => {
         projectId,
         projectIds,
         hiddenSprintIds: hidden.map(String),
+        fileProjectIds,
         sourceTypes: SOURCE_TYPES.filter((type) => wanted.includes(type)),
     };
 };
@@ -85,7 +102,7 @@ const clausesFor = (set) => {
     return {
         task,
         guide: { deletedStatusKey: { $ne: 1 } },
-        file: task,
+        file: { ...task, ProjectID: { $in: objectIds(set.fileProjectIds || []) } },
         page: { deletedStatusKey: { $ne: 1 }, $and: [inProjectOrCompanyWide(set, 'ProjectID'), pageVisibilityFilter(set.caller.userId)] },
         comment: { projectId: { $in: projects }, isDeleted: { $ne: true }, type: { $in: COMMENT_TYPES }, ...sprintClause },
         transcript: {
@@ -106,7 +123,7 @@ const chunkClausesFor = (set) => {
         page: { ...liveChunk(set, 'page'), $and: [inProjectOrCompanyWide(set, 'projectId'), pageVisibilityFilter(set.caller.userId)] },
         comment: { ...liveChunk(set, 'comment'), projectId: { $in: objectIds(set.projectIds) }, ...hidden },
         guide: { ...liveChunk(set, 'guide'), projectId: { $in: objectIds(set.projectIds) } },
-        file: { ...liveChunk(set, 'file'), projectId: { $in: objectIds(set.projectIds) }, ...hidden },
+        file: { ...liveChunk(set, 'file'), projectId: { $in: objectIds(set.fileProjectIds || []) }, ...hidden },
         transcript: {
             ...liveChunk(set, 'transcript'),
             participants: set.caller.userId,

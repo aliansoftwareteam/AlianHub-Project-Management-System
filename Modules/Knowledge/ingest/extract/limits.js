@@ -16,6 +16,7 @@ const limits = () => ({
     maxSheets: positive(process.env.KNOWLEDGE_FILE_MAX_SHEETS, 20),
     maxRows: positive(process.env.KNOWLEDGE_FILE_MAX_ROWS, 5000),
     maxUnzippedBytes: positive(process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES, 100 * MB),
+    maxParseMemoryBytes: positive(process.env.KNOWLEDGE_FILE_MAX_PARSE_MEMORY_BYTES, 256 * MB),
 });
 
 module.exports = { limits };

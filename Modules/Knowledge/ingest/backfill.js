@@ -39,7 +39,7 @@ const CANDIDATES = {
     comment: { type: SCHEMA_TYPE.COMMENTS, where: { isDeleted: { $ne: true }, type: { $in: COMMENT_TYPES } }, apply: syncRow('comment') },
     transcript: { type: SCHEMA_TYPE.CALLS, where: { deletedStatusKey: { $ne: 1 } }, apply: syncRow('transcript') },
     guide: { type: SCHEMA_TYPE.PROJECTS, where: { deletedStatusKey: { $ne: 1 }, 'aiGuide.markdown': { $exists: true } }, apply: syncRow('guide') },
-    file: { type: SCHEMA_TYPE.TASKS, where: { deletedStatusKey: { $ne: 1 }, 'attachments.0': { $exists: true } }, apply: (companyId, id) => indexer.syncTaskFiles(companyId, id) },
+    file: { type: SCHEMA_TYPE.TASKS, where: { deletedStatusKey: { $ne: 1 }, 'attachments.0': { $exists: true } }, apply: (companyId, id) => indexer.syncTaskFiles(companyId, id, { priority: 'backfill' }) },
 };
 
 /* Deleted rows are walked too, so a delete missed while off still tombstones. A comment and a file
@@ -57,7 +57,7 @@ const CATCH_UP_PASSES = {
         type: SCHEMA_TYPE.TASKS,
         apply: async (companyId, id) => {
             await indexer.reindexTask(companyId, id, { moved: true });
-            await indexer.syncTaskFiles(companyId, id);
+            await indexer.syncTaskFiles(companyId, id, { priority: 'backfill' });
         },
     }],
 };
@@ -278,16 +278,38 @@ const runOnce = async (companyId, options) => {
     }
 };
 
-/* Each run also re-embeds a batch of what a hybrid company's chunks still lack, so a failed
- * embed or a model change is caught up without anyone touching the source. */
-const backfillAll = async (options) => {
-    if (flag.indexer.mode() === 'off') return { companies: 0, reembedded: {} };
+const enabledCompanies = async () => {
     const companies = await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.COMPANIES, data: [{}, '_id'] }, 'find');
-    let ran = 0;
-    const reembedded = {};
+    const enabled = [];
     for (const company of companies || []) {
         const companyId = String(company._id);
-        if (!(await flag.indexer.enabledFor(companyId))) continue;
+        if (await flag.indexer.enabledFor(companyId)) enabled.push(companyId);
+    }
+    return enabled;
+};
+
+const resumeFiles = (companyId) => indexer.resumeFiles(companyId).catch((error) => {
+    logger.error(`${LOG_PREFIX} ${companyId}: file sweep: ${error.message}`);
+    return 0;
+});
+
+/* At start the files a stopped process still owed are taken up, whatever the heartbeat says. */
+const resumeAll = async () => {
+    if (flag.indexer.mode() === 'off') return 0;
+    let count = 0;
+    for (const companyId of await enabledCompanies()) count += await resumeFiles(companyId);
+    return count;
+};
+
+/* Each run also re-embeds a batch of what a hybrid company's chunks still lack, so a failed
+ * embed or a model change is caught up without anyone touching the source, and takes up the
+ * files owed a retry. */
+const backfillAll = async (options) => {
+    if (flag.indexer.mode() === 'off') return { companies: 0, reembedded: {} };
+    let ran = 0;
+    const reembedded = {};
+    for (const companyId of await enabledCompanies()) {
+        await resumeFiles(companyId);
         await keepAlive(companyId).catch((error) => logger.error(`${LOG_PREFIX} ${companyId}: heartbeat: ${error.message}`));
         if (await runOnce(companyId, options)) ran += 1;
         const count = await indexer.reembedMissing(companyId).catch((error) => {
@@ -322,5 +344,6 @@ module.exports = {
     backfillSource,
     backfillCompany,
     backfillAll,
+    resumeAll,
     ensureBackfill,
 };

@@ -480,7 +480,7 @@ describe('a file follows its task', () => {
         expect(readStoredFile).not.toHaveBeenCalled();
     });
 
-    it('is extracted once: a second sync of an indexed file reads nothing and writes nothing', async () => {
+    it('is extracted once: a second sync of an indexed file reads nothing and writes nothing but its owed mark', async () => {
         const task = await indexed();
         mockDb.calls.length = 0;
 
@@ -488,7 +488,8 @@ describe('a file follows its task', () => {
         await taskChanged(task, ['attachments']);
 
         expect(readStoredFile).not.toHaveBeenCalled();
-        expect(chunkWrites()).toHaveLength(0);
+        const onlyTheMark = (update) => ['$set', '$unset'].every((op) => !update[op] || Object.keys(update[op]).every((field) => field === 'extractDueAt'));
+        expect(chunkWrites().filter((c) => !onlyTheMark(c.data[1]))).toHaveLength(0);
     });
 
     it('is extracted again when a crash left only some of its chunks written', async () => {
@@ -637,6 +638,7 @@ describe('work that outlives the process', () => {
                 storage: require('../common-storage/readStoredFile'),
             };
         });
+        fresh.storage.readStoredFile.mockReset();
         fresh.storage.readStoredFile.mockImplementation(async ({ companyId, key }) => {
             const buffer = files.get(`${companyId}:${key}`);
             if (!buffer) throw Object.assign(new Error('not found'), { code: 'not_found' });

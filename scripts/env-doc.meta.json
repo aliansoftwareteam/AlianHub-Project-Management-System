@@ -555,6 +555,11 @@
     "description": "How many sheets of a spreadsheet the knowledge indexer reads.",
     "default": "20"
   },
+  "KNOWLEDGE_FILE_MAX_PARSE_MEMORY_BYTES": {
+    "group": "ai",
+    "description": "How far the process's resident memory may grow while one file is parsed before the knowledge indexer stops the parser thread and records the file for a retry; catches memory a parser holds outside its heap limit.",
+    "default": "268435456"
+  },
   "KNOWLEDGE_FILE_MAX_ROWS": {
     "group": "ai",
     "description": "How many rows of each sheet or CSV the knowledge indexer reads.",
@@ -562,7 +567,7 @@
   },
   "KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES": {
     "group": "ai",
-    "description": "The most a DOCX or XLSX may declare it unpacks to before the knowledge indexer refuses it unopened.",
+    "description": "The most a DOCX or XLSX may inflate to. The knowledge indexer refuses one that declares more without opening it, and inflates every entry itself against this budget, whatever the archive declares, before a parser sees it.",
     "default": "104857600"
   },
   "KNOWLEDGE_FLAG_CACHE_TTL_SECONDS": {

@@ -2,13 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { safeRelativePath } = require('../utils/uploadConfig');
 
-// The read side of putLocalFile: the bytes of one stored object, from the company's own bucket,
-// whichever storage type the install runs. There was no such entry point: every other reader
-// hands a browser a signed url, which is no use to code that has to parse the file itself.
-//
-// The key is an object key relative to the company's bucket, as an upload returns it and an
-// attachment record stores it. It is never a filesystem path or a url, and the company id is
-// never taken from the key.
+// Every other reader hands a browser a signed url; code that parses a file needs its bytes.
 
 const STORAGE_ROOT = path.join(__dirname, '..', 'storage');
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -37,8 +31,7 @@ const readFromDisk = async (companyId, key, maxBytes) => {
 
 let s3Client = null;
 
-/* Built the way Modules/storage/wasabi/controller.js builds its client, and only on a wasabi
- * install, so server storage never loads the S3 SDK. */
+/* Built lazily, so a server-storage install never loads the S3 SDK. */
 const client = () => {
     if (s3Client) return s3Client;
     const { S3Client } = require('@aws-sdk/client-s3');
@@ -58,8 +51,7 @@ const isMissing = (error) => Boolean(error) && (['NoSuchKey', 'NotFound', 'NoSuc
 
 const drop = (body) => { if (body && typeof body.destroy === 'function') body.destroy(); };
 
-/* The declared length is checked first, and the stream is counted as well: a length is only
- * what the bucket says. */
+/* A declared length is only what the bucket says, so the stream is counted too. */
 const readFromBucket = async (companyId, key, maxBytes) => {
     const { GetObjectCommand } = require('@aws-sdk/client-s3');
     let response;

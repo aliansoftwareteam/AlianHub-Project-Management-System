@@ -71,9 +71,10 @@ const inLane = (key, width, run) => new Promise((resolve, reject) => {
     else lane.waiting.push(begin);
 });
 
-/* Queued and left: the event that announced an attachment is answered at once, and the file is
- * read and parsed when its turn comes. Whatever a file does, the next one still runs. */
-const queueTaskFiles = (companyId, taskId) => {
+/* The files are marked owed before they are queued, so the queue can be lost with the process;
+ * the event is then answered and each file read and parsed when its turn comes. */
+const queueTaskFiles = async (companyId, taskId) => {
+    await indexer.markFilesPending(companyId, taskId);
     track(inLane(`files:${companyId}`, FILES_PER_COMPANY, () => indexer.syncTaskFiles(companyId, taskId)).catch((error) => {
         logger.error(`${LOG_PREFIX} files of task ${taskId} in company ${companyId}: ${domainEventBus.failureText(error)}`);
         return null;
@@ -85,9 +86,9 @@ const taskChanged = (envelope) => {
     const { companyId } = envelope;
     const id = envelope.entity && envelope.entity.id;
     const fields = changedFieldsOf(envelope);
-    if (fields.includes(TASK_FILES_FIELD)) queueTaskFiles(companyId, id);
-    if (!fields.some((field) => TASK_VISIBILITY_FIELDS.includes(field))) return null;
-    return indexer.reindexTask(companyId, id, { moved: fields.some((field) => TASK_MOVE_FIELDS.includes(field)) });
+    const files = fields.includes(TASK_FILES_FIELD) ? queueTaskFiles(companyId, id) : null;
+    if (!fields.some((field) => TASK_VISIBILITY_FIELDS.includes(field))) return files;
+    return Promise.all([files, indexer.reindexTask(companyId, id, { moved: fields.some((field) => TASK_MOVE_FIELDS.includes(field)) })]);
 };
 
 const apply = (envelope) => {
@@ -113,9 +114,28 @@ const apply = (envelope) => {
     }
 };
 
+const SWEEP_EVERY_MS = 60 * 1000;
+const sweeps = new Map();
+
+/* Owed files are taken up on the heartbeat whether or not the heartbeat is stale, at most once a
+ * minute per company. */
+const sweepFiles = (companyId) => {
+    const key = String(companyId);
+    const now = Date.now();
+    if (now - (sweeps.get(key) || 0) < SWEEP_EVERY_MS) return;
+    sweeps.set(key, now);
+    track(indexer.resumeFiles(key).catch((error) => {
+        logger.error(`${LOG_PREFIX} file sweep for company ${key} failed: ${domainEventBus.failureText(error)}`);
+        return 0;
+    }));
+};
+
+const resetFileSweeps = () => sweeps.clear();
+
 /* Heartbeats while the indexer is on, and starts the catch-up of any source found stale. */
 const keepAlive = (companyId, states) => {
     if (flag.indexer.mode() === 'off') return;
+    sweepFiles(companyId);
     track(backfill.keepAlive(companyId, { states })
         .then((stale) => { if (stale.length) track(backfill.ensureBackfill(companyId)); })
         .catch((error) => logger.error(`${LOG_PREFIX} heartbeat for company ${companyId} failed: ${domainEventBus.failureText(error)}`)));
@@ -148,6 +168,10 @@ const start = () => {
     HANDLED.forEach((type) => domainEventBus.bus.on(type, onEnvelope));
     started = true;
     logger.info(`${LOG_PREFIX} listening for ${HANDLED.join(', ')} (${flag.indexer.mode()})`);
+    track(backfill.resumeAll().catch((error) => {
+        logger.error(`${LOG_PREFIX} resuming owed files at start failed: ${domainEventBus.failureText(error)}`);
+        return 0;
+    }));
     return true;
 };
 
@@ -200,6 +224,7 @@ module.exports = {
     HANDLED,
     MAX_CONCURRENT_PER_COMPANY,
     keepAlive,
+    resetFileSweeps,
     start,
     stop,
     handle,
