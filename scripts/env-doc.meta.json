@@ -1258,5 +1258,49 @@
     "group": "ai",
     "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how long, in milliseconds, the knowledge.backfill job gives one tenant's index check before moving on; tenants are checked four at a time.",
     "default": "30000"
+  },
+  "MCP_OAUTH": {
+    "group": "security",
+    "description": "Set to on to run the OAuth 2.1 authorization server for the MCP endpoint (MCP authorization spec 2025-11-25): GET /.well-known/oauth-authorization-server, /oauth/authorize (authorization code with PKCE S256 only, resource required and equal to <issuer>/mcp, exact redirect URI match except that an http loopback redirect may use any port, https or loopback redirects; scope may be left out for read-only access), /oauth/token (single-use codes, rotating refresh tokens, a reused code or refresh token revokes its whole grant), /oauth/revoke (RFC 7009), and /api/v2/oauth-clients for workspace owners and admins to pre-register clients. Clients may also identify themselves with a client ID metadata document, fetched through the agents' SSRF-safe fetch (5 KB, 5 s, no redirects, one fetch per URL at a time, a failed URL retried after 5 s). Codes, tokens and client secrets are stored only as keyed hashes; every token is bound to one workspace, one person and the /mcp resource. The MCP endpoint does not accept these tokens yet, and the consent screen is not built yet, so an authorization cannot complete outside a test process. Unset or off registers none of these routes.",
+    "default": "off"
+  },
+  "MCP_OAUTH_DCR": {
+    "group": "security",
+    "description": "With MCP_OAUTH on, set to on to open RFC 7591 dynamic client registration at /oauth/register and advertise it in the server metadata. Off by default: clients use a client ID metadata document or are pre-registered by a workspace owner or admin.",
+    "default": "off"
+  },
+  "MCP_OAUTH_ISSUER": {
+    "group": "security",
+    "description": "Issuer URL of the MCP authorization server, and the base of its endpoints and of the /mcp resource tokens are bound to. Defaults to APIURL. It must be an origin (no path, query or fragment) and https; plain http is accepted only on localhost, 127.0.0.1 or [::1] while NODE_ENV is unset, development or test. With MCP_OAUTH on, any other value stops the server at boot."
+  },
+  "MCP_OAUTH_ACCESS_TOKEN_MINUTES": {
+    "group": "security",
+    "description": "Lifetime of an MCP OAuth access token, in minutes. Never longer than the grant it belongs to.",
+    "default": "15"
+  },
+  "MCP_OAUTH_REFRESH_TOKEN_DAYS": {
+    "group": "security",
+    "description": "Lifetime of an MCP OAuth refresh token, in days. Each use spends it and issues a new one; never longer than the grant it belongs to.",
+    "default": "30"
+  },
+  "MCP_OAUTH_GRANT_MAX_DAYS": {
+    "group": "security",
+    "description": "Longest an MCP OAuth grant lives, in days, however often its refresh token is rotated; after it the person authorizes the client again.",
+    "default": "90"
+  },
+  "MCP_OAUTH_RATE_LIMIT_PER_MIN": {
+    "group": "security",
+    "description": "Requests per minute per client address to /oauth/authorize, and separately to /oauth/token with /oauth/revoke, before the MCP authorization server answers 429.",
+    "default": "30"
+  },
+  "MCP_OAUTH_CLIENT_METADATA_CACHE_SECONDS": {
+    "group": "security",
+    "description": "How long a fetched client ID metadata document is cached when it sends no Cache-Control max-age (a max-age is followed up to a day; no-store is never cached).",
+    "default": "300"
+  },
+  "MCP_OAUTH_TOKEN_SECRET": {
+    "group": "security",
+    "description": "Key for the keyed hashes under which MCP OAuth codes, tokens and client secrets are stored, separate from JWT_SECRET, which is used when this is unset. Changing it invalidates every issued token and every pre-registered client secret.",
+    "secret": true
   }
 }
