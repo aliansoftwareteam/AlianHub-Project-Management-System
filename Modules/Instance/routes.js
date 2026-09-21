@@ -2,6 +2,7 @@ const ctrl = require('./controller');
 const enforcement = require('./enforcement');
 const csp = require('./csp');
 const egress = require('./egress');
+const knowledge = require('./knowledge');
 const { requireInstanceAdmin } = require('./guard');
 const agentMetrics = require('../Agents/metricsController');
 
@@ -39,4 +40,14 @@ exports.init = (app) => {
     app.put(`${admin}/enforcement/:companyId/mode`, enforcement.setMode);
     app.get(`${admin}/egress`, egress.summary);
     app.put(`${admin}/egress/:companyId`, egress.setHosts);
+    app.get(`${admin}/knowledge`, knowledge.summary);
+    app.get(`${admin}/knowledge/:companyId`, knowledge.workspace);
+    app.post(`${admin}/knowledge/:companyId/reindex`, knowledge.reindex);
+    app.post(`${admin}/knowledge/:companyId/reindex/cancel`, knowledge.cancelReindex);
+    app.post(`${admin}/knowledge/:companyId/reembed`, knowledge.reembed);
+    app.post(`${admin}/knowledge/:companyId/retry-files`, knowledge.retryFiles);
+    app.post(`${admin}/knowledge/:companyId/erase/document`, knowledge.eraseDocument);
+    app.post(`${admin}/knowledge/:companyId/erase/person`, knowledge.erasePerson);
+    app.get(`${admin}/knowledge/:companyId/exclusions`, knowledge.exclusions);
+    app.post(`${admin}/knowledge/:companyId/exclusions/:exclusionId/remove`, knowledge.removeExclusion);
 };

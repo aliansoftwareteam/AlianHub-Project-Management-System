@@ -1,3 +1,5 @@
+const os = require('os');
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
@@ -53,6 +55,9 @@ const EMBED_RETRY_BASE_MS = 30 * 1000;
 /* Sources the recurring job re-embeds per run, so a run stays short and a bad key cannot pay
  * for a whole corpus of refusals. */
 const REEMBED_BATCH = 50;
+/* Long enough for one source's embedding call; a server that dies holding a claim frees it after. */
+const EMBED_LEASE_MS = 10 * 60 * 1000;
+const SERVER = `${os.hostname()}:${process.pid}:${crypto.randomBytes(4).toString('hex')}`;
 
 const store = (companyId, type, data, method) => MongoDbCrudOpration(String(companyId), { type, data }, method);
 const chunkStore = (companyId, data, method) => store(companyId, SCHEMA_TYPE.KNOWLEDGE_CHUNKS, data, method);
@@ -76,6 +81,7 @@ const byId = (companyId, type, id, fields) => (isObjectId(id)
 const excluded = (companyId, rules) => store(companyId, SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS, [{ $or: rules }, '_id', { lean: true }], 'findOne').then(Boolean);
 
 const documentRule = (sourceType, row) => ({ kind: 'document', sourceType, sourceId: String(row._id) });
+const taskRule = (taskId) => ({ kind: 'task', sourceId: String(taskId).toLowerCase() });
 
 const anyTrashed = async (companyId, projectIds) => {
     const ids = [...new Set(projectIds.filter(isObjectId).map(String))];
@@ -252,7 +258,11 @@ const RULES = {
             title: asText(comment.message).replace(/\s+/g, ' ').trim().slice(0, TITLE_LENGTH),
         }),
         async decide(companyId, comment) {
-            const erasure = [documentRule('comment', comment), ...(comment.userId ? [{ kind: 'author', userId: String(comment.userId) }] : [])];
+            const erasure = [
+                documentRule('comment', comment),
+                ...(comment.userId ? [{ kind: 'author', userId: String(comment.userId) }] : []),
+                ...(comment.taskId ? [taskRule(comment.taskId)] : []),
+            ];
             if (await excluded(companyId, erasure)) return leaveOut('erase', 'erased', comment);
             if (comment.isDeleted === true) return { ...leaveOut('tombstone', 'deleted', comment), deletesWin: true };
             if (!COMMENT_TYPES.includes(comment.type)) return leaveOut('tombstone', 'no text', comment);
@@ -336,7 +346,7 @@ const RULES = {
         async decide(companyId, row) {
             const { task, attachment } = row;
             const fingerprint = [time(task.updatedAt), task.ProjectID, task.sprintId, task.deletedStatusKey, attachment && attachment.url].map(asText).join('|');
-            if (await excluded(companyId, [documentRule('file', row)])) return leaveOut('erase', 'erased', row, {}, fingerprint);
+            if (await excluded(companyId, [documentRule('file', row), taskRule(task._id)])) return leaveOut('erase', 'erased', row, {}, fingerprint);
             if (!attachment) return { ...leaveOut('tombstone', 'removed', row, {}, fingerprint), unconditional: true };
             if (Number(task.deletedStatusKey) === 1) return { ...leaveOut('tombstone', 'task deleted', row, {}, fingerprint), marker: TASK_DELETED };
             if (!task.ProjectID) return leaveOut('tombstone', 'no project', row, {}, fingerprint);
@@ -953,6 +963,26 @@ const clearEmbedRetries = () => {
     embedRetryQueue.clear();
 };
 
+const leaseFree = (now) => ({ $or: [{ embedLeaseUntil: { $exists: false } }, { embedLeaseUntil: null }, { embedLeaseUntil: { $lte: new Date(now) } }] });
+
+/* A source is claimed on its first chunk before it is embedded, so a second server sweeping at the
+ * same time (the recurring job, a console re-embed) passes it over instead of paying for it again.
+ * Neither the claim nor its release moves `updatedAt`, which says when the chunk was indexed. */
+const claimForEmbed = async (companyId, sourceType, sourceId) => {
+    const now = Date.now();
+    return Boolean(await chunkStore(companyId, [
+        { sourceType, sourceId, ordinal: 0, ...leaseFree(now) },
+        { $set: { embedLeaseUntil: new Date(now + EMBED_LEASE_MS), embedLeaseOwner: SERVER } },
+        { projection: { _id: 1 }, returnDocument: 'after', lean: true, timestamps: false },
+    ], 'findOneAndUpdate'));
+};
+
+const releaseEmbed = (companyId, sourceType, sourceId) => chunkStore(companyId, [
+    { sourceType, sourceId, ordinal: 0, embedLeaseOwner: SERVER },
+    { $unset: { embedLeaseUntil: '', embedLeaseOwner: '' } },
+    { timestamps: false },
+], 'updateOne');
+
 /* Sources of a hybrid company whose live chunks carry no vector for the current model: what a
  * failed embed left behind, and everything indexed before the model changed. Stops at the first
  * failure, since the next source would fail the same way. */
@@ -967,10 +997,16 @@ const reembedMissing = async (companyId) => {
     let count = 0;
     for (const row of rows || []) {
         const { sourceType, sourceId } = row._id || {};
-        const result = await sync(companyId, sourceType, sourceId).catch((error) => {
-            logger.error(`${LOG_PREFIX} ${companyId}: re-embedding ${sourceType} ${sourceId} failed: ${error.message}`);
-            return null;
-        });
+        if (!(await claimForEmbed(companyId, sourceType, sourceId))) continue;
+        let result;
+        try {
+            result = await sync(companyId, sourceType, sourceId).catch((error) => {
+                logger.error(`${LOG_PREFIX} ${companyId}: re-embedding ${sourceType} ${sourceId} failed: ${error.message}`);
+                return null;
+            });
+        } finally {
+            await releaseEmbed(companyId, sourceType, sourceId).catch(() => null);
+        }
         if (result && result.embedFailed) break;
         count += 1;
     }
@@ -983,6 +1019,7 @@ module.exports = {
     RULES,
     EMBED_RETRY_ATTEMPTS,
     FILE_EXTRACT_ATTEMPTS,
+    RETRIED_FILE_REASONS: RETRIED,
     REEMBED_BATCH,
     embedRetries,
     flushEmbedRetries,

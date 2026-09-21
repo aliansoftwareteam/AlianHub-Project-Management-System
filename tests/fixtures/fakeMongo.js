@@ -2,7 +2,7 @@
 // language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type/$size, $set/$inc/$push/$addToSet/$pull,
 // conditional findOneAndUpdate answering the old document unless asked for the new one (null after an upsert insert, as
 // the driver does), updateOne and findOneAndUpdate with upsert and $setOnInsert and a unique _id, findOneAndDelete, deleteOne, deleteMany,
-// sort/skip/limit on find, sort on findOneAndUpdate, $type 'date', $match/$project/$addFields ($toString)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
+// sort/skip/limit on find, sort on findOneAndUpdate, $type 'date', $match/$project/$addFields ($toString, $ifNull, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000, declared text indexes that bound $text to their fields) so a test can assert on what was written.
 
 let seq = 1;
@@ -149,6 +149,11 @@ const group = (docs, spec) => {
 const computed = (doc, value, search, textFields) => {
     if (value && typeof value === 'object' && value.$meta === 'textScore') return textScoreOf(doc, search, textFields);
     if (value && typeof value === 'object' && value.$toString !== undefined) return String(hex(fieldOf(doc, value.$toString)));
+    if (value && typeof value === 'object' && Array.isArray(value.$ifNull)) {
+        const found = computed(doc, value.$ifNull[0], search, textFields);
+        return found == null ? computed(doc, value.$ifNull[1], search, textFields) : found;
+    }
+    if (value && typeof value === 'object' && value.$strLenBytes !== undefined) return Buffer.byteLength(String(computed(doc, value.$strLenBytes, search, textFields)));
     return fieldOf(doc, value);
 };
 
@@ -203,6 +208,7 @@ const create = ({ mongooseCasting = false } = {}) => {
         if (method === 'find') return ordered(list.filter((d) => matches(d, data[0], textFields)), data[2]).map(clone);
         if (method === 'findOne') return clone(list.find((d) => matches(d, data[0], textFields)) || null);
         if (method === 'countDocuments') return list.filter((d) => matches(d, data[0], textFields)).length;
+        if (method === 'distinct') return [...new Set(list.filter((d) => matches(d, data[1] || {}, textFields)).map((d) => read(d, data[0])).filter((v) => v !== undefined))];
         if (method === 'deleteOne') { const index = list.findIndex((d) => matches(d, data[0], textFields)); if (index !== -1) list.splice(index, 1); return { deletedCount: index === -1 ? 0 : 1 }; }
         if (method === 'deleteMany') { const kept = list.filter((d) => !matches(d, data[0], textFields)); store[type] = kept; return { deletedCount: list.length - kept.length }; }
         if (method === 'findOneAndUpdate') {

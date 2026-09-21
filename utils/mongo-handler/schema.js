@@ -1564,6 +1564,8 @@ const schema = {
         extractDueAt: { type: Date, required: false },
         // The source row's updatedAt when it was read, so a slower, older read never overwrites a newer one.
         sourceUpdatedAt: { type: Date, required: false },
+        embedLeaseUntil: { type: Date, required: false },
+        embedLeaseOwner: { type: String, required: false },
         // Agent memory only (sourceType 'memory'): the scope, the agent whose runs alone read it, and what it was formed from.
         scope: { type: String, required: false },
         agentId: { type: String, required: false },
@@ -1578,15 +1580,18 @@ const schema = {
         derivedAuthors: { type: [String], required: false, default: undefined },
         derivedOnlyPrivateOf: { type: String, required: false },
     },
-    // What an erasure keeps out of the index for good: one document, or one person's private pages and comments.
+    // What an erasure keeps out of the index for good: one document, one task's comments and files, or one person's private pages and comments.
     knowledgeExclusions: {
         companyId: { type: String, required: true },
-        // 'document' | 'author'
+        // 'document' | 'task' | 'author'
         kind: { type: String, required: true },
         sourceType: { type: String, required: false, default: '' },
         sourceId: { type: String, required: false, default: '' },
         userId: { type: String, required: false, default: '' },
         reason: { type: String, required: false, default: 'erased' },
+        erasedAt: { type: Date, required: false },
+        erasedBy: { type: String, required: false, default: '' },
+        erasedChunks: { type: Number, required: false, default: 0 },
     },
     // Backfill progress per source type, one row per tenant database.
     knowledgeIndexState: {
@@ -1609,6 +1614,16 @@ const schema = {
         catchUpPass: { type: Number, required: false, default: 0 },
         // When the source's chunks were given their origin, so the fill runs once.
         originFilledAt: { type: Date, required: false },
+        reindexStatus: { type: String, required: false, default: '' },
+        reindexCursor: { type: String, required: false, default: '' },
+        reindexSynced: { type: Number, required: false, default: 0 },
+        reindexRequestedAt: { type: Date, required: false },
+        reindexRequestedBy: { type: String, required: false },
+        reindexFinishedAt: { type: Date, required: false },
+        reindexError: { type: String, required: false, default: '' },
+        reindexFailures: { type: Number, required: false, default: 0 },
+        reindexOwner: { type: String, required: false, default: '' },
+        reindexLeaseUntil: { type: Date, required: false, default: null },
     },
     // Submissions arriving through a public intake form
     intakeItems: {
