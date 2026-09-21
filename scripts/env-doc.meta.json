@@ -300,6 +300,51 @@
     "description": "IANA time zone for scheduled jobs (reminders, digests).",
     "default": "UTC"
   },
+  "CSP_EXTRA_CONNECT_SRC": {
+    "group": "security",
+    "description": "Extra hosts for the connect-src directive of the content security policy (API, XHR and websocket calls), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+  },
+  "CSP_EXTRA_FONT_SRC": {
+    "group": "security",
+    "description": "Extra hosts for the font-src directive of the content security policy (fonts), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+  },
+  "CSP_EXTRA_FORM_ACTION": {
+    "group": "security",
+    "description": "Extra hosts for the form-action directive of the content security policy (form posts), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+  },
+  "CSP_EXTRA_FRAME_ANCESTORS": {
+    "group": "security",
+    "description": "Extra hosts for the frame-ancestors directive of the content security policy (sites that may frame AlianHub), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+  },
+  "CSP_EXTRA_FRAME_SRC": {
+    "group": "security",
+    "description": "Extra hosts for the frame-src directive of the content security policy (framed pages), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+  },
+  "CSP_EXTRA_IMG_SRC": {
+    "group": "security",
+    "description": "Extra hosts for the img-src directive of the content security policy (images), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+  },
+  "CSP_EXTRA_MEDIA_SRC": {
+    "group": "security",
+    "description": "Extra hosts for the media-src directive of the content security policy (audio and video), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+  },
+  "CSP_EXTRA_SCRIPT_SRC": {
+    "group": "security",
+    "description": "Extra hosts for the script-src directive of the content security policy (scripts), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. In script-src and worker-src, sources must be https, may not be on a domain where anyone can publish (github.io, googleusercontent.com, githubusercontent.com and similar) must name exact hosts (no wildcard), and on a package CDN (cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com) must name one package and its version. Read at boot."
+  },
+  "CSP_EXTRA_STYLE_SRC": {
+    "group": "security",
+    "description": "Extra hosts for the style-src directive of the content security policy (style sheets), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. Read at boot."
+  },
+  "CSP_EXTRA_WORKER_SRC": {
+    "group": "security",
+    "description": "Extra hosts for the worker-src directive of the content security policy (workers), separated by spaces and written with their scheme, such as https://cdn.example.com or https://*.example.com. Quotes, keywords such as 'unsafe-eval', semicolons, commas, schemes on their own, a bare * and a wildcard over a top-level domain, a public suffix or a shared hosting domain stop the server at boot, whatever CSP_MODE is. In script-src and worker-src, sources must be https, may not be on a domain where anyone can publish (github.io, googleusercontent.com, githubusercontent.com and similar) must name exact hosts (no wildcard), and on a package CDN (cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com) must name one package and its version. Read at boot."
+  },
+  "CSP_MODE": {
+    "group": "security",
+    "description": "Content security policy: off (no policy header, the default), report (Content-Security-Policy-Report-Only: nothing is blocked, and what would be is counted under Instance > Enforcement) or enforce (Content-Security-Policy: the browser blocks it). The policy is built on the first request from the storage endpoint and whether push is configured (restart to change them), and follows WEBURL and APIURL when they change; the public share and form pages keep their own stricter policy. Violation reports go to POST /api/v2/csp-report, which keeps the day, directive, blocked host and page path shape for 30 days and nothing else. Run report until the list is quiet, then enforce. An unknown value stops the server at boot. Read at boot.",
+    "default": "off"
+  },
   "DEEPSEEK_API_KEY": {
     "group": "ai",
     "description": "DeepSeek API key, used when LLM_PROVIDER is deepseek.",
@@ -884,7 +929,7 @@
   },
   "STORAGE_TYPE": {
     "group": "storage",
-    "description": "wasabi | server",
+    "description": "wasabi | server. With server, uploads are served from the app's own origin, and whatever CSP_MODE is: every upload response carries X-Content-Type-Options: nosniff and a sandboxing Content-Security-Policy; images (including SVG), PDF, plain text, audio and video still preview inline; every other file (scripts, HTML, XML, unknown types) downloads as application/octet-stream.",
     "required": true,
     "default": "wasabi"
   },

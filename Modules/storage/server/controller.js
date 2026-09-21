@@ -6,6 +6,7 @@ const path = require('path');
 const { generateSignedUrl, checkBucketInDB, uploadStorageThumbnailFile } = require("./helpers/bucket.helper.js");
 const thumbnailArray = require("../../../thumbnail.json");
 const jwt = require("jsonwebtoken");
+const { sendStoredFile } = require("./helpers/downloadHeaders.js");
 
 /**
  * @description Create a bucket for the specified database.
@@ -270,11 +271,7 @@ exports.handleFileRequest = async(req, res) => {
             if(bucketValid && Object.keys(bucketValid).length && bucketValid.rule.isPrivate == false) {
                 const filePath = exports.resolveBucketFile(bucketId, filepath);
                 if (fs.existsSync(filePath)) {
-                    res.sendFile(filePath, (err) => {
-                        if (err) {
-                            return;
-                        }
-                    });
+                    sendStoredFile(res, filePath);
                     return;
                 } else {
                     res.status(404).send({status: false,statusText:'Resorce Not Found'});
@@ -294,19 +291,7 @@ exports.handleFileRequest = async(req, res) => {
             const filePath = exports.resolveBucketFile(bucketId, filepath);
     
             if (fs.existsSync(filePath)) {
-                if(req.query.download) {
-                    res.download(filePath, err => {
-                        if(err) {
-                            return;
-                        }
-                    })
-                } else {
-                    res.sendFile(filePath, (err) => {
-                        if (err) {
-                            return;
-                        }
-                    });
-                }
+                sendStoredFile(res, filePath, { download: Boolean(req.query.download) });
             } else {
                 res.status(404).send({status: false,statusText:'Resorce Not Found'});
                 return;
