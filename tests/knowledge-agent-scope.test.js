@@ -54,9 +54,16 @@ const SEED = {
         await indexer.syncTaskFiles(C, String(task._id));
         return indexer.fileSourceId(task._id, attached.id);
     },
+    transcript: async (projectId, word) => String(mockDb.seed(SCHEMA_TYPE.CALLS, { title: 'Call', transcript: `The call says ${word}.`, participants: [STARTER], projectId, deletedStatusKey: 0, updatedAt: at(1) })._id),
 };
 
-const asAgent = (agentId, word, sourceType) => retrieve({ companyId: C, caller: { kind: 'agent', userId: STARTER, agentId, runId: 'r1' }, query: word, scope: { sourceTypes: [sourceType] } })
+let runSeq = 0;
+const runFor = (agentId, over = {}) => {
+    runSeq += 1;
+    return String(mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { _id: `6f0000000000000000077${String(runSeq).padStart(3, '0')}`, agentId, startedBy: STARTER, status: 'running', ...over })._id);
+};
+
+const asAgent = (agentId, word, sourceType, runId = runFor(agentId)) => retrieve({ companyId: C, caller: { kind: 'agent', userId: STARTER, agentId, runId }, query: word, scope: { sourceTypes: [sourceType] } })
     .then((result) => result.passages.map((p) => p.sourceId));
 
 const setEnv = (key, value) => { if (value === undefined) delete process.env[key]; else process.env[key] = value; };
@@ -120,8 +127,60 @@ describe.each(Object.keys(SEED))('an agent-scoped run reading %s', (sourceType) 
     });
 });
 
+describe('content outside any project (owner decision pending)', () => {
+    const companyPage = (over = {}) => String(mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Page bollard', rawText: 'bollard', visibility: 'project', createdBy: STARTER, ProjectID: null, deletedStatusKey: 0, updatedAt: at(1), ...over })._id);
+    const looseCall = () => String(mockDb.seed(SCHEMA_TYPE.CALLS, { title: 'Call', transcript: 'The call says bollard.', participants: [STARTER], projectId: null, deletedStatusKey: 0, updatedAt: at(1) })._id);
+
+    it.each([SCOPED, UNSCOPED])('keeps company-level pages, private or not, from agent %s', async (agentId) => {
+        companyPage();
+        companyPage({ visibility: 'private' });
+        expect(await asAgent(agentId, 'bollard', 'page')).toEqual([]);
+    });
+
+    it.each([SCOPED, UNSCOPED])('keeps calls with no project from agent %s', async (agentId) => {
+        looseCall();
+        expect(await asAgent(agentId, 'bollard', 'transcript')).toEqual([]);
+    });
+
+    it('reads it through one named rule, closed until the owner decides', () => {
+        expect(agentScope.agentsReachContentWithoutProject()).toBe(false);
+    });
+
+    it('still reaches a person asking', async () => {
+        const page = companyPage();
+        const call = looseCall();
+        const asked = (sourceType) => retrieve({ companyId: C, caller: { kind: 'user', userId: STARTER }, query: 'bollard', scope: { sourceTypes: [sourceType] } }).then((r) => r.passages.map((p) => p.sourceId));
+        expect(await asked('page')).toEqual([page]);
+        expect(await asked('transcript')).toEqual([call]);
+    });
+});
+
+describe('the run a retrieval names', () => {
+    it('is refused when it is missing, not running, or another agent\'s or another starter\'s', async () => {
+        const OTHER = '6f0000000000000000000019';
+        const cases = [
+            '6f0000000000000000066666',
+            runFor(SCOPED, { status: 'done' }),
+            runFor(UNSCOPED),
+            runFor(SCOPED, { startedBy: OTHER }),
+        ];
+        for (const runId of cases) {
+            await expect(asAgent(SCOPED, 'bollard', 'task', runId)).rejects.toBeInstanceOf(RetrievalRefused);
+        }
+    });
+
+    it('is refused when the caller names none', async () => {
+        await expect(retrieve({ companyId: C, caller: { kind: 'agent', userId: STARTER, agentId: SCOPED }, query: 'bollard', scope: { sourceTypes: ['task'] } })).rejects.toBeInstanceOf(RetrievalRefused);
+    });
+
+    it('started by an event, with no starter, still retrieves project content as the caller', async () => {
+        const inScope = await SEED.task(SECRET, 'bollard');
+        expect(await asAgent(SCOPED, 'bollard', 'task', runFor(SCOPED, { startedBy: null }))).toEqual([inScope]);
+    });
+});
+
 describe('the narrowed set', () => {
-    const set = (over = {}) => ({ companyId: C, caller: { kind: 'agent', userId: STARTER, agentId: SCOPED }, projectIds: [SHARED, SECRET], fileProjectIds: [SHARED, SECRET], hiddenSprintIds: [], sourceTypes: ['file'], ...over });
+    const set = (over = {}) => ({ companyId: C, caller: { kind: 'agent', userId: STARTER, agentId: SCOPED, runId: runFor(SCOPED) }, projectIds: [SHARED, SECRET], fileProjectIds: [SHARED, SECRET], hiddenSprintIds: [], sourceTypes: ['file'], ...over });
 
     it('narrows every per-project list', async () => {
         const narrowed = await agentScope.narrowToAgent(set());
@@ -131,7 +190,7 @@ describe('the narrowed set', () => {
 
     it('reads an agent with no projects through one named rule, closed until the owner decides', async () => {
         expect(agentScope.projectsForAgentWithoutProjects([SHARED, SECRET])).toEqual([]);
-        const narrowed = await agentScope.narrowToAgent(set({ caller: { kind: 'agent', userId: STARTER, agentId: UNSCOPED } }));
+        const narrowed = await agentScope.narrowToAgent(set({ caller: { kind: 'agent', userId: STARTER, agentId: UNSCOPED, runId: runFor(UNSCOPED) } }));
         expect(narrowed).toMatchObject({ projectIds: [], fileProjectIds: [] });
     });
 

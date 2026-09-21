@@ -47,7 +47,6 @@ const runOf = (agentId, startedBy = STARTER, projectId = P1, over = {}) => {
     runSeq += 1;
     return mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { _id: `6f00000000000000000${String(runSeq).padStart(5, '0')}`, agentId, startedBy, projectId, status: 'running', ...over });
 };
-const RETRIEVING_RUN = '6f0000000000000000099999';
 
 const note = async (agentId, text, { run, derivedFrom } = {}) => {
     const written = await memory.rememberForAgent({ companyId: C, runId: String((run || runOf(agentId))._id), text, derivedFrom });
@@ -61,7 +60,7 @@ const chunksOf = (memoryId) => mockDb.store[CHUNKS].filter((c) => c.sourceType =
 const liveChunk = (memoryId) => chunksOf(memoryId).find((c) => c.deleted !== true) || null;
 
 const recall = (agentId, userId, query, over = {}) => retrieve({
-    companyId: C, caller: { kind: 'agent', userId, agentId, runId: RETRIEVING_RUN }, query, scope: { sourceTypes: ['memory'] }, ...over,
+    companyId: C, caller: { kind: 'agent', userId, agentId, runId: String((over.run || runOf(agentId, userId))._id) }, query, scope: { sourceTypes: ['memory'] }, ...over,
 });
 const recalledIds = async (...args) => (await recall(...args)).passages.map((p) => p.sourceId);
 
@@ -261,7 +260,7 @@ describe('who retrieves a memory', () => {
     });
 
     describe('the chunk search narrows before recheck', () => {
-        const setFor = (kind, agentId, userId, projectIds) => ({ companyId: C, caller: { kind, userId, agentId }, projectIds, sourceTypes: [] });
+        const setFor = (kind, agentId, userId, projectIds) => ({ companyId: C, caller: { kind, userId, agentId }, starterId: userId, projectIds, sourceTypes: [] });
         const candidates = async (set, query) => {
             const side = await memoryRetrieval.sideFor(set, {});
             return (await memoryRetrieval.search({ set, side, query, limit: 20 })).map((p) => p.sourceId);
@@ -296,7 +295,7 @@ describe('who retrieves a memory', () => {
 
     describe('recheck() decides from the live note', () => {
         const passage = (memoryId) => ({ id: `memory:${memoryId}`, sourceType: 'memory', sourceId: memoryId, title: '', excerpt: '', score: 1, authorKind: 'agent', updatedAt: null });
-        const setFor = (agentId, userId, projectIds) => ({ companyId: C, caller: { kind: 'agent', userId, agentId }, projectIds, sourceTypes: [] });
+        const setFor = (agentId, userId, projectIds) => ({ companyId: C, caller: { kind: 'agent', userId, agentId }, starterId: userId, projectIds, sourceTypes: [] });
 
         it('drops a passage from a project outside the set, whatever the index said', async () => {
             const secret = await note(AGENT_A, 'The acquisition closes Friday.', { run: runOf(AGENT_A, STARTER, P2) });
@@ -384,7 +383,7 @@ describe('a note is held to every source it came from, for the run reading it', 
             });
             return { id: `memory:${memoryId}`, sourceType: 'memory', sourceId: memoryId, title: '', excerpt: '', score: 1, authorKind: 'agent', updatedAt: null };
         };
-        const setFor = (userId) => ({ companyId: C, caller: { kind: 'agent', userId, agentId: AGENT_A }, projectIds: PROJECTS[userId], hiddenSprintIds: [], fileProjectIds: [], sourceTypes: [], privileged: false });
+        const setFor = (userId) => ({ companyId: C, caller: { kind: 'agent', userId, agentId: AGENT_A }, starterId: userId, projectIds: PROJECTS[userId], hiddenSprintIds: [], fileProjectIds: [], sourceTypes: [], privileged: false });
 
         it('gives a note naming a source it cannot check only to its starter, even unmarked', async () => {
             const passage = await stored({ derivedFrom: ['web:regulator.example'] });
@@ -451,6 +450,33 @@ describe('provenance comes from the stored run and the sources, never from the c
         }
     });
 
+    it.each(taint.KIND_LIST)('keeps a note from a run tainted by %s to its starter, though it names only workspace sources', async (kind) => {
+        const run = runOf(AGENT_A, STARTER, P1, { tainted: true, taintSources: [{ kind, ref: `${kind}-1` }] });
+        const written = await note(AGENT_A, `Formed after a ${kind} read.`, { run, derivedFrom: [pageIn(P1)] });
+        await indexReady();
+        expect(written).toMatchObject({ tainted: true, starterOnly: true });
+        expect(await recalledIds(AGENT_A, STARTER, kind)).toEqual([written.memoryId]);
+        expect(await recalledIds(AGENT_A, MEMBER, kind)).toEqual([]);
+    });
+
+    it('keeps a note starter-only on a repeat sighting from a clean run', async () => {
+        const first = await note(AGENT_A, 'Harbour dues rose.', { derivedFrom: ['web:harbour.example'] });
+        const again = await note(AGENT_A, 'Harbour dues rose.', { run: runOf(AGENT_A, STARTER, P1) });
+        expect(again).toMatchObject({ memoryId: first.memoryId, starterOnly: true });
+    });
+
+    it("counts a comment in its task's project, not the project the comment row names", async () => {
+        const task = mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Moved', ProjectID: P2, deletedStatusKey: 0 });
+        const comment = mockDb.seed(SCHEMA_TYPE.COMMENTS, { message: 'c', type: 'text', userId: STARTER, projectId: P1, taskId: String(task._id) });
+        const written = await note(AGENT_A, 'Comment on a moved task.', { run: runOf(AGENT_A, STARTER, null), derivedFrom: [`comment:${comment._id}`] });
+        expect(written.projectIds).toEqual([P2]);
+    });
+
+    it('refuses a file whose attachment is no longer on its task', async () => {
+        const task = mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'T', ProjectID: P1, deletedStatusKey: 0, attachments: [{ id: 'kept' }] });
+        await expect(memory.rememberForAgent({ companyId: C, runId: runOf(AGENT_A)._id, text: 'Removed file.', derivedFrom: [`file:${task._id}:removed`] })).rejects.toThrow(/does not exist/);
+    });
+
     it('marks performance reads and tool results as external, starter-only content', async () => {
         for (const ref of ['performance:hours-2026-09', 'tool:crm.lookup']) {
             const written = await note(AGENT_A, `Read ${ref}.`, { derivedFrom: [ref] });
@@ -468,6 +494,20 @@ describe('provenance comes from the stored run and the sources, never from the c
     it('refuses a repeat sighting that would take the note past the limit', async () => {
         await note(AGENT_A, 'Crowded note.', { derivedFrom: Array.from({ length: 15 }, () => pageIn(P1)) });
         await expect(note(AGENT_A, 'Crowded note.', { derivedFrom: Array.from({ length: 6 }, () => pageIn(P1)) })).rejects.toThrow(/at most 20/);
+    });
+});
+
+describe('a run started by an event, with no starter', () => {
+    it('reads project notes and fails closed for every starter-only note', async () => {
+        const shared = await note(AGENT_A, 'The crane inspection is due.');
+        const loose = await note(AGENT_A, 'The crane key is in the drawer.', { run: runOf(AGENT_A, STARTER, null) });
+        const fromNobody = await note(AGENT_A, 'The crane operator changed.', { run: runOf(AGENT_A, null, null) });
+        await indexReady();
+        const eventRun = runOf(AGENT_A, null, P1);
+        const ids = await recalledIds(AGENT_A, STARTER, 'crane', { run: eventRun });
+        expect(ids).toEqual([shared.memoryId]);
+        expect(ids).not.toContain(loose.memoryId);
+        expect(ids).not.toContain(fromNobody.memoryId);
     });
 });
 

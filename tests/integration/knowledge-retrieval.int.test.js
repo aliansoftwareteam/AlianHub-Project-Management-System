@@ -397,12 +397,18 @@ describe('agent memory in the knowledge store', () => {
     const other = new ObjectId();
     const runIds = [];
 
-    const recall = (agentId, word) => modules.retrieval.retrieve({
-        companyId: state.companyId,
-        caller: { kind: 'agent', userId: owner.uid, agentId: String(agentId), runId: String(new ObjectId()) },
-        query: word,
-        scope: { sourceTypes: ['memory'] },
-    }).then((result) => result.passages.map((p) => p.sourceId));
+    const recall = async (agentId, word) => {
+        const run = { _id: new ObjectId(), agentId: String(agentId), startedBy: owner.uid, status: 'running' };
+        await tenant.collection('agent_runs').insertOne(run);
+        runIds.push(run._id);
+        const result = await modules.retrieval.retrieve({
+            companyId: state.companyId,
+            caller: { kind: 'agent', userId: owner.uid, agentId: String(agentId), runId: String(run._id) },
+            query: word,
+            scope: { sourceTypes: ['memory'] },
+        });
+        return result.passages.map((p) => p.sourceId);
+    };
 
     beforeAll(async () => {
         // The LangGraph store refuses a real database under NODE_ENV=test, a guard meant for the unit suites.
