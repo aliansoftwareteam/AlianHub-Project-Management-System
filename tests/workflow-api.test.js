@@ -2,6 +2,11 @@ jest.mock('../Modules/Workflows/store');
 jest.mock('../Modules/Workflows/queue');
 jest.mock('../Modules/Agents/access');
 jest.mock('../Modules/Agents/revert');
+jest.mock('../Modules/Workflows/approvals');
+jest.mock('../Modules/Workflows/people');
+jest.mock('../Modules/Workflows/definitions');
+jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn(async () => null) }));
+jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async () => 1) }));
 
 const store = require('../Modules/Workflows/store');
 const queue = require('../Modules/Workflows/queue');
