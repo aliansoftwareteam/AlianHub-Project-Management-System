@@ -12,6 +12,7 @@ const { updateUserFun } = require('../Users/controller');
 const { storeRefferalCode } = require('../Affiliate/controller');
 const { planObj } = require('./defaultSubscriptionData');
 const { createDemoProject } = require('./demoProject');
+const vectorStore = require('../Knowledge/vectorStore');
 const { handleCreateCompanyDataStorageFun } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 
 const importSettings = (payload) => new Promise((resolve, reject) => {
@@ -72,6 +73,7 @@ async function createFirstCompany({ userId, email, companyName, teamFocus = '', 
         ensureNotificationDefaults(companyId, userId),
     ]);
     side.filter((r) => r.status === 'rejected').forEach((r) => logger.error(`setup: company side step failed: ${r.reason?.message || r.reason}`));
+    vectorStore.prepareCompany(companyId);
 
     await updateUserFun(SCHEMA_TYPE.GOLBAL, {
         type: SCHEMA_TYPE.USERS,

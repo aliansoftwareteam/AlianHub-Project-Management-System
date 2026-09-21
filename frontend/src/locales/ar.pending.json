@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-21T07:18:19.524Z",
+  "updatedAt": "2026-09-21T08:54:47.334Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_available_on_paid_plans_upgrade_now": "AI is only available for purchase on our paid plans. Upgrade and add AI now!",
@@ -8479,6 +8479,19 @@
     "Knowledge.exclusion_remove_confirm": "Remove the exclusion for {id}? It can be indexed again from its next change or re-index.",
     "Knowledge.exclusion_remove_now": "Remove exclusion",
     "Knowledge.exclusion_removed": "Exclusion removed.",
-    "Knowledge.by_admin_key": "the instance admin key"
+    "Knowledge.by_admin_key": "the instance admin key",
+    "Knowledge.vector_store": "Vector store",
+    "Knowledge.vector_store_local": "In the workspace database, cosine over the newest chunks of each source",
+    "Knowledge.vector_store_atlas": "Atlas Vector Search",
+    "Knowledge.vector_index_ready": "index ready",
+    "Knowledge.vector_index_building": "index building: questions use full-text search until it is ready",
+    "Knowledge.vector_index_missing": "index missing: it is created on the next check",
+    "Knowledge.vector_index_failed": "index failed to build",
+    "Knowledge.vector_index_unsupported": "this MongoDB server has no Atlas Search",
+    "Knowledge.vector_index_unreachable": "Atlas Search cannot be reached",
+    "Knowledge.vector_index_unknown": "index state unknown",
+    "Knowledge.vector_store_paused": "vector search paused until {until}",
+    "Knowledge.vector_index_mismatch": "index size does not match the embedding model: check KNOWLEDGE_EMBEDDING_DIMENSIONS",
+    "Knowledge.vector_index_timeout": "the index check timed out; it is tried again on the next check"
   }
 }

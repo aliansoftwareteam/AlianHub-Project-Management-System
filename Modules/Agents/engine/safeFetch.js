@@ -145,11 +145,20 @@ async function readCapped(stream, { maxBytes, remainingMs }) {
     });
 }
 
-/* Redirect method rules follow the Fetch spec: 303 always becomes GET, and so do
- * 301/302 for anything but GET/HEAD; 307/308 replay the original method and body. */
+/* 303 always becomes GET, and so do 301/302 for anything but GET/HEAD (stricter than the
+ * Fetch standard, which converts only POST); 307/308 replay the original method and body. */
 const methodAfterRedirect = (status, method) => (status === 303 || ((status === 301 || status === 302) && method !== 'get' && method !== 'head') ? 'get' : method);
 
 const portOf = (u) => Number(u.port || (u.protocol === 'https:' ? 443 : 80));
+
+const sameOrigin = (a, b) => a.protocol === b.protocol && a.hostname === b.hostname && portOf(a) === portOf(b);
+
+const CREDENTIAL_HEADERS = Object.freeze(['authorization', 'proxy-authorization', 'cookie']);
+const BODY_HEADERS = Object.freeze(['content-type', 'content-length', 'content-encoding', 'content-language', 'content-location']);
+
+const withoutHeaders = (headers, names) => Object.fromEntries(Object.entries(headers || {}).filter(([name]) => !names.includes(name.toLowerCase())));
+
+const hopOf = (u, status) => ({ host: u.host, path: u.pathname, status });
 
 const REFUSAL = Object.freeze({ PRIVATE_HOST: 'private_host', UNLISTED: 'unlisted', PRIVATE_ADDRESS: 'private_address' });
 
@@ -190,7 +199,13 @@ const withinBudget = (promise, ms) => new Promise((resolve, reject) => {
 });
 
 /* Follows redirects by hand so every hop is validated and pinned. `opts.resolve`
- * exists for tests that need a "public" name to land on a local server. */
+ * exists for tests that need a "public" name to land on a local server.
+ *
+ * Credentials (Authorization, Proxy-Authorization, Cookie and any `opts.sensitiveHeaders`)
+ * are dropped for good at the first hop to another origin, and a request that carried
+ * them is refused a hop from https to http. Only a credentialed request loses its body
+ * on a cross-origin 307/308: an unauthenticated one (a webhook delivery) is replayed as
+ * the Fetch standard does. */
 async function safeFetch(url, opts = {}) {
     const { timeoutMs, maxBytes, maxRedirects } = { ...DEFAULTS, ...opts };
     const resolve = opts.resolve || ((target) => resolvePublic(target, { allowlist: opts.allowlist }));
@@ -203,6 +218,10 @@ async function safeFetch(url, opts = {}) {
     const workspace = { ...(egressContext.get() || {}), ...(opts.companyId ? { companyId: opts.companyId, actor: opts.actor } : {}) };
     const gate = egressContext.isOn() && workspace.companyId ? await withinBudget(egressGate(workspace), remaining()) : null;
 
+    const sensitive = [...CREDENTIAL_HEADERS, ...(opts.sensitiveHeaders || []).map((name) => String(name).toLowerCase())];
+    let headers = opts.headers;
+    const credentialed = Object.keys(headers || {}).some((name) => sensitive.includes(name.toLowerCase()));
+    const hops = [];
     let current = String(url);
     let method = String(opts.method || 'get').toLowerCase();
     let data = opts.data;
@@ -223,7 +242,7 @@ async function safeFetch(url, opts = {}) {
                 url: target.url.toString(),
                 method,
                 data,
-                headers: opts.headers,
+                headers,
                 timeout: remaining(),
                 signal: controller.signal,
                 maxRedirects: 0,
@@ -239,19 +258,31 @@ async function safeFetch(url, opts = {}) {
         }
         clearTimeout(abortTimer);
 
+        hops.push(hopOf(target.url, res.status));
         const location = res.headers && res.headers.location;
         if (res.status >= 300 && res.status < 400 && location) {
             res.data.destroy();
             if (hop >= maxRedirects) throw new Error(`too many redirects (more than ${maxRedirects})`);
-            const next = methodAfterRedirect(res.status, method);
-            if (next !== method) data = undefined;
+            const nextUrl = new URL(String(location), target.url);
+            if (credentialed && target.url.protocol === 'https:' && nextUrl.protocol === 'http:') {
+                throw new Error(`refused a redirect from https to http (${nextUrl.host}) on a request that carries credentials`);
+            }
+            const crossOrigin = !sameOrigin(target.url, nextUrl);
+            let next = methodAfterRedirect(res.status, method);
+            if (crossOrigin && credentialed && next !== 'head') next = 'get';
+            if (next !== method || (crossOrigin && credentialed)) {
+                data = undefined;
+                headers = withoutHeaders(headers, BODY_HEADERS);
+            }
+            if (crossOrigin) headers = withoutHeaders(headers, sensitive);
             method = next;
-            current = new URL(String(location), target.url).toString();
+            current = nextUrl.toString();
             continue;
         }
 
         const body = await readCapped(res.data, { maxBytes, remainingMs: remaining() });
-        return { status: res.status, headers: res.headers, body: body.toString('utf8'), bytes: body.length, url: target.url.toString() };
+        const finalUrl = `${target.url.protocol}//${target.url.host}${target.url.pathname}`;
+        return { status: res.status, headers: res.headers, body: body.toString('utf8'), bytes: body.length, url: target.url.toString(), finalUrl, hops };
     }
 }
 
