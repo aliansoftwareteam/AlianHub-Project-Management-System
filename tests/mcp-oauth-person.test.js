@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { approveInWorkspace } = require('./fixtures/oauthApproval');
 
 const mockDb = require('./fixtures/fakeMongo').create();
 
@@ -44,6 +45,7 @@ afterAll(() => { ENV_KEYS.forEach((k) => { if (saved[k] === undefined) delete pr
 
 const mint = async () => {
     const { client } = await clients.register({ kind: 'dynamic', name: 'S10S4 Person', redirectUris: [REDIRECT], tokenEndpointAuthMethod: 'none' });
+    approveInWorkspace(mockDb, C, client.clientId);
     const verifier = crypto.randomBytes(32).toString('base64url');
     const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
     const { code } = await grants.issueCode({ client, companyId: C, userId: USER, scopes: ['tasks:read', 'tasks:write'], redirectUri: REDIRECT, codeChallenge: challenge });

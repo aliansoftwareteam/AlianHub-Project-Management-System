@@ -122,7 +122,8 @@ const {
     secretsSchema,
     oauthClientsSchema,
     oauthGrantsSchema,
-    oauthTokensSchema
+    oauthTokensSchema,
+    oauthClientApprovalsSchema
 } = require('./createSchema');
 
 
@@ -372,6 +373,8 @@ exports.checkType = (type) => {
             return oauthGrantsSchema
         case SCHEMA_TYPE.OAUTH_TOKENS:
             return oauthTokensSchema
+        case SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS:
+            return oauthClientApprovalsSchema
         default:
             return ""
     }
@@ -624,6 +627,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.OAUTH_GRANTS}`
         case SCHEMA_TYPE.OAUTH_TOKENS:
                 return `${dbCollections.OAUTH_TOKENS}`
+        case SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS:
+                return `${dbCollections.OAUTH_CLIENT_APPROVALS}`
         default:
             return ""
     }

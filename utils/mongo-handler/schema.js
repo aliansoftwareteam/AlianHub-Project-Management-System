@@ -1543,8 +1543,9 @@ const schema = {
         purgeAt: { type: Date, required: true },
         revokedAt: { type: Date, required: false },
         revokedReason: { type: String, required: false },
+        lastUsedAt: { type: Date, required: false },
     },
-    // kind is code, access or refresh. purgeAt drives the TTL index; a code outlives its expiry there so a replay is recognised.
+    // kind is code, access, refresh or consent (an answered consent request). purgeAt drives the TTL index; a code outlives its expiry there so a replay is recognised.
     oauthTokens: {
         tokenHash: { type: String, required: true },
         kind: { type: String, required: true },
@@ -1561,6 +1562,26 @@ const schema = {
         purgeAt: { type: Date, required: true },
         spentAt: { type: Date, required: false },
         revokedAt: { type: Date, required: false },
+    },
+    // One row per client per workspace; status is pending, approved, denied or revoked. scopes is the ceiling a
+    // person may consent to there, and privateSprints the admin opt-in private-sprint delegation needs (S7, S8).
+    oauthClientApprovals: {
+        companyId: { type: String, required: true },
+        clientId: { type: String, required: true },
+        clientName: { type: String, required: false },
+        clientKind: { type: String, required: false },
+        redirectHosts: { type: [String], required: false },
+        status: { type: String, required: true },
+        scopes: { type: [String], required: false },
+        requestedScopes: { type: [String], required: false },
+        privateSprints: { type: Boolean, required: false },
+        requestedBy: { type: String, required: false },
+        requestedAt: { type: Date, required: false },
+        decidedBy: { type: String, required: false },
+        decidedAt: { type: Date, required: false },
+        revokedBy: { type: String, required: false },
+        revokedAt: { type: Date, required: false },
+        updatedAt: { type: Date, required: false },
     },
     // One document per workspace (_id "workspace"): the hosts its agents may fetch when
     // AGENT_EGRESS_ALLOWLIST is on (Modules/Agents/engine/egressAllowlist.js).

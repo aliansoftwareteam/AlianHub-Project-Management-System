@@ -11,7 +11,7 @@ Backend variables: 249. Frontend build-time variables: 23.
 | `APIURL` | yes |  | Public base URL of this API, with a trailing slash (used in emails, OAuth callbacks and share links). | `Config/config.js`, `Config/contentSecurityPolicy.js` +7 |
 | `APP_NAME` |  | `Alian Hub` | Product name shown in emails and page titles. | `Config/config.js`, `Modules/Template/forgotPassword.js` +5 |
 | `BUILD_INFO_GIT_TIMEOUT_MS` |  | `10000` | Per-command timeout, in ms, for the git calls that resolve the running version. On timeout the server reports channel unknown and retries in the background. | `scripts/build-info.js` |
-| `NODE_ENV` |  | `development` | development \| production | `Config/config.js`, `Config/cookies.js` +9 |
+| `NODE_ENV` |  | `development` | development \| production | `Config/config.js`, `Config/cookies.js` +8 |
 | `PORT` | yes | `4000` | TCP port the HTTP server listens on. | `Config/config.js` |
 | `SERVER_HEADERS_TIMEOUT_MS` |  | `66000` | How long the HTTP server waits for a full request header block; always kept above the keep-alive timeout (default 66000). | `Modules/Agents/engine/timeouts.js` |
 | `SERVER_KEEP_ALIVE_TIMEOUT_MS` |  | `65000` | Idle keep-alive timeout of the HTTP server; keep it above the idle timeout of any proxy in front (default 65000). | `Modules/Agents/engine/timeouts.js` |

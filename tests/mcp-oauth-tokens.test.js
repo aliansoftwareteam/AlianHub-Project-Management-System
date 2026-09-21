@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { approveInWorkspace } = require('./fixtures/oauthApproval');
 
 const mockDb = require('./fixtures/fakeMongo').create();
 const mockApproved = { value: true };
@@ -13,7 +14,10 @@ jest.mock('../Modules/Agents/actions', () => ({ RefusedError: class RefusedError
 jest.mock('../Modules/Mcp/tools', () => ({ manifest: () => [], call: jest.fn(async () => ({ ok: true })) }));
 // Slice S3's per-workspace approval, standing in until that module lands.
 jest.mock('../Modules/Mcp/approvalsHook', () => {
-    const approvals = { isClientApproved: jest.fn(async () => mockApproved.value) };
+    const approvals = {
+        isClientApproved: jest.fn(async () => mockApproved.value),
+        approvedScopes: jest.fn(async () => (mockApproved.value === true ? ['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write'] : null)),
+    };
     return { load: jest.fn(() => approvals) };
 });
 
@@ -51,6 +55,7 @@ const store = (type) => mockDb.store[type] || [];
 
 const mint = async ({ scopes = ['tasks:read'], companyId = C, now = new Date(), client: given } = {}) => {
     const client = given || (await clients.register({ kind: 'dynamic', name: 'S10S4 Agent', redirectUris: [REDIRECT], tokenEndpointAuthMethod: 'none' })).client;
+    approveInWorkspace(mockDb, companyId, client.clientId);
     const verifier = crypto.randomBytes(32).toString('base64url');
     const { code, grant } = await grants.issueCode({ client, companyId, userId: USER, scopes, redirectUri: REDIRECT, codeChallenge: challengeOf(verifier), now });
     const issued = await grants.exchangeCode({ client, code, codeVerifier: verifier, redirectUri: REDIRECT, resource: RESOURCE, now });

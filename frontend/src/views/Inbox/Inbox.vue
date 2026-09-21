@@ -217,6 +217,8 @@ import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useHelper } from '@/components/organisms/Header/helper';
 import { openPanel } from '@/components/organisms/Shell/shellState';
 import { noticeTextOf } from '@/views/Ai/rateAlerts';
+import { escapeHtml } from '@/utils/notificationHtml';
+import { renderNotice } from './renderNotice';
 
 defineOptions({ name: 'InboxPage' });
 
@@ -281,11 +283,7 @@ const actorOf = (it) => (it.actorId ? getUser(it.actorId) : null);
 const actorImage = (it) => actorOf(it)?.Employee_profileImageURL || '';
 const actorName = (it) => actorOf(it)?.Employee_Name || '';
 const alertNotice = (it) => (it.changeType === 'agent_alert' ? noticeTextOf(it.changeData) : null);
-const render = (it) => {
-    const notice = alertNotice(it);
-    if (!notice) return changeText(String(it.message || ''));
-    return escapeHtml(t(notice.key, { ...notice.params, agent: notice.params.agent || t('AiAlerts.unnamed_agent') }));
-};
+const render = (it) => renderNotice(it, { t, changeText });
 const isExpanded = (it) => expanded.value === rowKey(it);
 const canReply = (it) => !!(it.taskId && it.projectId && it.sprintId && !it.mainChat);
 
@@ -503,7 +501,6 @@ const onReplyKey = (e, it) => {
     if (e.key === 'Escape') { closeReply(); return; }
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); sendReply(it); }
 };
-const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 const sendReply = async (it) => {
     const text = replyText.value.trim();
     if (!text) { replyError.value = t('Inbox.reply_empty'); return; }

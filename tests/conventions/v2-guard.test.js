@@ -11,7 +11,7 @@ const PUBLIC_BY_DESIGN = ['/api/v2/auth', '/api/v2/setup', '/api/v2/sso', '/api/
     '/api/v2/createUser', '/api/v2/sendVerificationEmail', '//api/v2/verifyEmail'.replace('//', '/'), '/api/v2/generateToken', '/api/v2/checkPermission'];
 const SELF_GUARDED = ['/api/v2/agents', '/api/v2/api-tokens', '/api/v2/automations', '/api/v2/billing', '/api/v2/intake', '/api/v2/invoices', '/api/v2/webhooks', '/api/v2/instance', '/api/v2/timesheet-approval', '/api/v2/generate', '/api/v2/secrets', '/api/v2/provider-keys',
     // registered only while MCP_OAUTH is on, each route behind verifyJWTTokenWithCV2 inline (Modules/OAuthServer/routes.js)
-    '/api/v2/oauth-clients'];
+    '/api/v2/oauth-clients', '/api/v2/oauth-client-approvals', '/api/v2/oauth-grants'];
 
 describe('every /api/v2 prefix is guarded, public by design, or guards itself', () => {
     const src = fs.readFileSync(path.join(__dirname, '..', '..', 'Config', 'setMiddleware.js'), 'utf8');

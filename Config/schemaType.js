@@ -122,6 +122,7 @@ const SCHEMA_TYPE = {
     OAUTH_CLIENTS: "oauth_clients",
     OAUTH_GRANTS: "oauth_grants",
     OAUTH_TOKENS: "oauth_tokens",
+    OAUTH_CLIENT_APPROVALS: "oauth_client_approvals",
     SCHEMA_VERSIONS: "schema_versions",
     INSTANCE_SETTINGS: "instance_settings",
 }
