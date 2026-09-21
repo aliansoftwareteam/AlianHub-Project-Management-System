@@ -27,7 +27,7 @@ exports.summary = async (req, res) => {
             data: {
                 mode: contentSecurityPolicy.modeOf(),
                 header: header ? header.name : null,
-                policy: contentSecurityPolicy.policyOf(process.env, { reportingApi: Boolean(req.secure) }),
+                policy: contentSecurityPolicy.sentPolicy(process.env, { reportingApi: Boolean(req.secure) }),
                 reportPath: contentSecurityPolicy.REPORT_PATH,
                 days: DAYS,
                 total: directives.reduce((sum, row) => sum + row.count, 0),

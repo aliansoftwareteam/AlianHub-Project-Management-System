@@ -23,3 +23,4 @@ exports.init = (app, env = process.env) => {
 exports.MAX_BODY_BYTES = MAX_BODY_BYTES;
 exports.REPORTS_PER_MINUTE = REPORTS_PER_MINUTE;
 exports.MAX_ROWS_PER_DAY = ctrl.MAX_ROWS_PER_DAY;
+exports.MAX_NEW_KEYS_PER_ADDRESS = ctrl.MAX_NEW_KEYS_PER_ADDRESS;

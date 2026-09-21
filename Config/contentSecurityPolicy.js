@@ -21,23 +21,32 @@ const UNSAFE_INLINE = "'unsafe-inline'";
 const GOOGLE_SIGN_IN_SCRIPT = 'https://accounts.google.com/gsi/client';
 const GOOGLE_SIGN_IN_STYLE = 'https://accounts.google.com/gsi/style';
 const GOOGLE_SIGN_IN_CALLS = 'https://accounts.google.com/gsi/';
-// api.js pulls the Drive picker's modules from its own host.
-const GOOGLE_PICKER_SCRIPTS = 'https://apis.google.com';
+// api.js pulls the Drive picker's module from /_/scs/ on the same host.
+const GOOGLE_PICKER_SCRIPTS = ['https://apis.google.com/js/api.js', 'https://apis.google.com/_/scs/'];
 const DROPBOX_CHOOSER_SCRIPT = 'https://www.dropbox.com/static/api/2/dropins.js';
 // PdfViewer.vue loads pdf.min.js and its worker from this folder.
 const PDF_VIEWER_SCRIPTS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 // firebase-messaging-sw.js imports the SDK from here, and a worker answers to the policy it was served with.
 const FIREBASE_WORKER_SCRIPTS = 'https://www.gstatic.com/firebasejs/';
-const FIREBASE_CALLS = ['https://firebaseinstallations.googleapis.com', 'https://fcmregistrations.googleapis.com'];
-const GOOGLE_FONTS_STYLE = 'https://fonts.googleapis.com';
-const GOOGLE_FONTS_FILES = 'https://fonts.gstatic.com';
-const GITHUB_PROFILE_API = 'https://api.github.com';
-const GITLAB_PROFILE_API = 'https://gitlab.com';
+const FIREBASE_CALLS = ['https://firebaseinstallations.googleapis.com/v1/', 'https://fcmregistrations.googleapis.com/v1/'];
+const GOOGLE_FONTS_STYLE = 'https://fonts.googleapis.com/css2';
+const GOOGLE_FONTS_FILES = 'https://fonts.gstatic.com/s/';
+const GITHUB_PROFILE_API = ['https://api.github.com/user', 'https://api.github.com/user/emails'];
+const GITLAB_PROFILE_API = 'https://gitlab.com/api/v4/user';
 const DEFAULT_STORAGE_ENDPOINT = 'https://s3.wasabisys.com';
 
 const HOST = '[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::\\d{1,5})?';
 const CONFIGURED_HOST = new RegExp(`^${HOST}$`, 'i');
-const EXTRA_SOURCE = new RegExp(`^(?:https?|wss?)://(?:\\*\\.)?${HOST}(?:/[A-Za-z0-9._~%/-]*)?$`, 'i');
+const EXTRA_SOURCE = new RegExp(`^(https?|wss?)://(\\*\\.)?(${HOST})(/[A-Za-z0-9._~%@/-]*)?$`, 'i');
+const SCRIPT_DIRECTIVES = ['script-src', 'worker-src'];
+// Second-level labels under a country code that are public suffixes themselves, as in co.uk or com.au.
+const PUBLIC_SECOND_LEVEL = new Set(['ac', 'co', 'com', 'edu', 'gob', 'gov', 'go', 'ltd', 'mil', 'ne', 'net', 'nic', 'or', 'org', 'plc', 'sch']);
+// Domains where anyone can publish under a subdomain or a path.
+const SHARED_HOSTING = ['github.io', 'gitlab.io', 'bitbucket.io', 'githubusercontent.com', 'googleusercontent.com', 'storage.googleapis.com',
+    'appspot.com', 'web.app', 'firebaseapp.com', 'pages.dev', 'workers.dev', 'netlify.app', 'vercel.app', 'herokuapp.com', 'glitch.me',
+    'blogspot.com', 'surge.sh', 'repl.co', 'codepen.io', 'jsfiddle.net', 's3.amazonaws.com', 'cloudfront.net', 'azurewebsites.net', 'onrender.com'];
+// Package CDNs serve every published package, so a script source there must name one.
+const PACKAGE_CDNS = ['cdn.jsdelivr.net', 'unpkg.com', 'cdnjs.cloudflare.com', 'esm.sh', 'esm.run', 'ga.jspm.io', 'cdn.skypack.dev'];
 const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?$/;
 
 const readExtras = (env = process.env) => ({
@@ -63,15 +72,36 @@ const modeOf = (env = process.env) => {
     return value;
 };
 
+const within = (host, domain) => host === domain || host.endsWith(`.${domain}`);
+
+const tooBroad = (base) => {
+    const labels = base.split('.');
+    return labels.length < 2 || (labels.length === 2 && PUBLIC_SECOND_LEVEL.has(labels[0])) || SHARED_HOSTING.some((domain) => within(domain, base));
+};
+
+const refusalOf = (directive, source) => {
+    const match = EXTRA_SOURCE.exec(source);
+    if (!match) return 'List hosts with their scheme, separated by spaces, such as https://cdn.example.com or wss://*.example.com. '
+        + 'Keywords, quotes, semicolons, schemes on their own and a bare * are refused.';
+    const [, scheme, wildcard, hostWithPort, pathPart] = match;
+    const host = hostWithPort.toLowerCase().replace(/:\d+$/, '');
+    if (wildcard && tooBroad(host)) return 'A wildcard may not cover a top-level domain, a public suffix or a shared hosting domain.';
+    if (!SCRIPT_DIRECTIVES.includes(directive)) return null;
+    if (scheme.toLowerCase() !== 'https') return 'Scripts load over https only.';
+    if (SHARED_HOSTING.some((domain) => within(host, domain))) return 'Scripts may not come from a domain where anyone can publish.';
+    if (PACKAGE_CDNS.some((domain) => within(host, domain)) && (!pathPart || pathPart === '/')) return 'Scripts from a package CDN must name the package path.';
+    return null;
+};
+
+/* A value goes into a response header as it is, so it may only be a list of hosts: a quote would let a
+ * keyword such as 'unsafe-eval' in, and a semicolon or a line break would start a directive or a header. */
 /* A value goes into a response header as it is, so it may only be a list of hosts: a quote would let a
  * keyword such as 'unsafe-eval' in, and a semicolon or a line break would start a directive or a header. */
 const extrasOf = (env = process.env) => Object.fromEntries(Object.entries(readExtras(env)).map(([directive, raw]) => {
-    const value = String(raw || '');
-    const sources = value.split(/\s+/).filter(Boolean);
-    const refused = sources.find((source) => !EXTRA_SOURCE.test(source));
-    if (refused !== undefined) {
-        throw new Error(`${extraKey(directive)}: ${JSON.stringify(refused)} is not allowed. List hosts with their scheme, separated by spaces, `
-            + 'such as https://cdn.example.com or wss://*.example.com. Keywords, quotes, semicolons, schemes on their own and a bare * are refused.');
+    const sources = String(raw || '').split(/\s+/).filter(Boolean);
+    for (const source of sources) {
+        const reason = refusalOf(directive, source);
+        if (reason) throw new Error(`${extraKey(directive)}: ${JSON.stringify(source)} is not allowed. ${reason}`);
     }
     return [directive, sources];
 }));
@@ -104,12 +134,12 @@ const buildDirectives = (env = process.env, { reportingApi = false } = {}) => {
 
     const directives = {
         'default-src': [SELF],
-        'script-src': [SELF, GOOGLE_SIGN_IN_SCRIPT, GOOGLE_PICKER_SCRIPTS, DROPBOX_CHOOSER_SCRIPT, PDF_VIEWER_SCRIPTS, ...(pushOn ? [FIREBASE_WORKER_SCRIPTS] : [])],
+        'script-src': [SELF, GOOGLE_SIGN_IN_SCRIPT, ...GOOGLE_PICKER_SCRIPTS, DROPBOX_CHOOSER_SCRIPT, PDF_VIEWER_SCRIPTS, ...(pushOn ? [FIREBASE_WORKER_SCRIPTS] : [])],
         'style-src': [SELF, UNSAFE_INLINE, GOOGLE_FONTS_STYLE, GOOGLE_SIGN_IN_STYLE],
         'img-src': [SELF, 'data:', 'blob:', 'https:', ...storage],
         'media-src': [SELF, 'blob:', ...storage],
         'font-src': [SELF, 'data:', GOOGLE_FONTS_FILES],
-        'connect-src': [SELF, ...socketSources(env), ...storage, GOOGLE_SIGN_IN_CALLS, GITHUB_PROFILE_API, GITLAB_PROFILE_API, ...(pushOn ? FIREBASE_CALLS : [])],
+        'connect-src': [SELF, ...socketSources(env), ...storage, GOOGLE_SIGN_IN_CALLS, ...GITHUB_PROFILE_API, GITLAB_PROFILE_API, ...(pushOn ? FIREBASE_CALLS : [])],
         'frame-src': [SELF, 'https:'],
         'worker-src': [SELF, 'blob:'],
         'manifest-src': [SELF],
@@ -143,25 +173,55 @@ const yieldToRoutePolicy = (res) => {
     };
 };
 
-/* The header is built on the first request, not here: index.js registers this before it applies the
- * instance settings saved in the database, and the storage endpoint is one of them.
- *
- * report-to goes out over https only. Chrome stops using report-uri once report-to is named, and accepts
+/* The restart-only settings (storage, push, extras) are read on the first request, not at registration: index.js
+ * registers this before it applies the instance settings saved in the database. WEBURL and APIURL change from the
+ * console without a restart, so the cached policy is rebuilt when they do. */
+const LIVE_KEYS = ['WEBURL', 'APIURL'];
+
+const policySource = (env) => {
+    let frozen = null;
+    let live = null;
+    let values = {};
+    return (reportingApi) => {
+        if (!frozen) frozen = { ...env };
+        const current = LIVE_KEYS.map((key) => env[key] || '').join('\n');
+        if (current !== live) {
+            live = current;
+            values = {};
+        }
+        if (values[reportingApi] === undefined) {
+            values[reportingApi] = policyOf({ ...frozen, ...Object.fromEntries(LIVE_KEYS.map((key) => [key, env[key]])) }, { reportingApi });
+        }
+        return values[reportingApi];
+    };
+};
+
+let active = null;
+
+/* What the server sends for this environment, from the middleware's own cache once it runs. */
+const sentPolicy = (env = process.env, { reportingApi = false } = {}) => (active && active.env === env
+    ? active.valueFor(reportingApi)
+    : policyOf(env, { reportingApi }));
+
+/* report-to goes out over https only. Chrome stops using report-uri once report-to is named, and accepts
  * a reporting endpoint only over https, so naming it on a plain http install would silence every report. */
 const middleware = (env = process.env) => {
     const mode = modeOf(env);
     extrasOf(env);
-    if (mode === OFF) return null;
+    if (mode === OFF) {
+        if (active && active.env === env) active = null;
+        return null;
+    }
     const name = headerNameOf(mode);
-    const values = {};
+    const valueFor = policySource(env);
+    active = { env, valueFor };
     return (req, res, next) => {
         const reportingApi = Boolean(req.secure);
-        if (values[reportingApi] === undefined) values[reportingApi] = policyOf(env, { reportingApi });
-        res.setHeader(name, values[reportingApi]);
+        res.setHeader(name, valueFor(reportingApi));
         if (reportingApi) res.setHeader(REPORTING_ENDPOINTS_HEADER, `${REPORT_GROUP}="${REPORT_PATH}"`);
         if (mode === REPORT) yieldToRoutePolicy(res);
         next();
     };
 };
 
-module.exports = { OFF, REPORT, ENFORCE, MODES, REPORT_PATH, EXTRA_ENV, DIRECTIVE_NAMES, modeOf, extrasOf, buildDirectives, policyOf, headerOf, middleware };
+module.exports = { OFF, REPORT, ENFORCE, MODES, REPORT_PATH, EXTRA_ENV, DIRECTIVE_NAMES, modeOf, extrasOf, buildDirectives, policyOf, headerOf, sentPolicy, middleware };
