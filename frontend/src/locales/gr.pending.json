@@ -1,7 +1,7 @@
 {
   "locale": "gr",
   "machineTranslated": false,
-  "updatedAt": "2026-09-21T12:26:03.078Z",
+  "updatedAt": "2026-09-21T13:27:56.427Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6377,6 +6377,20 @@
     "Instance.redact_code_unknown_workspace": "That workspace no longer exists.",
     "Instance.redact_code_confirmation_mismatch": "The id you typed does not match the person's user id.",
     "Instance.redact_code_redaction_running": "Another run is already redacting this person in this workspace. Try again once it ends.",
-    "Instance.redact_code_server_error": "The audit rows could not be redacted. Running it again resumes where it stopped."
+    "Instance.redact_code_server_error": "The audit rows could not be redacted. Running it again resumes where it stopped.",
+    "TaskPanel.agent_outside_tag": "OUTSIDE AGENT",
+    "TaskPanel.agent_activities": "Latest activity",
+    "TaskPanel.agent_session_offered": "Delegated — waiting for the agent to start",
+    "TaskPanel.agent_session_active": "Working on this task",
+    "TaskPanel.agent_session_completed": "Finished",
+    "TaskPanel.agent_session_failed": "Stopped with an error",
+    "TaskPanel.agent_session_revoked": "Stopped — access was revoked",
+    "TaskPanel.agent_session_unresponsive": "Did not start within ten seconds",
+    "TaskPanel.agent_session_with_reason": "{state}: {reason}",
+    "TaskPanel.agent_activity_thought": "Thinking",
+    "TaskPanel.agent_activity_action": "Action",
+    "TaskPanel.agent_activity_elicitation": "Question",
+    "TaskPanel.agent_activity_response": "Answer",
+    "TaskPanel.agent_activity_error": "Error"
   }
 }

@@ -93,6 +93,13 @@
 @keyframes ah-agent-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .ah-agent-strip.is-done { border-bottom-color: var(--ok); background: var(--ok-bg); }
 .ah-agent-strip.is-failed { border-bottom-color: var(--danger); background: var(--danger-bg); }
+.ah-agent-strip.has-session { flex-wrap: wrap; }
+.ah-agent-strip__activities { flex-basis: 100%; list-style: none; margin: 2px 0 0; padding: 0 0 0 30px; display: grid; gap: 3px; }
+.ah-agent-strip__activity { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--ink-2); }
+.ah-agent-strip__kind { height: 16px; padding: 0 5px; font-size: 9.5px; flex: none; }
+.ah-agent-strip__activity.is-error .ah-agent-strip__kind { color: var(--danger); }
+.ah-agent-strip__activity.is-elicitation .ah-agent-strip__kind { color: var(--agent); }
+.ah-agent-strip__activity-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- body ---------- */
 .ah-detail__body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 250px; }
