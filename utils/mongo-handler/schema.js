@@ -1483,6 +1483,8 @@ const schema = {
         hosts: { type: [String], required: false },
         updatedBy: { type: String, required: false },
         updatedAt: { type: Date, required: false },
+        // Moves on with every save; a save names the version it read, so two console tabs cannot drop each other's hosts.
+        version: { type: Number, required: false },
     },
     // Client invoices raised against a project (handoff 19c). Distinct from the
     // global `invoices` collection, which is AlianHub's own subscription billing.
