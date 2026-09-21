@@ -939,8 +939,8 @@
   },
   "STORAGE_DOWNLOAD_SCOPE": {
     "group": "storage",
-    "description": "Which stored files a signed download link is issued for. enforce (the default): only a file attached to a record the caller may open (a task, project, comment, form, clip, reminder, timesheet screenshot, or a company settings image); any other key answers 404 with code STORED_FILE_NOT_AVAILABLE. report: every link is issued as before, and each one enforce would refuse is logged with its layout type and a running count, never the key. Anything else reads as enforce.",
-    "default": "enforce"
+    "description": "Which stored files a signed download link is issued for. report (the default): every link is issued as before, and each one enforce would refuse is logged as 'stored-file download would be refused' with the key's layout type (task_attachment, channel_comment, form_upload, unknown, ...), a reason category (not_found, no_access, invalid_path, unknown) and a running count per pair, never the key or path. enforce: a link is issued only for a file attached to a record the caller may open (a task, project, comment, channel, direct message, form, clip, reminder, timesheet screenshot, or a company settings image); any other key answers 404 with code STORED_FILE_NOT_AVAILABLE. Anything else reads as report. Switch plan: run one release on report, check the logged counts, and set enforce once no layout other than unknown shows refusals that a legitimate screen caused.",
+    "default": "report"
   },
   "STORAGE_TYPE": {
     "group": "storage",

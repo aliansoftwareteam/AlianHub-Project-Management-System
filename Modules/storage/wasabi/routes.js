@@ -10,7 +10,7 @@ const wasabiUploadRefusal = (req) => {
     return uploadRefusal(req, isProfileUpload(body) ? USER_PROFILES_BUCKET : body.companyId, body.path);
 };
 
-const signedRead = [requireOwnBucket(bodyField('companyId')), requireStoredFileRead(bodyField('companyId'), bodyField('path'))];
+const signedRead = [requireOwnBucket(bodyField('companyId')), requireStoredFileRead(bodyField('companyId'), bodyField('path'), { storage: 'wasabi' })];
 
 const upload = multer({
     dest: "wasabiUploads/",

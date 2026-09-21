@@ -1135,7 +1135,7 @@ exports.cleanUpTrackshotStorage = async () => {
     getCompanyDataFun([],true)
     .then((response) => {
         response.forEach((cmp) => {
-            exports.cleanUpTrackShotCompanyWise(cmp._id);
+            cleanUpTrackShotCompanyWise(cmp._id);
         })}).catch((error)=>{
             logger.error(`Error getting company:${error}`)
         })

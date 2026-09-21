@@ -38,6 +38,8 @@ function serverEnv({ port, mongoUrl, workDir, embeddingsUrl }) {
         JWT_ALGORITHM: 'HS256',
         PRECOMPANYKEY: crypto.randomBytes(16).toString('hex'),
         STORAGE_TYPE: 'server',
+        // The harness exercises every screen's downloads under the rule the owner will switch to.
+        STORAGE_DOWNLOAD_SCOPE: 'enforce',
         LOG_DIR: path.join(workDir, 'log'),
         BACKUP_DIR: path.join(workDir, 'backups'),
         MIGRATIONS_AUTO: 'true',
