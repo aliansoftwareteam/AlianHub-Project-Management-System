@@ -10,6 +10,7 @@ const {
     findRoomsByPrefix,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { onJoin, roomFor, isSelf } = require('../roomAccess');
 
 const handleReminderChange = (changeData) => {
     if (!changeData || changeData.module !== 'generalReminder') return;
@@ -38,13 +39,12 @@ const handleReminderChange = (changeData) => {
 };
 
 exports.generalReminderSocketHandler = ({ socket, namespace }) => {
-    socket.on('joinGeneralReminder', (data) => {
-        if (!data || !data.uid) return;
-        const roomName = `generalReminder_${data.uid}**${data.socketId}`;
+    onJoin(socket, 'joinGeneralReminder', (data, identity) => isSelf(identity, data.uid), (data) => {
+        const roomName = roomFor(socket, `generalReminder_${data.uid}`);
         joinRoom(socket, roomName);
         upsertRoom({
             roomName,
-            socketId: data.socketId,
+            socketId: socket.id,
             namespace,
             socket,
             isUserIdCheck: data.uid ? true : false,

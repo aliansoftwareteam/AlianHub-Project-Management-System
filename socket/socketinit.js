@@ -14,6 +14,7 @@ const { resolveAccessSession } = require('../Config/jwt');
 const logger = require('../Config/loggerConfig');
 const { corsOriginDelegate } = require('../utils/cors.js');
 const { removeRoom, removeBySocket } = require('./helper');
+const { identityOf } = require('./roomAccess');
 exports.changeStreams = [];
 const EventEmitter = require('events');
 exports.emitter = new EventEmitter();
@@ -104,7 +105,12 @@ exports.initSocket = (server) => {
         if (!session.ok) {
             return next(new Error('Authentication error: Session has ended'));
         }
+        const identity = identityOf(socket.nsp.name, decoded);
+        if (!identity) {
+            return next(new Error('Authentication error: Namespace does not match the token'));
+        }
         socket.user = decoded;
+        socket.identity = identity;
         next();
     });
     const adminUiConfig = exports.getAdminUiConfig();
@@ -142,30 +148,18 @@ exports.initSocket = (server) => {
             removeBySocket(socket);
         });
 
-        // SOCKET-PERFORMANCE-PLAN #1 (Phase 2): explicit client-driven
-        // namespace disconnect. Behaviourally identical to the original
-        // recursive `countFunction` — for every room in this adapter whose
-        // name encodes the target socket id, remove the index entry. Then
-        // forcibly close the target socket. The recursion in the previous
-        // version was synchronous busy-work; a plain forEach over
-        // `adapter.rooms` is equivalent and easier to follow.
         socket.on('disconnectNameSpace', (id) => {
-            socket.adapter.rooms.forEach((_, roomName) => {
-                if (roomName.includes(id)) {
-                    removeRoom(roomName);
-                }
-            });
-            namespace.sockets.get(id)?.disconnect(true);
+            if (id !== socket.id) return;
+            socket.rooms.forEach((roomName) => removeRoom(roomName));
+            socket.disconnect(true);
         });
 
         socket.on('getRoomList', (socketId, callback) => {
-            let roomsArray = [];
-            socket.adapter.rooms.forEach((_, roomName) => {
-                if (roomName.includes("**") && roomName.includes(socketId)) {
-                    roomsArray.push(roomName)
-                }
-            })
-            callback(roomsArray);
+            if (typeof callback !== 'function') return;
+            const rooms = socketId === socket.id
+                ? [...socket.rooms].filter((roomName) => roomName.includes('**'))
+                : [];
+            callback(rooms);
         });
         taskSocketHandler({socket, namespace});
         chatSocketHandler({socket, namespace});

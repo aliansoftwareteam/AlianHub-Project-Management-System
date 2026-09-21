@@ -1,10 +1,10 @@
 const {
     joinRoom,
-    leaveRoom,
     upsertRoom,
     findRoomsByPrefix,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { onJoin, roomFor, isSelf } = require('../roomAccess');
 
 const handleUserNotificationChange = (changeData) => {
     if (changeData.module !== 'userIdNotification') return;
@@ -28,12 +28,12 @@ const handleUserNotificationChange = (changeData) => {
 };
 
 exports.userNotificationCountHandler = ({ socket, namespace }) => {
-    socket.on('joinUserIdNotification', (data) => {
-        const roomName = `userIdNotification_${data.uid}**${data.socketId}`;
+    onJoin(socket, 'joinUserIdNotification', (data, identity) => isSelf(identity, data.uid), (data) => {
+        const roomName = roomFor(socket, `userIdNotification_${data.uid}`);
         joinRoom(socket, roomName);
         upsertRoom({
             roomName,
-            socketId: data.socketId,
+            socketId: socket.id,
             namespace,
             socket,
             isUserIdCheck: data.userId ? true : false,
