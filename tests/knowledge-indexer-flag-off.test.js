@@ -11,6 +11,7 @@ jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/Automations/engine', () => ({ defineRecurring: jest.fn(async () => undefined) }));
 jest.mock('../common-storage/common-server.js', () => ({ handleTaskAttachmentsDuplicateFunctionality: jest.fn() }));
 jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({ handleNotificationtFun: jest.fn() }));
+jest.mock('../common-storage/readStoredFile', () => ({ readStoredFile: jest.fn() }));
 jest.mock('../Modules/AI/meetingNotes', () => ({ generateMeetingNotes: jest.fn(async () => ({ status: true, data: { summary: 'Summary.', actionItems: [] } })) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
@@ -25,6 +26,8 @@ const flag = require('../Modules/Knowledge/flag');
 const events = require('../Modules/Knowledge/ingest/events');
 const backfill = require('../Modules/Knowledge/ingest/backfill');
 const knowledge = require('../Modules/Knowledge/init');
+const extractor = require('../Modules/Knowledge/ingest/extract/extractor');
+const { readStoredFile } = require('../common-storage/readStoredFile');
 
 const C = '6f0000000000000000000c01';
 const OWNER = '6f0000000000000000000001';
@@ -181,6 +184,44 @@ describe('with KNOWLEDGE_INDEXER unset, nothing new runs, reads or writes', () =
         const { passages } = await retrieve({ companyId: C, caller: { kind: 'user', userId: OWNER }, query: 'budget', scope: { sourceTypes: ['comment', 'transcript'] } });
 
         expect(passages.map((p) => p.sourceType).sort()).toEqual(['comment', 'transcript']);
+        expect(knowledgeCalls()).toEqual([]);
+        expect(companyReads()).toEqual([]);
+    });
+
+    it('reads no file, extracts nothing and writes nothing for a task whose attachments changed or that was created with some', async () => {
+        const extract = jest.spyOn(extractor, 'extractText');
+        const task = mockDb.seed(SCHEMA_TYPE.TASKS, { CompanyId: C, ProjectID: PROJECT, sprintId: '6f00000000000000000000d1', deletedStatusKey: 0, attachments: [{ id: 'flagoff0000000001', filename: 'notes.txt', extension: 'txt', size: 10, url: 'Project/p/Sprint/t/Attachment/notes.txt' }] });
+        mockDb.calls.length = 0;
+
+        const changedFields = new Set(['attachments']);
+        domainEventBus.bus.emit('task.updated', domainEventBus.buildEnvelope({ companyId: C, type: 'task.updated', doc: task, changedFields }));
+        domainEventBus.bus.emit('task.created', domainEventBus.buildEnvelope({ companyId: C, type: 'task.created', doc: task, changedFields: new Set() }));
+        await events.drain();
+
+        expect(mockDb.calls).toEqual([]);
+        expect(readStoredFile).not.toHaveBeenCalled();
+        expect(extract).not.toHaveBeenCalled();
+        extract.mockRestore();
+    });
+
+    it('saves a project guide and announces nothing', async () => {
+        await updateProjectInternal(C, PROJECT, { aiGuide: { markdown: '## Stages\n1. Survey' } });
+        expect(events.publishGuideSaved(C, PROJECT)).toBeNull();
+        await events.drain();
+
+        expect(knowledgeCalls()).toEqual([]);
+        expect(companyReads()).toEqual([]);
+        expect(seen).toEqual([]);
+    });
+
+    it('searches neither files nor guides: both live in the chunk store only', async () => {
+        mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_CHUNKS, { companyId: C, sourceType: 'file', sourceId: '6f00000000000000000000e9:flagoff0000000001', ordinal: 0, projectId: PROJECT, text: 'budget', deleted: false });
+        mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_CHUNKS, { companyId: C, sourceType: 'guide', sourceId: PROJECT, ordinal: 0, projectId: PROJECT, text: 'budget', deleted: false });
+        mockDb.calls.length = 0;
+
+        const { passages } = await retrieve({ companyId: C, caller: { kind: 'user', userId: OWNER }, query: 'budget', scope: { sourceTypes: ['file', 'guide'] } });
+
+        expect(passages).toEqual([]);
         expect(knowledgeCalls()).toEqual([]);
         expect(companyReads()).toEqual([]);
     });

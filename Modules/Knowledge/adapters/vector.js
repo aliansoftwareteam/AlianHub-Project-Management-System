@@ -1,5 +1,6 @@
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
+const origin = require('../origin');
 
 // The vector side of retrieval, behind the same contract as the lexical adapter. Two
 // implementations: one in memory, for tests and as the reference for the contract, and one
@@ -13,7 +14,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const CANDIDATE_CHUNKS_PER_SOURCE = 300;
 const EXCERPT_LENGTH = 300;
 const TITLE_LENGTH = 160;
-const CANDIDATE_FIELDS = { sourceId: 1, ordinal: 1, title: 1, text: 1, projectId: 1, authorKind: 1, sourceUpdatedAt: 1, updatedAt: 1, embedding: 1 };
+const CANDIDATE_FIELDS = { sourceId: 1, ordinal: 1, title: 1, text: 1, projectId: 1, taskId: 1, authorKind: 1, origin: 1, contentHash: 1, sourceUpdatedAt: 1, updatedAt: 1, embedding: 1 };
 
 const cosine = (a, b) => {
     if (!Array.isArray(a) || !Array.isArray(b) || !a.length || a.length !== b.length) return 0;
@@ -40,6 +41,9 @@ const toPassage = (sourceType, row, score) => ({
     excerpt: clip(row.text, EXCERPT_LENGTH),
     score,
     authorKind: row.authorKind === 'agent' ? 'agent' : 'user',
+    origin: origin.ofChunk(row),
+    contentHash: row.contentHash || '',
+    ...(row.taskId ? { taskId: String(row.taskId) } : {}),
     updatedAt: row.sourceUpdatedAt || row.updatedAt || null,
 });
 

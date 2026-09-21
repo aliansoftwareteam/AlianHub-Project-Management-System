@@ -2,7 +2,7 @@
 // language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type/$size, $set/$inc/$push/$addToSet/$pull,
 // conditional findOneAndUpdate answering the old document unless asked for the new one (null after an upsert insert, as
 // the driver does), updateOne and findOneAndUpdate with upsert and $setOnInsert and a unique _id, findOneAndDelete, deleteOne, deleteMany,
-// sort/skip/limit on find, $match/$project/$addFields ($toString)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
+// sort/skip/limit on find, sort on findOneAndUpdate, $type 'date', $match/$project/$addFields ($toString)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000, declared text indexes that bound $text to their fields) so a test can assert on what was written.
 
 let seq = 1;
@@ -50,7 +50,7 @@ const matches = (doc, filter = {}, textFields) => Object.entries(filter).every((
             if (op === '$lt') return value < want;
             if (op === '$exists') return (value !== undefined) === arg;
             if (op === '$size') return Array.isArray(value) && value.length === arg;
-            if (op === '$type') return arg === 'string' ? typeof value === 'string' : typeof value === arg;
+            if (op === '$type') return arg === 'date' ? raw instanceof Date : (arg === 'string' ? typeof value === 'string' : typeof value === arg);
             if (op === '$regex') return new RegExp(arg, cond.$options || '').test(String(value));
             if (op === '$options') return true;
             throw new Error(`fakeMongo: unsupported operator ${op}`);
@@ -208,7 +208,7 @@ const create = ({ mongooseCasting = false } = {}) => {
         if (method === 'findOneAndUpdate') {
             const options = data[2] || {};
             const wantsNew = options.new === true || options.returnDocument === 'after' || options.returnOriginal === false;
-            const doc = list.find((d) => matches(d, data[0], textFields));
+            const doc = (options.sort ? ordered(list, { sort: options.sort }) : list).find((d) => matches(d, data[0], textFields));
             if (doc) {
                 const before = clone(doc);
                 apply(doc, data[1]);

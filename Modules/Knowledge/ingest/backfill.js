@@ -5,6 +5,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const logger = require('../../../Config/loggerConfig');
 const flag = require('../flag');
 const { INDEXED_SOURCES, COMMENT_TYPES } = require('../sources');
+const { ORIGINS, AGENT, MEMBER } = require('../origin');
 const { serviceStamp } = require('../../Agents/serviceIdentity');
 const indexer = require('./indexer');
 
@@ -28,14 +29,22 @@ const HEARTBEAT_MS = 60 * 1000;
 const STALE_AFTER_MS = 10 * 60 * 1000;
 const LOG_PREFIX = '[knowledge-backfill]';
 
+const counted = (result) => (result && result.leftOut ? { indexed: 0, skipped: 1 } : { indexed: 1, skipped: 0 });
+const syncRow = (sourceType) => async (companyId, id) => counted(await indexer.sync(companyId, sourceType, id));
+
+/* A guide is walked by its project, and files by the task that carries them, one row of the
+ * walk standing for every attachment on it. */
 const CANDIDATES = {
-    page: { type: SCHEMA_TYPE.PAGES, where: { deletedStatusKey: { $ne: 1 } } },
-    comment: { type: SCHEMA_TYPE.COMMENTS, where: { isDeleted: { $ne: true }, type: { $in: COMMENT_TYPES } } },
-    transcript: { type: SCHEMA_TYPE.CALLS, where: { deletedStatusKey: { $ne: 1 } } },
+    page: { type: SCHEMA_TYPE.PAGES, where: { deletedStatusKey: { $ne: 1 } }, apply: syncRow('page') },
+    comment: { type: SCHEMA_TYPE.COMMENTS, where: { isDeleted: { $ne: true }, type: { $in: COMMENT_TYPES } }, apply: syncRow('comment') },
+    transcript: { type: SCHEMA_TYPE.CALLS, where: { deletedStatusKey: { $ne: 1 } }, apply: syncRow('transcript') },
+    guide: { type: SCHEMA_TYPE.PROJECTS, where: { deletedStatusKey: { $ne: 1 }, 'aiGuide.markdown': { $exists: true } }, apply: syncRow('guide') },
+    file: { type: SCHEMA_TYPE.TASKS, where: { deletedStatusKey: { $ne: 1 }, 'attachments.0': { $exists: true } }, apply: (companyId, id) => indexer.syncTaskFiles(companyId, id, { priority: 'backfill' }) },
 };
 
-/* Deleted rows are walked too, so a delete missed while off still tombstones. A comment also follows
- * its task, so the tasks changed in the gap are walked after the comments. */
+/* Deleted rows are walked too, so a delete missed while off still tombstones. A comment and a file
+ * also follow their task, so the tasks changed in the gap are walked for both: a task's chunks are
+ * re-tagged, tombstoned or restored, and its files brought in line with its attachments. */
 const CATCH_UP_PASSES = {
     page: [{ type: SCHEMA_TYPE.PAGES, apply: (companyId, id) => indexer.sync(companyId, 'page', id) }],
     comment: [
@@ -43,6 +52,14 @@ const CATCH_UP_PASSES = {
         { type: SCHEMA_TYPE.TASKS, apply: (companyId, id) => indexer.reindexTask(companyId, id, { moved: true }) },
     ],
     transcript: [{ type: SCHEMA_TYPE.CALLS, apply: (companyId, id) => indexer.sync(companyId, 'transcript', id) }],
+    guide: [{ type: SCHEMA_TYPE.PROJECTS, apply: (companyId, id) => indexer.sync(companyId, 'guide', id) }],
+    file: [{
+        type: SCHEMA_TYPE.TASKS,
+        apply: async (companyId, id) => {
+            await indexer.reindexTask(companyId, id, { moved: true });
+            await indexer.syncTaskFiles(companyId, id, { priority: 'backfill' });
+        },
+    }],
 };
 
 const running = new Set();
@@ -167,28 +184,49 @@ const catchUp = async (company, sourceType, started, { batchSize = BATCH_SIZE, m
     }
 };
 
+/* Chunks written before `origin` existed say nothing about where they came from. Nothing inbound
+ * was indexed then, so each one is its author's kind; a page an inbound path filed is synced
+ * again, which is what writes 'external'. Done once per source, by updates rather than another
+ * walk, and recorded without touching the heartbeat. A source with no state yet is walked from
+ * the start, and its chunks are written with their origin. */
+const fillOrigins = async (company, sourceType, state) => {
+    if (!state || state.originFilledAt) return state;
+    const unmarked = { sourceType, origin: { $nin: ORIGINS } };
+    const chunks = (data) => MongoDbCrudOpration(company, { type: SCHEMA_TYPE.KNOWLEDGE_CHUNKS, data }, 'updateMany');
+    await chunks([{ ...unmarked, authorKind: 'agent' }, { $set: { origin: AGENT } }]);
+    await chunks([unmarked, { $set: { origin: MEMBER } }]);
+    if (sourceType === 'page') {
+        const inbound = await MongoDbCrudOpration(company, { type: SCHEMA_TYPE.PAGES, data: [{ 'origin.kind': { $exists: true } }, '_id', { lean: true }] }, 'find');
+        for (const page of inbound || []) await indexer.sync(company, 'page', String(page._id));
+    }
+    const originFilledAt = new Date();
+    await indexState(company, [{ sourceType }, { $set: { originFilledAt } }], 'updateOne');
+    return { ...state, originFilledAt };
+};
+
 const backfillSource = async (companyId, sourceType, options = {}) => {
     const { batchSize = BATCH_SIZE, maxBatches = Infinity } = options;
     const company = String(companyId);
-    let state = await readState(company, sourceType);
+    let state = await fillOrigins(company, sourceType, await readState(company, sourceType));
     if (state && state.status === 'complete' && !state.catchUpFrom) return summaryOf(state);
     if (state && state.status === 'complete') state = await saveState(company, sourceType, { status: 'catching-up', cursor: '', catchUpPass: 0 });
     if (state && state.status === 'catching-up') return catchUp(company, sourceType, state, options);
 
     let { cursor, indexed, skipped } = summaryOf(state);
     const startedAt = (state && state.startedAt) || new Date();
+    const originFilledAt = (state && state.originFilledAt) || startedAt;
     try {
         for (let batch = 0; batch < maxBatches; batch += 1) {
             const rows = (await batchOf(company, CANDIDATES[sourceType].type, CANDIDATES[sourceType].where, cursor, batchSize)) || [];
             for (const row of rows) {
-                const result = await indexer.sync(company, sourceType, String(row._id));
-                if (result && result.leftOut) skipped += 1;
-                else indexed += 1;
+                const result = await CANDIDATES[sourceType].apply(company, String(row._id));
+                indexed += result.indexed;
+                skipped += result.skipped;
             }
             if (rows.length) cursor = String(rows[rows.length - 1]._id);
             const done = rows.length < batchSize;
             state = await saveState(company, sourceType, {
-                status: done ? 'complete' : 'running', cursor, indexed, skipped, startedAt, lastRunAt: new Date(), finishedAt: done ? new Date() : null, error: '',
+                status: done ? 'complete' : 'running', cursor, indexed, skipped, startedAt, originFilledAt, lastRunAt: new Date(), finishedAt: done ? new Date() : null, error: '',
             });
             if (done && state && state.catchUpFrom) {
                 state = await saveState(company, sourceType, { status: 'catching-up', cursor: '', catchUpPass: 0 });
@@ -240,16 +278,38 @@ const runOnce = async (companyId, options) => {
     }
 };
 
-/* Each run also re-embeds a batch of what a hybrid company's chunks still lack, so a failed
- * embed or a model change is caught up without anyone touching the source. */
-const backfillAll = async (options) => {
-    if (flag.indexer.mode() === 'off') return { companies: 0, reembedded: {} };
+const enabledCompanies = async () => {
     const companies = await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.COMPANIES, data: [{}, '_id'] }, 'find');
-    let ran = 0;
-    const reembedded = {};
+    const enabled = [];
     for (const company of companies || []) {
         const companyId = String(company._id);
-        if (!(await flag.indexer.enabledFor(companyId))) continue;
+        if (await flag.indexer.enabledFor(companyId)) enabled.push(companyId);
+    }
+    return enabled;
+};
+
+const resumeFiles = (companyId) => indexer.resumeFiles(companyId).catch((error) => {
+    logger.error(`${LOG_PREFIX} ${companyId}: file sweep: ${error.message}`);
+    return 0;
+});
+
+/* At start the files a stopped process still owed are taken up, whatever the heartbeat says. */
+const resumeAll = async () => {
+    if (flag.indexer.mode() === 'off') return 0;
+    let count = 0;
+    for (const companyId of await enabledCompanies()) count += await resumeFiles(companyId);
+    return count;
+};
+
+/* Each run also re-embeds a batch of what a hybrid company's chunks still lack, so a failed
+ * embed or a model change is caught up without anyone touching the source, and takes up the
+ * files owed a retry. */
+const backfillAll = async (options) => {
+    if (flag.indexer.mode() === 'off') return { companies: 0, reembedded: {} };
+    let ran = 0;
+    const reembedded = {};
+    for (const companyId of await enabledCompanies()) {
+        await resumeFiles(companyId);
         await keepAlive(companyId).catch((error) => logger.error(`${LOG_PREFIX} ${companyId}: heartbeat: ${error.message}`));
         if (await runOnce(companyId, options)) ran += 1;
         const count = await indexer.reembedMissing(companyId).catch((error) => {
@@ -284,5 +344,6 @@ module.exports = {
     backfillSource,
     backfillCompany,
     backfillAll,
+    resumeAll,
     ensureBackfill,
 };

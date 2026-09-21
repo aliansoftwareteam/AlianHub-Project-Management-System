@@ -89,9 +89,9 @@ const pack = (lines, maxChars) => {
 
 const contentHashOf = (headingPath, text) => crypto.createHash('sha256').update(JSON.stringify([headingPath, text])).digest('hex');
 
-const chunkPage = (page, { maxChars = MAX_CHUNK_CHARS } = {}) => {
-    const title = inlineText(page && page.title);
-    const [intro, ...sections] = sectionsOf(htmlOf(page));
+const chunkHtml = (rawTitle, html, maxChars) => {
+    const title = inlineText(rawTitle);
+    const [intro, ...sections] = sectionsOf(html);
     const open = [];
     const pieces = [];
     const add = (headingPath, lines) => pack(lines.filter(Boolean), maxChars).forEach((text) => pieces.push({ headingPath, text }));
@@ -105,6 +105,15 @@ const chunkPage = (page, { maxChars = MAX_CHUNK_CHARS } = {}) => {
 
     return pieces.map((piece, ordinal) => ({ ordinal, ...piece, contentHash: contentHashOf(piece.headingPath, piece.text) }));
 };
+
+const chunkPage = (page, { maxChars = MAX_CHUNK_CHARS } = {}) => chunkHtml(page && page.title, htmlOf(page), maxChars);
+
+/* Markdown and extracted file text go the way an agent draft does: headings open sections. */
+const chunkText = (title, text, { maxChars = MAX_CHUNK_CHARS } = {}) => chunkHtml(escapeHtml(String(title || '')), textToHtml(text), maxChars);
+
+const guideMarkdown = (project) => String((project && project.aiGuide && project.aiGuide.markdown) || '');
+const guideTitle = (project) => `${String((project && project.ProjectName) || '').trim() || 'Project'} project guide`;
+const chunkGuide = (project, options) => chunkText(guideTitle(project), guideMarkdown(project), options);
 
 const MENTION = /\[([^\]]*)\]\([0-9a-fA-F]{24}\)/g;
 
@@ -128,4 +137,4 @@ const chunkTranscript = (call, { maxChars = MAX_CHUNK_CHARS } = {}) => {
     return piecesOf([title], [title, ...linesOf(call && call.summary), ...items, ...linesOf(call && call.transcript)], maxChars);
 };
 
-module.exports = { MAX_CHUNK_CHARS, chunkPage, chunkComment, chunkTranscript, contentHashOf, htmlOf };
+module.exports = { MAX_CHUNK_CHARS, chunkPage, chunkText, chunkGuide, guideMarkdown, guideTitle, chunkComment, chunkTranscript, contentHashOf, htmlOf };

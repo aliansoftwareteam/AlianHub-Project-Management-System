@@ -41,6 +41,8 @@ const OUTSIDE_GATEWAY = {
     'Modules/AICore/llmProvider/deepseekProvider.js': { uses: ['axios'], why: 'model provider calls to the endpoint the instance configures' },
     'Modules/AICore/llmProvider/googleProvider.js': { uses: ['axios'], why: 'model provider calls to the endpoint the instance configures' },
     'Modules/AICore/llmProvider/anthropicProvider.js': { uses: ['sdk:@anthropic-ai/sdk'], why: 'model provider calls through the Anthropic SDK to the endpoint the instance configures' },
+    'Modules/Knowledge/ingest/extract/extractor.js': { uses: ['process'], why: 'starts the thread an uploaded file is parsed in, with an empty environment; nothing is fetched' },
+    'Modules/Knowledge/ingest/extract/parseWorker.js': { uses: ['process'], why: 'that thread itself, reading the bytes it was handed; nothing is fetched' },
 };
 
 /* Node modules that reach the network (or run a process that could), as the kind a finding names. */
