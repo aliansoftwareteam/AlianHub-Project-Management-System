@@ -16,6 +16,8 @@ const agentFor = (ctx) => {
  * something the token could not have done. */
 const propose = async (ctx, tool, params, reason) => {
     const refuse = async (why) => { throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: why, ip: ctx.ip }); };
+    // Approval re-checks the filing token by id in apiTokens; an OAuth grant lives elsewhere and could never pass.
+    if (ctx.token && ctx.token.oauth) await refuse(`${tool.name} needs a person's approval, which is filed only for a personal access token.`);
     const check = registry.evaluate(tool.action, { ...params, __proposal: true }, { allowedActions: ctx.allowedActions });
     if (!check.allowed) await refuse(check.reason);
     const holder = await permissions.holderMay(ctx.companyId, ctx.actor, tool.action, params);
