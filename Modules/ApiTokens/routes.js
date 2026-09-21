@@ -6,7 +6,6 @@ exports.init = (app) => {
     app.get('/api/v2/api-tokens/me', ctrl.whoami);
     // Owners and admins only; the handler checks the seat itself, whatever the enforcement mode.
     app.get('/api/v2/api-tokens/needing-expiry', ctrl.listTokensNeedingExpiry);
-    // Live step-scoped credentials of the workspace's runs; the handler narrows a member to their own runs.
     app.get('/api/v2/api-tokens/step-credentials', ctrl.listStepCredentials);
     app.get('/api/v2/api-tokens/:id/logs', ctrl.listTokenLogs);
     // Mints the scoped token a CLI agent pastes into its MCP client. Before /:id

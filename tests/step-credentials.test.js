@@ -25,7 +25,9 @@ jest.mock('../Modules/ApiTokens/controller', () => ({
     logTokenActivity: jest.fn(),
 }));
 
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { dbCollections } = require('../Config/collections');
 const permissions = require('../Modules/Agents/permissions');
@@ -79,7 +81,9 @@ const claimAndMint = async (runId = 'r1', { lease = 60000, actionsGranted = ['ta
     const run = await store.getRun(C, runId);
     const claimed = await store.claimStep(C, { runId, stepId: 'sAgent', workerId: 'w1', lease, now });
     const minted = stepCredential.mint({ companyId: C, run, step: claimed, actions: actionsGranted, now });
-    return { run, claimed, claim: { runId, stepId: 'sAgent', fencingToken: Number(claimed.fencingToken) }, ...minted };
+    const claim = { runId, stepId: 'sAgent', fencingToken: Number(claimed.fencingToken) };
+    await store.noteStep(C, claim, { credentialId: minted.credentialId, credentialExpiresAt: minted.expiresAt });
+    return { run, claimed, claim, ...minted };
 };
 
 const ONLY_THE_CLOCK = ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance'];
@@ -252,8 +256,74 @@ describe('minting on claim', () => {
         const registry = require('../Modules/Agents/registry');
         expect(stepCredential.actionsFor({ type: 'agent_run', config: {} }, { allowedActions: [] })).toEqual(registry.keys());
         expect(stepCredential.actionsFor({ type: 'agent_run', config: {} }, { allowedActions: ['task.get'] })).toEqual(['task.get']);
+        expect(stepCredential.actionsFor({ type: 'agent_run', config: {} }, null)).toEqual([]);
         expect(stepCredential.actionsFor({ type: 'tool_call', config: { tool: 'task.comment' } }, null)).toEqual(['task.comment']);
         expect(stepCredential.actionsFor({ type: 'wait', config: {} }, null)).toEqual([]);
+    });
+
+    const runAgentStep = async (run, seen) => engine.runStep(C, run, (await store.listSteps(C, String(run._id)))[0], {
+        context: { runAgent: async (args) => { seen.push(args); return { runId: 'ar1', status: 'done', costUsd: 0, findings: [] }; } },
+        steps: await store.listSteps(C, String(run._id)),
+    });
+
+    it('grants nothing to an agent step whose agent does not exist', async () => {
+        rows(SCHEMA_TYPE.AGENTS).length = 0;
+        const seen = [];
+        expect((await runAgentStep(seedRun('r1'), seen)).outcome).toBe('success');
+        expect(jwt.decode(seen[0].stepCredential())).toMatchObject({ agentId: AGENT_ID, actions: [] });
+    });
+
+    it('hands the step back, with no credential, when its agent cannot be read', async () => {
+        jest.spyOn(agentRuns, 'getAgent').mockRejectedValue(new Error('mongo went away'));
+        const seen = [];
+        const result = await runAgentStep(seedRun('r1'), seen);
+        expect(result.outcome).toBe('retrying');
+        expect(seen).toHaveLength(0);
+        const row = await store.getStep(C, 'r1', 'sAgent');
+        expect(row).toMatchObject({ status: 'pending', leaseExpiresAt: null });
+        expect(row.error).toContain('mongo went away');
+        expect('credentialId' in row).toBe(false);
+    });
+
+    it('hands the step back when minting itself fails, rather than leaving it claimed for a lease', async () => {
+        jest.spyOn(stepCredential, 'issue').mockRejectedValue(new Error('no key to sign with'));
+        const seen = [];
+        const result = await runAgentStep(seedRun('r1'), seen);
+        expect(result.outcome).toBe('retrying');
+        expect(seen).toHaveLength(0);
+        expect(await store.getStep(C, 'r1', 'sAgent')).toMatchObject({ status: 'pending', leaseExpiresAt: null });
+    });
+
+    it('finds the agent of a step that names only its agent run, and grants nothing when that run is gone', async () => {
+        const onlyTheRun = [{ id: 'sAgent', type: 'agent_run', dependsOn: [], config: { agentRunId: AGENT_RUN_ID }, maxAttempts: 3 }];
+        mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { _id: AGENT_RUN_ID, agentId: AGENT_ID, taskId: TASK_ID, startedBy: STARTER, status: 'running' });
+        const seen = [];
+        await runAgentStep(seedRun('r1', { agentId: null, steps: onlyTheRun }), seen);
+        expect(jwt.decode(seen[0].stepCredential())).toMatchObject({ agentId: AGENT_ID, actions: ['task.comment', 'task.get'] });
+
+        rows(SCHEMA_TYPE.AGENT_RUNS).length = 0;
+        await runAgentStep(seedRun('r2', { agentId: null, steps: onlyTheRun }), seen);
+        expect(jwt.decode(seen[1].stepCredential())).toMatchObject({ agentId: null, actions: [] });
+    });
+
+    it('mints for the agent of the agent run a step names, as the runner executes it, over the run\'s own agent', async () => {
+        const OTHER_AGENT = '6f0000000000000000000a02';
+        mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: OTHER_AGENT, name: 'Writer', allowedActions: ['task.create'], autonomy: 2, deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { _id: AGENT_RUN_ID, agentId: OTHER_AGENT, taskId: TASK_ID, startedBy: STARTER, status: 'running' });
+        const seen = [];
+        await runAgentStep(seedRun('r1', { agentId: AGENT_ID, steps: [{ id: 'sAgent', type: 'agent_run', dependsOn: [], config: { agentRunId: AGENT_RUN_ID }, maxAttempts: 3 }] }), seen);
+        expect(jwt.decode(seen[0].stepCredential())).toMatchObject({ agentId: OTHER_AGENT, actions: ['task.create'] });
+    });
+
+    it('hands the step back when the claim\'s note cannot be written, rather than leaving it claimed for a lease', async () => {
+        jest.spyOn(store, 'noteStep').mockRejectedValueOnce(new Error('write concern timed out'));
+        const seen = [];
+        const result = await runAgentStep(seedRun('r1'), seen);
+        expect(result.outcome).toBe('retrying');
+        expect(seen).toHaveLength(0);
+        const row = await store.getStep(C, 'r1', 'sAgent');
+        expect(row).toMatchObject({ status: 'pending', leaseExpiresAt: null });
+        expect(row.error).toContain('write concern timed out');
     });
 
     it('records the step under the engine service identity, on behalf of whoever started the run', async () => {
@@ -332,12 +402,103 @@ describe('an action under a step credential', () => {
         await refused(token, stepCredential.REFUSAL.STEP_RECLAIMED);
     });
 
+    it('refuses an earlier claim\'s credential as reclaimed even while the row still names it as the replaced one', async () => {
+        seedRun('r1');
+        const past = new Date(Date.now() - 120000);
+        const first = await claimAndMint('r1', { lease: 1000, now: past });
+        const reclaimed = await store.claimStep(C, { runId: 'r1', stepId: 'sAgent', workerId: 'w2', lease: 60000 });
+        const second = stepCredential.mint({ companyId: C, run: first.run, step: reclaimed, actions: ['task.comment'] });
+        await store.noteStep(C, { runId: 'r1', stepId: 'sAgent', fencingToken: reclaimed.fencingToken }, { credentialId: second.credentialId, previousCredentialId: first.credentialId });
+        await refused(first.token, stepCredential.REFUSAL.STEP_RECLAIMED);
+    });
+
     it('reads as finished, not as expired, once the settled step\'s credential has also run out', async () => {
         seedRun('r1');
         const past = new Date(Date.now() - 120000);
         const { token, claim } = await claimAndMint('r1', { lease: 1000, now: past });
         await store.succeedStep(C, claim, { output: {} });
         await refused(token, stepCredential.REFUSAL.STEP_FINISHED);
+    });
+
+    it('matches ids whatever their case or type, and still tells two ids apart', async () => {
+        const upper = AGENT_ID.toUpperCase();
+        seedRun('r1', { steps: [{ id: 'sAgent', type: 'agent_run', dependsOn: [], config: { agentId: upper, taskId: TASK_ID }, maxAttempts: 3 }] });
+        const { token, claims } = await claimAndMint('r1');
+        expect(claims.agentId).toBe(upper);
+        const presentedBy = (agentId, userId = STARTER) => stepCredential.check(C, token, { action: 'task.get', actor: agentActor({ agentId, userId }) });
+        expect((await presentedBy(AGENT_ID)).ok).toBe(true);
+        expect((await presentedBy(upper)).ok).toBe(true);
+        expect((await presentedBy(new mongoose.Types.ObjectId(AGENT_ID), new mongoose.Types.ObjectId(STARTER))).ok).toBe(true);
+        expect((await presentedBy(AGENT_ID, STARTER.toUpperCase())).ok).toBe(true);
+        expect((await stepCredential.check(C.toUpperCase(), token, { action: 'task.get', actor: agentActor() })).ok).toBe(true);
+        expect((await presentedBy('6f0000000000000000000a02')).code).toBe(stepCredential.REFUSAL.AGENT_MISMATCH);
+        expect((await presentedBy(AGENT_ID, OTHER_STARTER)).code).toBe(stepCredential.REFUSAL.STARTER_MISMATCH);
+        expect((await stepCredential.check(OTHER_C, token, { action: 'task.get', actor: agentActor() })).code).toBe(stepCredential.REFUSAL.WRONG_COMPANY);
+    });
+
+    it.each(['stopped', 'failed', 'blocked', 'success', 'queued'])('is refused once its run is %s, even while the step row still says running', async (status) => {
+        seedRun('r1');
+        const { token } = await claimAndMint('r1');
+        rows(SCHEMA_TYPE.WORKFLOW_RUNS)[0].status = status;
+        const row = await refused(token, stepCredential.REFUSAL.RUN_NOT_RUNNING);
+        expect(row.meta.reason).toContain(status);
+    });
+
+    it('is refused once its run is gone', async () => {
+        seedRun('r1');
+        const { token } = await claimAndMint('r1');
+        rows(SCHEMA_TYPE.WORKFLOW_RUNS).length = 0;
+        await refused(token, stepCredential.REFUSAL.RUN_NOT_RUNNING);
+    });
+
+    it('is refused when the run was started by someone other than the starter it was minted for', async () => {
+        seedRun('r1');
+        const { token } = await claimAndMint('r1');
+        rows(SCHEMA_TYPE.WORKFLOW_RUNS)[0].startedBy = OTHER_STARTER;
+        await refused(token, stepCredential.REFUSAL.STARTER_MISMATCH);
+    });
+
+    it('is refused when the row under that run and step is not the row it was minted for', async () => {
+        seedRun('r1');
+        const { token } = await claimAndMint('r1');
+        rows(SCHEMA_TYPE.WORKFLOW_STEP_RUNS)[0]._id = '6f00000000000000000005ff';
+        await refused(token, stepCredential.REFUSAL.STEP_MISSING);
+    });
+
+    it('is refused when it is signed here but is not a step credential', async () => {
+        seedRun('r1');
+        const { claims } = await claimAndMint('r1');
+        const signingKey = crypto.scryptSync(process.env.JWT_SECRET, 'alianhub-step-credential', 32);
+        const otherKind = jwt.sign({ ...claims, kind: 'session', exp: Math.floor(Date.now() / 1000) + 600 }, signingKey, { algorithm: 'HS256' });
+        await refused(otherKind, stepCredential.REFUSAL.INVALID);
+    });
+
+    it('is refused when the row names neither it nor the credential it replaced', async () => {
+        seedRun('r1');
+        const { token } = await claimAndMint('r1');
+        const step = rows(SCHEMA_TYPE.WORKFLOW_STEP_RUNS)[0];
+        step.previousCredentialId = step.credentialId;
+        step.credentialId = 'a-later-credential';
+        expect((await stepCredential.check(C, token, { action: 'task.get', actor: agentActor() })).ok).toBe(true);
+        step.previousCredentialId = 'the-one-before';
+        await refused(token, stepCredential.REFUSAL.SUPERSEDED);
+    });
+
+    it('stops a read, too, once the step has finished', async () => {
+        seedRun('r1');
+        const { token, claim } = await claimAndMint('r1');
+        await store.succeedStep(C, claim, { output: {} });
+        await expect(actions.authorizeRead({ companyId: C, actor: agentActor({ stepCredential: token }), action: 'task.get', params: { taskId: TASK_ID } }))
+            .rejects.toMatchObject({ name: 'RefusedError', message: expect.stringContaining(stepCredential.REFUSAL.STEP_FINISHED) });
+        expect(auditRows(agentAudit.ACTION_REFUSED)).toHaveLength(1);
+    });
+
+    it('is refused when the actor says it acts under a credential and carries none', async () => {
+        seedRun('r1');
+        await claimAndMint('r1');
+        await expect(actions.perform({ companyId: C, actor: agentActor({ stepScoped: true }), action: 'task.comment', params: { body: 'x' } }))
+            .rejects.toMatchObject({ name: 'RefusedError', message: expect.stringContaining(stepCredential.REFUSAL.MISSING) });
+        expect(auditRows(agentAudit.ACTION_REFUSED)).toHaveLength(1);
     });
 
     it('is refused when another agent presents it', async () => {
@@ -489,6 +650,103 @@ describe('a heartbeat that extends the lease', () => {
         expect(held.secondThen.ok).toBe(true);
     });
 
+    it('does not revive a lease that has already lapsed: no extension, no new credential', async () => {
+        freezeClockAt(T0);
+        const run = seedRun('r1');
+        const held = {};
+        const result = await engine.runStep(C, run, (await store.listSteps(C, 'r1'))[0], {
+            context: {
+                runAgent: async (args) => {
+                    held.first = args.stepCredential();
+                    jest.setSystemTime(T0 + 31000);
+                    held.kept = await args.keepAlive();
+                    held.after = args.stepCredential();
+                    held.row = { ...(await store.getStep(C, 'r1', 'sAgent')) };
+                    held.verdict = await stepCredential.check(C, held.first, { action: 'task.get', actor: agentActor() });
+                    return { runId: 'ar1', status: 'done', costUsd: 0, findings: [] };
+                },
+            },
+            steps: await store.listSteps(C, 'r1'),
+        });
+        expect(result.outcome).toBe('success');
+        expect(held.kept).toBe(false);
+        expect(held.after).toBe(held.first);
+        expect(held.row.credentialId).toBe(jwt.decode(held.first).jti);
+        expect(new Date(held.row.leaseExpiresAt).getTime()).toBe(T0 + 30000);
+        expect(held.verdict).toMatchObject({ ok: false, code: stepCredential.REFUSAL.EXPIRED });
+    });
+
+    it('still extends a lapsed lease with the flag off, as before', async () => {
+        flag(false);
+        freezeClockAt(T0);
+        const run = seedRun('r1');
+        const held = {};
+        await engine.runStep(C, run, (await store.listSteps(C, 'r1'))[0], {
+            context: {
+                runAgent: async (args) => {
+                    jest.setSystemTime(T0 + 31000);
+                    held.kept = await args.keepAlive();
+                    held.row = { ...(await store.getStep(C, 'r1', 'sAgent')) };
+                    return { runId: 'ar1', status: 'done', costUsd: 0, findings: [] };
+                },
+            },
+            steps: await store.listSteps(C, 'r1'),
+        });
+        expect(held.kept).toBe(true);
+        expect(new Date(held.row.leaseExpiresAt).getTime()).toBe(T0 + 61000);
+    });
+
+    it('keeps the credential it replaced good until the next heartbeat, and no longer', async () => {
+        freezeClockAt(T0);
+        const run = seedRun('r1');
+        const held = {};
+        const presented = { action: 'task.get', actor: agentActor() };
+        await engine.runStep(C, run, (await store.listSteps(C, 'r1'))[0], {
+            context: {
+                runAgent: async (args) => {
+                    held.first = args.stepCredential();
+                    await args.keepAlive();
+                    held.second = args.stepCredential();
+                    held.firstAfterOne = await stepCredential.check(C, held.first, presented);
+                    await args.keepAlive();
+                    held.third = args.stepCredential();
+                    held.row = { ...(await store.getStep(C, 'r1', 'sAgent')) };
+                    held.firstAfterTwo = await stepCredential.check(C, held.first, presented);
+                    held.secondAfterTwo = await stepCredential.check(C, held.second, presented);
+                    held.thirdAfterTwo = await stepCredential.check(C, held.third, presented);
+                    return { runId: 'ar1', status: 'done', costUsd: 0, findings: [] };
+                },
+            },
+            steps: await store.listSteps(C, 'r1'),
+        });
+        expect(held.firstAfterOne.ok).toBe(true);
+        expect(held.row).toMatchObject({ credentialId: jwt.decode(held.third).jti, previousCredentialId: jwt.decode(held.second).jti });
+        expect(held.firstAfterTwo).toMatchObject({ ok: false, code: stepCredential.REFUSAL.SUPERSEDED });
+        expect(held.secondAfterTwo.ok).toBe(true);
+        expect(held.thirdAfterTwo.ok).toBe(true);
+    });
+
+    it('takes two heartbeats at once one after the other, so the step always holds the credential the row names', async () => {
+        freezeClockAt(T0);
+        const run = seedRun('r1');
+        const held = {};
+        await engine.runStep(C, run, (await store.listSteps(C, 'r1'))[0], {
+            context: {
+                runAgent: async (args) => {
+                    held.first = args.stepCredential();
+                    await Promise.all([args.keepAlive(), args.keepAlive()]);
+                    held.now = args.stepCredential();
+                    held.row = { ...(await store.getStep(C, 'r1', 'sAgent')) };
+                    return { runId: 'ar1', status: 'done', costUsd: 0, findings: [] };
+                },
+            },
+            steps: await store.listSteps(C, 'r1'),
+        });
+        expect(held.row.credentialId).toBe(jwt.decode(held.now).jti);
+        expect(held.row.previousCredentialId).not.toBe(jwt.decode(held.first).jti);
+        expect(held.row.previousCredentialId).not.toBe(held.row.credentialId);
+    });
+
     it('lets an agent step that outlives its first credential act under the re-minted one', async () => {
         freezeClockAt(T0);
         process.env.WORKFLOW_HEARTBEAT_MS = '5';
@@ -518,8 +776,23 @@ describe('a heartbeat that extends the lease', () => {
         expect(built).toMatchObject({ kind: 'agent', userId: STARTER, agentId: AGENT_ID, runId: AGENT_RUN_ID, stepCredential: 'first' });
         current = 'second';
         expect(built.stepCredential).toBe('second');
-        expect({ ...built }.stepCredential).toBe('second');
-        expect('stepCredential' in agentRunner.actorFor({ _id: AGENT_RUN_ID, startedBy: STARTER, viaAccount: 'workspace' }, { _id: AGENT_ID, name: 'Reviewer' }, null)).toBe(false);
+        const plain = agentRunner.actorFor({ _id: AGENT_RUN_ID, startedBy: STARTER, viaAccount: 'workspace' }, { _id: AGENT_ID, name: 'Reviewer' }, null);
+        expect('stepCredential' in plain).toBe(false);
+        expect('stepScoped' in plain).toBe(false);
+    });
+
+    it('keeps the credential out of any copy of the actor, and a copy is refused rather than left unchecked', async () => {
+        seedRun('r1');
+        const { token } = await claimAndMint('r1');
+        const built = agentRunner.actorFor({ _id: AGENT_RUN_ID, startedBy: STARTER, viaAccount: 'workspace' }, { _id: AGENT_ID, name: 'Reviewer' }, () => token);
+        expect(JSON.stringify(built)).not.toContain(token);
+        expect(JSON.stringify(built)).not.toContain('eyJ');
+        const copy = { ...built };
+        expect('stepCredential' in copy).toBe(false);
+        expect(Object.keys(built)).not.toContain('stepCredential');
+        expect((await actions.perform({ companyId: C, actor: built, action: 'task.comment', params: { body: 'x' } })).auditId).toBeTruthy();
+        await expect(actions.perform({ companyId: C, actor: copy, action: 'task.comment', params: { body: 'x' } }))
+            .rejects.toMatchObject({ name: 'RefusedError', message: expect.stringContaining(stepCredential.REFUSAL.MISSING) });
     });
 });
 
@@ -529,11 +802,13 @@ describe('a tool call step', () => {
         const seen = {};
         jest.spyOn(automationRegistry, 'getAction').mockReturnValue({ key: 'probe', schema: {}, run: async ({ context }) => { seen.context = context; return { changed: false }; } });
         const run = seedRun('r1', { steps: [{ id: 'sTool', type: 'tool_call', dependsOn: [], config: { tool: 'probe', params: {} }, maxAttempts: 1 }] });
+        mockDb.calls.length = 0;
         const result = await engine.runStep(C, run, (await store.listSteps(C, 'r1'))[0], { steps: await store.listSteps(C, 'r1') });
         expect(result.outcome).toBe('success');
         expect((await store.getStep(C, 'r1', 'sTool')).credentialId).toBeTruthy();
         expect(seen.context).toMatchObject({ runId: 'r1', action: 'workflow.probe' });
         expect(Object.keys(seen.context)).not.toContain('stepCredential');
+        expect(mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.AGENTS)).toEqual([]);
         expect(Object.values(seen.context).filter((value) => typeof value === 'string' && value.startsWith('eyJ'))).toEqual([]);
     });
 });
@@ -636,7 +911,7 @@ describe('the tokens screen list of step-scoped credentials', () => {
         await stamp('r1');
         rows(SCHEMA_TYPE.WORKFLOW_STEP_RUNS).find((r) => r.runId === 'r1').leaseExpiresAt = new Date(Date.now() - 1);
         await stamp('r3').catch(() => null);
-        expect((await ask('owner1')).body.data).toEqual([]);
+        expect((await ask('owner1')).body.data.map((r) => r.runId)).toEqual(['r2']);
     });
 
     it('refuses an API token, and someone with no seat', async () => {

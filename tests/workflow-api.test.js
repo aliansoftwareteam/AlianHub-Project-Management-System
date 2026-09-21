@@ -2,6 +2,11 @@ jest.mock('../Modules/Workflows/store');
 jest.mock('../Modules/Workflows/queue');
 jest.mock('../Modules/Agents/access');
 jest.mock('../Modules/Agents/revert');
+jest.mock('../Modules/Workflows/approvals');
+jest.mock('../Modules/Workflows/people');
+jest.mock('../Modules/Workflows/definitions');
+jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn(async () => null) }));
+jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async () => 1) }));
 
 const store = require('../Modules/Workflows/store');
 const queue = require('../Modules/Workflows/queue');
@@ -60,6 +65,46 @@ describe('the flag gates the whole surface', () => {
         }
         expect(store.createRun).not.toHaveBeenCalled();
         expect(store.getRun).not.toHaveBeenCalled();
+    });
+});
+
+describe('a step row in an answer', () => {
+    const CREDENTIAL = 'c0ffee00c0ffee00c0ffee00';
+    const PREVIOUS = 'decaf000decaf000decaf000';
+    const row = { stepId: 'sAgent', type: 'agent_run', status: 'running', fencingToken: 1, credentialId: CREDENTIAL, previousCredentialId: PREVIOUS, credentialExpiresAt: new Date() };
+    const document = { ...row, toObject: () => ({ ...row }) };
+    const serialised = { ...row, toJSON: () => ({ ...row }), toObject: () => { throw new Error('toJSON is what a response serialises'); } };
+
+    const ROUTES_WITH_STEP_ROWS = ['startRun', 'getRun', 'retryStep', 'skipStep', 'resumeStep', 'compensateStep'];
+
+    const serve = (step) => {
+        store.createRun.mockResolvedValue({ _id: RUN_ID, status: 'queued', startedBy: OWNER });
+        store.getRun.mockResolvedValue({ _id: RUN_ID, status: 'failed', startedBy: OWNER });
+        store.listRuns.mockResolvedValue([{ _id: RUN_ID, startedBy: OWNER }]);
+        store.listSteps.mockResolvedValue([step]);
+        store.getStep.mockResolvedValue(step);
+        ['retryStep', 'operatorSkipStep', 'resumeStep', 'recordCompensation'].forEach((fn) => store[fn].mockResolvedValue(step));
+        revert.revertRun.mockResolvedValue({ reverted: 1, failed: [] });
+    };
+
+    /* Every handler the controller exports is called; any answer that carries a step
+     * row must carry it without credential ids, and the routes known to carry one must. */
+    it.each([['a plain row', row], ['a mongoose document', document], ['a document that serialises with toJSON', serialised]])('never carries a credential id, on any route: %s', async (label, step) => {
+        const withOutput = step === row ? { ...row, output: { agentRunId: 'a1' } } : Object.assign(Object.create(Object.getPrototypeOf(step)), step, { output: { agentRunId: 'a1' } });
+        serve(withOutput);
+        const answeredWithSteps = [];
+        const handlers = Object.entries(controller).filter(([, handler]) => typeof handler === 'function');
+        for (const [name, handler] of handlers) {
+            const res = resSpy();
+            // eslint-disable-next-line no-await-in-loop
+            await handler(reqFor({ params: { id: RUN_ID, stepId: 'sAgent' }, body: { agentId: AGENT_ID, taskId: TASK_ID } }), res);
+            const text = JSON.stringify(res.body || {});
+            if (text.includes('"fencingToken"')) answeredWithSteps.push(name);
+            expect({ name, credentialFields: /credentialId|previousCredentialId/.test(text) }).toEqual({ name, credentialFields: false });
+            expect(text).not.toContain(CREDENTIAL);
+            expect(text).not.toContain(PREVIOUS);
+        }
+        expect(answeredWithSteps.sort()).toEqual([...ROUTES_WITH_STEP_ROWS].sort());
     });
 });
 

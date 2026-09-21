@@ -135,6 +135,7 @@ describe('a two-step workflow run under step-scoped credentials', () => {
         expect(second.exp).toBeGreaterThanOrEqual(first.exp);
         const step = await row(run._id, 'sTwo');
         expect(step.credentialId).toBe(second.jti);
+        expect(step.previousCredentialId).toBe(first.jti);
         expect(JSON.stringify(step)).not.toContain(renewed.sTwo);
     });
 
@@ -168,6 +169,8 @@ describe('a two-step workflow run under step-scoped credentials', () => {
         const then = new Date(Date.now() - 60000);
         const claimed = await store.claimStep(COMPANY, { runId: second._id, stepId: 'sRetry', workerId: 'w1', lease: 500, now: then });
         const first = stepCredential.mint({ companyId: COMPANY, run: second, step: claimed, actions: ['task.get'], now: then });
+        await store.noteStep(COMPANY, { runId: String(second._id), stepId: 'sRetry', fencingToken: claimed.fencingToken }, { credentialId: first.credentialId, credentialExpiresAt: first.expiresAt });
+        await store.patchRun(COMPANY, second._id, { status: 'running' });
         const presented = { action: 'task.get', actor: actorFor(first.token) };
         expect((await stepCredential.check(COMPANY, first.token, { ...presented, now: then })).ok).toBe(true);
         expect(jwt.decode(first.token).exp * 1000).toBeLessThan(Date.now());

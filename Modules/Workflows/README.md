@@ -390,27 +390,43 @@ When the engine claims a step it mints a credential for it
 (`stepCredential.js`): a JWT signed with a key derived from
 `STEP_CREDENTIAL_SECRET` (or `JWT_SECRET`), carrying the company, the run, the
 step, the fencing token the claim won, the run's agent and starter, and the
-actions the step may perform, expiring one lease after it was minted. Every
-heartbeat that extends the lease re-mints it in the same write (same fencing
-token, new id and expiry) and the running step is handed the fresh one, so a
-step that outruns its first lease is not refused at its last action. The
-replaced credential is not revoked; it runs out at its own expiry, so no single
-credential is good for longer than one lease (`WORKFLOW_LEASE_MS`, 17 minutes by
-default), and for less once its step settles, is handed back or is reclaimed.
-The row keeps only the current id and expiry; the credential travels in the
-executor context as something a step asks for, rides on the actor of the agent
-run, and is stripped from the context a `tool_call` hands its tool.
+actions the step may perform, expiring one lease after it was minted. An agent
+step is granted its agent's `allowedActions` (every registry action when the
+agent narrows nothing); an agent step whose agent does not exist, or that names
+no agent directly or through its agent run, is granted none. A step type with
+no agent by design (anything but `agent_run`) never reads the agents
+collection. When the agent read itself fails, or minting throws for any other
+reason, the step is handed back through the ordinary retry decision instead of
+staying claimed for a lease.
+
+Every heartbeat that extends a live lease re-mints the credential in the same
+write (same fencing token, new id and expiry) and the running step is handed
+the fresh one, so a step that outruns its first lease is not refused at its
+last action. A lease that has already lapsed is neither extended nor re-minted.
+Two heartbeats at once are taken one after the other. The row keeps the current
+id (`credentialId`) and the one it replaced (`previousCredentialId`), and only
+those two are accepted: a credential in flight during a re-mint still passes,
+anything older is refused. So no credential is good for longer than one lease
+(`WORKFLOW_LEASE_MS`, 17 minutes by default). Neither id is in any API answer.
+The credential travels in the executor context as something a step asks for,
+rides on the actor of the agent run as a non-enumerable property (a copy of the
+actor carries `stepScoped: true` and no credential, and is refused), and is
+stripped from the context a `tool_call` hands its tool.
 
 `Modules/Agents/actions.js` checks it whenever the actor performing an action or
 an authorised read carries one, which today is the act phase of an `agent_run`
 step. In order: the signature and kind, the company, the agent and the starter
 it was minted for against the actor presenting it, then the live row (it must
-exist, name the same agent, be running, hold the same fencing token), then the
-credential's own expiry, the lease, and the action. The first failure is refused
-and audited before the registry and the holder's permissions are even asked. The
-credential narrows only; it grants nothing the run's actor could not already do.
-The engine's own lifecycle writes (claim, heartbeat, settle) are fenced by the
-token and made under the engine identity, never under the credential.
+exist under the same row id, name the same agent, be running, hold the same
+fencing token and name this credential or the one it replaced), then the run
+(it must be running and started by the same person), then the credential's own
+expiry, the lease, and the action. Ids compare as Mongo compares them: an
+ObjectId, its hex in either case and a string are one id. The first failure is
+refused and audited before the registry and the holder's permissions are even
+asked. The credential narrows only; it grants nothing the run's actor could not
+already do. The engine's own lifecycle writes (claim, heartbeat, settle) are
+fenced by the token and made under the engine identity, never under the
+credential.
 
 Not under a credential yet: `automation_rule` steps, `tool_call` steps (including
 `run_agent`, whose nested agent performs registry actions as an actor without

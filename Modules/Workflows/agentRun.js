@@ -51,13 +51,22 @@ const taskFor = async (companyId, taskId) => {
     return task;
 };
 
-/* The agent an agent step will run, read when the engine claims the step so the
- * step's credential can carry what that agent may do. Null for any other step. */
+/* Null for a step with no agent by design (any type but agent_run). For an agent
+ * step, the agent runAgent will execute: an agent run the step names wins over
+ * any agent id, as it does there. A read that fails throws: the caller must not
+ * take it for "no agent". */
 const agentFor = async (companyId, run, step) => {
     if (!step || String(step.type) !== 'agent_run') return null;
-    const agentId = (step.config && step.config.agentId) || run.agentId;
-    if (!agentId) return null;
-    return runs.getAgent(companyId, agentId).catch(() => null);
+    const config = step.config || {};
+    let agentId = null;
+    if (config.agentRunId) {
+        const agentRun = await runs.get(companyId, config.agentRunId);
+        agentId = agentRun && agentRun.agentId ? String(agentRun.agentId) : null;
+    } else {
+        agentId = config.agentId || run.agentId || null;
+    }
+    if (!agentId) return { agentId: null, agent: null };
+    return { agentId: String(agentId), agent: (await runs.getAgent(companyId, agentId)) || null };
 };
 
 const startFor = async (companyId, { workflowRunId, stepId, agentId, taskId, skill, note, spendCapUsd, budgetUsd, startedBy, traceId, depth }) => {
@@ -90,10 +99,9 @@ const startFor = async (companyId, { workflowRunId, stepId, agentId, taskId, ski
     return run;
 };
 
-/* Who the run acts as. The step's credential rides on the actor, which is what
- * every action is performed as, and is read each time it is presented: a heartbeat
- * re-mints it while the run is still going. Enumerable, so a copy of the actor
- * carries the credential it was copied with rather than none, and is still checked. */
+/* The credential is read each time it is presented, because a heartbeat re-mints
+ * it mid-run. It is not enumerable, so no spread or JSON.stringify copies it;
+ * `stepScoped` is, so a copy that lost it is refused rather than left unchecked. */
 const actorFor = (agentRun, agent, stepCredential = null) => {
     const actor = {
         kind: 'agent',
@@ -104,7 +112,10 @@ const actorFor = (agentRun, agent, stepCredential = null) => {
         viaAccount: agentRun.viaAccount,
         tokenId: null,
     };
-    if (typeof stepCredential === 'function') Object.defineProperty(actor, 'stepCredential', { enumerable: true, get: stepCredential });
+    if (typeof stepCredential === 'function') {
+        actor.stepScoped = true;
+        Object.defineProperty(actor, 'stepCredential', { enumerable: false, get: stepCredential });
+    }
     return actor;
 };
 
