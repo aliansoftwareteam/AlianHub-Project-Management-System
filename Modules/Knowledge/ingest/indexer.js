@@ -3,10 +3,14 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const logger = require('../../../Config/loggerConfig');
+const storage = require('../../../common-storage/readStoredFile');
 const { COMMENT_TYPES } = require('../sources');
 const embeddings = require('../embeddings');
+const origin = require('../origin');
 const vectorStore = require('../vectorStore');
-const { chunkPage, chunkComment, chunkTranscript, contentHashOf } = require('./chunker');
+const extractor = require('./extract/extractor');
+const { limits: fileLimits } = require('./extract/limits');
+const { chunkPage, chunkText, chunkComment, chunkTranscript, contentHashOf } = require('./chunker');
 
 // Writes source chunks into the store. Callers check KNOWLEDGE_INDEXER first; nothing here
 // reads that flag, so the backfill, the event handlers and a re-index share one write path.
@@ -15,14 +19,27 @@ const { chunkPage, chunkComment, chunkTranscript, contentHashOf } = require('./c
 
 const SOURCE = 'page';
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
+/* An attachment lives inside its task and its id is whatever the client made up, so a file is
+ * named by both, and an id that could not sit in that name is never indexed. */
+const ATTACHMENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const FILE_ID = /^[a-f0-9]{24}:[A-Za-z0-9_-]{1,64}$/i;
 const DUPLICATE_KEY = 11000;
 const TRASHED = 1;
 const MAX_SYNC_ROUNDS = 3;
 const TITLE_LENGTH = 160;
 const TASK_DELETED = 'task';
+const TASK_SOURCES = ['comment', 'file'];
+const PROJECT_SOURCES = ['page', 'comment', 'guide', 'file'];
 const LOG_PREFIX = '[knowledge-indexer]';
-const EXISTING_FIELDS = 'ordinal contentHash deleted companyId projectId sprintId taskId participants visibility createdBy authorKind embeddingModel sourceUpdatedAt';
-const COMPARED_FIELDS = ['companyId', 'projectId', 'sprintId', 'taskId', 'participants', 'visibility', 'createdBy', 'authorKind'];
+const EXISTING_FIELDS = 'ordinal contentHash deleted companyId projectId sprintId taskId participants visibility createdBy authorKind origin embeddingModel sourceUpdatedAt';
+const COMPARED_FIELDS = ['companyId', 'projectId', 'sprintId', 'taskId', 'participants', 'visibility', 'createdBy', 'authorKind', 'origin'];
+const FILE_STORED_FIELDS = 'ordinal headingPath text contentHash fileKey pieceCount deleted tombstoneReason extractAttempts';
+const SKIPPED = Object.freeze({ LINKED: 'skipped:linked', UNSUPPORTED: 'skipped:unsupported', TOO_LARGE: 'skipped:too_large', EMPTY: 'skipped:empty', UNREADABLE: 'skipped:unreadable' });
+const EXTRACT_FAILED = 'extract:failed';
+const EXTRACT_TIMED_OUT = 'extract:timed_out';
+/* The first try and two retries. */
+const FILE_EXTRACT_ATTEMPTS = 3;
+const FILE_RETRY_DELAYS_MS = [60 * 1000, 5 * 60 * 1000];
 const EMBED_RETRY_ATTEMPTS = 3;
 const EMBED_RETRY_BASE_MS = 30 * 1000;
 /* Sources the recurring job re-embeds per run, so a run stays short and a bad key cannot pay
@@ -69,6 +86,7 @@ const base = (companyId, sourceType, row) => ({
     visibility: 'project',
     createdBy: '',
     authorKind: 'human',
+    origin: origin.MEMBER,
     title: '',
 });
 
@@ -90,10 +108,80 @@ const readTask = (companyId, taskId) => byId(companyId, SCHEMA_TYPE.TASKS, taskI
  * task moved to another sprint is a newer version of every comment on it. */
 const commentVersion = (comment, { task } = {}) => new Date(Math.max(time(rowVersion(comment)), task ? time(rowVersion(task)) : 0));
 
+const guideMarkdown = (project) => asText(project && project.aiGuide && project.aiGuide.markdown);
+const guideTitle = (project) => `${asText(project && project.ProjectName).trim() || 'Project'} project guide`;
+
+const fileSourceId = (taskId, attachmentId) => `${taskId}:${attachmentId}`;
+const fileTitle = (attachment) => asText(attachment && attachment.filename).trim().slice(0, TITLE_LENGTH) || 'Attachment';
+const isExtractFailure = (reason) => reason === EXTRACT_FAILED || reason === EXTRACT_TIMED_OUT;
+
+/* The task row is the only place an attachment's storage key is taken from. */
+const readFileRow = async (companyId, id) => {
+    const [taskId, attachmentId] = asText(id).split(':');
+    const task = await byId(companyId, SCHEMA_TYPE.TASKS, taskId, 'ProjectID sprintId deletedStatusKey origin attachments updatedAt createdAt');
+    if (!task) return null;
+    const attachment = (Array.isArray(task.attachments) ? task.attachments : []).find((item) => item && asText(item.id) === attachmentId) || null;
+    return { _id: asText(id), task, attachment, kind: attachment ? extractor.kindOf(attachment) : null };
+};
+
+/* What can be told without reading a byte. A file linked from a cloud drive has no key of ours,
+ * and a key that is a url is never followed. */
+const skipReason = ({ attachment, kind }) => {
+    const key = asText(attachment.url);
+    if (!key || /^[a-z][a-z0-9+.-]*:/i.test(key)) return SKIPPED.LINKED;
+    if (!kind) return SKIPPED.UNSUPPORTED;
+    if (Number(attachment.size) > fileLimits().maxBytes) return SKIPPED.TOO_LARGE;
+    return null;
+};
+
+/* The stored chunks of a file, when every one of them is there and they came from the same
+ * stored object: an attachment's bytes never change, so its text is extracted once, and a task
+ * restore, a move or a re-embed works from what is already stored. */
+const storedPieces = (stored, fileKey) => {
+    const rows = (stored || []).filter((chunk) => chunk.text).sort((a, b) => Number(a.ordinal) - Number(b.ordinal));
+    const complete = rows.length > 0
+        && rows.every((chunk, at) => Number(chunk.ordinal) === at && chunk.fileKey === fileKey && Number(chunk.pieceCount) === rows.length);
+    return complete ? rows.map((chunk) => ({ ordinal: Number(chunk.ordinal), headingPath: chunk.headingPath || [], text: chunk.text, contentHash: chunk.contentHash })) : null;
+};
+
+const leftOutFile = (reason, attempts = 0) => ({ leftOut: { reason, attempts } });
+
+const extractionOutcome = (error, attempts) => {
+    const code = error && error.code;
+    if (code === 'too_large') return leftOutFile(SKIPPED.TOO_LARGE);
+    if (code === 'invalid_key') return leftOutFile(SKIPPED.UNREADABLE);
+    if (code === 'unsupported') return leftOutFile(SKIPPED.UNSUPPORTED);
+    return leftOutFile(code === 'timed_out' ? EXTRACT_TIMED_OUT : EXTRACT_FAILED, attempts + 1);
+};
+
+/* Nothing here throws for the file's sake: whatever storage or a parser does is an outcome to
+ * record, so the next file is never held up by this one. */
+const loadFile = async (companyId, row) => {
+    const fileKey = asText(row.attachment.url);
+    const stored = await chunkStore(companyId, [{ sourceType: 'file', sourceId: row._id }, FILE_STORED_FIELDS, { lean: true }], 'find');
+    const pieces = storedPieces(stored, fileKey);
+    if (pieces) return { row: { ...row, pieces } };
+
+    const marker = (stored || []).find((chunk) => Number(chunk.ordinal) === 0 && chunk.deleted === true && !chunk.text && chunk.fileKey === fileKey);
+    const attempts = marker ? Number(marker.extractAttempts) || 0 : 0;
+    if (marker && marker.tombstoneReason === SKIPPED.EMPTY) return leftOutFile(SKIPPED.EMPTY);
+    if (marker && isExtractFailure(marker.tombstoneReason) && attempts >= FILE_EXTRACT_ATTEMPTS) return leftOutFile(marker.tombstoneReason, attempts);
+
+    try {
+        const { buffer } = await storage.readStoredFile({ companyId: String(companyId), key: fileKey, maxBytes: fileLimits().maxBytes });
+        const { text } = await extractor.extractText({ buffer, kind: row.kind });
+        if (!asText(text).trim()) return leftOutFile(SKIPPED.EMPTY);
+        return { row: { ...row, pieces: chunkText(fileTitle(row.attachment), text) } };
+    } catch (error) {
+        logger.warn(`${LOG_PREFIX} ${companyId}: file ${row._id} not indexed: ${(error && error.message) || error}`);
+        return extractionOutcome(error, attempts);
+    }
+};
+
 const RULES = {
     page: {
         collection: SCHEMA_TYPE.PAGES,
-        fields: 'title content rawText visibility createdBy ProjectID createdByAgent deletedStatusKey updatedAt createdAt',
+        fields: 'title content rawText visibility createdBy ProjectID createdByAgent origin deletedStatusKey updatedAt createdAt',
         ingestName: 'ingestPage',
         versionOf: rowVersion,
         chunk: chunkPage,
@@ -103,6 +191,7 @@ const RULES = {
             visibility: asText(page.visibility) || 'project',
             createdBy: asText(page.createdBy),
             authorKind: page.createdByAgent ? 'agent' : 'human',
+            origin: origin.ofPage(page),
             title: asText(page.title),
         }),
         async decide(companyId, page) {
@@ -130,6 +219,7 @@ const RULES = {
             taskId: task ? String(task._id) : '',
             createdBy: asText(comment.userId),
             authorKind: comment.isAgent || comment.actorType === 'agent' ? 'agent' : 'human',
+            origin: origin.ofComment(comment),
             title: asText(comment.message).replace(/\s+/g, ' ').trim().slice(0, TITLE_LENGTH),
         }),
         async decide(companyId, comment) {
@@ -168,6 +258,63 @@ const RULES = {
             if (Number(call.deletedStatusKey) === 1) return { ...leaveOut('tombstone', 'deleted', call, {}, fingerprint), deletesWin: true };
             if (await excluded(companyId, [documentRule('transcript', call)])) return leaveOut('erase', 'erased', call, {}, fingerprint);
             return ingestDecision(call, {}, fingerprint);
+        },
+    },
+    /* One guide per project, named by the project's id. The guide is written by the AI project
+     * flow from a brief a person approved, so it ranks as machine-written text does. */
+    guide: {
+        collection: SCHEMA_TYPE.PROJECTS,
+        fields: 'ProjectName aiGuide deletedStatusKey updatedAt createdAt',
+        ingestName: 'ingestGuide',
+        versionOf: rowVersion,
+        chunk: (project) => chunkText(guideTitle(project), guideMarkdown(project)),
+        metadata: (companyId, project) => ({
+            ...base(companyId, 'guide', project),
+            projectId: project._id,
+            authorKind: 'agent',
+            origin: origin.AGENT,
+            title: guideTitle(project),
+        }),
+        async decide(companyId, project) {
+            const fingerprint = [time(project.updatedAt), project.deletedStatusKey, contentHashOf([], guideMarkdown(project))].map(asText).join('|');
+            if (await excluded(companyId, [documentRule('guide', project)])) return leaveOut('erase', 'erased', project, {}, fingerprint);
+            if (Number(project.deletedStatusKey) === TRASHED) return leaveOut('tombstone', 'trashed', project, {}, fingerprint);
+            if (!guideMarkdown(project).trim()) return leaveOut('tombstone', 'no guide', project, {}, fingerprint);
+            return ingestDecision(project, {}, fingerprint);
+        },
+    },
+    /* A file is visible where its task is, as a comment is, so its chunks carry the task's
+     * project and sprint and its version is the task's. */
+    file: {
+        validId: (id) => FILE_ID.test(asText(id)),
+        read: readFileRow,
+        ingestName: 'ingestFile',
+        versionOf: (row) => rowVersion(row.task),
+        chunk: (row) => row.pieces || [],
+        load: loadFile,
+        metadata: (companyId, row) => ({
+            ...base(companyId, 'file', row),
+            projectId: row.task.ProjectID || null,
+            sprintId: row.task.sprintId || null,
+            taskId: String(row.task._id),
+            createdBy: asText(row.attachment && row.attachment.userId),
+            origin: origin.ofFile(row),
+            title: fileTitle(row.attachment),
+            fileKey: asText(row.attachment && row.attachment.url),
+            pieceCount: (row.pieces || []).length,
+            extractAttempts: 0,
+        }),
+        async decide(companyId, row) {
+            const { task, attachment } = row;
+            const fingerprint = [time(task.updatedAt), task.ProjectID, task.sprintId, task.deletedStatusKey, attachment && attachment.url].map(asText).join('|');
+            if (await excluded(companyId, [documentRule('file', row)])) return leaveOut('erase', 'erased', row, {}, fingerprint);
+            if (!attachment) return { ...leaveOut('tombstone', 'removed', row, {}, fingerprint), unconditional: true };
+            if (Number(task.deletedStatusKey) === 1) return { ...leaveOut('tombstone', 'task deleted', row, {}, fingerprint), marker: TASK_DELETED };
+            if (!task.ProjectID) return leaveOut('tombstone', 'no project', row, {}, fingerprint);
+            if (await anyTrashed(companyId, [task.ProjectID])) return leaveOut('tombstone', 'trashed', row, {}, fingerprint);
+            const skipped = skipReason(row);
+            if (skipped) return leaveOut('skip', skipped, row, {}, fingerprint);
+            return ingestDecision(row, {}, fingerprint);
         },
     },
 };
@@ -267,7 +414,7 @@ const tombstonePages = (companyId, pageIds, options) => tombstoneSource(companyI
 
 const tombstoneProject = async (companyId, projectId) => {
     if (!isObjectId(projectId)) return 0;
-    return tombstone(companyId, { projectId: String(projectId), sourceType: { $in: ['page', 'comment'] } });
+    return tombstone(companyId, { projectId: String(projectId), sourceType: { $in: PROJECT_SOURCES } });
 };
 
 const removeDepartedMember = async (companyId, userId) => {
@@ -356,18 +503,45 @@ const markLeftOut = async (companyId, sourceType, decision) => {
 };
 const ingestComment = (companyId, comment, context) => ingest(companyId, 'comment', comment, context);
 const ingestTranscript = (companyId, call) => ingest(companyId, 'transcript', call);
+const ingestGuide = (companyId, project) => ingest(companyId, 'guide', project);
+const ingestFile = (companyId, row) => ingest(companyId, 'file', row);
+
+/* A file that is out of the index for a reason of its own keeps one empty tombstone saying why,
+ * and, for a failed extraction, how many times it has been tried. */
+const recordFileOutcome = async (companyId, row, { reason, attempts = 0 }) => {
+    const where = { sourceType: 'file', sourceId: row._id };
+    const { pieceCount, ...metadata } = RULES.file.metadata(companyId, row);
+    const recorded = await chunkStore(companyId, [{ ...where, ordinal: 0 }, 'deleted tombstoneReason extractAttempts projectId sprintId', { lean: true }], 'findOne');
+    const asRecorded = Boolean(recorded) && recorded.deleted === true && recorded.tombstoneReason === reason && (Number(recorded.extractAttempts) || 0) === attempts
+        && sameValue(recorded.projectId, metadata.projectId) && sameValue(recorded.sprintId, metadata.sprintId);
+    if (asRecorded) return { tombstoned: 0, leftOut: true, reason, changed: false };
+    const tombstoned = await tombstone(companyId, where);
+    const marked = await chunkStore(companyId, [
+        { ...where, ordinal: 0 },
+        {
+            $set: { ...metadata, deleted: true, tombstoneReason: reason, extractAttempts: attempts, sourceUpdatedAt: RULES.file.versionOf(row) },
+            $setOnInsert: { headingPath: [], text: '', contentHash: contentHashOf([], ''), embedding: [], embeddingModel: null, pieceCount, deletedAt: new Date() },
+        },
+        { upsert: true },
+    ], 'updateOne');
+    if (isExtractFailure(reason) && attempts < FILE_EXTRACT_ATTEMPTS) queueFileRetry(companyId, row._id, attempts);
+    return { tombstoned, leftOut: true, reason, changed: tombstoned + modified(marked) + ((marked && marked.upsertedCount) || 0) > 0 };
+};
 
 const decide = async (companyId, sourceType, id) => {
     const rules = RULES[sourceType];
-    const row = await byId(companyId, rules.collection, id, rules.fields);
+    const row = await (rules.read ? rules.read(companyId, id) : byId(companyId, rules.collection, id, rules.fields));
     if (!row) return { ...leaveOut('tombstone', 'missing', null), unconditional: true };
     return rules.decide(companyId, row);
 };
 
 const applyDecision = async (companyId, sourceType, id, decision) => {
     const rules = RULES[sourceType];
+    if (decision.action === 'skip') return recordFileOutcome(companyId, decision.row, { reason: decision.reason });
     if (decision.action === 'ingest') {
-        const result = await module.exports[rules.ingestName](companyId, decision.row, decision.context);
+        const loaded = rules.load ? await rules.load(companyId, decision.row) : { row: decision.row };
+        if (loaded.leftOut) return recordFileOutcome(companyId, decision.row, loaded.leftOut);
+        const result = await module.exports[rules.ingestName](companyId, loaded.row, decision.context);
         return { ...result, changed: result.written + result.stamped + result.tombstoned > 0 };
     }
     if (decision.action === 'erase') {
@@ -421,11 +595,13 @@ const serialised = (key, run) => {
     return entry.done;
 };
 
+const namesASource = (sourceType, id) => Boolean(RULES[sourceType]) && (RULES[sourceType].validId ? RULES[sourceType].validId(id) : isObjectId(id));
+
 /* Decides from the source row and everything its visibility rests on as they are now, writes,
  * then decides again: a trash, delete, departure, move or restore that landed between the read
  * and the write (in this process or another) is caught and applied before the sync returns. */
 const sync = (companyId, sourceType, id) => {
-    if (!RULES[sourceType] || !isObjectId(id)) return Promise.resolve(null);
+    if (!namesASource(sourceType, id)) return Promise.resolve(null);
     return serialised(`${companyId}:${sourceType}:${id}`, async () => {
         let decision = await decide(companyId, sourceType, id);
         let result = null;
@@ -443,6 +619,33 @@ const sync = (companyId, sourceType, id) => {
 const syncPage = (companyId, pageId) => sync(companyId, 'page', pageId);
 const syncComment = (companyId, commentId) => sync(companyId, 'comment', commentId);
 const syncTranscript = (companyId, callId) => sync(companyId, 'transcript', callId);
+const syncGuide = (companyId, projectId) => sync(companyId, 'guide', projectId);
+const syncFile = (companyId, sourceId) => sync(companyId, 'file', sourceId);
+
+/* Brings a task's files in line with the attachments its row carries now: each one synced, and
+ * any file still indexed under the task whose attachment is gone taken out. */
+const syncTaskFiles = async (companyId, taskId) => {
+    const out = { indexed: 0, skipped: 0, removed: 0 };
+    if (!isObjectId(taskId)) return out;
+    const task = await byId(companyId, SCHEMA_TYPE.TASKS, taskId, 'attachments');
+    const attached = (task && Array.isArray(task.attachments) ? task.attachments : [])
+        .map((item) => asText(item && item.id))
+        .filter((attachmentId) => ATTACHMENT_ID.test(attachmentId))
+        .map((attachmentId) => fileSourceId(taskId, attachmentId));
+    const wanted = [...new Set(attached)];
+    const indexed = await chunkStore(companyId, [{ sourceType: 'file', taskId: String(taskId), deleted: { $ne: true } }, 'sourceId', { lean: true }], 'find');
+    const gone = [...new Set((indexed || []).map((chunk) => asText(chunk.sourceId)))].filter((sourceId) => !wanted.includes(sourceId));
+    for (const sourceId of wanted) {
+        const result = await sync(companyId, 'file', sourceId);
+        if (result && result.leftOut) out.skipped += 1;
+        else out.indexed += 1;
+    }
+    for (const sourceId of gone) {
+        await sync(companyId, 'file', sourceId);
+        out.removed += 1;
+    }
+    return out;
+};
 
 /* Carries on past a sync that throws, then runs each failed one once more through the same
  * per-source queue, and reports what still failed only after every other one has run. */
@@ -474,16 +677,36 @@ const syncEach = async (companyId, sourceType, where) => {
     return syncMany(companyId, sourceType, (rows || []).map((row) => String(row._id)));
 };
 
+/* Every task of the project that carries an attachment; one that keeps failing holds none of
+ * the others back. */
+const reindexProjectFiles = async (companyId, projectId) => {
+    const tasks = await store(companyId, SCHEMA_TYPE.TASKS, [{ ProjectID: oid(projectId), deletedStatusKey: { $ne: 1 }, 'attachments.0': { $exists: true } }, '_id', { lean: true }], 'find');
+    let count = 0;
+    let failure = null;
+    for (const task of tasks || []) {
+        try {
+            count += (await module.exports.syncTaskFiles(companyId, String(task._id))).indexed;
+        } catch (error) {
+            failure = failure || error;
+        }
+    }
+    if (failure) throw failure;
+    return count;
+};
+
 const reindexProject = async (companyId, projectId) => {
     if (!isObjectId(projectId)) return 0;
     let failure = null;
     let count = 0;
-    for (const [sourceType, where] of [
-        ['page', { ProjectID: oid(projectId), deletedStatusKey: { $ne: 1 } }],
-        ['comment', { projectId: oid(projectId), isDeleted: { $ne: true }, type: { $in: COMMENT_TYPES } }],
-    ]) {
+    const passes = [
+        () => syncEach(companyId, 'page', { ProjectID: oid(projectId), deletedStatusKey: { $ne: 1 } }),
+        () => syncEach(companyId, 'comment', { projectId: oid(projectId), isDeleted: { $ne: true }, type: { $in: COMMENT_TYPES } }),
+        () => sync(companyId, 'guide', String(projectId)).then((result) => (result && !result.leftOut ? 1 : 0)),
+        () => reindexProjectFiles(companyId, projectId),
+    ];
+    for (const pass of passes) {
         try {
-            count += await syncEach(companyId, sourceType, where);
+            count += await pass();
         } catch (error) {
             failure = failure || error;
         }
@@ -496,25 +719,33 @@ const reindexAuthor = async (companyId, userId) => (isObjectId(userId)
     ? syncEach(companyId, 'page', { createdBy: String(userId), visibility: 'private', deletedStatusKey: { $ne: 1 } })
     : 0);
 
-/* A task change reaches its comments through the chunks recorded under it. A deleted task tombstones
- * them in one write; a restore, known by the chunks it marked, re-syncs those comments and any
- * others under the task; a move re-tags the chunks' project and sprint. Only a restore reads
- * comments. Serialised per task, so a restore queued behind a delete reads the task again. */
+/* A task change reaches its comments and files through the chunks recorded under it. A deleted task
+ * tombstones them in one write; a restore, known by the chunks it marked, re-syncs those comments
+ * and any others under the task, and the task's files from the text already extracted; a move
+ * re-tags the chunks' project and sprint. Only a restore reads comments, and nothing here reads a
+ * file's bytes. Serialised per task, so a restore queued behind a delete reads the task again. */
 const reindexTask = (companyId, taskId, { moved = false } = {}) => {
     if (!isObjectId(taskId)) return Promise.resolve(0);
     return serialised(`${companyId}:task:${taskId}`, async () => {
-        const where = { sourceType: 'comment', taskId: String(taskId) };
+        const where = { sourceType: { $in: TASK_SOURCES }, taskId: String(taskId) };
         const task = await readTask(companyId, taskId);
         if (!task || Number(task.deletedStatusKey) === 1) {
             if (task) await stampForward(companyId, where, rowVersion(task));
             return tombstone(companyId, where, { tombstoneReason: TASK_DELETED });
         }
         let count = 0;
-        const marked = await chunkStore(companyId, [{ ...where, deleted: true, tombstoneReason: TASK_DELETED }, 'sourceId', { lean: true }], 'find');
-        if (marked && marked.length) {
+        const marked = await chunkStore(companyId, [{ ...where, deleted: true, tombstoneReason: TASK_DELETED }, 'sourceType sourceId', { lean: true }], 'find');
+        const markedComments = (marked || []).filter((chunk) => chunk.sourceType === 'comment');
+        if (markedComments.length) {
             const rows = await store(companyId, SCHEMA_TYPE.COMMENTS, [{ taskId: { $in: [oid(taskId), String(taskId)] } }, '_id', { lean: true }], 'find');
-            const ids = [...new Set([...marked.map((chunk) => String(chunk.sourceId)), ...(rows || []).map((row) => String(row._id))])];
+            const ids = [...new Set([...markedComments.map((chunk) => String(chunk.sourceId)), ...(rows || []).map((row) => String(row._id))])];
             count += await syncMany(companyId, 'comment', ids);
+        }
+        if ((marked || []).some((chunk) => chunk.sourceType === 'file')) {
+            count += (await module.exports.syncTaskFiles(companyId, String(taskId))).indexed;
+            /* What is still out after that (its attachment left while the task was deleted) stops
+             * looking like something the next task change should restore. */
+            await chunkStore(companyId, [{ sourceType: 'file', taskId: String(taskId), deleted: true, tombstoneReason: TASK_DELETED }, { $set: { tombstoneReason: '' } }], 'updateMany');
         }
         if (moved) {
             const projectId = task.ProjectID || null;
@@ -527,6 +758,42 @@ const reindexTask = (companyId, taskId, { moved = false } = {}) => {
         }
         return count;
     });
+};
+
+const fileRetryQueue = new Map();
+
+const runFileRetry = async (key) => {
+    const entry = fileRetryQueue.get(key);
+    if (!entry) return null;
+    fileRetryQueue.delete(key);
+    return sync(entry.companyId, 'file', entry.sourceId).catch((error) => {
+        logger.error(`${LOG_PREFIX} retry of file ${entry.sourceId} in company ${entry.companyId} failed: ${error.message}`);
+        return null;
+    });
+};
+
+/* One waiting retry per file. The attempts are counted on the file's own record, so a restart
+ * loses the timer and never the count: a file is tried three times at most, whoever asks. */
+const queueFileRetry = (companyId, sourceId, attempts) => {
+    const key = `${companyId}:${sourceId}`;
+    if (fileRetryQueue.has(key)) return;
+    const timer = setTimeout(() => { runFileRetry(key); }, FILE_RETRY_DELAYS_MS[Math.min(attempts, FILE_RETRY_DELAYS_MS.length) - 1]);
+    if (timer.unref) timer.unref();
+    fileRetryQueue.set(key, { companyId: String(companyId), sourceId, timer });
+};
+
+const fileRetries = () => [...fileRetryQueue.keys()].sort();
+
+const flushFileRetries = async () => {
+    for (const [key, entry] of [...fileRetryQueue.entries()]) {
+        clearTimeout(entry.timer);
+        await runFileRetry(key);
+    }
+};
+
+const clearFileRetries = () => {
+    fileRetryQueue.forEach((entry) => clearTimeout(entry.timer));
+    fileRetryQueue.clear();
 };
 
 const embedRetryQueue = new Map();
@@ -605,18 +872,28 @@ module.exports = {
     SOURCES,
     RULES,
     EMBED_RETRY_ATTEMPTS,
+    FILE_EXTRACT_ATTEMPTS,
     REEMBED_BATCH,
     embedRetries,
     flushEmbedRetries,
     clearEmbedRetries,
+    fileRetries,
+    flushFileRetries,
+    clearFileRetries,
     reembedMissing,
+    fileSourceId,
     ingestPage,
     ingestComment,
     ingestTranscript,
+    ingestGuide,
+    ingestFile,
     sync,
     syncPage,
     syncComment,
     syncTranscript,
+    syncGuide,
+    syncFile,
+    syncTaskFiles,
     tombstonePages,
     tombstoneProject,
     reindexProject,

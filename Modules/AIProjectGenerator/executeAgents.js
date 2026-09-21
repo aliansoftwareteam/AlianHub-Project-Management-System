@@ -165,6 +165,7 @@ const queueRuns = async ({ companyId, uid, projectId, pairs, agents }) => {
  * created, and a failure here must not roll it back. */
 const start = async ({ companyId, uid, projectId, projectName, pairs, agents, withGuide, approvedBrief, assumptions }) => {
     const out = { guideAgentId: null, runsQueued: 0, runsRefused: [] };
+    if (withGuide) require('../Knowledge/ingest/events').publishGuideSaved(companyId, projectId);
     if (withGuide) {
         try {
             const agent = await createGuideAgent({ companyId, projectId, projectName, ownerId: uid });
