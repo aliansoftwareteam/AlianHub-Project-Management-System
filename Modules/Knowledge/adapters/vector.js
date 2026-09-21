@@ -54,10 +54,10 @@ const byRank = (a, b) => (b.score - a.score)
 
 /* One passage per source from its best chunk, by cosine, the most similar first. A chunk at or
  * below zero is no match. */
-const rank = (sourceType, rows, queryEmbedding, limit) => {
+const rank = (sourceType, rows, queryEmbedding, limit, scoreOf = (row) => cosine(queryEmbedding, row.embedding)) => {
     const best = new Map();
     rows.forEach((row) => {
-        const score = cosine(queryEmbedding, row.embedding);
+        const score = scoreOf(row);
         if (score <= 0) return;
         const key = String(row.sourceId);
         const seen = best.get(key);
@@ -77,13 +77,13 @@ const searchableSources = (filter) => ((filter && filter.sourceTypes) || [])
 
 /* A source whose candidates cannot be read fails the whole search: an answer that quietly came
  * from the sources that happened to work would look complete and not be. */
-const searchWith = (candidatesOf) => async ({ companyId, queryEmbedding, model, filter, limit }) => {
+const searchWith = (candidatesOf, { scoreOf } = {}) => async ({ companyId, queryEmbedding, model, filter, limit }) => {
     const vector = Array.isArray(queryEmbedding) ? queryEmbedding : [];
     const wanted = clampLimit(limit);
     if (!vector.length || !model) return [];
     const results = await Promise.all(searchableSources(filter).map(async (sourceType) => {
         try {
-            return rank(sourceType, await candidatesOf(String(companyId), sourceType, model, filter.clauses[sourceType], { vector, wanted }), vector, wanted);
+            return rank(sourceType, await candidatesOf(String(companyId), sourceType, model, filter.clauses[sourceType], { vector, wanted }), vector, wanted, scoreOf);
         } catch (error) {
             throw Object.assign(new Error(`${sourceType} candidates unavailable for ${companyId}: ${error.message}`, { cause: error }), error.fallback ? { fallback: error.fallback } : {});
         }
@@ -97,6 +97,7 @@ const NOTHING_TO_DO = Object.freeze({ backend: 'vector-db', skipped: true });
  * nothing to add here: the row write, the tombstone and the deletion already covered them. */
 const createDatabaseVectorAdapter = ({ crud = MongoDbCrudOpration } = {}) => ({
     name: 'vector-db',
+    tracksSources: false,
     search: searchWith((companyId, sourceType, model, clause) => crud(companyId, {
         type: SCHEMA_TYPE.KNOWLEDGE_CHUNKS,
         data: [[
@@ -155,6 +156,7 @@ const createInMemoryVectorAdapter = ({ matches = matchesClause } = {}) => {
     const ofCompany = (companyId) => [...rows.values()].filter((row) => row.companyId === String(companyId));
     return {
         name: 'vector-memory',
+        tracksSources: true,
         search: searchWith(async (companyId, sourceType, model, clause) => ofCompany(companyId)
             .filter((row) => row.sourceType === sourceType && row.embeddingModel === model && row.deleted !== true && matches(row, clause))),
         async upsert({ companyId, chunks }) {

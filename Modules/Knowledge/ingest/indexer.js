@@ -427,10 +427,13 @@ const upsertChunk = async (companyId, row) => {
     }
 };
 
-/* The store hears about the sources the tombstone hides, read with the same filter first. */
+const storeTracksSources = () => Boolean(vectorStore.current().tracksSources);
+
+/* A store that keeps vectors of its own hears about the sources a tombstone hides, read with the
+ * same filter first. One whose vectors ride on the chunk rows needs no read: the write is enough. */
 const tombstone = async (companyId, where, set = {}, { fromOrdinal = 0 } = {}) => {
     const live = { ...where, deleted: { $ne: true } };
-    const hidden = await chunkStore(companyId, [live, 'sourceType sourceId', { lean: true }], 'find');
+    const hidden = storeTracksSources() ? await chunkStore(companyId, [live, 'sourceType sourceId', { lean: true }], 'find') : [];
     const count = modified(await chunkStore(companyId, [live, { $set: { deleted: true, deletedAt: new Date(), ...set } }], 'updateMany'));
     const bySourceType = new Map();
     (hidden || []).forEach((row) => bySourceType.set(row.sourceType, new Set([...(bySourceType.get(row.sourceType) || []), asText(row.sourceId)])));
@@ -450,9 +453,11 @@ const stampForward = async (companyId, where, at) => modified(await chunkStore(c
 const tombstoneSource = async (companyId, sourceType, ids, { sourceUpdatedAt } = {}) => {
     const unique = [...new Set((ids || []).map(asText).filter(Boolean))];
     if (!unique.length) return 0;
-    return sourceUpdatedAt
-        ? tombstone(companyId, { sourceType, sourceId: { $in: unique }, ...notNewerThan(sourceUpdatedAt) }, { sourceUpdatedAt })
-        : tombstone(companyId, { sourceType, sourceId: { $in: unique } });
+    const count = sourceUpdatedAt
+        ? await tombstone(companyId, { sourceType, sourceId: { $in: unique }, ...notNewerThan(sourceUpdatedAt) }, { sourceUpdatedAt })
+        : await tombstone(companyId, { sourceType, sourceId: { $in: unique } });
+    if (!storeTracksSources()) await tellStore('tombstone', { companyId: String(companyId), sourceType, sourceIds: unique });
+    return count;
 };
 
 const tombstonePages = (companyId, pageIds, options) => tombstoneSource(companyId, SOURCE, pageIds, options);

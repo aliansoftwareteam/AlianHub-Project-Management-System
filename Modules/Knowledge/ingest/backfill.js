@@ -309,8 +309,9 @@ const backfillAll = async (options) => {
     if (flag.indexer.mode() === 'off') return { companies: 0, reembedded: {} };
     let ran = 0;
     const reembedded = {};
-    for (const companyId of await enabledCompanies()) {
-        await vectorStore.prepareCompany(companyId);
+    const companies = await enabledCompanies();
+    await vectorStore.prepareCompanies(companies);
+    for (const companyId of companies) {
         await resumeFiles(companyId);
         await keepAlive(companyId).catch((error) => logger.error(`${LOG_PREFIX} ${companyId}: heartbeat: ${error.message}`));
         if (await runOnce(companyId, options)) ran += 1;

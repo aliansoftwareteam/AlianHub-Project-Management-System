@@ -148,7 +148,8 @@ const vectorSide = async (set, query, filter, limit) => {
     const store = vectorStore.current();
     try {
         const passages = await store.search({ companyId: set.companyId, queryEmbedding: question.vector, model: question.model, filter, limit });
-        return { backend: store.name, passages: [...(passages || [])].sort(byRank) };
+        const degraded = passages && passages.degraded;
+        return { backend: degraded ? `${store.name}(${degraded})` : store.name, passages: [...(passages || [])].sort(byRank) };
     } catch (error) {
         logger.error(`knowledge retrieval: vector search failed for ${set.companyId}; answering from the lexical side: ${error.message}`);
         return { fallback: error.fallback || 'vector failed' };
