@@ -241,9 +241,7 @@ describe('comment rooms', () => {
 
     it('refuses a room name that does not end in the socket own id', async () => {
         const socket = await connect({ uid: MEMBER });
-        await settle(socket, 'joinCommentRoom', { roomName: `comments_project_${ids.privateProject}**someone-else`, socketId: 'someone-else' });
-        const rooms = await new Promise((resolve) => socket.emit('getRoomList', 'someone-else', resolve));
-        expect(rooms).toEqual([]);
+        expect(await join(socket, 'joinCommentRoom', { roomName: `comments_project_${ids.privateProject}**someone-else`, socketId: 'someone-else' })).toEqual([]);
     });
 });
 
@@ -306,5 +304,6 @@ describe('socket housekeeping', () => {
         outsider.emit('disconnectNameSpace', member.id);
         await new Promise((resolve) => setTimeout(resolve, 200));
         expect(member.connected).toBe(true);
+        expect(outsider.connected).toBe(true);
     });
 });

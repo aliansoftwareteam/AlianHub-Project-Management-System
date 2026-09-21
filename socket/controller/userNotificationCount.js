@@ -1,6 +1,5 @@
 const {
     joinRoom,
-    leaveRoom,
     upsertRoom,
     findRoomsByPrefix,
 } = require('../helper');
