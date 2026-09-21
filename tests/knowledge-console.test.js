@@ -544,9 +544,9 @@ describe('who walks a re-index', () => {
         expect(await reindex.cancel(C, 'page')).toEqual({ ok: true });
         release();
         await walk;
+        expect(spy).toHaveBeenCalledTimes(1);
         spy.mockRestore();
         expect(stateOf('page')).toMatchObject({ status: 'complete', reindexStatus: 'cancelled', reindexOwner: '' });
-        expect(spy).toHaveBeenCalledTimes(1);
         expect(await reindex.cancel(C, 'page')).toEqual({ ok: false, code: 'reindex_not_running' });
     });
 });
