@@ -4,6 +4,9 @@ const { ACTIVITY_TYPES } = require('../AgentSessions/rules');
 
 const SCOPE = 'tasks:write';
 
+// They write the session record only, inside this workspace, and a closed session cannot be reopened.
+const ANNOTATIONS = Object.freeze({ readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false });
+
 const sessionArgs = (extra = {}) => ({
     type: 'object',
     properties: { sessionId: { type: 'string' }, handle: { type: 'string', description: 'The handle from the announcement; needed on the first call only.' }, ...extra },
@@ -18,6 +21,7 @@ const TOOLS = [
         description: `Report what you are doing on a task delegated to you: one of ${ACTIVITY_TYPES.join(', ')}. The first call must come within ten seconds of the announcement and carry its handle.`,
         input: { ...sessionArgs({ type: { type: 'string', enum: [...ACTIVITY_TYPES] }, text: { type: 'string' } }), required: ['sessionId', 'type', 'text'] },
         visibility: 'filtered',
+        annotations: ANNOTATIONS,
         run: (ctx, args, vis) => require('../AgentSessions/activity').record(ctx, args, vis),
     },
     {
@@ -25,6 +29,7 @@ const TOOLS = [
         description: 'Close a delegated session as done, with a one-line summary for the people on the task.',
         input: sessionArgs({ summary: { type: 'string' } }),
         visibility: 'filtered',
+        annotations: ANNOTATIONS,
         run: (ctx, args, vis) => require('../AgentSessions/activity').complete(ctx, args, vis),
     },
     {
@@ -32,6 +37,7 @@ const TOOLS = [
         description: 'Close a delegated session as failed, saying why.',
         input: sessionArgs({ reason: { type: 'string' } }),
         visibility: 'filtered',
+        annotations: ANNOTATIONS,
         run: (ctx, args, vis) => require('../AgentSessions/activity').fail(ctx, args, vis),
     },
 ];
