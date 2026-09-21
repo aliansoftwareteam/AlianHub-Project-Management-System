@@ -19,14 +19,15 @@ const emptyKey = (companyId) => `${EMPTY_PREFIX}${companyId}`;
  * have added hosts, so the read refuses. */
 const EMPTY_MEMORY_MS = CACHE_TTL_SECONDS * 1000;
 
+// A monotonic clock, so setting the system clock can neither stretch the window nor cut it short.
 const rememberEmptiness = (companyId, hosts) => {
     if (hosts.length) myCache.del(emptyKey(companyId));
-    else myCache.set(emptyKey(companyId), Date.now(), 0);
+    else myCache.set(emptyKey(companyId), performance.now(), 0);
 };
 
 const recentlyEmpty = (companyId) => {
     const at = myCache.get(emptyKey(companyId));
-    return typeof at === 'number' && Date.now() - at <= EMPTY_MEMORY_MS;
+    return typeof at === 'number' && performance.now() - at <= EMPTY_MEMORY_MS;
 };
 
 const hostsOf = (doc) => (doc && Array.isArray(doc.hosts) ? doc.hosts.map(String) : []);

@@ -48,7 +48,7 @@ const SHARED_AT_ANY_DEPTH = [
 /* Wildcard-DNS services answer any name under them with the address written into it (10.0.0.1.nip.io) or with
  * loopback, so a wildcard at any depth under one admits every address and makes the list pointless. An exact host
  * is still accepted: the resolved-address check refuses it if it lands somewhere private. */
-const WILDCARD_DNS_SUFFIXES = ['nip.io', 'sslip.io', 'xip.io', 'traefik.me', 'localtest.me', 'lvh.me'];
+const WILDCARD_DNS_SUFFIXES = ['nip.io', 'sslip.io', 'xip.io', 'traefik.me', 'localtest.me', 'lvh.me', 'backname.io', 'nip.direct'];
 
 const underWildcardDns = (host) => WILDCARD_DNS_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
 
