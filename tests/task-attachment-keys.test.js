@@ -28,6 +28,7 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn()
 jest.mock('../common-storage/common-server.js', () => mockStub());
 process.env.STORAGE_TYPE = 'server';
 
+const logger = require('../Config/loggerConfig');
 const mongoHelper = require('../Modules/Tasks/helpers/mongo_helper');
 const { handleTaskAttachmentsDuplicateFunctionality: copyStoredFile } = require('../common-storage/common-server.js');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
@@ -84,6 +85,8 @@ const taskDoc = (_id, extra = {}) => ({
 let submission;
 
 beforeEach(() => {
+    process.env.STORAGE_DOWNLOAD_SCOPE = 'enforce';
+    logger.warn.mockClear();
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     copyStoredFile.mockClear();
     mockDb.seed('projects', { _id: PROJECT, ProjectName: 'Parity', ProjectCode: 'PAR', CompanyId: CID, lastTaskId: 4, taskStatusData: STATUS_LIST, taskTypeCounts: TYPE_LIST });
@@ -189,5 +192,32 @@ describe('duplicating a task', () => {
         expect(copied).toEqual([own]);
         const copy = mockDb.store.tasks.find((task) => ![TASK, OTHER_TASK].includes(String(task._id)));
         expect(copy.attachments.map((item) => item.url)).toEqual([expect.stringMatching(new RegExp(`^Project/${PROJECT}/Sprint/${String(copy._id)}/Attachment/spec\\.pdf$`)), foreign]);
+    });
+});
+
+describe('the write check follows STORAGE_DOWNLOAD_SCOPE', () => {
+    const refusalWarnings = () => logger.warn.mock.calls.map(([line]) => line).filter((line) => line.startsWith('attachment write would be refused'));
+
+    it.each([['report', 'report'], ['unset', undefined]])('in %s mode writes a foreign key and counts one warning without the key', async (_label, value) => {
+        if (value === undefined) delete process.env.STORAGE_DOWNLOAD_SCOPE;
+        else process.env.STORAGE_DOWNLOAD_SCOPE = value;
+        expect((await attach(foreign)).code).toBe(200);
+        expect(urls(TASK)).toEqual([foreign]);
+        const lines = refusalWarnings();
+        expect(lines).toHaveLength(1);
+        expect(lines[0]).toMatch(/reason: other_task\b.*reported so far for this reason: \d+/);
+        expect(lines[0]).not.toContain(OTHER_TASK);
+        expect(lines[0]).not.toContain('secret');
+    });
+
+    it('in enforce mode refuses a foreign key and logs no warning', async () => {
+        expect(await attach(foreign)).toMatchObject(REFUSAL);
+        expect(refusalWarnings()).toEqual([]);
+    });
+
+    it.each(['report', 'enforce'])('in %s mode refuses a url that is not text', async (value) => {
+        process.env.STORAGE_DOWNLOAD_SCOPE = value;
+        expect(await attach([own])).toMatchObject(REFUSAL);
+        expect(urls(TASK)).toEqual([]);
     });
 });
