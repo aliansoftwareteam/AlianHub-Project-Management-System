@@ -6,6 +6,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const { COVERAGE_POINT_LABELS } = require('../AIProjectGenerator/promptBuilder');
 const { hasInstruction } = require('../AICore/instructionGuard');
+const knowledgeMemory = require('../Knowledge/memory/publish');
 
 // What the workspace already decided and what each person prefers, on the
 // LangGraph store, one instance per company database. Rows are keyed for
@@ -596,9 +597,124 @@ async function contextFor({ companyId, projectId, userId, maxChars = 2000 } = {}
     }
 }
 
+/* What one agent learned, kept apart from the shared tiers and written only by that agent's runs
+ * (docs/AI-PLATFORM-ARCHITECTURE.md §E). It records where it came from so retrieval can hold it to
+ * the same rules as its sources: every project it was formed in, the documents it was formed from,
+ * and the run's taint, which a repeat sighting can add to but never clear. */
+const AGENT_NOTE = 'agent.note';
+const AGENT_ROOT = 'agent';
+const AGENT_NOTE_LIMIT = 10000;
+const DERIVED_MAX = 20;
+const DERIVED_REF = /^(page|comment|transcript|task):[0-9a-fA-F]{24}$/;
+
+const agentNamespaceOf = (agentId) => [AGENT_ROOT, String(agentId), 'note'];
+const idsOf = (list) => [...new Set((Array.isArray(list) ? list : [list]).map((id) => String(id == null ? '' : id)).filter((id) => OBJECT_ID.test(id)))];
+const refsOf = (list) => [...new Set((Array.isArray(list) ? list : []).map((ref) => String(ref == null ? '' : ref).trim()).filter((ref) => DERIVED_REF.test(ref)))].slice(0, DERIVED_MAX);
+const union = (a, b) => [...new Set([...(a || []), ...(b || [])])];
+const taintOf = (run) => (Array.isArray(run.taintSources) ? run.taintSources : [])
+    .filter((s) => s && s.kind && s.ref)
+    .map((s) => ({ kind: String(s.kind).slice(0, 20), ref: String(s.ref).slice(0, 200) }));
+const sameTaint = (a, b) => `${a.kind}:${a.ref}` === `${b.kind}:${b.ref}`;
+
+const agentNoteOf = (item) => {
+    const v = item.value || {};
+    return {
+        memoryId: String(v.memoryId || ''),
+        agentId: item.namespace[1],
+        key: item.key,
+        text: sanitise(v.text),
+        status: v.status || STATUS.ACTIVE,
+        source: v.source || null,
+        projectIds: Array.isArray(v.projectIds) ? v.projectIds.map(String) : [],
+        derivedFrom: Array.isArray(v.derivedFrom) ? v.derivedFrom.map(String) : [],
+        tainted: v.tainted === true,
+        taintSources: Array.isArray(v.taintSources) ? v.taintSources : [],
+        occurrences: Number(v.occurrences) || 1,
+        firstSeenAt: v.firstSeenAt || null,
+        lastSeenAt: v.lastSeenAt || null,
+        updatedAt: v.updatedAt || v.lastSeenAt || null,
+    };
+};
+
+/* `run` is the agent_runs row writing the note. Its project and the projects of what it read are
+ * the note's projects; `derivedFrom` names the documents it was formed from ("page:<id>"). */
+async function rememberForAgent({ companyId, run, text, projectIds, derivedFrom }) {
+    const r = plain(run) || {};
+    const agentId = String(r.agentId || '');
+    const runId = String(r._id || '');
+    if (!OBJECT_ID.test(agentId) || !OBJECT_ID.test(runId)) throw invalid('An agent note is written by an agent run.');
+    const clean = sanitise(text);
+    if (!clean) throw invalid('text is required');
+    if (skipInstruction(`rememberForAgent ${agentId}`, clean)) return null;
+    const ns = agentNamespaceOf(agentId);
+    const key = slug(clean);
+    const s = await store(companyId);
+    const existing = await s.get(ns, key);
+    const prev = existing && existing.value ? existing.value : null;
+    const now = isoNow();
+    const projects = idsOf([r.projectId, ...(Array.isArray(projectIds) ? projectIds : [])]);
+    const taintSources = taintOf(r);
+    const row = prev
+        ? {
+            ...prev,
+            status: STATUS.ACTIVE,
+            occurrences: (Number(prev.occurrences) || 0) + 1,
+            projectIds: union(prev.projectIds, projects),
+            derivedFrom: union(prev.derivedFrom, refsOf(derivedFrom)).slice(0, DERIVED_MAX),
+            tainted: prev.tainted === true || r.tainted === true,
+            taintSources: [...(prev.taintSources || []), ...taintSources.filter((t) => !(prev.taintSources || []).some((p) => sameTaint(p, t)))],
+            lastSeenAt: now,
+            updatedAt: now,
+        }
+        : {
+            memoryId: new mongoose.Types.ObjectId().toHexString(),
+            text: clean,
+            status: STATUS.ACTIVE,
+            source: { origin: 'run', runId, userId: String(r.startedBy || '') },
+            projectIds: projects,
+            derivedFrom: refsOf(derivedFrom),
+            tainted: r.tainted === true,
+            taintSources,
+            occurrences: 1,
+            firstSeenAt: now,
+            lastSeenAt: now,
+            updatedAt: now,
+        };
+    await s.put(ns, key, row);
+    knowledgeMemory.memoryChanged(companyId, row.memoryId, prev ? 'updated' : 'created');
+    return agentNoteOf({ namespace: ns, key, value: row });
+}
+
+async function listAgentNotes({ companyId, agentId } = {}) {
+    const prefix = agentId ? agentNamespaceOf(agentId) : [AGENT_ROOT];
+    const items = await persistence.storeFor(companyId).search(prefix, { limit: AGENT_NOTE_LIMIT });
+    return items.map(agentNoteOf).filter((note) => note.memoryId);
+}
+
+async function readAgentNote({ companyId, memoryId }) {
+    if (!OBJECT_ID.test(String(memoryId || ''))) return null;
+    const [item] = await persistence.storeFor(companyId).search([AGENT_ROOT], { filter: { memoryId: String(memoryId) }, limit: 1 });
+    return item ? agentNoteOf(item) : null;
+}
+
+/* Retire-never-delete, as for every other row: the note stays in the store and leaves the index. */
+async function forgetAgentNote({ companyId, agentId, memoryId }) {
+    const note = await readAgentNote({ companyId, memoryId });
+    if (!note || note.agentId !== String(agentId)) return null;
+    const ns = agentNamespaceOf(note.agentId);
+    const s = await store(companyId);
+    const existing = await s.get(ns, note.key);
+    if (!existing) return null;
+    const row = { ...(existing.value || {}), status: STATUS.RETIRED, updatedAt: isoNow() };
+    await s.put(ns, note.key, row);
+    knowledgeMemory.memoryChanged(companyId, note.memoryId, 'deleted');
+    return agentNoteOf({ namespace: ns, key: note.key, value: row });
+}
+
 module.exports = {
-    KIND, KINDS, PROJECT_KINDS, STATUS, PLAN_SHAPING_ACTIONS, PREFERENCE_KEY, TONES, REVIEW_DEPTHS, DECLINE_REASON_TEXT, HEADER, LABEL, WORKSPACE_NAMESPACE,
+    KIND, KINDS, PROJECT_KINDS, STATUS, PLAN_SHAPING_ACTIONS, PREFERENCE_KEY, TONES, REVIEW_DEPTHS, DECLINE_REASON_TEXT, HEADER, LABEL, WORKSPACE_NAMESPACE, AGENT_NOTE,
     sanitise, slug, parseId, idOf, hasInstruction,
     contextFor, remember, find, update, retire, recordEpisode, listProject, listUser, setPreference,
     preferenceCandidate, fromBrief, rememberApprovedChanges,
+    rememberForAgent, listAgentNotes, readAgentNote, forgetAgentNote,
 };
