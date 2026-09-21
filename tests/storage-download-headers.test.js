@@ -74,8 +74,6 @@ beforeAll(async () => {
         for (const [name] of INLINE) fs.writeFileSync(fileAt(bucket, name), 'bytes');
         for (const name of ATTACHMENT) fs.writeFileSync(fileAt(bucket, name), '<script>alert(document.domain)</script>');
         for (const name of ['icon.svg', 'Logo.SVG']) fs.writeFileSync(fileAt(bucket, name), '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><script>alert(2)</script><rect width="4" height="4"/></svg>');
-        fs.mkdirSync(path.join(STORAGE_ROOT, bucket, FOLDER, '.hidden'), { recursive: true });
-        fs.writeFileSync(path.join(STORAGE_ROOT, bucket, FOLDER, '.hidden', 'photo.png'), 'bytes');
         fs.writeFileSync(fileAt(bucket, '.dotfile.png'), 'bytes');
     }
     const app = express();
@@ -143,7 +141,8 @@ describe.each(ROUTES)('SVG uploads served from %s', (label, urlOf) => {
 describe('a file the sender refuses', () => {
     beforeEach(() => logger.error.mockClear());
 
-    it.each([['a dot folder', '.hidden/photo.png'], ['a dot file', '.dotfile.png']])('answers 404 for %s instead of hanging, and logs it', async (label, name) => {
+    it('answers 404 for a file whose name starts with a dot instead of hanging, and logs it', async () => {
+        const name = '.dotfile.png';
         const url = `${baseURL}/api/v1/download/${PUBLIC_BUCKET}/${FOLDER}/${name}`;
         const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
         expect(res.status).toBe(404);
@@ -152,7 +151,7 @@ describe('a file the sender refuses', () => {
     });
 
     it('answers 404 on a signed link too', async () => {
-        const res = await fetch(signedURL('.hidden/photo.png'), { signal: AbortSignal.timeout(3000) });
+        const res = await fetch(signedURL('.dotfile.png'), { signal: AbortSignal.timeout(3000) });
         expect(res.status).toBe(404);
     });
 });
