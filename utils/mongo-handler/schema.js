@@ -1538,7 +1538,7 @@ const schema = {
         revokedReason: { type: String, required: false },
         lastUsedAt: { type: Date, required: false },
     },
-    // kind is code, access or refresh. purgeAt drives the TTL index; a code outlives its expiry there so a replay is recognised.
+    // kind is code, access, refresh or consent (an answered consent request). purgeAt drives the TTL index; a code outlives its expiry there so a replay is recognised.
     oauthTokens: {
         tokenHash: { type: String, required: true },
         kind: { type: String, required: true },

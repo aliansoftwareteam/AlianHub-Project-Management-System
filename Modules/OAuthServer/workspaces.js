@@ -32,6 +32,12 @@ const peopleNamesOf = async (userIds) => {
     return new Map(rows.map((row) => [String(row._id), row.Employee_Name || row.Employee_Email || '']));
 };
 
+const personOf = async (uid) => {
+    if (!OBJECT_ID.test(String(uid || ''))) return { name: '', email: '' };
+    const row = await db(SCHEMA_TYPE.USERS, [{ _id: new mongoose.Types.ObjectId(String(uid)) }, { Employee_Name: 1, Employee_Email: 1 }], 'findOne');
+    return { name: (row && row.Employee_Name) || '', email: (row && row.Employee_Email) || '' };
+};
+
 /* The workspaces a person belongs to, in the order the account lists them. */
 async function workspacesOf(uid) {
     if (!OBJECT_ID.test(String(uid || ''))) return [];
@@ -43,4 +49,4 @@ async function workspacesOf(uid) {
     return live.map((id) => ({ id, name: names.get(id) || '' }));
 }
 
-module.exports = { OBJECT_ID, isMember, namesOf, peopleNamesOf, workspacesOf };
+module.exports = { OBJECT_ID, isMember, namesOf, peopleNamesOf, personOf, workspacesOf };

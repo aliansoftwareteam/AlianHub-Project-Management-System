@@ -23,6 +23,8 @@ const REVOKED = Object.freeze({
     REVOKED_BY_CLIENT: 'revoked_by_client',
     CLIENT_REVOKED: 'client_revoked',
     APPROVAL_REVOKED: 'approval_revoked',
+    APPROVAL_NARROWED: 'approval_narrowed',
+    NOT_APPROVED: 'not_approved',
     REVOKED_BY_USER: 'revoked_by_user',
 });
 
@@ -101,6 +103,11 @@ async function issueCode({ client, companyId, userId, scopes, redirectUri, codeC
     return { code, grant };
 }
 
+/* The workspace approval is read at every exchange and refresh, not only at consent: an approval revoked or
+ * narrowed after the person consented still bounds what the grant can be turned into. Required lazily, since
+ * the approval module revokes grants through this one. */
+const ceilingOf = (grant) => require('./approvals').approvedScopes(grant.companyId, grant.clientId);
+
 const liveGrant = async (grantId, now) => {
     const grant = await store.grants.find(grantId);
     if (!grant || grant.revokedAt || new Date(grant.expiresAt).getTime() <= now.getTime()) return null;
@@ -152,6 +159,11 @@ async function exchangeCode({ client, code, codeVerifier, redirectUri, resource,
     if (resource !== row.resource) return rejected(new GrantError('invalid_target', 'resource does not match the authorization request'));
     const grant = await liveGrant(row.grantId, now);
     if (!grant) throw invalidGrant('the grant is no longer valid');
+    const ceiling = await ceilingOf(grant);
+    if (!ceiling || !grant.scopes.every((scope) => ceiling.includes(scope))) {
+        await revokeGrant(grant.grantId, REVOKED.NOT_APPROVED, now);
+        throw invalidGrant('the client is not approved for this grant in its workspace');
+    }
     return issueTokens(grant, { now });
 }
 
@@ -182,7 +194,10 @@ async function refresh({ client, refreshToken, scope, resource, now = new Date()
     }
     const grant = await liveGrant(row.grantId, now);
     if (!grant) throw invalidGrant('the grant is no longer valid');
-    return issueTokens(grant, { scopes: [...new Set(requested)], now });
+    const ceiling = await ceilingOf(grant);
+    const allowed = ceiling ? [...new Set(requested)].filter((s) => ceiling.includes(s)) : [];
+    if (!allowed.length) throw invalidGrant('the client is not approved for this grant in its workspace');
+    return issueTokens(grant, { scopes: allowed, now });
 }
 
 /* RFC 7009. An unknown token is not an error. A refresh token takes its grant with it (section 2.1); an
@@ -227,6 +242,26 @@ async function revokeClientGrants(clientId, now = new Date(), { companyId = null
     await store.tokens.revokeClient(clientId, now, companyId);
 }
 
+/* A narrowed approval takes its client's grants in that workspace with it: each keeps only the scopes the new
+ * ceiling allows, and one left with none is revoked. */
+async function narrowClientGrants(clientId, companyId, ceiling, now = new Date()) {
+    for (const grant of await store.grants.liveForClient(clientId, companyId)) {
+        const kept = grant.scopes.filter((scope) => ceiling.includes(scope));
+        if (kept.length === grant.scopes.length) continue;
+        if (!kept.length) {
+            await revokeGrant(grant.grantId, REVOKED.APPROVAL_NARROWED, now);
+            continue;
+        }
+        await store.grants.setScopes(grant.grantId, kept);
+        for (const token of await store.tokens.liveForGrant(grant.grantId)) {
+            const scopes = (token.scopes || []).filter((scope) => ceiling.includes(scope));
+            if (scopes.length) await store.tokens.setScopes(token.tokenHash, scopes);
+            else await store.tokens.revoke(token.tokenHash, now);
+        }
+        audit(grant, 'oauth.grant_narrowed', { scopes: kept });
+    }
+}
+
 const liveGrantsOf = (userId, now = new Date()) => store.grants.liveForUser(userId, now);
 
 /* A person takes back what they granted; anyone else's grant answers as if it did not exist. */
@@ -236,4 +271,6 @@ async function revokeOwnGrant(userId, grantId, now = new Date()) {
     return revokeGrant(grant.grantId, REVOKED.REVOKED_BY_USER, now);
 }
 
-module.exports = { GrantError, REVOKED, issueCode, exchangeCode, refresh, revoke, introspect, revokeGrant, revokeClientGrants, liveGrantsOf, revokeOwnGrant };
+module.exports = {
+    GrantError, REVOKED, issueCode, exchangeCode, refresh, revoke, introspect, revokeGrant, revokeClientGrants, narrowClientGrants, liveGrantsOf, revokeOwnGrant,
+};

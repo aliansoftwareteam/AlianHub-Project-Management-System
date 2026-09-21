@@ -1,7 +1,7 @@
 {
   "locale": "hi",
   "machineTranslated": false,
-  "updatedAt": "2026-09-21T12:26:03.152Z",
+  "updatedAt": "2026-09-21T13:17:52.042Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6441,6 +6441,10 @@
     "ConnectedApps.never_used": "Not used yet",
     "ConnectedApps.revoke": "Revoke",
     "ConnectedApps.revoke_confirm": "Revoke {name}? It loses access at once.",
-    "ConnectedApps.revoke_failed": "The app could not be revoked."
+    "ConnectedApps.revoke_failed": "The app could not be revoked.",
+    "Inbox.oauth_client_approval": "{client} asks to act for people in this workspace. An owner or admin can approve or deny it in Settings, Agent clients.",
+    "Inbox.unnamed_client": "An outside agent",
+    "OAuthConsent.signed_in_as": "Signed in as",
+    "OAuthConsent.switch_account": "Not you? Switch account"
   }
 }

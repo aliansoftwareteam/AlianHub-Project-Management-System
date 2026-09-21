@@ -6005,6 +6005,8 @@ export default {
         loading: "Loading…",
     },
     Inbox: {
+        oauth_client_approval: "{client} asks to act for people in this workspace. An owner or admin can approve or deny it in Settings, Agent clients.",
+        unnamed_client: "An outside agent",
         title: "Inbox",
         tab_all: "All",
         tab_notifications: "Notifications",
@@ -9249,6 +9251,8 @@ export default {
         approve: "Approve",
         deny: "Deny",
         revoke_hint: "You can revoke this at any time under Accounts, Connected apps.",
+        signed_in_as: "Signed in as",
+        switch_account: "Not you? Switch account",
         expired: "This sign-in request has expired or is not valid. Start again from the app that sent you here.",
         other_browser: "This sign-in request was started in another browser. Start again from the app that sent you here.",
         scope_tasks_read: "Read tasks you can see",

@@ -28,12 +28,26 @@ const grants = {
         { clientId: String(clientId), ...(companyId ? { companyId: String(companyId) } : {}), revokedAt: null },
         { $set: { revokedAt: at, revokedReason: String(reason) } },
     ], 'updateMany'),
+    liveForClient: async (clientId, companyId) => ((await db(SCHEMA_TYPE.OAUTH_GRANTS, [
+        { clientId: String(clientId), companyId: String(companyId), revokedAt: null },
+    ], 'find')) || []).map(plain),
+    setScopes: (grantId, scopes) => db(SCHEMA_TYPE.OAUTH_GRANTS, [{ grantId: String(grantId), revokedAt: null }, { $set: { scopes } }], 'updateOne'),
     touch: (grantId, at) => db(SCHEMA_TYPE.OAUTH_GRANTS, [{ grantId: String(grantId) }, { $set: { lastUsedAt: at } }], 'updateOne'),
     liveForUser: async (userId, now) => ((await db(SCHEMA_TYPE.OAUTH_GRANTS, [
         { userId: String(userId), revokedAt: null, expiresAt: { $gt: now } },
         {},
         { sort: { createdAt: -1 }, limit: 200 },
     ], 'find')) || []).map(plain),
+};
+
+/* A consent request is answered once: its nonce is recorded under the token hash index, so a second answer to
+ * the same request collides with the first one. The row expires with the request. */
+const consents = {
+    spend: async ({ nonce, clientId, companyId, userId, scopes, resource, now, expiresAt }) => plain(await db(SCHEMA_TYPE.OAUTH_TOKENS, {
+        tokenHash: require('./tokenHash').hashOf(`consent-spent:${nonce}`),
+        kind: 'consent', grantId: 'none', clientId: String(clientId), companyId: String(companyId || 'none'), userId: String(userId),
+        scopes: [...scopes], resource: String(resource), createdAt: now, expiresAt, purgeAt: expiresAt, spentAt: now, revokedAt: null,
+    }, 'save')),
 };
 
 const approvals = {
@@ -45,6 +59,9 @@ const approvals = {
         { $set: set },
         { new: true },
     ], 'findOneAndUpdate')),
+    countRequestedBy: async (userId, since) => Number(await db(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, [
+        { requestedBy: String(userId), requestedAt: { $gte: since } },
+    ], 'countDocuments')) || 0,
     listFor: async (companyId) => ((await db(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, [{ companyId: String(companyId) }, {}, { sort: { updatedAt: -1 }, limit: 500 }], 'find')) || []).map(plain),
     namesFor: async (pairs) => {
         if (!pairs.length) return [];
@@ -65,6 +82,10 @@ const tokens = {
         { $set: { spentAt: at } },
     ], 'findOneAndUpdate')),
     revoke: (tokenHash, at) => db(SCHEMA_TYPE.OAUTH_TOKENS, [{ tokenHash: String(tokenHash), revokedAt: null }, { $set: { revokedAt: at } }], 'updateOne'),
+    liveForGrant: async (grantId) => ((await db(SCHEMA_TYPE.OAUTH_TOKENS, [
+        { grantId: String(grantId), kind: { $in: ['access', 'refresh'] }, revokedAt: null },
+    ], 'find')) || []).map(plain),
+    setScopes: (tokenHash, scopes) => db(SCHEMA_TYPE.OAUTH_TOKENS, [{ tokenHash: String(tokenHash) }, { $set: { scopes } }], 'updateOne'),
     revokeGrant: (grantId, at) => db(SCHEMA_TYPE.OAUTH_TOKENS, [{ grantId: String(grantId), revokedAt: null }, { $set: { revokedAt: at } }], 'updateMany'),
     revokeClient: (clientId, at, companyId) => db(SCHEMA_TYPE.OAUTH_TOKENS, [
         { clientId: String(clientId), ...(companyId ? { companyId: String(companyId) } : {}), revokedAt: null },
@@ -72,4 +93,4 @@ const tokens = {
     ], 'updateMany'),
 };
 
-module.exports = { clients, grants, tokens, approvals };
+module.exports = { clients, grants, tokens, approvals, consents };

@@ -94,9 +94,9 @@ exports.details = async (req, res) => {
         const csrf = consentRequest.cookieToken(req, opened);
         if (!csrf) return refuse(res, 403, 'access_denied', 'This sign-in request was started in another browser.');
         const client = await clientOf(opened);
-        const mine = await workspaces.workspacesOf(req.uid);
+        const [mine, person] = await Promise.all([workspaces.workspacesOf(req.uid), workspaces.personOf(req.uid)]);
         const standing = await Promise.all(mine.map(async (w) => ({ ...w, ...standingIn(w.id, client, await store.approvals.find(w.id, client.clientId), opened.scopes) })));
-        return noStore(res).send({ status: true, data: { client: clientView(opened, client), scopes: opened.scopes, csrf, workspaces: standing } });
+        return noStore(res).send({ status: true, data: { client: clientView(opened, client), person, scopes: opened.scopes, csrf, workspaces: standing } });
     } catch (error) {
         if (error instanceof clients.ClientError) return refuse(res, 400, error.error, error.message);
         return failed(res, error, 'details');
@@ -117,9 +117,22 @@ exports.answer = async (req, res) => {
             consentRequest.clearCookie(res, opened);
             return redirectWith(res, opened.redirectUri, { ...params, state: opened.state, iss: config.issuer() });
         };
+        const spend = async (companyId) => {
+            try {
+                await store.consents.spend({
+                    nonce: opened.nonce, clientId: client.clientId, companyId, userId: req.uid, scopes: opened.scopes, resource: config.resource(),
+                    now: new Date(), expiresAt: new Date(opened.expiresAt),
+                });
+                return true;
+            } catch (error) {
+                if (error && (error.code === 11000 || /E11000/.test(String(error.message)))) return false;
+                throw error;
+            }
+        };
+        const alreadyAnswered = () => refuse(res, 400, 'invalid_request', 'This sign-in request has already been answered.');
 
         const decision = single(body.decision);
-        if (decision === 'deny') return back({ error: 'access_denied', error_description: 'the user declined' });
+        if (decision === 'deny') return (await spend('')) ? back({ error: 'access_denied', error_description: 'the user declined' }) : alreadyAnswered();
         if (decision !== 'approve') return refuse(res, 400, 'invalid_request', 'decision must be approve or deny');
 
         const companyId = single(body.workspace);
@@ -135,6 +148,7 @@ exports.answer = async (req, res) => {
                 : 'An owner or admin of this workspace has to approve this client first.');
         }
 
+        if (!(await spend(companyId))) return alreadyAnswered();
         const { code } = await grants.issueCode({
             client, companyId, userId: req.uid, scopes: opened.scopes, redirectUri: opened.redirectUri, codeChallenge: opened.codeChallenge,
         });
@@ -156,7 +170,12 @@ exports.requestApproval = async (req, res) => {
         const companyId = single(body.workspace);
         if (!(await workspaces.isMember(req.uid, companyId))) return refuse(res, 403, 'access_denied', 'You are not a member of that workspace.');
         if (client.companyId && String(client.companyId) !== companyId) return refuse(res, 403, 'access_denied', 'This client is registered to another workspace.');
-        const { approval } = await approvals.request({ companyId, client, userId: req.uid, scopes: opened.scopes, actor: actorOf(req) });
+        const { approval, limited } = await approvals.request({ companyId, client, userId: req.uid, scopes: opened.scopes, actor: actorOf(req) });
+        if (limited) {
+            return refuse(res, 429, 'temporarily_unavailable', limited === 'cooldown'
+                ? 'An admin turned this client down recently; it can be asked for again a day after that.'
+                : 'You have asked for approval of many clients today; try again tomorrow.');
+        }
         return noStore(res).send({ status: true, statusText: 'Approval requested.', data: { approval: approval ? approval.status : approvals.STATUS.PENDING } });
     } catch (error) {
         if (error instanceof clients.ClientError) return refuse(res, 400, error.error, error.message);

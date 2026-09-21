@@ -7,6 +7,10 @@ const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 const { ROLE_OWNER, ROLE_ADMIN } = require('../../Config/roleTypes');
 
 const STATUS = Object.freeze({ PENDING: 'pending', APPROVED: 'approved', DENIED: 'denied', REVOKED: 'revoked' });
+const DAY_MS = 24 * 60 * 60 * 1000;
+// A refused client cannot be put back in front of owners and admins until a day has passed.
+const REQUEST_COOLDOWN_MS = DAY_MS;
+const MAX_REQUESTS_PER_PERSON_PER_DAY = 10;
 
 class ApprovalError extends Error {
     constructor(statusCode, message) {
@@ -56,34 +60,63 @@ const ownersAndAdmins = async (companyId) => {
     return [...new Set((rows || []).map((row) => String(row.userId)).filter(Boolean))];
 };
 
+const NOTIFICATION_KEY = 'oauth_client_approval';
+// Not a project notification: the row names this scope where a project id would go, as the AI alerts do.
+const NOTIFICATION_SCOPE = 'oauth-clients';
+
+/* Written the way the AI alerts write theirs (company row, global copy with its socket event, bell counter),
+ * since the shared notification helper only takes project and task notifications. The client names itself, so
+ * its name travels in changeData and the Inbox renders it as text; the message carries no client-supplied text. */
 const notifyManagers = async (companyId, approval, requestedBy) => {
+    let recipients;
     try {
-        const recipients = await ownersAndAdmins(companyId);
-        if (!recipients.length) return;
-        const { handleNotificationtFun } = require('../notification/prepare-notification-data/controllerV2');
-        const { Notification_key } = require('../../Config/notificationKey');
-        const now = new Date();
-        await handleNotificationtFun({ body: {
-            createdAt: now, updatedAt: now,
-            key: Notification_key.TASK_NOTIFICATION, type: 'tasks', changeType: 'oauth_client_approval',
-            changeData: { clientId: approval.clientId, clientName: approval.clientName || '', requestedScopes: approval.requestedScopes || [] },
-            message: `${approval.clientName || 'An outside agent'} asks to act for people in this workspace. An owner or admin can approve or deny it in Settings, Agent clients.`,
-            companyId: String(companyId), projectId: '', taskId: '',
-            userId: String(requestedBy), assigneeUsers: recipients, notSeen: recipients,
-            isSelected: false, folderId: '', sprintId: '', comments_id: '',
-        } });
+        recipients = await ownersAndAdmins(companyId);
     } catch (error) {
-        logger.error(`oauth: approval request notification for ${companyId} failed: ${error.message}`);
+        logger.error(`oauth: approval request recipients for ${companyId} not read: ${error.message}`);
+        return;
+    }
+    const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+    const { dbCollections } = require('../../Config/collections');
+    const now = new Date();
+    for (const receiverID of recipients) {
+        const row = {
+            key: NOTIFICATION_KEY, type: 'oauth', changeType: NOTIFICATION_KEY,
+            message: 'An outside agent asks to act for people in this workspace. An owner or admin can approve or deny it in Settings, Agent clients.',
+            changeData: { clientId: approval.clientId, clientName: approval.clientName || '', requestedScopes: approval.requestedScopes || [] },
+            projectId: NOTIFICATION_SCOPE, taskId: '', userId: String(requestedBy), companyId: String(companyId),
+            assigneeUsers: [receiverID], notSeen: [receiverID], receiverID,
+            notificationType: 'push', isSchedule: false, isSeen: false, notificationStatus: 'in-process', createdAt: now, updatedAt: now,
+        };
+        try {
+            // eslint-disable-next-line no-await-in-loop
+            const saved = await MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.NOTIFICATIONS, collection: dbCollections.NOTIFICATIONS, data: row }, 'save');
+            // eslint-disable-next-line no-await-in-loop
+            const globalRow = await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.NOTIFICATIONS, collection: dbCollections.NOTIFICATIONS, data: { ...row, notificationId: saved && (saved.id || saved._id) } }, 'save');
+            require('../../event/socketEventEmitter').emit('insert', { type: 'insert', data: globalRow, updatedFields: {}, module: 'globalNotification' });
+            const { updateUnReadCommentsCountFun } = require('../notification-count/controller');
+            // eslint-disable-next-line no-await-in-loop
+            await Promise.resolve(updateUnReadCommentsCountFun({ body: { companyId: String(companyId), key: 5, userIds: [receiverID], readAll: false } }))
+                .catch((error) => logger.warn(`oauth: notification count for ${receiverID} not bumped: ${error.message || error}`));
+        } catch (error) {
+            logger.error(`oauth: approval request notification for ${companyId} to ${receiverID} failed: ${error.message || error}`);
+        }
     }
 };
 
 const isDuplicate = (error) => error && (error.code === 11000 || /E11000/.test(String(error.message)));
 
+const decidedAgo = (row, now) => now.getTime() - new Date((row.status === STATUS.REVOKED ? row.revokedAt : row.decidedAt) || 0).getTime();
+
 /* A person asks the workspace to let the client in. An approved or already pending client is left as it is, so
- * owners and admins hear about one request once; a denied or revoked one goes back to pending. */
+ * owners and admins hear about one request once; a denied or revoked one goes back to pending after a day. A
+ * person raises at most a set number of new requests a day. `limited` says why nothing was raised. */
 async function request({ companyId, client, userId, scopes, actor, now = new Date() }) {
     const existing = await store.approvals.find(companyId, client.clientId);
     if (existing && [STATUS.PENDING, STATUS.APPROVED].includes(existing.status)) return { approval: existing, created: false };
+    if (existing && decidedAgo(existing, now) < REQUEST_COOLDOWN_MS) return { approval: existing, created: false, limited: 'cooldown' };
+    if (await store.approvals.countRequestedBy(userId, new Date(now.getTime() - DAY_MS)) >= MAX_REQUESTS_PER_PERSON_PER_DAY) {
+        return { approval: existing, created: false, limited: 'cap' };
+    }
     const fields = { ...describeClient(client), status: STATUS.PENDING, requestedScopes: inScopeOrder(scopes), requestedBy: String(userId), requestedAt: now, updatedAt: now };
     let approval;
     try {
@@ -132,6 +165,7 @@ async function approve({ companyId, client, scopes, privateSprints, actor, now =
         ? await store.approvals.transition(companyId, client.clientId, existing.status, fields)
         : await store.approvals.save({ companyId: String(companyId), clientId: client.clientId, requestedScopes: [], ...fields });
     if (!approval) throw new ApprovalError(409, 'The approval changed while you were deciding; reload and try again.');
+    await grants.narrowClientGrants(client.clientId, companyId, approval.scopes, now);
     audit(companyId, actor, 'oauth.client_approved', approval);
     return approval;
 }
@@ -156,6 +190,17 @@ async function revoke({ companyId, clientId, actor, now = new Date() }) {
     return approval;
 }
 
+/* What /mcp and the token endpoint ask on every use: the client counts as approved only while the row says so. */
+async function isClientApproved(companyId, clientId) {
+    const row = await store.approvals.find(companyId, clientId);
+    return Boolean(row) && row.status === STATUS.APPROVED;
+}
+
+async function approvedScopes(companyId, clientId) {
+    const row = await store.approvals.find(companyId, clientId);
+    return row && row.status === STATUS.APPROVED ? [...(row.scopes || [])] : null;
+}
+
 const publicView = (row, names = new Map()) => ({
     clientId: row.clientId,
     clientName: row.clientName || '',
@@ -175,4 +220,7 @@ const publicView = (row, names = new Map()) => ({
     revokedAt: row.revokedAt || null,
 });
 
-module.exports = { STATUS, ApprovalError, covers, request, approve, deny, revoke, publicView, hostOf, describeClient };
+module.exports = {
+    STATUS, REQUEST_COOLDOWN_MS, MAX_REQUESTS_PER_PERSON_PER_DAY, ApprovalError,
+    covers, request, approve, deny, revoke, isClientApproved, approvedScopes, publicView, hostOf, describeClient,
+};

@@ -36,7 +36,7 @@ function open(request, now = Date.now()) {
     if (typeof p.c !== 'string' || typeof p.r !== 'string' || !Array.isArray(p.s) || typeof p.x !== 'string') return null;
     return {
         clientId: p.c, clientName: p.n || '', clientKind: p.k || '', redirectUri: p.r, scopes: p.s, state: p.st, codeChallenge: p.cc,
-        csrfDigest: p.x, cookieName: `${COOKIE_PREFIX}${p.i}`,
+        csrfDigest: p.x, cookieName: `${COOKIE_PREFIX}${p.i}`, nonce: p.i, expiresAt: p.e,
     };
 }
 

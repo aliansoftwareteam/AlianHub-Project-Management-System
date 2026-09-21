@@ -11,6 +11,11 @@
                     {{ $t('OAuthConsent.title_before') }} <strong data-test="client-name">{{ info.client.name }}</strong> {{ $t('OAuthConsent.title_after') }}
                 </h2>
 
+                <p v-if="info.person" class="oc__person" data-test="signed-in-as">
+                    {{ $t('OAuthConsent.signed_in_as') }} <strong>{{ personLabel }}</strong>
+                    <button type="button" class="ah-btn ah-btn--link ah-btn--sm" data-test="switch-account" @click="switchAccount">{{ $t('OAuthConsent.switch_account') }}</button>
+                </p>
+
                 <dl class="oc__facts">
                     <div v-if="info.client.clientHost" class="oc__fact" data-test="client-host">
                         <dt>{{ $t('OAuthConsent.published_by') }}</dt>
@@ -67,7 +72,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { apiRequestWithoutCompnay } from "@/services";
+import { apiRequestWithoutCompnay, useAuth } from "@/services";
 import * as env from "@/config/env";
 import { scopeSentenceKey, refusalOf } from "./oauthShared";
 
@@ -86,6 +91,16 @@ const chosen = ref("");
 const asking = ref("");
 const askError = ref("");
 const requested = reactive({});
+
+const personLabel = computed(() => {
+    const person = info.value?.person || {};
+    if (person.name && person.email) return `${person.name} (${person.email})`;
+    return person.name || person.email || "";
+});
+
+/* Signing out reloads this same address, which still carries the request: the router sends the signed-out
+ * browser to sign in and back here afterwards. */
+const switchAccount = () => useAuth().logOut({ islogOut: true });
 
 const eligible = computed(() => (info.value?.workspaces || []).filter((w) => w.eligible));
 const blocked = computed(() => (info.value?.workspaces || []).filter((w) => !w.eligible));
@@ -128,6 +143,7 @@ onMounted(load);
 <style>
 @import "../Authentication/authV2.css";
 
+.oc__person { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; margin: 4px 0 8px; }
 .oc__facts { display: grid; gap: 6px; margin: 12px 0; }
 .oc__fact { display: flex; gap: 8px; align-items: baseline; }
 .oc__fact dt { color: var(--text-2, #666); min-width: 120px; }
