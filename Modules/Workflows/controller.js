@@ -85,8 +85,15 @@ const readableRun = async (companyId, caller, runId) => {
 
 const CREDENTIAL_FIELDS = ['credentialId', 'previousCredentialId'];
 
+/* toJSON first: it is what res.send would have serialised the document with. */
+const plainRow = (step) => {
+    if (step && typeof step.toJSON === 'function') return step.toJSON();
+    if (step && typeof step.toObject === 'function') return step.toObject();
+    return { ...step };
+};
+
 const withoutCredentialIds = (step) => {
-    const row = step && typeof step.toObject === 'function' ? step.toObject() : { ...step };
+    const row = plainRow(step);
     CREDENTIAL_FIELDS.forEach((field) => delete row[field]);
     return row;
 };
