@@ -17,13 +17,13 @@ const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const RUNNING = 'running';
 const PER_PROJECT_LISTS = ['projectIds', 'fileProjectIds'];
 
-/* Owner decision pending. Elsewhere the app reads an agent with no projects as one that may work
- * in every project (policy.js, the MCP tools, the run starters); for knowledge retrieval the
- * starter ∩ agent-projects rule gives it nothing until the owner says otherwise. */
+/* An agent with no projects retrieves no project-scoped content (owner, 2026-09-21), although
+ * elsewhere the app reads such an agent as one that may work in every project (policy.js, the
+ * MCP tools, the run starters). */
 const projectsForAgentWithoutProjects = () => [];
 
-/* Owner decision pending: whether an agent run reaches content that sits in no project, such as
- * company-level pages and calls filed under no project. Closed until the owner says otherwise. */
+/* Agent runs do not reach content that sits in no project, such as company-level pages and calls
+ * filed under no project (owner, 2026-09-21). */
 const agentsReachContentWithoutProject = () => false;
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));

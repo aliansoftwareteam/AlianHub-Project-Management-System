@@ -46,6 +46,7 @@ exports.validateUpdateFilter = validateUpdateFilter;
 exports.saveFilter = async (req, res) => {
     try {
         const body = req.body || {};
+        if (savedFilters.namesAnotherUser(req, body.userId)) return reject(res, 403, savedFilters.FOR_ANOTHER_USER);
         const invalid = validateCreateFilter(body);
         if (invalid) return reject(res, 400, invalid.message, invalid.field);
 
@@ -78,6 +79,7 @@ exports.getFilter = savedFilters.listFilters(() => ({ filter: 'projectFilter', t
 exports.updateFilter = async (req, res) => {
     try {
         const body = req.body || {};
+        if (savedFilters.namesAnotherUser(req, body.userId)) return reject(res, 403, 'A saved filter can only belong to yourself.');
         const invalid = validateUpdateFilter(body);
         if (invalid) return reject(res, 400, invalid.message, invalid.field);
 

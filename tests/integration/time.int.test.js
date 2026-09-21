@@ -199,6 +199,29 @@ describe('time — regressions for confirmed findings', () => {
         expect(res.body.status).toBe(true);
     });
 
+    // Follow-up 56: only a timesheet reviewer (owner or admin) may name another user.
+    it('TIM-03 gives a member their own approvals whatever user they name, and a reviewer the named user\'s', async () => {
+        const period = { periodStart: '2020-01-06', periodEnd: '2020-01-12' };
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const admin = await loginAs('admin');
+        expect((await owner.api.post('/api/v2/timesheet-approval/submit', period)).body.status).toBe(true);
+        expect((await member.api.post('/api/v2/timesheet-approval/submit', period)).body.status).toBe(true);
+
+        const peeked = await member.api.get('/api/v2/timesheet-approval/mine', { query: { userId: owner.uid } });
+        expect(peeked.body.status).toBe(true);
+        expect(peeked.body.data.length).toBeGreaterThan(0);
+        expect(peeked.body.data.every((d) => String(d.userId) === String(member.uid))).toBe(true);
+        const status = await member.api.get('/api/v2/timesheet-approval/status', { query: { userId: owner.uid, ...period } });
+        expect(String(status.body.data.userId)).toBe(String(member.uid));
+
+        const reviewed = await admin.api.get('/api/v2/timesheet-approval/mine', { query: { userId: member.uid } });
+        expect(reviewed.body.data.length).toBeGreaterThan(0);
+        expect(reviewed.body.data.every((d) => String(d.userId) === String(member.uid))).toBe(true);
+        const ownerStatus = await admin.api.get('/api/v2/timesheet-approval/status', { query: { userId: owner.uid, ...period } });
+        expect(String(ownerStatus.body.data.userId)).toBe(String(owner.uid));
+    });
+
     // TIM-03: tracker mutation routes are unauthenticated — a create with no token
     // should be rejected as unauthenticated (401), not reach the controller (400).
     it('TIM-03 refuses an unauthenticated tracker create', async () => {

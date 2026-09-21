@@ -11,6 +11,8 @@ const EDITABLE_FIELDS = ['name', 'filters', 'sortByField', 'sortByOrder'];
 
 const refuse = (res, statusCode, statusText) => res.status(statusCode).json({ status: false, statusText });
 const ownerOf = (req) => String(req.uid || '');
+const namesAnotherUser = (req, userId) => userId !== undefined && String(userId) !== ownerOf(req);
+const FOR_ANOTHER_USER = 'A saved filter can only be created for yourself.';
 
 const editableSet = (update) => Object.fromEntries(
     Object.entries((update && update.$set) || {}).filter(([key]) => EDITABLE_FIELDS.includes(key))
@@ -39,8 +41,8 @@ const saveFilter = async (req, res) => {
         const uid = ownerOf(req);
         const companyId = req.headers['companyid'] || '';
         const fields = { ...(req.body || {}) };
-        if (fields.userId !== undefined && String(fields.userId) !== uid) {
-            return refuse(res, 403, 'A saved filter can only be created for yourself.');
+        if (namesAnotherUser(req, fields.userId)) {
+            return refuse(res, 403, FOR_ANOTHER_USER);
         }
         delete fields._id;
         const response = await MongoDbCrudOpration(companyId, {
@@ -104,4 +106,4 @@ const deleteFilter = async (req, res) => {
     }
 };
 
-module.exports = { EDITABLE_FIELDS, listFilters, saveFilter, updateFilter, deleteFilter };
+module.exports = { EDITABLE_FIELDS, FOR_ANOTHER_USER, namesAnotherUser, listFilters, saveFilter, updateFilter, deleteFilter };
