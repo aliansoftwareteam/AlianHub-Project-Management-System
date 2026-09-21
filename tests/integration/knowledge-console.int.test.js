@@ -120,4 +120,22 @@ describe('the instance knowledge console', () => {
         expect(audit).toMatchObject({ actorId: String(owner.userId), entityType: 'page', meta: { sourceType: 'page', removed: { page: res.body.data.total }, total: res.body.data.total } });
         expect(JSON.stringify(audit)).not.toContain(word);
     });
+
+    it('lists the exclusion the erasure wrote, with who and how many chunks', async () => {
+        const res = await owner.api.get(`${BASE}/${state.companyId}/exclusions`);
+        expect(res.status).toBe(200);
+        expect(res.body.data.exclusions).toEqual(expect.arrayContaining([
+            expect.objectContaining({ kind: 'document', sourceType: 'page', sourceId: pageId, erasedBy: String(owner.userId), erasedChunks: expect.any(Number) }),
+        ]));
+    });
+
+    it('explains the figures aggregation: an index scan on source type, then a fetch of each chunk', async () => {
+        const { figuresPipeline } = require('../../Modules/Knowledge/figuresPipeline');
+        const chunks = tenant.collection('knowledge_chunks');
+        const types = await chunks.distinct('sourceType');
+        const plan = JSON.stringify(await chunks.aggregate(figuresPipeline(types, ['extract:failed'], 3)).explain('queryPlanner'));
+        expect(plan).toMatch(/IXSCAN/);
+        expect(plan).toMatch(/FETCH/);
+        expect(plan).not.toMatch(/COLLSCAN/);
+    });
 });

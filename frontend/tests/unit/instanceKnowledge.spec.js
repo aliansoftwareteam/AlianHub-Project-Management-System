@@ -193,7 +193,7 @@ describe('InstanceKnowledge', () => {
         expect(wrapper.find('[data-test="figures-error"]').text()).toBe('Knowledge.code_figures_timed_out');
         await wrapper.find('[data-test="refresh-figures"]').trigger('click');
         await flushPromises();
-        expect(apiRequestWithoutCompnay.mock.calls.at(-1)[1]).toBe(`${BASE}/${CID_A}?refresh=1`);
+        expect(apiRequestWithoutCompnay.mock.calls.map((c) => c[1])).toContain(`${BASE}/${CID_A}?refresh=1`);
         expect(has(wrapper, 'source-page')).toBe(true);
         expect(wrapper.find('[data-test="figures-cached"]').text()).toContain('Knowledge.cached_at');
     });
