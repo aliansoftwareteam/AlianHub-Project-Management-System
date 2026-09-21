@@ -7,7 +7,6 @@ const embeddings = require('./embeddings');
 const { INDEXED_SOURCES } = require('./sources');
 const indexer = require('./ingest/indexer');
 const erase = require('./ingest/erase');
-const { redactPerson } = require('../Audit/redact');
 
 // The instance console's writes on a workspace's index. Each answers counts, never text, so the
 // caller can audit what it did without holding anything it removed.
@@ -158,14 +157,11 @@ const eraseDocument = async (companyId, { sourceType, sourceId }, progress = { r
     return { removed: progress.removed, total: totalOf(progress.removed) };
 };
 
-const ERASE_PERSON_REASON = 'knowledge.erase_person';
-
 const erasePerson = async (companyId, userId, progress = { removed: {} }, { by = '' } = {}) => {
     const company = String(companyId);
     const counts = await countsBySource(company, erase.personWhere(userId));
     await erase.erasePerson(company, userId, eraseOptions(progress, by));
     Object.assign(progress.removed, counts);
-    progress.audit = await redactPerson(company, userId, { by, reason: ERASE_PERSON_REASON });
     return { removed: progress.removed, total: totalOf(progress.removed) };
 };
 

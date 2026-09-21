@@ -665,6 +665,10 @@ const schema = {
         startedAt: { type: Date, required: false },
         finishedAt: { type: Date, required: false },
         recordedRowId: { type: String, required: false },
+        runId: { type: String, required: false },
+        owner: { type: String, required: false },
+        leaseUntil: { type: Date, required: false },
+        pending: { type: Object, required: false },
     },
     // Per-company SCIM 2.0 provisioning config — managed by Modules/Scim (SEC-05).
     // The IdP-held bearer token is stored only as a bcrypt hash; the company is

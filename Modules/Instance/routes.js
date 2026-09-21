@@ -3,6 +3,7 @@ const enforcement = require('./enforcement');
 const csp = require('./csp');
 const egress = require('./egress');
 const knowledge = require('./knowledge');
+const auditRedaction = require('./auditRedaction');
 const { requireInstanceAdmin } = require('./guard');
 const agentMetrics = require('../Agents/metricsController');
 
@@ -33,6 +34,7 @@ exports.init = (app) => {
     app.get(`${admin}/stats`, ctrl.stats);
     app.get(`${admin}/companies`, ctrl.companies);
     app.get(`${admin}/audit-export`, ctrl.auditExport);
+    app.post(`${admin}/audit/:companyId/redact-person`, auditRedaction.redactPerson);
     app.get(`${admin}/csp`, csp.summary);
     app.get(`${admin}/enforcement`, enforcement.summary);
     app.put(`${admin}/enforcement/default`, enforcement.setDefault);
