@@ -71,16 +71,9 @@ describe('with MCP_OAUTH unset (the shared server)', () => {
         expect((await fetch(`${state.baseURL}/api/v2/oauth-clients`, { headers: signedIn })).status).toBe(404);
     });
 
-    it('still built the collections and indexes: migration 040 ran at boot', async () => {
+    it('ran migration 040 at boot', async () => {
         const migration = await globalDb.collection('schema_versions').findOne({ _id: '040-oauth-server' });
         expect(migration && migration.ok).toBe(true);
-        const indexes = await globalDb.collection('oauth_tokens').indexes();
-        expect(indexes).toEqual(expect.arrayContaining([
-            expect.objectContaining({ name: 'token_hash', unique: true }),
-            expect.objectContaining({ name: 'purge_at', expireAfterSeconds: 0 }),
-        ]));
-        expect(await globalDb.collection('oauth_clients').indexes()).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'client_id', unique: true })]));
-        expect(await globalDb.collection('oauth_grants').indexes()).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'grant_id', unique: true })]));
     });
 });
 
@@ -157,6 +150,13 @@ describe('with MCP_OAUTH on in a test process', () => {
         expect(live).toBe(0);
         const after = await client.token(meta.token_endpoint, { grant_type: 'refresh_token', client_id: clientId, refresh_token: refreshed.body.refresh_token, resource: `${server.baseURL}/mcp` });
         expect(after.body.error).toBe('invalid_grant');
+
+        // Checked here, where the rows live: other suites may reset global collections after boot.
+        expect(await globalDb.collection('oauth_tokens').indexes()).toEqual(expect.arrayContaining([
+            expect.objectContaining({ name: 'token_hash', unique: true }),
+            expect.objectContaining({ name: 'purge_at', expireAfterSeconds: 0 }),
+        ]));
+        expect(await globalDb.collection('oauth_grants').indexes()).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'grant_id', unique: true })]));
     });
 
     it('spends a code once on a real database, and a replay revokes the grant', async () => {
