@@ -1093,6 +1093,8 @@ const schema = {
         source: { type: String, required: false },
         requestedBy: { type: String, required: false },
         tokenId: { type: String, required: false },
+        // the token's project list when it filed; approval refuses a target outside it
+        tokenProjectIds: { type: Array, required: false },
         allowedActions: { type: Array, required: false },
     },
     automationRuns: {

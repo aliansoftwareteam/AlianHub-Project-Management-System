@@ -1,15 +1,26 @@
 const crypto = require('crypto');
+const v2 = require('./v2Flag');
 
 const PAGE_DEFAULT = 25;
 const PAGE_MAX = 100;
 const TTL_MS = 60 * 60 * 1000;
 const INVALID = 'Invalid cursor.';
+const KEY_MIN_LENGTH = 32;
 
 // Without a configured key, cursors fall back to one derived from JWT_SECRET, and
 // failing that to a per-process key, so a restart only ends the cursors in flight.
 const PROCESS_KEY = crypto.randomBytes(32);
 
+/* Thrown at start (Modules/Mcp/init) and again before any signing, so a weak key never signs a cursor. */
+const assertKey = () => {
+    const configured = process.env.MCP_CURSOR_SECRET;
+    if (!v2.enabled() || !configured) return;
+    if (configured.length < KEY_MIN_LENGTH) throw new Error(`MCP_CURSOR_SECRET must be at least ${KEY_MIN_LENGTH} characters while MCP_TOOLS_V2 is on.`);
+    if (configured === process.env.JWT_SECRET) throw new Error('MCP_CURSOR_SECRET must differ from JWT_SECRET.');
+};
+
 const key = () => {
+    assertKey();
     if (process.env.MCP_CURSOR_SECRET) return process.env.MCP_CURSOR_SECRET;
     if (process.env.JWT_SECRET) return crypto.createHmac('sha256', process.env.JWT_SECRET).update('mcp-cursor').digest();
     return PROCESS_KEY;
@@ -69,4 +80,4 @@ const page = async (ctx, tool, args, readRows) => {
     return { rows: rows.slice(0, size), nextCursor: more ? issue(ctx, tool, args, offset + size) : undefined };
 };
 
-module.exports = { PAGE_DEFAULT, PAGE_MAX, TTL_MS, pageSize, issue, open, page };
+module.exports = { PAGE_DEFAULT, PAGE_MAX, TTL_MS, KEY_MIN_LENGTH, assertKey, pageSize, issue, open, page };

@@ -28,6 +28,7 @@ const COMPANY = crypto.randomBytes(12).toString('hex');
 const OTHER_COMPANY = crypto.randomBytes(12).toString('hex');
 const OWNER = new ObjectId();
 const MATE = new ObjectId();
+const ADMIN = new ObjectId();
 const PROJECT = new ObjectId();
 const SPRINT = new ObjectId();
 const TOKEN = String(new ObjectId());
@@ -53,7 +54,9 @@ beforeAll(async () => {
     await db.collection('company_users').insertMany([
         { userId: String(OWNER), roleType: 1, status: 2 },
         { userId: String(MATE), roleType: 3, status: 2 },
+        { userId: String(ADMIN), roleType: 2, status: 2 },
     ]);
+    await db.collection('apiTokens').insertOne({ _id: new ObjectId(TOKEN), userId: String(OWNER), name: 'Laptop', active: true, scopes: ['read', 'write'], projectIds: [], expiresAt: new Date(Date.now() + 86400000) });
     await client.db(OTHER_COMPANY).collection('company_users').insertOne({ userId: String(OWNER), roleType: 1, status: 2 });
     await db.collection('projects').insertOne({ _id: PROJECT, ProjectName: 'Orbit', isPrivateSpace: false, deletedStatusKey: 0, taskTypeCounts: [{ key: 1, name: 'Task' }] });
     await db.collection('sprints').insertOne({ _id: SPRINT, name: 'Launch', projectId: PROJECT, deletedStatusKey: 0 });
@@ -115,7 +118,9 @@ describe('MCP_TOOLS_V2 over a real database', () => {
         const inbox = await proposals.list(COMPANY, { status: 'pending', projectIds: [String(PROJECT)] });
         expect(inbox.proposals.map((p) => String(p._id))).toContain(out.proposalId);
 
-        const decided = await proposals.approve(COMPANY, out.proposalId, { decider: { kind: 'human', userId: String(MATE) }, isPrivileged: false, ip: '' });
+        const edited = await proposals.approve(COMPANY, out.proposalId, { decider: { kind: 'human', userId: String(ADMIN) }, isPrivileged: true, ip: '', changes: [{ action: 'task.comment', params: { taskId: taskIds[1], body: 'Other' } }] });
+        expect(edited).toMatchObject({ status: 409 });
+        const decided = await proposals.approve(COMPANY, out.proposalId, { decider: { kind: 'human', userId: String(ADMIN) }, isPrivileged: true, ip: '' });
         expect(decided.error).toBeUndefined();
         expect(decided.applied).toEqual([expect.objectContaining({ action: 'task.comment', ok: true })]);
         const written = await MongoDbCrudOpration(COMPANY, { type: SCHEMA_TYPE.COMMENTS, data: [{}] }, 'find');

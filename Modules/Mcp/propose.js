@@ -33,6 +33,7 @@ const propose = async (ctx, tool, params, reason) => {
         source: SOURCE,
         requestedBy: String(ctx.userId),
         tokenId: String((ctx.token && ctx.token._id) || ''),
+        tokenProjectIds: Array.isArray(ctx.projectIds) ? ctx.projectIds : [],
         allowedActions: Array.isArray(ctx.allowedActions) ? ctx.allowedActions : [],
     });
     const id = String(saved._id);
