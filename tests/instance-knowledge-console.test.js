@@ -395,6 +395,22 @@ describe('erasure', () => {
         })]);
     });
 
+    it('by person also redacts the person in that workspace\'s audit rows, and records it', async () => {
+        const { pseudonymOf, REDACTED_ACTION } = require('../Modules/Audit/redact');
+        seedChunk(CID_A, { sourceId: 'private', visibility: 'private' });
+        const own = mockDbFor(CID_A).seed('audit_logs', { actorId: ALICE, actorName: 'Alice Doe', action: 'member.update', entityType: 'member', entityId: MEMBER, entityName: 'Max Member', meta: {}, ip: '10.0.0.7', createdAt: new Date() });
+        const elsewhere = mockDbFor(CID_B).seed('audit_logs', { actorId: ALICE, actorName: 'Alice Doe', action: 'member.update', entityType: 'member', entityId: MEMBER, meta: {}, ip: '10.0.0.7', createdAt: new Date() });
+
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: ALICE });
+
+        expect(res.status).toBe(200);
+        const alias = pseudonymOf(ALICE);
+        expect(own).toMatchObject({ actorName: alias, ip: alias, entityName: 'Max Member' });
+        expect(elsewhere).toMatchObject({ actorName: 'Alice Doe', ip: '10.0.0.7' });
+        const recorded = (mockDbFor(CID_A).store.audit_logs || []).filter((row) => row.action === REDACTED_ACTION);
+        expect(recorded).toEqual([expect.objectContaining({ actorId: OWNER, entityId: alias, meta: expect.objectContaining({ reason: ACTIONS.ERASE_PERSON, rows: 1, fields: 2 }) })]);
+    });
+
     it.each([
         [{ sourceType: 'pages', sourceId: PAGE, confirm: PAGE }, 'INVALID_SOURCE_TYPE'],
         [{ sourceType: 'page', sourceId: 'not-an-id', confirm: 'not-an-id' }, 'INVALID_DOCUMENT_ID'],
