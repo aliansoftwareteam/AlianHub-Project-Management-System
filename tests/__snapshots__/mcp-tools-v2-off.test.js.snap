@@ -1,0 +1,376 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers docs.read in today's shape 1`] = `
+{
+  "pageId": "6f00000000000000000000e1",
+  "text": "The spec",
+  "title": "Spec",
+  "updatedAt": 2026-09-02T00:00:00.000Z,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers subtask.create in today's shape 1`] = `
+{
+  "auditId": "audit-1",
+  "ok": true,
+  "result": {
+    "action": "subtask.create",
+  },
+  "undoable": true,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers task.comment in today's shape 1`] = `
+{
+  "auditId": "audit-1",
+  "ok": true,
+  "result": {
+    "action": "task.comment",
+  },
+  "undoable": true,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers task.create in today's shape 1`] = `
+{
+  "auditId": "audit-1",
+  "ok": true,
+  "result": {
+    "action": "task.create",
+  },
+  "undoable": true,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers task.get in today's shape 1`] = `
+{
+  "acceptanceCriteria": [],
+  "checklist": [],
+  "commentCount": 0,
+  "description": "Goal: ship it",
+  "dueDate": null,
+  "estimateHours": 2,
+  "goal": "ship it",
+  "key": "AP-1",
+  "linkedDocs": [],
+  "links": [],
+  "priority": "HIGH",
+  "project": {
+    "id": "6f00000000000000000000a1",
+    "name": "Apollo",
+  },
+  "relations": [],
+  "sprint": {
+    "id": "6f00000000000000000000b1",
+    "name": "Sprint 1",
+  },
+  "status": "To do",
+  "statusType": "default_active",
+  "taskId": "6f00000000000000000000d1",
+  "thread": [],
+  "title": "Ship it",
+  "youMayNot": [
+    "Set this task to Done — a person closes it",
+    "Merge, deploy to production, or delete anything",
+  ],
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers task.link in today's shape 1`] = `
+{
+  "auditId": "audit-1",
+  "ok": true,
+  "result": {
+    "action": "task.link",
+  },
+  "undoable": true,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers task.status.set in today's shape 1`] = `
+{
+  "auditId": "audit-1",
+  "ok": true,
+  "result": {
+    "action": "task.status.set",
+  },
+  "undoable": true,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers tasks.next in today's shape 1`] = `
+{
+  "tasks": [
+    {
+      "dueDate": null,
+      "estimateHours": 2,
+      "key": "AP-1",
+      "priority": "HIGH",
+      "projectId": "6f00000000000000000000a1",
+      "sprintId": "6f00000000000000000000b1",
+      "status": "To do",
+      "statusType": "default_active",
+      "taskId": "6f00000000000000000000d1",
+      "title": "Ship it",
+    },
+  ],
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers tasks.search in today's shape 1`] = `
+{
+  "tasks": [
+    {
+      "dueDate": null,
+      "estimateHours": 2,
+      "key": "AP-1",
+      "priority": "HIGH",
+      "projectId": "6f00000000000000000000a1",
+      "sprintId": "6f00000000000000000000b1",
+      "status": "To do",
+      "statusType": "default_active",
+      "taskId": "6f00000000000000000000d1",
+      "title": "Ship it",
+    },
+  ],
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers timelog.start in today's shape 1`] = `
+{
+  "auditId": "audit-1",
+  "ok": true,
+  "result": {
+    "action": "timelog.start",
+  },
+  "undoable": true,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers timelog.stop in today's shape 1`] = `
+{
+  "auditId": "audit-1",
+  "ok": true,
+  "result": {
+    "action": "timelog.stop",
+  },
+  "undoable": true,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes lists the same tools with the same schemas and no annotations 1`] = `
+[
+  {
+    "description": "The next task assigned to you, highest priority and nearest due date first. Start here.",
+    "inputSchema": {
+      "properties": {
+        "projectId": {
+          "type": "string",
+        },
+      },
+      "type": "object",
+    },
+    "name": "tasks.next",
+  },
+  {
+    "description": "Search tasks you can see by text, status or project.",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "type": "integer",
+        },
+        "projectId": {
+          "type": "string",
+        },
+        "query": {
+          "type": "string",
+        },
+        "status": {
+          "type": "string",
+        },
+      },
+      "type": "object",
+    },
+    "name": "tasks.search",
+  },
+  {
+    "description": "A task as a brief: goal, acceptance criteria, relations, linked docs and what the comment thread has settled. Read this before writing code.",
+    "inputSchema": {
+      "properties": {
+        "taskId": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "taskId",
+      ],
+      "type": "object",
+    },
+    "name": "task.get",
+  },
+  {
+    "description": "Post a comment. Use it to report findings, ask a question, or leave a PR link with context.",
+    "inputSchema": {
+      "properties": {
+        "body": {
+          "type": "string",
+        },
+        "taskId": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "taskId",
+        "body",
+      ],
+      "type": "object",
+    },
+    "name": "task.comment",
+  },
+  {
+    "description": "Move a task to In progress or In review. Done is not available to agents — a person closes the task.",
+    "inputSchema": {
+      "properties": {
+        "status": {
+          "type": "string",
+        },
+        "taskId": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "taskId",
+        "status",
+      ],
+      "type": "object",
+    },
+    "name": "task.status.set",
+  },
+  {
+    "description": "Attach a pull request, branch or document URL to the task.",
+    "inputSchema": {
+      "properties": {
+        "kind": {
+          "type": "string",
+        },
+        "label": {
+          "type": "string",
+        },
+        "taskId": {
+          "type": "string",
+        },
+        "url": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "taskId",
+        "url",
+      ],
+      "type": "object",
+    },
+    "name": "task.link",
+  },
+  {
+    "description": "File a new task in a project, in its opening status and unassigned. Use it for work you found that is not on the board yet; put the goal and acceptance criteria in the description.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "type": "string",
+        },
+        "priority": {
+          "enum": [
+            "URGENT",
+            "HIGH",
+            "MEDIUM",
+            "LOW",
+          ],
+          "type": "string",
+        },
+        "projectId": {
+          "type": "string",
+        },
+        "sprintId": {
+          "type": "string",
+        },
+        "title": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "projectId",
+        "title",
+      ],
+      "type": "object",
+    },
+    "name": "task.create",
+  },
+  {
+    "description": "Break the task down. One subtask per call.",
+    "inputSchema": {
+      "properties": {
+        "taskId": {
+          "type": "string",
+        },
+        "title": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "taskId",
+        "title",
+      ],
+      "type": "object",
+    },
+    "name": "subtask.create",
+  },
+  {
+    "description": "Start the timer on a task so the hours you spend are attributed to you.",
+    "inputSchema": {
+      "properties": {
+        "taskId": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "taskId",
+      ],
+      "type": "object",
+    },
+    "name": "timelog.start",
+  },
+  {
+    "description": "Stop the running timer and write the time log.",
+    "inputSchema": {
+      "properties": {
+        "note": {
+          "type": "string",
+        },
+        "taskId": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "taskId",
+      ],
+      "type": "object",
+    },
+    "name": "timelog.stop",
+  },
+  {
+    "description": "Read a page linked from a task, by page id.",
+    "inputSchema": {
+      "properties": {
+        "pageId": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "pageId",
+      ],
+      "type": "object",
+    },
+    "name": "docs.read",
+  },
+]
+`;
