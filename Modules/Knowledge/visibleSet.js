@@ -6,14 +6,15 @@ const { isPrivileged } = require('../../Config/roleTypes');
 const { visibleProjectIds } = require('../Agents/scope');
 const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
 const { pageVisibilityFilter } = require('../Pages/helpers/pageRules');
-const { COMMENT_TYPES } = require('./sources');
+const { COMMENT_TYPES, CHUNK_ONLY_SOURCES } = require('./sources');
+const { chunkGuide, guideMarkdown, guideTitle } = require('./ingest/chunker');
 
 // What one caller may retrieve, resolved on every call and never cached here:
 // a snapshot kept between calls is exactly how a person removed from a project
 // or a sprint keeps reading it. Agents and MCP tokens do not pass the browser
 // session check, so the company role is looked up here for every kind of caller.
 
-const SOURCE_TYPES = ['task', 'page', 'comment', 'transcript'];
+const SOURCE_TYPES = ['task', 'page', 'comment', 'transcript', 'guide', 'file'];
 const CALLER_KINDS = ['user', 'agent', 'mcp'];
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const TITLE_LENGTH = 160;
@@ -23,6 +24,8 @@ const SOURCE_COLLECTIONS = {
     page: SCHEMA_TYPE.PAGES,
     comment: SCHEMA_TYPE.COMMENTS,
     transcript: SCHEMA_TYPE.CALLS,
+    guide: SCHEMA_TYPE.PROJECTS,
+    file: SCHEMA_TYPE.TASKS,
 };
 
 class RetrievalRefused extends Error {
@@ -78,8 +81,11 @@ const inProjectOrCompanyWide = (set, field) => {
 const clausesFor = (set) => {
     const projects = objectIds(set.projectIds);
     const sprintClause = set.hiddenSprintIds.length ? { sprintId: { $nin: objectIds(set.hiddenSprintIds) } } : {};
+    const task = { ProjectID: { $in: projects }, deletedStatusKey: { $ne: 1 }, ...sprintClause };
     return {
-        task: { ProjectID: { $in: projects }, deletedStatusKey: { $ne: 1 }, ...sprintClause },
+        task,
+        guide: { deletedStatusKey: { $ne: 1 } },
+        file: task,
         page: { deletedStatusKey: { $ne: 1 }, $and: [inProjectOrCompanyWide(set, 'ProjectID'), pageVisibilityFilter(set.caller.userId)] },
         comment: { projectId: { $in: projects }, isDeleted: { $ne: true }, type: { $in: COMMENT_TYPES }, ...sprintClause },
         transcript: {
@@ -99,6 +105,8 @@ const chunkClausesFor = (set) => {
     return {
         page: { ...liveChunk(set, 'page'), $and: [inProjectOrCompanyWide(set, 'projectId'), pageVisibilityFilter(set.caller.userId)] },
         comment: { ...liveChunk(set, 'comment'), projectId: { $in: objectIds(set.projectIds) }, ...hidden },
+        guide: { ...liveChunk(set, 'guide'), projectId: { $in: objectIds(set.projectIds) } },
+        file: { ...liveChunk(set, 'file'), projectId: { $in: objectIds(set.projectIds) }, ...hidden },
         transcript: {
             ...liveChunk(set, 'transcript'),
             participants: set.caller.userId,
@@ -114,7 +122,8 @@ const filterFor = (set, { chunkSources = [] } = {}) => {
     const chunked = chunkClausesFor(set);
     const fromChunks = Object.keys(chunked).filter((sourceType) => chunkSources.includes(sourceType));
     fromChunks.forEach((sourceType) => { clauses[sourceType] = chunked[sourceType]; });
-    return { sourceTypes: set.sourceTypes, clauses, chunkSources: fromChunks };
+    const sourceTypes = set.sourceTypes.filter((sourceType) => !CHUNK_ONLY_SOURCES.includes(sourceType) || fromChunks.includes(sourceType));
+    return { sourceTypes, clauses, chunkSources: fromChunks };
 };
 
 const permissionOf = (sourceType, row) => {
@@ -125,21 +134,13 @@ const permissionOf = (sourceType, row) => {
     }
     if (sourceType === 'comment') return { visibility: 'project', via: row.taskId ? 'task' : 'project' };
     if (sourceType === 'transcript') return { visibility: 'participants', via: 'participant' };
+    if (sourceType === 'file') return { visibility: 'project', via: 'task' };
     return { visibility: 'project', via: 'project' };
 };
 
-const RECHECK_FIELDS = {
-    task: '_id',
-    page: '_id visibility ProjectID title updatedAt',
-    comment: '_id taskId message updatedAt',
-    transcript: '_id title updatedAt',
-};
+const time = (value) => (value ? new Date(value).getTime() || 0 : 0);
 
-const LIVE_TITLE = {
-    page: (row) => row.title,
-    comment: (row) => String(row.message || '').replace(/\s+/g, ' ').trim(),
-    transcript: (row) => row.title || 'Call notes',
-};
+const commentTitle = (row) => String(row.message || '').replace(/\s+/g, ' ').trim();
 
 /* A comment is visible where its task is: the task must still pass the task clause. */
 const onVisibleTasks = async (set, clauses, comments) => {
@@ -153,37 +154,69 @@ const onVisibleTasks = async (set, clauses, comments) => {
     return comments.filter((c) => !c.taskId || visible.has(String(c.taskId)));
 };
 
-const time = (value) => (value ? new Date(value).getTime() || 0 : 0);
+const editedSince = (row, p) => time(row.updatedAt) > time(p.updatedAt);
+
+/* How each source is re-read. `rowId` names the live row a passage stands on, `keep` decides from
+ * that row whether the passage still exists, and `stale` whether its excerpt may quote text the
+ * source no longer says. A file is one attachment of its task: it exists while the attachment is
+ * on the task, and its text never changes. A guide is one field of its project, so its project's
+ * other edits do not make it stale; a passage from a guide chunk whose text the guide no longer
+ * chunks into is. */
+const RECHECK = {
+    task: { fields: '_id' },
+    page: { fields: '_id visibility ProjectID title updatedAt', title: (row) => row.title, stale: editedSince },
+    comment: { fields: '_id taskId message updatedAt', title: commentTitle, stale: editedSince, narrow: onVisibleTasks },
+    transcript: { fields: '_id title updatedAt', title: (row) => row.title || 'Call notes', stale: editedSince },
+    guide: {
+        fields: '_id ProjectName aiGuide updatedAt',
+        visible: (set, projectId) => set.projectIds.map(String).includes(projectId),
+        keep: (row) => Boolean(guideMarkdown(row).trim()),
+        title: guideTitle,
+        stale: (row, p) => (p.contentHash ? !chunkGuide(row).some((piece) => piece.contentHash === p.contentHash) : editedSince(row, p)),
+    },
+    file: {
+        fields: '_id attachments.id',
+        rowId: (p) => String(p.sourceId).split(':')[0],
+        keep: (row, p) => (Array.isArray(row.attachments) ? row.attachments : []).some((item) => item && `${row._id}:${item.id}` === String(p.sourceId)),
+    },
+};
+
+const rowIdOf = (p) => (RECHECK[p.sourceType].rowId ? RECHECK[p.sourceType].rowId(p) : String(p.sourceId));
 
 /* Re-read the ranked candidates from their live source rows and keep only those the
- * caller may still see, whatever index produced them. Order is preserved. A page, comment or
- * transcript edited after the text a passage came from keeps its place but shows its live title
- * and no excerpt, since the old excerpt may quote what the edit removed; onStale hears about it. */
+ * caller may still see, whatever index produced them. Order is preserved. A source edited after
+ * the text a passage came from keeps its place but shows its live title and no excerpt, since the
+ * old excerpt may quote what the edit removed; onStale hears about it. */
 const recheck = async ({ set, passages, onStale }) => {
     const clauses = clausesFor(set);
     const bySource = {};
     passages.forEach((p) => {
-        if (!set.sourceTypes.includes(p.sourceType) || !OBJECT_ID.test(String(p.sourceId))) return;
-        (bySource[p.sourceType] = bySource[p.sourceType] || []).push(String(p.sourceId));
+        const spec = RECHECK[p.sourceType];
+        if (!set.sourceTypes.includes(p.sourceType) || !spec || !OBJECT_ID.test(rowIdOf(p))) return;
+        if (spec.visible && !spec.visible(set, rowIdOf(p))) return;
+        (bySource[p.sourceType] = bySource[p.sourceType] || new Set()).add(rowIdOf(p));
     });
 
     const live = {};
     await Promise.all(Object.entries(bySource).map(async ([sourceType, ids]) => {
+        const spec = RECHECK[sourceType];
         let rows = await MongoDbCrudOpration(set.companyId, {
             type: SOURCE_COLLECTIONS[sourceType],
-            data: [{ _id: { $in: objectIds(ids) }, ...clauses[sourceType] }, RECHECK_FIELDS[sourceType]],
+            data: [{ _id: { $in: objectIds([...ids]) }, ...clauses[sourceType] }, spec.fields],
         }, 'find');
-        if (sourceType === 'comment') rows = await onVisibleTasks(set, clauses, rows || []);
-        (rows || []).forEach((row) => { live[`${sourceType}:${row._id}`] = { row, permission: permissionOf(sourceType, row) }; });
+        if (spec.narrow) rows = await spec.narrow(set, clauses, rows || []);
+        (rows || []).forEach((row) => { live[`${sourceType}:${row._id}`] = row; });
     }));
 
     return passages
-        .filter((p) => live[`${p.sourceType}:${p.sourceId}`])
-        .map((p) => {
-            const { row, permission } = live[`${p.sourceType}:${p.sourceId}`];
-            if (!LIVE_TITLE[p.sourceType] || time(row.updatedAt) <= time(p.updatedAt)) return { ...p, permission };
+        .map((p) => ({ p, row: RECHECK[p.sourceType] && live[`${p.sourceType}:${rowIdOf(p)}`] }))
+        .filter(({ p, row }) => row && (!RECHECK[p.sourceType].keep || RECHECK[p.sourceType].keep(row, p)))
+        .map(({ p, row }) => {
+            const spec = RECHECK[p.sourceType];
+            const permission = permissionOf(p.sourceType, row);
+            if (!spec.stale || !spec.stale(row, p)) return { ...p, permission };
             if (onStale) onStale(p);
-            return { ...p, title: String(LIVE_TITLE[p.sourceType](row) || '').slice(0, TITLE_LENGTH), excerpt: '', updatedAt: row.updatedAt, permission };
+            return { ...p, title: String(spec.title(row) || '').slice(0, TITLE_LENGTH), excerpt: '', updatedAt: row.updatedAt, permission };
         });
 };
 

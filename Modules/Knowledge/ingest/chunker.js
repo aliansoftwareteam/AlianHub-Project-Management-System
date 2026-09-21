@@ -111,6 +111,10 @@ const chunkPage = (page, { maxChars = MAX_CHUNK_CHARS } = {}) => chunkHtml(page 
 /* Markdown and extracted file text go the way an agent draft does: headings open sections. */
 const chunkText = (title, text, { maxChars = MAX_CHUNK_CHARS } = {}) => chunkHtml(escapeHtml(String(title || '')), textToHtml(text), maxChars);
 
+const guideMarkdown = (project) => String((project && project.aiGuide && project.aiGuide.markdown) || '');
+const guideTitle = (project) => `${String((project && project.ProjectName) || '').trim() || 'Project'} project guide`;
+const chunkGuide = (project, options) => chunkText(guideTitle(project), guideMarkdown(project), options);
+
 const MENTION = /\[([^\]]*)\]\([0-9a-fA-F]{24}\)/g;
 
 const piecesOf = (headingPath, lines, maxChars) => pack(lines.filter(Boolean), maxChars)
@@ -133,4 +137,4 @@ const chunkTranscript = (call, { maxChars = MAX_CHUNK_CHARS } = {}) => {
     return piecesOf([title], [title, ...linesOf(call && call.summary), ...items, ...linesOf(call && call.transcript)], maxChars);
 };
 
-module.exports = { MAX_CHUNK_CHARS, chunkPage, chunkText, chunkComment, chunkTranscript, contentHashOf, htmlOf };
+module.exports = { MAX_CHUNK_CHARS, chunkPage, chunkText, chunkGuide, guideMarkdown, guideTitle, chunkComment, chunkTranscript, contentHashOf, htmlOf };

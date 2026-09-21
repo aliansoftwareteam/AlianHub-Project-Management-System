@@ -530,6 +530,41 @@
     "description": "How long a question waits for its embedding before Ask answers from the lexical side alone (the backend then reads \"lexical (embed timed out)\"). Embedding at ingest keeps the provider's own timeout.",
     "default": "2000"
   },
+  "KNOWLEDGE_FILE_MAX_BYTES": {
+    "group": "ai",
+    "description": "The largest task attachment, in bytes, whose text the knowledge indexer extracts. A larger file is recorded as skipped and never read.",
+    "default": "10485760"
+  },
+  "KNOWLEDGE_FILE_MAX_CHARS": {
+    "group": "ai",
+    "description": "How many characters of one file's text the knowledge indexer keeps; the rest is cut and a truncation marker added.",
+    "default": "200000"
+  },
+  "KNOWLEDGE_FILE_TIMEOUT_MS": {
+    "group": "ai",
+    "description": "How long the knowledge indexer lets one file's parser run before stopping its thread and recording the file as timed out. A failed or timed-out file is retried at most twice.",
+    "default": "20000"
+  },
+  "KNOWLEDGE_FILE_MAX_PAGES": {
+    "group": "ai",
+    "description": "How many pages of a PDF the knowledge indexer reads.",
+    "default": "200"
+  },
+  "KNOWLEDGE_FILE_MAX_SHEETS": {
+    "group": "ai",
+    "description": "How many sheets of a spreadsheet the knowledge indexer reads.",
+    "default": "20"
+  },
+  "KNOWLEDGE_FILE_MAX_ROWS": {
+    "group": "ai",
+    "description": "How many rows of each sheet or CSV the knowledge indexer reads.",
+    "default": "5000"
+  },
+  "KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES": {
+    "group": "ai",
+    "description": "The most a DOCX or XLSX may declare it unpacks to before the knowledge indexer refuses it unopened.",
+    "default": "104857600"
+  },
   "KNOWLEDGE_FLAG_CACHE_TTL_SECONDS": {
     "group": "ai",
     "description": "Seconds a company's knowledgeRetrieval and knowledgeIndexer modes are kept after one read, so a question, a sync and a retry share it; 0 reads the row on every call, which the e2e harness sets so a test sees a switch it just flipped.",
@@ -547,7 +582,7 @@
   },
   "KNOWLEDGE_INDEXER": {
     "group": "ai",
-    "description": "Knowledge indexer: \"off\" subscribes to nothing and reads or writes no chunk; \"tenant\" ingests page, comment and call-notes events into knowledge_chunks (pages split on headings; tombstoned on delete, on a deleted task for comments, on project trash for pages and comments, and on a member's departure for private pages), backfills each source separately, and lets retrieval read a source's passages from the chunks once that source's backfill is complete, for a company whose knowledgeIndexer.mode is \"on\"; \"all\" does so for every company except one set to \"off\".",
+    "description": "Knowledge indexer: \"off\" subscribes to nothing and reads or writes no chunk; \"tenant\" ingests page, comment, call-notes, project-guide and task-attachment events into knowledge_chunks (pages and guides split on headings; attachment text extracted off the request path within the KNOWLEDGE_FILE_* limits; tombstoned on delete, on a deleted task or a removed attachment for comments and files, on project trash for pages, comments, guides and files, and on a member's departure for private pages), backfills each source separately, and lets retrieval read a source's passages from the chunks once that source's backfill is complete, for a company whose knowledgeIndexer.mode is \"on\"; \"all\" does so for every company except one set to \"off\".",
     "default": "off"
   },
   "LLM_MAX_TOKENS_CLARIFY": {

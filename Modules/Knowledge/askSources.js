@@ -18,6 +18,8 @@ const askSources = async ({ companyId, uid, question, projectId, projects, limit
         detail: p.excerpt,
         updatedAt: p.updatedAt,
         permission: p.permission,
+        origin: p.origin,
+        ...(p.taskId ? { taskId: p.taskId } : {}),
     }));
 };
 

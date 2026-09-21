@@ -70,7 +70,7 @@ const checkBytes = (buffer, kind, limits) => {
 const decodeText = (buffer) => {
     if (buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe) return new TextDecoder('utf-16le').decode(buffer.subarray(2));
     if (buffer.includes(0)) throw refusal('failed', 'The file is not text.');
-    return new TextDecoder('utf-8').decode(buffer).replace(/^﻿/, '');
+    return new TextDecoder('utf-8').decode(buffer);
 };
 
 let active = 0;

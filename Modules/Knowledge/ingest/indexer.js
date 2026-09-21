@@ -10,7 +10,7 @@ const origin = require('../origin');
 const vectorStore = require('../vectorStore');
 const extractor = require('./extract/extractor');
 const { limits: fileLimits } = require('./extract/limits');
-const { chunkPage, chunkText, chunkComment, chunkTranscript, contentHashOf } = require('./chunker');
+const { chunkPage, chunkText, chunkGuide, guideMarkdown, guideTitle, chunkComment, chunkTranscript, contentHashOf } = require('./chunker');
 
 // Writes source chunks into the store. Callers check KNOWLEDGE_INDEXER first; nothing here
 // reads that flag, so the backfill, the event handlers and a re-index share one write path.
@@ -108,8 +108,6 @@ const readTask = (companyId, taskId) => byId(companyId, SCHEMA_TYPE.TASKS, taskI
  * task moved to another sprint is a newer version of every comment on it. */
 const commentVersion = (comment, { task } = {}) => new Date(Math.max(time(rowVersion(comment)), task ? time(rowVersion(task)) : 0));
 
-const guideMarkdown = (project) => asText(project && project.aiGuide && project.aiGuide.markdown);
-const guideTitle = (project) => `${asText(project && project.ProjectName).trim() || 'Project'} project guide`;
 
 const fileSourceId = (taskId, attachmentId) => `${taskId}:${attachmentId}`;
 const fileTitle = (attachment) => asText(attachment && attachment.filename).trim().slice(0, TITLE_LENGTH) || 'Attachment';
@@ -267,7 +265,7 @@ const RULES = {
         fields: 'ProjectName aiGuide deletedStatusKey updatedAt createdAt',
         ingestName: 'ingestGuide',
         versionOf: rowVersion,
-        chunk: (project) => chunkText(guideTitle(project), guideMarkdown(project)),
+        chunk: (project) => chunkGuide(project),
         metadata: (companyId, project) => ({
             ...base(companyId, 'guide', project),
             projectId: project._id,

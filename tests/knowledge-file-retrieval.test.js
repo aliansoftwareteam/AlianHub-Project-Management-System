@@ -15,7 +15,7 @@ const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
 const { getRoleType } = require('../Config/permissionGuard');
-const { knowledgeChunksSchema } = require('../utils/mongo-handler/createSchema');
+const { knowledgeChunksSchema, taskSchema, pagesSchema } = require('../utils/mongo-handler/createSchema');
 const { readStoredFile } = require('../common-storage/readStoredFile');
 const lexical = require('../Modules/Knowledge/adapters/lexical');
 const { createInMemoryVectorAdapter, createDatabaseVectorAdapter } = require('../Modules/Knowledge/adapters/vector');
@@ -89,6 +89,9 @@ beforeEach(() => {
     myCache.flushAll();
     indexer.clearFileRetries();
     mockDb.uniqueFromSchema(CHUNKS, knowledgeChunksSchema);
+    mockDb.textFromSchema(CHUNKS, knowledgeChunksSchema);
+    mockDb.textFromSchema(SCHEMA_TYPE.TASKS, taskSchema);
+    mockDb.textFromSchema(SCHEMA_TYPE.PAGES, pagesSchema);
     getRoleType.mockImplementation(async (companyId, uid) => ROLES[uid]);
     visibleProjectIds.mockImplementation(async (companyId, uid) => PROJECTS[uid] || []);
     readStoredFile.mockImplementation(async ({ companyId, key }) => {

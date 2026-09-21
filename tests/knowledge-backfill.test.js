@@ -301,6 +301,7 @@ describe('backfilling project guides and task files', () => {
             return String(mockDb.seed(SCHEMA_TYPE.TASKS, { _id, TaskName: `Task ${i + 1}`, ProjectID: PROJECT, sprintId: SPRINT, deletedStatusKey: 0, attachments: [attachmentOf(_id, i + 1)], updatedAt: new Date('2026-09-01T00:00:00Z') })._id);
         });
         mockDb.seed(SCHEMA_TYPE.TASKS, { _id: '6f00000000000000000e0099', TaskName: 'No files', ProjectID: PROJECT, sprintId: SPRINT, deletedStatusKey: 0, attachments: [] });
+        readStoredFile.mockReset();
         readStoredFile.mockImplementation(async ({ key }) => ({ buffer: Buffer.from(`Text of ${key}`), size: 20 }));
     });
 
