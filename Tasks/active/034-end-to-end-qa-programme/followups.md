@@ -118,6 +118,10 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 92 | Agent notes: on a repeat sighting by another starter the first starter stays on the note while the second's references merge in. | #787 |
 | 93 | Files: non-ASCII names inside spreadsheets are misread by the parser; the API-token and MCP caller paths for file passages are not yet reviewed. | #783 |
 | 94 | Owner sweeps for the new Sprint 7 and 8 screens: the Knowledge tab (#788) and the security policy card (#785), in addition to follow-up 83. | interface rows |
+| 95 | A local full integration run shows an order dependency between the egress allowlist suite and the declared-reads suite; each passes alone and CI passes. | #795 run |
+| 96 | Audit hash format v2 (a per-value salt stored outside the hash, per-row format version, dual-format verification) would let user ids and free text in future audit rows be erased; existing chains keep them. Owner decision. | #801 |
+| 97 | Stored-file downloads: `/api/v1/importTasks` attachments are not validated on write; merged tasks keep attachments judged under the soft-deleted source; switch `STORAGE_DOWNLOAD_SCOPE` to enforce once report logs are clean. | #794 |
+| 98 | MCP: under `MCP_OAUTH=both` personal tokens are still accepted (one-release decision); discovery methods need no scope; a client id stored as `actorId` needs a label in the UI and audit filters. | #802 |
 
 ## Owner decisions recorded
 
