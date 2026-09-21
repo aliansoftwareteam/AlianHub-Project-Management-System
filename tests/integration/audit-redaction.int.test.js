@@ -91,14 +91,25 @@ describe('erasure by person over real audit rows', () => {
     let other;
     let verifiedBefore;
     let result;
+    let refused;
 
     beforeAll(async () => {
         before = await sorted(COMPANY);
         other = await sorted(OTHER);
         verifiedBefore = await chain.verifyChain(COMPANY);
-        const progress = { removed: {} };
-        await controls.erasePerson(COMPANY, PERSON, progress, { by: ADMIN });
-        result = progress.audit;
+        await controls.erasePerson(COMPANY, PERSON, { removed: {} }, { by: ADMIN });
+        expect(await sorted(COMPANY)).toEqual(before);
+        const runs = await Promise.allSettled([
+            redact.redactPerson(COMPANY, PERSON, { by: ADMIN, reason: 'instance.audit_redact_person' }),
+            redact.redactPerson(COMPANY, PERSON, { by: ADMIN, reason: 'instance.audit_redact_person' }),
+        ]);
+        refused = runs.filter((r) => r.status === 'rejected').map((r) => r.reason);
+        result = runs.filter((r) => r.status === 'fulfilled').map((r) => r.value)[0];
+    });
+
+    it('leaves audit rows alone on the knowledge erasure, and lets one of two concurrent runs through', () => {
+        expect(refused).toEqual([expect.objectContaining({ code: 'redaction_running', status: 409 })]);
+        expect(result).toBeTruthy();
     });
 
     it('starts from a chain that verifies, with an unchained row beside it', () => {
@@ -150,7 +161,7 @@ describe('erasure by person over real audit rows', () => {
         const alias = redact.pseudonymOf(PERSON);
         expect(recorded[0]).toMatchObject({
             actorId: ADMIN, entityType: 'user', entityId: alias, entityName: alias,
-            meta: { reason: 'knowledge.erase_person', rows: 7, fields: 11 }, chain: { seq: tip + 1 },
+            meta: { reason: 'instance.audit_redact_person', rows: 7, fields: 11 }, chain: { seq: tip + 1 },
         });
         expect(JSON.stringify(recorded[0])).not.toContain(PERSON);
     });

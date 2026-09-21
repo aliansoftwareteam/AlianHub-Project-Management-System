@@ -48,6 +48,7 @@ const load = () => {
 const rowsOf = (companyId = CID) => mockDbFor(companyId).store[SCHEMA_TYPE.AUDIT_LOGS] || [];
 const byAction = (action, companyId = CID) => rowsOf(companyId).filter((r) => r.action === action);
 const one = (action, companyId = CID) => byAction(action, companyId)[0];
+const markers = (companyId = CID) => mockDbFor(companyId).store[SCHEMA_TYPE.AUDIT_REDACTIONS] || [];
 const snapshot = (companyId = CID) => JSON.parse(JSON.stringify(rowsOf(companyId)));
 const hashedOf = (companyId, row) => rules.canonical(rules.hashedContent(companyId, row));
 const settle = async () => { for (let i = 0; i < 50; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
@@ -204,17 +205,17 @@ describe('redacting a person under AUDIT_CHAIN', () => {
         expect(mockDbFor(OTHER_CID).calls.filter((c) => c.method === 'updateOne' && c.type === SCHEMA_TYPE.AUDIT_LOGS)).toHaveLength(0);
     });
 
-    it('resumes from its progress marker after failing partway, and records one row with the full counts', async () => {
+    it('resumes from its progress marker after failing mid-batch, and records one row with the full counts', async () => {
         await writeRows();
         let updates = 0;
         const failed = await withCrud(CID, (id, query, method, real) => {
-            if (query.type === SCHEMA_TYPE.AUDIT_LOGS && method === 'updateOne' && (updates += 1) > 3) throw new Error('connection lost');
+            if (query.type === SCHEMA_TYPE.AUDIT_LOGS && method === 'updateOne' && (updates += 1) > 4) throw new Error('connection lost');
             return real();
         }, () => redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure', batchSize: 3 }).catch((e) => e));
         expect(failed).toBeInstanceOf(Error);
         expect(byAction(redact.REDACTED_ACTION)).toHaveLength(0);
-        const marker = (mockDbFor(CID).store[SCHEMA_TYPE.AUDIT_REDACTIONS] || [])[0];
-        expect(marker).toMatchObject({ _id: redact.pseudonymOf(ALICE), rows: 3 });
+        const marker = markers()[0];
+        expect(marker).toMatchObject({ _id: redact.pseudonymOf(ALICE), rows: 4 });
         expect(marker.after).toBeTruthy();
 
         mockDbFor(CID).calls.length = 0;
@@ -226,6 +227,161 @@ describe('redacting a person under AUDIT_CHAIN', () => {
         expect(byAction(redact.REDACTED_ACTION)).toHaveLength(1);
         expect(one(redact.REDACTED_ACTION).meta).toMatchObject({ rows: 7, fields: 10 });
         expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified' });
+    });
+
+    it('counts a row whose redaction landed just before a crash, on the next run', async () => {
+        await writeRows();
+        let crashed = false;
+        const failed = await withCrud(CID, (id, query, method, real) => {
+            if (!crashed && query.type === SCHEMA_TYPE.AUDIT_REDACTIONS && method === 'updateOne' && query.data[1].$set.rows === 2) {
+                crashed = true;
+                throw new Error('process killed');
+            }
+            return real();
+        }, () => redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure', batchSize: 3 }).catch((e) => e));
+        expect(failed).toBeInstanceOf(Error);
+        expect(rowsOf().find((r) => r.action === 'scim.user_provision').entityName).toBe(redact.pseudonymOf(ALICE));
+
+        const resumed = await redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure', batchSize: 3 });
+
+        expect(resumed).toMatchObject({ rows: 7, fields: 10 });
+        expect(one(redact.REDACTED_ACTION).meta).toMatchObject({ rows: 7, fields: 10 });
+    });
+
+    it('writes no second row when a crash falls between recording the row and finishing the marker', async () => {
+        await writeRows();
+        const failed = await withCrud(CID, (id, query, method, real) => {
+            if (query.type === SCHEMA_TYPE.AUDIT_REDACTIONS && method === 'updateOne' && query.data[1].$set.finishedAt) throw new Error('process killed');
+            return real();
+        }, () => redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' }).catch((e) => e));
+        expect(failed).toBeInstanceOf(Error);
+        const [first] = byAction(redact.REDACTED_ACTION);
+        expect(first).toBeTruthy();
+
+        const again = await redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' });
+
+        expect(byAction(redact.REDACTED_ACTION)).toHaveLength(1);
+        expect(again).toMatchObject({ rows: 7, fields: 10, recorded: String(first._id) });
+        expect(markers()[0].finishedAt).toBeTruthy();
+        expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified' });
+    });
+
+    it('lets one of two runs at once proceed and refuses the other with a stable code', async () => {
+        await writeRows();
+        const results = await Promise.allSettled([
+            redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' }),
+            redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' }),
+        ]);
+        const done = results.filter((r) => r.status === 'fulfilled');
+        const refused = results.filter((r) => r.status === 'rejected');
+        expect(done).toHaveLength(1);
+        expect(done[0].value).toMatchObject({ rows: 7, fields: 10 });
+        expect(refused).toHaveLength(1);
+        expect(refused[0].reason).toMatchObject({ code: 'redaction_running', status: 409 });
+        expect(byAction(redact.REDACTED_ACTION)).toHaveLength(1);
+    });
+
+    it('refuses while another run holds the lease, and resumes once it has expired', async () => {
+        await writeRows();
+        const alias = redact.pseudonymOf(ALICE);
+        const marker = mockDbFor(CID).seed(SCHEMA_TYPE.AUDIT_REDACTIONS, {
+            _id: alias, owner: 'another-server', leaseUntil: new Date(Date.now() + 60000), after: '', rows: 0, fields: 0, startedAt: new Date(), finishedAt: null,
+        });
+        await expect(redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' })).rejects.toMatchObject({ code: 'redaction_running', status: 409 });
+        expect(byAction('member.update').find((r) => r.actorId === ALICE).actorName).toBe('Alice Doe');
+
+        marker.leaseUntil = new Date(Date.now() - 1000);
+        const result = await redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' });
+
+        expect(result).toMatchObject({ rows: 7, fields: 10 });
+        expect(markers()[0].finishedAt).toBeInstanceOf(Date);
+    });
+
+    it('leaves a row that changed after it was read, and counts only what it wrote', async () => {
+        await writeRows();
+        let changed = false;
+        const result = await withCrud(CID, async (id, query, method, real) => {
+            const answer = await real();
+            if (!changed && query.type === SCHEMA_TYPE.AUDIT_LOGS && method === 'find') {
+                changed = true;
+                rowsOf().find((r) => r.actorId === ALICE && r.action === 'member.update').actorName = 'Alice Renamed';
+            }
+            return answer;
+        }, () => redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' }));
+
+        expect(rowsOf().find((r) => r.actorId === ALICE && r.action === 'member.update').actorName).toBe('Alice Renamed');
+        expect(result).toMatchObject({ rows: 6, fields: 8 });
+        const again = await redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' });
+        expect(again).toMatchObject({ rows: 1, fields: 2 });
+    });
+
+    it('takes ownership from an amendment that moves a row\'s entity to the person', async () => {
+        const row = await chain.saveAuditRow(CID, { actorId: ADMIN, actorName: 'Ada Admin', action: 'agent.action', entityType: 'task', entityId: 't9', entityName: 'Task nine', meta: {}, ip: '10.0.0.1' });
+        await chain.amend(CID, String(row._id), { entityType: 'member', entityId: ALICE, entityName: 'Alice Doe' });
+
+        await redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' });
+
+        expect(one(rules.AMENDED_ACTION).meta.setRow).toEqual({ entityType: 'member', entityId: ALICE, entityName: redact.pseudonymOf(ALICE) });
+        expect(one('agent.action')).toMatchObject({ entityName: 'Task nine', actorName: 'Ada Admin' });
+        expect(await chain.verifyChain(CID)).toMatchObject({ state: 'verified' });
+    });
+
+    it('scopes a userId in meta to the object that carries it, never to the row\'s own fields', async () => {
+        await chain.saveAuditRow(CID, {
+            actorId: ADMIN, actorName: 'Ada Admin', action: 'pto.create', entityType: 'pto', entityId: 'p2', entityName: '', ip: '10.0.0.1',
+            meta: { userId: ALICE, ip: '10.0.0.1', userAgent: 'Admin browser', subject: { userId: ALICE, userAgent: 'Alice browser', detail: { userAgent: 'Admin browser' } } },
+        });
+
+        await redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' });
+        const alias = redact.pseudonymOf(ALICE);
+        expect(one('pto.create').meta).toEqual({ userId: ALICE, ip: '10.0.0.1', userAgent: 'Admin browser', subject: { userId: ALICE, userAgent: alias, detail: { userAgent: 'Admin browser' } } });
+
+        await redact.redactPerson(CID, ADMIN, { by: ALICE, reason: 'erasure' });
+        const admin = redact.pseudonymOf(ADMIN);
+        expect(one('pto.create')).toMatchObject({ actorName: admin, ip: admin });
+        expect(one('pto.create').meta).toEqual({ userId: ALICE, ip: admin, userAgent: admin, subject: { userId: ALICE, userAgent: alias, detail: { userAgent: admin } } });
+    });
+
+    it('covers member rows that name the member document rather than the user', async () => {
+        const MEMBER_DOC = '6f0000000000000000000e11';
+        const BOB_DOC = '6f0000000000000000000e12';
+        mockDbFor(CID).seed(SCHEMA_TYPE.COMPANY_USERS, { _id: MEMBER_DOC, userId: ALICE, roleType: 3, status: 2 });
+        mockDbFor(CID).seed(SCHEMA_TYPE.COMPANY_USERS, { _id: BOB_DOC, userId: BOB, roleType: 3, status: 2 });
+        mockDbFor(OTHER_CID).seed(SCHEMA_TYPE.COMPANY_USERS, { _id: BOB_DOC, userId: ALICE, roleType: 3, status: 2 });
+        await chain.saveAuditRow(CID, { actorId: ADMIN, actorName: 'Ada Admin', action: 'member.update', entityType: 'member', entityId: MEMBER_DOC, entityName: 'Alice Doe', meta: { fields: ['role'] }, ip: '10.0.0.1' });
+        await chain.saveAuditRow(CID, { actorId: ADMIN, actorName: 'Ada Admin', action: 'member.update', entityType: 'member', entityId: BOB_DOC, entityName: 'Bob Roe', meta: {}, ip: '10.0.0.1' });
+
+        await redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' });
+
+        const [alice, bob] = byAction('member.update');
+        expect(alice.entityName).toBe(redact.pseudonymOf(ALICE));
+        expect(bob.entityName).toBe('Bob Roe');
+    });
+
+    it('gives an email to the entity when the entity is a person, and to the actor otherwise', async () => {
+        await chain.saveAuditRow(CID, { actorId: ALICE, actorName: '', action: 'member.update', entityType: 'member', entityId: BOB, entityName: '', meta: { email: 'bob.other@example.com' }, ip: '' });
+        await chain.saveAuditRow(CID, { actorId: ALICE, actorName: '', action: 'sso.config_update', entityType: 'sso', entityId: '', entityName: '', meta: { email: 'alice.other@example.com' }, ip: '' });
+
+        await redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' });
+        expect(one('member.update').meta.email).toBe('bob.other@example.com');
+        expect(one('sso.config_update').meta.email).toBe(redact.pseudonymOf(ALICE));
+
+        await redact.redactPerson(CID, BOB, { by: ADMIN, reason: 'erasure' });
+        expect(one('member.update').meta.email).toBe(redact.pseudonymOf(BOB));
+    });
+
+    it('changes nothing after the key is rotated, though the person gets a new pseudonym', async () => {
+        await writeRows();
+        await redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' });
+        const before = snapshot();
+        const old = redact.pseudonymOf(ALICE);
+        process.env.AUDIT_CHAIN_KEY = `${KEY}-rotated`;
+
+        const again = await redact.redactPerson(CID, ALICE, { by: ADMIN, reason: 'erasure' });
+
+        expect(redact.pseudonymOf(ALICE)).not.toBe(old);
+        expect(again).toMatchObject({ rows: 0, fields: 0, recorded: null });
+        expect(snapshot()).toEqual(before);
     });
 
     it('refuses to write a path that is inside the hash', async () => {
@@ -282,5 +438,19 @@ describe('redacting a person with AUDIT_CHAIN off', () => {
         const recorded = one(redact.REDACTED_ACTION);
         expect(recorded).toMatchObject({ actorId: ADMIN, meta: { rows: 2, fields: 3, reason: 'erasure' } });
         expect(recorded.chain).toBeUndefined();
+    });
+
+    it('keys the pseudonym on JWT_SECRET when there is no chain key', () => {
+        const crypto = require('crypto');
+        const saved = process.env.JWT_SECRET;
+        try {
+            process.env.JWT_SECRET = 'jwt-secret-one';
+            const expected = `erased-user-${crypto.createHmac('sha256', 'jwt-secret-one').update(`audit-erasure:${ALICE}`).digest('hex').slice(0, 16)}`;
+            expect(redact.pseudonymOf(ALICE)).toBe(expected);
+            process.env.JWT_SECRET = 'jwt-secret-two';
+            expect(redact.pseudonymOf(ALICE)).not.toBe(expected);
+        } finally {
+            if (saved === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = saved;
+        }
     });
 });
