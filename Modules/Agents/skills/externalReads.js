@@ -1,8 +1,8 @@
 // Declared external reads (Sprint 11, ADR 003 phase 4): a data skill names the
-// one host it reads and a path template. This slice checks the declaration at
-// save; nothing is fetched until the run-time slice lands.
+// one host it reads and a path template. The declaration is checked at save, and
+// every rule again at run time against the live allowlist and secret.
 
-const { parseEntry, hostMatches, underWildcardDns } = require('../engine/egressRules');
+const { parseEntry, hostMatches, underWildcardDns, normalizeHost } = require('../engine/egressRules');
 const secrets = require('../../../Config/secrets');
 
 const FLAG = 'SKILL_EXTERNAL_READS';
@@ -22,6 +22,10 @@ const CODE = Object.freeze({
     CREDENTIAL_REVOKED: 'credential_revoked',
     CREDENTIAL_STORE_OFF: 'credential_store_off',
     CREDENTIAL_STORE_UNAVAILABLE: 'credential_store_unavailable',
+    CREDENTIAL_HOST_NOT_BOUND: 'credential_host_not_bound',
+    CREDENTIAL_UNAVAILABLE: 'credential_unavailable',
+    HOST_NOT_DECLARED: 'host_not_declared',
+    READ_FAILED: 'read_failed',
     ALLOWLIST_UNREADABLE: 'allowlist_unreadable',
     SECRET_IN_BODY: 'secret_in_body',
     NOT_AVAILABLE: 'external_reads_not_available',
@@ -147,19 +151,37 @@ const CREDENTIAL_REFUSAL = Object.freeze({
     store_off: [CODE.CREDENTIAL_STORE_OFF, 'the secrets store is off, so no credential can be named'],
 });
 
-const checkCredential = async (companyId, handle, at) => {
+/* Exact host and port: a secret or a declaration without a port means https on 443. */
+const namesHost = (list, hostname, port) => (Array.isArray(list) ? list : []).some((text) => {
+    const { entry } = parseDeclaredHost(text);
+    return Boolean(entry) && entry.host === normalizeHost(hostname) && (entry.port || HTTPS_PORT) === port;
+});
+
+const portOf = (u) => Number(u.port || (u.protocol === 'https:' ? HTTPS_PORT : 80));
+
+/* The credential rules at save and at run: a live skill_read secret of this workspace that names the host. */
+const credentialProblem = async (companyId, handle, { host, port }) => {
     let meta;
     try {
         meta = await secrets.describe({ companyId, handle });
     } catch (e) {
         const known = CREDENTIAL_REFUSAL[e && e.code];
-        if (known) return error(`${at}.params.credential`, known[0], known[1]);
-        return error(`${at}.params.credential`, CODE.CREDENTIAL_STORE_UNAVAILABLE, 'the secrets store could not be read, so the credential was not checked; try again', { retryable: true });
+        if (known) return { code: known[0], message: known[1] };
+        return { code: CODE.CREDENTIAL_STORE_UNAVAILABLE, message: 'the secrets store could not be read, so the credential was not checked; try again', retryable: true };
     }
     if (meta.kind !== CREDENTIAL_KIND) {
-        return error(`${at}.params.credential`, CODE.CREDENTIAL_WRONG_KIND, `the secret is of kind "${meta.kind}"; a skill reads only with a "${CREDENTIAL_KIND}" secret`);
+        return { code: CODE.CREDENTIAL_WRONG_KIND, message: `the secret is of kind "${meta.kind}"; a skill reads only with a "${CREDENTIAL_KIND}" secret` };
     }
-    return null;
+    if (!namesHost(meta.hosts, host, port)) {
+        return { code: CODE.CREDENTIAL_HOST_NOT_BOUND, message: `the secret may not be sent to ${host}${port === HTTPS_PORT ? '' : `:${port}`}; an admin adds the host to the secret under Settings > Integrations > Secrets` };
+    }
+    return { meta };
+};
+
+const checkCredential = async (companyId, handle, at, entry) => {
+    const found = await credentialProblem(companyId, handle, { host: entry.host, port: entry.port || HTTPS_PORT });
+    if (found.meta) return null;
+    return error(`${at}.params.credential`, found.code, found.message, found.retryable ? { retryable: true } : {});
 };
 
 /* The save-time half of the check: the live allowlist of this workspace, an
@@ -178,13 +200,59 @@ const checkDeclaredReads = async (companyId, value) => {
         const { entry, reason } = parseDeclaredHost(step.params.host);
         if (!entry) errors.push(hostError(at, step.params.host, reason));
         else if (!hostMatches(listed, entry.host, entry.port || HTTPS_PORT)) errors.push(hostError(at, entry.text));
-        if (step.params.credential) {
+        if (entry && step.params.credential) {
             // eslint-disable-next-line no-await-in-loop
-            const refused = await checkCredential(companyId, step.params.credential, at);
+            const refused = await checkCredential(companyId, step.params.credential, at, entry);
             if (refused) errors.push(refused);
         }
     }
     return errors;
+};
+
+const refusal = (code, message, extra = {}) => Object.assign(new Error(`${code}: ${message}`), { code, deterministic: true, ...extra });
+
+const listedHosts = async (companyId) => {
+    try {
+        return await require('../engine/egressAllowlist').hostsFor(companyId);
+    } catch (e) {
+        throw refusal(CODE.ALLOWLIST_UNREADABLE, 'the workspace egress allowlist could not be read, so nothing was fetched');
+    }
+};
+
+/* Every hop of a declared read, the first included: https, one of the skill's declared hosts, and on the
+ * workspace allowlist as it stands now, an empty list refusing everything. */
+const admitHop = ({ companyId, actor, declaredHosts, listed }, target, hop) => {
+    const port = portOf(target);
+    if (target.protocol !== 'https:') throw refusal(CODE.HOST_NOT_DECLARED, `refused a redirect from https to http (${target.host}); a declared read stays on https`);
+    if (!namesHost(declaredHosts, target.hostname, port)) throw refusal(CODE.HOST_NOT_DECLARED, `${target.host} is not a host this skill declares, so it was not fetched`);
+    if (!hostMatches(listed, target.hostname, port)) {
+        require('../engine/egressAllowlist').recordRefusal(companyId, { actor, host: normalizeHost(target.hostname), port, reason: 'unlisted', hop });
+        throw refusal(CODE.HOST_NOT_ALLOWED, `${target.host} is not on this workspace's egress allowlist; an instance owner adds it under Instance > Egress`);
+    }
+};
+
+/* The header the secret names, the value as stored; a bare token in Authorization is sent as a bearer token. */
+const credentialFor = async (companyId, handle, target) => {
+    const found = await credentialProblem(companyId, handle, { host: target.hostname, port: portOf(target) });
+    if (!found.meta) throw refusal(found.code, found.message);
+    let value = null;
+    try { value = await secrets.resolve({ companyId, handle }); } catch (e) { value = null; }
+    if (!value) throw refusal(CODE.CREDENTIAL_UNAVAILABLE, 'the credential could not be read, so nothing was fetched');
+    const header = found.meta.header || 'authorization';
+    const sent = header === 'authorization' && !/^[A-Za-z][A-Za-z0-9-]*\s+\S/.test(value) ? `Bearer ${value}` : value;
+    return { header, sent, values: [...new Set([sent, value])] };
+};
+
+const REDACTED = '[redacted]';
+
+const scrub = (text, secret) => (secret ? secret.values.reduce((out, value) => out.split(value).join(REDACTED), String(text)) : String(text));
+
+/* A failed read is rethrown as a new error carrying only a scrubbed message: an HTTP client error holds the
+ * request config, headers and all. */
+const readFailure = (e, secret) => {
+    const message = scrub((e && e.message) || 'the read failed', secret);
+    if (e && e.deterministic && Object.values(CODE).includes(e.code)) return refusal(e.code, message.replace(new RegExp(`^${e.code}: `), ''));
+    return Object.assign(new Error(message), { code: CODE.READ_FAILED });
 };
 
 const notAvailable = (skillKey) => Object.assign(
@@ -195,4 +263,5 @@ const notAvailable = (skillKey) => Object.assign(
 module.exports = {
     FLAG, READERS, CREDENTIAL_KIND, HANDLE, MAX_PATH, CODE,
     enabled, isExternal, parseDeclaredHost, hostProblem, pathProblem, assertBuilt, buildUrl, hostError, checkDeclaredReads, notAvailable,
+    namesHost, listedHosts, admitHop, credentialFor, scrub, readFailure, refusal,
 };

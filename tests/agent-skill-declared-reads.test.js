@@ -71,7 +71,10 @@ const seedRawList = (hosts, companyId = C) => {
     mockDbFor(companyId).seed(allowlist.COLLECTION, { _id: allowlist.DOC_ID, hosts });
     allowlist.invalidate(companyId);
 };
-const credential = (kind = externalReads.CREDENTIAL_KIND, companyId = C) => secrets.create({ companyId, name: 'GitHub read token', kind, value: `ghp_${crypto.randomBytes(18).toString('hex')}`, actor: ACTOR });
+const credential = (kind = externalReads.CREDENTIAL_KIND, companyId = C) => secrets.create({
+    companyId, name: 'GitHub read token', kind, value: `ghp_${crypto.randomBytes(18).toString('hex')}`, actor: ACTOR,
+    ...(kind === externalReads.CREDENTIAL_KIND ? { hosts: [HOST] } : {}),
+});
 
 beforeEach(() => {
     Object.values(mockDbs).forEach((db) => { Object.keys(db.store).forEach((k) => { db.store[k].length = 0; }); db.calls.length = 0; });

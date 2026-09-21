@@ -26,7 +26,7 @@ const KIND_LIST = Object.freeze(Object.values(KINDS));
 const ORIGIN = Object.freeze({ MEMBER: 'member', AGENT: 'agent', EXTERNAL: 'external' });
 const TASK_ORIGIN_KINDS = Object.freeze([KINDS.EMAIL, KINDS.FORM, KINDS.WEBHOOK]);
 // Skill inputs and reads that name content from outside the workspace.
-const EXTERNAL_READS = Object.freeze(['pr_diff', 'page']);
+const EXTERNAL_READS = Object.freeze(['pr_diff', 'page', 'url', 'api']);
 const MAX_REF = 200;
 const MAX_SOURCES = 50;
 // An email-in task reaches a rule as task.created, and its origin is read from the stored row.

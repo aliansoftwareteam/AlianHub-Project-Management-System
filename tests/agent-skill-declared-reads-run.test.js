@@ -76,6 +76,7 @@ const ROUTES = {
     '/to-undeclared': (req, res) => redirect(res, `${origin('other')}/landed`),
     '/to-second': (req, res) => redirect(res, `${origin('second')}/landed`),
     '/to-http': (req, res) => redirect(res, `http://reads.example.com:${plainPort}/landed`),
+    '/to-http-same-port': (req, res) => redirect(res, `http://reads.example.com:${tlsPort}/landed`),
     '/echo': (req, res) => text(res, `you sent ${req.headers.authorization || ''} ${req.headers['x-read-key'] || ''}`),
     '/nojson': (req, res) => text(res, 'not json'),
     '/missing': (req, res) => { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('nope'); },
@@ -248,6 +249,14 @@ describe('a declared read at run time', () => {
         expect(seen.map((h) => [h.host, h.path])).toEqual([['reads.example.com', '/to-second'], ['second.example.com', '/landed'], ['second.example.com', '/text']]);
     });
 
+    it('refuses a redirect off https even to the declared host and port', async () => {
+        await save([step({ path: '/to-http-same-port', format: 'text', maxRedirects: 1 })]);
+        const error = await refusalOf(gatherRun());
+        expect(error).toMatchObject({ code: 'host_not_declared' });
+        expect(error.message).toMatch(/stays on https/);
+        expect(seen.map((h) => h.path)).toEqual(['/to-http-same-port']);
+    });
+
     it('holds the redirect cap of the read', async () => {
         await save([step({ path: '/to-self', format: 'text', maxRedirects: 0 })]);
         expect((await refusalOf(gatherRun())).message).toMatch(/too many redirects/);
@@ -318,7 +327,7 @@ describe('the credential', () => {
         expect(seen[0].headers['x-read-key']).toBe(TOKEN);
         expect(JSON.stringify(out)).not.toContain(TOKEN);
         expect(out.context.gather.r.text).toContain('[redacted]');
-        const skill = compile(await skillRecord.getSkill(C, 'reads.run'));
+        const skill = await skillRecord.getSkill(C, 'reads.run');
         expect(skill.buildUserPrompt({ task: TASK, context: out.context })).not.toContain(TOKEN);
 
         await skillRecord.updateSkill(C, 'reads.run', { gather: [step({ path: '/to-http', format: 'text', maxRedirects: 1, credential: handle })] });
@@ -393,7 +402,7 @@ describe('taint', () => {
         const { out, found } = await taint.collect(() => gatherRun());
         expect(out.context.gather.r.taint.map((s) => [s.kind, s.ref])).toEqual([['fetch', 'reads.example.com'], ['fetch', 'second.example.com']]);
         expect(out.context.gather.s.taint.map((s) => [s.kind, s.ref])).toEqual([['fetch', 'second.example.com']]);
-        const sources = taint.merge([], [...found, ...taint.fromContext(out.context, { skill: compile(await skillRecord.getSkill(C, 'reads.run')) })]);
+        const sources = taint.merge([], [...found, ...taint.fromContext(out.context, { skill: await skillRecord.getSkill(C, 'reads.run') })]);
         expect(sources.map((s) => s.ref)).toEqual(['reads.example.com', 'second.example.com']);
     });
 });
