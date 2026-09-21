@@ -40,7 +40,8 @@ const relay = async (change) => {
         const uid = entry.socket.user && entry.socket.user.uid;
         // eslint-disable-next-line no-await-in-loop
         if (!(await mayReceive(change.companyId, uid, task))) continue;
-        entry.namespace.to(entry.roomName).emit(EVENT, change.data.session);
+        // A room name carries the socket id the client sent, so another socket can share it; only this one was checked.
+        entry.socket.emit(EVENT, change.data.session);
         sent += 1;
     }
     return sent;
@@ -48,6 +49,13 @@ const relay = async (change) => {
 
 const onChange = (change) => relay(change).catch((error) => logger.error(`agent session relay: ${error.message}`));
 
-socketEmitter.on('agentSession:update', onChange);
+let registered = false;
 
-module.exports = { EVENT, relay, mayReceive, resetDecisions: () => decisions.clear() };
+const registerWhenOn = (env = process.env) => {
+    if (!require('../../Modules/AgentSessions/config').isOn(env)) return false;
+    if (!registered) socketEmitter.on('agentSession:update', onChange);
+    registered = true;
+    return true;
+};
+
+module.exports = { EVENT, relay, mayReceive, registerWhenOn, resetDecisions: () => decisions.clear() };

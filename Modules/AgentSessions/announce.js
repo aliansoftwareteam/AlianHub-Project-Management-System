@@ -2,7 +2,7 @@ const agentFetch = require('../Agents/engine/agentFetch');
 const egressContext = require('../Agents/engine/egressContext');
 const { webhookAllowlist } = require('../Webhooks/helpers/privateHostAllowlist');
 const { signingSecretOf } = require('../Webhooks/helpers/signingSecret');
-const { signPayload } = require('../Webhooks/helpers/webhookRules');
+const crypto = require('crypto');
 const mcpOAuth = require('../../Config/mcpOAuth');
 const store = require('./store');
 const events = require('./events');
@@ -11,6 +11,10 @@ const { STATE, announcement, deliveryUrlProblem } = require('./rules');
 const { LIMITS } = require('./config');
 
 const EVENT = 'agent_session.offered';
+
+/* The HMAC covers `<timestamp>.<body>`, so a captured announcement cannot be replayed under a fresh timestamp;
+ * receivers reject one whose timestamp is further than REPLAY_WINDOW_SECONDS from their clock. */
+const signed = (secret, timestamp, body) => `sha256=${crypto.createHmac('sha256', String(secret)).update(`${timestamp}.${body}`).digest('hex')}`;
 
 const egressHostsFor = async (companyId) => (egressContext.isOn()
     ? require('../Agents/engine/egressAllowlist').hostsFor(String(companyId))
@@ -39,6 +43,7 @@ const announce = async (session, handle) => {
     if (!secret) return { session: await fail(session, 'the signing secret of the delivery URL is unavailable'), delivered: false };
 
     const body = JSON.stringify(announcement({ session, handle, issuer: issuerOrEmpty() }));
+    const timestamp = String(Math.floor(Date.now() / 1000));
     let response;
     try {
         response = await deliver({
@@ -51,7 +56,8 @@ const announce = async (session, handle) => {
                 'User-Agent': 'AlianHub-AgentSessions/1.0',
                 'X-AlianHub-Event': EVENT,
                 'X-AlianHub-Session': String(session._id),
-                'X-AlianHub-Signature': signPayload(secret, body),
+                'X-AlianHub-Timestamp': timestamp,
+                'X-AlianHub-Signature': signed(secret, timestamp, body),
             },
         });
     } catch (error) {

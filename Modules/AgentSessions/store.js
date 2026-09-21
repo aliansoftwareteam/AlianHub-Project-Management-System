@@ -46,8 +46,9 @@ const appendActivity = async (companyId, id, activity) => {
     const _id = toOid(id);
     if (!_id) return null;
     const push = { activities: { $each: [activity], $slice: -LIMITS.activitiesKept } };
+    const deadline = new Date(new Date(activity.at).getTime() - LIMITS.firstActivityMs);
     const taken = await sessions(companyId, [
-        { _id, state: OPEN[0] },
+        { _id, state: OPEN[0], $or: [{ deliveredAt: { $exists: false } }, { deliveredAt: { $gte: deadline } }] },
         { $set: { state: OPEN[1], firstActivityAt: activity.at, lastActivityAt: activity.at, handleHash: '' }, $push: push, $inc: { activityCount: 1 } },
         { returnDocument: 'after' },
     ], 'findOneAndUpdate');

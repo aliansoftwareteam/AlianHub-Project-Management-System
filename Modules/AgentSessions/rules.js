@@ -71,6 +71,7 @@ const announcement = ({ session, handle, issuer, now = new Date() }) => ({
     handle,
     handleExpiresAt: new Date(session.handleExpiresAt).toISOString(),
     firstActivityWithinSeconds: Math.round(LIMITS.firstActivityMs / 1000),
+    replayWindowSeconds: LIMITS.replayWindowSeconds,
     mcp: issuer ? `${String(issuer).replace(/\/+$/, '')}/mcp` : '',
     tools: ['session.activity', 'session.complete', 'session.fail'],
 });

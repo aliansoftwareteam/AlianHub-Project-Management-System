@@ -11,7 +11,7 @@ const handle = (label, fn) => async (req, res) => {
     try {
         return await fn(req, res, { companyId: tenantOf(req), uid: String(req.uid || '') });
     } catch (error) {
-        if (error instanceof delegation.DelegationError) return fail(res, error.message, error.statusCode);
+        if (error instanceof delegation.DelegationError) return fail(res, error.message, error.statusCode, error.code ? { code: error.code } : {});
         logger.error(`agent sessions: ${label}: ${error.message}`);
         return fail(res, 'Something went wrong.', 500);
     }

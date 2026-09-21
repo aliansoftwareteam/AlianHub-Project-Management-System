@@ -11,14 +11,17 @@ const { STATE, OPEN, newHandle, hashOf } = require('./rules');
 const { LIMITS } = require('./config');
 
 class DelegationError extends Error {
-    constructor(statusCode, message) {
+    constructor(statusCode, message, code = '') {
         super(message);
         this.name = 'DelegationError';
         this.statusCode = statusCode;
+        this.code = code;
     }
 }
 
-const refuse = (statusCode, message) => { throw new DelegationError(statusCode, message); };
+const refuse = (statusCode, message, code) => { throw new DelegationError(statusCode, message, code); };
+
+const ASSIGNED_MESSAGE = 'A task delegated to an outside agent had no assignee, so it is now assigned to you.';
 
 /* The session is the sender, as a run is for its own notices: the pipeline drops the sender from the recipients, so
  * the delegator cannot be it, and it looks the sender up by object id, which a client id is not. */
@@ -30,8 +33,9 @@ const notifyDelegator = async (companyId, task, uid, session) => {
         await handleNotificationtFun({ body: {
             createdAt: now, updatedAt: now,
             key: Notification_key.TASK_NOTIFICATION, type: 'tasks', changeType: 'agent_session_assigned',
-            changeData: { taskId: String(task._id), sessionId: String(session._id), clientName: session.clientName },
-            message: `${task.TaskKey || task.TaskName || 'A task'} had no assignee, so it is now yours while ${session.clientName || 'an outside agent'} works on it for you.`,
+            // The Inbox renders message as HTML, so the client's and the task's own text travel only as data.
+            changeData: { taskId: String(task._id), sessionId: String(session._id), clientName: session.clientName, taskKey: task.TaskKey || '', taskName: task.TaskName || '' },
+            message: ASSIGNED_MESSAGE,
             companyId: String(companyId), projectId: String(task.ProjectID || ''), taskId: String(task._id),
             userId: String(session._id), assigneeUsers: [String(uid)], notSeen: [String(uid)],
             isSelected: false, folderId: '', sprintId: String(task.sprintId || ''), comments_id: '',
@@ -64,6 +68,9 @@ const delegate = async ({ companyId, uid, taskId, clientId, ip = '', now = new D
 
     const assignees = (task.AssigneeUserId || []).map(String).filter(Boolean);
     const assignDelegator = assignees.length === 0;
+    if (assignDelegator && !(await access.canAssignSelf(companyId, uid, task))) {
+        refuse(403, 'This task has no assignee and you may not assign it, so it cannot be delegated; ask someone who can assign it.', 'assign_not_allowed');
+    }
     const handle = newHandle();
     const session = await store.create(companyId, {
         taskId: String(task._id), projectId: String(task.ProjectID || ''), sprintId: String(task.sprintId || ''),

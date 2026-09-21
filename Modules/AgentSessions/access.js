@@ -27,6 +27,12 @@ const canEditTask = async (companyId, uid, task) => {
     return Boolean(verdict && verdict.allowed);
 };
 
+/* Handing an unassigned task to its delegator is an assignment, held to the key the web app's assignee picker is. */
+const canAssignSelf = async (companyId, uid, task) => {
+    const verdict = await canEditProject(String(companyId), String(uid), String(task.ProjectID), [['task.task_assignee']]);
+    return Boolean(verdict && verdict.allowed);
+};
+
 const privateSprintOf = async (companyId, sprintId) => {
     const _id = toOid(sprintId);
     if (!_id) return null;
@@ -37,4 +43,4 @@ const privateSprintOf = async (companyId, sprintId) => {
 /* Membership proper: owners and admins read past sprint privacy, but that does not make them members. */
 const isSprintMember = async (companyId, uid, sprint) => canSeeSprint(sprint, await sprintIdentities(String(companyId), String(uid)));
 
-module.exports = { EDIT_KEYS, taskOf, canOpenTask, canEditTask, privateSprintOf, isSprintMember };
+module.exports = { EDIT_KEYS, taskOf, canOpenTask, canEditTask, canAssignSelf, privateSprintOf, isSprintMember };
