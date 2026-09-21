@@ -395,7 +395,11 @@ const schema = {
     },
     // Per-call audit of token-authenticated API requests
     apiActivityLogs: {
-        tokenId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        // An MCP call made with an OAuth access token has no personal token: it names the client and grant instead.
+        tokenId: { type: mongoose.Schema.Types.ObjectId, required() { return !this.clientId; } },
+        clientId: { type: String, required: false },
+        grantId: { type: String, required: false },
+        userId: { type: String, required: false },
         method: { type: String, required: true },
         path: { type: String, required: true },
         statusCode: { type: Number, required: false },
@@ -653,6 +657,22 @@ const schema = {
         rowId: { type: String, required: false },
         cutoff: { type: Date, required: false },
         mac: { type: String, required: true },
+    },
+    // Where an erasure's audit redaction has got to (Modules/Audit/redact.js), keyed by the person's pseudonym.
+    auditRedactions: {
+        _id: { type: String, required: true },
+        after: { type: String, required: false },
+        rows: { type: Number, required: false },
+        fields: { type: Number, required: false },
+        by: { type: String, required: false },
+        reason: { type: String, required: false },
+        startedAt: { type: Date, required: false },
+        finishedAt: { type: Date, required: false },
+        recordedRowId: { type: String, required: false },
+        runId: { type: String, required: false },
+        owner: { type: String, required: false },
+        leaseUntil: { type: Date, required: false },
+        pending: { type: Object, required: false },
     },
     // Per-company SCIM 2.0 provisioning config — managed by Modules/Scim (SEC-05).
     // The IdP-held bearer token is stored only as a bcrypt hash; the company is

@@ -76,6 +76,21 @@ const resolveActor = async (req) => {
     return { ...base, kind: ACTOR_HUMAN, viaAccount: 'workspace' };
 };
 
+const VIA_EXTERNAL = 'external';
+
+/* An outside client holding an OAuth grant, acting for the person who granted it. Built by the MCP
+ * server from the verified grant, never from the request, and kept out of VIA so no token's
+ * agentAccount can claim it. */
+const externalClientActor = async ({ userId, clientId, clientName, grantId }) => {
+    const account = await userAgentAccount(userId);
+    return {
+        kind: ACTOR_AGENT, userId: String(userId), tokenId: null, tokenName: null, runId: null, agentId: null,
+        agentName: clientName || String(clientId), viaAccount: VIA_EXTERNAL, provider: null,
+        personName: (account && account.name) || '', projectIds: [],
+        clientId: String(clientId), grantId: String(grantId), delegatedBy: String(userId),
+    };
+};
+
 /* A component acting on its own account. `userId` is the person the work is on
  * behalf of, when there is one (the run's starter), never who the actor is. */
 const serviceActor = (service, { runId = null, userId = '', traceId = null, workerId = null } = {}) => {
@@ -94,6 +109,11 @@ const isService = (actor) => Boolean(actor && actor.kind === ACTOR_SERVICE);
 const attribution = (actor) => {
     if (isService(actor)) return { actorId: serviceIdOf(actor.service), actorType: ACTOR_SERVICE, service: actor.service, label: SERVICE_LABELS[actor.service] };
     if (!isAgent(actor)) return { actorId: actor.userId, actorType: ACTOR_HUMAN, label: actor.personName || '' };
+    if (actor.viaAccount === VIA_EXTERNAL) {
+        return { actorId: actor.clientId, actorType: ACTOR_AGENT, agentId: null, viaAccount: VIA_EXTERNAL,
+                 clientId: actor.clientId, grantId: actor.grantId, delegatedBy: actor.delegatedBy,
+                 label: `${actor.agentName || 'Outside client'} for ${actor.personName || 'Member'}` };
+    }
     if (actor.viaAccount === 'personal') {
         return { actorId: actor.userId, actorType: ACTOR_AGENT, agentId: actor.agentId, viaAccount: 'personal',
                  label: `${actor.personName || 'Member'} via ${actor.provider || actor.agentName || 'personal agent'}` };
@@ -103,6 +123,6 @@ const attribution = (actor) => {
 };
 
 module.exports = {
-    ACTOR_HUMAN, ACTOR_AGENT, ACTOR_SERVICE, SERVICES, VIA, isAgentToken, resolveActor, isAgent, isService, serviceActor, attribution,
+    ACTOR_HUMAN, ACTOR_AGENT, ACTOR_SERVICE, SERVICES, VIA, VIA_EXTERNAL, isAgentToken, resolveActor, externalClientActor, isAgent, isService, serviceActor, attribution,
     serviceIdOf, looksLikeServiceIdentity, stepCredentialsEnabled, serviceStamp, userAgentAccount, invalidateAgentAccountCache,
 };

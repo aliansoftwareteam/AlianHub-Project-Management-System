@@ -105,6 +105,7 @@ const baseMeta = (actor) => {
         viaAccount: isAgent(actor) ? actor.viaAccount : null,
         tokenId: actor.tokenId || null,
         onBehalfOf: (isAgent(actor) || isService(actor)) && actor.userId ? actor.userId : null,
+        ...(a.clientId ? { clientId: a.clientId, grantId: a.grantId, delegatedBy: a.delegatedBy } : {}),
         ...(isService(actor) ? { service: actor.service } : {}),
         ...(actor.traceId ? { traceId: actor.traceId } : {}),
     };

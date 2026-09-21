@@ -395,6 +395,19 @@ describe('erasure', () => {
         })]);
     });
 
+    it("by person leaves the app's own audit rows as they are (owner's rule)", async () => {
+        seedChunk(CID_A, { sourceId: 'private', visibility: 'private' });
+        const own = mockDbFor(CID_A).seed('audit_logs', { actorId: ALICE, actorName: 'Alice Doe', action: 'member.update', entityType: 'member', entityId: MEMBER, entityName: 'Max Member', meta: {}, ip: '10.0.0.7', createdAt: new Date() });
+        const before = { ...own };
+
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: ALICE });
+
+        expect(res.status).toBe(200);
+        expect(own).toEqual(before);
+        expect((mockDbFor(CID_A).store.audit_logs || []).map((row) => row.action).filter((a) => !a.startsWith('knowledge.') && a !== 'member.update')).toEqual([]);
+        expect(mockDbFor(CID_A).store.audit_redactions).toBeUndefined();
+    });
+
     it.each([
         [{ sourceType: 'pages', sourceId: PAGE, confirm: PAGE }, 'INVALID_SOURCE_TYPE'],
         [{ sourceType: 'page', sourceId: 'not-an-id', confirm: 'not-an-id' }, 'INVALID_DOCUMENT_ID'],
