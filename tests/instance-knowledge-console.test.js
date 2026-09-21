@@ -117,13 +117,16 @@ const call = async (method, path, { uid, body, apiToken, adminKey } = {}) => {
 };
 const asOwner = (method, path, body) => call(method, path, { uid: OWNER, body });
 
-const WRITES = [
+const RUNS = [
     ['POST', `${BASE}/${CID_A}/reindex`, { sourceType: 'page' }],
     ['POST', `${BASE}/${CID_A}/reembed`, {}],
     ['POST', `${BASE}/${CID_A}/retry-files`, {}],
-    ['POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'page', sourceId: PAGE, confirm: PAGE }],
-    ['POST', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: 'Acme' }],
 ];
+const ERASURES = [
+    ['POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'page', sourceId: PAGE, confirm: PAGE }],
+    ['POST', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: ALICE }],
+];
+const WRITES = [...RUNS, ['POST', `${BASE}/${CID_A}/reindex/cancel`, { sourceType: 'page' }], ...ERASURES];
 const ROUTES = [['GET', BASE, undefined], ['GET', `${BASE}/${CID_A}`, undefined], ...WRITES];
 
 describe('who may open the knowledge console', () => {
@@ -227,7 +230,7 @@ describe('one workspace', () => {
 describe('with the indexer off', () => {
     beforeEach(() => { delete process.env.KNOWLEDGE_INDEXER; });
 
-    it.each(WRITES)('refuses %s %s with indexer_off and changes nothing', async (method, path, body) => {
+    it.each(RUNS)('refuses %s %s with indexer_off and changes nothing', async (method, path, body) => {
         seedChunk(CID_A);
         seedState(CID_A, 'page');
         const res = await asOwner(method, path, body);
@@ -238,12 +241,21 @@ describe('with the indexer off', () => {
         await settle();
         expect(audits(CID_A)).toEqual([]);
     });
+
+    it.each(ERASURES)('still erases on %s %s, since what was indexed earlier must stay erasable', async (method, path, body) => {
+        seedChunk(CID_A, { visibility: 'private' });
+        const res = await asOwner(method, path, body);
+        expect(res.status).toBe(200);
+        expect(chunksOf(CID_A)).toEqual([]);
+        await settle();
+        expect(audits(CID_A)).toHaveLength(1);
+    });
 });
 
 describe('with the indexer off for the workspace alone', () => {
     beforeEach(() => { g().store.companies.find((c) => c._id === CID_A).knowledgeIndexer = { mode: 'off' }; });
 
-    it.each(WRITES.slice(0, 3))('refuses %s %s, which would run nothing there', async (method, path, body) => {
+    it.each(RUNS)('refuses %s %s, which would run nothing there', async (method, path, body) => {
         seedState(CID_A, 'page');
         const res = await asOwner(method, path, body);
         expect(res.status).toBe(409);
@@ -362,18 +374,18 @@ describe('erasure', () => {
         expect(audits(CID_B)).toEqual([]);
     });
 
-    it('by person needs the workspace name typed back, and follows the owner\'s rule', async () => {
+    it('by person needs the person\'s id typed back, and follows the owner\'s rule', async () => {
         seedChunk(CID_A, { sourceId: 'private', visibility: 'private' });
         seedChunk(CID_A, { sourceId: 'shared' });
         seedChunk(CID_A, { sourceType: 'comment', sourceId: 'c1' });
         seedChunk(CID_A, { sourceType: 'transcript', sourceId: 't1', visibility: 'participants' });
 
-        const wrong = await asOwner('POST', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: 'acme' });
+        const wrong = await asOwner('POST', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: 'Acme' });
         expect(wrong.status).toBe(400);
         expect(wrong.body.code).toBe(CODE.CONFIRMATION_MISMATCH);
         expect(chunksOf(CID_A)).toHaveLength(4);
 
-        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: 'Acme' });
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: ALICE });
         expect(res.status).toBe(200);
         expect(res.body.data).toEqual({ removed: { page: 1, comment: 1 }, total: 2 });
         expect(chunksOf(CID_A).map((c) => c.sourceId).sort()).toEqual(['shared', 't1']);
@@ -398,15 +410,185 @@ describe('erasure', () => {
 
     it.each([['nope'], [''], [{ $ne: '' }]])('refuses a person id that is not an id: %j', async (userId) => {
         seedChunk(CID_A, { visibility: 'private' });
-        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/person`, { userId, confirm: 'Acme' });
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/person`, { userId, confirm: userId });
         expect(res.status).toBe(400);
         expect(res.body.code).toBe(CODE.INVALID_USER_ID);
         expect(chunksOf(CID_A)).toHaveLength(1);
     });
 
     it('refuses a workspace that does not exist', async () => {
-        const res = await asOwner('POST', `${BASE}/${MISSING_CID}/erase/person`, { userId: ALICE, confirm: '' });
+        const res = await asOwner('POST', `${BASE}/${MISSING_CID}/erase/person`, { userId: ALICE, confirm: ALICE });
         expect(res.status).toBe(404);
         expect(res.body.code).toBe(CODE.UNKNOWN_WORKSPACE);
+    });
+});
+
+describe('ids in another case', () => {
+    const UPPER_A = CID_A.toUpperCase();
+
+    it('reads and changes the real workspace when its id comes in capitals', async () => {
+        seedChunk(CID_A);
+        const res = await asOwner('GET', `${BASE}/${UPPER_A}`);
+        expect(res.status).toBe(200);
+        expect(res.body.data).toMatchObject({ companyId: CID_A, totals: { chunks: 1 } });
+        const erased = await asOwner('POST', `${BASE}/${UPPER_A}/erase/document`, { sourceType: 'page', sourceId: PAGE, confirm: PAGE });
+        expect(erased.body.data).toEqual({ removed: { page: 1 }, total: 1 });
+        expect(chunksOf(CID_A)).toEqual([]);
+        await settle();
+        expect(audits(CID_A)).toHaveLength(1);
+        expect(Object.keys(mockDbs)).not.toContain(UPPER_A);
+    });
+
+    it('erases a document named in capitals, and keeps it out under the id the indexer checks', async () => {
+        seedChunk(CID_A);
+        seedChunk(CID_A, { ordinal: 1 });
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'page', sourceId: PAGE.toUpperCase(), confirm: PAGE.toUpperCase() });
+        expect(res.body.data).toEqual({ removed: { page: 2 }, total: 2 });
+        expect(chunksOf(CID_A)).toEqual([]);
+        expect(mockDbFor(CID_A).store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS]).toEqual([expect.objectContaining({ sourceType: 'page', sourceId: PAGE })]);
+    });
+
+    it('erases a file whose task id comes in capitals, keeping the attachment id as it is', async () => {
+        seedChunk(CID_A, { sourceType: 'file', sourceId: `${TASK}:aB1`, taskId: TASK });
+        const id = `${TASK.toUpperCase()}:aB1`;
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'file', sourceId: id, confirm: id });
+        expect(res.body.data).toEqual({ removed: { file: 1 }, total: 1 });
+    });
+
+    it('erases a person named in capitals, with the confirmation in either case', async () => {
+        seedChunk(CID_A, { visibility: 'private' });
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/person`, { userId: ALICE.toUpperCase(), confirm: ALICE });
+        expect(res.body.data).toEqual({ removed: { page: 1 }, total: 1 });
+        expect(mockDbFor(CID_A).store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS]).toEqual([expect.objectContaining({ kind: 'author', userId: ALICE })]);
+    });
+});
+
+describe('an erasure that matches nothing', () => {
+    it('says so with its own code, still records the exclusion, and is audited', async () => {
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'page', sourceId: PAGE, confirm: PAGE });
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({ code: CODE.NOTHING_ERASED, data: { removed: {}, total: 0 } });
+        expect(mockDbFor(CID_A).store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS]).toHaveLength(1);
+        await settle();
+        expect(audits(CID_A)).toEqual([expect.objectContaining({ action: ACTIONS.ERASE_DOCUMENT, meta: expect.objectContaining({ total: 0 }) })]);
+    });
+});
+
+describe('an erasure that fails partway', () => {
+    const failChunkDeletes = (companyId, { after = 0 } = {}) => {
+        const db = mockDbFor(companyId);
+        const real = db.crud.getMockImplementation();
+        let seen = 0;
+        db.crud.mockImplementation((c, q, method) => {
+            if (method === 'deleteMany' && q.type === CHUNKS) {
+                seen += 1;
+                if (seen > after) return Promise.reject(new Error('disk gone'));
+            }
+            return real(c, q, method);
+        });
+    };
+
+    it('after the exclusion is written: answers 500 and audits a partial row with what it reached', async () => {
+        seedChunk(CID_A);
+        failChunkDeletes(CID_A);
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'page', sourceId: PAGE, confirm: PAGE });
+        expect(res.status).toBe(500);
+        expect(res.body.code).toBe(CODE.SERVER_ERROR);
+        expect(mockDbFor(CID_A).store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS]).toHaveLength(1);
+        await settle();
+        expect(audits(CID_A)).toEqual([expect.objectContaining({
+            action: ACTIONS.ERASE_DOCUMENT, actorId: OWNER, meta: { sourceType: 'page', removed: {}, total: 0, partial: true, error: CODE.SERVER_ERROR },
+        })]);
+    });
+
+    it('partway through a task: audits the sources already removed', async () => {
+        seedChunk(CID_A, { sourceType: 'comment', sourceId: 'c1', taskId: TASK });
+        seedChunk(CID_A, { sourceType: 'file', sourceId: `${TASK}:a1`, taskId: TASK });
+        failChunkDeletes(CID_A, { after: 1 });
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'task', sourceId: TASK, confirm: TASK });
+        expect(res.status).toBe(500);
+        await settle();
+        const [row] = audits(CID_A);
+        expect(row.meta).toMatchObject({ partial: true, error: CODE.SERVER_ERROR, total: 1 });
+        expect(Object.values(row.meta.removed)).toEqual([1]);
+    });
+
+    it('by person: audits a partial row', async () => {
+        seedChunk(CID_A, { visibility: 'private' });
+        failChunkDeletes(CID_A);
+        const res = await asOwner('POST', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: ALICE });
+        expect(res.status).toBe(500);
+        await settle();
+        expect(audits(CID_A)).toEqual([expect.objectContaining({ action: ACTIONS.ERASE_PERSON, meta: expect.objectContaining({ partial: true, total: 0 }) })]);
+    });
+});
+
+describe('cancelling a re-index', () => {
+    it('stops a running walk, audits it, and lets a new one start', async () => {
+        seedState(CID_A, 'page');
+        await asOwner('POST', `${BASE}/${CID_A}/reindex`, { sourceType: 'page' });
+        const res = await asOwner('POST', `${BASE}/${CID_A}/reindex/cancel`, { sourceType: 'page' });
+        expect(res.status).toBe(200);
+        expect(stateOf(CID_A, 'page')).toMatchObject({ status: 'complete', reindexStatus: 'cancelled' });
+        await settle();
+        expect(audits(CID_A).map((row) => row.action)).toEqual([ACTIONS.REINDEX, ACTIONS.REINDEX_CANCEL]);
+        expect((await asOwner('POST', `${BASE}/${CID_A}/reindex`, { sourceType: 'page' })).status).toBe(202);
+    });
+
+    it('answers 409 when nothing runs, and 400 to an unknown source type', async () => {
+        seedState(CID_A, 'page');
+        const none = await asOwner('POST', `${BASE}/${CID_A}/reindex/cancel`, { sourceType: 'page' });
+        expect(none.status).toBe(409);
+        expect(none.body.code).toBe(CODE.REINDEX_NOT_RUNNING);
+        expect((await asOwner('POST', `${BASE}/${CID_A}/reindex/cancel`, { sourceType: 'nope' })).body.code).toBe(CODE.INVALID_SOURCE_TYPE);
+    });
+});
+
+describe('the cost of the figures', () => {
+    const aggregates = () => mockDbFor(CID_A).calls.filter((c) => c.method === 'aggregate' && c.type === CHUNKS);
+
+    it('are cached per workspace for a short time, and read again on refresh or after a control', async () => {
+        seedChunk(CID_A);
+        await asOwner('GET', `${BASE}/${CID_A}`);
+        const second = await asOwner('GET', `${BASE}/${CID_A}`);
+        expect(aggregates()).toHaveLength(1);
+        expect(second.body.data.cachedAt).toEqual(expect.any(String));
+        await asOwner('GET', `${BASE}/${CID_A}?refresh=1`);
+        expect(aggregates()).toHaveLength(2);
+        await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'page', sourceId: PAGE, confirm: PAGE });
+        const after = await asOwner('GET', `${BASE}/${CID_A}`);
+        expect(after.body.data.totals.chunks).toBe(0);
+    });
+
+    it('run under a time limit, overridable by the environment', async () => {
+        await asOwner('GET', `${BASE}/${CID_A}?refresh=1`);
+        expect(aggregates().at(-1).data[1]).toEqual({ maxTimeMS: 10000 });
+        process.env.KNOWLEDGE_FIGURES_MAX_TIME_MS = '2500';
+        try {
+            await asOwner('GET', `${BASE}/${CID_A}?refresh=1`);
+            expect(aggregates().at(-1).data[1]).toEqual({ maxTimeMS: 2500 });
+        } finally {
+            delete process.env.KNOWLEDGE_FIGURES_MAX_TIME_MS;
+        }
+    });
+
+    it('answer figures_timed_out when the database gives up', async () => {
+        const db = mockDbFor(CID_A);
+        const real = db.crud.getMockImplementation();
+        db.crud.mockImplementation((c, q, method) => (method === 'aggregate' && q.type === CHUNKS
+            ? Promise.reject(Object.assign(new Error('operation exceeded time limit'), { code: 50, codeName: 'MaxTimeMSExpired' }))
+            : real(c, q, method)));
+        const res = await asOwner('GET', `${BASE}/${CID_A}`);
+        expect(res.status).toBe(503);
+        expect(res.body.code).toBe(CODE.FIGURES_TIMED_OUT);
+    });
+
+    it('start from an indexed match and never bring whole rows or vectors into the pipeline', async () => {
+        seedChunk(CID_A, { embedding: [1, 2, 3], embeddingModel: 'm' });
+        await asOwner('GET', `${BASE}/${CID_A}`);
+        const [pipeline] = aggregates().at(-1).data;
+        expect(Object.keys(pipeline[0])).toEqual(['$match']);
+        expect(pipeline[0].$match).toEqual({ sourceType: { $in: expect.arrayContaining(['page']) } });
+        expect(JSON.stringify(pipeline)).not.toMatch(/\$\$ROOT|\$bsonSize|"embedding"|"\$embedding"/);
     });
 });

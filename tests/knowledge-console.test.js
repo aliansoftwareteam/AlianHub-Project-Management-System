@@ -100,12 +100,12 @@ describe('workspace figures', () => {
         const result = await figures.workspaceFigures(C);
 
         expect(sourceFigures(result, 'page')).toMatchObject({ chunks: 3, sources: 2, tombstones: 1, lastIndexedAt: new Date('2026-09-12T00:00:00Z') });
-        expect(sourceFigures(result, 'page').bytes).toBeGreaterThan(0);
+        expect(sourceFigures(result, 'page').textBytes).toBe(3 * Buffer.byteLength('Some words here.'));
         expect(sourceFigures(result, 'comment')).toMatchObject({ chunks: 1, sources: 1, tombstones: 0 });
         expect(sourceFigures(result, 'transcript')).toMatchObject({ chunks: 2, sources: 1 });
-        expect(sourceFigures(result, 'guide')).toMatchObject({ chunks: 0, sources: 0, bytes: 0, lastIndexedAt: null });
+        expect(sourceFigures(result, 'guide')).toMatchObject({ chunks: 0, sources: 0, textBytes: 0, lastIndexedAt: null });
         expect(result.totals).toMatchObject({ chunks: 6, sources: 4 });
-        expect(result.totals.bytes).toBe(result.sources.reduce((sum, s) => sum + s.bytes, 0));
+        expect(result.totals.textBytes).toBe(result.sources.reduce((sum, s) => sum + s.textBytes, 0));
     });
 
     it('lists a source type the chunk store holds even when the known list does not name it', async () => {
@@ -373,7 +373,7 @@ describe('erasure', () => {
         chunk({ sourceId: 'p1', ordinal: 1, deleted: true });
         chunk({ sourceId: 'p2' });
         const result = await controls.eraseDocument(C, { sourceType: 'page', sourceId: 'p1' });
-        expect(result).toEqual({ ok: true, removed: { page: 2 }, total: 2 });
+        expect(result).toMatchObject({ removed: { page: 2 }, total: 2 });
         expect(chunks().map((c) => c.sourceId)).toEqual(['p2']);
         expect(db().store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS]).toEqual([expect.objectContaining({ kind: 'document', sourceType: 'page', sourceId: 'p1' })]);
     });
@@ -384,9 +384,10 @@ describe('erasure', () => {
         chunk({ sourceType: 'file', sourceId: `${TASK}:a1`, taskId: TASK, ordinal: 1 });
         chunk({ sourceType: 'comment', sourceId: 'c2', taskId: 'another' });
         const result = await controls.eraseDocument(C, { sourceType: 'task', sourceId: TASK });
-        expect(result).toEqual({ ok: true, removed: { comment: 1, file: 2 }, total: 3 });
+        expect(result).toMatchObject({ removed: { comment: 1, file: 2 }, total: 3 });
         expect(chunks().map((c) => c.sourceId)).toEqual(['c2']);
-        expect(db().store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS].map((e) => `${e.sourceType}:${e.sourceId}`).sort()).toEqual([`comment:c1`, `file:${TASK}:a1`]);
+        expect(db().store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS].filter((e) => e.kind === 'document').map((e) => `${e.sourceType}:${e.sourceId}`).sort()).toEqual([`comment:c1`, `file:${TASK}:a1`]);
+        expect(db().store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS]).toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'task', sourceId: TASK })]));
     });
 
     it("by person removes their private pages and their comments, never their shared pages or transcripts (owner's rule)", async () => {
@@ -399,7 +400,7 @@ describe('erasure', () => {
 
         const result = await controls.erasePerson(C, ALICE);
 
-        expect(result).toEqual({ ok: true, removed: { page: 2, comment: 1 }, total: 3 });
+        expect(result).toMatchObject({ removed: { page: 2, comment: 1 }, total: 3 });
         expect(chunks().map((c) => c.sourceId).sort()).toEqual(['bobs', 'shared', 't1']);
     });
 
@@ -430,5 +431,122 @@ describe('the recurring job', () => {
         expect(spies[2]).toHaveBeenCalled();
         expect(spies[3]).toHaveBeenCalled();
         spies.forEach((spy) => spy.mockRestore());
+    });
+});
+
+describe('erasing a task', () => {
+    it('keeps comments and files added under the task later out of the index', async () => {
+        db().seed(SCHEMA_TYPE.TASKS, { _id: TASK, ProjectID: PROJECT, deletedStatusKey: 0, attachments: [{ id: 'a2', url: 'https://drive.example.com/x', filename: 'x.pdf' }] });
+        await controls.eraseDocument(C, { sourceType: 'task', sourceId: TASK });
+
+        const comment = db().seed(SCHEMA_TYPE.COMMENTS, { message: 'A later note', type: 'text', taskId: TASK, projectId: PROJECT, userId: BOB, isDeleted: false, updatedAt: new Date() });
+        const indexer = require('../Modules/Knowledge/ingest/indexer');
+        await indexer.syncComment(C, String(comment._id));
+        await indexer.syncFile(C, `${TASK}:a2`);
+
+        expect(chunks().filter((c) => c.sourceId === String(comment._id))).toEqual([]);
+        expect(chunks().filter((c) => c.sourceId === `${TASK}:a2`)).toEqual([]);
+    });
+});
+
+describe('an erasure racing a sync', () => {
+    it('landing between the sync reading the source and writing its chunks still leaves nothing behind', async () => {
+        const erase = require('../Modules/Knowledge/ingest/erase');
+        const indexer = require('../Modules/Knowledge/ingest/indexer');
+        const page = seedPage();
+        const real = db().crud.getMockImplementation();
+        let fired = false;
+        db().crud.mockImplementation(async (c, q, method) => {
+            if (!fired && q.type === CHUNKS && method === 'updateOne' && q.data[2] && q.data[2].upsert) {
+                fired = true;
+                await erase.eraseDocument(C, { sourceType: 'page', sourceId: String(page._id) });
+            }
+            return real(c, q, method);
+        });
+        await indexer.syncPage(C, String(page._id));
+        expect(fired).toBe(true);
+        expect(chunks().filter((c) => c.sourceId === String(page._id))).toEqual([]);
+    });
+});
+
+describe('who walks a re-index', () => {
+    const indexer = require('../Modules/Knowledge/ingest/indexer');
+    const ticks = async (check) => {
+        for (let i = 0; i < 200 && !check(); i += 1) await new Promise((resolve) => setImmediate(resolve));
+    };
+    const buildPages = async (n) => {
+        Array.from({ length: n }, (_, i) => seedPage({ title: `Harbour ${i}` }));
+        await backfill.backfillSource(C, 'page');
+    };
+    const gated = () => {
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        const real = indexer.sync;
+        const spy = jest.spyOn(indexer, 'sync').mockImplementation(async (...args) => {
+            await gate;
+            return real(...args);
+        });
+        return { spy, release: () => release() };
+    };
+
+    it('one server holds the walk under a lease while another passes it over', async () => {
+        await buildPages(2);
+        await reindex.request(C, 'page', {});
+        const { spy, release } = gated();
+        const first = reindex.runSource(C, 'page', { owner: 'server-a' });
+        await ticks(() => spy.mock.calls.length > 0);
+        expect(stateOf('page')).toMatchObject({ reindexOwner: 'server-a' });
+        expect(stateOf('page').reindexLeaseUntil.getTime()).toBeGreaterThan(Date.now());
+
+        expect(await reindex.runSource(C, 'page', { owner: 'server-b' })).toBeNull();
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        release();
+        await first;
+        spy.mockRestore();
+        expect(stateOf('page')).toMatchObject({ reindexStatus: 'complete', reindexSynced: 2, reindexOwner: '', reindexLeaseUntil: null });
+    });
+
+    it('takes over a walk whose lease ran out, and leaves one whose lease still holds', async () => {
+        await buildPages(2);
+        await reindex.request(C, 'page', {});
+        stateOf('page').reindexOwner = 'gone';
+        stateOf('page').reindexLeaseUntil = new Date(Date.now() + 60 * 1000);
+        expect(await reindex.runSource(C, 'page', { owner: 'server-b' })).toBeNull();
+        expect(stateOf('page')).toMatchObject({ reindexStatus: 'running', reindexOwner: 'gone' });
+
+        stateOf('page').reindexLeaseUntil = new Date(Date.now() - 1000);
+        await reindex.runSource(C, 'page', { owner: 'server-b' });
+        expect(stateOf('page')).toMatchObject({ reindexStatus: 'complete', reindexSynced: 2 });
+    });
+
+    it('gives up a walk that keeps failing, so a new request is not refused for ever', async () => {
+        await buildPages(1);
+        await reindex.request(C, 'page', {});
+        const spy = jest.spyOn(indexer, 'sync').mockRejectedValue(new Error('storage down'));
+        for (let run = 1; run < reindex.MAX_FAILURES; run += 1) {
+            await reindex.runSource(C, 'page');
+            expect(stateOf('page')).toMatchObject({ reindexStatus: 'running', reindexFailures: run, reindexLeaseUntil: null });
+        }
+        await reindex.runSource(C, 'page');
+        spy.mockRestore();
+        expect(stateOf('page')).toMatchObject({ status: 'complete', reindexStatus: 'failed', reindexFailures: reindex.MAX_FAILURES });
+        expect(await reindex.request(C, 'page', {})).toMatchObject({ ok: true });
+        expect(stateOf('page')).toMatchObject({ reindexStatus: 'running', reindexFailures: 0 });
+    });
+
+    it('stops a walk that is cancelled while it runs', async () => {
+        await buildPages(2);
+        await reindex.request(C, 'page', {});
+        const { spy, release } = gated();
+        const walk = reindex.runSource(C, 'page', { owner: 'server-a', batchSize: 1 });
+        await ticks(() => spy.mock.calls.length > 0);
+        expect(await reindex.cancel(C, 'page')).toEqual({ ok: true });
+        release();
+        await walk;
+        spy.mockRestore();
+        expect(stateOf('page')).toMatchObject({ status: 'complete', reindexStatus: 'cancelled', reindexOwner: '' });
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(await reindex.cancel(C, 'page')).toEqual({ ok: false, code: 'reindex_not_running' });
     });
 });

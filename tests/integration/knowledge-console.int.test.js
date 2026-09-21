@@ -35,7 +35,7 @@ describe('the instance knowledge console', () => {
         mode ? { $set: { knowledgeIndexer: { mode } } } : { $unset: { knowledgeIndexer: '' } },
     );
     const figures = async () => {
-        const res = await owner.api.get(`${BASE}/${state.companyId}`);
+        const res = await owner.api.get(`${BASE}/${state.companyId}?refresh=1`);
         expect(res.status).toBe(200);
         return res.body.data;
     };
@@ -81,12 +81,13 @@ describe('the instance knowledge console', () => {
 
     it('reads the figures from the real aggregation, stored sizes included, and never the text', async () => {
         const data = await figures();
+        expect(data.cachedAt).toEqual(expect.any(String));
         const page = data.sources.find((s) => s.sourceType === 'page');
         expect(page.chunks).toBeGreaterThan(0);
         expect(page.sources).toBeGreaterThan(0);
-        expect(page.bytes).toBeGreaterThan(0);
+        expect(page.textBytes).toBeGreaterThan(0);
         expect(page.backfill.status).toBe('complete');
-        expect(data.totals.bytes).toBeGreaterThanOrEqual(page.bytes);
+        expect(data.totals.textBytes).toBeGreaterThanOrEqual(page.textBytes);
         expect(JSON.stringify(data)).not.toContain(word);
     });
 

@@ -41,7 +41,7 @@ const source = (sourceType, over = {}) => ({
     chunks: 0,
     tombstones: 0,
     sources: 0,
-    bytes: 0,
+    textBytes: 0,
     lastIndexedAt: null,
     backfill: { status: 'complete', progress: null, indexed: 0, skipped: 0, startedAt: null, finishedAt: null },
     reindex: { status: '', progress: null, requestedAt: null, finishedAt: null, failing: false },
@@ -56,11 +56,12 @@ const figures = (over = {}) => ({
     indexer: { mode: 'tenant', envKey: 'KNOWLEDGE_INDEXER' },
     staleAfterMs: 600000,
     sources: [
-        source('page', { chunks: 12, sources: 4, bytes: 2048, lastIndexedAt: WHEN }),
+        source('page', { chunks: 12, sources: 4, textBytes: 2048, lastIndexedAt: WHEN }),
         source('file', { chunks: 3, sources: 1, backfill: { status: 'running', progress: { done: 2, total: 8 }, indexed: 2, skipped: 0 } }),
         source('memory', { chunks: 5, sources: 2, freshness: { heartbeatAt: WHEN, behindMs: 1200000, stale: true, catchUpFrom: null, catchUpBehindMs: null } }),
     ],
-    totals: { chunks: 20, sources: 7, bytes: 4096 },
+    totals: { chunks: 20, sources: 7, textBytes: 4096 },
+    cachedAt: WHEN,
     embeddings: {
         model: 'text-embedding-3-small',
         configured: true,
@@ -142,12 +143,62 @@ describe('InstanceKnowledge', () => {
         expect(figuresCard.find('[data-test="reason-skipped:too_large"]').text()).toContain('Knowledge.reason_skipped_too_large');
     });
 
-    it('with the indexer off, says so and offers nothing that writes', async () => {
-        const off = { indexer: { mode: 'off', envKey: 'KNOWLEDGE_INDEXER' } };
+    it('with the indexer off, says so and offers erasure only', async () => {
+        const off = { indexer: { mode: 'off', envKey: 'KNOWLEDGE_INDEXER' }, modes: { indexer: 'off', retrieval: 'hybrid' } };
         const wrapper = await opened({ summaryData: summary(off), figuresData: figures(off) });
         expect(wrapper.find('[data-test="indexer-off"]').text()).toContain('Knowledge.indexer_off');
-        expect(wrapper.findAll('button').map((b) => b.attributes('data-test'))).not.toEqual(expect.arrayContaining([expect.stringMatching(/^(reindex|reembed|retry|erase)/)]));
-        expect(wrapper.findAll('form').length).toBe(0);
+        expect(wrapper.findAll('button').map((b) => b.attributes('data-test'))).not.toEqual(expect.arrayContaining([expect.stringMatching(/^(reindex|cancel-reindex|reembed|retry)/)]));
+        expect(has(wrapper, 'erase-document')).toBe(true);
+        expect(has(wrapper, 'erase-person')).toBe(true);
+    });
+
+    it('with the indexer off for the workspace alone, offers erasure only', async () => {
+        const wrapper = await opened({ figuresData: figures({ modes: { indexer: 'off', retrieval: 'hybrid' } }) });
+        expect(has(wrapper, 'reindex-page')).toBe(false);
+        expect(has(wrapper, 'reembed')).toBe(false);
+        expect(has(wrapper, 'retry-files')).toBe(false);
+        expect(has(wrapper, 'erase-document')).toBe(true);
+    });
+
+    it('cancels a running re-index after a confirmation', async () => {
+        const running = figures({ sources: [source('page', { reindex: { status: 'running', progress: { done: 1, total: 3 }, requestedAt: WHEN, finishedAt: null, failing: true } })] });
+        const wrapper = await opened({ figuresData: running, post: () => ok({ sourceType: 'page' }) });
+        expect(wrapper.find('[data-test="source-page"]').text()).toContain('Knowledge.reindex_failing');
+        await wrapper.find('[data-test="cancel-reindex-page"]').trigger('click');
+        await flushPromises();
+        expect(confirm).toHaveBeenLastCalledWith('Knowledge.cancel_reindex_confirm');
+        expect(posts()).toEqual([['post', `${BASE}/${CID_A}/reindex/cancel`, { sourceType: 'page' }]]);
+    });
+
+    it('says when the figures timed out, and reads them again on refresh', async () => {
+        let calls = 0;
+        serve();
+        const wrapper = mount(InstanceKnowledge);
+        await flushPromises();
+        apiRequestWithoutCompnay.mockImplementation((type, url) => {
+            if (type === 'get' && url.split('?')[0] === BASE) return ok(summary());
+            calls += 1;
+            return calls === 1 ? refused(503, 'figures_timed_out') : ok(figures());
+        });
+        await wrapper.find(`[data-test="open-${CID_A}"]`).trigger('click');
+        await flushPromises();
+        expect(wrapper.find('[data-test="figures-error"]').text()).toBe('Knowledge.code_figures_timed_out');
+        await wrapper.find('[data-test="refresh-figures"]').trigger('click');
+        await flushPromises();
+        expect(apiRequestWithoutCompnay.mock.calls.at(-1)[1]).toBe(`${BASE}/${CID_A}?refresh=1`);
+        expect(has(wrapper, 'source-page')).toBe(true);
+        expect(wrapper.find('[data-test="figures-cached"]').text()).toContain('Knowledge.cached_at');
+    });
+
+    it('says so when an erasure matched nothing', async () => {
+        const wrapper = await opened({ post: () => ok({ removed: {}, total: 0 }) });
+        await wrapper.find('[data-test="erase-id"]').setValue(PAGE);
+        await wrapper.find('[data-test="erase-document"]').trigger('submit');
+        await wrapper.find('[data-test="erase-confirm-input"]').setValue(PAGE);
+        await wrapper.find('[data-test="erase-confirm-button"]').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('[data-test="erase-nothing"]').text()).toBe('Knowledge.code_nothing_erased');
+        expect(toast.success).not.toHaveBeenCalled();
     });
 
     it('re-indexes a source after a confirmation, and not when the confirmation is declined', async () => {
@@ -234,18 +285,18 @@ describe('InstanceKnowledge', () => {
         expect(has(wrapper, 'erase-confirm')).toBe(false);
     });
 
-    it('erases a person only once the workspace name is typed back', async () => {
+    it("erases a person only once the person's id is typed back, in either case", async () => {
         const wrapper = await opened({ post: () => ok({ removed: { page: 1 }, total: 1 }) });
-        await wrapper.find('[data-test="erase-user"]').setValue(ALICE);
+        await wrapper.find('[data-test="erase-user"]').setValue(ALICE.toUpperCase());
         await wrapper.find('[data-test="erase-person"]').trigger('submit');
         await flushPromises();
         expect(wrapper.find('[data-test="erase-confirm"]').text()).toContain('Knowledge.erase_person_confirm');
-        await wrapper.find('[data-test="erase-confirm-input"]').setValue('acme');
-        expect(wrapper.find('[data-test="erase-confirm-button"]').attributes('disabled')).toBeDefined();
         await wrapper.find('[data-test="erase-confirm-input"]').setValue('Acme');
+        expect(wrapper.find('[data-test="erase-confirm-button"]').attributes('disabled')).toBeDefined();
+        await wrapper.find('[data-test="erase-confirm-input"]').setValue(ALICE);
         await wrapper.find('[data-test="erase-confirm-button"]').trigger('click');
         await flushPromises();
-        expect(posts()).toEqual([['post', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: 'Acme' }]]);
+        expect(posts()).toEqual([['post', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: ALICE }]]);
     });
 
     it('refuses to ask for an erasure of an id that is not an id', async () => {
@@ -261,7 +312,7 @@ describe('InstanceKnowledge', () => {
         const wrapper = await opened({ post: () => refused(400, 'confirmation_mismatch') });
         await wrapper.find('[data-test="erase-user"]').setValue(ALICE);
         await wrapper.find('[data-test="erase-person"]').trigger('submit');
-        await wrapper.find('[data-test="erase-confirm-input"]').setValue('Acme');
+        await wrapper.find('[data-test="erase-confirm-input"]').setValue(ALICE);
         await wrapper.find('[data-test="erase-confirm-button"]').trigger('click');
         await flushPromises();
         expect(wrapper.find('[data-test="action-error"]').text()).toBe('Knowledge.code_confirmation_mismatch');
