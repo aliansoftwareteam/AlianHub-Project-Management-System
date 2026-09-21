@@ -13,6 +13,7 @@ const revisions = require('../revisions');
 const taint = require('../taint');
 const { FEATURES } = require('../../AICore/features');
 const { failureOf } = require('../../AICore/providerError');
+const providerContext = require('../../AICore/providerContext');
 const telemetry = require('../../../Config/telemetry');
 
 // The run engine as a LangGraph thread, one per run (thread_id = run id):
@@ -377,10 +378,10 @@ const executeGraph = async ({ companyId, run, agent, task, deps }) => {
 };
 
 /* Rows from before tracing get their trace id here, so every step of the run shares one. */
-const runGraph = ({ companyId, run, agent, task, deps }) => {
+const runGraph = ({ companyId, run, agent, task, deps }) => providerContext.run({ companyId }, () => {
     const traceId = run.traceId || telemetry.traceIdNow() || telemetry.newTraceId();
     return telemetry.withTrace(traceId, () => executeGraph({ companyId, run: { ...plain(run), traceId }, agent, task, deps }));
-};
+});
 
 /* Resolves { resumed: false } when the thread holds no interrupt — a run from
  * before the graph, or one that already finished — so the caller can close the

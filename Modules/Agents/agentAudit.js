@@ -4,8 +4,11 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { normalizeAuditEntry } = require('../Audit/helpers/auditRules');
 const logger = require('../../Config/loggerConfig');
 const { isAgent, attribution } = require('./actor');
+const { ACTOR_SERVICE } = require('./serviceIdentity');
 const { traceIdNow } = require('../../Config/telemetry');
 const chain = require('../Audit/chain');
+
+const isService = (actor) => Boolean(actor && actor.kind === ACTOR_SERVICE);
 
 // One audit log for people and agents (11b). Agent rows carry
 // { actorType, agentId, runId, action, reason, params, cost, undo, viaAccount }
@@ -101,7 +104,8 @@ const baseMeta = (actor) => {
         runId: actor.runId || null,
         viaAccount: isAgent(actor) ? actor.viaAccount : null,
         tokenId: actor.tokenId || null,
-        onBehalfOf: isAgent(actor) && actor.userId ? actor.userId : null,
+        onBehalfOf: (isAgent(actor) || isService(actor)) && actor.userId ? actor.userId : null,
+        ...(isService(actor) ? { service: actor.service } : {}),
         ...(actor.traceId ? { traceId: actor.traceId } : {}),
     };
 };
@@ -229,7 +233,7 @@ const markUndone = async (companyId, auditId, byActorId) => {
     const r = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AUDIT_LOGS,
         data: [unchained(filter), { $set }],
-    }, 'updateOne').catch((e) => { logger.error(`markUndone: ${e.message}`); return null; });
+    }, 'updateOne').catch((e) => { logger.error(`markUndone: ${e.message}`); throw e; });
     if (!r || r.matchedCount > 0 || r.modifiedCount > 0) return undefined;
     return appendUndone();
 };

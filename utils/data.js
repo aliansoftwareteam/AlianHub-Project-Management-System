@@ -1942,34 +1942,30 @@ exports.importProjectTabComponents = (companyName) => {
     ];
     return new Promise(async (resolve, reject) => {
         try {
-            await MongoDbCrudOpration(companyName, {
-                type: SCHEMA_TYPE.PROJECT_TAB_COMPONENTS,data:[{}]
-            }, "deleteMany");
-
-            // Add new data after removing old data
+            // Upsert by keyName, never wipe and refill: a crash or a second import between
+            // the delete and the last save used to leave catalogues partial, and one
+            // failed save was only a console line. Existing rows keep their stored
+            // values; only missing views are inserted.
             const savePromises = data.map(async (item) => {
-                try {
-                    let obj = {
-                        data : {
-                            ...item,
-                            default: true
-                        },
-                        type : SCHEMA_TYPE.PROJECT_TAB_COMPONENTS
-                    }
-                    await MongoDbCrudOpration(companyName, obj, "save");
-                } catch (error) {
-                    console.log(error,"error");
-                }
+                await MongoDbCrudOpration(companyName, {
+                    type: SCHEMA_TYPE.PROJECT_TAB_COMPONENTS,
+                    data: [
+                        { keyName: item.keyName },
+                        { $setOnInsert: { ...item, default: true } },
+                        { upsert: true },
+                    ],
+                }, 'findOneAndUpdate');
             });
 
-            await Promise.allSettled(savePromises).then(() => {
-                resolve();
-            }).catch((error) => {
-                reject(error);
-            });
-
+            const settled = await Promise.allSettled(savePromises);
+            const failed = settled.filter((result) => result.status === 'rejected');
+            if (failed.length) {
+                throw new Error(`${failed.length} of ${data.length} project tab components were not stored: ${failed.map((result) => result.reason && result.reason.message || result.reason).join('; ')}`);
+            }
+            resolve();
         } catch (error) {
-            console.error("ERROR in importProjectStatusTemplate:", error);
+            logger.error(`ERROR in importProjectTabComponents: ${error.message || error}`);
+            reject(error);
         }
     });
 }

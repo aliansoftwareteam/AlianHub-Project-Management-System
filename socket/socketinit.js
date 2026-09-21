@@ -8,6 +8,7 @@ const {generalReminderSocketHandler} = require('./controller/generalReminderSock
 const {callSocketHandler} = require('./controller/callSocket');
 const { instrument } = require('@socket.io/admin-ui');
 const jwt = require('jsonwebtoken');
+const { handshakeToken } = require('../Config/cookies');
 const { resolveAccessSession } = require('../Config/jwt');
 const logger = require('../Config/loggerConfig');
 const { corsOriginDelegate } = require('../utils/cors.js');
@@ -88,7 +89,7 @@ exports.initSocket = (server) => {
     });
     const userNamespace = io.of(/^\/userid_\w+$/);
     userNamespace.use(async (socket, next) => {
-        const token = socket.handshake.auth.token;
+        const token = handshakeToken(socket.handshake);
         if (!token) {
             return next(new Error('Authentication error: Token not provided'));
         }

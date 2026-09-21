@@ -161,6 +161,8 @@ describe('a write into another project is judged in that project too', () => {
         ['bulkConvertToTask', { action: 'bulkConvertToTask', taskIds: [OPEN_TASK], projectData: { id: LOCKED_PROJECT } }, 'task.task_create', BULK],
         ['duplicateTask', { action: 'duplicateTask', selectedTaskId: OPEN_TASK, projectData: { id: LOCKED_PROJECT } }, 'task.task_duplicate'],
         ['bulkDuplicate', { action: 'bulkDuplicate', taskIds: [OPEN_TASK], projectData: { id: LOCKED_PROJECT } }, 'task.task_duplicate', BULK],
+        ['mergeTask', { action: 'mergeTask', taskId: OPEN_TASK, mergeTaskId: OPEN_TASK_2, projectData: { id: LOCKED_PROJECT } }, 'task.task_merge'],
+        ['convertToSubTask', { action: 'convertToSubTask', selectedTaskId: OPEN_TASK, taskId: OPEN_TASK_2, projectData: { id: LOCKED_PROJECT } }, 'task.sub_task_create'],
     ];
 
     test.each(INTO_LOCKED)('%s into a project that refuses the key is recorded in report and refused in enforce', async (_, body, key, [route, method] = []) => {
@@ -179,11 +181,10 @@ describe('a write into another project is judged in that project too', () => {
     });
 
     test.each([
-        ['mergeTask', { action: 'mergeTask', taskId: OPEN_TASK, mergeTaskId: OPEN_TASK_2, projectData: { id: LOCKED_PROJECT } }],
-        ['convertToSubTask', { action: 'convertToSubTask', selectedTaskId: OPEN_TASK, taskId: OPEN_TASK_2, projectData: { id: LOCKED_PROJECT } }],
+        ['bulkConvertToSubTask', { action: 'bulkConvertToSubTask', taskIds: [OPEN_TASK], parentTaskId: OPEN_TASK_2, projectData: { id: LOCKED_PROJECT } }],
     ])('%s stays judged on the tasks it names', async (_, body) => {
         setMode('enforce');
-        expect((await run(guard, session(MEMBER, body))).passed).toBe(true);
+        expect((await run(guard, session(MEMBER, body, ...BULK))).passed).toBe(true);
     });
 });
 

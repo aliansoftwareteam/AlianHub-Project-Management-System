@@ -65,4 +65,25 @@ describe('the call-site convention the parity harness relies on', () => {
             .map((file) => path.relative(path.resolve(__dirname, '../..'), file));
         expect(offenders).toEqual([]);
     });
+
+    it('no settings key reaches a project-scoped check through a variable', () => {
+        const files = sources(path.resolve(__dirname, '../../src'));
+        const bodies = new Map(files.map((file) => [file, fs.readFileSync(file, 'utf8')]));
+
+        const dataKeys = [...bodies.values()].flatMap((body) => [...body.matchAll(/funcPermission\s*:\s*['"`]([^'"`]+)['"`]/g)].map((m) => m[1]));
+        expect(dataKeys.filter((key) => key.startsWith('settings.'))).toEqual([]);
+
+        const offenders = [];
+        for (const [file, body] of bodies) {
+            const bound = new Map([...body.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*['"`]([^'"`]+)['"`]/g)].map((m) => [m[1], m[2]]));
+            for (const m of body.matchAll(/checkPermission\(\s*([A-Za-z_$][\w$]*)\s*,([^)]*)\)/g)) {
+                const key = bound.get(m[1]);
+                const flag = m[2].trim();
+                if (key && key.startsWith('settings.') && flag !== '' && !/^(true|undefined)\b/.test(flag)) {
+                    offenders.push(`${path.relative(path.resolve(__dirname, '../..'), file)}: ${m[1]} is '${key}'`);
+                }
+            }
+        }
+        expect(offenders).toEqual([]);
+    });
 });

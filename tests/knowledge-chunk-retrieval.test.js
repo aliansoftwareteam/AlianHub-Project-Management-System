@@ -63,6 +63,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     myCache.flushAll();
     mockDb.uniqueFromSchema(CHUNKS, knowledgeChunksSchema);
+    mockDb.textFromSchema(CHUNKS, knowledgeChunksSchema);
     getRoleType.mockImplementation(async (companyId, uid) => ROLES[uid]);
     visibleProjectIds.mockImplementation(async (companyId, uid) => PROJECTS[uid] || []);
     mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C, knowledgeIndexer: { mode: 'on' } });

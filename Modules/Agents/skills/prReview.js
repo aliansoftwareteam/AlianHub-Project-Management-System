@@ -1,6 +1,6 @@
 // Reviewer: summarise a linked pull request and flag risk.
 
-const { fetchPage } = require('../engine/pageAudit');
+const { fetchPage } = require('../engine/agentFetch');
 const { isBlockedHostname } = require('../engine/safeFetch');
 
 const MAX_DIFF_CHARS = 30000;

@@ -8,6 +8,7 @@
                 <button v-if="canManage" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="new-agent" @click="creating = true">
                     <ShellIcon name="plus" :size="14" />{{ $t('Ai.new_agent') }}
                 </button>
+                <router-link v-if="canManage" class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'WorkflowBuilder', params: { cid: companyId } }">{{ $t('WorkflowBuilder.nav') }}</router-link>
             </div>
 
             <div class="ai-page__body ah-scroll">

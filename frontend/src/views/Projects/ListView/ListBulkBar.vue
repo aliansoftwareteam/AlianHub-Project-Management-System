@@ -76,6 +76,8 @@ const working = ref(false);
 
 const canStatus = computed(() => checkPermission("task.task_status", props.project?.isGlobalPermission) === true);
 const canAssign = computed(() => checkPermission("task.task_assignee", props.project?.isGlobalPermission) === true);
+const canMove = computed(() => checkPermission("task.task_move", props.project?.isGlobalPermission) === true || canStatus.value);
+const canTag = computed(() => checkPermission("task.task_tag", props.project?.isGlobalPermission) === true || canStatus.value);
 const canArchive = computed(() => checkPermission("task.task_archive", props.project?.isGlobalPermission) === true);
 const canDelete = computed(() => checkPermission("task.task_delete", props.project?.isGlobalPermission) === true);
 
@@ -127,8 +129,8 @@ const tags = computed(() => (props.project?.tagsArray || []).map((tag) => ({
 const menus = computed(() => [
     { key: "status", label: t("List.status"), enabled: canStatus.value, options: statuses.value, pick: pickStatus },
     { key: "assignee", label: t("List.assignee"), enabled: canAssign.value, options: people.value, pick: pickAssignee },
-    { key: "sprint", label: t("List.sprint"), enabled: canStatus.value, options: sprints.value, pick: pickSprint },
-    { key: "tags", label: t("List.tags"), enabled: canStatus.value, options: tags.value, pick: pickTag }
+    { key: "sprint", label: t("List.sprint"), enabled: canMove.value, options: sprints.value, pick: pickSprint },
+    { key: "tags", label: t("List.tags"), enabled: canTag.value, options: tags.value, pick: pickTag }
 ]);
 
 function toggle(key) {

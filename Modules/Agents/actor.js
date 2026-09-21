@@ -2,15 +2,19 @@ const mongoose = require('mongoose');
 const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { myCache } = require('../../Config/config');
+const serviceIdentity = require('./serviceIdentity');
 
-// Who is calling. Two kinds only:
-//   human — a web session (JWT) or a plain personal token used by a script
-//   agent — a token minted for a coding agent, a workspace agent run, or any MCP call
+// Who is calling. Three kinds:
+//   human   — a web session (JWT) or a plain personal token used by a script
+//   agent   — a token minted for a coding agent, a workspace agent run, or any MCP call
+//   service — the platform's own components (engine, worker, indexer, router),
+//             built in process by serviceActor(); never resolved from a request
 // The distinction decides whether the registry applies. It is derived from what
 // authenticated the request, never from a header the caller can set.
 
 const ACTOR_HUMAN = 'human';
 const ACTOR_AGENT = 'agent';
+const { ACTOR_SERVICE, SERVICES, SERVICE_LABELS, serviceIdOf, looksLikeServiceIdentity, stepCredentialsEnabled, serviceStamp } = serviceIdentity;
 const VIA = Object.freeze(['workspace', 'personal', 'local']);
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 
@@ -72,10 +76,23 @@ const resolveActor = async (req) => {
     return { ...base, kind: ACTOR_HUMAN, viaAccount: 'workspace' };
 };
 
+/* A component acting on its own account. `userId` is the person the work is on
+ * behalf of, when there is one (the run's starter), never who the actor is. */
+const serviceActor = (service, { runId = null, userId = '', traceId = null, workerId = null } = {}) => {
+    serviceIdOf(service);
+    return Object.freeze({
+        kind: ACTOR_SERVICE, service, userId: userId ? String(userId) : '', tokenId: null, tokenName: null,
+        runId: runId ? String(runId) : null, agentId: null, agentName: SERVICE_LABELS[service], viaAccount: 'workspace',
+        ...(traceId ? { traceId } : {}), ...(workerId ? { workerId: String(workerId) } : {}),
+    });
+};
+
 const isAgent = (actor) => Boolean(actor && actor.kind === ACTOR_AGENT);
+const isService = (actor) => Boolean(actor && actor.kind === ACTOR_SERVICE);
 
 /* How attribution reads everywhere (27c): person, tool, account type. */
 const attribution = (actor) => {
+    if (isService(actor)) return { actorId: serviceIdOf(actor.service), actorType: ACTOR_SERVICE, service: actor.service, label: SERVICE_LABELS[actor.service] };
     if (!isAgent(actor)) return { actorId: actor.userId, actorType: ACTOR_HUMAN, label: actor.personName || '' };
     if (actor.viaAccount === 'personal') {
         return { actorId: actor.userId, actorType: ACTOR_AGENT, agentId: actor.agentId, viaAccount: 'personal',
@@ -85,4 +102,7 @@ const attribution = (actor) => {
              label: actor.agentName || 'Agent' };
 };
 
-module.exports = { ACTOR_HUMAN, ACTOR_AGENT, VIA, isAgentToken, resolveActor, isAgent, attribution, userAgentAccount, invalidateAgentAccountCache };
+module.exports = {
+    ACTOR_HUMAN, ACTOR_AGENT, ACTOR_SERVICE, SERVICES, VIA, isAgentToken, resolveActor, isAgent, isService, serviceActor, attribution,
+    serviceIdOf, looksLikeServiceIdentity, stepCredentialsEnabled, serviceStamp, userAgentAccount, invalidateAgentAccountCache,
+};

@@ -134,6 +134,8 @@ module.exports.SSO_DISCOVER = '/api/v2/sso/discover';
 // Webhooks / integrations (Modules/Webhooks)
 module.exports.WEBHOOKS = '/api/v2/webhooks';
 module.exports.WEBHOOK_EVENTS = '/api/v2/webhooks/events';
+// Workspace secrets by handle (Modules/Secrets): metadata only, owner or admin
+module.exports.SECRETS = '/api/v2/secrets';
 module.exports.AUTH = '/api/v2/auth';
 module.exports.DELETE_SESSION = '/api/v2/session/delete';
 module.exports.UPDATE_SESSION = '/api/v2/session/update';
@@ -223,6 +225,7 @@ module.exports.WORKFLOW_APPROVALS = '/api/v2/workflows/approvals';
 module.exports.API_TOKENS = '/api/v2/api-tokens';
 module.exports.MCP_TOKENS = '/api/v2/api-tokens/mcp';
 module.exports.API_TOKENS_NEEDING_EXPIRY = '/api/v2/api-tokens/needing-expiry';
+module.exports.API_TOKENS_STEP_CREDENTIALS = '/api/v2/api-tokens/step-credentials';
 module.exports.MCP_MANIFEST = '/mcp/manifest';
 module.exports.AGENT_TEAM = '/api/v2/agents/team';
 module.exports.AGENT_ROUTABLE = '/api/v2/agents/routable';
@@ -232,6 +235,7 @@ module.exports.AGENT_SETTINGS = '/api/v2/agents/settings';
 module.exports.AGENT_BUDGET = '/api/v2/agents/budget';
 module.exports.AGENT_MODELS = '/api/v2/agents/models';
 module.exports.AGENT_ROUTING_POLICY = '/api/v2/agents/routing-policy';
+module.exports.PROVIDER_KEYS = '/api/v2/provider-keys';
 module.exports.AGENT_MEMORY_PROJECT = '/api/v2/agents/memory/project';
 module.exports.AGENT_MEMORY = '/api/v2/agents/memory';
 module.exports.AGENT_PREFERENCES = '/api/v2/agents/preferences';
@@ -379,6 +383,7 @@ module.exports.REPO_URL = 'https://github.com/aliansoftwareteam/AlianHub-Project
 module.exports.INSTANCE_COMPANIES = '/api/v2/instance/companies';
 module.exports.INSTANCE_AUDIT_EXPORT = '/api/v2/instance/audit-export';
 module.exports.INSTANCE_ENFORCEMENT = '/api/v2/instance/enforcement';
+module.exports.INSTANCE_EGRESS = '/api/v2/instance/egress';
 
 // The storage flag is decided by the server at runtime; build-time VUE_APP_STORAGE_TYPE is only the fallback
 module.exports.setRuntimeConfig = (cfg) => { if (cfg && cfg.storageType) module.exports.STORAGE_TYPE = cfg.storageType; };

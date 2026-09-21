@@ -150,6 +150,9 @@ require('../../Modules/Audit/helpers/chainRules').CHAIN_INDEXES.forEach(([keys, 
 const auditChainHeadsSchema = new Schema(schema.auditChainHeads, {strict: true, timestamps: false});
 const auditChainAnchorsSchema = new Schema(schema.auditChainAnchors, {strict: true, timestamps: true});
 auditChainAnchorsSchema.index({ seq: -1 }, { unique: true, name: 'audit_anchor_seq' });
+const secretsSchema = new Schema(schema.secrets, {strict: true, timestamps: false});
+secretsSchema.index({ handle: 1 }, { unique: true, name: 'secrets_handle' });
+secretsSchema.index({ createdAt: -1 });
 const scimConfigsSchema = new Schema(schema.scimConfigs, {strict: true, timestamps: true});
 const ptoEntriesSchema = new Schema(schema.ptoEntries, {strict: true, timestamps: true});
 ptoEntriesSchema.index({ userId: 1, startDate: 1 });
@@ -319,6 +322,7 @@ knowledgeExclusionsSchema.index({ kind: 1, sourceType: 1, sourceId: 1, userId: 1
 const permissionDecisionsSchema = new Schema(schema.permissionDecisions, {strict: true, timestamps: false});
 permissionDecisionsSchema.index({ day: 1, mode: 1, method: 1, route: 1, permission: 1, role: 1, scope: 1, reason: 1 }, { unique: true, name: 'decision_key' });
 permissionDecisionsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+const egressAllowlistsSchema = new Schema(schema.egressAllowlists, {strict: true, timestamps: false});
 
 // One combined text index per collection, for global search and knowledge retrieval.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
@@ -456,6 +460,8 @@ module.exports = {
     permissionDecisionsSchema,
     auditChainHeadsSchema,
     auditChainAnchorsSchema,
+    egressAllowlistsSchema,
+    secretsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

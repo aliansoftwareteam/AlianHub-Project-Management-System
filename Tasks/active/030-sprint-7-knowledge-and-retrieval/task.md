@@ -53,3 +53,5 @@ None directly.
 - An agent retrieving knowledge during a run sees only what the person who started the run can see, further limited to the agent's own projects (owner, 2026-09-18).
 - Hosted deployments keep vectors in MongoDB Atlas Vector Search inside each tenant's database; self-hosted installs keep the in-database cosine adapter (owner, 2026-09-18).
 - The held-out question set is about thirty real questions the owner writes, each with its expected source, kept in the owner's private notes; retrieval defaults on only after the comparison passes (owner, 2026-09-18).
+- Slice 4 sets `origin` (`member`, `agent`, `external`) on every chunk and returned passage, the contract Sprint 8's #757 reads; chunks without it read as not external until the backfill fills it in (2026-09-19).
+- Migrations 024–027 are used, so slice 4 takes 032 if it needs indexes: 031 is held by Sprint 8's secrets store (#759) and 033 by its content security policy slice (2026-09-19).

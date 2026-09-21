@@ -160,8 +160,8 @@
                 <EmptyState
                     v-if="project?.deletedStatusKey !== 2"
                     :image="noSearchResult"
-                    :title="showArchived ? $t('ProjectSlider.no_archived') : (!project?.lastTaskId ? $t('EmptyState.no_tasks_title') : $t('EmptyState.no_match_title'))"
-                    :message="showArchived ? '' : (!project?.lastTaskId ? $t('EmptyState.no_tasks_msg') : $t('EmptyState.no_match_msg'))"
+                    :title="showArchived ? $t('ProjectSlider.no_archived') : $t(`EmptyState.${emptyKind}_title`)"
+                    :message="showArchived ? '' : $t(`EmptyState.${emptyKind}_msg`)"
                     :helpPath="showArchived ? '' : 'tasks'"
                 />
             </div>
@@ -192,6 +192,7 @@ import { useCustomComposable, useGetterFunctions } from '../../../../composable'
 import { apiRequest } from '../../../../services';
 import * as env from '@/config/env';
 import { buildFilterQuery, teamIdToUserId } from "@/composable/commonFunction";
+import { taskEmptyStateKind } from "@/views/Projects/composables/useTaskEmptyState.js";
 import { resolveCardRange } from "@/composable/useResourceWorkload";
 
 const triangleBlack = require('@/assets/images/svg/triangleBlack.svg');
@@ -286,6 +287,11 @@ const groupById = ref(0);
 // `=== 4` grouping checks work and the list loads.
 const normalizeGroupId = (g) => Number(g && typeof g === 'object' ? g.$numberLong : g) || 0;
 const searchTask = ref(false);
+const emptyKind = computed(() => taskEmptyStateKind({
+    showArchived: !!showArchived?.value,
+    lastTaskId: project?.value?.lastTaskId,
+    searched: !!searchTask.value,
+}));
 const taskNameSearch = ref(true)
 const taskKeySearch = ref(false)
 const taskDescriptionSearch = ref(false)

@@ -40,6 +40,7 @@ COPY package.json /app/package.json
 # an alias is added without its COPY line here.
 COPY Modules/Pages/helpers/pageContent.js /app/Modules/Pages/helpers/pageContent.js
 COPY Modules/Agents/workKinds.js /app/Modules/Agents/workKinds.js
+COPY Modules/Agents/engine/egressRules.js /app/Modules/Agents/engine/egressRules.js
 
 # Build the SPA bundle. webpack needs more than Node's default ~2 GB heap for
 # this bundle (same setting as ci.yml).
