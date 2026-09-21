@@ -2,6 +2,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType.js");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
 const iCtr = require('../ImportSettings/controller.js');
 const { ensureNotificationDefaults } = require('../notification/defaults');
+const vectorStore = require('../Knowledge/vectorStore');
 const helperCtr = require('../Auth/controller/helper.js');
 const logger = require('../../Config/loggerConfig.js');
 const { addAndRemoveUserInMongodbNotificationCount } = require("../Auth/controller.js");
@@ -578,6 +579,7 @@ exports.createCompanyV2 = (req, res) => {
                         paymentObj = allSettledRes[4].status === "fulfilled" ? allSettledRes[4].value : {}
                     }
                     await ensureNotificationDefaults(companyId, bodyData.userId).catch((error) => logger.error(`notification defaults: ${error.message}`));
+                    vectorStore.prepareCompany(companyId);
                     await storeRefferalCode(companyId,bodyData.userId);
                     if (req.body.refferalCode && req.body.refferalCode !== '') {
                        await checkAndStoreRefferalCode(req.body.refferalCode,companyId,bodyData.userId);

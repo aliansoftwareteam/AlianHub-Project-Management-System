@@ -427,10 +427,18 @@ const upsertChunk = async (companyId, row) => {
     }
 };
 
-const tombstone = async (companyId, where, set = {}) => modified(await chunkStore(companyId, [
-    { ...where, deleted: { $ne: true } },
-    { $set: { deleted: true, deletedAt: new Date(), ...set } },
-], 'updateMany'));
+/* The store hears about the sources the tombstone hides, read with the same filter first. */
+const tombstone = async (companyId, where, set = {}, { fromOrdinal = 0 } = {}) => {
+    const live = { ...where, deleted: { $ne: true } };
+    const hidden = await chunkStore(companyId, [live, 'sourceType sourceId', { lean: true }], 'find');
+    const count = modified(await chunkStore(companyId, [live, { $set: { deleted: true, deletedAt: new Date(), ...set } }], 'updateMany'));
+    const bySourceType = new Map();
+    (hidden || []).forEach((row) => bySourceType.set(row.sourceType, new Set([...(bySourceType.get(row.sourceType) || []), asText(row.sourceId)])));
+    for (const [sourceType, ids] of bySourceType) {
+        await tellStore('tombstone', { companyId: String(companyId), sourceType, sourceIds: [...ids], ...(fromOrdinal ? { fromOrdinal } : {}) });
+    }
+    return count;
+};
 
 /* Moves chunks' version up to `at`, never down, so a read older than a delete or a task move cannot
  * write its chunks back afterwards. */
@@ -442,11 +450,9 @@ const stampForward = async (companyId, where, at) => modified(await chunkStore(c
 const tombstoneSource = async (companyId, sourceType, ids, { sourceUpdatedAt } = {}) => {
     const unique = [...new Set((ids || []).map(asText).filter(Boolean))];
     if (!unique.length) return 0;
-    const count = sourceUpdatedAt
-        ? await tombstone(companyId, { sourceType, sourceId: { $in: unique }, ...notNewerThan(sourceUpdatedAt) }, { sourceUpdatedAt })
-        : await tombstone(companyId, { sourceType, sourceId: { $in: unique } });
-    await tellStore('tombstone', { companyId: String(companyId), sourceType, sourceIds: unique });
-    return count;
+    return sourceUpdatedAt
+        ? tombstone(companyId, { sourceType, sourceId: { $in: unique }, ...notNewerThan(sourceUpdatedAt) }, { sourceUpdatedAt })
+        : tombstone(companyId, { sourceType, sourceId: { $in: unique } });
 };
 
 const tombstonePages = (companyId, pageIds, options) => tombstoneSource(companyId, SOURCE, pageIds, options);
@@ -507,7 +513,7 @@ const ingest = async (companyId, sourceType, row, context = {}) => {
         ], 'updateMany'));
     }
     if ([...byOrdinal.values()].some((chunk) => Number(chunk.ordinal) >= pieces.length && chunk.deleted !== true)) {
-        result.tombstoned = await tombstone(companyId, { sourceType, sourceId: metadata.sourceId, ordinal: { $gte: pieces.length }, ...notNewerThan(sourceUpdatedAt) }, { sourceUpdatedAt });
+        result.tombstoned = await tombstone(companyId, { sourceType, sourceId: metadata.sourceId, ordinal: { $gte: pieces.length }, ...notNewerThan(sourceUpdatedAt) }, { sourceUpdatedAt }, { fromOrdinal: pieces.length });
     }
     return result;
 };
@@ -587,6 +593,7 @@ const applyDecision = async (companyId, sourceType, id, decision, options = {}) 
     }
     if (decision.action === 'erase') {
         const removed = await chunkStore(companyId, [{ sourceType, sourceId: String(id) }], 'deleteMany');
+        await tellStore('erase', { companyId: String(companyId), sources: [{ sourceType, sourceId: String(id) }] });
         const count = (removed && removed.deletedCount) || 0;
         return { erased: count, changed: count > 0 };
     }

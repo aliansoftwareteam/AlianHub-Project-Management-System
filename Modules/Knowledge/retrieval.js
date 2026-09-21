@@ -151,7 +151,7 @@ const vectorSide = async (set, query, filter, limit) => {
         return { backend: store.name, passages: [...(passages || [])].sort(byRank) };
     } catch (error) {
         logger.error(`knowledge retrieval: vector search failed for ${set.companyId}; answering from the lexical side: ${error.message}`);
-        return { fallback: 'vector failed' };
+        return { fallback: error.fallback || 'vector failed' };
     }
 };
 
