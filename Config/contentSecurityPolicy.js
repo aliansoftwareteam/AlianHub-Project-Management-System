@@ -44,9 +44,15 @@ const PUBLIC_SECOND_LEVEL = new Set(['ac', 'co', 'com', 'edu', 'gob', 'gov', 'go
 // Domains where anyone can publish under a subdomain or a path.
 const SHARED_HOSTING = ['github.io', 'gitlab.io', 'bitbucket.io', 'githubusercontent.com', 'googleusercontent.com', 'storage.googleapis.com',
     'appspot.com', 'web.app', 'firebaseapp.com', 'pages.dev', 'workers.dev', 'netlify.app', 'vercel.app', 'herokuapp.com', 'glitch.me',
-    'blogspot.com', 'surge.sh', 'repl.co', 'codepen.io', 'jsfiddle.net', 's3.amazonaws.com', 'cloudfront.net', 'azurewebsites.net', 'onrender.com'];
-// Package CDNs serve every published package, so a script source there must name one.
+    'blogspot.com', 'surge.sh', 'repl.co', 'codepen.io', 'jsfiddle.net', 's3.amazonaws.com', 'cloudfront.net', 'azurewebsites.net', 'onrender.com',
+    'r2.dev', 'blob.core.windows.net', 'web.core.windows.net', 'digitaloceanspaces.com', 'backblazeb2.com', 'wasabisys.com', 'pp.ua', 'eu.org'];
+// Package CDNs serve every published package, so a script source there must name one package at one version.
 const PACKAGE_CDNS = ['cdn.jsdelivr.net', 'unpkg.com', 'cdnjs.cloudflare.com', 'esm.sh', 'esm.run', 'ga.jspm.io', 'cdn.skypack.dev'];
+const PINNED_PACKAGE_PATHS = {
+    'cdn.jsdelivr.net': /^\/(?:npm\/(?:@[^/@]+\/)?[^/@]+@[^/]+|gh\/[^/]+\/[^/@]+@[^/]+)(?:\/|$)/,
+    'unpkg.com': /^\/(?:@[^/@]+\/)?[^/@]+@[^/]+(?:\/|$)/,
+    'cdnjs.cloudflare.com': /^\/ajax\/libs\/[^/]+\/[0-9][^/]*(?:\/|$)/,
+};
 const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?$/;
 
 const readExtras = (env = process.env) => ({
@@ -88,13 +94,14 @@ const refusalOf = (directive, source) => {
     if (wildcard && tooBroad(host)) return 'A wildcard may not cover a top-level domain, a public suffix or a shared hosting domain.';
     if (!SCRIPT_DIRECTIVES.includes(directive)) return null;
     if (scheme.toLowerCase() !== 'https') return 'Scripts load over https only.';
+    if (wildcard) return 'Script sources name exact hosts; list each host instead of a wildcard.';
     if (SHARED_HOSTING.some((domain) => within(host, domain))) return 'Scripts may not come from a domain where anyone can publish.';
-    if (PACKAGE_CDNS.some((domain) => within(host, domain)) && (!pathPart || pathPart === '/')) return 'Scripts from a package CDN must name the package path.';
+    const cdn = PACKAGE_CDNS.find((domain) => within(host, domain));
+    const pinned = PINNED_PACKAGE_PATHS[cdn];
+    if (cdn && !(pinned && pinned.test(pathPart || ''))) return 'Scripts from a package CDN must name one package and its version, such as /npm/name@1.2.3/.';
     return null;
 };
 
-/* A value goes into a response header as it is, so it may only be a list of hosts: a quote would let a
- * keyword such as 'unsafe-eval' in, and a semicolon or a line break would start a directive or a header. */
 /* A value goes into a response header as it is, so it may only be a list of hosts: a quote would let a
  * keyword such as 'unsafe-eval' in, and a semicolon or a line break would start a directive or a header. */
 const extrasOf = (env = process.env) => Object.fromEntries(Object.entries(readExtras(env)).map(([directive, raw]) => {
