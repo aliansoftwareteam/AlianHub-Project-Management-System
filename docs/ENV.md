@@ -37,7 +37,7 @@ Backend variables: 246. Frontend build-time variables: 23.
 |---|---|---|---|---|
 | `JWT_ALGORITHM` |  | `HS256` | Algorithm used to sign JWTs. | `Config/jwt.js`, `Modules/Auth/helpers/refreshTokenRules.js` +1 |
 | `JWT_EXP` |  | `24h` | Access token lifetime (jsonwebtoken duration string). | `Config/jwt.js`, `Modules/Auth/controller/loginSession.js` +3 |
-| `JWT_SECRET` (secret) | yes | `your_jwt_secret_here` | Secret used to sign JWTs and derive encryption keys. | `Config/instanceSettings.js`, `Config/jwt.js` +5 |
+| `JWT_SECRET` (secret) | yes | `your_jwt_secret_here` | Secret used to sign JWTs and derive encryption keys. | `Config/instanceSettings.js`, `Config/jwt.js` +6 |
 | `MAGIC_LINK_ENABLED` |  | `true` | Set to false to disable passwordless magic-link sign-in. | `Modules/Auth/controller/magicLink.js` |
 | `REFRESH_TOKEN_REUSE_GRACE_SECONDS` |  | `10` | Seconds after a refresh token is rotated during which presenting the old one again is refused without revoking the session, so parallel requests or tabs do not log the user out. Past this window a reused token revokes the session. | `Modules/Auth/helpers/refreshTokenRules.js` |
 | `SESSIONEXPIREDTIME` |  | `172800` | Idle time after which a login session expires. | `Modules/Auth/controller/loginSession.js`, `Modules/Auth/helpers/refreshTokenRules.js` +3 |
