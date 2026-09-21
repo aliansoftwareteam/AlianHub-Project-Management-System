@@ -4,7 +4,7 @@
         <div v-else-if="flagOff" class="in-banner in-banner--warn" data-test="flag-off"><ShellIcon name="alert" :size="15" /><span>{{ $t('Egress.flag_off') }} <code class="ah-mono">{{ `${flagOff.envKey}=true` }}</code></span></div>
         <div v-else-if="!summary" class="ah-empty">{{ $t('Instance.loading') }}</div>
         <template v-else>
-            <div v-if="actionError" class="in-banner in-banner--danger" data-test="action-error"><ShellIcon name="alert" :size="15" /><span>{{ actionError }}</span></div>
+            <div v-if="actionError" class="in-banner in-banner--danger" data-test="action-error"><ShellIcon name="alert" :size="15" /><span><code v-if="actionEntry" class="ah-mono">{{ actionEntry }}</code> {{ actionError }}</span></div>
             <div class="in-banner in-banner--ok" data-test="flag-on"><ShellIcon name="check" :size="15" /><span>{{ $t('Egress.flag_on') }} <code class="ah-mono">{{ `${summary.flag.envKey}=true` }}</code></span></div>
 
             <section class="ah-card in-card">
@@ -16,6 +16,7 @@
                 </div>
                 <p class="ah-small">{{ $t('Egress.lead') }}</p>
                 <p class="ah-small">{{ $t('Egress.format_help') }}</p>
+                <p class="ah-small" data-test="port-help">{{ $t('Egress.port_help') }}</p>
                 <p class="ah-small" data-test="cache-note">{{ $t('Egress.cache_note', { seconds: summary.cacheTtlSeconds }) }}</p>
             </section>
 
@@ -39,14 +40,20 @@
                     <button type="submit" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy">{{ $t('Egress.add') }}</button>
                 </form>
                 <p v-if="draftErrors[w.companyId]" class="ah-small eg-error" :data-test="`host-error-${w.companyId}`">{{ draftErrors[w.companyId] }}</p>
-                <p v-if="w.updatedAt" class="ah-small" :data-test="`updated-${w.companyId}`">{{ $t('Egress.updated') }} <strong>{{ w.updatedByName || w.updatedBy }}</strong> · {{ formatWhen(w.updatedAt) }}</p>
+                <p v-if="w.updatedAt" class="ah-small" :data-test="`updated-${w.companyId}`">{{ $t('Egress.updated') }} <strong>{{ setBy(w) }}</strong> · {{ formatWhen(w.updatedAt) }}</p>
             </section>
+
+            <div v-if="pages > 1" class="in-actions eg-pager" data-test="pager">
+                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="page-prev" :disabled="busy || page <= 1" @click="goTo(page - 1)">{{ $t('Egress.page_prev') }}</button>
+                <span class="ah-small" data-test="page-status">{{ $t('Egress.page_status', { page, pages, total: summary.total }) }}</span>
+                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="page-next" :disabled="busy || page >= pages" @click="goTo(page + 1)">{{ $t('Egress.page_next') }}</button>
+            </div>
         </template>
     </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import { validateHosts } from "@egressRules";
@@ -63,14 +70,26 @@ const summary = ref(null);
 const flagOff = ref(null);
 const error = ref("");
 const actionError = ref("");
+const actionEntry = ref("");
 const busy = ref(false);
 const version = ref(0);
+const page = ref(1);
 const drafts = reactive({});
 const draftErrors = reactive({});
 
+const ADMIN_KEY_ACTOR = "instance-admin-key";
+const TRANSLATED_CODES = ["flag_off", "invalid_company_id", "hosts_not_list", "version_required", "stale_version", "unknown_workspace", "server_error"];
+
+const pages = computed(() => {
+    const s = summary.value;
+    return s && s.pageSize ? Math.max(1, Math.ceil((s.total || 0) / s.pageSize)) : 1;
+});
+
+const setBy = (w) => (w.updatedBy === ADMIN_KEY_ACTOR ? t("Egress.updated_by_admin_key") : w.updatedByName || w.updatedBy);
+
 const load = async () => {
     try {
-        summary.value = await get(env.INSTANCE_EGRESS);
+        summary.value = await get(`${env.INSTANCE_EGRESS}?page=${page.value}`);
         flagOff.value = null;
         error.value = "";
         version.value += 1;
@@ -86,16 +105,31 @@ const load = async () => {
     }
 };
 
+const goTo = (next) => {
+    page.value = next;
+    return load();
+};
+
+const showActionError = (e) => {
+    const body = e?.response?.data || {};
+    const refusal = Array.isArray(body.data?.errors) ? body.data.errors[0] : null;
+    actionEntry.value = refusal?.entry || "";
+    if (refusal?.reason) actionError.value = t(`Egress.error_${refusal.reason}`, { max: summary.value?.maxHosts });
+    else if (TRANSLATED_CODES.includes(body.code)) actionError.value = t(`Egress.code_${body.code}`);
+    else actionError.value = message(e);
+};
+
 const save = async (w, hosts) => {
     busy.value = true;
     actionError.value = "";
+    actionEntry.value = "";
     try {
-        await put(`${env.INSTANCE_EGRESS}/${w.companyId}`, { hosts });
+        await put(`${env.INSTANCE_EGRESS}/${w.companyId}`, { hosts, version: w.version || 0 });
         $toast.success(t("Egress.saved", { name: w.name || w.companyId }));
         drafts[w.companyId] = "";
         draftErrors[w.companyId] = "";
     } catch (e) {
-        actionError.value = message(e);
+        showActionError(e);
     } finally {
         busy.value = false;
         await load();
@@ -137,5 +171,6 @@ onMounted(load);
 .eg-host__remove:disabled { cursor: default; opacity: 0.5; }
 .eg-input { max-width: 320px; }
 .eg-error { color: var(--danger-ink); }
+.eg-pager { justify-content: center; align-items: center; gap: 12px; }
 .in-card__title .ah-small { font-weight: 400; color: var(--ink-2); margin-left: 6px; }
 </style>
