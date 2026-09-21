@@ -119,14 +119,6 @@ describe('CSP_MODE=report', () => {
         expect(headers[REPORT_ONLY]).toBeUndefined();
     });
 
-    it('built the TTL and key indexes at boot', async () => {
-        const indexes = await reports.indexes();
-        expect(indexes).toEqual(expect.arrayContaining([
-            expect.objectContaining({ key: { day: 1 }, expireAfterSeconds: THIRTY_DAYS }),
-            expect.objectContaining({ key: { day: 1, directive: 1, blockedHost: 1, documentPath: 1 }, unique: true }),
-        ]));
-    });
-
     it('takes a report in either format without a session and keeps the host and the path shape only', async () => {
         expect((await send(server.baseURL, legacyReport(), 'application/csp-report')).status).toBe(204);
         const batch = [{ type: 'csp-violation', age: 1, url: `${state.baseURL}/?t=${SECRET}`, body: { documentURL: `${state.baseURL}/${state.companyId}/project/${SECRET}/board`, blockedURL: `https://${BLOCKED_HOST}/other.js?k=${SECRET}`, effectiveDirective: 'img-src', sample: SECRET } }];
@@ -136,6 +128,20 @@ describe('CSP_MODE=report', () => {
         expect(rows).toHaveLength(1);
         expect(Object.keys(rows[0]).sort()).toEqual(['__v', '_id', 'blockedHost', 'count', 'day', 'directive', 'documentPath', 'lastSeen']);
         expect(rows[0]).toMatchObject({ directive: 'img-src', documentPath: '/:id/project/:id/board', count: 2 });
+    });
+
+    it('keeps the TTL and key indexes on the collection it writes', async () => {
+        const deadline = Date.now() + 10000;
+        let indexes = [];
+        while (Date.now() < deadline) {
+            indexes = await reports.indexes().catch(() => []);
+            if (indexes.some((index) => index.expireAfterSeconds !== undefined) && indexes.some((index) => index.unique)) break;
+            await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+        expect(indexes).toEqual(expect.arrayContaining([
+            expect.objectContaining({ key: { day: 1 }, expireAfterSeconds: THIRTY_DAYS }),
+            expect.objectContaining({ key: { day: 1, directive: 1, blockedHost: 1, documentPath: 1 }, unique: true }),
+        ]));
     });
 
     it('never writes the token to the database or to a log', async () => {

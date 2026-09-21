@@ -68,7 +68,7 @@ const modeOf = (env = process.env) => {
 const extrasOf = (env = process.env) => Object.fromEntries(Object.entries(readExtras(env)).map(([directive, raw]) => {
     const value = String(raw || '');
     const sources = value.split(/\s+/).filter(Boolean);
-    const refused = /[;,'"\r\n]/.test(value) ? value.trim() : sources.find((source) => !EXTRA_SOURCE.test(source));
+    const refused = sources.find((source) => !EXTRA_SOURCE.test(source));
     if (refused !== undefined) {
         throw new Error(`${extraKey(directive)}: ${JSON.stringify(refused)} is not allowed. List hosts with their scheme, separated by spaces, `
             + 'such as https://cdn.example.com or wss://*.example.com. Keywords, quotes, semicolons, schemes on their own and a bare * are refused.');
