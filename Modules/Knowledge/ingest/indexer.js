@@ -10,6 +10,7 @@ const origin = require('../origin');
 const vectorStore = require('../vectorStore');
 const extractor = require('./extract/extractor');
 const { limits: fileLimits } = require('./extract/limits');
+const fileSweep = require('./fileSweep');
 const { chunkPage, chunkText, chunkGuide, guideMarkdown, guideTitle, chunkComment, chunkTranscript, contentHashOf } = require('./chunker');
 
 // Writes source chunks into the store. Callers check KNOWLEDGE_INDEXER first; nothing here
@@ -134,16 +135,26 @@ const readFileRow = async (companyId, id) => {
 /* The attachment record is written as the client sends it, so its key is only read when it is
  * where the app itself stores this task's files: the task's own attachment folder (under whichever
  * project the task was in at upload), or a public form's upload folder on a task that form filed. */
-const writtenByTheApp = (task, key) => {
-    const own = /^Project\/[a-f0-9]{24}\/Sprint\/([a-f0-9]{24})\/Attachment\/([^/]+)$/i.exec(key);
-    if (own) return own[1].toLowerCase() === String(task._id).toLowerCase() && !['.', '..'].includes(own[2]);
-    return Boolean(task.origin && task.origin.kind === 'form') && /^formAttachment\/[a-f0-9]{24}\/[a-f0-9]{24}\.[a-z0-9]{1,8}$/i.test(key);
+/* A form task's origin names the submission that filed it, and the submission names its form. */
+const formOf = async (companyId, task) => {
+    const ref = asText(task.origin && task.origin.ref);
+    if (!isObjectId(ref)) return '';
+    const submission = await store(companyId, SCHEMA_TYPE.FORM_SUBMISSIONS, [{ _id: oid(ref) }, 'formId', { lean: true }], 'findOne');
+    return submission && submission.formId ? String(submission.formId).toLowerCase() : '';
 };
 
-const skipReason = ({ task, attachment, kind }) => {
+const writtenByTheApp = async (companyId, task, key) => {
+    const own = /^Project\/[a-f0-9]{24}\/Sprint\/([a-f0-9]{24})\/Attachment\/([^/]+)$/i.exec(key);
+    if (own) return own[1].toLowerCase() === String(task._id).toLowerCase() && !['.', '..'].includes(own[2]);
+    const form = /^formAttachment\/([a-f0-9]{24})\/[a-f0-9]{24}\.[a-z0-9]{1,8}$/i.exec(key);
+    if (!form || !(task.origin && task.origin.kind === 'form')) return false;
+    return form[1].toLowerCase() === await formOf(companyId, task);
+};
+
+const skipReason = async (companyId, { task, attachment, kind }) => {
     const key = asText(attachment.url);
     if (!key || /^[a-z][a-z0-9+.-]*:/i.test(key)) return SKIPPED.LINKED;
-    if (!writtenByTheApp(task, key)) return SKIPPED.FOREIGN_KEY;
+    if (!(await writtenByTheApp(companyId, task, key))) return SKIPPED.FOREIGN_KEY;
     if (!kind) return SKIPPED.UNSUPPORTED;
     if (Number(attachment.size) > fileLimits().maxBytes) return SKIPPED.TOO_LARGE;
     return null;
@@ -330,7 +341,7 @@ const RULES = {
             if (Number(task.deletedStatusKey) === 1) return { ...leaveOut('tombstone', 'task deleted', row, {}, fingerprint), marker: TASK_DELETED };
             if (!task.ProjectID) return leaveOut('tombstone', 'no project', row, {}, fingerprint);
             if (await anyTrashed(companyId, [task.ProjectID])) return leaveOut('tombstone', 'trashed', row, {}, fingerprint);
-            const skipped = skipReason(row);
+            const skipped = await skipReason(companyId, row);
             if (skipped) return leaveOut('skip', skipped, row, {}, fingerprint);
             return ingestDecision(row, {}, fingerprint);
         },
@@ -532,10 +543,10 @@ const recordFileOutcome = async (companyId, row, { reason, attempts = 0 }) => {
         ? new Date(Date.now() + FILE_RETRY_DELAYS_MS[Math.min(attempts, FILE_RETRY_DELAYS_MS.length) - 1])
         : null;
     const { pieceCount, ...metadata } = RULES.file.metadata(companyId, row);
-    const recorded = await chunkStore(companyId, [{ ...where, ordinal: 0 }, 'deleted tombstoneReason extractAttempts projectId sprintId', { lean: true }], 'findOne');
+    const recorded = await chunkStore(companyId, [{ ...where, ordinal: 0 }, 'deleted tombstoneReason extractAttempts projectId sprintId extractDueAt', { lean: true }], 'findOne');
     const asRecorded = Boolean(recorded) && recorded.deleted === true && recorded.tombstoneReason === reason && (Number(recorded.extractAttempts) || 0) === attempts
         && sameValue(recorded.projectId, metadata.projectId) && sameValue(recorded.sprintId, metadata.sprintId);
-    if (asRecorded) return { tombstoned: 0, leftOut: true, reason, retryAt: null, changed: false };
+    if (asRecorded) return { tombstoned: 0, leftOut: true, reason, retryAt: isExtractFailure(reason) && attempts < FILE_EXTRACT_ATTEMPTS ? recorded.extractDueAt || retryAt : null, changed: false };
     const tombstoned = await tombstone(companyId, where);
     const marked = await chunkStore(companyId, [
         { ...where, ordinal: 0 },
@@ -642,20 +653,31 @@ const syncTranscript = (companyId, callId) => sync(companyId, 'transcript', call
 const syncGuide = (companyId, projectId) => sync(companyId, 'guide', projectId);
 const fileMarker = (sourceId) => ({ sourceType: 'file', sourceId: String(sourceId), ordinal: 0 });
 
-const clearDue = (companyId, sourceId) => chunkStore(companyId, [{ ...fileMarker(sourceId), extractDueAt: { $gt: EPOCH } }, { $unset: { extractDueAt: '' } }], 'updateOne');
+const clearDue = (companyId, sourceId) => chunkStore(companyId, [{ ...fileMarker(sourceId), extractDueAt: { $type: 'date' } }, { $unset: { extractDueAt: '' } }], 'updateOne');
 
 /* A file's work is done once its sync returns without a retry due; until then its record says it
  * is owed one, so a restart or a lost queue cannot drop it. */
+const owedHere = new Set();
+const hereKey = (companyId, sourceId) => `${companyId}:${sourceId}`;
+
 const syncFile = async (companyId, sourceId, options = {}) => {
-    const result = await sync(companyId, 'file', sourceId, options);
-    if (!(result && result.retryAt)) await clearDue(companyId, sourceId);
-    return result;
+    const key = hereKey(companyId, sourceId);
+    owedHere.add(key);
+    try {
+        const result = await sync(companyId, 'file', sourceId, options);
+        if (!(result && result.retryAt)) await clearDue(companyId, sourceId);
+        return result;
+    } finally {
+        owedHere.delete(key);
+    }
 };
+
+const inHand = (companyId) => [...owedHere].filter((key) => key.startsWith(`${companyId}:`)).map((key) => key.slice(String(companyId).length + 1));
 
 /* Written before a task's files are queued: each attachment's record is marked due now, created
  * empty and out of the index when the file has none yet. */
 const markFilesPending = async (companyId, taskId) => {
-    if (!isObjectId(taskId)) return 0;
+    if (!isObjectId(taskId)) return [];
     const task = await byId(companyId, SCHEMA_TYPE.TASKS, taskId, 'ProjectID sprintId attachments');
     const now = new Date();
     const ids = (task && Array.isArray(task.attachments) ? task.attachments : [])
@@ -664,6 +686,7 @@ const markFilesPending = async (companyId, taskId) => {
     await chunkStore(companyId, [{ sourceType: 'file', taskId: String(taskId), ordinal: 0 }, { $set: { extractDueAt: now } }], 'updateMany');
     const recorded = new Set(((await chunkStore(companyId, [{ sourceType: 'file', taskId: String(taskId), ordinal: 0 }, 'sourceId', { lean: true }], 'find')) || [])
         .map((row) => String(row.sourceId)));
+    ids.forEach((attachmentId) => owedHere.add(hereKey(companyId, fileSourceId(taskId, attachmentId))));
     for (const attachmentId of [...new Set(ids)].filter((id) => !recorded.has(fileSourceId(taskId, id)))) {
         await upsertChunk(companyId, {
             ...base(companyId, 'file', { _id: fileSourceId(taskId, attachmentId) }),
@@ -681,26 +704,61 @@ const markFilesPending = async (companyId, taskId) => {
             sourceUpdatedAt: EPOCH,
         }).catch(() => false);
     }
-    return ids.length;
+    return ids.map((attachmentId) => fileSourceId(taskId, attachmentId));
 };
 
-const pendingFiles = async (companyId) => ((await chunkStore(companyId, [{ sourceType: 'file', ordinal: 0, extractDueAt: { $gt: EPOCH } }, 'sourceId', { lean: true }], 'find')) || [])
+const releaseHeld = (companyId, sourceIds) => (sourceIds || []).forEach((sourceId) => owedHere.delete(hereKey(companyId, sourceId)));
+
+const pendingFiles = async (companyId) => ((await chunkStore(companyId, [fileSweep.pendingFilter(), 'sourceId', { lean: true }], 'find')) || [])
     .map((row) => String(row.sourceId)).sort();
+
+/* Long enough for one extraction to finish, so another server sweeping at the same time passes
+ * over a file this one has taken; if this one dies holding it, the file is due again after. */
+const LEASE_MARGIN_MS = 60 * 1000;
+
+/* One owed file, taken by moving its due time forward to the end of a lease. Files this process
+ * already holds in its queue are left to that queue, and a sweep takes each file once. */
+const claimOwedFile = async (companyId, now, taken) => {
+    const lease = new Date(now + fileLimits().timeoutMs + LEASE_MARGIN_MS);
+    const skip = [...inHand(companyId), ...taken];
+    const claimed = await chunkStore(companyId, [
+        { ...fileSweep.dueFilter(now), ...(skip.length ? { sourceId: { $nin: skip } } : {}) },
+        { $set: { extractDueAt: lease } },
+        { sort: fileSweep.DUE_SORT, projection: { sourceId: 1 }, returnDocument: 'after', lean: true },
+    ], 'findOneAndUpdate');
+    return claimed ? String(claimed.sourceId) : null;
+};
+
+/* A sync that throws keeps its lease, so the file waits its turn instead of heading every later
+ * sweep, and the throw counts as an attempt. */
+const countThrow = async (companyId, sourceId) => {
+    const marker = await chunkStore(companyId, [
+        { sourceType: 'file', sourceId, ordinal: 0 },
+        { $inc: { extractAttempts: 1 } },
+        { returnDocument: 'after', lean: true },
+    ], 'findOneAndUpdate');
+    if (marker && Number(marker.extractAttempts) >= FILE_EXTRACT_ATTEMPTS) {
+        await chunkStore(companyId, [
+            { sourceType: 'file', sourceId, ordinal: 0 },
+            { $set: { tombstoneReason: EXTRACT_FAILED }, $unset: { extractDueAt: '' } },
+        ], 'updateOne');
+    }
+};
 
 /* What the durable records say is owed: queued files a restart dropped, and retries now due. */
 const resumeFiles = async (companyId, { now = Date.now(), limit = FILE_SWEEP_BATCH, priority = 'backfill' } = {}) => {
-    const due = await chunkStore(companyId, [
-        { sourceType: 'file', ordinal: 0, extractDueAt: { $gt: EPOCH, $lte: new Date(now) } },
-        'sourceId',
-        { sort: { extractDueAt: 1 }, limit, lean: true },
-    ], 'find');
     let count = 0;
-    for (const row of due || []) {
+    const taken = [];
+    while (taken.length < limit) {
+        const sourceId = await claimOwedFile(companyId, now, taken);
+        if (!sourceId) break;
+        taken.push(sourceId);
         try {
-            await syncFile(companyId, String(row.sourceId), { priority });
+            await module.exports.syncFile(companyId, sourceId, { priority });
             count += 1;
         } catch (error) {
-            logger.error(`${LOG_PREFIX} ${companyId}: resuming file ${row.sourceId} failed: ${error.message}`);
+            logger.error(`${LOG_PREFIX} ${companyId}: resuming file ${sourceId} failed: ${error.message}`);
+            await countThrow(companyId, sourceId).catch(() => null);
         }
     }
     return count;
@@ -718,7 +776,7 @@ const syncTaskFiles = async (companyId, taskId, { priority = 'live' } = {}) => {
         .map((attachmentId) => fileSourceId(taskId, attachmentId));
     const wanted = [...new Set(attached)];
     const recorded = await chunkStore(companyId, [
-        { sourceType: 'file', taskId: String(taskId), $or: [{ deleted: { $ne: true } }, { extractDueAt: { $gt: EPOCH } }] },
+        { sourceType: 'file', taskId: String(taskId), $or: [{ deleted: { $ne: true } }, { extractDueAt: { $type: 'date' } }] },
         'sourceId',
         { lean: true },
     ], 'find');
@@ -933,6 +991,7 @@ module.exports = {
     pendingFiles,
     resumeFiles,
     markFilesPending,
+    releaseHeld,
     reembedMissing,
     fileSourceId,
     ingestPage,

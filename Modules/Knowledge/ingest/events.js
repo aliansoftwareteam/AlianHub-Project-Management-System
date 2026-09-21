@@ -74,11 +74,11 @@ const inLane = (key, width, run) => new Promise((resolve, reject) => {
 /* The files are marked owed before they are queued, so the queue can be lost with the process;
  * the event is then answered and each file read and parsed when its turn comes. */
 const queueTaskFiles = async (companyId, taskId) => {
-    await indexer.markFilesPending(companyId, taskId);
+    const held = await indexer.markFilesPending(companyId, taskId);
     track(inLane(`files:${companyId}`, FILES_PER_COMPANY, () => indexer.syncTaskFiles(companyId, taskId)).catch((error) => {
         logger.error(`${LOG_PREFIX} files of task ${taskId} in company ${companyId}: ${domainEventBus.failureText(error)}`);
         return null;
-    }));
+    }).finally(() => indexer.releaseHeld(companyId, held)));
     return null;
 };
 

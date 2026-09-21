@@ -2,7 +2,8 @@ const zlib = require('zlib');
 
 // Office files are zip archives whose headers state their own inflated sizes, and parsers inflate
 // first and check after. So every entry is inflated here against one budget, zlib being told the
-// most it may produce, and the parser is handed an archive rebuilt from what was really inflated.
+// most it may produce, and the parser is handed an archive rebuilt from what was really inflated,
+// with the UTF-8 name flag kept so names that are not ASCII read the same.
 
 const END_OF_CENTRAL_DIRECTORY = 0x06054b50;
 const CENTRAL_FILE_HEADER = 0x02014b50;
@@ -85,52 +86,74 @@ const inflateEntry = (buffer, entry, left) => {
     }
 };
 
-const storedArchive = (files) => {
-    const locals = [];
-    const centrals = [];
-    let offset = 0;
-    files.forEach(({ name, content }) => {
-        const crc = crc32(content);
-        const local = Buffer.alloc(30);
-        local.writeUInt32LE(LOCAL_FILE_HEADER, 0);
-        local.writeUInt16LE(20, 4);
-        local.writeUInt32LE(crc, 14);
-        local.writeUInt32LE(content.length, 18);
-        local.writeUInt32LE(content.length, 22);
-        local.writeUInt16LE(name.length, 26);
-        const central = Buffer.alloc(46);
-        central.writeUInt32LE(CENTRAL_FILE_HEADER, 0);
-        central.writeUInt16LE(20, 4);
-        central.writeUInt16LE(20, 6);
-        central.writeUInt32LE(crc, 16);
-        central.writeUInt32LE(content.length, 20);
-        central.writeUInt32LE(content.length, 24);
-        central.writeUInt16LE(name.length, 28);
-        central.writeUInt32LE(offset, 42);
-        locals.push(local, name, content);
-        centrals.push(central, name);
-        offset += 30 + name.length + content.length;
-    });
-    const directory = Buffer.concat(centrals);
-    const end = Buffer.alloc(22);
-    end.writeUInt32LE(END_OF_CENTRAL_DIRECTORY, 0);
-    end.writeUInt16LE(files.length, 8);
-    end.writeUInt16LE(files.length, 10);
-    end.writeUInt32LE(directory.length, 12);
-    end.writeUInt32LE(offset, 16);
-    return Buffer.concat([...locals, directory, end]);
+const UTF8_NAMES = 0x800;
+
+const localHeader = ({ name, flags, crc, size }) => {
+    const header = Buffer.alloc(30);
+    header.writeUInt32LE(LOCAL_FILE_HEADER, 0);
+    header.writeUInt16LE(20, 4);
+    header.writeUInt16LE(flags & UTF8_NAMES, 6);
+    header.writeUInt32LE(crc, 14);
+    header.writeUInt32LE(size, 18);
+    header.writeUInt32LE(size, 22);
+    header.writeUInt16LE(name.length, 26);
+    return header;
 };
 
-/** @returns {Buffer} an archive of stored entries holding at most `budget` inflated bytes */
+const centralHeader = ({ name, flags, crc, size }, offset) => {
+    const header = Buffer.alloc(46);
+    header.writeUInt32LE(CENTRAL_FILE_HEADER, 0);
+    header.writeUInt16LE(20, 4);
+    header.writeUInt16LE(20, 6);
+    header.writeUInt16LE(flags & UTF8_NAMES, 8);
+    header.writeUInt32LE(crc, 16);
+    header.writeUInt32LE(size, 20);
+    header.writeUInt32LE(size, 24);
+    header.writeUInt16LE(name.length, 28);
+    header.writeUInt32LE(offset, 42);
+    return header;
+};
+
+/**
+ * An archive of stored entries holding at most `budget` inflated bytes. The first pass inflates
+ * each entry only to measure it and lets it go; the second inflates it again straight into the
+ * output, so what is held at once is the output and one entry, never every entry beside it.
+ */
 const inflateWithin = (buffer, budget) => {
+    const entries = entriesOf(buffer);
     let used = 0;
-    const files = entriesOf(buffer).map((entry) => {
+    const measured = entries.map((entry) => {
         const content = inflateEntry(buffer, entry, budget - used);
         used += content.length;
         if (used > budget) throw refusal('inflated_too_large', 'The archive inflates past the budget.');
-        return { name: entry.name, content };
+        return { name: entry.name, flags: entry.flags, crc: crc32(content), size: content.length };
     });
-    return storedArchive(files);
+    const directorySize = measured.reduce((sum, file) => sum + 46 + file.name.length, 0);
+    const out = Buffer.allocUnsafe(measured.reduce((sum, file) => sum + 30 + file.name.length + file.size, 0) + directorySize + 22);
+    let offset = 0;
+    const offsets = [];
+    entries.forEach((entry, at) => {
+        const file = measured[at];
+        offsets.push(offset);
+        offset += localHeader(file).copy(out, offset);
+        offset += file.name.copy(out, offset);
+        const content = inflateEntry(buffer, entry, file.size);
+        if (content.length !== file.size) throw damaged();
+        offset += content.copy(out, offset);
+    });
+    const directoryAt = offset;
+    measured.forEach((file, at) => {
+        offset += centralHeader(file, offsets[at]).copy(out, offset);
+        offset += file.name.copy(out, offset);
+    });
+    const end = Buffer.alloc(22);
+    end.writeUInt32LE(END_OF_CENTRAL_DIRECTORY, 0);
+    end.writeUInt16LE(measured.length, 8);
+    end.writeUInt16LE(measured.length, 10);
+    end.writeUInt32LE(directorySize, 12);
+    end.writeUInt32LE(directoryAt, 16);
+    end.copy(out, offset);
+    return out;
 };
 
 module.exports = { inflateWithin, crc32 };

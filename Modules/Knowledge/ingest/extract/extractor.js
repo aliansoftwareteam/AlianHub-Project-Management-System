@@ -1,22 +1,20 @@
 const path = require('path');
 const { Worker } = require('worker_threads');
 const { limits: readLimits } = require('./limits');
-const { TRUNCATION_MARKER, finish } = require('./text');
-const { csvText } = require('./csv');
+const { TRUNCATION_MARKER, isUtf16 } = require('./text');
 
 // Parsers run on bytes anyone with an upload may have chosen, so each gets a thread of its own
 // that can be stopped whether or not it ever yields, and whose failures end with it.
 
 const KINDS = Object.freeze({ pdf: 'pdf', docx: 'docx', xlsx: 'xlsx', csv: 'csv', txt: 'text', md: 'markdown', markdown: 'markdown' });
-const PARSED = ['pdf', 'docx', 'xlsx'];
 const ZIPPED = ['docx', 'xlsx'];
-const TEXT = ['csv', 'text', 'markdown'];
 const MAX_WORKERS = 2;
 const PER_COMPANY_WHEN_OTHERS_WAIT = 1;
 const WORKER_HEAP_MB = 512;
 const MEMORY_SAMPLE_MS = 20;
 const MAX_ZIP_ENTRIES = 5000;
 const WORKER_PATH = path.join(__dirname, 'parseWorker.js');
+const OWN_REASONS = ['inflated_too_large', 'too_much_memory'];
 
 const END_OF_CENTRAL_DIRECTORY = 0x06054b50;
 const CENTRAL_FILE_HEADER = 0x02014b50;
@@ -54,8 +52,6 @@ const declaredUnzippedBytes = (buffer) => {
     return total;
 };
 
-const isUtf16 = (buffer) => buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe;
-
 const signs = (buffer) => ({
     pdf: buffer.subarray(0, 1024).includes('%PDF-'),
     zip: buffer.length >= 4 && buffer.readUInt32LE(0) === 0x04034b50,
@@ -68,7 +64,7 @@ const signs = (buffer) => ({
 const agrees = (kind, sign) => {
     if (kind === 'pdf') return sign.pdf && !sign.zip && !sign.cfb;
     if (ZIPPED.includes(kind)) return sign.zip;
-    return !sign.zip && !sign.cfb && !sign.webPage && !sign.binary && !sign.pdf;
+    return !sign.zip && !sign.cfb && !sign.webPage && !sign.binary;
 };
 
 const checkBytes = (buffer, kind, limits) => {
@@ -77,10 +73,6 @@ const checkBytes = (buffer, kind, limits) => {
         throw refusal('too_large', `The archive declares more than the ${limits.maxUnzippedBytes} bytes allowed.`);
     }
 };
-
-const decodeText = (buffer) => (isUtf16(buffer)
-    ? new TextDecoder('utf-16le').decode(buffer.subarray(2))
-    : new TextDecoder('utf-8').decode(buffer));
 
 let active = 0;
 const holding = new Map();
@@ -125,9 +117,9 @@ const inSlot = ({ companyId = '', priority = 'live' } = {}, run) => new Promise(
     pump();
 });
 
-/* Memory a parser inflates into lives outside the thread's heap limit, and a thread cannot be
- * measured on its own, so the process's resident size is watched while it runs. With two parsers
- * running either may be the one stopped; the outcome is retried, so an innocent file comes back. */
+/* The thread judges its own memory where its parser yields (parseWorker.js). A parser that never
+ * yields cannot, so the process's resident growth is watched as well, allowing each running parse
+ * its cap: with two running, either may be stopped past twice the cap, and the file is retried. */
 const parseInThread = (buffer, kind, limits, workerPath) => new Promise((resolve, reject) => {
     const bytes = new Uint8Array(buffer.byteLength);
     bytes.set(buffer);
@@ -149,11 +141,11 @@ const parseInThread = (buffer, kind, limits, workerPath) => new Promise((resolve
     };
     const timer = setTimeout(() => settle(reject, refusal('timed_out', `Abandoned after ${limits.timeoutMs} ms.`)), limits.timeoutMs);
     const watchdog = setInterval(() => {
-        if (process.memoryUsage.rss() - baseline > limits.maxParseMemoryBytes) settle(reject, refusal('too_much_memory', `Stopped past ${limits.maxParseMemoryBytes} bytes of memory.`));
+        if (process.memoryUsage.rss() - baseline > limits.maxParseMemoryBytes * Math.max(active, 1)) settle(reject, refusal('too_much_memory', `Stopped past ${limits.maxParseMemoryBytes} bytes of memory.`));
     }, MEMORY_SAMPLE_MS);
     worker.once('message', (message) => (message && message.ok
         ? settle(resolve, { text: message.text, truncated: message.truncated })
-        : settle(reject, refusal(message && message.code === 'inflated_too_large' ? 'inflated_too_large' : 'failed', (message && message.message) || 'The parser failed.'))));
+        : settle(reject, refusal(OWN_REASONS.includes(message && message.code) ? message.code : 'failed', (message && message.message) || 'The parser failed.'))));
     worker.once('error', (error) => settle(reject, refusal('failed', String((error && error.message) || error).slice(0, 300))));
     worker.once('exit', (code) => settle(reject, refusal('failed', `The parser stopped with code ${code}.`)));
 });
@@ -168,14 +160,9 @@ const extractText = async ({ buffer, kind } = {}, { workerPath = WORKER_PATH, co
     const limits = readLimits();
     if (buffer.length > limits.maxBytes) throw refusal('too_large', `The file is ${buffer.length} bytes, over the ${limits.maxBytes} allowed.`);
     checkBytes(buffer, kind, limits);
-    if (kind === 'csv') {
-        const { text, partial } = csvText(decodeText(buffer), limits.maxRows);
-        return finish(text, limits.maxChars, partial);
-    }
-    if (TEXT.includes(kind)) return finish(decodeText(buffer), limits.maxChars);
-    return inSlot({ companyId, priority }, () => parseInThread(buffer, kind, limits, workerPath));
+    return module.exports.inSlot({ companyId, priority }, () => parseInThread(buffer, kind, limits, workerPath));
 };
 
 const activeWorkers = () => active;
 
-module.exports = { KINDS, MAX_WORKERS, TRUNCATION_MARKER, PARSED, kindOf, extractText, inSlot, activeWorkers, declaredUnzippedBytes };
+module.exports = { KINDS, MAX_WORKERS, TRUNCATION_MARKER, kindOf, extractText, inSlot, activeWorkers, declaredUnzippedBytes };

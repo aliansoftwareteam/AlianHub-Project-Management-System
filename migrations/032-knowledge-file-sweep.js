@@ -3,7 +3,10 @@
  * would drop any index the schema does not declare. */
 
 const ID = '032-knowledge-file-sweep';
-const KEY = { sourceType: 1, extractDueAt: 1 };
+const { INDEX_KEY: KEY } = require('../Modules/Knowledge/ingest/fileSweep');
+
+const INDEX_NAME = 'sourceType_1_extractDueAt_1';
+const INDEX_NOT_FOUND = 27;
 
 const keyed = (fields) => (index) => Boolean(index && index.key)
     && Object.keys(index.key).length === Object.keys(fields).length
@@ -18,6 +21,16 @@ async function indexCompany(ctx, companyId) {
     return { fileSweepIndex: index.name };
 }
 
+async function dropCompany(ctx, companyId) {
+    try {
+        await ctx.company(companyId, { type: ctx.SCHEMA_TYPE.KNOWLEDGE_CHUNKS, data: [INDEX_NAME] }, 'dropIndex');
+        return { dropped: INDEX_NAME };
+    } catch (error) {
+        if (error && error.code === INDEX_NOT_FOUND) return { dropped: null };
+        throw error;
+    }
+}
+
 module.exports = {
     id: ID,
     scope: 'company',
@@ -27,6 +40,13 @@ module.exports = {
             const names = await indexCompany(ctx, companyId);
             ctx.logger.info(`[migrations] 032 ${companyId}: ${JSON.stringify(names)}`);
             return names;
+        });
+    },
+    async down(ctx) {
+        await ctx.forEachCompany(async (companyId) => {
+            const result = await dropCompany(ctx, companyId);
+            ctx.logger.info(`[migrations] 032 down ${companyId}: ${JSON.stringify(result)}`);
+            return result;
         });
     },
 };

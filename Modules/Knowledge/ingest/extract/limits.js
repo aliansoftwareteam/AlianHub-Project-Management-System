@@ -8,15 +8,22 @@ const positive = (raw, fallback) => {
     return Number.isFinite(n) && n > 0 ? n : fallback;
 };
 
-const limits = () => ({
-    maxBytes: positive(process.env.KNOWLEDGE_FILE_MAX_BYTES, 10 * MB),
-    maxChars: positive(process.env.KNOWLEDGE_FILE_MAX_CHARS, 200000),
-    timeoutMs: positive(process.env.KNOWLEDGE_FILE_TIMEOUT_MS, 20000),
-    maxPages: positive(process.env.KNOWLEDGE_FILE_MAX_PAGES, 200),
-    maxSheets: positive(process.env.KNOWLEDGE_FILE_MAX_SHEETS, 20),
-    maxRows: positive(process.env.KNOWLEDGE_FILE_MAX_ROWS, 5000),
-    maxUnzippedBytes: positive(process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES, 100 * MB),
-    maxParseMemoryBytes: positive(process.env.KNOWLEDGE_FILE_MAX_PARSE_MEMORY_BYTES, 256 * MB),
-});
+/* A rebuilt archive holds at most the budget, and while it is built one more entry of at most the
+ * budget is held beside it; the rest is the parser's own working memory. */
+const PARSER_HEADROOM = 128 * MB;
+
+const limits = () => {
+    const maxUnzippedBytes = positive(process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES, 100 * MB);
+    return {
+        maxBytes: positive(process.env.KNOWLEDGE_FILE_MAX_BYTES, 10 * MB),
+        maxChars: positive(process.env.KNOWLEDGE_FILE_MAX_CHARS, 200000),
+        timeoutMs: positive(process.env.KNOWLEDGE_FILE_TIMEOUT_MS, 20000),
+        maxPages: positive(process.env.KNOWLEDGE_FILE_MAX_PAGES, 200),
+        maxSheets: positive(process.env.KNOWLEDGE_FILE_MAX_SHEETS, 20),
+        maxRows: positive(process.env.KNOWLEDGE_FILE_MAX_ROWS, 5000),
+        maxUnzippedBytes,
+        maxParseMemoryBytes: positive(process.env.KNOWLEDGE_FILE_MAX_PARSE_MEMORY_BYTES, 2 * maxUnzippedBytes + PARSER_HEADROOM),
+    };
+};
 
 module.exports = { limits };

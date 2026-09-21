@@ -18,4 +18,12 @@ const finish = (text, maxChars, partial = false) => {
     return { text: `${(over ? cleaned.slice(0, maxChars) : cleaned).trimEnd()}\n${TRUNCATION_MARKER}`, truncated: true };
 };
 
-module.exports = { TRUNCATION_MARKER, finish };
+/* UTF-16 is read only when it says so with a little-endian byte order mark; any other bytes with
+ * a NUL in them are refused before this as not text. */
+const isUtf16 = (buffer) => buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe;
+
+const decodeText = (buffer) => (isUtf16(buffer)
+    ? new TextDecoder('utf-16le').decode(buffer.subarray(2))
+    : new TextDecoder('utf-8').decode(buffer));
+
+module.exports = { TRUNCATION_MARKER, finish, isUtf16, decodeText };

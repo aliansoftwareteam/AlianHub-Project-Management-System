@@ -1,8 +1,37 @@
 const { parentPort, workerData } = require('worker_threads');
-const { finish } = require('./text');
+const { finish, decodeText } = require('./text');
 const { inflateWithin } = require('./zip');
+const { csvText } = require('./csv');
 
 const { kind, bytes, limits } = workerData;
+
+/* This thread's own heap and off-heap memory, which only it can read: checked where the work
+ * yields, and after inflation, so a parser is judged on what it holds itself. */
+const held = () => {
+    const usage = process.memoryUsage();
+    return usage.heapUsed + usage.external;
+};
+
+class TooMuchMemory extends Error {
+    constructor() {
+        super(`Held past ${limits.maxParseMemoryBytes} bytes.`);
+        this.code = 'too_much_memory';
+    }
+}
+
+/* The extractor stops the thread on the first answer, so a report sent from the timer ends it. */
+const checkMemory = () => {
+    if (held() > limits.maxParseMemoryBytes) throw new TooMuchMemory();
+};
+
+const report = (error) => parentPort.postMessage({ ok: false, code: error && error.code, message: String((error && error.message) || error).slice(0, 300) });
+setInterval(() => { try { checkMemory(); } catch (error) { report(error); } }, 20).unref();
+
+const inflated = () => {
+    const archive = inflateWithin(Buffer.from(bytes), limits.maxUnzippedBytes);
+    checkMemory();
+    return archive;
+};
 
 const pdfText = async () => {
     const { PDFParse } = require('pdf-parse');
@@ -18,14 +47,14 @@ const pdfText = async () => {
 
 const docxText = async () => {
     const mammoth = require('mammoth');
-    const result = await mammoth.extractRawText({ buffer: inflateWithin(Buffer.from(bytes), limits.maxUnzippedBytes) });
+    const result = await mammoth.extractRawText({ buffer: inflated() });
     return { text: result.value || '', partial: false };
 };
 
 /* The macro part is never loaded and formulas never read, so nothing in a workbook is evaluated. */
 const sheetText = () => {
     const XLSX = require('xlsx');
-    const archive = inflateWithin(Buffer.from(bytes), limits.maxUnzippedBytes);
+    const archive = inflated();
     const book = XLSX.read(archive, { type: 'buffer', cellFormula: false, cellHTML: false, cellStyles: false, bookVBA: false, bookDeps: false, sheetRows: limits.maxRows + 1 });
     const names = book.SheetNames.slice(0, limits.maxSheets);
     let partial = book.SheetNames.length > names.length;
@@ -38,9 +67,13 @@ const sheetText = () => {
     return { text: sections.join('\n\n'), partial };
 };
 
-const PARSERS = { pdf: pdfText, docx: docxText, xlsx: sheetText };
+const plainText = () => ({ text: decodeText(Buffer.from(bytes)), partial: false });
+
+const csvRows = () => csvText(decodeText(Buffer.from(bytes)), limits.maxRows);
+
+const PARSERS = { pdf: pdfText, docx: docxText, xlsx: sheetText, csv: csvRows, text: plainText, markdown: plainText };
 
 (async () => {
     const { text, partial } = await PARSERS[kind]();
     parentPort.postMessage({ ok: true, ...finish(text, limits.maxChars, partial) });
-})().catch((error) => parentPort.postMessage({ ok: false, code: error && error.code, message: String((error && error.message) || error).slice(0, 300) }));
+})().catch(report);
