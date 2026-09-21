@@ -57,6 +57,45 @@ jobs:
           VUE_APP_IS_GITHUB_LOGIN: "false"
           VUE_APP_IS_GITLAB_LOGIN: "false"
 
+  mcp-conformance:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/beta'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      E2E_MONGODB_URL: mongodb://127.0.0.1:27017
+    steps:
+      - uses: actions/checkout@v4
+      # The conformance suite needs Node 22; the app runs on 20, which is set up last and so comes first on the PATH.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: echo "CONFORMANCE_NODE=$(command -v node)" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node tests/conformance/mcpServerConformance.js
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-conformance
+          path: |
+            e2e/.state/conformance
+            e2e/.state/conformance-server.log
+          retention-days: 7
+          if-no-files-found: ignore
+
   e2e:
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/beta'
     runs-on: ubuntu-latest
