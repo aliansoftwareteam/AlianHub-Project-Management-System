@@ -9,7 +9,15 @@ jest.mock('../Modules/AgentSessions/access', () => ({
     taskOf: jest.fn(async (companyId, taskId) => ({ _id: taskId, ProjectID: 'p1', sprintId: 's1' })),
     canOpenTask: jest.fn(async (companyId, uid) => uid !== 'hidden'),
 }));
-jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn(async () => null) }));
+jest.mock('../utils/mongo-handler/mongoQueries', () => ({
+    MongoDbCrudOpration: jest.fn(async (companyId, { data }) => {
+        const id = data && data[0] && data[0]._id;
+        return id ? { _id: id, ProjectID: '6a0000000000000000000a01', sprintId: '6a0000000000000000000b01' } : null;
+    }),
+}));
+// Joining a task room is authorised against the task (socket/roomAccess); here every task in the workspace opens.
+jest.mock('../Config/projectAccess', () => ({ canReadProject: jest.fn(async () => ({ allowed: true })) }));
+jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({ canSeeSprintById: jest.fn(async () => true) }));
 
 const { taskSocketHandler } = require('../socket/controller/taskSocket');
 const relay = require('../socket/controller/agentSessionSocket');
@@ -36,6 +44,7 @@ beforeAll(async () => {
     const users = ioServer.of(/^\/userid_\w+$/);
     users.use((socket, next) => {
         socket.user = { uid: socket.handshake.auth.uid };
+        socket.identity = { companyId: CID, uid: socket.handshake.auth.uid };
         next();
     });
     users.on('connection', (socket) => taskSocketHandler({ socket, namespace: socket.nsp }));
