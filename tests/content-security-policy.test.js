@@ -321,6 +321,19 @@ describe('CSP_EXTRA_<DIRECTIVE>', () => {
         ['CSP_EXTRA_SCRIPT_SRC', 'https://cdn.jsdelivr.net/', 'a whole package CDN in a script directive'],
         ['CSP_EXTRA_SCRIPT_SRC', 'https://unpkg.com', 'a whole package CDN in a script directive'],
         ['CSP_EXTRA_SCRIPT_SRC', 'https://unpkg.com/', 'a whole package CDN in a script directive'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://*.jsdelivr.net', 'a wildcard in a script directive'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://*.cloudflare.com', 'a wildcard in a script directive'],
+        ['CSP_EXTRA_WORKER_SRC', 'https://*.cdn.example.com', 'a wildcard in a script directive'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://cdn.jsdelivr.net/npm/', 'a package CDN prefix that serves every package'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://cdn.jsdelivr.net/gh/', 'a package CDN prefix that serves every repository'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://cdn.jsdelivr.net/npm', 'a package CDN prefix that serves every package'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://cdn.jsdelivr.net/gh/someone/', 'a package CDN prefix that serves one account'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://unpkg.com/react', 'a package without a version'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://cdnjs.cloudflare.com/ajax/libs/', 'a package CDN prefix that serves every library'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://cdnjs.cloudflare.com/ajax/libs/lodash.js/', 'a library without a version'],
+        ['CSP_EXTRA_IMG_SRC', 'https://*.pp.ua', 'a wildcard over a public suffix'],
+        ['CSP_EXTRA_MEDIA_SRC', 'https://*.r2.dev', 'a wildcard over shared storage'],
+        ['CSP_EXTRA_CONNECT_SRC', 'https://*.blob.core.windows.net', 'a wildcard over shared storage'],
     ])('refuses %s=%s (%s)', (key, value) => {
         expect(() => csp.policyOf({ CSP_MODE: 'report', [key]: value })).toThrow(new RegExp(key));
     });
@@ -330,9 +343,13 @@ describe('CSP_EXTRA_<DIRECTIVE>', () => {
         ['CSP_EXTRA_IMG_SRC', 'http://cdn.example.com'],
         ['CSP_EXTRA_IMG_SRC', 'https://lh3.googleusercontent.com'],
         ['CSP_EXTRA_FRAME_SRC', 'https://someone.github.io'],
-        ['CSP_EXTRA_SCRIPT_SRC', 'https://*.cdn.example.com'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://cdn.example.com'],
         ['CSP_EXTRA_SCRIPT_SRC', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://cdn.jsdelivr.net/npm/@scope/pkg@1.2.3/dist/pkg.min.js'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://cdn.jsdelivr.net/gh/org/repo@v1.0.0/dist/'],
         ['CSP_EXTRA_SCRIPT_SRC', 'https://unpkg.com/htmx.org@2.0.0/dist/htmx.min.js'],
+        ['CSP_EXTRA_SCRIPT_SRC', 'https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/'],
+        ['CSP_EXTRA_IMG_SRC', 'https://*.mybucket.example.org'],
         ['CSP_EXTRA_CONNECT_SRC', 'https://*.example.co.uk'],
     ])('accepts %s=%s', (key, value) => {
         expect(() => csp.policyOf({ CSP_MODE: 'report', [key]: value })).not.toThrow();

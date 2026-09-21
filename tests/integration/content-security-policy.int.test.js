@@ -77,7 +77,8 @@ describe('uploads on server storage, with CSP_MODE unset', () => {
         ['s8s12-report.pdf', Buffer.from('%PDF-1.4\n%%EOF'), 'application/pdf', false],
         ['s8s12-payload.js', Buffer.from('alert(document.domain)'), 'application/octet-stream', true],
         ['s8s12-page.html', Buffer.from('<script>alert(document.domain)</script>'), 'application/octet-stream', true],
-        ['s8s12-drawing.svg', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'), 'application/octet-stream', true],
+        ['s8s12-drawing.svg', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'), 'image/svg+xml', false],
+        ['S8S12-CAMERA.JPG', PNG, 'image/jpeg', false],
     ];
     let owner;
 
@@ -95,7 +96,7 @@ describe('uploads on server storage, with CSP_MODE unset', () => {
         expect(res.status).toBe(200);
         expect(res.headers.get('content-type')).toBe(type);
         expect(res.headers.get('x-content-type-options')).toBe('nosniff');
-        expect(res.headers.get('content-security-policy')).toBe("default-src 'none'; sandbox");
+        expect(res.headers.get('content-security-policy')).toBe(name.endsWith('.svg') ? "default-src 'none'; style-src 'unsafe-inline'; sandbox" : "default-src 'none'; sandbox");
         expect(res.headers.get('content-disposition')).toBe(download ? `attachment; filename="${name}"` : null);
         expect(Buffer.from(await res.arrayBuffer()).equals(bytes)).toBe(true);
     });

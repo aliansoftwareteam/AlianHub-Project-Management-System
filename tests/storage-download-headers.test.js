@@ -13,6 +13,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     }),
 }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
+const logger = require('../Config/loggerConfig');
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || 's8s12-download-secret';
 process.env.JWT_ALGORITHM = process.env.JWT_ALGORITHM || 'HS256';
@@ -25,6 +26,7 @@ const { generateSignedUrl } = require('../Modules/storage/server/helpers/bucket.
 const STORAGE_ROOT = path.resolve(__dirname, '..', 'storage');
 const FOLDER = 's8s12';
 const SANDBOX = "default-src 'none'; sandbox";
+const SVG_POLICY = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
 const OCTET = 'application/octet-stream';
 
 /* Inline: what the app shows in an <img>, <video>, <audio>, a PDF tab or the text previewer. */
@@ -37,6 +39,10 @@ const INLINE = [
     ['photo.avif', 'image/avif'],
     ['scan.bmp', 'image/bmp'],
     ['favicon.ico', 'image/x-icon'],
+    ['IMG_1234.JPG', 'image/jpeg'],
+    ['Scan.PNG', 'image/png'],
+    ['Report.Pdf', 'application/pdf'],
+    ['VOICE.MP3', 'audio/mpeg'],
     ['report.pdf', 'application/pdf'],
     ['notes.txt', 'text/plain; charset=utf-8'],
     ['server.log', 'text/plain; charset=utf-8'],
@@ -54,7 +60,7 @@ const INLINE = [
 ];
 
 /* Everything else downloads: anything a browser could run as a page or a script, and anything unknown. */
-const ATTACHMENT = ['payload.js', 'module.mjs', 'page.html', 'page.htm', 'drawing.svg', 'feed.xml', 'page.xhtml', 'sheet.css', 'data.json', 'table.csv',
+const ATTACHMENT = ['payload.js', 'module.mjs', 'page.html', 'page.htm', 'PAGE.HTML', 'Payload.JS', 'feed.xml', 'page.xhtml', 'sheet.css', 'data.json', 'table.csv',
     'readme.md', 'archive.zip', 'deck.pptx', 'binary.exe', 'no-extension', 'photo.PNG.html', 'weird.unknownext'];
 
 let server;
@@ -67,6 +73,10 @@ beforeAll(async () => {
         fs.mkdirSync(path.join(STORAGE_ROOT, bucket, FOLDER), { recursive: true });
         for (const [name] of INLINE) fs.writeFileSync(fileAt(bucket, name), 'bytes');
         for (const name of ATTACHMENT) fs.writeFileSync(fileAt(bucket, name), '<script>alert(document.domain)</script>');
+        for (const name of ['icon.svg', 'Logo.SVG']) fs.writeFileSync(fileAt(bucket, name), '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><script>alert(2)</script><rect width="4" height="4"/></svg>');
+        fs.mkdirSync(path.join(STORAGE_ROOT, bucket, FOLDER, '.hidden'), { recursive: true });
+        fs.writeFileSync(path.join(STORAGE_ROOT, bucket, FOLDER, '.hidden', 'photo.png'), 'bytes');
+        fs.writeFileSync(fileAt(bucket, '.dotfile.png'), 'bytes');
     }
     const app = express();
     app.get('/api/v1/download/:bucketId/*', handleFileRequest);
@@ -106,6 +116,44 @@ describe.each(ROUTES)('stored files served from %s', (label, urlOf) => {
         expect(headers['content-disposition']).toMatch(/^attachment; filename="/);
         expect(headers['x-content-type-options']).toBe('nosniff');
         expect(headers['content-security-policy']).toBe(SANDBOX);
+    });
+});
+
+describe.each(ROUTES)('SVG uploads served from %s', (label, urlOf) => {
+    it.each(['icon.svg', 'Logo.SVG'])('shows %s inline as image/svg+xml under a policy that runs no script', async (name) => {
+        const { status, headers } = await headersOf(urlOf(name));
+        expect(status).toBe(200);
+        expect(headers['content-type']).toBe('image/svg+xml');
+        expect(headers['x-content-type-options']).toBe('nosniff');
+        expect(headers['content-disposition']).toBeUndefined();
+        expect(headers['content-security-policy']).toBe(SVG_POLICY);
+    });
+
+    it('allows inline styles only, and keeps the document sandboxed without scripts', async () => {
+        const policy = (await headersOf(urlOf('icon.svg'))).headers['content-security-policy'];
+        const directives = Object.fromEntries(policy.split(';').map((part) => part.trim().split(/\s+/)).map(([name, ...sources]) => [name, sources]));
+        expect(directives.sandbox).toEqual([]);
+        expect(directives['default-src']).toEqual(["'none'"]);
+        expect(Object.keys(directives).filter((name) => name.startsWith('script-src'))).toEqual([]);
+        expect(Object.entries(directives).filter(([, sources]) => sources.includes("'unsafe-inline'")).map(([name]) => name)).toEqual(['style-src']);
+        expect(policy).not.toMatch(/allow-scripts|allow-same-origin|unsafe-eval/);
+    });
+});
+
+describe('a file the sender refuses', () => {
+    beforeEach(() => logger.error.mockClear());
+
+    it.each([['a dot folder', '.hidden/photo.png'], ['a dot file', '.dotfile.png']])('answers 404 for %s instead of hanging, and logs it', async (label, name) => {
+        const url = `${baseURL}/api/v1/download/${PUBLIC_BUCKET}/${FOLDER}/${name}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+        expect(res.status).toBe(404);
+        expect(await res.json()).toEqual({ status: false, statusText: 'Resorce Not Found' });
+        expect(logger.error).toHaveBeenCalledWith(expect.stringMatching(/^stored file not sent: /));
+    });
+
+    it('answers 404 on a signed link too', async () => {
+        const res = await fetch(signedURL('.hidden/photo.png'), { signal: AbortSignal.timeout(3000) });
+        expect(res.status).toBe(404);
     });
 });
 
