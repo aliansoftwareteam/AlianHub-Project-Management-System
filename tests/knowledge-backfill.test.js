@@ -305,7 +305,6 @@ describe('backfilling project guides and task files', () => {
         readStoredFile.mockImplementation(async ({ key }) => ({ buffer: Buffer.from(`Text of ${key}`), size: 20 }));
     });
 
-    afterEach(() => indexer.clearFileRetries());
 
     it('indexes every guide and every attachment a company already had, and only then says the source is ready', async () => {
         expect(await backfill.indexedSources(C, ['guide', 'file'])).toEqual([]);

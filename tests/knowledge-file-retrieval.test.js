@@ -7,14 +7,14 @@ const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(), visibleProjects: jest.fn() }));
-jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(), isPrivileged: (roleType) => roleType === 1 || roleType === 2 }));
+jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(), evaluatePermission: jest.fn(), isReadable: (value) => value !== null && value !== undefined && value !== 0, isPrivileged: (roleType) => roleType === 1 || roleType === 2 }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 jest.mock('../common-storage/readStoredFile', () => ({ readStoredFile: jest.fn() }));
 
 const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
-const { getRoleType } = require('../Config/permissionGuard');
+const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const { knowledgeChunksSchema, taskSchema, pagesSchema } = require('../utils/mongo-handler/createSchema');
 const { readStoredFile } = require('../common-storage/readStoredFile');
 const lexical = require('../Modules/Knowledge/adapters/lexical');
@@ -87,12 +87,12 @@ beforeEach(() => {
     files.clear();
     jest.clearAllMocks();
     myCache.flushAll();
-    indexer.clearFileRetries();
     mockDb.uniqueFromSchema(CHUNKS, knowledgeChunksSchema);
     mockDb.textFromSchema(CHUNKS, knowledgeChunksSchema);
     mockDb.textFromSchema(SCHEMA_TYPE.TASKS, taskSchema);
     mockDb.textFromSchema(SCHEMA_TYPE.PAGES, pagesSchema);
     getRoleType.mockImplementation(async (companyId, uid) => ROLES[uid]);
+    evaluatePermission.mockImplementation(async () => true);
     visibleProjectIds.mockImplementation(async (companyId, uid) => PROJECTS[uid] || []);
     readStoredFile.mockImplementation(async ({ companyId, key }) => {
         const buffer = files.get(`${companyId}:${key}`);
@@ -414,3 +414,78 @@ describe('where a passage came from', () => {
         expect(await originsOf('fenders', ['page'])).toEqual({ [written]: 'member', [drafted]: 'agent' });
     });
 });
+
+describe('the task attachments permission', () => {
+    beforeEach(() => INDEXED_SOURCES.forEach((s) => indexReady(s)));
+
+    /* MEMBER holds task.task_attachments nowhere; SPRINTER holds it in SHARED only. */
+    const grant = () => evaluatePermission.mockImplementation(async (companyId, uid, key, { projectId } = {}) => {
+        if (key !== 'task.task_attachments') return true;
+        if (uid === SPRINTER) return String(projectId) === SHARED ? false : null;
+        if (uid === MEMBER) return null;
+        return true;
+    });
+
+    it('keeps every file passage from a role that cannot see attachments, and never selects one for it', async () => {
+        const { sourceId } = await file('The dock plans.');
+        grant();
+
+        expect(await candidates(MEMBER, 'dock', 'file')).toEqual([]);
+        expect(idsOf(await ask(MEMBER, 'dock', ['file']))).toEqual([]);
+        expect(idsOf(await ask(SPRINTER, 'dock', ['file']))).toEqual([sourceId]);
+        expect(evaluatePermission).toHaveBeenCalledWith(C, MEMBER, 'task.task_attachments', expect.objectContaining({ projectId: SHARED }));
+    });
+
+    it('asks per project, as project rules can differ', async () => {
+        const { sourceId } = await file('The quay drawings.', { ProjectID: SECRET });
+        PROJECTS[SPRINTER] = [SHARED, SECRET];
+        try {
+            grant();
+            expect(idsOf(await ask(SPRINTER, 'quay', ['file']))).toEqual([]);
+            evaluatePermission.mockImplementation(async () => true);
+            expect(idsOf(await ask(SPRINTER, 'quay', ['file']))).toEqual([sourceId]);
+        } finally {
+            PROJECTS[SPRINTER] = [SHARED];
+        }
+    });
+
+    it('does not ask for an owner or an admin, who see every attachment', async () => {
+        const { sourceId } = await file('The mooring chart.');
+        evaluatePermission.mockImplementation(async () => null);
+        expect(idsOf(await ask(ADMIN, 'mooring', ['file']))).toEqual([sourceId]);
+    });
+
+    it('holds for an agent run, which retrieves as the person who started it', async () => {
+        const { sourceId } = await file('The crane schedule.');
+        grant();
+        const asAgent = (userId) => retrieve({ companyId: C, caller: { kind: 'agent', userId, agentId: 'a1', runId: 'r1' }, query: 'crane', scope: { sourceTypes: ['file'] } });
+        expect(idsOf(await asAgent(MEMBER))).toEqual([]);
+        expect(idsOf(await asAgent(SPRINTER))).toEqual([sourceId]);
+    });
+
+    it('drops at recheck a file passage selected before the permission was withdrawn', async () => {
+        const { sourceId } = await file('The pontoon quote.');
+        const set = await resolveVisibleSet({ companyId: C, caller: { kind: 'user', userId: MEMBER }, scope: { sourceTypes: ['file'] } });
+        const passages = await lexical.search({ companyId: C, query: 'pontoon', filter: filterFor(set, { chunkSources: INDEXED_SOURCES }), limit: 10 });
+        expect(passages.map((p) => p.sourceId)).toEqual([sourceId]);
+
+        grant();
+        const { recheck } = require('../Modules/Knowledge/visibleSet');
+        const withdrawn = await resolveVisibleSet({ companyId: C, caller: { kind: 'user', userId: MEMBER }, scope: { sourceTypes: ['file'] } });
+        expect(await recheck({ set: withdrawn, passages })).toEqual([]);
+    });
+
+    it('reads as not granted when the rules cannot be read', async () => {
+        await file('The slipway budget.');
+        evaluatePermission.mockImplementation(async () => { throw new Error('rules unreadable'); });
+        expect(idsOf(await ask(MEMBER, 'slipway', ['file']))).toEqual([]);
+    });
+
+    it('leaves the other sources alone', async () => {
+        await guide(SHARED, '## Stages\n1. Dredge the harbour basin');
+        grant();
+        expect(idsOf(await ask(MEMBER, 'dredge', ['guide']))).toEqual([SHARED]);
+        expect(evaluatePermission).not.toHaveBeenCalled();
+    });
+});
+

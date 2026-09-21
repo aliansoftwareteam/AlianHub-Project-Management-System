@@ -30,6 +30,7 @@ const P2 = '6f00000000000000000000a2';
 const OPEN_SPRINT = '6f00000000000000000000d1';
 const OTHER_SPRINT = '6f00000000000000000000d2';
 const ENV = { indexer: process.env.KNOWLEDGE_INDEXER, bytes: process.env.KNOWLEDGE_FILE_MAX_BYTES };
+const LATER = Date.now() + 24 * 60 * 60 * 1000;
 
 const CHUNKS = SCHEMA_TYPE.KNOWLEDGE_CHUNKS;
 const at = (day) => new Date(`2026-09-${String(day).padStart(2, '0')}T00:00:00Z`);
@@ -88,7 +89,6 @@ beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
     myCache.flushAll();
-    indexer.clearFileRetries();
     mockDb.uniqueFromSchema(CHUNKS, knowledgeChunksSchema);
     mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C, knowledgeIndexer: { mode: 'on' } });
     mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: OFF_COMPANY });
@@ -266,7 +266,7 @@ describe('files that are not indexed', () => {
         expect(readStoredFile).toHaveBeenCalledTimes(1);
         expect(live(sourceOf(task, task.attachments[0]))).toHaveLength(0);
         expect(markerOf(sourceOf(task, task.attachments[0]))).toMatchObject({ tombstoneReason: 'skipped:too_large' });
-        expect(indexer.fileRetries()).toEqual([]);
+        expect(await indexer.pendingFiles(C)).toEqual([]);
     });
 
     it('skips a file with no text in it', async () => {
@@ -291,7 +291,7 @@ describe('files that are not indexed', () => {
 describe('a file that fails', () => {
     it('is recorded, and the next file is still indexed', async () => {
         const task = seedTask([attachment('broken.pdf'), attachment('fine.txt')]);
-        storeFor(task, ['not a pdf', 'Fine harbour text.']);
+        storeFor(task, ['%PDF-1.4 broken beyond repair', 'Fine harbour text.']);
 
         await taskChanged(task, ['attachments']);
 
@@ -325,23 +325,23 @@ describe('a file that fails', () => {
 
     it('is retried at most twice: three attempts in all, and no sync after that reads it again', async () => {
         const task = seedTask([attachment('broken.pdf')]);
-        storeFor(task, ['not a pdf']);
+        storeFor(task, ['%PDF-1.4 broken beyond repair']);
         const sourceId = sourceOf(task, task.attachments[0]);
 
         await taskChanged(task, ['attachments']);
-        expect(indexer.fileRetries()).toEqual([`${C}:${sourceId}`]);
+        expect(await indexer.pendingFiles(C)).toEqual([sourceId]);
         expect(readStoredFile).toHaveBeenCalledTimes(1);
 
-        await indexer.flushFileRetries();
+        await indexer.resumeFiles(C, { now: LATER });
         expect(markerOf(sourceId)).toMatchObject({ extractAttempts: 2 });
-        expect(indexer.fileRetries()).toEqual([`${C}:${sourceId}`]);
+        expect(await indexer.pendingFiles(C)).toEqual([sourceId]);
 
-        await indexer.flushFileRetries();
+        await indexer.resumeFiles(C, { now: LATER });
         expect(markerOf(sourceId)).toMatchObject({ tombstoneReason: 'extract:failed', extractAttempts: 3 });
-        expect(indexer.fileRetries()).toEqual([]);
+        expect(await indexer.pendingFiles(C)).toEqual([]);
         expect(readStoredFile).toHaveBeenCalledTimes(3);
 
-        await indexer.flushFileRetries();
+        await indexer.resumeFiles(C, { now: LATER });
         await indexer.syncFile(C, sourceId);
         await taskChanged(task, ['attachments']);
         await indexer.syncTaskFiles(C, String(task._id));
@@ -357,10 +357,10 @@ describe('a file that fails', () => {
         expect(markerOf(sourceId)).toMatchObject({ tombstoneReason: 'extract:failed', extractAttempts: 1 });
 
         storeFor(task, ['Arrived late but whole.']);
-        await indexer.flushFileRetries();
+        await indexer.resumeFiles(C, { now: LATER });
 
         expect(live(sourceId)[0].text).toContain('Arrived late but whole.');
-        expect(indexer.fileRetries()).toEqual([]);
+        expect(await indexer.pendingFiles(C)).toEqual([]);
     });
 });
 
@@ -541,15 +541,204 @@ describe('where a file came from', () => {
         expect(await originOf(seedTask([attachment('invoice.txt')], { origin: { kind: 'email', ref: '9f2c4e6a8b0d1f3a' } }))).toBe('external');
     });
 
-    it('reads as external on a task filed through a public form, and for any file the form upload path stored', async () => {
+    it('reads as external on a task filed through a public form, including the file the form upload path stored', async () => {
         expect(await originOf(seedTask([attachment('cv.txt')], { origin: { kind: 'form', ref: 'submission-1' } }))).toBe('external');
 
-        const task = seedTask([attachment('cv.txt')]);
+        const task = seedTask([attachment('cv.txt')], { origin: { kind: 'form', ref: 'submission-2' } });
         task.attachments[0].url = 'formAttachment/6f00000000000000000000f1/abcdef0123456789abcdef01.txt';
         expect(await originOf(task)).toBe('external');
     });
 
     it('reads as external when the attachment itself is marked as inbound', async () => {
         expect(await originOf(seedTask([attachment('mail.txt', { origin: { kind: 'email', ref: 'abc' } })]))).toBe('external');
+    });
+});
+
+describe('files whose bytes or keys cannot be trusted', () => {
+    const { xlsxOf, lyingZipOf } = require('./fixtures/knowledgeFiles');
+
+    it('skips a file whose bytes are not the type its name says, and does not retry it', async () => {
+        const task = seedTask([attachment('rates.csv')]);
+        files.set(`${C}:${task.attachments[0].url}`, xlsxOf({ One: [['hidden']] }));
+
+        await taskChanged(task, ['attachments']);
+
+        expect(markerOf(sourceOf(task, task.attachments[0]))).toMatchObject({ tombstoneReason: 'skipped:type_mismatch' });
+        expect(await indexer.pendingFiles(C)).toEqual([]);
+    });
+
+    it('skips an archive that inflates past the budget with its own reason, and does not retry it', async () => {
+        const saved = process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES;
+        process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES = String(1024 * 1024);
+        try {
+            const task = seedTask([attachment('report.docx')]);
+            files.set(`${C}:${task.attachments[0].url}`, lyingZipOf([['word/document.xml', Buffer.alloc(4 * 1024 * 1024, 0x41)]], 10));
+
+            await taskChanged(task, ['attachments']);
+
+            expect(markerOf(sourceOf(task, task.attachments[0]))).toMatchObject({ tombstoneReason: 'skipped:inflated_too_large' });
+            expect(await indexer.pendingFiles(C)).toEqual([]);
+        } finally {
+            if (saved === undefined) delete process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES;
+            else process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES = saved;
+        }
+    });
+
+    it('records a parser stopped for memory as a failure to retry, and the next file is still indexed', async () => {
+        const task = seedTask([attachment('heavy.pdf'), attachment('fine.txt')]);
+        storeFor(task, ['%PDF-1.4 heavy', 'Fine harbour text.']);
+        const real = extractor.extractText;
+        jest.spyOn(extractor, 'extractText').mockImplementation((input, options) => (input.kind === 'pdf'
+            ? Promise.reject(Object.assign(new Error('memory cap'), { code: 'too_much_memory' }))
+            : real(input, options)));
+
+        await taskChanged(task, ['attachments']);
+
+        expect(markerOf(sourceOf(task, task.attachments[0]))).toMatchObject({ tombstoneReason: 'extract:too_much_memory', extractAttempts: 1 });
+        expect(await indexer.pendingFiles(C)).toEqual([sourceOf(task, task.attachments[0])]);
+        expect(live(sourceOf(task, task.attachments[1]))).toHaveLength(1);
+    });
+
+    it('skips an attachment whose key is not where the app stores this task\'s files, without reading it', async () => {
+        const other = seedTask();
+        const task = seedTask([attachment('a.txt'), attachment('b.txt'), attachment('c.txt'), attachment('d.txt')]);
+        task.attachments[0].url = `Project/${P1}/Sprint/${other._id}/Attachment/a.txt`;
+        task.attachments[1].url = 'Payroll/2026/salaries.txt';
+        task.attachments[2].url = `Project/${P1}/Sprint/${task._id}/Attachment/../../../Payroll/salaries.txt`;
+        task.attachments[3].url = 'formAttachment/6f00000000000000000000f1/abcdef0123456789abcdef01.txt';
+        task.attachments.forEach((a) => store(C, a.url, 'Someone else\'s text.'));
+
+        await taskChanged(task, ['attachments']);
+
+        expect(readStoredFile).not.toHaveBeenCalled();
+        task.attachments.forEach((a) => expect(markerOf(sourceOf(task, a))).toMatchObject({ tombstoneReason: 'skipped:foreign_key' }));
+    });
+
+    it('reads a key the app wrote for this task, under the project it had when the file was uploaded', async () => {
+        const task = seedTask([attachment('moved.txt')]);
+        task.attachments[0].url = `Project/${P2}/Sprint/${task._id}/Attachment/20260901T000000000Z_moved.txt`;
+        store(C, task.attachments[0].url, 'Uploaded before the move.');
+
+        await taskChanged(task, ['attachments']);
+
+        expect(live(sourceOf(task, task.attachments[0]))[0].text).toContain('Uploaded before the move.');
+    });
+});
+
+describe('work that outlives the process', () => {
+    /* A new module registry is a restarted process: its queues and timers start empty, and only
+     * what is in the database carries over. */
+    const restarted = () => {
+        let fresh;
+        jest.isolateModules(() => {
+            fresh = {
+                indexer: require('../Modules/Knowledge/ingest/indexer'),
+                events: require('../Modules/Knowledge/ingest/events'),
+                storage: require('../common-storage/readStoredFile'),
+            };
+        });
+        fresh.storage.readStoredFile.mockImplementation(async ({ companyId, key }) => {
+            const buffer = files.get(`${companyId}:${key}`);
+            if (!buffer) throw Object.assign(new Error('not found'), { code: 'not_found' });
+            return { buffer, size: buffer.length };
+        });
+        return fresh;
+    };
+
+    it('marks a file pending before it is queued, so a restart that lost the queue still extracts it', async () => {
+        const task = seedTask([attachment('queued.txt')]);
+        storeFor(task, ['Queued before the restart.']);
+        const before = restarted();
+        before.storage.readStoredFile.mockImplementation(() => new Promise(() => {}));
+
+        await before.events.handle(taskEnvelope(task, ['attachments']));
+        expect(await indexer.pendingFiles(C)).toEqual([sourceOf(task, task.attachments[0])]);
+
+        const after = restarted();
+        await after.indexer.resumeFiles(C);
+
+        expect(live(sourceOf(task, task.attachments[0]))[0].text).toContain('Queued before the restart.');
+        expect(await after.indexer.pendingFiles(C)).toEqual([]);
+    });
+
+    it('picks up pending files when the indexer starts', async () => {
+        const task = seedTask([attachment('queued.txt')]);
+        storeFor(task, ['Picked up at start.']);
+        const before = restarted();
+        before.storage.readStoredFile.mockImplementation(() => new Promise(() => {}));
+        await before.events.handle(taskEnvelope(task, ['attachments']));
+
+        const after = restarted();
+        expect(after.events.start()).toBe(true);
+        try {
+            await after.events.drain();
+        } finally {
+            after.events.stop();
+        }
+
+        expect(live(sourceOf(task, task.attachments[0]))[0].text).toContain('Picked up at start.');
+    });
+
+    it('retries a failed file after a restart once its retry is due, and not before', async () => {
+        const task = seedTask([attachment('late.txt')]);
+        const sourceId = sourceOf(task, task.attachments[0]);
+        await taskChanged(task, ['attachments']);
+        expect(markerOf(sourceId)).toMatchObject({ tombstoneReason: 'extract:failed', extractAttempts: 1 });
+        storeFor(task, ['Arrived after the restart.']);
+
+        const after = restarted();
+        await after.indexer.resumeFiles(C);
+        expect(after.storage.readStoredFile).not.toHaveBeenCalled();
+
+        await after.indexer.resumeFiles(C, { now: LATER });
+        expect(live(sourceId)[0].text).toContain('Arrived after the restart.');
+    });
+
+    it('keeps the retry limit across restarts', async () => {
+        const task = seedTask([attachment('never.txt')]);
+        const sourceId = sourceOf(task, task.attachments[0]);
+        await taskChanged(task, ['attachments']);
+
+        let reads = 1;
+        for (let i = 0; i < 4; i += 1) {
+            const after = restarted();
+            await after.indexer.resumeFiles(C, { now: LATER });
+            reads += after.storage.readStoredFile.mock.calls.length;
+        }
+
+        expect(reads).toBe(3);
+        expect(markerOf(sourceId)).toMatchObject({ tombstoneReason: 'extract:failed', extractAttempts: 3 });
+        expect(await indexer.pendingFiles(C)).toEqual([]);
+    });
+
+    it('is picked up by the heartbeat whatever the heartbeat\'s age, and by the recurring job', async () => {
+        const first = seedTask([attachment('one.txt')]);
+        const second = seedTask([attachment('two.txt')]);
+        await taskChanged(first, ['attachments']);
+        await taskChanged(second, ['attachments']);
+        storeFor(first, ['First, by the heartbeat.']);
+        storeFor(second, ['Second, by the recurring job.']);
+        mockDb.store[CHUNKS].filter((c) => c.sourceType === 'file').forEach((c) => { c.extractDueAt = new Date(Date.now() - 1000); });
+        mockDb.store[CHUNKS].find((c) => c.sourceId === sourceOf(second, second.attachments[0])).extractDueAt = new Date(Date.now() + 60000);
+
+        events.resetFileSweeps();
+        events.keepAlive(C);
+        await events.drain();
+        expect(live(sourceOf(first, first.attachments[0]))).toHaveLength(1);
+        expect(live(sourceOf(second, second.attachments[0]))).toHaveLength(0);
+
+        mockDb.store[CHUNKS].find((c) => c.sourceId === sourceOf(second, second.attachments[0])).extractDueAt = new Date(Date.now() - 1000);
+        await require('../Modules/Knowledge/ingest/backfill').backfillAll();
+        expect(live(sourceOf(second, second.attachments[0]))).toHaveLength(1);
+    });
+
+    it('takes a bounded number of due files per sweep', async () => {
+        const tasks = Array.from({ length: indexer.FILE_SWEEP_BATCH + 5 }, (_, i) => seedTask([attachment(`f${i}.txt`)]));
+        for (const task of tasks) await indexer.syncTaskFiles(C, String(task._id));
+        readStoredFile.mockClear();
+
+        await indexer.resumeFiles(C, { now: LATER });
+
+        expect(readStoredFile).toHaveBeenCalledTimes(indexer.FILE_SWEEP_BATCH);
     });
 });

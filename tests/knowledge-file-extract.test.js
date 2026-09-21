@@ -5,14 +5,17 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { pdfOf, docxOf, xlsxOf, zipDeclaring } = require('./fixtures/knowledgeFiles');
+const zlib = require('zlib');
+const { pdfOf, docxOf, xlsxOf, zipDeclaring, lyingZipOf } = require('./fixtures/knowledgeFiles');
 const extractor = require('../Modules/Knowledge/ingest/extract/extractor');
 const { limits } = require('../Modules/Knowledge/ingest/extract/limits');
 
-const ENV_KEYS = ['KNOWLEDGE_FILE_MAX_BYTES', 'KNOWLEDGE_FILE_MAX_CHARS', 'KNOWLEDGE_FILE_TIMEOUT_MS', 'KNOWLEDGE_FILE_MAX_PAGES', 'KNOWLEDGE_FILE_MAX_SHEETS', 'KNOWLEDGE_FILE_MAX_ROWS', 'KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES'];
+const ENV_KEYS = ['KNOWLEDGE_FILE_MAX_BYTES', 'KNOWLEDGE_FILE_MAX_CHARS', 'KNOWLEDGE_FILE_TIMEOUT_MS', 'KNOWLEDGE_FILE_MAX_PAGES', 'KNOWLEDGE_FILE_MAX_SHEETS', 'KNOWLEDGE_FILE_MAX_ROWS', 'KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES', 'KNOWLEDGE_FILE_MAX_PARSE_MEMORY_BYTES'];
 const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
 const SPINNING_WORKER = path.join(__dirname, 'fixtures', 'knowledgeSpinningWorker.js');
+const MEMORY_WORKER = path.join(__dirname, 'fixtures', 'knowledgeMemoryWorker.js');
+const MB = 1024 * 1024;
 
 jest.setTimeout(30000);
 
@@ -101,14 +104,14 @@ describe('what is never done', () => {
         }
     });
 
-    it('never treats a file as text by its name alone: bytes that are not text fail', async () => {
-        await expect(extractor.extractText({ buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x00, 0x01]), kind: 'text' })).rejects.toMatchObject({ code: 'failed' });
+    it('never treats a file as text by its name alone: bytes that are not text are a type mismatch', async () => {
+        await expect(extractor.extractText({ buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x00, 0x01]), kind: 'text' })).rejects.toMatchObject({ code: 'type_mismatch' });
     });
 
     it('never hands a parser a file whose bytes are not its type', async () => {
-        await expect(extractor.extractText({ buffer: Buffer.from('not a pdf at all'), kind: 'pdf' })).rejects.toMatchObject({ code: 'failed', message: 'The file is not a PDF.' });
-        await expect(extractor.extractText({ buffer: Buffer.from('not a zip at all'), kind: 'docx' })).rejects.toMatchObject({ code: 'failed' });
-        await expect(extractor.extractText({ buffer: Buffer.from('not a zip at all'), kind: 'xlsx' })).rejects.toMatchObject({ code: 'failed' });
+        await expect(extractor.extractText({ buffer: Buffer.from('not a pdf at all'), kind: 'pdf' })).rejects.toMatchObject({ code: 'type_mismatch' });
+        await expect(extractor.extractText({ buffer: Buffer.from('not a zip at all'), kind: 'docx' })).rejects.toMatchObject({ code: 'type_mismatch' });
+        await expect(extractor.extractText({ buffer: Buffer.from('not a zip at all'), kind: 'xlsx' })).rejects.toMatchObject({ code: 'type_mismatch' });
     });
 
     it('spawns no process and evaluates nothing: the extraction code names no child process, shell or eval', () => {
@@ -123,7 +126,7 @@ describe('what is never done', () => {
 describe('limits', () => {
     it('default to 10 MB, 200,000 characters, 20 s, 200 pages, 20 sheets, 5,000 rows and 100 MB unzipped, each overridable', () => {
         ENV_KEYS.forEach((key) => delete process.env[key]);
-        expect(limits()).toEqual({ maxBytes: 10 * 1024 * 1024, maxChars: 200000, timeoutMs: 20000, maxPages: 200, maxSheets: 20, maxRows: 5000, maxUnzippedBytes: 100 * 1024 * 1024 });
+        expect(limits()).toEqual({ maxBytes: 10 * 1024 * 1024, maxChars: 200000, timeoutMs: 20000, maxPages: 200, maxSheets: 20, maxRows: 5000, maxUnzippedBytes: 100 * 1024 * 1024, maxParseMemoryBytes: 256 * 1024 * 1024 });
 
         process.env.KNOWLEDGE_FILE_MAX_BYTES = '2048';
         process.env.KNOWLEDGE_FILE_MAX_CHARS = '500';
@@ -132,7 +135,8 @@ describe('limits', () => {
         process.env.KNOWLEDGE_FILE_MAX_SHEETS = '2';
         process.env.KNOWLEDGE_FILE_MAX_ROWS = '10';
         process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES = '4096';
-        expect(limits()).toEqual({ maxBytes: 2048, maxChars: 500, timeoutMs: 750, maxPages: 3, maxSheets: 2, maxRows: 10, maxUnzippedBytes: 4096 });
+        process.env.KNOWLEDGE_FILE_MAX_PARSE_MEMORY_BYTES = '8192';
+        expect(limits()).toEqual({ maxBytes: 2048, maxChars: 500, timeoutMs: 750, maxPages: 3, maxSheets: 2, maxRows: 10, maxUnzippedBytes: 4096, maxParseMemoryBytes: 8192 });
     });
 
     it('fall back to the default for a value that is not a positive number', () => {
@@ -208,5 +212,143 @@ describe('limits', () => {
         expect(outcomes).toEqual(['timed_out', 'timed_out', 'timed_out', 'timed_out']);
         expect(peak).toBeLessThanOrEqual(extractor.MAX_WORKERS);
         expect(extractor.MAX_WORKERS).toBe(2);
+    });
+});
+
+describe('bytes decide the parser together with the name', () => {
+    const mismatched = (buffer, kind) => expect(extractor.extractText({ buffer, kind })).rejects.toMatchObject({ code: 'type_mismatch' });
+
+    it('refuses a workbook, a legacy office file or a web page named .csv', async () => {
+        await mismatched(xlsxOf({ One: [['cell']] }), 'csv');
+        await mismatched(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0]), 'csv');
+        await mismatched(Buffer.from('<html><body><table><tr><td>cell</td></tr></table></body></html>'), 'csv');
+        await mismatched(Buffer.from('  <!DOCTYPE html><html></html>'), 'csv');
+    });
+
+    it('refuses a zip, a pdf, a legacy office file or a web page named as text or markdown', async () => {
+        for (const kind of ['text', 'markdown']) {
+            await mismatched(await docxOf(['x']), kind);
+            await mismatched(pdfOf([['x']]), kind);
+            await mismatched(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]), kind);
+            await mismatched(Buffer.from('<!doctype html><p>x</p>'), kind);
+        }
+    });
+
+    it('refuses a pdf named .docx, a workbook named .pdf, and text named .xlsx', async () => {
+        await mismatched(pdfOf([['x']]), 'docx');
+        await mismatched(xlsxOf({ One: [['cell']] }), 'pdf');
+        await mismatched(Buffer.from('plain words'), 'xlsx');
+    });
+
+    it('reads a csv as text with its own reader: no workbook format is ever sniffed from it', async () => {
+        const out = await extractor.extractText({ buffer: Buffer.from('ID;PWXL;N;E\nC;Y1;X1;K"cell"\n'), kind: 'csv' });
+        expect(out.text).toContain('ID;PWXL;N;E');
+        const quoted = await extractor.extractText({ buffer: Buffer.from('a,"b, still b","line\nbreak"\n1,2,3\n'), kind: 'csv' });
+        expect(quoted.text).toBe('a | b, still b | line break\n1 | 2 | 3');
+    });
+
+    it('keeps the row limit for a csv', async () => {
+        process.env.KNOWLEDGE_FILE_MAX_ROWS = '2';
+        const out = await extractor.extractText({ buffer: Buffer.from('one\ntwo\nthree\n'), kind: 'csv' });
+        expect(out.text).toContain('two');
+        expect(out.text).not.toContain('three');
+        expect(out.truncated).toBe(true);
+    });
+});
+
+describe('inflation is bounded by what is really inflated, not by what the archive says', () => {
+    it('refuses an archive whose entries claim to be small and inflate past the budget, with its own reason', async () => {
+        process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES = String(MB);
+        const bomb = lyingZipOf([['xl/workbook.xml', Buffer.alloc(8 * MB, 0x41)]], 100);
+        expect(bomb.length).toBeLessThan(64 * 1024);
+        await expect(extractor.extractText({ buffer: bomb, kind: 'xlsx' })).rejects.toMatchObject({ code: 'inflated_too_large' });
+        await expect(extractor.extractText({ buffer: bomb, kind: 'docx' })).rejects.toMatchObject({ code: 'inflated_too_large' });
+    });
+
+    it('counts every entry against one budget', async () => {
+        process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES = String(MB);
+        const many = lyingZipOf(Array.from({ length: 4 }, (_, i) => [`part${i}.xml`, Buffer.alloc(300 * 1024, 0x42)]), 10);
+        await expect(extractor.extractText({ buffer: many, kind: 'docx' })).rejects.toMatchObject({ code: 'inflated_too_large' });
+    });
+
+    it('never asks zlib for more than the budget left', () => {
+        const { inflateWithin } = require('../Modules/Knowledge/ingest/extract/zip');
+        const spy = jest.spyOn(zlib, 'inflateRawSync');
+        try {
+            const bomb = lyingZipOf([['a.xml', Buffer.alloc(4 * MB)], ['b.xml', Buffer.alloc(4 * MB)]], 1);
+            expect(() => inflateWithin(bomb, MB)).toThrow(expect.objectContaining({ code: 'inflated_too_large' }));
+            expect(spy).toHaveBeenCalled();
+            spy.mock.calls.forEach(([, options]) => expect(options.maxOutputLength).toBeLessThanOrEqual(MB + 1));
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
+    it('still reads an honest archive under the budget', async () => {
+        process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES = String(MB);
+        const out = await extractor.extractText({ buffer: await docxOf(['Within the budget.']), kind: 'docx' });
+        expect(out.text).toContain('Within the budget.');
+    });
+});
+
+describe('memory outside the heap', () => {
+    it('stops a parser whose memory passes the cap, says so, and the next file still runs', async () => {
+        process.env.KNOWLEDGE_FILE_MAX_PARSE_MEMORY_BYTES = String(48 * MB);
+        await expect(extractor.extractText({ buffer: pdfOf([['x']]), kind: 'pdf' }, { workerPath: MEMORY_WORKER })).rejects.toMatchObject({ code: 'too_much_memory' });
+        expect(extractor.activeWorkers()).toBe(0);
+        delete process.env.KNOWLEDGE_FILE_MAX_PARSE_MEMORY_BYTES;
+        const next = await extractor.extractText({ buffer: pdfOf([['Next file.']]), kind: 'pdf' });
+        expect(next.text).toContain('Next file.');
+    });
+});
+
+describe('parser slots', () => {
+    const tick = () => new Promise((resolve) => setImmediate(resolve));
+    const recorder = () => {
+        const started = [];
+        const release = {};
+        const job = (label, companyId, priority) => extractor.inSlot({ companyId, priority }, () => new Promise((resolve) => {
+            started.push(label);
+            release[label] = resolve;
+        }));
+        return { started, release, job };
+    };
+
+    it('give a live upload the next free slot before the backfill', async () => {
+        const { started, release, job } = recorder();
+        const runs = [job('a1', 'A', 'backfill'), job('a2', 'A', 'backfill'), job('a3', 'A', 'backfill'), job('a4', 'A', 'live')];
+        await tick();
+        expect(started).toEqual(['a1', 'a2']);
+        release.a1();
+        await tick();
+        await tick();
+        expect(started).toEqual(['a1', 'a2', 'a4']);
+        release.a2();
+        release.a4();
+        await tick();
+        await tick();
+        release.a3();
+        await Promise.all(runs);
+    });
+
+    it('never let one company take a freed slot while another company waits with none', async () => {
+        const { started, release, job } = recorder();
+        const runs = [job('a1', 'A', 'backfill'), job('a2', 'A', 'backfill'), job('a3', 'A', 'backfill'), job('a4', 'A', 'backfill'), job('b1', 'B', 'backfill')];
+        await tick();
+        expect(started).toEqual(['a1', 'a2']);
+        release.a1();
+        await tick();
+        await tick();
+        expect(started).toEqual(['a1', 'a2', 'b1']);
+        release.a2();
+        await tick();
+        await tick();
+        expect(started).toEqual(['a1', 'a2', 'b1', 'a3']);
+        release.b1();
+        release.a3();
+        await tick();
+        await tick();
+        release.a4();
+        await Promise.all(runs);
     });
 });

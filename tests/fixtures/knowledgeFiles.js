@@ -84,4 +84,43 @@ const xlsxOf = (sheets, { bookType = 'xlsx' } = {}) => {
 /* A zip whose central directory declares `bytes` of content in one stored entry of zeros. */
 const zipDeclaring = (bytes) => zipOf([['word/document.xml', Buffer.alloc(bytes)]]);
 
-module.exports = { pdfOf, docxOf, xlsxOf, zipOf, zipDeclaring };
+/* Deflated entries whose headers claim `declared` bytes each, whatever they really inflate to. */
+const lyingZipOf = (entries, declared) => {
+    const zlib = require('zlib');
+    const locals = [];
+    const centrals = [];
+    let offset = 0;
+    entries.forEach(([name, content]) => {
+        const nameBytes = Buffer.from(name);
+        const data = zlib.deflateRawSync(Buffer.isBuffer(content) ? content : Buffer.from(content));
+        const local = Buffer.alloc(30);
+        local.writeUInt32LE(0x04034b50, 0);
+        local.writeUInt16LE(20, 4);
+        local.writeUInt16LE(8, 8);
+        local.writeUInt32LE(data.length, 18);
+        local.writeUInt32LE(declared, 22);
+        local.writeUInt16LE(nameBytes.length, 26);
+        const central = Buffer.alloc(46);
+        central.writeUInt32LE(0x02014b50, 0);
+        central.writeUInt16LE(20, 4);
+        central.writeUInt16LE(20, 6);
+        central.writeUInt16LE(8, 10);
+        central.writeUInt32LE(data.length, 20);
+        central.writeUInt32LE(declared, 24);
+        central.writeUInt16LE(nameBytes.length, 28);
+        central.writeUInt32LE(offset, 42);
+        locals.push(local, nameBytes, data);
+        centrals.push(central, nameBytes);
+        offset += local.length + nameBytes.length + data.length;
+    });
+    const directory = Buffer.concat(centrals);
+    const end = Buffer.alloc(22);
+    end.writeUInt32LE(0x06054b50, 0);
+    end.writeUInt16LE(entries.length, 8);
+    end.writeUInt16LE(entries.length, 10);
+    end.writeUInt32LE(directory.length, 12);
+    end.writeUInt32LE(offset, 16);
+    return Buffer.concat([...locals, directory, end]);
+};
+
+module.exports = { pdfOf, docxOf, xlsxOf, zipOf, zipDeclaring, lyingZipOf };
