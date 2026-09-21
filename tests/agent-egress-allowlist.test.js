@@ -94,6 +94,34 @@ describe('egress allowlist entries', () => {
         expect(rules.validateHosts(['*.github.io']).errors).toEqual([{ entry: '*.github.io', reason: 'public_suffix' }]);
     });
 
+    const WILDCARD_DNS = ['nip.io', 'sslip.io', 'xip.io', 'traefik.me', 'localtest.me', 'lvh.me'];
+    const SHARED_HOSTING = [
+        'ngrok.io', 'ngrok.dev', 'ngrok-free.app', 'loca.lt', 'trycloudflare.com', 'github.io', 'github.dev', 'myshopify.com', 'readthedocs.io',
+        'azurestaticapps.net', 'firebaseio.com', 'herokuapp.com', 'vercel.app', 'netlify.app', 'pages.dev', 'workers.dev', 'blogspot.com',
+        'appspot.com', 'web.app',
+    ];
+
+    it.each(WILDCARD_DNS)('refuses a wildcard at any depth under %s, whose names resolve to any address written into them', (suffix) => {
+        for (const check of [valid, (list) => rules.validateHosts(list)]) {
+            expect(check([`*.${suffix}`]).errors).toEqual([{ entry: `*.${suffix}`, reason: 'wildcard_dns' }]);
+            expect(check([`*.team.${suffix}`]).errors).toEqual([{ entry: `*.team.${suffix}`, reason: 'wildcard_dns' }]);
+            expect(check([`*.${suffix}:443`]).errors).toEqual([{ entry: `*.${suffix}:443`, reason: 'wildcard_dns' }]);
+        }
+        expect(rules.hostMatches([`*.${suffix}`], `10.0.0.1.${suffix}`, 443)).toBe(false);
+        expect(rules.hostMatches([`*.team.${suffix}`], `x.team.${suffix}`, 443)).toBe(false);
+    });
+
+    it.each(WILDCARD_DNS)('still accepts an exact host under %s', (suffix) => {
+        expect(valid([`myapp.${suffix}`])).toEqual({ hosts: [`myapp.${suffix}`], errors: [] });
+    });
+
+    it.each(SHARED_HOSTING)('refuses the wildcard *.%s, a shared-hosting suffix, and keeps exact hosts under it', (suffix) => {
+        expect(valid([`*.${suffix}`]).errors).toEqual([{ entry: `*.${suffix}`, reason: 'public_suffix' }]);
+        expect(rules.validateHosts([`*.${suffix}`]).errors).toEqual([{ entry: `*.${suffix}`, reason: 'public_suffix' }]);
+        expect(valid([`myapp.${suffix}`])).toEqual({ hosts: [`myapp.${suffix}`], errors: [] });
+        expect(rules.hostMatches([`*.${suffix}`], `attacker.${suffix}`, 443)).toBe(false);
+    });
+
     it('a stored wildcard on a shared suffix matches nothing', () => {
         expect(rules.hostMatches(['*.github.io'], 'attacker.github.io', 443)).toBe(false);
         expect(rules.hostMatches(['*.co.uk'], 'attacker.co.uk', 443)).toBe(false);
@@ -245,6 +273,22 @@ describe('the gateway', () => {
             expect(hits).toHaveLength(1);
         });
 
+        it('an entry naming the https port does not admit plain http on the default port', async () => {
+            seedList(CID_A, ['api.public.test:443']);
+            await expect(fetchAs(CID_A, 'http://api.public.test/page')).rejects.toThrow(/not on this workspace's egress allowlist/);
+            expect(hits).toEqual([]);
+            await settle();
+            expect(audits(CID_A)[0].meta).toEqual({ reason: 'unlisted', host: 'api.public.test', port: 80, hop: 0 });
+        });
+
+        it('an entry naming the http port does not admit https on the default port', async () => {
+            seedList(CID_A, ['api.public.test:80']);
+            await expect(fetchAs(CID_A, 'https://api.public.test/page')).rejects.toThrow(/not on this workspace's egress allowlist/);
+            expect(hits).toEqual([]);
+            await settle();
+            expect(audits(CID_A)[0].meta).toEqual({ reason: 'unlisted', host: 'api.public.test', port: 443, hop: 0 });
+        });
+
         it('a private host stays refused even when the list names it', async () => {
             seedList(CID_A, ['localhost', '127.0.0.1', 'printer.local']);
             await expect(fetchAs(CID_A, `http://localhost:${port}/secret`)).rejects.toThrow(/private|local/i);
@@ -379,6 +423,45 @@ describe('the gateway', () => {
             await store.replaceHosts(CID_A, [], ACTOR);
             failNextListRead(CID_A);
             expect((await fetchAs(CID_A, `http://api.public.test:${port}/page`)).status).toBe(200);
+        });
+
+        describe('the last known emptiness, on a clock', () => {
+            let clock;
+            let now;
+            const WINDOW_MS = store.CACHE_TTL_SECONDS * 1000;
+            const failNextRead = () => mockDbFor(CID_A).crud.mockImplementationOnce(async () => { throw new Error('mongo down'); });
+
+            beforeEach(() => {
+                clock = Date.now();
+                now = jest.spyOn(Date, 'now').mockImplementation(() => clock);
+            });
+            afterEach(() => now.mockRestore());
+
+            it('lets a failed read fetch as without a list within one cache window of the empty read', async () => {
+                expect((await fetchAs(CID_A, `http://api.public.test:${port}/page`)).status).toBe(200);
+                clock += WINDOW_MS - 1000;
+                failNextListRead(CID_A);
+                expect((await fetchAs(CID_A, `http://api.public.test:${port}/page`)).status).toBe(200);
+                expect(hits).toHaveLength(2);
+            });
+
+            it('refuses a failed read once the window since the empty read has passed, another server may have added hosts', async () => {
+                expect((await fetchAs(CID_A, `http://api.public.test:${port}/page`)).status).toBe(200);
+                clock += WINDOW_MS + 1000;
+                failNextRead();
+                await expect(fetchAs(CID_A, `http://api.public.test:${port}/page`)).rejects.toThrow(/allowlist.*read/i);
+                expect(hits).toHaveLength(1);
+            });
+
+            it('a write that empties the list starts the window again, and it ends too', async () => {
+                await store.replaceHosts(CID_A, [], ACTOR);
+                clock += WINDOW_MS - 1000;
+                failNextListRead(CID_A);
+                expect((await fetchAs(CID_A, `http://api.public.test:${port}/page`)).status).toBe(200);
+                clock += 2000;
+                failNextListRead(CID_A);
+                await expect(fetchAs(CID_A, `http://api.public.test:${port}/page`)).rejects.toThrow(/allowlist.*read/i);
+            });
         });
 
         it('counts the list read against the fetch deadline', async () => {

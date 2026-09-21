@@ -98,14 +98,14 @@ const workspace = (data, id) => data.workspaces.find((w) => w.companyId === id);
 
 const ROUTES = [
     ['GET', BASE, undefined],
-    ['PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com'] }],
+    ['PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com'], version: 0 }],
 ];
 
 describe('with the flag off', () => {
     it.each(ROUTES)('answers 404 to the owner on %s %s and names the flag', async (method, path, body) => {
         const res = await asOwner(method, path, body);
         expect(res.status).toBe(404);
-        expect(res.body).toMatchObject({ status: false, statusText: expect.stringContaining(ENV_KEY), data: { flag: { on: false, envKey: ENV_KEY } } });
+        expect(res.body).toMatchObject({ status: false, code: 'flag_off', statusText: expect.stringContaining(ENV_KEY), data: { flag: { on: false, envKey: ENV_KEY } } });
         expect(listOf(CID_A)).toBeUndefined();
     });
 
@@ -151,9 +151,9 @@ describe('with the flag on', () => {
             expect(body.status).toBe(true);
             expect(body.data).toMatchObject({ flag: { on: true, envKey: ENV_KEY }, cacheTtlSeconds: 30, windowDays: 7, maxHosts: expect.any(Number) });
             expect(WINDOW_DAYS).toBe(7);
-            expect(workspace(body.data, CID_A)).toMatchObject({ companyId: CID_A, name: 'Acme', hosts: ['docs.example.com', '*.api.example.com'], updatedBy: OWNER, updatedByName: 'Olivia Owner', refused7d: 2 });
+            expect(workspace(body.data, CID_A)).toMatchObject({ companyId: CID_A, name: 'Acme', hosts: ['docs.example.com', '*.api.example.com'], updatedBy: OWNER, updatedByName: 'Olivia Owner', refused7d: 2, version: 0 });
             expect(new Date(workspace(body.data, CID_A).updatedAt).getTime()).toBeCloseTo(daysAgo(1).getTime(), -4);
-            expect(workspace(body.data, CID_B)).toMatchObject({ companyId: CID_B, name: 'Bolt', hosts: [], updatedAt: null, updatedBy: '', updatedByName: '', refused7d: 1 });
+            expect(workspace(body.data, CID_B)).toMatchObject({ companyId: CID_B, name: 'Bolt', hosts: [], updatedAt: null, updatedBy: '', updatedByName: '', refused7d: 1, version: 0 });
         });
 
         it('reads the stored list, not the cache', async () => {
@@ -171,11 +171,11 @@ describe('with the flag on', () => {
             seedList(CID_A, ['old.example.com', 'kept.example.com']);
             myCache.set(cacheKey, ['old.example.com', 'kept.example.com'], 30);
             const before = Date.now();
-            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['Kept.example.com', '*.new.example.com', 'kept.example.com'] });
+            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['Kept.example.com', '*.new.example.com', 'kept.example.com'], version: 0 });
             expect(res.status).toBe(200);
-            expect(res.body.data).toMatchObject({ companyId: CID_A, hosts: ['kept.example.com', '*.new.example.com'], updatedBy: OWNER, cacheTtlSeconds: 30 });
+            expect(res.body.data).toMatchObject({ companyId: CID_A, hosts: ['kept.example.com', '*.new.example.com'], updatedBy: OWNER, version: 1, cacheTtlSeconds: 30 });
             expect(new Date(res.body.data.updatedAt).getTime()).toBeGreaterThanOrEqual(before);
-            expect(listOf(CID_A)).toMatchObject({ _id: store.DOC_ID, hosts: ['kept.example.com', '*.new.example.com'], updatedBy: OWNER });
+            expect(listOf(CID_A)).toMatchObject({ _id: store.DOC_ID, hosts: ['kept.example.com', '*.new.example.com'], updatedBy: OWNER, version: 1 });
             expect(mockDbFor(CID_A).store[store.COLLECTION]).toHaveLength(1);
             expect(myCache.get(cacheKey)).toBeUndefined();
             await settle();
@@ -188,16 +188,16 @@ describe('with the flag on', () => {
         });
 
         it('creates the document for a workspace that had none', async () => {
-            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com'] });
+            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com'], version: 0 });
             expect(res.status).toBe(200);
-            expect(listOf(CID_A).hosts).toEqual(['docs.example.com']);
+            expect(listOf(CID_A)).toMatchObject({ hosts: ['docs.example.com'], version: 1 });
             await settle();
             expect(changeAudits(CID_A)[0].meta).toEqual({ added: ['docs.example.com'], removed: [], count: 1 });
         });
 
         it('an empty list clears the workspace back to today\'s behaviour, and the audit row says the list was emptied', async () => {
             seedList(CID_A, ['docs.example.com']);
-            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: [] });
+            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: [], version: 0 });
             expect(res.status).toBe(200);
             expect(res.body.data.hosts).toEqual([]);
             expect(listOf(CID_A).hosts).toEqual([]);
@@ -208,7 +208,7 @@ describe('with the flag on', () => {
 
         it('the same list again writes nothing and no audit row', async () => {
             seedList(CID_A, ['docs.example.com']);
-            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['DOCS.example.com'] });
+            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['DOCS.example.com'], version: 0 });
             expect(res.status).toBe(200);
             expect(res.body.data.hosts).toEqual(['docs.example.com']);
             expect(new Date(listOf(CID_A).updatedAt).getTime()).toBeCloseTo(daysAgo(1).getTime(), -4);
@@ -220,35 +220,170 @@ describe('with the flag on', () => {
             [['10.0.0.1'], 'address'], [['169.254.169.254'], 'address'], [['[::1]'], 'address'], [['0x7f000001'], 'address'],
             [['localhost'], 'private'], [['printer.local'], 'private'], [['vault.internal'], 'private'],
             [['https://docs.example.com'], 'scheme'], [['docs.example.com/api'], 'path'], [['192.168.0.0/16'], 'address'],
-            [['*.com'], 'wildcard'], [['*.co.uk'], 'public_suffix'], [['*.github.io'], 'public_suffix'], [['*.s3.amazonaws.com'], 'public_suffix'], [['docs.example.com:99999'], 'port'], [['docs.example.com', 'not a host'], 'invalid'],
+            [['*.com'], 'wildcard'], [['*.co.uk'], 'public_suffix'], [['*.nip.io'], 'wildcard_dns'], [['*.team.sslip.io'], 'wildcard_dns'], [['*.vercel.app'], 'public_suffix'], [['*.github.io'], 'public_suffix'], [['*.s3.amazonaws.com'], 'public_suffix'], [['docs.example.com:99999'], 'port'], [['docs.example.com', 'not a host'], 'invalid'],
         ])('refuses %j as %s and leaves the list alone', async (hosts, reason) => {
             seedList(CID_A, ['docs.example.com']);
-            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts });
+            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts, version: 0 });
             expect(res.status).toBe(400);
-            expect(res.body.status).toBe(false);
+            expect(res.body).toMatchObject({ status: false, code: 'entries_refused' });
             expect(res.body.data.errors).toEqual([{ entry: hosts[hosts.length - 1], reason }]);
             expect(listOf(CID_A).hosts).toEqual(['docs.example.com']);
             await settle();
             expect(changeAudits(CID_A)).toHaveLength(0);
         });
 
-        it.each([[{}], [{ hosts: 'docs.example.com' }], [{ hosts: null }], [{ hosts: [{ host: 'docs.example.com' }] }]])('refuses a body of %j', async (body) => {
+        it.each([[{ version: 0 }, 'hosts_not_list'], [{ hosts: 'docs.example.com', version: 0 }, 'hosts_not_list'], [{ hosts: null, version: 0 }, 'hosts_not_list'], [{ hosts: [{ host: 'docs.example.com' }], version: 0 }, 'entries_refused']])('refuses a body of %j as %s', async (body, code) => {
             const res = await asOwner('PUT', `${BASE}/${CID_A}`, body);
             expect(res.status).toBe(400);
+            expect(res.body.code).toBe(code);
             expect(listOf(CID_A)).toBeUndefined();
         });
 
         it('refuses an unknown workspace and a malformed id', async () => {
-            expect((await asOwner('PUT', `${BASE}/${MISSING_CID}`, { hosts: ['docs.example.com'] })).status).toBe(404);
-            expect((await asOwner('PUT', `${BASE}/nope`, { hosts: ['docs.example.com'] })).status).toBe(400);
+            expect((await asOwner('PUT', `${BASE}/${MISSING_CID}`, { hosts: ['docs.example.com'], version: 0 })).body).toMatchObject({ status: false, code: 'unknown_workspace' });
+            expect((await asOwner('PUT', `${BASE}/nope`, { hosts: ['docs.example.com'], version: 0 })).body).toMatchObject({ status: false, code: 'invalid_company_id' });
+            expect((await asOwner('PUT', `${BASE}/${MISSING_CID}`, { hosts: ['docs.example.com'], version: 0 })).status).toBe(404);
+            expect((await asOwner('PUT', `${BASE}/nope`, { hosts: ['docs.example.com'], version: 0 })).status).toBe(400);
             expect(listOf(MISSING_CID)).toBeUndefined();
         });
 
         it('never touches another workspace\'s list', async () => {
             seedList(CID_B, ['bolt.example.com']);
-            await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['acme.example.com'] });
+            await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['acme.example.com'], version: 0 });
             expect(listOf(CID_B).hosts).toEqual(['bolt.example.com']);
             expect(changeAudits(CID_B)).toHaveLength(0);
+        });
+    });
+
+    describe('two tabs saving the same list', () => {
+        it('the summary carries each list\'s version, 0 for a workspace with none or a list stored before versions', async () => {
+            seedList(CID_A, ['docs.example.com']);
+            seedList(CID_B, ['bolt.example.com'], { version: 4 });
+            const { body } = await asOwner('GET', BASE);
+            expect(workspace(body.data, CID_A).version).toBe(0);
+            expect(workspace(body.data, CID_B).version).toBe(4);
+        });
+
+        it('a save names the version it read, and each save moves the version on', async () => {
+            seedList(CID_A, ['docs.example.com'], { version: 2 });
+            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com', 'api.example.com'], version: 2 });
+            expect(res.status).toBe(200);
+            expect(res.body.data.version).toBe(3);
+            expect(listOf(CID_A).version).toBe(3);
+        });
+
+        it('a save from a stale read gets 409 and drops nobody\'s hosts', async () => {
+            seedList(CID_A, ['docs.example.com']);
+            expect((await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com', 'first.example.com'], version: 0 })).status).toBe(200);
+            const second = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com', 'second.example.com'], version: 0 });
+            expect(second.status).toBe(409);
+            expect(second.body).toMatchObject({ status: false, code: 'stale_version', data: { version: 1 } });
+            expect(listOf(CID_A)).toMatchObject({ hosts: ['docs.example.com', 'first.example.com'], version: 1 });
+            await settle();
+            expect(changeAudits(CID_A)).toHaveLength(1);
+        });
+
+        it('a stale save is refused even when it would change nothing', async () => {
+            seedList(CID_A, ['docs.example.com'], { version: 5 });
+            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com'], version: 4 });
+            expect(res.status).toBe(409);
+            expect(res.body.code).toBe('stale_version');
+        });
+
+        it('a write that lands between the check and the save is refused too', async () => {
+            seedList(CID_A, ['docs.example.com'], { version: 1 });
+            const db = mockDbFor(CID_A);
+            const real = db.crud.getMockImplementation();
+            db.crud.mockImplementation(async (companyId, q, method) => {
+                if (method === 'findOneAndUpdate' && q.type === store.COLLECTION) {
+                    listOf(CID_A).hosts = ['docs.example.com', 'raced.example.com'];
+                    listOf(CID_A).version = 2;
+                }
+                return real(companyId, q, method);
+            });
+            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com', 'mine.example.com'], version: 1 });
+            expect(res.status).toBe(409);
+            expect(res.body.code).toBe('stale_version');
+            expect(listOf(CID_A)).toMatchObject({ hosts: ['docs.example.com', 'raced.example.com'], version: 2 });
+            expect(mockDbFor(CID_A).store[store.COLLECTION]).toHaveLength(1);
+        });
+
+        it.each([[{ hosts: ['docs.example.com'] }], [{ hosts: ['docs.example.com'], version: -1 }], [{ hosts: ['docs.example.com'], version: '1' }], [{ hosts: ['docs.example.com'], version: 1.5 }]])('refuses a save of %j without a usable version', async (body) => {
+            const res = await asOwner('PUT', `${BASE}/${CID_A}`, body);
+            expect(res.status).toBe(400);
+            expect(res.body.code).toBe('version_required');
+            expect(listOf(CID_A)).toBeUndefined();
+        });
+    });
+
+    describe('many workspaces', () => {
+        it('pages the workspace list, newest first, and reaches past the first 500', async () => {
+            for (let i = 0; i < 520; i += 1) seedCompany(`6f${String(i).padStart(22, '0')}`, `W${i}`);
+            const seen = [];
+            let page = 1;
+            let total;
+            for (;;) {
+                // eslint-disable-next-line no-await-in-loop
+                const { status, body } = await asOwner('GET', `${BASE}?page=${page}&pageSize=100`);
+                expect(status).toBe(200);
+                expect(body.data).toMatchObject({ page, pageSize: 100 });
+                total = body.data.total;
+                if (!body.data.workspaces.length) break;
+                seen.push(...body.data.workspaces.map((w) => w.companyId));
+                page += 1;
+            }
+            expect(total).toBe(522);
+            expect(new Set(seen).size).toBe(522);
+            expect(page).toBe(7);
+        });
+
+        it('defaults to the first page and bounds the page size', async () => {
+            const first = await asOwner('GET', BASE);
+            expect(first.body.data).toMatchObject({ page: 1, pageSize: 50, total: 2 });
+            const odd = await asOwner('GET', `${BASE}?page=-3&pageSize=100000`);
+            expect(odd.body.data).toMatchObject({ page: 1, pageSize: 200 });
+            const second = await asOwner('GET', `${BASE}?page=2&pageSize=1`);
+            expect(second.body.data.workspaces).toHaveLength(1);
+            expect(second.body.data.workspaces[0].companyId).not.toBe((await asOwner('GET', `${BASE}?page=1&pageSize=1`)).body.data.workspaces[0].companyId);
+        });
+    });
+
+    describe('the admin key', () => {
+        const KEY = 'egfx-admin-key';
+        beforeEach(() => { process.env.INSTANCE_ADMIN_KEY = KEY; });
+        afterEach(() => { delete process.env.INSTANCE_ADMIN_KEY; });
+
+        it('is recorded as its own actor, on the list and on the audit row', async () => {
+            const res = await fetch(`${baseURL}${BASE}/${CID_A}`, { method: 'PUT', headers: { 'content-type': 'application/json', adminkey: KEY }, body: JSON.stringify({ hosts: ['docs.example.com'], version: 0 }) });
+            expect(res.status).toBe(200);
+            expect(listOf(CID_A).updatedBy).toBe('instance-admin-key');
+            await settle();
+            expect(changeAudits(CID_A)).toHaveLength(1);
+            expect(changeAudits(CID_A)[0]).toMatchObject({ actorId: 'instance-admin-key', meta: { via: 'admin_key' } });
+        });
+
+        it('an owner session stays the owner', async () => {
+            await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com'], version: 0 });
+            await settle();
+            expect(changeAudits(CID_A)[0]).toMatchObject({ actorId: OWNER, actorName: 'Olivia Owner' });
+            expect(changeAudits(CID_A)[0].meta).not.toHaveProperty('via');
+        });
+    });
+
+    describe('error answers', () => {
+        it('carry a stable code when the store fails', async () => {
+            const global = g();
+            const real = global.crud.getMockImplementation();
+            global.crud.mockImplementation(async (companyId, q, method) => {
+                if (q.type === 'companies') throw new Error('mongo down');
+                return real(companyId, q, method);
+            });
+            const summary = await asOwner('GET', BASE);
+            expect(summary.status).toBe(500);
+            expect(summary.body).toMatchObject({ status: false, code: 'server_error' });
+            const save = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com'], version: 0 });
+            expect(save.status).toBe(500);
+            expect(save.body).toMatchObject({ status: false, code: 'server_error' });
         });
     });
 });
