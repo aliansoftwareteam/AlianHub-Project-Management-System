@@ -68,8 +68,9 @@ describe('a step row in an answer', () => {
     const PREVIOUS = 'decaf000decaf000decaf000';
     const row = { stepId: 'sAgent', type: 'agent_run', status: 'running', fencingToken: 1, credentialId: CREDENTIAL, previousCredentialId: PREVIOUS, credentialExpiresAt: new Date() };
     const document = { ...row, toObject: () => ({ ...row }) };
+    const serialised = { ...row, toJSON: () => ({ ...row }), toObject: () => { throw new Error('toJSON is what a response serialises'); } };
 
-    it.each([['a plain row', row], ['a mongoose document', document]])('never carries a credential id: %s', async (label, step) => {
+    it.each([['a plain row', row], ['a mongoose document', document], ['a document that serialises with toJSON', serialised]])('never carries a credential id: %s', async (label, step) => {
         store.getRun.mockResolvedValue({ _id: RUN_ID, status: 'failed', startedBy: OWNER });
         store.listSteps.mockResolvedValue([step]);
         store.getStep.mockResolvedValue(step);
