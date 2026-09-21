@@ -1,7 +1,7 @@
 {
   "locale": "ch",
   "machineTranslated": false,
-  "updatedAt": "2026-09-20T10:51:24.128Z",
+  "updatedAt": "2026-09-21T03:53:28.755Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6159,6 +6159,19 @@
     "ProviderKeys.err_value": "A key value is required.",
     "ProviderKeys.confirm_clear": "Clear the {name} key? Calls bill the instance key again.",
     "ProviderKeys.saved_toast": "{name} key saved.",
-    "ProviderKeys.cleared_toast": "{name} key cleared."
+    "ProviderKeys.cleared_toast": "{name} key cleared.",
+    "Egress.error_wildcard_dns": "That domain answers every name under it with whatever address the name spells out, private ones included, so a wildcard there would allow any address. List the exact host instead.",
+    "Egress.port_help": "An entry without a port allows that host on any port, over plain http as well as https. Add :443 to allow https on its usual port only.",
+    "Egress.updated_by_admin_key": "the instance admin key",
+    "Egress.page_prev": "Previous",
+    "Egress.page_next": "Next",
+    "Egress.page_status": "Page {page} of {pages} · {total} workspaces",
+    "Egress.code_flag_off": "The gateway is off, so there is no list to change.",
+    "Egress.code_invalid_company_id": "That is not a workspace id.",
+    "Egress.code_hosts_not_list": "The save did not carry a list of hosts.",
+    "Egress.code_version_required": "The save did not say which version of the list it was made from. Reload the page and try again.",
+    "Egress.code_stale_version": "Someone changed this list since you opened it. The page now shows the current list; make your change again.",
+    "Egress.code_unknown_workspace": "That workspace no longer exists.",
+    "Egress.code_server_error": "The list could not be read or saved. Try again; if it keeps failing, the server log has the cause."
   }
 }

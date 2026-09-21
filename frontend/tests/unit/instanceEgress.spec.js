@@ -13,26 +13,29 @@ const CID_A = '6f00000000000000000000a1';
 const CID_B = '6f00000000000000000000b1';
 const WHEN = '2026-09-17T10:00:00.000Z';
 
-const ws = (companyId, name, over = {}) => ({ companyId, name, hosts: [], updatedAt: null, updatedBy: '', updatedByName: '', refused7d: 0, ...over });
+const ws = (companyId, name, over = {}) => ({ companyId, name, hosts: [], updatedAt: null, updatedBy: '', updatedByName: '', refused7d: 0, version: 0, ...over });
 
 const summary = (over = {}) => ({
     flag: { on: true, envKey: 'AGENT_EGRESS_ALLOWLIST' },
     cacheTtlSeconds: 30,
     windowDays: 7,
     maxHosts: 200,
+    page: 1,
+    pageSize: 50,
+    total: 2,
     workspaces: [
-        ws(CID_A, 'Acme', { hosts: ['docs.example.com', '*.api.example.com'], updatedAt: WHEN, updatedBy: 'u1', updatedByName: 'Olivia Owner', refused7d: 3 }),
+        ws(CID_A, 'Acme', { hosts: ['docs.example.com', '*.api.example.com'], updatedAt: WHEN, updatedBy: 'u1', updatedByName: 'Olivia Owner', refused7d: 3, version: 4 }),
         ws(CID_B, 'Bolt'),
     ],
     ...over,
 });
 
 const ok = (data) => Promise.resolve({ data: { status: true, data } });
-const refused = (status, statusText, data) => Promise.reject({ response: { status, data: { status: false, statusText, data } } });
+const refused = (status, statusText, data, code) => Promise.reject({ response: { status, data: { status: false, statusText, ...(code ? { code } : {}), data } } });
 
 const serve = ({ summaryData = summary(), put = () => ok({}) } = {}) => {
     apiRequestWithoutCompnay.mockImplementation((type, url, body) => {
-        if (type === 'get' && url === BASE) return ok(summaryData);
+        if (type === 'get' && url.split('?')[0] === BASE) return ok(typeof summaryData === 'function' ? summaryData(url) : summaryData);
         if (type === 'put') return put(url, body);
         return Promise.reject(new Error(`unexpected ${type} ${url}`));
     });
@@ -46,6 +49,7 @@ const mountWith = async (options) => {
 };
 
 const calls = (type) => apiRequestWithoutCompnay.mock.calls.filter(([t]) => t === type);
+const summaryLoads = () => calls('get').filter(([, url]) => url.split('?')[0] === BASE);
 const addHost = async (wrapper, cid, host) => {
     await wrapper.find(`input[data-test="host-input-${cid}"]`).setValue(host);
     await wrapper.find(`form[data-test="add-${cid}"]`).trigger('submit');
@@ -85,8 +89,8 @@ describe('InstanceEgress', () => {
     it('adds a host by sending the whole list and reloads', async () => {
         const wrapper = await mountWith();
         await addHost(wrapper, CID_A, ' Static.Example.com ');
-        expect(calls('put')).toEqual([['put', `${BASE}/${CID_A}`, { hosts: ['docs.example.com', '*.api.example.com', 'static.example.com'] }]]);
-        expect(calls('get').filter(([, url]) => url === BASE)).toHaveLength(2);
+        expect(calls('put')).toEqual([['put', `${BASE}/${CID_A}`, { hosts: ['docs.example.com', '*.api.example.com', 'static.example.com'], version: 4 }]]);
+        expect(summaryLoads()).toHaveLength(2);
         expect(wrapper.find(`input[data-test="host-input-${CID_A}"]`).element.value).toBe('');
     });
 
@@ -96,7 +100,7 @@ describe('InstanceEgress', () => {
         await wrapper.find(`button[data-test="remove-${CID_A}-docs.example.com"]`).trigger('click');
         await flushPromises();
         expect(confirm).not.toHaveBeenCalled();
-        expect(calls('put')).toEqual([['put', `${BASE}/${CID_A}`, { hosts: ['*.api.example.com'] }]]);
+        expect(calls('put')).toEqual([['put', `${BASE}/${CID_A}`, { hosts: ['*.api.example.com'], version: 4 }]]);
     });
 
     describe('removing the last host', () => {
@@ -120,7 +124,7 @@ describe('InstanceEgress', () => {
             vi.spyOn(window, 'confirm').mockReturnValue(true);
             const wrapper = await mountWith({ summaryData: oneHost() });
             await removeLast(wrapper);
-            expect(calls('put')).toEqual([['put', `${BASE}/${CID_A}`, { hosts: [] }]]);
+            expect(calls('put')).toEqual([['put', `${BASE}/${CID_A}`, { hosts: [], version: 0 }]]);
         });
     });
 
@@ -134,6 +138,11 @@ describe('InstanceEgress', () => {
         ['*.com', 'Egress.error_wildcard'],
         ['*.co.uk', 'Egress.error_public_suffix'],
         ['*.github.io', 'Egress.error_public_suffix'],
+        ['*.nip.io', 'Egress.error_wildcard_dns'],
+        ['*.team.sslip.io', 'Egress.error_wildcard_dns'],
+        ['*.nip.direct', 'Egress.error_wildcard_dns'],
+        ['*.backname.io', 'Egress.error_wildcard_dns'],
+        ['*.vercel.app', 'Egress.error_public_suffix'],
         ['docs.example.com:99999', 'Egress.error_port'],
         ['not a host', 'Egress.error_invalid'],
     ])('refuses %s in the browser before asking the server', async (entry, message) => {
@@ -151,10 +160,100 @@ describe('InstanceEgress', () => {
         expect(calls('put')).toEqual([]);
     });
 
-    it('shows a refusal from the server instead of pretending the list changed', async () => {
-        const wrapper = await mountWith({ put: () => refused(400, 'Entry refused.', { errors: [{ entry: 'x.example.com', reason: 'private' }] }) });
+    it('shows a refusal from the server instead of pretending the list changed, translated from its reason', async () => {
+        const wrapper = await mountWith({ put: () => refused(400, 'Entry refused.', { errors: [{ entry: 'x.example.com', reason: 'private' }] }, 'entries_refused') });
         await addHost(wrapper, CID_A, 'x.example.com');
-        expect(wrapper.find('[data-test="action-error"]').text()).toContain('Entry refused.');
+        expect(wrapper.find('[data-test="action-error"]').text()).toContain('x.example.com');
+        expect(wrapper.find('[data-test="action-error"]').text()).toContain('Egress.error_private');
+        expect(wrapper.find('[data-test="action-error"]').text()).not.toContain('Entry refused.');
+    });
+
+    it.each(['unknown_workspace', 'invalid_company_id', 'hosts_not_list', 'version_required', 'server_error'])('translates the %s answer from its code', async (code) => {
+        const wrapper = await mountWith({ put: () => refused(400, 'English text from the server.', undefined, code) });
+        await addHost(wrapper, CID_A, 'x.example.com');
+        expect(wrapper.find('[data-test="action-error"]').text()).toBe(`Egress.code_${code}`);
+    });
+
+    it('falls back to the server text for a code it does not know', async () => {
+        const wrapper = await mountWith({ put: () => refused(400, 'English text from the server.', undefined, 'something_new') });
+        await addHost(wrapper, CID_A, 'x.example.com');
+        expect(wrapper.find('[data-test="action-error"]').text()).toBe('English text from the server.');
+    });
+
+    it('a save from a stale read reloads the lists and says so', async () => {
+        let loads = 0;
+        const fresh = summary({ workspaces: [ws(CID_A, 'Acme', { hosts: ['docs.example.com', 'other-tab.example.com'], version: 5 })] });
+        const wrapper = await mountWith({
+            summaryData: () => { loads += 1; return loads === 1 ? summary() : fresh; },
+            put: () => refused(409, 'Stale.', { version: 5 }, 'stale_version'),
+        });
+        await addHost(wrapper, CID_A, 'mine.example.com');
+        expect(calls('put')[0][2]).toEqual({ hosts: ['docs.example.com', '*.api.example.com', 'mine.example.com'], version: 4 });
+        expect(summaryLoads()).toHaveLength(2);
+        expect(wrapper.find('[data-test="action-error"]').text()).toBe('Egress.code_stale_version');
+        expect(wrapper.findAll(`[data-test="host-${CID_A}"]`).map((chip) => chip.text())).toEqual(['docs.example.com', 'other-tab.example.com']);
+    });
+
+    it('says a port-less entry allows any port and plain http', async () => {
+        const wrapper = await mountWith();
+        expect(wrapper.find('[data-test="port-help"]').text()).toBe('Egress.port_help');
+    });
+
+    it('names the admin key as the one who last set a list', async () => {
+        const wrapper = await mountWith({ summaryData: summary({ workspaces: [ws(CID_A, 'Acme', { hosts: ['docs.example.com'], updatedAt: WHEN, updatedBy: 'instance-admin-key' })] }) });
+        expect(wrapper.find(`[data-test="updated-${CID_A}"]`).text()).toContain('Egress.updated_by_admin_key');
+        expect(wrapper.find(`[data-test="updated-${CID_A}"]`).text()).not.toContain('instance-admin-key');
+    });
+
+    describe('paging', () => {
+        const pageOf = (url) => Number(new URLSearchParams(url.split('?')[1] || '').get('page') || 1);
+        const paged = (url) => summary({ page: pageOf(url), pageSize: 50, total: 120, workspaces: [ws(`6f0000000000000000000${pageOf(url)}00`, `Page ${pageOf(url)}`)] });
+
+        it('asks for the first page, then moves between pages', async () => {
+            const wrapper = await mountWith({ summaryData: paged });
+            expect(summaryLoads()[0][1]).toBe(`${BASE}?page=1`);
+            expect(wrapper.find('[data-test="page-status"]').text()).toBe('Egress.page_status');
+            expect(wrapper.find('button[data-test="page-prev"]').attributes('disabled')).toBeDefined();
+            await wrapper.find('button[data-test="page-next"]').trigger('click');
+            await flushPromises();
+            expect(summaryLoads().at(-1)[1]).toBe(`${BASE}?page=2`);
+            expect(wrapper.text()).toContain('Page 2');
+            await wrapper.find('button[data-test="page-next"]').trigger('click');
+            await flushPromises();
+            expect(summaryLoads().at(-1)[1]).toBe(`${BASE}?page=3`);
+            expect(wrapper.find('button[data-test="page-next"]').attributes('disabled')).toBeDefined();
+            await wrapper.find('button[data-test="page-prev"]').trigger('click');
+            await flushPromises();
+            expect(summaryLoads().at(-1)[1]).toBe(`${BASE}?page=2`);
+        });
+
+        it('follows the page the server answers with when the list shrank under it', async () => {
+            let total = 150;
+            const shrinking = (url) => {
+                const pages = Math.ceil(total / 50);
+                const page = Math.min(pageOf(url), pages);
+                return summary({ page, pageSize: 50, total, workspaces: [ws(`6f0000000000000000000${page}00`, `Page ${page}`)] });
+            };
+            const wrapper = await mountWith({ summaryData: shrinking });
+            await wrapper.find('button[data-test="page-next"]').trigger('click');
+            await flushPromises();
+            await wrapper.find('button[data-test="page-next"]').trigger('click');
+            await flushPromises();
+            expect(summaryLoads().at(-1)[1]).toBe(`${BASE}?page=3`);
+            total = 100;
+            await wrapper.find('button.ah-btn--ghost').trigger('click');
+            await flushPromises();
+            expect(wrapper.text()).toContain('Page 2');
+            expect(wrapper.find('button[data-test="page-next"]').attributes('disabled')).toBeDefined();
+            await wrapper.find('button[data-test="page-prev"]').trigger('click');
+            await flushPromises();
+            expect(summaryLoads().at(-1)[1]).toBe(`${BASE}?page=1`);
+        });
+
+        it('shows no pager when every workspace fits on one page', async () => {
+            const wrapper = await mountWith();
+            expect(wrapper.find('[data-test="pager"]').exists()).toBe(false);
+        });
     });
 
     it('shows the flag off, names the variable and lists nothing', async () => {
