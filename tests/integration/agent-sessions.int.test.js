@@ -172,7 +172,9 @@ describe('outside agent sessions with EXTERNAL_AGENT_SESSIONS on', () => {
         expect(res.body.data.deliveredAt).toEqual(expect.any(String));
 
         const announced = await waitFor(() => announcements.find((a) => a.headers['x-alianhub-session'] === sessionId));
-        const expected = `sha256=${crypto.createHmac('sha256', secret).update(announced.body).digest('hex')}`;
+        const timestamp = announced.headers['x-alianhub-timestamp'];
+        expect(Math.abs(Number(timestamp) * 1000 - announced.at)).toBeLessThan(5000);
+        const expected = `sha256=${crypto.createHmac('sha256', secret).update(`${timestamp}.${announced.body}`).digest('hex')}`;
         expect(announced.headers['x-alianhub-signature']).toBe(expected);
         const body = JSON.parse(announced.body);
         expect(body).toMatchObject({ type: 'agent_session.offered', sessionId, task: { id: task._id } });
@@ -183,7 +185,8 @@ describe('outside agent sessions with EXTERNAL_AGENT_SESSIONS on', () => {
         const stored = await mongo.db(state.companyId).collection('tasks').findOne({ _id: new (require('mongodb').ObjectId)(task._id) });
         expect(stored.AssigneeUserId).toEqual([owner.uid]);
         const notified = await waitFor(() => mongo.db(state.companyId).collection('notifications').findOne({ changeType: 'agent_session_assigned', notSeen: owner.uid }));
-        expect(notified).toMatchObject({ assigneeUsers: [owner.uid], message: expect.stringMatching(/now yours while S10S7 coding agent works on it/) });
+        expect(notified).toMatchObject({ assigneeUsers: [owner.uid], changeData: { clientName: 'S10S7 coding agent', taskName: task.name, sessionId } });
+        expect(notified.message).not.toContain('S10S7');
         const audited = await waitFor(() => mongo.db(state.companyId).collection('audit_logs').findOne({ action: 'agent_session.delegated', entityId: task._id }));
         expect(audited).toMatchObject({ actorId: owner.uid, meta: { sessionId, clientId } });
 

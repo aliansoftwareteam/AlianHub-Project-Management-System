@@ -19,6 +19,7 @@ jest.mock('../Modules/AgentSessions/access', () => ({
     taskOf: jest.fn(),
     canOpenTask: jest.fn(async () => true),
     canEditTask: jest.fn(async () => true),
+    canAssignSelf: jest.fn(async () => true),
     privateSprintOf: jest.fn(async () => null),
     isSprintMember: jest.fn(async () => true),
 }));
@@ -117,6 +118,33 @@ describe('delegating a task to an outside agent', () => {
         expect(body).toMatchObject({ companyId: CID, taskId: TASK, userId: String(session._id), assigneeUsers: [OWNER], notSeen: [OWNER] });
     });
 
+    it('sends client and task text as data, never inside the notification message', async () => {
+        const markup = '<img src=x onerror=alert(1)>';
+        clients.clientStanding.mockResolvedValueOnce({ ok: true, name: `Coder ${markup}` });
+        access.taskOf.mockImplementation(async () => task({ TaskName: `Parser ${markup}`, TaskKey: `AH-7${markup}` }));
+        await delegateNow();
+        const { body } = handleNotificationtFun.mock.calls[0][0];
+        expect(body.message).not.toContain('<');
+        expect(body.message).not.toContain('Coder');
+        expect(body.message).not.toContain('Parser');
+        expect(body.changeData).toMatchObject({ clientName: `Coder ${markup}`, taskName: `Parser ${markup}`, taskKey: `AH-7${markup}` });
+    });
+
+    it('refuses to hand an unassigned task to a delegator who may not assign, with a code', async () => {
+        access.canAssignSelf.mockResolvedValueOnce(false);
+        await expect(delegateNow()).rejects.toMatchObject({ statusCode: 403, code: 'assign_not_allowed' });
+        expect(automationTools.updateTask).not.toHaveBeenCalled();
+        expect(db().store[SCHEMA_TYPE.AGENT_SESSIONS] || []).toHaveLength(0);
+    });
+
+    it('does not ask for the assign permission when the task keeps its assignee', async () => {
+        access.canAssignSelf.mockResolvedValue(false);
+        access.taskOf.mockImplementation(async () => task({ AssigneeUserId: [MEMBER] }));
+        const { session } = await delegateNow();
+        access.canAssignSelf.mockResolvedValue(true);
+        expect(session.state).toBe('offered');
+    });
+
     it('is refused to a person who cannot edit the task', async () => {
         access.canEditTask.mockResolvedValueOnce(false);
         await expect(delegateNow({ uid: MEMBER })).rejects.toMatchObject({ statusCode: 403 });
@@ -197,12 +225,25 @@ describe('the announcement', () => {
         const [{ url, options, egress }] = sent;
         expect(url).toBe(URL_OUT);
         expect(egress).toEqual({ companyId: CID, actor: OWNER });
-        const expected = `sha256=${crypto.createHmac('sha256', SECRET).update(options.body).digest('hex')}`;
+        const timestamp = options.headers['X-AlianHub-Timestamp'];
+        expect(timestamp).toMatch(/^\d{10}$/);
+        expect(Math.abs(Number(timestamp) - Math.floor(Date.now() / 1000))).toBeLessThan(5);
+        const expected = `sha256=${crypto.createHmac('sha256', SECRET).update(`${timestamp}.${options.body}`).digest('hex')}`;
         expect(options.headers['X-AlianHub-Signature']).toBe(expected);
         expect(options.headers['X-AlianHub-Event']).toBe('agent_session.offered');
         const body = JSON.parse(options.body);
         expect(body).toMatchObject({ sessionId: String(session._id), task: { id: TASK, key: 'AH-7', title: 'Write the parser' } });
         expect(body.handle).toMatch(/^ahs_/);
+    });
+
+    it('signs the timestamp with the body, so a replayed body under a new timestamp does not verify', async () => {
+        await delegateNow();
+        const { options } = sent[0];
+        const sign = (text) => `sha256=${crypto.createHmac('sha256', SECRET).update(text).digest('hex')}`;
+        const timestamp = options.headers['X-AlianHub-Timestamp'];
+        expect(options.headers['X-AlianHub-Signature']).not.toBe(sign(options.body));
+        expect(options.headers['X-AlianHub-Signature']).not.toBe(sign(`${Number(timestamp) + 60}.${options.body}`));
+        expect(JSON.parse(options.body).replayWindowSeconds).toBe(300);
     });
 
     it('carries no access token, refresh token or bearer credential', async () => {
@@ -287,6 +328,26 @@ describe('the ten-second first-activity rule', () => {
         await activity.record(ctxFor(), { sessionId: String(session._id), handle: handleOf(), type: 'thought', text: 'Reading the brief' });
         await jest.advanceTimersByTimeAsync(20000);
         expect((await store.find(CID, session._id)).state).toBe('active');
+    });
+
+    it('refuses a first activity that arrives after the ten seconds even when no timer or sweep ran', async () => {
+        const { session } = await delegateNow();
+        const handle = handleOf();
+        lifecycle.reset();
+        await jest.advanceTimersByTimeAsync(10001);
+        expect((await store.find(CID, session._id)).state).toBe('offered');
+        const error = await activity.record(ctxFor(), { sessionId: String(session._id), handle, type: 'thought', text: 'late' }).catch((e) => e);
+        expect(error).toBeInstanceOf(RefusedError);
+        expect(error.message).toMatch(/ten seconds/);
+        expect(await store.find(CID, session._id)).toMatchObject({ state: 'unresponsive', activityCount: 0 });
+    });
+
+    it('will not store a first activity past the deadline, whatever the caller checked', async () => {
+        const { session } = await delegateNow();
+        lifecycle.reset();
+        const late = new Date(Date.now() + 10001);
+        expect(await store.appendActivity(CID, session._id, { type: 'thought', text: 'late', at: late })).toBeNull();
+        expect(await store.appendActivity(CID, session._id, { type: 'thought', text: 'in time', at: new Date(Date.now() + 9999) })).toMatchObject({ first: true });
     });
 
     it('is decided after a restart from the stored delivery time', async () => {
@@ -384,6 +445,12 @@ describe('activities from the outside agent', () => {
         expect((await store.find(CID, session._id)).activityCount).toBe(60);
     });
 
+    it('forgets rate windows that have ended', () => {
+        activity.rateLimited('old-session', 0);
+        activity.rateLimited('new-session', 120000);
+        expect(activity.rateWindowCount()).toBe(1);
+    });
+
     it('completes and fails a session with its own closing activity', async () => {
         await activity.record(ctxFor(), { sessionId: String(session._id), handle, type: 'thought', text: 'go' });
         const done = await activity.complete(ctxFor(), { sessionId: String(session._id), summary: 'Opened PR #12' });
@@ -419,6 +486,26 @@ describe('revocation', () => {
         expect(await store.find(CID, session._id)).toMatchObject({ state: 'revoked', reason: expect.stringMatching(/no longer approved/) });
     });
 
+    it('closes the sessions on a task whose private-sprint opt-in was withdrawn', async () => {
+        access.privateSprintOf.mockResolvedValue({ _id: SPRINT, private: true, AssigneeUserId: [OWNER] });
+        const { session } = await delegateNow();
+        clients.privateSprintsOptIn.mockResolvedValue(false);
+        await lifecycle.sweepCompany(CID);
+        clients.privateSprintsOptIn.mockResolvedValue(true);
+        access.privateSprintOf.mockResolvedValue(null);
+        expect(await store.find(CID, session._id)).toMatchObject({ state: 'revoked', reason: expect.stringMatching(/opt/) });
+    });
+
+    it('closes the sessions on a task moved into a private sprint the delegator is not on', async () => {
+        const { session } = await delegateNow();
+        access.privateSprintOf.mockResolvedValue({ _id: SPRINT, private: true, AssigneeUserId: [MEMBER] });
+        access.isSprintMember.mockResolvedValue(false);
+        await lifecycle.sweepCompany(CID);
+        access.privateSprintOf.mockResolvedValue(null);
+        access.isSprintMember.mockResolvedValue(true);
+        expect(await store.find(CID, session._id)).toMatchObject({ state: 'revoked', reason: expect.stringMatching(/private sprint/) });
+    });
+
     it('leaves closed sessions alone', async () => {
         const { session } = await delegateNow();
         await activity.complete(ctxFor(), { sessionId: String(session._id), handle: handleOf(), summary: 'done' });
@@ -439,6 +526,12 @@ describe('with EXTERNAL_AGENT_SESSIONS off', () => {
         expect(tools.names().filter((name) => name.startsWith('session.'))).toEqual([]);
         expect(tools.manifest().map((t) => t.name)).not.toContain('session.activity');
         await expect(tools.call(ctxFor(), 'session.activity', { sessionId: 'x' })).rejects.toMatchObject({ code: -32601 });
+    });
+
+    it('maps no session tool to a scope', () => {
+        const { scopeForTool } = require('../Modules/Mcp/scopes');
+        expect(scopeForTool('session.activity')).toBeNull();
+        expect(scopeForTool('session.complete')).toBeNull();
     });
 
     it('registers no route and starts no sweep', () => {

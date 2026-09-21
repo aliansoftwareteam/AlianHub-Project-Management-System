@@ -15,6 +15,11 @@ const { taskSocketHandler } = require('../socket/controller/taskSocket');
 const relay = require('../socket/controller/agentSessionSocket');
 const { emitSession } = require('../Modules/AgentSessions/events');
 const access = require('../Modules/AgentSessions/access');
+const socketEmitter = require('../event/socketEventEmitter');
+
+const savedFlag = process.env.EXTERNAL_AGENT_SESSIONS;
+process.env.EXTERNAL_AGENT_SESSIONS = 'on';
+relay.registerWhenOn();
 
 const CID = '6a0000000000000000000001';
 const TASK = '6a00000000000000000000c3';
@@ -39,6 +44,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+    if (savedFlag === undefined) delete process.env.EXTERNAL_AGENT_SESSIONS; else process.env.EXTERNAL_AGENT_SESSIONS = savedFlag;
     clients.forEach((c) => c.close());
     await new Promise((resolve) => ioServer.close(resolve));
 });
@@ -104,6 +110,23 @@ describe('the agent session relay', () => {
         expect(access.canOpenTask).toHaveBeenCalledWith(CID, 'hidden', expect.objectContaining({ _id: TASK }));
     });
 
+    it('reaches only the authorised socket when another socket joined under the same room name', async () => {
+        const owner = await open('owner');
+        const intruder = await open('hidden');
+        const ownerGot = [];
+        const intruderGot = [];
+        owner.on(relay.EVENT, (payload) => ownerGot.push(payload));
+        intruder.on(relay.EVENT, (payload) => intruderGot.push(payload));
+        intruder.emit('joinTaskDetail', { taskId: TASK, socketId: owner.id });
+        await settle();
+        owner.emit('joinTaskDetail', { taskId: TASK, socketId: owner.id });
+        await settle();
+        emitSession(session());
+        await settle();
+        expect(ownerGot).toHaveLength(1);
+        expect(intruderGot).toHaveLength(0);
+    });
+
     it('stops reaching a socket that left the room', async () => {
         const socket = await open('owner');
         const got = [];
@@ -115,5 +138,25 @@ describe('the agent session relay', () => {
         emitSession(session());
         await settle();
         expect(got).toHaveLength(0);
+    });
+});
+
+describe('registering the relay', () => {
+    it('listens only while EXTERNAL_AGENT_SESSIONS is on, and once', () => {
+        const before = socketEmitter.listenerCount('agentSession:update');
+        expect(relay.registerWhenOn({})).toBe(false);
+        expect(relay.registerWhenOn({ EXTERNAL_AGENT_SESSIONS: 'on' })).toBe(true);
+        expect(socketEmitter.listenerCount('agentSession:update')).toBe(before);
+    });
+
+    it('adds no listener with the flag off', () => {
+        jest.isolateModules(() => {
+            const emitter = require('../event/socketEventEmitter');
+            const fresh = require('../socket/controller/agentSessionSocket');
+            expect(fresh.registerWhenOn({})).toBe(false);
+            expect(emitter.listenerCount('agentSession:update')).toBe(0);
+            expect(fresh.registerWhenOn({ EXTERNAL_AGENT_SESSIONS: 'on' })).toBe(true);
+            expect(emitter.listenerCount('agentSession:update')).toBe(1);
+        });
     });
 });
