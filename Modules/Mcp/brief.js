@@ -1,7 +1,7 @@
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { oid } = require('../Automations/engine/tools');
-const scope = require('../Agents/scope');
+const visibility = require('./visibility');
 const logger = require('../../Config/loggerConfig');
 
 const ACCEPTANCE_HEADING = /^\s*(acceptance|acceptance criteria|done when|definition of done|ac)\s*[:\-–]?\s*$/i;
@@ -74,16 +74,12 @@ const threadDigest = (comments) => {
  * without asking, and to know what it must not decide alone. */
 const TASK_NOT_FOUND = { error: 'task not found' };
 
-const inScope = async (ctx, projectId) => {
-    const id = String(projectId || '');
-    if (ctx.projectIds && ctx.projectIds.length && !ctx.projectIds.map(String).includes(id)) return false;
-    return (await scope.visibleProjectIds(ctx.companyId, String(ctx.userId))).map(String).includes(id);
-};
-
-const buildBrief = async (ctx, taskId) => {
+const buildBrief = async (ctx, taskId, vis) => {
     if (!oid(taskId)) return TASK_NOT_FOUND;
     const task = await MongoDbCrudOpration(ctx.companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(taskId), deletedStatusKey: { $ne: 1 } }] }, 'findOne');
-    if (!task || !(await inScope(ctx, task.ProjectID))) return TASK_NOT_FOUND;
+    if (!task) return TASK_NOT_FOUND;
+    const seen = vis || await visibility.forCaller(ctx);
+    if (!seen.allowsTask(task)) return TASK_NOT_FOUND;
     const description = plain(task.description || task.rawDescription || '');
 
     const [comments, project, sprint, relatedRows, pages] = await Promise.all([
@@ -99,12 +95,12 @@ const buildBrief = async (ctx, taskId) => {
         (task.relations || []).length
             ? MongoDbCrudOpration(ctx.companyId, {
                 type: SCHEMA_TYPE.TASKS,
-                data: [{ _id: { $in: (task.relations || []).map((r) => oid(r.taskId)).filter(Boolean) } }, { TaskName: 1, TaskKey: 1, status: 1, statusType: 1 }],
+                data: [{ _id: { $in: (task.relations || []).map((r) => oid(r.taskId)).filter(Boolean) }, deletedStatusKey: { $ne: 1 }, ...seen.taskClause() }, { TaskName: 1, TaskKey: 1, status: 1, statusType: 1 }],
             }, 'find').catch(() => [])
             : Promise.resolve([]),
         MongoDbCrudOpration(ctx.companyId, {
             type: SCHEMA_TYPE.PAGES,
-            data: [{ linkedTasks: String(task._id), deletedStatusKey: { $ne: 1 } }, { title: 1, updatedAt: 1 }, { limit: 10 }],
+            data: [{ linkedTasks: String(task._id), deletedStatusKey: { $ne: 1 }, ...seen.pageClause() }, { title: 1, updatedAt: 1 }, { limit: 10 }],
         }, 'find').catch(() => []),
     ]);
 
@@ -131,14 +127,14 @@ const buildBrief = async (ctx, taskId) => {
         acceptanceCriteria: acceptance.length ? acceptance : checklist,
         checklist,
 
-        relations: (task.relations || []).map((r) => {
+        relations: (task.relations || []).filter((r) => relatedById.has(String(r.taskId))).map((r) => {
             const other = relatedById.get(String(r.taskId));
             return {
                 type: REL_LABEL[r.type] || r.type || 'relates to',
-                taskId: String(r.taskId || ''),
-                key: other ? other.TaskKey || '' : '',
-                title: other ? other.TaskName || '' : '',
-                status: other ? other.status || '' : '',
+                taskId: String(r.taskId),
+                key: other.TaskKey || '',
+                title: other.TaskName || '',
+                status: other.status || '',
             };
         }),
         links: (task.links || []).map((l) => ({ url: l.url || String(l), label: l.label || '', kind: l.kind || 'link' })),
@@ -152,9 +148,9 @@ const buildBrief = async (ctx, taskId) => {
     };
 };
 
-const safeBuildBrief = async (ctx, taskId) => {
+const safeBuildBrief = async (ctx, taskId, vis) => {
     try {
-        return await buildBrief(ctx, taskId);
+        return await buildBrief(ctx, taskId, vis);
     } catch (error) {
         logger.error(`mcp brief ${taskId}: ${error.message}`);
         throw error;
