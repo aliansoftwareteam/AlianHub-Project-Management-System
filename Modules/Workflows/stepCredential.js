@@ -5,17 +5,9 @@ const registry = require('../Agents/registry');
 const { leaseMs } = require('./flag');
 const { STEP_CREDENTIAL_KIND, stepCredentialsEnabled } = require('../Agents/serviceIdentity');
 
-// The credential a step acts under, minted by the engine when it claims the
-// step and verified against the live step row whenever an actor presents it.
-//
-// It is derived from the engine's identity, not from any person's token: it
-// carries the tenant, the run, the step, the fencing token the claim won, the
-// run's actor context and the actions the step may perform, and it expires one
-// lease after it was minted. A heartbeat that extends the lease re-mints it, so
-// a long step always holds a live one while no single credential outlives one
-// lease. A credential for a step that has settled, been handed back or been
-// reclaimed under a new fencing token is refused before it expires, so a leaked
-// one buys one step's authority for at most one lease.
+// A replaced credential is not revoked: it stays good until the heartbeat after
+// the one that replaced it, so an action already in flight during a re-mint is
+// not refused, and no credential outlives one lease.
 
 const ALGORITHM = 'HS256';
 const KEY_SALT = 'alianhub-step-credential';
@@ -33,6 +25,9 @@ const REFUSAL = Object.freeze({
     AGENT_MISMATCH: 'agent_mismatch',
     STARTER_MISMATCH: 'starter_mismatch',
     ACTION_NOT_GRANTED: 'action_not_granted',
+    RUN_NOT_RUNNING: 'run_not_running',
+    SUPERSEDED: 'credential_superseded',
+    MISSING: 'credential_missing',
 });
 
 const enabled = stepCredentialsEnabled;
@@ -48,14 +43,14 @@ const key = () => {
     return cached.key;
 };
 
-/* What a step may perform: an agent step is bounded by its agent (every registry
- * action when the agent narrows nothing, as registry.evaluate reads it), a tool
- * call by its one tool, and any other step by nothing. */
+/* An agent that narrows nothing may do every registry action, as registry.evaluate
+ * reads it; an agent step whose agent was not found is granted nothing. */
 const actionsFor = (step, agent) => {
     const type = String(step && step.type);
     const config = (step && step.config) || {};
     if (type === 'agent_run') {
-        const allowed = agent && Array.isArray(agent.allowedActions) ? agent.allowedActions.map(String) : [];
+        if (!agent) return [];
+        const allowed = Array.isArray(agent.allowedActions) ? agent.allowedActions.map(String) : [];
         return allowed.length ? allowed : registry.keys();
     }
     if (type === 'tool_call') return config.tool ? [String(config.tool)] : [];
@@ -73,8 +68,19 @@ const sign = (claims, leaseExpiresAt, now = new Date()) => {
     return { token, credentialId, expiresAt, claims: signed };
 };
 
-const mint = ({ companyId, run, step, actions = [], now = new Date() }) => {
+const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
+
+/* An ObjectId, its hex in either case and a plain string id are the same id to Mongo. */
+const idOf = (value) => {
+    const text = value === null || value === undefined ? '' : String(value);
+    return OBJECT_ID.test(text) ? text.toLowerCase() : text;
+};
+
+const same = (a, b) => idOf(a) === idOf(b);
+
+const mint = ({ companyId, run, step, actions = [], agentId, now = new Date() }) => {
     const config = step.config || {};
+    const named = agentId !== undefined ? agentId : (config.agentId || (run && run.agentId) || null);
     return sign({
         kind: STEP_CREDENTIAL_KIND,
         companyId: String(companyId),
@@ -82,31 +88,40 @@ const mint = ({ companyId, run, step, actions = [], now = new Date() }) => {
         stepId: String(step.stepId),
         stepRunId: String(step._id),
         fencingToken: Number(step.fencingToken),
-        agentId: config.agentId ? String(config.agentId) : (run && run.agentId ? String(run.agentId) : null),
+        agentId: named ? String(named) : null,
         startedBy: run && run.startedBy ? String(run.startedBy) : null,
         actions: [...new Set(actions.map(String))],
     }, step.leaseExpiresAt, now);
 };
 
-/* Mints for a claimed step under the flag. With it off nothing is minted and
- * `agentOf` is never called, so a claim reads exactly what it read before. */
+/* The flag is read before `agentOf`, so a claim with it off reads what it read
+ * before. `agentOf` answers { agentId, agent }: an agent it could not read throws
+ * rather than coming back empty, since an empty answer would be taken as "no agent". */
 const issue = async ({ companyId, run, step, agentOf, now }) => {
     if (!enabled()) return null;
-    const agent = typeof agentOf === 'function' ? await agentOf() : null;
-    return mint({ companyId, run, step, actions: actionsFor(step, agent), now });
+    const found = typeof agentOf === 'function' ? await agentOf() : null;
+    const agent = found ? found.agent : null;
+    const agentId = found && found.agentId !== undefined ? found.agentId : undefined;
+    return mint({ companyId, run, step, actions: actionsFor(step, agent), agentId, now });
 };
 
-/* The credential a claimed step holds right now. `renew` is the step's heartbeat:
- * it extends the lease and, in the same write, moves the row to a credential
- * re-minted over the same claims (same fencing token, new id and expiry). The
- * one it replaces is not revoked; it runs out at its own expiry. */
+/* Renewals are chained: two at once (the timer and a step's own keepAlive) would
+ * otherwise each replace the same credential, and the step could end up holding
+ * one the row no longer names. A lease that has already lapsed is not renewed. */
 const hold = (companyId, claim, first) => {
     let current = first;
-    const renew = async ({ now = new Date(), lease = leaseMs() } = {}) => {
+    let queue = Promise.resolve();
+    const renewOnce = async ({ now = new Date(), lease = leaseMs() } = {}) => {
         const next = sign(current.claims, new Date(now.getTime() + lease), now);
-        const held = await store.heartbeat(companyId, { ...claim, now, lease, set: { credentialId: next.credentialId, credentialExpiresAt: next.expiresAt } });
+        const set = { credentialId: next.credentialId, previousCredentialId: current.credentialId, credentialExpiresAt: next.expiresAt };
+        const held = await store.heartbeat(companyId, { ...claim, now, lease, set, onlyWhileLive: true });
         if (held) current = next;
         return held;
+    };
+    const renew = (options) => {
+        const turn = queue.then(() => renewOnce(options));
+        queue = turn.catch(() => {});
+        return turn;
     };
     return { token: () => current.token, renew };
 };
@@ -123,32 +138,32 @@ const verify = (token) => {
     }
 };
 
-const same = (a, b) => String(a || '') === String(b || '');
-
-/* The live-step check. The row is read fresh every time: a credential is only
- * as good as the claim it was minted for, right now, in the hands of the agent
- * and on behalf of the person it was minted for. */
+/* The row and the run are compared before the credential's own expiry, so a step
+ * that was reclaimed or has settled says so even when its credential has also run out. */
 const check = async (companyId, token, { action = null, actor = null, now = new Date() } = {}) => {
     const { claims, error } = verify(token);
     if (error) return refusal(error);
     if (claims.kind !== STEP_CREDENTIAL_KIND) return refusal(REFUSAL.INVALID, 'not a step credential');
-    if (String(claims.companyId) !== String(companyId)) return refusal(REFUSAL.WRONG_COMPANY);
+    if (!same(claims.companyId, companyId)) return refusal(REFUSAL.WRONG_COMPANY);
+    const tenant = String(claims.companyId);
     const where = `${claims.runId}/${claims.stepId}`;
     if (!same(claims.agentId, actor && actor.agentId)) return refusal(REFUSAL.AGENT_MISMATCH, `${where} was claimed for another agent than the one presenting it`);
     if (!same(claims.startedBy, actor && actor.userId)) return refusal(REFUSAL.STARTER_MISMATCH, `${where} was started by someone other than the person it is presented on behalf of`);
-    const step = await store.getStep(companyId, claims.runId, claims.stepId);
-    if (!step || String(step._id) !== String(claims.stepRunId)) return refusal(REFUSAL.STEP_MISSING, where);
+    const step = await store.getStep(tenant, claims.runId, claims.stepId);
+    if (!step || !same(step._id, claims.stepRunId)) return refusal(REFUSAL.STEP_MISSING, where);
     if (step.config && step.config.agentId && !same(step.config.agentId, claims.agentId)) return refusal(REFUSAL.AGENT_MISMATCH, `${where} now names another agent`);
     if (store.STEP_TERMINAL.includes(step.status)) return refusal(REFUSAL.STEP_FINISHED, `${where} is ${step.status}`);
     if (step.status !== 'running') return refusal(REFUSAL.STEP_RELEASED, `${where} is ${step.status}`);
     if (Number(step.fencingToken) !== Number(claims.fencingToken)) return refusal(REFUSAL.STEP_RECLAIMED, `${where} fencing token ${step.fencingToken}, credential ${claims.fencingToken}`);
+    if (claims.jti !== step.credentialId && claims.jti !== step.previousCredentialId) return refusal(REFUSAL.SUPERSEDED, `${where} has since been given a newer credential`);
+    const run = await store.getRun(tenant, claims.runId);
+    if (!run || run.status !== 'running') return refusal(REFUSAL.RUN_NOT_RUNNING, `run ${claims.runId} is ${run ? run.status : 'gone'}`);
+    if (!same(run.startedBy, claims.startedBy)) return refusal(REFUSAL.STARTER_MISMATCH, `run ${claims.runId} was started by someone else`);
     if (!(Number(claims.exp) * 1000 > now.getTime())) return refusal(REFUSAL.EXPIRED, where);
     if (!step.leaseExpiresAt || new Date(step.leaseExpiresAt).getTime() <= now.getTime()) return refusal(REFUSAL.LEASE_EXPIRED, where);
     if (action !== null && !(Array.isArray(claims.actions) && claims.actions.includes(String(action)))) return refusal(REFUSAL.ACTION_NOT_GRANTED, `${action} is not granted to ${where}`);
     return { ok: true, claims, step };
 };
-
-const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 
 /* The live credentials a person may see: every run's for an owner or admin, the
  * runs they started for anyone else. Never the credential, nor its id. */
@@ -161,7 +176,7 @@ const listActive = async (companyId, { userId, privileged = false, now = new Dat
     const viewer = String(userId || '');
     return steps
         .map((step) => ({ step, run: byId[String(step.runId)] }))
-        .filter(({ run }) => run && (privileged || (OBJECT_ID.test(viewer) && String(run.startedBy || '') === viewer)))
+        .filter(({ run }) => run && (privileged || (OBJECT_ID.test(viewer) && same(run.startedBy, viewer))))
         .map(({ step, run }) => ({
             _id: String(step._id),
             kind: 'step_scoped',

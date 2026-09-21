@@ -169,9 +169,9 @@ const claimStep = async (companyId, { runId, stepId, workerId, now = new Date(),
 /* Extends the lease of a step this worker still holds. False means the lease was
  * taken: the caller has lost the step and must stop touching it. `set` is what
  * has to move with the lease in the same write (the re-minted credential's id). */
-const heartbeat = async (companyId, { runId, stepId, fencingToken, now = new Date(), lease = leaseMs(), set = {} }) => {
+const heartbeat = async (companyId, { runId, stepId, fencingToken, now = new Date(), lease = leaseMs(), set = {}, onlyWhileLive = false }) => {
     const result = await call(companyId, STEPS, [
-        { runId: String(runId), stepId: String(stepId), status: 'running', fencingToken: Number(fencingToken) },
+        { runId: String(runId), stepId: String(stepId), status: 'running', fencingToken: Number(fencingToken), ...(onlyWhileLive ? { leaseExpiresAt: { $gt: now } } : {}) },
         { $set: { ...set, leaseExpiresAt: new Date(now.getTime() + lease) } },
     ], 'updateOne');
     return Boolean(result && result.matchedCount > 0);
