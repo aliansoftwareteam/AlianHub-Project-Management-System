@@ -95,5 +95,11 @@ module.exports = defineConfig({
   chainWebpack: config => {
     // Remove the default HtmlWebpackPlugin added by Vue CLI
     config.plugins.delete('html');
+    // Without it vue-i18n compiles every message with new Function, which a content security policy
+    // without 'unsafe-eval' refuses; with it messages are interpreted from their syntax tree.
+    config.plugin('define').tap((args) => {
+      args[0].__INTLIFY_JIT_COMPILATION__ = JSON.stringify(true);
+      return args;
+    });
   }
 });

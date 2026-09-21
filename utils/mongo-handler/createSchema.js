@@ -320,6 +320,10 @@ const permissionDecisionsSchema = new Schema(schema.permissionDecisions, {strict
 permissionDecisionsSchema.index({ day: 1, mode: 1, method: 1, route: 1, permission: 1, role: 1, scope: 1, reason: 1 }, { unique: true, name: 'decision_key' });
 permissionDecisionsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 
+const cspReportsSchema = new Schema(schema.cspReports, {strict: true, timestamps: false});
+cspReportsSchema.index({ day: 1, directive: 1, blockedHost: 1, documentPath: 1 }, { unique: true, name: 'report_key' });
+cspReportsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+
 // One combined text index per collection, for global search and knowledge retrieval.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -454,6 +458,7 @@ module.exports = {
     knowledgeIndexStateSchema,
     knowledgeExclusionsSchema,
     permissionDecisionsSchema,
+    cspReportsSchema,
     auditChainHeadsSchema,
     auditChainAnchorsSchema,
     historySchema,

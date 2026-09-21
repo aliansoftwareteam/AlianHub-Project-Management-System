@@ -1,7 +1,7 @@
 {
   "locale": "gr",
   "machineTranslated": false,
-  "updatedAt": "2026-09-18T11:25:17.314Z",
+  "updatedAt": "2026-09-19T04:21:46.991Z",
   "keys": {
     "Auth.welcome_back": "Welcome back",
     "Auth.login_to_workspace": "Log in to your workspace.",
@@ -6075,6 +6075,21 @@
     "Audit.taint_kind_form": "Form submission",
     "Audit.taint_kind_webhook": "Webhook",
     "Audit.taint_kind_file": "Uploaded file",
-    "Audit.taint_kind_passage": "Knowledge passage"
+    "Audit.taint_kind_passage": "Knowledge passage",
+    "ContentSecurity.title": "Content security policy",
+    "ContentSecurity.lead": "The response header that tells the browser what the app may load. Report only blocks nothing and records what it would block; enforce blocks it.",
+    "ContentSecurity.mode_off": "Off",
+    "ContentSecurity.mode_report": "Report only",
+    "ContentSecurity.mode_enforce": "Enforce",
+    "ContentSecurity.mode_help": "Set in the environment, then restart the server. Variable:",
+    "ContentSecurity.off_note": "The policy is off, so browsers send no reports.",
+    "ContentSecurity.empty": "No reports in the last {days} days.",
+    "ContentSecurity.total": "{n} reports in the last {days} days",
+    "ContentSecurity.col_source": "Blocked source",
+    "ContentSecurity.col_directive": "Directive",
+    "ContentSecurity.col_reports": "Reports",
+    "ContentSecurity.col_last_seen": "Last report",
+    "ContentSecurity.rollout": "Run report only until this list stays empty, then switch to enforce. A host you trust goes in the variable for its directive:",
+    "ContentSecurity.policy": "Policy"
   }
 }

@@ -1452,6 +1452,16 @@ const schema = {
         lastAuditedAt: { type: Date, required: false },
         userIds: { type: [String], required: false },
     },
+    // Global only. One row per day, directive, blocked host and document path shape (Modules/CspReport):
+    // a violation report's URLs, referrer and sample are never stored.
+    cspReports: {
+        day: { type: Date, required: true },
+        directive: { type: String, required: true },
+        blockedHost: { type: String, required: true },
+        documentPath: { type: String, required: true },
+        count: { type: Number, required: false },
+        lastSeen: { type: Date, required: false },
+    },
     // Client invoices raised against a project (handoff 19c). Distinct from the
     // global `invoices` collection, which is AlianHub's own subscription billing.
     // Every line keeps the ids it was drafted from so a client question about a

@@ -114,6 +114,7 @@ const {
     knowledgeIndexStateSchema,
     knowledgeExclusionsSchema,
     permissionDecisionsSchema,
+    cspReportsSchema,
     auditChainHeadsSchema,
     auditChainAnchorsSchema
 } = require('./createSchema');
@@ -347,6 +348,8 @@ exports.checkType = (type) => {
             return knowledgeExclusionsSchema
         case SCHEMA_TYPE.PERMISSION_DECISIONS:
             return permissionDecisionsSchema
+        case SCHEMA_TYPE.CSP_REPORTS:
+            return cspReportsSchema
         case SCHEMA_TYPE.AUDIT_CHAIN_HEADS:
             return auditChainHeadsSchema
         case SCHEMA_TYPE.AUDIT_CHAIN_ANCHORS:
@@ -585,6 +588,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.KNOWLEDGE_EXCLUSIONS}`
         case SCHEMA_TYPE.PERMISSION_DECISIONS:
                 return `${dbCollections.PERMISSION_DECISIONS}`
+        case SCHEMA_TYPE.CSP_REPORTS:
+                return `${dbCollections.CSP_REPORTS}`
         case SCHEMA_TYPE.AUDIT_CHAIN_HEADS:
                 return `${dbCollections.AUDIT_CHAIN_HEADS}`
         case SCHEMA_TYPE.AUDIT_CHAIN_ANCHORS:
