@@ -70,7 +70,7 @@ describe('declared external reads in a data skill', () => {
         expect(res.body.data.errors.map((e) => e.code)).toEqual(['host_not_allowed']);
     });
 
-    it('saves a listed host, keeps it on the row, and a run fails before anything is fetched', async () => {
+    it('saves a listed host, keeps it on the row, and a run refuses it once it leaves the list, before anything is fetched', async () => {
         await setHosts([HOST]);
         const key = `qa-reads-${uniqueSuffix()}`;
         const created = await admin.api.post('/api/v2/agents/skills', skillBody(key));
@@ -78,9 +78,10 @@ describe('declared external reads in a data skill', () => {
         keys.push(key);
         expect((await skills.findOne({ key })).declaredHosts).toEqual([HOST]);
 
+        await setHosts(['example.com']);
         const dry = await owner.api.post(`/api/v2/agents/skills/${key}/dry-run`, { taskId: task._id });
         expect(dry.body.status).toBe(false);
-        expect(dry.body.message).toContain('external_reads_not_available');
+        expect(dry.body.message).toContain(`${HOST} is not on this workspace's egress allowlist`);
     });
 
     it('refuses a raw secret in the skill body', async () => {

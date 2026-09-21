@@ -573,7 +573,7 @@ describe('a raw secret anywhere in the skill body is refused', () => {
     });
 });
 
-describe('running a skill with a declared read before the run-time slice', () => {
+describe('running a skill with a declared read', () => {
     let spies;
     beforeEach(() => {
         spies = [jest.spyOn(http, 'request'), jest.spyOn(https, 'request'), jest.spyOn(http, 'get'), jest.spyOn(https, 'get'), jest.spyOn(dns, 'lookup')];
@@ -584,28 +584,25 @@ describe('running a skill with a declared read before the run-time slice', () =>
 
     const noFetch = () => spies.forEach((s) => expect(s).not.toHaveBeenCalled());
 
-    it('fails with external_reads_not_available and fetches nothing', async () => {
+    it('checks the live allowlist first and fetches nothing when the host is not on it', async () => {
         await expect(orchestrator.gather({ skillSlug: 'pr.fetch', task: TASK, companyId: C, startedBy: ACTOR.id }))
-            .rejects.toMatchObject({ code: 'external_reads_not_available', deterministic: true, message: expect.stringContaining('external_reads_not_available') });
+            .rejects.toMatchObject({ code: 'host_not_allowed', deterministic: true });
         noFetch();
     });
 
-    it('fails before any step of the skill reads anything', async () => {
+    it('fails with external_reads_not_available with the flag off, before any step of the skill reads anything', async () => {
         mockDbFor(C).store[SCHEMA_TYPE.AGENT_SKILLS].length = 0;
         mockDbFor(C).seed(SCHEMA_TYPE.AGENT_SKILLS, validateSkill(skillBody({ gather: [{ reader: 'project' }, readStep()] })).value);
+        delete process.env[FLAG];
         mockDbFor(C).calls.length = 0;
-        await expect(orchestrator.gather({ skillSlug: 'pr.fetch', task: TASK, companyId: C, startedBy: ACTOR.id })).rejects.toMatchObject({ code: 'external_reads_not_available' });
+        await expect(orchestrator.gather({ skillSlug: 'pr.fetch', task: TASK, companyId: C, startedBy: ACTOR.id }))
+            .rejects.toMatchObject({ code: 'external_reads_not_available', deterministic: true, message: expect.stringContaining('external_reads_not_available') });
         expect(mockDbFor(C).calls.filter((c) => c.type !== SCHEMA_TYPE.AGENT_SKILLS)).toEqual([]);
         noFetch();
     });
 
-    it('fails the same way with the flag off', async () => {
+    it.each(['url', 'api'])('the %s reader itself refuses to run with the flag off', async (reader) => {
         delete process.env[FLAG];
-        await expect(orchestrator.gather({ skillSlug: 'pr.fetch', task: TASK, companyId: C, startedBy: ACTOR.id })).rejects.toMatchObject({ code: 'external_reads_not_available' });
-        noFetch();
-    });
-
-    it.each(['url', 'api'])('the %s reader itself refuses to run', async (reader) => {
         await expect(readers.read(reader, C, { task: TASK }, { host: HOST, path: '/x' })).rejects.toMatchObject({ code: 'external_reads_not_available' });
         noFetch();
     });

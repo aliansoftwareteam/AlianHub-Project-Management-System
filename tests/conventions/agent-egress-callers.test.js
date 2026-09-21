@@ -5,7 +5,7 @@ const ROOT = path.join(__dirname, '..', '..');
 /* Everything an agent run can reach: the agents themselves, the workflow and automation engines that start them
  * and hold their tool steps, the MCP server's tools, knowledge retrieval, and the model layer they all call. */
 const SCANNED = ['Modules/Agents', 'Modules/Workflows', 'Modules/Automations', 'Modules/Mcp', 'Modules/Knowledge', 'Modules/AICore'];
-const FETCH_HELPERS = { safeFetch: ['safeFetch'], pageAudit: ['fetchPage', 'audit'], agentFetch: ['fetchPage', 'audit'] };
+const FETCH_HELPERS = { safeFetch: ['safeFetch'], pageAudit: ['fetchPage', 'audit'], agentFetch: ['fetchPage', 'audit', 'readDeclared'] };
 const CID = '6f00000000000000000000a1';
 const ACTOR = '6f0000000000000000000011';
 
@@ -16,12 +16,35 @@ const orchestrator = () => require('../../Modules/Agents/engine/orchestrator');
  * egressContext.run, so each is listed with a `reach` that drives its real entry point. */
 const FETCHERS = {
     'Modules/Agents/engine/pageAudit.js': { uses: ['helper:safeFetch.safeFetch'] },
-    'Modules/Agents/engine/agentFetch.js': { uses: ['helper:pageAudit.*'] },
+    'Modules/Agents/engine/agentFetch.js': { uses: ['helper:pageAudit.*', 'helper:safeFetch.*'] },
     'Modules/Agents/engine/orchestrator.js': {
         uses: ['helper:agentFetch.audit'],
         reach: () => {
             useSkill({ slug: 'qa-review', kind: 'audit', maxFindings: 5, buildUserPrompt: () => '' });
             return orchestrator().analyse({ skillSlug: 'qa-review', task: { _id: 't1' }, context: { url: 'https://example.com/pricing' }, spend: { companyId: CID, userId: ACTOR }, companyId: CID });
+        },
+    },
+    'Modules/Agents/skills/readers.js': {
+        uses: ['helper:agentFetch.readDeclared'],
+        reach: async () => {
+            process.env.SKILL_EXTERNAL_READS = 'on';
+            try {
+                const { validateSkill } = require('../../Modules/Agents/skills/validateSkill');
+                const { compile } = require('../../Modules/Agents/skills/compile');
+                const doc = validateSkill({
+                    key: 'reads.probe',
+                    name: 'Probe',
+                    inputs: [],
+                    gather: [{ reader: 'api', as: 'r', params: { host: 'api.github.com', path: '/repos/acme/repo' } }],
+                    prompt: { template: '{{gather.r.text}}', output: '{"summary":"..."}' },
+                    emit: [{ action: 'task.comment', params: { body: '{{answer.summary}}' } }],
+                }).value;
+                useSkill(compile(doc));
+                jest.spyOn(require('../../Modules/Agents/engine/egressAllowlist'), 'hostsFor').mockResolvedValue(['api.github.com']);
+                return await orchestrator().gather({ skillSlug: 'reads.probe', task: { _id: 't1', TaskName: 'Read' }, companyId: CID, startedBy: ACTOR });
+            } finally {
+                delete process.env.SKILL_EXTERNAL_READS;
+            }
         },
     },
     'Modules/Agents/skills/prReview.js': {
@@ -184,8 +207,8 @@ describe('agent fetches go through the workspace egress gateway', () => {
         Object.values(OUTSIDE_GATEWAY).forEach(({ why }) => expect(String(why || '').length).toBeGreaterThan(20));
     });
 
-    it('only the raw reader calls safeFetch, and only the agent-facing entry reads through the raw reader', () => {
-        expect(importersOf('safeFetch')).toEqual(['Modules/Agents/engine/pageAudit.js']);
+    it('only the raw reader and the agent-facing entry call safeFetch, and only the agent-facing entry reads through the raw reader', () => {
+        expect(importersOf('safeFetch')).toEqual(['Modules/Agents/engine/agentFetch.js', 'Modules/Agents/engine/pageAudit.js']);
         expect(importersOf('pageAudit')).toEqual(['Modules/Agents/engine/agentFetch.js']);
     });
 
