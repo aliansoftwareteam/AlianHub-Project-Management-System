@@ -94,7 +94,7 @@ describe('egress allowlist entries', () => {
         expect(rules.validateHosts(['*.github.io']).errors).toEqual([{ entry: '*.github.io', reason: 'public_suffix' }]);
     });
 
-    const WILDCARD_DNS = ['nip.io', 'sslip.io', 'xip.io', 'traefik.me', 'localtest.me', 'lvh.me'];
+    const WILDCARD_DNS = ['nip.io', 'sslip.io', 'xip.io', 'traefik.me', 'localtest.me', 'lvh.me', 'backname.io', 'nip.direct'];
     const SHARED_HOSTING = [
         'ngrok.io', 'ngrok.dev', 'ngrok-free.app', 'loca.lt', 'trycloudflare.com', 'github.io', 'github.dev', 'myshopify.com', 'readthedocs.io',
         'azurestaticapps.net', 'firebaseio.com', 'herokuapp.com', 'vercel.app', 'netlify.app', 'pages.dev', 'workers.dev', 'blogspot.com',
@@ -427,15 +427,38 @@ describe('the gateway', () => {
 
         describe('the last known emptiness, on a clock', () => {
             let clock;
+            let wallShift;
             let now;
+            let mono;
             const WINDOW_MS = store.CACHE_TTL_SECONDS * 1000;
             const failNextRead = () => mockDbFor(CID_A).crud.mockImplementationOnce(async () => { throw new Error('mongo down'); });
 
+            // `clock` is time that passes; `wallShift` is the system clock being set, which must not move the window.
             beforeEach(() => {
-                clock = Date.now();
-                now = jest.spyOn(Date, 'now').mockImplementation(() => clock);
+                clock = 0;
+                wallShift = 0;
+                const wallStart = Date.now();
+                const monoStart = performance.now();
+                now = jest.spyOn(Date, 'now').mockImplementation(() => wallStart + clock + wallShift);
+                mono = jest.spyOn(performance, 'now').mockImplementation(() => monoStart + clock);
             });
-            afterEach(() => now.mockRestore());
+            afterEach(() => { now.mockRestore(); mono.mockRestore(); });
+
+            it('a system clock set back does not stretch the window', async () => {
+                expect((await fetchAs(CID_A, `http://api.public.test:${port}/page`)).status).toBe(200);
+                clock += WINDOW_MS + 1000;
+                wallShift = -60 * 60 * 1000;
+                failNextListRead(CID_A);
+                await expect(fetchAs(CID_A, `http://api.public.test:${port}/page`)).rejects.toThrow(/allowlist.*read/i);
+            });
+
+            it('a system clock set forward does not cut the window short', async () => {
+                expect((await fetchAs(CID_A, `http://api.public.test:${port}/page`)).status).toBe(200);
+                clock += 1000;
+                wallShift = 60 * 60 * 1000;
+                failNextListRead(CID_A);
+                expect((await fetchAs(CID_A, `http://api.public.test:${port}/page`)).status).toBe(200);
+            });
 
             it('lets a failed read fetch as without a list within one cache window of the empty read', async () => {
                 expect((await fetchAs(CID_A, `http://api.public.test:${port}/page`)).status).toBe(200);
@@ -597,6 +620,29 @@ describe('the store', () => {
         store.invalidate(CID_B);
         expect(await store.hostsFor(CID_B)).toEqual(['b.example.com']);
         expect(listReads(CID_B)).toBe(2);
+    });
+
+    it('a first save on version 0 creates the list and answers with version 1', async () => {
+        const saved = await store.replaceHosts(CID_A, ['a.example.com'], ACTOR, 0);
+        expect(saved).toMatchObject({ hosts: ['a.example.com'], updatedBy: ACTOR, version: 1 });
+        expect(listOf(CID_A)).toMatchObject({ _id: store.DOC_ID, hosts: ['a.example.com'], version: 1 });
+    });
+
+    it('a save on the version it read answers with the next version', async () => {
+        mockDbFor(CID_A).seed(store.COLLECTION, { _id: store.DOC_ID, hosts: ['a.example.com'], version: 3 });
+        expect(await store.replaceHosts(CID_A, ['b.example.com'], ACTOR, 3)).toMatchObject({ hosts: ['b.example.com'], version: 4 });
+    });
+
+    it('a first save on version 0 that loses the race to another first save answers null and changes nothing', async () => {
+        mockDbFor(CID_A).seed(store.COLLECTION, { _id: store.DOC_ID, hosts: ['other.example.com'], version: 1 });
+        expect(await store.replaceHosts(CID_A, ['mine.example.com'], ACTOR, 0)).toBeNull();
+        expect(mockDbFor(CID_A).store[store.COLLECTION]).toEqual([expect.objectContaining({ hosts: ['other.example.com'], version: 1 })]);
+    });
+
+    it('a save on a stale version answers null and changes nothing', async () => {
+        mockDbFor(CID_A).seed(store.COLLECTION, { _id: store.DOC_ID, hosts: ['other.example.com'], version: 2 });
+        expect(await store.replaceHosts(CID_A, ['mine.example.com'], ACTOR, 1)).toBeNull();
+        expect(listOf(CID_A)).toMatchObject({ hosts: ['other.example.com'], version: 2 });
     });
 
     it('keeps one document per workspace', async () => {

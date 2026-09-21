@@ -165,6 +165,32 @@ describe('agent fetches go through the workspace egress gateway', () => {
             ['helper namespace', "const sf = require('./safeFetch');\nmodule.exports = (u) => sf.safeFetch(u);", 'helper:safeFetch.*'],
             ['helper renamed', "const { fetchPage: read } = require('./agentFetch');\nmodule.exports = read;", 'helper:agentFetch.fetchPage'],
             ['helper imported', "import { safeFetch } from '../engine/safeFetch';\nexport default safeFetch;", 'helper:safeFetch.*'],
+            ['axios by a template require', 'module.exports = (u) => require(`axios`).get(u);', 'axios'],
+            ['https by a template require', 'module.exports = (u) => require(`https`).get(u);', 'http'],
+            ['undici by a template import', 'module.exports = async (u) => (await import(`undici`)).request(u);', 'undici'],
+            ['safeFetch by a template require', 'module.exports = (u) => require(`./engine/safeFetch`).safeFetch(u);', 'helper:safeFetch.safeFetch'],
+            ['an aliased require', "const r = require;\nmodule.exports = (u) => r('https').get(u);", 'http'],
+            ['fetch called through .call', 'module.exports = (u) => fetch.call(null, u);', 'fetch'],
+            ['fetch held in a variable', 'const f = fetch;\nmodule.exports = (u) => f(u);', 'fetch'],
+            ['fetch passed as a value', 'module.exports = (u) => [u].map(fetch);', 'fetch'],
+            ['a computed global lookup', "module.exports = (u) => globalThis['fe' + 'tch'](u);", 'global-computed'],
+            ['Reflect.get on the global', "module.exports = (u) => Reflect.get(globalThis, 'fetch')(u);", 'global-computed'],
+            ['child_process', "const { execFile } = require('child_process');\nmodule.exports = (u) => execFile('curl', [u]);", 'process'],
+            ['node:child_process', "const cp = require('node:child_process');\nmodule.exports = (u) => cp.spawn('curl', [u]);", 'process'],
+            ['net', "const net = require('net');\nmodule.exports = (h) => net.connect(80, h);", 'socket'],
+            ['tls', "const tls = require('tls');\nmodule.exports = (h) => tls.connect(443, h);", 'socket'],
+            ['ws', "const WebSocket = require('ws');\nmodule.exports = (u) => new WebSocket(u);", 'socket'],
+            ['cross-fetch', "const fetchIt = require('cross-fetch');\nmodule.exports = (u) => fetchIt(u);", 'node-fetch'],
+            ['ky', "const ky = require('ky');\nmodule.exports = (u) => ky.get(u);", 'http-client'],
+            ['the Anthropic SDK', "const Anthropic = require('@anthropic-ai/sdk');\nmodule.exports = (o) => new Anthropic(o);", 'sdk:@anthropic-ai/sdk'],
+            ['the OpenAI SDK', "const OpenAI = require('openai');\nmodule.exports = (o) => new OpenAI(o);", 'sdk:openai'],
+            ['a LangChain OpenAI model', "const { ChatOpenAI } = require('@langchain/openai');\nmodule.exports = (o) => new ChatOpenAI(o);", 'sdk:@langchain/openai'],
+            ['a LangChain Anthropic model', "const { ChatAnthropic } = require('@langchain/anthropic');\nmodule.exports = (o) => new ChatAnthropic(o);", 'sdk:@langchain/anthropic'],
+            ['a LangChain community loader', "const { CheerioWebBaseLoader } = require('@langchain/community/document_loaders/web/cheerio');\nmodule.exports = (u) => new CheerioWebBaseLoader(u);", 'sdk:@langchain/community'],
+            ['an MCP client transport', "const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');\nmodule.exports = (u) => new StreamableHTTPClientTransport(new URL(u));", 'sdk:@modelcontextprotocol/sdk/client'],
+            ['an MCP SSE client transport', "import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';\nexport default (u) => new SSEClientTransport(new URL(u));", 'sdk:@modelcontextprotocol/sdk/client'],
+            ['eval of a built string', "module.exports = (u) => eval('fe' + 'tch')(u);", 'eval'],
+            ['new Function', "module.exports = (u) => new Function('u', 'return fe' + 'tch(u)')(u);", 'eval'],
         ];
 
         it.each(EVASIONS)('catches %s', (label, source, kind) => {
@@ -174,6 +200,30 @@ describe('agent fetches go through the workspace egress gateway', () => {
         it.each(EVASIONS)('reports a file that does it (%s)', (label, source) => {
             const file = 'Modules/Workflows/stepTypes/egfx-evader.js';
             expect(unexpected(scan({ ...repoFiles, [file]: source }))).toEqual([file]);
+        });
+
+        const HELPER = "const axios = require('axios');\nmodule.exports = (u) => axios.get(u);";
+
+        it.each([
+            ['a utils helper', 'utils/egfx-client.js', '../../../utils/egfx-client'],
+            ['a Config helper', 'Config/egfx-client.js', '../../../Config/egfx-client.js'],
+            ['a utils folder index', 'utils/egfx-net/index.js', '../../../utils/egfx-net'],
+        ])('follows a require into %s that reaches the network', (label, helperFile, specifier) => {
+            const caller = 'Modules/Agents/skills/egfx-caller.js';
+            const files = { ...repoFiles, [helperFile]: HELPER, [caller]: `const get = require('${specifier}');\nmodule.exports = get;` };
+            expect(unexpected(scan(files))).toEqual([caller]);
+        });
+
+        it('does not report a utils helper that makes no call', () => {
+            const caller = 'Modules/Agents/skills/egfx-caller.js';
+            const files = { ...repoFiles, 'utils/egfx-quiet.js': 'module.exports = (x) => x + 1;', [caller]: "module.exports = require('../../../utils/egfx-quiet');" };
+            expect(unexpected(scan(files))).toEqual([]);
+        });
+
+        it('reports a folder index under a scanned folder that fetches', () => {
+            const index = 'Modules/Workflows/egfx-net/index.js';
+            const files = { ...repoFiles, [index]: 'module.exports = (u) => fetch(u);', 'Modules/Workflows/egfx-caller.js': "module.exports = require('./egfx-net');" };
+            expect(unexpected(scan(files))).toEqual([index]);
         });
 
         it('reports a listed file that gains another way out', () => {
@@ -188,6 +238,9 @@ describe('agent fetches go through the workspace egress gateway', () => {
             ['a helper call name', 'module.exports = (safeFetch, fetchPage) => [safeFetch(1), fetchPage(2)];'],
             ['the private-host check from safeFetch', "const { isBlockedHostname } = require('./engine/safeFetch');\nmodule.exports = isBlockedHostname;"],
             ['the URL finder from pageAudit', "const { extractUrl } = require('./pageAudit');\nmodule.exports = require('./pageAudit').extractUrl;"],
+            ['the agent graph runtime', "const { StateGraph } = require('@langchain/langgraph');\nmodule.exports = StateGraph;"],
+            ['a fetch key in an object', 'module.exports = { fetch: 1, fetchPage: 2 };'],
+            ['a word that ends in eval', "const retrieval = (x) => x;\nmodule.exports = retrieval('q');"],
         ])('leaves %s alone', (label, source) => {
             expect(outboundUses(source)).toEqual([]);
         });

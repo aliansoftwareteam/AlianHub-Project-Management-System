@@ -320,21 +320,32 @@ describe('with the flag on', () => {
         it('pages the workspace list, newest first, and reaches past the first 500', async () => {
             for (let i = 0; i < 520; i += 1) seedCompany(`6f${String(i).padStart(22, '0')}`, `W${i}`);
             const seen = [];
-            let page = 1;
-            let total;
-            for (;;) {
+            let pages = 1;
+            for (let page = 1; page <= pages; page += 1) {
                 // eslint-disable-next-line no-await-in-loop
                 const { status, body } = await asOwner('GET', `${BASE}?page=${page}&pageSize=100`);
                 expect(status).toBe(200);
-                expect(body.data).toMatchObject({ page, pageSize: 100 });
-                total = body.data.total;
-                if (!body.data.workspaces.length) break;
+                expect(body.data).toMatchObject({ page, pageSize: 100, total: 522 });
+                pages = Math.ceil(body.data.total / body.data.pageSize);
                 seen.push(...body.data.workspaces.map((w) => w.companyId));
-                page += 1;
             }
-            expect(total).toBe(522);
+            expect(pages).toBe(6);
+            expect(seen).toHaveLength(522);
             expect(new Set(seen).size).toBe(522);
-            expect(page).toBe(7);
+        });
+
+        it.each([['1e308'], ['3'], ['99999999999999999999'], ['Infinity']])('answers page=%s past the end with the last page', async (page) => {
+            const res = await asOwner('GET', `${BASE}?page=${page}&pageSize=1`);
+            expect(res.status).toBe(200);
+            expect(res.body.data).toMatchObject({ page: 2, pageSize: 1, total: 2 });
+            expect(res.body.data.workspaces).toHaveLength(1);
+        });
+
+        it('answers page 1 when there are no workspaces at all', async () => {
+            g().store.companies = [];
+            const res = await asOwner('GET', `${BASE}?page=4`);
+            expect(res.status).toBe(200);
+            expect(res.body.data).toMatchObject({ page: 1, total: 0, workspaces: [] });
         });
 
         it('defaults to the first page and bounds the page size', async () => {

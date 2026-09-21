@@ -140,6 +140,8 @@ describe('InstanceEgress', () => {
         ['*.github.io', 'Egress.error_public_suffix'],
         ['*.nip.io', 'Egress.error_wildcard_dns'],
         ['*.team.sslip.io', 'Egress.error_wildcard_dns'],
+        ['*.nip.direct', 'Egress.error_wildcard_dns'],
+        ['*.backname.io', 'Egress.error_wildcard_dns'],
         ['*.vercel.app', 'Egress.error_public_suffix'],
         ['docs.example.com:99999', 'Egress.error_port'],
         ['not a host', 'Egress.error_invalid'],
@@ -223,6 +225,29 @@ describe('InstanceEgress', () => {
             await wrapper.find('button[data-test="page-prev"]').trigger('click');
             await flushPromises();
             expect(summaryLoads().at(-1)[1]).toBe(`${BASE}?page=2`);
+        });
+
+        it('follows the page the server answers with when the list shrank under it', async () => {
+            let total = 150;
+            const shrinking = (url) => {
+                const pages = Math.ceil(total / 50);
+                const page = Math.min(pageOf(url), pages);
+                return summary({ page, pageSize: 50, total, workspaces: [ws(`6f0000000000000000000${page}00`, `Page ${page}`)] });
+            };
+            const wrapper = await mountWith({ summaryData: shrinking });
+            await wrapper.find('button[data-test="page-next"]').trigger('click');
+            await flushPromises();
+            await wrapper.find('button[data-test="page-next"]').trigger('click');
+            await flushPromises();
+            expect(summaryLoads().at(-1)[1]).toBe(`${BASE}?page=3`);
+            total = 100;
+            await wrapper.find('button.ah-btn--ghost').trigger('click');
+            await flushPromises();
+            expect(wrapper.text()).toContain('Page 2');
+            expect(wrapper.find('button[data-test="page-next"]').attributes('disabled')).toBeDefined();
+            await wrapper.find('button[data-test="page-prev"]').trigger('click');
+            await flushPromises();
+            expect(summaryLoads().at(-1)[1]).toBe(`${BASE}?page=1`);
         });
 
         it('shows no pager when every workspace fits on one page', async () => {

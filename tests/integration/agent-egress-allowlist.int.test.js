@@ -26,7 +26,7 @@ const mine = async () => {
     for (let page = 1; ; page += 1) {
         const res = await owner.api.get(`${BASE}?page=${page}&pageSize=200`);
         const found = res.body.data.workspaces.find((w) => w.companyId === state.companyId);
-        if (found || !res.body.data.workspaces.length) return found;
+        if (found || page >= Math.ceil(res.body.data.total / res.body.data.pageSize)) return found;
     }
 };
 
