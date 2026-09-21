@@ -601,9 +601,9 @@ describe('index checks never hold up a question', () => {
         let running = 0;
         let most = 0;
         jest.spyOn(store, 'prepare').mockImplementation(({ companyId }) => {
+            if (companyId === SLOW) return new Promise(() => {});
             running += 1;
             most = Math.max(most, running);
-            if (companyId === SLOW) return new Promise(() => {});
             return new Promise((resolve) => setTimeout(() => { running -= 1; resolve({ status: 'ready' }); }, 5));
         });
         const backfill = require('../Modules/Knowledge/ingest/backfill');
