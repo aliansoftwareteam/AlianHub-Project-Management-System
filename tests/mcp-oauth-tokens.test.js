@@ -12,7 +12,10 @@ jest.mock('../Modules/ApiTokens/controller', () => ({ verifyToken: jest.fn(), lo
 jest.mock('../Modules/Agents/actions', () => ({ RefusedError: class RefusedError extends Error {}, rating: () => null }));
 jest.mock('../Modules/Mcp/tools', () => ({ manifest: () => [], call: jest.fn(async () => ({ ok: true })) }));
 // Slice S3's per-workspace approval, standing in until that module lands.
-jest.mock('../Modules/OAuthServer/approvals', () => ({ isClientApproved: jest.fn(async () => mockApproved.value) }), { virtual: true });
+jest.mock('../Modules/Mcp/approvalsHook', () => {
+    const approvals = { isClientApproved: jest.fn(async () => mockApproved.value) };
+    return { load: jest.fn(() => approvals) };
+});
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { dbCollections } = require('../Config/collections');
@@ -22,7 +25,7 @@ const tools = require('../Modules/Mcp/tools');
 const server = require('../Modules/Mcp/server');
 const grants = require('../Modules/OAuthServer/grants');
 const clients = require('../Modules/OAuthServer/clients');
-const approvals = require('../Modules/OAuthServer/approvals');
+const approvals = require('../Modules/Mcp/approvalsHook').load();
 
 /* Sprint 10 slice S4: /mcp accepts audience-bound OAuth access tokens. */
 
@@ -115,6 +118,17 @@ describe('an OAuth access token on /mcp', () => {
         expectInvalidToken(await post(request({ token: raw })));
     });
 
+    it.each([
+        ['a trailing slash', `${RESOURCE}/`],
+        ['an upper-case host', 'https://HUB.s10s4.test/mcp'],
+        ['an upper-case path', `${ISSUER}/MCP`],
+        ['a query', `${RESOURCE}?x=1`],
+    ])('is refused when its audience differs by %s', async (label, audience) => {
+        const { raw } = await mint();
+        store(SCHEMA_TYPE.OAUTH_TOKENS).filter((row) => row.kind === 'access').forEach((row) => { row.resource = audience; });
+        expectInvalidToken(await post(request({ token: raw })));
+    });
+
     it('is refused when the server\'s own resource moved (the token names the old one)', async () => {
         const { raw } = await mint();
         process.env.MCP_OAUTH_ISSUER = 'https://moved.s10s4.test';
@@ -177,6 +191,33 @@ describe('an OAuth access token on /mcp', () => {
         expect(res.statusCode).toBe(403);
         expect(jwt.verifyCompanyMembership).toHaveBeenCalledWith(USER, C);
         expect(tools.call).not.toHaveBeenCalled();
+    });
+});
+
+describe('a client ID metadata document client (a URL, no client row)', () => {
+    const DOCUMENT_CLIENT = { clientId: 'https://agent.s10s4.test/oauth/client.json', kind: 'metadata_document', tokenEndpointAuthMethod: 'none', scopes: [], redirectUris: [REDIRECT] };
+
+    it('is accepted and named after its host', async () => {
+        const { raw, grant } = await mint({ client: DOCUMENT_CLIENT });
+        const res = await post(request({ token: raw, body: call('tasks.search') }));
+        expect(res.statusCode).toBe(200);
+        const [ctx] = tools.call.mock.calls[0];
+        expect(ctx.oauth).toMatchObject({ clientId: DOCUMENT_CLIENT.clientId, grantId: grant.grantId });
+        expect(ctx.actor).toMatchObject({ clientId: DOCUMENT_CLIENT.clientId, agentName: 'agent.s10s4.test' });
+        expect(store(SCHEMA_TYPE.OAUTH_CLIENTS)).toHaveLength(0);
+    });
+
+    it('is refused once its grant is revoked', async () => {
+        const { raw, grant } = await mint({ client: DOCUMENT_CLIENT });
+        store(SCHEMA_TYPE.OAUTH_GRANTS).find((g) => g.grantId === grant.grantId).revokedAt = new Date();
+        expectInvalidToken(await post(request({ token: raw })));
+    });
+
+    it('is refused once the workspace withdraws its approval', async () => {
+        const { raw } = await mint({ client: DOCUMENT_CLIENT });
+        mockApproved.value = false;
+        expectInvalidToken(await post(request({ token: raw })));
+        expect(approvals.isClientApproved).toHaveBeenCalledWith(C, DOCUMENT_CLIENT.clientId);
     });
 });
 
