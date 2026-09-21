@@ -35,6 +35,7 @@ const tabs = [
     { name: "InstanceSettings", label: "Instance.nav_settings", anchor: "configure" },
     { name: "InstanceEnforcement", label: "Enforcement.nav", anchor: "configure" },
     { name: "InstanceEgress", label: "Egress.nav", anchor: "configure" },
+    { name: "InstanceKnowledge", label: "Knowledge.nav", anchor: "configure" },
     { name: "InstanceBackups", label: "Instance.nav_backups", anchor: "backup-restore" },
     { name: "InstanceUpgrade", label: "Instance.nav_upgrade", anchor: "upgrade" },
     { name: "InstanceLogs", label: "Instance.nav_logs", anchor: "troubleshooting" },
