@@ -36,18 +36,33 @@ const FETCHERS = {
 
 // Deliberately outside the workspace gateway: none of these fetches a URL taken from task text.
 const OUTSIDE_GATEWAY = {
-    'Modules/Agents/engine/safeFetch.js': { uses: ['axios'], why: 'the gateway itself: every agent fetch leaves the box here, after the list check' },
+    'Modules/Agents/engine/safeFetch.js': { uses: ['axios', 'socket'], why: 'the gateway itself: every agent fetch leaves the box here, after the list check; net is for isIP' },
     'Modules/AICore/llmProvider/openaiProvider.js': { uses: ['axios'], why: 'model provider and embeddings calls to the endpoint the instance configures' },
     'Modules/AICore/llmProvider/deepseekProvider.js': { uses: ['axios'], why: 'model provider calls to the endpoint the instance configures' },
     'Modules/AICore/llmProvider/googleProvider.js': { uses: ['axios'], why: 'model provider calls to the endpoint the instance configures' },
+    'Modules/AICore/llmProvider/anthropicProvider.js': { uses: ['sdk:@anthropic-ai/sdk'], why: 'model provider calls through the Anthropic SDK to the endpoint the instance configures' },
 };
 
-const HTTP_MODULES = {
+/* Node modules that reach the network (or run a process that could), as the kind a finding names. */
+const MODULE_KINDS = {
     axios: 'axios',
-    http: 'http', https: 'http', http2: 'http', 'node:http': 'http', 'node:https': 'http', 'node:http2': 'http',
+    http: 'http', https: 'http', http2: 'http',
     undici: 'undici',
-    'node-fetch': 'node-fetch',
-    got: 'http-client', superagent: 'http-client', request: 'http-client',
+    'node-fetch': 'node-fetch', 'cross-fetch': 'node-fetch', 'isomorphic-fetch': 'node-fetch',
+    got: 'http-client', superagent: 'http-client', request: 'http-client', ky: 'http-client', needle: 'http-client',
+    net: 'socket', tls: 'socket', dgram: 'socket', ws: 'socket', 'socket.io-client': 'socket',
+    child_process: 'process', worker_threads: 'process', vm: 'eval',
+    '@anthropic-ai/sdk': 'sdk:@anthropic-ai/sdk', openai: 'sdk:openai', '@google/generative-ai': 'sdk:@google/generative-ai', '@google/genai': 'sdk:@google/genai',
+};
+// The LangGraph runtime and LangChain core make no calls of their own; every other @langchain package is a model or loader client.
+const QUIET_LANGCHAIN = /^@langchain\/(langgraph|langgraph-[\w-]+|core)(\/|$)/;
+
+const kindOfModule = (specifier) => {
+    const name = specifier.replace(/^node:/, '');
+    if (MODULE_KINDS[name]) return MODULE_KINDS[name];
+    if (/^@langchain\//.test(name) && !QUIET_LANGCHAIN.test(name)) return `sdk:${name.split('/').slice(0, 2).join('/')}`;
+    if (/^@modelcontextprotocol\/sdk\/client(\/|$)/.test(name)) return 'sdk:@modelcontextprotocol/sdk/client';
+    return null;
 };
 
 /* Line and block comments go, so prose about "every fetch" is not a call. A `//` counts only after whitespace or at
@@ -56,44 +71,70 @@ const stripComments = (source) => source
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(^|\s)\/\/.*$/gm, '$1');
 
-/* String contents go too, for the call patterns only, so a URL such as 'https://x/fetch(1)' is not a call. A
+/* String contents go too, for the identifier patterns only, so a URL such as 'https://x/fetch(1)' is not a use. A
  * template keeps its ${…} expressions, which are code. */
 const blankStrings = (source) => source
     .replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"/g, "''")
     .replace(/`(?:[^`\\]|\\.)*`/g, (template) => (template.match(/\$\{[^}]*\}/g) || []).join(' '));
 
-const REQUIRE = /(?:(?:const|let|var)\s+(\{[^}]*\}|[A-Za-z_$][\w$]*)\s*=\s*)?\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)(?:\s*\.\s*([A-Za-z_$][\w$]*))?/g;
-const IMPORT = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)|\bfrom\s+['"]([^'"]+)['"]|^\s*import\s+['"]([^'"]+)['"]/gm;
+const LITERAL = String.raw`['"\x60]([^'"\x60$]+)['"\x60]`;
+const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const helperOf = (specifier) => {
-    const base = path.basename(specifier).replace(/\.js$/, '');
-    return specifier.startsWith('.') && FETCH_HELPERS[base] ? base : null;
-};
+/* `const r = require` (or `= module.require`) makes r a require too. */
+const requireNames = (code) => ['require', ...[...code.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:module\s*\.\s*)?require\b(?!\s*\()/g)].map(([, name]) => name)];
 
 /* Each module a file loads, with the names it takes from it ('*' for the whole module). */
-const loads = (source) => [
-    ...[...source.matchAll(REQUIRE)].map(([, binding, specifier, member]) => ({
-        specifier,
-        names: binding && binding.startsWith('{') && !member
-            ? binding.slice(1, -1).split(',').map((name) => name.split(':')[0].trim()).filter(Boolean)
-            : [member || '*'],
-    })),
-    ...[...source.matchAll(IMPORT)].map(([, a, b, c]) => ({ specifier: a || b || c, names: ['*'] })),
-];
+const loads = (source, code) => {
+    const callee = requireNames(code).map(escape).join('|');
+    const require = new RegExp(String.raw`(?:(?:const|let|var)\s+(\{[^}]*\}|[A-Za-z_$][\w$]*)\s*=\s*)?(?<![\w$.])(?:${callee})\s*\(\s*${LITERAL}\s*\)(?:\s*\.\s*([A-Za-z_$][\w$]*))?`, 'g');
+    const imports = new RegExp(String.raw`\bimport\s*\(\s*${LITERAL}\s*\)|\bfrom\s+${LITERAL}|^\s*import\s+${LITERAL}`, 'gm');
+    return [
+        ...[...source.matchAll(require)].map(([, binding, specifier, member]) => ({
+            specifier,
+            names: binding && binding.startsWith('{') && !member
+                ? binding.slice(1, -1).split(',').map((name) => name.split(':')[0].trim()).filter(Boolean)
+                : [member || '*'],
+        })),
+        ...[...source.matchAll(imports)].map(([, a, b, c]) => ({ specifier: a || b || c, names: ['*'] })),
+    ];
+};
 
-/* What a source file uses to reach the network, as kinds a reviewer can read. */
-const outboundUses = (raw) => {
+const HELPER_FILES = Object.fromEntries(Object.keys(FETCH_HELPERS).map((name) => [`Modules/Agents/engine/${name}.js`, name]));
+
+const isFile = (file) => { try { return fs.statSync(path.join(ROOT, file)).isFile(); } catch (e) { return false; } };
+
+/* A relative specifier as the file it loads: the path, then .js, then a folder's index.js. */
+const resolve = (from, specifier, files) => {
+    if (!specifier.startsWith('.')) return null;
+    const base = path.posix.normalize(path.posix.join(path.posix.dirname(from), specifier));
+    return [base, `${base}.js`, `${base}/index.js`].find((file) => (files[file] !== undefined ? true : isFile(file))) || null;
+};
+
+const readSource = (file, files) => (files[file] !== undefined ? files[file] : fs.readFileSync(path.join(ROOT, file), 'utf8'));
+
+// Shared helpers outside the scanned folders: an agent module that loads one that reaches the network is reported.
+const HOP_FOLDERS = ['utils/', 'Config/'];
+
+/* What a source file uses to reach the network, as kinds a reviewer can read. `file` and `files` let a relative
+ * require be resolved: a fetch helper by path or name, and one hop into utils/ and Config/. */
+const outboundUses = (raw, file = '', files = {}, hop = true) => {
     const source = stripComments(raw);
     const code = blankStrings(source);
     const uses = new Set();
-    for (const { specifier, names } of loads(source)) {
-        if (HTTP_MODULES[specifier]) uses.add(HTTP_MODULES[specifier]);
-        const helper = helperOf(specifier);
+    for (const { specifier, names } of loads(source, code)) {
+        const kind = kindOfModule(specifier);
+        if (kind) uses.add(kind);
+        const target = file ? resolve(file, specifier, files) : null;
+        const helper = (target && HELPER_FILES[target]) || (specifier.startsWith('.') && FETCH_HELPERS[path.posix.basename(specifier).replace(/\.js$/, '')] ? path.posix.basename(specifier).replace(/\.js$/, '') : null);
         if (helper) names.filter((name) => name === '*' || FETCH_HELPERS[helper].includes(name)).forEach((name) => uses.add(`helper:${helper}.${name}`));
+        if (hop && target && HOP_FOLDERS.some((folder) => target.startsWith(folder)) && outboundUses(readSource(target, files), target, files, false).length) uses.add(`via:${target}`);
     }
     if (/\baxios\s*[.(]/.test(code)) uses.add('axios');
     if (/\bhttps?2?\s*\.\s*(request|get|connect)\s*\(/.test(code)) uses.add('http');
-    if (/(^|[^\w$.])fetch\s*\(/m.test(code) || /\b(globalThis|global|window|self)\s*(\.\s*fetch\b|\[\s*['"`]fetch['"`]\s*\])/.test(source)) uses.add('fetch');
+    if (/(?<![\w$.])fetch(?![\w$])/.test(code.replace(/([{,]\s*)fetch(\s*:)/g, '$1$2'))) uses.add('fetch');
+    if (/\b(globalThis|global|window|self)\s*(\.\s*fetch\b|\[\s*['"\x60]fetch['"\x60]\s*\])/.test(source)) uses.add('fetch');
+    if (/\b(globalThis|global|window|self)\s*\[/.test(code) || /\bReflect\s*\.\s*(get|apply)\s*\(\s*(globalThis|global|window|self)\b/.test(code)) uses.add('global-computed');
+    if (/(?<![\w$.])eval\s*\(/.test(code) || /\bnew\s+Function\s*\(/.test(code) || /(?<![\w$.])Function\s*\(/.test(code)) uses.add('eval');
     return [...uses].sort();
 };
 
@@ -103,8 +144,11 @@ const sourceFiles = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMa
     return /\.(c|m)?js$/.test(entry.name) ? [full] : [];
 });
 
+const inScanned = (file) => SCANNED.some((dir) => file.startsWith(`${dir}/`));
+
 const scan = (files) => Object.fromEntries(Object.entries(files)
-    .map(([file, source]) => [file, outboundUses(source)])
+    .filter(([file]) => inScanned(file))
+    .map(([file, source]) => [file, outboundUses(source, file, files)])
     .filter(([, uses]) => uses.length));
 
 const LISTED = { ...FETCHERS, ...OUTSIDE_GATEWAY };
