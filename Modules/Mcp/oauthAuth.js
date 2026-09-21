@@ -5,8 +5,8 @@ const mcpOAuth = require('../../Config/mcpOAuth');
 const { verifyCompanyMembership } = require('../../Config/jwt');
 const { externalClientActor } = require('../Agents/actor');
 const taint = require('../Agents/taint');
-
-const APPROVALS_MODULE = '../OAuthServer/approvals';
+const approvalsHook = require('./approvalsHook');
+const logger = require('../../Config/loggerConfig');
 
 const isAccessToken = (raw) => typeof raw === 'string' && raw.startsWith(tokenHash.PREFIX.access);
 
@@ -26,29 +26,34 @@ const clientStanding = async (clientId) => {
     return { ok: true, name: row.name || String(clientId) };
 };
 
-const approvalsModule = () => {
-    try {
-        return require(APPROVALS_MODULE);
-    } catch (error) {
-        if (error.code === 'MODULE_NOT_FOUND' && String(error.message).includes('OAuthServer/approvals')) return null;
-        throw error;
-    }
+const refuseApproval = (clientId, why) => {
+    logger.error(`mcp oauth: refusing client ${clientId}, its workspace approval could not be checked: ${why}`);
+    return false;
 };
 
-/* Slice S3's per-workspace client approval plugs in here: Modules/OAuthServer/approvals.js exporting
- * isClientApproved(companyId, clientId). Until it exists every client that holds a live grant passes. */
+/* Slice S3's per-workspace client approval: Modules/OAuthServer/approvals.js exporting
+ * isClientApproved(companyId, clientId). Until that file exists every client with a live grant passes;
+ * once it exists, anything short of a plain true refuses. */
 const clientApprovedInWorkspace = async (companyId, clientId) => {
-    const approvals = approvalsModule();
-    if (!approvals || typeof approvals.isClientApproved !== 'function') return true;
-    return Boolean(await approvals.isClientApproved(companyId, clientId));
+    let approvals;
+    try {
+        approvals = approvalsHook.load();
+    } catch (error) {
+        return refuseApproval(clientId, `the approval module failed to load (${error.message})`);
+    }
+    if (!approvals) return true;
+    if (typeof approvals.isClientApproved !== 'function') return refuseApproval(clientId, 'the approval module has no isClientApproved');
+    try {
+        return (await approvals.isClientApproved(companyId, clientId)) === true;
+    } catch (error) {
+        return refuseApproval(clientId, `isClientApproved failed (${error.message})`);
+    }
 };
 
 const taintOf = (clientId, at = new Date()) => ({ tainted: true, taintSources: [{ kind: taint.KINDS.CLIENT, ref: String(clientId).slice(0, 200), at }] });
 
-/* MCP 2025-11-25 "Token Audience Binding and Validation" and RFC 8707: the token must name this server's
- * /mcp resource. Answers null for any token that is not good here (the caller sends 401 invalid_token),
- * { wrongWorkspace } when the request names a workspace other than the token's, { forbidden } when the
- * person who granted it has left the workspace, and otherwise the calling context. */
+/* The audience must be exactly this server's canonical /mcp resource (MCP 2025-11-25 "Token Audience
+ * Binding and Validation"): no normalising, so a trailing slash or other case is another resource. */
 const authenticate = async (req, raw, { namedCompanies = [], now = new Date() } = {}) => {
     const token = await grants.introspect(raw, now);
     if (!token.active || token.aud !== mcpOAuth.resource()) return null;

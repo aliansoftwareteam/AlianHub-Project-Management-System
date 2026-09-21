@@ -102,7 +102,6 @@ const unsupportedVersion = (req) => {
 const versionRefused = (res, version) => res.status(400).json(rpcError(null, -32600,
     `Unsupported MCP-Protocol-Version "${version}"; this server speaks ${SUPPORTED_PROTOCOL_VERSIONS.join(', ')}.`));
 
-/* Checks every request makes before its token is looked at. Answers true when it already replied. */
 const refusedAtTheDoor = (req, res) => {
     if (!mcpOAuth.isOn()) return false;
     if (hasQueryToken(req)) { queryTokenRefused(res); return true; }
@@ -111,7 +110,6 @@ const refusedAtTheDoor = (req, res) => {
     return false;
 };
 
-/* Answers true when the caller was refused and a reply has been sent. */
 const refusedCaller = (req, res, ctx) => {
     if (!ctx) { unauthorized(req, res); return true; }
     if (ctx.forbidden) { forbidden(res); return true; }
@@ -128,14 +126,10 @@ const logActivity = (ctx, statusCode) => {
     apiTokens.logTokenActivity(ctx.companyId, ctx.token._id, entry);
 };
 
-/* Authenticate the bearer token and build the calling context. Only the
- * Authorization header counts: a session cookie or an Mcp-Session-Id is never
- * authorization (MCP 2025-11-25, "Session Hijacking"). A token narrows the
- * user's own permissions — it never widens them. Returns null for a bad token
- * and { forbidden: true } when the holder has left the company, so a removed
- * member is cut off on the next request, not when the token expires.
- * MCP_OAUTH=both takes an OAuth access token or a personal token, only takes
- * OAuth tokens alone, and off takes personal tokens as before. */
+/* Only the Authorization header counts: a session cookie or an Mcp-Session-Id
+ * is never authorization (MCP 2025-11-25, "Session Hijacking"). Membership is
+ * checked on every call, so a removed member is cut off on the next request,
+ * not when the token expires. */
 const namedCompanies = (req) => [req.query.companyId, req.headers.companyid].filter(Boolean).map(String);
 
 const authenticate = async (req) => {
