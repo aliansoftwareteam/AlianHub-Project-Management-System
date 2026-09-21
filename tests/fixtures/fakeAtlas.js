@@ -53,6 +53,7 @@ const create = (dbFor) => {
             if (!cond || typeof cond !== 'object' || Array.isArray(cond)) throw serverError(8, 'UnknownError', `"${key}" needs an operator`);
             Object.entries(cond).forEach(([op, arg]) => {
                 if (!OPERATORS.includes(op)) throw serverError(8, 'UnknownError', `"${op}" is not supported in a $vectorSearch filter`);
+                if (Array.isArray(arg) && !arg.length) throw serverError(8, 'UnknownError', `"${key}.${op}" cannot be empty`);
                 const values = Array.isArray(arg) ? arg : [arg];
                 if (values.some((v) => v === null || v === undefined)) throw serverError(8, 'UnknownError', `"${key}" compares with null`);
             });

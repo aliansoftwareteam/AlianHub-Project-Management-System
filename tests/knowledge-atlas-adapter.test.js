@@ -329,6 +329,7 @@ describe('the pre-filter', () => {
         set({ hiddenSprintIds: [HIDDEN_SPRINT] }),
         set({ projectBound: true, reachesProjectless: false }),
         set({ projectBound: true, reachesProjectless: true }),
+        set({ projectIds: [], fileProjectIds: [] }),
     ];
     const clauses = () => sets.flatMap((s) => Object.values(filterFor(s, { chunkSources: ['page', 'comment', 'transcript', 'guide', 'file'] }).clauses)
         .concat([{ companyId: C, sourceType: 'memory', deleted: { $ne: true }, agentId: AGENT }]));
@@ -354,12 +355,13 @@ describe('the pre-filter', () => {
         expect(rows.filter((row) => fakeAtlasModule.filterMatches(row, agentFilter)).every((row) => row.agentId === AGENT)).toBe(true);
     });
 
-    it('uses only declared filter paths, supported operators and no null', () => {
+    it('uses only declared filter paths, supported operators, no null and no empty list', () => {
         const check = (node) => Object.entries(node || {}).forEach(([key, cond]) => {
             if (key === '$and' || key === '$or') { cond.forEach(check); return; }
             expect(FILTER_PATHS).toContain(key);
             Object.entries(cond).forEach(([op, arg]) => {
                 expect(['$eq', '$ne', '$in', '$nin']).toContain(op);
+                if (Array.isArray(arg)) expect(arg.length).toBeGreaterThan(0);
                 (Array.isArray(arg) ? arg : [arg]).forEach((value) => expect(value == null).toBe(false));
             });
         });

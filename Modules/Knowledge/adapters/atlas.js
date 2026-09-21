@@ -86,13 +86,14 @@ const isOperator = (cond) => cond !== null && typeof cond === 'object' && !Array
 /* The pre-filter keeps what Atlas can evaluate and drops the rest. Dropping a condition only
  * widens it (a branch of an $or that cannot be expressed drops the whole $or), so the pre-filter
  * never keeps out a chunk the access clause admits; the clause itself runs after it. Null is
- * dropped too: a projectless page or call is matched by the clause, not by the index. */
+ * dropped too, since a projectless page or call is matched by the clause, not by the index, and
+ * so is an empty $in, which Atlas refuses. */
 const fieldParts = (key, cond) => {
     if (!FILTER_PATHS.includes(key)) return [];
     if (!isOperator(cond)) return filterable(cond) ? [{ [key]: { $eq: cond } }] : [];
     return Object.entries(cond).flatMap(([op, arg]) => {
         if ((op === '$eq' || op === '$ne') && filterable(arg)) return [{ [key]: { [op]: arg } }];
-        if (op === '$in' && Array.isArray(arg) && arg.every(filterable)) return [{ [key]: { $in: arg } }];
+        if (op === '$in' && Array.isArray(arg) && arg.length && arg.every(filterable)) return [{ [key]: { $in: arg } }];
         if (op === '$nin' && Array.isArray(arg)) {
             const kept = arg.filter(filterable);
             return kept.length ? [{ [key]: { $nin: kept } }] : [];
