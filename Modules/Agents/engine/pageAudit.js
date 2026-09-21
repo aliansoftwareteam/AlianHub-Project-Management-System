@@ -40,7 +40,12 @@ const attrs = (tag) => {
 };
 const tagsOf = (html, name) => html.match(new RegExp(`<${name}\\b[^>]*>`, 'gi')) || [];
 
-/* The one way an agent fetches: a page that was read is noted for the run it was read in. */
+const hostsRead = (url, hops) => {
+    const hosts = (Array.isArray(hops) && hops.length ? hops.map((hop) => `http://${hop.host}/`) : [url]).map(taint.fetched).filter(Boolean);
+    return hosts.filter((found, i) => hosts.findIndex((other) => other.ref === found.ref) === i);
+};
+
+/* The one way an agent fetches: every host a read passed through is noted for the run it was read in. */
 async function fetchPage(url) {
     const res = await safeFetch(url, {
         timeoutMs: TIMEOUT_MS,
@@ -48,8 +53,8 @@ async function fetchPage(url) {
         maxRedirects: 5,
         headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' },
     });
-    taint.note(taint.fetched(url));
-    return { status: res.status, html: res.body, bytes: res.bytes };
+    hostsRead(url, res.hops).forEach(taint.note);
+    return { status: res.status, html: res.body, bytes: res.bytes, finalUrl: res.finalUrl, hops: res.hops };
 }
 
 /* Each check returns a fact: { id, ok, detail, evidence }. `evidence` is what the
