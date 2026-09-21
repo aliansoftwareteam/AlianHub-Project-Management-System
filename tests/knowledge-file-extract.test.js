@@ -1,5 +1,5 @@
 /* Text extraction for uploaded files: each supported type yields its text, anything else is not
- * a kind at all, and the limits hold: characters, pages, sheets, rows, declared unzipped size and
+ * a kind at all, and the limits hold: characters, pages, sheets, rows, declared and inflated archive size, memory and
  * time. Parsing runs in a worker thread the extractor can stop, so a parser that never returns
  * is abandoned at the deadline rather than waited for. */
 const fs = require('fs');
@@ -269,6 +269,13 @@ describe('inflation is bounded by what is really inflated, not by what the archi
         process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES = String(MB);
         const many = lyingZipOf(Array.from({ length: 4 }, (_, i) => [`part${i}.xml`, Buffer.alloc(300 * 1024, 0x42)]), 10);
         await expect(extractor.extractText({ buffer: many, kind: 'docx' })).rejects.toMatchObject({ code: 'inflated_too_large' });
+    });
+
+    it('counts stored entries, which need no inflating, against the same budget', () => {
+        const { inflateWithin } = require('../Modules/Knowledge/ingest/extract/zip');
+        const stored = lyingZipOf([['a.xml', Buffer.alloc(600 * 1024, 0x43)], ['b.xml', Buffer.alloc(600 * 1024, 0x44)]], 1, { store: true });
+        expect(() => inflateWithin(stored, MB)).toThrow(expect.objectContaining({ code: 'inflated_too_large' }));
+        expect(inflateWithin(stored, 2 * MB).length).toBeGreaterThan(1200 * 1024);
     });
 
     it('never asks zlib for more than the budget left', () => {
