@@ -83,7 +83,15 @@ const readableRun = async (companyId, caller, runId) => {
     return null;
 };
 
-const stepsOf = (companyId, run) => store.listSteps(companyId, run._id);
+const CREDENTIAL_FIELDS = ['credentialId', 'previousCredentialId'];
+
+const withoutCredentialIds = (step) => {
+    const row = step && typeof step.toObject === 'function' ? step.toObject() : { ...step };
+    CREDENTIAL_FIELDS.forEach((field) => delete row[field]);
+    return row;
+};
+
+const stepsOf = async (companyId, run) => ((await store.listSteps(companyId, run._id)) || []).map(withoutCredentialIds);
 
 /* Shape first, then the step types' own rules.
  *
