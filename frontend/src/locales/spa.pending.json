@@ -1,7 +1,7 @@
 {
   "locale": "spa",
   "machineTranslated": false,
-  "updatedAt": "2026-09-21T06:45:18.778Z",
+  "updatedAt": "2026-09-21T07:18:19.799Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6316,6 +6316,26 @@
     "Knowledge.code_reindex_not_running": "No re-index of this source is running.",
     "Knowledge.code_nothing_erased": "Nothing in the index matched, so nothing was removed. The exclusion is recorded, so it stays out if it is indexed later.",
     "Knowledge.code_figures_timed_out": "Reading the figures took too long. Try again later, or raise KNOWLEDGE_FIGURES_MAX_TIME_MS.",
-    "Knowledge.col_size": "Text size"
+    "Knowledge.col_size": "Text size",
+    "Knowledge.code_not_found": "Nothing by that id exists in this workspace, so nothing was erased and no exclusion was recorded.",
+    "Knowledge.code_invalid_exclusion_id": "That is not an exclusion id.",
+    "Knowledge.exclusions_title": "Exclusions",
+    "Knowledge.exclusions_lead": "What erasure keeps out of the index for good. Removing one lets the item be indexed again at its next change or re-index; it does not bring back what was erased.",
+    "Knowledge.exclusions_shown": "Showing the latest {n} of {total}.",
+    "Knowledge.no_exclusions": "Nothing has been erased from this workspace's index.",
+    "Knowledge.col_kind": "Kind",
+    "Knowledge.col_id": "Id",
+    "Knowledge.col_when": "When",
+    "Knowledge.col_who": "Who",
+    "Knowledge.col_kept_out": "Chunks removed",
+    "Knowledge.exclusion_kind_document": "Document",
+    "Knowledge.exclusion_kind_task": "Task",
+    "Knowledge.exclusion_kind_author": "Person",
+    "Knowledge.exclusion_remove": "Remove",
+    "Knowledge.exclusion_type_id": "Type the id this exclusion names to confirm",
+    "Knowledge.exclusion_remove_confirm": "Remove the exclusion for {id}? It can be indexed again from its next change or re-index.",
+    "Knowledge.exclusion_remove_now": "Remove exclusion",
+    "Knowledge.exclusion_removed": "Exclusion removed.",
+    "Knowledge.by_admin_key": "the instance admin key"
   }
 }

@@ -169,15 +169,45 @@
                             <p v-if="eraseInputError" class="ah-small kn-error" data-test="erase-input-error">{{ eraseInputError }}</p>
 
                             <div v-if="pendingErase" class="in-banner in-banner--danger kn-confirm" data-test="erase-confirm">
-                                <span>{{ pendingErase.kind === 'document'
-                                    ? $t('Knowledge.erase_document_confirm', { type: sourceLabel(pendingErase.sourceType), id: pendingErase.expected })
-                                    : $t('Knowledge.erase_person_confirm', { id: pendingErase.expected, name: openName || openId }) }}</span>
-                                <label class="ah-small" for="knowledge-erase-confirm">{{ pendingErase.kind === 'document' ? $t('Knowledge.erase_type_id') : $t('Knowledge.erase_type_user_id') }}</label>
+                                <span>{{ confirmText }}</span>
+                                <label class="ah-small" for="knowledge-erase-confirm">{{ $t(CONFIRM_LABEL[pendingErase.kind]) }}</label>
                                 <input id="knowledge-erase-confirm" v-model="eraseTyped" type="text" class="ah-input kn-input ah-mono" autocomplete="off" spellcheck="false" data-test="erase-confirm-input" />
                                 <div class="in-actions">
-                                    <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" data-test="erase-confirm-button" :disabled="busy || !typedMatches" @click="erase">{{ $t('Knowledge.erase_now') }}</button>
+                                    <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" data-test="erase-confirm-button" :disabled="busy || !typedMatches" @click="erase">{{ pendingErase.kind === 'exclusion' ? $t('Knowledge.exclusion_remove_now') : $t('Knowledge.erase_now') }}</button>
                                     <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="erase-cancel" @click="cancelErase">{{ $t('Knowledge.cancel') }}</button>
                                 </div>
+                            </div>
+
+                            <div class="in-card__head"><span class="in-card__title">{{ $t('Knowledge.exclusions_title') }}</span></div>
+                            <p class="ah-small">{{ $t('Knowledge.exclusions_lead') }}</p>
+                            <p v-if="exclusionsError" class="ah-small kn-error" data-test="exclusions-error">{{ exclusionsError }}</p>
+                            <p v-else-if="exclusions && !exclusions.exclusions.length" class="ah-small" data-test="no-exclusions">{{ $t('Knowledge.no_exclusions') }}</p>
+                            <div v-else-if="exclusions" class="kn-scroll">
+                                <p v-if="exclusions.total > exclusions.exclusions.length" class="ah-small">{{ $t('Knowledge.exclusions_shown', { n: exclusions.exclusions.length, total: exclusions.total }) }}</p>
+                                <table class="in-table">
+                                    <thead>
+                                        <tr>
+                                            <th>{{ $t('Knowledge.col_kind') }}</th>
+                                            <th>{{ $t('Knowledge.col_id') }}</th>
+                                            <th>{{ $t('Knowledge.col_when') }}</th>
+                                            <th>{{ $t('Knowledge.col_who') }}</th>
+                                            <th>{{ $t('Knowledge.col_kept_out') }}</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="x in exclusions.exclusions" :key="x.id" :data-test="`exclusion-${x.id}`">
+                                            <td>{{ $t(`Knowledge.exclusion_kind_${x.kind}`) }}<span v-if="x.sourceType" class="ah-small">{{ sourceLabel(x.sourceType) }}</span></td>
+                                            <td class="ah-mono">{{ exclusionTarget(x) }}</td>
+                                            <td>{{ formatWhen(x.erasedAt) }}</td>
+                                            <td>{{ erasedBy(x) }}</td>
+                                            <td>{{ x.erasedChunks }}</td>
+                                            <td>
+                                                <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :data-test="`remove-exclusion-${x.id}`" :disabled="busy" @click="askRemoveExclusion(x)">{{ $t('Knowledge.exclusion_remove') }}</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </template>
@@ -207,17 +237,21 @@ const $toast = useToast();
 const { get, post, message, env } = useInstanceApi();
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const ADMIN_KEY_ACTOR = "instance-admin-key";
+const CONFIRM_LABEL = { document: "Knowledge.erase_type_id", person: "Knowledge.erase_type_user_id", exclusion: "Knowledge.exclusion_type_id" };
 const FILE_ID = /^[a-f0-9]{24}:[A-Za-z0-9_-]{1,64}$/i;
 const TRANSLATED_CODES = [
     "indexer_off", "workspace_indexer_off", "invalid_company_id", "unknown_workspace", "invalid_source_type", "invalid_document_id", "invalid_user_id",
     "confirmation_mismatch", "backfill_pending", "backfill_running", "reindex_running", "not_hybrid", "embedding_unconfigured", "embedding_paused", "reembed_running", "server_error",
-    "reindex_not_running", "figures_timed_out",
+    "reindex_not_running", "figures_timed_out", "not_found", "invalid_exclusion_id",
 ];
 const STATE_CHIP = { failed: "ah-chip--danger", running: "ah-chip--warn", catching_up: "ah-chip--warn", not_started: "" };
 
 const summary = ref(null);
 const detail = ref(null);
 const detailError = ref("");
+const exclusions = ref(null);
+const exclusionsError = ref("");
 const nothingErased = ref(false);
 const openId = ref("");
 const error = ref("");
@@ -270,6 +304,12 @@ async function loadDetail({ refresh = false } = {}) {
         const code = e?.response?.data?.code;
         detailError.value = TRANSLATED_CODES.includes(code) ? t(`Knowledge.code_${code}`) : message(e);
     }
+    try {
+        exclusions.value = await get(`${env.INSTANCE_KNOWLEDGE}/${openId.value}/exclusions`);
+        exclusionsError.value = "";
+    } catch (e) {
+        exclusionsError.value = message(e);
+    }
 }
 
 const refresh = async () => {
@@ -283,6 +323,7 @@ const toggle = async (w) => {
     nothingErased.value = false;
     cancelErase();
     detail.value = null;
+    exclusions.value = null;
     if (openId.value === w.companyId) {
         openId.value = "";
         return;
@@ -340,9 +381,13 @@ const retryFiles = () => {
 
 const validId = (sourceType, id) => (sourceType === "file" ? FILE_ID.test(id) : OBJECT_ID.test(id));
 
+const exclusionTarget = (x) => (x.kind === "author" ? x.userId : x.sourceId);
+const erasedBy = (x) => (x.erasedBy === ADMIN_KEY_ACTOR ? t("Knowledge.by_admin_key") : x.erasedByName || x.erasedBy || "—");
+
 /* The form the server compares, so a confirmation in the other case still matches. */
 const canonical = (kind, sourceType, id) => {
     const value = String(id || "");
+    if (kind === "exclusion") return value.replace(/^[a-f0-9]{24}/i, (hex) => hex.toLowerCase());
     if (kind === "document" && sourceType === "file") {
         const at = value.indexOf(":");
         return at < 0 ? value : `${value.slice(0, at).toLowerCase()}${value.slice(at)}`;
@@ -375,6 +420,20 @@ const askErase = (kind) => {
     pendingErase.value = { kind, userId, expected: userId };
 };
 
+const askRemoveExclusion = (x) => {
+    eraseInputError.value = "";
+    eraseTyped.value = "";
+    pendingErase.value = { kind: "exclusion", id: x.id, exclusionKind: x.kind, expected: canonical("exclusion", "", exclusionTarget(x)) };
+};
+
+const confirmText = computed(() => {
+    const pending = pendingErase.value;
+    if (!pending) return "";
+    if (pending.kind === "document") return t("Knowledge.erase_document_confirm", { type: sourceLabel(pending.sourceType), id: pending.expected });
+    if (pending.kind === "person") return t("Knowledge.erase_person_confirm", { id: pending.expected, name: openName.value || openId.value });
+    return t("Knowledge.exclusion_remove_confirm", { id: pending.expected });
+});
+
 function cancelErase() {
     pendingErase.value = null;
     eraseTyped.value = "";
@@ -383,6 +442,11 @@ function cancelErase() {
 const erase = async () => {
     const pending = pendingErase.value;
     if (!pending || !typedMatches.value) return;
+    if (pending.kind === "exclusion") {
+        const removed = await run(`${base()}/exclusions/${pending.id}/remove`, { confirm: pending.expected }, () => t("Knowledge.exclusion_removed"));
+        if (removed) cancelErase();
+        return;
+    }
     const [url, body] = pending.kind === "document"
         ? [`${base()}/erase/document`, { sourceType: pending.sourceType, sourceId: pending.expected, confirm: pending.expected }]
         : [`${base()}/erase/person`, { userId: pending.userId, confirm: pending.expected }];
