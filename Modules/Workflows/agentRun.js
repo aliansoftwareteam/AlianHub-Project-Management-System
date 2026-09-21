@@ -51,16 +51,19 @@ const taskFor = async (companyId, taskId) => {
     return task;
 };
 
-/* Null for a step with no agent by design (any type but agent_run); for an agent
- * step, the agent it names, directly or through its agent run, and that agent if
- * it exists. A read that fails throws: the caller must not take it for "no agent". */
+/* Null for a step with no agent by design (any type but agent_run). For an agent
+ * step, the agent runAgent will execute: an agent run the step names wins over
+ * any agent id, as it does there. A read that fails throws: the caller must not
+ * take it for "no agent". */
 const agentFor = async (companyId, run, step) => {
     if (!step || String(step.type) !== 'agent_run') return null;
     const config = step.config || {};
-    let agentId = config.agentId || run.agentId || null;
-    if (!agentId && config.agentRunId) {
+    let agentId = null;
+    if (config.agentRunId) {
         const agentRun = await runs.get(companyId, config.agentRunId);
         agentId = agentRun && agentRun.agentId ? String(agentRun.agentId) : null;
+    } else {
+        agentId = config.agentId || run.agentId || null;
     }
     if (!agentId) return { agentId: null, agent: null };
     return { agentId: String(agentId), agent: (await runs.getAgent(companyId, agentId)) || null };

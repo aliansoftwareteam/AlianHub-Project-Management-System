@@ -141,20 +141,20 @@ const runStep = async (companyId, run, pending, { workerId = WORKER_ID, context 
     let credential;
     try {
         credential = await stepCredential.issue({ companyId, run, step: claimed, agentOf: () => agentRunner.agentFor(companyId, run, claimed) });
+        // What this hop was given out of what the run had left, on the row before it
+        // runs: the answer to "why did this step only get ninety seconds" has to
+        // outlive the tick that decided it.
+        await store.noteStep(companyId, claim, {
+            deadlineAt: permit.grant.deadlineAt, budgetUsd: permit.grant.budgetUsd, depth: permit.depth,
+            ...(credential ? { credentialId: credential.credentialId, credentialExpiresAt: credential.expiresAt } : {}),
+        });
     } catch (error) {
-        // Minting failed after the claim was won: hand the step back now rather than
+        // The claim was won but the step cannot start: hand it back now rather than
         // leave it claimed, unworked, until its lease runs out.
         return settleFailure(companyId, run, claimed, claim, error);
     }
     const held = credential ? stepCredential.hold(companyId, claim, credential) : null;
     const beat = held ? held.renew : () => store.heartbeat(companyId, claim);
-    // What this hop was given out of what the run had left, on the row before it
-    // runs: the answer to "why did this step only get ninety seconds" has to
-    // outlive the tick that decided it.
-    await store.noteStep(companyId, claim, {
-        deadlineAt: permit.grant.deadlineAt, budgetUsd: permit.grant.budgetUsd, depth: permit.depth,
-        ...(credential ? { credentialId: credential.credentialId, previousCredentialId: null, credentialExpiresAt: credential.expiresAt } : {}),
-    });
     const lost = { value: false };
     const stopHeartbeat = startHeartbeat(claim, lost, beat);
     const key = idempotency.keyFor({ runId: run._id, stepId: claimed.stepId, action: claimed.action });

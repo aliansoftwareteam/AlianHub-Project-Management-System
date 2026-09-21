@@ -319,7 +319,7 @@ exports.compensateStep = async (req, res) => {
         const compensated = await store.recordCompensation(ctx.companyId, run._id, step.stepId, {
             by: String(ctx.caller.actor.userId), agentRunId: String(agentRunId), reverted: out.reverted, failed: out.failed || [],
         });
-        return ok(res, 'Step compensated.', { step: compensated, revert: out });
+        return ok(res, 'Step compensated.', { step: compensated ? withoutCredentialIds(compensated) : compensated, revert: out });
     } catch (error) {
         logger.error(`[workflow-api] compensateStep: ${error.message}`);
         return fail(res, error.message, error.status || 500);
