@@ -458,7 +458,8 @@ describe('the task attachments permission', () => {
     it('holds for an agent run, which retrieves as the person who started it', async () => {
         const { sourceId } = await file('The crane schedule.');
         grant();
-        const asAgent = (userId) => retrieve({ companyId: C, caller: { kind: 'agent', userId, agentId: 'a1', runId: 'r1' }, query: 'crane', scope: { sourceTypes: ['file'] } });
+        const agent = mockDb.seed(SCHEMA_TYPE.AGENTS, { name: 'Crane scheduler', projectIds: [], deletedStatusKey: 0 });
+        const asAgent = (userId) => retrieve({ companyId: C, caller: { kind: 'agent', userId, agentId: String(agent._id), runId: 'r1' }, query: 'crane', scope: { sourceTypes: ['file'] } });
         expect(idsOf(await asAgent(MEMBER))).toEqual([]);
         expect(idsOf(await asAgent(SPRINTER))).toEqual([sourceId]);
     });
