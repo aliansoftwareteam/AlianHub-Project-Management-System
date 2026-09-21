@@ -402,6 +402,16 @@ describe('an action under a step credential', () => {
         await refused(token, stepCredential.REFUSAL.STEP_RECLAIMED);
     });
 
+    it('refuses an earlier claim\'s credential as reclaimed even while the row still names it as the replaced one', async () => {
+        seedRun('r1');
+        const past = new Date(Date.now() - 120000);
+        const first = await claimAndMint('r1', { lease: 1000, now: past });
+        const reclaimed = await store.claimStep(C, { runId: 'r1', stepId: 'sAgent', workerId: 'w2', lease: 60000 });
+        const second = stepCredential.mint({ companyId: C, run: first.run, step: reclaimed, actions: ['task.comment'] });
+        await store.noteStep(C, { runId: 'r1', stepId: 'sAgent', fencingToken: reclaimed.fencingToken }, { credentialId: second.credentialId, previousCredentialId: first.credentialId });
+        await refused(first.token, stepCredential.REFUSAL.STEP_RECLAIMED);
+    });
+
     it('reads as finished, not as expired, once the settled step\'s credential has also run out', async () => {
         seedRun('r1');
         const past = new Date(Date.now() - 120000);
