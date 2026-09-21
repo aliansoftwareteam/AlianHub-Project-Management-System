@@ -6,6 +6,7 @@ const { RefusedError } = require('../Agents/actions');
 const registry = require('../Agents/registry');
 const tools = require('./tools');
 const scopes = require('./scopes');
+const oauthAuth = require('./oauthAuth');
 const mcpOAuth = require('../../Config/mcpOAuth');
 const { TOKEN_PREFIX } = require('../ApiTokens/helpers/apiTokenRules');
 const logger = require('../../Config/loggerConfig');
@@ -53,7 +54,7 @@ const QUERY_TOKEN_KEYS = ['access_token', 'token', 'bearer'];
 
 const hasQueryToken = (req) => Object.entries(req.query || {}).some(([key, value]) =>
     QUERY_TOKEN_KEYS.includes(String(key).toLowerCase())
-    || [].concat(value).some((v) => String(v).startsWith(TOKEN_PREFIX)));
+    || [].concat(value).some((v) => String(v).startsWith(TOKEN_PREFIX) || oauthAuth.looksLikeOAuthSecret(v)));
 
 /* MCP 2025-11-25 "Access Token Usage": tokens never travel in the URI, where
  * proxies and access logs keep them. Refused before any lookup. */
@@ -86,13 +87,66 @@ const forbidden = (res) => res.status(403).json({
     ...rpcError(null, -32003, NOT_A_MEMBER), status: false, error: NOT_A_MEMBER, statusText: 'Forbidden',
 });
 
-/* Authenticate the bearer PAT and build the calling context. The token narrows
- * the user's own permissions — it never widens them. Returns null for a bad
- * token and { forbidden: true } when the holder has left the company, so a
- * removed member is cut off on the next request, not when the token expires. */
+const WRONG_WORKSPACE = 'This token is bound to another workspace than the companyId the request names.';
+
+const wrongWorkspace = (res) => res.status(403).json(rpcError(null, -32003, WRONG_WORKSPACE));
+
+/* MCP 2025-11-25 "Protocol Version Header": a version the server does not support is a 400. Absent,
+ * the client predates the header and negotiated through initialize. */
+const unsupportedVersion = (req) => {
+    const version = req.headers['mcp-protocol-version'];
+    if (version === undefined || SUPPORTED_PROTOCOL_VERSIONS.includes(String(version))) return '';
+    return String(version).slice(0, 40);
+};
+
+const versionRefused = (res, version) => res.status(400).json(rpcError(null, -32600,
+    `Unsupported MCP-Protocol-Version "${version}"; this server speaks ${SUPPORTED_PROTOCOL_VERSIONS.join(', ')}.`));
+
+/* Checks every request makes before its token is looked at. Answers true when it already replied. */
+const refusedAtTheDoor = (req, res) => {
+    if (!mcpOAuth.isOn()) return false;
+    if (hasQueryToken(req)) { queryTokenRefused(res); return true; }
+    const version = unsupportedVersion(req);
+    if (version) { versionRefused(res, version); return true; }
+    return false;
+};
+
+/* Answers true when the caller was refused and a reply has been sent. */
+const refusedCaller = (req, res, ctx) => {
+    if (!ctx) { unauthorized(req, res); return true; }
+    if (ctx.forbidden) { forbidden(res); return true; }
+    if (ctx.wrongWorkspace) { wrongWorkspace(res); return true; }
+    return false;
+};
+
+const logActivity = (ctx, statusCode) => {
+    const entry = { method: 'POST', path: '/mcp', statusCode, durationMs: 0, ip: ctx.ip };
+    if (ctx.oauth) {
+        apiTokens.logTokenActivity(ctx.companyId, null, { ...entry, clientId: ctx.oauth.clientId, grantId: ctx.oauth.grantId, userId: ctx.userId });
+        return;
+    }
+    apiTokens.logTokenActivity(ctx.companyId, ctx.token._id, entry);
+};
+
+/* Authenticate the bearer token and build the calling context. Only the
+ * Authorization header counts: a session cookie or an Mcp-Session-Id is never
+ * authorization (MCP 2025-11-25, "Session Hijacking"). A token narrows the
+ * user's own permissions — it never widens them. Returns null for a bad token
+ * and { forbidden: true } when the holder has left the company, so a removed
+ * member is cut off on the next request, not when the token expires.
+ * MCP_OAUTH=both takes an OAuth access token or a personal token, only takes
+ * OAuth tokens alone, and off takes personal tokens as before. */
+const namedCompanies = (req) => [req.query.companyId, req.headers.companyid].filter(Boolean).map(String);
+
 const authenticate = async (req) => {
     const raw = bearerOf(req);
-    const companyId = String(req.query.companyId || req.headers.companyid || '');
+    const mode = mcpOAuth.mode();
+    if (raw && mode !== mcpOAuth.MODE.OFF && oauthAuth.isAccessToken(raw)) {
+        const ctx = await oauthAuth.authenticate(req, raw, { namedCompanies: namedCompanies(req) });
+        return ctx && !ctx.forbidden && !ctx.wrongWorkspace ? { ...ctx, ip: ipOf(req) } : ctx;
+    }
+    if (mode === mcpOAuth.MODE.ONLY) return null;
+    const companyId = namedCompanies(req)[0] || '';
     if (!raw || !companyId) return null;
 
     const token = await apiTokens.verifyToken(companyId, raw);
@@ -187,10 +241,9 @@ const handleRpc = async (ctx, message) => {
 const post = async (req, res) => {
     try {
         const oauth = mcpOAuth.isOn();
-        if (oauth && hasQueryToken(req)) return queryTokenRefused(res);
+        if (refusedAtTheDoor(req, res)) return undefined;
         const ctx = await authenticate(req);
-        if (!ctx) return unauthorized(req, res);
-        if (ctx.forbidden) return forbidden(res);
+        if (refusedCaller(req, res, ctx)) return undefined;
 
         const body = req.body;
         const batch = Array.isArray(body);
@@ -198,9 +251,7 @@ const post = async (req, res) => {
 
         const missing = oauth ? scopes.missingScopes(ctx.token, messages) : [];
         if (missing.length) {
-            apiTokens.logTokenActivity(ctx.companyId, ctx.token._id, {
-                method: 'POST', path: '/mcp', statusCode: 403, durationMs: 0, ip: ctx.ip,
-            });
+            logActivity(ctx, 403);
             return insufficientScope(res, ctx, body, missing);
         }
 
@@ -210,9 +261,7 @@ const post = async (req, res) => {
             if (reply) replies.push(reply);
         }
 
-        apiTokens.logTokenActivity(ctx.companyId, ctx.token._id, {
-            method: 'POST', path: '/mcp', statusCode: 200, durationMs: 0, ip: ctx.ip,
-        });
+        logActivity(ctx, 200);
 
         if (!replies.length) return res.status(202).end();
         return res.json(batch ? replies : replies[0]);
@@ -225,10 +274,9 @@ const post = async (req, res) => {
 /* GET /mcp — clients probe this for a server-sent stream. This server answers
  * every request in the POST response, so there is no stream to open. */
 const get = async (req, res) => {
-    if (mcpOAuth.isOn() && hasQueryToken(req)) return queryTokenRefused(res);
+    if (refusedAtTheDoor(req, res)) return undefined;
     const ctx = await authenticate(req);
-    if (!ctx) return unauthorized(req, res);
-    if (ctx.forbidden) return forbidden(res);
+    if (refusedCaller(req, res, ctx)) return undefined;
     return res.status(405).json(rpcError(null, -32000, 'This server replies on POST; no SSE stream is offered.'));
 };
 

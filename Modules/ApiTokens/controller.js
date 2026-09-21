@@ -468,10 +468,10 @@ exports.whoami = async (req, res) => {
 };
 
 /* Fire-and-forget per-call audit row. */
-exports.logTokenActivity = (companyId, tokenId, { method, path, statusCode, durationMs, ip }) => {
+exports.logTokenActivity = (companyId, tokenId, { method, path, statusCode, durationMs, ip, clientId, grantId, userId }) => {
     MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.API_ACTIVITY_LOGS,
-        data: { tokenId, method, path, statusCode, durationMs, ip },
+        data: { ...(tokenId ? { tokenId } : {}), method, path, statusCode, durationMs, ip, ...(clientId ? { clientId, grantId, userId } : {}) },
     }, 'save').catch((error) => {
         logger.error(`ERROR in api token activity log: ${error.message}`);
     });

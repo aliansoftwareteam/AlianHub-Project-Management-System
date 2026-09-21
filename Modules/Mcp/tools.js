@@ -8,6 +8,8 @@ const { htmlToRawText, pageVisibleTo } = require('../Pages/helpers/pageRules');
 const { blocksToRawText, contentToEditorData } = require('../Pages/helpers/pageContent');
 const { hasScope } = require('../ApiTokens/helpers/apiTokenRules');
 const performanceRead = require('../Agents/performanceRead');
+const scopes = require('./scopes');
+const { heldForApproval } = require('./taintHold');
 
 const PAGE_TEXT_MAX = 40000;
 
@@ -202,6 +204,16 @@ const manifest = () => offered().map((t) => ({
     inputSchema: t.input,
 }));
 
+/* An OAuth token is held to the one scope the tool needs; a personal token keeps its read/write rule. */
+const scopeRefusal = (ctx, tool, write) => {
+    if (ctx.token && ctx.token.oauth) {
+        const needed = scopes.scopeForTool(tool.name);
+        return needed && scopes.grantedScopes(ctx.token).includes(needed) ? '' : `This token lacks the ${needed || 'required'} scope.`;
+    }
+    if (write) return ctx.canWrite ? '' : 'This token is read-only.';
+    return hasScope(ctx.token, 'read') ? '' : 'This token lacks the read scope.';
+};
+
 /* Run a tool for an MCP caller. Reads are authorised through the registry;
  * writes go through actions.perform, so they are audited and undoable. */
 const call = async (ctx, name, args = {}) => {
@@ -209,9 +221,8 @@ const call = async (ctx, name, args = {}) => {
     if (!tool) throw Object.assign(new Error(`Unknown tool "${name}"`), { code: -32601 });
 
     if (tool.run) {
-        if (!hasScope(ctx.token, 'read')) {
-            throw Object.assign(new Error('This token lacks the read scope.'), { code: -32004 });
-        }
+        const refused = scopeRefusal(ctx, tool, false);
+        if (refused) throw Object.assign(new Error(refused), { code: -32004 });
         if (!tool.authorizesPerProject) await actions.authorizeRead({
             companyId: ctx.companyId, actor: ctx.actor, action: tool.action,
             params: { taskId: args.taskId }, ip: ctx.ip, allowedActions: ctx.allowedActions,
@@ -219,17 +230,20 @@ const call = async (ctx, name, args = {}) => {
         return tool.run(ctx, args);
     }
 
-    if (!ctx.canWrite) {
-        throw Object.assign(new Error('This token is read-only.'), { code: -32004 });
-    }
+    const refused = scopeRefusal(ctx, tool, true);
+    if (refused) throw Object.assign(new Error(refused), { code: -32004 });
+    const params = tool.params(args);
+    const held = heldForApproval(ctx, tool.action);
+    if (held) throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: held, ip: ctx.ip, taint: ctx.taint });
     const out = await actions.perform({
         companyId: ctx.companyId,
         actor: ctx.actor,
         action: tool.action,
-        params: tool.params(args),
+        params,
         reason: str(args.reason, 500) || `${tool.name} via MCP`,
         ip: ctx.ip,
         allowedActions: ctx.allowedActions,
+        ...(ctx.taint ? { taint: ctx.taint } : {}),
     });
     return { ok: true, auditId: out.auditId, result: out.result || null, undoable: Boolean(out.undo) };
 };

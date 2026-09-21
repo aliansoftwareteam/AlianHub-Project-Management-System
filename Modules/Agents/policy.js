@@ -63,4 +63,4 @@ const decide = ({ agent = {}, action, params = {}, rating = null, run = null, ta
     return out(DECISION.ACT, `${key} is a reversible task-scoped write with no money in it`);
 };
 
-module.exports = { DECISION, SCOPES, REVIEW_LEVEL, decide, isNever, isComplete };
+module.exports = { DECISION, SCOPES, REVIEW_LEVEL, decide, escalations, isNever, isComplete };

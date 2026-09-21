@@ -20,10 +20,12 @@ const DISCOVERY_SCOPES = mcpOAuth.READ_SCOPES;
 
 const scopeForTool = (name) => (Object.prototype.hasOwnProperty.call(TOOL_SCOPES, name) ? TOOL_SCOPES[name] : null);
 
-/* A personal access token only knows read and write. hasScope keeps its rules
- * (empty scopes, API_TOKEN_STRICT), so each maps onto every *:read or *:write
- * and no token that works today loses a tool. */
+/* An OAuth token holds exactly what was granted. A personal access token only
+ * knows read and write. hasScope keeps its rules (empty scopes, API_TOKEN_STRICT),
+ * so each maps onto every *:read or *:write and no token that works today loses a
+ * tool; an OAuth token must never take that path, where empty would mean everything. */
 const grantedScopes = (tokenDoc) => {
+    if (tokenDoc && tokenDoc.oauth) return mcpOAuth.SCOPES.filter((scope) => (tokenDoc.scopes || []).includes(scope));
     const granted = new Set((tokenDoc?.scopes || []).filter((scope) => mcpOAuth.SCOPES.includes(scope)));
     if (hasScope(tokenDoc, 'read')) mcpOAuth.READ_SCOPES.forEach((scope) => granted.add(scope));
     if (hasScope(tokenDoc, 'write')) mcpOAuth.WRITE_SCOPES.forEach((scope) => granted.add(scope));

@@ -19,7 +19,17 @@ const DEFAULTS = Object.freeze({
 
 const flagOn = (value) => FLAG_ON.includes(String(value || '').trim().toLowerCase());
 
-const isOn = (env = process.env) => flagOn(env.MCP_OAUTH);
+const MODE = Object.freeze({ OFF: 'off', BOTH: 'both', ONLY: 'only' });
+
+// on, true, 1 and yes predate the modes and mean both: personal access tokens still work on /mcp.
+const mode = (env = process.env) => {
+    const value = String(env.MCP_OAUTH || '').trim().toLowerCase();
+    if (value === MODE.ONLY) return MODE.ONLY;
+    if (value === MODE.BOTH || flagOn(value)) return MODE.BOTH;
+    return MODE.OFF;
+};
+
+const isOn = (env = process.env) => mode(env) !== MODE.OFF;
 
 const dcrOn = (env = process.env) => isOn(env) && flagOn(env.MCP_OAUTH_DCR);
 
@@ -96,6 +106,6 @@ const endpoints = (env = process.env) => {
 };
 
 module.exports = {
-    SCOPES, READ_SCOPES, CODE_TTL_MS, CODE_REUSE_WINDOW_MS, DEFAULTS,
-    isOn, dcrOn, lifetimes, rateLimitPerMinute, metadataCacheMs, issuer, issuerProblem, assertIssuer, resource, canonicalResource, endpoints,
+    SCOPES, READ_SCOPES, CODE_TTL_MS, CODE_REUSE_WINDOW_MS, DEFAULTS, MODE,
+    mode, isOn, dcrOn, lifetimes, rateLimitPerMinute, metadataCacheMs, issuer, issuerProblem, assertIssuer, resource, canonicalResource, endpoints,
 };

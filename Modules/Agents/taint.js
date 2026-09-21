@@ -6,8 +6,8 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 
 // A run is tainted once its context has taken in content from outside the
 // workspace's own members: a fetched page, an email-in body, a form submission,
-// a webhook payload, uploaded file text or a retrieved passage whose origin is
-// external. The run keeps only where the content came from (a host, an id or a
+// a webhook payload, uploaded file text, a retrieved passage whose origin is
+// external, or an instruction from an outside client holding an OAuth grant. The run keeps only where the content came from (a host, an id or a
 // hash), never the content, and under AGENT_TAINT_ROUTING the policy proposes
 // its risky writes instead of acting on them (docs/AI-PLATFORM-ARCHITECTURE.md §G).
 //
@@ -21,7 +21,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 // `passages` on the context itself; and a generic skill that declares an external
 // read (EXTERNAL_READS) is marked from the url it read even if it attached nothing.
 
-const KINDS = Object.freeze({ FETCH: 'fetch', EMAIL: 'email', FORM: 'form', WEBHOOK: 'webhook', FILE: 'file', PASSAGE: 'passage' });
+const KINDS = Object.freeze({ FETCH: 'fetch', EMAIL: 'email', FORM: 'form', WEBHOOK: 'webhook', FILE: 'file', PASSAGE: 'passage', CLIENT: 'client' });
 const KIND_LIST = Object.freeze(Object.values(KINDS));
 const ORIGIN = Object.freeze({ MEMBER: 'member', AGENT: 'agent', EXTERNAL: 'external' });
 const TASK_ORIGIN_KINDS = Object.freeze([KINDS.EMAIL, KINDS.FORM, KINDS.WEBHOOK]);
