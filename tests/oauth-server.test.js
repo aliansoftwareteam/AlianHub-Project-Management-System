@@ -780,7 +780,8 @@ describe('client authentication', () => {
         const { client } = await confidential('client_secret_basic');
         const res = await authorize(validParams(client, newVerifier()), { companyId: OTHER_CID });
         expect(res.status).toBe(403);
-        expect(res.location.searchParams.get('error')).toBe('access_denied');
+        expect(res.location).toBeNull();
+        expect(res.body.error).toBe('access_denied');
         expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)).toHaveLength(0);
     });
 });

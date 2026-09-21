@@ -24,9 +24,35 @@ const grants = {
         { grantId: String(grantId), revokedAt: null },
         { $set: { revokedAt: at, revokedReason: String(reason) } },
     ], 'findOneAndUpdate')),
-    revokeForClient: (clientId, reason, at) => db(SCHEMA_TYPE.OAUTH_GRANTS, [
-        { clientId: String(clientId), revokedAt: null },
+    revokeForClient: (clientId, reason, at, companyId) => db(SCHEMA_TYPE.OAUTH_GRANTS, [
+        { clientId: String(clientId), ...(companyId ? { companyId: String(companyId) } : {}), revokedAt: null },
         { $set: { revokedAt: at, revokedReason: String(reason) } },
+    ], 'updateMany'),
+    touch: (grantId, at) => db(SCHEMA_TYPE.OAUTH_GRANTS, [{ grantId: String(grantId) }, { $set: { lastUsedAt: at } }], 'updateOne'),
+    liveForUser: async (userId, now) => ((await db(SCHEMA_TYPE.OAUTH_GRANTS, [
+        { userId: String(userId), revokedAt: null, expiresAt: { $gt: now } },
+        {},
+        { sort: { createdAt: -1 }, limit: 200 },
+    ], 'find')) || []).map(plain),
+};
+
+const approvals = {
+    find: async (companyId, clientId) => plain(await db(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, [{ companyId: String(companyId), clientId: String(clientId) }], 'findOne')),
+    save: async (row) => plain(await db(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, row, 'save')),
+    // Moves a row on only from the status it was read in, so two admins acting at once cannot both win.
+    transition: async (companyId, clientId, fromStatus, set) => plain(await db(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, [
+        { companyId: String(companyId), clientId: String(clientId), status: fromStatus },
+        { $set: set },
+        { new: true },
+    ], 'findOneAndUpdate')),
+    listFor: async (companyId) => ((await db(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, [{ companyId: String(companyId) }, {}, { sort: { updatedAt: -1 }, limit: 500 }], 'find')) || []).map(plain),
+    namesFor: async (pairs) => {
+        if (!pairs.length) return [];
+        return ((await db(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, [{ $or: pairs.map(({ companyId, clientId }) => ({ companyId: String(companyId), clientId: String(clientId) })) }, { companyId: 1, clientId: 1, clientName: 1 }], 'find')) || []).map(plain);
+    },
+    revokeForClient: (clientId, by, at) => db(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, [
+        { clientId: String(clientId), status: { $in: ['pending', 'approved'] } },
+        { $set: { status: 'revoked', revokedBy: String(by || ''), revokedAt: at, updatedAt: at } },
     ], 'updateMany'),
 };
 
@@ -40,7 +66,10 @@ const tokens = {
     ], 'findOneAndUpdate')),
     revoke: (tokenHash, at) => db(SCHEMA_TYPE.OAUTH_TOKENS, [{ tokenHash: String(tokenHash), revokedAt: null }, { $set: { revokedAt: at } }], 'updateOne'),
     revokeGrant: (grantId, at) => db(SCHEMA_TYPE.OAUTH_TOKENS, [{ grantId: String(grantId), revokedAt: null }, { $set: { revokedAt: at } }], 'updateMany'),
-    revokeClient: (clientId, at) => db(SCHEMA_TYPE.OAUTH_TOKENS, [{ clientId: String(clientId), revokedAt: null }, { $set: { revokedAt: at } }], 'updateMany'),
+    revokeClient: (clientId, at, companyId) => db(SCHEMA_TYPE.OAUTH_TOKENS, [
+        { clientId: String(clientId), ...(companyId ? { companyId: String(companyId) } : {}), revokedAt: null },
+        { $set: { revokedAt: at } },
+    ], 'updateMany'),
 };
 
-module.exports = { clients, grants, tokens };
+module.exports = { clients, grants, tokens, approvals };

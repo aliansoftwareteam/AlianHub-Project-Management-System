@@ -337,6 +337,11 @@ const oauthTokensSchema = new Schema(schema.oauthTokens, {strict: true, timestam
 oauthTokensSchema.index({ tokenHash: 1 }, { unique: true, name: 'token_hash' });
 oauthTokensSchema.index({ grantId: 1 });
 oauthTokensSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0, name: 'purge_at' });
+oauthGrantsSchema.index({ clientId: 1, companyId: 1 });
+oauthGrantsSchema.index({ userId: 1, createdAt: -1 });
+const oauthClientApprovalsSchema = new Schema(schema.oauthClientApprovals, {strict: true, timestamps: false});
+oauthClientApprovalsSchema.index({ companyId: 1, clientId: 1 }, { unique: true, name: 'company_client' });
+oauthClientApprovalsSchema.index({ companyId: 1, status: 1 });
 
 const cspReportsSchema = new Schema(schema.cspReports, {strict: true, timestamps: false});
 cspReportsSchema.index({ day: 1, directive: 1, blockedHost: 1, documentPath: 1 }, { unique: true, name: 'report_key' });
@@ -484,6 +489,7 @@ module.exports = {
     oauthClientsSchema,
     oauthGrantsSchema,
     oauthTokensSchema,
+    oauthClientApprovalsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,
