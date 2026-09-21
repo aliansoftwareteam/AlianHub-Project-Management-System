@@ -148,8 +148,12 @@ describe('adding an attachment to a task', () => {
         expect(await attach(formUpload())).toMatchObject(REFUSAL);
     });
 
-    it('refuses a url that is not text', async () => {
-        expect(await attach({ $ne: null })).toMatchObject({ code: 400 });
+    it.each([
+        ['an operator', { $ne: null }],
+        ['a list naming the task\'s own file', [own]],
+    ])('refuses a url that is %s', async (_label, url) => {
+        expect(await attach(url)).toMatchObject({ code: 400 });
+        expect(urls(TASK)).toEqual([]);
     });
 });
 

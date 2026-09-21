@@ -14,7 +14,8 @@ jest.mock('../Config/permissionGuard', () => {
 });
 jest.mock('../Config/projectAccess', () => ({ canReadProject: jest.fn() }));
 jest.mock('../Config/contentAccess', () => ({ projectAccess: jest.fn() }));
-jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({ canSeeSprintById: jest.fn() }));
+jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({ canSeeSprintById: jest.fn(), hiddenSprintIds: jest.fn() }));
+jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn() }));
 jest.mock('../Modules/TimeSheet/helpers/timeScope', () => ({
     SHEET_PERMISSION: { user: 'u', project: 'p', workload: 'w', tracker: 't' },
     resolveSheetScope: jest.fn(),
@@ -41,7 +42,8 @@ const logger = require('../Config/loggerConfig');
 const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const { canReadProject } = require('../Config/projectAccess');
 const { projectAccess } = require('../Config/contentAccess');
-const { canSeeSprintById } = require('../Modules/Sprints/helpers/sprintVisibility');
+const { canSeeSprintById, hiddenSprintIds } = require('../Modules/Sprints/helpers/sprintVisibility');
+const { visibleProjectIds } = require('../Modules/Agents/scope');
 const { resolveSheetScope } = require('../Modules/TimeSheet/helpers/timeScope');
 const { ROLE_OWNER, ROLE_MEMBER } = require('../Config/roleTypes');
 
@@ -110,21 +112,38 @@ const flat = (value, path) => path.reduce((values, part) => values.flatMap((v) =
     return Array.isArray(next) ? next : [next];
 }), [value]);
 
+const matchValue = (values, want) => {
+    const have = values.map(String);
+    if (want && typeof want === 'object' && !Array.isArray(want) && Object.keys(want).some((op) => op.startsWith('$'))) {
+        return Object.entries(want).every(([op, arg]) => {
+            if (op === '$in') return arg.some((w) => have.includes(String(w)));
+            if (op === '$nin') return !arg.some((w) => have.includes(String(w)));
+            if (op === '$ne') return !have.includes(String(arg));
+            throw new Error(`unsupported ${op}`);
+        });
+    }
+    return have.includes(String(want));
+};
+
 const matches = (doc, query) => Object.entries(query).every(([field, want]) => {
-    const values = flat(doc, field.split('.')).map(String);
-    if (want && typeof want === 'object' && Array.isArray(want.$in)) return want.$in.some((w) => values.includes(String(w)));
-    return values.includes(String(want));
+    if (field === '$or') return want.some((q) => matches(doc, q));
+    if (field === '$and') return want.every((q) => matches(doc, q));
+    const values = flat(doc, field.split('.'));
+    if (want && typeof want === 'object' && want.$elemMatch) return values.some((item) => item && typeof item === 'object' && matches(item, want.$elemMatch));
+    return matchValue(values, want);
 });
 
 mockDb.crud = async (db, { type, data }, method) => {
     const [query] = data;
     if (type === 'company_users') return { _id: 'seat' };
     const rows = (mockDb.rows[type] || []).filter((row) => matches(row, query));
-    return method === 'find' ? rows : rows[0] || null;
+    const limit = data[2] && data[2].limit;
+    if (method === 'find') return limit ? rows.slice(0, limit) : rows;
+    return rows[0] || null;
 };
 
 beforeEach(() => {
-    delete process.env.STORAGE_DOWNLOAD_SCOPE;
+    process.env.STORAGE_DOWNLOAD_SCOPE = 'enforce';
     logger.warn.mockClear();
     mockDb.rows = {
         tasks: [
@@ -150,7 +169,13 @@ beforeEach(() => {
         const visible = ROLES[uid] === ROLE_OWNER || projectId !== HIDDEN_PROJECT;
         return { visible, canEdit: visible };
     });
-    canSeeSprintById.mockImplementation(async (companyId, uid, sprintId) => String(sprintId) !== PRIVATE_SPRINT);
+    canSeeSprintById.mockImplementation(async (companyId, uid, sprintId) => {
+        const sprint = (mockDb.rows.sprints || []).find((row) => String(row._id) === String(sprintId));
+        if (sprint) return sprint.private !== true || (sprint.AssigneeUserId || []).includes(uid);
+        return String(sprintId) !== PRIVATE_SPRINT;
+    });
+    visibleProjectIds.mockImplementation(async (companyId, uid) => (ROLES[uid] === ROLE_OWNER ? [OPEN_PROJECT, HIDDEN_PROJECT, LOCKED_FILES_PROJECT] : [OPEN_PROJECT, LOCKED_FILES_PROJECT]));
+    hiddenSprintIds.mockImplementation(async () => [PRIVATE_SPRINT]);
     resolveSheetScope.mockImplementation(async (companyId, uid) => ({ uid, everyone: ROLES[uid] === ROLE_OWNER, visible: null }));
 });
 
@@ -255,6 +280,23 @@ describe.each(ROUTE_NAMES)('%s', (routeName) => {
 });
 
 describe('report mode', () => {
+    it('is the default', async () => {
+        delete process.env.STORAGE_DOWNLOAD_SCOPE;
+        expect(signed(await SIGNING_ROUTES['POST /api/v1/wasabi/retriveObject'](MEMBER, key.hiddenTaskAttachment))).toBe(true);
+        expect(logger.warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('logs the reason category beside the layout type', async () => {
+        process.env.STORAGE_DOWNLOAD_SCOPE = 'report';
+        await SIGNING_ROUTES['POST /api/v1/wasabi/retriveObject'](MEMBER, key.outsideLayouts);
+        await SIGNING_ROUTES['POST /api/v1/wasabi/retriveObject'](MEMBER, key.missingTaskAttachment);
+        const [unknown] = logger.warn.mock.calls[0];
+        const [missing] = logger.warn.mock.calls[1];
+        expect(unknown).toMatch(/layout: unknown\b/);
+        expect(missing).toMatch(/layout: task_attachment, reason: not_found/);
+        expect(missing).not.toContain(MISSING_TASK);
+    });
+
     it('signs a refused key and logs its layout type only', async () => {
         process.env.STORAGE_DOWNLOAD_SCOPE = 'report';
         const out = await SIGNING_ROUTES['POST /api/v1/wasabi/retriveObject'](MEMBER, key.hiddenTaskAttachment);
@@ -266,9 +308,11 @@ describe('report mode', () => {
         expect(line).not.toContain('secret');
     });
 
-    it('is enforce for anything but report', async () => {
-        process.env.STORAGE_DOWNLOAD_SCOPE = 'off';
+    it('refuses only when set to enforce', async () => {
+        process.env.STORAGE_DOWNLOAD_SCOPE = 'ENFORCE';
         expect((await SIGNING_ROUTES['POST /api/v1/wasabi/retriveObject'](MEMBER, key.hiddenTaskAttachment)).status).toBe(404);
+        process.env.STORAGE_DOWNLOAD_SCOPE = 'off';
+        expect(signed(await SIGNING_ROUTES['POST /api/v1/wasabi/retriveObject'](MEMBER, key.hiddenTaskAttachment))).toBe(true);
     });
 });
 
@@ -278,5 +322,125 @@ describe('the profile bucket on server storage', () => {
         mockDb.rows.users = [{ _id: MEMBER, AssignCompany: [CID] }];
         const out = await run(SERVER['GET /api/v1/generateSignedUrl/:bucketId'], { ...session(MEMBER), params: { bucketId: 'USER_PROFILES' }, query: { filepath: avatar } });
         expect(signed(out)).toBe(true);
+    });
+});
+
+const CHAT_PROJECT = '6f0000000000000000000c0a';
+const DM_PROJECT = '6f0000000000000000000c0b';
+const PUBLIC_CHANNEL = '6f0000000000000000000e11';
+const PRIVATE_CHANNEL = '6f0000000000000000000e12';
+const PROJECT_CHANNEL = '6f0000000000000000000e13';
+const HIDDEN_PROJECT_CHANNEL = '6f0000000000000000000e14';
+const DM_SPRINT = '6f0000000000000000000e15';
+const DM_TASK = '6f0000000000000000000b21';
+const OTHER_PROJECT = '6f0000000000000000000a09';
+const OTHER_COMPANY = '6f00000000000000000000c2';
+
+const channelKey = (projectId, channelId) => `Project/${projectId}/${channelId}/default/Comments/room.png`;
+const dmKey = `Project/${DM_PROJECT}/${DM_SPRINT}/${DM_TASK}/Comments/photo.png`;
+
+const withChats = () => {
+    mockDb.rows.main_chats = [{ _id: CHAT_PROJECT, default: false }, { _id: DM_PROJECT, default: true }];
+    mockDb.rows.sprints = [
+        { _id: PUBLIC_CHANNEL, projectId: CHAT_PROJECT, private: false, AssigneeUserId: [] },
+        { _id: PRIVATE_CHANNEL, projectId: CHAT_PROJECT, private: true, AssigneeUserId: [MEMBER] },
+        { _id: PROJECT_CHANNEL, projectId: OPEN_PROJECT, private: false, AssigneeUserId: [] },
+        { _id: HIDDEN_PROJECT_CHANNEL, projectId: HIDDEN_PROJECT, private: false, AssigneeUserId: [] },
+    ];
+    mockDb.rows.tasks.push({ _id: DM_TASK, ProjectID: DM_PROJECT, sprintId: DM_SPRINT, mainChat: true, AssigneeUserId: [MEMBER, OWNER], attachments: [] });
+};
+
+describe.each(ROUTE_NAMES)('%s, chat files', (routeName) => {
+    const ask = SIGNING_ROUTES[routeName];
+    beforeEach(withChats);
+
+    it.each([
+        ['a public channel file, for any member', OTHER_MEMBER, channelKey(CHAT_PROJECT, PUBLIC_CHANNEL)],
+        ['a private channel file, for a channel member', MEMBER, channelKey(CHAT_PROJECT, PRIVATE_CHANNEL)],
+        ['a channel file in a project the caller can open', MEMBER, channelKey(OPEN_PROJECT, PROJECT_CHANNEL)],
+        ['a direct-message file, for a participant', MEMBER, dmKey],
+    ])('signs %s', async (_label, uid, path) => {
+        expect(signed(await ask(uid, path))).toBe(true);
+    });
+
+    it.each([
+        ['a private channel file, for someone not in the channel', OTHER_MEMBER, channelKey(CHAT_PROJECT, PRIVATE_CHANNEL)],
+        ['a private channel file, for an owner not in the channel', OWNER, channelKey(CHAT_PROJECT, PRIVATE_CHANNEL)],
+        ['a channel file in a project the caller cannot open', MEMBER, channelKey(HIDDEN_PROJECT, HIDDEN_PROJECT_CHANNEL)],
+        ['a channel named under another project', OTHER_MEMBER, channelKey(OPEN_PROJECT, PUBLIC_CHANNEL)],
+        ['a channel that does not exist', MEMBER, channelKey(CHAT_PROJECT, '6f0000000000000000000eff')],
+        ['a direct-message file, for someone outside the conversation', OTHER_MEMBER, dmKey],
+    ])('refuses %s', async (_label, uid, path) => {
+        expect((await ask(uid, path)).status).toBe(404);
+    });
+});
+
+describe.each(ROUTE_NAMES)('%s, files a task lists outside its own folder', (routeName) => {
+    const ask = SIGNING_ROUTES[routeName];
+
+    it('signs a voice note whose task moved to another sprint, then another project', async () => {
+        const task = mockDb.rows.tasks.find((row) => row._id === VOICE_TASK);
+        task.sprintId = '6f0000000000000000000e09';
+        expect(signed(await ask(MEMBER, key.voiceNote))).toBe(true);
+        task.ProjectID = OTHER_PROJECT;
+        visibleProjectIds.mockImplementation(async () => [OPEN_PROJECT, OTHER_PROJECT]);
+        canReadProject.mockImplementation(async () => ({ allowed: true }));
+        expect(signed(await ask(MEMBER, key.voiceNote))).toBe(true);
+    });
+
+    it('refuses a voice note whose only listing task the caller cannot open', async () => {
+        mockDb.rows.tasks.find((row) => row._id === VOICE_TASK).ProjectID = HIDDEN_PROJECT;
+        expect((await ask(MEMBER, key.voiceNote)).status).toBe(404);
+    });
+
+    it('signs a key listed by many tasks the caller cannot open and one they can', async () => {
+        const shared = `Clips/${CID}/${OTHER_MEMBER}/shared.webm`;
+        for (let i = 0; i < 25; i += 1) {
+            mockDb.rows.tasks.unshift({ _id: `6f00000000000000000001${String(i).padStart(2, '0')}`, ProjectID: HIDDEN_PROJECT, sprintId: SPRINT, attachments: [{ url: shared, userId: OTHER_MEMBER }] });
+        }
+        mockDb.rows.tasks.push({ _id: '6f0000000000000000000199', ProjectID: OPEN_PROJECT, sprintId: SPRINT, attachments: [{ url: shared, userId: OTHER_MEMBER }] });
+        expect(signed(await ask(MEMBER, shared))).toBe(true);
+    });
+
+    it('signs a thumbnail of a form upload', async () => {
+        expect(signed(await ask(MEMBER, `formAttachment/${FORM}/abcdef0123456789abcdef01-150x150.png`))).toBe(true);
+        mockDb.rows.tasks.find((row) => row._id === FORM_TASK).attachments = [{ url: `formAttachment/${FORM}/abcdef0123456789abcdef03.png` }];
+        projectAccess.mockImplementation(async () => ({ visible: true, canEdit: false }));
+        expect(signed(await ask(OWNER, `formAttachment/${FORM}/abcdef0123456789abcdef03-150x150.png`))).toBe(true);
+    });
+
+    it('lets owners and admins read past a private sprint', async () => {
+        expect(signed(await ask(OWNER, key.privateSprintAttachment))).toBe(true);
+        expect(signed(await ask(OWNER, key.privateSprintComment))).toBe(true);
+    });
+
+    it.each([
+        ['a clip filed under another company', `Clips/${OTHER_COMPANY}/${MEMBER}/clip-1.webm`],
+        ['a reminder attachment filed under another company', `Reminders/${OTHER_COMPANY}/${MEMBER}/note.pdf`],
+    ])('refuses %s', async (_label, path) => {
+        expect((await ask(MEMBER, path)).status).toBe(404);
+    });
+});
+
+describe('paths', () => {
+    const wasabi = SIGNING_ROUTES['POST /api/v1/wasabi/retriveObject'];
+    const server = SIGNING_ROUTES['GET /api/v1/generateSignedUrl/:bucketId'];
+    const dotted = `Project/${OPEN_PROJECT}/Sprint/${OPEN_TASK}/Attachment/notes...final.pdf`;
+
+    it('signs a Wasabi key with dots inside a name', async () => {
+        expect(signed(await wasabi(MEMBER, dotted))).toBe(true);
+    });
+
+    it.each([
+        ['a .. segment', `Project/${OPEN_PROJECT}/Sprint/${OPEN_TASK}/Attachment/../../../${HIDDEN_PROJECT}/ProjectAttachment/secret.pdf`],
+        ['a . segment', `Project/${OPEN_PROJECT}/./ProjectAttachment/brief.pdf`],
+        ['an empty segment', `Project/${OPEN_PROJECT}//ProjectAttachment/brief.pdf`],
+        ['an absolute key', `/Project/${OPEN_PROJECT}/ProjectAttachment/brief.pdf`],
+    ])('refuses a Wasabi key with %s', async (_label, path) => {
+        expect((await wasabi(OWNER, path)).status).toBe(404);
+    });
+
+    it('keeps the stricter rule for server storage', async () => {
+        expect(signed(await server(MEMBER, dotted))).toBe(false);
     });
 });
