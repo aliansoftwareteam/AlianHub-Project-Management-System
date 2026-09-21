@@ -598,23 +598,101 @@ async function contextFor({ companyId, projectId, userId, maxChars = 2000 } = {}
 }
 
 /* What one agent learned, kept apart from the shared tiers and written only by that agent's runs
- * (docs/AI-PLATFORM-ARCHITECTURE.md §E). It records where it came from so retrieval can hold it to
- * the same rules as its sources: every project it was formed in, the documents it was formed from,
- * and the run's taint, which a repeat sighting can add to but never clear. */
+ * (docs/AI-PLATFORM-ARCHITECTURE.md §E). Everything it records about where it came from is read
+ * from the stored run and the sources it names, never taken from the caller: the agent, the person
+ * who started the run, the projects of the run and of every source, and the taint, which a repeat
+ * sighting can add to but never clear. Content from outside the workspace (a web page, a tool
+ * result, a performance read) has no project to hold it to, so it taints the note and keeps it to
+ * the runs of the person whose run formed it. */
 const AGENT_NOTE = 'agent.note';
 const AGENT_ROOT = 'agent';
 const AGENT_NOTE_LIMIT = 10000;
 const DERIVED_MAX = 20;
-const DERIVED_REF = /^(page|comment|transcript|task):[0-9a-fA-F]{24}$/;
+const RUN_RUNNING = 'running';
+const REPLAY_TAINT_LIMIT = 50;
+const WORKSPACE_REF = /^(page|comment|transcript|task|guide):([0-9a-fA-F]{24})$/;
+const FILE_REF = /^file:([0-9a-fA-F]{24}):([A-Za-z0-9_-]{1,64})$/;
+const EXTERNAL_REF = /^(web|tool|performance):(\S{1,200})$/;
 
 const agentNamespaceOf = (agentId) => [AGENT_ROOT, String(agentId), 'note'];
 const idsOf = (list) => [...new Set((Array.isArray(list) ? list : [list]).map((id) => String(id == null ? '' : id)).filter((id) => OBJECT_ID.test(id)))];
-const refsOf = (list) => [...new Set((Array.isArray(list) ? list : []).map((ref) => String(ref == null ? '' : ref).trim()).filter((ref) => DERIVED_REF.test(ref)))].slice(0, DERIVED_MAX);
 const union = (a, b) => [...new Set([...(a || []), ...(b || [])])];
-const taintOf = (run) => (Array.isArray(run.taintSources) ? run.taintSources : [])
-    .filter((s) => s && s.kind && s.ref)
-    .map((s) => ({ kind: String(s.kind).slice(0, 20), ref: String(s.ref).slice(0, 200) }));
 const sameTaint = (a, b) => `${a.kind}:${a.ref}` === `${b.kind}:${b.ref}`;
+const taintList = (list) => (Array.isArray(list) ? list : [])
+    .filter((t) => t && t.kind && t.ref)
+    .map((t) => ({ kind: String(t.kind).slice(0, 20), ref: String(t.ref).slice(0, 200) }));
+const mergeTaint = (...lists) => lists.flat().reduce((out, t) => (out.some((have) => sameTaint(have, t)) ? out : [...out, t]), []);
+
+const parseRef = (ref) => {
+    const text = String(ref == null ? '' : ref).trim();
+    let m = text.match(WORKSPACE_REF);
+    if (m) return { ref: text, sourceType: m[1], id: m[2] };
+    m = text.match(FILE_REF);
+    if (m) return { ref: text, sourceType: 'file', id: m[1], attachmentId: m[2] };
+    m = text.match(EXTERNAL_REF);
+    if (m) return { ref: text, external: m[1], id: m[2] };
+    return null;
+};
+
+const refsOf = (list) => {
+    const given = Array.isArray(list) ? list : (list == null ? [] : [list]);
+    const unknown = given.find((ref) => !parseRef(ref));
+    if (unknown !== undefined) throw invalid(`derivedFrom names a source of unknown type: "${String(unknown).slice(0, 80)}"`);
+    const refs = [...new Map(given.map(parseRef).map((ref) => [ref.ref, ref])).values()];
+    if (refs.length > DERIVED_MAX) throw invalid(`A note can name at most ${DERIVED_MAX} sources.`);
+    return refs;
+};
+
+const gone = (row) => !row || Number(row.deletedStatusKey) === 1 || row.isDeleted === true;
+
+const SOURCE_ROWS = {
+    page: { type: SCHEMA_TYPE.PAGES, fields: 'ProjectID deletedStatusKey', projectOf: (row) => row.ProjectID },
+    task: { type: SCHEMA_TYPE.TASKS, fields: 'ProjectID deletedStatusKey', projectOf: (row) => row.ProjectID },
+    file: {
+        type: SCHEMA_TYPE.TASKS,
+        fields: 'ProjectID deletedStatusKey attachments',
+        projectOf: (row) => row.ProjectID,
+        holds: (row, ref) => (Array.isArray(row.attachments) ? row.attachments : []).some((a) => a && String(a.id) === ref.attachmentId),
+    },
+    comment: { type: SCHEMA_TYPE.COMMENTS, fields: 'projectId taskId isDeleted', projectOf: (row) => row.projectId },
+    transcript: { type: SCHEMA_TYPE.CALLS, fields: 'projectId deletedStatusKey', projectOf: (row) => row.projectId },
+    guide: { type: SCHEMA_TYPE.PROJECTS, fields: '_id deletedStatusKey', projectOf: (row) => row._id },
+};
+
+const readRow = async (companyId, type, id, fields) => plain(await MongoDbCrudOpration(companyId, { type, data: [{ _id: oid(id) }, fields, { lean: true }] }, 'findOne'));
+
+/* The project each workspace source sits in, read now; a comment on a task sits where its task does. */
+const projectsOfRefs = async (companyId, refs) => Promise.all(refs.filter((ref) => ref.sourceType).map(async (ref) => {
+    const spec = SOURCE_ROWS[ref.sourceType];
+    const row = await readRow(companyId, spec.type, ref.id, spec.fields);
+    if (gone(row) || (spec.holds && !spec.holds(row, ref))) throw invalid(`derivedFrom names a source that does not exist: "${ref.ref}"`);
+    if (ref.sourceType === 'comment' && row.taskId) {
+        const task = await readRow(companyId, SCHEMA_TYPE.TASKS, row.taskId, 'ProjectID');
+        if (task && task.ProjectID) return String(task.ProjectID);
+    }
+    const project = spec.projectOf(row);
+    return project ? String(project) : null;
+}));
+
+const storedRun = async (companyId, runId) => {
+    if (!OBJECT_ID.test(String(runId || ''))) throw invalid('An agent note is written by a stored agent run.');
+    const run = await readRow(companyId, SCHEMA_TYPE.AGENT_RUNS, runId, 'agentId startedBy projectId status tainted taintSources');
+    if (!run || !OBJECT_ID.test(String(run.agentId || ''))) throw invalid('An agent note is written by a stored agent run.', 404);
+    if (run.status !== RUN_RUNNING) throw invalid(`An agent note is written only while its run is running; this run is ${run.status || 'not started'}.`, 409);
+    const replays = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AI_REPLAYS,
+        data: [{ runId: String(run._id), tainted: true }, 'taintSources', { limit: REPLAY_TAINT_LIMIT, lean: true }],
+    }, 'find');
+    const marked = Array.isArray(replays) ? replays : [];
+    return {
+        runId: String(run._id),
+        agentId: String(run.agentId),
+        startedBy: String(run.startedBy || ''),
+        projectId: run.projectId ? String(run.projectId) : null,
+        tainted: run.tainted === true || marked.length > 0,
+        taintSources: mergeTaint(taintList(run.taintSources), ...marked.map((row) => taintList(row.taintSources))),
+    };
+};
 
 const agentNoteOf = (item) => {
     const v = item.value || {};
@@ -628,6 +706,7 @@ const agentNoteOf = (item) => {
         projectIds: Array.isArray(v.projectIds) ? v.projectIds.map(String) : [],
         derivedFrom: Array.isArray(v.derivedFrom) ? v.derivedFrom.map(String) : [],
         tainted: v.tainted === true,
+        starterOnly: v.starterOnly === true,
         taintSources: Array.isArray(v.taintSources) ? v.taintSources : [],
         occurrences: Number(v.occurrences) || 1,
         firstSeenAt: v.firstSeenAt || null,
@@ -636,33 +715,39 @@ const agentNoteOf = (item) => {
     };
 };
 
-/* `run` is the agent_runs row writing the note. Its project and the projects of what it read are
- * the note's projects; `derivedFrom` names the documents it was formed from ("page:<id>"). */
-async function rememberForAgent({ companyId, run, text, projectIds, derivedFrom }) {
-    const r = plain(run) || {};
-    const agentId = String(r.agentId || '');
-    const runId = String(r._id || '');
-    if (!OBJECT_ID.test(agentId) || !OBJECT_ID.test(runId)) throw invalid('An agent note is written by an agent run.');
+/* `derivedFrom` names what the note was formed from: "page:<id>", "comment:<id>", "task:<id>",
+ * "transcript:<id>", "guide:<projectId>", "file:<taskId>:<attachmentId>", or, for content from
+ * outside, "web:<host>", "tool:<name>", "performance:<ref>". An unknown kind, a missing source or
+ * more than DERIVED_MAX of them is refused, never dropped: erasure and a departure find a note
+ * only by what it records. */
+async function rememberForAgent({ companyId, runId, text, derivedFrom }) {
+    const run = await storedRun(companyId, runId);
     const clean = sanitise(text);
     if (!clean) throw invalid('text is required');
-    if (skipInstruction(`rememberForAgent ${agentId}`, clean)) return null;
-    const ns = agentNamespaceOf(agentId);
+    const refs = refsOf(derivedFrom);
+    if (skipInstruction(`rememberForAgent ${run.agentId}`, clean)) return null;
+    const external = refs.filter((ref) => ref.external);
+    const projects = idsOf([run.projectId, ...(await projectsOfRefs(companyId, refs))]);
+    const tainted = run.tainted || external.length > 0;
+    const taintSources = mergeTaint(run.taintSources, external.map((ref) => ({ kind: ref.external, ref: ref.id })));
+    const ns = agentNamespaceOf(run.agentId);
     const key = slug(clean);
     const s = await store(companyId);
     const existing = await s.get(ns, key);
     const prev = existing && existing.value ? existing.value : null;
+    const derived = union(prev && prev.derivedFrom, refs.map((ref) => ref.ref));
+    if (derived.length > DERIVED_MAX) throw invalid(`A note can name at most ${DERIVED_MAX} sources.`);
     const now = isoNow();
-    const projects = idsOf([r.projectId, ...(Array.isArray(projectIds) ? projectIds : [])]);
-    const taintSources = taintOf(r);
     const row = prev
         ? {
             ...prev,
             status: STATUS.ACTIVE,
             occurrences: (Number(prev.occurrences) || 0) + 1,
             projectIds: union(prev.projectIds, projects),
-            derivedFrom: union(prev.derivedFrom, refsOf(derivedFrom)).slice(0, DERIVED_MAX),
-            tainted: prev.tainted === true || r.tainted === true,
-            taintSources: [...(prev.taintSources || []), ...taintSources.filter((t) => !(prev.taintSources || []).some((p) => sameTaint(p, t)))],
+            derivedFrom: derived,
+            tainted: prev.tainted === true || tainted,
+            starterOnly: prev.starterOnly === true || external.length > 0,
+            taintSources: mergeTaint(taintList(prev.taintSources), taintSources),
             lastSeenAt: now,
             updatedAt: now,
         }
@@ -670,10 +755,11 @@ async function rememberForAgent({ companyId, run, text, projectIds, derivedFrom 
             memoryId: new mongoose.Types.ObjectId().toHexString(),
             text: clean,
             status: STATUS.ACTIVE,
-            source: { origin: 'run', runId, userId: String(r.startedBy || '') },
+            source: { origin: 'run', runId: run.runId, userId: run.startedBy },
             projectIds: projects,
-            derivedFrom: refsOf(derivedFrom),
-            tainted: r.tainted === true,
+            derivedFrom: derived,
+            tainted,
+            starterOnly: external.length > 0,
             taintSources,
             occurrences: 1,
             firstSeenAt: now,
@@ -683,6 +769,15 @@ async function rememberForAgent({ companyId, run, text, projectIds, derivedFrom 
     await s.put(ns, key, row);
     knowledgeMemory.memoryChanged(companyId, row.memoryId, prev ? 'updated' : 'created');
     return agentNoteOf({ namespace: ns, key, value: row });
+}
+
+/* One agent's notes by id, each read on its own, so a retrieval reads the notes it matched and no more. */
+async function readAgentNotes({ companyId, agentId, memoryIds }) {
+    const ids = [...new Set((memoryIds || []).map(String))].filter((id) => OBJECT_ID.test(id));
+    if (!OBJECT_ID.test(String(agentId || '')) || !ids.length) return [];
+    const s = persistence.storeFor(companyId);
+    const found = await Promise.all(ids.map((memoryId) => s.search(agentNamespaceOf(agentId), { filter: { memoryId }, limit: 1 })));
+    return found.flat().map(agentNoteOf).filter((note) => note.memoryId);
 }
 
 async function listAgentNotes({ companyId, agentId } = {}) {
@@ -716,5 +811,5 @@ module.exports = {
     sanitise, slug, parseId, idOf, hasInstruction,
     contextFor, remember, find, update, retire, recordEpisode, listProject, listUser, setPreference,
     preferenceCandidate, fromBrief, rememberApprovedChanges,
-    rememberForAgent, listAgentNotes, readAgentNote, forgetAgentNote,
+    DERIVED_MAX, parseRef, rememberForAgent, listAgentNotes, readAgentNotes, readAgentNote, forgetAgentNote,
 };

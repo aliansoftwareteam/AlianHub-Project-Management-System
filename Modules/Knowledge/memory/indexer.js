@@ -19,7 +19,7 @@ const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const DUPLICATE_KEY = 11000;
 const TITLE = 'Agent memory';
 const LOG_PREFIX = '[knowledge-memory]';
-const COMPARED_FIELDS = ['agentId', 'projectIds', 'startedBy', 'runId', 'tainted', 'taintRefs', 'derivedFrom', 'derivedAuthors', 'derivedOnlyPrivateOf'];
+const COMPARED_FIELDS = ['agentId', 'projectIds', 'startedBy', 'starterOnly', 'runId', 'tainted', 'taintRefs', 'derivedFrom', 'derivedAuthors', 'derivedOnlyPrivateOf'];
 
 const asText = (value) => (value === undefined || value === null ? '' : String(value));
 const isObjectId = (value) => OBJECT_ID.test(asText(value));
@@ -92,6 +92,7 @@ const chunkOf = (companyId, note, derived) => {
         projectIds: note.projectIds,
         runId: asText(note.source && note.source.runId),
         startedBy: asText(note.source && note.source.userId),
+        starterOnly: note.starterOnly === true,
         tainted: note.tainted,
         taintRefs: note.taintSources.map((s) => `${s.kind}:${s.ref}`),
         derivedFrom: note.derivedFrom,

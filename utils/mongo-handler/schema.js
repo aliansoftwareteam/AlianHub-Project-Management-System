@@ -1570,6 +1570,8 @@ const schema = {
         projectIds: { type: [String], required: false, default: undefined },
         runId: { type: String, required: false },
         startedBy: { type: String, required: false },
+        // Read only by runs of the person in startedBy: the note formed outside any project, or from content outside the workspace.
+        starterOnly: { type: Boolean, required: false },
         tainted: { type: Boolean, required: false },
         taintRefs: { type: [String], required: false, default: undefined },
         derivedFrom: { type: [String], required: false, default: undefined },
