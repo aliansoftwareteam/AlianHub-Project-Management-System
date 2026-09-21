@@ -137,6 +137,7 @@
   "devDependencies": {
     "@commitlint/cli": "^19.5.0",
     "@commitlint/config-conventional": "^19.5.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@playwright/test": "1.63.0",
     "eslint": "^8.57.1",
     "husky": "^9.1.7",
