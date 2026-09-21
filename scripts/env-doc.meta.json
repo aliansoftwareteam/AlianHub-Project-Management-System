@@ -155,9 +155,14 @@
     "required": true,
     "default": ""
   },
+  "API_TOKEN_MAX_DAYS": {
+    "group": "security",
+    "description": "Longest lifetime, in days, of an API token while API_TOKEN_STRICT is on. Can only lower the 365-day maximum: a value above 365 or not a whole number of days is ignored with a warning at boot. Ignored while API_TOKEN_STRICT is off.",
+    "default": "365"
+  },
   "API_TOKEN_STRICT": {
     "group": "security",
-    "description": "Set to true to require an expiry and at least one scope on every new API token, and to allow a token without an expiry only to be revoked. A token without an expiry keeps working for 30 days from the later of its creation and when this was first on for the instance (recorded once as apiTokenStrictSince on the instance settings document and kept across backup restores), then stops. Unset or false keeps the old rules.",
+    "description": "Set to true to require an expiry and at least one scope on every new API token, and to allow a token without an expiry only to be revoked. A token without an expiry keeps working for 30 days from the later of its creation and when this was first on for the instance (recorded once as apiTokenStrictSince on the instance settings document and kept across backup restores), then stops. A new token may last at most API_TOKEN_MAX_DAYS (365 by default); an older token that expires later works for that many days from the later of its creation and when the maximum first applied (recorded once as apiTokenMaxLifetimeSince, also kept across restores), then stops. Unset or false keeps the old rules.",
     "default": "false"
   },
   "APPID": {

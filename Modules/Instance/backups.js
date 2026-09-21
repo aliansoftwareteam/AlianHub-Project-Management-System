@@ -16,6 +16,7 @@ const logger = require('../../Config/loggerConfig');
 const { STORAGE_ROOT } = require('./probes');
 const { DOC_ID: INSTANCE_SETTINGS_ID } = require('../../Config/instanceSettings');
 const apiTokenStrictSince = require('../ApiTokens/helpers/strictSince');
+const maxLifetimeSince = require('../ApiTokens/helpers/maxLifetimeSince');
 
 const BACKUP_DIR = path.resolve(process.env.BACKUP_DIR || 'backups');
 const FORMAT = 'alianhub-backup';
@@ -24,7 +25,7 @@ const NAME_RX = /^[a-z0-9.-]+-\d{8}-\d{6}\.tar\.gz$/;
 const DB_RX = /^(global|[a-f0-9]{24})$/;
 const ENTRY_RX = /^(global|[a-f0-9]{24})\/([A-Za-z0-9_.-]+)\.jsonl$/;
 const INSERT_BATCH = 500;
-const FIRST_SEEN_FIELDS = [apiTokenStrictSince.FIELD];
+const FIRST_SEEN_FIELDS = [apiTokenStrictSince.FIELD, maxLifetimeSince.FIELD];
 
 const stamp = (date = new Date()) => { const iso = date.toISOString(); return `${iso.slice(0, 10).replace(/-/g, '')}-${iso.slice(11, 19).replace(/:/g, '')}`; };
 const backupName = (prefix = 'alianhub', date = new Date()) => `${prefix}-${buildInfo.get().version}-${stamp(date)}.tar.gz`.toLowerCase().replace(/[^a-z0-9.-]/g, '-');
@@ -250,6 +251,7 @@ async function restoreBackup({ name, confirm }) {
         });
         await keepEarliestFirstSeen(await nativeDb('global'), firstSeen);
         apiTokenStrictSince.forget();
+        maxLifetimeSince.forget();
         myCache.flushAll();
         resetMongoConnections();
         const migrations = require('../../migrations');

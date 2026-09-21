@@ -1,7 +1,7 @@
 {
   "locale": "gr",
   "machineTranslated": false,
-  "updatedAt": "2026-09-21T08:54:47.459Z",
+  "updatedAt": "2026-09-21T11:00:44.369Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6352,6 +6352,11 @@
     "Knowledge.vector_index_unknown": "index state unknown",
     "Knowledge.vector_store_paused": "vector search paused until {until}",
     "Knowledge.vector_index_mismatch": "index size does not match the embedding model: check KNOWLEDGE_EMBEDDING_DIMENSIONS",
-    "Knowledge.vector_index_timeout": "the index check timed out; it is tried again on the next check"
+    "Knowledge.vector_index_timeout": "the index check timed out; it is tried again on the next check",
+    "Accounts.expiry_list_over_max_lead": "Tokens made to last longer than the maximum of {n} days stop working {n} days after the maximum took effect. Their owners should create a new token with a shorter expiry, then revoke the old one.",
+    "Accounts.token_expiry_over_max": "A token can last at most {n} days. Choose a shorter expiry.",
+    "Accounts.lifetime_capped_until": "exceeds the maximum lifetime · works until {d}",
+    "Accounts.lifetime_stopped_on": "exceeds the maximum lifetime · stopped on {d}",
+    "Accounts.lifetime_unchecked": "exceeds the maximum lifetime · cannot be checked right now"
   }
 }

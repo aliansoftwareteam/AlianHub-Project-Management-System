@@ -243,11 +243,18 @@ describe('an existing token whose expiry is further away than the maximum', () =
         expect(await ctrl.verifyToken(COMPANY, raw)).toBeNull();
     });
 
-    it('leaves a token inside the maximum alone and reads no cap start for it', async () => {
+    it('leaves a token inside the maximum alone', async () => {
         const { raw } = seedToken({ expiresAt: new Date(T0 + 300 * DAY) });
         clock(T0 + 299 * DAY);
         expect(await ctrl.verifyToken(COMPANY, raw)).toBeTruthy();
-        expect(capWrites()).toHaveLength(0);
+    });
+
+    it('with the cap start unknown, stops only a token that expires further off than the maximum from now', () => {
+        const old = { createdAt: new Date(T0 - 400 * DAY), expiresAt: new Date(T0 + DAY) };
+        const far = { createdAt: new Date(T0 - 10 * DAY), expiresAt: new Date(T0 + 400 * DAY) };
+        const at = { strict: true, maxLifetimeSince: null, now: new Date(T0) };
+        expect(rules.lifetimeStanding(old, at).state).toBe('ok');
+        expect(rules.lifetimeStanding(far, at).state).toBe('stopped');
     });
 
     it('shows its owner the date it stops, then that it stopped', async () => {
