@@ -1,3 +1,4 @@
+process.env.AGENT_PERFORMANCE_READ = 'on';
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -15,6 +16,7 @@ jest.mock('../Modules/Agents/actions', () => {
         refusal: jest.fn(async (companyId, actor, { reason }) => new RefusedError(reason)),
     };
 });
+jest.mock('../Modules/Agents/performanceRead', () => ({ ...jest.requireActual('../Modules/Agents/performanceRead'), read: jest.fn(async () => ({ projects: [] })) }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
@@ -22,6 +24,7 @@ const { ROLE_GUEST, ROLE_OWNER, ROLE_MEMBER } = require('../Config/roleTypes');
 const scope = require('../Modules/Agents/scope');
 const guard = require('../Config/permissionGuard');
 const actions = require('../Modules/Agents/actions');
+const performanceRead = require('../Modules/Agents/performanceRead');
 const tools = require('../Modules/Mcp/tools');
 
 const C = '6f0000000000000000000c01';
@@ -157,6 +160,22 @@ describe.each(Object.keys(people))('MCP tools apply the web app visibility for a
         actions.perform.mockClear();
         await refused(call(name, args({ _id: '6f00000000000000000000ff' })));
         expect(actions.perform).not.toHaveBeenCalled();
+    });
+
+    it('performance.read refuses a project outside the filter before reading any numbers', async () => {
+        const range = { from: '2026-09-01', to: '2026-09-07' };
+        await call('performance.read', { ...range, projectId: P_A });
+        expect(performanceRead.read).toHaveBeenCalledTimes(1);
+        for (const [open, projectId] of [[want.openB, P_B], [want.openC, P_C]]) {
+            performanceRead.read.mockClear();
+            if (open) {
+                await call('performance.read', { ...range, projectIds: [P_A, projectId] });
+                expect(performanceRead.read).toHaveBeenCalledTimes(1);
+            } else {
+                await refused(call('performance.read', { ...range, projectIds: [P_A, projectId] }));
+                expect(performanceRead.read).not.toHaveBeenCalled();
+            }
+        }
     });
 
     it('task.create refuses a project outside the filter, a hidden sprint and a sprint from another project', async () => {
