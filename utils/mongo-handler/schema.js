@@ -1060,6 +1060,7 @@ const schema = {
         risk: { type: String, required: false },
         // Model pinned to this skill, validated against the priced allowlist at save time
         model: { type: String, required: false },
+        declaredHosts: { type: [String], default: undefined, required: false },
         retiredAt: { type: Date, required: false },
         createdBy: { type: String, required: false },
     },
