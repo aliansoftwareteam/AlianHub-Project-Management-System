@@ -1,7 +1,7 @@
 {
   "locale": "ru",
   "machineTranslated": false,
-  "updatedAt": "2026-09-21T13:27:57.527Z",
+  "updatedAt": "2026-09-21T16:02:09.858Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6388,6 +6388,7 @@
     "TaskPanel.agent_activity_action": "Action",
     "TaskPanel.agent_activity_elicitation": "Question",
     "TaskPanel.agent_activity_response": "Answer",
-    "TaskPanel.agent_activity_error": "Error"
+    "TaskPanel.agent_activity_error": "Error",
+    "Inbox.agent_session_assigned": "{task} had no assignee, so it is now yours while {agent} works on it for you."
   }
 }
