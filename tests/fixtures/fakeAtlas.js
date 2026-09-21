@@ -37,6 +37,19 @@ const asQuery = (node) => Object.fromEntries(Object.entries(node || {}).map(([ke
     return [key, Object.fromEntries(ops.filter(([op]) => op !== '$eq'))];
 }));
 
+/* Mongoose answers find and aggregate with a query that runs once per `then`, and refuses a second
+ * run; so does this, for the calls an index check makes. */
+const runsOnce = (work) => {
+    let ran = false;
+    return {
+        then(resolve, reject) {
+            if (ran) return Promise.reject(new Error('Query was already executed')).then(resolve, reject);
+            ran = true;
+            return Promise.resolve().then(work).then(resolve, reject);
+        },
+    };
+};
+
 const serverError = (code, codeName, message) => Object.assign(new Error(message), { name: 'MongoServerError', code, codeName });
 
 const create = (dbFor) => {
@@ -103,7 +116,7 @@ const create = (dbFor) => {
         throw serverError(59, 'CommandNotFound', "no such command: 'createSearchIndexes'");
     };
 
-    const crud = jest.fn(async (companyId, query, method) => {
+    const answer = async (companyId, query, method) => {
         const { type, data } = query;
         const searching = type === CHUNKS && method === 'aggregate' && Array.isArray(data[0]) && data[0][0] && data[0][0].$vectorSearch;
         const indexCommand = ['listSearchIndexes', 'createSearchIndex', 'updateSearchIndex'].includes(method);
@@ -139,6 +152,11 @@ const create = (dbFor) => {
         } finally {
             delete scratch.store[SCRATCH];
         }
+    };
+
+    const crud = jest.fn((companyId, query, method) => {
+        const once = ['listSearchIndexes', 'createSearchIndex', 'updateSearchIndex'].includes(method) || (query.type === CHUNKS && method === 'findOne');
+        return once ? runsOnce(() => answer(companyId, query, method)) : answer(companyId, query, method);
     });
 
     return {
