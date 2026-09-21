@@ -11,6 +11,7 @@ const { MongoDbCrudOpration } = require("../../../../utils/mongo-handler/mongoQu
 const { default: mongoose } = require("mongoose")
 const { updateUnReadCommentsCountFun } = require("../../../notification-count/controller")
 const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../../../common-storage/common-${process.env.STORAGE_TYPE}.js`)
+const { isTaskStoredFile } = require('../../../../common-storage/taskFileKeys');
 const { buildQueryObject, buildHistoryObject, convertToDisplayFormat } = require("../helper");
 const socketEmitter = require('../../../../event/socketEventEmitter');
 const { addCommentCollection, updateCommentCollection } = require('../../../Comments/controller')
@@ -304,15 +305,14 @@ module.exports = {
                                 // UPDATE TASK COUNT IN SPRINT                                
                                 if(duplicateData.includes('Attachments')){
                                     if(selectedTask.attachments.length > 0) {
-                                        let promises = [];
-
-                                        selectedTask.attachments.forEach((x) => {
+                                        /* Only a file stored for the source task is copied; any other key stays as it was, read under its own owner. */
+                                        const promises = selectedTask.attachments.map(async (x) => {
                                             const previousUrl = x.url;
+                                            if (!(await isTaskStoredFile(companyId, selectedTask, previousUrl))) return;
                                             let lastSlashIndex = previousUrl.lastIndexOf('/');
                                             let fileName = previousUrl.substring(lastSlashIndex + 1);
                                             x.url = `Project/${projectData.id}/Sprint/${taskResult.id}/Attachment/${fileName}`;
-
-                                            promises.push(handleTaskAttachmentsDuplicateFunctionality(companyId, previousUrl, x.url));
+                                            await handleTaskAttachmentsDuplicateFunctionality(companyId, previousUrl, x.url);
                                         });
                                         Promise.allSettled(promises).then(() => {
                                             let updateObj = {

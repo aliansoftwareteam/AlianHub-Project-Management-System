@@ -6,6 +6,7 @@ const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const logger = require('../../../Config/loggerConfig');
 const storage = require('../../../common-storage/readStoredFile');
+const { isLinkedFile, isTaskOwnKey } = require('../../../common-storage/taskFileKeys');
 const { COMMENT_TYPES } = require('../sources');
 const embeddings = require('../embeddings');
 const origin = require('../origin');
@@ -138,29 +139,10 @@ const readFileRow = async (companyId, id) => {
 
 /* What can be told without reading a byte. A file linked from a cloud drive has no key of ours,
  * and a key that is a url is never followed. */
-/* The attachment record is written as the client sends it, so its key is only read when it is
- * where the app itself stores this task's files: the task's own attachment folder (under whichever
- * project the task was in at upload), or a public form's upload folder on a task that form filed. */
-/* A form task's origin names the submission that filed it, and the submission names its form. */
-const formOf = async (companyId, task) => {
-    const ref = asText(task.origin && task.origin.ref);
-    if (!isObjectId(ref)) return '';
-    const submission = await store(companyId, SCHEMA_TYPE.FORM_SUBMISSIONS, [{ _id: oid(ref) }, 'formId', { lean: true }], 'findOne');
-    return submission && submission.formId ? String(submission.formId).toLowerCase() : '';
-};
-
-const writtenByTheApp = async (companyId, task, key) => {
-    const own = /^Project\/[a-f0-9]{24}\/Sprint\/([a-f0-9]{24})\/Attachment\/([^/]+)$/i.exec(key);
-    if (own) return own[1].toLowerCase() === String(task._id).toLowerCase() && !['.', '..'].includes(own[2]);
-    const form = /^formAttachment\/([a-f0-9]{24})\/[a-f0-9]{24}\.[a-z0-9]{1,8}$/i.exec(key);
-    if (!form || !(task.origin && task.origin.kind === 'form')) return false;
-    return form[1].toLowerCase() === await formOf(companyId, task);
-};
-
 const skipReason = async (companyId, { task, attachment, kind }) => {
     const key = asText(attachment.url);
-    if (!key || /^[a-z][a-z0-9+.-]*:/i.test(key)) return SKIPPED.LINKED;
-    if (!(await writtenByTheApp(companyId, task, key))) return SKIPPED.FOREIGN_KEY;
+    if (isLinkedFile(key)) return SKIPPED.LINKED;
+    if (!(await isTaskOwnKey(companyId, task, key))) return SKIPPED.FOREIGN_KEY;
     if (!kind) return SKIPPED.UNSUPPORTED;
     if (Number(attachment.size) > fileLimits().maxBytes) return SKIPPED.TOO_LARGE;
     return null;
