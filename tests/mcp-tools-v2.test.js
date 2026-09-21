@@ -10,7 +10,7 @@ jest.mock('../Config/permissionGuard', () => ({ ...jest.requireActual('../Config
 jest.mock('../Modules/Agents/proposals', () => ({
     create: jest.fn(async (companyId, o) => mockDb.crud(companyId, {
         type: 'agent_proposals',
-        data: { agentId: String(o.agent._id), agentName: o.agent.name, taskId: o.taskId || null, what: o.what, why: o.why, changes: o.changes, status: 'pending', source: o.source, requestedBy: o.requestedBy, tokenId: o.tokenId, allowedActions: o.allowedActions },
+        data: { agentId: String(o.agent._id), agentName: o.agent.name, taskId: o.taskId || null, what: o.what, why: o.why, changes: o.changes, status: 'pending', source: o.source, requestedBy: o.requestedBy, tokenId: o.tokenId, tokenProjectIds: o.tokenProjectIds, allowedActions: o.allowedActions },
     }, 'save')),
 }));
 jest.mock('../Modules/Agents/actions', () => ({
@@ -66,7 +66,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
     process.env.MCP_TOOLS_V2 = 'on';
-    process.env.MCP_CURSOR_SECRET = 'unit-test-cursor-secret';
+    process.env.MCP_CURSOR_SECRET = 'unit-test-cursor-secret-of-32-chars-or-more';
     scope.visibleProjectIds.mockResolvedValue([PROJECT]);
     guard.getRoleType.mockResolvedValue(ROLE_MEMBER);
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: 'Apollo', taskTypeCounts: [{ key: 1, name: 'Task' }, { key: 2, name: 'Bug' }] });
@@ -245,7 +245,7 @@ describe('cursors are bound to the company, the caller and the query', () => {
 
     it('refuses a cursor signed with another key', async () => {
         const cursor = await firstCursor();
-        process.env.MCP_CURSOR_SECRET = 'rotated';
+        process.env.MCP_CURSOR_SECRET = 'rotated-cursor-secret-of-32-chars-or-more';
         await expect(tools.call(ctxFor(), 'tasks.search', { cursor })).rejects.toMatchObject(invalid);
     });
 });
@@ -273,11 +273,11 @@ describe('destructive calls open a proposal', () => {
     it('files a proposal attributed to the token user, marked MCP, and changes nothing', async () => {
         const t = seedTask();
         irreversible('task.comment');
-        const out = await tools.call(ctxFor(), 'task.comment', { taskId: t._id, body: 'drop it' });
+        const out = await tools.call(ctxFor({ projectIds: [PROJECT] }), 'task.comment', { taskId: t._id, body: 'drop it' });
         expect(actions.perform).not.toHaveBeenCalled();
         expect(proposals.create).toHaveBeenCalledTimes(1);
         const saved = mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS][0];
-        expect(saved).toMatchObject({ source: 'mcp', requestedBy: USER, tokenId: TOKEN, taskId: t._id, status: 'pending' });
+        expect(saved).toMatchObject({ source: 'mcp', requestedBy: USER, tokenId: TOKEN, tokenProjectIds: [PROJECT], taskId: t._id, status: 'pending' });
         expect(saved.changes).toEqual([expect.objectContaining({ action: 'task.comment', params: { taskId: t._id, body: 'drop it' } })]);
         expect(out).toEqual({ ok: false, pending: true, approval: 'pending', proposalRef: `proposal:${saved._id}`, proposalId: String(saved._id), message: expect.stringMatching(/approv/i) });
     });
