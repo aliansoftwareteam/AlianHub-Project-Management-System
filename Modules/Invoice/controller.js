@@ -2,8 +2,10 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { replaceObjectKey } = require("../Auth/helper");
 const { validateInvoicePipeline, InvoiceQueryRefused } = require("./helpers/invoiceQueryGuard");
+const logger = require("../../Config/loggerConfig");
 
 exports.getInvoice = async (req, res) => {
+    logger.warn('POST /api/v1/invoice/find is deprecated: nothing writes the subscription invoices collection and the route is due for removal in the next release.');
     try {
         const { findQuery } = req.body || {};
         if (!findQuery) {
