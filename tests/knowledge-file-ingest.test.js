@@ -816,6 +816,30 @@ describe('sweeping owed files', () => {
         expect(await indexer.pendingFiles(C)).toEqual([sourceId]);
     });
 
+    it('keeps a retry when two syncs of the same file fail the same attempt at once', async () => {
+        const task = seedTask([attachment('late.txt')]);
+        const sourceId = sourceOf(task, task.attachments[0]);
+        await taskChanged(task, ['attachments']);
+        expect(markerOf(sourceId)).toMatchObject({ extractAttempts: 1 });
+
+        const waiting = [];
+        readStoredFile.mockImplementation(() => new Promise((resolve, reject) => {
+            waiting.push(() => reject(Object.assign(new Error('not found'), { code: 'not_found' })));
+        }));
+        const until = async (done) => { while (!done()) await new Promise((resolve) => setImmediate(resolve)); };
+        const [one, two] = [isolated(), isolated()];
+        const both = Promise.all([one.indexer.syncFile(C, sourceId), two.indexer.syncFile(C, sourceId)]);
+        await until(() => waiting.length === 2);
+        waiting[0]();
+        await until(() => mockDb.store[CHUNKS].some((c) => c.sourceId === sourceId && c.extractAttempts === 2 && c.extractDueAt));
+        waiting[1]();
+        await both;
+        expect(readStoredFile).toHaveBeenCalledTimes(3);
+
+        expect(markerOf(sourceId)).toMatchObject({ tombstoneReason: 'extract:failed', extractAttempts: 2 });
+        expect(await indexer.pendingFiles(C)).toEqual([sourceId]);
+    });
+
     it('claims a file before working on it, pushing its due time forward as a lease', async () => {
         const task = seedTask([attachment('slow.txt')]);
         const sourceId = await owe(task);

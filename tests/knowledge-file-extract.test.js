@@ -415,7 +415,7 @@ describe('memory against the inflation budget', () => {
     it('stops the same archive for memory when the cap is set below what it needs, measured by the parser thread itself', async () => {
         process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES = String(16 * MB);
         process.env.KNOWLEDGE_FILE_MAX_PARSE_MEMORY_BYTES = String(8 * MB);
-        await expect(extractor.extractText({ buffer: await nearBudget(), kind: 'docx' })).rejects.toMatchObject({ code: 'too_much_memory' });
+        await expect(extractor.extractText({ buffer: await nearBudget(), kind: 'docx' })).rejects.toMatchObject({ code: 'too_much_memory', message: expect.stringMatching(/^Held past/) });
     });
 
     it('rebuilds the archive without keeping every inflated entry beside the copy', () => {
@@ -437,8 +437,12 @@ describe('memory against the inflation budget', () => {
         const JSZip = require('jszip');
         const { zipOf } = require('./fixtures/knowledgeFiles');
         const archive = await zipOf([['wörd/dökument.xml', 'inner']]);
-        const names = Object.keys((await JSZip.loadAsync(inflateWithin(archive, MB))).files);
+        const rebuilt = inflateWithin(archive, MB);
+        const names = Object.keys((await JSZip.loadAsync(rebuilt)).files);
         expect(names).toContain('wörd/dökument.xml');
+        const directory = rebuilt.readUInt32LE(rebuilt.length - 6);
+        expect(rebuilt.readUInt16LE(6) & 0x800).toBe(0x800);
+        expect(rebuilt.readUInt16LE(directory + 8) & 0x800).toBe(0x800);
     });
 });
 
