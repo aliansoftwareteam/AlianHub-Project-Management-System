@@ -4,8 +4,8 @@ const origin = require('../origin');
 
 // The vector side of retrieval, behind the same contract as the lexical adapter. Two
 // implementations: one in memory, for tests and as the reference for the contract, and one
-// over the chunk rows in the tenant database, which carry their own vectors. A hosted vector
-// store is one more implementation of this file's contract, chosen in vectorStore.js.
+// over the chunk rows in the tenant database, which carry their own vectors. The hosted store
+// (atlas.js) is one more implementation of this contract, chosen in vectorStore.js.
 
 /* The in-database adapter reads at most this many chunks per source type for a question, the
  * newest first, and scores them in process: a plain MongoDB server has no vector index. Around
@@ -83,9 +83,9 @@ const searchWith = (candidatesOf) => async ({ companyId, queryEmbedding, model, 
     if (!vector.length || !model) return [];
     const results = await Promise.all(searchableSources(filter).map(async (sourceType) => {
         try {
-            return rank(sourceType, await candidatesOf(String(companyId), sourceType, model, filter.clauses[sourceType]), vector, wanted);
+            return rank(sourceType, await candidatesOf(String(companyId), sourceType, model, filter.clauses[sourceType], { vector, wanted }), vector, wanted);
         } catch (error) {
-            throw new Error(`${sourceType} candidates unavailable for ${companyId}: ${error.message}`);
+            throw Object.assign(new Error(`${sourceType} candidates unavailable for ${companyId}: ${error.message}`, { cause: error }), error.fallback ? { fallback: error.fallback } : {});
         }
     }));
     return results.flat();
@@ -95,9 +95,9 @@ const NOTHING_TO_DO = Object.freeze({ backend: 'vector-db', skipped: true });
 
 /* Vectors ride on the chunk rows the indexer writes, so upsert, tombstone and erase have
  * nothing to add here: the row write, the tombstone and the deletion already covered them. */
-const createDatabaseVectorAdapter = () => ({
+const createDatabaseVectorAdapter = ({ crud = MongoDbCrudOpration } = {}) => ({
     name: 'vector-db',
-    search: searchWith((companyId, sourceType, model, clause) => MongoDbCrudOpration(companyId, {
+    search: searchWith((companyId, sourceType, model, clause) => crud(companyId, {
         type: SCHEMA_TYPE.KNOWLEDGE_CHUNKS,
         data: [[
             { $match: { ...clause, embeddingModel: model } },
@@ -110,7 +110,7 @@ const createDatabaseVectorAdapter = () => ({
     tombstone: async () => NOTHING_TO_DO,
     erase: async () => NOTHING_TO_DO,
     async stats({ companyId }) {
-        const rows = await MongoDbCrudOpration(String(companyId), {
+        const rows = await crud(String(companyId), {
             type: SCHEMA_TYPE.KNOWLEDGE_CHUNKS,
             data: [[{ $match: { deleted: { $ne: true } } }, { $group: { _id: '$embeddingModel', n: { $sum: 1 } } }]],
         }, 'aggregate');
@@ -161,11 +161,11 @@ const createInMemoryVectorAdapter = ({ matches = matchesClause } = {}) => {
             (chunks || []).forEach((chunk) => rows.set(keyOf(String(companyId), chunk), { ...chunk, companyId: String(companyId), sourceId: String(chunk.sourceId), deleted: chunk.deleted === true }));
             return { backend: 'vector-memory', upserted: (chunks || []).length };
         },
-        async tombstone({ companyId, sourceType, sourceIds }) {
+        async tombstone({ companyId, sourceType, sourceIds, fromOrdinal = 0 }) {
             const wanted = new Set((sourceIds || []).map(String));
             let tombstoned = 0;
             ofCompany(companyId).forEach((row) => {
-                if (row.sourceType === sourceType && wanted.has(row.sourceId) && !row.deleted) { row.deleted = true; tombstoned += 1; }
+                if (row.sourceType === sourceType && wanted.has(row.sourceId) && Number(row.ordinal) >= fromOrdinal && !row.deleted) { row.deleted = true; tombstoned += 1; }
             });
             return { backend: 'vector-memory', tombstoned };
         },
@@ -191,4 +191,4 @@ const createInMemoryVectorAdapter = ({ matches = matchesClause } = {}) => {
     };
 };
 
-module.exports = { CANDIDATE_CHUNKS_PER_SOURCE, cosine, rank, matchesClause, createDatabaseVectorAdapter, createInMemoryVectorAdapter };
+module.exports = { CANDIDATE_CHUNKS_PER_SOURCE, CANDIDATE_FIELDS, cosine, rank, matchesClause, searchWith, createDatabaseVectorAdapter, createInMemoryVectorAdapter };

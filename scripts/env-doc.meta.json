@@ -1208,5 +1208,30 @@
     "group": "jobs",
     "description": "Deadline given to an approval step whose definition names none, so a run cannot wait forever on a decision nobody will make.",
     "default": "259200000"
+  },
+  "KNOWLEDGE_VECTOR_STORE": {
+    "group": "ai",
+    "description": "Where hybrid knowledge retrieval searches vectors: \"local\" scores the newest chunks of each source in process from the tenant database (any MongoDB); \"atlas\", for hosted deployments on MongoDB Atlas, searches the same chunk rows with Atlas Vector Search through the knowledge_chunks_vector index in each tenant's database, created or checked at tenant creation and by the knowledge.backfill job, with the index state shown in the instance knowledge console. While that index is missing or building, or Atlas cannot answer, questions are answered from the lexical side. Any other value is read as \"local\".",
+    "default": "local"
+  },
+  "KNOWLEDGE_ATLAS_NUM_CANDIDATES": {
+    "group": "ai",
+    "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how many nearest chunks Atlas considers per source type for a question ($vectorSearch numCandidates). Raised to the limit when lower, and at most 10000.",
+    "default": "1000"
+  },
+  "KNOWLEDGE_ATLAS_VECTOR_LIMIT": {
+    "group": "ai",
+    "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how many chunks per source type Atlas returns for a question ($vectorSearch limit) before they are narrowed by access and collapsed to one passage per source; never fewer than the passages asked for.",
+    "default": "100"
+  },
+  "KNOWLEDGE_ATLAS_MAX_TIME_MS": {
+    "group": "ai",
+    "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how long, in milliseconds, one vector search may run before the question is answered from the lexical side (the backend then reads \"lexical (vector store timed out)\").",
+    "default": "3000"
+  },
+  "KNOWLEDGE_EMBEDDING_DIMENSIONS": {
+    "group": "ai",
+    "description": "With KNOWLEDGE_VECTOR_STORE=atlas, the vector size the Atlas index is built for. Leave unset to take it from a stored vector of KNOWLEDGE_EMBEDDING_MODEL, or from the model (1536 for text-embedding-3-small, 3072 for text-embedding-3-large); set it for any other model.",
+    "default": ""
   }
 }

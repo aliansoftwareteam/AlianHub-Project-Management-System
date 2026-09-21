@@ -8,6 +8,7 @@ const { INDEXED_SOURCES, COMMENT_TYPES } = require('../sources');
 const { ORIGINS, AGENT, MEMBER } = require('../origin');
 const { serviceStamp } = require('../../Agents/serviceIdentity');
 const indexer = require('./indexer');
+const vectorStore = require('../vectorStore');
 
 // Indexes what a company already had before its indexer was switched on, one source at a time.
 // Each source saves its own progress after every batch in knowledge_index_state, so a restart or
@@ -309,6 +310,7 @@ const backfillAll = async (options) => {
     let ran = 0;
     const reembedded = {};
     for (const companyId of await enabledCompanies()) {
+        await vectorStore.prepareCompany(companyId);
         await resumeFiles(companyId);
         await keepAlive(companyId).catch((error) => logger.error(`${LOG_PREFIX} ${companyId}: heartbeat: ${error.message}`));
         if (await runOnce(companyId, options)) ran += 1;

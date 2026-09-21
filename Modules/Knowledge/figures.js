@@ -8,6 +8,7 @@ const { INDEXED_SOURCES } = require('./sources');
 const { FEATURES } = require('../AICore/features');
 const backfill = require('./ingest/backfill');
 const indexer = require('./ingest/indexer');
+const vectorStore = require('./vectorStore');
 const { figuresPipeline } = require('./figuresPipeline');
 
 // What the instance console shows of one workspace's index: counts, sizes, times, states and
@@ -159,12 +160,13 @@ const summaryRow = async (company) => {
     };
 };
 
-const readFigures = async (company, now) => {
+const readFigures = async (company, now, refresh) => {
     const known = sourceTypesOf((await chunkSourceTypes(company)) || []);
-    const [facets, states, modes] = await Promise.all([
+    const [facets, states, modes, store] = await Promise.all([
         chunkFacets(company, known, indexer.RETRIED_FILE_REASONS, indexer.FILE_EXTRACT_ATTEMPTS),
         MongoDbCrudOpration(company, { type: SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, data: [{}, null, { lean: true }] }, 'find'),
         modesOf(company),
+        vectorStore.health(company, { refresh }),
     ]);
     const stateOf = new Map((states || []).map((state) => [state.sourceType, state]));
     const figuresOf = new Map();
@@ -201,6 +203,7 @@ const readFigures = async (company, now) => {
         sources,
         totals: sources.reduce((sum, s) => ({ chunks: sum.chunks + s.chunks, sources: sum.sources + s.sources, textBytes: sum.textBytes + s.textBytes }), { chunks: 0, sources: 0, textBytes: 0 }),
         embeddings: await embeddingsOf(company, facets.byModel),
+        vectorStore: store,
         files: filesOf(facets),
         cachedAt: new Date(now),
     };
@@ -215,7 +218,7 @@ const workspaceFigures = async (companyId, { now = Date.now(), refresh = false }
     const cached = refresh ? undefined : myCache.get(key);
     if (cached) return cached;
     try {
-        const figures = await readFigures(company, now);
+        const figures = await readFigures(company, now, refresh);
         myCache.set(key, figures, CACHE_SECONDS);
         return figures;
     } catch (error) {
