@@ -242,6 +242,7 @@ module.exports = {
     CALLER_KINDS,
     SOURCE_COLLECTIONS,
     RetrievalRefused,
+    attachmentProjects,
     resolveVisibleSet,
     clausesFor,
     chunkClausesFor,
