@@ -795,8 +795,9 @@ describe('sweeping owed files', () => {
         });
         return fresh;
     };
+    /* Owed by a queue that is gone: marked, then let go, as a restart leaves it. */
     const owe = async (task) => {
-        await indexer.markFilesPending(C, String(task._id));
+        indexer.releaseHeld(C, await indexer.markFilesPending(C, String(task._id)));
         return sourceOf(task, task.attachments[0]);
     };
 

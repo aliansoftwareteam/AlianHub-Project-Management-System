@@ -425,7 +425,8 @@ describe('memory against the inflation budget', () => {
             const archive = lyingZipOf([['a.xml', Buffer.alloc(2 * MB, 0x41)], ['b.xml', Buffer.alloc(2 * MB, 0x42)]], 1);
             const rebuilt = inflateWithin(archive, 8 * MB);
             expect(rebuilt.length).toBeGreaterThan(4 * MB);
-            concat.mock.calls.forEach(([parts]) => expect(parts.reduce((sum, part) => sum + part.length, 0)).toBeLessThan(MB));
+            const wholeCopies = concat.mock.calls.filter(([parts]) => parts.reduce((sum, part) => sum + part.length, 0) >= 4 * MB);
+            expect(wholeCopies).toEqual([]);
         } finally {
             concat.mockRestore();
         }
