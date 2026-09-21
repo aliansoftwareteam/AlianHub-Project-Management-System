@@ -72,7 +72,8 @@ beforeEach(() => {
     process.env.JWT_SECRET = 's10s4-person-secret';
     mockDb.seed(dbCollections.USERS, { _id: USER, Employee_Name: 'Priya', AssignCompany: C });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: USER, roleType: ADMIN_ROLE, status: ACTIVE, isDelete: false });
-    mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK, ProjectID: PROJECT, CompanyId: C, TaskName: 'Fix it' });
+    mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: 'Shared', isPrivateSpace: false, deletedStatusKey: 0 });
+    mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK, ProjectID: PROJECT, CompanyId: C, TaskName: 'Fix it', deletedStatusKey: 0 });
 });
 
 it('uses the real permission evaluator, not a stand-in', () => {
@@ -100,7 +101,7 @@ it('refuses the same token once the person behind the grant is removed from the 
     seat().isDelete = true;
     const refused = await comment(raw, 2);
     expect(payloadOf(refused)).toMatchObject({ refused: true });
-    expect(payloadOf(refused).reason).toMatch(/permission_denied/);
+    expect(payloadOf(refused).reason).toMatch(/permission_denied|not_visible/);
 
     jwt.verifyCompanyMembership.mockResolvedValue(false);
     const cutOff = await comment(raw, 3);

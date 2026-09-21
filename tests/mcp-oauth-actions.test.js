@@ -109,6 +109,9 @@ beforeEach(() => {
     delete process.env.AUDIT_CHAIN_KEY;
     delete process.env.AGENT_TAINT_ROUTING;
     mockDb.seed(dbCollections.USERS, { _id: USER, Employee_Name: 'Priya', AssignCompany: C });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: USER, roleType: 2, status: 2, isDelete: false });
+    mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: 'Shared', isPrivateSpace: false, deletedStatusKey: 0 });
+    mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK, ProjectID: PROJECT, CompanyId: C, TaskName: 'Fix it', deletedStatusKey: 0 });
 });
 
 afterEach(async () => { await require('../Modules/Audit/chain').flushMirrors(); });
@@ -193,6 +196,49 @@ describe('tainted routing (AGENT_TAINT_ROUTING)', () => {
         const res = await post(raw, call('task.create', { projectId: PROJECT, title: 'Filed from outside' }));
         expect(resultOf(res)).toMatchObject({ ok: true });
         expect(automationTools.createTask).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('visibility of an OAuth call', () => {
+    const HIDDEN_PROJECT = '6f0000000000000000000b59';
+    const HIDDEN_TASK = '6f0000000000000000000d59';
+
+    beforeEach(() => {
+        mockDb.store[SCHEMA_TYPE.COMPANY_USERS][0].roleType = 3;
+        mockDb.seed(dbCollections.RULES, { key: 'private_projects', name: 'Private projects', roles: [{ key: 3, permission: null }] });
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: HIDDEN_PROJECT, ProjectName: 'Board only', isPrivateSpace: true, deletedStatusKey: 0, AssigneeUserId: [] });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: HIDDEN_TASK, ProjectID: HIDDEN_PROJECT, CompanyId: C, TaskName: 'Private work', deletedStatusKey: 0 });
+    });
+
+    it('is computed for the person who granted the token, never for the client', async () => {
+        const visibility = require('../Modules/Mcp/visibility');
+        const spy = jest.spyOn(visibility, 'forCaller');
+        const { raw, client } = await mint(['tasks:read']);
+        await post(raw, call('tasks.search', {}));
+        expect(spy).toHaveBeenCalled();
+        const [ctx] = spy.mock.calls[0];
+        expect(ctx.userId).toBe(USER);
+        expect(ctx.userId).toBe(ctx.actor.delegatedBy);
+        expect(ctx.userId).not.toBe(client.clientId);
+        spy.mockRestore();
+    });
+
+    it('does not show an OAuth client a project the person cannot open', async () => {
+        const { raw } = await mint(['tasks:read']);
+        const found = resultOf(await post(raw, call('tasks.search', {})));
+        const ids = found.tasks.map((t) => t.taskId);
+        expect(ids).toContain(TASK);
+        expect(ids).not.toContain(HIDDEN_TASK);
+    });
+
+    it('refuses a write to a task the person cannot open, and the refusal carries the taint', async () => {
+        const { raw, client } = await mint(['tasks:read', 'tasks:write']);
+        const res = await post(raw, call('task.comment', { taskId: HIDDEN_TASK, body: 'x' }));
+        expect(resultOf(res)).toMatchObject({ refused: true });
+        expect(resultOf(res).reason).toMatch(/not_visible/);
+        expect(automationTools.addComment).not.toHaveBeenCalled();
+        const refused = auditRows().find((row) => row.action === agentAudit.ACTION_REFUSED);
+        expect(refused.meta).toMatchObject({ viaAccount: 'external', clientId: client.clientId, tainted: true, taintSources: [expect.objectContaining({ kind: 'client' })] });
     });
 });
 

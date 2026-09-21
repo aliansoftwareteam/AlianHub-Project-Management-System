@@ -372,6 +372,7 @@ describe('attribution of an OAuth call', () => {
         const { actor } = tools.call.mock.calls[0][0];
         const { attribution } = require('../Modules/Agents/actor');
         expect(actor).toMatchObject({ kind: 'agent', userId: USER, viaAccount: 'external', clientId: client.clientId, grantId: grant.grantId, delegatedBy: USER, tokenId: null });
+        expect(tools.call.mock.calls[0][0].userId).toBe(actor.delegatedBy);
         expect(attribution(actor)).toEqual({
             actorId: client.clientId, actorType: 'agent', agentId: null, viaAccount: 'external',
             clientId: client.clientId, grantId: grant.grantId, delegatedBy: USER, label: 'S10S4 Agent for Priya',
