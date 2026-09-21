@@ -11,6 +11,7 @@ const LIMITS = Object.freeze({
     activitiesPerMinute: 60,
     sweepMs: 15 * 1000,
     deliveryTimeoutMs: 5000,
+    replayWindowSeconds: 300,
     deliveryResponseBytes: 16 * 1024,
 });
 

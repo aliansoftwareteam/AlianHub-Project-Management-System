@@ -18,11 +18,10 @@ const TOOL_SCOPES = Object.freeze({
 
 const DISCOVERY_SCOPES = mcpOAuth.READ_SCOPES;
 
-const sessionScopes = () => require('./sessionTools').SCOPES;
-
 const scopeForTool = (name) => {
     if (Object.prototype.hasOwnProperty.call(TOOL_SCOPES, name)) return TOOL_SCOPES[name];
-    return Object.prototype.hasOwnProperty.call(sessionScopes(), name) ? sessionScopes()[name] : null;
+    const sessionTools = require('./sessionTools');
+    return sessionTools.owns(name) ? sessionTools.SCOPES[name] : null;
 };
 
 /* An OAuth token holds exactly what was granted. A personal access token only

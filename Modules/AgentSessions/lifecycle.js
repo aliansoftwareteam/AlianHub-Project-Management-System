@@ -2,6 +2,7 @@ const { recordAudit } = require('../Audit/recorder');
 const store = require('./store');
 const events = require('./events');
 const clients = require('./clients');
+const access = require('./access');
 const { STATE, OPEN } = require('./rules');
 const { LIMITS } = require('./config');
 const logger = require('../../Config/loggerConfig');
@@ -62,6 +63,12 @@ const arm = (session, now = Date.now()) => {
 const revokedBecause = async (session, now) => {
     if (!(await clients.grantStanding(session.grantId, now))) return 'the grant behind this session was revoked or has expired';
     if (!(await clients.clientStanding(session.companyId, session.clientId)).ok) return 'the outside client is no longer approved in this workspace';
+    const task = await access.taskOf(session.companyId, session.taskId);
+    if (!task) return 'the task is gone';
+    const sprint = await access.privateSprintOf(session.companyId, task.sprintId);
+    if (!sprint) return '';
+    if (!(await access.isSprintMember(session.companyId, session.delegatedBy, sprint))) return 'the task is in a private sprint the delegating person is not on';
+    if (!(await clients.privateSprintsOptIn(session.companyId, session.clientId))) return 'the client is not opted in to private sprints in this workspace';
     return '';
 };
 

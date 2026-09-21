@@ -12,7 +12,12 @@ const WINDOW_MS = 60 * 1000;
 const windows = new Map();
 
 /* A fixed one-minute window per session, in this process: enough to stop a loop from flooding the strip. */
+const prune = (now) => {
+    windows.forEach((window, key) => { if (now - window.start >= WINDOW_MS) windows.delete(key); });
+};
+
 const rateLimited = (sessionId, now = Date.now()) => {
+    prune(now);
     const key = String(sessionId);
     const current = windows.get(key);
     if (!current || now - current.start >= WINDOW_MS) {
@@ -38,6 +43,10 @@ const authorize = async (ctx, action, { sessionId, handle }, vis, now = new Date
     if (String(session.clientId) !== String(ctx.oauth.clientId)) return refuse(ctx, action, sessionId, 'this session was delegated to another client');
     if (String(session.grantId) !== String(ctx.oauth.grantId)) return refuse(ctx, action, sessionId, 'this session belongs to another grant');
     if (!isOpen(session)) return refuse(ctx, action, sessionId, `this session is ${session.state}`);
+    if (session.state === STATE.OFFERED && session.deliveredAt && now.getTime() > new Date(session.deliveredAt).getTime() + LIMITS.firstActivityMs) {
+        await lifecycle.expire(session, now);
+        return refuse(ctx, action, sessionId, 'no first activity came within ten seconds of delivery, so the offer lapsed');
+    }
     if (session.state === STATE.OFFERED && !handleMatches(session, handle, now)) {
         return refuse(ctx, action, sessionId, 'the first call on an offered session must carry the handle from its announcement');
     }
@@ -96,5 +105,6 @@ const complete = (ctx, args = {}, vis) => finish(ctx, args, vis, { action: 'sess
 const fail = (ctx, args = {}, vis) => finish(ctx, args, vis, { action: 'session.fail', state: STATE.FAILED, type: 'error', textOf: (a) => cleanText(a.reason) || 'the outside agent gave up' });
 
 const resetRateLimits = () => windows.clear();
+const rateWindowCount = () => windows.size;
 
-module.exports = { authorize, record, complete, fail, rateLimited, resetRateLimits };
+module.exports = { authorize, record, complete, fail, rateLimited, resetRateLimits, rateWindowCount };
