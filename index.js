@@ -5,7 +5,6 @@ const express = require("express");
 const fs = require("fs");
 var cors = require('cors');
 const path = require('path');
-const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
 const bodyParser = require("body-parser");
@@ -25,14 +24,7 @@ app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
 // CORS allow-list is env-driven; see utils/cors.js.
 app.use(cors({ origin: corsOriginDelegate }));
 
-// CSP stays off: the Vue bundle uses inline scripts and styles in production.
-if (process.env.HELMET_ENABLED !== 'false') {
-    app.use(helmet({
-        contentSecurityPolicy: false,
-        crossOriginEmbedderPolicy: false,
-        crossOriginResourcePolicy: { policy: 'cross-origin' },
-    }));
-}
+require('./Config/securityHeaders').install(app);
 
 // API traffic only: static assets and socket.io are never counted, so an SPA cold
 // load cannot trip the limit. 0 / off disables it for internal deployments.
@@ -127,6 +119,7 @@ function initializeControllers() {
     require('./Modules/notification/sendEmail/init').init(app);
     require('./Modules/trackerUserPermission/init').init(app);
     require('./Modules/Instance/init').init(app);
+    require('./Modules/CspReport/init').init(app);
     require('./Modules/ScreenshotRetention/init').init(app);
     require('./Modules/projectClose/init').init(app);
     if (process.env.CRON_ENABLED !== 'false') {

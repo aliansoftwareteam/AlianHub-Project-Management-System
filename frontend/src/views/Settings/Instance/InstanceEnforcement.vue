@@ -140,6 +140,7 @@
                 </div>
             </section>
         </template>
+        <InstanceCspCard />
     </div>
 </template>
 
@@ -149,6 +150,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useInstanceApi, formatWhen } from "./useInstanceApi";
+import InstanceCspCard from "./InstanceCspCard.vue";
 
 defineOptions({ name: "InstanceEnforcement" });
 

@@ -6172,6 +6172,21 @@
     "Egress.code_version_required": "The save did not say which version of the list it was made from. Reload the page and try again.",
     "Egress.code_stale_version": "Someone changed this list since you opened it. The page now shows the current list; make your change again.",
     "Egress.code_unknown_workspace": "That workspace no longer exists.",
-    "Egress.code_server_error": "The list could not be read or saved. Try again; if it keeps failing, the server log has the cause."
+    "Egress.code_server_error": "The list could not be read or saved. Try again; if it keeps failing, the server log has the cause.",
+    "ContentSecurity.col_directive": "Directive",
+    "ContentSecurity.col_last_seen": "Last report",
+    "ContentSecurity.col_reports": "Reports",
+    "ContentSecurity.col_source": "Blocked source",
+    "ContentSecurity.empty": "No reports in the last {days} days.",
+    "ContentSecurity.lead": "The response header that tells the browser what the app may load. Report only blocks nothing and records what it would block; enforce blocks it.",
+    "ContentSecurity.mode_enforce": "Enforce",
+    "ContentSecurity.mode_help": "Set in the environment, then restart the server. Variable:",
+    "ContentSecurity.mode_off": "Off",
+    "ContentSecurity.mode_report": "Report only",
+    "ContentSecurity.off_note": "The policy is off, so browsers send no reports.",
+    "ContentSecurity.policy": "Policy",
+    "ContentSecurity.rollout": "Run report only until this list stays empty, then switch to enforce. A host you trust goes in the variable for its directive:",
+    "ContentSecurity.title": "Content security policy",
+    "ContentSecurity.total": "{n} reports in the last {days} days"
   }
 }
