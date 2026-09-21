@@ -133,6 +133,7 @@ function publicConfig() {
             messagingSenderId: env('MESSAGINGSENDERID'), appId: env('APPID'), measurementId: env('MEASUREMENTID'),
         },
         demoMode: env('DEMO_MODE') === 'true',
+        mcpOAuth: require('../Modules/OAuthServer/config').isOn(process.env),
     };
 }
 

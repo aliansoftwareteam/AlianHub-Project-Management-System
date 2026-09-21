@@ -39,7 +39,7 @@ const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } ca
 const routeId = (v) => (v === undefined || v === null ? undefined : String(v));
 
 // Notices rendered from their values through i18n rather than from message (Inbox.vue renderNotice).
-const STRUCTURED_CHANGES = ['agent_alert', 'agent_session_assigned'];
+const STRUCTURED_CHANGES = ['agent_alert', 'agent_session_assigned', 'oauth_client_approval'];
 
 const fail = (res, statusText) => res.send({ status: false, statusText });
 

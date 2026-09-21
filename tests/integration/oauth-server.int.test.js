@@ -5,15 +5,16 @@ const { MongoClient } = require('mongodb');
 const { STATE_DIR, resolveMongoUrl } = require('../../e2e/support/env');
 const { emailFor, login, readState } = require('../../e2e/support/fixtures');
 const { startServer } = require('../../e2e/support/server');
+const consentFlow = require('../fixtures/oauthConsent');
 
-/* Sprint 10 slice S2: the MCP authorization server through the real app and a real database. A scripted
- * client in plain HTTP runs discovery, dynamic registration, authorize with PKCE and resource, token,
- * refresh and revoke; the consent step is the test-only path, so the server runs with NODE_ENV=test. */
+/* Sprint 10 slices S2 and S3: the MCP authorization server through the real app and a real database. A scripted
+ * client in plain HTTP runs discovery, dynamic registration, authorize with PKCE and resource, token, refresh and
+ * revoke; a signed-in person answers on the consent screen's endpoints, after a workspace owner approved the client. */
 
 const state = readState();
 const BOOT_TIMEOUT_MS = 180000;
 const REDIRECT = 'http://127.0.0.1:47291/callback';
-const TEST_ENV = { MCP_OAUTH: 'on', MCP_OAUTH_DCR: 'on', NODE_ENV: 'test', MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000' };
+const TEST_ENV = { MCP_OAUTH: 'on', MCP_OAUTH_DCR: 'on', NODE_ENV: 'test', MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000', CSP_MODE: 'enforce' };
 
 const newVerifier = () => crypto.randomBytes(32).toString('base64url');
 const challengeOf = (verifier) => crypto.createHash('sha256').update(verifier).digest('base64url');
@@ -37,11 +38,9 @@ const scriptedClient = (baseURL) => {
             const res = await fetch(registrationEndpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(metadata) });
             return { status: res.status, body: await res.json() };
         },
-        async authorize(authorizationEndpoint, params, headers) {
+        async authorize(authorizationEndpoint, params, person) {
             const url = `${authorizationEndpoint}?${new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined))}`;
-            const res = await fetch(url, { redirect: 'manual', headers });
-            const location = res.headers.get('location');
-            return { status: res.status, location: location ? new URL(location) : null };
+            return person ? consentFlow.consentThrough(url, person) : consentFlow.startAuthorization(url);
         },
         token: (tokenEndpoint, body, headers) => post(tokenEndpoint, body, headers),
         revoke: (revocationEndpoint, body, headers) => post(revocationEndpoint, body, headers),
@@ -83,10 +82,19 @@ describe('with MCP_OAUTH on in a test process', () => {
     let consent;
     const secrets = [];
 
+    const approve = async (clientId) => {
+        const res = await fetch(`${server.baseURL}/api/v2/oauth-client-approvals/approve`, {
+            method: 'POST',
+            headers: { authorization: `Bearer ${owner.accessToken}`, companyid: state.companyId, 'content-type': 'application/json' },
+            body: JSON.stringify({ clientId }),
+        });
+        expect(res.status).toBe(200);
+    };
+
     beforeAll(async () => {
         server = await startWith('on', TEST_ENV);
         owner = await login(server.baseURL, emailFor('owner'));
-        consent = { authorization: `Bearer ${owner.accessToken}`, companyid: state.companyId, 'x-oauth-test-consent': 'approve' };
+        consent = { session: `accessToken=${owner.accessToken}`, workspace: state.companyId };
     }, BOOT_TIMEOUT_MS);
 
     afterAll(async () => { if (server) await server.stop(); }, BOOT_TIMEOUT_MS);
@@ -97,7 +105,7 @@ describe('with MCP_OAUTH on in a test process', () => {
             response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, scope: 'tasks:read projects:read', state: 's10s2-state',
             code_challenge: challengeOf(verifier), code_challenge_method: 'S256', resource: `${server.baseURL}/mcp`,
         }, consent);
-        expect(authorized.status).toBe(302);
+        expect(authorized.status).toBe(303);
         expect(authorized.location.searchParams.get('state')).toBe('s10s2-state');
         expect(authorized.location.searchParams.get('iss')).toBe(meta.issuer);
         const code = authorized.location.searchParams.get('code');
@@ -120,6 +128,7 @@ describe('with MCP_OAUTH on in a test process', () => {
         const registered = await client.register(meta.registration_endpoint, { client_name: 'S10S2 scripted client', redirect_uris: [REDIRECT], token_endpoint_auth_method: 'none', grant_types: ['authorization_code', 'refresh_token'] });
         expect(registered.status).toBe(201);
         const clientId = registered.body.client_id;
+        await approve(clientId);
 
         const { tokens, code, verifier } = await flow(client, meta, { clientId });
         expect(tokens.status).toBe(200);
@@ -131,7 +140,7 @@ describe('with MCP_OAUTH on in a test process', () => {
         secrets.push(refreshed.body.access_token, refreshed.body.refresh_token);
 
         const rows = await globalDb.collection('oauth_tokens').find({ clientId }).toArray();
-        expect(rows.map((row) => row.kind).sort()).toEqual(['access', 'access', 'code', 'refresh', 'refresh']);
+        expect(rows.map((row) => row.kind).sort()).toEqual(['access', 'access', 'code', 'consent', 'refresh', 'refresh']);
         const codeRow = rows.find((row) => row.kind === 'code');
         expect(codeRow).toMatchObject({ redirectUri: REDIRECT, codeChallenge: challengeOf(verifier), resource: `${server.baseURL}/mcp`, companyId: state.companyId, userId: owner.uid });
         expect(codeRow.spentAt).toBeInstanceOf(Date);
@@ -167,6 +176,7 @@ describe('with MCP_OAUTH on in a test process', () => {
         const client = scriptedClient(server.baseURL);
         const meta = (await client.discover()).body;
         const clientId = (await client.register(meta.registration_endpoint, { client_name: 'S10S2 replay', redirect_uris: [REDIRECT], token_endpoint_auth_method: 'none' })).body.client_id;
+        await approve(clientId);
         const { code, verifier, tokens } = await flow(client, meta, { clientId });
         secrets.push(tokens.body.access_token, tokens.body.refresh_token);
         const replays = await Promise.all([1, 2].map(() => client.token(meta.token_endpoint, { grant_type: 'authorization_code', client_id: clientId, code, code_verifier: verifier, redirect_uri: REDIRECT, resource: `${server.baseURL}/mcp` })));
@@ -178,6 +188,7 @@ describe('with MCP_OAUTH on in a test process', () => {
         const client = scriptedClient(server.baseURL);
         const meta = (await client.discover()).body;
         const clientId = (await client.register(meta.registration_endpoint, { client_name: 'S10S2 refusals', redirect_uris: [REDIRECT], token_endpoint_auth_method: 'none' })).body.client_id;
+        await approve(clientId);
         const base = { response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, scope: 'tasks:read', state: 'x', resource: `${server.baseURL}/mcp` };
         const plain = await client.authorize(meta.authorization_endpoint, { ...base, code_challenge: newVerifier(), code_challenge_method: 'plain' }, consent);
         expect(plain.location.searchParams.get('error')).toBe('invalid_request');
@@ -225,22 +236,98 @@ describe('with MCP_OAUTH on in a test process', () => {
     });
 });
 
-describe('with MCP_OAUTH on outside a test process', () => {
+
+describe('the consent screen and workspace approval on the real app', () => {
     let server;
-    beforeAll(async () => { server = await startWith('dev', { ...TEST_ENV, NODE_ENV: 'development' }); }, BOOT_TIMEOUT_MS);
+    let owner;
+    let member;
+    const ownerApi = () => ({ authorization: `Bearer ${owner.accessToken}`, companyid: state.companyId, 'content-type': 'application/json' });
+
+    beforeAll(async () => {
+        server = await startWith('consent', TEST_ENV);
+        owner = await login(server.baseURL, emailFor('owner'));
+        member = await login(server.baseURL, emailFor('member'));
+    }, BOOT_TIMEOUT_MS);
     afterAll(async () => { if (server) await server.stop(); }, BOOT_TIMEOUT_MS);
 
-    it('cannot complete an authorization through the test consent path', async () => {
-        const owner = await login(server.baseURL, emailFor('owner'));
+    const register = async (name) => {
         const client = scriptedClient(server.baseURL);
         const meta = (await client.discover()).body;
-        const clientId = (await client.register(meta.registration_endpoint, { client_name: 'S10S2 dev', redirect_uris: [REDIRECT], token_endpoint_auth_method: 'none' })).body.client_id;
-        const res = await client.authorize(meta.authorization_endpoint, {
-            response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, scope: 'tasks:read', state: 'dev',
-            code_challenge: challengeOf(newVerifier()), code_challenge_method: 'S256', resource: `${server.baseURL}/mcp`,
-        }, { authorization: `Bearer ${owner.accessToken}`, companyid: state.companyId, 'x-oauth-test-consent': 'approve' });
-        expect(res.location.searchParams.get('error')).toBe('temporarily_unavailable');
-        expect(res.location.searchParams.get('code')).toBeNull();
+        const clientId = (await client.register(meta.registration_endpoint, { client_name: name, redirect_uris: [REDIRECT], token_endpoint_auth_method: 'none' })).body.client_id;
+        return { client, meta, clientId };
+    };
+    const authorizeUrl = (clientId, verifier) => `${server.baseURL}/oauth/authorize?${new URLSearchParams({
+        response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, scope: 'tasks:read', state: 's10s3', code_challenge: challengeOf(verifier), code_challenge_method: 'S256', resource: `${server.baseURL}/mcp`,
+    })}`;
+    const auditRow = async (action, entityId) => {
+        for (let tries = 0; tries < 20; tries += 1) {
+            const row = await mongo.db(state.companyId).collection('audit_logs').findOne({ action, entityId });
+            if (row) return row;
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        return null;
+    };
+    const directive = (policy, name) => (String(policy || '').split(';').map((part) => part.trim()).find((part) => part.split(/\s+/)[0] === name) || '');
+
+    it('ignores a test consent header in a test process and sends the person to the consent page', async () => {
+        const { clientId } = await register('S10S3 header');
+        const res = await fetch(authorizeUrl(clientId, newVerifier()), { redirect: 'manual', headers: { authorization: `Bearer ${owner.accessToken}`, companyid: state.companyId, 'x-oauth-test-consent': 'approve' } });
+        expect(res.status).toBe(302);
+        expect(new URL(res.headers.get('location'), server.baseURL).pathname).toBe('/oauth/consent');
         expect(await globalDb.collection('oauth_grants').countDocuments({ clientId })).toBe(0);
+    });
+
+    it('serves the consent page with its own policy under CSP_MODE=enforce', async () => {
+        const { clientId } = await register('S10S3 page');
+        const started = await consentFlow.startAuthorization(authorizeUrl(clientId, newVerifier()));
+        const res = await fetch(`${server.baseURL}/oauth/consent?request=${encodeURIComponent(started.consent.request)}`, { headers: { accept: 'text/html' } });
+        const policy = res.headers.get('content-security-policy');
+        expect(directive(policy, 'form-action')).toBe(`form-action 'self' ${REDIRECT}`);
+        expect(directive(policy, 'frame-ancestors')).toBe("frame-ancestors 'none'");
+        expect(directive(policy, 'script-src')).toMatch(/^script-src 'self'/);
+        expect(res.headers.get('content-security-policy-report-only')).toBeNull();
+        expect(res.headers.get('x-frame-options')).toBe('DENY');
+    });
+
+    it('refuses an unapproved client, records the request, and binds the grant to the workspace once approved', async () => {
+        const { clientId, client, meta } = await register('S10S3 approval');
+        const refused = await consentFlow.consentThrough(authorizeUrl(clientId, newVerifier()), { session: `accessToken=${member.accessToken}`, workspace: state.companyId });
+        expect(refused.status).toBe(403);
+        expect(await globalDb.collection('oauth_client_approvals').findOne({ clientId })).toMatchObject({ companyId: state.companyId, status: 'pending', requestedBy: member.uid, privateSprints: false });
+        expect(await auditRow('oauth.client_approval_requested', clientId)).toMatchObject({ actorId: member.uid });
+
+        const approved = await fetch(`${server.baseURL}/api/v2/oauth-client-approvals/approve`, { method: 'POST', headers: ownerApi(), body: JSON.stringify({ clientId, privateSprints: true }) });
+        expect(approved.status).toBe(200);
+        expect(await globalDb.collection('oauth_client_approvals').findOne({ clientId })).toMatchObject({ status: 'approved', privateSprints: true, decidedBy: owner.uid });
+        expect(await auditRow('oauth.client_approved', clientId)).toMatchObject({ actorId: owner.uid });
+
+        const verifier = newVerifier();
+        const done = await consentFlow.consentThrough(authorizeUrl(clientId, verifier), { session: `accessToken=${member.accessToken}`, workspace: state.companyId });
+        expect(done.status).toBe(303);
+        const tokens = await client.token(meta.token_endpoint, { grant_type: 'authorization_code', client_id: clientId, code: done.location.searchParams.get('code'), code_verifier: verifier, redirect_uri: REDIRECT, resource: `${server.baseURL}/mcp` });
+        expect(tokens.status).toBe(200);
+        expect(await globalDb.collection('oauth_grants').findOne({ clientId })).toMatchObject({ companyId: state.companyId, userId: member.uid, scopes: ['tasks:read'] });
+
+        const mine = await (await fetch(`${server.baseURL}/api/v2/oauth-grants`, { headers: { authorization: `Bearer ${member.accessToken}`, companyid: state.companyId } })).json();
+        expect(mine.data).toEqual([expect.objectContaining({ clientId, clientName: 'S10S3 approval', companyId: state.companyId, scopes: ['tasks:read'] })]);
+
+        const revoked = await fetch(`${server.baseURL}/api/v2/oauth-client-approvals/revoke`, { method: 'POST', headers: ownerApi(), body: JSON.stringify({ clientId }) });
+        expect(revoked.status).toBe(200);
+        expect(await globalDb.collection('oauth_grants').findOne({ clientId })).toMatchObject({ revokedReason: 'approval_revoked' });
+        expect(await globalDb.collection('oauth_tokens').countDocuments({ clientId, kind: { $in: ['access', 'refresh'] }, revokedAt: null })).toBe(0);
+        const refreshed = await client.token(meta.token_endpoint, { grant_type: 'refresh_token', client_id: clientId, refresh_token: tokens.body.refresh_token, resource: `${server.baseURL}/mcp` });
+        expect(refreshed.body.error).toBe('invalid_grant');
+        expect(await auditRow('oauth.client_approval_revoked', clientId)).toMatchObject({ actorId: owner.uid });
+    });
+
+    it('refuses the approval routes to a member', async () => {
+        const res = await fetch(`${server.baseURL}/api/v2/oauth-client-approvals`, { headers: { authorization: `Bearer ${member.accessToken}`, companyid: state.companyId } });
+        expect(res.status).toBe(403);
+    });
+
+    it('built the approval index with migration 041', async () => {
+        const migration = await globalDb.collection('schema_versions').findOne({ _id: '041-oauth-client-approvals' });
+        expect(migration && migration.ok).toBe(true);
+        expect(await globalDb.collection('oauth_client_approvals').indexes()).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'company_client', unique: true })]));
     });
 });

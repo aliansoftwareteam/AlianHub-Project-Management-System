@@ -1,7 +1,7 @@
 const config = require('./config');
 const clients = require('./clients');
 const grants = require('./grants');
-const consent = require('./consent');
+const consentRequest = require('./consentRequest');
 const { matchesRegistered } = require('./redirectUri');
 const logger = require('../../Config/loggerConfig');
 
@@ -54,7 +54,7 @@ const parseScopes = (value) => {
 
 /* MCP 2025-11-25 "Scope Selection Strategy" lets a client leave scope out. It then gets read access only:
  * the read scopes it registered or its metadata document names, or every read scope when it named none.
- * Writing always takes an explicit request, and later the consent screen (S3). */
+ * Writing always takes an explicit request, which the person then sees on the consent screen. */
 const defaultScopes = (client) => {
     const named = Array.isArray(client.scopes) ? client.scopes : [];
     return named.length ? named.filter((scope) => config.READ_SCOPES.includes(scope)) : [...config.READ_SCOPES];
@@ -90,16 +90,11 @@ exports.authorize = async (req, res) => {
         if (!scopes || !scopes.length) return refuse('invalid_scope', `scope must be drawn from: ${config.SCOPES.join(' ')}`);
         if (client.scopes && client.scopes.length && !scopes.every((scope) => client.scopes.includes(scope))) return refuse('invalid_scope', 'this client may not ask for that scope');
 
-        const answer = await consent.testConsent(req, res);
-        if (answer && answer.answered) return undefined;
-        if (!answer) return refuse('temporarily_unavailable', 'user consent is not available on this server yet');
-        if (!answer.approved) return refuse('access_denied', 'the user declined');
-        if (client.companyId && client.companyId !== answer.companyId) return refuse('access_denied', 'this client is registered to another workspace');
-
-        const { code } = await grants.issueCode({
-            client, companyId: answer.companyId, userId: answer.userId, scopes, redirectUri, codeChallenge: q.code_challenge,
-        });
-        return back({ code });
+        /* The hash is the web app's route (its router reads only the hash); the request stays in the query, where
+         * the consent page's own policy is built from it. */
+        const sealed = consentRequest.seal({ client, redirectUri, scopes, state, codeChallenge: q.code_challenge });
+        consentRequest.setCookie(res, sealed);
+        return noStore(res).redirect(302, `/oauth/consent?request=${encodeURIComponent(sealed.request)}#/oauth/consent`);
     } catch (error) {
         return failed(res, error, 'authorize');
     }

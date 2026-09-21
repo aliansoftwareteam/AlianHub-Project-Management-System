@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { approveInWorkspace } = require('./fixtures/oauthApproval');
 const http = require('http');
 const https = require('https');
 
@@ -69,6 +70,7 @@ const challengeOf = (verifier) => crypto.createHash('sha256').update(verifier).d
 
 const mint = async (scopes) => {
     const { client } = await clients.register({ kind: 'dynamic', name: 'S10S4 Coder', redirectUris: [REDIRECT], tokenEndpointAuthMethod: 'none' });
+    approveInWorkspace(mockDb, C, client.clientId);
     const verifier = crypto.randomBytes(32).toString('base64url');
     const { code, grant } = await grants.issueCode({ client, companyId: C, userId: USER, scopes, redirectUri: REDIRECT, codeChallenge: challengeOf(verifier) });
     const issued = await grants.exchangeCode({ client, code, codeVerifier: verifier, redirectUri: REDIRECT, resource: RESOURCE });

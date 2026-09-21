@@ -26,6 +26,11 @@ module.exports = defineConfig({
         target: 'http://localhost:4000',
         changeOrigin: true
       },
+      // The MCP authorization server's consent page and its calls (MCP_OAUTH).
+      '^/(oauth/|\\.well-known/oauth-)': {
+        target: 'http://localhost:4000',
+        changeOrigin: true
+      },
       'socket.io': {
         target: 'http://localhost:4000',
         changeOrigin: true

@@ -217,7 +217,8 @@ import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useHelper } from '@/components/organisms/Header/helper';
 import { openPanel } from '@/components/organisms/Shell/shellState';
 import { noticeTextOf } from '@/views/Ai/rateAlerts';
-import { escapeHtml, renderNotice } from '@/views/Inbox/inboxNotices';
+import { escapeHtml } from '@/utils/notificationHtml';
+import { renderNotice } from './renderNotice';
 
 defineOptions({ name: 'InboxPage' });
 

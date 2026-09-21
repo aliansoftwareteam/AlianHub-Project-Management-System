@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
-import { renderNotice } from '@/views/Inbox/inboxNotices';
+import { renderNotice } from '@/views/Inbox/renderNotice';
 import en from '@/locales/en';
 
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } });
