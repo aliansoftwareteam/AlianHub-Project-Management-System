@@ -125,7 +125,7 @@ const lifetimeStanding = (tokenDoc, { strict = isStrict(), maxLifetimeSince, now
     return { state: now.getTime() < deadline.getTime() ? 'capped' : 'stopped', deadline };
 };
 
-const lastUsedIsStale =(tokenDoc, now = new Date()) =>
+const lastUsedIsStale = (tokenDoc, now = new Date()) =>
     !tokenDoc?.lastUsedAt || now.getTime() - new Date(tokenDoc.lastUsedAt).getTime() >= LAST_USED_WRITE_INTERVAL_MS;
 
 module.exports = {
