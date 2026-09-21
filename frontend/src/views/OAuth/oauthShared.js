@@ -19,12 +19,14 @@ export const formatWhen = (value) => {
     return Number.isNaN(date.getTime()) ? "" : date.toLocaleString();
 };
 
-/* The authorization server answers its metadata only while MCP_OAUTH is on, so its screens show only then. */
+/* Asked of the public config rather than of the authorization server, whose routes do not exist with MCP_OAUTH
+ * off: a 404 there would land in every settings page's console. */
 let availability = null;
 export const oauthAvailable = () => {
     if (!availability) {
-        availability = fetch(env.OAUTH_METADATA, { headers: { accept: "application/json" } })
-            .then((res) => res.ok)
+        availability = fetch(env.INSTANCE_PUBLIC_CONFIG, { headers: { accept: "application/json" } })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((body) => body?.data?.mcpOAuth === true)
             .catch(() => false);
     }
     return availability;

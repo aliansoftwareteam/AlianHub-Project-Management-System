@@ -227,7 +227,6 @@ module.exports.MCP_TOKENS = '/api/v2/api-tokens/mcp';
 module.exports.API_TOKENS_NEEDING_EXPIRY = '/api/v2/api-tokens/needing-expiry';
 module.exports.API_TOKENS_STEP_CREDENTIALS = '/api/v2/api-tokens/step-credentials';
 module.exports.MCP_MANIFEST = '/mcp/manifest';
-module.exports.OAUTH_METADATA = '/.well-known/oauth-authorization-server';
 module.exports.OAUTH_CONSENT = '/oauth/consent';
 module.exports.OAUTH_CONSENT_DETAILS = '/oauth/consent/details';
 module.exports.OAUTH_CONSENT_APPROVAL_REQUEST = '/oauth/consent/approval-request';

@@ -21,6 +21,7 @@ export const publicConfig = reactive({
     },
     firebase: {},
     demoMode: false,
+    mcpOAuth: false,
 });
 
 export function applyPublicConfig(data = {}) {
