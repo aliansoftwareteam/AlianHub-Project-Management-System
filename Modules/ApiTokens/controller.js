@@ -5,10 +5,12 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { myCache } = require("../../Config/config");
 const {
-    SCOPES, MIN_EXPIRY_DAYS, MAX_EXPIRY_DAYS, STRICT_GRACE_DAYS, LAST_USED_WRITE_INTERVAL_MS,
+    SCOPES, MIN_EXPIRY_DAYS, STRICT_GRACE_DAYS, LAST_USED_WRITE_INTERVAL_MS,
     generateToken, hashToken, tokenPrefixOf, looksLikeToken, isStrict, validateCreateInput, isExpired, effectiveScopes, graceStanding, lastUsedIsStale,
+    maxLifetimeDays, maxExpiryDaysFor, mayExceedMaxLifetime, lifetimeStanding,
 } = require('./helpers/apiTokenRules');
 const { strictSince } = require('./helpers/strictSince');
+const { maxLifetimeSince } = require('./helpers/maxLifetimeSince');
 const { stepCredentialsEnabled } = require('../Agents/serviceIdentity');
 
 // Resolve the acting user. These routes now sit behind the JWT middleware
@@ -24,7 +26,7 @@ const actingUserId = (req) => {
 // only its sha256 hash is stored. The prefix (first 12 chars) stays
 // visible so users can match a token in hand against the list.
 
-const maskToken = (doc, standing = null) => ({
+const maskToken = (doc, standing = null, lifetime = null) => ({
     _id: doc._id,
     name: doc.name,
     prefix: doc.prefix,
@@ -39,7 +41,20 @@ const maskToken = (doc, standing = null) => ({
     createdAt: doc.createdAt,
     graceState: standing && standing.state !== 'ok' ? standing.state : null,
     graceEndsAt: standing && standing.state !== 'ok' ? standing.deadline : null,
+    ...(lifetime && lifetime.state !== 'ok' ? { lifetimeState: lifetime.state, lifetimeEndsAt: lifetime.deadline } : {}),
 });
+
+const refuseInput = (res, check) => res.send({
+    status: false, statusText: check.reason,
+    ...(check.code ? { code: check.code, maxExpiryDays: check.maxExpiryDays } : {}),
+});
+
+/* The cap's start is read only when some token could be over the maximum. */
+const lifetimeStandings = async (docs, { strict, now }) => {
+    const maxDays = maxLifetimeDays();
+    const since = docs.some((doc) => mayExceedMaxLifetime(doc, { strict, maxDays })) ? await maxLifetimeSince(now) : null;
+    return docs.map((doc) => lifetimeStanding(doc, { strict, maxLifetimeSince: since, now, maxDays }));
+};
 
 const ymd = (date) => new Date(date).toISOString().slice(0, 10);
 
@@ -55,9 +70,7 @@ exports.createToken = async (req, res) => {
             return res.send({ status: false, statusText: 'companyId and userId are required.' });
         }
         const check = validateCreateInput({ name, scopes, expiresInDays });
-        if (!check.valid) {
-            return res.send({ status: false, statusText: check.reason });
-        }
+        if (!check.valid) return refuseInput(res, check);
 
         const rawToken = generateToken();
         const doc = {
@@ -93,7 +106,7 @@ exports.createMcpToken = async (req, res) => {
         if (req.apiToken) return res.status(403).send({ status: false, statusText: 'API tokens cannot mint tokens.' });
         const scopes = isStrict() && askedScopes !== undefined ? askedScopes : ['read', 'write'];
         const check = validateCreateInput({ name: name || 'CLI agent', scopes, expiresInDays });
-        if (!check.valid) return res.send({ status: false, statusText: check.reason });
+        if (!check.valid) return refuseInput(res, check);
         const accounts = require('../Agents/accounts');
         const policy = await accounts.getPolicy(companyId);
         const wanted = accounts.MODES.includes(mode) ? mode : 'personal';
@@ -141,11 +154,12 @@ exports.listTokens = async (req, res) => {
         // The flag is named only while it is on, so the answer with it off is the one
         // given before it existed; the screen asks for the credential list on seeing it.
         const policy = {
-            strict, minExpiryDays: MIN_EXPIRY_DAYS, maxExpiryDays: MAX_EXPIRY_DAYS, scopes: [...SCOPES], graceDays: STRICT_GRACE_DAYS,
+            strict, minExpiryDays: MIN_EXPIRY_DAYS, maxExpiryDays: maxExpiryDaysFor({ strict }), scopes: [...SCOPES], graceDays: STRICT_GRACE_DAYS,
             strictSince: since,
             ...(stepCredentialsEnabled() ? { stepCredentials: true } : {}),
         };
-        const data = (tokens || []).map((doc) => maskToken(doc, graceStanding(doc, { strict, strictSince: since, now })));
+        const lifetimes = await lifetimeStandings(tokens || [], { strict, now });
+        const data = (tokens || []).map((doc, i) => maskToken(doc, graceStanding(doc, { strict, strictSince: since, now }), lifetimes[i]));
         return res.send({ status: true, statusText: 'Tokens fetched.', data, policy });
     } catch (error) {
         logger.error(`ERROR in list api tokens: ${error.message}`);
@@ -170,8 +184,9 @@ const displayNamesOf = async (userIds) => {
 };
 
 /* GET /api/v2/api-tokens/needing-expiry — every active token in the company with no
- * expiry, for owners and admins, so they can see who has to replace what before the
- * grace ends. Never the token, its hash or its prefix: only its owner can replace it. */
+ * expiry or with one past the maximum lifetime, for owners and admins, so they can see
+ * who has to replace what before it stops. Never the token, its hash or its prefix:
+ * only its owner can replace it. */
 exports.listTokensNeedingExpiry = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
@@ -188,25 +203,37 @@ exports.listTokensNeedingExpiry = async (req, res) => {
         const policy = { strict, graceDays: STRICT_GRACE_DAYS, strictSince: null };
         if (!strict) return res.send({ status: true, statusText: 'Tokens fetched.', data: [], policy });
         const now = new Date();
+        const maxDays = maxLifetimeDays();
         policy.strictSince = await strictSince(now);
+        policy.maxExpiryDays = maxDays;
+        const capSince = await maxLifetimeSince(now);
+        // Any token over the maximum expires after the cap's start plus the maximum; with no known start, after now.
+        const overMaxBound = capSince ? new Date(capSince.getTime() + maxDays * 24 * 60 * 60 * 1000) : now;
         const tokens = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.API_TOKENS,
-            data: [{ active: true, $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }] }, { name: 1, userId: 1, kind: 1, createdAt: 1, lastUsedAt: 1 }],
+            data: [
+                { active: true, $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }, { expiresAt: { $gt: overMaxBound } }] },
+                { name: 1, userId: 1, kind: 1, createdAt: 1, lastUsedAt: 1, expiresAt: 1 },
+            ],
         }, 'find');
-        const names = await displayNamesOf((tokens || []).map((doc) => String(doc.userId || '')));
-        const data = (tokens || []).map((doc) => {
-            const standing = graceStanding(doc, { strict, strictSince: policy.strictSince, now });
-            return {
-                _id: doc._id,
-                name: doc.name,
-                kind: doc.kind || 'personal',
-                owner: { id: String(doc.userId || ''), name: names[String(doc.userId)] || '' },
-                createdAt: doc.createdAt,
-                lastUsedAt: doc.lastUsedAt || null,
-                deadline: standing.deadline,
-                stopped: standing.state === 'stopped',
-            };
-        }).sort(byDeadline);
+        const rows = (tokens || []).map((doc) => {
+            if (!doc.expiresAt) return { doc, reason: 'no-expiry', standing: graceStanding(doc, { strict, strictSince: policy.strictSince, now }) };
+            const standing = lifetimeStanding(doc, { strict, maxLifetimeSince: capSince, now, maxDays });
+            return standing.state === 'ok' ? null : { doc, reason: 'over-max-lifetime', standing };
+        }).filter(Boolean);
+        const names = await displayNamesOf(rows.map(({ doc }) => String(doc.userId || '')));
+        const data = rows.map(({ doc, reason, standing }) => ({
+            _id: doc._id,
+            name: doc.name,
+            kind: doc.kind || 'personal',
+            owner: { id: String(doc.userId || ''), name: names[String(doc.userId)] || '' },
+            createdAt: doc.createdAt,
+            lastUsedAt: doc.lastUsedAt || null,
+            reason,
+            ...(doc.expiresAt ? { expiresAt: doc.expiresAt } : {}),
+            deadline: standing.deadline,
+            stopped: standing.state === 'stopped',
+        })).sort(byDeadline);
         return res.send({ status: true, statusText: 'Tokens fetched.', data, policy });
     } catch (error) {
         logger.error(`ERROR in list api tokens needing expiry: ${error.message}`);
@@ -355,6 +382,14 @@ exports.resolveToken = async (companyId, rawToken) => {
             if (standing.state === 'stopped') {
                 const when = standing.deadline ? `stopped working on ${ymd(standing.deadline)}` : 'cannot be checked against its grace period right now';
                 return { token: null, refusal: `This API token has no expiry and ${when}. Create a new token with an expiry.` };
+            }
+        }
+        if (isStrict() && doc.expiresAt) {
+            const maxDays = maxLifetimeDays();
+            const standing = lifetimeStanding(doc, { strict: true, maxLifetimeSince: await maxLifetimeSince(now), now, maxDays });
+            if (standing.state === 'stopped') {
+                const when = standing.deadline ? `stopped working on ${ymd(standing.deadline)}` : 'cannot be checked against the maximum right now';
+                return { token: null, refusal: `This API token expires later than the maximum lifetime of ${maxDays} days allows and ${when}. Create a new token with a shorter expiry.` };
             }
         }
         recordLastUsed(companyId, doc, now);

@@ -149,14 +149,16 @@ export function useAccounts() {
 
     // The raw token comes back exactly once; the caller shows it and then loses it.
     const mintToken = async (body) => {
+        let res;
         try {
-            const res = await apiRequest("post", env.MCP_TOKENS, body);
-            if (!ok(res)) throw new Error(failure(res, "The token was not created."));
-            await loadTokens();
-            return res.data.data;
+            res = await apiRequest("post", env.MCP_TOKENS, body);
         } catch (error) {
-            throw new Error(thrown(error, "The token was not created."));
+            const data = error?.response?.data || {};
+            throw Object.assign(new Error(thrown(error, "The token was not created.")), { code: data.code, maxExpiryDays: data.maxExpiryDays });
         }
+        if (!ok(res)) throw Object.assign(new Error(failure(res, "The token was not created.")), { code: res?.data?.code, maxExpiryDays: res?.data?.maxExpiryDays });
+        await loadTokens();
+        return res.data.data;
     };
 
     /* Deactivating rather than deleting is what keeps the audit trail: an
