@@ -25,7 +25,9 @@ const PERMISSION = Object.freeze({ visibility: 'agent', via: 'agent' });
 
 const clip = (value, n) => String(value == null ? '' : value).replace(/\s+/g, ' ').trim().slice(0, n);
 
-const ownStarter = (set, startedBy) => String(startedBy || '') === set.caller.userId;
+/* The run's own starter, read from the run by agentScope.js; a run started by an event has none,
+ * and then no starter-only note is its. */
+const ownStarter = (set, startedBy) => Boolean(set.starterId) && String(startedBy || '') === String(set.starterId);
 
 const admissible = (set, { projectIds, startedBy, starterOnly }) => {
     const projects = (projectIds || []).map(String);

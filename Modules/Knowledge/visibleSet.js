@@ -85,12 +85,24 @@ const resolveVisibleSet = async ({ companyId, caller, scope } = {}) => {
     };
 };
 
+/* A set narrowed for an agent run (agentScope.js) is project-bound: content in no project reaches
+ * it only as far as that module allows. */
+const projectlessClosed = (set) => Boolean(set.projectBound) && !set.reachesProjectless;
+
 /* A page with no project is the company's, unless the caller scoped to one project. */
 const inProjectOrCompanyWide = (set, field) => {
     const projects = objectIds(set.projectIds);
-    return set.projectId
+    return set.projectId || projectlessClosed(set)
         ? { [field]: { $in: projects } }
         : { $or: [{ [field]: { $in: projects } }, { [field]: { $in: [null, undefined] } }] };
+};
+
+/* A call belongs to the people on it; its project narrows only a search scoped to one project, or
+ * a project-bound set. */
+const callProjects = (set, ids) => {
+    if (set.projectId || projectlessClosed(set)) return { projectId: { $in: ids } };
+    if (set.projectBound) return { $and: [{ $or: [{ projectId: { $in: ids } }, { projectId: { $in: [null, undefined] } }] }] };
+    return {};
 };
 
 /* Access control as plain match clauses, one per source, that a backend puts beside
@@ -108,7 +120,7 @@ const clausesFor = (set) => {
         transcript: {
             participants: set.caller.userId,
             deletedStatusKey: { $ne: 1 },
-            ...(set.projectId ? { projectId: { $in: set.projectIds } } : {}),
+            ...callProjects(set, set.projectIds),
         },
     };
 };
@@ -127,7 +139,7 @@ const chunkClausesFor = (set) => {
         transcript: {
             ...liveChunk(set, 'transcript'),
             participants: set.caller.userId,
-            ...(set.projectId ? { projectId: { $in: objectIds(set.projectIds) } } : {}),
+            ...callProjects(set, objectIds(set.projectIds)),
         },
     };
 };
