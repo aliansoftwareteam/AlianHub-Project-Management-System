@@ -77,7 +77,7 @@ const connect = ({ uid, companyId = C1, namespaceUser = uid, aud = companyId }) 
 });
 
 const roomsOf = (socket) => new Promise((resolve) => {
-    socket.emit('getRoomList', socket.id, (rooms) => resolve(rooms));
+    socket.emit('getRoomList', socket.id, (rooms) => resolve(rooms.filter((room) => !room.startsWith('call_'))));
 });
 
 const settle = (socket, event, data) => new Promise((resolve) => {
