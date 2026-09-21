@@ -395,6 +395,7 @@ describe('agent memory in the knowledge store', () => {
     let modules;
     const own = new ObjectId();
     const other = new ObjectId();
+    const runIds = [];
 
     const recall = (agentId, word) => modules.retrieval.retrieve({
         companyId: state.companyId,
@@ -429,6 +430,7 @@ describe('agent memory in the knowledge store', () => {
     afterAll(async () => {
         modules.events.stop();
         await tenant.collection('agents').deleteMany({ _id: { $in: [own, other] } });
+        await tenant.collection('agent_runs').deleteMany({ _id: { $in: runIds } });
         await tenant.collection('knowledge_chunks').deleteMany({ sourceType: 'memory', agentId: { $in: [String(own), String(other)] } });
         await tenant.collection('agent_memory').deleteMany({ namespace: { $in: [String(own), String(other)] } });
         await tenant.collection('knowledge_index_state').deleteOne({ sourceType: 'memory' });
@@ -442,8 +444,10 @@ describe('agent memory in the knowledge store', () => {
 
     it("recalls an agent's own note in its own run, and never in another agent's", async () => {
         const word = token();
-        const run = { _id: new ObjectId(), agentId: String(own), startedBy: owner.uid, projectId: String(state.projects.shared._id) };
-        const note = await modules.memory.rememberForAgent({ companyId: state.companyId, run, text: `The berth code is ${word}.` });
+        const run = { _id: new ObjectId(), agentId: String(own), startedBy: owner.uid, projectId: String(state.projects.shared._id), status: 'running' };
+        await tenant.collection('agent_runs').insertOne(run);
+        runIds.push(run._id);
+        const note = await modules.memory.rememberForAgent({ companyId: state.companyId, runId: String(run._id), text: `The berth code is ${word}.` });
         await modules.events.drain();
         expect(await modules.backfill.backfill(state.companyId)).toMatchObject({ status: 'complete' });
 
