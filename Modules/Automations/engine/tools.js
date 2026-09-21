@@ -43,11 +43,9 @@ const getTask = async (companyId, taskId) => {
     return task;
 };
 
-/* Under STEP_CREDENTIALS a row the runner writes while it executes a run names the
- * worker as its service identity. An agent's context already carries its own actor
- * type, and a context with no run is a person's request (the apply endpoint), which
- * the worker did not decide to make. */
-const workerIdentity = (context) => (context.actorType || !context.runId ? {} : serviceStamp('worker', 'serviceId'));
+/* A context with no run is a person's request (the apply endpoint): the worker did
+ * not decide to make it. */
+const workerIdentity = (context) => (context.runId ? serviceStamp('worker', 'serviceId') : {});
 
 const recordAutomationAudit = (companyId, context, entry) => {
     if (context.auditedByCaller) return;

@@ -68,6 +68,22 @@ const startHeartbeat = (claim, lost, beat) => {
     return () => clearInterval(timer);
 };
 
+/* A failed step either comes back later or fails for good, whatever stage failed. */
+const settleFailure = async (companyId, run, claimed, claim, error) => {
+    const decision = retry.decide(error, { attempt: Number(claimed.attempts) || 1, maxAttempts: Number(claimed.maxAttempts) || 3 });
+    const message = String(error.message || error).slice(0, 500);
+    const failure = { ...decision.failure, deterministic: decision.failure.deterministic };
+    if (!decision.retry) {
+        await store.failStep(companyId, claim, { error: message, failure });
+        logger.error(`${LOG_PREFIX} ${run._id}/${claimed.stepId} failed (${decision.reason}): ${message}`);
+        return { outcome: 'failed', reason: decision.reason };
+    }
+    const runAt = new Date(Date.now() + decision.delayMs);
+    await store.deferStep(companyId, claim, { error: message, failure, runAt });
+    logger.info(`${LOG_PREFIX} ${run._id}/${claimed.stepId} retrying in ${decision.delayMs}ms (attempt ${claimed.attempts}): ${message}`);
+    return { outcome: 'retrying', retryInMs: decision.delayMs, reason: message };
+};
+
 const claimOf = (step) => ({ runId: String(step.runId), stepId: String(step.stepId), fencingToken: Number(step.fencingToken) });
 
 /* Fail a step that never ran, which needs a claim of its own to write under. */
@@ -122,21 +138,23 @@ const runStep = async (companyId, run, pending, { workerId = WORKER_ID, context 
     }
 
     const claim = claimOf(claimed);
-    // The credential the step acts under, minted from this claim so it carries the
-    // fencing token the claim won and dies one lease later. Only its id and expiry
-    // reach the row; the credential itself travels in the context and nowhere else.
-    const credential = await stepCredential.issue({ companyId, run, step: claimed, agentOf: () => agentRunner.agentFor(companyId, run, claimed) });
-    // Under a credential every heartbeat re-mints it with the lease it extends, so
-    // a step that outruns its first lease is not refused at its last action.
+    let credential;
+    try {
+        credential = await stepCredential.issue({ companyId, run, step: claimed, agentOf: () => agentRunner.agentFor(companyId, run, claimed) });
+        // What this hop was given out of what the run had left, on the row before it
+        // runs: the answer to "why did this step only get ninety seconds" has to
+        // outlive the tick that decided it.
+        await store.noteStep(companyId, claim, {
+            deadlineAt: permit.grant.deadlineAt, budgetUsd: permit.grant.budgetUsd, depth: permit.depth,
+            ...(credential ? { credentialId: credential.credentialId, credentialExpiresAt: credential.expiresAt } : {}),
+        });
+    } catch (error) {
+        // The claim was won but the step cannot start: hand it back now rather than
+        // leave it claimed, unworked, until its lease runs out.
+        return settleFailure(companyId, run, claimed, claim, error);
+    }
     const held = credential ? stepCredential.hold(companyId, claim, credential) : null;
     const beat = held ? held.renew : () => store.heartbeat(companyId, claim);
-    // What this hop was given out of what the run had left, on the row before it
-    // runs: the answer to "why did this step only get ninety seconds" has to
-    // outlive the tick that decided it.
-    await store.noteStep(companyId, claim, {
-        deadlineAt: permit.grant.deadlineAt, budgetUsd: permit.grant.budgetUsd, depth: permit.depth,
-        ...(credential ? { credentialId: credential.credentialId, credentialExpiresAt: credential.expiresAt } : {}),
-    });
     const lost = { value: false };
     const stopHeartbeat = startHeartbeat(claim, lost, beat);
     const key = idempotency.keyFor({ runId: run._id, stepId: claimed.stepId, action: claimed.action });
@@ -190,18 +208,7 @@ const runStep = async (companyId, run, pending, { workerId = WORKER_ID, context 
         return { outcome: 'success', replayed: result.replayed, output, costUsd };
     } catch (error) {
         if (error instanceof store.StaleLeaseError) throw error;
-        const decision = retry.decide(error, { attempt: Number(claimed.attempts) || 1, maxAttempts: Number(claimed.maxAttempts) || 3 });
-        const message = String(error.message || error).slice(0, 500);
-        const failure = { ...decision.failure, deterministic: decision.failure.deterministic };
-        if (!decision.retry) {
-            await store.failStep(companyId, claim, { error: message, failure });
-            logger.error(`${LOG_PREFIX} ${run._id}/${claimed.stepId} failed (${decision.reason}): ${message}`);
-            return { outcome: 'failed', reason: decision.reason };
-        }
-        const runAt = new Date(Date.now() + decision.delayMs);
-        await store.deferStep(companyId, claim, { error: message, failure, runAt });
-        logger.info(`${LOG_PREFIX} ${run._id}/${claimed.stepId} retrying in ${decision.delayMs}ms (attempt ${claimed.attempts}): ${message}`);
-        return { outcome: 'retrying', retryInMs: decision.delayMs, reason: message };
+        return settleFailure(companyId, run, claimed, claim, error);
     } finally {
         stopHeartbeat();
     }

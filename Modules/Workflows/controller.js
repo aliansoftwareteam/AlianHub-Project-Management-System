@@ -83,7 +83,22 @@ const readableRun = async (companyId, caller, runId) => {
     return null;
 };
 
-const stepsOf = (companyId, run) => store.listSteps(companyId, run._id);
+const CREDENTIAL_FIELDS = ['credentialId', 'previousCredentialId'];
+
+/* toJSON first: it is what res.send would have serialised the document with. */
+const plainRow = (step) => {
+    if (step && typeof step.toJSON === 'function') return step.toJSON();
+    if (step && typeof step.toObject === 'function') return step.toObject();
+    return { ...step };
+};
+
+const withoutCredentialIds = (step) => {
+    const row = plainRow(step);
+    CREDENTIAL_FIELDS.forEach((field) => delete row[field]);
+    return row;
+};
+
+const stepsOf = async (companyId, run) => ((await store.listSteps(companyId, run._id)) || []).map(withoutCredentialIds);
 
 /* Shape first, then the step types' own rules.
  *
@@ -304,7 +319,7 @@ exports.compensateStep = async (req, res) => {
         const compensated = await store.recordCompensation(ctx.companyId, run._id, step.stepId, {
             by: String(ctx.caller.actor.userId), agentRunId: String(agentRunId), reverted: out.reverted, failed: out.failed || [],
         });
-        return ok(res, 'Step compensated.', { step: compensated, revert: out });
+        return ok(res, 'Step compensated.', { step: compensated ? withoutCredentialIds(compensated) : compensated, revert: out });
     } catch (error) {
         logger.error(`[workflow-api] compensateStep: ${error.message}`);
         return fail(res, error.message, error.status || 500);
