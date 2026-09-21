@@ -1,5 +1,5 @@
 const { io } = require('socket.io-client');
-const { createTask, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
+const { createProject, createTask, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 
 const state = readState();
 
@@ -64,7 +64,8 @@ describe('socket room authorisation', () => {
     it('refuses a member the room of a task in a private project they are not on', async () => {
         const owner = await loginAs('owner');
         const member = await loginAs('member');
-        const task = await createTask(owner.api, { project: state.projects.restricted, name: `SOCKET Hidden ${uniqueSuffix()}`, user: state.users.owner, companyOwnerId: owner.userId });
+        const hidden = await createProject(owner.api, { assigneeIds: [owner.userId], createdBy: owner.userId, isPrivate: true });
+        const task = await createTask(owner.api, { project: hidden, name: `SOCKET Hidden ${uniqueSuffix()}`, user: state.users.owner, companyOwnerId: owner.userId });
         const socket = await openAs(member);
         expect(await joinTask(socket, task._id)).toEqual({ joined: false });
         const ownerSocket = await openAs(owner);
