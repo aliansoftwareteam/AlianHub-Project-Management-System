@@ -144,9 +144,8 @@ describe('the policy', () => {
         expect(Object.entries(policy).filter(([, sources]) => sources.includes("'unsafe-inline'")).map(([name]) => name)).toEqual(['style-src']);
     });
 
-    it('allows scripts from the app and the exact files or folders the four loaders fetch', () => {
-        expect(policyFor({})['script-src']).toEqual(["'self'", 'https://accounts.google.com/gsi/client', 'https://apis.google.com/js/api.js', 'https://apis.google.com/_/scs/',
-            'https://www.dropbox.com/static/api/2/dropins.js', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/']);
+    it('allows scripts from the app and the exact files or folders the three loaders fetch, the Drive picker being on its own page', () => {
+        expect(policyFor({})['script-src']).toEqual(["'self'", 'https://accounts.google.com/gsi/client', 'https://www.dropbox.com/static/api/2/dropins.js', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/']);
     });
 
     it('names every third-party source with the path the app loads, never a bare host', () => {

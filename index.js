@@ -121,6 +121,7 @@ function initializeControllers() {
     require('./Modules/trackerUserPermission/init').init(app);
     require('./Modules/Instance/init').init(app);
     require('./Modules/CspReport/init').init(app);
+    require('./Modules/Pickers/init').init(app);
     require('./Modules/ScreenshotRetention/init').init(app);
     require('./Modules/projectClose/init').init(app);
     if (process.env.CRON_ENABLED !== 'false') {
