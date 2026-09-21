@@ -7,6 +7,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { sanitizeInput } = require('../../serviceFunction');
 const { BODY_COMPANY_PATHS } = require('../../../Config/taskWritePermissions');
 const { canReadProject } = require('../../../Config/projectAccess');
+const { mayAttachKey } = require('../../../common-storage/taskFileKeys');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
@@ -19,14 +20,16 @@ const UNKNOWN_USER = 'Unknown user';
 const USER_CACHE_SECONDS = 604800;
 
 class TaskWriteRefusal extends Error {
-    constructor(statusCode, message) {
+    constructor(statusCode, message, code) {
         super(message);
         this.name = 'TaskWriteRefusal';
         this.statusCode = statusCode;
+        if (code) this.code = code;
     }
 }
 
 const refuse = (statusCode, message) => { throw new TaskWriteRefusal(statusCode, message); };
+const ATTACHMENT_KEY_REFUSED = 'ATTACHMENT_KEY_NOT_OWN';
 const taskNotFound = () => new TaskWriteRefusal(404, 'Task not found');
 
 const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
@@ -101,8 +104,8 @@ const holdsTaskType = (payload, stored) => {
  * isUpdateTask records history without writing only when it does. `destination` names the project a move or copy writes
  * into, which must exist. `actor` are the params that receive the signed-in user.
  */
-const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, project = [], taskIds = [], taskNames = [], held = null, destination = null, actor }) => Object.freeze({
-    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, project, taskIds, taskNames, held, destination,
+const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, project = [], taskIds = [], taskNames = [], held = null, destination = null, attachments = null, actor }) => Object.freeze({
+    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, project, taskIds, taskNames, held, destination, attachments,
     actor: actor || (params.includes('userData') ? ['userData'] : []),
 });
 
@@ -131,6 +134,7 @@ const CREATE = spec({
     ids: [['data', 'ParentTaskId'], ['data', 'ProjectID']],
     objects: [['indexObj']],
     actor: ['user'],
+    attachments: 'created',
 });
 
 const TASK_ACTION_FIELDS = Object.freeze({
@@ -155,7 +159,7 @@ const TASK_ACTION_FIELDS = Object.freeze({
     updateTags: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'tagId', 'operation'], company: companyId, ids: TASK_ID, scalars: [['tagId']], task: TASK_ID[0], project: PROJECT_ID }),
     updateChecklists: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'operation', 'data', 'historyObj', 'taskData', ...HISTORY_USER], company: companyId, ids: TASK_ID, task: TASK_ID[0], project: PROJECT_ID }),
     AddAiChecklist: spec({ params: ['companyId', 'taskId', 'checklistArray', 'sprintId', 'projectId', ...HISTORY_USER], company: companyId, ids: TASK_ID, task: TASK_ID[0], project: PROJECT_ID }),
-    updateAttachments: spec({ params: ['companyId', 'sprintId', 'taskId', 'taskData', 'id', 'operation', 'data', 'projectData', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ...TASK_DATA], scalars: [['data', 'id']], task: TASK_ID[0], project: [['projectData', 'id']] }),
+    updateAttachments: spec({ params: ['companyId', 'sprintId', 'taskId', 'taskData', 'id', 'operation', 'data', 'projectData', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ...TASK_DATA], scalars: [['data', 'id']], task: TASK_ID[0], project: [['projectData', 'id']], attachments: 'added' }),
     updateDescription: spec({ params: ['companyId', 'projectData', 'sprintId', 'task', 'text', ...HISTORY_USER], company: companyId, ids: TASK, task: TASK[0] }),
     updateTaskCustomField: spec({ params: ['companyId', 'taskId', 'updateDetail', 'customFieldId'], company: companyId, fieldNames: [['customFieldId']], ids: TASK_ID, task: TASK_ID[0] }),
     updateMarkAsFavourite: spec({ params: ['companyId', 'taskId', 'updateDetail', 'type'], company: companyId, ids: [...TASK_ID, ['updateDetail']], task: TASK_ID[0] }),
@@ -420,6 +424,31 @@ const visibleTaskOf = async (req, company, taskId) => {
     return stored;
 };
 
+/* A new task has no id yet and its body's origin is the client's word, so only its placement counts. */
+const attachmentsWritten = (taskSpec, { payload, task }) => {
+    if (taskSpec.attachments === 'created') {
+        const data = payload.data || {};
+        return { task: { ProjectID: data.ProjectID, sprintId: data.sprintId }, actor: payload.user, records: Array.isArray(data.attachments) ? data.attachments : [] };
+    }
+    if (taskSpec.attachments === 'added' && payload.operation === 'add') {
+        return { task, actor: payload.userData, records: [payload.data] };
+    }
+    return null;
+};
+
+const checkAttachmentKeys = async (taskSpec, prepared) => {
+    const written = attachmentsWritten(taskSpec, prepared);
+    if (!written) return;
+    const actorId = written.actor && written.actor.id;
+    for (const record of written.records) {
+        const key = isPlainObject(record) ? record.url : undefined;
+        if (key !== undefined && key !== null && typeof key !== 'string') throw new TaskWriteRefusal(400, 'An attachment url must be text.', ATTACHMENT_KEY_REFUSED);
+        if (!(await mayAttachKey(prepared.companyId, written.task, key, actorId))) {
+            throw new TaskWriteRefusal(400, 'An attachment can only name a file stored for this task.', ATTACHMENT_KEY_REFUSED);
+        }
+    }
+};
+
 const prepareTaskRequest = async (req, taskSpec, label) => {
     const prepared = prepareTaskWrite(req, taskSpec, label);
     const { companyId: company, payload } = prepared;
@@ -442,10 +471,11 @@ const prepareTaskRequest = async (req, taskSpec, label) => {
         if (typeof projectId !== 'string' || !projectId) refuse(400, `${nameOf(taskSpec.destination)} is required.`);
         if (!(await storedProjectOf(company, projectId))) throw new TaskWriteRefusal(404, 'Project not found');
     }
+    await checkAttachmentKeys(taskSpec, prepared);
     return prepared;
 };
 
-const sendRefusal = (res, error) => res.status(error.statusCode).send({ status: false, statusText: error.message });
+const sendRefusal = (res, error) => res.status(error.statusCode).send({ status: false, statusText: error.message, ...(error.code ? { code: error.code } : {}) });
 
 const prepareOrRefuse = async (req, res, taskSpec, label) => {
     try {

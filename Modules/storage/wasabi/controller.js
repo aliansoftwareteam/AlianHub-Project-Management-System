@@ -348,19 +348,9 @@ exports.uploadMainFileForbase64Thumbnail = (companyId, path, base64String, repla
                 }
             }).catch((error)=>{
                 reject(formatS3UploadError(error, { bucket: bucketName, key: fileName, op: 'PutObject(base64)' }))
-                fs.unlink(file, (err) => {
-                    if (err) {
-                        logger.error(`Error deleting file: ${err}`);
-                    }
-                });
             })
         } catch (error) {
             reject(`File upload error: ${error}`)
-            fs.unlink(file, (err) => {
-                if (err) {
-                    logger.error(`Error deleting file: ${err}`);
-                }
-            });
         }
 
     });
@@ -510,7 +500,7 @@ exports.getPresignedUrl  = async (req,res) => {
             return;
         }
         if (req.body.isCache === true) {
-            const cacheKey = `image:${req.body.path}`;
+            const cacheKey = `image:${req.body.companyId}:${req.body.path}`;
             const value = myCache.get(cacheKey);
             
             if (value) {
@@ -1149,7 +1139,7 @@ exports.cleanUpTrackshotStorage = async () => {
     getCompanyDataFun([],true)
     .then((response) => {
         response.forEach((cmp) => {
-            cleanUpTrackShotCompanyWise(cmp._id);
+            exports.cleanUpTrackShotCompanyWise(cmp._id);
         })}).catch((error)=>{
             logger.error(`Error getting company:${error}`)
         })

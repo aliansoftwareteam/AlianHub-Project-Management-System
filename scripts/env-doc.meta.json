@@ -937,6 +937,11 @@
     "group": "integrations",
     "description": "Firebase storage bucket."
   },
+  "STORAGE_DOWNLOAD_SCOPE": {
+    "group": "storage",
+    "description": "Which stored files a signed download link is issued for. enforce (the default): only a file attached to a record the caller may open (a task, project, comment, form, clip, reminder, timesheet screenshot, or a company settings image); any other key answers 404 with code STORED_FILE_NOT_AVAILABLE. report: every link is issued as before, and each one enforce would refuse is logged with its layout type and a running count, never the key. Anything else reads as enforce.",
+    "default": "enforce"
+  },
   "STORAGE_TYPE": {
     "group": "storage",
     "description": "wasabi | server. With server, uploads are served from the app's own origin, and whatever CSP_MODE is: every upload response carries X-Content-Type-Options: nosniff and a sandboxing Content-Security-Policy; images (including SVG), PDF, plain text, audio and video still preview inline; every other file (scripts, HTML, XML, unknown types) downloads as application/octet-stream.",
