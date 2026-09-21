@@ -1,7 +1,7 @@
 {
   "locale": "spa",
   "machineTranslated": false,
-  "updatedAt": "2026-09-21T11:50:07.413Z",
+  "updatedAt": "2026-09-21T12:26:03.285Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6357,6 +6357,23 @@
     "Accounts.lifetime_unchecked": "exceeds the maximum lifetime · cannot be checked right now",
     "Attachments.cloud_picker_loading": "Opening Google Drive…",
     "Attachments.cloud_picker_failed": "Google Drive could not be opened. Please try again.",
-    "Attachments.cloud_popup_blocked": "Your browser blocked the Google Drive window. Allow pop-ups for this site and try again."
+    "Attachments.cloud_popup_blocked": "Your browser blocked the Google Drive window. Allow pop-ups for this site and try again.",
+    "Instance.redact_open": "Redact a person",
+    "Instance.redact_title": "Redact a person in the audit rows of {name}",
+    "Instance.redact_lead": "Rewrites one person's name, IP address, email and browser details in this workspace's audit rows with a pseudonym. Their user account is not changed, and user ids and free text that the audit chain protects stay as they are.",
+    "Instance.redact_user": "Person's user id",
+    "Instance.redact_continue": "Continue",
+    "Instance.redact_confirm": "This permanently rewrites the name, IP address, email and browser details of user {id} in every audit row of {name}. It cannot be undone.",
+    "Instance.redact_type_user_id": "Type the person's user id to confirm",
+    "Instance.redact_now": "Redact permanently",
+    "Instance.redact_cancel": "Cancel",
+    "Instance.redact_done": "Redacted {rows} audit rows ({fields} fields) as {pseudonym}.",
+    "Instance.redact_nothing": "Nothing left to redact for that person in this workspace.",
+    "Instance.redact_code_invalid_user_id": "That is not a user id.",
+    "Instance.redact_code_invalid_company_id": "That is not a workspace id.",
+    "Instance.redact_code_unknown_workspace": "That workspace no longer exists.",
+    "Instance.redact_code_confirmation_mismatch": "The id you typed does not match the person's user id.",
+    "Instance.redact_code_redaction_running": "Another run is already redacting this person in this workspace. Try again once it ends.",
+    "Instance.redact_code_server_error": "The audit rows could not be redacted. Running it again resumes where it stopped."
   }
 }

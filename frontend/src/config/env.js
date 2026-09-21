@@ -382,6 +382,7 @@ module.exports.APP_VERSION = '/version';
 module.exports.REPO_URL = 'https://github.com/aliansoftwareteam/AlianHub-Project-Management-System';
 module.exports.INSTANCE_COMPANIES = '/api/v2/instance/companies';
 module.exports.INSTANCE_AUDIT_EXPORT = '/api/v2/instance/audit-export';
+module.exports.INSTANCE_AUDIT = '/api/v2/instance/audit';
 module.exports.INSTANCE_ENFORCEMENT = '/api/v2/instance/enforcement';
 module.exports.INSTANCE_CSP = '/api/v2/instance/csp';
 module.exports.INSTANCE_EGRESS = '/api/v2/instance/egress';
