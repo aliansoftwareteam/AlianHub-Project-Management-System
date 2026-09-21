@@ -14,6 +14,7 @@ One pull request per step; tick with the merge commit.
 | Date | Entry |
 |---|---|
 | 2026-09-10 | Filed from `docs/AI-PLATFORM-ARCHITECTURE.md` (sprint 10) |
+| 2026-09-21 | Started after Sprints 5 and 8. Planned against `beta` into nine pull requests (see task.md Decisions); the owner settled every open question. S2 (authorization server core, #795) is in its review fix round; S1 (resource metadata and scope challenges) and S5 (tool contract v2) started. |
 
 ## Last step
-Not started.
+S2 in review fixes (#795); S1 and S5 in progress; then S3, S4, S6, S7, S8, S9.
