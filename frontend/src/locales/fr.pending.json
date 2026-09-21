@@ -1,7 +1,7 @@
 {
   "locale": "fr",
   "machineTranslated": false,
-  "updatedAt": "2026-09-21T09:38:22.616Z",
+  "updatedAt": "2026-09-21T08:54:47.395Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6359,15 +6359,6 @@
     "Knowledge.vector_index_unknown": "index state unknown",
     "Knowledge.vector_store_paused": "vector search paused until {until}",
     "Knowledge.vector_index_mismatch": "index size does not match the embedding model: check KNOWLEDGE_EMBEDDING_DIMENSIONS",
-    "Knowledge.vector_index_timeout": "the index check timed out; it is tried again on the next check",
-    "Ai.skill_error_host_not_allowed": "{host} is not on this workspace's egress allowlist. An instance owner adds it under Instance > Egress.",
-    "Ai.skill_error_host_refused": "{host} cannot be read: declare one exact public host name, without a scheme, path or wildcard.",
-    "Ai.skill_error_invalid_path": "The read path must start with a single \"/\" and hold no spaces, backslashes, \"#\" or sections.",
-    "Ai.skill_error_credential_invalid": "Name the handle of a workspace secret here, never the secret itself.",
-    "Ai.skill_error_credential_not_found": "No live secret with this handle in this workspace.",
-    "Ai.skill_error_credential_wrong_kind": "This secret is not a skill read credential. Choose a secret of kind skill_read.",
-    "Ai.skill_error_allowlist_unreadable": "The egress allowlist could not be read, so the reads were not checked. Try again.",
-    "Ai.skill_error_secret_in_body": "This looks like {kind}. Keep it in a workspace secret and name its handle as the read's credential.",
-    "Ai.skill_error_external_reads_not_available": "This skill reads an outside host, which this server does not run yet. Nothing was fetched."
+    "Knowledge.vector_index_timeout": "the index check timed out; it is tried again on the next check"
   }
 }

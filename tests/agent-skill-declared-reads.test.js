@@ -558,6 +558,7 @@ describe('a raw secret anywhere in the skill body is refused', () => {
         'SG. Pepper and ya29 are prefixes, not keys.',
         'Basic authentication is required on the staging server.',
         'Basic plan users get 5 projects.',
+        'Basic responsibilities of the reviewer are listed below.',
         'Put X-Amz-Signature= in the query only when presigning.',
         'Set token= to your value in the settings page.',
         'The token=abc pair is too short to be one.',

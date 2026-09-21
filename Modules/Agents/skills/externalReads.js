@@ -2,8 +2,7 @@
 // one host it reads and a path template. This slice checks the declaration at
 // save; nothing is fetched until the run-time slice lands.
 
-const { parseEntry, hostMatches } = require('../engine/egressRules');
-const { isBlockedHostname } = require('../engine/safeFetch');
+const { parseEntry, hostMatches, underWildcardDns } = require('../engine/egressRules');
 const secrets = require('../../../Config/secrets');
 
 const FLAG = 'SKILL_EXTERNAL_READS';
@@ -20,6 +19,9 @@ const CODE = Object.freeze({
     CREDENTIAL_INVALID: 'credential_invalid',
     CREDENTIAL_NOT_FOUND: 'credential_not_found',
     CREDENTIAL_WRONG_KIND: 'credential_wrong_kind',
+    CREDENTIAL_REVOKED: 'credential_revoked',
+    CREDENTIAL_STORE_OFF: 'credential_store_off',
+    CREDENTIAL_STORE_UNAVAILABLE: 'credential_store_unavailable',
     ALLOWLIST_UNREADABLE: 'allowlist_unreadable',
     SECRET_IN_BODY: 'secret_in_body',
     NOT_AVAILABLE: 'external_reads_not_available',
@@ -33,7 +35,15 @@ const HOST_REASON = Object.freeze({
     path: 'must be a bare host, without a path',
     wildcard: 'must be one exact host, not a wildcard',
     port: 'has a port outside 1 to 65535',
+    wildcard_dns: 'is under a wildcard-DNS service that answers any address written into the name',
 });
+
+/* Names reserved for private networks, testing or documentation (RFC 6761,
+ * RFC 8375 and common intranet suffixes). Held here, not in the shared egress
+ * rules, so agent page fetches keep today's behaviour. */
+const RESERVED_SUFFIXES = Object.freeze(['home.arpa', 'lan', 'corp', 'intranet', 'localdomain', 'test', 'example', 'invalid']);
+
+const underReservedSuffix = (host) => RESERVED_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
 
 const enabled = () => ['on', 'true', '1', 'yes'].includes(String(process.env.SKILL_EXTERNAL_READS || 'off').trim().toLowerCase());
 
@@ -44,9 +54,31 @@ const isExternal = (reader) => READERS.includes(reader);
 const parseDeclaredHost = (raw) => {
     if (typeof raw !== 'string' || !raw.trim()) return { reason: 'invalid' };
     if (raw.includes('*')) return { reason: 'wildcard' };
-    const { entry, reason } = parseEntry(raw, { isBlockedHostname });
-    return reason ? { reason } : { entry };
+    const { entry, reason } = parseEntry(raw);
+    if (reason) return { reason };
+    if (underWildcardDns(entry.host)) return { reason: 'wildcard_dns' };
+    if (underReservedSuffix(entry.host)) return { reason: 'private' };
+    return { entry };
 };
+
+const DOT_SEGMENT = /^\.{0,2}$/;
+
+/* Decoded until stable, so ".", "%2e" and "%252e" all read as the dot they
+ * would become somewhere along the way. */
+const decodedFully = (text) => {
+    let current = String(text);
+    for (let i = 0; i < 5; i += 1) {
+        let next;
+        try { next = decodeURIComponent(current); } catch (e) { return current; }
+        if (next === current) return current;
+        current = next;
+    }
+    return current;
+};
+
+const isDotSegment = (text) => DOT_SEGMENT.test(decodedFully(text));
+
+const pathPartOf = (path) => path.split('?')[0];
 
 const hostProblem = (reason) => HOST_REASON[reason] || HOST_REASON.invalid;
 
@@ -61,11 +93,24 @@ const pathProblem = (path) => {
     if (literal.includes('\\')) return 'must not contain a backslash';
     if ([...literal].some((ch) => /\s/.test(ch) || ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f)) return 'must not contain whitespace or control characters';
     if (literal.includes('#')) return 'must not contain "#"';
+    const segments = pathPartOf(path).replace(TAG, 'x').split('/').slice(1);
+    if (segments.some((segment, i) => segment !== '' && isDotSegment(segment)) || segments.slice(0, -1).some((segment) => segment === '')) return 'must not contain empty, "." or ".." dot segments';
     return '';
 };
 
 /* Every placeholder value is percent-encoded whole, so no value can add a "/",
  * "@", "\\", "?" or "#" and move the read off its declared origin. */
+const segmentsOf = (pathname) => pathname.split('/').map(decodedFully);
+
+/* The parser resolves dot segments and re-encodes some characters, so the built
+ * path is compared segment by segment with the one that was meant. */
+const assertBuilt = (url, { origin, pathname }) => {
+    if (url.origin !== origin || url.username || url.password) throw new Error('the read left its declared origin');
+    const got = segmentsOf(url.pathname);
+    const meant = segmentsOf(pathname);
+    if (got.length !== meant.length || got.some((segment, i) => segment !== meant[i])) throw new Error('the read path changed when parsed');
+};
+
 const buildUrl = ({ host, path }, { task = {}, input = {} } = {}) => {
     const { entry, reason } = parseDeclaredHost(host);
     if (!entry) throw new Error(`the declared host ${hostProblem(reason)}`);
@@ -73,10 +118,20 @@ const buildUrl = ({ host, path }, { task = {}, input = {} } = {}) => {
     if (problem) throw new Error(`the declared path ${problem}`);
     const { renderString } = require('./skillTemplate');
     const ctx = require('./compile').contextOf(task, { input });
-    const filled = path.replace(TAG, (tag) => encodeURIComponent(renderString(tag, ctx)));
+    const queryAt = path.indexOf('?');
+    let filled = '';
+    let last = 0;
+    path.replace(TAG, (tag, at) => {
+        const value = renderString(tag, ctx);
+        if ((queryAt === -1 || at < queryAt) && isDotSegment(value)) throw new Error('a value would fill a path segment with nothing, "." or ".."');
+        filled += path.slice(last, at) + encodeURIComponent(value);
+        last = at + tag.length;
+        return tag;
+    });
+    filled += path.slice(last);
     const origin = new URL(`https://${entry.host}${entry.port ? `:${entry.port}` : ''}`).origin;
     const url = new URL(`${origin}${filled}`);
-    if (url.origin !== origin || url.username || url.password) throw new Error('the read left its declared host');
+    assertBuilt(url, { origin, pathname: pathPartOf(filled) });
     return url.href;
 };
 
@@ -86,14 +141,20 @@ const hostError = (at, host, reason) => error(`${at}.params.host`, CODE.HOST_NOT
     reason ? `"${host}" ${hostProblem(reason)}` : `"${host}" is not on this workspace's egress allowlist; an instance owner adds it under Instance > Egress`,
     { host, ...(reason ? { reason } : {}) });
 
+const CREDENTIAL_REFUSAL = Object.freeze({
+    not_found: [CODE.CREDENTIAL_NOT_FOUND, 'no secret with this handle in this workspace'],
+    revoked: [CODE.CREDENTIAL_REVOKED, 'this secret is revoked; choose a live one'],
+    store_off: [CODE.CREDENTIAL_STORE_OFF, 'the secrets store is off, so no credential can be named'],
+});
+
 const checkCredential = async (companyId, handle, at) => {
     let meta;
     try {
         meta = await secrets.describe({ companyId, handle });
     } catch (e) {
-        return error(`${at}.params.credential`, CODE.CREDENTIAL_NOT_FOUND, e && e.code === 'store_off'
-            ? 'the secrets store is off, so no credential can be named'
-            : 'no live secret with this handle in this workspace');
+        const known = CREDENTIAL_REFUSAL[e && e.code];
+        if (known) return error(`${at}.params.credential`, known[0], known[1]);
+        return error(`${at}.params.credential`, CODE.CREDENTIAL_STORE_UNAVAILABLE, 'the secrets store could not be read, so the credential was not checked; try again', { retryable: true });
     }
     if (meta.kind !== CREDENTIAL_KIND) {
         return error(`${at}.params.credential`, CODE.CREDENTIAL_WRONG_KIND, `the secret is of kind "${meta.kind}"; a skill reads only with a "${CREDENTIAL_KIND}" secret`);
@@ -133,5 +194,5 @@ const notAvailable = (skillKey) => Object.assign(
 
 module.exports = {
     FLAG, READERS, CREDENTIAL_KIND, HANDLE, MAX_PATH, CODE,
-    enabled, isExternal, parseDeclaredHost, hostProblem, pathProblem, buildUrl, hostError, checkDeclaredReads, notAvailable,
+    enabled, isExternal, parseDeclaredHost, hostProblem, pathProblem, assertBuilt, buildUrl, hostError, checkDeclaredReads, notAvailable,
 };
