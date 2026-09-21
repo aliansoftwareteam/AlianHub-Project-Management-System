@@ -378,6 +378,15 @@ describe('erasure', () => {
         expect(db().store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS]).toEqual([expect.objectContaining({ kind: 'document', sourceType: 'page', sourceId: 'p1' })]);
     });
 
+    it('by document counts the agent notes formed from it under their own source type', async () => {
+        chunk({ sourceId: 'p1' });
+        chunk({ sourceType: 'memory', sourceId: 'n1', derivedFrom: ['page:p1'] });
+        chunk({ sourceType: 'memory', sourceId: 'n2', derivedFrom: ['page:p2'] });
+        const result = await controls.eraseDocument(C, { sourceType: 'page', sourceId: 'p1' });
+        expect(result).toMatchObject({ removed: { page: 1, memory: 1 }, total: 2 });
+        expect(chunks().map((c) => c.sourceId)).toEqual(['n2']);
+    });
+
     it('by task removes the chunks of every comment and file under it', async () => {
         chunk({ sourceType: 'comment', sourceId: 'c1', taskId: TASK });
         chunk({ sourceType: 'file', sourceId: `${TASK}:a1`, taskId: TASK });
