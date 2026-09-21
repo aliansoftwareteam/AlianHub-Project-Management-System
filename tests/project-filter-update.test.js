@@ -35,7 +35,7 @@ beforeEach(() => {
 describe('updating a saved project filter (PRJ-08)', () => {
     test('the owner\'s update reports success and changes only the editable fields', async () => {
         const filter = seedFilter();
-        const res = await run({ id: filter._id, name: 'After', filters: [{ key: 'status' }], userId: OTHER, companyId: UNKNOWN_FILTER });
+        const res = await run({ id: filter._id, name: 'After', filters: [{ key: 'status' }], userId: OWNER, companyId: UNKNOWN_FILTER });
         expect(res.statusCode).toBe(200);
         expect(res.body.status).toBe(true);
         expect(stored()[0]).toEqual(expect.objectContaining({ name: 'After', filters: [{ key: 'status' }], userId: OWNER, companyId: COMPANY }));
@@ -43,6 +43,15 @@ describe('updating a saved project filter (PRJ-08)', () => {
         expect(companyId).toBe(COMPANY);
         expect(method).toBe('findOneAndUpdate');
         expect(query.data).toEqual([expect.objectContaining({ userId: OWNER }), { $set: { name: 'After', filters: [{ key: 'status' }] } }, { new: true }]);
+    });
+
+    test('an update naming another user is a 403 before the database is touched', async () => {
+        const filter = seedFilter();
+        const res = await run({ id: filter._id, name: 'After', userId: OTHER });
+        expect(res.statusCode).toBe(403);
+        expect(res.body.status).toBe(false);
+        expect(mockCrud).not.toHaveBeenCalled();
+        expect(stored()[0].name).toBe('Before');
     });
 
     test('someone else\'s filter is a 404 and stays unchanged', async () => {

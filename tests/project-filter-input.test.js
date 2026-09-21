@@ -55,8 +55,15 @@ describe('creating a saved project filter with bad input (PRJ-06)', () => {
         expect(JSON.stringify(res.body)).not.toMatch(/userId|validation failed|Path/);
     });
 
-    test('a valid filter is saved for the caller, whatever user or company the body names', async () => {
-        const res = await run(filters.saveFilter, { body: { name: ' Mine ', filter: 'projectFilter', typeFilter: 'projects', userId: OTHER, companyId: FOREIGN_COMPANY } });
+    test('a filter for another user is a 403 before the database is touched', async () => {
+        const res = await run(filters.saveFilter, { body: { name: 'Mine', filter: 'projectFilter', typeFilter: 'projects', userId: OTHER } });
+        expect(res.statusCode).toBe(403);
+        expect(res.body.status).toBe(false);
+        expect(mockCrud).not.toHaveBeenCalled();
+    });
+
+    test('a valid filter is saved for the caller, whatever company the body names', async () => {
+        const res = await run(filters.saveFilter, { body: { name: ' Mine ', filter: 'projectFilter', typeFilter: 'projects', companyId: FOREIGN_COMPANY } });
         expect(res.statusCode).toBe(200);
         expect(res.body.status).toBe(true);
         expect(stored()[0]).toEqual(expect.objectContaining({ name: 'Mine', userId: OWNER, companyId: COMPANY, filters: [] }));
