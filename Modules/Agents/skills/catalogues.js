@@ -5,6 +5,7 @@
 const registry = require('../registry');
 const { isBlockedHostname } = require('../engine/safeFetch');
 const workKinds = require('../workKinds');
+const externalReads = require('./externalReads');
 
 const { MIN_BRIEF_CHARS } = workKinds;
 
@@ -73,6 +74,19 @@ const INPUT_CATALOGUE = Object.freeze({
     }),
 });
 
+const EXTERNAL_READ_CAPS = Object.freeze({ maxBytes: 512 * 1024, timeoutMs: 10000, maxRedirects: 3 });
+
+const externalReadParams = (formats) => Object.freeze({
+    host: Object.freeze({ type: 'host', required: true }),
+    path: Object.freeze({ type: 'path', required: true, maxLength: externalReads.MAX_PATH }),
+    method: Object.freeze({ type: 'enum', values: Object.freeze(['GET']), default: 'GET' }),
+    maxBytes: Object.freeze({ type: 'number', min: 1024, max: EXTERNAL_READ_CAPS.maxBytes, default: 256 * 1024 }),
+    timeoutMs: Object.freeze({ type: 'number', min: 500, max: EXTERNAL_READ_CAPS.timeoutMs, default: 8000 }),
+    maxRedirects: Object.freeze({ type: 'number', min: 0, max: EXTERNAL_READ_CAPS.maxRedirects, default: 1 }),
+    credential: Object.freeze({ type: 'secret_handle', kind: externalReads.CREDENTIAL_KIND }),
+    format: Object.freeze({ type: 'enum', values: Object.freeze([...formats]), default: formats[0] }),
+});
+
 /* Context a skill may read before the model is asked. Each reader is a call into
  * the companyId-first tool layer (skills/readers.js); `params` is the whole
  * surface a skill can tune. The result is what the template reads as
@@ -120,7 +134,24 @@ const READER_CATALOGUE = Object.freeze({
         params: Object.freeze({ maxChars: Object.freeze({ type: 'number', min: 200, max: 20000, default: 8000 }) }),
         fields: Object.freeze(['title', 'text']),
     }),
+    url: Object.freeze({
+        label: 'A page on a declared host',
+        description: 'One GET to a host on the workspace egress allowlist, as text or a diff.',
+        external: true,
+        params: externalReadParams(['text', 'diff']),
+        fields: Object.freeze(['status', 'text', 'bytes']),
+    }),
+    api: Object.freeze({
+        label: 'An API on a declared host',
+        description: 'One GET to a host on the workspace egress allowlist, as JSON, text or a diff.',
+        external: true,
+        params: externalReadParams(['json', 'text', 'diff']),
+        fields: Object.freeze(['status', 'json', 'text', 'bytes']),
+    }),
 });
+
+const isOffered = (reader) => Boolean(READER_CATALOGUE[reader]) && (!READER_CATALOGUE[reader].external || externalReads.enabled());
+const offeredReaders = () => Object.keys(READER_CATALOGUE).filter(isOffered);
 
 /* Reusable prompt fragments, lifted from the code skills' system prompts. A data
  * skill names the ones it wants; they are joined in this order ahead of its own
@@ -207,7 +238,7 @@ const MAX_EMIT_EACH = 25;
 const catalogues = () => ({
     version: SKILL_VERSION,
     inputs: Object.entries(INPUT_CATALOGUE).map(([key, v]) => ({ key, label: v.label, description: v.description, needs: v.needs, scope: v.scope })),
-    readers: Object.entries(READER_CATALOGUE).map(([key, v]) => ({ key, label: v.label, description: v.description, params: v.params, fields: [...v.fields] })),
+    readers: offeredReaders().map((key) => { const v = READER_CATALOGUE[key]; return { key, label: v.label, description: v.description, ...(v.external ? { external: true } : {}), params: v.params, fields: [...v.fields] }; }),
     partials: Object.entries(PROMPT_PARTIALS).map(([key, text]) => ({ key, text })),
     actions: EMIT_ACTIONS.map((key) => { const a = registry.get(key); return { key, label: a.label, risk: a.risk, undoable: a.undoable, required: [...(EMIT_REQUIRED[key] || [])] }; }),
     taskFields: [...TASK_FIELDS],
@@ -216,4 +247,4 @@ const catalogues = () => ({
     risks: [...RISKS],
 });
 
-module.exports = { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, FILTERS, MAX_EMIT_EACH, MIN_BRIEF_CHARS, catalogues, hasInput, plain, text };
+module.exports = { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, EXTERNAL_READ_CAPS, isOffered, offeredReaders, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, FILTERS, MAX_EMIT_EACH, MIN_BRIEF_CHARS, catalogues, hasInput, plain, text };

@@ -11,6 +11,7 @@ const { validateSkill, riskOf } = require('./skills/validateSkill');
 const { effectiveActions } = require('./skills/effectiveActions');
 const { requirementDetail } = require('./skills/inputRules');
 const { catalogues } = require('./skills/catalogues');
+const { checkDeclaredReads } = require('./skills/externalReads');
 
 const isLive = (doc) => Boolean(doc) && doc.enabled !== false && !doc.retiredAt;
 
@@ -79,6 +80,8 @@ const invalid = (errors, message = 'The skill has errors.') => Object.assign(new
 const createSkill = async (companyId, input, { createdBy } = {}) => {
     const checked = validateSkill(input);
     if (!checked.ok) throw invalid(checked.errors);
+    const readErrors = await checkDeclaredReads(companyId, checked.value);
+    if (readErrors.length) throw invalid(readErrors);
     const existing = await findData(companyId, checked.value.key);
     if (existing) throw invalid([{ field: 'key', code: 'duplicate', message: `a skill with key "${checked.value.key}" already exists` }]);
     return plainOf(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_SKILLS, data: { ...checked.value, createdBy: createdBy || null } }, 'save'));
@@ -92,7 +95,11 @@ const updateSkill = async (companyId, key, patch = {}) => {
     const merged = Object.fromEntries(EDITABLE.map((f) => [f, patch[f] !== undefined ? patch[f] : existing[f]]));
     const checked = validateSkill({ ...merged, key: existing.key });
     if (!checked.ok) throw invalid(checked.errors);
-    return plainOf(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_SKILLS, data: [{ _id: existing._id }, { $set: checked.value }, { returnDocument: 'after' }] }, 'findOneAndUpdate'));
+    const readErrors = await checkDeclaredReads(companyId, checked.value);
+    if (readErrors.length) throw invalid(readErrors);
+    const set = { ...checked.value };
+    if (!set.declaredHosts && Array.isArray(existing.declaredHosts) && existing.declaredHosts.length) set.declaredHosts = [];
+    return plainOf(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_SKILLS, data: [{ _id: existing._id }, { $set: set }, { returnDocument: 'after' }] }, 'findOneAndUpdate'));
 };
 
 const skillKeyOf = (entry) => (typeof entry === 'string' ? entry : String((entry && (entry.key || entry.slug || entry.name)) || ''));

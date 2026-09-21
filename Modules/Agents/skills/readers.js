@@ -9,6 +9,7 @@ const { DONE_STATUS_TYPES } = require('../registry');
 const memoryStore = require('../memory');
 const taint = require('../taint');
 const { READER_CATALOGUE, plain } = require('./catalogues');
+const externalReads = require('./externalReads');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BLOCKED = /hold|block|wait/i;
@@ -48,6 +49,8 @@ const paramsFor = (reader, given = {}) => {
             out[name] = Number.isFinite(n) ? Math.min(rule.max, Math.max(rule.min, Math.round(n))) : rule.default;
         } else if (rule.type === 'boolean') {
             out[name] = typeof raw === 'boolean' ? raw : rule.default;
+        } else if (raw !== undefined || rule.default !== undefined) {
+            out[name] = raw !== undefined ? raw : rule.default;
         }
     });
     return out;
@@ -134,6 +137,10 @@ const READERS = Object.freeze({
         // A page a member or an agent wrote is the workspace's own; only an inbound origin marks the run.
         return { title: page.title || '', text: plain(page.rawText || '').slice(0, params.maxChars), taint: taint.fromTask(page) };
     },
+
+    async url() { throw externalReads.notAvailable('url'); },
+
+    async api() { throw externalReads.notAvailable('api'); },
 });
 
 const read = (reader, companyId, scope, params) => {

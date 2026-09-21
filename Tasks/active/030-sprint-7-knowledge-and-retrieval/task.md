@@ -57,3 +57,6 @@ None directly.
 - Migrations 024–027 are used, so slice 4 takes 032 if it needs indexes: 031 is held by Sprint 8's secrets store (#759) and 033 by its content security policy slice (2026-09-19).
 - Retrieval for agent runs fails closed where the owner has not decided: an agent with no projects retrieves no project-scoped content, agent runs reach no content outside any project, and agent notes stay out of Ask. Each is one named function (`Modules/Knowledge/agentScope.js`), so the owner's decision is a one-line change (2026-09-21).
 - Erasure from the knowledge console works while the indexer is off, since it only removes; an erasure that matches nothing records no exclusion, and exclusions can be listed and removed (2026-09-21).
+- Settled (owner, 2026-09-21), replacing the fail-closed defaults: an agent with no projects retrieves no project-scoped content; agent runs do not reach content outside any project (company-level pages, calls with no project); agent notes stay out of Ask.
+- The redaction of personal fields in audit rows on erasure (owner, 2026-09-16) was not built; it ships as its own slice (owner, 2026-09-21).
+- Slice 7 merged: #791 `67e52c0e` (build 261), the Atlas Vector Search adapter behind `KNOWLEDGE_VECTOR_STORE` (2026-09-21).

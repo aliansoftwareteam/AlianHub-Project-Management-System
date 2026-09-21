@@ -5,7 +5,9 @@
 const registry = require('../registry');
 const modelPin = require('../../AICore/modelPin');
 const { tagsIn, structureErrors } = require('./skillTemplate');
-const { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, MAX_EMIT_EACH } = require('./catalogues');
+const { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, MAX_EMIT_EACH, isOffered, offeredReaders } = require('./catalogues');
+const externalReads = require('./externalReads');
+const { findSecrets } = require('./secretScan');
 
 const KEY = /^[a-z0-9][a-z0-9._-]{1,79}$/;
 const MAX_NAME = 80;
@@ -19,7 +21,7 @@ const MAX_GROUNDED_FIELDS = 10;
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const asString = (v) => (v === undefined || v === null ? '' : String(v)).trim();
 
-const error = (field, code, message) => ({ field, code, message });
+const error = (field, code, message, extra) => ({ field, code, message, ...(extra || {}) });
 
 const riskRank = (r) => RISKS.indexOf(r);
 const riskOf = (actions) => actions.reduce((worst, key) => { const a = registry.get(key); return a && riskRank(a.risk) > riskRank(worst) ? a.risk : worst; }, 'low');
@@ -72,7 +74,47 @@ const validateInputs = (input, errors) => {
     return keys;
 };
 
-const validateReaderParams = (reader, given, at, errors) => {
+/* A read path reaches outside the workspace, so it may carry only the task and
+ * the declared inputs: never memory, gathered data or the answer. */
+const checkReadPath = (value, field, inputs, errors) => {
+    const problem = externalReads.pathProblem(value);
+    if (problem) { errors.push(error(field, externalReads.CODE.INVALID_PATH, problem)); return null; }
+    structureErrors(value).forEach((e) => errors.push(error(field, e.code, e.message)));
+    tagsIn(value).filter((tag) => tag.path).forEach((tag) => {
+        if (tag.path.replace(/^task\./, '').split('.')[0] === TEMPLATE_ROOTS.memory) errors.push(error(field, 'unknown_placeholder', `"{{${tag.path}}}" cannot be sent to another host; a read path takes task fields and declared inputs`));
+        else checkPlaceholder(tag.path, field, { inputs, gather: new Set() }, [], errors);
+    });
+    return value;
+};
+
+const checkParam = (rule, value, field, inputs, errors) => {
+    if (rule.type === 'number') {
+        if (typeof value === 'number' && Number.isFinite(value) && value >= rule.min && value <= rule.max) return value;
+        errors.push(error(field, 'invalid_params', `must be a number between ${rule.min} and ${rule.max}`)); return null;
+    }
+    if (rule.type === 'boolean') {
+        if (typeof value === 'boolean') return value;
+        errors.push(error(field, 'invalid_params', 'must be true or false')); return null;
+    }
+    if (rule.type === 'enum') {
+        if (rule.values.includes(value)) return value;
+        errors.push(error(field, 'invalid_params', `must be one of ${rule.values.join(', ')}`)); return null;
+    }
+    if (rule.type === 'host') {
+        const { entry, reason } = externalReads.parseDeclaredHost(value);
+        if (entry) return entry.text;
+        const shown = typeof value === 'string' ? value : '';
+        errors.push(error(field, externalReads.CODE.HOST_NOT_ALLOWED, `"${shown}" ${externalReads.hostProblem(reason)}`, { host: shown, reason })); return null;
+    }
+    if (rule.type === 'path') return checkReadPath(value, field, inputs, errors);
+    if (rule.type === 'secret_handle') {
+        if (typeof value === 'string' && externalReads.HANDLE.test(value)) return value;
+        errors.push(error(field, externalReads.CODE.CREDENTIAL_INVALID, 'must be the handle of a workspace secret (sec_…), never the secret itself')); return null;
+    }
+    return null;
+};
+
+const validateReaderParams = (reader, given, at, inputs, errors) => {
     const spec = READER_CATALOGUE[reader].params;
     const params = isPlainObject(given) ? given : {};
     if (given !== undefined && !isPlainObject(given)) { errors.push(error(`${at}.params`, 'invalid', 'must be an object')); return {}; }
@@ -80,16 +122,14 @@ const validateReaderParams = (reader, given, at, errors) => {
     Object.entries(params).forEach(([name, value]) => {
         const rule = spec[name];
         if (!rule) { errors.push(error(`${at}.params.${name}`, 'invalid_params', `"${reader}" takes no "${name}" (have: ${Object.keys(spec).join(', ') || 'none'})`)); return; }
-        if (rule.type === 'number' && !(typeof value === 'number' && Number.isFinite(value) && value >= rule.min && value <= rule.max)) {
-            errors.push(error(`${at}.params.${name}`, 'invalid_params', `must be a number between ${rule.min} and ${rule.max}`)); return;
-        }
-        if (rule.type === 'boolean' && typeof value !== 'boolean') { errors.push(error(`${at}.params.${name}`, 'invalid_params', 'must be true or false')); return; }
-        out[name] = value;
+        const checked = checkParam(rule, value, `${at}.params.${name}`, inputs, errors);
+        if (checked !== null) out[name] = checked;
     });
+    Object.entries(spec).filter(([name, rule]) => rule.required && params[name] === undefined).forEach(([name]) => errors.push(error(`${at}.params.${name}`, 'required', 'required')));
     return out;
 };
 
-const validateGather = (input, errors) => {
+const validateGather = (input, inputs, errors) => {
     const steps = Array.isArray(input.gather) ? input.gather : [];
     if (input.gather !== undefined && !Array.isArray(input.gather)) errors.push(error('gather', 'invalid', 'must be a list of reader steps'));
     if (steps.length > MAX_STEPS) errors.push(error('gather', 'too_long', `at most ${MAX_STEPS} reader steps`));
@@ -99,10 +139,10 @@ const validateGather = (input, errors) => {
         if (!isPlainObject(step)) { errors.push(error(at, 'invalid', 'must be an object')); return; }
         const reader = asString(step.reader);
         if (!reader) { errors.push(error(`${at}.reader`, 'required', 'required')); return; }
-        if (!READER_CATALOGUE[reader]) { errors.push(error(`${at}.reader`, 'unknown_reader', `unknown reader "${reader}" (have: ${Object.keys(READER_CATALOGUE).join(', ')})`)); return; }
+        if (!isOffered(reader)) { errors.push(error(`${at}.reader`, 'unknown_reader', `unknown reader "${reader}" (have: ${offeredReaders().join(', ')})`)); return; }
         const as = asString(step.as) || reader;
         if (!/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/.test(as)) { errors.push(error(`${at}.as`, 'invalid', 'must be a short name: letters, digits and underscores')); return; }
-        out.push({ reader, as, params: validateReaderParams(reader, step.params, at, errors) });
+        out.push({ reader, as, params: validateReaderParams(reader, step.params, at, new Set(inputs), errors) });
     });
     const names = out.map((s) => s.as);
     if (new Set(names).size !== names.length) errors.push(error('gather', 'duplicate', 'each gathered value needs its own name'));
@@ -247,7 +287,7 @@ const validateSkill = (input = {}) => {
     if (doc.enabled !== undefined && typeof doc.enabled !== 'boolean') errors.push(error('enabled', 'invalid', 'must be true or false'));
 
     const inputs = validateInputs(doc, errors);
-    const gather = validateGather(doc, errors);
+    const gather = validateGather(doc, inputs, errors);
     const declared = { inputs: new Set(inputs), gather: new Set(gather.map((s) => s.as)) };
     const prompt = validatePrompt(doc, declared, errors);
     const emit = validateEmit(doc, declared, errors);
@@ -260,7 +300,13 @@ const validateSkill = (input = {}) => {
     const pin = modelPin.validatePin(doc.model);
     if (!pin.ok) errors.push(error('model', pin.code, pin.message));
 
+    if (externalReads.enabled()) {
+        findSecrets(doc).forEach(({ field, kind }) => errors.push(error(field, externalReads.CODE.SECRET_IN_BODY, `looks like ${kind}; keep it in a workspace secret and name the secret's handle as a read's credential`)));
+    }
+
     if (errors.length) return { ok: false, errors, value: null };
+
+    const declaredHosts = [...new Set(gather.filter((s) => externalReads.isExternal(s.reader)).map((s) => s.params.host))];
 
     const emits = [...new Set(emit.map((m) => m.action))];
     const computed = riskOf(emits);
@@ -275,6 +321,7 @@ const validateSkill = (input = {}) => {
             ...(summary ? { summary } : {}),
             ...(fallback ? { fallback } : {}),
             ...(grounded ? { grounded } : {}),
+            ...(declaredHosts.length ? { declaredHosts } : {}),
             model: pin.model,
             risk: doc.risk && riskRank(doc.risk) > riskRank(computed) ? doc.risk : computed,
         },
