@@ -40,14 +40,19 @@ const eraseVectors = async (companyId, sources) => {
     }
 };
 
+/* The document's own chunks and any agent note formed from it. */
+const documentWhere = (sourceType, sourceId) => ({ $or: [{ sourceType, sourceId }, { sourceType: 'memory', derivedFrom: `${sourceType}:${sourceId}` }] });
+
 const eraseDocument = async (companyId, { sourceType, sourceId } = {}, options = {}) => {
     const type = String(sourceType || '').trim();
     const id = String(sourceId || '').trim();
     if (!type) throw new Error('eraseDocument needs a sourceType.');
     if (!id) throw new Error('eraseDocument needs a sourceId.');
+    const where = documentWhere(type, id);
     const rule = await exclude(companyId, { kind: 'document', sourceType: type, sourceId: id, userId: '' }, options);
-    const result = await eraseChunks(companyId, { sourceType: type, sourceId: id });
-    await eraseVectors(companyId, [{ sourceType: type, sourceId: id }]);
+    const notes = await sourcesOf(companyId, where.$or[1]);
+    const result = await eraseChunks(companyId, where);
+    await eraseVectors(companyId, [{ sourceType: type, sourceId: id }, ...notes]);
     await recordErased(companyId, rule, result.erased);
     return result;
 };
@@ -56,10 +61,11 @@ const eraseDocument = async (companyId, { sourceType, sourceId } = {}, options =
  * including ones written after the erasure. */
 const excludeTask = (companyId, taskId, options) => exclude(companyId, { kind: 'task', sourceType: '', sourceId: String(taskId).toLowerCase(), userId: '' }, options);
 
-const personWhere = (userId) => ({ createdBy: String(userId), $or: [{ sourceType: 'page', visibility: 'private' }, { sourceType: 'comment' }] });
+const personWhere = (userId) => ({ $or: [{ createdBy: String(userId), sourceType: 'page', visibility: 'private' }, { createdBy: String(userId), sourceType: 'comment' }, { sourceType: 'memory', derivedAuthors: String(userId) }] });
 
-/* A person's private pages and the comments they wrote (owner, 2026-09-17). Their shared pages stay,
- * and so do the calls they were on, which hold other participants' words. */
+/* A person's private pages and the comments they wrote (owner, 2026-09-17), and an agent's notes
+ * formed from either. Their shared pages stay, and so do the calls they were on, which hold other
+ * participants' words. */
 const erasePerson = async (companyId, userId, options = {}) => {
     const id = String(userId || '').trim();
     if (!OBJECT_ID.test(id)) throw new Error('erasePerson needs a valid user id.');
@@ -72,4 +78,4 @@ const erasePerson = async (companyId, userId, options = {}) => {
     return result;
 };
 
-module.exports = { eraseDocument, erasePerson, excludeTask, recordErased, personWhere };
+module.exports = { eraseDocument, erasePerson, excludeTask, recordErased, documentWhere, personWhere };

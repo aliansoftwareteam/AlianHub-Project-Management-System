@@ -140,17 +140,18 @@ const eraseDocument = async (companyId, { sourceType, sourceId }, progress = { r
     const company = String(companyId);
     const options = eraseOptions(progress, by);
     const add = (type, n) => { if (n) progress.removed[type] = (progress.removed[type] || 0) + n; };
+    const eraseOne = async (type, id) => {
+        const counts = await countsBySource(company, erase.documentWhere(type, id));
+        await erase.eraseDocument(company, { sourceType: type, sourceId: id }, options);
+        Object.entries(counts).forEach(([counted, n]) => add(counted, n));
+    };
     if (sourceType !== TASK) {
-        const { erased } = await erase.eraseDocument(company, { sourceType, sourceId }, options);
-        add(sourceType, erased);
+        await eraseOne(sourceType, sourceId);
     } else {
         const rule = await erase.excludeTask(company, sourceId, options);
         const rows = await chunkStore(company, [taskChunks(sourceId), 'sourceType sourceId', { lean: true }], 'find');
         const sources = new Map((rows || []).map((row) => [`${row.sourceType}:${row.sourceId}`, row]));
-        for (const row of sources.values()) {
-            const { erased } = await erase.eraseDocument(company, { sourceType: row.sourceType, sourceId: String(row.sourceId) }, options);
-            add(row.sourceType, erased);
-        }
+        for (const row of sources.values()) await eraseOne(row.sourceType, String(row.sourceId));
         await erase.recordErased(company, rule, totalOf(progress.removed));
     }
     return { removed: progress.removed, total: totalOf(progress.removed) };
