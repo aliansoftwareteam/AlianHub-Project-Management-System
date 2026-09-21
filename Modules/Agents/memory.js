@@ -602,8 +602,8 @@ async function contextFor({ companyId, projectId, userId, maxChars = 2000 } = {}
  * from the stored run and the sources it names, never taken from the caller: the agent, the person
  * who started the run, the projects of the run and of every source, and the taint, which a repeat
  * sighting can add to but never clear. Content from outside the workspace (a web page, a tool
- * result, a performance read) has no project to hold it to, so it taints the note and keeps it to
- * the runs of the person whose run formed it. */
+ * result, a performance read) has no project to hold it to, so it taints the note. A tainted note,
+ * whatever tainted its run, goes only to runs of the person whose run formed it. */
 const AGENT_NOTE = 'agent.note';
 const AGENT_ROOT = 'agent';
 const AGENT_NOTE_LIMIT = 10000;
@@ -744,7 +744,7 @@ async function rememberForAgent({ companyId, runId, text, derivedFrom }) {
             projectIds: union(prev.projectIds, projects),
             derivedFrom: derived,
             tainted: prev.tainted === true || tainted,
-            starterOnly: prev.starterOnly === true || external.length > 0,
+            starterOnly: prev.starterOnly === true || tainted,
             taintSources: mergeTaint(taintList(prev.taintSources), taintSources),
             lastSeenAt: now,
             updatedAt: now,
@@ -757,7 +757,7 @@ async function rememberForAgent({ companyId, runId, text, derivedFrom }) {
             projectIds: projects,
             derivedFrom: derived,
             tainted,
-            starterOnly: external.length > 0,
+            starterOnly: tainted,
             taintSources,
             occurrences: 1,
             firstSeenAt: now,
