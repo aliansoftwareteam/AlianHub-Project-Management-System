@@ -136,6 +136,28 @@ describe('InstanceKnowledge', () => {
         expect(has(wrapper, `figures-${CID_A}`)).toBe(false);
     });
 
+    it('shows the vector store: the in-database one, or Atlas with its index state and a pause', async () => {
+        const local = await opened({ figuresData: figures({ vectorStore: { backend: 'local', index: null, breaker: null } }) });
+        expect(local.find('[data-test="vector-store"]').text()).toContain('Knowledge.vector_store_local');
+        expect(has(local, 'vector-index')).toBe(false);
+
+        const building = await opened({ figuresData: figures({ vectorStore: { backend: 'atlas', index: { name: 'knowledge_chunks_vector', status: 'building', dimensions: 1536 }, breaker: { open: false } } }) });
+        expect(building.find('[data-test="vector-store"]').text()).toContain('Knowledge.vector_store_atlas');
+        expect(building.find('[data-test="vector-index"]').text()).toContain('Knowledge.vector_index_building');
+        expect(building.find('[data-test="vector-index"]').classes()).toContain('ah-chip--warn');
+        expect(has(building, 'vector-breaker')).toBe(false);
+
+        const paused = await opened({ figuresData: figures({ vectorStore: { backend: 'atlas', index: { status: 'odd' }, breaker: { open: true, until: WHEN } } }) });
+        expect(paused.find('[data-test="vector-index"]').text()).toContain('Knowledge.vector_index_unknown');
+        expect(paused.find('[data-test="vector-breaker"]').text()).toContain('Knowledge.vector_store_paused');
+
+        const ready = await opened({ figuresData: figures({ vectorStore: { backend: 'atlas', index: { status: 'ready' }, breaker: { open: false } } }) });
+        expect(ready.find('[data-test="vector-index"]').classes()).not.toContain('ah-chip--warn');
+
+        const older = await opened();
+        expect(has(older, 'vector-store')).toBe(false);
+    });
+
     it('shows the figures of an opened workspace: counts, size, progress, freshness, models and file reasons', async () => {
         const wrapper = await opened();
         const figuresCard = wrapper.find(`[data-test="figures-${CID_A}"]`);

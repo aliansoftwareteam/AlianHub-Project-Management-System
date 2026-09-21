@@ -121,6 +121,17 @@
                                     <span v-if="detail.embeddings.breaker.open" class="ah-chip ah-chip--warn">{{ $t(`Knowledge.breaker_open_${detail.embeddings.breaker.reason}`, { until: formatWhen(detail.embeddings.breaker.until) }) }}</span>
                                     <span v-else class="ah-chip">{{ $t('Knowledge.breaker_closed') }}</span>
                                 </dd>
+                                <template v-if="detail.vectorStore">
+                                    <dt>{{ $t('Knowledge.vector_store') }}</dt>
+                                    <dd data-test="vector-store">
+                                        <template v-if="detail.vectorStore.backend === 'atlas'">
+                                            {{ $t('Knowledge.vector_store_atlas') }}
+                                            <span class="ah-chip" :class="{ 'ah-chip--warn': vectorIndexStatus !== 'ready' }" data-test="vector-index">{{ $t(`Knowledge.vector_index_${vectorIndexStatus}`) }}</span>
+                                            <span v-if="detail.vectorStore.breaker && detail.vectorStore.breaker.open" class="ah-chip ah-chip--warn" data-test="vector-breaker">{{ $t('Knowledge.vector_store_paused', { until: formatWhen(detail.vectorStore.breaker.until) }) }}</span>
+                                        </template>
+                                        <template v-else>{{ $t('Knowledge.vector_store_local') }}</template>
+                                    </dd>
+                                </template>
                             </dl>
                             <div v-if="canRun && detail.modes.retrieval === 'hybrid'" class="in-actions">
                                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="reembed" :disabled="busy" @click="reembed">{{ $t('Knowledge.reembed') }}</button>
@@ -266,6 +277,11 @@ const eraseTyped = ref("");
 const indexerOff = computed(() => summary.value?.indexer?.mode === "off");
 const canRun = computed(() => !indexerOff.value && detail.value?.indexer?.mode !== "off" && detail.value?.modes?.indexer !== "off");
 const openName = computed(() => summary.value?.workspaces.find((w) => w.companyId === openId.value)?.name || "");
+const VECTOR_INDEX_STATES = ["ready", "building", "missing", "failed", "unsupported", "unreachable"];
+const vectorIndexStatus = computed(() => {
+    const status = detail.value?.vectorStore?.index?.status;
+    return VECTOR_INDEX_STATES.includes(status) ? status : "unknown";
+});
 const retryable = computed(() => (detail.value?.files.reasons || []).some((r) => r.retryable && r.count > 0));
 const pages = computed(() => {
     const s = summary.value;
