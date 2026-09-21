@@ -53,7 +53,7 @@ const REDIRECT = 'http://127.0.0.1:33418/callback';
 const CIMD_ID = 'https://agent.s10s2.test/oauth/client.json';
 const MINUTE = 60 * 1000;
 const DAY = 24 * 60 * MINUTE;
-const ENV_KEYS = ['MCP_OAUTH', 'MCP_OAUTH_DCR', 'MCP_OAUTH_ISSUER', 'MCP_OAUTH_ACCESS_TOKEN_MINUTES', 'MCP_OAUTH_REFRESH_TOKEN_DAYS', 'MCP_OAUTH_GRANT_MAX_DAYS', 'MCP_OAUTH_RATE_LIMIT_PER_MIN', 'MCP_OAUTH_TOKEN_SECRET', 'NODE_ENV'];
+const ENV_KEYS = ['APIURL', 'MCP_OAUTH', 'MCP_OAUTH_DCR', 'MCP_OAUTH_ISSUER', 'MCP_OAUTH_ACCESS_TOKEN_MINUTES', 'MCP_OAUTH_REFRESH_TOKEN_DAYS', 'MCP_OAUTH_GRANT_MAX_DAYS', 'MCP_OAUTH_RATE_LIMIT_PER_MIN', 'MCP_OAUTH_TOKEN_SECRET', 'NODE_ENV'];
 const savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
 const newVerifier = () => crypto.randomBytes(32).toString('base64url');
@@ -68,7 +68,11 @@ const start = async (env = {}) => {
     const app = express();
     app.use(bodyParser.urlencoded({ extended: true }));
     app.use(bodyParser.json());
-    routes.init(app, process.env);
+    try {
+        routes.init(app, process.env);
+    } finally {
+        process.env.NODE_ENV = 'test';
+    }
     await new Promise((resolve) => { server = app.listen(0, '127.0.0.1', resolve); });
     base = `http://127.0.0.1:${server.address().port}`;
     return app;
@@ -179,6 +183,38 @@ describe('flag off', () => {
     });
 });
 
+describe('issuer', () => {
+    it.each([
+        ['empty', { MCP_OAUTH_ISSUER: '', APIURL: '' }],
+        ['not a URL', { MCP_OAUTH_ISSUER: 'hub.s10s2.test' }],
+        ['plain http on a public host', { MCP_OAUTH_ISSUER: 'http://hub.s10s2.test' }],
+        ['plain http on loopback in production', { MCP_OAUTH_ISSUER: 'http://127.0.0.1:4000', NODE_ENV: 'production' }],
+        ['with a path', { MCP_OAUTH_ISSUER: 'https://hub.s10s2.test/tenant1' }],
+        ['with a query', { MCP_OAUTH_ISSUER: 'https://hub.s10s2.test/?a=1' }],
+    ])('refuses to start when it is %s', async (label, env) => {
+        await expect(start(env)).rejects.toThrow(/MCP_OAUTH/);
+    });
+
+    it.each([
+        ['https', { MCP_OAUTH_ISSUER: 'https://hub.s10s2.test/' }, 'https://hub.s10s2.test'],
+        ['APIURL when no issuer is set', { MCP_OAUTH_ISSUER: '', APIURL: 'https://api.s10s2.test/' }, 'https://api.s10s2.test'],
+        ['http on loopback outside production', { MCP_OAUTH_ISSUER: 'http://127.0.0.1:4000/', NODE_ENV: 'development' }, 'http://127.0.0.1:4000'],
+    ])('starts with %s', async (label, env, issuer) => {
+        const savedApiUrl = process.env.APIURL;
+        try {
+            await start(env);
+            expect((await (await fetch(`${base}/.well-known/oauth-authorization-server`)).json()).issuer).toBe(issuer);
+        } finally {
+            if (savedApiUrl === undefined) delete process.env.APIURL;
+            else process.env.APIURL = savedApiUrl;
+        }
+    });
+
+    it('does not start with MCP_OAUTH off, whatever the issuer', async () => {
+        await expect(start({ MCP_OAUTH: 'off', MCP_OAUTH_ISSUER: 'http://hub.s10s2.test' })).resolves.toBeDefined();
+    });
+});
+
 describe('authorization server metadata (RFC 8414)', () => {
     it('names the issuer, the endpoints, S256 only, the scopes and client ID metadata documents', async () => {
         await start();
@@ -220,7 +256,10 @@ describe('/oauth/authorize', () => {
         ['a case change', REDIRECT.replace('callback', 'Callback')],
         ['an extra query', `${REDIRECT}?next=1`],
         ['a fragment', `${REDIRECT}#frag`],
-        ['another port', 'http://127.0.0.1:33419/callback'],
+        ['a loopback path change', 'http://127.0.0.1:33418/other'],
+        ['a loopback query change', 'http://127.0.0.1:33418/callback?x=1'],
+        ['a loopback host change', 'http://localhost:33418/callback'],
+        ['a parser-rewritten form', 'http://127.0.0.1:33418/./callback'],
         ['no redirect_uri', undefined],
     ])('refuses a redirect_uri with %s, and never redirects to it', async (label, redirectUri) => {
         await start();
@@ -230,6 +269,71 @@ describe('/oauth/authorize', () => {
         expect(res.location).toBeNull();
         expect(res.body.error).toBe('invalid_request');
         expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)).toHaveLength(0);
+    });
+
+    it.each([
+        ['127.0.0.1', 'http://127.0.0.1:33418/callback', 'http://127.0.0.1:51234/callback'],
+        ['[::1]', 'http://[::1]:33418/callback', 'http://[::1]:40000/callback'],
+        ['localhost', 'http://localhost:33418/callback', 'http://localhost:40001/callback'],
+        ['a loopback URI registered without a port', 'http://127.0.0.1/callback', 'http://127.0.0.1:40002/callback'],
+    ])('accepts any port on an http loopback redirect on %s (OAuth 2.1 section 2.3.1, RFC 8252 section 7.3)', async (label, registered, presented) => {
+        await start();
+        const client = await registerPublicClient({ redirectUris: [registered] });
+        const res = await authorize(validParams(client, newVerifier(), { redirect_uri: presented }));
+        expect(res.status).toBe(302);
+        expect(res.location.origin + res.location.pathname).toBe(presented.replace(/\?.*$/, ''));
+        expect(res.location.searchParams.get('code')).toBeTruthy();
+    });
+
+    it.each([
+        ['a non-loopback https port change', 'https://app.s10s2.test/cb', 'https://app.s10s2.test:8443/cb'],
+        ['https://localhost, which gets no exception', 'https://localhost:33418/cb', 'https://localhost:33419/cb'],
+        ['http on a loopback host registered as https', 'https://localhost/cb', 'http://localhost/cb'],
+    ])('keeps exact matching for %s', async (label, registered, presented) => {
+        await start();
+        const client = await registerPublicClient({ redirectUris: [registered] });
+        const res = await authorize(validParams(client, newVerifier(), { redirect_uri: presented }));
+        expect(res.status).toBe(400);
+        expect(res.location).toBeNull();
+    });
+
+    it('binds the code to the redirect_uri actually used, port included', async () => {
+        await start();
+        const client = await registerPublicClient();
+        const verifier = newVerifier();
+        const used = 'http://127.0.0.1:51234/callback';
+        const res = await authorize(validParams(client, verifier, { redirect_uri: used }));
+        const code = res.location.searchParams.get('code');
+        expect((await exchange(client, { code, verifier }, { redirect_uri: REDIRECT })).body.error).toBe('invalid_grant');
+        const again = await authorize(validParams(client, verifier, { redirect_uri: used }));
+        const ok = await exchange(client, { code: again.location.searchParams.get('code'), verifier }, { redirect_uri: used });
+        expect(ok.status).toBe(200);
+        seen.push(ok.body.access_token, ok.body.refresh_token);
+    });
+
+    it.each([
+        ['a backslash', 'https://evil.s10s2.test\\@good.s10s2.test/cb'],
+        ['userinfo', 'https://user@good.s10s2.test/cb'],
+        ['a fragment', 'https://good.s10s2.test/cb#x'],
+        ['surrounding whitespace', ' https://good.s10s2.test/cb'],
+        ['an upper-case scheme', 'HTTPS://good.s10s2.test/cb'],
+        ['a missing path', 'https://good.s10s2.test'],
+        ['javascript:', 'javascript:alert(1)'],
+        ['data:', 'data:text/html,hi'],
+    ])('refuses to register a redirect URI with %s', async (label, uri) => {
+        const clients = require('../Modules/OAuthServer/clients');
+        await expect(clients.register({ kind: 'dynamic', name: 'x', redirectUris: [uri], tokenEndpointAuthMethod: 'none' })).rejects.toMatchObject({ error: 'invalid_redirect_uri' });
+    });
+
+    it('refuses repeated parameters', async () => {
+        await start();
+        const client = await registerPublicClient();
+        const params = new URLSearchParams(validParams(client, newVerifier()));
+        params.append('scope', 'tasks:write');
+        const res = await fetch(`${base}/oauth/authorize?${params}`, { redirect: 'manual', headers: consentHeaders() });
+        const location = new URL(res.headers.get('location'));
+        expect(location.searchParams.get('error')).toBe('invalid_request');
+        expect(location.searchParams.get('code')).toBeNull();
     });
 
     it.each([
@@ -268,13 +372,32 @@ describe('/oauth/authorize', () => {
         expect(res.location.searchParams.get('code')).toBeTruthy();
     });
 
-    it('refuses an unknown or missing scope', async () => {
+    it('refuses an unknown or empty scope', async () => {
         await start();
         const client = await registerPublicClient();
-        for (const scope of [undefined, 'tasks:read admin']) {
+        for (const scope of ['', 'tasks:read admin']) {
             const res = await authorize(validParams(client, newVerifier(), { scope }));
             expect(res.location.searchParams.get('error')).toBe('invalid_scope');
         }
+    });
+
+    const grantedWithoutScope = async (client) => {
+        const verifier = newVerifier();
+        const res = await authorize(validParams(client, verifier, { scope: undefined }));
+        const tokens = await exchange(client, { code: res.location.searchParams.get('code'), verifier });
+        seen.push(tokens.body.access_token, tokens.body.refresh_token);
+        return tokens.body.scope;
+    };
+
+    it('grants the resource default read scopes when scope is omitted and the client named none', async () => {
+        await start();
+        expect(await grantedWithoutScope(await registerPublicClient())).toBe('tasks:read projects:read docs:read time:read');
+    });
+
+    it('grants the read scopes the client registered when scope is omitted', async () => {
+        await start();
+        const client = await registerPublicClient({ scopes: ['tasks:read', 'tasks:write', 'time:read'] });
+        expect(await grantedWithoutScope(client)).toBe('tasks:read time:read');
     });
 
     it('echoes state and the issuer with the code', async () => {
@@ -311,10 +434,11 @@ describe('/oauth/authorize', () => {
         expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)).toHaveLength(0);
     });
 
-    it.each(['production', 'development', '', 'Test', 'test '])('keeps the test-only consent path unreachable when NODE_ENV is %p', async (nodeEnv) => {
+    it.each(['production', 'development', 'staging', '', 'Test', 'test ', undefined])('keeps the test-only consent path unreachable when NODE_ENV is %p', async (nodeEnv) => {
         await start();
         const client = await registerPublicClient();
-        process.env.NODE_ENV = nodeEnv;
+        if (nodeEnv === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = nodeEnv;
         const res = await authorize(validParams(client, newVerifier()));
         expect(res.location.searchParams.get('error')).toBe('temporarily_unavailable');
         expect(jwt.verifyJWTTokenWithCV2).not.toHaveBeenCalled();
@@ -334,6 +458,7 @@ describe('/oauth/token: authorization code', () => {
 
         const grant = rows(SCHEMA_TYPE.OAUTH_GRANTS)[0];
         expect(new Date(grant.expiresAt).getTime() - new Date(grant.createdAt).getTime()).toBe(90 * DAY);
+        expect(new Date(grant.purgeAt).getTime() - new Date(grant.expiresAt).getTime()).toBe(30 * DAY);
         const refresh = rows(SCHEMA_TYPE.OAUTH_TOKENS).find((row) => row.kind === 'refresh');
         expect(new Date(refresh.expiresAt).getTime() - before).toBeGreaterThanOrEqual(30 * DAY - 1000);
         expect(new Date(refresh.expiresAt).getTime() - before).toBeLessThanOrEqual(30 * DAY + 5000);
@@ -366,12 +491,45 @@ describe('/oauth/token: authorization code', () => {
         expect(right.body.access_token).toBeUndefined();
     });
 
-    it('refuses an exchange with no verifier', async () => {
+    it.each([
+        ['no verifier', undefined],
+        ['a verifier too short', 'a'.repeat(42)],
+        ['a verifier too long', 'a'.repeat(129)],
+        ['a verifier outside the RFC 7636 alphabet', `${'a'.repeat(43)}+/`],
+    ])('refuses an exchange with %s before spending the code', async (label, verifier) => {
         await start();
         const client = await registerPublicClient();
         const issued = await codeFor(client);
-        const res = await exchange(client, { code: issued.code, verifier: undefined });
+        const res = await exchange(client, { code: issued.code, verifier });
         expect(res.body.error).toBe('invalid_grant');
+        expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)[0].revokedAt).toBeFalsy();
+        const ok = await exchange(client, issued);
+        expect(ok.status).toBe(200);
+        seen.push(ok.body.access_token, ok.body.refresh_token);
+    });
+
+    it.each([
+        ['dots and tildes', () => `${crypto.randomBytes(24).toString('base64url')}.~._~`],
+        ['128 characters', () => `${'~'.repeat(64)}${'.'.repeat(64)}`],
+    ])('accepts a verifier with %s (RFC 7636 section 4.1)', async (label, make) => {
+        await start();
+        const client = await registerPublicClient();
+        const res = await exchange(client, await codeFor(client, make()));
+        expect(res.status).toBe(200);
+        seen.push(res.body.access_token, res.body.refresh_token);
+    });
+
+    it('lets exactly one of two parallel first redemptions of a code succeed, and the other revokes it', async () => {
+        await start();
+        const client = await registerPublicClient();
+        const issued = await codeFor(client);
+        const results = await Promise.all([exchange(client, issued), exchange(client, issued)]);
+        const won = results.filter((r) => r.status === 200);
+        expect(won).toHaveLength(1);
+        expect(results.filter((r) => r.body.error === 'invalid_grant')).toHaveLength(1);
+        seen.push(won[0].body.access_token, won[0].body.refresh_token);
+        expect((await grants.introspect(won[0].body.access_token)).active).toBe(false);
+        expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)[0]).toMatchObject({ revokedReason: 'code_reuse' });
     });
 
     it.each([
@@ -468,6 +626,34 @@ describe('/oauth/token: refresh', () => {
         expect((await refreshWith(client, second.refresh_token)).body.error).toBe('invalid_grant');
     });
 
+    it.each([
+        ['a wrong resource', { resource: 'https://other.s10s2.test/mcp' }],
+        ['no resource', { resource: undefined }],
+        ['a wider scope', { scope: 'tasks:read tasks:write' }],
+    ])('revokes the family when a spent refresh token comes back with %s (OAuth 2.1 section 4.3.1)', async (label, over) => {
+        await start();
+        const client = await registerPublicClient();
+        const first = await tokensFor(client);
+        const second = (await refreshWith(client, first.refresh_token)).body;
+        seen.push(second.access_token, second.refresh_token);
+        const replay = await refreshWith(client, first.refresh_token, over);
+        expect(replay.status).toBe(400);
+        expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)[0]).toMatchObject({ revokedReason: 'refresh_reuse' });
+        expect((await grants.introspect(second.access_token)).active).toBe(false);
+    });
+
+    it('refuses a refresh token presented by another client, and revokes its grant', async () => {
+        await start();
+        const client = await registerPublicClient();
+        const other = await registerPublicClient();
+        const first = await tokensFor(client);
+        const res = await refreshWith(other, first.refresh_token);
+        expect(res.body.error).toBe('invalid_grant');
+        expect(res.body.access_token).toBeUndefined();
+        expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)[0]).toMatchObject({ revokedReason: 'refresh_wrong_client' });
+        expect((await grants.introspect(first.access_token)).active).toBe(false);
+    });
+
     it('may narrow the scopes but never widen them', async () => {
         await start();
         const client = await registerPublicClient();
@@ -543,6 +729,24 @@ describe('client authentication', () => {
         seen.push(ok.body.access_token, ok.body.refresh_token);
     });
 
+    it('refuses a client that authenticates two ways at once', async () => {
+        await start();
+        const { client, secret } = await confidential('client_secret_basic');
+        const issued = await codeFor(client);
+        const res = await post('/oauth/token', { grant_type: 'authorization_code', code: issued.code, code_verifier: issued.verifier, redirect_uri: REDIRECT, resource: RESOURCE, client_secret: secret }, { authorization: basic(client.clientId, secret) });
+        expect(res.status).toBe(401);
+        expect(res.body.error).toBe('invalid_client');
+    });
+
+    it.each(['Bearer ahoa_x', 'Basic', 'Basic !!!', `Basic ${Buffer.from('no-colon').toString('base64')}`])('refuses a malformed Authorization header %p', async (header) => {
+        await start();
+        const client = await registerPublicClient();
+        const issued = await codeFor(client);
+        const res = await post('/oauth/token', { grant_type: 'authorization_code', client_id: client.clientId, code: issued.code, code_verifier: issued.verifier, redirect_uri: REDIRECT, resource: RESOURCE }, { authorization: header });
+        expect(res.status).toBe(401);
+        expect(res.body.error).toBe('invalid_client');
+    });
+
     it('refuses a secret from a public client', async () => {
         await start();
         const client = await registerPublicClient();
@@ -606,7 +810,7 @@ describe('client ID metadata documents at /oauth/authorize', () => {
         const client = { clientId: CIMD_ID };
         const res = await exchange(client, await codeFor(client));
         expect(res.status).toBe(200);
-        expect(safeFetch).toHaveBeenCalledWith(CIMD_ID, expect.objectContaining({ timeoutMs: 5000, maxBytes: 5120, maxRedirects: 2 }));
+        expect(safeFetch).toHaveBeenCalledWith(CIMD_ID, expect.objectContaining({ timeoutMs: 5000, maxBytes: 5120, maxRedirects: 0 }));
         seen.push(res.body.access_token, res.body.refresh_token);
     });
 
@@ -637,6 +841,56 @@ describe('client ID metadata documents at /oauth/authorize', () => {
         expect(res.status).toBe(400);
         expect(res.location).toBeNull();
         expect(res.body.error).toBe('invalid_client');
+    });
+
+    it('refuses a document served from another URL than its client_id', async () => {
+        await start();
+        safeFetch.mockImplementation(async () => ({ status: 200, headers: {}, body: JSON.stringify(doc()), bytes: 10, url: 'https://agent.s10s2.test/oauth/other.json' }));
+        const res = await authorize(validParams({ clientId: CIMD_ID }, newVerifier()));
+        expect(res.status).toBe(400);
+        expect(res.body.error).toBe('invalid_client');
+    });
+
+    it('fetches one document once for concurrent authorizations', async () => {
+        await start();
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        safeFetch.mockImplementation(async () => { await gate; return { status: 200, headers: { 'cache-control': 'no-store' }, body: JSON.stringify(doc()), bytes: 10, url: CIMD_ID }; });
+        const pending = [1, 2, 3, 4].map(() => authorize(validParams({ clientId: CIMD_ID }, newVerifier())));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        release();
+        const results = await Promise.all(pending);
+        expect(results.every((r) => r.status === 302 && r.location.searchParams.get('code'))).toBe(true);
+        expect(safeFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fetch a failing document again for a few seconds', async () => {
+        await start();
+        safeFetch.mockImplementation(async () => ({ status: 404, headers: {}, body: '', bytes: 0, url: CIMD_ID }));
+        for (let i = 0; i < 5; i += 1) expect((await authorize(validParams({ clientId: CIMD_ID }, newVerifier()))).body.error).toBe('invalid_client');
+        expect(safeFetch).toHaveBeenCalledTimes(1);
+        const now = Date.now();
+        const clock = jest.spyOn(Date, 'now').mockReturnValue(now + metadataDocument.FAILURE_BACKOFF_MS + 1);
+        try {
+            serve(doc());
+            const res = await authorize(validParams({ clientId: CIMD_ID }, newVerifier()));
+            expect(res.location.searchParams.get('code')).toBeTruthy();
+            expect(safeFetch).toHaveBeenCalledTimes(2);
+        } finally {
+            clock.mockRestore();
+        }
+    });
+
+    it('grants the read scopes a document asks for when scope is omitted, and holds it to them', async () => {
+        await start();
+        serve(doc({ scope: 'tasks:read tasks:write other:scope' }));
+        const verifier = newVerifier();
+        const res = await authorize(validParams({ clientId: CIMD_ID }, verifier, { scope: undefined }));
+        const tokens = await exchange({ clientId: CIMD_ID }, { code: res.location.searchParams.get('code'), verifier });
+        expect(tokens.body.scope).toBe('tasks:read');
+        seen.push(tokens.body.access_token, tokens.body.refresh_token);
+        const wider = await authorize(validParams({ clientId: CIMD_ID }, newVerifier(), { scope: 'docs:read' }));
+        expect(wider.location.searchParams.get('error')).toBe('invalid_scope');
     });
 
     it('refuses a redirect_uri the document does not list', async () => {

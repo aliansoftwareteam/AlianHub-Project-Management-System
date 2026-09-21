@@ -30,7 +30,8 @@ const database = ({ ttl = true } = {}) => {
         methods.push([companyId, q.type, method]);
         if (method === 'createIndexes') {
             const [, , , , unique, key] = COLLECTIONS.find(([name]) => SCHEMA_TYPE[name] === q.type);
-            indexes[q.type] = [ID_INDEX, { name: unique, key, unique: true }, ...(ttl && q.type === SCHEMA_TYPE.OAUTH_TOKENS ? [TTL_INDEX] : [])];
+            const purges = ttl && [SCHEMA_TYPE.OAUTH_TOKENS, SCHEMA_TYPE.OAUTH_GRANTS].includes(q.type);
+            indexes[q.type] = [ID_INDEX, { name: unique, key, unique: true }, ...(purges ? [TTL_INDEX] : [])];
             return undefined;
         }
         if (method === 'listIndexes') return indexes[q.type] || [ID_INDEX];
@@ -63,6 +64,11 @@ describe('the strict schemas', () => {
         expect(createSchema.oauthTokensSchema.indexes()).toContainEqual([{ purgeAt: 1 }, expect.objectContaining({ expireAfterSeconds: 0 })]);
     });
 
+    test('expire grants through a TTL index on purgeAt, a field every grant must carry', () => {
+        expect(createSchema.oauthGrantsSchema.indexes()).toContainEqual([{ purgeAt: 1 }, expect.objectContaining({ expireAfterSeconds: 0 })]);
+        expect(createSchema.oauthGrantsSchema.path('purgeAt').isRequired).toBe(true);
+    });
+
     test('keep every field the server writes and drop anything else, including a raw token', () => {
         const Model = mongoose.model('s10s2OauthTokens', createSchema.oauthTokensSchema);
         const now = new Date();
@@ -87,7 +93,7 @@ describe('the strict schemas', () => {
 
     test('keep every grant field', () => {
         const Model = mongoose.model('s10s2OauthGrants', createSchema.oauthGrantsSchema);
-        const row = { grantId: 'g1', clientId: 'ahc_1', companyId: 'c1', userId: 'u1', scopes: ['tasks:read'], resource: 'https://hub.example/mcp', createdAt: new Date(), expiresAt: new Date(), revokedAt: new Date(), revokedReason: 'code_reuse' };
+        const row = { grantId: 'g1', clientId: 'ahc_1', companyId: 'c1', userId: 'u1', scopes: ['tasks:read'], resource: 'https://hub.example/mcp', createdAt: new Date(), expiresAt: new Date(), purgeAt: new Date(), revokedAt: new Date(), revokedReason: 'code_reuse' };
         expect(new Model(row).toObject()).toMatchObject(row);
     });
 });
@@ -115,7 +121,7 @@ describe(ID, () => {
         await expect(migration.up(contextFor(db))).resolves.toBeUndefined();
     });
 
-    test('fails when the TTL index did not build, so the runner retries it', async () => {
-        await expect(migration.up(contextFor(database({ ttl: false })))).rejects.toThrow('oauth_tokens TTL index missing after createIndexes');
+    test('fails when a TTL index did not build, so the runner retries it', async () => {
+        await expect(migration.up(contextFor(database({ ttl: false })))).rejects.toThrow(/oauth_grants TTL index missing after createIndexes/);
     });
 });

@@ -140,6 +140,7 @@ describe('with MCP_OAUTH on in a test process', () => {
         const grant = await globalDb.collection('oauth_grants').findOne({ clientId });
         expect(grant).toMatchObject({ companyId: state.companyId, userId: owner.uid, scopes: ['tasks:read', 'projects:read'], resource: `${server.baseURL}/mcp`, revokedAt: null });
         expect(grant.expiresAt.getTime() - grant.createdAt.getTime()).toBe(90 * 24 * 60 * 60 * 1000);
+        expect(grant.purgeAt.getTime() - grant.expiresAt.getTime()).toBe(30 * 24 * 60 * 60 * 1000);
         const stored = JSON.stringify(rows);
         for (const value of [code, tokens.body.access_token, tokens.body.refresh_token]) expect(stored).not.toContain(value);
 
@@ -156,7 +157,10 @@ describe('with MCP_OAUTH on in a test process', () => {
             expect.objectContaining({ name: 'token_hash', unique: true }),
             expect.objectContaining({ name: 'purge_at', expireAfterSeconds: 0 }),
         ]));
-        expect(await globalDb.collection('oauth_grants').indexes()).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'grant_id', unique: true })]));
+        expect(await globalDb.collection('oauth_grants').indexes()).toEqual(expect.arrayContaining([
+            expect.objectContaining({ name: 'grant_id', unique: true }),
+            expect.objectContaining({ name: 'purge_at', expireAfterSeconds: 0 }),
+        ]));
     });
 
     it('spends a code once on a real database, and a replay revokes the grant', async () => {

@@ -38,7 +38,7 @@ beforeEach(() => {
 
 const viaLocalServer = () => safeFetch.mockImplementation((url, opts) => {
     const local = String(url).replace('https://agent.s10s2.test', `http://agent.s10s2.test:${port}`);
-    const resolve = (target) => (new URL(target).hostname === 'agent.s10s2.test'
+    const resolve = (target) => (new URL(target).hostname.endsWith('.s10s2.test')
         ? { url: new URL(target), address: '127.0.0.1', family: 4 }
         : actual.resolvePublic(target));
     return actual.safeFetch(local, { ...opts, resolve });
@@ -70,7 +70,9 @@ describe('client ID metadata document fetching refuses to reach private addresse
         ['loopback', () => `http://127.0.0.1:${port}/oauth/client.json`],
         ['the cloud metadata endpoint', () => 'http://169.254.169.254/latest/meta-data'],
         ['an internal name', () => 'https://db.internal/client.json'],
-    ])('a redirect from a public host to %s', async (label, target) => {
+        ['the same origin, where a copy of the document is', () => '/oauth/copy.json'],
+        ['another public origin', () => `http://elsewhere.s10s2.test:${port}/oauth/copy.json`],
+    ])('any redirect, here from a public host to %s: the document is not at its client_id', async (label, target) => {
         viaLocalServer();
         let served = 0;
         route = (req, res) => {
@@ -79,7 +81,7 @@ describe('client ID metadata document fetching refuses to reach private addresse
             res.setHeader('content-type', 'application/json');
             return res.end(JSON.stringify(doc));
         };
-        await expect(metadataDocument.load(PUBLIC_ID)).rejects.toThrow(/private, local or internal host/);
+        await expect(metadataDocument.load(PUBLIC_ID)).rejects.toThrow(metadataDocument.MetadataDocumentError);
         expect(served).toBe(1);
     });
 
