@@ -126,7 +126,7 @@ describe('what is never done', () => {
 describe('limits', () => {
     it('default to 10 MB, 200,000 characters, 20 s, 200 pages, 20 sheets, 5,000 rows and 100 MB unzipped, each overridable', () => {
         ENV_KEYS.forEach((key) => delete process.env[key]);
-        expect(limits()).toEqual({ maxBytes: 10 * 1024 * 1024, maxChars: 200000, timeoutMs: 20000, maxPages: 200, maxSheets: 20, maxRows: 5000, maxUnzippedBytes: 100 * 1024 * 1024, maxParseMemoryBytes: 256 * 1024 * 1024 });
+        expect(limits()).toEqual({ maxBytes: 10 * 1024 * 1024, maxChars: 200000, timeoutMs: 20000, maxPages: 200, maxSheets: 20, maxRows: 5000, maxUnzippedBytes: 100 * 1024 * 1024, maxParseMemoryBytes: 2 * 100 * 1024 * 1024 + 128 * 1024 * 1024 });
 
         process.env.KNOWLEDGE_FILE_MAX_BYTES = '2048';
         process.env.KNOWLEDGE_FILE_MAX_CHARS = '500';
@@ -137,6 +137,13 @@ describe('limits', () => {
         process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES = '4096';
         process.env.KNOWLEDGE_FILE_MAX_PARSE_MEMORY_BYTES = '8192';
         expect(limits()).toEqual({ maxBytes: 2048, maxChars: 500, timeoutMs: 750, maxPages: 3, maxSheets: 2, maxRows: 10, maxUnzippedBytes: 4096, maxParseMemoryBytes: 8192 });
+    });
+
+    it('derive the parser memory cap from the inflation budget, two copies of it plus 128 MB, unless it is set', () => {
+        process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES = String(300 * MB);
+        expect(limits().maxParseMemoryBytes).toBe(2 * 300 * MB + 128 * MB);
+        process.env.KNOWLEDGE_FILE_MAX_PARSE_MEMORY_BYTES = String(64 * MB);
+        expect(limits().maxParseMemoryBytes).toBe(64 * MB);
     });
 
     it('fall back to the default for a value that is not a positive number', () => {
@@ -225,10 +232,9 @@ describe('bytes decide the parser together with the name', () => {
         await mismatched(Buffer.from('  <!DOCTYPE html><html></html>'), 'csv');
     });
 
-    it('refuses a zip, a pdf, a legacy office file or a web page named as text or markdown', async () => {
+    it('refuses a zip, a legacy office file or a web page named as text or markdown', async () => {
         for (const kind of ['text', 'markdown']) {
             await mismatched(await docxOf(['x']), kind);
-            await mismatched(pdfOf([['x']]), kind);
             await mismatched(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]), kind);
             await mismatched(Buffer.from('<!doctype html><p>x</p>'), kind);
         }
@@ -359,3 +365,79 @@ describe('parser slots', () => {
         await Promise.all(runs);
     });
 });
+
+describe('text encodings and markers', () => {
+    it('reads UTF-16 LE with its byte order mark as text', async () => {
+        const out = await extractor.extractText({ buffer: Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('Tide tables.', 'utf16le')]), kind: 'text' });
+        expect(out.text).toBe('Tide tables.');
+    });
+
+    it('refuses UTF-16 BE and UTF-16 without a byte order mark as not text', async () => {
+        const be = Buffer.from('Tide tables.', 'utf16le').swap16();
+        await expect(extractor.extractText({ buffer: Buffer.concat([Buffer.from([0xfe, 0xff]), be]), kind: 'text' })).rejects.toMatchObject({ code: 'type_mismatch' });
+        await expect(extractor.extractText({ buffer: Buffer.from('Tide tables.', 'utf16le'), kind: 'text' })).rejects.toMatchObject({ code: 'type_mismatch' });
+    });
+
+    it('reads a .txt that mentions %PDF- near its start as the text it is', async () => {
+        const out = await extractor.extractText({ buffer: Buffer.from('Save it as %PDF-1.7 before sending.'), kind: 'text' });
+        expect(out.text).toBe('Save it as %PDF-1.7 before sending.');
+    });
+});
+
+describe('text files take a parser slot and its deadline', () => {
+    it('runs csv, plain text and markdown in the parser thread, stopped at the deadline like any other', async () => {
+        process.env.KNOWLEDGE_FILE_TIMEOUT_MS = '300';
+        for (const kind of ['csv', 'text', 'markdown']) {
+            await expect(extractor.extractText({ buffer: Buffer.from('a,b\n1,2\n'), kind }, { workerPath: SPINNING_WORKER })).rejects.toMatchObject({ code: 'timed_out' });
+        }
+        expect(extractor.activeWorkers()).toBe(0);
+    });
+
+    it('holds a slot while a large text file is read', async () => {
+        let peak = 0;
+        const watch = setInterval(() => { peak = Math.max(peak, extractor.activeWorkers()); }, 1);
+        const out = await extractor.extractText({ buffer: Buffer.from(`${'cell,'.repeat(400000)}end\n`), kind: 'csv' });
+        clearInterval(watch);
+        expect(out.text.length).toBeGreaterThan(0);
+        expect(peak).toBe(1);
+    });
+});
+
+describe('memory against the inflation budget', () => {
+    const nearBudget = () => docxOf(['x'.repeat(12 * MB)]);
+
+    it('parses a legitimate archive near the budget under the derived cap', async () => {
+        process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES = String(16 * MB);
+        const out = await extractor.extractText({ buffer: await nearBudget(), kind: 'docx' });
+        expect(out.text.length).toBeGreaterThan(1000);
+    });
+
+    it('stops the same archive for memory when the cap is set below what it needs, measured by the parser thread itself', async () => {
+        process.env.KNOWLEDGE_FILE_MAX_UNZIPPED_BYTES = String(16 * MB);
+        process.env.KNOWLEDGE_FILE_MAX_PARSE_MEMORY_BYTES = String(8 * MB);
+        await expect(extractor.extractText({ buffer: await nearBudget(), kind: 'docx' })).rejects.toMatchObject({ code: 'too_much_memory' });
+    });
+
+    it('rebuilds the archive without keeping every inflated entry beside the copy', () => {
+        const { inflateWithin } = require('../Modules/Knowledge/ingest/extract/zip');
+        const concat = jest.spyOn(Buffer, 'concat');
+        try {
+            const archive = lyingZipOf([['a.xml', Buffer.alloc(2 * MB, 0x41)], ['b.xml', Buffer.alloc(2 * MB, 0x42)]], 1);
+            const rebuilt = inflateWithin(archive, 8 * MB);
+            expect(rebuilt.length).toBeGreaterThan(4 * MB);
+            concat.mock.calls.forEach(([parts]) => expect(parts.reduce((sum, part) => sum + part.length, 0)).toBeLessThan(MB));
+        } finally {
+            concat.mockRestore();
+        }
+    });
+
+    it('keeps entry names that are not ASCII, as the readers expect them', async () => {
+        const { inflateWithin } = require('../Modules/Knowledge/ingest/extract/zip');
+        const JSZip = require('jszip');
+        const { zipOf } = require('./fixtures/knowledgeFiles');
+        const archive = await zipOf([['wörd/dökument.xml', 'inner']]);
+        const names = Object.keys((await JSZip.loadAsync(inflateWithin(archive, MB))).files);
+        expect(names).toContain('wörd/dökument.xml');
+    });
+});
+

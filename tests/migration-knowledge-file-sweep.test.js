@@ -25,10 +25,16 @@ const tenants = ({ broken = [] } = {}) => {
             indexes[`${companyId}:${q.type}`] = BUILT[q.type];
             return undefined;
         }
+        if (method === 'dropIndex') {
+            const kept = (indexes[`${companyId}:${q.type}`] || [ID_INDEX]).filter((index) => index.name !== q.data[0]);
+            if (kept.length === (indexes[`${companyId}:${q.type}`] || [ID_INDEX]).length) throw Object.assign(new Error('index not found with name'), { code: 27 });
+            indexes[`${companyId}:${q.type}`] = kept;
+            return undefined;
+        }
         if (method === 'listIndexes') return indexes[`${companyId}:${q.type}`] || [ID_INDEX];
         return db.crud(companyId, q, method);
     };
-    return { crud, methods };
+    return { crud, methods, indexes };
 };
 
 const contextFor = (db, companies) => buildContext({ MongoDbCrudOpration: db.crud, SCHEMA_TYPE, logger, listCompanies: async () => companies.map((_id) => ({ _id })) });
@@ -88,4 +94,28 @@ describe('032-knowledge-file-sweep', () => {
         await expect(migration.up(ctx)).rejects.toThrow(/c1/);
         expect(ctx.companies.c1).toMatchObject({ ok: false, error: expect.stringContaining('knowledge_chunks file sweep') });
     });
+
+    it('drops the index on the way down, runs down twice safely, and builds it again on the way up', async () => {
+        const db = tenants();
+        await migration.up(contextFor(db, ['c1']));
+        expect(db.indexes[`c1:${CHUNKS}`].map((index) => index.name)).toContain('sourceType_1_extractDueAt_1');
+
+        const down = contextFor(db, ['c1']);
+        await migration.down(down);
+        expect(down.companies.c1).toMatchObject({ ok: true });
+        expect(db.indexes[`c1:${CHUNKS}`].map((index) => index.name)).not.toContain('sourceType_1_extractDueAt_1');
+        await migration.down(contextFor(db, ['c1']));
+
+        const again = contextFor(db, ['c1']);
+        await migration.up(again);
+        expect(again.companies.c1).toEqual({ ok: true, ...RECORDED });
+    });
+
+    it('builds the index from the same definition the sweep queries with', () => {
+        const sweep = require('../Modules/Knowledge/ingest/fileSweep');
+        expect(knowledgeChunksSchema.indexes()).toContainEqual([sweep.INDEX_KEY, expect.objectContaining(sweep.INDEX_OPTIONS)]);
+        expect(sweep.INDEX_KEY).toEqual(KEY);
+        expect(sweep.dueFilter(new Date()).extractDueAt).toMatchObject(sweep.INDEX_OPTIONS.partialFilterExpression.extractDueAt);
+    });
 });
+

@@ -545,7 +545,8 @@ describe('where a file came from', () => {
     it('reads as external on a task filed through a public form, including the file the form upload path stored', async () => {
         expect(await originOf(seedTask([attachment('cv.txt')], { origin: { kind: 'form', ref: 'submission-1' } }))).toBe('external');
 
-        const task = seedTask([attachment('cv.txt')], { origin: { kind: 'form', ref: 'submission-2' } });
+        const submission = mockDb.seed(SCHEMA_TYPE.FORM_SUBMISSIONS, { formId: '6f00000000000000000000f1', ProjectID: P1, deletedStatusKey: 0 });
+        const task = seedTask([attachment('cv.txt')], { origin: { kind: 'form', ref: String(submission._id) } });
         task.attachments[0].url = 'formAttachment/6f00000000000000000000f1/abcdef0123456789abcdef01.txt';
         expect(await originOf(task)).toBe('external');
     });
@@ -744,3 +745,130 @@ describe('work that outlives the process', () => {
         expect(readStoredFile).toHaveBeenCalledTimes(indexer.FILE_SWEEP_BATCH);
     });
 });
+
+describe('a public form upload on a form task', () => {
+    const FORM = '6f00000000000000000000f1';
+    const OTHER_FORM = '6f00000000000000000000f2';
+    const formTask = () => {
+        const submission = mockDb.seed(SCHEMA_TYPE.FORM_SUBMISSIONS, { formId: FORM, ProjectID: P1, deletedStatusKey: 0 });
+        return seedTask([attachment('cv.txt')], { origin: { kind: 'form', ref: String(submission._id) } });
+    };
+
+    it('is read when the key is under the folder of the form that filed the task', async () => {
+        const task = formTask();
+        task.attachments[0].url = `formAttachment/${FORM}/abcdef0123456789abcdef01.txt`;
+        store(C, task.attachments[0].url, 'The applicant\'s letter.');
+
+        await taskChanged(task, ['attachments']);
+
+        expect(live(sourceOf(task, task.attachments[0]))[0].text).toContain('The applicant');
+    });
+
+    it('is refused unread when the key is under another form\'s folder', async () => {
+        const task = formTask();
+        task.attachments[0].url = `formAttachment/${OTHER_FORM}/abcdef0123456789abcdef01.txt`;
+        store(C, task.attachments[0].url, 'Another form\'s upload.');
+
+        await taskChanged(task, ['attachments']);
+
+        expect(readStoredFile).not.toHaveBeenCalled();
+        expect(markerOf(sourceOf(task, task.attachments[0]))).toMatchObject({ tombstoneReason: 'skipped:foreign_key' });
+    });
+
+    it('is refused unread when the submission the task names cannot be found', async () => {
+        const task = seedTask([attachment('cv.txt')], { origin: { kind: 'form', ref: '6f00000000000000000000e9' } });
+        task.attachments[0].url = `formAttachment/${FORM}/abcdef0123456789abcdef01.txt`;
+        store(C, task.attachments[0].url, 'Orphan upload.');
+
+        await taskChanged(task, ['attachments']);
+
+        expect(readStoredFile).not.toHaveBeenCalled();
+        expect(markerOf(sourceOf(task, task.attachments[0]))).toMatchObject({ tombstoneReason: 'skipped:foreign_key' });
+    });
+});
+
+describe('sweeping owed files', () => {
+    const isolated = () => {
+        let fresh;
+        jest.isolateModules(() => {
+            fresh = { indexer: require('../Modules/Knowledge/ingest/indexer') };
+        });
+        return fresh;
+    };
+    const owe = async (task) => {
+        await indexer.markFilesPending(C, String(task._id));
+        return sourceOf(task, task.attachments[0]);
+    };
+
+    it('lets one of two servers sweeping at once take a file, and keeps its retry', async () => {
+        const task = seedTask([attachment('late.txt')]);
+        const sourceId = sourceOf(task, task.attachments[0]);
+        await taskChanged(task, ['attachments']);
+        expect(markerOf(sourceId)).toMatchObject({ extractAttempts: 1 });
+        readStoredFile.mockClear();
+
+        const [one, two] = [isolated(), isolated()];
+        await Promise.all([one.indexer.resumeFiles(C, { now: LATER }), two.indexer.resumeFiles(C, { now: LATER })]);
+
+        expect(readStoredFile).toHaveBeenCalledTimes(1);
+        expect(markerOf(sourceId)).toMatchObject({ tombstoneReason: 'extract:failed', extractAttempts: 2 });
+        expect(await indexer.pendingFiles(C)).toEqual([sourceId]);
+    });
+
+    it('claims a file before working on it, pushing its due time forward as a lease', async () => {
+        const task = seedTask([attachment('slow.txt')]);
+        const sourceId = await owe(task);
+        let release;
+        readStoredFile.mockImplementation(() => new Promise((resolve) => { release = () => resolve({ buffer: Buffer.from('Slow text.'), size: 10 }); }));
+
+        const sweep = indexer.resumeFiles(C);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const leased = mockDb.store[CHUNKS].find((c) => c.sourceId === sourceId && c.ordinal === 0).extractDueAt;
+        expect(new Date(leased).getTime()).toBeGreaterThan(Date.now() + 20000);
+
+        release();
+        await sweep;
+        expect(await indexer.pendingFiles(C)).toEqual([]);
+    });
+
+    it('does not let files whose sync keeps throwing hold every place in the sweep, and counts each throw as an attempt', async () => {
+        const tasks = Array.from({ length: indexer.FILE_SWEEP_BATCH + 1 }, (_, i) => seedTask([attachment(`f${i}.txt`)]));
+        tasks.forEach((task) => store(C, task.attachments[0].url, 'Harbour text.'));
+        const ids = [];
+        for (const task of tasks) ids.push(await owe(task));
+        const failing = new Set(ids.slice(0, indexer.FILE_SWEEP_BATCH));
+        const real = indexer.syncFile;
+        jest.spyOn(indexer, 'syncFile').mockImplementation((companyId, sourceId, options) => (failing.has(sourceId)
+            ? Promise.reject(new Error('connection reset'))
+            : real(companyId, sourceId, options)));
+
+        const t0 = Date.now();
+        await indexer.resumeFiles(C, { now: t0 });
+        await indexer.resumeFiles(C, { now: t0 });
+        expect(live(ids[indexer.FILE_SWEEP_BATCH])).toHaveLength(1);
+
+        await indexer.resumeFiles(C, { now: t0 + 60 * 60 * 1000 });
+        await indexer.resumeFiles(C, { now: t0 + 2 * 60 * 60 * 1000 });
+        const stuck = mockDb.store[CHUNKS].find((c) => c.sourceId === ids[0] && c.ordinal === 0);
+        expect(stuck).toMatchObject({ extractAttempts: 3, tombstoneReason: 'extract:failed' });
+        expect(stuck.extractDueAt).toBeUndefined();
+        expect(await indexer.pendingFiles(C)).toEqual([]);
+    });
+
+    it('leaves alone a file this process already has queued, whatever its due time says', async () => {
+        const task = seedTask([attachment('queued.txt')]);
+        let release;
+        readStoredFile.mockImplementation(() => new Promise((resolve) => { release = () => resolve({ buffer: Buffer.from('Queued text.'), size: 12 }); }));
+
+        await events.handle(taskEnvelope(task, ['attachments']));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        await indexer.resumeFiles(C, { now: LATER });
+        expect(readStoredFile).toHaveBeenCalledTimes(1);
+
+        release();
+        await events.drain();
+        expect(readStoredFile).toHaveBeenCalledTimes(1);
+        expect(live(sourceOf(task, task.attachments[0]))).toHaveLength(1);
+    });
+});
+
