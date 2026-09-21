@@ -1208,5 +1208,50 @@
     "group": "jobs",
     "description": "Deadline given to an approval step whose definition names none, so a run cannot wait forever on a decision nobody will make.",
     "default": "259200000"
+  },
+  "KNOWLEDGE_VECTOR_STORE": {
+    "group": "ai",
+    "description": "Where hybrid knowledge retrieval searches vectors: \"local\" scores the newest chunks of each source in process from the tenant database (any MongoDB); \"atlas\", for hosted deployments on MongoDB Atlas, searches the same chunk rows with Atlas Vector Search through one knowledge_chunks_vector index in the database of each tenant whose knowledgeRetrieval mode is \"hybrid\", created or checked in the background at tenant creation and by the knowledge.backfill job (which also creates it once a tenant switches to hybrid), with the index state shown in the instance knowledge console. Atlas caps the number of search indexes a cluster may hold, lower on shared and free tiers, so check the tier's limit against the number of hybrid tenants. While a tenant's index is being checked, missing, building or the wrong size, or Atlas cannot answer, questions are answered from the lexical side. Any other value is read as \"local\".",
+    "default": "local"
+  },
+  "KNOWLEDGE_ATLAS_NUM_CANDIDATES": {
+    "group": "ai",
+    "description": "With KNOWLEDGE_VECTOR_STORE=atlas, the fewest nearest chunks Atlas considers per source type for a question ($vectorSearch numCandidates); raised to KNOWLEDGE_ATLAS_CANDIDATE_RATIO times the limit when that is more, and at most 10000.",
+    "default": "1000"
+  },
+  "KNOWLEDGE_ATLAS_VECTOR_LIMIT": {
+    "group": "ai",
+    "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how many chunks per source type Atlas returns for a question ($vectorSearch limit) before they are narrowed by access and collapsed to one passage per source; never fewer than the passages asked for.",
+    "default": "100"
+  },
+  "KNOWLEDGE_ATLAS_MAX_TIME_MS": {
+    "group": "ai",
+    "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how long, in milliseconds, one vector search may run before the question is answered from the lexical side (the backend then reads \"lexical (vector store timed out)\").",
+    "default": "3000"
+  },
+  "KNOWLEDGE_EMBEDDING_DIMENSIONS": {
+    "group": "ai",
+    "description": "With KNOWLEDGE_VECTOR_STORE=atlas, the vector size the Atlas index is built for. Leave unset to take it from a stored vector of KNOWLEDGE_EMBEDDING_MODEL, or from the model (1536 for text-embedding-3-small, 3072 for text-embedding-3-large); set it for any other model. A value that disagrees with a stored vector of the model, or with the model's known size, builds no index: the console shows the index as the wrong size and questions stay lexical.",
+    "default": ""
+  },
+  "KNOWLEDGE_ATLAS_CANDIDATE_RATIO": {
+    "group": "ai",
+    "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how many candidates Atlas considers for each chunk it returns (numCandidates is at least this times the limit, at most 10000).",
+    "default": "10"
+  },
+  "KNOWLEDGE_ATLAS_THIN_RESULTS": {
+    "group": "ai",
+    "description": "With KNOWLEDGE_VECTOR_STORE=atlas, when Atlas returns a full limit of chunks but fewer than this many passages survive the access check, the answer's backend reads \"lexical+vector-atlas(thin)\", so a vector side crowded out by chunks the asker may not see is visible.",
+    "default": "3"
+  },
+  "KNOWLEDGE_ATLAS_INDEX_TIMEOUT_MS": {
+    "group": "ai",
+    "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how long, in milliseconds, each step of a tenant's index check (listing, creating or updating the search index, reading a stored vector) may take before the check records the index state as timed out. Questions never wait on a check.",
+    "default": "5000"
+  },
+  "KNOWLEDGE_ATLAS_INDEX_BUDGET_MS": {
+    "group": "ai",
+    "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how long, in milliseconds, the knowledge.backfill job gives one tenant's index check before moving on; tenants are checked four at a time.",
+    "default": "30000"
   }
 }
