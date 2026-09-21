@@ -8,6 +8,11 @@ const { htmlToRawText, pageVisibleTo } = require('../Pages/helpers/pageRules');
 const { blocksToRawText, contentToEditorData } = require('../Pages/helpers/pageContent');
 const { hasScope } = require('../ApiTokens/helpers/apiTokenRules');
 const performanceRead = require('../Agents/performanceRead');
+const v2 = require('./v2Flag');
+const cursor = require('./cursor');
+const names = require('./names');
+const { annotationsFor, isDestructive } = require('./annotations');
+const { propose } = require('./propose');
 
 const PAGE_TEXT_MAX = 40000;
 
@@ -43,6 +48,23 @@ const taskRow = (t) => ({
     estimateHours: Number(t.totalEstimatedTime || 0) / 3600 || 0,
 });
 
+const taskPage = async (ctx, tool, args, filter, sort) => {
+    const { rows, nextCursor } = await cursor.page(ctx, tool, args, ({ skip, limit }) => MongoDbCrudOpration(ctx.companyId, {
+        type: SCHEMA_TYPE.TASKS, data: [filter, null, { sort, skip, limit }],
+    }, 'find'));
+    const tasks = await names.forTasks(ctx, rows, taskRow);
+    return nextCursor ? { tasks, nextCursor } : { tasks };
+};
+
+const briefWithNames = async (ctx, brief) => {
+    const task = await MongoDbCrudOpration(ctx.companyId, {
+        type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(brief.taskId) }, { ProjectID: 1, sprintId: 1, AssigneeUserId: 1, Task_Priority: 1, TaskType: 1, TaskTypeKey: 1 }],
+    }, 'findOne');
+    if (!task) return brief;
+    const [named] = await names.forTasks(ctx, [task], () => ({}));
+    return { ref: named.ref, ...brief, ...named };
+};
+
 /* Every tool is one registry action. The registry decides what an agent may do;
  * nothing here widens it. */
 const TOOLS = [
@@ -51,9 +73,14 @@ const TOOLS = [
         action: 'tasks.next',
         description: 'The next task assigned to you, highest priority and nearest due date first. Start here.',
         input: { type: 'object', properties: { projectId: { type: 'string' } } },
+        paginated: true,
         run: async (ctx, args) => {
             const filter = scopeFilter(ctx, { AssigneeUserId: String(ctx.userId) });
             if (args.projectId && oid(args.projectId)) filter.ProjectID = String(args.projectId);
+            if (v2.enabled()) {
+                filter.statusType = { $nin: [...registry.DONE_STATUS_TYPES] };
+                return taskPage(ctx, 'tasks.next', args, filter, { Task_Priority: 1, DueDate: 1, _id: 1 });
+            }
             const rows = await MongoDbCrudOpration(ctx.companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [filter, null, { sort: { Task_Priority: 1, DueDate: 1 }, limit: 5 }],
@@ -66,6 +93,7 @@ const TOOLS = [
         name: 'tasks.search',
         action: 'tasks.search',
         description: 'Search tasks you can see by text, status or project.',
+        paginated: true,
         input: {
             type: 'object',
             properties: { query: { type: 'string' }, projectId: { type: 'string' }, status: { type: 'string' }, limit: { type: 'integer' } },
@@ -75,6 +103,7 @@ const TOOLS = [
             if (args.query) filter.TaskName = { $regex: str(args.query, 120).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
             if (args.projectId && oid(args.projectId)) filter.ProjectID = String(args.projectId);
             if (args.status) filter.status = { $regex: `^${str(args.status, 60)}$`, $options: 'i' };
+            if (v2.enabled()) return taskPage(ctx, 'tasks.search', args, filter, { updatedAt: -1, _id: -1 });
             const rows = await MongoDbCrudOpration(ctx.companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [filter, null, { sort: { updatedAt: -1 }, limit: clampLimit(args.limit) }],
@@ -87,7 +116,10 @@ const TOOLS = [
         action: 'task.get',
         description: 'A task as a brief: goal, acceptance criteria, relations, linked docs and what the comment thread has settled. Read this before writing code.',
         input: { type: 'object', properties: { taskId: { type: 'string' } }, required: ['taskId'] },
-        run: (ctx, args) => buildBrief(ctx, str(args.taskId, 40)),
+        run: async (ctx, args) => {
+            const brief = await buildBrief(ctx, str(args.taskId, 40));
+            return v2.enabled() && brief && !brief.error ? briefWithNames(ctx, brief) : brief;
+        },
     },
     {
         name: 'task.comment',
@@ -158,12 +190,13 @@ const TOOLS = [
                 type: SCHEMA_TYPE.PAGES, data: [projectScope(ctx, { _id, deletedStatusKey: { $ne: 1 } })],
             }, 'findOne');
             if (!pageVisibleTo(page, ctx.userId)) return { error: 'page not found' };
-            return {
+            const out = {
                 pageId: String(page._id),
                 title: page.title || '',
                 updatedAt: page.updatedAt || null,
                 text: str(pageText(page), PAGE_TEXT_MAX),
             };
+            return v2.enabled() ? { ...(await names.forPage(ctx, page)), ...out } : out;
         },
     },
 ];
@@ -194,13 +227,25 @@ const FLAGGED_TOOLS = [
 
 const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action))];
 
-const names = () => offered().map((t) => t.name);
+const toolNames = () => offered().map((t) => t.name);
 
-const manifest = () => offered().map((t) => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: t.input,
-}));
+const PAGE_INPUT = Object.freeze({
+    cursor: { type: 'string', description: 'nextCursor from the previous page' },
+    limit: { type: 'integer', description: `Page size, default ${cursor.PAGE_DEFAULT}, at most ${cursor.PAGE_MAX}` },
+});
+
+const manifest = () => {
+    if (!v2.enabled()) return offered().map((t) => ({ name: t.name, description: t.description, inputSchema: t.input }));
+    return offered().map((t) => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: t.paginated ? { ...t.input, properties: { ...t.input.properties, ...PAGE_INPUT } } : t.input,
+        annotations: annotationsFor(actions.rating(t.action)),
+    }));
+};
+
+const actionOf = (name) => { const tool = offered().find((t) => t.name === String(name)); return tool ? tool.action : null; };
+const actionsOffered = () => offered().map((t) => t.action);
 
 /* Run a tool for an MCP caller. Reads are authorised through the registry;
  * writes go through actions.perform, so they are audited and undoable. */
@@ -222,6 +267,9 @@ const call = async (ctx, name, args = {}) => {
     if (!ctx.canWrite) {
         throw Object.assign(new Error('This token is read-only.'), { code: -32004 });
     }
+    if (v2.enabled() && isDestructive(actions.rating(tool.action))) {
+        return propose(ctx, tool, tool.params(args), str(args.reason, 500) || `${tool.name} via MCP`);
+    }
     const out = await actions.perform({
         companyId: ctx.companyId,
         actor: ctx.actor,
@@ -234,4 +282,4 @@ const call = async (ctx, name, args = {}) => {
     return { ok: true, auditId: out.auditId, result: out.result || null, undoable: Boolean(out.undo) };
 };
 
-module.exports = { TOOLS, names, manifest, call };
+module.exports = { TOOLS, names: toolNames, manifest, call, actionOf, actionsOffered };

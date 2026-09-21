@@ -110,7 +110,7 @@ const handleRpc = async (ctx, message) => {
                         isError: true,
                     });
                 }
-                if (error && error.code === -32601) return rpcError(id, -32601, error.message);
+                if (error && (error.code === -32601 || error.code === -32602)) return rpcError(id, error.code, error.message);
                 logger.error(`mcp tools/call ${name}: ${error.message}`);
                 return rpcResult(id, { ...contentResult({ error: error.message }), isError: true });
             }

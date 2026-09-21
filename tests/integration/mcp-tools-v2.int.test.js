@@ -25,6 +25,7 @@ const tools = require('../../Modules/Mcp/tools');
 jest.setTimeout(60000);
 
 const COMPANY = crypto.randomBytes(12).toString('hex');
+const OTHER_COMPANY = crypto.randomBytes(12).toString('hex');
 const OWNER = new ObjectId();
 const MATE = new ObjectId();
 const PROJECT = new ObjectId();
@@ -53,10 +54,11 @@ beforeAll(async () => {
         { userId: String(OWNER), roleType: 1, status: 2 },
         { userId: String(MATE), roleType: 3, status: 2 },
     ]);
+    await client.db(OTHER_COMPANY).collection('company_users').insertOne({ userId: String(OWNER), roleType: 1, status: 2 });
     await db.collection('projects').insertOne({ _id: PROJECT, ProjectName: 'Orbit', isPrivateSpace: false, deletedStatusKey: 0, taskTypeCounts: [{ key: 1, name: 'Task' }] });
     await db.collection('sprints').insertOne({ _id: SPRINT, name: 'Launch', projectId: PROJECT, deletedStatusKey: 0 });
     const rows = Array.from({ length: TASKS }, (_, i) => ({
-        _id: new ObjectId(), TaskName: `Orbit task ${i}`, TaskKey: `OR-${i}`, CompanyId: COMPANY, ProjectID: String(PROJECT), sprintId: SPRINT,
+        _id: new ObjectId(), TaskName: `Orbit task ${i}`, TaskKey: `OR-${i}`, CompanyId: new ObjectId(COMPANY), ProjectID: PROJECT, sprintId: SPRINT,
         status: { text: 'To do', type: 'default_active', key: 1 }, statusType: 'default_active', Task_Priority: 'LOW', TaskType: 'Task', TaskTypeKey: 1,
         AssigneeUserId: [String(MATE)], deletedStatusKey: 0, updatedAt: new Date(Date.UTC(2026, 8, 1, 0, i)),
     }));
@@ -68,9 +70,11 @@ afterAll(async () => {
     if (client) {
         await client.db('global').collection('users').deleteMany({ _id: { $in: [OWNER, MATE] } }).catch(() => {});
         await client.db(COMPANY).dropDatabase().catch(() => {});
+        await client.db(OTHER_COMPANY).dropDatabase().catch(() => {});
         await client.close();
     }
     closeConnection(COMPANY);
+    closeConnection(OTHER_COMPANY);
     ENV_KEYS.forEach((k) => { if (savedEnv[k] === undefined) delete process.env[k]; else process.env[k] = savedEnv[k]; });
 });
 
@@ -91,7 +95,7 @@ describe('MCP_TOOLS_V2 over a real database', () => {
         expect(second.tasks).toHaveLength(TASKS - 25);
         expect(second.nextCursor).toBeUndefined();
         expect([...first.tasks, ...second.tasks].map((t) => t.taskId).sort()).toEqual([...taskIds].sort());
-        await expect(tools.call({ ...ctx(), companyId: crypto.randomBytes(12).toString('hex') }, 'tasks.search', { query: 'Orbit', cursor: first.nextCursor }))
+        await expect(tools.call({ ...ctx(), companyId: OTHER_COMPANY }, 'tasks.search', { query: 'Orbit', cursor: first.nextCursor }))
             .rejects.toMatchObject({ code: -32602 });
     });
 

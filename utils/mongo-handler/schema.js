@@ -1088,6 +1088,11 @@ const schema = {
         declineReason: { type: String, required: false },
         // { sources: [{ kind, ref, at }], reason } — set when the run behind it read external content
         taint: { type: Object, required: false },
+        // 'mcp' when an MCP tool call filed it: requestedBy is the token's person, who the approved change runs as
+        source: { type: String, required: false },
+        requestedBy: { type: String, required: false },
+        tokenId: { type: String, required: false },
+        allowedActions: { type: Array, required: false },
     },
     automationRuns: {
         ruleId: { type: String, required: true },

@@ -116,7 +116,14 @@ const projectOfTask = async (companyId, taskId) => {
     return task && task.ProjectID ? String(task.ProjectID) : null;
 };
 
-const create = async (companyId, { agent, runId, taskId, projectId, what, why, changes, gate, priority, cost, taint: marker }) => {
+// A proposal filed by an MCP call names the token's person, not a workspace agent,
+// and runs as that person once approved.
+const SOURCE_MCP = 'mcp';
+const mcpFields = ({ source, requestedBy, tokenId, allowedActions }) => (source === SOURCE_MCP
+    ? { source, requestedBy: String(requestedBy || ''), tokenId: String(tokenId || ''), allowedActions: Array.isArray(allowedActions) ? allowedActions.map(String) : [] }
+    : {});
+
+const create = async (companyId, { agent, runId, taskId, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, allowedActions }) => {
     if (typeof what !== 'string' || !what.trim()) throw Object.assign(new Error('what is required: say in one sentence what the proposal does.'), { status: 400 });
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
@@ -129,6 +136,7 @@ const create = async (companyId, { agent, runId, taskId, projectId, what, why, c
             changes: changes.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
             ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
+            ...mcpFields({ source, requestedBy, tokenId, allowedActions }),
         },
     }, 'save');
     emit(companyId, saved);
@@ -200,7 +208,8 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     }
 
     const runs = require('./runs');
-    const agent = await runs.getAgent(companyId, p.agentId);
+    const fromMcp = p.source === SOURCE_MCP;
+    const agent = fromMcp ? { allowedActions: p.allowedActions || [] } : await runs.getAgent(companyId, p.agentId);
     if (!agent) return { error: 'This agent was deleted — decline the proposal instead.', status: 409 };
     const run = p.runId ? await runOf(companyId, p.runId) : null;
     if (p.runId && !run) return { error: 'The run behind this proposal no longer exists — decline it instead.', status: 409, reason: REASON.RUN_MISSING };
@@ -212,7 +221,9 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
 
     const runTrace = run && run.traceId ? { traceId: run.traceId } : {};
     const marker = taint.record(run);
-    const agentActor = { kind: 'agent', userId: decider.userId, agentId: p.agentId, agentName: p.agentName, runId: p.runId, viaAccount: 'workspace', tokenId: null, ...runTrace };
+    const agentActor = fromMcp
+        ? { kind: 'agent', userId: p.requestedBy, agentId: null, agentName: p.agentName, runId: null, viaAccount: 'personal', tokenId: p.tokenId || null, source: SOURCE_MCP }
+        : { kind: 'agent', userId: decider.userId, agentId: p.agentId, agentName: p.agentName, runId: p.runId, viaAccount: 'workspace', tokenId: null, ...runTrace };
     const auditIds = [];
     const applied = [];
     for (const c of changes) {
@@ -315,4 +326,4 @@ const reapStuck = async (companyId, { olderThanMs = stuckThresholdMs(), now = ne
     return { reaped };
 };
 
-module.exports = { STATUS, REASON, REAPED_PREFIX, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, undoApproval, bucketOf, reapStuck, stuckThresholdMs };
+module.exports = { STATUS, REASON, SOURCE_MCP, REAPED_PREFIX, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, undoApproval, bucketOf, reapStuck, stuckThresholdMs };
