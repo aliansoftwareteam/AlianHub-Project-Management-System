@@ -509,7 +509,7 @@ describe('/oauth/token: authorization code', () => {
     });
 
     it.each([
-        ['dots and tildes', () => `${crypto.randomBytes(24).toString('base64url')}.~._~`],
+        ['dots and tildes', () => `${crypto.randomBytes(32).toString('base64url')}.~._~`],
         ['128 characters', () => `${'~'.repeat(64)}${'.'.repeat(64)}`],
     ])('accepts a verifier with %s (RFC 7636 section 4.1)', async (label, make) => {
         await start();

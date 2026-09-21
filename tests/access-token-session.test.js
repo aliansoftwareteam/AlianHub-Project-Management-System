@@ -328,7 +328,7 @@ describe('tracker sign-in bound to the tracker that asked for it (PKCE)', () => 
     });
 
     it('exchanges a bound code for a verifier using the whole RFC 7636 alphabet, dots and tildes included', async () => {
-        const verifier = `${crypto.randomBytes(24).toString('base64url')}.~_-.~`;
+        const verifier = `${crypto.randomBytes(32).toString('base64url')}.~_-.~`;
         const res = await issueCode((await signIn(USER_A)).accessToken, { codeChallenge: challengeOf(verifier) });
         const tracker = await call(loginSession.loginAuthTracker, { body: { code: res.body.data.code, userId: USER_A, codeVerifier: verifier } });
         expect(refused(tracker)).toBe(false);

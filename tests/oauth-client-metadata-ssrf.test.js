@@ -41,7 +41,8 @@ const viaLocalServer = () => safeFetch.mockImplementation((url, opts) => {
     const resolve = (target) => (new URL(target).hostname.endsWith('.s10s2.test')
         ? { url: new URL(target), address: '127.0.0.1', family: 4 }
         : actual.resolvePublic(target));
-    return actual.safeFetch(local, { ...opts, resolve });
+    const served = (res) => ({ ...res, url: res.url.replace(`http://agent.s10s2.test:${port}`, 'https://agent.s10s2.test') });
+    return actual.safeFetch(local, { ...opts, resolve }).then(served);
 });
 
 describe('client ID metadata document fetching refuses to reach private addresses', () => {
