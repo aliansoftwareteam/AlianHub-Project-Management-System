@@ -376,6 +376,29 @@ describe('a note is held to every source it came from, for the run reading it', 
         expect(await recalledIds(AGENT_A, MEMBER, 'regulator fees')).toEqual([]);
     });
 
+    describe('recheck() on a stored note, whatever wrote it', () => {
+        const stored = async (value) => {
+            const memoryId = `6f00000000000000000${String(runSeq += 1).padStart(5, '0')}`;
+            await persistence.storeFor(C).put(['agent', AGENT_A, 'note'], `k${memoryId}`, {
+                memoryId, text: 'Stored note.', status: 'active', source: { origin: 'run', userId: STARTER }, projectIds: [P1], derivedFrom: [], ...value,
+            });
+            return { id: `memory:${memoryId}`, sourceType: 'memory', sourceId: memoryId, title: '', excerpt: '', score: 1, authorKind: 'agent', updatedAt: null };
+        };
+        const setFor = (userId) => ({ companyId: C, caller: { kind: 'agent', userId, agentId: AGENT_A }, projectIds: PROJECTS[userId], hiddenSprintIds: [], fileProjectIds: [], sourceTypes: [], privileged: false });
+
+        it('gives a note naming a source it cannot check only to its starter, even unmarked', async () => {
+            const passage = await stored({ derivedFrom: ['web:regulator.example'] });
+            expect(await memoryRetrieval.recheck({ set: setFor(STARTER), passages: [passage] })).toHaveLength(1);
+            expect(await memoryRetrieval.recheck({ set: setFor(MEMBER), passages: [passage] })).toEqual([]);
+        });
+
+        it('gives a note marked starter-only only to its starter, though its sources pass', async () => {
+            const passage = await stored({ starterOnly: true });
+            expect(await memoryRetrieval.recheck({ set: setFor(STARTER), passages: [passage] })).toHaveLength(1);
+            expect(await memoryRetrieval.recheck({ set: setFor(MEMBER), passages: [passage] })).toEqual([]);
+        });
+    });
+
     it('reads only the notes whose chunks matched', async () => {
         await note(AGENT_A, 'Tugboat one is red.');
         await note(AGENT_A, 'Tugboat two is blue.');
