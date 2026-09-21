@@ -14,6 +14,7 @@ const REASON = Object.freeze({
     PATH: 'path',
     WILDCARD: 'wildcard',
     PUBLIC_SUFFIX: 'public_suffix',
+    WILDCARD_DNS: 'wildcard_dns',
     PORT: 'port',
     TOO_MANY: 'too_many',
 });
@@ -37,11 +38,19 @@ const SHARED_SUFFIXES = [
     'github.io', 'gitlab.io', 'pages.dev', 'workers.dev', 'vercel.app', 'netlify.app', 'herokuapp.com', 'onrender.com', 'fly.dev',
     'web.app', 'firebaseapp.com', 'azurewebsites.net', 'blogspot.com', 'wordpress.com', 'glitch.me', 'replit.app', 'replit.dev',
     'ngrok.io', 'ngrok.app', 'ngrok-free.app', 'trycloudflare.com', 'deno.dev', 'surge.sh', 'uk.com', 'us.com', 'eu.org',
+    'ngrok.dev', 'loca.lt', 'github.dev', 'myshopify.com', 'readthedocs.io', 'azurestaticapps.net', 'firebaseio.com',
 ];
 const SHARED_AT_ANY_DEPTH = [
     'amazonaws.com', 'amazonaws.com.cn', 'cloudfront.net', 'elasticbeanstalk.com', 'windows.net', 'azureedge.net', 'cloudapp.azure.com',
     'appspot.com', 'run.app', 'cloudfunctions.net', 'googleusercontent.com', 'digitaloceanspaces.com', 'r2.dev',
 ];
+
+/* Wildcard-DNS services answer any name under them with the address written into it (10.0.0.1.nip.io) or with
+ * loopback, so a wildcard at any depth under one admits every address and makes the list pointless. An exact host
+ * is still accepted: the resolved-address check refuses it if it lands somewhere private. */
+const WILDCARD_DNS_SUFFIXES = ['nip.io', 'sslip.io', 'xip.io', 'traefik.me', 'localtest.me', 'lvh.me'];
+
+const underWildcardDns = (host) => WILDCARD_DNS_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
 
 const isPublicSuffix = (host) => {
     const labels = host.split('.');
@@ -90,6 +99,7 @@ function parseEntry(raw, { isBlockedHostname } = {}) {
     if (isPrivateName(bare) || (typeof isBlockedHostname === 'function' && isBlockedHostname(bare))) return { reason: REASON.PRIVATE };
     // A single label resolves through the local search domain, and a suffix on one would cover a whole top-level domain.
     if (!bare.includes('.')) return { reason: suffix ? REASON.WILDCARD : REASON.PRIVATE };
+    if (suffix && underWildcardDns(bare)) return { reason: REASON.WILDCARD_DNS };
     if (suffix && isPublicSuffix(bare)) return { reason: REASON.PUBLIC_SUFFIX };
 
     return { entry: { text: `${suffix ? '*.' : ''}${bare}${port ? `:${port}` : ''}`, host: bare, suffix, port } };
