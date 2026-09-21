@@ -158,6 +158,12 @@ describe('InstanceKnowledge', () => {
         expect(has(older, 'vector-store')).toBe(false);
     });
 
+    it.each(['mismatch', 'timeout'])('names an Atlas index in the %s state', async (status) => {
+        const wrapper = await opened({ figuresData: figures({ vectorStore: { backend: 'atlas', index: { status, reason: status }, breaker: { open: false } } }) });
+        expect(wrapper.find('[data-test="vector-index"]').text()).toContain(`Knowledge.vector_index_${status}`);
+        expect(wrapper.find('[data-test="vector-index"]').classes()).toContain('ah-chip--warn');
+    });
+
     it('shows the figures of an opened workspace: counts, size, progress, freshness, models and file reasons', async () => {
         const wrapper = await opened();
         const figuresCard = wrapper.find(`[data-test="figures-${CID_A}"]`);
