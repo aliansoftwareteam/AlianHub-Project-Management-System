@@ -4,6 +4,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (
 jest.mock('../Modules/Agents/actions', () => ({ authorizeRead: jest.fn(async () => true), perform: jest.fn(), RefusedError: class RefusedError extends Error {} }));
 jest.mock('../Modules/Automations/engine/tools', () => ({ oid: (id) => (/^[0-9a-fA-F]{24}$/.test(String(id)) ? String(id) : null) }));
 jest.mock('../Modules/Mcp/brief', () => ({ buildBrief: jest.fn() }));
+jest.mock('../Config/permissionGuard', () => ({ ...jest.requireActual('../Config/permissionGuard'), getRoleType: jest.fn(async () => require('../Config/roleTypes').ROLE_OWNER) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const actions = require('../Modules/Agents/actions');
