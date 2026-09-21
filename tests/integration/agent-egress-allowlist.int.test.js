@@ -20,6 +20,15 @@ let project;
 let task;
 
 const listRow = () => lists.findOne({ _id: 'workspace' });
+const version = async () => ((await listRow()) || {}).version || 0;
+
+const mine = async () => {
+    for (let page = 1; ; page += 1) {
+        const res = await owner.api.get(`${BASE}?page=${page}&pageSize=200`);
+        const found = res.body.data.workspaces.find((w) => w.companyId === state.companyId);
+        if (found || page >= Math.ceil(res.body.data.total / res.body.data.pageSize)) return found;
+    }
+};
 
 const waitFor = async (read, what) => {
     const deadline = Date.now() + ROW_DEADLINE_MS;
@@ -43,7 +52,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    if (owner) await owner.api.put(`${BASE}/${state.companyId}`, { hosts: [] });
+    if (owner) await owner.api.put(`${BASE}/${state.companyId}`, { hosts: [], version: await version() });
     if (lists) await lists.deleteMany({});
     if (client) await client.close();
 });
@@ -54,30 +63,29 @@ describe('the workspace egress allowlist', () => {
         expect(res.status).toBe(200);
         expect(res.body.status).toBe(true);
         expect(res.body.data).toMatchObject({ flag: { on: true, envKey: 'AGENT_EGRESS_ALLOWLIST' }, cacheTtlSeconds: expect.any(Number), windowDays: 7 });
-        const mine = res.body.data.workspaces.find((w) => w.companyId === state.companyId);
-        expect(mine).toMatchObject({ name: expect.any(String), hosts: [], refused7d: expect.any(Number) });
+        expect(res.body.data).toMatchObject({ page: 1, total: expect.any(Number) });
+        expect(await mine()).toMatchObject({ name: expect.any(String), hosts: [], refused7d: expect.any(Number), version: 0 });
     });
 
     it('refuses a member and a workspace admin on every route', async () => {
         for (const { api } of [member, admin]) {
             expect((await api.get(BASE)).status).toBe(403);
-            expect((await api.put(`${BASE}/${state.companyId}`, { hosts: ['docs.example.com'] })).status).toBe(403);
+            expect((await api.put(`${BASE}/${state.companyId}`, { hosts: ['docs.example.com'], version: 0 })).status).toBe(403);
         }
         expect(await listRow()).toBeNull();
     });
 
     it('lets the owner set a list, shows it, and writes an audit row naming the change', async () => {
         const before = Date.now();
-        const set = await owner.api.put(`${BASE}/${state.companyId}`, { hosts: ['Docs.example.com', '*.api.example.com'] });
+        const set = await owner.api.put(`${BASE}/${state.companyId}`, { hosts: ['Docs.example.com', '*.api.example.com'], version: 0 });
         expect(set.status).toBe(200);
-        expect(set.body.data).toMatchObject({ companyId: state.companyId, hosts: ['docs.example.com', '*.api.example.com'], updatedBy: owner.uid });
+        expect(set.body.data).toMatchObject({ companyId: state.companyId, hosts: ['docs.example.com', '*.api.example.com'], updatedBy: owner.uid, version: 1 });
 
         const row = await listRow();
-        expect(row).toMatchObject({ hosts: ['docs.example.com', '*.api.example.com'], updatedBy: owner.uid });
+        expect(row).toMatchObject({ hosts: ['docs.example.com', '*.api.example.com'], updatedBy: owner.uid, version: 1 });
         expect(new Date(row.updatedAt).getTime()).toBeGreaterThanOrEqual(before - 1000);
 
-        const summary = await owner.api.get(BASE);
-        expect(summary.body.data.workspaces.find((w) => w.companyId === state.companyId)).toMatchObject({ hosts: ['docs.example.com', '*.api.example.com'], updatedByName: expect.any(String) });
+        expect(await mine()).toMatchObject({ hosts: ['docs.example.com', '*.api.example.com'], updatedByName: expect.any(String), version: 1 });
 
         const audit = await waitFor(() => audits.findOne({ action: 'agent.egress_allowlist', actorId: owner.uid, entityId: state.companyId }), 'the audit row');
         expect(audit.meta).toMatchObject({ added: ['docs.example.com', '*.api.example.com'], removed: [], count: 2 });
@@ -94,26 +102,33 @@ describe('the workspace egress allowlist', () => {
         expect(refusal).toMatchObject({ entityType: 'host', meta: expect.objectContaining({ reason: 'unlisted', host: PR_HOST, hop: 0 }) });
         expect(JSON.stringify(refusal)).not.toContain('/acme/repo/pull/7');
 
-        const summary = await owner.api.get(BASE);
-        expect(summary.body.data.workspaces.find((w) => w.companyId === state.companyId).refused7d).toBeGreaterThanOrEqual(1);
+        expect((await mine()).refused7d).toBeGreaterThanOrEqual(1);
     });
 
     it('refuses an address, a private name, a scheme and a path, and keeps the list', async () => {
-        for (const [entry, reason] of [['10.0.0.1', 'address'], ['169.254.169.254', 'address'], ['localhost', 'private'], ['vault.internal', 'private'], ['https://docs.example.com', 'scheme'], ['docs.example.com/api', 'path'], ['*.com', 'wildcard'], ['*.co.uk', 'public_suffix'], ['*.github.io', 'public_suffix']]) {
-            const res = await owner.api.put(`${BASE}/${state.companyId}`, { hosts: ['docs.example.com', entry] });
+        for (const [entry, reason] of [['10.0.0.1', 'address'], ['169.254.169.254', 'address'], ['localhost', 'private'], ['vault.internal', 'private'], ['https://docs.example.com', 'scheme'], ['docs.example.com/api', 'path'], ['*.com', 'wildcard'], ['*.co.uk', 'public_suffix'], ['*.github.io', 'public_suffix'], ['*.nip.io', 'wildcard_dns']]) {
+            const res = await owner.api.put(`${BASE}/${state.companyId}`, { hosts: ['docs.example.com', entry], version: 1 });
             expect([entry, res.status]).toEqual([entry, 400]);
+            expect(res.body.code).toBe('entries_refused');
             expect(res.body.data.errors).toEqual([{ entry, reason }]);
         }
         expect((await listRow()).hosts).toEqual(['docs.example.com', '*.api.example.com']);
     });
 
+    it('a save from a stale read gets 409 and keeps the stored list', async () => {
+        const res = await owner.api.put(`${BASE}/${state.companyId}`, { hosts: ['stale.example.com'], version: 0 });
+        expect(res.status).toBe(409);
+        expect(res.body).toMatchObject({ status: false, code: 'stale_version', data: { version: 1 } });
+        expect(await listRow()).toMatchObject({ hosts: ['docs.example.com', '*.api.example.com'], version: 1 });
+    });
+
     it('a member cannot change the list once it exists', async () => {
-        expect((await member.api.put(`${BASE}/${state.companyId}`, { hosts: [] })).status).toBe(403);
+        expect((await member.api.put(`${BASE}/${state.companyId}`, { hosts: [], version: 1 })).status).toBe(403);
         expect((await listRow()).hosts).toEqual(['docs.example.com', '*.api.example.com']);
     });
 
     it('clearing the list restores today\'s behaviour for the workspace', async () => {
-        const res = await owner.api.put(`${BASE}/${state.companyId}`, { hosts: [] });
+        const res = await owner.api.put(`${BASE}/${state.companyId}`, { hosts: [], version: 1 });
         expect(res.status).toBe(200);
         expect(res.body.data.hosts).toEqual([]);
         expect((await listRow()).hosts).toEqual([]);

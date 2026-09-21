@@ -1212,9 +1212,9 @@ const schema = {
         budgetUsd: { type: Number, required: false },
         costUsd: { type: Number, required: false },
         depth: { type: Number, required: false },
-        /* Sprint 8 slice 8. The id and expiry of the step-scoped credential the engine
-         * minted on claim (STEP_CREDENTIALS); never the credential itself. */
+        // Ids only, never the credential. The previous one stays accepted until the next re-mint.
         credentialId: { type: String, required: false },
+        previousCredentialId: { type: String, required: false },
         credentialExpiresAt: { type: Date, required: false },
     },
     /* Task 028 sprint 5 step 2. One row per human approval step: who owns the
@@ -1493,6 +1493,8 @@ const schema = {
         hosts: { type: [String], required: false },
         updatedBy: { type: String, required: false },
         updatedAt: { type: Date, required: false },
+        // Moves on with every save; a save names the version it read, so two console tabs cannot drop each other's hosts.
+        version: { type: Number, required: false },
     },
     // Client invoices raised against a project (handoff 19c). Distinct from the
     // global `invoices` collection, which is AlianHub's own subscription billing.
