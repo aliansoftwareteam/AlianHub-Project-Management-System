@@ -225,7 +225,9 @@ describe('hosts that come from configuration', () => {
         expect((await get('/'))[REPORT_ONLY]).toContain('https://*.s3.eu-central-1.wasabisys.com');
         env.WASABIENDPOINT = 'https://later.example.com';
         env.APIKEY = 'AIza-later';
+        env.WEBURL = 'https://moved.example.com';
         const later = (await get('/'))[REPORT_ONLY];
+        expect(later).toContain('wss://moved.example.com');
         expect(later).not.toContain('later.example.com');
         expect(later).not.toContain('firebaseinstallations');
     });
