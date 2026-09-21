@@ -73,24 +73,24 @@ const describeWorkspace = async (company, since) => {
     };
 };
 
-const whole = (value, fallback) => {
-    const n = Math.floor(Number(value));
-    return Number.isFinite(n) && n !== 0 ? n : fallback;
+/* A whole number within [min, max], from a query value that may be anything; 1e308 and Infinity land on max. */
+const within = (value, fallback, min, max) => {
+    const n = Number(value);
+    if (Number.isNaN(n) || n === 0) return Math.min(max, Math.max(min, fallback));
+    return Math.min(max, Math.max(min, Math.floor(n)));
 };
 
 exports.summary = async (req, res) => {
     if (!egressContext.isOn()) return flagOff(res);
     try {
         const since = new Date(Date.now() - WINDOW_DAYS * DAY_MS);
-        const page = Math.max(1, whole(req.query.page, 1));
-        const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, whole(req.query.pageSize, DEFAULT_PAGE_SIZE)));
-        const [companies, total] = await Promise.all([
-            MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
-                type: SCHEMA_TYPE.COMPANIES,
-                data: [{}, 'Cst_CompanyName createdAt', { sort: { createdAt: -1, _id: -1 }, skip: (page - 1) * pageSize, limit: pageSize }],
-            }, 'find'),
-            MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: [{}] }, 'countDocuments'),
-        ]);
+        const pageSize = within(req.query.pageSize, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE);
+        const total = Number(await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: [{}] }, 'countDocuments')) || 0;
+        const page = within(req.query.page, 1, 1, Math.max(1, Math.ceil(total / pageSize)));
+        const companies = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+            type: SCHEMA_TYPE.COMPANIES,
+            data: [{}, 'Cst_CompanyName createdAt', { sort: { createdAt: -1, _id: -1 }, skip: (page - 1) * pageSize, limit: pageSize }],
+        }, 'find');
         const workspaces = await inBatches(companies || [], COMPANY_BATCH, (company) => describeWorkspace(company, since));
         const names = await userNames(workspaces.map((w) => w.updatedBy));
         return ok(res, 'Egress summary.', {
@@ -100,7 +100,7 @@ exports.summary = async (req, res) => {
             maxHosts: rules.MAX_HOSTS,
             page,
             pageSize,
-            total: Number(total) || 0,
+            total,
             workspaces: workspaces.map((w) => ({ ...w, updatedByName: names.get(w.updatedBy) || '' })),
         });
     } catch (error) {

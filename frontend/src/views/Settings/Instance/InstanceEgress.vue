@@ -90,6 +90,8 @@ const setBy = (w) => (w.updatedBy === ADMIN_KEY_ACTOR ? t("Egress.updated_by_adm
 const load = async () => {
     try {
         summary.value = await get(`${env.INSTANCE_EGRESS}?page=${page.value}`);
+        // The server answers with the last page when the list shrank below the one asked for.
+        if (Number.isInteger(summary.value.page)) page.value = summary.value.page;
         flagOff.value = null;
         error.value = "";
         version.value += 1;
