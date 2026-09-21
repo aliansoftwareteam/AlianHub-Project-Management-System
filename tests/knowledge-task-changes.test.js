@@ -69,7 +69,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     mockDb.uniqueFromSchema(CHUNKS, knowledgeChunksSchema);
     mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C, knowledgeIndexer: { mode: 'on' } });
-    ['page', 'comment', 'transcript'].forEach((sourceType) => mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType, status: 'complete', lastSeenOnAt: new Date() }));
+    ['page', 'comment', 'transcript', 'guide', 'file'].forEach((sourceType) => mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType, status: 'complete', lastSeenOnAt: new Date(), originFilledAt: new Date() }));
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P1, deletedStatusKey: 0 });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P2, deletedStatusKey: 0 });
 });

@@ -645,6 +645,10 @@ exports.MongoDbCrudOpration = (companyId, data, method) => {
                     const model = database.model(table, myVariable, table)
                     model.collection.createIndex(...data.data).then(resolve).catch(reject)
                 }
+                else if (method === 'dropIndex') {
+                    const model = database.model(table, myVariable, table)
+                    model.collection.dropIndex(...data.data).then(resolve).catch(reject)
+                }
                 else if (method == "find") {
                     const model = database.model(table, myVariable, table)
                     model[method].apply(model, data.data).then((res) => {

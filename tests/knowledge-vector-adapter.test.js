@@ -186,7 +186,7 @@ describe('both adapters rank a fixture the same way', () => {
             const passages = await adapter.search({ companyId: C, queryEmbedding: Q, model: MODEL, filter: await filterAs(ME), limit: 10 });
             expect(passages.map((p) => [p.sourceId, Number(p.score.toFixed(6))])).toEqual([[a, 1], [rows[2].sourceId, 0.707107], [rows[3].sourceId, 0.099504]]);
             expect(passages[0]).toEqual({
-                id: `page:${a}`, sourceType: 'page', sourceId: a, projectId: SHARED, title: 'Harbour guide', excerpt: 'Harbour appendix', score: 1, authorKind: 'user', updatedAt: day(10),
+                id: `page:${a}`, sourceType: 'page', sourceId: a, projectId: SHARED, title: 'Harbour guide', excerpt: 'Harbour appendix', score: 1, authorKind: 'user', origin: 'member', contentHash: 'h', updatedAt: day(10),
             });
             expect(passages[1].authorKind).toBe('agent');
         }
