@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const express = require('express');
 const bodyParser = require('body-parser');
 const fakeMongo = require('./fixtures/fakeMongo');
+const consentFlow = require('./fixtures/oauthConsent');
 
 let mockDb;
 const mockLogged = [];
@@ -14,15 +15,18 @@ jest.mock('../Config/loggerConfig', () => {
     return { info: keep('info'), error: keep('error'), warn: keep('warn'), debug: keep('debug') };
 });
 jest.mock('../Modules/Audit/recorder', () => ({ recordAudit: jest.fn((...args) => mockAudited.push(args)) }));
-jest.mock('../Config/jwt', () => ({
-    verifyJWTTokenWithCV2: jest.fn((req, res, next) => {
-        const signedIn = /^Bearer user:([a-f0-9]{24})$/.exec(String(req.headers.authorization || ''));
+jest.mock('../Config/jwt', () => {
+    const guard = (req, res, next) => {
+        const signedIn = /^Bearer user:([a-f0-9]{24})$/.exec(String(req.headers.authorization || ''))
+            || /(?:^|;\s*)accessToken=user:([a-f0-9]{24})(?:;|$)/.exec(String(req.headers.cookie || ''));
         if (!signedIn) return res.status(401).json({ status: false, error: 'Unauthorized' });
         req.uid = signedIn[1];
         if (req.headers['x-test-api-token']) req.apiToken = { _id: 'pat' };
         return next();
-    }),
-}));
+    };
+    return { verifyJWTTokenWithCV2: jest.fn(guard), verifyJWTTokenV2: jest.fn(guard) };
+});
+jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({ handleNotificationtFun: jest.fn(async () => ({ status: true })) }));
 jest.mock('../Config/permissionGuard', () => ({
     getRoleType: jest.fn(async (companyId, uid) => mockRoles[uid]),
     isPrivileged: (roleType) => roleType === 1 || roleType === 2,
@@ -112,13 +116,24 @@ const post = async (path, body, headers = {}) => {
 
 const authorizeUrl = (params) => `${base}/oauth/authorize?${new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined))}`;
 
-const consentHeaders = (uid = OWNER, companyId = CID, answer = 'approve') => ({ authorization: `Bearer user:${uid}`, companyid: companyId, 'x-oauth-test-consent': answer });
+const approvedIn = (clientId, companyId) => rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS).some((row) => row.clientId === clientId && row.companyId === companyId);
 
-const authorize = async (params, headers = consentHeaders()) => {
-    const res = await fetch(authorizeUrl(params), { redirect: 'manual', headers });
-    const location = res.headers.get('location');
-    const text = location ? '' : await res.text();
-    return { status: res.status, location: location ? new URL(location) : null, body: text ? JSON.parse(text) : null };
+/* A workspace owner has approved the client where the test consents, as the consent screen requires. */
+const ensureApproved = (clientId, companyId = CID) => {
+    if (approvedIn(clientId, companyId)) return;
+    mockDb.seed(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, {
+        companyId, clientId, clientName: 'approved in test', clientKind: 'dynamic', status: 'approved',
+        scopes: ['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write'], privateSprints: false,
+        decidedBy: OWNER, decidedAt: new Date(), requestedScopes: [], redirectHosts: [], updatedAt: new Date(),
+    });
+};
+
+/* The browser round: /oauth/authorize, then the consent screen's form, answered as `uid` in `companyId`. */
+const authorize = async (params, { uid = OWNER, companyId = CID, answer = 'approve', headers = {} } = {}) => {
+    const started = await consentFlow.startAuthorization(authorizeUrl(params));
+    if (!started.consent) return started;
+    ensureApproved(params.client_id, CID);
+    return consentFlow.answer(started.consent, { session: `accessToken=user:${uid}`, workspace: companyId, decision: answer, headers });
 };
 
 const registerPublicClient = async (overrides = {}) => {
@@ -142,7 +157,7 @@ const validParams = (client, verifier, over = {}) => ({
 
 const codeFor = async (client, verifier = newVerifier(), over = {}) => {
     const res = await authorize(validParams(client, verifier, over));
-    expect(res.status).toBe(302);
+    expect(res.status).toBe(303);
     const code = res.location.searchParams.get('code');
     expect(code).toBeTruthy();
     seen.push(code, verifier);
@@ -280,7 +295,7 @@ describe('/oauth/authorize', () => {
         await start();
         const client = await registerPublicClient({ redirectUris: [registered] });
         const res = await authorize(validParams(client, newVerifier(), { redirect_uri: presented }));
-        expect(res.status).toBe(302);
+        expect(res.status).toBe(303);
         expect(res.location.origin + res.location.pathname).toBe(presented.replace(/\?.*$/, ''));
         expect(res.location.searchParams.get('code')).toBeTruthy();
     });
@@ -331,7 +346,7 @@ describe('/oauth/authorize', () => {
         const client = await registerPublicClient();
         const params = new URLSearchParams(validParams(client, newVerifier()));
         params.append('scope', 'tasks:write');
-        const res = await fetch(`${base}/oauth/authorize?${params}`, { redirect: 'manual', headers: consentHeaders() });
+        const res = await fetch(`${base}/oauth/authorize?${params}`, { redirect: 'manual' });
         const location = new URL(res.headers.get('location'));
         expect(location.searchParams.get('error')).toBe('invalid_request');
         expect(location.searchParams.get('code')).toBeNull();
@@ -411,37 +426,41 @@ describe('/oauth/authorize', () => {
         expect(tokenHash.looksLike('code', res.location.searchParams.get('code'))).toBe(true);
     });
 
-    it('answers "consent not available" when no consent was given, and issues nothing', async () => {
+    it('hands the request to the consent screen and issues nothing until a person answers', async () => {
         await start();
         const client = await registerPublicClient();
-        const res = await authorize(validParams(client, newVerifier()), {});
-        expect(res.location.searchParams.get('error')).toBe('temporarily_unavailable');
-        expect(res.location.searchParams.get('state')).toBe('st-s10s2');
+        const started = await consentFlow.startAuthorization(authorizeUrl(validParams(client, newVerifier())));
+        expect(started.status).toBe(302);
+        expect(started.location.pathname).toBe('/oauth/consent');
+        expect(started.location.searchParams.get('code')).toBeNull();
         expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)).toHaveLength(0);
+        expect(rows(SCHEMA_TYPE.OAUTH_TOKENS)).toHaveLength(0);
     });
 
     it('sends access_denied when the user declines', async () => {
         await start();
         const client = await registerPublicClient();
-        const res = await authorize(validParams(client, newVerifier()), consentHeaders(OWNER, CID, 'deny'));
+        const res = await authorize(validParams(client, newVerifier()), { answer: 'deny' });
         expect(res.location.searchParams.get('error')).toBe('access_denied');
+        expect(res.location.searchParams.get('state')).toBe('st-s10s2');
     });
 
     it('never lets an API token consent', async () => {
         await start();
         const client = await registerPublicClient();
-        const res = await authorize(validParams(client, newVerifier()), { ...consentHeaders(), 'x-test-api-token': '1' });
+        const res = await authorize(validParams(client, newVerifier()), { headers: { 'x-test-api-token': '1' } });
         expect(res.status).toBe(403);
         expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)).toHaveLength(0);
     });
 
-    it.each(['production', 'development', 'staging', '', 'Test', 'test ', undefined])('keeps the test-only consent path unreachable when NODE_ENV is %p', async (nodeEnv) => {
+    it.each(['production', 'development', 'test', undefined])('offers no way to consent but the consent screen when NODE_ENV is %p', async (nodeEnv) => {
         await start();
         const client = await registerPublicClient();
         if (nodeEnv === undefined) delete process.env.NODE_ENV;
         else process.env.NODE_ENV = nodeEnv;
-        const res = await authorize(validParams(client, newVerifier()));
-        expect(res.location.searchParams.get('error')).toBe('temporarily_unavailable');
+        const res = await fetch(authorizeUrl(validParams(client, newVerifier())), { redirect: 'manual', headers: { authorization: `Bearer user:${OWNER}`, companyid: CID, 'x-oauth-test-consent': 'approve' } });
+        expect(res.status).toBe(302);
+        expect(new URL(res.headers.get('location'), base).pathname).toBe('/oauth/consent');
         expect(jwt.verifyJWTTokenWithCV2).not.toHaveBeenCalled();
         expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)).toHaveLength(0);
     });
@@ -759,7 +778,8 @@ describe('client authentication', () => {
     it('binds a pre-registered client to the workspace that registered it', async () => {
         await start();
         const { client } = await confidential('client_secret_basic');
-        const res = await authorize(validParams(client, newVerifier()), consentHeaders(OWNER, OTHER_CID));
+        const res = await authorize(validParams(client, newVerifier()), { companyId: OTHER_CID });
+        expect(res.status).toBe(403);
         expect(res.location.searchParams.get('error')).toBe('access_denied');
         expect(rows(SCHEMA_TYPE.OAUTH_GRANTS)).toHaveLength(0);
     });
@@ -861,7 +881,7 @@ describe('client ID metadata documents at /oauth/authorize', () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
         release();
         const results = await Promise.all(pending);
-        expect(results.every((r) => r.status === 302 && r.location.searchParams.get('code'))).toBe(true);
+        expect(results.every((r) => r.status === 303 && r.location.searchParams.get('code'))).toBe(true);
         expect(safeFetch).toHaveBeenCalledTimes(1);
     });
 
