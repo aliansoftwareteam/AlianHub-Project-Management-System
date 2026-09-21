@@ -39,6 +39,7 @@ module.exports = {
                 ]
             }
         },
+        { files: ['Modules/Pickers/static/*.js'], env: { browser: true, node: false } },
         { files: ['**/*.mjs'], parserOptions: { sourceType: 'module' } }
     ]
 };

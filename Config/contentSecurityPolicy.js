@@ -21,8 +21,11 @@ const UNSAFE_INLINE = "'unsafe-inline'";
 const GOOGLE_SIGN_IN_SCRIPT = 'https://accounts.google.com/gsi/client';
 const GOOGLE_SIGN_IN_STYLE = 'https://accounts.google.com/gsi/style';
 const GOOGLE_SIGN_IN_CALLS = 'https://accounts.google.com/gsi/';
-// api.js pulls the Drive picker's module from /_/scs/ on the same host.
+/* The Drive picker's module calls eval, so it runs only on its own page (Modules/Pickers) under drivePickerPolicy.
+ * api.js pulls that module from /_/scs/ on the same host, and the picker draws itself in a docs.google.com frame. */
 const GOOGLE_PICKER_SCRIPTS = ['https://apis.google.com/js/api.js', 'https://apis.google.com/_/scs/'];
+const GOOGLE_PICKER_FRAMES = 'https://docs.google.com/';
+const UNSAFE_EVAL = "'unsafe-eval'";
 const DROPBOX_CHOOSER_SCRIPT = 'https://www.dropbox.com/static/api/2/dropins.js';
 // PdfViewer.vue loads pdf.min.js and its worker from this folder.
 const PDF_VIEWER_SCRIPTS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
@@ -141,7 +144,7 @@ const buildDirectives = (env = process.env, { reportingApi = false } = {}) => {
 
     const directives = {
         'default-src': [SELF],
-        'script-src': [SELF, GOOGLE_SIGN_IN_SCRIPT, ...GOOGLE_PICKER_SCRIPTS, DROPBOX_CHOOSER_SCRIPT, PDF_VIEWER_SCRIPTS, ...(pushOn ? [FIREBASE_WORKER_SCRIPTS] : [])],
+        'script-src': [SELF, GOOGLE_SIGN_IN_SCRIPT, DROPBOX_CHOOSER_SCRIPT, PDF_VIEWER_SCRIPTS, ...(pushOn ? [FIREBASE_WORKER_SCRIPTS] : [])],
         'style-src': [SELF, UNSAFE_INLINE, GOOGLE_FONTS_STYLE, GOOGLE_SIGN_IN_STYLE],
         'img-src': [SELF, 'data:', 'blob:', 'https:', ...storage],
         'media-src': [SELF, 'blob:', ...storage],
@@ -162,6 +165,20 @@ const buildDirectives = (env = process.env, { reportingApi = false } = {}) => {
 const DIRECTIVE_NAMES = Object.freeze(Object.keys(buildDirectives({})).filter((name) => !name.startsWith('report-')));
 
 const policyOf = (env = process.env, options) => Object.entries(buildDirectives(env, options)).map(([name, sources]) => `${name} ${sources.join(' ')}`).join('; ');
+
+/* Sent as the enforced header whatever CSP_MODE is: the page carries no app code, session or data, and this policy
+ * is what lets it allow eval at all. The picker's styles and its backdrop are injected by Google's script. */
+const drivePickerPolicy = (env = process.env) => [
+    ['default-src', [NONE]],
+    ['script-src', [SELF, ...GOOGLE_PICKER_SCRIPTS, UNSAFE_EVAL]],
+    ['style-src', [UNSAFE_INLINE]],
+    ['frame-src', [GOOGLE_PICKER_FRAMES]],
+    ['frame-ancestors', [NONE]],
+    ['form-action', [NONE]],
+    ['base-uri', [NONE]],
+    ['object-src', [NONE]],
+    ...(modeOf(env) === OFF ? [] : [['report-uri', [REPORT_PATH]]]),
+].map(([name, sources]) => `${name} ${sources.join(' ')}`).join('; ');
 
 const headerNameOf = (mode) => ({ [REPORT]: REPORT_ONLY_HEADER, [ENFORCE]: ENFORCE_HEADER })[mode] || null;
 
@@ -231,4 +248,4 @@ const middleware = (env = process.env) => {
     };
 };
 
-module.exports = { OFF, REPORT, ENFORCE, MODES, REPORT_PATH, EXTRA_ENV, DIRECTIVE_NAMES, modeOf, extrasOf, buildDirectives, policyOf, headerOf, sentPolicy, middleware };
+module.exports = { OFF, REPORT, ENFORCE, MODES, REPORT_PATH, EXTRA_ENV, DIRECTIVE_NAMES, modeOf, extrasOf, buildDirectives, policyOf, headerOf, sentPolicy, middleware, drivePickerPolicy };

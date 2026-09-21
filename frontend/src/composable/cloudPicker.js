@@ -12,7 +12,7 @@
 //   dropbox   — Chooser needs only the public app key; the user signs in inside
 //               the widget. No token ever reaches us.
 //   google    — Picker needs an OAuth access token, which the server mints from
-//               the stored refresh token.
+//               the stored refresh token. It runs in its own popup page.
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 
@@ -175,61 +175,115 @@ const openDropboxChooser = ({ appKey, multiple, mode }) => new Promise((resolve,
 
 // ── Google Drive ────────────────────────────────────────────────────────────
 
+/* Google's picker module calls eval, which the app's content security policy refuses, so the picker runs in a
+ * same-origin popup page served with its own policy (Modules/Pickers). The token never goes into a URL: the
+ * popup announces itself, and only then is it sent the settings, to this origin, with a one-time nonce that
+ * its answer must carry back. */
+const DRIVE_PICKER_PATH = '/pickers/google-drive';
+const DRIVE_PICKER_WINDOW = 'alianhub-drive-picker';
+const DRIVE_PICKER_FEATURES = 'popup,width=1100,height=720';
+const DRIVE_CLOSED_POLL_MS = 500;
+const DRIVE_MESSAGE = {
+    READY: 'drive-picker:ready',
+    CONFIG: 'drive-picker:config',
+    PICKED: 'drive-picker:picked',
+    CANCEL: 'drive-picker:cancel',
+    ERROR: 'drive-picker:error',
+};
+
+const codedError = (message, code) => Object.assign(new Error(message), { code });
+
+const newNonce = () => Array.from(window.crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+
+const asText = (value) => (typeof value === 'string' ? value : '');
+
 /**
- * Biggest entry from the Picker's `thumbnails` array ([{url,width,height}]).
- *
- * This is a real preview image. It is NOT the same as `iconUrl`, which is a
- * 16px file-TYPE glyph — stretching that into a 131x100 tile produced a blurry
- * coloured blob, so the tile must never fall back to it.
+ * Biggest entry from the Picker's `thumbnails` array ([{url,width}]). Never fall back to `iconUrl`: that is a
+ * 16px file-type glyph, and stretched into a tile it is a blur.
  */
 const largestThumbnail = (thumbnails) => {
     if (!Array.isArray(thumbnails) || !thumbnails.length) return '';
     const best = thumbnails
-        .filter((t) => t && t.url)
+        .filter((t) => t && typeof t.url === 'string' && t.url)
         .sort((a, b) => Number(b.width || 0) - Number(a.width || 0))[0];
     return (best && best.url) || '';
 };
 
-const loadGooglePicker = () => loadScript('https://apis.google.com/js/api.js').then(() => new Promise((resolve, reject) => {
-    if (!window.gapi) return reject(new Error('The Google API script did not initialise.'));
-    if (window.google && window.google.picker) return resolve();
-    window.gapi.load('picker', { callback: () => resolve(), onerror: () => reject(new Error('Could not load the Google Picker.')) });
-}));
+const driveFileOf = (doc) => {
+    const id = asText(doc && doc.id);
+    const url = asText(doc && doc.url);
+    return {
+        id,
+        name: asText(doc && doc.name),
+        size: Number(doc && doc.sizeBytes) || 0,
+        mimeType: asText(doc && doc.mimeType),
+        url: url.startsWith('https://') ? url : `https://drive.google.com/open?id=${encodeURIComponent(id)}`,
+        iconUrl: asText(doc && doc.iconUrl),
+        thumbnailUrl: largestThumbnail(doc && doc.thumbnails),
+    };
+};
 
-const openGooglePicker = ({ token, apiKey, appId, multiple }) => new Promise((resolve, reject) => {
-    loadGooglePicker().then(() => {
-        const picker = window.google.picker;
-        const view = new picker.DocsView(picker.ViewId.DOCS)
-            .setIncludeFolders(true)
-            .setSelectFolderEnabled(false);
-        const builder = new picker.PickerBuilder()
-            .setOAuthToken(token)
-            .addView(view)
-            .setCallback((data) => {
-                if (data.action === picker.Action.CANCEL) return resolve([]);
-                if (data.action !== picker.Action.PICKED) return;
-                resolve((data.docs || []).map((d) => ({
-                    id: d.id,
-                    name: d.name,
-                    size: Number(d.sizeBytes || 0),
-                    mimeType: d.mimeType || '',
-                    // Prefer the canonical Drive link; url is a fallback for
-                    // shortcut-type results that omit it.
-                    url: d.url || `https://drive.google.com/open?id=${encodeURIComponent(d.id)}`,
-                    iconUrl: d.iconUrl || '',
-                    thumbnailUrl: largestThumbnail(d.thumbnails),
-                })));
-            });
-        // The developer key is optional but Google throttles keyless picker use.
-        if (apiKey) builder.setDeveloperKey(apiKey);
-        // setAppId is what makes a drive.file pick actually grant our app access
-        // to that file. Omit it and picking still works, but every later Drive API
-        // call for the file 404s — no thumbnails, no importing.
-        if (appId) builder.setAppId(appId);
-        if (multiple) builder.enableFeature(picker.Feature.MULTISELECT_ENABLED);
-        builder.build().setVisible(true);
-    }).catch(reject);
+const openDrivePopup = () => {
+    const popup = window.open(DRIVE_PICKER_PATH, DRIVE_PICKER_WINDOW, DRIVE_PICKER_FEATURES);
+    if (!popup) throw codedError('The browser blocked the Google Drive window.', 'popup_blocked');
+    return popup;
+};
+
+const runDrivePicker = (popup, settings) => new Promise((resolve, reject) => {
+    const origin = window.location.origin;
+    const nonce = newNonce();
+    let configSent = false;
+    let done = false;
+    let closedPoll = null;
+
+    const finish = (settle, value) => {
+        if (done) return;
+        done = true;
+        window.removeEventListener('message', onMessage);
+        clearInterval(closedPoll);
+        settle(value);
+    };
+
+    const onMessage = (event) => {
+        if (done || event.origin !== origin || event.source !== popup) return;
+        const data = event.data;
+        if (!data || typeof data !== 'object') return;
+        if (data.type === DRIVE_MESSAGE.READY) {
+            if (configSent) return;
+            configSent = true;
+            settings.then((config) => {
+                if (!done) popup.postMessage({ type: DRIVE_MESSAGE.CONFIG, nonce, config }, origin);
+            }, () => {});
+            return;
+        }
+        if (data.nonce !== nonce) return;
+        if (data.type === DRIVE_MESSAGE.PICKED && Array.isArray(data.files)) finish(resolve, data.files.map(driveFileOf));
+        else if (data.type === DRIVE_MESSAGE.CANCEL) finish(resolve, []);
+        else if (data.type === DRIVE_MESSAGE.ERROR) finish(reject, codedError('Could not load the Google Picker.', 'picker_failed'));
+    };
+
+    window.addEventListener('message', onMessage);
+    closedPoll = setInterval(() => { if (popup.closed) finish(resolve, []); }, DRIVE_CLOSED_POLL_MS);
+    settings.catch((error) => {
+        finish(reject, error);
+        popup.close();
+    });
 });
+
+const pickFromDrive = ({ multiple, labels }) => {
+    const popup = openDrivePopup();
+    const settings = fetchPickerToken('google_drive').then(({ token, config }) => {
+        if (!token) throw codedError('Not connected.', 'not_connected');
+        return {
+            token,
+            developerKey: (config && config.api_key) || '',
+            appId: (config && config.app_id) || '',
+            multiple: !!multiple,
+            labels: { loading: asText(labels && labels.loading) },
+        };
+    });
+    return runDrivePicker(popup, settings);
+};
 
 // ── public entry point ──────────────────────────────────────────────────────
 
@@ -238,10 +292,12 @@ const openGooglePicker = ({ token, apiKey, appId, multiple }) => new Promise((re
  * user cancelled).
  *
  * Throws with `code === 'not_connected'` / `'reauth_required'` when the user needs
- * to (re)authorise, so the caller can offer a Connect action instead of showing a
- * meaningless error.
+ * to (re)authorise, and `'popup_blocked'` / `'picker_failed'` for the Drive window.
+ * Call it straight from the click: the Drive window opens before anything is awaited.
  */
-export const pickCloudFiles = async ({ provider, multiple = true, mode = 'link' }) => {
+export const pickCloudFiles = async ({ provider, multiple = true, mode = 'link', labels }) => {
+    if (provider === 'google_drive') return pickFromDrive({ multiple, labels });
+
     if (provider === 'dropbox') {
         const { config } = await fetchPickerToken('dropbox');
         const appKey = (config && config.app_key) || '';
@@ -249,21 +305,6 @@ export const pickCloudFiles = async ({ provider, multiple = true, mode = 'link' 
         // Dropbox needs to know the mode up front: the kind of link the Chooser
         // returns is decided when it opens, not afterwards.
         return openDropboxChooser({ appKey, multiple, mode });
-    }
-
-    const { token, config } = await fetchPickerToken(provider);
-    if (!token) {
-        const err = new Error('Not connected.');
-        err.code = 'not_connected';
-        throw err;
-    }
-    if (provider === 'google_drive') {
-        return openGooglePicker({
-            token,
-            apiKey: (config && config.api_key) || '',
-            appId: (config && config.app_id) || '',
-            multiple,
-        });
     }
     throw new Error('Unknown provider.');
 };
