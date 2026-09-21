@@ -128,7 +128,7 @@ describe('memory ingestion off the memory events', () => {
     });
 
     it('declares every memory field on the strict chunk schema', () => {
-        ['scope', 'agentId', 'projectIds', 'runId', 'startedBy', 'tainted', 'taintRefs', 'derivedFrom', 'derivedAuthors', 'derivedOnlyPrivateOf']
+        ['scope', 'agentId', 'projectIds', 'runId', 'startedBy', 'starterOnly', 'tainted', 'taintRefs', 'derivedFrom', 'derivedAuthors', 'derivedOnlyPrivateOf']
             .forEach((field) => expect(knowledgeChunksSchema.path(field)).toBeDefined());
         expect(knowledgeChunksSchema.get('strict')).toBe(true);
     });
@@ -342,7 +342,7 @@ describe('a note is held to every source it came from, for the run reading it', 
     });
 
     it("keeps a note from a file from a run whose starter may not open the task's attachments", async () => {
-        evaluatePermission.mockImplementation(async (companyId, uid) => uid !== MEMBER);
+        evaluatePermission.mockImplementation(async (companyId, uid) => (uid === MEMBER ? 0 : 1));
         const task = mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Carrier', ProjectID: P1, deletedStatusKey: 0, attachments: [{ id: 'att1' }] });
         const got = await recallBoth('The survey found hull damage.', [`file:${task._id}:att1`], 'survey');
         expect(got.starter).toEqual([got.id]);
