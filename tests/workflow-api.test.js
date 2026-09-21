@@ -63,6 +63,32 @@ describe('the flag gates the whole surface', () => {
     });
 });
 
+describe('a step row in an answer', () => {
+    const CREDENTIAL = 'c0ffee00c0ffee00c0ffee00';
+    const PREVIOUS = 'decaf000decaf000decaf000';
+    const row = { stepId: 'sAgent', type: 'agent_run', status: 'running', fencingToken: 1, credentialId: CREDENTIAL, previousCredentialId: PREVIOUS, credentialExpiresAt: new Date() };
+    const document = { ...row, toObject: () => ({ ...row }) };
+
+    it.each([['a plain row', row], ['a mongoose document', document]])('never carries a credential id: %s', async (label, step) => {
+        store.getRun.mockResolvedValue({ _id: RUN_ID, status: 'failed', startedBy: OWNER });
+        store.listSteps.mockResolvedValue([step]);
+        store.getStep.mockResolvedValue(step);
+        store.retryStep.mockResolvedValue(step);
+        for (const handler of [controller.getRun, controller.retryStep]) {
+            const res = resSpy();
+            // eslint-disable-next-line no-await-in-loop
+            await handler(reqFor({ params: { id: RUN_ID, stepId: 'sAgent' } }), res);
+            expect(res.body.status).toBe(true);
+            expect(res.body.data.steps).toHaveLength(1);
+            expect(res.body.data.steps[0]).toMatchObject({ stepId: 'sAgent', status: 'running', fencingToken: 1 });
+            const text = JSON.stringify(res.body);
+            expect(text).not.toMatch(/credentialId|previousCredentialId/);
+            expect(text).not.toContain(CREDENTIAL);
+            expect(text).not.toContain(PREVIOUS);
+        }
+    });
+});
+
 describe('who may manage a workflow run', () => {
     it('refuses a member every control, and lets them read', async () => {
         asCaller({ privileged: false, userId: MEMBER });
