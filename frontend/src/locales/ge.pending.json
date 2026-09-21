@@ -1,7 +1,7 @@
 {
   "locale": "ge",
   "machineTranslated": false,
-  "updatedAt": "2026-09-21T11:00:44.310Z",
+  "updatedAt": "2026-09-21T11:50:07.093Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6436,6 +6436,9 @@
     "Accounts.token_expiry_over_max": "A token can last at most {n} days. Choose a shorter expiry.",
     "Accounts.lifetime_capped_until": "exceeds the maximum lifetime · works until {d}",
     "Accounts.lifetime_stopped_on": "exceeds the maximum lifetime · stopped on {d}",
-    "Accounts.lifetime_unchecked": "exceeds the maximum lifetime · cannot be checked right now"
+    "Accounts.lifetime_unchecked": "exceeds the maximum lifetime · cannot be checked right now",
+    "Attachments.cloud_picker_loading": "Opening Google Drive…",
+    "Attachments.cloud_picker_failed": "Google Drive could not be opened. Please try again.",
+    "Attachments.cloud_popup_blocked": "Your browser blocked the Google Drive window. Allow pop-ups for this site and try again."
   }
 }

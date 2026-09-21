@@ -22,6 +22,10 @@ module.exports = defineConfig({
         target: 'http://localhost:4000',
         changeOrigin: true
       },
+      '^/pickers/': {
+        target: 'http://localhost:4000',
+        changeOrigin: true
+      },
       'socket.io': {
         target: 'http://localhost:4000',
         changeOrigin: true

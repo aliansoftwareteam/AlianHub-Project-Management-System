@@ -6,10 +6,7 @@ jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), 
 jest.mock('../Modules/Automations/engine/tools', () => ({ oid: (id) => (/^[0-9a-fA-F]{24}$/.test(String(id)) ? String(id) : null) }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn() }));
 jest.mock('../Modules/Agents/permissions', () => ({ holderMay: jest.fn(async () => ({ allowed: true, reason: '' })) }));
-jest.mock('../Config/permissionGuard', () => ({
-    getRoleType: jest.fn(async () => 'member'),
-    isPrivileged: (role) => ['owner', 'admin'].includes(String(role)),
-}));
+jest.mock('../Config/permissionGuard', () => ({ ...jest.requireActual('../Config/permissionGuard'), getRoleType: jest.fn() }));
 jest.mock('../Modules/Agents/proposals', () => ({
     create: jest.fn(async (companyId, o) => mockDb.crud(companyId, {
         type: 'agent_proposals',
@@ -25,11 +22,13 @@ jest.mock('../Modules/Agents/actions', () => ({
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { dbCollections } = require('../Config/collections');
+const { ROLE_OWNER, ROLE_MEMBER } = require('../Config/roleTypes');
 const scope = require('../Modules/Agents/scope');
 const guard = require('../Config/permissionGuard');
 const actions = require('../Modules/Agents/actions');
 const proposals = require('../Modules/Agents/proposals');
 const tools = require('../Modules/Mcp/tools');
+const names = require('../Modules/Mcp/names');
 
 const C = '6f0000000000000000000c01';
 const OTHER_C = '6f0000000000000000000c02';
@@ -69,7 +68,7 @@ beforeEach(() => {
     process.env.MCP_TOOLS_V2 = 'on';
     process.env.MCP_CURSOR_SECRET = 'unit-test-cursor-secret';
     scope.visibleProjectIds.mockResolvedValue([PROJECT]);
-    guard.getRoleType.mockResolvedValue('member');
+    guard.getRoleType.mockResolvedValue(ROLE_MEMBER);
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: 'Apollo', taskTypeCounts: [{ key: 1, name: 'Task' }, { key: 2, name: 'Bug' }] });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: SECRET_PROJECT, ProjectName: 'Skunkworks', isPrivateSpace: true });
     mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: SPRINT, name: 'Sprint 1', projectId: PROJECT });
@@ -105,12 +104,18 @@ describe('names in results', () => {
         });
     });
 
-    it('does not resolve names under a project the caller cannot open', async () => {
+    it('leaves out tasks under a project the caller cannot open', async () => {
         seedTask({ ProjectID: SECRET_PROJECT, sprintId: null });
         const { tasks } = await tools.call(ctxFor(), 'tasks.search', {});
-        expect(tasks[0].project).toEqual({ id: SECRET_PROJECT, name: null });
-        expect(tasks[0].assignees).toEqual([{ id: USER, name: null }, { id: MATE, name: null }]);
-        expect(JSON.stringify(tasks[0])).not.toMatch(/Skunkworks|Asha/);
+        expect(tasks).toEqual([]);
+    });
+
+    it('does not resolve names under a project the caller cannot open, even for a row handed to it', async () => {
+        const t = seedTask({ ProjectID: SECRET_PROJECT, sprintId: null });
+        const [row] = await names.forTasks(ctxFor(), [t], () => ({}));
+        expect(row.project).toEqual({ id: SECRET_PROJECT, name: null });
+        expect(row.assignees).toEqual([{ id: USER, name: null }, { id: MATE, name: null }]);
+        expect(JSON.stringify(row)).not.toMatch(/Skunkworks|Asha/);
     });
 
     it('does not resolve a project the token is narrowed away from', async () => {
@@ -126,10 +131,12 @@ describe('names in results', () => {
     });
 
     it('hides a private sprint\'s name from a member who is not on it, and shows it to an owner', async () => {
-        seedTask({ sprintId: PRIVATE_SPRINT });
+        const t = seedTask({ sprintId: PRIVATE_SPRINT });
         const member = await tools.call(ctxFor(), 'tasks.search', {});
-        expect(member.tasks[0].sprint).toEqual({ id: PRIVATE_SPRINT, name: null });
-        guard.getRoleType.mockResolvedValue('owner');
+        expect(member.tasks).toEqual([]);
+        const [row] = await names.forTasks(ctxFor(), [t], () => ({}));
+        expect(row.sprint).toEqual({ id: PRIVATE_SPRINT, name: null });
+        guard.getRoleType.mockResolvedValue(ROLE_OWNER);
         const owner = await tools.call(ctxFor(), 'tasks.search', {});
         expect(owner.tasks[0].sprint).toEqual({ id: PRIVATE_SPRINT, name: 'Hush sprint' });
     });
@@ -141,13 +148,14 @@ describe('names in results', () => {
     });
 
     it('gives task.get a ref and the same visibility-checked names', async () => {
-        const t = seedTask({ sprintId: PRIVATE_SPRINT, description: 'Goal: do it' });
+        const t = seedTask({ description: 'Goal: do it' });
         const brief = await tools.call(ctxFor(), 'task.get', { taskId: t._id });
         expect(brief).toMatchObject({
-            ref: `task:${t._id}`, title: t.TaskName, project: { id: PROJECT, name: 'Apollo' }, sprint: { id: PRIVATE_SPRINT, name: null },
+            ref: `task:${t._id}`, title: t.TaskName, project: { id: PROJECT, name: 'Apollo' }, sprint: { id: SPRINT, name: 'Sprint 1' },
             priorityName: 'High', taskType: { key: 2, name: 'Bug' }, assignees: [{ id: USER, name: 'Mevil B' }, { id: MATE, name: 'Asha K' }],
         });
-        expect(JSON.stringify(brief)).not.toMatch(/Hush sprint/);
+        const hidden = seedTask({ sprintId: PRIVATE_SPRINT });
+        expect(await tools.call(ctxFor(), 'task.get', { taskId: hidden._id })).toEqual({ error: 'task not found' });
     });
 
     it('gives docs.read a ref and the page\'s project name', async () => {
