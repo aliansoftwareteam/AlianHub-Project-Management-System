@@ -17,7 +17,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'mcp-tools-v2-integration-sec
 
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
-const { closeConnection } = require('../../middlewares/mongoConnector/helper');
+const mongoConnections = require('../../middlewares/mongoConnector/helper');
 const actions = require('../../Modules/Agents/actions');
 const proposals = require('../../Modules/Agents/proposals');
 const tools = require('../../Modules/Mcp/tools');
@@ -73,8 +73,8 @@ afterAll(async () => {
         await client.db(OTHER_COMPANY).dropDatabase().catch(() => {});
         await client.close();
     }
-    closeConnection(COMPANY);
-    closeConnection(OTHER_COMPANY);
+    // The name lookup opens the shared 'global' connection too; one left open keeps jest from exiting.
+    [...mongoConnections.connections].forEach((c) => mongoConnections.closeConnection(c.db));
     ENV_KEYS.forEach((k) => { if (savedEnv[k] === undefined) delete process.env[k]; else process.env[k] = savedEnv[k]; });
 });
 
