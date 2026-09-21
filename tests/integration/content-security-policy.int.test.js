@@ -69,6 +69,38 @@ afterAll(async () => {
     if (mongo) await mongo.close();
 });
 
+describe('uploads on server storage, with CSP_MODE unset', () => {
+    const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+    const FILES = [
+        ['s8s12-photo.png', PNG, 'image/png', false],
+        ['s8s12-notes.txt', Buffer.from('plain notes'), 'text/plain; charset=utf-8', false],
+        ['s8s12-report.pdf', Buffer.from('%PDF-1.4\n%%EOF'), 'application/pdf', false],
+        ['s8s12-payload.js', Buffer.from('alert(document.domain)'), 'application/octet-stream', true],
+        ['s8s12-page.html', Buffer.from('<script>alert(document.domain)</script>'), 'application/octet-stream', true],
+        ['s8s12-drawing.svg', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'), 'application/octet-stream', true],
+    ];
+    let owner;
+
+    beforeAll(async () => {
+        const session = await login(state.baseURL, emailFor('owner'));
+        owner = createApiClient({ baseURL: state.baseURL, accessToken: session.accessToken, companyId: state.companyId });
+    });
+
+    it.each(FILES)('serves %s as %s', async (name, bytes, type, download) => {
+        const filepath = `project/${state.projects.shared._id}/${name}`;
+        const up = await owner.post('/api/v1/storage/uploadFileBase64', { companyId: state.companyId, path: filepath, base64String: bytes.toString('base64') });
+        expect(up.status).toBe(200);
+        const signed = await owner.get(`/api/v1/generateSignedUrl/${state.companyId}`, { query: { filepath, domainUrl: state.baseURL } });
+        const res = await fetch(signed.body.url);
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-type')).toBe(type);
+        expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+        expect(res.headers.get('content-security-policy')).toBe("default-src 'none'; sandbox");
+        expect(res.headers.get('content-disposition')).toBe(download ? `attachment; filename="${name}"` : null);
+        expect(Buffer.from(await res.arrayBuffer()).equals(bytes)).toBe(true);
+    });
+});
+
 describe('CSP_MODE unset, the harness server', () => {
     it.each(['/', '/login', '/api/v2/changelog', '/api/v2/instance/public-config'])('sends the security headers beta sends, and no policy, on %s', async (route) => {
         expect(await headersOf(state.baseURL, route)).toEqual(BETA_HELMET_HEADERS);
