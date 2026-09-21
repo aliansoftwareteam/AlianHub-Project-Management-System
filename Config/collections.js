@@ -125,6 +125,8 @@ const dbCollections = {
     OAUTH_TOKENS: "oauth_tokens",
     SCHEMA_VERSIONS: "schema_versions",
     INSTANCE_SETTINGS: "instance_settings",
+    AGENT_SESSIONS: "agent_sessions",
+    AGENT_SESSION_ENDPOINTS: "agent_session_endpoints",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

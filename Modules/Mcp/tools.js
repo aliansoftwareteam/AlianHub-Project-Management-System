@@ -11,6 +11,7 @@ const performanceRead = require('../Agents/performanceRead');
 const scopes = require('./scopes');
 const { heldForApproval } = require('./taintHold');
 const visibility = require('./visibility');
+const sessionTools = require('./sessionTools');
 
 const PAGE_TEXT_MAX = 40000;
 
@@ -222,9 +223,9 @@ const FLAGGED_TOOLS = [
     },
 ];
 
-const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action))];
+const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...sessionTools.offered()];
 
-const registered = () => [...TOOLS, ...FLAGGED_TOOLS];
+const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...sessionTools.TOOLS];
 
 const names = () => offered().map((t) => t.name);
 
@@ -247,6 +248,7 @@ const scopeRefusal = (ctx, tool, write) => {
 /* Run a tool for an MCP caller. Reads are authorised through the registry;
  * writes go through actions.perform, so they are audited and undoable. */
 const call = async (ctx, name, args = {}) => {
+    if (sessionTools.owns(name)) return sessionTools.call(ctx, name, args);
     const tool = offered().find((t) => t.name === String(name));
     if (!tool) throw Object.assign(new Error(`Unknown tool "${name}"`), { code: -32601 });
     if (!['filtered', 'none'].includes(tool.visibility)) throw new Error(`${tool.name} declares no visibility`);

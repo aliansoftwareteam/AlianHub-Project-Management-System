@@ -18,7 +18,12 @@ const TOOL_SCOPES = Object.freeze({
 
 const DISCOVERY_SCOPES = mcpOAuth.READ_SCOPES;
 
-const scopeForTool = (name) => (Object.prototype.hasOwnProperty.call(TOOL_SCOPES, name) ? TOOL_SCOPES[name] : null);
+const sessionScopes = () => require('./sessionTools').SCOPES;
+
+const scopeForTool = (name) => {
+    if (Object.prototype.hasOwnProperty.call(TOOL_SCOPES, name)) return TOOL_SCOPES[name];
+    return Object.prototype.hasOwnProperty.call(sessionScopes(), name) ? sessionScopes()[name] : null;
+};
 
 /* An OAuth token holds exactly what was granted. A personal access token only
  * knows read and write. hasScope keeps its rules (empty scopes, API_TOKEN_STRICT),

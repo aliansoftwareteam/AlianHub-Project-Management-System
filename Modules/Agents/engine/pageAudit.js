@@ -57,6 +57,21 @@ async function fetchPage(url) {
     return { status: res.status, html: res.body, bytes: res.bytes, finalUrl: res.finalUrl, hops: res.hops };
 }
 
+/* A signed JSON announcement to an outside agent (Modules/AgentSessions). Nothing is read back into a run, so no host
+ * is noted, and it follows no redirect: the signature was made for this URL alone. */
+async function postJson(url, { body, headers = {}, timeoutMs, maxBytes, allowlist } = {}) {
+    const res = await safeFetch(url, {
+        method: 'post',
+        data: body,
+        timeoutMs,
+        maxBytes,
+        maxRedirects: 0,
+        allowlist,
+        headers: { 'Content-Type': 'application/json', ...headers },
+    });
+    return { status: res.status, hops: res.hops };
+}
+
 /* Each check returns a fact: { id, ok, detail, evidence }. `evidence` is what the
  * finding will quote, so it has to be concrete enough to act on without re-running. */
 function auditHtml(html, url) {
@@ -159,4 +174,4 @@ async function audit(url) {
              facts: auditHtml(page.html, url), blindSpots: BLIND_SPOTS };
 }
 
-module.exports = { audit, auditHtml, extractUrl, fetchPage, BLIND_SPOTS };
+module.exports = { audit, auditHtml, extractUrl, fetchPage, postJson, BLIND_SPOTS };
