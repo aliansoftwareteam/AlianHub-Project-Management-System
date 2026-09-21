@@ -23,6 +23,11 @@ const TAG_BYTES = 16;
 const RESOLVE_FAILED_AUDIT_INTERVAL_MS = 60 * 60 * 1000;
 const RESOLVE_FAILED_TRACKED = 5000;
 const STATUS_BY_CODE = { store_off: 404, key_invalid: 503, invalid_input: 400, not_found: 404, revoked: 409 };
+const READ_KIND = 'skill_read';
+const MAX_READ_HOSTS = 20;
+const HEADER_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;
+// Headers the transport or the read itself sets, so a credential can never replace them.
+const RESERVED_HEADERS = ['host', 'content-length', 'content-type', 'transfer-encoding', 'connection', 'keep-alive', 'upgrade', 'te', 'trailer', 'proxy-connection', 'user-agent', 'accept', 'accept-encoding', 'cookie'];
 
 class SecretsStoreError extends Error {
     constructor(code, message) {
@@ -178,7 +183,40 @@ const metadata = (row) => ({
     rotatedAt: row.rotatedAt || null,
     revokedAt: row.revokedAt || null,
     lastResolvedAt: row.lastResolvedAt || null,
+    ...(Array.isArray(row.hosts) ? { hosts: [...row.hosts] } : {}),
+    ...(row.header ? { header: row.header } : {}),
 });
+
+/* A skill_read secret names the exact hosts it may be sent to; no other kind carries any. `undefined` leaves a
+ * rotate's binding as it was. */
+const hostsOf = (kind, hosts, { required }) => {
+    if (kind !== READ_KIND) {
+        if (hosts !== undefined) throw invalid(`Only a ${READ_KIND} secret names the hosts it is sent to.`);
+        return undefined;
+    }
+    if (hosts === undefined && !required) return undefined;
+    if (!Array.isArray(hosts) || !hosts.length) throw invalid('Name at least one host this secret may be sent to.');
+    if (hosts.length > MAX_READ_HOSTS) throw invalid(`A secret names at most ${MAX_READ_HOSTS} hosts.`);
+    const { parseDeclaredHost, hostProblem } = require('../Modules/Agents/skills/externalReads');
+    const out = [];
+    for (const raw of hosts) {
+        const { entry, reason } = parseDeclaredHost(raw);
+        if (!entry) throw invalid(`"${String(raw).slice(0, 100)}" ${hostProblem(reason)}.`);
+        if (!out.includes(entry.text)) out.push(entry.text);
+    }
+    return out;
+};
+
+const headerOf = (kind, header) => {
+    if (header === undefined || header === null || header === '') return undefined;
+    if (kind !== READ_KIND) throw invalid(`Only a ${READ_KIND} secret names a header.`);
+    const name = typeof header === 'string' ? header.trim().toLowerCase() : '';
+    if (!HEADER_NAME.test(name)) throw invalid('A header name is letters, digits and dashes, up to 64 characters.');
+    if (RESERVED_HEADERS.includes(name)) throw invalid(`A credential cannot be sent as the ${name} header.`);
+    return name === 'authorization' ? undefined : name;
+};
+
+const bindingMeta = (row) => (Array.isArray(row.hosts) ? { hosts: [...row.hosts], ...(row.header ? { header: row.header } : {}) } : {});
 
 const findRow = async (companyId, handle) => {
     const id = String(handle || '');
@@ -193,23 +231,28 @@ const requireRow = async (companyId, handle) => {
     return row;
 };
 
-async function create({ companyId, name, kind, value, actor }) {
+async function create({ companyId, name, kind, value, actor, hosts, header }) {
     const cfg = requireOn();
     const id = companyOf(companyId);
+    const kindText = textOf(kind, MAX_KIND_LENGTH, 'kind');
+    const boundHosts = hostsOf(kindText, hosts, { required: true });
+    const boundHeader = headerOf(kindText, header);
     const row = {
         handle: `sec_${crypto.randomBytes(12).toString('hex')}`,
         name: textOf(name, MAX_NAME_LENGTH, 'name'),
-        kind: textOf(kind, MAX_KIND_LENGTH, 'kind'),
+        kind: kindText,
         keyId: cfg.keyId,
         createdBy: String(actorOf(actor).id || ''),
         createdAt: new Date(),
         rotatedAt: null,
         revokedAt: null,
         lastResolvedAt: null,
+        ...(boundHosts ? { hosts: boundHosts } : {}),
+        ...(boundHeader ? { header: boundHeader } : {}),
     };
     Object.assign(row, seal({ material: keyMaterial(cfg.keyId), companyId: id, handle: row.handle, value: valueOf(value) }));
     const saved = plain(await db(id, row, 'save')) || row;
-    audit(id, actor, { action: 'secret.create', entityId: row.handle, entityName: row.name, meta: { kind: row.kind, keyId: cfg.keyId } });
+    audit(id, actor, { action: 'secret.create', entityId: row.handle, entityName: row.name, meta: { kind: row.kind, keyId: cfg.keyId, ...bindingMeta(row) } });
     return metadata(saved);
 }
 
@@ -255,13 +298,21 @@ async function describe({ companyId, handle }) {
     return metadata(await requireRow(companyOf(companyId), handle));
 }
 
-async function rotate({ companyId, handle, value, actor }) {
+async function rotate({ companyId, handle, value, actor, hosts, header }) {
     const cfg = requireOn();
     const id = companyOf(companyId);
     const row = await requireRow(id, handle);
-    const set = { keyId: cfg.keyId, rotatedAt: new Date(), ...seal({ material: keyMaterial(cfg.keyId), companyId: id, handle: row.handle, value: valueOf(value) }) };
+    const boundHosts = hostsOf(row.kind, hosts, { required: false });
+    const boundHeader = headerOf(row.kind, header);
+    const set = {
+        keyId: cfg.keyId,
+        rotatedAt: new Date(),
+        ...(boundHosts ? { hosts: boundHosts } : {}),
+        ...(header !== undefined && row.kind === READ_KIND ? { header: boundHeader || '' } : {}),
+        ...seal({ material: keyMaterial(cfg.keyId), companyId: id, handle: row.handle, value: valueOf(value) }),
+    };
     const updated = plain(await db(id, [{ _id: row._id }, { $set: set }, { returnDocument: 'after' }], 'findOneAndUpdate'));
-    audit(id, actor, { action: 'secret.rotate', entityId: row.handle, entityName: row.name, meta: { kind: row.kind, keyId: cfg.keyId } });
+    audit(id, actor, { action: 'secret.rotate', entityId: row.handle, entityName: row.name, meta: { kind: row.kind, keyId: cfg.keyId, ...bindingMeta({ ...row, ...set }) } });
     return metadata(updated || { ...row, ...set });
 }
 
@@ -339,7 +390,7 @@ async function reencryptAll({ companyId, actor, run }) {
 }
 
 module.exports = {
-    SecretsStoreError, HANDLE, MIN_KEY_LENGTH, MAX_VALUE_LENGTH, MAX_NAME_LENGTH, MAX_KIND_LENGTH,
+    SecretsStoreError, HANDLE, READ_KIND, MIN_KEY_LENGTH, MAX_VALUE_LENGTH, MAX_NAME_LENGTH, MAX_KIND_LENGTH,
     storeConfig, config, isOn, logBootState, keyIdOf,
     create, resolve, describe, rotate, revoke, retire, revokeOrphans, list, reencryptAll,
 };

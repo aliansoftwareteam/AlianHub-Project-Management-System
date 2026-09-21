@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-21T12:26:02.921Z",
+  "updatedAt": "2026-09-21T13:21:10.115Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_available_on_paid_plans_upgrade_now": "AI is only available for purchase on our paid plans. Upgrade and add AI now!",
@@ -8517,6 +8517,24 @@
     "Instance.redact_code_unknown_workspace": "That workspace no longer exists.",
     "Instance.redact_code_confirmation_mismatch": "The id you typed does not match the person's user id.",
     "Instance.redact_code_redaction_running": "Another run is already redacting this person in this workspace. Try again once it ends.",
-    "Instance.redact_code_server_error": "The audit rows could not be redacted. Running it again resumes where it stopped."
+    "Instance.redact_code_server_error": "The audit rows could not be redacted. Running it again resumes where it stopped.",
+    "Secrets.kind_skill_read": "Skill read",
+    "Secrets.sent_to": "Sent only to {hosts}",
+    "Secrets.add_read": "Add a read credential",
+    "Secrets.add_read_lead": "A token a skill sends when it reads a declared host. It is sent only to the hosts named here, and only while they are on the workspace egress allowlist.",
+    "Secrets.read_name": "Name",
+    "Secrets.read_name_ph": "GitHub read token",
+    "Secrets.read_value": "Value",
+    "Secrets.read_value_ph": "Paste the token",
+    "Secrets.read_hosts": "Hosts it may be sent to",
+    "Secrets.read_hosts_ph": "api.github.com, one per line",
+    "Secrets.read_hosts_hint": "Exact host names, with a port if not 443. No wildcards.",
+    "Secrets.read_header": "Header",
+    "Secrets.read_header_ph": "authorization",
+    "Secrets.read_header_hint": "Leave empty to send it as a bearer token in Authorization.",
+    "Secrets.err_name": "A name is required.",
+    "Secrets.err_hosts": "Name at least one host.",
+    "Secrets.create": "Add credential",
+    "Secrets.created_toast": "{name} added."
   }
 }
