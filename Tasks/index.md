@@ -23,7 +23,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 015 | Guided project start — complete brief, agent/human split | active | high | 014 | active/015-guided-project-brief |
 | 016 | Agent trust layer — risk-rated actions, policy L2, whole-run revert, budgets | done | high | 014 | done/016-agent-trust-layer |
 | 017 | Agent memory the product owns | done | high | 015, 016 | done/017-agent-memory |
-| 018 | Sprint 10 — external agents: OAuth, scopes, delegation | backlog | medium | 028, 031 | backlog/018-agent-interop |
+| 018 | Sprint 10 — external agents: OAuth, scopes, delegation | active | medium | 028, 031 | active/018-agent-interop |
 | 019 | Sprint 9 — evals and routing measurement | backlog | medium | 026, 027, 030 | backlog/019-agent-evals-observability |
 | 020 | Automation comments show as Ghost User | backlog | medium | — | backlog/020-automation-comment-author |
 | 021 | Maintainability leftovers verified 2026-09-10 | backlog | medium | — | backlog/021-maintainability-leftovers |
@@ -37,7 +37,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 029 | Sprint 6 — skill authoring and migration | done | medium | 025, 028 | done/029-sprint-6-skill-authoring-migration |
 | 030 | Sprint 7 — knowledge and retrieval | active | medium | 024 | active/030-sprint-7-knowledge-and-retrieval |
 | 031 | Sprint 8 — security hardening | active | high | 024 | active/031-sprint-8-security-hardening |
-| 032 | Sprint 11 — data skills reach outside (ADR 003 phase 4) | backlog | medium | 029, 031 | backlog/032-sprint-11-data-skills-reach |
+| 032 | Sprint 11 — data skills reach outside (ADR 003 phase 4) | active | medium | 029, 031 | active/032-sprint-11-data-skills-reach |
 | 033 | Beta build version and log — every merge is a numbered build | active | high | — | active/033-beta-build-version-and-log |
 | 034 | End-to-end QA programme — sweep every function, keep it covered in CI | active | high | — | active/034-end-to-end-qa-programme |
 | 035 | QA follow-ups — fix what the QA fix PRs left out | active | high | 034 | active/035-qa-followups |

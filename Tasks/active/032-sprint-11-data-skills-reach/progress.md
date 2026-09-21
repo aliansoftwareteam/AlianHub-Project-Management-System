@@ -13,6 +13,7 @@ One pull request per step; tick with the merge commit.
 | Date | Entry |
 |---|---|
 | 2026-09-10 | Filed from `docs/AI-PLATFORM-ARCHITECTURE.md` (sprint 11) |
+| 2026-09-21 | Started after Sprints 6 and 8. Planned into six pull requests (see task.md Decisions); the owner settled every open question. S0 merged: #792 `1730b429` (build 262), outbound fetches drop credentials at the first hop to another origin, refuse https-to-http with credentials, and mark every hop's host as outside content. S1 (declared reads, #793) is in its review fix round. |
 
 ## Last step
-Not started.
+S0 merged (build 262). S1 in review fixes (#793); then S2, S3, S4 and S5.
