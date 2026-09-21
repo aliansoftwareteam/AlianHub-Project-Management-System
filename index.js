@@ -77,6 +77,7 @@ function initializeControllers() {
     require('./Modules/Audit/init').init(app);
     require('./Modules/Agents/init').init(app);
     require('./Modules/Mcp/init').init(app);
+    require('./Modules/OAuthServer/init').init(app);
     require('./Modules/Scim/init').init(app);
     require('./Modules/Pto/init').init(app);
     require('./Modules/Portfolio/init').init(app);

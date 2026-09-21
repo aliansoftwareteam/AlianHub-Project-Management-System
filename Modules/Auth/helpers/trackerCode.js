@@ -74,4 +74,4 @@ const redeemTrackerCode = async (code, codeVerifier) => {
     return { ok: true, userId: String(session.userId) };
 };
 
-module.exports = { issueTrackerCode, redeemTrackerCode, isCodeChallenge, challengeOf, TRACKER_CODE_TTL_MS };
+module.exports = { issueTrackerCode, redeemTrackerCode, isCodeChallenge, challengeOf, sameSecret, CODE_VERIFIER_PATTERN, TRACKER_CODE_TTL_MS };

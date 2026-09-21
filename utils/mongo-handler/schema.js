@@ -1486,6 +1486,52 @@ const schema = {
         count: { type: Number, required: false },
         lastSeen: { type: Date, required: false },
     },
+    // MCP OAuth authorization server (Modules/OAuthServer), global database. Secrets, codes and tokens are
+    // kept only as keyed hashes; a client whose companyId is set was pre-registered by that workspace.
+    oauthClients: {
+        clientId: { type: String, required: true },
+        kind: { type: String, required: true },
+        name: { type: String, required: true },
+        redirectUris: { type: [String], required: true },
+        tokenEndpointAuthMethod: { type: String, required: true },
+        secretHash: { type: String, required: false },
+        scopes: { type: [String], required: false },
+        companyId: { type: String, required: false },
+        createdBy: { type: String, required: false },
+        createdAt: { type: Date, required: true },
+        revokedAt: { type: Date, required: false },
+        revokedBy: { type: String, required: false },
+    },
+    oauthGrants: {
+        grantId: { type: String, required: true },
+        clientId: { type: String, required: true },
+        companyId: { type: String, required: true },
+        userId: { type: String, required: true },
+        scopes: { type: [String], required: true },
+        resource: { type: String, required: true },
+        createdAt: { type: Date, required: true },
+        expiresAt: { type: Date, required: true },
+        revokedAt: { type: Date, required: false },
+        revokedReason: { type: String, required: false },
+    },
+    // kind is code, access or refresh. purgeAt drives the TTL index; a code outlives its expiry there so a replay is recognised.
+    oauthTokens: {
+        tokenHash: { type: String, required: true },
+        kind: { type: String, required: true },
+        grantId: { type: String, required: true },
+        clientId: { type: String, required: true },
+        companyId: { type: String, required: true },
+        userId: { type: String, required: true },
+        scopes: { type: [String], required: true },
+        resource: { type: String, required: true },
+        redirectUri: { type: String, required: false },
+        codeChallenge: { type: String, required: false },
+        createdAt: { type: Date, required: true },
+        expiresAt: { type: Date, required: true },
+        purgeAt: { type: Date, required: true },
+        spentAt: { type: Date, required: false },
+        revokedAt: { type: Date, required: false },
+    },
     // One document per workspace (_id "workspace"): the hosts its agents may fetch when
     // AGENT_EGRESS_ALLOWLIST is on (Modules/Agents/engine/egressAllowlist.js).
     egressAllowlists: {

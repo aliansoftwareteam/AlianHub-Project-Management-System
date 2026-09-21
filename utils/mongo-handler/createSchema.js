@@ -326,6 +326,17 @@ permissionDecisionsSchema.index({ day: 1, mode: 1, method: 1, route: 1, permissi
 permissionDecisionsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 const egressAllowlistsSchema = new Schema(schema.egressAllowlists, {strict: true, timestamps: false});
 
+const oauthClientsSchema = new Schema(schema.oauthClients, {strict: true, timestamps: false});
+oauthClientsSchema.index({ clientId: 1 }, { unique: true, name: 'client_id' });
+oauthClientsSchema.index({ companyId: 1, createdAt: -1 });
+const oauthGrantsSchema = new Schema(schema.oauthGrants, {strict: true, timestamps: false});
+oauthGrantsSchema.index({ grantId: 1 }, { unique: true, name: 'grant_id' });
+oauthGrantsSchema.index({ companyId: 1, userId: 1 });
+const oauthTokensSchema = new Schema(schema.oauthTokens, {strict: true, timestamps: false});
+oauthTokensSchema.index({ tokenHash: 1 }, { unique: true, name: 'token_hash' });
+oauthTokensSchema.index({ grantId: 1 });
+oauthTokensSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0, name: 'purge_at' });
+
 const cspReportsSchema = new Schema(schema.cspReports, {strict: true, timestamps: false});
 cspReportsSchema.index({ day: 1, directive: 1, blockedHost: 1, documentPath: 1 }, { unique: true, name: 'report_key' });
 cspReportsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
@@ -469,6 +480,9 @@ module.exports = {
     auditChainAnchorsSchema,
     egressAllowlistsSchema,
     secretsSchema,
+    oauthClientsSchema,
+    oauthGrantsSchema,
+    oauthTokensSchema,
     historySchema,
     userIdSchema, 
     usersSchema,
