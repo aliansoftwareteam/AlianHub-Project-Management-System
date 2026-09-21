@@ -104,4 +104,4 @@ const authenticate = async (req, raw, { namedCompanies = [], now = new Date() } 
     };
 };
 
-module.exports = { isAccessToken, looksLikeOAuthSecret, authenticate, clientApprovedInWorkspace };
+module.exports = { isAccessToken, looksLikeOAuthSecret, authenticate, clientStanding, clientApprovedInWorkspace };

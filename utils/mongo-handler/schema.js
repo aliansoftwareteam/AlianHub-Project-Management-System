@@ -1593,6 +1593,51 @@ const schema = {
         // Moves on with every save; a save names the version it read, so two console tabs cannot drop each other's hosts.
         version: { type: Number, required: false },
     },
+    // An outside agent delegated a task (Modules/AgentSessions, EXTERNAL_AGENT_SESSIONS). state is offered, active,
+    // completed, failed, revoked or unresponsive; the handle is stored only as a hash and dies with the offer.
+    agentSessions: {
+        taskId: { type: String, required: true },
+        projectId: { type: String, required: false },
+        sprintId: { type: String, required: false },
+        taskKey: { type: String, required: false },
+        taskName: { type: String, required: false },
+        clientId: { type: String, required: true },
+        clientName: { type: String, required: false },
+        grantId: { type: String, required: true },
+        delegatedBy: { type: String, required: true },
+        assignedDelegator: { type: Boolean, required: false },
+        privateSprint: { type: Boolean, required: false },
+        state: { type: String, required: true },
+        reason: { type: String, required: false },
+        handleHash: { type: String, required: false },
+        handleExpiresAt: { type: Date, required: false },
+        tainted: { type: Boolean, required: false },
+        createdAt: { type: Date, required: true },
+        deliveredAt: { type: Date, required: false },
+        firstActivityAt: { type: Date, required: false },
+        lastActivityAt: { type: Date, required: false },
+        endedAt: { type: Date, required: false },
+        activityCount: { type: Number, required: false },
+        activities: {
+            type: [{
+                _id: false,
+                type: { type: String, required: true },
+                text: { type: String, required: false },
+                at: { type: Date, required: true },
+            }],
+            required: false,
+        },
+    },
+    // Where a workspace announces delegations to one outside client: an https URL and the HMAC secret that signs each
+    // announcement, by handle when SECRETS_STORE is on and on the row otherwise.
+    agentSessionEndpoints: {
+        clientId: { type: String, required: true },
+        url: { type: String, required: true },
+        secret: { type: String, required: false },
+        secretHandle: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        updatedAt: { type: Date, required: false },
+    },
     // Client invoices raised against a project (handoff 19c). Distinct from the
     // global `invoices` collection, which is AlianHub's own subscription billing.
     // Every line keeps the ids it was drafted from so a client question about a

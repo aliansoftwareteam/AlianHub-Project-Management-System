@@ -268,6 +268,9 @@ const verifyJWTTokenWithCRoute = [
     // A prefix, so /:id, /runs, /proposals/:id/approve are all behind a token. The MCP
     // endpoint (/mcp) is deliberately NOT here — it authenticates its own bearer PAT.
     '/api/v2/agents',
+    // Outside agent sessions (Modules/AgentSessions, EXTERNAL_AGENT_SESSIONS): delegation, the strip's reads and the
+    // delivery URLs. The outside agent itself never calls these; it reports through /mcp with its OAuth token.
+    ...(require('../Modules/AgentSessions/config').isOn() ? ["/api/v2/agent-sessions"] : []),
     // Not listed, on purpose (Modules/Mcp, MCP_OAUTH): /.well-known/oauth-protected-resource and
     // /.well-known/oauth-protected-resource/mcp are public by design (RFC 9728), since a client
     // reads them before it holds a token; they carry no secret and exist only with the flag on.
@@ -419,6 +422,8 @@ const verifyJWTToken = [
  * Middleware With CompanyId
  * @param {*} app 
  */
+exports.guardedPrefixes = verifyJWTTokenWithCRoute;
+
 exports.setMiddlewareWithCV2 = (app) => {
     app.use(verifyJWTTokenWithCRoute, jwt.verifyJWTTokenWithCV2)
     // Runs the rest of the request inside the verified tenant so model calls it

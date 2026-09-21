@@ -1457,7 +1457,21 @@ export default {
         "agent_stop": "Stop",
         "agent_tag": "AGENT",
         "agent_stopped": "Run stopped.",
-        "agent_stop_failed": "That run could not be stopped."
+        "agent_stop_failed": "That run could not be stopped.",
+        "agent_outside_tag": "OUTSIDE AGENT",
+        "agent_activities": "Latest activity",
+        "agent_session_offered": "Delegated — waiting for the agent to start",
+        "agent_session_active": "Working on this task",
+        "agent_session_completed": "Finished",
+        "agent_session_failed": "Stopped with an error",
+        "agent_session_revoked": "Stopped — access was revoked",
+        "agent_session_unresponsive": "Did not start within ten seconds",
+        "agent_session_with_reason": "{state}: {reason}",
+        "agent_activity_thought": "Thinking",
+        "agent_activity_action": "Action",
+        "agent_activity_elicitation": "Question",
+        "agent_activity_response": "Answer",
+        "agent_activity_error": "Error"
     },
     "Ai": {
         "title": "AI",
@@ -5851,6 +5865,7 @@ export default {
         "loading": "Loading…"
     },
     "Inbox": {
+        "agent_session_assigned": "{task} had no assignee, so it is now yours while {agent} works on it for you.",
         "oauth_client_approval": "{client} asks to act for people in this workspace. An owner or admin can approve or deny it in Settings, Agent clients.",
         "unnamed_client": "An outside agent",
         "title": "Inbox",

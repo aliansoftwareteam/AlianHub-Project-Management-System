@@ -326,6 +326,12 @@ const permissionDecisionsSchema = new Schema(schema.permissionDecisions, {strict
 permissionDecisionsSchema.index({ day: 1, mode: 1, method: 1, route: 1, permission: 1, role: 1, scope: 1, reason: 1 }, { unique: true, name: 'decision_key' });
 permissionDecisionsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 const egressAllowlistsSchema = new Schema(schema.egressAllowlists, {strict: true, timestamps: false});
+const agentSessionsSchema = new Schema(schema.agentSessions, {strict: true, timestamps: false});
+agentSessionsSchema.index({ taskId: 1, createdAt: -1 });
+agentSessionsSchema.index({ state: 1, deliveredAt: 1 });
+agentSessionsSchema.index({ grantId: 1, state: 1 });
+const agentSessionEndpointsSchema = new Schema(schema.agentSessionEndpoints, {strict: true, timestamps: false});
+agentSessionEndpointsSchema.index({ clientId: 1 }, { unique: true, name: 'client_id' });
 
 const oauthClientsSchema = new Schema(schema.oauthClients, {strict: true, timestamps: false});
 oauthClientsSchema.index({ clientId: 1 }, { unique: true, name: 'client_id' });
@@ -487,6 +493,8 @@ module.exports = {
     auditChainAnchorsSchema,
     auditRedactionsSchema,
     egressAllowlistsSchema,
+    agentSessionsSchema,
+    agentSessionEndpointsSchema,
     secretsSchema,
     oauthClientsSchema,
     oauthGrantsSchema,

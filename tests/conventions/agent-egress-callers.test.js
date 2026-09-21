@@ -4,8 +4,8 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..', '..');
 /* Everything an agent run can reach: the agents themselves, the workflow and automation engines that start them
  * and hold their tool steps, the MCP server's tools, knowledge retrieval, and the model layer they all call. */
-const SCANNED = ['Modules/Agents', 'Modules/Workflows', 'Modules/Automations', 'Modules/Mcp', 'Modules/Knowledge', 'Modules/AICore'];
-const FETCH_HELPERS = { safeFetch: ['safeFetch'], pageAudit: ['fetchPage', 'audit'], agentFetch: ['fetchPage', 'audit'] };
+const SCANNED = ['Modules/Agents', 'Modules/Workflows', 'Modules/Automations', 'Modules/Mcp', 'Modules/Knowledge', 'Modules/AICore', 'Modules/AgentSessions'];
+const FETCH_HELPERS = { safeFetch: ['safeFetch'], pageAudit: ['fetchPage', 'audit', 'postJson'], agentFetch: ['fetchPage', 'audit', 'postJson'] };
 const CID = '6f00000000000000000000a1';
 const ACTOR = '6f0000000000000000000011';
 
@@ -23,6 +23,10 @@ const FETCHERS = {
             useSkill({ slug: 'qa-review', kind: 'audit', maxFindings: 5, buildUserPrompt: () => '' });
             return orchestrator().analyse({ skillSlug: 'qa-review', task: { _id: 't1' }, context: { url: 'https://example.com/pricing' }, spend: { companyId: CID, userId: ACTOR }, companyId: CID });
         },
+    },
+    'Modules/AgentSessions/announce.js': {
+        uses: ['helper:agentFetch.*'],
+        reach: () => require('../../Modules/AgentSessions/announce').deliver({ companyId: CID, actor: ACTOR, url: 'https://agent.example.com/hooks/alianhub', body: '{}', headers: {} }),
     },
     'Modules/Agents/skills/prReview.js': {
         uses: ['helper:agentFetch.fetchPage'],
@@ -324,6 +328,7 @@ describe('agent fetches go through the workspace egress gateway', () => {
             const { fetchPage, audit } = require('../../Modules/Agents/engine/agentFetch');
             await expect(fetchPage('https://github.com/acme/repo/pull/7.diff')).rejects.toMatchObject({ code: 'no_workspace' });
             await expect(audit('https://example.com/pricing')).rejects.toMatchObject({ code: 'no_workspace' });
+            await expect(require('../../Modules/Agents/engine/agentFetch').postJson('https://agent.example.com/hooks/alianhub', { body: '{}' })).rejects.toMatchObject({ code: 'no_workspace' });
             expect(seen).toEqual([]);
         });
     });
