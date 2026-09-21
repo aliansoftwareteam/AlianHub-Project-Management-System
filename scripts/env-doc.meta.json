@@ -635,6 +635,11 @@
     "description": "Knowledge indexer: \"off\" subscribes to nothing and reads or writes no chunk; \"tenant\" ingests page, comment, call-notes, project-guide and task-attachment events into knowledge_chunks (pages and guides split on headings; attachment text extracted off the request path within the KNOWLEDGE_FILE_* limits; tombstoned on delete, on a deleted task or a removed attachment for comments and files, on project trash for pages, comments, guides and files, and on a member's departure for private pages), backfills each source separately, and lets retrieval read a source's passages from the chunks once that source's backfill is complete, for a company whose knowledgeIndexer.mode is \"on\"; \"all\" does so for every company except one set to \"off\".",
     "default": "off"
   },
+  "KNOWLEDGE_AGENT_MEMORY": {
+    "group": "ai",
+    "description": "Agent memory in the knowledge index: \"off\" publishes and indexes nothing, so agent notes stay in the LangGraph store only; \"on\", for a company whose knowledge indexer is on, indexes each agent note (agent_memory, namespace agent/<agentId>/note) into knowledge_chunks under scope \"agent\" off the memory events, backfills existing notes in the knowledge.memory.backfill job, and lets an agent's own runs retrieve its notes once that backfill is complete: only within the run's visible set (the starter's projects, narrowed to the agent's), only when every project the note was formed in is in that set, ranked below what people wrote, and with origin \"external\" when a tainted run formed it. People asking through Ask never see agent notes.",
+    "default": "off"
+  },
   "LLM_MAX_TOKENS_CLARIFY": {
     "group": "ai",
     "description": "cap for follow-up Q&A",

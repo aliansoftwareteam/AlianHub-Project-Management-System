@@ -8,6 +8,8 @@ const backfill = require('./ingest/backfill');
 const { INDEXED_SOURCES } = require('./sources');
 const events = require('./ingest/events');
 const { resolveVisibleSet, filterFor, recheck } = require('./visibleSet');
+const { narrowToAgent } = require('./agentScope');
+const memory = require('./memory/retrieval');
 
 // One way in to what the workspace knows. The backend behind it is an adapter;
 // whichever one answers, the caller's visible set is resolved first and handed
@@ -84,13 +86,26 @@ const byFusedRank = (a, b) => {
     return agentLast(a, b) || ((b.rrf || 0) - (a.rrf || 0)) || (time(b.updatedAt) - time(a.updatedAt));
 };
 
+/* An agent's memory passages are rechecked against the live notes, the rest against their rows;
+ * the order of the window is kept. */
+const recheckWindow = async ({ set, passages, onStale }) => {
+    const notes = passages.filter((p) => p.sourceType === 'memory');
+    if (!notes.length) return recheck({ set, passages, onStale });
+    const [sources, memories] = await Promise.all([
+        recheck({ set, passages: passages.filter((p) => p.sourceType !== 'memory'), onStale }),
+        memory.recheck({ set, passages: notes }),
+    ]);
+    const kept = new Map([...sources, ...memories].map((p) => [p.id, p]));
+    return passages.filter((p) => kept.has(p.id)).map((p) => kept.get(p.id));
+};
+
 /* Rechecked a window at a time, so a list whose top candidates were deleted still fills, while
  * the usual case costs one window of reads. */
 const rechecked = async ({ set, ranked, wanted, onStale }) => {
     const size = wanted * RECHECK_HEADROOM;
     const kept = [];
     for (let start = 0, round = 0; start < ranked.length && kept.length < wanted && round < RECHECK_WINDOWS; start += size, round += 1) {
-        kept.push(...await recheck({ set, passages: ranked.slice(start, start + size), onStale }));
+        kept.push(...await recheckWindow({ set, passages: ranked.slice(start, start + size), onStale }));
     }
     return kept.slice(0, wanted);
 };
@@ -149,7 +164,7 @@ const backendName = (adapter, vector) => {
 const createRetrieve = (adapter) => {
     assertAdapter(adapter);
     return async ({ companyId, caller, query, scope, limit } = {}) => {
-        const set = await resolveVisibleSet({ companyId, caller, scope });
+        const set = await narrowToAgent(await resolveVisibleSet({ companyId, caller, scope }));
         const wanted = clampLimit(limit);
         const summary = {
             projectId: set.projectId,
@@ -157,16 +172,19 @@ const createRetrieve = (adapter) => {
             sourceTypes: set.sourceTypes,
             privileged: set.privileged,
         };
-        if (!set.sourceTypes.length || !String(query || '').trim()) return { passages: [], backend: adapter.name, scope: summary };
+        if (!String(query || '').trim()) return { passages: [], backend: adapter.name, scope: summary };
+        const memorySide = await memory.sideFor(set, scope);
+        if (!set.sourceTypes.length && !memorySide) return { passages: [], backend: adapter.name, scope: summary };
 
         const chunkSources = await chunkSourcesFor(set);
         const filter = filterFor(set, { chunkSources });
         const headroom = wanted * RECHECK_HEADROOM;
-        const [found, vector] = await Promise.all([
-            adapter.search({ companyId: set.companyId, query: String(query), filter, limit: headroom }),
-            chunkSources.length ? vectorSide(set, String(query), filter, headroom) : null,
+        const [found, recalled, vector] = await Promise.all([
+            set.sourceTypes.length ? adapter.search({ companyId: set.companyId, query: String(query), filter, limit: headroom }) : [],
+            memory.search({ set, side: memorySide, query: String(query), limit: headroom }),
+            chunkSources.length || memorySide ? vectorSide(set, String(query), memory.withMemory(filter, memorySide), headroom) : null,
         ]);
-        const lexicalRanked = scaleScores(found || []).sort(byRank);
+        const lexicalRanked = scaleScores([...(found || []), ...recalled]).sort(byRank);
         const ranked = vector && vector.passages
             ? fuse([lexicalRanked, vector.passages]).sort(byFusedRank)
             : weighAgents(lexicalRanked).sort(byRank);

@@ -960,7 +960,7 @@ const reembedMissing = async (companyId) => {
     const plan = await embeddings.planFor(companyId);
     if (!plan) return null;
     const rows = await chunkStore(companyId, [[
-        { $match: { companyId: String(companyId), deleted: { $ne: true }, embeddingModel: { $ne: plan.model } } },
+        { $match: { companyId: String(companyId), sourceType: { $in: SOURCES }, deleted: { $ne: true }, embeddingModel: { $ne: plan.model } } },
         { $group: { _id: { sourceType: '$sourceType', sourceId: '$sourceId' } } },
         { $limit: REEMBED_BATCH },
     ]], 'aggregate');

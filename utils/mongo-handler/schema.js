@@ -1564,6 +1564,19 @@ const schema = {
         extractDueAt: { type: Date, required: false },
         // The source row's updatedAt when it was read, so a slower, older read never overwrites a newer one.
         sourceUpdatedAt: { type: Date, required: false },
+        // Agent memory only (sourceType 'memory'): the scope, the agent whose runs alone read it, and what it was formed from.
+        scope: { type: String, required: false },
+        agentId: { type: String, required: false },
+        projectIds: { type: [String], required: false, default: undefined },
+        runId: { type: String, required: false },
+        startedBy: { type: String, required: false },
+        // Read only by runs of the person in startedBy: the note formed outside any project, or from content outside the workspace.
+        starterOnly: { type: Boolean, required: false },
+        tainted: { type: Boolean, required: false },
+        taintRefs: { type: [String], required: false, default: undefined },
+        derivedFrom: { type: [String], required: false, default: undefined },
+        derivedAuthors: { type: [String], required: false, default: undefined },
+        derivedOnlyPrivateOf: { type: String, required: false },
     },
     // What an erasure keeps out of the index for good: one document, or one person's private pages and comments.
     knowledgeExclusions: {

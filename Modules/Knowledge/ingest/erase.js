@@ -41,18 +41,21 @@ const eraseDocument = async (companyId, { sourceType, sourceId } = {}) => {
     if (!type) throw new Error('eraseDocument needs a sourceType.');
     if (!id) throw new Error('eraseDocument needs a sourceId.');
     await exclude(companyId, { kind: 'document', sourceType: type, sourceId: id, userId: '' });
-    const result = await eraseChunks(companyId, { sourceType: type, sourceId: id });
-    await eraseVectors(companyId, [{ sourceType: type, sourceId: id }]);
+    const derived = { sourceType: 'memory', derivedFrom: `${type}:${id}` };
+    const notes = await sourcesOf(companyId, derived);
+    const result = await eraseChunks(companyId, { $or: [{ sourceType: type, sourceId: id }, derived] });
+    await eraseVectors(companyId, [{ sourceType: type, sourceId: id }, ...notes]);
     return result;
 };
 
-/* A person's private pages and the comments they wrote (owner, 2026-09-17). Their shared pages stay,
- * and so do the calls they were on, which hold other participants' words. */
+/* A person's private pages and the comments they wrote (owner, 2026-09-17), and an agent's notes
+ * formed from either. Their shared pages stay, and so do the calls they were on, which hold other
+ * participants' words. */
 const erasePerson = async (companyId, userId) => {
     const id = String(userId || '').trim();
     if (!OBJECT_ID.test(id)) throw new Error('erasePerson needs a valid user id.');
     await exclude(companyId, { kind: 'author', sourceType: '', sourceId: '', userId: id });
-    const where = { createdBy: id, $or: [{ sourceType: 'page', visibility: 'private' }, { sourceType: 'comment' }] };
+    const where = { $or: [{ createdBy: id, sourceType: 'page', visibility: 'private' }, { createdBy: id, sourceType: 'comment' }, { sourceType: 'memory', derivedAuthors: id }] };
     const sources = await sourcesOf(companyId, where);
     const result = await eraseChunks(companyId, where);
     await eraseVectors(companyId, sources);

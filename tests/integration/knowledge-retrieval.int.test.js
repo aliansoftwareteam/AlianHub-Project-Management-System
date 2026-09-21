@@ -380,3 +380,87 @@ describe('knowledge retrieval reading the page index', () => {
         expect(await sourceIds(member, word)).not.toContain(projectId);
     });
 });
+
+/* Sprint 7 slice 8, in process against the harness database: an agent's note goes through the
+ * LangGraph store, the memory event, the chunk store and its text index, and comes back to that
+ * agent's own run and to no other agent's. The harness server keeps KNOWLEDGE_AGENT_MEMORY off. */
+describe('agent memory in the knowledge store', () => {
+    const MEMORY_ENV = ['NODE_ENV', 'MONGODB_URL', 'KNOWLEDGE_INDEXER', 'KNOWLEDGE_AGENT_MEMORY', 'KNOWLEDGE_FLAG_CACHE_TTL_SECONDS'];
+    const saved = Object.fromEntries(MEMORY_ENV.map((key) => [key, process.env[key]]));
+
+    let client;
+    let companies;
+    let tenant;
+    let owner;
+    let modules;
+    const own = new ObjectId();
+    const other = new ObjectId();
+    const runIds = [];
+
+    const recall = async (agentId, word) => {
+        const run = { _id: new ObjectId(), agentId: String(agentId), startedBy: owner.uid, status: 'running' };
+        await tenant.collection('agent_runs').insertOne(run);
+        runIds.push(run._id);
+        const result = await modules.retrieval.retrieve({
+            companyId: state.companyId,
+            caller: { kind: 'agent', userId: owner.uid, agentId: String(agentId), runId: String(run._id) },
+            query: word,
+            scope: { sourceTypes: ['memory'] },
+        });
+        return result.passages.map((p) => p.sourceId);
+    };
+
+    beforeAll(async () => {
+        // The LangGraph store refuses a real database under NODE_ENV=test, a guard meant for the unit suites.
+        Object.assign(process.env, { NODE_ENV: 'integration', MONGODB_URL: resolveMongoUrl(), KNOWLEDGE_INDEXER: 'tenant', KNOWLEDGE_AGENT_MEMORY: 'on', KNOWLEDGE_FLAG_CACHE_TTL_SECONDS: '0' });
+        client = await MongoClient.connect(resolveMongoUrl());
+        companies = client.db('global').collection('companies');
+        tenant = client.db(state.companyId);
+        await companies.updateOne({ _id: new ObjectId(state.companyId) }, { $set: { knowledgeIndexer: { mode: 'on' } } });
+        await tenant.collection('agents').insertMany([
+            { _id: own, name: '[QA memory] scribe', projectIds: [String(state.projects.shared._id)], deletedStatusKey: 0 },
+            { _id: other, name: '[QA memory] planner', projectIds: [String(state.projects.shared._id)], deletedStatusKey: 0 },
+        ]);
+        owner = await loginAs('owner');
+        modules = {
+            memory: require('../../Modules/Agents/memory'),
+            persistence: require('../../Modules/AICore/persistence'),
+            events: require('../../Modules/Knowledge/memory/events'),
+            backfill: require('../../Modules/Knowledge/memory/backfill'),
+            retrieval: require('../../Modules/Knowledge/retrieval'),
+            connections: require('../../middlewares/mongoConnector/helper'),
+        };
+        modules.events.start();
+    });
+
+    afterAll(async () => {
+        modules.events.stop();
+        await tenant.collection('agents').deleteMany({ _id: { $in: [own, other] } });
+        await tenant.collection('agent_runs').deleteMany({ _id: { $in: runIds } });
+        await tenant.collection('knowledge_chunks').deleteMany({ sourceType: 'memory', agentId: { $in: [String(own), String(other)] } });
+        await tenant.collection('agent_memory').deleteMany({ namespace: { $in: [String(own), String(other)] } });
+        await tenant.collection('knowledge_index_state').deleteOne({ sourceType: 'memory' });
+        await companies.updateOne({ _id: new ObjectId(state.companyId) }, { $unset: { knowledgeIndexer: '' } });
+        await modules.persistence.close();
+        modules.connections.closeConnection(state.companyId);
+        modules.connections.closeConnection('global');
+        await client.close();
+        MEMORY_ENV.forEach((key) => { if (saved[key] === undefined) delete process.env[key]; else process.env[key] = saved[key]; });
+    });
+
+    it("recalls an agent's own note in its own run, and never in another agent's", async () => {
+        const word = token();
+        const run = { _id: new ObjectId(), agentId: String(own), startedBy: owner.uid, projectId: String(state.projects.shared._id), status: 'running' };
+        await tenant.collection('agent_runs').insertOne(run);
+        runIds.push(run._id);
+        const note = await modules.memory.rememberForAgent({ companyId: state.companyId, runId: String(run._id), text: `The berth code is ${word}.` });
+        await modules.events.drain();
+        expect(await modules.backfill.backfill(state.companyId)).toMatchObject({ status: 'complete' });
+
+        const [chunk] = await tenant.collection('knowledge_chunks').find({ sourceType: 'memory', sourceId: note.memoryId, deleted: false }).toArray();
+        expect(chunk).toMatchObject({ scope: 'agent', agentId: String(own), projectIds: [String(state.projects.shared._id)], authorKind: 'agent', tainted: false });
+
+        expect(await recall(own, word)).toEqual([note.memoryId]);
+        expect(await recall(other, word)).toEqual([]);
+    });
+});

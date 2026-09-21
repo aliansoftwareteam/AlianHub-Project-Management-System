@@ -27,6 +27,7 @@ const revisions = require('./revisions');
 const skillRecord = require('./skillRecord');
 const { buildTrace } = require('./runTrace');
 const workflows = require('../Workflows');
+const knowledgeMemory = require('../Knowledge/memory/publish');
 
 const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId) || '';
 // 'mention' is a run started by @naming the agent in a comment (13b); it is
@@ -305,6 +306,7 @@ exports.deleteAgent = async (req, res) => {
         await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ _id: agent._id }, { $set: { deletedStatusKey: 1, deletedAt: new Date(), deletedBy: String(actor.userId), paused: true, pausedReason: 'deleted' } }] }, 'updateOne');
         await agentAudit.recordAgentDeleted(companyId, actor, { agentId: String(agent._id), agentName: agent.name, ip: req.ip || '' });
         runs.emitAgent(companyId, { agentId: String(agent._id), deleted: true });
+        knowledgeMemory.agentDeleted(companyId, String(agent._id));
         return res.send({ status: true, statusText: 'Agent deleted. Its runs and audit history stay.', data: { agentId: String(agent._id) } });
     } catch (e) { logger.error(`deleteAgent: ${e.message}`); return fail(res, e.message, 500); }
 };
