@@ -4351,6 +4351,8 @@ const schema = {
         updatedBy: { type: String, required: false },
         // When API_TOKEN_STRICT was first seen on; the legacy-token grace counts from here and it is never rewritten.
         apiTokenStrictSince: { type: Date, required: false },
+        // When the maximum API token lifetime first applied; tokens made earlier with a longer expiry count from here.
+        apiTokenMaxLifetimeSince: { type: Date, required: false },
     },
     globalSettings: {
         name: {

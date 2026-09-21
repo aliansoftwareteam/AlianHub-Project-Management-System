@@ -282,7 +282,7 @@
                                                 <label class="ah-field__label" for="tok-expiry">{{ $t('Accounts.field_expiry') }}</label>
                                                 <select id="tok-expiry" v-model.number="tokenForm.expiresInDays" class="ah-input" :class="{ 'ah-input--error': Boolean(expiryError) }" data-test="token-expiry">
                                                     <option value="">{{ $t('Accounts.expiry_choose') }}</option>
-                                                    <option v-for="days in EXPIRY_CHOICES" :key="days" :value="days">{{ $t('Accounts.expiry_days', { n: days }) }}</option>
+                                                    <option v-for="days in expiryChoices" :key="days" :value="days">{{ $t('Accounts.expiry_days', { n: days }) }}</option>
                                                 </select>
                                                 <p v-if="expiryError" class="ah-field__error">{{ expiryError }}</p>
                                             </div>
@@ -316,9 +316,10 @@
                                             <div class="acct-token__text">
                                                 <div class="acct-token__name">{{ tk.name }}</div>
                                                 <div class="acct-token__meta">{{ tokenMeta(tk) }}</div>
-                                                <div v-if="tokenPolicy.strict && tk.active && tk.graceState" class="acct-token__flags">
+                                                <div v-if="tokenPolicy.strict && tk.active && (tk.graceState || tk.lifetimeState)" class="acct-token__flags">
                                                     <span v-if="tk.graceState === 'grace'" class="ah-chip ah-chip--warn ah-chip--mono" data-test="token-grace">{{ $t('Accounts.grace_works_until', { d: dayOf(tk.graceEndsAt) }) }}</span>
                                                     <span v-else-if="tk.graceState === 'stopped'" class="ah-chip ah-chip--danger ah-chip--mono" data-test="token-stopped">{{ $t('Accounts.grace_stopped_on', { d: dayOf(tk.graceEndsAt) }) }}</span>
+                                                    <span v-if="tk.lifetimeState" class="ah-chip ah-chip--mono" :class="tk.lifetimeState === 'capped' ? 'ah-chip--warn' : 'ah-chip--danger'" data-test="token-over-max">{{ lifetimeChip(tk.lifetimeState, tk.lifetimeEndsAt) }}</span>
                                                 </div>
                                             </div>
                                             <button v-if="tk.active" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="revoking === tk._id" @click="onRevoke(tk)">
@@ -346,12 +347,16 @@
                                 </div>
                                 <div class="ah-card__body">
                                     <p class="acct-note">{{ $t('Accounts.expiry_list_lead') }}</p>
+                                    <p v-if="tokensNeedingExpiry.some(isOverMax)" class="acct-note" data-test="expiry-over-max-lead">{{ $t('Accounts.expiry_list_over_max_lead', { n: tokenPolicy.maxExpiryDays }) }}</p>
                                     <ul v-if="tokensNeedingExpiry.length" class="acct-token-list">
                                         <li v-for="tk in tokensNeedingExpiry" :key="tk._id" class="acct-token" data-test="expiry-row">
                                             <div class="acct-token__text">
                                                 <div class="acct-token__name">{{ tk.name }}</div>
                                                 <div class="acct-token__meta">{{ expiryRowMeta(tk) }}</div>
-                                                <div class="acct-token__flags">
+                                                <div v-if="isOverMax(tk)" class="acct-token__flags">
+                                                    <span class="ah-chip ah-chip--mono" :class="tk.stopped ? 'ah-chip--danger' : 'ah-chip--warn'" data-test="expiry-over-max">{{ lifetimeChip(tk.stopped ? 'stopped' : 'capped', tk.deadline) }}</span>
+                                                </div>
+                                                <div v-else class="acct-token__flags">
                                                     <span v-if="tk.stopped" class="ah-chip ah-chip--danger ah-chip--mono" data-test="expiry-stopped">
                                                         {{ tk.deadline ? $t('Accounts.grace_stopped_on', { d: dayOf(tk.deadline) }) : $t('Accounts.expiry_list_unchecked') }}
                                                     </span>
@@ -492,7 +497,7 @@ import { useGetterFunctions } from "@/composable/index.js";
 import AiSidebar from "./AiSidebar.vue";
 import AccountAttribution from "./AccountAttribution.vue";
 import { useAccounts, MODES, PROVIDERS } from "./useAccounts";
-import { EXPIRY_CHOICES, TOKEN_SCOPES, tokenFormProblem } from "./tokenPolicy";
+import { EXPIRY_OVER_MAX, TOKEN_SCOPES, expiryChoicesFor, tokenFormProblem } from "./tokenPolicy";
 import { reasonOf } from "./useAgents";
 import { mcpUrlFor } from "./mcpUrl";
 import { isOwnerOrAdmin } from "@/utils/roles";
@@ -586,6 +591,15 @@ const expiryOf = (tk) => {
 };
 
 const dayOf = (value) => (value ? new Date(value).toLocaleDateString() : "");
+
+const expiryChoices = computed(() => expiryChoicesFor(tokenPolicy.value));
+
+const isOverMax = (tk) => tk.reason === "over-max-lifetime";
+
+const lifetimeChip = (state, at) => {
+    if (!at) return t("Accounts.lifetime_unchecked");
+    return state === "capped" ? t("Accounts.lifetime_capped_until", { d: dayOf(at) }) : t("Accounts.lifetime_stopped_on", { d: dayOf(at) });
+};
 
 const scopesOf = (tk) => (tk.scopes || []).map((scope) => (TOKEN_SCOPES.includes(scope) ? t(`Accounts.token_scope_${scope}`) : scope)).join(" + ");
 
@@ -738,7 +752,7 @@ const onMint = async () => {
     const problem = tokenFormProblem(tokenForm, tokenPolicy.value);
     if (problem) {
         const target = { name: mintError, expiry: expiryError, scopes: scopeError }[problem.field];
-        target.value = t(problem.key);
+        target.value = t(problem.key, problem.params || {});
         return;
     }
     const body = {
@@ -759,7 +773,8 @@ const onMint = async () => {
         tokenForm.expiresInDays = "";
         tokenForm.scopes = [...TOKEN_SCOPES];
     } catch (error) {
-        mintError.value = error.message;
+        if (error.code === EXPIRY_OVER_MAX) expiryError.value = t("Accounts.token_expiry_over_max", { n: error.maxExpiryDays || tokenPolicy.value.maxExpiryDays });
+        else mintError.value = error.message;
     } finally {
         mintBusy.value = false;
     }
