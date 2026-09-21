@@ -1253,5 +1253,14 @@
     "group": "ai",
     "description": "With KNOWLEDGE_VECTOR_STORE=atlas, how long, in milliseconds, the knowledge.backfill job gives one tenant's index check before moving on; tenants are checked four at a time.",
     "default": "30000"
+  },
+  "MCP_OAUTH": {
+    "group": "security",
+    "description": "Set to on to run OAuth 2.1 for the MCP endpoint (MCP authorization spec 2025-11-25). On the resource side: GET /.well-known/oauth-protected-resource and /.well-known/oauth-protected-resource/mcp (RFC 9728) name the /mcp resource, the in-app authorization server and the scopes tasks:read tasks:write projects:read docs:read time:read time:write; a 401 from /mcp carries resource_metadata and the scopes the call needs; a call whose token lacks a scope answers 403 insufficient_scope naming it; access tokens in the query string are refused; initialize also negotiates protocol version 2025-11-25. Personal access tokens keep working: read grants every *:read scope, write every *:write. Unset or off registers none of these routes and /mcp answers exactly as before.",
+    "default": "off"
+  },
+  "MCP_OAUTH_ISSUER": {
+    "group": "security",
+    "description": "Issuer URL of the MCP authorization server, and the base of the /mcp resource URI its tokens are bound to. Defaults to APIURL without its trailing slash; it must be the https origin clients reach the server on."
   }
 }

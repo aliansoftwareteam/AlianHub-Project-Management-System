@@ -268,6 +268,9 @@ const verifyJWTTokenWithCRoute = [
     // A prefix, so /:id, /runs, /proposals/:id/approve are all behind a token. The MCP
     // endpoint (/mcp) is deliberately NOT here — it authenticates its own bearer PAT.
     '/api/v2/agents',
+    // Not listed, on purpose (Modules/Mcp, MCP_OAUTH): /.well-known/oauth-protected-resource and
+    // /.well-known/oauth-protected-resource/mcp are public by design (RFC 9728), since a client
+    // reads them before it holds a token; they carry no secret and exist only with the flag on.
     // Workflow runs (Modules/Workflows) — JWT+company; prefix-matches /workflows/runs
     // and the per-step controls. Owner/admin is enforced in-controller.
     "/api/v2/workflows",
