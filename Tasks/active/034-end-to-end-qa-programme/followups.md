@@ -125,6 +125,11 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 99 | A request with a foreign `Origin` is refused by CORS but answered 200 instead of 403. | #807 |
 | 100 | Sweep of every place stored text is rendered as HTML (activity log, old description view, page blocks, embed view, file previewer, AI output); details in the owner's private notes. | #805, #808 reviews |
 | 101 | Agents stall on a ten-minute watchdog during long silent commands and when the tool-approval service times out; briefs now require short commands and polling. | 2026-09-21/22 |
+| 102 | One review finding in the Sprints controller is still open; details in the owner's private notes. | 2026-09-22 review |
+| 103 | Delete the `prReview.js` code skill once `SKILL_EXTERNAL_READS` defaults on and the `pr.summary` data seed replaces it. | #819 |
+| 104 | The Skill editor does not yet expose a declared read's `link` and `hosts` params; they can only be set in the skill body. | #816, #819 |
+| 105 | Integration suites share one harness workspace: a suite that reads audit or list rows by action and actor alone can pick up another suite's rows when file order changes. Scope such reads to rows written after the suite starts, as #822 did. | #821, #822 |
+| 106 | Two PRs that each add an environment variable leave `docs/ENV.md` with a stale count after both merge; the branch that merges second must re-run `node scripts/env-doc.js` after taking `beta`. | #820 |
 
 ## Owner decisions recorded
 
