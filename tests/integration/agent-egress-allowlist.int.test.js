@@ -18,6 +18,10 @@ let member;
 let admin;
 let project;
 let task;
+let since;
+
+// The declared-reads suites set and clear this workspace's list as the same owner, so their audit rows match too.
+const ours = (filter) => ({ ...filter, createdAt: { $gte: since } });
 
 const listRow = () => lists.findOne({ _id: 'workspace' });
 const version = async () => ((await listRow()) || {}).version || 0;
@@ -41,6 +45,7 @@ const waitFor = async (read, what) => {
 };
 
 beforeAll(async () => {
+    since = new Date();
     client = await MongoClient.connect(resolveMongoUrl());
     lists = client.db(state.companyId).collection('egress_allowlists');
     audits = client.db(state.companyId).collection('audit_logs');
@@ -87,7 +92,7 @@ describe('the workspace egress allowlist', () => {
 
         expect(await mine()).toMatchObject({ hosts: ['docs.example.com', '*.api.example.com'], updatedByName: expect.any(String), version: 1 });
 
-        const audit = await waitFor(() => audits.findOne({ action: 'agent.egress_allowlist', actorId: owner.uid, entityId: state.companyId }), 'the audit row');
+        const audit = await waitFor(() => audits.findOne(ours({ action: 'agent.egress_allowlist', actorId: owner.uid, entityId: state.companyId })), 'the audit row');
         expect(audit.meta).toMatchObject({ added: ['docs.example.com', '*.api.example.com'], removed: [], count: 2 });
     });
 
@@ -98,7 +103,7 @@ describe('the workspace egress allowlist', () => {
         expect(JSON.stringify(res.body)).toMatch(new RegExp(`${PR_HOST}.*allow`, 'i'));
         expect(Date.now() - started).toBeLessThan(5000);
 
-        const refusal = await waitFor(() => audits.findOne({ action: 'agent.egress_refused', entityId: PR_HOST, actorId: owner.uid }), 'the refusal audit row');
+        const refusal = await waitFor(() => audits.findOne(ours({ action: 'agent.egress_refused', entityId: PR_HOST, actorId: owner.uid })), 'the refusal audit row');
         expect(refusal).toMatchObject({ entityType: 'host', meta: expect.objectContaining({ reason: 'unlisted', host: PR_HOST, hop: 0 }) });
         expect(JSON.stringify(refusal)).not.toContain('/acme/repo/pull/7');
 
@@ -132,8 +137,8 @@ describe('the workspace egress allowlist', () => {
         expect(res.status).toBe(200);
         expect(res.body.data.hosts).toEqual([]);
         expect((await listRow()).hosts).toEqual([]);
-        const audit = await waitFor(() => audits.findOne({ action: 'agent.egress_allowlist', actorId: owner.uid, 'meta.emptied': true }), 'the clearing audit row');
+        const audit = await waitFor(() => audits.findOne(ours({ action: 'agent.egress_allowlist', actorId: owner.uid, 'meta.emptied': true })), 'the clearing audit row');
         expect(audit.meta).toMatchObject({ removed: ['docs.example.com', '*.api.example.com'], count: 0, emptied: true });
-        expect(await audits.countDocuments({ action: 'agent.egress_allowlist', actorId: owner.uid, 'meta.emptied': true })).toBe(1);
+        expect(await audits.countDocuments(ours({ action: 'agent.egress_allowlist', actorId: owner.uid, 'meta.emptied': true }))).toBe(1);
     });
 });
