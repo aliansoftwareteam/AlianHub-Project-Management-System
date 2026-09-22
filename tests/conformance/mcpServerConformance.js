@@ -50,7 +50,18 @@ async function accessToken(baseURL, session) {
     return tokens.access_token;
 }
 
-function startProxy(target, token) {
+/* The suite sends the proxy's own origin on the request it expects to be accepted, so the app has to know
+ * that origin before it starts; the port is therefore reserved here and handed to both. */
+const freePort = () => new Promise((resolve, reject) => {
+    const probe = http.createServer();
+    probe.on('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+        const { port } = probe.address();
+        probe.close(() => resolve(port));
+    });
+});
+
+function startProxy(target, token, port) {
     const upstream = new URL(target);
     const proxy = http.createServer((req, res) => {
         const headers = { ...req.headers };
@@ -62,7 +73,7 @@ function startProxy(target, token) {
         forwarded.on('error', (error) => { res.writeHead(502); res.end(error.message); });
         req.pipe(forwarded);
     });
-    return new Promise((resolve) => proxy.listen(0, '127.0.0.1', () => resolve(proxy)));
+    return new Promise((resolve) => proxy.listen(port, '127.0.0.1', () => resolve(proxy)));
 }
 
 const run = (command, args, options = {}) => new Promise((resolve, reject) => {
@@ -86,17 +97,23 @@ const runSuite = (entry, url) => run(process.env.CONFORMANCE_NODE || 'node', [en
 async function main() {
     const mongoUrl = resolveMongoUrl();
     await resetDatabase(mongoUrl);
+    const proxyPort = await freePort();
     const server = await startServer({
         mongoUrl,
         logFile: path.join(STATE_DIR, 'conformance-server.log'),
-        env: { MCP_OAUTH: 'both', NODE_ENV: 'development', MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000' },
+        env: {
+            MCP_OAUTH: 'both',
+            NODE_ENV: 'development',
+            MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000',
+            CORS_ORIGINS: `http://127.0.0.1:${proxyPort}`,
+        },
     });
     let proxy;
     try {
         const entry = await installSuite();
         const token = await accessToken(server.baseURL, await setupOwner(server.baseURL));
-        proxy = await startProxy(server.baseURL, token);
-        const code = await runSuite(entry, `http://127.0.0.1:${proxy.address().port}/mcp`);
+        proxy = await startProxy(server.baseURL, token, proxyPort);
+        const code = await runSuite(entry, `http://127.0.0.1:${proxyPort}/mcp`);
         process.exitCode = code;
     } finally {
         if (proxy) await new Promise((done) => proxy.close(done));
