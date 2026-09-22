@@ -161,6 +161,61 @@ async function recordToolStep({ companyId, runId, agentId, action, args, scope, 
     }
 }
 
+const FETCH_KIND = 'fetch';
+const FETCH_BODY_BYTES = 32 * 1024;
+const FETCH_TRUNCATION_MARKER = '\n[truncated: only the first 32 KB is kept]';
+
+const withoutQuery = (path) => String(path || '').split(/[?#]/)[0];
+
+/* A data skill's declared read (Agents/engine/agentFetch.readDeclared). The body arrives already scrubbed of the
+ * credential; it is redacted again here, like a prompt, then capped. sha256 covers the whole body, taken before
+ * the cap. No header is ever passed in, so none can be kept. */
+async function recordFetch({ companyId, runId, host, path, status, bytes, hops, sha256, body, taintSources, durationMs }) {
+    if (!runId || !shouldRecord(FEATURES.AGENT_RUN)) return null;
+    const kept = cut(redact(String(body === undefined || body === null ? '' : body)), FETCH_BODY_BYTES);
+    const createdAt = new Date();
+    try {
+        return await MongoDbCrudOpration(companyId || dbCollections.GLOBAL, {
+            type: SCHEMA_TYPE.AI_REPLAYS,
+            data: {
+                feature: FEATURES.AGENT_RUN,
+                kind: FETCH_KIND,
+                runId: String(runId),
+                agentId: null,
+                model: null,
+                provider: null,
+                promptHash: sha256,
+                messages: [],
+                retrievedChunkIds: [],
+                ...taintOf({ tainted: true, taintSources }),
+                fetch: {
+                    host: String(host),
+                    path: withoutQuery(path),
+                    status: Number(status),
+                    bytes: Number(bytes) || 0,
+                    hops: (Array.isArray(hops) ? hops : []).map((hop) => ({ host: String(hop.host), path: withoutQuery(hop.path), status: Number(hop.status) })),
+                    sha256,
+                    body: kept.cut ? `${kept.text}${FETCH_TRUNCATION_MARKER}` : kept.text,
+                    bodyTruncated: kept.cut,
+                },
+                truncated: kept.cut,
+                usage: { inputTokens: 0, outputTokens: 0 },
+                costUsd: null,
+                durationMs: Number(durationMs) || 0,
+                decision: null,
+                status: 'ok',
+                errorCode: null,
+                traceId: currentTraceId(),
+                createdAt,
+                expiresAt: new Date(createdAt.getTime() + retentionDays() * DAY_MS),
+            },
+        }, 'save');
+    } catch (e) {
+        logger.warn(`${LOG_PREFIX} ${companyId}: a read of ${host} in run ${runId} not recorded: ${e.message}`);
+        return null;
+    }
+}
+
 async function record(call) {
     const { context } = call;
     if (!shouldRecord(context.feature)) return null;
@@ -172,4 +227,4 @@ async function record(call) {
     }
 }
 
-module.exports = { record, recordToolStep, mode, retentionDays, shouldRecord, promptHashOf, MAX_BYTES, TOOL_KIND };
+module.exports = { record, recordToolStep, recordFetch, mode, retentionDays, shouldRecord, promptHashOf, MAX_BYTES, TOOL_KIND, FETCH_KIND, FETCH_BODY_BYTES, FETCH_TRUNCATION_MARKER };

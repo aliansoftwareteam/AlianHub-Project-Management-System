@@ -87,6 +87,13 @@ describe('a run is a LangGraph thread', () => {
         expect(memory.recordEpisode).not.toHaveBeenCalled();
     });
 
+    it('hands gather the run id, so a declared read can land in the run replay', async () => {
+        planned([subtask('One')]);
+        const run = await start(agent());
+        await execute(run);
+        expect(orchestrator.gather).toHaveBeenCalledWith(expect.objectContaining({ skillSlug: 'plan', companyId: C, runId: String(run._id) }));
+    });
+
     it('approving the proposal resumes the thread: the run ends done and the episode counts the approval', async () => {
         planned([subtask('One'), newTask('Two')]);
         const run = await start(agent());

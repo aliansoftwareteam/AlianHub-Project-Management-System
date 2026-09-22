@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const pageAudit = require('./pageAudit');
 const egressContext = require('./egressContext');
 const fetcher = require('./safeFetch');
@@ -56,7 +57,10 @@ const readDeclared = async ({ companyId, actor, url, declaredHosts, credential, 
     }
     const found = sourcesOf(target.href, res.hops);
     found.forEach(taint.note);
-    return { status: res.status, body: rules.scrub(res.body, secret), bytes: res.bytes, hops: res.hops || [], taint: found };
+    const body = rules.scrub(res.body, secret);
+    // Of the scrubbed body, so a stored hash can never confirm a guess at the credential.
+    const sha256 = crypto.createHash('sha256').update(body).digest('hex');
+    return { status: res.status, body, sha256, bytes: res.bytes, hops: res.hops || [], taint: found };
 };
 
 module.exports = { fetchPage: inWorkspace('fetchPage'), audit: inWorkspace('audit'), postJson: inWorkspace('postJson'), readDeclared };

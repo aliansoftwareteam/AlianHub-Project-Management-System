@@ -97,6 +97,30 @@ describe('AgentRunReplay', () => {
         expect(row.find('[data-test="replay-response"]').exists()).toBe(false);
     });
 
+    it('shows a declared-read fetch with host, path, status, bytes and hash, and its redacted body only when expanded', async () => {
+        const fetchRow = {
+            _id: 'rp3', kind: 'fetch', status: 'ok', durationMs: 12, tainted: true, taintSources: [{ kind: 'fetch', ref: 'api.example.com' }], truncated: true,
+            fetch: { host: 'api.example.com', path: '/v1/items/AR-7', status: 200, bytes: 40960, sha256: 'f00d', body: '{"note":"[redacted]"}…', bodyTruncated: true, hops: [{ host: 'api.example.com', path: '/v1/items/AR-7', status: 200 }] }
+        };
+        const wrapper = await mountReplay({ rows: [calls[0], fetchRow] });
+        const row = wrapper.findAll('[data-test="replay-call"]')[1];
+        expect(row.find('[data-test="replay-fetch-target"]').text()).toBe('api.example.com/v1/items/AR-7');
+        expect(row.find('[data-test="replay-fetch-status"]').text()).toBe('Ai.replay_fetch_status {"status":200}');
+        expect(row.find('[data-test="replay-fetch-bytes"]').text()).toBe('Ai.replay_fetch_bytes {"bytes":40960}');
+        expect(row.find('[data-test="replay-model"]').exists()).toBe(false);
+        expect(row.find('[data-test="replay-tokens"]').exists()).toBe(false);
+        expect(row.find('[data-test="replay-tainted"]').exists()).toBe(true);
+        expect(row.find('[data-test="replay-fetch-body"]').exists()).toBe(false);
+        expect(row.find('[data-test="replay-fetch-hash"]').text()).toBe('Ai.replay_fetch_hash {"hash":"f00d"}');
+
+        await row.find('button').trigger('click');
+        expect(row.find('button').attributes('aria-label')).toBe('Ai.replay_fetch_hide');
+        expect(row.find('[data-test="replay-fetch-body"]').element.tagName).toBe('PRE');
+        expect(row.find('[data-test="replay-fetch-body"]').text()).toBe('{"note":"[redacted]"}…');
+        expect(row.find('[data-test="replay-fetch-truncated"]').text()).toBe('Ai.replay_fetch_truncated');
+        expect(row.find('[data-test="replay-system"]').exists()).toBe(false);
+    });
+
     it('gives every call the #replay-<recordId> anchor', async () => {
         const wrapper = await mountReplay();
         expect(wrapper.findAll('[data-test="replay-call"]').map((row) => row.attributes('id'))).toEqual(['replay-rp1', 'replay-rp2']);

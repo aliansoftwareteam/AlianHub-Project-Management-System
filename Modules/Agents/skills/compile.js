@@ -108,7 +108,7 @@ const compile = (doc) => ({
     usesMemory: usesMemory(doc),
     systemPrompt: systemPromptOf(doc),
 
-    async gather({ task, companyId, memory, startedBy }) {
+    async gather({ task, companyId, memory, startedBy, runId }) {
         if (!externalReads.enabled() && doc.gather.some((step) => externalReads.isExternal(step.reader))) throw externalReads.notAvailable(doc.key);
         const input = {};
         for (const key of doc.inputs) {
@@ -119,7 +119,7 @@ const compile = (doc) => ({
         const gather = {};
         for (const step of doc.gather) {
             // eslint-disable-next-line no-await-in-loop
-            const out = await readers.read(step.reader, companyId, { task, memory, startedBy, input, declaredHosts: doc.declaredHosts || [] }, step.params);
+            const out = await readers.read(step.reader, companyId, { task, memory, startedBy, runId, input, declaredHosts: doc.declaredHosts || [] }, step.params);
             if (out && out.skip) return { skip: out.skip };
             gather[step.as] = out;
         }

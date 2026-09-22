@@ -7,41 +7,66 @@
         <p v-else-if="!calls.length" class="ah-empty run-replay__empty" data-test="replay-none">{{ $t('Ai.replay_none') }}</p>
         <ol v-else class="run-replay__calls">
             <li v-for="(call, i) in calls" :id="call._id ? replayAnchorId(call._id) : undefined" :key="call._id || i" class="run-replay__call" data-test="replay-call">
-                <button type="button" class="run-replay__row" :aria-expanded="String(open === i)" :aria-label="open === i ? $t('Ai.replay_hide') : $t('Ai.replay_show')" @click="toggle(i)">
-                    <span class="ah-small">{{ $t('Ai.replay_call', { n: i + 1 }) }}</span>
-                    <span class="ah-mono ah-small" data-test="replay-model">{{ call.model || $t('Ai.revision_value_empty') }}</span>
-                    <span class="ah-small" data-test="replay-tokens">{{ $t('Ai.replay_tokens', tokensOf(call)) }}</span>
-                    <span class="ah-small" data-test="replay-cost">{{ costOf(call) }}</span>
-                    <span class="ah-small" data-test="replay-duration">{{ $t('Ai.replay_duration', { ms: Number(call.durationMs || 0) }) }}</span>
-                    <span class="ah-chip" :class="call.status === 'error' ? 'ah-chip--danger' : 'ah-chip--ok'" data-test="replay-status">{{ $t(call.status === 'error' ? 'Ai.replay_status_error' : 'Ai.replay_status_ok') }}</span>
-                    <span v-if="call.tainted" class="ah-chip ah-chip--warn" :title="taintLine(call)" data-test="replay-tainted">{{ $t('Audit.tainted') }}</span>
-                </button>
-                <div v-if="open === i" class="run-replay__body" data-test="replay-body">
-                    <p v-if="call.errorCode" class="ah-small" data-test="replay-error-code">{{ $t('Ai.replay_error_code', { code: call.errorCode }) }}</p>
-                    <p v-if="call.truncated" class="ah-small" data-test="replay-truncated">{{ $t('Ai.replay_truncated') }}</p>
-
-                    <span class="ah-label">{{ $t('Ai.replay_system') }}</span>
-                    <pre v-if="call.system" class="ah-mono run-replay__pre" data-test="replay-system">{{ call.system }}</pre>
-                    <p v-else class="ah-empty">{{ $t('Ai.replay_system_empty') }}</p>
-
-                    <span class="ah-label">{{ $t('Ai.replay_messages') }}</span>
-                    <div v-for="(m, j) in messagesOf(call)" :key="j" class="run-replay__message" data-test="replay-message">
-                        <span class="ah-mono ah-small">{{ m.role }}</span>
-                        <pre class="ah-mono run-replay__pre">{{ m.content }}</pre>
+                <template v-if="isFetch(call)">
+                    <button type="button" class="run-replay__row" :aria-expanded="String(open === i)" :aria-label="open === i ? $t('Ai.replay_fetch_hide') : $t('Ai.replay_fetch_show')" @click="toggle(i)">
+                        <span class="ah-small">{{ $t('Ai.replay_call', { n: i + 1 }) }}</span>
+                        <span class="ah-mono ah-small" data-test="replay-fetch-target">{{ call.fetch.host }}{{ call.fetch.path }}</span>
+                        <span class="ah-small" data-test="replay-fetch-status">{{ $t('Ai.replay_fetch_status', { status: call.fetch.status }) }}</span>
+                        <span class="ah-small" data-test="replay-fetch-bytes">{{ $t('Ai.replay_fetch_bytes', { bytes: Number(call.fetch.bytes || 0) }) }}</span>
+                        <span class="ah-small" data-test="replay-duration">{{ $t('Ai.replay_duration', { ms: Number(call.durationMs || 0) }) }}</span>
+                        <span v-if="call.tainted" class="ah-chip ah-chip--warn" :title="taintLine(call)" data-test="replay-tainted">{{ $t('Audit.tainted') }}</span>
+                    </button>
+                    <p class="ah-mono ah-small run-replay__hash run-replay__fetch-hash" data-test="replay-fetch-hash">{{ $t('Ai.replay_fetch_hash', { hash: call.fetch.sha256 }) }}</p>
+                    <div v-if="open === i" class="run-replay__body" data-test="replay-body">
+                        <p v-if="call.fetch.bodyTruncated" class="ah-small" data-test="replay-fetch-truncated">{{ $t('Ai.replay_fetch_truncated') }}</p>
+                        <template v-if="hopsOf(call).length > 1">
+                            <span class="ah-label">{{ $t('Ai.replay_fetch_hops') }}</span>
+                            <ol class="run-replay__passages" data-test="replay-fetch-hops">
+                                <li v-for="(hop, j) in hopsOf(call)" :key="j" class="ah-mono ah-small">{{ hop.status }} {{ hop.host }}{{ hop.path }}</li>
+                            </ol>
+                        </template>
+                        <span class="ah-label">{{ $t('Ai.replay_fetch_body') }}</span>
+                        <pre v-if="call.fetch.body" class="ah-mono run-replay__pre" data-test="replay-fetch-body">{{ call.fetch.body }}</pre>
+                        <p v-else class="ah-empty">{{ $t('Ai.replay_fetch_body_empty') }}</p>
                     </div>
+                </template>
+                <template v-else>
+                    <button type="button" class="run-replay__row" :aria-expanded="String(open === i)" :aria-label="open === i ? $t('Ai.replay_hide') : $t('Ai.replay_show')" @click="toggle(i)">
+                        <span class="ah-small">{{ $t('Ai.replay_call', { n: i + 1 }) }}</span>
+                        <span class="ah-mono ah-small" data-test="replay-model">{{ call.model || $t('Ai.revision_value_empty') }}</span>
+                        <span class="ah-small" data-test="replay-tokens">{{ $t('Ai.replay_tokens', tokensOf(call)) }}</span>
+                        <span class="ah-small" data-test="replay-cost">{{ costOf(call) }}</span>
+                        <span class="ah-small" data-test="replay-duration">{{ $t('Ai.replay_duration', { ms: Number(call.durationMs || 0) }) }}</span>
+                        <span class="ah-chip" :class="call.status === 'error' ? 'ah-chip--danger' : 'ah-chip--ok'" data-test="replay-status">{{ $t(call.status === 'error' ? 'Ai.replay_status_error' : 'Ai.replay_status_ok') }}</span>
+                        <span v-if="call.tainted" class="ah-chip ah-chip--warn" :title="taintLine(call)" data-test="replay-tainted">{{ $t('Audit.tainted') }}</span>
+                    </button>
+                    <div v-if="open === i" class="run-replay__body" data-test="replay-body">
+                        <p v-if="call.errorCode" class="ah-small" data-test="replay-error-code">{{ $t('Ai.replay_error_code', { code: call.errorCode }) }}</p>
+                        <p v-if="call.truncated" class="ah-small" data-test="replay-truncated">{{ $t('Ai.replay_truncated') }}</p>
 
-                    <span class="ah-label">{{ $t('Ai.replay_passages') }}</span>
-                    <ul v-if="passagesOf(call).length" class="run-replay__passages" data-test="replay-passages">
-                        <li v-for="id in passagesOf(call)" :key="id" class="ah-mono ah-small">{{ id }}</li>
-                    </ul>
-                    <p v-else class="ah-empty" data-test="replay-passages-empty">{{ $t('Ai.replay_passages_empty') }}</p>
+                        <span class="ah-label">{{ $t('Ai.replay_system') }}</span>
+                        <pre v-if="call.system" class="ah-mono run-replay__pre" data-test="replay-system">{{ call.system }}</pre>
+                        <p v-else class="ah-empty">{{ $t('Ai.replay_system_empty') }}</p>
 
-                    <span class="ah-label">{{ $t('Ai.replay_response') }}</span>
-                    <pre v-if="call.response" class="ah-mono run-replay__pre" data-test="replay-response">{{ call.response }}</pre>
-                    <p v-else class="ah-empty">{{ $t('Ai.replay_response_empty') }}</p>
+                        <span class="ah-label">{{ $t('Ai.replay_messages') }}</span>
+                        <div v-for="(m, j) in messagesOf(call)" :key="j" class="run-replay__message" data-test="replay-message">
+                            <span class="ah-mono ah-small">{{ m.role }}</span>
+                            <pre class="ah-mono run-replay__pre">{{ m.content }}</pre>
+                        </div>
 
-                    <p v-if="call.promptHash" class="ah-mono ah-small run-replay__hash">{{ $t('Ai.replay_prompt_hash', { hash: call.promptHash }) }}</p>
-                </div>
+                        <span class="ah-label">{{ $t('Ai.replay_passages') }}</span>
+                        <ul v-if="passagesOf(call).length" class="run-replay__passages" data-test="replay-passages">
+                            <li v-for="id in passagesOf(call)" :key="id" class="ah-mono ah-small">{{ id }}</li>
+                        </ul>
+                        <p v-else class="ah-empty" data-test="replay-passages-empty">{{ $t('Ai.replay_passages_empty') }}</p>
+
+                        <span class="ah-label">{{ $t('Ai.replay_response') }}</span>
+                        <pre v-if="call.response" class="ah-mono run-replay__pre" data-test="replay-response">{{ call.response }}</pre>
+                        <p v-else class="ah-empty">{{ $t('Ai.replay_response_empty') }}</p>
+
+                        <p v-if="call.promptHash" class="ah-mono ah-small run-replay__hash">{{ $t('Ai.replay_prompt_hash', { hash: call.promptHash }) }}</p>
+                    </div>
+                </template>
             </li>
         </ol>
     </section>
@@ -74,6 +99,8 @@ const costOf = (call) => (typeof call?.costUsd === "number" ? t("Ai.replay_cost"
 const messagesOf = (call) => (Array.isArray(call?.messages) ? call.messages : []);
 const passagesOf = (call) => (Array.isArray(call?.retrievedChunkIds) ? call.retrievedChunkIds : []);
 const taintLine = (call) => taintSourcesLine(t, taintSourcesOf(call));
+const isFetch = (call) => call?.kind === "fetch" && Boolean(call.fetch);
+const hopsOf = (call) => (Array.isArray(call?.fetch?.hops) ? call.fetch.hops : []);
 const toggle = (i) => { open.value = open.value === i ? -1 : i; };
 
 const wanted = ref("");
@@ -140,4 +167,5 @@ defineExpose({ focus });
 .run-replay__message { display: flex; flex-direction: column; gap: 2px; }
 .run-replay__passages { margin: 0; padding-left: 18px; max-height: 160px; overflow: auto; }
 .run-replay__hash { margin: 0; color: var(--ink-2); overflow-x: auto; }
+.run-replay__fetch-hash { padding: 0 10px 6px; }
 </style>
