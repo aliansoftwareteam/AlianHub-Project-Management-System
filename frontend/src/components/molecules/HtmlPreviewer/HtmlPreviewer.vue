@@ -12,7 +12,7 @@
         </label>
       </div>
 
-      <div v-if="viewMode === 'html'" v-html="fileContent" class="html-previewer style-scroll"></div>
+      <iframe v-if="viewMode === 'html'" sandbox="" :srcdoc="fileContent" class="html-previewer style-scroll"></iframe>
 
       <textarea v-else v-model="fileContent" readonly ref="textRef" class="code-previewer style-scroll"></textarea>
     </div>
@@ -183,6 +183,9 @@ import { apiRequest } from '@/services';
   }
 
   .html-previewer {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
     min-height: 300px;
     overflow: auto;
     padding: 10px;
