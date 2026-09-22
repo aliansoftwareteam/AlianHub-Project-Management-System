@@ -11,6 +11,8 @@ const { attribution, isAgent } = require('./actor');
 const stepCredential = require('../Workflows/stepCredential');
 const completionStore = require('../Tasks/helpers/completionStore');
 const { emitPageChange } = require('../Pages/helpers/pageEvents');
+const { escapeCommentText } = require('../Comments/helpers/plainText');
+const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
 
 // The single place an agent's action is executed. MCP tools, approved proposals
 // and workspace-agent runs all call perform(): registry check → pending audit
@@ -58,6 +60,16 @@ const RATINGS = Object.freeze({
 // Rated only while the registry holds them, so a flag that is off leaves no rating behind.
 const FLAGGED_RATINGS = Object.freeze({
     'performance.read': read(SCOPE.PROJECT),
+    'projects.list': read(SCOPE.WORKSPACE),
+    'project.get': read(SCOPE.PROJECT),
+    'sprints.list': read(SCOPE.PROJECT),
+    'statuses.list': read(SCOPE.PROJECT),
+    'comments.list': read(SCOPE.TASK),
+    'pages.search': read(SCOPE.WORKSPACE),
+    'page.get': read(SCOPE.PROJECT),
+    'timesheet.read': read(SCOPE.WORKSPACE),
+    'comment.create': write(SCOPE.TASK),
+    'timelog.create': write(SCOPE.TASK),
 });
 
 const ratingTable = () => ({ ...RATINGS, ...Object.fromEntries(Object.entries(FLAGGED_RATINGS).filter(([k]) => registry.has(k))) });
@@ -109,15 +121,61 @@ const findRunningTimer = (companyId, taskId, userId) => MongoDbCrudOpration(comp
 
 /* ── the executors ─────────────────────────────────────────────────────────── */
 
+const commentOn = async ({ companyId, actor, params, depth }, action, body) => {
+    const r = await tools.addComment(companyId, params.taskId, body, context(actor, action, depth));
+    const a = attribution(actor);
+    await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMMENTS,
+        data: [{ _id: oid(r.commentId) }, { $set: { userId: String(actor.userId || a.actorId), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null } }],
+    }, 'updateOne').catch(() => {});
+    return { result: { commentId: r.commentId }, undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId };
+};
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
+const MAX_LOG_MINUTES = 24 * 60;
+
+/* The entry the manual log form writes (Modules/LogTime manualLogtime), for the person behind the agent only. */
+const timelogEntry = (params) => {
+    const minutes = Number(params.minutes);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_LOG_MINUTES) throw new tools.DeterministicError(`minutes must be a whole number from 1 to ${MAX_LOG_MINUTES}`);
+    const day = params.date ? String(params.date) : DateTime.utc().toISODate();
+    const clock = params.startTime ? String(params.startTime) : '09:00';
+    if (!DAY.test(day) || !CLOCK.test(clock)) throw new tools.DeterministicError('date must be YYYY-MM-DD and startTime HH:MM (UTC)');
+    const start = DateTime.fromISO(`${day}T${clock}`, { zone: 'utc' });
+    if (!start.isValid || start.toISODate() !== day) throw new tools.DeterministicError(`${day} is not a date`);
+    if (start.startOf('day') > DateTime.utc().plus({ days: 1 }).startOf('day')) throw new tools.DeterministicError('time cannot be logged on a future day');
+    return { start: Math.floor(start.toSeconds()), minutes };
+};
+
 const executors = {
-    async 'task.comment'({ companyId, actor, params, depth }) {
-        const r = await tools.addComment(companyId, params.taskId, params.body, context(actor, 'task.comment', depth));
+    async 'task.comment'(args) {
+        return commentOn(args, 'task.comment', args.params.body);
+    },
+
+    async 'comment.create'(args) {
+        return commentOn(args, 'comment.create', escapeCommentText(String(args.params.body || '')));
+    },
+
+    async 'timelog.create'({ companyId, actor, params }) {
+        const task = await tools.getTask(companyId, params.taskId);
+        const userId = String(actor.userId || '');
+        if (!OBJECT_ID.test(userId)) throw new tools.DeterministicError('time needs a person to log against');
+        const { start, minutes } = timelogEntry(params);
+        if (await isPeriodLocked({ companyId, userId, date: new Date(start * 1000) })) {
+            throw new tools.DeterministicError('that day is in an approved timesheet period, which is locked');
+        }
         const a = attribution(actor);
-        await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.COMMENTS,
-            data: [{ _id: oid(r.commentId) }, { $set: { userId: String(actor.userId || a.actorId), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null } }],
-        }, 'updateOne').catch(() => {});
-        return { result: { commentId: r.commentId }, undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId };
+        const saved = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TIMESHEET,
+            data: {
+                LogDescription: String(params.description || `${a.label} on ${task.TaskKey || task.TaskName}`).slice(0, 500),
+                Loggeduser: userId, TicketID: String(task._id), ProjectId: String(task.ProjectID),
+                LogStartTime: start, LogEndTime: start + minutes * 60, LogTimeDuration: minutes, logAddType: 0, trackShots: [],
+                billable: params.billable !== false, actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null, runId: actor.runId || null,
+            },
+        }, 'save');
+        return { result: { timesheetId: String(saved._id), minutes }, undo: { kind: 'timelog.create', timesheetId: String(saved._id), taskId: String(task._id) }, entityId: task._id, entityName: task.TaskName };
     },
 
     async 'task.status.set'({ companyId, actor, params, depth }) {

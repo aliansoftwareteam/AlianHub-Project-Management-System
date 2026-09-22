@@ -20,6 +20,8 @@ const DISCOVERY_SCOPES = mcpOAuth.READ_SCOPES;
 
 const scopeForTool = (name) => {
     if (Object.prototype.hasOwnProperty.call(TOOL_SCOPES, name)) return TOOL_SCOPES[name];
+    const dataTools = require('./dataTools');
+    if (Object.prototype.hasOwnProperty.call(dataTools.SCOPES, name)) return dataTools.SCOPES[name];
     const sessionTools = require('./sessionTools');
     return sessionTools.owns(name) ? sessionTools.SCOPES[name] : null;
 };
