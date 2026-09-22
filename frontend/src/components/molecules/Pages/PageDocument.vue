@@ -180,6 +180,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useGetterFunctions } from '@/composable';
 import pageContent from '@pageContent';
+import { richHtml } from '@/utils/richHtml';
 import { relativeTime, shortDate, toDateInput, reviewChipClass, reviewLabelKey, headingsOf } from './docsFormat';
 
 const { contentToEditorData, blocksToRawText, TASK_TOKEN_PATTERN } = pageContent.default || pageContent;
@@ -459,7 +460,7 @@ function chipSpan({ taskKey, statusName, bgColor, textColor, taskName }) {
 
 // Preview hydrates every task token with the task's current status, fetched on open.
 async function buildPreviewHtml() {
-    const html = contentHtml.value || '';
+    const html = richHtml(contentHtml.value || '');
     const tokens = [...html.matchAll(TASK_TOKEN_PATTERN)];
     if (!tokens.length) {
         previewHtml.value = html;

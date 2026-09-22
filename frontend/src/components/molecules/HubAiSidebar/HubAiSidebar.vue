@@ -20,7 +20,7 @@
                             <span class="black font-weight-bold" v-if="hubResponse?.title">{{$t('AI.title')}}: </span>
                             <p>{{hubResponse?.title}}</p>
                             <span v-if="hubResponse.description" class="black font-weight-bold">{{$t('ProjectDetails.description')}}: </span> 
-                            <div class="p15x-0px" id="description-single" v-if="hubResponse.description" v-html="hubResponse.description"></div>
+                            <div class="p15x-0px" id="description-single" v-if="hubResponse.description" v-html="richHtml(hubResponse.description)"></div>
                             <span class="error_class" v-if="hubResponse.error">{{hubResponse.error}}</span>
                             <template v-if="!isSendMessage && !isErrorGenerateSingle">
                                 <button v-for="(buttons,ind) in content.displayButton" :class="[{'pointer-event-none': isButtonClicked}]" :key="ind" class="btn-primary mr-10-px font-size-16 font-weight-400" @click="handleButtonClick(buttons,hubResponse)"> {{buttons.name}}</button>
@@ -108,6 +108,7 @@ import { apiRequest } from '../../../services';
 import { useAiApiFunction } from "@/composable/aiHelper";
 import { useCustomComposable } from "@/composable";
 import markdownit from 'markdown-it'
+import { richHtml } from '@/utils/richHtml';
 import * as env from '@/config/env'
 import { taskPlanPermission } from "@/composable/commonFunction";
 import { useI18n } from "vue-i18n";
@@ -447,7 +448,7 @@ function parseJsonAiText(index) {
 
 function renderHtmlFun (data) {
     if(data){
-        return mardownInit.render(data);
+        return richHtml(mardownInit.render(data));
     }else{
         return '';
     }

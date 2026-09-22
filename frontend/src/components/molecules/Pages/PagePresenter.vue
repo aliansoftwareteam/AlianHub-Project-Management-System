@@ -28,6 +28,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import pageContent from '@pageContent';
+import { richHtml } from '@/utils/richHtml';
 
 const { blocksToSlides, blocksToHtml, escapeHtml } = pageContent.default || pageContent;
 
@@ -55,7 +56,7 @@ const bodyHtml = computed(() => current.value.blocks.map((block) => {
     if (block.type === 'taskList') {
         return `<p class="pp__task">${escapeHtml(block.data.projectName)}</p>`;
     }
-    return blocksToHtml([block]);
+    return richHtml(blocksToHtml([block]));
 }).join(''));
 
 function next() { if (index.value < slides.value.length - 1) index.value += 1; }
