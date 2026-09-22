@@ -140,7 +140,7 @@ describe('a declared read in a run leaves a fetch row in the replay', () => {
                 bodyTruncated: false,
             },
             tainted: true,
-            taintSources: [{ kind: 'fetch', ref: 'reads.example.com', at: expect.any(String) }],
+            taintSources: [{ kind: 'fetch', ref: 'reads.example.com', at: expect.any(Date) }],
             status: 'ok',
             expiresAt: expect.any(Date),
         })]);

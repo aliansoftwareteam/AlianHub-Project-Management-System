@@ -86,7 +86,7 @@ async function gather(state, config) {
     const block = wantsMemory(slugOf(run))
         ? (await quietly(run._id, 'memory unavailable', () => memory.contextFor({ companyId, projectId: task.ProjectID, userId: run.startedBy }))) || ''
         : '';
-    const { out: gathered, found } = await taint.collect(() => orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block, startedBy: run.startedBy }));
+    const { out: gathered, found } = await taint.collect(() => orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block, startedBy: run.startedBy, runId: String(run._id) }));
     if (gathered.status === 'skipped') return { result: gathered };
     const marked = await taint.mark(companyId, run, [
         ...taint.fromTask({ origin: await taint.originOf(companyId, task) }),

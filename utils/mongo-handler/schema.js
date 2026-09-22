@@ -973,7 +973,7 @@ const schema = {
     // One per model call (Modules/AICore/replay.js); system, messages and response are redacted and capped
     aiReplays: {
         feature: { type: String, required: true },
-        // 'tool' for a registry read an agent called; absent on a model call
+        // 'tool' for a registry read an agent called, 'fetch' for a data skill's declared read; absent on a model call
         kind: { type: String, required: false },
         runId: { type: String, required: false },
         agentId: { type: String, required: false },
@@ -1000,6 +1000,8 @@ const schema = {
         taintSources: { type: Array, default: undefined, required: false },
         // tool rows: { action, args, scope } and the numbers the action returned
         query: { type: Object, required: false },
+        // fetch rows: { host, path, status, bytes, hops, sha256, body, bodyTruncated }; no headers, no query strings
+        fetch: { type: Object, required: false },
         result: { type: Object, required: false },
         response: { type: String, required: false },
         truncated: { type: Boolean, default: false, required: false },
