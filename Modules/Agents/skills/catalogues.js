@@ -76,15 +76,26 @@ const INPUT_CATALOGUE = Object.freeze({
 
 const EXTERNAL_READ_CAPS = Object.freeze({ maxBytes: 512 * 1024, timeoutMs: 10000, maxRedirects: 3 });
 
-const externalReadParams = (formats) => Object.freeze({
+const LINK_INPUTS = Object.freeze(['pr_link', 'public_url', 'linked_doc']);
+const MAX_EXTRA_HOSTS = 4;
+
+/* `link` reads a whole URL the task carries instead of host + path; the URL's
+ * host must still be one the step declares, in `host` or `hosts`. */
+const linkParams = Object.freeze({
+    hosts: Object.freeze({ type: 'hosts', max: MAX_EXTRA_HOSTS }),
+    link: Object.freeze({ type: 'input', values: LINK_INPUTS }),
+});
+
+const externalReadParams = (formats, extra = {}) => Object.freeze({
     host: Object.freeze({ type: 'host', required: true }),
-    path: Object.freeze({ type: 'path', required: true, maxLength: externalReads.MAX_PATH }),
+    path: Object.freeze({ type: 'path', required: true, ...(extra.link ? { unless: 'link' } : {}), maxLength: externalReads.MAX_PATH }),
     method: Object.freeze({ type: 'enum', values: Object.freeze(['GET']), default: 'GET' }),
     maxBytes: Object.freeze({ type: 'number', min: 1024, max: EXTERNAL_READ_CAPS.maxBytes, default: 256 * 1024 }),
     timeoutMs: Object.freeze({ type: 'number', min: 500, max: EXTERNAL_READ_CAPS.timeoutMs, default: 8000 }),
     maxRedirects: Object.freeze({ type: 'number', min: 0, max: EXTERNAL_READ_CAPS.maxRedirects, default: 1 }),
     credential: Object.freeze({ type: 'secret_handle', kind: externalReads.CREDENTIAL_KIND }),
     format: Object.freeze({ type: 'enum', values: Object.freeze([...formats]), default: formats[0] }),
+    ...extra,
 });
 
 /* Context a skill may read before the model is asked. Each reader is a call into
@@ -136,10 +147,10 @@ const READER_CATALOGUE = Object.freeze({
     }),
     url: Object.freeze({
         label: 'A page on a declared host',
-        description: 'One GET to a host on the workspace egress allowlist, as text or a diff.',
+        description: 'One GET to a host on the workspace egress allowlist, as text or a diff. A diff reads a GitHub pull request or GitLab merge request link as its .diff, stripped of markup and clipped to 30,000 characters.',
         external: true,
-        params: externalReadParams(['text', 'diff']),
-        fields: Object.freeze(['status', 'text', 'bytes']),
+        params: externalReadParams(['text', 'diff'], linkParams),
+        fields: Object.freeze(['status', 'text', 'bytes', 'truncated']),
     }),
     api: Object.freeze({
         label: 'An API on a declared host',
@@ -231,6 +242,13 @@ const FILTERS = Object.freeze({
         args: Object.freeze([Object.freeze({ name: 'limit', min: 1, max: 100 })]),
         apply: (v, limit) => (Array.isArray(v) ? v.filter(Boolean).slice(0, limit).map((x) => `• ${text(x)}`).join('\n') : ''),
     }),
+    findings: Object.freeze({
+        label: 'Findings',
+        description: 'A list of {title, severity, where, why} as one "• [severity] title — where: why" line per entry with a title, at most this many.',
+        args: Object.freeze([Object.freeze({ name: 'limit', min: 1, max: 100 })]),
+        apply: (v, limit) => (Array.isArray(v) ? v.filter((f) => f && typeof f === 'object' && f.title).slice(0, limit)
+            .map((f) => `• [${text(f.severity || 'medium').toLowerCase()}] ${text(f.title)}${f.where ? ` — ${text(f.where)}` : ''}${f.why ? `: ${text(f.why)}` : ''}`).join('\n') : ''),
+    }),
 });
 
 const MAX_EMIT_EACH = 25;
@@ -247,4 +265,4 @@ const catalogues = () => ({
     risks: [...RISKS],
 });
 
-module.exports = { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, EXTERNAL_READ_CAPS, isOffered, offeredReaders, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, FILTERS, MAX_EMIT_EACH, MIN_BRIEF_CHARS, catalogues, hasInput, plain, text };
+module.exports = { SKILL_VERSION, RISKS, INPUT_CATALOGUE, READER_CATALOGUE, EXTERNAL_READ_CAPS, LINK_INPUTS, isOffered, offeredReaders, PROMPT_PARTIALS, EMIT_ACTIONS, EMIT_REQUIRED, TASK_FIELDS, TEMPLATE_ROOTS, FILTERS, MAX_EMIT_EACH, MIN_BRIEF_CHARS, catalogues, hasInput, plain, text };

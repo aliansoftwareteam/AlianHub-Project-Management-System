@@ -127,8 +127,9 @@ describe('flag off: beta exactly', () => {
 describe('the url and api readers (flag on)', () => {
     it('are offered with their whole parameter surface', () => {
         const byKey = Object.fromEntries(catalogues().readers.map((r) => [r.key, r]));
+        const surface = { url: ['hosts', 'link'], api: [] };
         ['url', 'api'].forEach((key) => {
-            expect(Object.keys(byKey[key].params).sort()).toEqual(['credential', 'format', 'host', 'maxBytes', 'maxRedirects', 'method', 'path', 'timeoutMs']);
+            expect(Object.keys(byKey[key].params).sort()).toEqual(['credential', 'format', 'host', 'maxBytes', 'maxRedirects', 'method', 'path', 'timeoutMs', ...surface[key]].sort());
             expect(byKey[key].params.method.values).toEqual(['GET']);
             expect(byKey[key].params.maxBytes.max).toBe(512 * 1024);
             expect(byKey[key].params.timeoutMs.max).toBe(10000);
