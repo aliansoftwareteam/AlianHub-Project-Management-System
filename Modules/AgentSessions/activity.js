@@ -43,6 +43,10 @@ const authorize = async (ctx, action, { sessionId, handle }, vis, now = new Date
     if (String(session.clientId) !== String(ctx.oauth.clientId)) return refuse(ctx, action, sessionId, 'this session was delegated to another client');
     if (String(session.grantId) !== String(ctx.oauth.grantId)) return refuse(ctx, action, sessionId, 'this session belongs to another grant');
     if (!isOpen(session)) return refuse(ctx, action, sessionId, `this session is ${session.state}`);
+    if (session.workflowRunId) {
+        const live = await require('../Workflows/externalSession').enforce(ctx.companyId, session, now);
+        if (!live.ok) return refuse(ctx, action, sessionId, live.reason);
+    }
     if (session.state === STATE.OFFERED && session.deliveredAt && now.getTime() > new Date(session.deliveredAt).getTime() + LIMITS.firstActivityMs) {
         await lifecycle.expire(session, now);
         return refuse(ctx, action, sessionId, 'no first activity came within ten seconds of delivery, so the offer lapsed');

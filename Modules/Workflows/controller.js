@@ -100,6 +100,24 @@ const withoutCredentialIds = (step) => {
 
 const stepsOf = async (companyId, run) => ((await store.listSteps(companyId, run._id)) || []).map(withoutCredentialIds);
 
+/* The session an external_agent step waits on. Its activities are the task's, so only a reader who can open the
+ * task gets them, as the task panel's strip would; anyone else sees the state alone. */
+const withAgentSessions = async (companyId, uid, steps) => {
+    if (!steps.some((step) => step.agentSessionId)) return steps;
+    const sessions = require('../AgentSessions/store');
+    const agentAccess = require('../AgentSessions/access');
+    const { publicView } = require('../AgentSessions/rules');
+    return Promise.all(steps.map(async (step) => {
+        if (!step.agentSessionId) return step;
+        const session = await sessions.find(companyId, step.agentSessionId);
+        if (!session) return step;
+        const view = publicView(session);
+        const task = await agentAccess.taskOf(companyId, session.taskId);
+        const full = await agentAccess.canOpenTask(companyId, uid, task);
+        return { ...step, agentSession: full ? view : { id: view.id, state: view.state, reason: view.reason, clientName: view.clientName, activityCount: view.activityCount, activities: [] } };
+    }));
+};
+
 /* Shape first, then the step types' own rules.
  *
  * The shape — an id, a known type, a dependency that exists — is what the engine
@@ -247,7 +265,7 @@ exports.getRun = async (req, res) => {
         if (!ctx) return undefined;
         const run = await readableRun(ctx.companyId, ctx.caller, req.params.id);
         if (!run) return fail(res, 'Workflow run not found.', 404);
-        return ok(res, 'Run fetched.', { run, steps: await stepsOf(ctx.companyId, run) });
+        return ok(res, 'Run fetched.', { run, steps: await withAgentSessions(ctx.companyId, ctx.caller.actor.userId, await stepsOf(ctx.companyId, run)) });
     } catch (error) {
         logger.error(`[workflow-api] getRun: ${error.message}`);
         return fail(res, error.message, 500);

@@ -9,6 +9,7 @@ const condition = require('./condition');
 const wait = require('./wait');
 const loop = require('./loop');
 const waiting = require('./waiting');
+const externalAgent = require('./externalAgent');
 
 // The step types, and what each one is.
 //
@@ -165,12 +166,12 @@ const CONTRACTS = Object.freeze([
     },
 ]);
 
-const BY_KEY = new Map(CONTRACTS.map((contract) => [contract.key, contract]));
+const contracts = () => (executors.has(externalAgent.TYPE) ? [...CONTRACTS, externalAgent.CONTRACT] : CONTRACTS);
 
-const get = (type) => BY_KEY.get(String(type)) || null;
+const get = (type) => contracts().find((contract) => contract.key === String(type)) || null;
 
 const manifest = () => ({
-    stepTypes: CONTRACTS,
+    stepTypes: contracts(),
     bounds: { maxFanOut: flag.maxFanOut(), maxLoopIterations: flag.maxLoopIterations() },
 });
 
@@ -289,4 +290,5 @@ module.exports = {
     WAIT: wait.WAIT,
     TIMER: wait.TIMER,
     LOOP: loop.TYPE,
+    EXTERNAL_AGENT: externalAgent.TYPE,
 };

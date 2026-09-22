@@ -1,7 +1,7 @@
 {
   "locale": "gr",
   "machineTranslated": false,
-  "updatedAt": "2026-09-22T07:41:58.697Z",
+  "updatedAt": "2026-09-22T13:02:54.851Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6533,6 +6533,8 @@
     "Ai.skill_read_err_required": "Required.",
     "Ai.skill_read_err_range": "Must be a number from {min} to {max}.",
     "Ai.skill_read_host_placeholder": "api.example.com",
-    "Ai.skill_read_path_placeholder": "/repos/{'{{'}input.pr_link{'}}'}"
+    "Ai.skill_read_path_placeholder": "/repos/{'{{'}input.pr_link{'}}'}",
+    "WorkflowBuilder.no_approved_clients": "no outside agent is approved here",
+    "Workflows.type_external_agent": "Outside agent"
   }
 }

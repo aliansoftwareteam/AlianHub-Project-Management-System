@@ -6,6 +6,7 @@ const MODULE = 'agentSession';
 /* socket/controller/agentSessionSocket.js relays this to the task's detail room, to the people who can open the task. */
 const emitSession = (session) => {
     if (!session) return;
+    if (session.workflowRunId) require('../Workflows/externalSession').wake(session);
     socketEmitter.emit('update', {
         type: 'update',
         module: MODULE,

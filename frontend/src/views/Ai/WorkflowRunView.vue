@@ -42,6 +42,10 @@
                                 >{{ $t('Workflows.control_resume') }}</button>
                             </WorkflowStepRow>
 
+                            <div v-if="sessionStripOf(node.step)" class="wf-session" data-test="step-session">
+                                <TaskAgentStrip :run="sessionStripOf(node.step)" />
+                            </div>
+
                             <div v-if="node.tally" class="wf-fan" data-test="fan-group">
                                 <span class="ah-small" data-test="fan-tally">{{ tallyLine(node.tally) }}</span>
                                 <button
@@ -103,9 +107,10 @@ import AiSidebar from "./AiSidebar.vue";
 import WorkflowStepRow from "./WorkflowStepRow.vue";
 import WorkflowFailedStep from "./WorkflowFailedStep.vue";
 import WorkflowLoopCounter from "./WorkflowLoopCounter.vue";
+import TaskAgentStrip from "@/components/organisms/TaskDetailOverlay/TaskAgentStrip.vue";
 import { useAgentAccess } from "./agentAccess";
 import { useWorkflowRun } from "./useWorkflowRun";
-import { recoveryControlOf, runStatusOf } from "./workflowRun";
+import { recoveryControlOf, runStatusOf, sessionStripOf } from "./workflowRun";
 
 defineOptions({ name: "WorkflowRunView" });
 

@@ -47,7 +47,7 @@ const notifyDelegator = async (companyId, task, uid, session) => {
 
 /* The owner's rules (2026-09-21): the assignee stays; an unassigned task gets the delegating person, who is notified;
  * a private sprint only with a delegator who is a member of it and a client an admin opted in to private sprints. */
-const delegate = async ({ companyId, uid, taskId, clientId, ip = '', now = new Date() }) => {
+const delegate = async ({ companyId, uid, taskId, clientId, ip = '', binding = null, now = new Date() }) => {
     const task = await access.taskOf(companyId, taskId);
     if (!task) refuse(404, 'Task not found.');
     if (!(await access.canEditTask(companyId, uid, task))) refuse(403, 'You cannot edit this task, so you cannot delegate it.');
@@ -71,6 +71,7 @@ const delegate = async ({ companyId, uid, taskId, clientId, ip = '', now = new D
     if (assignDelegator && !(await access.canAssignSelf(companyId, uid, task))) {
         refuse(403, 'This task has no assignee and you may not assign it, so it cannot be delegated; ask someone who can assign it.', 'assign_not_allowed');
     }
+    const bound = binding ? { workflowRunId: String(binding.workflowRunId), workflowStepId: String(binding.workflowStepId) } : {};
     const handle = newHandle();
     const session = await store.create(companyId, {
         taskId: String(task._id), projectId: String(task.ProjectID || ''), sprintId: String(task.sprintId || ''),
@@ -78,7 +79,7 @@ const delegate = async ({ companyId, uid, taskId, clientId, ip = '', now = new D
         clientId: String(clientId), clientName: client.name || String(clientId), grantId: String(grant.grantId), delegatedBy: String(uid),
         assignedDelegator: assignDelegator, privateSprint: Boolean(sprint),
         state: STATE.OFFERED, handleHash: hashOf(handle), handleExpiresAt: new Date(now.getTime() + LIMITS.handleMs),
-        tainted: true, createdAt: now, activityCount: 0, activities: [],
+        tainted: true, createdAt: now, activityCount: 0, activities: [], ...bound,
     });
 
     if (assignDelegator) {
@@ -89,7 +90,7 @@ const delegate = async ({ companyId, uid, taskId, clientId, ip = '', now = new D
         actorId: String(uid), actorName: '', ip,
         action: 'agent_session.delegated',
         entityType: 'task', entityId: String(task._id), entityName: task.TaskName || '',
-        meta: { sessionId: String(session._id), clientId: session.clientId, clientName: session.clientName, grantId: session.grantId, assignedDelegator: assignDelegator, privateSprint: Boolean(sprint) },
+        meta: { sessionId: String(session._id), clientId: session.clientId, clientName: session.clientName, grantId: session.grantId, assignedDelegator: assignDelegator, privateSprint: Boolean(sprint), ...bound },
     });
     lifecycle.track(companyId);
     events.emitSession(session);

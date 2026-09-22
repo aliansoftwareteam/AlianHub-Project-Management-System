@@ -190,6 +190,34 @@ describe('WorkflowRunView', () => {
         expect(wrapper.find('[data-test="run-read-only"]').exists()).toBe(true);
     });
 
+    it('shows the outside agent session an external_agent step waits on, with its latest activities', async () => {
+        const wrapper = await mountView({
+            run: run(),
+            steps: [step({
+                type: 'external_agent', status: 'pending', finishedAt: null,
+                agentSession: {
+                    id: 'sess-1', state: 'active', clientName: 'Coder', reason: '', createdAt: '2026-09-01T10:00:00.000Z', firstActivityAt: '2026-09-01T10:00:03.000Z',
+                    activities: [{ type: 'thought', text: 'Reading the brief', at: '2026-09-01T10:00:03.000Z' }, { type: 'action', text: 'Running the tests', at: '2026-09-01T10:00:09.000Z' }]
+                }
+            })]
+        });
+        expect(wrapper.find('[data-test="step-type"]').text()).toBe('Workflows.type_external_agent');
+        const strip = wrapper.find('[data-test="step-session"]');
+        expect(strip.exists()).toBe(true);
+        expect(strip.text()).toContain('Coder');
+        expect(strip.text()).toContain('TaskPanel.agent_session_active');
+        expect(strip.text()).toContain('Running the tests');
+        expect(strip.text()).toContain('Reading the brief');
+    });
+
+    it('names why a revoked session stopped its step', async () => {
+        const wrapper = await mountView({
+            run: run({ status: 'failed' }),
+            steps: [step({ type: 'external_agent', status: 'failed', agentSession: { id: 'sess-1', state: 'revoked', clientName: 'Coder', reason: 'the grant behind this session was revoked', activities: [] } })]
+        });
+        expect(wrapper.find('[data-test="step-session"]').text()).toContain('the grant behind this session was revoked');
+    });
+
     it('shows status, duration and cost for every step', async () => {
         const wrapper = await mountView({
             run: run({ status: 'success' }),
