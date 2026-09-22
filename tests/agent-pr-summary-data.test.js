@@ -211,3 +211,30 @@ describe('a PR host the workspace has not listed', () => {
         expect(fetched).toEqual([]);
     });
 });
+
+describe('a url read of a task link', () => {
+    beforeEach(() => setFlags(true));
+    const withStep = (params, inputs = ['pr_link']) => validateSkill({ ...seed, inputs, gather: [{ reader: 'url', as: 'pr', params }] });
+    const fields = (checked) => checked.errors.map((e) => `${e.field} ${e.code}`);
+
+    it('declares every host of the step', () => {
+        expect(validateSkill(seed).value.declaredHosts).toEqual(FORGES);
+    });
+
+    it('takes a link or a path, not both, and not neither', () => {
+        expect(fields(withStep({ host: 'github.com', link: 'pr_link', path: '/x' }))).toContain('gather[0].params.path invalid_params');
+        expect(fields(withStep({ host: 'github.com' }))).toContain('gather[0].params.path required');
+    });
+
+    it('reads only a declared URL input', () => {
+        expect(fields(withStep({ host: 'github.com', link: 'public_url' }))).toContain('gather[0].params.link undeclared_input');
+        expect(fields(withStep({ host: 'github.com', link: 'brief' }, ['pr_link', 'brief']))).toContain('gather[0].params.link invalid_params');
+    });
+
+    it('refuses an extra host that is not declarable, and at save one the workspace has not listed', async () => {
+        expect(fields(withStep({ host: 'github.com', link: 'pr_link', hosts: ['localhost'] }))).toContain('gather[0].params.hosts[0] host_not_allowed');
+        allowlist.hostsFor.mockResolvedValue(['github.com']);
+        const errors = await externalReads.checkDeclaredReads(C, validateSkill(seed).value);
+        expect(errors.map((e) => `${e.field} ${e.host}`)).toEqual(['gather[0].params.hosts[0] patch-diff.githubusercontent.com', 'gather[0].params.hosts[1] gitlab.com']);
+    });
+});
