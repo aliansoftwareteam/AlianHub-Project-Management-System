@@ -157,6 +157,13 @@ describe('a declared read in a run leaves a fetch row in the replay', () => {
         expect(JSON.stringify(row)).not.toContain('page=2');
     });
 
+    it('drops a query string handed to it directly', async () => {
+        await replay.recordFetch({ companyId: C, runId: RUN_ID, host: READS, path: '/a?key=v1', status: 200, bytes: 2, hops: [{ host: READS, path: '/a?key=v1#top', status: 200 }], sha256: 'h', body: '{}', taintSources: [] });
+        const [row] = fetchRows();
+        expect(row.fetch.path).toBe('/a');
+        expect(row.fetch.hops).toEqual([{ host: READS, path: '/a', status: 200 }]);
+    });
+
     it('keeps the first 32 KB of the body with a truncation marker and hashes the whole body', async () => {
         await save([step({ path: '/huge', format: 'text' })]);
         const out = await gatherRun();
