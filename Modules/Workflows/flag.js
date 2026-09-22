@@ -79,8 +79,12 @@ const joinPollMs = () => number(process.env.WORKFLOW_JOIN_POLL_MS, 2000);
  * a step nobody can ever finish is a run that never ends. */
 const approvalDeadlineMs = () => number(process.env.WORKFLOW_APPROVAL_DEADLINE_MS, 3 * 24 * 60 * MINUTE);
 
+/* A step handed to an outside agent runs as one of its sessions, so the step type needs those on as well. */
+const externalAgentSteps = (env = process.env) => ['on', 'true', '1', 'yes'].includes(String(env.EXTERNAL_AGENT_STEPS || '').trim().toLowerCase())
+    && require('../AgentSessions/config').isOn(env);
+
 module.exports = {
-    enabled, leaseMs, heartbeatMs, tenantConcurrency, maxAttempts, backoffLadder, DEFAULT_BACKOFF_MS,
+    enabled, externalAgentSteps, leaseMs, heartbeatMs, tenantConcurrency, maxAttempts, backoffLadder, DEFAULT_BACKOFF_MS,
     maxFanOut, maxLoopIterations, maxRunsPerHour, runLimitCacheMs, approvalPollMs, joinPollMs, approvalDeadlineMs,
     runDeadlineMs, runBudgetUsd,
 };

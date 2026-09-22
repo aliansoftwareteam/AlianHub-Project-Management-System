@@ -21,6 +21,11 @@ const find = async (companyId, id) => {
 const forTask = async (companyId, taskId, limit = 5) => ((await sessions(companyId, [{ taskId: String(taskId) }, null, { sort: { createdAt: -1 }, limit }], 'find')) || [])
     .map((row) => withCompany(companyId, row));
 
+const forStep = async (companyId, runId, stepId) => {
+    const [row] = (await sessions(companyId, [{ workflowRunId: String(runId), workflowStepId: String(stepId) }, null, { sort: { createdAt: -1 }, limit: 1 }], 'find')) || [];
+    return withCompany(companyId, row);
+};
+
 const openRows = async (companyId, extra = {}) => ((await sessions(companyId, [{ state: { $in: [...OPEN] }, ...extra }], 'find')) || [])
     .map((row) => withCompany(companyId, row));
 
@@ -73,4 +78,4 @@ const saveEndpoint = async (companyId, clientId, fields) => plain(await endpoint
     { upsert: true, returnDocument: 'after' },
 ], 'findOneAndUpdate'));
 
-module.exports = { toOid, create, find, forTask, openRows, transition, markDelivered, appendActivity, endpointFor, listEndpoints, saveEndpoint };
+module.exports = { toOid, create, find, forTask, forStep, openRows, transition, markDelivered, appendActivity, endpointFor, listEndpoints, saveEndpoint };

@@ -296,6 +296,7 @@ const call = async (ctx, name, args = {}) => {
     if (sessionTools.owns(name)) return sessionTools.call(ctx, name, args);
     const tool = offered().find((t) => t.name === String(name));
     if (!tool) throw Object.assign(new Error(`Unknown tool "${name}"`), { code: -32601 });
+    await require('../Workflows/externalSession').checkToolCall(ctx, tool.name);
     if (!['filtered', 'none'].includes(tool.visibility)) throw new Error(`${tool.name} declares no visibility`);
     const filtered = tool.visibility === 'filtered';
 

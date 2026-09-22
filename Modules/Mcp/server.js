@@ -132,11 +132,21 @@ const logActivity = (ctx, statusCode) => {
  * not when the token expires. */
 const namedCompanies = (req) => [req.query.companyId, req.headers.companyid].filter(Boolean).map(String);
 
+const calledTool = (req) => {
+    const call = messagesOf(req.body).find((message) => message && message.method === 'tools/call');
+    return call && call.params && call.params.name ? String(call.params.name).slice(0, 100) : 'mcp';
+};
+
+const refuseForWaitingSteps = (req, raw) => require('../Workflows/externalSession')
+    .refuseRevokedToken(raw, { action: calledTool(req), ip: ipOf(req) })
+    .catch((error) => logger.error(`mcp: closing the step sessions of a refused token failed: ${error.message}`));
+
 const authenticate = async (req) => {
     const raw = bearerOf(req);
     const mode = mcpOAuth.mode();
     if (raw && mode !== mcpOAuth.MODE.OFF && oauthAuth.isAccessToken(raw)) {
         const ctx = await oauthAuth.authenticate(req, raw, { namedCompanies: namedCompanies(req) });
+        if (!ctx) await refuseForWaitingSteps(req, raw);
         return ctx && !ctx.forbidden && !ctx.wrongWorkspace ? { ...ctx, ip: ipOf(req) } : ctx;
     }
     if (mode === mcpOAuth.MODE.ONLY) return null;
