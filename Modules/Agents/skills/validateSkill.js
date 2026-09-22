@@ -106,6 +106,16 @@ const checkParam = (rule, value, field, inputs, errors) => {
         const shown = typeof value === 'string' ? value : '';
         errors.push(error(field, externalReads.CODE.HOST_NOT_ALLOWED, `"${shown}" ${externalReads.hostProblem(reason)}`, { host: shown, reason })); return null;
     }
+    if (rule.type === 'hosts') {
+        if (!Array.isArray(value) || value.length > rule.max) { errors.push(error(field, 'invalid_params', `must be a list of at most ${rule.max} hosts`)); return null; }
+        const hosts = value.map((host, i) => checkParam({ type: 'host' }, host, `${field}[${i}]`, inputs, errors));
+        return hosts.includes(null) ? null : [...new Set(hosts)];
+    }
+    if (rule.type === 'input') {
+        if (!rule.values.includes(value)) { errors.push(error(field, 'invalid_params', `must be one of ${rule.values.join(', ')}`)); return null; }
+        if (!inputs.has(value)) { errors.push(error(field, 'undeclared_input', `reads input "${value}", which the skill does not declare`)); return null; }
+        return value;
+    }
     if (rule.type === 'path') return checkReadPath(value, field, inputs, errors);
     if (rule.type === 'secret_handle') {
         if (typeof value === 'string' && externalReads.HANDLE.test(value)) return value;
@@ -125,7 +135,10 @@ const validateReaderParams = (reader, given, at, inputs, errors) => {
         const checked = checkParam(rule, value, `${at}.params.${name}`, inputs, errors);
         if (checked !== null) out[name] = checked;
     });
-    Object.entries(spec).filter(([name, rule]) => rule.required && params[name] === undefined).forEach(([name]) => errors.push(error(`${at}.params.${name}`, 'required', 'required')));
+    Object.entries(spec).filter(([name, rule]) => rule.required && params[name] === undefined && !(rule.unless && params[rule.unless] !== undefined))
+        .forEach(([name]) => errors.push(error(`${at}.params.${name}`, 'required', 'required')));
+    Object.entries(spec).filter(([name, rule]) => rule.unless && params[name] !== undefined && params[rule.unless] !== undefined)
+        .forEach(([name, rule]) => errors.push(error(`${at}.params.${name}`, 'invalid_params', `takes either "${name}" or "${rule.unless}", not both`)));
     return out;
 };
 
@@ -249,6 +262,22 @@ const answerFields = (value, field, errors) => {
     return value.slice(0, MAX_GROUNDED_FIELDS).map(asString).filter(Boolean);
 };
 
+const ANSWER_FIELD = /^[a-zA-Z][a-zA-Z0-9_]{0,39}$/;
+
+/* A list in the answer whose items must cite something in a gathered text:
+ * an item whose `field` names nothing in `source` is dropped. */
+const validateCites = (value, declared, errors) => {
+    if (value === undefined || value === null) return null;
+    if (!isPlainObject(value)) { errors.push(error('grounded.cites', 'invalid', 'must be an object: { list, field, source }')); return null; }
+    const list = asString(value.list);
+    const field = asString(value.field);
+    if (!ANSWER_FIELD.test(list)) errors.push(error('grounded.cites.list', 'invalid', 'must name a list in the answer, e.g. risks'));
+    if (!ANSWER_FIELD.test(field)) errors.push(error('grounded.cites.field', 'invalid', 'must name the field of each item that cites the text, e.g. where'));
+    const source = gatherPath(value.source, 'grounded.cites.source', declared, errors);
+    if (!source && !errors.some((e) => e.field === 'grounded.cites.source')) errors.push(error('grounded.cites.source', 'required', 'name the gathered text the items must cite'));
+    return ANSWER_FIELD.test(list) && ANSWER_FIELD.test(field) && source ? { list, field, source } : null;
+};
+
 /* The ground-truth gate: which gathered values hold the task keys and the
  * counts the answer is allowed to name, and which answer fields to hold to them. */
 const validateGrounded = (input, declared, errors) => {
@@ -259,14 +288,17 @@ const validateGrounded = (input, declared, errors) => {
     const numbers = gatherPath(spec.numbers, 'grounded.numbers', declared, errors);
     const fields = answerFields(spec.fields, 'grounded.fields', errors);
     const mustNameKey = answerFields(spec.mustNameKey, 'grounded.mustNameKey', errors);
-    if (!fields.length && !mustNameKey.length) errors.push(error('grounded.fields', 'required', 'name at least one answer field to hold to the data'));
-    if (!keys && !numbers) errors.push(error('grounded.keys', 'required', 'name the gathered keys or counts the answer is checked against'));
+    const cites = validateCites(spec.cites, declared, errors);
+    if (!cites || fields.length || mustNameKey.length || keys || numbers) {
+        if (!fields.length && !mustNameKey.length) errors.push(error('grounded.fields', 'required', 'name at least one answer field to hold to the data'));
+        if (!keys && !numbers) errors.push(error('grounded.keys', 'required', 'name the gathered keys or counts the answer is checked against'));
+    }
     let allowHours = [];
     if (spec.allowHours !== undefined) {
         if (!Array.isArray(spec.allowHours) || spec.allowHours.some((n) => !Number.isInteger(Number(n)) || Number(n) < 1)) errors.push(error('grounded.allowHours', 'invalid', 'must be a list of whole hour windows the skill itself names'));
         else allowHours = spec.allowHours.slice(0, MAX_GROUNDED_FIELDS).map(Number);
     }
-    return { ...(keys ? { keys } : {}), ...(numbers ? { numbers } : {}), fields, mustNameKey, allowHours };
+    return { ...(keys ? { keys } : {}), ...(numbers ? { numbers } : {}), fields, mustNameKey, allowHours, ...(cites ? { cites } : {}) };
 };
 
 const validateSkill = (input = {}) => {
@@ -306,7 +338,7 @@ const validateSkill = (input = {}) => {
 
     if (errors.length) return { ok: false, errors, value: null };
 
-    const declaredHosts = [...new Set(gather.filter((s) => externalReads.isExternal(s.reader)).map((s) => s.params.host))];
+    const declaredHosts = [...new Set(gather.filter((s) => externalReads.isExternal(s.reader)).flatMap((s) => [s.params.host, ...(s.params.hosts || [])]))];
 
     const emits = [...new Set(emit.map((m) => m.action))];
     const computed = riskOf(emits);

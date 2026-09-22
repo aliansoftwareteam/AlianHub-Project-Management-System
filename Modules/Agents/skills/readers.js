@@ -58,21 +58,58 @@ const paramsFor = (reader, given = {}) => {
     return out;
 };
 
+const MAX_DIFF_CHARS = 30000;
+
+const stepHosts = (params) => [params.host, ...(params.hosts || [])];
+
+/* A link comes from the task, not from the skill's author, so a link the skill cannot read skips the run. */
+const linkTarget = (params, input) => {
+    let url;
+    try { url = new URL(String(input[params.link] || '')); } catch (e) { return { skip: `the ${params.link} is not a valid URL` }; }
+    const port = Number(url.port || 443);
+    if (url.protocol !== 'https:' || !externalReads.namesHost(stepHosts(params), url.hostname, port)) {
+        return { skip: `the link points at ${url.host}, which this skill does not read; it reads ${stepHosts(params).join(', ')}` };
+    }
+    return { url: url.href };
+};
+
+const targetOf = (params, { task, input }) => {
+    if (params.link) return linkTarget(params, input);
+    try {
+        return { url: externalReads.buildUrl(params, { task, input }) };
+    } catch (e) {
+        throw externalReads.refusal(externalReads.CODE.INVALID_PATH, e.message);
+    }
+};
+
+const asDiff = (body) => {
+    const stripped = String(body).replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<[^>]+>/g, ' ');
+    return { text: stripped.slice(0, MAX_DIFF_CHARS), truncated: stripped.length > MAX_DIFF_CHARS };
+};
+
+const unlistedSkip = (e) => (e && e.code === externalReads.CODE.HOST_NOT_ALLOWED
+    ? { skip: String(e.message).replace(`${externalReads.CODE.HOST_NOT_ALLOWED}: `, '') }
+    : null);
+
 /* An error status or a body that is not the JSON the read declared skips the run rather than hand the model
  * something it was not written for. */
 const declaredRead = (reader) => async (companyId, { task, input, declaredHosts, startedBy, runId }, params) => {
     if (!externalReads.enabled()) throw externalReads.notAvailable(reader);
-    let url;
-    try {
-        url = externalReads.buildUrl(params, { task, input });
-    } catch (e) {
-        throw externalReads.refusal(externalReads.CODE.INVALID_PATH, e.message);
-    }
+    const target = targetOf(params, { task, input });
+    if (target.skip) return { skip: target.skip };
+    const url = params.format === 'diff' ? externalReads.forgeDiffUrl(target.url) : target.url;
     const started = Date.now();
-    const res = await readDeclared({
-        companyId, actor: startedBy, url, declaredHosts, credential: params.credential,
-        maxBytes: params.maxBytes, timeoutMs: params.timeoutMs, maxRedirects: params.maxRedirects,
-    });
+    let res;
+    try {
+        res = await readDeclared({
+            companyId, actor: startedBy, url, declaredHosts, credential: params.credential,
+            maxBytes: params.maxBytes, timeoutMs: params.timeoutMs, maxRedirects: params.maxRedirects,
+        });
+    } catch (e) {
+        const skipped = params.link && unlistedSkip(e);
+        if (skipped) return skipped;
+        throw e;
+    }
     const { host, pathname } = new URL(url);
     if (runId) {
         await replay.recordFetch({
@@ -82,6 +119,7 @@ const declaredRead = (reader) => async (companyId, { task, input, declaredHosts,
     }
     if (res.status < 200 || res.status >= 300) return { skip: `the read of ${host} answered HTTP ${res.status}` };
     const out = { status: res.status, text: res.body, bytes: res.bytes, taint: res.taint };
+    if (params.format === 'diff') return { ...out, ...asDiff(res.body) };
     if (params.format !== 'json') return out;
     try {
         return { ...out, json: JSON.parse(res.body) };
