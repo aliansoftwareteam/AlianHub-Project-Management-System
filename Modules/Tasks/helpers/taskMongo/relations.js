@@ -1,3 +1,4 @@
+const { escapeHtml } = require('../../../../utils/escapeHtml');
 const logger = require("../../../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require('../../../../Config/schemaType');
 const { MongoDbCrudOpration } = require("../../../../utils/mongo-handler/mongoQueries");
@@ -234,7 +235,7 @@ module.exports = {
     addRelationHistory({ companyId, task, otherKey, type, userData }) {
         const historyObj = {
             key: 'Task_Relation',
-            message: `<b>${userData?.Employee_Name || 'Someone'}</b> has linked this task — it now <b>${RELATION_LABELS[type]}</b> <b>${otherKey}</b>.`,
+            message: `<b>${userData?.Employee_Name || 'Someone'}</b> has linked this task — it now <b>${RELATION_LABELS[type]}</b> <b>${escapeHtml(otherKey)}</b>.`,
             sprintId: task.sprintId,
         };
         HandleHistory('task', companyId, task.ProjectID, task._id, historyObj, userData)
@@ -273,7 +274,7 @@ module.exports = {
     removeRelationHistory({ companyId, task, otherKey, userData }) {
         const historyObj = {
             key: 'Task_Relation',
-            message: `<b>${userData?.Employee_Name || 'Someone'}</b> has removed the link with <b>${otherKey}</b>.`,
+            message: `<b>${userData?.Employee_Name || 'Someone'}</b> has removed the link with <b>${escapeHtml(otherKey)}</b>.`,
             sprintId: task.sprintId,
         };
         HandleHistory('task', companyId, task.ProjectID, task._id, historyObj, userData)

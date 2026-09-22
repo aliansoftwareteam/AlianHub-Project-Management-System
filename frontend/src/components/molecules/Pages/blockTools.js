@@ -1,3 +1,5 @@
+import { richHtml } from '@/utils/richHtml';
+
 const CALLOUT_TONES = ['info', 'warn', 'ok', 'danger'];
 const STATUS_TYPES = ['open', 'close', 'all'];
 const TASK_LIST_LIMIT = 30;
@@ -95,7 +97,7 @@ function makeCallout(ctx) {
             icon.innerHTML = ICONS.callout;
             this.text = el('div', 'pb-callout__text');
             this.text.contentEditable = String(!this.readOnly);
-            this.text.innerHTML = this.data.text;
+            this.text.innerHTML = richHtml(this.data.text);
             this.text.dataset.placeholder = ctx.t('Docs.callout_placeholder');
             this.wrapper.append(icon, this.text);
             if (!this.readOnly) {
@@ -144,7 +146,7 @@ function makeQuote(ctx) {
         render() {
             this.text = el('blockquote', 'pb-quote');
             this.text.contentEditable = String(!this.readOnly);
-            this.text.innerHTML = this.data.text;
+            this.text.innerHTML = richHtml(this.data.text);
             this.text.dataset.placeholder = ctx.t('Docs.quote_placeholder');
             return this.text;
         }

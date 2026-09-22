@@ -43,6 +43,7 @@ const { t } = useI18n();
 
 // utility
 import { defineComponent, ref,computed, inject} from "vue";
+import { escapeHtml } from "@/utils/notificationHtml";
 import * as env from '@/config/env';
 import { apiRequestWithoutCompnay } from '@/services';
 import { useStore } from "vuex";
@@ -76,7 +77,7 @@ const visibleClick = async (status) => {
             if (!data.isFree) {
                 showAlertModal({
 					title: t('Toast.free_company_limit_reached'),
-					message: `${t('Company.freelimitreachedstart')} <strong>${data?.companies?.join(', ')}</strong> ${t('Company.freelimitreachedend')}`,
+					message: `${t('Company.freelimitreachedstart')} <strong>${escapeHtml((data?.companies || []).join(', '))}</strong> ${t('Company.freelimitreachedend')}`,
 					type: 'info',
 					showCancel: false,
 					confirmButtonText: t("alertBox.ok"),

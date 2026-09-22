@@ -16,6 +16,7 @@
 // companyId verification + frontend gating). When the single-task path
 // gains role-level checks, the bulk path will inherit them automatically.
 
+const { escapeHtml } = require('../../../../utils/escapeHtml');
 const { dbCollections } = require('../../../../Config/collections');
 const { SCHEMA_TYPE } = require('../../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../../utils/mongo-handler/mongoQueries');
@@ -219,7 +220,7 @@ module.exports = {
                         const historyObj = {
                             key: 'Task_Status',
                             sprintId: task.sprintId,
-                            message: `<b>${userData?.Employee_Name || ''}</b> has changed <b>Status</b> as <b>${newStatusText}</b>.`,
+                            message: `<b>${userData?.Employee_Name || ''}</b> has changed <b>Status</b> as <b>${escapeHtml(newStatusText)}</b>.`,
                         };
                         HandleHistory('task', companyId, projectData._id, task._id, historyObj, userData)
                             .catch((err) => logger.error(`bulkUpdateStatus history ${task._id}: ${err.message}`));
@@ -308,7 +309,7 @@ module.exports = {
                         const historyObj = {
                             key: 'task_priority',
                             sprintId: task.sprintId,
-                            message: `<b>${userData?.Employee_Name || ''}</b> has changed <b>Priority</b> as <b>${newPriorityName}</b>.`,
+                            message: `<b>${userData?.Employee_Name || ''}</b> has changed <b>Priority</b> as <b>${escapeHtml(newPriorityName)}</b>.`,
                         };
                         HandleHistory('task', companyId, projectData._id, task._id, historyObj, userData)
                             .catch((err) => logger.error(`bulkUpdatePriority history ${task._id}: ${err.message}`));

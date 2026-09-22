@@ -12,7 +12,7 @@
                     <img :src="frameImage" alt="frameImage" class="mb-1 mw-100">
                     <div class="style-scroll overflow-auto archieve__titledesc--wrapper text-center w-100 mw-100">
                         <h4 class="mb-0 text-center archive-delete-title font-weight-700">{{title}}</h4>
-                        <p v-if="message" class="text-center archive-delete-desc font-weight-400 font-size-16 gray81" v-html="message"></p>
+                        <p v-if="message" class="text-center archive-delete-desc font-weight-400 font-size-16 gray81" v-html="richHtml(message)"></p>
                         <slot name="body"> 
                             <strong class="font-weight-500 text-center d-block mb-7px dark-gray type__confirmation-string">{{ $t('conformationmsg.type') }} <i>{{confirmationString}}</i></strong>
 
@@ -39,6 +39,7 @@
 <script setup>
 // PACKAGES
 import {defineProps, defineEmits, ref , inject} from "vue";
+import { richHtml } from "@/utils/richHtml";
 
 // COMPONENTS
 import InputText from "@/components/atom/InputText/InputText.vue"

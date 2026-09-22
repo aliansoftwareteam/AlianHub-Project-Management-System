@@ -90,6 +90,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import markdownit from 'markdown-it';
+import { richHtml } from '@/utils/richHtml';
 import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
@@ -131,7 +132,7 @@ const applyLabel = computed(() => (mode.value === 'add'
 
 const previewHtml = computed(() => {
     try {
-        return md.render(generatedMarkdown.value || '');
+        return richHtml(md.render(generatedMarkdown.value || ''));
     } catch (_e) {
         return '';
     }

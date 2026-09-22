@@ -2,7 +2,7 @@
     <ConfirmationSidebar
             v-model="showSidebarData"
             :title="`${statusConfirmData === true ? $t('general.Different_Statuses') : ''}`"
-            :message="`${subTaskConfirm === true ? `<b class='black'>${task!== undefined ? task?.TaskName : ''}’s</b> ${$t('conformationmsg.subtasks_will_become_subtasks_of')} <b class='black'>${selectedTask !== undefined  ? selectedTask?.TaskName : ''}</b>.` : taskConfirm ? `<b class='black'>${task!== undefined ? task?.TaskName : ''}’s</b> ${$t('conformationmsg.task_will_become_subtasks_of')} <b class='black'>${selectedTask !== undefined  ? selectedTask?.TaskName : ''}</b>.` : ''}`"
+            :message="`${subTaskConfirm === true ? `<b class='black'>${escapeHtml(task?.TaskName)}’s</b> ${$t('conformationmsg.subtasks_will_become_subtasks_of')} <b class='black'>${escapeHtml(selectedTask?.TaskName)}</b>.` : taskConfirm ? `<b class='black'>${escapeHtml(task?.TaskName)}’s</b> ${$t('conformationmsg.task_will_become_subtasks_of')} <b class='black'>${escapeHtml(selectedTask?.TaskName)}</b>.` : ''}`"
             :acceptButtonClass="'btn-primary font-roboto-sans'"
             :acceptButton="$t('general.Continue')"
             :isShowInput="false"
@@ -292,6 +292,7 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 import { useStore } from "vuex";
 import { useGetterFunctions } from "@/composable";
 import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
+import { escapeHtml } from "@/utils/notificationHtml";
 
 const emit = defineEmits(["checkAllModel", "checkTaskType", "finalConfirm", "changeStatus","update:modelValue" ,"changeTaskType","assigneeConfirm","closeModel"]);
 const clientWidth = inject("$clientWidth");

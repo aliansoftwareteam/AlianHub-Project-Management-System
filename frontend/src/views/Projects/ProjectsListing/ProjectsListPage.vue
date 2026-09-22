@@ -144,6 +144,7 @@
 
 <script setup>
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue';
+import { escapeHtml } from '@/utils/notificationHtml';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -283,7 +284,7 @@ function toggleFavourite(project) {
 
 const confirmTitle = computed(() => (pendingMode.value === 0 ? t('Projects.close_project') : pendingMode.value === 1 ? t('Projects.archive') : t('Projects.delete')));
 const confirmWord = computed(() => (pendingMode.value === 0 ? 'close' : pendingMode.value === 1 ? 'archive' : 'delete'));
-const confirmMessage = computed(() => t('Projects.confirm_message', { name: pending.value?.ProjectName || '' }));
+const confirmMessage = computed(() => t('Projects.confirm_message', { name: escapeHtml(pending.value?.ProjectName) }));
 
 function ask(project, mode) {
     pending.value = project;

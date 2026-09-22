@@ -13,7 +13,7 @@
 
                 <div class="custom-padding-1">
                     <h2 class="font-size-22 font-weight-bold dark-gray font-roboto">{{ title }}</h2>
-                    <p class="font-size-16 mt-10px color52 font-roboto" v-if="isHtml" v-html="message"></p>
+                    <p class="font-size-16 mt-10px color52 font-roboto" v-if="isHtml" v-html="richHtml(message)"></p>
                     <p class="font-size-16 mt-10px color52 font-roboto" v-else>{{ message }}</p>
                     <div v-if="fields.length" class="gap d-flex justify-content-center flex-wrap mt-10px">
                         <span v-for="field in fields" :key="field"
@@ -38,6 +38,7 @@
 
 <script setup>
 import { defineProps, defineEmits, ref, onMounted, computed } from "vue";
+import { richHtml } from "@/utils/richHtml";
 import { useCustomComposable } from "@/composable";
 
 const { makeUniqueId } = useCustomComposable();

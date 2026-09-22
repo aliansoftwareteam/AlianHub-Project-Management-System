@@ -57,7 +57,7 @@
         <ConfirmationSidebar
             v-model="isDelete"
             :title="$t('Projects.deleteview')"
-            :message="`${$t('Filters.are_you_sure')}  ${item.name} ${$t('Projects.view')}?`"
+            :message="`${$t('Filters.are_you_sure')}  ${escapeHtml(item.name)} ${$t('Projects.view')}?`"
             acceptButtonClass="btn-danger"
             @confirm="() => editOptions('Delete')"
             :acceptButton="$t('Projects.delete')"
@@ -72,6 +72,7 @@
 <script setup>
 // PACKAGES
 import { defineProps, defineEmits, ref , inject ,computed} from 'vue';
+import { escapeHtml } from '@/utils/notificationHtml';
 import { useToast } from 'vue-toast-notification';
 
 // UTILS

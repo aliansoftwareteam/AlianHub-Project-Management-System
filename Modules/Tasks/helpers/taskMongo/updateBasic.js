@@ -1,3 +1,4 @@
+const { escapeHtml } = require('../../../../utils/escapeHtml');
 const { dbCollections } = require('../../../../Config/collections')
 const { sanitizeInput } = require("../../../serviceFunction");
 const { HandleHistory,HandleTask,convertToSubTaskFunction, moveTaskFunction, convertToListSubTask,mergeSubTask, duplicateSubTaskFunction, addHistoryCollection, removeCommentCount,updateHistoryCollection, updateTimesheetCollection, updateEstimatedTimeCollection} = require("../mongo_helper")
@@ -478,7 +479,7 @@ module.exports = {
                     const pointsValue = (firebaseObj.points === null || firebaseObj.points === undefined || firebaseObj.points === '') ? '—' : firebaseObj.points;
                     const historyObj = {
                         key: "task_points",
-                        message: `<b>${userData.Employee_Name}</b> set <b>Story Points</b> as <b>${pointsValue}</b>.`,
+                        message: `<b>${userData.Employee_Name}</b> set <b>Story Points</b> as <b>${escapeHtml(pointsValue)}</b>.`,
                         sprintId: taskData.sprintId
                     };
                     HandleHistory('task', projectData.CompanyId, projectData._id, taskData._id, historyObj, userData)

@@ -11,7 +11,7 @@
     <div class="embed__view-item" v-else>
         <SpinnerComp :is-spinner="!isVisible" v-if="!isVisible"/>
         <div class="embed__viewshow-visible"  v-show="isVisible">
-        <div class="vhtml" v-if="Data?.type == 'Anything_html'"  v-html='URL'></div>
+        <iframe class="vhtml" v-if="Data?.type == 'Anything_html'" sandbox="" :srcdoc="URL" height="100%" width="100%"></iframe>
             <iframe id="frame" v-show="Data?.type != 'Anything_html'" :src=" Data?.type != 'Anything_html' ? URL : '' " height="100%" width="100%" class="border-0"></iframe>
         </div>
     </div>
@@ -122,7 +122,7 @@ const modifyURL = () =>{
 </script>
 <style>
 
-.vhtml iframe {
+iframe.vhtml {
     border-width: 0;
     display: block;
     min-height: 100%;

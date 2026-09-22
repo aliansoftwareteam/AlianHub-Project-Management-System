@@ -50,6 +50,7 @@ const { estimateAndPersist: estimateTaskTimeWithAI } = require('../EstimatedTime
 const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
 const executeAgents = require('./executeAgents');
+const { taskCreatedHistoryMessage, projectCreatedHistoryMessage, projectCreatedNoticeMessage } = require('./historyMessages');
 
 // Concurrency cap for fire-and-forget AI estimates after bulk task insert —
 // keeps us well under the LLM provider's per-key rate limits when a single
@@ -862,9 +863,8 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
     // failures are logged and never block task creation.
     const historyActor = userData || { id: String(creatorUid || ''), Employee_Name: 'AlianHub AI' };
     for (const d of docs) {
-        const taskTypeLabel = String(d.TaskType || 'task').replace(/_/g, '-');
         const historyObj = {
-            message: `<b>${historyActor.Employee_Name || 'AlianHub AI'}</b> has created new <b>${d.TaskName}</b> ${taskTypeLabel}.`,
+            message: taskCreatedHistoryMessage(historyActor, d),
             key: 'Task_Created',
             sprintId: String(sprintDoc._id),
         };
@@ -936,7 +936,7 @@ async function rollback({ companyId, tracker }) {
 
 async function fireProjectCreateNotification({ companyId, projectDoc, userData }) {
     const notificationObject = {
-        message: `<p>Created a new project named <strong>${projectDoc.ProjectName}</strong>.</p>`,
+        message: projectCreatedNoticeMessage(projectDoc),
         key: 'project_create',
         projectId: String(projectDoc._id),
     };
@@ -1113,7 +1113,7 @@ async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrie
 
         // 9. History row (best-effort, single entry).
         const historyObject = {
-            message: `<b>${userData.Employee_Name || 'AI'}</b> created project <b>${projectDoc.ProjectName}</b> with <b>${tracker.sprints.length}</b> sprints and <b>${tracker.tasks.length}</b> tasks via AI.`,
+            message: projectCreatedHistoryMessage(userData, projectDoc, tracker),
             key: 'Project_Created_AI',
         };
         HandleHistory('project', companyId, projectDoc._id.toString(), null, historyObject, userData).catch((e) => {
