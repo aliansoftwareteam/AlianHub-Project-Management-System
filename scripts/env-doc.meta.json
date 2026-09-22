@@ -731,6 +731,11 @@
     "group": "security",
     "description": "Key that signs the MCP list cursors (HMAC-SHA256) while MCP_TOOLS_V2 is on. A cursor is bound to the company, the caller, the token and the query, and expires after an hour. Unset derives a key from JWT_SECRET; changing it ends the cursors in flight. With MCP_TOOLS_V2 on the server refuses to start when it is set but shorter than 32 characters or equal to JWT_SECRET."
   },
+  "MCP_TOOLS_DATA": {
+    "group": "ai",
+    "description": "MCP data tools: \"on\" registers and offers projects.list, project.get, sprints.list, statuses.list, comments.list, pages.search, page.get and timesheet.read (reads), and comment.create and timelog.create (the caller's own time), each a rated registry action that answers only what the person behind the token can open in the web app and needs its own OAuth scope. Default \"off\" leaves the registry and the MCP tool list as they were.",
+    "default": "off"
+  },
   "MCP_TOOLS_V2": {
     "group": "ai",
     "description": "MCP tools v2: \"on\" puts human names and a ref next to the ids in tool results (only names the caller may see), pages every list tool with an opaque cursor (default 25, at most 100 per page), annotates every tool with readOnlyHint, destructiveHint, idempotentHint and openWorldHint from its action rating, and turns a destructive call (an irreversible or workspace-scope write) into a proposal a person approves in the Inbox instead of acting. Default \"off\" keeps the tool list and result shapes as they were.",
