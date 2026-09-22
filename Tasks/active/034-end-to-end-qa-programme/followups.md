@@ -122,6 +122,9 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 96 | Audit hash format v2 (a per-value salt stored outside the hash, per-row format version, dual-format verification) would let user ids and free text in future audit rows be erased; existing chains keep them. Owner decision. | #801 |
 | 97 | Stored-file downloads: `/api/v1/importTasks` attachments are not validated on write; merged tasks keep attachments judged under the soft-deleted source; switch `STORAGE_DOWNLOAD_SCOPE` to enforce once report logs are clean. | #794 |
 | 98 | MCP: under `MCP_OAUTH=both` personal tokens are still accepted (one-release decision); discovery methods need no scope; a client id stored as `actorId` needs a label in the UI and audit filters. | #802 |
+| 99 | A request with a foreign `Origin` is refused by CORS but answered 200 instead of 403. | #807 |
+| 100 | Sweep of every place stored text is rendered as HTML (activity log, old description view, page blocks, embed view, file previewer, AI output); details in the owner's private notes. | #805, #808 reviews |
+| 101 | Agents stall on a ten-minute watchdog during long silent commands and when the tool-approval service times out; briefs now require short commands and polling. | 2026-09-21/22 |
 
 ## Owner decisions recorded
 
