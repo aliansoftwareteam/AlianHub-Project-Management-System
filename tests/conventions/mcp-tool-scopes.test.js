@@ -10,21 +10,24 @@ describe('every registered MCP tool maps to one scope', () => {
     let sessionTools;
     const saved = process.env.AGENT_PERFORMANCE_READ;
     const savedSessions = process.env.EXTERNAL_AGENT_SESSIONS;
+    const savedData = process.env.MCP_TOOLS_DATA;
     const restore = (key, value) => { if (value === undefined) delete process.env[key]; else process.env[key] = value; };
 
     beforeAll(() => {
         process.env.AGENT_PERFORMANCE_READ = 'on';
         process.env.EXTERNAL_AGENT_SESSIONS = 'on';
+        process.env.MCP_TOOLS_DATA = 'on';
         tools = require('../../Modules/Mcp/tools');
         registry = require('../../Modules/Agents/registry');
         sessionTools = require('../../Modules/Mcp/sessionTools');
         ({ TOOL_SCOPES, scopeForTool } = require('../../Modules/Mcp/scopes'));
     });
-    afterAll(() => { restore('AGENT_PERFORMANCE_READ', saved); restore('EXTERNAL_AGENT_SESSIONS', savedSessions); });
+    afterAll(() => { restore('AGENT_PERFORMANCE_READ', saved); restore('EXTERNAL_AGENT_SESSIONS', savedSessions); restore('MCP_TOOLS_DATA', savedData); });
 
     it('sees the flagged tools too (the scan works)', () => {
         expect(tools.names()).toContain('performance.read');
         expect(tools.names()).toContain('session.activity');
+        expect(tools.names()).toContain('timesheet.read');
         expect(tools.names().length).toBeGreaterThan(10);
     });
 
@@ -32,7 +35,7 @@ describe('every registered MCP tool maps to one scope', () => {
         const wrong = tools.names().filter((name) => {
             // Session tools write only the session record and are not registry actions; each needs tasks:write.
             if (sessionTools.owns(name)) return scopeForTool(name) !== 'tasks:write';
-            const scope = TOOL_SCOPES[name];
+            const scope = scopeForTool(name);
             const action = registry.get(name);
             if (!SCOPES.includes(scope) || !action) return true;
             return scope.endsWith(':write') !== Boolean(action.write);

@@ -4,17 +4,23 @@
 describe('every registered MCP tool goes through the visibility filter', () => {
     let tools;
     const saved = process.env.AGENT_PERFORMANCE_READ;
+    const savedData = process.env.MCP_TOOLS_DATA;
 
     beforeAll(() => {
         process.env.AGENT_PERFORMANCE_READ = 'on';
+        process.env.MCP_TOOLS_DATA = 'on';
         tools = require('../../Modules/Mcp/tools');
     });
-    afterAll(() => { if (saved === undefined) delete process.env.AGENT_PERFORMANCE_READ; else process.env.AGENT_PERFORMANCE_READ = saved; });
+    afterAll(() => {
+        if (saved === undefined) delete process.env.AGENT_PERFORMANCE_READ; else process.env.AGENT_PERFORMANCE_READ = saved;
+        if (savedData === undefined) delete process.env.MCP_TOOLS_DATA; else process.env.MCP_TOOLS_DATA = savedData;
+    });
 
     const registered = () => tools.registered();
 
     it('sees the flagged tools too (the scan works)', () => {
         expect(registered().map((t) => t.name)).toContain('performance.read');
+        expect(registered().map((t) => t.name)).toEqual(expect.arrayContaining(['projects.list', 'comment.create']));
     });
 
     it('declares filtered or none on every tool', () => {

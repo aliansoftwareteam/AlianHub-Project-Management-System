@@ -83,6 +83,10 @@ const inverses = {
         await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [{ _id: oid(u.timesheetId), LogTimeDuration: 0 }] }, 'deleteOne');
         return { timesheetId: u.timesheetId, deleted: true };
     },
+    async 'timelog.create'(companyId, u) {
+        await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [{ _id: oid(u.timesheetId), TicketID: String(u.taskId) }] }, 'deleteOne');
+        return { timesheetId: u.timesheetId, deleted: true };
+    },
     async 'timelog.stop'(companyId, u) {
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,

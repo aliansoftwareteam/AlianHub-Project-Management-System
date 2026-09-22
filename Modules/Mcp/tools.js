@@ -4,8 +4,7 @@ const registry = require('../Agents/registry');
 const actions = require('../Agents/actions');
 const { oid } = require('../Automations/engine/tools');
 const { buildBrief } = require('./brief');
-const { htmlToRawText } = require('../Pages/helpers/pageRules');
-const { blocksToRawText, contentToEditorData } = require('../Pages/helpers/pageContent');
+const { PAGE_TEXT_MAX, pageText } = require('./pageText');
 const { hasScope } = require('../ApiTokens/helpers/apiTokenRules');
 const performanceRead = require('../Agents/performanceRead');
 const scopes = require('./scopes');
@@ -17,8 +16,7 @@ const names = require('./names');
 const { annotationsFor, isDestructive } = require('./annotations');
 const { propose } = require('./propose');
 const sessionTools = require('./sessionTools');
-
-const PAGE_TEXT_MAX = 40000;
+const dataTools = require('./dataTools');
 
 const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).slice(0, max);
 const clampLimit = (v, def = 10, max = 50) => Math.min(Math.max(parseInt(v, 10) || def, 1), max);
@@ -28,14 +26,6 @@ const taskFilter = (ctx, vis, narrowTo, extra = {}) => ({
 });
 
 const taskTarget = (args) => ({ taskId: str(args.taskId, 40) });
-
-/* Stored rawText is a 5000-char search excerpt, so the full body comes from the html. */
-const pageText = (page) => {
-    const content = page.content || {};
-    if (content.html) return htmlToRawText(content.html, PAGE_TEXT_MAX);
-    if (page.rawText) return String(page.rawText);
-    return blocksToRawText(contentToEditorData(content), PAGE_TEXT_MAX);
-};
 
 const taskRow = (t) => ({
     taskId: String(t._id),
@@ -256,9 +246,9 @@ const FLAGGED_TOOLS = [
     },
 ];
 
-const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...sessionTools.offered()];
+const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...sessionTools.offered()];
 
-const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...sessionTools.TOOLS];
+const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...sessionTools.TOOLS];
 
 const toolNames = () => offered().map((t) => t.name);
 
@@ -305,7 +295,7 @@ const call = async (ctx, name, args = {}) => {
         if (refused) throw Object.assign(new Error(refused), { code: -32004 });
         if (!tool.authorizesPerProject) await actions.authorizeRead({
             companyId: ctx.companyId, actor: ctx.actor, action: tool.action,
-            params: { taskId: args.taskId }, ip: ctx.ip, allowedActions: ctx.allowedActions,
+            params: tool.readParams ? tool.readParams(args) : { taskId: args.taskId }, ip: ctx.ip, allowedActions: ctx.allowedActions,
         });
         return tool.run(ctx, args, filtered ? await visibility.forCaller(ctx) : undefined);
     }

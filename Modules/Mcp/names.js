@@ -96,4 +96,4 @@ const forPage = async (ctx, page) => {
     return { ref: `page:${page._id}`, project: projectId ? names.project(projectId) : null };
 };
 
-module.exports = { PRIORITY_NAMES, forTasks, forPage };
+module.exports = { PRIORITY_NAMES, resolver, forTasks, forPage };
