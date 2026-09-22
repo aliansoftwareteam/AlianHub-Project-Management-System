@@ -76,6 +76,8 @@ beforeAll(async () => {
     originalCa = https.globalAgent.options.ca;
     https.globalAgent.options.ca = cert;
     tlsServer = https.createServer({ key, cert }, (req, res) => {
+        // A reused keep-alive socket the server is closing answers ECONNRESET in CI; one socket per request avoids it.
+        res.setHeader('Connection', 'close');
         const path = req.url.split('?')[0];
         seen.push({ path, headers: req.headers });
         return (ROUTES[path] || ((q, s) => { s.writeHead(404); s.end('nope'); }))(req, res);
