@@ -216,6 +216,7 @@ module.exports.AGENT_PROPOSALS = '/api/v2/agents/proposals';
 module.exports.AGENT_REGISTRY = '/api/v2/agents/registry';
 module.exports.AGENT_SKILLS = '/api/v2/agents/skills';
 module.exports.AGENT_SKILL_CATALOGUES = '/api/v2/agents/skills/catalogues';
+module.exports.AGENT_SKILL_EGRESS_CHECK = '/api/v2/agents/skills/egress-check';
 module.exports.AGENT_MANIFEST = '/api/v2/agents/manifest';
 module.exports.AGENT_SPEND = '/api/v2/agents/spend';
 module.exports.AGENT_ACCOUNT = '/api/v2/agents/account';

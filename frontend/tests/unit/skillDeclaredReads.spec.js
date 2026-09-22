@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { config, flushPromises, mount } from '@vue/test-utils';
+import { DOMWrapper, config, flushPromises, mount } from '@vue/test-utils';
 
 const { apiRequest, apiRequestWithoutCompnay } = vi.hoisted(() => ({ apiRequest: vi.fn(), apiRequestWithoutCompnay: vi.fn() }));
 
@@ -91,13 +91,16 @@ const serve = () => {
 
 const RouterLink = { name: 'RouterLink', props: ['to'], template: '<a class="router-link" :data-to="JSON.stringify(to)"><slot /></a>' };
 
+let mounted = null;
+
+/* The editor teleports to <body>; a stubbed Teleport would remount its content on every render. */
 const open = async ({ on = true, skill = apiSkill() } = {}) => {
-    const wrapper = mount(SkillEditor, {
+    mounted = mount(SkillEditor, {
         props: { skill, catalogues: catalogues(on) },
-        global: { mocks: { $t: t }, stubs: { teleport: true, RouterLink } },
+        global: { mocks: { $t: t }, stubs: { RouterLink } },
     });
     await flushPromises();
-    return wrapper;
+    return new DOMWrapper(document.body);
 };
 
 const calls = (prefix) => apiRequest.mock.calls.filter(([, url]) => url.startsWith(prefix));
@@ -109,7 +112,11 @@ beforeEach(() => {
     serve();
 });
 
-afterEach(() => { vi.useRealTimers(); });
+afterEach(() => {
+    if (mounted) mounted.unmount();
+    mounted = null;
+    vi.useRealTimers();
+});
 
 describe('Skill editor: declared reads', () => {
     it('shows nothing new, and asks nothing new, with declared reads off', async () => {
@@ -249,6 +256,10 @@ describe('Skill editor: declared reads', () => {
         const wrapper = await open();
         const caps = wrapper.findAll('[data-test="read-cap"]');
         await caps[0].setValue('4096');
+        await caps[1].setValue('3000');
+        await caps[1].setValue('');
+        await wrapper.find('[data-test="read-credential"]').setValue(HANDLE_GH);
+        await wrapper.find('[data-test="read-credential"]').setValue('');
         await wrapper.find('[data-test="read-format"]').setValue('text');
         await wrapper.find('.ah-btn--primary').trigger('click');
         await flushPromises();
