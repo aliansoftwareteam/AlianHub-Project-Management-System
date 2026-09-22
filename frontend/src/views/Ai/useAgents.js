@@ -44,7 +44,8 @@ const request = async (type, endpoint, body, fallbackKey) => {
     try {
         res = await apiRequest(type, endpoint, body);
     } catch (error) {
-        throw new Error(reasonOf(error, fallbackKey));
+        const errors = error?.response?.data?.data?.errors;
+        throw Object.assign(new Error(reasonOf(error, fallbackKey)), Array.isArray(errors) ? { errors } : {});
     }
     if (!ok(res)) throw new Error(res?.data?.statusText || res?.data?.message || i18n.global.t(fallbackKey));
     return res.data;

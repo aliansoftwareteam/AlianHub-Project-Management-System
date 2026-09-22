@@ -64,7 +64,7 @@
                         <span class="ah-field__label">{{ $t('Ai.skill_gather') }}</span>
                         <span class="ah-field__hint">{{ $t('Ai.skill_gather_hint') }}</span>
                         <div v-for="(step, i) in form.gather" :key="`g${i}`" class="sk-editor__step">
-                            <select v-model="step.reader" class="ah-input ah-mono" :aria-label="$t('Ai.skill_reader')">
+                            <select v-model="step.reader" class="ah-input ah-mono" :aria-label="$t('Ai.skill_reader')" @change="keepParams(step)">
                                 <option v-for="reader in catalogues.readers || []" :key="reader.key" :value="reader.key">{{ reader.key }}</option>
                             </select>
                             <input v-model.trim="step.as" type="text" class="ah-input ah-mono" :aria-label="$t('Ai.skill_gather_as')" :placeholder="step.reader" />
@@ -73,8 +73,20 @@
                             </button>
                             <p class="ah-small sk-editor__fields">{{ $t('Ai.skill_gather_fields', { fields: fieldsOf(step.reader) }) }}</p>
                             <span v-if="errorFor(`gather[${i}]`)" class="ah-field__error">{{ errorFor(`gather[${i}]`) }}</span>
+                            <SkillDeclaredRead
+                                v-if="isExternalReader(catalogues, step.reader)"
+                                :index="i"
+                                :reader="readerOf(catalogues, step.reader)"
+                                :params="step.params"
+                                :secrets="readSecrets"
+                                :instance-admin="instanceAdmin"
+                                :placeholders="placeholders"
+                                :error-for="errorFor"
+                                @set="(name, value) => (step.params[name] = value)"
+                            />
                         </div>
                         <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="addGather">{{ $t('Ai.skill_add_reader') }}</button>
+                        <span v-if="errorFor('gather')" class="ah-field__error" data-test="gather-error">{{ errorFor('gather') }}</span>
                     </div>
 
                     <div class="ah-field">
@@ -87,7 +99,8 @@
 
                     <div class="ah-field">
                         <label class="ah-field__label" for="sk-instructions">{{ $t('Ai.skill_instructions') }}</label>
-                        <textarea id="sk-instructions" v-model="form.instructions" class="ah-input ah-textarea"></textarea>
+                        <textarea id="sk-instructions" v-model="form.instructions" class="ah-input ah-textarea" :class="{ 'ah-input--error': errorFor('prompt.instructions') }"></textarea>
+                        <span v-if="errorFor('prompt.instructions')" class="ah-field__error" data-test="instructions-error">{{ errorFor('prompt.instructions') }}</span>
                     </div>
 
                     <div class="ah-field">
@@ -180,9 +193,11 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { apiRequest } from "@/services";
+import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 import { useAgents, reasonOf } from "./useAgents";
+import SkillDeclaredRead from "./SkillDeclaredRead.vue";
+import { isExternalReader, offersExternalReads, paramsKeptFor, readErrorText, readerOf, withoutBlanks } from "./declaredReads";
 
 defineOptions({ name: "SkillEditor" });
 
@@ -202,6 +217,8 @@ const busy = ref(false);
 const formError = ref("");
 const errors = ref([]);
 const models = ref([]);
+const readSecrets = ref([]);
+const instanceAdmin = ref(false);
 
 const form = reactive({
     key: props.skill?.key || "",
@@ -237,7 +254,11 @@ const computedRisk = computed(() => form.emit.reduce((worst, m) => {
 }, "low"));
 
 const fieldsOf = (reader) => ((props.catalogues.readers || []).find((r) => r.key === reader)?.fields || []).join(", ");
-const errorFor = (field) => errors.value.find((e) => e.field === field)?.message || "";
+const errorFor = (field) => readErrorText(errors.value.find((e) => e.field === field), t, { catalogues: props.catalogues, gather: form.gather });
+
+const placeholders = computed(() => [...form.inputs.map((key) => `input.${key}`), ...(props.catalogues.taskFields || []).map((field) => `task.${field}`)]);
+
+const keepParams = (step) => { step.params = paramsKeptFor(props.catalogues, step.reader, step.params); };
 const groundedError = computed(() => errors.value.find((e) => e.field.startsWith("grounded"))?.message || "");
 
 const listOf = (value) => String(value || "").split(",").map((v) => v.trim()).filter(Boolean);
@@ -294,7 +315,7 @@ const body = () => ({
     model: form.model || null,
     ...(form.risk ? { risk: form.risk } : {}),
     inputs: [...form.inputs],
-    gather: form.gather.map((s) => ({ reader: s.reader, as: s.as || s.reader, params: { ...s.params } })),
+    gather: form.gather.map((s) => ({ reader: s.reader, as: s.as || s.reader, params: withoutBlanks(s.params) })),
     prompt: { partials: [...form.partials], instructions: form.instructions, template: form.template, output: form.output, maxTokens: props.skill?.prompt?.maxTokens || undefined },
     emit: form.emit.map((m) => ({ action: m.action, ...(m.each ? { each: m.each } : {}), params: { ...m.params } })),
     ...(form.summary ? { summary: form.summary } : {}),
@@ -317,7 +338,19 @@ const save = async () => {
     }
 };
 
+/* Only a server offering declared reads is asked for read credentials or instance access. */
+const loadReadContext = async () => {
+    if (!offersExternalReads(props.catalogues)) return;
+    const [secrets, access] = await Promise.all([
+        apiRequest("get", env.SECRETS).catch(() => null),
+        apiRequestWithoutCompnay("get", env.INSTANCE_ACCESS).catch(() => null)
+    ]);
+    readSecrets.value = secrets?.data?.status && Array.isArray(secrets.data.data) ? secrets.data.data : [];
+    instanceAdmin.value = access?.data?.data?.allowed === true;
+};
+
 onMounted(async () => {
+    loadReadContext();
     const res = await apiRequest("get", `${env.AGENT_MODELS}?configured=true`).catch(() => null);
     models.value = res?.data?.status ? (res.data.data?.models || []) : [];
     if (!form.emit.length) addEmit();
