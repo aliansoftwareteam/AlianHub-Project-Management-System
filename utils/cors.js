@@ -60,7 +60,21 @@ const corsOriginDelegate = (origin, callback) => {
     return callback(new Error(`CORS: origin ${origin} not allowed`));
 };
 
+const ORIGIN_REFUSED = 'Origin not allowed.';
+
+/* The refusal is answered here rather than through the cors callback's error: that
+ * error reaches Config/errorHandler, which keeps the app's 200 + {status:false}
+ * convention, so a refused origin — preflight or not — read as a successful reply.
+ * Nothing downstream runs, so the answer carries no CORS headers. */
+const corsGuard = () => (req, res, next) => {
+    const origin = req.headers && req.headers.origin;
+    if (isOriginAllowed(origin, buildCorsAllowList())) return next();
+    res.set('Vary', 'Origin');
+    return res.status(403).json({ status: false, statusText: ORIGIN_REFUSED, message: ORIGIN_REFUSED });
+};
+
 const installCors = (app) => {
+    app.use(corsGuard());
     app.use(cors({ origin: corsOriginDelegate }));
 };
 
@@ -69,5 +83,6 @@ module.exports = {
     buildCorsAllowList,
     isOriginAllowed,
     corsOriginDelegate,
+    corsGuard,
     installCors,
 };

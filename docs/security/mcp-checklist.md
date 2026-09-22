@@ -64,7 +64,7 @@ AlianHub is the authorization server for its own data. It does not act as a prox
 
 | Rule | Status |
 |---|---|
-| **Origin validation (DNS rebinding).** | Partly met. `utils/cors.js` refuses a foreign `Origin` for every route, `/mcp` included, before the handler runs. The refusal comes back as HTTP 200 with `status: false`, but the transport specification requires a 403, so the suite's `dns-rebinding-protection` scenario is an expected failure. The risk is limited because only an `Authorization` header authenticates, and a rebinding page has none. |
+| **Origin validation (DNS rebinding).** | `utils/cors.js` `corsGuard` refuses a foreign `Origin` for every route, `/mcp` included, before the handler and before any credential is read. The refusal is HTTP 403 with the app's `{ status: false }` body and no CORS headers, on preflight as on the request itself; requests with no `Origin`, and the desktop client's `file://` / `app://` / `null` origins, are unaffected. Covered by `tests/cors-origin-status.test.js`, `tests/integration/cors-origin-status.int.test.js` and the suite's `dns-rebinding-protection` scenario. |
 | **Protocol version header.** | An unsupported `MCP-Protocol-Version` gets a 400: `tests/integration/mcp-oauth-tokens.int.test.js` "answers 400 to an unknown MCP-Protocol-Version". |
 | **HTTPS.** | `Modules/OAuthServer/config.js` `issuerProblem` refuses to start with a non-https issuer, except on a loopback host outside production. |
 

@@ -26,4 +26,3 @@ server:
   - prompts-get-embedded-resource # prompts/list is empty and prompts/get is not offered
   - prompts-get-with-image # prompts/list is empty and prompts/get is not offered
   - server-sse-multiple-streams # the server is stateless: it issues no Mcp-Session-Id and answers every request on the POST
-  - dns-rebinding-protection # a foreign Origin is refused by utils/cors.js but answered 200, not 403 (see docs/security/mcp-checklist.md)
