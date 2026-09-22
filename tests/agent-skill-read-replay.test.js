@@ -80,6 +80,9 @@ beforeAll(async () => {
         seen.push({ path, headers: req.headers });
         return (ROUTES[path] || ((q, s) => { s.writeHead(404); s.end('nope'); }))(req, res);
     });
+    // Client and server share one event loop: after a test holds it past the 5 s keep-alive default, the
+    // server's idle timer and the next read race on the same pooled socket (read ECONNRESET on a slow runner).
+    tlsServer.keepAliveTimeout = 0;
     await new Promise((resolve) => tlsServer.listen(0, '127.0.0.1', resolve));
     READS = `reads.example.com:${tlsServer.address().port}`;
 }, 30000);
