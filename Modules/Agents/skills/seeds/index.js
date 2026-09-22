@@ -7,6 +7,7 @@ const { compile } = require('../compile');
 const briefParse = require('./briefParse');
 const digest = require('./digest');
 const projectGuide = require('./projectGuide');
+const prReview = require('./prReview');
 
 const documentOf = (seed) => {
     const checked = validateSkill(seed);
@@ -22,4 +23,12 @@ const builtInOf = (seed, aliases = []) => ({ ...compile(documentOf(seed)), sourc
 
 const BUILT_IN = [builtInOf(digest, ['risk.today']), builtInOf(projectGuide)];
 
-module.exports = { documentOf, BUILT_IN, SEEDS: { briefParse, digest, projectGuide } };
+/* Compiled on first use rather than at boot: the url reader it declares only
+ * validates while SKILL_EXTERNAL_READS is on. */
+let prReviewBuilt = null;
+const prReviewSkill = () => {
+    if (!prReviewBuilt) prReviewBuilt = builtInOf(prReview, ['risk.flags']);
+    return prReviewBuilt;
+};
+
+module.exports = { documentOf, BUILT_IN, prReviewSkill, SEEDS: { briefParse, digest, projectGuide, prReview } };

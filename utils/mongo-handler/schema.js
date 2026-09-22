@@ -1080,7 +1080,7 @@ const schema = {
         summary: { type: String, required: false },
         // Template rendered from gathered data alone, posted when the model answered nothing.
         fallback: { type: String, required: false },
-        // { keys, numbers, fields, mustNameKey, allow } — the ground-truth gate over the answer.
+        // { keys, numbers, fields, mustNameKey, allowHours, cites } — the ground-truth gate over the answer.
         grounded: { type: Object, required: false },
         risk: { type: String, required: false },
         // Model pinned to this skill, validated against the priced allowlist at save time

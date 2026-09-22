@@ -56,6 +56,24 @@ const groundList = (value, known, counts, dropped, mustNameKey, windows) => (Arr
     return !fault;
 });
 
+/* A citation counts when any of its words longer than three characters is in
+ * the text, so "the session handling in src/auth" still cites src/auth/session.js. */
+const citesText = (cite, hay) => {
+    const words = cite.toLowerCase().split(/[\s,;:()]+/).filter((w) => w.length > 3);
+    return words.length === 0 || words.some((w) => hay.includes(w));
+};
+
+const groundCites = ({ list, field, source }, out, ctx, dropped) => {
+    if (!Array.isArray(out[list])) return;
+    const hay = text(readField(source, ctx)).toLowerCase();
+    out[list] = out[list].filter((item) => {
+        const cite = text(item && item[field]).trim();
+        if (!cite || citesText(cite, hay)) return true;
+        dropped.push({ reason: `"${cite}" does not appear in the fetched text`, text: text(item.title || item.text) });
+        return false;
+    });
+};
+
 /* `spec` is the skill's `grounded` clause; `ctx` is the gathered context the
  * reader filled. A field the model did not answer is left alone. */
 const ground = (spec, raw, ctx) => {
@@ -75,6 +93,7 @@ const ground = (spec, raw, ctx) => {
         if (out[field] === undefined || out[field] === null) return;
         out[field] = groundList(out[field], known, counts, dropped, true, windows);
     });
+    if (spec.cites) groundCites(spec.cites, out, ctx, dropped);
     return { raw: out, dropped: dropped.slice(0, MAX_DROPPED) };
 };
 

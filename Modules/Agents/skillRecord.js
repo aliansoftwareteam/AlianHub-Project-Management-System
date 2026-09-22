@@ -72,7 +72,7 @@ const dataEntry = (doc) => ({
 const listSkills = async (companyId, options = {}) => {
     const data = await listData(companyId, options);
     const shadowed = new Set(data.filter(isLive).map((d) => d.key));
-    return [...data.map(dataEntry), ...codeSkills.ALL.filter((s) => !shadowed.has(s.slug)).map(codeEntry)];
+    return [...data.map(dataEntry), ...codeSkills.all().filter((s) => !shadowed.has(s.slug)).map(codeEntry)];
 };
 
 const invalid = (errors, message = 'The skill has errors.') => Object.assign(new Error(message), { status: 400, errors });

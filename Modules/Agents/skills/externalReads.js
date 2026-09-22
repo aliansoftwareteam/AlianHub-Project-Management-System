@@ -139,6 +139,20 @@ const buildUrl = ({ host, path }, { task = {}, input = {} } = {}) => {
     return url.href;
 };
 
+/* The forges whose pull request page has a plain-diff twin; any other URL is read as given. */
+const FORGE_DIFF = Object.freeze([
+    { host: 'github.com', shape: /^(\/[^/]+\/[^/]+\/pull\/\d+)(?:\.diff|\/.*)?$/ },
+    { host: 'gitlab.com', shape: /^(\/(?:[^/]+\/)+-\/merge_requests\/\d+)(?:\.diff|\/.*)?$/ },
+]);
+
+const forgeDiffUrl = (raw) => {
+    let url;
+    try { url = new URL(String(raw)); } catch (e) { return raw; }
+    const forge = FORGE_DIFF.find((f) => f.host === url.hostname && url.protocol === 'https:' && !url.port);
+    const match = forge && forge.shape.exec(url.pathname);
+    return match ? `${url.origin}${match[1]}.diff` : raw;
+};
+
 const error = (field, code, message, extra = {}) => ({ field, code, message, ...extra });
 
 const hostError = (at, host, reason) => error(`${at}.params.host`, CODE.HOST_NOT_ALLOWED,
@@ -200,6 +214,12 @@ const checkDeclaredReads = async (companyId, value) => {
         const { entry, reason } = parseDeclaredHost(step.params.host);
         if (!entry) errors.push(hostError(at, step.params.host, reason));
         else if (!hostMatches(listed, entry.host, entry.port || HTTPS_PORT)) errors.push(hostError(at, entry.text));
+        (step.params.hosts || []).forEach((host, i) => {
+            const also = parseDeclaredHost(host);
+            const field = `${at}.params.hosts[${i}]`;
+            if (!also.entry) errors.push({ ...hostError(at, host, also.reason), field });
+            else if (!hostMatches(listed, also.entry.host, also.entry.port || HTTPS_PORT)) errors.push({ ...hostError(at, also.entry.text), field });
+        });
         if (entry && step.params.credential) {
             // eslint-disable-next-line no-await-in-loop
             const refused = await checkCredential(companyId, step.params.credential, at, entry);
@@ -272,6 +292,6 @@ const notAvailable = (skillKey) => Object.assign(
 
 module.exports = {
     FLAG, READERS, CREDENTIAL_KIND, HANDLE, MAX_PATH, CODE, HOST_STATE,
-    enabled, checkHost, isExternal, parseDeclaredHost, hostProblem, pathProblem, assertBuilt, buildUrl, hostError, checkDeclaredReads, notAvailable,
+    enabled, checkHost, isExternal, parseDeclaredHost, hostProblem, pathProblem, assertBuilt, buildUrl, forgeDiffUrl, hostError, checkDeclaredReads, notAvailable,
     namesHost, listedHosts, admitHop, credentialFor, scrub, readFailure, refusal,
 };

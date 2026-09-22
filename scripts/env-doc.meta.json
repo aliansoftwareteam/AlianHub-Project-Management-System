@@ -868,6 +868,11 @@
     "required": true,
     "default": "4000"
   },
+  "PR_SUMMARY_AS_DATA": {
+    "group": "ai",
+    "description": "Runs the pr.summary skill (alias risk.flags) as its built-in data skill instead of the code skill: the same prompt, the same one review comment and the same 30,000-character clip, with the diff fetched as a declared url read of github.com, patch-diff.githubusercontent.com or gitlab.com. Takes effect only while SKILL_EXTERNAL_READS is on. Each of those hosts must be on the workspace egress allowlist (an instance owner adds them under Instance > Egress); a pull request on a host that is not listed or not declared skips the run with the reason. A company's own pr.summary skill still wins. Default \"off\" keeps the code skill.",
+    "default": "off"
+  },
   "PRECOMPANYKEY": {
     "group": "security",
     "description": "Random key for the preset company routes, presented in the x-preset-key header; generated at setup.",

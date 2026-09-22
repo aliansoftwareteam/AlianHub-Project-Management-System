@@ -1,0 +1,23 @@
+diff --git a/src/auth/session.js b/src/auth/session.js
+index 3b18e51..a9c4f02 100644
+--- a/src/auth/session.js
++++ b/src/auth/session.js
+@@ -12,9 +12,11 @@ const TTL_MS = 30 * 60 * 1000;
+
+ const touch = (session) => {
+-    session.expiresAt = Date.now() + TTL_MS;
++    if (session.remember) session.expiresAt = Date.now() + 30 * TTL_MS;
++    else session.expiresAt = Date.now() + TTL_MS;
+     return session;
+ };
+
+diff --git a/src/auth/cookies.js b/src/auth/cookies.js
+index 71c2d0e..0f3be11 100644
+--- a/src/auth/cookies.js
++++ b/src/auth/cookies.js
+@@ -4,7 +4,7 @@ module.exports = {
+     name: 'sid',
+-    secure: true,
++    secure: process.env.NODE_ENV === 'production',
+     httpOnly: true,
+ };

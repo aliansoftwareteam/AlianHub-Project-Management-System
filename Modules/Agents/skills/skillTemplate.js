@@ -9,7 +9,8 @@ const { FILTERS, text } = require('./catalogues');
 
 const TAG = /\{\{\s*([^{}]+?)\s*\}\}/g;
 const NUMBER = /^-?\d+(\.\d+)?$/;
-const MAX_RENDERED_LENGTH = 20000;
+// Room for the url reader's 30,000-character diff and the prompt around it.
+const MAX_RENDERED_LENGTH = 40000;
 const MAX_DEPTH = 8;
 
 const parseFilter = (raw) => {
