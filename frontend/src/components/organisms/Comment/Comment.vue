@@ -99,13 +99,13 @@
                                                 <strong class="text-nowrap mr-5px">{{getUser(message.reply_userId).Employee_Name}}: </strong>
                                                 <pre
                                                     class="text-ellipsis text-nowrap white__space-nowrap"
-                                                    :title="['link', 'text'].includes(message.reply_type) ? checkLink(changeText(message?.reply_message || ''), true) : message?.reply_mediaOriginalName"
-                                                    v-html="['link', 'text'].includes(message.reply_type) ? checkLink(changeText(message?.reply_message || ''), true) : message?.reply_mediaOriginalName"
+                                                    :title="['link', 'text'].includes(message.reply_type) ? commentPlainText(message?.reply_message) : message?.reply_mediaOriginalName"
+                                                    v-html="commentHtml(['link', 'text'].includes(message.reply_type) ? message?.reply_message : message?.reply_mediaOriginalName, { links: true })"
                                                 />
                                             </div>
                                             <pre
                                                 :class="{'para-overflow': message.overflow && !showMore}"
-                                                v-html="message.type === 'link' ? checkLink(changeText(message.message), true) : changeText(message.message)"
+                                                v-html="commentHtml(message.message, { links: message.type === 'link' })"
                                             />
                                             <div v-if="message.overflow" class="text-center cursor-pointer border-top mt-10px pt-5px text-center" @click="showMore = !showMore">
                                                 <span>{{$t('Permissions.Read')}} {{showMore ? $t('Comments.less') : $t('Comments.more')}}</span>
@@ -115,7 +115,7 @@
                                     <template v-else>
                                         <pre
                                             :class="{'para-overflow': message.overflow && !showMore}"
-                                            v-html="message.type === 'link' ? checkLink(changeText(message.message), true) : changeText(message.message)"
+                                            v-html="commentHtml(message.message, { links: message.type === 'link' })"
                                         />
                                         <div v-if="message.overflow" class="text-center cursor-pointer border-top mt-10px pt-5px text-center" @click="showMore = !showMore">
                                             <span>{{$t('Permissions.Read')}} {{showMore ? $t('Comments.less') : $t('Comments.more')}}</span>
@@ -176,7 +176,8 @@
 <script setup>
 // PACKAGES
 import { defineComponent, defineProps, inject, onMounted, ref, watch } from 'vue';
-import { useConvertDate, useCustomComposable, useGetterFunctions } from '@/composable';
+import { useConvertDate, useGetterFunctions } from '@/composable';
+import { commentHtml, commentPlainText } from '@/utils/commentHtml';
 
 // COMPONENTS
 import WasabiImageComp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue"
@@ -197,7 +198,6 @@ const { handleStorageImageRequest } = storageHelper();
 const {getDateType} = useProjects();
 
 // UTILS
-const {changeText, checkLink} = useCustomComposable();
 const {convertDateFormat} = useConvertDate();
 const {getUser} = useGetterFunctions();
 const userId = inject("$userId");
