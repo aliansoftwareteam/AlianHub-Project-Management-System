@@ -43,7 +43,8 @@ describe('comment.create stores text through the web path\'s escaping', () => {
         const out = await perform('comment.create', { taskId: task._id, body: '<img src=x onerror=alert(1)> & "quotes"' });
         const [saved] = rows(SCHEMA_TYPE.COMMENTS);
         expect(saved.message).toBe('&lt;img src=x onerror=alert(1)&gt; &amp; &quot;quotes&quot;');
-        expect(saved).toMatchObject({ taskId: task._id, projectId: P_A, userId: ME, project: false, isDeleted: false });
+        expect(saved).toMatchObject({ userId: ME, project: false, isDeleted: false });
+        expect([String(saved.taskId), String(saved.projectId)]).toEqual([task._id, P_A]);
         expect(out).toMatchObject({ auditId: 'audit-1', result: { commentId: String(saved._id) }, undo: { kind: 'comment', commentId: String(saved._id), taskId: task._id } });
     });
 
