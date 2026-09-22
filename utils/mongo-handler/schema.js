@@ -1232,6 +1232,7 @@ const schema = {
         waitUntil: { type: Date, required: false },
         waitReason: { type: String, required: false },
         approvalId: { type: String, required: false },
+        agentSessionId: { type: String, required: false },
         // Fan-out children are written at run time and point back at the step that expanded them.
         parentStepId: { type: String, required: false },
         childIndex: { type: Number, required: false },
@@ -1617,6 +1618,9 @@ const schema = {
         handleHash: { type: String, required: false },
         handleExpiresAt: { type: Date, required: false },
         tainted: { type: Boolean, required: false },
+        // Set when a workflow's external_agent step opened the session; the step waits on it.
+        workflowRunId: { type: String, required: false },
+        workflowStepId: { type: String, required: false },
         createdAt: { type: Date, required: true },
         deliveredAt: { type: Date, required: false },
         firstActivityAt: { type: Date, required: false },

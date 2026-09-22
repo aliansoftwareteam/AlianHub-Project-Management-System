@@ -6,7 +6,7 @@
 
 export const STEP_TYPES = Object.freeze([
     "agent_run", "tool_call", "human_approval", "fan_out", "fan_in",
-    "condition", "wait", "timer", "loop", "automation_rule"
+    "condition", "wait", "timer", "loop", "automation_rule", "external_agent"
 ]);
 
 export const STEP_STATUSES = Object.freeze(["pending", "running", "success", "failed", "skipped", "stopped"]);
@@ -202,3 +202,18 @@ export const runTotalsOf = (steps = []) => ({
 export const ENGINE_OFF_STATUS = 503;
 
 export const isEngineOff = (error) => Number(error?.status) === ENGINE_OFF_STATUS;
+
+const SESSION_STRIP_STATUS = Object.freeze({ offered: "running", active: "running", completed: "done", failed: "failed", revoked: "failed", unresponsive: "failed" });
+
+/* The shape TaskAgentStrip reads, for the outside agent session an external_agent step waits on. */
+export const sessionStripOf = (step) => {
+    const session = step?.agentSession;
+    if (!session) return null;
+    return {
+        agentName: session.clientName || "",
+        status: SESSION_STRIP_STATUS[session.state] || "running",
+        startedAt: session.firstActivityAt || session.createdAt || null,
+        session,
+        onStop: null
+    };
+};

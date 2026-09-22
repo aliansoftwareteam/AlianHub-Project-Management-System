@@ -92,6 +92,7 @@ const publicView = (session, { shown = LIMITS.activitiesShown } = {}) => ({
     lastActivityAt: iso(session.lastActivityAt),
     endedAt: iso(session.endedAt),
     activityCount: Number(session.activityCount || 0),
+    ...(session.workflowRunId ? { workflowRunId: String(session.workflowRunId), workflowStepId: String(session.workflowStepId || '') } : {}),
     activities: (session.activities || []).slice(-shown).map((a) => ({ type: a.type, text: a.text || '', at: iso(a.at) })),
 });
 
