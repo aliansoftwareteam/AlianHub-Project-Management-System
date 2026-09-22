@@ -16,7 +16,7 @@ describe('richHtml', () => {
     });
 
     it('drops links and images whose address is not an allowed scheme', () => {
-        const out = parse(richHtml('<a href="javascript:alert(1)">a</a><a href=" JaVaScRiPt:alert(1)">b</a><a href="data:text/html,x">c</a><img src="javascript:alert(1)"><img src="data:text/html,x"><a href="vbscript:x">d</a>'));
+        const out = parse(richHtml('<a href="javascript:alert(1)">a</a><a href=" JaVaScRiPt:alert(1)">b</a><a href="data:text/html,x">c</a><img src="javascript:alert(1)"><img src="data:text/html,x"><a href="vbscript:x">d</a><a href="ftp://x.test">e</a><img src="cid:x">'));
         out.querySelectorAll('a').forEach((a) => expect(a.hasAttribute('href')).toBe(false));
         out.querySelectorAll('img').forEach((img) => expect(img.hasAttribute('src')).toBe(false));
     });
