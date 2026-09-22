@@ -1,3 +1,4 @@
+const { escapeHtml } = require('../../../../utils/escapeHtml');
 const { dbCollections } = require('../../../../Config/collections')
 const { sanitizeInput } = require("../../../serviceFunction");
 const { HandleHistory,HandleTask,convertToSubTaskFunction, moveTaskFunction, convertToListSubTask,mergeSubTask, duplicateSubTaskFunction, addHistoryCollection, removeCommentCount,updateHistoryCollection, updateTimesheetCollection, updateEstimatedTimeCollection} = require("../mongo_helper")
@@ -171,7 +172,7 @@ module.exports = {
                             const verb = deletedStatusKey === 0 ? 'restored' : deletedStatusKey === 1 ? 'deleted' : 'archieved';
                             const projectName = sanitizeInput(String((projectData && projectData.ProjectName) || ''));
                             let historyObj = {
-                                message: `<b>${userData.Employee_Name}</b> has ${verb} <b>${sanitizeInput(before.TaskName)}</b> task in <b>${projectName}</b> project.`,
+                                message: `<b>${userData.Employee_Name}</b> has ${verb} <b>${sanitizeInput(before.TaskName)}</b> task in <b>${escapeHtml(projectName)}</b> project.`,
                                 key: "task_delete",
                                 sprintId: before.sprintId,
                             }
@@ -179,7 +180,7 @@ module.exports = {
                             let notificationObject = {
                                 'type': 'task',
                                 'key': 'task_delete',
-                                'message': `<strong>${userData.Employee_Name}</strong> has ${verb} <strong>${sanitizeInput(before.TaskName)}</strong> task in <strong>${projectName}</strong> project.`,
+                                'message': `<strong>${userData.Employee_Name}</strong> has ${verb} <strong>${sanitizeInput(before.TaskName)}</strong> task in <strong>${escapeHtml(projectName)}</strong> project.`,
                             }
 
                             if(historyObj && Object.keys(historyObj).length) {

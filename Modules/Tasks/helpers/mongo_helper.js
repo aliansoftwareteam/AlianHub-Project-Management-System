@@ -1,4 +1,5 @@
 // BUG-042 / #96 — replaced `moment` with luxon-backed helper.
+const { escapeHtml } = require('../../../utils/escapeHtml');
 const { formatDate } = require('../../../utils/dateHelpers');
 const logger = require("../../../Config/loggerConfig");
 const { DateTime } = require('luxon');
@@ -316,9 +317,9 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                         if(convertTask.sprintId === task.sprintId){
                             historyObj.message = `<b>${userData.Employee_Name}</b> has converted the <b>${serviceFun.sanitizeInput(convertTask.TaskName)}</b> task to subtask of <b>${serviceFun.sanitizeInput(task.TaskName)}</b> task ${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
                         }else if(convertTask.sprintId !== task.sprintId && JSON.parse(JSON.stringify(convertTask))?.ProjectID === JSON.parse(JSON.stringify(task))?.ProjectID){
-                            historyObj.message = `<b>${userData.Employee_Name}</b> has converted the <b>${serviceFun.sanitizeInput(convertTask.TaskName)}</b> task of <b>(${convertTask.folderObjId ?  convertTask.sprintArray.folderName + '/' : ''}${convertTask.sprintArray.name})</b> sprint to subtask of <b>${serviceFun.sanitizeInput(task.TaskName)}</b> task <b>(${task.folderObjId ? task.sprintArray.folderName + '/'  : ''}${task.sprintArray.name})</b>${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
+                            historyObj.message = `<b>${userData.Employee_Name}</b> has converted the <b>${serviceFun.sanitizeInput(convertTask.TaskName)}</b> task of <b>(${convertTask.folderObjId ?  escapeHtml(convertTask.sprintArray.folderName) + '/' : ''}${escapeHtml(convertTask.sprintArray.name)})</b> sprint to subtask of <b>${serviceFun.sanitizeInput(task.TaskName)}</b> task <b>(${task.folderObjId ? escapeHtml(task.sprintArray.folderName) + '/'  : ''}${escapeHtml(task.sprintArray.name)})</b>${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
                         }else{
-                            historyObj.message = `<b>${userData.Employee_Name}</b> has converted the <b>${serviceFun.sanitizeInput(convertTask.TaskName)}</b> task of <b>(${oldProject.ProjectName}${convertTask.folderObjId ? '/' + convertTask.sprintArray.folderName : ''}/${convertTask.sprintArray.name})</b> sprint to subtask of <b>${serviceFun.sanitizeInput(task.TaskName)}</b> task <b>(${projectData.ProjectName}${task.folderObjId ? '/' + task.sprintArray.folderName : ''}/${task.sprintArray.name})</b> ${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
+                            historyObj.message = `<b>${userData.Employee_Name}</b> has converted the <b>${serviceFun.sanitizeInput(convertTask.TaskName)}</b> task of <b>(${escapeHtml(oldProject.ProjectName)}${convertTask.folderObjId ? '/' + escapeHtml(convertTask.sprintArray.folderName) : ''}/${escapeHtml(convertTask.sprintArray.name)})</b> sprint to subtask of <b>${serviceFun.sanitizeInput(task.TaskName)}</b> task <b>(${escapeHtml(projectData.ProjectName)}${task.folderObjId ? '/' + escapeHtml(task.sprintArray.folderName) : ''}/${escapeHtml(task.sprintArray.name)})</b> ${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
                         }
                         exports.HandleHistory('task', companyId, projectData.id, convertTask._id, historyObj, userData)
                             .catch((error) => { logger.error(`ERROR IN CONVERT TASK HISTORY: ${error && error.message}`); });
@@ -467,9 +468,9 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                     mainChat: false
                 }
                 if(JSON.parse(JSON.stringify(moveTask))?.ProjectID !== projectData.id){
-                    historyObj.message = `<b>${userData.Employee_Name}</b> has moved <b>${moveTask.TaskName}</b> task from <b>(${oldProject.ProjectName}${oldSprintObj.folderId ? '/' + oldSprintObj.folderName : ''}/${oldSprintObj.name})</b> to <b>(${projectData.ProjectName}${sprintObj.folderId ? '/' + sprintObj.folderName : ''}/${sprintObj.name})</b> project ${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
+                    historyObj.message = `<b>${userData.Employee_Name}</b> has moved <b>${escapeHtml(moveTask.TaskName)}</b> task from <b>(${escapeHtml(oldProject.ProjectName)}${oldSprintObj.folderId ? '/' + escapeHtml(oldSprintObj.folderName) : ''}/${escapeHtml(oldSprintObj.name)})</b> to <b>(${escapeHtml(projectData.ProjectName)}${sprintObj.folderId ? '/' + escapeHtml(sprintObj.folderName) : ''}/${escapeHtml(sprintObj.name)})</b> project ${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
                 }else{
-                    historyObj.message = `<b>${userData.Employee_Name}</b> has moved <b>${moveTask.TaskName}</b> task from <b>(${oldSprintObj.folderId ?  oldSprintObj.folderName + '/' : ''}${oldSprintObj.name})</b> to <b>(${sprintObj.folderId ? sprintObj.folderName + '/'  : ''}${sprintObj.name})</b> sprint ${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
+                    historyObj.message = `<b>${userData.Employee_Name}</b> has moved <b>${escapeHtml(moveTask.TaskName)}</b> task from <b>(${oldSprintObj.folderId ?  escapeHtml(oldSprintObj.folderName) + '/' : ''}${escapeHtml(oldSprintObj.name)})</b> to <b>(${sprintObj.folderId ? escapeHtml(sprintObj.folderName) + '/'  : ''}${escapeHtml(sprintObj.name)})</b> sprint ${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
                 }
                 // Unhandled, this rejects the whole process rather than losing one
                 // history line: HandleHistory writes a REQUIRED UserId from

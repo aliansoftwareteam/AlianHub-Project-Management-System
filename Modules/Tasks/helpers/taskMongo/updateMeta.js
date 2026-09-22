@@ -1,3 +1,4 @@
+const { escapeHtml } = require('../../../../utils/escapeHtml');
 const { dbCollections } = require('../../../../Config/collections')
 const { sanitizeInput } = require("../../../serviceFunction");
 const { HandleHistory,HandleTask,convertToSubTaskFunction, moveTaskFunction, convertToListSubTask,mergeSubTask, duplicateSubTaskFunction, addHistoryCollection, removeCommentCount,updateHistoryCollection, updateTimesheetCollection, updateEstimatedTimeCollection} = require("../mongo_helper")
@@ -168,7 +169,7 @@ module.exports = {
                     let notificationObject = {};
                     if(operation === "add") {
                         historyObj = {
-                            message: `<b>${userData.Employee_Name}</b> has attached <b>${data.filename}</b> on <b>${sanitizeInput(taskData.TaskName)}</b>.`,
+                            message: `<b>${userData.Employee_Name}</b> has attached <b>${escapeHtml(data.filename)}</b> on <b>${sanitizeInput(taskData.TaskName)}</b>.`,
                             key: "Task_Attachment",
                             sprintId: taskData.sprintId,
                         }
@@ -182,7 +183,7 @@ module.exports = {
                         }
                     } else if(operation === "remove") {
                         historyObj = {
-                            message: `<b>${data.filename}</b> removed from <b>${sanitizeInput(taskData.TaskName)}</b>&apos;s attchments.`,
+                            message: `<b>${escapeHtml(data.filename)}</b> removed from <b>${sanitizeInput(taskData.TaskName)}</b>&apos;s attchments.`,
                             key: "Task_Attachment_Remove",
                             sprintId: taskData.sprintId,
                         }
@@ -475,11 +476,7 @@ module.exports = {
                             logger.error(`ERROR in notification: ${error.message}`);
                         });
                     }
-                    // AHE — a RE-update requires a reason; append it to the activity-log
-                    // message. Message renders as HTML (v-html), so escape the user text.
-                    const escapeHtml = (s) => String(s == null ? '' : s)
-                        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    // AHE — a RE-update requires a reason; append it to the activity-log message.
                     const reasonText = obj.reason && String(obj.reason).trim()
                         ? ` <b>Reason:</b> ${escapeHtml(String(obj.reason).trim())}`
                         : '';

@@ -10,6 +10,7 @@ const requestQueue = new RequestQueue();
 const { getCachedCompanyData } = require('../../utils/planHelper');
 const { stepCompanyCounters } = require("../Company/helpers/companyCounters");
 const scrumRules = require("./scrumRules");
+const { escapeHtml } = require("../../utils/escapeHtml");
 
 exports.addSprint = (req, res) => {
     exports.addSprintFun(req).then((data) => {
@@ -147,12 +148,12 @@ exports.addSprintFun = (req) => {
                         let historyObj = {};
                         if(folder && folder.folderId !== "") {
                             historyObj = {
-                                'message': `<b>${userData.Employee_Name}</b> has created new <b>Sprint</b> as <b>${sprintName}</b> in <b>${folder.folderName}</b> folder in <b>${projectName}</b> project ${from !== '' ? `from the (<b>${taskSprintObj.taskFodlerName ? '/' + taskSprintObj.taskFodlerName : ''}${taskSprintObj.taskSprintName}/${sprintName}</b>) task.` : ''}.`,
+                                'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has created new <b>Sprint</b> as <b>${escapeHtml(sprintName)}</b> in <b>${escapeHtml(folder.folderName)}</b> folder in <b>${escapeHtml(projectName)}</b> project ${from !== '' ? `from the (<b>${taskSprintObj.taskFodlerName ? "/" + escapeHtml(taskSprintObj.taskFodlerName) : ""}${escapeHtml(taskSprintObj.taskSprintName)}/${escapeHtml(sprintName)}</b>) task.` : ''}.`,
                                 'key' : 'Sub_Sprint_Created',
                             }
                         } else {
                             historyObj = {
-                                'message': `<b>${userData.Employee_Name}</b> has created new <b>Sprint</b> as <b>${sprintName}</b> in <b>${projectName}</b> project ${from !== '' ? `from the (<b>${taskSprintObj.taskSprintName}/${sprintName}</b>) task.` : ''}.`,
+                                'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has created new <b>Sprint</b> as <b>${escapeHtml(sprintName)}</b> in <b>${escapeHtml(projectName)}</b> project ${from !== '' ? `from the (<b>${escapeHtml(taskSprintObj.taskSprintName)}/${escapeHtml(sprintName)}</b>) task.` : ''}.`,
                                 'key' : 'Create_Sprint',
                             }
                         }
@@ -208,11 +209,11 @@ exports.editSprintName = (req, res) => {
             const previousName = prevData.name || '';
             const historyObj = folder && folder.folderId !== ""
                 ? {
-                    'message': `<b>${userData.Employee_Name}</b> has changed <b>Sprint</b> name from <b>${previousName}</b> to <b>${sprintName}</b> in <b>${folder.folderName}</b> folder in <b>${projectName}</b> project.`,
+                    'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has changed <b>Sprint</b> name from <b>${escapeHtml(previousName)}</b> to <b>${escapeHtml(sprintName)}</b> in <b>${escapeHtml(folder.folderName)}</b> folder in <b>${escapeHtml(projectName)}</b> project.`,
                     'key' : 'Sub_Sprint_Created',
                 }
                 : {
-                    'message': `<b>${userData.Employee_Name}</b> has changed <b>Sprint</b> name from <b>${previousName}</b> to <b>${sprintName}</b> in <b>${projectName}</b> project.`,
+                    'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has changed <b>Sprint</b> name from <b>${escapeHtml(previousName)}</b> to <b>${escapeHtml(sprintName)}</b> in <b>${escapeHtml(projectName)}</b> project.`,
                     'key' : 'Create_Sprint',
                 };
 
@@ -479,9 +480,9 @@ exports.updateSprintFun = (req) => {
                     sprintId: id,
                 }
                 if(updatedValueDeleteStatusKey) {
-                    historyObj.message = `<b>${userData.Employee_Name}</b> has ${updatedValueDeleteStatusKey === 0 ? 'restored' : updatedValueDeleteStatusKey === 5 ? 'closed' : updatedValueDeleteStatusKey === 1 ? 'deleted' : 'archived'} <b>${sprintName}</b> sprint ${folderId === null ? '' : `in <b>${folderName}</b> folder`} in <b>${projectData.ProjectName}</b> project.`
+                    historyObj.message = `<b>${escapeHtml(userData.Employee_Name)}</b> has ${updatedValueDeleteStatusKey === 0 ? 'restored' : updatedValueDeleteStatusKey === 5 ? 'closed' : updatedValueDeleteStatusKey === 1 ? 'deleted' : 'archived'} <b>${escapeHtml(sprintName)}</b> sprint ${folderId === null ? '' : `in <b>${escapeHtml(folderName)}</b> folder`} in <b>${escapeHtml(projectData.ProjectName)}</b> project.`
                 }else if(historyData && Object.keys(historyData).length > 0){
-                    historyObj.message = `<b>${userData.Employee_Name}</b> has <b>${historyData.type}</b> <b>${historyData.userName ? historyData.userName : ''}</b> ${historyData.userName ? historyData.type === 'added' ? 'in' : 'from' : ''} <b>${sprintName}</b> sprint ${folderId === null ? '' : `in <b>${folderName}</b> folder`} in <b>${projectData.ProjectName}</b> project.`
+                    historyObj.message = `<b>${escapeHtml(userData.Employee_Name)}</b> has <b>${escapeHtml(historyData.type)}</b> <b>${escapeHtml(historyData.userName)}</b> ${historyData.userName ? historyData.type === 'added' ? 'in' : 'from' : ''} <b>${escapeHtml(sprintName)}</b> sprint ${folderId === null ? '' : `in <b>${escapeHtml(folderName)}</b> folder`} in <b>${escapeHtml(projectData.ProjectName)}</b> project.`
                 }
                 if (historyObj && Object.keys(historyObj).length) {
                     HandleHistoryref.HandleHistory('project', companyId, projectId, null, historyObj, userData).catch((error) => {
@@ -544,7 +545,7 @@ exports.addFolder = (req, res) => {
 
             // Call history function
             const historyObject = {
-                'message': `<b>${userData.Employee_Name}</b> has created new <b>Folder</b> as <b>${folderName}</b> in <b>${projectName}</b> project.`,
+                'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has created new <b>Folder</b> as <b>${escapeHtml(folderName)}</b> in <b>${escapeHtml(projectName)}</b> project.`,
                 'key' : 'Create_Folder',
             }
             HandleHistoryref.HandleHistory('project', companyId, projectId, null, historyObject, userData)
@@ -593,7 +594,7 @@ exports.editFolderName = (req, res) => {
 
             // Call history function
             let historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b>Folder</b> name from <b>${prevFolderName}</b> to <b>${folderName}</b> in <b>${projectName}</b> project.`,
+                'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has changed <b>Folder</b> name from <b>${escapeHtml(prevFolderName)}</b> to <b>${escapeHtml(folderName)}</b> in <b>${escapeHtml(projectName)}</b> project.`,
                 'key' : 'Create_Folder',
             }
             HandleHistoryref.HandleHistory('project', companyId, projectId, null, historyObj, userData)
@@ -710,7 +711,7 @@ exports.updateFolder = (req, res) => {
 
             // Call history function
             let historyObj = {
-                message: `<b>${userData.Employee_Name}</b> has ${updateObject[`sprintsfolders.${id}.deletedStatusKey`] === 0 ? 'restored' : updateObject[`sprintsfolders.${id}.deletedStatusKey`] === 1 ? 'deleted' : 'archieved'} <b>${folderName}</b> folder in <b>${projectData.ProjectName}</b> project.`,
+                message: `<b>${escapeHtml(userData.Employee_Name)}</b> has ${updateObject[`sprintsfolders.${id}.deletedStatusKey`] === 0 ? 'restored' : updateObject[`sprintsfolders.${id}.deletedStatusKey`] === 1 ? 'deleted' : 'archieved'} <b>${escapeHtml(folderName)}</b> folder in <b>${escapeHtml(projectData.ProjectName)}</b> project.`,
                 key: "project_sprint_removed",
             }
             if(historyObj && Object.keys(historyObj).length) {

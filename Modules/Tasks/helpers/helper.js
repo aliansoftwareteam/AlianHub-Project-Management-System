@@ -9,7 +9,7 @@ const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueri
 const { taskCheckListEdit, taskCheckList, taskCheckListRemove, taskCheckListChecked, taskCheckListAssignee, taskCheckListAssigneeRemove } = require('./notificationTemplate');
 const { default: mongoose } = require("mongoose");
 const { insertCustomFieldPromise } = require('../../CustomField/controller');
-const { sanitizeInput } = require('../../serviceFunction');
+const { escapeHtml } = require('../../../utils/escapeHtml');
 
 
 /* ------------- HANDLE HISTIRY FOR ALL THE ACTIVITIES ------------- */
@@ -68,19 +68,17 @@ exports.changeDateFormat = (date, format) => {
     return formatDate(date, format);
 }
 
-const escapeText = (value) => sanitizeInput(String(value === undefined || value === null ? '' : value));
-
 /* History renders as HTML, so every user-typed value is escaped before it is placed in a message; the actor's name arrives escaped. */
 const escapedHistoryParams = (raw) => {
     const params = { ...raw };
     ['name', 'previousName', 'newName', 'label', 'checkList', 'projectName', 'taskName', 'value'].forEach((key) => {
-        if (params[key] !== undefined) params[key] = escapeText(params[key]);
+        if (params[key] !== undefined) params[key] = escapeHtml(params[key]);
     });
     if (params.extractedData && typeof params.extractedData === 'object') {
         params.extractedData = {
             ...params.extractedData,
-            name: escapeText(params.extractedData.name),
-            subItemNames: Array.isArray(params.extractedData.subItemNames) ? params.extractedData.subItemNames.map(escapeText) : [],
+            name: escapeHtml(params.extractedData.name),
+            subItemNames: Array.isArray(params.extractedData.subItemNames) ? params.extractedData.subItemNames.map(escapeHtml) : [],
         };
     }
     return params;

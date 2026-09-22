@@ -293,7 +293,7 @@ exports.startSprint = async (req, res) => {
         if (actor) {
             HandleHistoryref.HandleHistory('project', companyId, String(sprint.projectId), null, {
                 key: 'Sprint_Started',
-                message: `<b>${actor.Employee_Name}</b> started sprint <b>${sprint.name || ''}</b> with <b>${commitment.tasks}</b> task(s) committed.`,
+                message: rules.sprintStartedMessage(actor, sprint, commitment),
                 sprintId: String(sprint._id),
             }, actor).catch((e) => logger.error(`Sprint_Started history: ${e && e.message}`));
         }
@@ -669,7 +669,7 @@ exports.completeSprint = async (req, res) => {
 
         HandleHistoryref.HandleHistory('project', companyId, String(sprint.projectId), null, {
             key: 'Sprint_Completed',
-            message: `<b>${actor.Employee_Name}</b> completed sprint <b>${sprint.name || ''}</b> — <b>${closeReport.done.tasks}</b> done, <b>${closeReport.notDone.tasks}</b> moved${movedTo ? ` to <b>${movedTo.name}</b>` : ''}.`,
+            message: rules.sprintCompletedMessage(actor, sprint, closeReport, movedTo),
             sprintId: String(sprint._id),
         }, actor).catch((e) => logger.error(`Sprint_Completed history: ${e && e.message}`));
 

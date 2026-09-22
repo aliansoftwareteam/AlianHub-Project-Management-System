@@ -441,6 +441,16 @@ describe('the actor is the signed-in user', () => {
         notifications().forEach((sent) => expect(sent.object.message).not.toMatch(/<b onmouseover|&amp;lt;/));
     });
 
+    test('an attachment history row escapes the file name', async () => {
+        const body = bodyFor(PATCH, 'updateAttachments');
+        body.data = { id: 'a1', filename: '<img src=x onerror=alert(1)>.png' };
+        const result = await call(PATCH, body);
+        expect(result.code).toBe(200);
+        const [row] = historyRows();
+        expect(row.Message).toContain('<b>&lt;img src=x onerror=alert(1)&gt;.png</b>');
+        expect(row.Message).not.toContain('<img');
+    });
+
     test('a queue entry names the stored task, not the name the body sends', async () => {
         const result = await call(PATCH, { ...bodyFor(PATCH, 'updateQueueList'), taskName: '<script>alert(1)</script>' });
         expect(result.code).toBe(200);
