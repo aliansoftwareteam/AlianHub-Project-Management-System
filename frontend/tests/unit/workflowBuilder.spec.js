@@ -95,6 +95,41 @@ describe('the builder composes from the manifest the API serves', () => {
     });
 });
 
+describe('handing a step to an outside agent', () => {
+    const OUTSIDE = {
+        key: 'external_agent',
+        label: 'Hand to an outside agent',
+        config: { clientId: { type: 'oauth_client', label: 'Outside agent', required: true }, taskId: { type: 'text', label: 'Task' } },
+        output: {},
+    };
+    const APPROVALS = [
+        { clientId: 'ahc_approved', clientName: 'Coder', status: 'approved' },
+        { clientId: 'ahc_pending', clientName: 'Asked for', status: 'pending' },
+        { clientId: 'ahc_denied', clientName: 'Turned down', status: 'denied' },
+        { clientId: 'ahc_revoked', clientName: 'Withdrawn', status: 'revoked' },
+    ];
+    const withOutside = (method, url) => {
+        if (url.includes('/workflows/step-types')) return { data: { status: true, data: { stepTypes: [OUTSIDE], bounds: {} } } };
+        if (url.includes('/oauth-client-approvals')) return { data: { status: true, data: APPROVALS } };
+        return answer(method, url);
+    };
+
+    it('offers only the outside agents approved in this workspace', async () => {
+        apiRequest.mockImplementation(async (method, url) => withOutside(method, url));
+        const wrapper = await build();
+        const picker = wrapper.find('[data-test="client-picker"]');
+        expect(picker.exists()).toBe(true);
+        expect(picker.findAll('option').map((option) => option.attributes('value'))).toEqual(['', 'ahc_approved']);
+        expect(picker.text()).toContain('Coder');
+        expect(picker.text()).not.toContain('Asked for');
+    });
+
+    it('asks for no approvals when the server offers no outside agent step', async () => {
+        await build();
+        expect(apiRequest.mock.calls.some(([, url]) => url.includes('/oauth-client-approvals'))).toBe(false);
+    });
+});
+
 describe('saving', () => {
     it('saves without asking for the workflow to be turned on, and says so', async () => {
         const wrapper = await build();
