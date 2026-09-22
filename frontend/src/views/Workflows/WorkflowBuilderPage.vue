@@ -56,6 +56,11 @@
                                             <option v-for="agent in agents" :key="agent._id" :value="String(agent._id)">{{ agent.name }}</option>
                                         </select>
 
+                                        <select v-else-if="spec.type === 'oauth_client'" v-model="step.config[field]" class="wb__slot" data-test="client-picker">
+                                            <option value="">{{ approvedClients.length ? $t('WorkflowBuilder.unset') : $t('WorkflowBuilder.no_approved_clients') }}</option>
+                                            <option v-for="client in approvedClients" :key="client.clientId" :value="client.clientId">{{ client.clientName || client.clientId }}</option>
+                                        </select>
+
                                         <select v-else-if="spec.type === 'user'" v-model="step.config[field]" class="wb__slot">
                                             <option value="">{{ $t('WorkflowBuilder.unset') }}</option>
                                             <option v-for="user in users" :key="user._id" :value="String(user._id)">{{ user.Employee_Name }}</option>
@@ -235,6 +240,7 @@ const projects = ref([]);
 const tasks = ref([]);
 const agents = ref([]);
 const actions = ref([]);
+const approvedClients = ref([]);
 const loading = ref(true);
 const loadError = ref('');
 const engineOff = ref('');
@@ -447,6 +453,15 @@ const loadSideLists = async () => {
     projects.value = projectBody?.data?.data || [];
     agents.value = agentBody?.data?.data || [];
     actions.value = registryBody?.data?.data?.actions || [];
+    await loadApprovedClients();
+};
+
+/* Only asked for when the server offers a step that names an outside agent; a delegation to one not approved here is refused anyway. */
+const loadApprovedClients = async () => {
+    const wanted = manifest.stepTypes.some((type) => Object.values(type.config || {}).some((spec) => spec.type === 'oauth_client'));
+    if (!wanted) return;
+    const body = await apiRequest('get', env.OAUTH_CLIENT_APPROVALS).catch(() => null);
+    approvedClients.value = (body?.data?.data || []).filter((row) => row.status === 'approved');
 };
 
 onMounted(async () => {

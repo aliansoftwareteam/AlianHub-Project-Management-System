@@ -16,6 +16,7 @@
 .wf-step__duration, .wf-step__cost { color: var(--text-muted); }
 .wf-step__spacer { flex: 1 1 auto; }
 
+.wf-session { padding: 2px 0 4px 22px; }
 .wf-fan { display: flex; align-items: center; gap: 8px; padding: 2px 0 2px 22px; color: var(--text-muted); }
 
 .wf-failure { margin: 6px 0 2px 22px; padding: 9px 11px; border: 1px solid var(--hairline); border-radius: 6px; }
