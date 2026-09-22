@@ -54,10 +54,11 @@ describe('GET /api/v2/agents/skills/egress-check', () => {
         expect((await check('API.GitHub.com')).body.data).toEqual({ host: 'api.github.com', state: 'allowed' });
     });
 
-    it('answers not_listed for a declarable host the list does not hold, on another port too', async () => {
+    it('answers not_listed for a declarable host the list does not hold, or holds on another port only', async () => {
         expect((await check('api.gitlab.com')).body.data).toEqual({ host: 'api.gitlab.com', state: 'not_listed' });
-        expect((await check('api.github.com:8443')).body.data.state).toBe('not_listed');
         expect((await check('status.example.org')).body.data.state).toBe('not_listed');
+        expect((await check('status.example.org:9443')).body.data.state).toBe('not_listed');
+        expect((await check('api.github.com:8443')).body.data.state).toBe('allowed');
     });
 
     it('answers not_listed for every host when the list is empty', async () => {

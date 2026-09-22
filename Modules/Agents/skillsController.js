@@ -1,8 +1,9 @@
-const { tenantOf } = require('../../Config/tenant');
+const { tenantOf, TenantError } = require('../../Config/tenant');
 const logger = require('../../Config/loggerConfig');
 const { callerOf, canManageAgents } = require('./access');
 const skillRecord = require('./skillRecord');
 const skillDryRun = require('./skillDryRun');
+const externalReads = require('./skills/externalReads');
 
 const fail = (res, message, code, extra) => res.status(code || 400).send({ status: false, statusText: message, message, ...(extra || {}) });
 
@@ -41,6 +42,28 @@ exports.getCatalogues = (req, res) => {
         tenantOf(req);
         return res.send({ status: true, statusText: 'Catalogues fetched.', data: skillRecord.catalogues() });
     } catch (e) { return failWith(res, e); }
+};
+
+/* GET /api/v2/agents/skills/egress-check?host= — whether one host is on this workspace's list, for whoever may
+ * save a skill. A token never asks: the answer, host by host, would read the list out. */
+exports.egressCheck = async (req, res) => {
+    try {
+        const companyId = tenantOf(req);
+        if (req.apiToken || req.mcp) return fail(res, 'A token cannot check the egress allowlist.', 403);
+        if (!(await privilegedHuman(req, companyId))) return fail(res, 'Owner/admin only.', 403);
+        if (!externalReads.enabled()) return fail(res, 'Declared reads are not available on this server.', 404);
+        let data;
+        try {
+            data = await externalReads.checkHost(companyId, req.query && req.query.host);
+        } catch (e) {
+            logger.error(`agent skills: egress check: ${e && e.message}`);
+            return fail(res, 'The workspace egress allowlist could not be read; try again.', 503, { code: externalReads.CODE.ALLOWLIST_UNREADABLE });
+        }
+        return res.send({ status: true, statusText: 'Host checked.', data });
+    } catch (e) {
+        if (e instanceof TenantError) return fail(res, e.message, e.statusCode);
+        return failWith(res, e);
+    }
 };
 
 /* GET /api/v2/agents/skills/:key */

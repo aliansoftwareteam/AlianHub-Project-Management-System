@@ -209,6 +209,16 @@ const checkDeclaredReads = async (companyId, value) => {
     return errors;
 };
 
+const HOST_STATE = Object.freeze({ ALLOWED: 'allowed', NOT_LISTED: 'not_listed', NOT_DECLARABLE: 'not_declarable' });
+
+/* The editor's live check of one host: the same rules as the save, and never the list itself. */
+const checkHost = async (companyId, raw) => {
+    const { entry, reason } = parseDeclaredHost(raw);
+    if (!entry) return { host: typeof raw === 'string' ? raw.trim().slice(0, 300) : '', state: HOST_STATE.NOT_DECLARABLE, reason: reason || 'invalid' };
+    const listed = await require('../engine/egressAllowlist').hostsFor(companyId);
+    return { host: entry.text, state: hostMatches(listed, entry.host, entry.port || HTTPS_PORT) ? HOST_STATE.ALLOWED : HOST_STATE.NOT_LISTED };
+};
+
 const refusal = (code, message, extra = {}) => Object.assign(new Error(`${code}: ${message}`), { code, deterministic: true, ...extra });
 
 const listedHosts = async (companyId) => {
@@ -261,7 +271,7 @@ const notAvailable = (skillKey) => Object.assign(
 );
 
 module.exports = {
-    FLAG, READERS, CREDENTIAL_KIND, HANDLE, MAX_PATH, CODE,
-    enabled, isExternal, parseDeclaredHost, hostProblem, pathProblem, assertBuilt, buildUrl, hostError, checkDeclaredReads, notAvailable,
+    FLAG, READERS, CREDENTIAL_KIND, HANDLE, MAX_PATH, CODE, HOST_STATE,
+    enabled, checkHost, isExternal, parseDeclaredHost, hostProblem, pathProblem, assertBuilt, buildUrl, hostError, checkDeclaredReads, notAvailable,
     namesHost, listedHosts, admitHop, credentialFor, scrub, readFailure, refusal,
 };

@@ -30,6 +30,7 @@ exports.init = (app) => {
     app.post('/api/v2/agents/alerts/evaluate', metricsCtrl.evaluateAlerts);
 
     app.get('/api/v2/agents/skills/catalogues', skillsCtrl.getCatalogues);
+    app.get('/api/v2/agents/skills/egress-check', skillsCtrl.egressCheck);
     app.get('/api/v2/agents/skills', skillsCtrl.listSkills);
     app.post('/api/v2/agents/skills', skillsCtrl.createSkill);
     app.post('/api/v2/agents/skills/:key/dry-run', skillsCtrl.dryRunSkill);
