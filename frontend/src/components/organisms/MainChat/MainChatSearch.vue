@@ -97,6 +97,8 @@ import { useStore } from 'vuex';
 import { useConvertDate, useCustomComposable, useGetterFunctions } from '@/composable';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { commentPlainText } from '@/utils/commentHtml';
+import { escapeHtml } from '@/utils/notificationHtml';
 import MainChatAvatar from './MainChatAvatar.vue';
 import MainChatIcon from './MainChatIcon.vue';
 
@@ -120,7 +122,7 @@ const emit = defineEmits(['close', 'open', 'unpin']);
 const { t } = useI18n();
 const { getters } = useStore();
 const { getUser } = useGetterFunctions();
-const { debounce, changeText } = useCustomComposable();
+const { debounce } = useCustomComposable();
 const { convertDateFormat } = useConvertDate();
 
 const field = ref(null);
@@ -275,31 +277,17 @@ function ext(message) {
     return parts.length > 1 ? parts.pop().toLowerCase() : 'file';
 }
 
-/**
- * Mark the matched run inside a value.
- *
- * Callers must pass TAG-FREE text: the term is injected as `<mark>`, so matching
- * over markup could otherwise split an element. Regex metacharacters in the term
- * are escaped — a search containing `(` used to throw here.
- */
 function highlight(value) {
     const text = String(value || '');
-    if (!term.value) return text;
-    const escaped = term.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return text.replace(new RegExp(`(${escaped})`, 'gi'), '<mark>$1</mark>');
+    if (!term.value) return escapeHtml(text);
+    const pattern = term.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return text.split(new RegExp(`(${pattern})`, 'gi'))
+        .map((part, index) => (index % 2 ? `<mark>${escapeHtml(part)}</mark>` : escapeHtml(part)))
+        .join('');
 }
 
-/**
- * One line of the message body.
- *
- * changeText() renders mention tokens as markup; stripping the tags afterwards
- * leaves plain "@Name" text and — importantly — nothing for highlight() to break.
- * Character entities are left encoded because the stored message is escaped on
- * write, and v-html decodes them back to the right characters.
- */
 function snippet(message) {
-    const rendered = changeText(String(message.message || ''));
-    const plain = String(rendered).replace(/<[^>]*>/g, '').trim();
+    const plain = commentPlainText(message.message).trim();
     const capped = plain.length > 220 ? `${plain.slice(0, 220)}…` : plain;
     return highlight(capped);
 }

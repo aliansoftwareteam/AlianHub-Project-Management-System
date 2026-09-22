@@ -35,7 +35,8 @@
 
 <script setup>
 import { computed, defineProps, defineEmits } from 'vue';
-import { useCustomComposable, useGetterFunctions } from '@/composable';
+import { useGetterFunctions } from '@/composable';
+import { commentHtml, commentPlainText } from '@/utils/commentHtml';
 import MainChatMedia from './MainChatMedia.vue';
 
 const props = defineProps({
@@ -45,15 +46,12 @@ const props = defineProps({
 
 defineEmits(['preview', 'make-task', 'transcribed']);
 
-const { changeText, checkLink } = useCustomComposable();
 const { getUser } = useGetterFunctions();
 
 const isMedia = computed(() => !['text', 'link'].includes(props.message.type));
 const gallery = computed(() => [props.message, ...props.siblings]);
 
-// Mentions first so their markup exists, then URLs. Stored text was escaped on write and
-// checkLink only wraps http/https/ftp matches, so a javascript: URL cannot get through.
-const renderedBody = computed(() => checkLink(changeText(String(props.message.message || '')), true));
+const renderedBody = computed(() => commentHtml(props.message.message, { links: true }));
 
 const replyAuthor = computed(() => {
     const user = props.message.reply_userId ? getUser(props.message.reply_userId) : null;
@@ -62,7 +60,7 @@ const replyAuthor = computed(() => {
 
 const replyPreview = computed(() => {
     const text = props.message.reply_message || props.message.reply_mediaOriginalName || '';
-    const plain = String(text).replace(/<[^>]*>/g, '');
+    const plain = commentPlainText(text);
     return plain.length > 70 ? `${plain.slice(0, 70)}…` : plain;
 });
 </script>

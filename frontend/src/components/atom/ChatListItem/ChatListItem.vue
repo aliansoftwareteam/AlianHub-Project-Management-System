@@ -47,7 +47,7 @@
                         <span v-if="item?.message === 'general.message_deleted'">
                             {{ $t('general.message_deleted') }}
                         </span>
-                        <span v-else v-html="changeText(item?.message || '', '', '')"></span>
+                        <span v-else>{{ commentPlainText(item?.message) }}</span>
                     </div>
                 </div>
             </div>
@@ -138,6 +138,7 @@ import { useStore } from "vuex";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 // AHE-3834 — one-time shared FA registration (was per-row in <script setup>).
 import { ensureFaIcons, findFaIcon } from "@/utils/faIcons";
+import { commentPlainText } from "@/utils/commentHtml";
 
 // COMPONENTS
 import MainChatAvatar from "@/components/organisms/MainChat/MainChatAvatar.vue"
@@ -150,7 +151,7 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 // UTILS
 const {getUser} = useGetterFunctions()
 const {getters} = useStore();
-const {changeText, checkPermission} = useCustomComposable();
+const {checkPermission} = useCustomComposable();
 const userId = inject("$userId")
 const selectedChat = inject("selectedChat")
 const instance = getCurrentInstance();
