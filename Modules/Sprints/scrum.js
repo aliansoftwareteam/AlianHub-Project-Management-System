@@ -1,11 +1,11 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
-const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const HandleHistoryref = require('../Tasks/helpers/helper');
 const { addSprintFun } = require('./controller');
 const rules = require('./scrumRules');
+const { actingUser } = require('./helpers/actingUser');
 
 /**
  * Scrum sprint lifecycle — opt in, start, complete.
@@ -74,30 +74,6 @@ async function loadSprint(companyId, rawId, { allowBacklog = false } = {}) {
     if (sprint.mainChat === true) return { error: 'That is a chat channel, not a sprint.' };
     if (!allowBacklog && sprint.isBacklog === true) return { error: 'The backlog is not a time-boxed sprint.' };
     return { sprint };
-}
-
-/* Who is doing this, taken from the session rather than the request body.
-
-   Two reasons it is not `req.body.userData`. It is forgeable, so history would
-   be attributable to anyone. And HandleHistory writes `UserId: userData.id`
-   into a schema where that field is REQUIRED — an absent id makes it reject,
-   and moveTaskFunction fires one of those without a .catch, so an empty
-   userData does not merely lose a history line, it takes the server down.
-
-   Users live in the global database, not the company one. */
-async function actingUser(req) {
-    const uid = String((req && req.uid) || '');
-    if (!/^[0-9a-fA-F]{24}$/.test(uid)) return null;
-
-    const user = await MongoDbCrudOpration(dbCollections.GLOBAL, {
-        type: SCHEMA_TYPE.USERS,
-        data: [{ _id: new mongoose.Types.ObjectId(uid) }, { Employee_Name: 1, Employee_Email: 1 }],
-    }, 'findOne').catch(() => null);
-
-    return {
-        id: uid,
-        Employee_Name: (user && (user.Employee_Name || user.Employee_Email)) || 'Someone',
-    };
 }
 
 const projectOf = (companyId, projectId) => MongoDbCrudOpration(companyId, {

@@ -5,6 +5,7 @@ const scrum = require('./scrum');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { READ, WRITE, requireProjectAccess, projectIdsFrom } = require('../../Config/projectAccess');
 const { requireSprintAccess } = require('./helpers/sprintVisibility');
+const { withActingUser } = require('./helpers/actingUser');
 
 // Whitelist of functions allowed to be called via PATCH /sprint/:id
 const ALLOWED_SPRINT_TYPES = ['editSprintName', 'updateSprint', 'deleteChannel'];
@@ -63,8 +64,8 @@ exports.init = (app) => {
     app.get('/api/v2/sprints/report', guard(READ, sprintProject((req) => req.query && req.query.sprintId)), onSprint((req) => req.query && req.query.sprintId), scrum.sprintReport);
 
     const addsSprint = projectIdsFrom({ records: [[SCHEMA_TYPE.FOLDERS, (req) => bodyOf(req).folder && bodyOf(req).folder.folderId]], direct: (req) => bodyOf(req).projectId });
-    app.post('/api/v1/sprint', guard(WRITE, addsSprint, () => [SPRINT_CREATE]), ctrl.addSprint);
-    app.patch('/api/v1/sprint/:id', guard(WRITE, sprintProject((req) => req.params.id, (req) => bodyOf(req).projectId), sprintPatchPermissions), (req, res) => {
+    app.post('/api/v1/sprint', guard(WRITE, addsSprint, () => [SPRINT_CREATE]), withActingUser, ctrl.addSprint);
+    app.patch('/api/v1/sprint/:id', guard(WRITE, sprintProject((req) => req.params.id, (req) => bodyOf(req).projectId), sprintPatchPermissions), withActingUser, (req, res) => {
         if(!req?.body?.type) {
             res.send({status: false, statusText: "type not found"});
             return;
@@ -80,9 +81,9 @@ exports.init = (app) => {
         ctrl[req.body.type](req,res);
     });
 
-    app.post('/api/v1/folder', guard(WRITE, (req) => bodyOf(req).projectId, () => ['project.project_folder_create']), ctrl.addFolder);
+    app.post('/api/v1/folder', guard(WRITE, (req) => bodyOf(req).projectId, () => ['project.project_folder_create']), withActingUser, ctrl.addFolder);
     const folderProject = projectIdsFrom({ records: [[SCHEMA_TYPE.FOLDERS, (req) => req.params.id]], direct: (req) => [bodyOf(req).projectId, bodyOf(req).projectData] });
-    app.patch('/api/v1/folder/:id', guard(WRITE, folderProject, folderPatchPermissions), (req, res) => {
+    app.patch('/api/v1/folder/:id', guard(WRITE, folderProject, folderPatchPermissions), withActingUser, (req, res) => {
         if(!req?.body?.type) {
             res.send({status: false, statusText: "type not found"});
             return;
