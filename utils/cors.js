@@ -24,6 +24,8 @@
  */
 'use strict';
 
+const cors = require('cors');
+
 const splitAndClean = (raw) => {
     if (!raw) return [];
     return String(raw)
@@ -58,9 +60,14 @@ const corsOriginDelegate = (origin, callback) => {
     return callback(new Error(`CORS: origin ${origin} not allowed`));
 };
 
+const installCors = (app) => {
+    app.use(cors({ origin: corsOriginDelegate }));
+};
+
 module.exports = {
     splitAndClean,
     buildCorsAllowList,
     isOriginAllowed,
     corsOriginDelegate,
+    installCors,
 };

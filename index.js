@@ -3,7 +3,6 @@ require('./Config/processGuards').install();
 require('./Config/buildInfo').start();
 const express = require("express");
 const fs = require("fs");
-var cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 
@@ -12,7 +11,7 @@ const config =  require('./Config/config.js');
 const { loadDotEnv, applyEnvMap } = require('./Config/applyEnv.js');
 loadDotEnv();
 const { makeDefaultBrandSettings } = require("./Modules/Admin/common/controller.js");
-const { corsOriginDelegate } = require('./utils/cors.js');
+const { installCors } = require('./utils/cors.js');
 const { getHealth, versionBody } = require('./Modules/Instance/health.js');
 
 const app = express();
@@ -22,7 +21,7 @@ const app = express();
 app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
 
 // CORS allow-list is env-driven; see utils/cors.js.
-app.use(cors({ origin: corsOriginDelegate }));
+installCors(app);
 
 require('./Config/securityHeaders').install(app);
 
