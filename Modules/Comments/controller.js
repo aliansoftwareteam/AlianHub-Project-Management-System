@@ -7,6 +7,7 @@ const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require('../../event/socketEventEmitter');
 const { escapeRegex } = require("../../utils/escapeRegex");
 const { parseMentionIds } = require("./helpers/parseMentions");
+const { escapeCommentFields } = require("./helpers/plainText");
 const { handleNotificationtFun } = require("../notification/prepare-notification-data/controllerV2");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 const { sprintIdentities, visibleSprintExpr } = require("../Sprints/helpers/sprintVisibility");
@@ -70,7 +71,7 @@ const notifyMentions = async (companyId, comment, mentionIds) => {
 exports.save = async (req, res) => {
     try {
         const { data } = req.body
-        const convertData = replaceObjectKey(data, ["objId"]);
+        const convertData = escapeCommentFields(replaceObjectKey(data, ["objId"]));
         // SEC (AHE-3834) — the author is the authenticated caller, never a client-supplied
         // userId. Legit callers already send their own id, so this is transparent.
         if (req.uid) convertData.userId = req.uid;
@@ -122,7 +123,8 @@ exports.save = async (req, res) => {
  */
 exports.update = async (req, res) => {
     try {
-        const { id, isProjectComment, data, options = {} } = req.body;
+        const { id, isProjectComment, options = {} } = req.body;
+        const data = escapeCommentFields(req.body.data);
 
         if (!id) {
             return res.status(400).json({

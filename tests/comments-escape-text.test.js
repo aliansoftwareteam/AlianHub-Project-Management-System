@@ -56,9 +56,9 @@ describe('comment text is stored as plain text', () => {
     });
 
     it('keeps mention tokens readable for mention parsing', async () => {
-        const stored = await storedOnSave({ message: 'hi @[Max Member](abcd1234) <b>' });
-        expect(stored.message).toBe('hi @[Max Member](abcd1234) &lt;b&gt;');
-        expect(stored.mentionIds).toEqual(['abcd1234']);
+        const stored = await storedOnSave({ message: `hi @[Max Member](${USER}) <b>` });
+        expect(stored.message).toBe(`hi @[Max Member](${USER}) &lt;b&gt;`);
+        expect(stored.mentionIds).toEqual([USER]);
     });
 
     it('leaves other fields and a pin toggle alone', async () => {
