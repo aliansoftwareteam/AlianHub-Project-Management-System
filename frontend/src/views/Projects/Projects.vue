@@ -187,7 +187,7 @@
                                                 <ConfirmationSidebar
                                                     v-model="openDelete.flag"
                                                     :title="$t('Projects.deleteview')"
-                                                    :message="`${$t('Filters.are_you_sure')} ${openDelete.data.name} ${$t('Projects.view')}?`"
+                                                    :message="`${$t('Filters.are_you_sure')} ${escapeHtml(openDelete.data.name)} ${$t('Projects.view')}?`"
                                                     acceptButtonClass="btn-danger"
                                                     @confirm="() => deleteEmbedView()"
                                                     :acceptButton="$t('Projects.delete')"
@@ -422,6 +422,7 @@
 import AppState from '@/components/molecules/AppState/AppState.vue';
 // PACKAGES
 import { computed, defineComponent, inject, onMounted, provide, ref, watch, onUnmounted, nextTick } from 'vue';
+import { escapeHtml } from '@/utils/notificationHtml';
 import isEqual from 'lodash/isEqual';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';

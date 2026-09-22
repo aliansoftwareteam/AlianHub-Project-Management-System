@@ -38,7 +38,7 @@ describe('confirmation sidebar', () => {
 describe('convert to subtask confirmation', () => {
     it('shows task names with markup as text', () => {
         const wrapper = mount(ConfirmationsInTask, {
-            props: { modelValue: true, subTaskConfirm: true, task: { TaskName: '<i>one</i>' }, selectedTask: { TaskName: MARKUP } },
+            props: { modelValue: true, subTaskConfirm: true, task: { TaskName: '<i>one</i>' }, selectedConvertTask: { TaskName: MARKUP } },
             global: { stubs: { Sidebar: SidebarStub, TaskStatus: true, TaskType: true, Assignee: true, UserProfile: true, DropDown: true, DropDownOption: true, TaskTypeIcon: true } },
         });
         const message = wrapper.find('.archive-delete-desc');
