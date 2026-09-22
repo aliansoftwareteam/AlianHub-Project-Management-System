@@ -205,7 +205,10 @@ const withinBudget = (promise, ms) => new Promise((resolve, reject) => {
  * are dropped for good at the first hop to another origin, and a request that carried
  * them is refused a hop from https to http. Only a credentialed request loses its body
  * on a cross-origin 307/308: an unauthenticated one (a webhook delivery) is replayed as
- * the Fetch standard does. */
+ * the Fetch standard does.
+ *
+ * `opts.beforeHop(url, hop)` may throw to refuse a hop before it is resolved; a declared read uses it to keep
+ * every redirect on its declared hosts. */
 async function safeFetch(url, opts = {}) {
     const { timeoutMs, maxBytes, maxRedirects } = { ...DEFAULTS, ...opts };
     const resolve = opts.resolve || ((target) => resolvePublic(target, { allowlist: opts.allowlist }));
@@ -226,6 +229,7 @@ async function safeFetch(url, opts = {}) {
     let method = String(opts.method || 'get').toLowerCase();
     let data = opts.data;
     for (let hop = 0; ; hop += 1) {
+        if (opts.beforeHop) opts.beforeHop(current, hop);
         if (gate) gate.check(current, hop);
         let target;
         try {

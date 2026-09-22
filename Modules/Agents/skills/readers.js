@@ -10,6 +10,7 @@ const memoryStore = require('../memory');
 const taint = require('../taint');
 const { READER_CATALOGUE, plain } = require('./catalogues');
 const externalReads = require('./externalReads');
+const { readDeclared } = require('../engine/agentFetch');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BLOCKED = /hold|block|wait/i;
@@ -54,6 +55,31 @@ const paramsFor = (reader, given = {}) => {
         }
     });
     return out;
+};
+
+/* An error status or a body that is not the JSON the read declared skips the run rather than hand the model
+ * something it was not written for. */
+const declaredRead = (reader) => async (companyId, { task, input, declaredHosts, startedBy }, params) => {
+    if (!externalReads.enabled()) throw externalReads.notAvailable(reader);
+    let url;
+    try {
+        url = externalReads.buildUrl(params, { task, input });
+    } catch (e) {
+        throw externalReads.refusal(externalReads.CODE.INVALID_PATH, e.message);
+    }
+    const res = await readDeclared({
+        companyId, actor: startedBy, url, declaredHosts, credential: params.credential,
+        maxBytes: params.maxBytes, timeoutMs: params.timeoutMs, maxRedirects: params.maxRedirects,
+    });
+    const { host } = new URL(url);
+    if (res.status < 200 || res.status >= 300) return { skip: `the read of ${host} answered HTTP ${res.status}` };
+    const out = { status: res.status, text: res.body, bytes: res.bytes, taint: res.taint };
+    if (params.format !== 'json') return out;
+    try {
+        return { ...out, json: JSON.parse(res.body) };
+    } catch (e) {
+        return { skip: `the read of ${host} did not answer JSON` };
+    }
 };
 
 const READERS = Object.freeze({
@@ -138,9 +164,9 @@ const READERS = Object.freeze({
         return { title: page.title || '', text: plain(page.rawText || '').slice(0, params.maxChars), taint: taint.fromTask(page) };
     },
 
-    async url() { throw externalReads.notAvailable('url'); },
+    url: declaredRead('url'),
 
-    async api() { throw externalReads.notAvailable('api'); },
+    api: declaredRead('api'),
 });
 
 const read = (reader, companyId, scope, params) => {

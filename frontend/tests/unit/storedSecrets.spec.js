@@ -137,3 +137,79 @@ describe('the stored secrets panel', () => {
         expect(wrapper.text()).toBe('');
     });
 });
+
+describe('read credentials for skills', () => {
+    const READ = { name: 'GitHub read token', kind: 'skill_read', hosts: ['api.github.com', 'raw.githubusercontent.com'] };
+
+    const serveReads = ({ skillReads = true, rows = [] } = {}) => {
+        apiRequest.mockImplementation((method, url, body) => {
+            if (method === 'get' && url === ROUTE) return Promise.resolve({ data: { status: true, data: rows, keyId: KEY_ID, skillReads } });
+            if (method === 'post' && url === ROUTE) return Promise.resolve({ data: { status: true, data: row({ name: body.name, kind: body.kind, hosts: body.hosts }) } });
+            if (method === 'post' && /\/rotate$/.test(url)) return Promise.resolve({ data: { status: true, data: { ...rows[0], hosts: body.hosts, rotatedAt: ROTATED } } });
+            return Promise.reject(new Error(`unexpected ${method} ${url}`));
+        });
+    };
+
+    const openReads = async (setup) => {
+        serveReads(setup);
+        const wrapper = mount(StoredSecrets, { global: { mocks: { $t: t } } });
+        await flushPromises();
+        return wrapper;
+    };
+
+    it('shows the hosts a read credential may be sent to', async () => {
+        const wrapper = await openReads({ rows: [row(READ)] });
+        expect(wrapper.find('[data-test="secret-kind"]').text()).toBe(t('Secrets.kind_skill_read'));
+        expect(wrapper.find('[data-test="secret-hosts"]').text()).toBe(t('Secrets.sent_to', { hosts: 'api.github.com, raw.githubusercontent.com' }));
+    });
+
+    it('offers the create form only while the server offers read credentials', async () => {
+        expect((await openReads({ skillReads: false })).find('[data-test="read-create-form"]').exists()).toBe(false);
+        expect((await openReads({ skillReads: true })).find('[data-test="read-create-form"]').exists()).toBe(true);
+    });
+
+    it('creates a skill_read secret with the hosts it names, and clears the value', async () => {
+        const wrapper = await openReads();
+        await wrapper.find('[data-test="read-name"]').setValue('GitHub read token');
+        await wrapper.find('[data-test="read-value"]').setValue('rk_value');
+        await wrapper.find('[data-test="read-hosts"]').setValue('api.github.com\nraw.githubusercontent.com, api.github.com:8443');
+        await wrapper.find('[data-test="read-create-form"]').trigger('submit');
+        await flushPromises();
+        expect(posts()).toEqual([['post', ROUTE, { name: 'GitHub read token', value: 'rk_value', kind: 'skill_read', hosts: ['api.github.com', 'raw.githubusercontent.com', 'api.github.com:8443'] }]]);
+        expect(wrapper.find('[data-test="read-value"]').element.value).toBe('');
+        expect(wrapper.findAll('[data-test="secret-row"]')).toHaveLength(1);
+    });
+
+    it('sends a header name only when one is given', async () => {
+        const wrapper = await openReads();
+        await wrapper.find('[data-test="read-name"]').setValue('Key');
+        await wrapper.find('[data-test="read-value"]').setValue('v');
+        await wrapper.find('[data-test="read-hosts"]').setValue('api.example.com');
+        await wrapper.find('[data-test="read-header"]').setValue('X-Api-Key');
+        await wrapper.find('[data-test="read-create-form"]').trigger('submit');
+        await flushPromises();
+        expect(posts()[0][2]).toMatchObject({ header: 'X-Api-Key' });
+    });
+
+    it('refuses to create without a host', async () => {
+        const wrapper = await openReads();
+        await wrapper.find('[data-test="read-name"]').setValue('GitHub read token');
+        await wrapper.find('[data-test="read-value"]').setValue('rk_value');
+        await wrapper.find('[data-test="read-create-form"]').trigger('submit');
+        await flushPromises();
+        expect(posts()).toEqual([]);
+        expect(wrapper.find('[data-test="read-create-error"]').text()).toBe(t('Secrets.err_hosts'));
+    });
+
+    it('rotates a read credential with its hosts, prefilled', async () => {
+        const wrapper = await openReads({ rows: [row(READ)] });
+        await wrapper.find('[data-test="secret-rotate"]').trigger('click');
+        expect(wrapper.find('[data-test="rotate-hosts"]').element.value).toBe('api.github.com\nraw.githubusercontent.com');
+        await wrapper.find('[data-test="rotate-input"]').setValue('rk_next');
+        await wrapper.find('[data-test="rotate-hosts"]').setValue('api.gitlab.com');
+        await wrapper.find('[data-test="rotate-form"]').trigger('submit');
+        await flushPromises();
+        expect(posts()).toEqual([['post', `${ROUTE}/${wrapper.find('[data-test="secret-row"]').attributes('data-handle')}/rotate`, { value: 'rk_next', hosts: ['api.gitlab.com'] }]]);
+        expect(wrapper.find('[data-test="secret-hosts"]').text()).toBe(t('Secrets.sent_to', { hosts: 'api.gitlab.com' }));
+    });
+});

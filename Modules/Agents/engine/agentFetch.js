@@ -1,5 +1,9 @@
 const pageAudit = require('./pageAudit');
 const egressContext = require('./egressContext');
+const fetcher = require('./safeFetch');
+const taint = require('../taint');
+
+const UA = 'AlianHub-Skill-Reader/1.0 (+https://alianhub.com)';
 
 const hostOf = (url) => {
     try { return new URL(String(url)).hostname; } catch (e) { return ''; }
@@ -18,4 +22,41 @@ const inWorkspace = (name) => async (url, ...rest) => {
     return pageAudit[name](url, ...rest);
 };
 
-module.exports = { fetchPage: inWorkspace('fetchPage'), audit: inWorkspace('audit'), postJson: inWorkspace('postJson') };
+const sourcesOf = (url, hops) => {
+    const found = (Array.isArray(hops) && hops.length ? hops.map((hop) => `https://${hop.host}/`) : [url]).map(taint.fetched).filter(Boolean);
+    return found.filter((source, i) => found.findIndex((other) => other.ref === source.ref) === i);
+};
+
+/* A data skill's declared read (skills/externalReads.js holds the rules). The allowlist is read live, never the
+ * save-time answer; the credential is resolved here and lives only in the request header, which safeFetch drops
+ * at the first hop to another origin. `fetcher.safeFetch` is looked up per call so a test server can stand in
+ * for DNS. */
+const readDeclared = async ({ companyId, actor, url, declaredHosts, credential, maxBytes, timeoutMs, maxRedirects }) => {
+    const rules = require('../skills/externalReads');
+    if (!companyId) throw Object.assign(new Error('a declared read names no workspace, so it was refused'), { code: 'no_workspace', deterministic: true });
+    const target = new URL(String(url));
+    const scope = { companyId, actor, declaredHosts, listed: await rules.listedHosts(companyId) };
+    rules.admitHop(scope, target, 0);
+    const secret = credential ? await rules.credentialFor(companyId, credential, target) : null;
+    let res;
+    try {
+        res = await fetcher.safeFetch(target.href, {
+            method: 'get',
+            timeoutMs,
+            maxBytes,
+            maxRedirects,
+            headers: { 'User-Agent': UA, ...(secret ? { [secret.header]: secret.sent } : {}) },
+            sensitiveHeaders: secret ? [secret.header] : [],
+            companyId,
+            actor,
+            beforeHop: (next, hop) => { if (hop > 0) rules.admitHop(scope, new URL(next), hop); },
+        });
+    } catch (e) {
+        throw rules.readFailure(e, secret);
+    }
+    const found = sourcesOf(target.href, res.hops);
+    found.forEach(taint.note);
+    return { status: res.status, body: rules.scrub(res.body, secret), bytes: res.bytes, hops: res.hops || [], taint: found };
+};
+
+module.exports = { fetchPage: inWorkspace('fetchPage'), audit: inWorkspace('audit'), postJson: inWorkspace('postJson'), readDeclared };

@@ -649,6 +649,9 @@ const schema = {
         lastResolvedAt: { type: Date, required: false },
         // No document points at the handle any more, and no key was set to revoke it with (Config/secrets.js retire).
         orphanedAt: { type: Date, required: false },
+        // A skill_read secret is sent only to these hosts, in this request header (authorization when unset).
+        hosts: { type: [String], required: false, default: undefined },
+        header: { type: String, required: false },
     },
     // The last chained row a retention sweep deleted; verification starts after the newest one.
     auditChainAnchors: {
