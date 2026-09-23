@@ -15,6 +15,7 @@ const { memberRowView } = require('../../settings/Members/membershipGuard.js');
 const logger = require("../../../Config/loggerConfig.js");
 const { emitListener } = require("../../Company/eventController.js");
 const { newLinkToken } = require("../helpers/linkToken");
+const { pinSessionTenant } = require("../../../Config/tenant");
 
 
 async function batchUpdate(arr, eventId) {
@@ -109,7 +110,7 @@ async function batchUpdate(arr, eventId) {
 exports.sendInvitationEmailFun = (bodyData) => {
     return new Promise((resolve, reject) => {
         try {
-            let keys = ["email", "companyId", "companyName", "role", "designation"];
+            let keys = ["email", "companyName", "role", "designation"];
             let valid = "";
     
             keys.forEach((key) => {
@@ -333,8 +334,10 @@ exports.sendInvitationEmailFun = (bodyData) => {
  * @returns
  */
 exports.sendInvitationEmail = (req,res) => {
+    const sessionCompanyId = pinSessionTenant(req, res);
+    if (!sessionCompanyId) return;
     try {
-        let keys = ["email", "companyId", "companyName", "role", "designation"];
+        let keys = ["email", "companyName", "role", "designation"];
         let valid = "";
 
         keys.forEach((key) => {
@@ -350,7 +353,8 @@ exports.sendInvitationEmail = (req,res) => {
             return
         }
 
-        let {email, companyId, companyName, role, designation,isResend} = req.body;
+        let {email, companyName, role, designation,isResend} = req.body;
+        const companyId = sessionCompanyId;
 
         email = email.toLowerCase();
 
@@ -520,7 +524,7 @@ exports.sendInvitationEmail = (req,res) => {
             status: false,
             statusText: error
         })
-        exports.decreaseUserCount(req.body.companyId);
+        exports.decreaseUserCount(sessionCompanyId);
     }
 }
 
@@ -536,15 +540,8 @@ exports.checkSendInviatation = (req,res) => {
             res.send({ status: false, statusText: 'email is required' });
             return;
         }
-        const bodyCompanyId = req.body.companyId;
-        const companyId = String(req.headers['companyid'] || bodyCompanyId || '');
-        if (!companyId) {
-            res.send({ status: false, statusText: 'companyId is required' });
-            return;
-        }
-        if (req.headers['companyid'] && bodyCompanyId && String(bodyCompanyId) !== companyId) {
-            return res.status(403).send({ status: false, statusText: 'You do not have access to this company' });
-        }
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
         let obj = {
             type: dbCollections.COMPANY_USERS,
             data: [

@@ -1,10 +1,6 @@
 {
   "Agents/controller.js": 1,
-  "Auth/controller/loginSession.js": 1,
-  "Auth/controller/sendInvitation.js": 2,
   "Mcp/server.js": 1,
-  "Users/controller.js": 1,
   "createProject/controller.js": 2,
-  "notification/prepare-notification-data/controllerV2.js": 1,
-  "trackerUserPermission/controller.js": 1
+  "notification/prepare-notification-data/controllerV2.js": 1
 }

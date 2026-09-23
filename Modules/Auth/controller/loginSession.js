@@ -20,6 +20,7 @@ const { updateUserFun } = require("../../Users/controller.js");
 const { addAndRemoveUserInMongodbNotificationCount, generateTokenV2Fun, sessionRefusalFor, verifyAuth } = require('./authHelpers');
 const twoFactorRules = require('../helpers/twoFactorRules');
 const { pinSessionTenant } = require('../../../Config/tenant');
+const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { requestAddress } = require('../../../utils/requestAddress');
 exports.manageAttempt = (req, res) => {
     helperCtr.manageResetAttempt(req.ip, req.body, (mRes) => {
@@ -38,8 +39,9 @@ exports.manageAttempt = (req, res) => {
  * @returns 
  */
 
-exports.removeUserNotification = (req,res) => {
-    if (!pinSessionTenant(req, res)) return;
+exports.removeUserNotification = async (req,res) => {
+    const companyId = pinSessionTenant(req, res);
+    if (!companyId) return;
     if (!(req.body && req.body.userId)) {
         res.send({
             status: false,
@@ -49,8 +51,18 @@ exports.removeUserNotification = (req,res) => {
     }
 
     let type = req.body.type !== undefined && req.body.type ? req.body.type : "Remove" 
+    const userId = String(req.body.userId);
 
-    addAndRemoveUserInMongodbNotificationCount(req.body.companyId,req.body.userId,type).then((response)=>{
+    // Joining adds only yourself; taking someone else out follows their removal by an owner or admin.
+    if (userId !== String(req.uid || '')) {
+        const mayActForOthers = type !== 'Add' && isPrivileged(await getRoleType(companyId, req.uid));
+        if (!mayActForOthers) {
+            res.status(403).send({ status: false, statusText: 'You can only change your own notification count.' });
+            return;
+        }
+    }
+
+    addAndRemoveUserInMongodbNotificationCount(companyId,userId,type).then((response)=>{
         res.send(response)
     }).catch((error)=>{
         res.send(error);
