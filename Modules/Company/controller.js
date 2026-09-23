@@ -470,11 +470,6 @@ exports.sendMailAfterCompanyCreation = (allSettledRes, companyId, req) => {
     }
 };
 
-/**
- * Create Company V2
- * @param {Object} req 
- * @param {Object} res 
- */
 const NEW_COMPANY_PLAN = () => ({
     totalProjects: 0,
     isInactive: false,
