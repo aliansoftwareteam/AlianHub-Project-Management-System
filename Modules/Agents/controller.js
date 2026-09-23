@@ -29,6 +29,7 @@ const { buildTrace } = require('./runTrace');
 const workflows = require('../Workflows');
 const knowledgeMemory = require('../Knowledge/memory/publish');
 const { DEFAULT_RATE_LIMIT_PER_DAY } = require('./dailyRunLimit');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 
 // Every /api/v2/agents route sits behind the company-header JWT check, so the header is the verified tenant.
 const companyOf = (req) => String(req.headers['companyid'] || '');
@@ -64,7 +65,7 @@ const idempotencyKeyOf = (req) => {
     return raw;
 };
 
-const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, hiddenTaskIdsFor, canSeeTaskOf, REFUSAL } = access;
+const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, agentProjectsFor, hiddenTaskIdsFor, canSeeTaskOf, REFUSAL } = access;
 
 /* The projects the caller may open and, inside them, the tasks a private sprint keeps from them. */
 const readScopeOf = async (companyId, caller) => {
@@ -134,8 +135,12 @@ exports.listAgents = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
-        const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { createdAt: 1 } }] }, 'find');
-        return res.send({ status: true, statusText: 'Agents fetched.', data: await skillRecord.enrichAgentSkills(companyId, rows || []) });
+        const [rows, visible] = await Promise.all([
+            MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { createdAt: 1 } }] }, 'find'),
+            callerOf(req, companyId).then((caller) => visibleProjectIdsFor(companyId, caller)),
+        ]);
+        const agents = await skillRecord.enrichAgentSkills(companyId, rows || []);
+        return res.send({ status: true, statusText: 'Agents fetched.', data: agents.map((agent) => ({ ...agent, ...agentProjectsFor(agent, visible) })) });
     } catch (e) { logger.error(`listAgents: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -689,9 +694,10 @@ exports.routableTasks = async (req, res) => {
         const q = req.query || {};
         const wanted = q.projectId && ids.includes(String(q.projectId)) ? [String(q.projectId)] : ids;
         const limit = Math.min(100, Math.max(1, Number(q.limit) || 40));
+        const sprints = await hiddenSprintFilter(companyId, req.uid, wanted);
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [{ deletedStatusKey: { $ne: 1 }, ProjectID: { $in: wanted }, statusType: { $nin: ['close', 'done', 'default_close'] } },
+            data: [{ ...sprints, deletedStatusKey: { $ne: 1 }, ProjectID: { $in: wanted }, statusType: { $nin: ['close', 'done', 'default_close'] } },
                    'TaskName TaskKey status statusType Task_Priority ProjectID tagsArray AssigneeUserId totalEstimatedTime updatedAt links description rawDescription',
                    { sort: { updatedAt: -1 }, limit }],
         }, 'find').catch(() => []);

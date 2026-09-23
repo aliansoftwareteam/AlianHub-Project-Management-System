@@ -4,6 +4,7 @@ const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const runs = require('./runs');
+const { agentProjectsFor } = require('./access');
 const { visibilityStage } = require('../Tasks/helpers/taskQueryGuard');
 const { resolveSheetScope, scopedTimeMatch, SHEET_PERMISSION } = require('../TimeSheet/helpers/timeScope');
 
@@ -198,7 +199,7 @@ const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
             paused: Boolean(a.paused),
             skills: a.skills || [],
             allowedActions: a.allowedActions || [],
-            projectIds: (a.projectIds || []).map(String),
+            ...agentProjectsFor(a, visibleProjectIdsOf(taskFilter)),
             spend: { usd: Math.round(Number(month.usd || 0) * 100) / 100, cap: Number(a.spendCapUsd || 0), runs: Number(month.runs || 0) },
             run: run ? {
                 id: hiddenTask(run.taskId) ? '' : String(run._id),

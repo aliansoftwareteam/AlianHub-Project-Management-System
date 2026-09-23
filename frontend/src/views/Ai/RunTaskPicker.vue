@@ -59,6 +59,7 @@ import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { useAgents, reasonOf } from "./useAgents";
 import { requirementsOf, indexSkills } from "./skillInputs";
+import { projectScopeOf } from "./agentFit";
 
 defineOptions({ name: "RunTaskPicker" });
 
@@ -85,8 +86,9 @@ const searchError = ref("");
 let debounce = null;
 
 const requirements = computed(() => props.requirementCodes || requirementsOf(props.agent, indexSkills(skillManifest.value)));
-const scopeIds = computed(() => (props.agent.projectIds || []).map(String));
-const inScope = (task) => !scopeIds.value.length || scopeIds.value.includes(String(task.ProjectID || ""));
+const projectScope = computed(() => projectScopeOf(props.agent));
+const scopeIds = computed(() => projectScope.value.ids);
+const inScope = (task) => !projectScope.value.scoped || scopeIds.value.includes(String(task.ProjectID || ""));
 
 /* Without a query the open tasks the caller can see are offered; a query goes
  * through the same search the command palette uses. Both are cut to the

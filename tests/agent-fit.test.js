@@ -142,6 +142,11 @@ describe('not eligible states name the reason', () => {
         expect(out.blockedReason).toBe('Not scoped to this project.');
     });
 
+    test('scoped only to projects the viewer cannot open', () => {
+        const out = F.fitFor({ agent: agent({ projectIds: [], projectScoped: true }), task: task({ ProjectID: 'p1' }), registryActions: REGISTRY_ACTIONS, never: NEVER, skills: SKILLS });
+        expect(out.blockedReason).toBe('Not scoped to this project.');
+    });
+
     test('a task that needs a person makes every agent ineligible', () => {
         const ranked = rank({ agents: [agent(), agent({ _id: 'a2', name: 'Claude Code' })], task: task({ TaskName: 'Decide the pricing page layout' }) });
         expect(ranked.every((r) => !r.eligible)).toBe(true);
@@ -250,5 +255,20 @@ describe('routing refuses a task that lacks what the agent\'s skills need (brows
         const onlySkips = fit(reviewer, t, runs.slice(0, 2));
         expect(onlySkips.noHistory).toBe(true);
         expect(onlySkips.percent).toBeNull();
+    });
+});
+
+describe('projectScopeOf', () => {
+    test('an agent with no projects is unscoped', () => {
+        expect(F.projectScopeOf(agent())).toEqual({ scoped: false, ids: [] });
+    });
+
+    test('an agent whose projects the viewer cannot open is still scoped', () => {
+        expect(F.projectScopeOf(agent({ projectIds: [], projectScoped: true }))).toEqual({ scoped: true, ids: [] });
+    });
+
+    test('lists the projects the viewer can open', () => {
+        expect(F.projectScopeOf(agent({ projectIds: ['p1'], projectScoped: true }))).toEqual({ scoped: true, ids: ['p1'] });
+        expect(F.projectScopeOf(agent({ projectIds: ['p1'] }))).toEqual({ scoped: true, ids: ['p1'] });
     });
 });
