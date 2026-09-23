@@ -35,7 +35,7 @@
                             <label class="ah-field__label" for="sk-model">{{ $t('Ai.skill_model_pin') }}</label>
                             <select id="sk-model" v-model="form.model" class="ah-input">
                                 <option value="">{{ $t('Ai.skill_model_inherit') }}</option>
-                                <option v-for="model in models" :key="model.id || model" :value="model.id || model">{{ model.id || model }}</option>
+                                <option v-for="m in models" :key="m.model" :value="m.model">{{ m.model }} · {{ m.provider }}</option>
                             </select>
                             <span class="ah-field__hint">{{ $t('Ai.skill_model_hint') }}</span>
                             <span v-if="errorFor('model')" class="ah-field__error">{{ errorFor('model') }}</span>
