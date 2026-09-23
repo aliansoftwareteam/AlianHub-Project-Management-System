@@ -41,7 +41,7 @@ const CANDIDATES = {
     comment: { type: SCHEMA_TYPE.COMMENTS, where: { isDeleted: { $ne: true }, type: { $in: COMMENT_TYPES } }, apply: syncRow('comment') },
     transcript: { type: SCHEMA_TYPE.CALLS, where: { deletedStatusKey: { $ne: 1 } }, apply: syncRow('transcript') },
     guide: { type: SCHEMA_TYPE.PROJECTS, where: { deletedStatusKey: { $ne: 1 }, 'aiGuide.markdown': { $exists: true } }, apply: syncRow('guide') },
-    file: { type: SCHEMA_TYPE.TASKS, where: { deletedStatusKey: { $ne: 1 }, 'attachments.0': { $exists: true } }, apply: (companyId, id) => indexer.syncTaskFiles(companyId, id, { priority: 'backfill' }) },
+    file: { type: SCHEMA_TYPE.TASKS, where: { deletedStatusKey: { $ne: 1 }, 'attachments.0': { $exists: true } }, apply: (companyId, id, { onProgress } = {}) => indexer.syncTaskFiles(companyId, id, { priority: 'backfill', onProgress }) },
 };
 
 /* Deleted rows are walked too, so a delete missed while off still tombstones. A comment and a file

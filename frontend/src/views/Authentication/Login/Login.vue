@@ -226,7 +226,7 @@ onMounted(() => {
     if (route.query.reason === "expired") banner.value = { kind: "warn", text: t("Auth.two_factor_session_expired") };
     if (route.query.magic === "invalid") banner.value = { kind: "danger", text: t("Auth.magic_invalid") };
     if (route.query.magic === "disabled") banner.value = { kind: "warn", text: t("Auth.magic_unavailable") };
-    if (route.query.ssoError) banner.value = { kind: "danger", text: t("Auth.sso_failed") };
+    if (route.query.ssoError) banner.value = { kind: "danger", text: t(route.query.ssoError === "not_allowed" ? "Auth.sso_not_allowed" : "Auth.sso_failed") };
     if (route.query.magic === "ok" && route.query.uid) {
         busy.value = true;
         proceedAfterAuth(String(route.query.uid)).catch(() => {

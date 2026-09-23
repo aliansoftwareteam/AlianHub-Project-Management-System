@@ -9,6 +9,7 @@ const { importUserNotifications } = require("../../../utils/data");
 const { addAndRemoveUserInMongodbNotificationCount } = require("../../Auth/controller");
 const { toAuthView } = require("../../Users/helpers/userAccessRules");
 const { recordInvitedOwner } = require("../../Company/helpers/recordInvitedOwner");
+const { linkTokenAccepted } = require("./invitationPreview");
 
 
 exports.authenticateToken = "";
@@ -28,14 +29,21 @@ exports.findPendingInvitation = async ({ companyId, email, companyUserId }) => {
     return mongoRef.MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.COMPANY_USERS, data: [filter] }, 'findOne').catch(() => null);
 };
 
+/* Signing up from an invitation needs the invitation id and secret token the link carries,
+ * not only the invited address: that is what marks the address verified. */
 exports.admitInvitee = async (body) => {
-    if (!body.assignCompany && !body.isInvitation) return { ...body, isInvitation: false };
-    const invitation = await exports.findPendingInvitation({ companyId: body.assignCompany, email: body.email });
-    return invitation ? { ...body, isInvitation: true } : { ...body, assignCompany: '', isInvitation: false };
+    const { memberId, linkId, ...registrant } = body;
+    if (!registrant.assignCompany && !registrant.isInvitation) return { ...registrant, isInvitation: false };
+    const invitation = memberId
+        ? await exports.findPendingInvitation({ companyId: registrant.assignCompany, email: registrant.email, companyUserId: memberId })
+        : null;
+    return invitation && linkTokenAccepted(invitation.linkId, linkId)
+        ? { ...registrant, isInvitation: true }
+        : { ...registrant, assignCompany: '', isInvitation: false };
 };
 
 
-const REGISTRANT_FIELDS = ['firstName', 'lastName', 'email', 'password', 'assignCompany', 'isInvitation'];
+const REGISTRANT_FIELDS = ['firstName', 'lastName', 'email', 'password', 'assignCompany', 'isInvitation', 'memberId', 'linkId'];
 const REQUIRED_SIGNUP_FIELDS = [['firstName', 'First Name'], ['lastName', 'Last Name'], ['email', 'Email'], ['password', 'Password']];
 
 /* A signup never copies ownership, verification, billing or token fields from the request:
