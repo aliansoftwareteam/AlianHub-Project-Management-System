@@ -1,11 +1,12 @@
+import dailyRunLimit from "@agentDailyRunLimit";
 import { sameValue } from "./revisionDiff";
 
 /* The form fills fields the agent never set with display defaults (a missing
- * rate limit reads as 40), so a save must not send what the user left alone:
+ * rate limit reads as the server's default), so a save must not send what the user left alone:
  * the server would store the default and the revision would name the field. */
 export const formFromAgent = (agent) => ({
     autonomy: Number(agent.autonomy ?? 1),
-    rateLimitPerDay: Number(agent.rateLimitPerDay || 40),
+    rateLimitPerDay: dailyRunLimit.dailyRunLimitOf(agent),
     spendCapUsd: Number(agent.spendCapUsd || 30),
     model: agent.model || "",
     projectIds: (agent.projectIds || []).map(String),

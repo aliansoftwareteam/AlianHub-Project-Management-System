@@ -13,7 +13,7 @@
   "SSO/oidc.js": 1,
   "SSO/saml.js": 4,
   "Users/controller.js": 1,
-  "createProject/controller.js": 18,
+  "createProject/controller.js": 2,
   "notification/prepare-notification-data/controllerV2.js": 1,
   "projectSetting/controller.js": 9,
   "storage/server/controller.js": 6,
