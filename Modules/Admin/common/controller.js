@@ -1,63 +1,40 @@
 const fs = require("fs");
 const path = require("path");
 const logger = require("../../../Config/loggerConfig");
+const { sendStoredFile } = require("../../storage/server/helpers/downloadHeaders");
 
 
-exports.getlogo = (req, res) => {
-    try {
-        const rootPath = '../../../public/images/';
-        let fileName = "";
-        let folderName = "web-logo/";
-        let folderFullPath = __dirname + "/" + rootPath + folderName;
-        let queryData = req.query;
-        if (!(req.query && req.query.key)) {
-            queryData.key = "logo";
-            queryData.type = "admin";
-        }
+const LOGO_ROOT = path.join(__dirname, '../../../public/images');
 
-        if (queryData.key === "logo" && queryData.type === "admin") {
-            folderName = "admin-logo/"
-            folderFullPath = __dirname + "/" + rootPath + folderName;
-        }
-
-        if (queryData.key === "logo" && queryData.type === "web") {
-            folderName = "web-logo/"
-            folderFullPath = __dirname + "/" + rootPath + folderName;
-        }
-        if (queryData.key === "logo" && queryData.type === "desktop") {
-            folderName = "desktop-logo/"
-            folderFullPath = __dirname + "/" + rootPath + folderName;
-        }
-        
-        if (queryData.key === "favicon") {
-            folderName = "favicon/"
-            folderFullPath = __dirname + "/" + rootPath + folderName;
-        }
-        if (queryData.key === "logo" && queryData.type === "emailTemplateLogo") {
-            folderName = "emailTemplateLogo/"
-            folderFullPath = __dirname + "/" + rootPath + folderName;
-        }
-        if (queryData.key === "defaultuser") {
-            folderName = "default-user-image/"
-            folderFullPath = __dirname + "/" + rootPath + folderName;
-        }
-        if (queryData.key === "ghostuser") {
-            folderName = "ghost-user-image/"
-            folderFullPath = __dirname + "/" + rootPath + folderName;
-        }
-        fs.readdir(folderFullPath, (err, files) => {
-            files.forEach(file => {
-                fileName = file || "";
-            });
-            const filePath = rootPath + folderName + fileName;
-            res.sendFile(path.join(__dirname, filePath));
-        });
-
-    } catch (error) {
-        logger.error(`error: ${error}`);
-        res.send("Not Set Logo");
-    }
+const logoFolderFor = ({ key, type } = {}) => {
+    if (!key) return 'admin-logo';
+    if (key === 'favicon') return 'favicon';
+    if (key === 'defaultuser') return 'default-user-image';
+    if (key === 'ghostuser') return 'ghost-user-image';
+    if (key === 'logo' && type === 'admin') return 'admin-logo';
+    if (key === 'logo' && type === 'desktop') return 'desktop-logo';
+    if (key === 'logo' && type === 'emailTemplateLogo') return 'emailTemplateLogo';
+    return 'web-logo';
 };
+
+const logoNotFound = (res) => res.status(404).send({ status: false, statusText: 'Not Found', message: 'Logo not found' });
+
+// Operator-uploaded files are served from the app's own origin, so they carry the stored-file sandbox headers.
+const createLogoHandler = (imagesRoot) => (req, res) => {
+    const folder = path.join(imagesRoot, logoFolderFor(req.query || {}));
+    fs.readdir(folder, (err, files) => {
+        if (err) {
+            logger.error(`logo folder not readable: ${err.code || err.message}`);
+            return logoNotFound(res);
+        }
+        const fileName = files.filter((file) => !file.startsWith('.')).pop();
+        if (!fileName) return logoNotFound(res);
+        sendStoredFile(res, path.join(folder, fileName));
+    });
+};
+
+exports.createLogoHandler = createLogoHandler;
+exports.getlogo = createLogoHandler(LOGO_ROOT);
 
 
 exports.makeDefaultBrandSettings = () => {

@@ -5,8 +5,9 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const registry = require('./registry');
 const runs = require('./runs');
 const revisions = require('./revisions');
+const { DEFAULT_RATE_LIMIT_PER_DAY } = require('./dailyRunLimit');
 
-const DEFAULTS = Object.freeze({ autonomy: 0, spendCapUsd: 30, paused: false, account: 'workspace', deletedStatusKey: 0, projectIds: [] });
+const DEFAULTS = Object.freeze({ autonomy: 0, spendCapUsd: 30, rateLimitPerDay: DEFAULT_RATE_LIMIT_PER_DAY, paused: false, account: 'workspace', deletedStatusKey: 0, projectIds: [] });
 
 const createAgentRecord = async (companyId, fields, { ownerId } = {}) => {
     const name = String((fields && fields.name) || '').trim().slice(0, 80);

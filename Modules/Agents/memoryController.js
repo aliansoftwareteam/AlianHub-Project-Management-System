@@ -7,6 +7,7 @@ const logger = require('../../Config/loggerConfig');
 const { resolveActor, isAgent } = require('./actor');
 const scope = require('./scope');
 const memory = require('./memory');
+const instructionGuard = require('../AICore/instructionGuard');
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const ROW_STATUSES = [memory.STATUS.ACTIVE, memory.STATUS.RETIRED];
@@ -82,6 +83,7 @@ exports.addProjectMemory = async (req, res) => {
         if (!memory.PROJECT_KINDS.includes(body.kind)) return fail(res, `kind must be one of ${memory.PROJECT_KINDS.join(', ')}.`, 400);
         const text = memory.sanitise(body.text);
         if (!text) return fail(res, 'text is required.', 400);
+        await instructionGuard.fresh();
         if (memory.hasInstruction(text)) return fail(res, INSTRUCTION_TEXT, 400);
         const existing = await memory.find({ companyId: auth.companyId, kind: body.kind, scopeId: projectId, key: memory.slug(text) });
         if (existing && existing.status === memory.STATUS.ACTIVE) return fail(res, 'This is already on record.', 409);
@@ -113,6 +115,7 @@ exports.updateMemory = async (req, res) => {
             if (!project) return fail(res, 'Only project rows can be reworded.', 400);
             patch.text = memory.sanitise(body.text);
             if (!patch.text) return fail(res, 'text must not be empty.', 400);
+            await instructionGuard.fresh();
             if (memory.hasInstruction(patch.text)) return fail(res, INSTRUCTION_TEXT, 400);
         }
         if (body.status !== undefined) {

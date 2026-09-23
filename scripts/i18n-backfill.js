@@ -4,6 +4,10 @@
    copied from English; either way the key lands in <locale>.pending.json so
    a reviewer can find it. Rewrites the locale in en.js key order and drops
    keys en.js no longer has.
+   Pending files carry no timestamp and keep their keys sorted, so the same key
+   set always writes the same bytes and two PRs adding different keys touch
+   different lines. On a conflict, keep both sides' keys in any order and
+   re-run the backfill to restore the canonical form.
    Usage: node scripts/i18n-backfill.js [--dry-run] [--only=fr,ge] */
 const fs = require('fs');
 const path = require('path');
@@ -51,10 +55,20 @@ async function translateAll(texts, target) {
     return out;
 }
 
-function pendingPath(code) { return path.join(LOCALES_DIR, `${code}.pending.json`); }
+function pendingPath(code, dir = LOCALES_DIR) { return path.join(dir, `${code}.pending.json`); }
 
-function readPending(code) {
-    try { return JSON.parse(fs.readFileSync(pendingPath(code), 'utf8')); } catch (_) { return { locale: code, keys: {} }; }
+/* A file that exists but does not parse is usually a half-resolved merge;
+   treating it as empty would silently drop every key awaiting review. */
+function readPending(file, code) {
+    if (!fs.existsSync(file)) return { locale: code, keys: {} };
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return { ...parsed, keys: parsed.keys || {} };
+}
+
+function renderPending({ locale, machineTranslated, keys }) {
+    const sorted = {};
+    Object.keys(keys).sort().forEach((k) => { sorted[k] = keys[k]; });
+    return `${JSON.stringify({ locale, machineTranslated: !!machineTranslated, keys: sorted }, null, 2)}\n`;
 }
 
 /* A locale that spreads en.js over itself already has every key; rewriting it
@@ -64,7 +78,8 @@ const inheritsSource = (file) => /^\s*import\s+\w+\s+from\s+["']\.\/en["']/m.tes
 async function backfillLocale(locale, sourceFlat, dryRun) {
     if (inheritsSource(locale.file)) return { code: locale.code, filled: 0, dropped: 0, pending: 0, inherits: true };
     const ownFlat = flatten(loadLocale(locale.file));
-    const pending = readPending(locale.code);
+    const pendingFile = pendingPath(locale.code, path.dirname(locale.file));
+    const pending = readPending(pendingFile, locale.code);
     const missing = Object.keys(sourceFlat).filter((k) => !(k in ownFlat));
     const obsolete = Object.keys(ownFlat).filter((k) => !(k in sourceFlat));
     const translatable = missing.filter((k) => typeof sourceFlat[k] === 'string');
@@ -82,9 +97,10 @@ async function backfillLocale(locale, sourceFlat, dryRun) {
     if (!dryRun && (missing.length || obsolete.length)) {
         fs.writeFileSync(locale.file, serialize(unflatten(next)));
     }
-    if (!dryRun && missing.length) {
-        fs.writeFileSync(pendingPath(locale.code), `${JSON.stringify({ locale: locale.code, machineTranslated: !!(API_KEY && TARGET[locale.code]), updatedAt: new Date().toISOString(), keys: pending.keys }, null, 2)}\n`);
-    }
+    const machineTranslated = !!pending.machineTranslated || !!(missing.length && API_KEY && TARGET[locale.code]);
+    const text = renderPending({ locale: locale.code, machineTranslated, keys: pending.keys });
+    const current = fs.existsSync(pendingFile) ? fs.readFileSync(pendingFile, 'utf8') : '';
+    if (!dryRun && Object.keys(pending.keys).length && text !== current) fs.writeFileSync(pendingFile, text);
     return { code: locale.code, filled: missing.length, dropped: obsolete.length, pending: Object.keys(pending.keys).length };
 }
 
@@ -105,7 +121,7 @@ async function main(argv) {
     }
 }
 
-module.exports = { unflatten, serialize, backfillLocale, pendingPath };
+module.exports = { unflatten, serialize, backfillLocale, pendingPath, readPending, renderPending };
 
 if (require.main === module) {
     main(process.argv.slice(2)).catch((error) => { console.error(error.message); process.exit(1); });

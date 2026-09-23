@@ -6,6 +6,7 @@ const logger = require('../../Config/loggerConfig');
 const usage = require('../AICore/usage');
 const { MAX_DEPTH } = require('../../event/domainEventBus');
 const telemetry = require('../../Config/telemetry');
+const { dailyRunLimitOf } = require('./dailyRunLimit');
 
 // Agent runs and spend. A run is the unit the rail footer counts ("2 running"),
 // the project header chip sums (elapsed, spend) and the audit log links to
@@ -64,9 +65,10 @@ const canStart = async (agent, { trigger, viaAccount, companyId, depth } = {}) =
     if (trigger === 'schedule' && Number(agent.autonomy) < 3) {
         return { ok: false, reason: 'This agent is not allowed to run on a schedule (autonomy below L3).' };
     }
-    if (companyId && Number(agent.rateLimitPerDay) > 0) {
+    const dailyLimit = dailyRunLimitOf(agent);
+    if (companyId && dailyLimit > 0) {
         const today = Number(await runsToday(companyId, agent._id)) || 0;
-        if (today >= Number(agent.rateLimitPerDay)) return { ok: false, reason: `Daily run limit reached (${today} of ${agent.rateLimitPerDay} today).` };
+        if (today >= dailyLimit) return { ok: false, reason: `Daily run limit reached (${today} of ${dailyLimit} today).` };
     }
     if (companyId) {
         const budget = await require('./budget').check(companyId);
@@ -121,6 +123,7 @@ const start = async (companyId, { agent, taskId, projectId, skill, trigger, star
                 notifyMe: Boolean(notifyMe),
                 ...(key ? { idempotencyKey: key } : {}),
                 agentRevision: pinned.agentRevision, skillRevision: pinned.skillRevision,
+                ...(pinned.skillSource ? { skillSource: pinned.skillSource } : {}),
                 traceId: traceId || telemetry.traceIdNow() || telemetry.newTraceId(),
             },
         }, 'save');

@@ -21,7 +21,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: alianhub
+    container_name: ${ALIANHUB_APP_CONTAINER:-alianhub}
     restart: unless-stopped
     ports:
       - "${APP_PORT:-4000}:4000"
@@ -58,7 +58,7 @@ services:
   # ── MongoDB ───────────────────────────────────────────────────────
   mongo:
     image: mongo:7
-    container_name: alianhub-mongo
+    container_name: ${ALIANHUB_MONGO_CONTAINER:-alianhub-mongo}
     restart: unless-stopped
     volumes:
       - alianhub_mongo_data:/data/db
@@ -99,7 +99,7 @@ services:
   # so a `:?` here would break `docker compose up` for everyone.
   coturn:
     image: coturn/coturn:4.6-alpine
-    container_name: alianhub-coturn
+    container_name: ${ALIANHUB_COTURN_CONTAINER:-alianhub-coturn}
     restart: unless-stopped
     profiles: ["calling"]
     network_mode: host

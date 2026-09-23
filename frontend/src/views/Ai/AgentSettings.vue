@@ -103,7 +103,8 @@
                         <div class="ai-fields">
                             <div class="ah-field">
                                 <label class="ah-field__label" for="rate">{{ $t('Ai.rate_limit') }}</label>
-                                <input id="rate" v-model.number="form.rateLimitPerDay" type="number" min="1" max="500" class="ah-input" :disabled="!canManage" />
+                                <input id="rate" v-model.number="form.rateLimitPerDay" type="number" min="0" max="500" class="ah-input" :disabled="!canManage" />
+                                <span class="ah-field__hint" data-test="rate-hint">{{ $t('Ai.rate_limit_hint') }}</span>
                             </div>
                             <div class="ah-field">
                                 <label class="ah-field__label" for="cap">{{ $t('Ai.spend_cap') }}</label>

@@ -13,12 +13,15 @@ exports.init = (app) => {
     *         - ProjectCategory
     *         - ProjectName
     *         - ProjectCode
-    *         - CompanyId
     *        properties:
     *         CompanyId: 
     *           type: string
-    *           required: true
-    *           description: CompanyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header. A different company is refused.
+    *         projectCreatedBy:
+    *           type: string
+    *           required: false
+    *           description: Ignored; the project is created by the signed-in user.
     *         ProjectCategory: 
     *           type: string
     *           required: true
