@@ -6,29 +6,29 @@
                     type="button"
                     class="start-in-tracker-btn"
                     @click="startInTracker"
-                    title="Start this task in the AlianHub desktop tracker"
+                    :title="$t('TaskPanel.tracker_start_hint')"
                 >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                    Start Tracker
+                    {{ $t('TaskPanel.tracker_start') }}
                 </button>
             </div>
 
             <Modal
                 :modelValue="showTrackerModal"
-                title="Start Tracker"
-                acceptButtonText="Start tracking"
+                :title="$t('TaskPanel.tracker_start')"
+                :acceptButtonText="$t('TaskPanel.tracker_start_accept')"
                 bodyClasses="tracker-modal-body"
                 @close="showTrackerModal = false"
                 @accept="confirmStartTracker"
             >
                 <template #body>
                     <div class="tracker-modal-task">{{ task?.TaskKey }} · {{ task?.TaskName }}</div>
-                    <label class="tracker-modal-label">What are you working on?</label>
+                    <label class="tracker-modal-label">{{ $t('TaskPanel.tracker_working_on') }}</label>
                     <textarea
                         v-model="trackerComment"
                         rows="4"
                         class="tracker-modal-textarea"
-                        placeholder="Add a comment for this session…"
+                        :placeholder="$t('TaskPanel.tracker_comment_ph')"
                         @input="trackerCommentError = ''"
                     ></textarea>
                     <div class="tracker-modal-error" v-if="trackerCommentError">{{ trackerCommentError }}</div>
@@ -147,7 +147,7 @@
             </div>
             <!-- Story Points: permission gate removed — free for anyone to view + edit. -->
             <div class="d-flex task-detail-right-side-label">
-                <h4>Story Points</h4>
+                <h4>{{ $t('TaskPanel.story_points') }}</h4>
                 <StoryPoints
                     :pointsVal="task.points"
                     :estimationScale="project?.estimationScale || 'fibonacci'"
@@ -220,8 +220,8 @@
                         class="ai-estimate-btn"
                         :class="{ 'is-loading': isAiEstimateLoading }"
                         :disabled="isAiEstimateLoading"
-                        :title="isAiEstimateLoading ? 'Generating estimate…' : 'Generate estimate using AI'"
-                        :aria-label="isAiEstimateLoading ? 'Generating estimate' : 'Generate estimate using AI'"
+                        :title="isAiEstimateLoading ? $t('TaskPanel.ai_estimate_generating') : $t('TaskPanel.ai_estimate_generate')"
+                        :aria-label="isAiEstimateLoading ? $t('TaskPanel.ai_estimate_generating_label') : $t('TaskPanel.ai_estimate_generate')"
                         @click.stop="generateAiEstimate"
                     >
                         <span v-if="isAiEstimateLoading" class="ai-estimate-spinner" aria-hidden="true"></span>
@@ -240,17 +240,17 @@
                 @close="cancelEstimateReason"
             >
                 <template #header>
-                    <h3 class="m-0 font-size-16 font-weight-600 black">Reason for changing estimated hours</h3>
+                    <h3 class="m-0 font-size-16 font-weight-600 black">{{ $t('TaskPanel.estimate_reason_title') }}</h3>
                 </template>
                 <template #body>
                     <textarea
                         v-model.trim="estimateReasonText"
                         class="w-100 border-radius-6-px font-size-14"
                         style="min-height:90px; resize:vertical; border:1px solid #DFE1E6; outline:none; padding:8px;"
-                        placeholder="Why are you changing the estimated hours?"
+                        :placeholder="$t('TaskPanel.estimate_reason_ph')"
                         @input="estimateReasonError = false"
                     ></textarea>
-                    <span v-if="estimateReasonError" class="red font-size-12">Please enter a reason.</span>
+                    <span v-if="estimateReasonError" class="red font-size-12">{{ $t('TaskPanel.estimate_reason_required') }}</span>
                 </template>
             </Modal>
             <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
@@ -373,7 +373,7 @@ const trackerCommentError = ref('');
 
 const startInTracker = () => {
     if (!isTrackerCapableDevice()) {
-        $toast.warning('Open this on a desktop with the AlianHub Tracker installed.');
+        $toast.warning(t('TaskPanel.tracker_desktop_only'));
         return;
     }
     trackerComment.value = '';
@@ -384,7 +384,7 @@ const startInTracker = () => {
 const confirmStartTracker = () => {
     const comment = (trackerComment.value || '').trim();
     if (!comment) {
-        trackerCommentError.value = 'Please enter a comment';
+        trackerCommentError.value = t('TaskPanel.tracker_comment_required');
         return;
     }
     const res = openInTracker({
@@ -401,15 +401,15 @@ const confirmStartTracker = () => {
     });
     showTrackerModal.value = false;
     if (res.ok) {
-        $toast.success('Opening the tracker…');
+        $toast.success(t('TaskPanel.tracker_opening'));
         return;
     }
     if (res.reason === 'unsupported') {
-        $toast.warning('Open this on a desktop with the AlianHub Tracker installed.');
+        $toast.warning(t('TaskPanel.tracker_desktop_only'));
     } else if (res.reason === 'missing') {
-        $toast.error('Task details are incomplete to start the tracker.');
+        $toast.error(t('TaskPanel.tracker_task_incomplete'));
     } else {
-        $toast.error('Could not open the tracker.');
+        $toast.error(t('TaskPanel.tracker_open_failed'));
     }
 };
 //ref
@@ -609,15 +609,15 @@ const updatePoints = (val) => {
         const updateObj = { points: (val === null || val === undefined || val === '') ? null : Number(val) };
         taskClass.updatePoints({ firebaseObj: updateObj, projectData, taskData: props.task, userData })
         .then(() => {
-            $toast.success('Story points updated', { position: 'top-right' });
+            $toast.success(t('TaskPanel.story_points_updated'), { position: 'top-right' });
         })
         .catch((error) => {
             console.error("ERROR in update points: ", error);
-            $toast.error('Story points not updated', { position: 'top-right' });
+            $toast.error(t('TaskPanel.story_points_not_updated'), { position: 'top-right' });
         });
     } catch (error) {
         console.error('updatePoints error', error);
-        $toast.error('Story points not updated', { position: 'top-right' });
+        $toast.error(t('TaskPanel.story_points_not_updated'), { position: 'top-right' });
     }
 }
 
@@ -881,7 +881,7 @@ const generateAiEstimate = async () => {
     if (!canEditEstimatedHours.value) return;
     const taskId = props.task && props.task._id;
     if (!taskId) {
-        $toast.error('Task is not available', { position: 'top-right' });
+        $toast.error(t('TaskPanel.task_unavailable'), { position: 'top-right' });
         return;
     }
     isAiEstimateLoading.value = true;
@@ -895,16 +895,16 @@ const generateAiEstimate = async () => {
             userId: userData.id,
         });
         if (response && response.data && response.data.status) {
-            $toast.success('Estimate generated', { position: 'top-right' });
+            $toast.success(t('TaskPanel.ai_estimate_done'), { position: 'top-right' });
         } else {
             const msg = (response && response.data && response.data.statusText)
-                || 'Could not generate estimate';
+                || t('TaskPanel.ai_estimate_failed');
             $toast.error(msg, { position: 'top-right' });
         }
     } catch (err) {
         const msg = (err && err.response && err.response.data && err.response.data.statusText)
             || (err && err.message)
-            || 'Could not generate estimate';
+            || t('TaskPanel.ai_estimate_failed');
         $toast.error(msg, { position: 'top-right' });
     } finally {
         isAiEstimateLoading.value = false;
