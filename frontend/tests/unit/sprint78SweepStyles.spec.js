@@ -21,6 +21,23 @@ describe('Ask landing', () => {
     });
 });
 
+describe('Accounts → token rows on a phone', () => {
+    const css = read('views/Ai/accounts.css');
+
+    test('the meta line breaks between words, not inside "never used"', () => {
+        const body = ruleBody(css, '.acct-token__meta');
+        expect(body).toMatch(/overflow-wrap:\s*anywhere/);
+        expect(body).not.toMatch(/word-break:\s*break-all/);
+    });
+
+    test('an expiry chip wraps inside the card instead of running past it', () => {
+        const body = ruleBody(css, '.acct-token__flags .ah-chip');
+        expect(body).toMatch(/max-width:\s*100%/);
+        expect(body).toMatch(/white-space:\s*normal/);
+        expect(body).toMatch(/height:\s*auto/);
+    });
+});
+
 describe('Audit log on a phone', () => {
     const vue = read('views/Settings/Audit/AuditLog.vue');
 
