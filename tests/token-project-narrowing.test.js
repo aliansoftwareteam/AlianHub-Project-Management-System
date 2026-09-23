@@ -190,6 +190,13 @@ describe('routes that cannot hold a narrowed token', () => {
         expect((await viaJwt(OWNER_FULL, 'GET', '/api/v1/project', [])).body).toBe(REACHED);
     });
 
+    it('lets Ask through, since Ask holds the token to its list itself', async () => {
+        for (const raw of [OWNER_NARROWED, MEMBER_NARROWED]) {
+            expect((await viaJwt(raw, 'POST', '/api/v1/ai/ask', [])).body).toBe(REACHED);
+            expect((await viaJwt(raw, 'GET', '/api/v1/ai/ask/sources', [])).body).toBe(REACHED);
+        }
+    });
+
     it('holds a route that names its project to the list', async () => {
         const page = (raw, project) => viaJwt(raw, 'GET', `/api/v1/comments/get-paginated-messages?projectId=${project._id}`, [], { query: { projectId: String(project._id) } });
         for (const raw of [OWNER_NARROWED, MEMBER_NARROWED]) {

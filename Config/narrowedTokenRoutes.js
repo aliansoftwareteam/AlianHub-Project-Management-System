@@ -20,6 +20,8 @@ const HELD_ROUTES = [
     { methods: ['GET'], path: /^\/api\/v1\/task\/[a-f0-9]{24}\/?$/i },
     { methods: ['POST'], path: /^\/api\/v1\/task\/find\/?$/i },
     { methods: ['GET'], path: /^\/api\/v1\/project\/[a-f0-9]{24}\/?$/i },
+    { methods: ['POST'], path: /^\/api\/v1\/ai\/ask\/?$/i },
+    { methods: ['GET'], path: /^\/api\/v1\/ai\/ask\/sources\/?$/i },
     { methods: ['GET'], path: /^\/api\/v1\/comments\/get-paginated-messages\/?$/i, projects: (req) => [req.query && req.query.projectId] },
     { methods: ['GET'], path: /^\/api\/v1\/generateSignedUrl\/[^/]+\/?$/i, projects: (req) => [projectOfKey(req.query && req.query.filepath)] },
     { methods: ['POST'], path: /^\/api\/v1\/wasabi\/retriveObject\/?$/i, projects: (req) => [projectOfKey(req.body && req.body.path)] },
