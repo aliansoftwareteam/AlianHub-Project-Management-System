@@ -2650,6 +2650,11 @@ const schema = {
             type: String,
             required: false
         },
+        // What the company's SCIM IdP says about this member. The shared users record belongs to every
+        // company the person is in, so an IdP's rename lands here instead.
+        scimExternalId: { type: String, required: false },
+        scimGivenName: { type: String, required: false },
+        scimFamilyName: { type: String, required: false },
         // The userId of this member's manager in the same company. Empty means no
         // reporting line is recorded, which is the normal state for most workspaces.
         managerId: {
