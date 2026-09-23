@@ -23,6 +23,7 @@ const loadUserData = async (uid, companyId) => {
     }
     return { id: String(uid), Employee_Name: name || 'Workspace owner', companyOwnerId: companyId };
 };
+exports.loadUserData = loadUserData;
 
 /**
  * Creates the "Welcome to AlianHub" project for a brand-new workspace. Never
