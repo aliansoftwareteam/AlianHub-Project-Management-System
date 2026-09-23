@@ -30,6 +30,8 @@ const approvals = require('../../Modules/Workflows/approvals');
 const stepTypes = require('../../Modules/Workflows/stepTypes');
 
 const COMPANY = crypto.randomBytes(12).toString('hex');
+const USER_7 = crypto.randomBytes(12).toString('hex');
+const USER_1 = crypto.randomBytes(12).toString('hex');
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const EVERY_TIMER_BUT_THE_DATE = ['hrtime', 'nextTick', 'performance', 'queueMicrotask', 'setImmediate', 'clearImmediate', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'];
 
@@ -77,6 +79,7 @@ beforeAll(async () => {
         // eslint-disable-next-line no-await-in-loop
         await MongoDbCrudOpration(COMPANY, { type, data: [] }, 'syncIndexes');
     }
+    await client.db(COMPANY).collection('company_users').insertMany([USER_7, USER_1].map((userId) => ({ companyId: COMPANY, userId, roleType: 3, status: 2, isDelete: false })));
 });
 
 afterAll(async () => {
@@ -100,7 +103,7 @@ describe('a human approval', () => {
     ];
 
     it('blocks the run with a reason, and resumes it on a decision', async () => {
-        const run = await startRun(approvalWorkflow({ ownerUserId: 'user-7', prompt: 'ship it?', deadlineMs: 60000 }));
+        const run = await startRun(approvalWorkflow({ ownerUserId: USER_7, prompt: 'ship it?', deadlineMs: 60000 }));
 
         const first = await engine.tick(COMPANY, run._id);
         expect(first.status).toBe('running');
@@ -108,7 +111,7 @@ describe('a human approval', () => {
 
         const waiting = await row(run._id, 'ask');
         expect(waiting.status).toBe('pending');
-        expect(waiting.waitReason).toBe('waiting for user user-7 to approve');
+        expect(waiting.waitReason).toBe(`waiting for user ${USER_7} to approve`);
         expect(waiting.attempts).toBe(0);
         expect(waiting.error).toBeFalsy();
         expect(stepTypes.blockedReason(await rows(run._id))).toMatchObject({ blocked: true, stepId: 'ask' });
@@ -117,20 +120,20 @@ describe('a human approval', () => {
         expect(request.status).toBe('pending');
         expect(String(waiting.approvalId)).toBe(String(request._id));
 
-        expect(await approvals.decide(COMPANY, { runId: run._id, stepId: 'ask', decision: 'approved', decidedBy: 'user-7', comment: 'go' })).not.toBeNull();
+        expect(await approvals.decide(COMPANY, { runId: run._id, stepId: 'ask', decision: 'approved', decidedBy: USER_7, comment: 'go' })).not.toBeNull();
         // A second decision finds the request already answered.
         expect(await approvals.decide(COMPANY, { runId: run._id, stepId: 'ask', decision: 'rejected', decidedBy: 'user-9' })).toBeNull();
 
         expect((await drive(run._id)).status).toBe('success');
         expect(calls).toEqual(['act']);
-        expect((await row(run._id, 'ask')).output).toMatchObject({ decision: 'approved', decidedBy: 'user-7' });
+        expect((await row(run._id, 'ask')).output).toMatchObject({ decision: 'approved', decidedBy: USER_7 });
         expect((await row(run._id, 'ask')).waitReason).toBeFalsy();
     });
 
     it('stops the path it was asked about when it is refused', async () => {
-        const run = await startRun(approvalWorkflow({ ownerUserId: 'user-7', deadlineMs: 60000 }));
+        const run = await startRun(approvalWorkflow({ ownerUserId: USER_7, deadlineMs: 60000 }));
         await engine.tick(COMPANY, run._id);
-        await approvals.decide(COMPANY, { runId: run._id, stepId: 'ask', decision: 'rejected', decidedBy: 'user-7', comment: 'no' });
+        await approvals.decide(COMPANY, { runId: run._id, stepId: 'ask', decision: 'rejected', decidedBy: USER_7, comment: 'no' });
 
         expect((await drive(run._id)).status).toBe('success');
         expect(calls).toEqual([]);
@@ -139,7 +142,7 @@ describe('a human approval', () => {
     });
 
     it('escalates on its escalation deadline and keeps waiting', async () => {
-        const run = await startRun(approvalWorkflow({ ownerUserId: 'user-7', escalateToUserId: 'user-1', escalateAfterMs: 60, deadlineMs: 60000 }));
+        const run = await startRun(approvalWorkflow({ ownerUserId: USER_7, escalateToUserId: USER_1, escalateAfterMs: 60, deadlineMs: 60000 }));
         await engine.tick(COMPANY, run._id);
         expect((await approvals.get(COMPANY, run._id, 'ask')).escalatedAt).toBeFalsy();
 
@@ -148,15 +151,15 @@ describe('a human approval', () => {
 
         const escalated = await approvals.get(COMPANY, run._id, 'ask');
         expect(escalated.escalatedAt).toBeTruthy();
-        expect(escalated.ownerUserId).toBe('user-1');
-        expect(escalated.owners).toEqual(['user-7', 'user-1']);
+        expect(escalated.ownerUserId).toBe(USER_1);
+        expect(escalated.owners).toEqual([USER_7, USER_1]);
         expect(escalated.status).toBe('pending');
-        expect((await row(run._id, 'ask')).waitReason).toBe('waiting for user user-1 to approve (escalated)');
+        expect((await row(run._id, 'ask')).waitReason).toBe(`waiting for user ${USER_1} to approve (escalated)`);
         expect(calls).toEqual([]);
     });
 
     it('fails the step when nobody decides by the deadline', async () => {
-        const run = await startRun(approvalWorkflow({ ownerUserId: 'user-7', deadlineMs: 60, onDeadline: 'fail' }));
+        const run = await startRun(approvalWorkflow({ ownerUserId: USER_7, deadlineMs: 60, onDeadline: 'fail' }));
         await engine.tick(COMPANY, run._id);
         await sleep(120);
 
@@ -167,7 +170,7 @@ describe('a human approval', () => {
     });
 
     it('lets the deadline itself be the decision when the definition says so', async () => {
-        const run = await startRun(approvalWorkflow({ ownerUserId: 'user-7', deadlineMs: 60, onDeadline: 'approve' }));
+        const run = await startRun(approvalWorkflow({ ownerUserId: USER_7, deadlineMs: 60, onDeadline: 'approve' }));
         await engine.tick(COMPANY, run._id);
         await sleep(120);
 

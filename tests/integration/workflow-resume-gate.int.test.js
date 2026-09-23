@@ -37,6 +37,8 @@ const approvals = require('../../Modules/Workflows/approvals');
 const stepTypes = require('../../Modules/Workflows/stepTypes');
 
 const COMPANY = crypto.randomBytes(12).toString('hex');
+const USER_OWNER = crypto.randomBytes(12).toString('hex');
+const USER_ESCALATION = crypto.randomBytes(12).toString('hex');
 const LEASE_MS = 600;
 const STEPS = 15;
 const KILL_AT = 's11';
@@ -131,6 +133,7 @@ beforeAll(async () => {
         // eslint-disable-next-line no-await-in-loop
         await MongoDbCrudOpration(COMPANY, { type, data: [] }, 'syncIndexes');
     }
+    await client.db(COMPANY).collection('company_users').insertMany([USER_OWNER, USER_ESCALATION].map((userId) => ({ companyId: COMPANY, userId, roleType: 3, status: 2, isDelete: false })));
 });
 
 afterAll(async () => {
@@ -221,9 +224,9 @@ describe('an approval step', () => {
 
     it('waits, records a reassignment, escalates on its delay and resumes on the decision after the handover', async () => {
         const run = await startRun(approvalWorkflow({
-            ownerUserId: 'user-owner',
+            ownerUserId: USER_OWNER,
             prompt: 'ship it?',
-            escalateToUserId: 'user-escalation',
+            escalateToUserId: USER_ESCALATION,
             escalateAfterMs: 150,
             deadlineMs: 60000,
         }));
@@ -232,17 +235,17 @@ describe('an approval step', () => {
         expect(calls).toEqual([]);
         const waiting = await row(run._id, 'ask');
         expect(waiting.status).toBe('pending');
-        expect(waiting.waitReason).toBe('waiting for user user-owner to approve');
+        expect(waiting.waitReason).toBe(`waiting for user ${USER_OWNER} to approve`);
         expect(waiting.attempts).toBe(0);
         expect(stepTypes.blockedReason(await rows(run._id))).toMatchObject({ blocked: true, stepId: 'ask' });
 
         // Handed on by a person: who moved it, from whom and to whom.
         const moved = await approvals.reassign(COMPANY, { runId: run._id, stepId: 'ask', toUserId: 'user-stand-in', by: 'user-admin', reason: 'owner is away' });
         expect(moved.ownerUserId).toBe('user-stand-in');
-        expect(moved.owners).toEqual(['user-owner', 'user-stand-in']);
+        expect(moved.owners).toEqual([USER_OWNER, 'user-stand-in']);
         expect(moved.reassignedBy).toBe('user-admin');
         expect(moved.reassignments).toHaveLength(1);
-        expect(moved.reassignments[0]).toMatchObject({ from: 'user-owner', to: 'user-stand-in', by: 'user-admin', reason: 'owner is away' });
+        expect(moved.reassignments[0]).toMatchObject({ from: USER_OWNER, to: 'user-stand-in', by: 'user-admin', reason: 'owner is away' });
         expect(moved.status).toBe('pending');
 
         // The escalation delay passes with nobody having decided.
@@ -251,17 +254,17 @@ describe('an approval step', () => {
 
         const escalated = await approvals.get(COMPANY, run._id, 'ask');
         expect(escalated.escalatedAt).toBeTruthy();
-        expect(escalated.ownerUserId).toBe('user-escalation');
-        expect(escalated.owners).toEqual(['user-owner', 'user-stand-in', 'user-escalation']);
+        expect(escalated.ownerUserId).toBe(USER_ESCALATION);
+        expect(escalated.owners).toEqual([USER_OWNER, 'user-stand-in', USER_ESCALATION]);
         expect(escalated.status).toBe('pending');
-        expect((await row(run._id, 'ask')).waitReason).toBe('waiting for user user-escalation to approve (escalated)');
+        expect((await row(run._id, 'ask')).waitReason).toBe(`waiting for user ${USER_ESCALATION} to approve (escalated)`);
         expect(calls).toEqual([]);
 
         // A decision by the escalation target, after the handover, resumes the run.
-        expect(await approvals.decide(COMPANY, { runId: run._id, stepId: 'ask', decision: 'approved', decidedBy: 'user-escalation', comment: 'go' })).not.toBeNull();
+        expect(await approvals.decide(COMPANY, { runId: run._id, stepId: 'ask', decision: 'approved', decidedBy: USER_ESCALATION, comment: 'go' })).not.toBeNull();
         expect((await drive(run._id)).status).toBe('success');
         expect(calls).toEqual(['act']);
-        expect((await row(run._id, 'ask')).output).toMatchObject({ decision: 'approved', decidedBy: 'user-escalation', escalated: true });
+        expect((await row(run._id, 'ask')).output).toMatchObject({ decision: 'approved', decidedBy: USER_ESCALATION, escalated: true });
         expect(await effects().countDocuments({ runId: String(run._id) })).toBe(1);
     }, 30000);
 
@@ -270,7 +273,7 @@ describe('an approval step', () => {
         ['approve', 'success', { ask: 'success', act: 'success' }, 'approved'],
         ['reject', 'success', { ask: 'success', act: 'skipped' }, 'rejected'],
     ])('honours onDeadline "%s" when nobody decides in time', async (onDeadline, runStatus, stepStatuses, requestStatus) => {
-        const run = await startRun(approvalWorkflow({ ownerUserId: 'user-owner', deadlineMs: 120, onDeadline }));
+        const run = await startRun(approvalWorkflow({ ownerUserId: USER_OWNER, deadlineMs: 120, onDeadline }));
         await engine.tick(COMPANY, run._id);
         await sleep(200);
 
