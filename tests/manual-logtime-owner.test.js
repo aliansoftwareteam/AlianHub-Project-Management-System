@@ -280,3 +280,18 @@ describe('deleting a manual entry', () => {
         expect(mockLocked).toHaveBeenCalledWith(expect.objectContaining({ userId: ME }));
     });
 });
+
+describe('the history line', () => {
+    it('escapes the signed-in user\'s name, which it renders as HTML', async () => {
+        const stored = mockCrud.getMockImplementation();
+        mockCrud.mockImplementation(async (companyId, arg, method) => (arg.type === 'users' && method === 'findOne'
+            ? { _id: ME, Employee_Name: 'Amp& <img src=x>' }
+            : stored(companyId, arg, method)));
+        const r = await call(manualLogTime, logBody());
+
+        expect(r.body.status).toBe(true);
+        const { message } = mockHistory.mock.calls[0][4];
+        expect(message).toContain('Amp&amp; &lt;img src=x&gt;');
+        expect(message).not.toContain('<img');
+    });
+});

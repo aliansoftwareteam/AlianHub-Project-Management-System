@@ -12,6 +12,7 @@ const { isPeriodLocked } = require('../../TimesheetApproval/helpers/lockGuard');
 const { pinSessionTenant } = require('../../../Config/tenant');
 const { resolveSheetScope, SHEET_PERMISSION } = require('../../TimeSheet/helpers/timeScope');
 const { actingUser } = require('../../Sprints/helpers/actingUser');
+const { escapeHtml } = require('../../../utils/escapeHtml');
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const NOT_YOUR_TIME = "You can't log or change time for this person.";
@@ -210,7 +211,7 @@ exports.manualLogTime = async (req, res) => {
         MongoDbCrudOpration(req.body.companyId, obj, "findOneAndUpdate")
             .then((response) => {
                 let historyObj = {
-                    'message': `<b>${actor.Employee_Name}</b> has edited <b>${req.body.timeDuration} hrs (DATE_${new Date(req.body.logTimeDate).getTime()} from TIMESTAMP_${data.LogStartTime * 1000} to TIMESTAMP_${data.LogEndTime * 1000}) </b> logged hours`,
+                    'message': `<b>${escapeHtml(actor.Employee_Name)}</b> has edited <b>${req.body.timeDuration} hrs (DATE_${new Date(req.body.logTimeDate).getTime()} from TIMESTAMP_${data.LogStartTime * 1000} to TIMESTAMP_${data.LogEndTime * 1000}) </b> logged hours`,
                     'key': 'TimeLog',
                     sprintId: req.body.sprintId
                 }
@@ -276,7 +277,7 @@ exports.manualLogTime = async (req, res) => {
             .then((response) => {
                 findAndUpdateProjectOrTaskStartDate({companyId:req.body.companyId,userId:owner,projectId:req.body.projectId,taskId:req.body.ticketId,startDateForProjectOrTask:new Date(req.body.logTimeDate)});
                 let historyObj = {
-                    'message': `<b>${actor.Employee_Name}</b> has added <b>${req.body.timeDuration} hrs (DATE_${new Date(req.body.logTimeDate).getTime()} from TIMESTAMP_${data.LogStartTime * 1000} to TIMESTAMP_${data.LogEndTime * 1000}) </b> logged hours
+                    'message': `<b>${escapeHtml(actor.Employee_Name)}</b> has added <b>${req.body.timeDuration} hrs (DATE_${new Date(req.body.logTimeDate).getTime()} from TIMESTAMP_${data.LogStartTime * 1000} to TIMESTAMP_${data.LogEndTime * 1000}) </b> logged hours
                 `,
                     'key': 'TimeLog',
                     sprintId: req.body.sprintId
@@ -486,7 +487,7 @@ exports.deleteManualLogtime = async (req, res) => {
             const hoursStr = String(hours).padStart(2, '0');
             const minutesStr = String(remainingMinutes).padStart(2, '0');
             let historyObj = {
-                'message': `<b>${actor.Employee_Name}</b> has deleted <b>${`${hoursStr}:${minutesStr}`} hrs (DATE_${new Date(req.body.logTimeDate).getTime()} from TIMESTAMP_${req.body.LogStartTime * 1000} to TIMESTAMP_${req.body.LogEndTime * 1000}) </b> logged hours`,
+                'message': `<b>${escapeHtml(actor.Employee_Name)}</b> has deleted <b>${`${hoursStr}:${minutesStr}`} hrs (DATE_${new Date(req.body.logTimeDate).getTime()} from TIMESTAMP_${req.body.LogStartTime * 1000} to TIMESTAMP_${req.body.LogEndTime * 1000}) </b> logged hours`,
                 'key': 'TimeLog',
                 sprintId: req.body.sprintId
             }
