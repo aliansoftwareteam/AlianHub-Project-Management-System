@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-23T15:57:26.205Z",
+  "updatedAt": "2026-09-23T16:06:44.383Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_available_on_paid_plans_upgrade_now": "AI is only available for purchase on our paid plans. Upgrade and add AI now!",
@@ -455,6 +455,7 @@
     "Ai.queue_clear": "Queue clear",
     "Ai.queue_clear_body": "{approved} approved, {declined} declined. Nothing is waiting on you.",
     "Ai.rate_limit": "Rate limit (actions per day)",
+    "Ai.rate_limit_hint": "0 means no daily limit.",
     "Ai.recent_audit": "Recent runs",
     "Ai.refused_n": "{n} refused",
     "Ai.remove": "Remove",
