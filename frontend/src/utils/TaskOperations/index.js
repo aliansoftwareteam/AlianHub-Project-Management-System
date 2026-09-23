@@ -70,6 +70,7 @@ class Task {
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updateDueDate",
                     commonDateFormatString,
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                     firebaseObj,
                     project,
                     task,
@@ -107,6 +108,7 @@ class Task {
                 apiRequest("patch", env.V2_TASKS, {
                     action: "updateStartDate",
                     commonDateFormatString,
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                     firebaseObj,
                     project,
                     task,

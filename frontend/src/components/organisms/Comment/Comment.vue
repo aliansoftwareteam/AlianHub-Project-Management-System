@@ -166,7 +166,7 @@
                         <DropDownOption v-if="message.type === 'text' || message.type === 'link'" @click="$emit('copy', message), $refs[`message_option_${message._id}`].click()">
                             {{$t('Comments.copy_message')  }}
                         </DropDownOption>
-                        <DropDownOption v-if="message.sent" @click="$emit('delete', message), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption v-if="message.sent || message.userId === userId" @click="$emit('delete', message), $refs[`message_option_${message._id}`].click()">
                             {{$t('Projects.delete')}}
                         </DropDownOption>
                         <DropDownOption @click="$emit('reply', message), $refs[`message_option_${message._id}`].click()">

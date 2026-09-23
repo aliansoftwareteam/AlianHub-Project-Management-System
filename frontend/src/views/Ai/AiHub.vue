@@ -142,7 +142,7 @@ const scopeOf = (agent) => {
 const monthLine = (agent) => {
     const row = (spend.value.agents || []).find((a) => a.agentId === String(agent._id));
     if (!row || !row.runs) return t("Ai.no_runs_month");
-    return t("Ai.month_runs", { runs: row.runs, usd: Number(row.usd || 0).toFixed(2) });
+    return t("Ai.month_runs", { runs: row.runs, usd: Number(row.usd || 0).toFixed(2) }, Number(row.runs) || 0);
 };
 
 const needsLine = (agent) => t("Ai.needs_line", { what: requirementsOf(agent).map((code) => t(`Ai.req_${code}`)).join(" · ") });

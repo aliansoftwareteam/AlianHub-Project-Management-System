@@ -529,7 +529,7 @@ const WikiTable = defineComponent({
 .hub__item.is-active .hub__item-icon { color: var(--brand); }
 .hub__item-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hub__item-count { margin-left: auto; font: 500 11px var(--font-mono); color: var(--ink-3); }
-.hub__item-badge { margin-left: auto; background: var(--brand); color: #fff; font: 700 10px/1 var(--font-mono); padding: 3px 6px; border-radius: 9px; }
+.hub__item-badge { margin-left: auto; background: var(--brand); color: var(--on-brand); font: 700 10px/1 var(--font-mono); padding: 3px 6px; border-radius: 9px; }
 .hub__item-badge--warn { background: var(--warn); }
 .hub__swatch { width: 7px; height: 7px; border-radius: 2px; flex: none; }
 .hub__swatch--none { background: var(--ink-3); }

@@ -29,7 +29,7 @@ const { recordCompletion } = require('./recordCompletion.js');
 const { escapeText } = require('../taskWriteFields');
 const {
     taskAssigneeAdd, taskAssigneeRemove, taskAssigneeReplace,
-    taskStatusChange, taskPriorityChange,
+    taskStatusChange, taskPriorityChange, shownStatus, shownPriority,
 } = require('../notificationTemplate');
 
 // convertToTask's inner failure path neither resolves nor rejects, so awaiting
@@ -229,8 +229,7 @@ module.exports = {
                             const notifContext = {
                                 ProjectName: projectData.ProjectName,
                                 taskName: task.TaskName,
-                                statusName: prevStatusName,
-                                newStatusName: newStatusText,
+                                ...shownStatus({ statusName: prevStatusName }, newStatus).template,
                             };
                             HandleBothNotification({
                                 type: 'tasks',
@@ -317,8 +316,7 @@ module.exports = {
                         const notifContext = {
                             ProjectName: projectData.ProjectName,
                             taskName: task.TaskName,
-                            priorityName: priorityObj?.priorityName || '',
-                            newPriorityName,
+                            ...shownPriority({ priorityName: priorityObj?.priorityName || '', newPriorityName }).template,
                         };
                         if ((priorityObj?.priorityName || '') !== newPriorityName) {
                             HandleBothNotification({
