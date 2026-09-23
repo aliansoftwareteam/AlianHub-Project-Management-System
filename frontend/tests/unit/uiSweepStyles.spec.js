@@ -51,6 +51,17 @@ describe('Settings → Instance → Knowledge on a phone', () => {
     });
 });
 
+describe('project header icons in dark mode', () => {
+    test('the voice-notes icon has no white tile of its own', () => {
+        expect(read('assets/images/svg/Voice_Record.svg')).not.toMatch(/fill="white"|fill="#fff(fff)?"/i);
+    });
+
+    test('the watchers button border follows the theme', () => {
+        const css = read('views/Projects/components/project-header.css');
+        expect(ruleBody(css, '.ph2 .open__watcher')).toMatch(/border-color:\s*var\(--border\)/);
+    });
+});
+
 describe('legacy blocks inside the task panel in dark mode', () => {
     const css = read('components/organisms/TaskDetailOverlay/style.css');
     const dark = (selector) => ruleBody(css, `:root[data-theme="dark"] .ah-detail__panel ${selector}`);
