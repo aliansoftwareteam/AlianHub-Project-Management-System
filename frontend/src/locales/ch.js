@@ -3658,6 +3658,10 @@ export default {
     },
     "Header": {
         "help": "Help",
+        "wordmark_start": "Alian",
+        "wordmark_end": "Hub",
+        "open_advance_filter": "Open Advance Filter",
+        "search_shortcut": "(Ctrl + K)",
         "Project_Forecasting": "项目预测（即将推出）",
         "Resource_Planning": "资源规划（即将推出）",
         "Projects": "项目",

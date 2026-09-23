@@ -3715,6 +3715,10 @@ export default {
     },
     Header: {
         help: "Help",
+        wordmark_start: "Alian",
+        wordmark_end: "Hub",
+        open_advance_filter: "Open Advance Filter",
+        search_shortcut: "(Ctrl + K)",
         Project_Forecasting: "Project Forecasting (Coming soon)",
         Resource_Planning: "Resource Planning (Coming soon)",
         Projects: "Projects",

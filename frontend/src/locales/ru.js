@@ -3658,6 +3658,10 @@ export default {
     },
     "Header": {
         "help": "Help",
+        "wordmark_start": "Alian",
+        "wordmark_end": "Hub",
+        "open_advance_filter": "Open Advance Filter",
+        "search_shortcut": "(Ctrl + K)",
         "Project_Forecasting": "Прогноз проекта (Скоро будет доступно)",
         "Resource_Planning": "Планирование ресурсов (Скоро будет доступно)",
         "Projects": "Проекты",
