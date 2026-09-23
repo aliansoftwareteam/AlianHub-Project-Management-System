@@ -70,7 +70,7 @@
             </tr>
         </tfoot>
     </table>
-    <div v-if="!projectData.length && !isManinSpinner" class="text-center red mt-15px">{{$t('UserTimesheet.no_records_found')}}</div>
+    <div v-if="!projectData.length && !isManinSpinner" class="ts-empty text-center mt-15px">{{$t('UserTimesheet.no_records_found')}}</div>
 </div>
 </template>
 <script setup>

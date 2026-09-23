@@ -238,6 +238,38 @@ describe('timesheets and the milestone report without the permission', () => {
     });
 });
 
+describe('Project and Tracker timesheet bodies', () => {
+    const theme = read('views/Timesheet/legacyTimesheetTheme.css');
+
+    test.each(['views/Timesheet/ProjectTimesheet/ProjectTimesheet.vue', 'views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue'])('%s loads the theme bridge', (rel) => {
+        expect(read(rel)).toMatch(/<style src="\.\.\/legacyTimesheetTheme\.css"><\/style>/);
+    });
+
+    test('dark mode maps the light utilities, the table fills and the hour strip onto tokens', () => {
+        expect(theme).toMatch(/:root\[data-theme="dark"\] :is\(\.project-timesheet-contain, \.time_tracker__timesheet\) :is\(\.bg-white,[^{]*\.dp__input\) \{\s*background-color: var\(--surface\);/);
+        expect(theme).toMatch(/:is\(\.GunPowder, \.color47\):not\(\.current_date \*\) \{ color: var\(--ink-2\) !important; \}/);
+        expect(theme).toMatch(/\.timesheet_table :is\(thead, tfoot, th:not\(\.current_date\), tfoot td\) \{ background-color: var\(--surface-2\) !important;/);
+        expect(theme).toMatch(/\.time_tracker__timesheet \.time__slot--count \{ color: var\(--ink-2\); \}/);
+    });
+
+    test('the tracker panel takes the canvas, so it no longer stops part way down', () => {
+        expect(ruleBody(theme, '.time_tracker__timesheet .bg-light-gray')).toMatch(/background-color:\s*var\(--canvas\)/);
+    });
+
+    test('"No records found" is an empty state, not an error', () => {
+        expect(read('views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue')).toMatch(/class="screenShotTime ts-empty mt-50px text-center" v-if="!finalRange\?\.length/);
+        expect(read('components/atom/TimesheetView/ProjectTimeSheetView/ProjectTimesheetView.vue')).toMatch(/class="ts-empty text-center mt-15px">\{\{\$t\('UserTimesheet\.no_records_found'\)/);
+        expect(theme).toMatch(/\.project-timesheet-contain \.ts-empty,\s*\.time_tracker__timesheet \.ts-empty \{ color: var\(--ink-2\); \}/);
+    });
+
+    test('the week range and the 24-hour strip fit at laptop width', () => {
+        expect(read('components/molecules/RangePickerComp/RangePickerComp.vue')).toMatch(/\.timesheet__wrapper \.range-picker\.rangeComp \{\s*min-width: 265px !important;/);
+        const timebar = read('components/atom/TimesheetView/TrackerTimeSheetView/TimebarComponent.css');
+        expect(ruleBody(timebar, '.time-bar')).toMatch(/min-width:\s*1080px/);
+        expect(ruleBody(timebar, '.time__slot-length')).toMatch(/left:\s*100%/);
+    });
+});
+
 describe('Settings → Projects apps column', () => {
     test('the app list does not share class names with the global search palette', () => {
         const vue = read('components/molecules/ProjectAppsList/ProjectAppsList.vue');

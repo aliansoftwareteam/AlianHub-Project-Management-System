@@ -764,6 +764,7 @@
     }
 </script>
 <style src="../style.css"></style>
+<style src="../legacyTimesheetTheme.css"></style>
 <style scoped>
     .page-content {
         padding: 15px;

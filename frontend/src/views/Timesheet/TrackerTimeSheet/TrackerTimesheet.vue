@@ -154,7 +154,7 @@
                         <div class="screenShotTime style-scroll" v-if="finalRange?.length && !subSpinner">
                             <ScreenshotTime v-for="log in finalRange" :key="log.time" :logRangeData="log" :active="selectedSlot === log.time" :trackShots="log.trackShot" @update:getScreenShotDetail="getScreenShotDetailFunction" @toggle="selectedSlot = $event" :id="log.time" />
                         </div>
-                        <div class="screenShotTime red mt-50px text-center" v-if="!finalRange?.length && !subSpinner">
+                        <div class="screenShotTime ts-empty mt-50px text-center" v-if="!finalRange?.length && !subSpinner">
                             {{$t('UserTimesheet.no_records_found')}}
                         </div>
                     </div>
@@ -752,6 +752,7 @@
     }
 </script>
 <style src="../style.css"></style>
+<style src="../legacyTimesheetTheme.css"></style>
 <style scoped>
 .screenShotTime-skelaton--time {
     font-weight: 500;
