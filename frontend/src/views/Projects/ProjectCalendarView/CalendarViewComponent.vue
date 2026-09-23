@@ -586,6 +586,7 @@
                 const startAndDueDateObj = {
                     action: "updateStartDateAndDueDate",
                     commonDateFormatString: dateFormat.value,
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                     userData: updateObj.userData,
                     notificationObj: updateObj.obj,
                     firebaseObj: newFirebaseObj,

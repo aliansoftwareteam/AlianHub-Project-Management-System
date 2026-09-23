@@ -16,6 +16,7 @@ import 'v-calendar/style.css';
 import {i18n } from '@/locales/main';
 import VueApexCharts from "vue3-apexcharts";
 import DemoBanner from "@/components/atom/DemoBanner/DemoBanner.vue";
+import { installChunkRecovery } from '@/config/chunkRecovery';
 // Plugins Path
 import registerPlugin from './plugins/register/registerPlugin';
 import createcompanyinsidePlugin from './plugins/createcompanyinside/createcompanyinsidePlugin';
@@ -66,6 +67,7 @@ app.use(plugin, defaultConfig({ plugins: [pro]}))
 app.use(i18n);
 // Registered before mount so the root App.vue template can resolve it.
 app.component('DemoBanner', DemoBanner);
+installChunkRecovery(app, router);
 app.mount('#app');
 // Use plugin defaults (optional)
 app.component('ApexChart', VueApexCharts); // Register the apexchart component globally

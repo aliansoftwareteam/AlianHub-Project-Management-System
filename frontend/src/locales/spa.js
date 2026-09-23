@@ -6414,7 +6414,12 @@ export default {
         "This_message_is_deleted": "Este mensaje ha sido eliminado",
         "You_deleted_this_message": "Tú eliminaste este mensaje",
         "no_user_found": "No se encontró usuario",
-        "unlock_comment_view": "Para desbloquear la vista de comentarios"
+        "unlock_comment_view": "Para desbloquear la vista de comentarios",
+        "agent_tag": "AGENT",
+        "an_agent": "An agent",
+        "ai_assistant": "AI assistant",
+        "cited_page": "page",
+        "cited_page_hidden": "a page you cannot open"
     },
     "PlaceHolder": {
         "enter_task_type": "Ingresa el tipo de tarea",
