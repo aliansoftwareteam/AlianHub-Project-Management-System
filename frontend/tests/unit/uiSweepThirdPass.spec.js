@@ -179,6 +179,12 @@ describe('My settings → working hours', () => {
     });
 });
 
+describe('Notifications → quiet hours', () => {
+    test('the two time fields keep their width: the rule out-specifies .ah-input', () => {
+        expect(ruleBody(read('views/Settings/Notifications/style.css'), '.nt__quiet-row .nt__time')).toMatch(/width:\s*96px/);
+    });
+});
+
 describe('Team on a phone', () => {
     test('the headline counts give way so both toolbar buttons fit', () => {
         const css = read('views/Team/style.css');
