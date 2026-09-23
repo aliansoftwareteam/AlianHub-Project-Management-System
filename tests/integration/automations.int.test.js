@@ -337,7 +337,8 @@ describe('automation rules (v2)', () => {
 
             const runs = await finishedRuns(owner.api, rule._id, priorities.length);
             expect(runs.map((r) => r.status)).toEqual(priorities.map(() => 'success'));
-            expect(runs.map((r) => r.envelope.data.Task_Priority).sort()).toEqual([...priorities].sort());
+            expect(new Set(runs.map((r) => r._id)).size).toBe(priorities.length);
+            expect(runs.every((r) => r.entity.id === task._id)).toBe(true);
             expect(await commentsSaying(owner.api, { project, task, body })).toHaveLength(priorities.length);
             expect((await listedRule(owner.api, rule._id)).firedCount).toBe(priorities.length);
         } finally {
@@ -368,6 +369,41 @@ describe('automation rules (v2)', () => {
             await sleep(1500);
             expect((await owner.api.get(`/api/v2/automations/${rule._id}/runs`)).body.data).toEqual([]);
             expect(await commentsSaying(owner.api, { project, task, body: rendered })).toHaveLength(0);
+        } finally {
+            await owner.api.patch(`/api/v2/automations/${rule._id}/enabled`, { enabled: false });
+            await removeRule(owner.api, rule._id);
+        }
+    });
+
+    it('answers a member the runs for tasks in projects they can open, with only the fields the history shows', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const open = await projectWithTask(owner);
+        const hidden = await privateProjectWithTask(owner);
+        const rule = await createRule(owner.api, unnamed(ruleFor(open.project._id, {
+            scope: { allProjects: false, projectIds: [String(open.project._id), String(hidden.project._id)] },
+            steps: [{ id: 's1', type: 'action', action: 'add_comment', config: { body: `E2E run visibility ${uniqueSuffix()}` } }],
+        })));
+        try {
+            await owner.api.patch(`/api/v2/automations/${rule._id}/enabled`, { enabled: true });
+            for (const { project, task } of [open, hidden]) {
+                expect((await setPriority(owner.api, { project, task, user: state.users.owner, priority: 'HIGH' })).body.status).toBe(true);
+            }
+
+            const everyRun = await finishedRuns(owner.api, rule._id, 2);
+            expect(everyRun.map((r) => r.entity.id).sort()).toEqual([open.task._id, hidden.task._id].sort());
+
+            const res = await member.api.get(`/api/v2/automations/${rule._id}/runs`);
+            expect(res.status).toBe(200);
+            expect(res.body.data.map((r) => r.entity.id)).toEqual([open.task._id]);
+            const text = JSON.stringify(res.body);
+            [hidden.task._id, hidden.task.name, String(hidden.project._id)].forEach((value) => expect(text).not.toContain(value));
+
+            const [run] = res.body.data;
+            expect(Object.keys(run.envelope).sort()).toEqual(['data', 'scope']);
+            expect(Object.keys(run.envelope.data)).toEqual(['TaskName']);
+            expect(run.envelope.scope.projectId).toBe(String(open.project._id));
+            expect(run.entity).toMatchObject({ kind: 'task', id: open.task._id });
         } finally {
             await owner.api.patch(`/api/v2/automations/${rule._id}/enabled`, { enabled: false });
             await removeRule(owner.api, rule._id);

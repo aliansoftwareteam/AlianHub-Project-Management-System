@@ -296,17 +296,69 @@ exports.setRuleEnabled = async (req, res) => {
     } catch (e) { logger.error(`setRuleEnabled: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
+const RUNS_LIMIT = 50;
+const RUN_PROJECT = 'envelope.scope.projectId';
+
+const definedOnly = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+
+/* A run without a project is shown only when it names no task: a task always has
+ * a project, so a task run without one cannot be checked against the caller. */
+const visibleRunsMatch = async (companyId, uid) => {
+    if (await access.canManageRules(companyId, uid)) return {};
+    return {
+        $or: [
+            { [RUN_PROJECT]: { $in: await access.visibleProjectIds(companyId, uid) } },
+            { [RUN_PROJECT]: null, 'entity.kind': { $ne: 'task' } },
+        ],
+    };
+};
+
+const runStep = (step = {}) => {
+    const output = step.output || {};
+    return definedOnly({
+        id: step.id,
+        type: step.type,
+        action: step.action || undefined,
+        error: step.error || undefined,
+        durationMs: step.durationMs,
+        output: step.output ? definedOnly({ changed: output.changed, passed: output.passed }) : undefined,
+    });
+};
+
+const runSummary = (row) => {
+    const run = row.toObject ? row.toObject() : row;
+    const entity = run.entity || {};
+    const envelope = run.envelope || {};
+    const scope = envelope.scope || {};
+    const isTask = entity.kind === 'task';
+    return definedOnly({
+        _id: run._id,
+        status: run.status,
+        eventType: run.eventType,
+        entity: isTask ? { kind: 'task', id: entity.id, key: entity.key } : definedOnly({ kind: entity.kind, id: entity.id }),
+        envelope: {
+            scope: definedOnly({ projectId: scope.projectId, sprintId: scope.sprintId, folderId: scope.folderId }),
+            data: isTask ? { TaskName: (envelope.data && envelope.data.TaskName) || null } : {},
+        },
+        steps: (run.steps || []).map(runStep),
+        error: run.error || undefined,
+        startedAt: run.startedAt,
+        finishedAt: run.finishedAt,
+    });
+};
+
 // GET /api/v2/automations/:id/runs
 exports.listRuns = async (req, res) => {
     try {
         const companyId = companyOf(req);
         const id = req.params.id;
         if (!companyId || !id) return res.send({ status: false, statusText: 'companyId and id are required.' });
+        const match = { ruleId: String(id), ...(await visibleRunsMatch(companyId, req.uid)) };
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AUTOMATION_RUNS,
-            data: [{ ruleId: String(id) }, {}, { sort: { startedAt: -1 }, limit: 50 }],
+            data: [match, {}, { sort: { startedAt: -1 }, limit: RUNS_LIMIT }],
         }, 'find');
-        return res.send({ status: true, data: rows || [] });
+        return res.send({ status: true, data: (rows || []).map(runSummary) });
     } catch (e) { logger.error(`listRuns: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
