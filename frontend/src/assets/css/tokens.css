@@ -288,11 +288,10 @@ html, body, #app {
     padding: 0 8px;
     border-radius: var(--r-chip);
     font: 600 11.5px/1 var(--font-ui);
-    background: rgba(0, 0, 0, .06);
+    background: var(--fill);
     color: var(--ink);
     white-space: nowrap;
 }
-:root[data-theme="dark"] .ah-chip { background: rgba(255, 255, 255, .1); }
 .ah-chip--ok { background: var(--ok-bg); color: var(--ok-ink); }
 .ah-chip--warn { background: var(--warn-bg); color: var(--warn-ink); }
 .ah-chip--danger { background: var(--danger-bg); color: var(--danger-ink); }
