@@ -80,7 +80,6 @@
     "frontend/src/views/Changelog/Changelog.vue": 3,
     "frontend/src/views/Chat/ChatSidebar.vue": 1,
     "frontend/src/views/Integrations/ExternalData.vue": 1,
-    "frontend/src/views/Integrations/IntegrationsHub.vue": 8,
     "frontend/src/views/PersonalList/PersonalList.vue": 1,
     "frontend/src/views/Projects/GanttView/GanttView.vue": 1,
     "frontend/src/views/Projects/Reports/BurndownChart.vue": 6,

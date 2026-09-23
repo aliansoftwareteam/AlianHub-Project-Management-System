@@ -935,6 +935,12 @@ export default {
     },
     "IntegrationsHub": {
         "title": "Integrations & Automation",
+        "home": "Home",
+        "untitled_project": "(untitled)",
+        "priority_low": "LOW",
+        "priority_medium": "MEDIUM",
+        "priority_high": "HIGH",
+        "slack_channel_ph": "#general",
         "soon": "Coming soon",
         "active": "Active",
         "paused": "Paused",
