@@ -167,9 +167,15 @@ npm start
 Migrations run automatically at boot before the server starts listening; each one is recorded in `global.schema_versions` with its duration and, for per-company steps, the outcome per company. A failed migration does not stop the server: `/health` reports `migrationError`, the Upgrade page shows which step failed and why, and the next boot (or **Run pending migrations**) retries it. Set `MIGRATIONS_AUTO=false` to run them by hand instead:
 
 ```bash
-npm run migrate:status   # what is applied and what is pending
-npm run migrate          # apply what is pending
+npm run migrate:status          # what is applied and what is pending
+npm run migrate -- up --dry-run  # what the pending ones would write, without writing it
+npm run migrate                 # apply what is pending
+npm run migrate -- verify       # re-check what the applied ones guarantee, read-only
 ```
+
+`up --dry-run` runs each pending migration's own code with every database write refused at the driver and recorded instead, then prints, per migration, each collection it would write, the operation, how many calls in how many databases, how many documents match, and the field names of the filter and update. Values and documents are never printed. Nothing is marked applied and no lock is taken. A migration that reads back what it (or an earlier pending one) would have written is listed as **cannot dry-run** with the collection it reads, because its plan would describe the old data. It exits 1 only when a migration throws under the dry run.
+
+`verify` runs the optional `verify` check of every applied migration with writes refused and prints `pass`, `fail` (with the problems, by record id and count) or `no check`. It exits 1 when any check fails.
 
 Take a backup before upgrading; the Upgrade page says so and the Backups page is one click away.
 
@@ -286,4 +292,4 @@ answers `200 {"status":"ok", "db":{"ok":true,...}}` or `503 {"status":"degraded"
 
 ### Scripts
 
-`npm run setup` (first install), `npm start`, `npm run migrate:status`, `npm run migrate`, `npm test`.
+`npm run setup` (first install), `npm start`, `npm run migrate:status`, `npm run migrate` (`-- up --dry-run`, `-- verify`), `npm test`.

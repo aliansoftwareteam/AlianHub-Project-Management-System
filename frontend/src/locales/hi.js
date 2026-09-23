@@ -6386,7 +6386,12 @@ export default {
         "This_message_is_deleted": "यह संदेश हटा दिया गया है",
         "You_deleted_this_message": "आपने यह संदेश हटा दिया है",
         "no_user_found": "कोई उपयोगकर्ता नहीं मिला",
-        "unlock_comment_view": "टिप्पणी दृश्य अनलॉक करने के लिए"
+        "unlock_comment_view": "टिप्पणी दृश्य अनलॉक करने के लिए",
+        "agent_tag": "AGENT",
+        "an_agent": "An agent",
+        "ai_assistant": "AI assistant",
+        "cited_page": "page",
+        "cited_page_hidden": "a page you cannot open"
     },
     "PlaceHolder": {
         "enter_task_type": "कार्य प्रकार दर्ज करें",

@@ -81,6 +81,7 @@ A fresh database redirects every address to `http://localhost:4000/#/setup`, whe
 | `npm run check-version` | Verify app version |
 | `npm run setup` | Install deps, write `.env`, build the web app, start |
 | `npm run migrate:status` / `npm run migrate` | Inspect / apply database migrations by hand (they also run at boot) |
+| `npm run migrate -- up --dry-run` / `npm run migrate -- verify` | Plan the pending migrations without writing / re-check the applied ones read-only |
 
 ## Frontend Build
 

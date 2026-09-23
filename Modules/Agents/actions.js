@@ -110,6 +110,7 @@ const context = (actor, action, depth) => {
     return {
         ruleId: null, ruleName: a.label, runId: actor.runId || null, action: `agent.${action}`, depth: clampDepth(depth),
         userId: String(actor.userId || a.actorId || ''), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null,
+        agentName: a.actorType === 'agent' ? a.label : null,
         auditedByCaller: true,
     };
 };

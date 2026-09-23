@@ -219,6 +219,7 @@ async function applySavedSettings() {
 
 (async () => {
     await applySavedSettings();
+    await require('./Modules/Audit/keyGuard').guardAtBoot();
     if (!process.env.STORAGE_TYPE) applyEnvMap({ STORAGE_TYPE: 'wasabi' });
     if (process.env.MONGODB_URL) {
         initializeControllers();

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-/* npm run migrate -- status | up | down <id> [--confirm]
+/* npm run migrate -- status | up [--dry-run] | verify | down <id> [--confirm]
  * The same runner the server uses at boot, for operators who set
  * MIGRATIONS_AUTO=false or want to see what a new version will do first.
+ * `up --dry-run` runs the pending migrations with every write refused and prints
+ * what each would write; `verify` runs the read-only checks of applied migrations.
  * `down` reverts one migration that defines down(); a migration that rewrites
  * data (007 decrypts every integration secret) refuses without --confirm. */
 const path = require('path');
@@ -16,7 +18,9 @@ const command = positional[0] || 'status';
 
 async function main() {
     if (!process.env.MONGODB_URL) throw new Error('MONGODB_URL is not set.');
-    const { liveDeps, runMigrations, rollbackMigration, migrationStatus } = require('../migrations');
+    if (flags.has('--dry-run') && command !== 'up') throw new Error('--dry-run only applies to up.');
+    const { liveDeps, runMigrations, rollbackMigration, dryRunMigrations, verifyMigrations, migrationStatus } = require('../migrations');
+    const { formatDryRun, formatVerify } = require('../migrations/report');
     const deps = liveDeps();
     deps.logger = console;
 
@@ -39,6 +43,20 @@ async function main() {
         status.failed.forEach((m) => console.log(`  ✗ ${m.id} failed last time: ${m.error}`));
         return;
     }
+    if (command === 'up' && flags.has('--dry-run')) {
+        const result = await dryRunMigrations({ ...deps, guard: deps.installWriteGuard() });
+        console.log(formatDryRun(result));
+        const failed = result.results.filter((r) => r.status === 'failed').length;
+        if (failed) throw new Error(`${failed} migration(s) failed under the dry run.`);
+        return;
+    }
+    if (command === 'verify') {
+        const result = await verifyMigrations({ ...deps, guard: deps.installWriteGuard() });
+        console.log(formatVerify(result));
+        const failed = result.results.filter((r) => r.status === 'fail').length;
+        if (failed) throw new Error(`${failed} check(s) failed.`);
+        return;
+    }
     if (command === 'up') {
         const result = await runMigrations(deps);
         if (result.skipped) { console.log(`Skipped: ${result.skipped} (another process is migrating).`); return; }
@@ -47,7 +65,7 @@ async function main() {
         console.log(result.applied.length ? `Applied ${result.applied.length}; ${result.pending.length} pending.` : 'Nothing to do.');
         return;
     }
-    throw new Error(`Unknown command "${command}". Use: status | up | down <id> [--confirm]`);
+    throw new Error(`Unknown command "${command}". Use: status | up [--dry-run] | verify | down <id> [--confirm]`);
 }
 
 main().then(() => process.exit(0)).catch((error) => {

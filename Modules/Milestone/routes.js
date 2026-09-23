@@ -22,16 +22,14 @@ exports.init = (app) => {
     *      addMilestone:
     *        type: object
     *        required:
-    *         - companyId
     *         - projectId
     *         - milestoneObject
     *         - ProjectName
-    *         - userDetail
     *        properties:
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true
@@ -46,8 +44,8 @@ exports.init = (app) => {
     *           description: ProjectName.
     *         userDetail:
     *           type: object
-    *           required: true
-    *           description: userDetail.
+    *           required: false
+    *           description: Ignored; history and notifications name the signed-in user.
     *         milestoneStatusObj:
     *           type: object
     *           required: false
@@ -84,16 +82,14 @@ exports.init = (app) => {
     *      updateMilestone:
     *        type: object
     *        required:
-    *         - companyId
     *         - projectId
     *         - milestoneObject
     *         - ProjectName
-    *         - userDetail
     *        properties:
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true
@@ -108,8 +104,8 @@ exports.init = (app) => {
     *           description: ProjectName.
     *         userDetail:
     *           type: object
-    *           required: true
-    *           description: userDetail.
+    *           required: false
+    *           description: Ignored; history and notifications name the signed-in user.
     *         milestoneStatusObj:
     *           type: object
     *           required: false
@@ -159,16 +155,14 @@ exports.init = (app) => {
     *      deleteMilestone:
     *        type: object
     *        required:
-    *         - companyId
     *         - projectId
     *         - milestoneObjForDelete
     *         - ProjectName
-    *         - userDetail
     *        properties:
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true
@@ -183,8 +177,8 @@ exports.init = (app) => {
     *           description: ProjectName.
     *         userDetail:
     *           type: object
-    *           required: true
-    *           description: userDetail.
+    *           required: false
+    *           description: Ignored; history and notifications name the signed-in user.
     *         onlyNumber:
     *           type: number
     *           required: true
@@ -221,16 +215,14 @@ exports.init = (app) => {
     *      clearMilestoneStatus:
     *        type: object
     *        required:
-    *         - companyId
     *         - projectId
     *         - milestoneObject
     *         - ProjectName
-    *         - userDetail
     *        properties:
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true
@@ -245,8 +237,8 @@ exports.init = (app) => {
     *           description: ProjectName.
     *         userDetail:
     *           type: object
-    *           required: true
-    *           description: userDetail.
+    *           required: false
+    *           description: Ignored; history and notifications name the signed-in user.
     */
     /**
      * @swagger
@@ -279,16 +271,14 @@ exports.init = (app) => {
     *      cancelMilestoneStatus:
     *        type: object
     *        required:
-    *         - companyId
     *         - projectId
     *         - milestoneObject
     *         - ProjectName
-    *         - userDetail
     *        properties:
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true
@@ -303,8 +293,8 @@ exports.init = (app) => {
     *           description: ProjectName.
     *         userDetail:
     *           type: object
-    *           required: true
-    *           description: userDetail.
+    *           required: false
+    *           description: Ignored; history and notifications name the signed-in user.
     *         statusObj:
     *           type: object
     *           required: false
@@ -345,14 +335,13 @@ exports.init = (app) => {
     *      refundAmount:
     *        type: object
     *        required:
-    *         - companyId
     *         - projectId
     *         - milestoneObject
     *        properties:
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true
@@ -397,14 +386,13 @@ exports.init = (app) => {
     *      draggableMilestone:
     *        type: object
     *        required:
-    *         - companyId
     *         - projectId
     *         - milestoneObject
     *        properties:
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true

@@ -153,6 +153,7 @@ const auditChainAnchorsSchema = new Schema(schema.auditChainAnchors, {strict: tr
 auditChainAnchorsSchema.index({ seq: -1 }, { unique: true, name: 'audit_anchor_seq' });
 const auditChainProgressSchema = new Schema(schema.auditChainProgress, {strict: true, timestamps: false});
 const auditRedactionsSchema = new Schema(schema.auditRedactions, {strict: true, timestamps: true});
+const auditChainKeySchema = new Schema(schema.auditChainKey, {strict: true, timestamps: false});
 const secretsSchema = new Schema(schema.secrets, {strict: true, timestamps: false});
 secretsSchema.index({ handle: 1 }, { unique: true, name: 'secrets_handle' });
 secretsSchema.index({ createdAt: -1 });
@@ -494,6 +495,7 @@ module.exports = {
     auditChainAnchorsSchema,
     auditChainProgressSchema,
     auditRedactionsSchema,
+    auditChainKeySchema,
     egressAllowlistsSchema,
     agentSessionsSchema,
     agentSessionEndpointsSchema,

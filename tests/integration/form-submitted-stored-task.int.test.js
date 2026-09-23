@@ -1,4 +1,6 @@
+const { MongoClient, ObjectId } = require('mongodb');
 const { createProject, listSprints, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
+const { resolveMongoUrl } = require('../../e2e/support/env');
 
 /* Follow-up 81. A rule on form.submitted is handed the event's data as its task. When the
  * submission files a task, that task must be the stored row, carrying its _id; with task
@@ -27,6 +29,7 @@ const submitPublicForm = (token, fields) => fetch(new URL(`/form/${token}`, stat
 });
 
 let owner;
+let client;
 let project;
 let sprintId;
 const ruleIds = [];
@@ -62,9 +65,13 @@ const finishedRun = (ruleId) => waitFor(async () => {
     return rows.length && rows.every((run) => FINISHED_RUN.includes(run.status)) ? rows : null;
 });
 
+// The runs endpoint answers only what the run history shows, so the envelope the engine stored is read from the row.
+const storedRun = (run) => client.db(state.companyId).collection('automation_runs').findOne({ _id: new ObjectId(String(run._id)) });
+
 const submissionsOf = async (form) => (await owner.api.get(`/api/v2/forms/${form._id}/submissions`)).body.data.submissions;
 
 beforeAll(async () => {
+    client = await MongoClient.connect(resolveMongoUrl());
     owner = await loginAs('owner');
     project = await createProject(owner.api, { name: `[QA fu81] ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid });
     sprintId = String((await listSprints(owner.api, project._id))[0]._id);
@@ -72,6 +79,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
     for (const id of ruleIds) await owner.api.delete(`/api/v2/automations/${id}`).catch(() => null);
+    await client.close();
 });
 
 describe('form.submitted on a form that files a task', () => {
@@ -94,8 +102,9 @@ describe('form.submitted on a form that files a task', () => {
     it('hands the rule the stored task, whose _id is the task the submission filed', async () => {
         const taskId = String(submission.taskId);
         expect(run.entity).toMatchObject({ kind: 'task', id: taskId });
-        expect(run.envelope.data._id).toBe(taskId);
-        expect(run.envelope.data.taskId).toBe(taskId);
+        const { envelope } = await storedRun(run);
+        expect(envelope.data._id).toBe(taskId);
+        expect(envelope.data.taskId).toBe(taskId);
         const stored = await owner.api.get(`/api/v1/task/${taskId}`);
         expect(stored.status).toBe(200);
         expect(JSON.stringify(stored.body)).toContain(taskId);
@@ -121,7 +130,8 @@ describe('form.submitted on a form that files no task', () => {
 
         const [run] = await finishedRun(ruleId);
         expect(run.entity).toMatchObject({ kind: 'form', id: String(form._id) });
-        expect(run.envelope.data).toMatchObject({ formId: String(form._id), submissionId: String(submission._id), taskId: null });
-        expect(run.envelope.data).not.toHaveProperty('_id');
+        const { envelope } = await storedRun(run);
+        expect(envelope.data).toMatchObject({ formId: String(form._id), submissionId: String(submission._id), taskId: null });
+        expect(envelope.data).not.toHaveProperty('_id');
     });
 });
