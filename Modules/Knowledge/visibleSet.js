@@ -53,9 +53,16 @@ const attachmentProjects = async (companyId, uid, privileged, projectIds) => {
     return projectIds.filter((projectId, at) => granted[at]);
 };
 
+/* An API token narrowed to some projects reads inside them only, and, as the MCP tools hold it,
+ * reaches nothing filed under no project. An empty list is a token that is not narrowed. */
+const tokenNarrowing = (tokenProjectIds) => {
+    const allowed = (Array.isArray(tokenProjectIds) ? tokenProjectIds : []).map(String);
+    return allowed.length ? allowed : null;
+};
+
 const resolveVisibleSet = async ({ companyId, caller, scope } = {}) => {
     const company = String(companyId || '');
-    const { kind, userId, agentId = null, runId = null } = caller || {};
+    const { kind, userId, agentId = null, runId = null, tokenProjectIds = [] } = caller || {};
     const uid = String(userId || '');
     if (!OBJECT_ID.test(company)) throw new RetrievalRefused('A valid companyId is required.');
     if (!CALLER_KINDS.includes(kind)) throw new RetrievalRefused(`Unknown caller kind: ${kind}.`);
@@ -65,7 +72,8 @@ const resolveVisibleSet = async ({ companyId, caller, scope } = {}) => {
     if (roleType === null || roleType === undefined) throw new RetrievalRefused('The caller holds no role in this company.');
     const privileged = isPrivileged(roleType);
 
-    const visible = (await visibleProjectIds(company, uid)).map(String);
+    const narrowing = tokenNarrowing(tokenProjectIds);
+    const visible = (await visibleProjectIds(company, uid)).map(String).filter((id) => !narrowing || narrowing.includes(id));
     const projectId = scope && scope.projectId ? String(scope.projectId) : null;
     const projectIds = projectId ? visible.filter((id) => id === projectId) : visible;
     const hidden = privileged || !projectIds.length ? [] : await hiddenSprintIds(company, uid, projectIds);
@@ -82,6 +90,7 @@ const resolveVisibleSet = async ({ companyId, caller, scope } = {}) => {
         hiddenSprintIds: hidden.map(String),
         fileProjectIds,
         sourceTypes: SOURCE_TYPES.filter((type) => wanted.includes(type)),
+        ...(narrowing ? { projectBound: true, reachesProjectless: false } : {}),
     };
 };
 

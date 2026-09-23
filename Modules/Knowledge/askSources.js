@@ -2,12 +2,12 @@ const { retrieve } = require('./retrieval');
 
 /* Ask's source list, gathered through the retrieval interface. A project the caller
  * cannot open is ignored rather than refused, as Ask has always done with it. */
-const askSources = async ({ companyId, uid, question, projectId, projects, limit }) => {
+const askSources = async ({ companyId, uid, question, projectId, projects, limit, tokenProjectIds = [] }) => {
     const nameById = {};
     (projects || []).forEach((p) => { nameById[String(p._id)] = p.ProjectName || ''; });
     const scope = projectId && nameById[String(projectId)] !== undefined ? { projectId: String(projectId) } : {};
 
-    const { passages } = await retrieve({ companyId, caller: { kind: 'user', userId: uid }, query: question, scope, limit });
+    const { passages } = await retrieve({ companyId, caller: { kind: 'user', userId: uid, ...(tokenProjectIds.length ? { tokenProjectIds } : {}) }, query: question, scope, limit });
     return passages.map((p) => ({
         kind: p.sourceType,
         id: p.sourceId,
