@@ -1,7 +1,6 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-23T16:23:41.045Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_available_on_paid_plans_upgrade_now": "AI is only available for purchase on our paid plans. Upgrade and add AI now!",
@@ -1574,6 +1573,7 @@
     "Auth.verify_first_title": "Verify your email first",
     "Auth.verify_ok_body": "You can log in now.",
     "Auth.verify_ok_title": "Email verified",
+    "Auth.verify_resent_body": "We sent a new verification link to your email address. Click it, then log in.",
     "Auth.visibility": "Visibility",
     "Auth.welcome_back": "Welcome back",
     "Auth.work_email": "Work email",
