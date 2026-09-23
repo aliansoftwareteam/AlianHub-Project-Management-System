@@ -5,6 +5,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const runs = require('./runs');
 const { visibilityStage } = require('../Tasks/helpers/taskQueryGuard');
+const { resolveSheetScope, scopedTimeMatch, SHEET_PERMISSION } = require('../TimeSheet/helpers/timeScope');
 
 // The Team board (handoff 13h): who is on what right now, people and agents in
 // one list.
@@ -38,11 +39,12 @@ const liveTimers = async (companyId) => {
     return rows || [];
 };
 
-const loggedThisWeek = async (companyId) => {
+/* Other people's hours follow the workload timesheet's rule for the same numbers. */
+const loggedThisWeek = async (companyId, sheetScope) => {
     const from = Math.floor(weekStart().getTime() / 1000);
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TIMESHEET,
-        data: [[{ $match: { LogStartTime: { $gte: from } } },
+        data: [[{ $match: { ...scopedTimeMatch(sheetScope), LogStartTime: { $gte: from } } },
                 { $group: { _id: '$Loggeduser', minutes: { $sum: '$LogTimeDuration' } } }]],
     }, 'aggregate').catch(() => []);
     const byUser = {};
@@ -98,12 +100,16 @@ const assigneeIds = (task) => {
  * how loaded they are this week. A task the viewer cannot open is never named:
  * the row says only that its person or agent is busy. */
 const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
-    const taskFilter = await taskFilterFor(companyId, viewerId);
+    const [taskFilter, sheetScope] = await Promise.all([
+        taskFilterFor(companyId, viewerId),
+        resolveSheetScope(companyId, viewerId, SHEET_PERMISSION.workload),
+    ]);
     const scoped = Object.keys(taskFilter).length > 0;
+    const showsHoursOf = (uid) => sheetScope.everyone || uid === sheetScope.uid;
     const [members, timers, weekMinutes, pto, tasks, agents, openRuns, recentRuns] = await Promise.all([
         MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [{ isDelete: { $ne: true } }, { userId: 1, userEmail: 1, roleType: 1, status: 1 }] }, 'find').catch(() => []),
         liveTimers(companyId),
-        loggedThisWeek(companyId),
+        loggedThisWeek(companyId, sheetScope),
         activePto(companyId),
         inProgressTasks(companyId, taskFilter),
         MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { createdAt: 1 } }] }, 'find').catch(() => []),
@@ -145,6 +151,7 @@ const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
         const leave = ptoByUser[uid];
         const mine = tasksByUser[uid] || [];
         const minutes = Number(weekMinutes[uid] || 0);
+        const showHours = showsHoursOf(uid);
         const onLeaveNow = leave && new Date(leave.startDate) <= new Date() && new Date(leave.endDate) >= new Date();
         const timerTask = timer ? timerTaskById[String(timer.TicketID)] : null;
         const timerHidden = Boolean(scoped && timer && !timerTask);
@@ -160,14 +167,14 @@ const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
                 taskId: timerHidden ? '' : String(timer.TicketID || ''),
                 taskName: timerTask ? timerTask.TaskName : '',
                 hidden: timerHidden,
-                elapsedMs: Math.max(0, now - (Number(timer.LogStartTime) || 0) * 1000),
+                elapsedMs: showHours && !timerHidden ? Math.max(0, now - (Number(timer.LogStartTime) || 0) * 1000) : null,
             } : null,
             nowOn: timerTask ? timerTask.TaskName : (!timerHidden && mine[0] ? mine[0].TaskName : ''),
             nowOnHidden: timerHidden,
             openTasks: mine.length,
-            loggedHours: hours(minutes * 60000),
+            loggedHours: showHours ? hours(minutes * 60000) : null,
             capacityHours: hoursPerWeek,
-            load: hoursPerWeek ? Math.round((hours(minutes * 60000) / hoursPerWeek) * 100) : 0,
+            load: showHours ? (hoursPerWeek ? Math.round((hours(minutes * 60000) / hoursPerWeek) * 100) : 0) : null,
             pto: leave ? { from: leave.startDate, to: leave.endDate, type: leave.type || 'pto', active: Boolean(onLeaveNow) } : null,
             status: onLeaveNow ? 'away' : (timer ? 'working' : (profile.isOnline ? 'available' : 'offline')),
         };
@@ -218,7 +225,7 @@ const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
         status: r.status,
     }));
 
-    const loads = people.map((p) => p.load);
+    const loads = sheetScope.everyone ? people.map((p) => p.load) : [];
     return {
         people,
         agents: agentRows,
@@ -228,7 +235,7 @@ const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
             agents: agentRows.length,
             running: agentRows.filter((a) => a.status === 'running').length,
             away: people.filter((p) => p.status === 'away').length,
-            load: loads.length ? Math.round(loads.reduce((s, n) => s + n, 0) / loads.length) : 0,
+            load: sheetScope.everyone ? (loads.length ? Math.round(loads.reduce((s, n) => s + n, 0) / loads.length) : 0) : null,
             weekStart: weekStart(),
         },
     };
@@ -254,13 +261,14 @@ const standup = (data) => {
     data.agents.filter((a) => a.run).forEach((a) => {
         lines.push(`${a.name} (agent): ${a.run.taskKey || a.run.taskName || 'running'} · ${Math.round(a.run.elapsedMs / 60000)} min in · $${a.spend.usd.toFixed(2)} this month`);
     });
-    const over = data.people.filter((p) => p.load > 100).map((p) => p.name);
-    const free = data.people.filter((p) => p.status !== 'away' && p.load < 60).map((p) => p.name);
+    const loaded = data.people.filter((p) => typeof p.load === 'number');
+    const over = loaded.filter((p) => p.load > 100).map((p) => p.name);
+    const free = loaded.filter((p) => p.status !== 'away' && p.load < 60).map((p) => p.name);
     return {
         generatedAt: new Date(),
         lines,
         balance: { over, free },
-        headline: `${data.totals.people} people · ${data.totals.agents} agents · ${data.totals.load}% load`,
+        headline: [`${data.totals.people} people`, `${data.totals.agents} agents`, ...(data.totals.load === null ? [] : [`${data.totals.load}% load`])].join(' · '),
     };
 };
 

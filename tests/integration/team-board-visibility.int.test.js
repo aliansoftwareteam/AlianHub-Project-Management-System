@@ -153,7 +153,8 @@ describe('GET /api/v2/agents/team shows task names and logged hours only where t
         const data = await boardAs(member);
         expect(personOf(data, 'owner').loggedHours).toBe(2);
         expect(personOf(data, 'member').loggedHours).toBe(0.5);
-        expect(typeof personOf(data, 'owner').timer.elapsedMs).toBe('number');
+        expect(typeof personOf(data, 'owner').load).toBe('number');
+        expect(personOf(data, 'owner').timer.elapsedMs).toBeNull();
         expect(JSON.stringify(data)).not.toContain(privateName);
         await grantMemberEveryone(null);
     });
