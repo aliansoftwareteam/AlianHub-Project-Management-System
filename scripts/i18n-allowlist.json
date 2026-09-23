@@ -1,6 +1,3 @@
 {
-  "files": {
-    "frontend/src/components/molecules/Home/SetupChecklist.vue": 1,
-    "frontend/src/views/Authentication/Login/Login.vue": 1
-  }
+  "files": {}
 }
