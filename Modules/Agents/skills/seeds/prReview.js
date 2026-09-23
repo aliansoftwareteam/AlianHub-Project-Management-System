@@ -1,6 +1,6 @@
-// pr.summary written in the skill vocabulary (ADR 003 phase 4), resolved in
-// place of ../prReview.js when PR_SUMMARY_AS_DATA is on.
-// tests/agent-pr-summary-data.test.js holds the two to the same comment.
+// pr.summary (alias risk.flags), the only version there is: it runs while
+// SKILL_EXTERNAL_READS is on and is listed as unavailable while it is off.
+// tests/agent-pr-summary-data.test.js holds it to the comment the retired code skill posted.
 
 const REVIEW = '{{answer.summary | clip:2000}}{{^answer.summary}}Reviewed {{input.pr_link}}.{{/answer.summary}}';
 

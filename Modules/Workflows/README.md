@@ -180,9 +180,11 @@ time changes.
 
 The number is the smallest of the ones that are set: the loop step's own
 `maxRunsPerHour`, the rule's stored `limits.maxRunsPerHour` when the run came
-from a rule, and `WORKFLOW_MAX_RUNS_PER_HOUR`. Zero or absent is no limit, the
-same convention `rateLimitPerDay` uses, and when none of the three is set a loop
-is bounded by its iterations and its budget exactly as before.
+from a rule, and `WORKFLOW_MAX_RUNS_PER_HOUR`. Zero or absent is no limit, and
+when none of the three is set a loop is bounded by its iterations and its budget
+exactly as before. `rateLimitPerDay` differs on absent: an agent with no stored
+limit gets the default of 40 (`Agents/dailyRunLimit.js`); only a stored 0 means
+no daily limit.
 
 Counting is per company and per agent over a rolling hour, and it costs one
 query per agent per `WORKFLOW_RUN_LIMIT_CACHE_MS`, not one per iteration: the

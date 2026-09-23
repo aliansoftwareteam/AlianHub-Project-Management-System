@@ -52,7 +52,7 @@ describe('where the hourly limit comes from', () => {
         expect(await runLimit.limitFor(COMPANY, { ruleId: 'r1' }, { maxRunsPerHour: 50 })).toBe(3);
     });
 
-    it('treats zero as no limit, the way rateLimitPerDay always has', async () => {
+    it('treats zero as no limit, the way a stored rateLimitPerDay of 0 does', async () => {
         expect(await runLimit.limitFor(COMPANY, {}, { maxRunsPerHour: 0 })).toBe(0);
         expect(await runLimit.check(COMPANY, AGENT, 0)).toMatchObject({ ok: true, limit: 0 });
         expect(reads()).toBe(0);
