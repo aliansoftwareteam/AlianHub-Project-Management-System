@@ -34,6 +34,15 @@ describe('Planner', () => {
     });
 });
 
+describe('Settings → Custom fields', () => {
+    const css = read('plugins/customFieldView/component/organisms/FieldBuilder/style.css');
+
+    test('the builder grid out-specifies .ah-page, so the editor sits beside the list', () => {
+        expect(ruleBody(css, '.ah-page.fb')).toMatch(/display:\s*grid/);
+        expect(css).not.toMatch(/(^|\s)\.fb\s*\{/m);
+    });
+});
+
 describe('Docs hub', () => {
     const vue = read('views/Pages/PagesSpace.vue');
     const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));
