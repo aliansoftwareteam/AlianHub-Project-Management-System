@@ -430,9 +430,10 @@ module.exports = {
     },
 
 
-    updateTaskTotalEstimate({firebaseObj,projectData ,taskData , obj, userData}) {
+    updateTaskTotalEstimate({firebaseObj,projectData ,taskData , obj, userData, storedTask}) {
         return new Promise((resolve,reject) => {
             try {
+                const previousEstimate = Number(storedTask && storedTask.totalEstimatedTime) || 0;
                 const query = {
                     type: dbCollections.TASKS,
                     data: [
@@ -443,7 +444,7 @@ module.exports = {
                                 ...firebaseObj,
                                 // AHE — flag the task for the TL on a RE-update (an estimate
                                 // already existed). First-time set (previous 0/undefined) never flags.
-                                ...(Number(obj.previousEstimatedTime) > 0 ? { estimateChangedFlag: true } : {})
+                                ...(previousEstimate > 0 ? { estimateChangedFlag: true } : {})
                             }
                         },
                         {returnDocument: "after"}
@@ -455,7 +456,7 @@ module.exports = {
                     updateRemainingTime(projectData.CompanyId,taskData._id);
                     resolve({status: true, statusText: "Task total estimate update successfully"});
                     const updatedDisplayText = convertToDisplayFormat(firebaseObj.totalEstimatedTime);
-                    const previousDisplayText = convertToDisplayFormat(obj.previousEstimatedTime);
+                    const previousDisplayText = convertToDisplayFormat(previousEstimate);
                     let editTaskObj = {
                         'TaskName' : taskData.TaskName,
                         'UserName': userData.Employee_Name,

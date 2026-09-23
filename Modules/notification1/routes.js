@@ -1,8 +1,17 @@
 const { HandleBothNotification } = require('../Tasks/helpers/handleNotification');
 const { HandleHistory } = require('../Tasks/helpers/helper');
 
+const planHistory = require('../EstimatedTime/helpers/planHistory');
+
 const NOTIFICATION_TYPES = ['project', 'tasks', 'task', 'chat'];
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+/* The server records these changes when they are saved; web apps built before that still post their own text here. */
+const SERVER_BUILT_HISTORY = [{ type: 'task', key: planHistory.HISTORY_KEY }];
+const SERVER_BUILT_NOTIFICATIONS = [planHistory.NOTIFICATION_KEY];
+const keyOf = (body) => (isPlainObject(body) && isPlainObject(body.object) ? body.object.key : undefined);
+const serverBuiltHistory = (body) => SERVER_BUILT_HISTORY.some((entry) => body.type === entry.type && keyOf(body) === entry.key);
+const serverBuiltNotification = (body) => SERVER_BUILT_NOTIFICATIONS.includes(keyOf(body));
 
 function notificationBodyError(body) {
     if (!NOTIFICATION_TYPES.includes(body.type)) return `type must be one of ${NOTIFICATION_TYPES.join(', ')}`;
@@ -136,6 +145,9 @@ exports.init = (app) => {
      * Send Notification Mail API
      */
     app.post('/api/v1/handleHistory', (req, res) => {
+        if (isPlainObject(req.body) && serverBuiltHistory(req.body)) {
+            return res.send({ status: true, statusText: 'History is recorded by the server.' });
+        }
         HandleHistory.apply(null, Object.values(req.body))
         .then(() => {
             res.send({status: true, statusText: "History added successfully."});
@@ -223,6 +235,9 @@ exports.init = (app) => {
         const invalid = notificationBodyError(body);
         if (invalid) {
             return res.status(400).send({ status: false, statusText: invalid });
+        }
+        if (serverBuiltNotification(body)) {
+            return res.send({ status: true, statusText: 'Notification is sent by the server.' });
         }
         return HandleBothNotification({ ...body, companyId: sessionCompanyId })
             .then(() => {
