@@ -91,6 +91,6 @@ describe('phone touch targets', () => {
     test('Members row controls reach 40px', () => {
         const phone = phoneBlocks(read('views/Settings/Members/style.css'));
         expect(ruleBody(phone, '.mbv__role-select')).toMatch(/height:\s*40px/);
-        expect(ruleBody(phone, '.mbv__dots')).toMatch(/height:\s*40px/);
+        expect(ruleBody(phone, '.mbv__actions .mbv__dots')).toMatch(/height:\s*40px/);
     });
 });

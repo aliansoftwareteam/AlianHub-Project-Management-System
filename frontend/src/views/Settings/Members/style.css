@@ -161,6 +161,6 @@
     .mbv__bar .ah-tab { min-height: 36px; }
     .mbv__search { height: 40px; }
     .mbv__role-select { height: 40px; }
-    .mbv__dots { min-width: 40px; height: 40px; }
+    .mbv__actions .mbv__dots { min-width: 40px; height: 40px; }
     .mbv__pop { top: 40px; }
 }
