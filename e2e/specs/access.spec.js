@@ -41,12 +41,11 @@ test.describe('access screens as the owner', () => {
 test.describe('access — SSO admin config is refused for a member', () => {
     test.use(asRole('member'));
 
+    // The settings shell sends a member away from pages their menu hides, so the page never asks;
+    // the member's own session asks the server directly.
     test('the SSO config request is 403 for a member', async ({ page, state }) => {
-        const configResponse = page.waitForResponse(
-            (res) => res.url().includes('/api/v2/sso/config'),
-            { timeout: 30000 },
-        );
         await page.goto(`/#/${state.companyId}/settings/sso`);
-        expect((await configResponse).status()).toBe(403);
+        const res = await page.request.get('/api/v2/sso/config', { headers: { companyid: state.companyId } });
+        expect(res.status()).toBe(403);
     });
 });
