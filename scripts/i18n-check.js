@@ -112,7 +112,8 @@ function templateOf(source) {
 const ATTR = new RegExp(`(^|\\s)(${ATTRS.join('|')})=("([^"]*)"|'([^']*)')`, 'g');
 
 /* Walks tags and text by hand: a `>` inside an attribute value (`w > 767`, `=>`)
-   must not end the tag, which a regex over the raw template gets wrong. */
+   must not end the tag, and a `<` inside an interpolation (`{{ i < 9 }}`) must
+   not start one, which a regex over the raw template gets wrong. */
 function scanTemplate(template) {
     const findings = [];
     const lineOf = (index) => template.slice(0, index).split('\n').length;
@@ -139,9 +140,21 @@ function scanTemplate(template) {
             let m;
             ATTR.lastIndex = 0;
             while ((m = ATTR.exec(tag))) flag(start, m[2], m[4] !== undefined ? m[4] : m[5]);
+            // A command or an env var name inside <code> must stay verbatim in every language.
+            if (/^<code(\s|$)/i.test(tag) && !tag.endsWith('/')) {
+                const close = template.toLowerCase().indexOf('</code', i);
+                i = close === -1 ? template.length : close;
+            }
         } else {
             const start = i;
-            while (i < template.length && template[i] !== '<') i += 1;
+            while (i < template.length && template[i] !== '<') {
+                if (template.startsWith('{{', i)) {
+                    const close = template.indexOf('}}', i + 2);
+                    i = close === -1 ? template.length : close + 2;
+                } else {
+                    i += 1;
+                }
+            }
             flag(start, 'text', template.slice(start, i));
         }
     }
