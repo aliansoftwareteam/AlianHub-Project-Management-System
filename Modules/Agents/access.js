@@ -31,6 +31,12 @@ const canActAsAgent = (caller, agentId) => Boolean(caller && isAgent(caller.acto
 /* null means every project; otherwise the ids the caller may open. */
 const visibleProjectIdsFor = async (companyId, caller) => (caller.privileged ? null : (await scope.visibleProjectIds(companyId, caller.actor.userId)).map(String));
 
+/* projectScoped keeps an agent limited to projects the viewer cannot open from reading as unrestricted. */
+const agentProjectsFor = (agent, visible) => {
+    const all = ((agent && agent.projectIds) || []).map(String);
+    return { projectIds: visible ? all.filter((id) => visible.includes(id)) : all, projectScoped: all.length > 0 };
+};
+
 const projectScope = (projectIds) => (projectIds ? { projectId: { $in: projectIds } } : {});
 
 const REFUSAL = Object.freeze({
@@ -42,5 +48,5 @@ const REFUSAL = Object.freeze({
 
 module.exports = {
     privileged, humanActor, callerOf, canManageAgents, canControlRun, canUndoDecision, canActAsAgent,
-    visibleProjectIdsFor, projectScope, REFUSAL,
+    visibleProjectIdsFor, agentProjectsFor, projectScope, REFUSAL,
 };

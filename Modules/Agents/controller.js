@@ -64,7 +64,7 @@ const idempotencyKeyOf = (req) => {
     return raw;
 };
 
-const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, REFUSAL } = access;
+const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, agentProjectsFor, REFUSAL } = access;
 
 const refuseUnlessManager = (res, caller, agentsMessage) => {
     if (!caller.human) return fail(res, agentsMessage, 403);
@@ -128,8 +128,12 @@ exports.listAgents = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
-        const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { createdAt: 1 } }] }, 'find');
-        return res.send({ status: true, statusText: 'Agents fetched.', data: await skillRecord.enrichAgentSkills(companyId, rows || []) });
+        const [rows, visible] = await Promise.all([
+            MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { createdAt: 1 } }] }, 'find'),
+            callerOf(req, companyId).then((caller) => visibleProjectIdsFor(companyId, caller)),
+        ]);
+        const agents = await skillRecord.enrichAgentSkills(companyId, rows || []);
+        return res.send({ status: true, statusText: 'Agents fetched.', data: agents.map((agent) => ({ ...agent, ...agentProjectsFor(agent, visible) })) });
     } catch (e) { logger.error(`listAgents: ${e.message}`); return fail(res, e.message, 500); }
 };
 

@@ -90,6 +90,7 @@ import RunTaskPicker from "./RunTaskPicker.vue";
 import { useAgents, autonomyOf } from "./useAgents";
 import { AGENT_TEMPLATES } from "./agentTemplates";
 import { requirementsOf } from "./skillInputs";
+import { projectScopeOf } from "./agentFit";
 import { useAgentAccess } from "./agentAccess";
 
 defineOptions({ name: "AiHubPage" });
@@ -135,8 +136,8 @@ const autonomyChip = (agent) => {
 const ladderLabel = (step) => t(`Ai.autonomy_${step.level}`);
 
 const scopeOf = (agent) => {
-    const ids = agent.projectIds || [];
-    return ids.length ? t("Ai.scope_projects", { n: ids.length }) : t("Ai.scope_none");
+    const projects = projectScopeOf(agent);
+    return projects.scoped ? t("Ai.scope_projects", { n: projects.ids.length }) : t("Ai.scope_none");
 };
 
 const monthLine = (agent) => {
