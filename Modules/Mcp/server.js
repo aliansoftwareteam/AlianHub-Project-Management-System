@@ -130,7 +130,7 @@ const logActivity = (ctx, statusCode) => {
  * is never authorization (MCP 2025-11-25, "Session Hijacking"). Membership is
  * checked on every call, so a removed member is cut off on the next request,
  * not when the token expires. */
-const namedCompanies = (req) => [req.query.companyId, req.headers.companyid].filter(Boolean).map(String);
+const namedCompanies = (req) => [req.query.companyId, req.headers.companyid].filter(Boolean).map(String); // tenant-scoping: MCP clients name the workspace in the endpoint URL; the bearer token must be issued for it and its user must hold a seat there
 
 const calledTool = (req) => {
     const call = messagesOf(req.body).find((message) => message && message.method === 'tools/call');

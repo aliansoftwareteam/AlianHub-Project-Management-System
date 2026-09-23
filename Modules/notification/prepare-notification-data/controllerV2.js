@@ -47,7 +47,7 @@ exports.handleNotificationtFun = (req) => {
         });
         return;
       }
-      if (!(req.body && req.body.companyId)) {
+      if (!(req.body && req.body.companyId)) { // tenant-scoping: internal callers pass a payload built from trusted data, and handleNotification pins the HTTP one to the session
         resolve({
           status: false,
           message: "companyId is required."
