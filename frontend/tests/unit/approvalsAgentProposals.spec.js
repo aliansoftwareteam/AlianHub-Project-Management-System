@@ -133,5 +133,8 @@ describe('Approvals — agent proposals', () => {
         expect(wrapper.findAll('.ap__card')).toHaveLength(2);
         expect(wrapper.text()).toContain('Dana Reed');
         expect(wrapper.text()).toContain('Sam Ali');
+        expect(wrapper.text()).toContain('Time.agent_load_failed');
+        await showTab(wrapper, 'Time.filter_ai');
+        expect(wrapper.text()).not.toContain('Time.agent_empty');
     });
 });
