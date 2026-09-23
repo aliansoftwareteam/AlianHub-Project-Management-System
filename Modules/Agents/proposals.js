@@ -157,9 +157,13 @@ const skillSourcesOfRuns = async (companyId, rows) => {
     return new Map((found || []).filter((r) => r.skillSource).map((r) => [String(r._id), r.skillSource]));
 };
 
-/* projectIds, when given, is the caller's visible set; the counts follow the same scope. */
-const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds } = {}) => {
-    const scoped = Array.isArray(projectIds) ? { projectId: { $in: projectIds.map(String) } } : {};
+/* projectIds, when given, is the caller's visible set, and hiddenTaskIds the tasks in it they
+ * cannot read; the counts follow the same scope. */
+const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds, hiddenTaskIds } = {}) => {
+    const scoped = {
+        ...(Array.isArray(projectIds) ? { projectId: { $in: projectIds.map(String) } } : {}),
+        ...(Array.isArray(hiddenTaskIds) && hiddenTaskIds.length ? { taskId: { $nin: hiddenTaskIds.map(String) } } : {}),
+    };
     const match = { ...scoped };
     if (status) match.status = String(status);
     if (agentId) match.agentId = String(agentId);
