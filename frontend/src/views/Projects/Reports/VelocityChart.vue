@@ -19,6 +19,7 @@ export default { name: 'VelocityChart' };
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import { downloadReportPdf, chartImage } from './reportsPdf';
 
@@ -26,6 +27,7 @@ const props = defineProps({
     projectData: { type: Object, default: () => ({}) },
 });
 
+const { t } = useI18n();
 const limit = 10;
 const loading = ref(false);
 const rows = ref([]); // [{ name, committed, completed, rollingAvg }]
@@ -35,9 +37,9 @@ const chartRef = ref(null);
 const hasData = computed(() => rows.value.length > 0);
 
 const series = computed(() => [
-    { name: 'Committed', type: 'column', data: rows.value.map((r) => Number(r.committed) || 0) },
-    { name: 'Completed', type: 'column', data: rows.value.map((r) => Number(r.completed) || 0) },
-    { name: 'Avg (3-sprint)', type: 'line', data: rows.value.map((r) => Number(r.rollingAvg) || 0) },
+    { name: t('Reports.velocity_series_committed'), type: 'column', data: rows.value.map((r) => Number(r.committed) || 0) },
+    { name: t('Reports.velocity_series_completed'), type: 'column', data: rows.value.map((r) => Number(r.completed) || 0) },
+    { name: t('Reports.velocity_series_rolling_avg'), type: 'line', data: rows.value.map((r) => Number(r.rollingAvg) || 0) },
 ]);
 
 const chartOptions = computed(() => ({
@@ -49,9 +51,9 @@ const chartOptions = computed(() => ({
     plotOptions: { bar: { columnWidth: '55%' } },
     dataLabels: { enabled: false },
     xaxis: { categories: rows.value.map((r) => r.name) },
-    yaxis: { min: 0, title: { text: 'Story points' } },
+    yaxis: { min: 0, title: { text: t('Reports.velocity_axis_points') } },
     legend: { position: 'top' },
-    title: { text: 'Velocity' },
+    title: { text: t('Reports.velocity') },
 }));
 
 const load = async () => {
@@ -72,10 +74,10 @@ const load = async () => {
 const exportPdf = async () => {
     const image = await chartImage(chartRef);
     await downloadReportPdf('velocity', {
-        title: 'Velocity',
+        title: t('Reports.velocity'),
         filename: 'velocity',
         image,
-        tableHead: ['Sprint', 'Committed', 'Completed', 'Avg (3)'],
+        tableHead: [t('Reports.sprint'), t('Reports.velocity_series_committed'), t('Reports.velocity_series_completed'), t('Reports.velocity_table_rolling_avg')],
         tableRows: rows.value.map((r) => [r.name, r.committed, r.completed, r.rollingAvg]),
     });
 };

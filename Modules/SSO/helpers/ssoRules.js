@@ -81,7 +81,27 @@ const keepVerifications = (verifiedDomains, domains) => {
     const kept = [];
     (Array.isArray(verifiedDomains) ? verifiedDomains : []).forEach((v) => {
         const domain = normalizeDomain(v && v.domain);
-        if (v && v.verifiedAt && listed.includes(domain) && !kept.some((k) => k.domain === domain)) kept.push({ domain, verifiedAt: v.verifiedAt });
+        if (!v || !v.verifiedAt || !listed.includes(domain) || kept.some((k) => k.domain === domain)) return;
+        kept.push({
+            domain,
+            verifiedAt: v.verifiedAt,
+            ...(v.lastCheckedAt ? { lastCheckedAt: v.lastCheckedAt } : {}),
+            ...(Number(v.failedChecks) > 0 ? { failedChecks: Number(v.failedChecks) } : {}),
+        });
+    });
+    return kept;
+};
+
+/* A lapse is shown only while its domain is listed and has not been verified again. */
+const keepLapses = (lapsedDomains, domains, verifiedDomains) => {
+    const listed = normalizeDomains(domains);
+    const verified = keepVerifications(verifiedDomains, domains).map((v) => v.domain);
+    const kept = [];
+    (Array.isArray(lapsedDomains) ? lapsedDomains : []).forEach((l) => {
+        const domain = normalizeDomain(l && l.domain);
+        if (l && l.lapsedAt && listed.includes(domain) && !verified.includes(domain) && !kept.some((k) => k.domain === domain)) {
+            kept.push({ domain, lapsedAt: l.lapsedAt });
+        }
     });
     return kept;
 };
@@ -93,14 +113,22 @@ const isVerifiedDomain = (cfg, domain) => Boolean(domain) && verifiedDomainsOf(c
 const domainRecordsOf = (cfg) => {
     if (!cfg || !cfg.domainVerificationToken) return [];
     const verified = keepVerifications(cfg.verifiedDomains, cfg.domains);
+    const lapsed = keepLapses(cfg.lapsedDomains, cfg.domains, cfg.verifiedDomains);
     return normalizeDomains(cfg.domains).map((domain) => {
         const hit = verified.find((v) => v.domain === domain);
-        return { domain, ...domainTxtRecord(domain, cfg.domainVerificationToken), verifiedAt: hit ? hit.verifiedAt : null };
+        const lapse = lapsed.find((l) => l.domain === domain);
+        return {
+            domain,
+            ...domainTxtRecord(domain, cfg.domainVerificationToken),
+            verifiedAt: hit ? hit.verifiedAt : null,
+            failedChecks: (hit && hit.failedChecks) || 0,
+            lapsedAt: lapse ? lapse.lapsedAt : null,
+        };
     });
 };
 
 module.exports = {
     SSO_PROVIDERS, validateSsoConfig, publicSsoView, extractIdentity,
     normalizeDomain, normalizeDomains, domainOfEmail, domainTxtRecord, txtRecordsInclude,
-    keepVerifications, verifiedDomainsOf, isVerifiedDomain, domainRecordsOf,
+    keepVerifications, keepLapses, verifiedDomainsOf, isVerifiedDomain, domainRecordsOf,
 };

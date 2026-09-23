@@ -16,6 +16,7 @@ export default { name: 'CFDChart' };
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import { downloadReportPdf, chartImage } from './reportsPdf';
 
@@ -23,6 +24,7 @@ const props = defineProps({
     projectData: { type: Object, default: () => ({}) },
 });
 
+const { t } = useI18n();
 const days = 30;
 const loading = ref(false);
 const rows = ref([]); // [{ date, open, inprogress, onhold, close }]
@@ -32,14 +34,14 @@ const chartRef = ref(null);
 // The band colours are data series, not theme colours: they stay literal so the
 // four stacked bands never collapse into the same hue.
 const BANDS = [
-    { key: 'close', label: 'Done', color: '#3aaa6f' },
-    { key: 'onhold', label: 'On hold', color: '#e8a33d' },
-    { key: 'inprogress', label: 'In progress', color: '#2F3990' },
-    { key: 'open', label: 'To do', color: '#9aa0d4' },
+    { key: 'close', label: 'Reports.cfd_band_done', color: '#3aaa6f' },
+    { key: 'onhold', label: 'Reports.cfd_band_on_hold', color: '#e8a33d' },
+    { key: 'inprogress', label: 'Reports.cfd_band_in_progress', color: '#2F3990' },
+    { key: 'open', label: 'Reports.cfd_band_to_do', color: '#9aa0d4' },
 ];
 
 const hasData = computed(() => rows.value.length > 0);
-const series = computed(() => BANDS.map((b) => ({ name: b.label, data: rows.value.map((d) => Number(d[b.key]) || 0) })));
+const series = computed(() => BANDS.map((b) => ({ name: t(b.label), data: rows.value.map((d) => Number(d[b.key]) || 0) })));
 
 const chartOptions = computed(() => ({
     chart: { id: 'cfd', type: 'area', stacked: true, toolbar: { show: false }, animations: { enabled: false } },
@@ -48,9 +50,9 @@ const chartOptions = computed(() => ({
     stroke: { curve: 'straight', width: 1 },
     fill: { type: 'solid', opacity: 0.85 },
     xaxis: { categories: rows.value.map((d) => d.date), labels: { rotate: -45, hideOverlappingLabels: true } },
-    yaxis: { min: 0, title: { text: 'Tasks' } },
+    yaxis: { min: 0, title: { text: t('Reports.cfd_axis_tasks') } },
     legend: { position: 'top' },
-    title: { text: 'Cumulative Flow Diagram' },
+    title: { text: t('Reports.cfd_chart_title') },
 }));
 
 const load = async () => {
@@ -69,7 +71,7 @@ const load = async () => {
 
 const exportPdf = async () => {
     const image = await chartImage(chartRef);
-    await downloadReportPdf('cfd', { title: 'Cumulative Flow Diagram', filename: 'cfd', image });
+    await downloadReportPdf('cfd', { title: t('Reports.cfd_chart_title'), filename: 'cfd', image });
 };
 
 onMounted(load);

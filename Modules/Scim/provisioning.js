@@ -7,6 +7,7 @@ const { domainOfEmail, isVerifiedDomain } = require('../SSO/helpers/ssoRules');
 const { removeCache } = require('../../utils/commonFunctions');
 const logger = require('../../Config/loggerConfig');
 const { SEAT_ACTIVE, SEAT_CANCELLED } = require('../../Config/seatStatus');
+const { ROLE_OWNER } = require('../../Config/roleTypes');
 const knowledgeEvents = require('../Knowledge/ingest/events');
 const { sharedRecordVisible } = require('./helpers/scimRules');
 
@@ -75,13 +76,26 @@ const scimFields = ({ externalId, firstName, lastName }) => {
     return set;
 };
 
-/* A SCIM token speaks for its company's own people only: a member it deactivated earlier, or an address on
- * a domain the company verified for SSO. Everyone else gets the invitation any admin would send. */
-const mayProvisionDirectly = async (companyId, email, existingRow) => {
-    if (existingRow && existingRow.userId && (holdsSeat(existingRow) || Number(existingRow.status) === SCIM_DEACTIVATED)) return true;
+const onVerifiedDomain = async (companyId, email) => {
     const ssoConfig = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SSO_CONFIGS, data: [{ deletedStatusKey: 0 }] }, 'findOne');
     return isVerifiedDomain(ssoConfig, domainOfEmail(email));
 };
+
+/* SCIM before #911 left a deactivated seat for any address it was sent, so a deactivated row proves that
+ * someone was one of the company's people only when SCIM took it from a live seat, they came in through an
+ * invitation, or they own the company. */
+const wasMemberBeforeDeactivation = (row) => Boolean(row) && Number(row.status) === SCIM_DEACTIVATED
+    && (row.scimDeactivatedSeatAt != null || row.sendInvitationTime != null || Number(row.roleType) === ROLE_OWNER);
+
+/* A SCIM token speaks for its company's own people only: a member it deactivated earlier, or an address on
+ * a domain the company verified for SSO. Everyone else gets the invitation any admin would send. */
+const mayProvisionDirectly = async (companyId, email, existingRow) => {
+    if (existingRow && existingRow.userId && (holdsSeat(existingRow) || wasMemberBeforeDeactivation(existingRow))) return true;
+    return onVerifiedDomain(companyId, email);
+};
+
+const mayReactivate = async (companyId, row) => Number(row.status) !== SCIM_DEACTIVATED
+    || wasMemberBeforeDeactivation(row) || onVerifiedDomain(companyId, row.userEmail);
 
 // Create or reactivate a SCIM-managed membership. Reuses the SSO JIT path so a
 // user provisioned by SCIM and a user who later logs in via SSO are the SAME
@@ -140,7 +154,12 @@ const setActive = async (companyId, id, active) => {
         clearUserCaches(companyId, cu.userId);
         return getCompanyUser(companyId, cu._id);
     }
-    await updateRow(companyId, cu, { status: active ? SEAT_ACTIVE : SCIM_DEACTIVATED, isDelete: !active });
+    if (active && !(await mayReactivate(companyId, cu))) return cu;
+    await updateRow(companyId, cu, {
+        status: active ? SEAT_ACTIVE : SCIM_DEACTIVATED,
+        isDelete: !active,
+        ...(!active && holdsSeat(cu) ? { scimDeactivatedSeatAt: new Date() } : {}),
+    });
     clearUserCaches(companyId, cu.userId);
     announceSeatChange(companyId, cu.userId, cu, active);
     return getCompanyUser(companyId, cu._id);

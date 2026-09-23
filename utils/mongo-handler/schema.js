@@ -598,7 +598,19 @@ const schema = {
         // Published as the TXT record _alianhub-sso.<domain> to prove the company controls a domain.
         domainVerificationToken: { type: String, required: false },
         verifiedDomains: {
-            type: [{ _id: false, domain: { type: String, required: true }, verifiedAt: { type: Date, required: true } }],
+            type: [{
+                _id: false,
+                domain: { type: String, required: true },
+                verifiedAt: { type: Date, required: true },
+                // Set by the daily re-check (Modules/SSO/domainRecheck.js); consecutive checks that found no record.
+                lastCheckedAt: { type: Date, required: false },
+                failedChecks: { type: Number, required: false },
+            }],
+            default: [],
+            required: false,
+        },
+        lapsedDomains: {
+            type: [{ _id: false, domain: { type: String, required: true }, lapsedAt: { type: Date, required: true } }],
             default: [],
             required: false,
         },
@@ -2657,6 +2669,8 @@ const schema = {
         scimExternalId: { type: String, required: false },
         scimGivenName: { type: String, required: false },
         scimFamilyName: { type: String, required: false },
+        // Set when SCIM deactivates a live seat; a deactivated row without it may never have been a membership.
+        scimDeactivatedSeatAt: { type: Date, required: false },
         // The userId of this member's manager in the same company. Empty means no
         // reporting line is recorded, which is the normal state for most workspaces.
         managerId: {

@@ -1,15 +1,13 @@
 const crypto = require("crypto");
-const dns = require("dns");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 const {
     validateSsoConfig, publicSsoView, normalizeDomain, normalizeDomains, domainTxtRecord, txtRecordsInclude,
-    keepVerifications, domainRecordsOf,
+    keepVerifications, keepLapses, domainRecordsOf,
 } = require("./helpers/ssoRules");
+const { resolveTxt } = require("./helpers/dnsTxt");
 const logger = require("../../Config/loggerConfig");
-
-const DNS_TIMEOUT_MS = 10000;
 
 const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
 
@@ -36,11 +34,6 @@ const withToken = async (companyId, cfg) => {
 };
 
 const adminView = (cfg) => (cfg ? { ...cfg, domainRecords: domainRecordsOf(cfg) } : null);
-
-const resolveTxt = (name) => Promise.race([
-    dns.promises.resolveTxt(name),
-    new Promise((resolve, reject) => { setTimeout(() => reject(new Error('DNS lookup timed out')), DNS_TIMEOUT_MS).unref(); }),
-]);
 
 /* GET /api/v2/sso/config — owner/admin: the full config (incl. secrets they own). */
 exports.getSsoConfig = async (req, res) => {
@@ -79,6 +72,7 @@ exports.setSsoConfig = async (req, res) => {
             domains: listedDomains,
             domainVerificationToken: (existing && existing.domainVerificationToken) || newVerificationToken(),
             verifiedDomains: keepVerifications(existing && existing.verifiedDomains, listedDomains),
+            lapsedDomains: keepLapses(existing && existing.lapsedDomains, listedDomains, existing && existing.verifiedDomains),
             enforcement: ['optional', 'required', 'required_except_guests'].includes(enforcement) ? enforcement : 'optional',
             updatedBy: actor,
             deletedStatusKey: 0,
@@ -122,7 +116,8 @@ exports.verifySsoDomain = async (req, res) => {
         }
         const verifiedAt = new Date();
         const verifiedDomains = [...keepVerifications(cfg.verifiedDomains, cfg.domains).filter((v) => v.domain !== domain), { domain, verifiedAt }];
-        const saved = await updateConfig(companyId, { verifiedDomains });
+        const lapsedDomains = keepLapses(cfg.lapsedDomains, cfg.domains, verifiedDomains);
+        const saved = await updateConfig(companyId, { verifiedDomains, lapsedDomains });
         try {
             require('../Audit/recorder').recordAuditFromReq(req, { action: 'sso.domain_verified', entityType: 'sso', entityName: domain });
         } catch (e) { /* audit is best-effort */ }
