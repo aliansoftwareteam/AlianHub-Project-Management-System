@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-23T15:38:14.721Z",
+  "updatedAt": "2026-09-23T16:06:44.383Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_available_on_paid_plans_upgrade_now": "AI is only available for purchase on our paid plans. Upgrade and add AI now!",
@@ -8693,6 +8693,7 @@
     "Time.agent_load_failed": "Agent proposals didn't load. Refresh to try again.",
     "Ai.nothing_changed": "Nothing changed, so nothing was saved.",
     "Time.agent_tag": "AGENT",
-    "Time.approval_types": "Approval types"
+    "Time.approval_types": "Approval types",
+    "Ai.rate_limit_hint": "0 means no daily limit."
   }
 }
