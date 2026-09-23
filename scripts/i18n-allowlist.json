@@ -91,7 +91,6 @@
     "frontend/src/views/Settings/Instance/InstanceHealth.vue": 1,
     "frontend/src/views/Settings/Language/Language.vue": 2,
     "frontend/src/views/Settings/Projects/Projects.vue": 4,
-    "frontend/src/views/Settings/Sso/SsoSettings.vue": 7,
     "frontend/src/views/Settings/Template/TemplateBasicDetail.vue": 1,
     "frontend/src/views/Settings/TimeOff/TimeOff.vue": 1,
     "frontend/src/views/Settings/TimeTracking/TimeTracking.vue": 1,
