@@ -22,6 +22,7 @@
 
 <script setup>
 import { computed, defineEmits, defineProps } from "vue";
+import "./style.css";
 
 defineOptions({ name: "SetupChecklist" });
 

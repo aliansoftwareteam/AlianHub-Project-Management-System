@@ -54,7 +54,9 @@ export default {
         "report_none": "No sprints to report on yet.",
         "report_moved_out": "moved out",
         "points": "points",
-        "tasks": "tasks"
+        "tasks": "tasks",
+        "story_points_empty": "Points",
+        "story_points_clear": "Clear"
     },
     "generalErrorMessage": {
         "fieldIsRequired": "Il campo è obbligatorio",
@@ -294,6 +296,8 @@ export default {
         "email_invalid": "That doesn't look like an email address.",
         "password_required": "Enter your password.",
         "password_mismatch": "That password doesn't match this email.",
+        "credentials_mismatch": "That email and password don't match. Check both, or reset your password.",
+        "account_blocked": "This account is blocked. Ask your administrator to unblock it.",
         "attempts_left": "{n} attempts left.",
         "account_unknown": "No account with that email. Check the spelling, or create one.",
         "too_many_attempts": "Too many attempts. Wait a few minutes, then try again.",
@@ -772,7 +776,8 @@ export default {
         "overdue_since": "Overdue · {date}",
         "tracking_short": "tracking {time}",
         "this_week": "This week",
-        "access_denied": "You don't have access to Home."
+        "access_denied": "You don't have access to Home.",
+        "views_nav": "Views"
     },
     "Portfolio": {
         "new": "New portfolio",
@@ -1104,7 +1109,9 @@ export default {
         "agents_running": "{n} running",
         "legacy_nav": "Use the old top bar",
         "new_nav": "Try the new navigation",
-        "skip_to_content": "Skip to content"
+        "skip_to_content": "Skip to content",
+        "palette_esc": "ESC",
+        "primary_nav": "Primary"
     },
     "Docs": {
         "docs": "Docs",
@@ -1247,7 +1254,12 @@ export default {
     },
     "Common": {
         "select_task": "Select task",
-        "select_all_tasks": "Select all tasks in group"
+        "select_all_tasks": "Select all tasks in group",
+        "close": "Close",
+        "key_esc": "Esc",
+        "key_enter": "Enter",
+        "key_shift_enter": "Shift + Enter",
+        "key_tab": "Tab"
     },
     "Time": {
         "loading": "Loading…",
@@ -3006,7 +3018,9 @@ export default {
         "error_save": "Your language could not be saved.",
         "monday": "Monday",
         "sunday": "Sunday",
-        "saturday": "Saturday"
+        "saturday": "Saturday",
+        "rtl_tag": "RTL",
+        "preview_ltr": "LTR"
     },
     "Parity": {
         "nav_connections": "Connections",
@@ -3835,7 +3849,8 @@ export default {
         "ext_never": "Never available to an agent",
         "ext_same_treatment": "External agents get the same treatment as yours: allow-listed actions, everything through the AI Inbox, full audit.",
         "mob_tap_slot": "Tap a time to place {task}",
-        "mob_cancel": "Cancel"
+        "mob_cancel": "Cancel",
+        "ext_mcp_mark": "MCP"
     },
     "Gaps": {
         "wip_note": "Saved for everyone on this project. Over the limit warns, it never blocks a move.",
@@ -4524,7 +4539,15 @@ export default {
         "view_options": "Options for the {view} view",
         "search_views": "Search or describe a view to create",
         "no_views_match": "No view matches that search.",
-        "private_view": "Private view"
+        "private_view": "Private view",
+        "select_billing_period": "Select Billing Period",
+        "sprint_data_required": "SPRINT DATA REQUIRED",
+        "export_csv": "CSV",
+        "export_xlsx": "XLSX",
+        "just_now": "Just now",
+        "private_project": "Private project",
+        "points_total": "{n} pts",
+        "col_title": "Title"
     },
     "Watcher": {
         "ignore": "Ignora",
@@ -4568,7 +4591,8 @@ export default {
         "to_unlock_list_view": "Per sbloccare la vista della lista",
         "error_message_for_empty": "Seleziona almeno una vista",
         "set_as_default": "Imposta come predefinito",
-        "remove_as_default": "Rimuovi como predefinito"
+        "remove_as_default": "Rimuovi como predefinito",
+        "active_of_min": "Active {active} of {total} min"
     },
     "ViewListTag": {
         "ProjectListView": "List",
@@ -4977,7 +5001,8 @@ export default {
         "link_file": "Link the file",
         "importing": "Importing...",
         "import_done": "Imported {name}",
-        "import_failed": "Could not import from {provider}."
+        "import_failed": "Could not import from {provider}.",
+        "download_all": "Download All"
     },
     "ClipRecorder": {
         "record_clip": "Record clip",
@@ -5084,7 +5109,10 @@ export default {
         "white_color_not_allowed": "Il colore bianco non è consentito. Seleziona un colore valido",
         "billing": "Fatturazione",
         "per_hour": "Per ora",
-        "adding_taskPlanning": "Aggiungi Pianificazione delle attività"
+        "adding_taskPlanning": "Aggiungi Pianificazione delle attività",
+        "hh_placeholder": "hh",
+        "mm_placeholder": "mm",
+        "hh_mm_placeholder": "hh:mm"
     },
     "Comment": {
         "created_by": "Creato da",
@@ -5116,7 +5144,8 @@ export default {
         "Projects": "Progetti",
         "task_planning": "Pianificazione delle attività",
         "task_remaining_planning": "Ore rimanenti",
-        "planned": "Pianificato"
+        "planned": "Pianificato",
+        "views_nav": "Timesheet views"
     },
     "TimesheetApproval": {
         "submit": "Submit timesheet",
@@ -5196,7 +5225,10 @@ export default {
         "max_should_be_greater_than_min": "Il massimo dovrebbe essere maggiore del minimo",
         "min_should_be_less_than_max": "Il minimo dovrebbe essere inferiore al massimo",
         "separator": "Separatore",
-        "countryCode": "Attivalo per modificare il codice del paese."
+        "countryCode": "Attivalo per modificare il codice del paese.",
+        "field_is_required": "{field} is required",
+        "all_projects": "All Projects",
+        "no_record_found": "No record found"
     },
     "Category": {
         "cateory_name": "Nome della Categoria",
@@ -5277,7 +5309,8 @@ export default {
         "ai_after_desc_placeholder": "Qui puoi continuare a chiedere modifiche pertinenti",
         "try_with_ai": "Prova con l'IA",
         "msg_search_result_found": "Ecco alcuni modelli suggeriti pertinenti alle tue esigenze. Puoi selezionarne uno oppure fare clic per crearne uno con l'IA",
-        "msg_search_result_not_found": "Nessun modello pertinente trovato. Per crearne uno con l'IA, fai semplicemente clic"
+        "msg_search_result_not_found": "Nessun modello pertinente trovato. Per crearne uno con l'IA, fai semplicemente clic",
+        "back_to_templates": "Back to templates"
     },
     "Settings": {
         "add_new_projects": "Aggiungi Nuovo Progetto",
@@ -5574,7 +5607,10 @@ export default {
         "agents_candidate_too_many_changes": "Prefers fewer changes per proposal",
         "agents_candidate_wrong_tone": "Prefers a different tone — ask before rewriting",
         "agents_candidate_needs_person": "Wants a person to handle this kind of work",
-        "agents_candidate_not_now": "Prefers proposals batched, not one at a time"
+        "agents_candidate_not_now": "Prefers proposals batched, not one at a time",
+        "phone_placeholder": "eg. 000-000-0000",
+        "company_profile": "Company Profile",
+        "image_dimensions": "{width}x{height}px"
     },
     "PermissionDesc": {
         "project": "Everything to do with projects. Turning this off hides projects entirely.",
@@ -6710,7 +6746,8 @@ export default {
         "details_project": "Belongs to",
         "details_slack": "Mirrored to Slack",
         "load_failed": "Could not load. Try again.",
-        "something_wrong": "Something went wrong. Try again."
+        "something_wrong": "Something went wrong. Try again.",
+        "dnd_short": "DND"
     },
     "Comments": {
         "unread_message": "Messaggi non letti",
@@ -7041,7 +7078,8 @@ export default {
         "client_contacts": "Client contacts",
         "client_contacts_hint": "Whoever is listed here gets the sign-off tasks and sees the client view.",
         "saved": "Saved",
-        "save_failed": "That could not be saved."
+        "save_failed": "That could not be saved.",
+        "views_nav": "Billing views"
     },
     "Tour": {
         "Tag_name_required": "Tag name is required.",
@@ -7196,7 +7234,8 @@ export default {
         "ai_failed": "Couldn't generate a description. Please try again.",
         "ai_optional": "— optional",
         "ai_skills_hint": "Skills this project needs. The AI also suggests skills from your description — you can adjust them on the review step.",
-        "ai_proposal_id_hint": "The won proposal this project came from. Used to tie the project back to the bid it originated from."
+        "ai_proposal_id_hint": "The won proposal this project came from. Used to tie the project back to the bid it originated from.",
+        "you": "You"
     },
     "ScreenshotRetention": {
         "heading": "Auto-delete old screenshots",
@@ -7714,7 +7753,8 @@ export default {
         "enable_app_use_milestones": "Abilitando questa app sarai in grado di utilizzare <b>Punti di riferimento</b> per questo <b>progetto</b>",
         "enable_app_use_ai_operations": "Abilitando questa app sarai in grado di utilizzare <b>Operazioni AI</b> per questo <b>progetto</b>",
         "enable_app_manage_time_log": "Abilitando questa app sarai in grado di gestire <b>Registro del tempo</b> nei <b>Compiti</b> per questo <b>progetto</b>",
-        "enable_app_manage_custom_fields": "Abilitando questa app sarai in grado di gestire <b>Campi personalizzati</b> per questo <b>progetto</b>"
+        "enable_app_manage_custom_fields": "Abilitando questa app sarai in grado di gestire <b>Campi personalizzati</b> per questo <b>progetto</b>",
+        "read_more": "Read more"
     },
     "Company": {
         "fill_company_details": "Compila i dettagli della tua azienda",
@@ -8205,7 +8245,12 @@ export default {
         "ewr_logged_over_planned": "{time} over planned",
         "ewr_empty_search": "No employees match \"{query}\".",
         "ewr_empty_current": "No one is currently working on a task.",
-        "ewr_empty_filter": "No employees match this filter."
+        "ewr_empty_filter": "No employees match this filter.",
+        "lwt_people_working_now": "{n} person working now | {n} people working now",
+        "lwt_tracker_running": "Tracker running",
+        "no_data_found": "No data found",
+        "milestone_clear_status_filter": "Clear status filter",
+        "tcb_group_logged_time_by": "Group logged time by"
     },
     "designationMapping": {
         "title": "Mappatura delle Designazioni",
@@ -8230,7 +8275,8 @@ export default {
         "user_limit_100": "Puoi importare un massimo di 100 utenti alla volta."
     },
     "importUserButton": {
-        "import_user_processing": "I tuoi utenti stanno venendo importati"
+        "import_user_processing": "I tuoi utenti stanno venendo importati",
+        "import_users": "Import Users"
     },
     "timeForecastingReport": {
         "project_name": "Nome del progetto",
@@ -8497,6 +8543,7 @@ export default {
         "source_default": "Built-in default",
         "locked_help": "The environment sets this value, so the console cannot change it. Change it there and restart the server.",
         "cache_note": "A mode change applies on this server at once and on every other server within {seconds} seconds.",
+        "cache_note_now": "A mode change applies on every server at once.",
         "kill_switch": "DISABLE_PERMISSION_ENFORCEMENT is on: every workspace set to enforce runs in report until it is turned off.",
         "workspaces_title": "Workspaces",
         "readiness_rule": "A workspace in report is ready to enforce once its would-be-denial log has been empty for {days} days in a row. Nothing switches by itself: you choose when.",
@@ -8556,6 +8603,7 @@ export default {
         "role_member": "Member",
         "role_none": "No seat",
         "mode_saved": "Mode set for {name}. Other servers pick it up within {seconds} seconds.",
+        "mode_saved_now": "Mode set for {name}. Every server applies it at once.",
         "default_saved": "Instance default set. Other servers apply it when they next start."
     },
     "Egress": {
@@ -8650,6 +8698,7 @@ export default {
         "lead": "What each workspace's knowledge index holds: chunks and sources per type, how far the backfill has got, how fresh the index is, the embedding model, and why files were left out. Open a workspace to see its figures and controls.",
         "no_text_note": "Counts, sizes, times, reasons and ids only: no text from the index is shown here.",
         "indexer_on": "The indexer is on:",
+        "indexer_tenant": "The indexer runs only for workspaces that turn it on, as each card below shows:",
         "indexer_off": "The indexer is off, so nothing is indexed and nothing here can be changed. To turn it on, set this and restart the server:",
         "indexer_label": "Indexer",
         "retrieval_label": "Retrieval",
@@ -9036,7 +9085,8 @@ export default {
         "agent_key_missing": "No key",
         "agent_saved": "AI agent settings saved.",
         "agent_save_failed": "AI agent settings were not saved.",
-        "agent_load_failed": "Could not load AI agent settings."
+        "agent_load_failed": "Could not load AI agent settings.",
+        "latency_ms": "{ms} ms"
     },
     "Routing": {
         "nav": "Routing policy",

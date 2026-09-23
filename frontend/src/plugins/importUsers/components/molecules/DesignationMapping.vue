@@ -30,7 +30,7 @@
                         </template>
                         <template #options>
                             <DropDownOption>
-                                <input type="text" placeholder="Search" v-model="search[designationIndex]"
+                                <input type="text" :placeholder="$t('PlaceHolder.search')" v-model="search[designationIndex]"
                                     class="p6px-8px border-gray-blue border-radius-4-px font-size-14" />
                             </DropDownOption>
                             <DropDownOption v-for="(sysDesignation, sysIndex) in filteredDesignations(designationIndex)"

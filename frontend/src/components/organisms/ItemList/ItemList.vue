@@ -41,7 +41,7 @@
                                 <h5 class="text-ellipse item-title" :style="`color: ${item.textColor ? item.textColor : '#818181'}; background-color: ${item.backColor ? item.backColor : 'transparent'}; margin-left: 5px;`">{{$t('general.unassigned')}}</h5>
                             </div>
                             <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                            <span class="font-size-14 ml-6px dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}<template v-if="pointsTotal"> · {{pointsTotal}} pts</template></span>
+                            <span class="font-size-14 ml-6px dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}<template v-if="pointsTotal"> · {{ $t('Projects.points_total', { n: pointsTotal }) }}</template></span>
                         </template>
                         <template v-else>
                             <img src="@/assets/images/svg/triangleBlack.svg" alt="traingle" class="mr-5px" :style="`transform: rotateZ(${item.isExpanded ? 90 : 0}deg); width: 6px;`">
@@ -50,7 +50,7 @@
                                 {{item.name}}
                             </span>
                             <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                            <span class="dark-gray font-size-13 font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}<template v-if="pointsTotal"> · {{pointsTotal}} pts</template></span>
+                            <span class="dark-gray font-size-13 font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}<template v-if="pointsTotal"> · {{ $t('Projects.points_total', { n: pointsTotal }) }}</template></span>
                         </template>
                     </div>
                 </div>
@@ -258,7 +258,7 @@
                             </template>
                             <template #options>
                                 <DropDownOption>
-                                    <input type="text" class="customfield__form-control" placeholder="search" v-model="search" @input="handleInput">
+                                    <input type="text" class="customfield__form-control" :placeholder="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
                                 </DropDownOption>
                                 <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields')">
                                     <span class="font-weight-500 line-height-19 font-roboto-sans blue" @click="isCustomField = true">+ {{$t('CustomField.custom_field')}}</span>

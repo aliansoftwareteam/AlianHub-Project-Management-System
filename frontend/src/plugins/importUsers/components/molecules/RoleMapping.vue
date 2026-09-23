@@ -29,7 +29,7 @@
                         </template>
                         <template #options>
                             <DropDownOption>
-                                <input type="text" placeholder="Search" v-model="search[roleIndex]"
+                                <input type="text" :placeholder="$t('PlaceHolder.search')" v-model="search[roleIndex]"
                                     class="p6px-8px border-gray-blue border-radius-4-px font-size-14" />
                             </DropDownOption>
                             <DropDownOption v-for="(sysRole, sysIndex) in filteredRoles(roleIndex)" :key="sysIndex"

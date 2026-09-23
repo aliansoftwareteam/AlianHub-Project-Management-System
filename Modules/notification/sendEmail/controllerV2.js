@@ -31,40 +31,6 @@ exports.sendEmailHandlerSingle = (EmailDetails) => {
   })
 
 }
-exports.sendEmailHandlerSingleApi = (req, res) => {
-  // An Express handler that returned a rejecting promise and never answered: a bad
-  // body threw, the rejection was unhandled, and the process died. Validate, answer.
-  const EmailDetails = req.body || {};
-  if (!EmailDetails.notification || !EmailDetails.notification.Employee_Email) {
-    return res.send({ status: false, statusText: 'notification with Employee_Email is required.' });
-  }
-  return new Promise(async (resolve, reject) => {
-    try {
-      let email = [EmailDetails.notification.Employee_Email]
-      var action_url = await actionForOpenTask(EmailDetails.notification)
-      this.manageEmailData(EmailDetails).then(async response => {
-        let mail = await sendEmailNotification({ bodyData: { ...response, action_url: action_url }, type: EmailDetails.notification.key, isSingle: false, defaultMessage: EmailDetails.notification.message, action_url: action_url });
-        await sendMail.SendNotificationEmail(`${config.APP_NAME} - ${"Update: Stay Informed About Recent Changes"}`, mail, email, true, (result) => {
-          if (!result.status) {
-            logger.error(`send Email Handler Single Not Send`)
-            if (!res.headersSent) res.send({ status: false, statusText: 'Email not sent.' })
-            resolve(false)
-          } else {
-            removeDocument(EmailDetails.notification)
-            UpdateDocument(EmailDetails.notification)
-            resolve(true)
-          }
-        })
-      })
-
-    } catch (error) {
-       logger.error(`sendEmailHandlerSingleApi: ${error.message}`)
-       if (!res.headersSent) res.send({ status: false, statusText: error.message })
-       resolve(false)
-    }
-  })
-
-}
 exports.sendEmailHandlerMultiple = (EmailDetails) => {
   return new Promise((resolve, reject) => {
     let email = [EmailDetails.user.Employee_Email]

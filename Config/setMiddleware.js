@@ -61,11 +61,9 @@ const verifyJWTTokenWithCRoute = [
     // Found by probing every v2 prefix without a token (AR-52): these ran their
     // handlers for anyone with a company id in a header. app.use only guards the
     // prefixes it is given, so a module that forgets to register here is open.
-    // an unauthenticated mail relay: anyone could POST subject/html/toMail and the server sent it
-    "/api/v2/sendMail",
+    "/api/v2/support-mail",
     "/api/v2/test",
     "/api/v2/custom-fields",
-    "/api/v2/single-notification-email",
     "/api/v2/prepare-notification-data",
     "/api/v2/sendInvitationEmail",
     "/api/v2/epics",

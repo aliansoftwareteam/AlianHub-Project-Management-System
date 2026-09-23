@@ -7,8 +7,8 @@
             </div>
             <div class="font-size-12 gray81 export-tasks__hint">{{ $t('Projects.export_hint') }}</div>
             <div class="d-flex">
-                <button class="btn-primary font-size-13 mr-10px" :disabled="isBusy" @click="startExport('csv')">CSV</button>
-                <button class="btn-primary font-size-13" :disabled="isBusy" @click="startExport('xlsx')">XLSX</button>
+                <button class="btn-primary font-size-13 mr-10px" :disabled="isBusy" @click="startExport('csv')">{{ $t('Projects.export_csv') }}</button>
+                <button class="btn-primary font-size-13" :disabled="isBusy" @click="startExport('xlsx')">{{ $t('Projects.export_xlsx') }}</button>
             </div>
         </div>
     </div>

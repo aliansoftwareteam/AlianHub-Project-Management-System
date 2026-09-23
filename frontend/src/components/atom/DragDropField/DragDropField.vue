@@ -5,10 +5,10 @@
                 <li class=" d-flex align-items-center justify-content-between position-re">
                     <span class="taskInnerData"  v-if="!element.isEditable">
                         <div class="d-flex align-items-center  position-re">
-                            <span v-if="props.from === 'task_type'" class="drag-handle" title="Drag to reorder">
+                            <span v-if="props.from === 'task_type'" class="drag-handle" :title="$t('Projects.form_drag_to_reorder')">
                                 <img :src="dragDots" class="drag-handle__img" alt="drag" />
                             </span>
-                            <span v-else class="drag-image-wrapper position-ab" title="Drag to reorder">
+                            <span v-else class="drag-image-wrapper position-ab" :title="$t('Projects.form_drag_to_reorder')">
                                 <img :src="dragIcon" class="dragImage position-re" :style="[{verticalAlign: 'middle'}]" />
                             </span>
                         <template v-if="!element.isEditable && !isChangeColor" >

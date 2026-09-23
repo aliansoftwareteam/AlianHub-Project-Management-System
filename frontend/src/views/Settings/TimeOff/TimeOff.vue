@@ -74,7 +74,7 @@
                             <td v-if="isAdmin" class="pto-nowrap">{{ e.userName || '—' }}</td>
                             <td class="pto-nowrap">{{ fmt(e.startDate) }} → {{ fmt(e.endDate) }}</td>
                             <td>{{ $t('Pto.types.' + (e.type || 'casual')) }}</td>
-                            <td>{{ e.hoursPerDay }}h/day</td>
+                            <td>{{ $t('Time.per_day', { h: e.hoursPerDay }) }}</td>
                             <td class="pto-nowrap">{{ e.totalDays != null ? e.totalDays : leaveDays(e.startDate, e.endDate, e.hoursPerDay) }}</td>
                             <td><span class="pto-badge" :class="e.status">{{ $t('Pto.status.' + e.status) }}</span></td>
                             <td class="pto-reason" :title="e.reason || ''">{{ e.reason || '—' }}</td>

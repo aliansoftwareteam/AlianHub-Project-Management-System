@@ -47,7 +47,7 @@
             <div v-if="data.byStatus.length" class="mrc-status">
                 <div class="mrc-section-title">
                     <span>{{ $t('dashboardCard.milestone_by_status') }}</span>
-                    <button v-if="selectedStatus" type="button" class="mrc-clear" title="Clear status filter" @click="clearStatus">
+                    <button v-if="selectedStatus" type="button" class="mrc-clear" :title="$t('dashboardCard.milestone_clear_status_filter')" @click="clearStatus">
                         {{ statusLabel(selectedStatus) }} ✕
                     </button>
                 </div>

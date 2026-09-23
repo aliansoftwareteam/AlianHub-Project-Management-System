@@ -62,7 +62,7 @@ describe('Settings > General company details on a fresh company', () => {
         const { wrapper, errors } = await open(fromSetupWizard);
         apiRequest.mockResolvedValue({ status: 200, data: { _id: COMPANY_ID } });
 
-        const phoneInput = wrapper.find('input[placeholder="eg. 000-000-0000"]');
+        const phoneInput = wrapper.find('input[placeholder="Settings.phone_placeholder"]');
         await phoneInput.setValue('4155552671');
         await phoneInput.trigger('keyup');
         await wrapper.find('#blue-btn-savecompany').trigger('click');

@@ -2,7 +2,7 @@
     <div class="story-points" ref="rootEl" :class="{ 'sp-disabled': !permission }">
         <div class="sp-trigger" @click="toggle">
             <span v-if="display !== null" class="sp-chip">{{ display }}</span>
-            <span v-else class="sp-empty">Points</span>
+            <span v-else class="sp-empty">{{ $t('Scrum.story_points_empty') }}</span>
         </div>
         <div v-if="open" class="sp-menu">
             <span
@@ -12,7 +12,7 @@
                 :class="{ 'sp-active': Number(pointsVal) === opt }"
                 @click="choose(opt)"
             >{{ opt }}</span>
-            <span class="sp-option sp-clear" @click="choose(null)">Clear</span>
+            <span class="sp-option sp-clear" @click="choose(null)">{{ $t('Scrum.story_points_clear') }}</span>
         </div>
     </div>
 </template>

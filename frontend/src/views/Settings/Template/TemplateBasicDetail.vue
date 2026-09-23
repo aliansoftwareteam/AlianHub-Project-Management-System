@@ -55,7 +55,7 @@
     <CroppingTool
         :image="{url:previewImageSrc,name:''}"
         @updateVisible="(val) => isCropperVisible = val"
-        title="Create Template"
+        :title="$t('Templates.create_template')"
         @getEditedImage="(val) => getImageData(val)"
         :isCheckStorage="true"
         :stencilType="'square'"

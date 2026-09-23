@@ -144,7 +144,7 @@
                                                     <span v-if="userActivity[1]?.timestamp">
                                                         {{getTimeAgo(userActivity[1]?.timestamp * 1000)}}
                                                     </span>
-                                                    <span v-else>Just now</span>
+                                                    <span v-else>{{ $t('Projects.just_now') }}</span>
                                                 </div>
                                             </div>
                                         </DropDownOption>
@@ -154,7 +154,7 @@
                             <template v-else>
                                 <img :src="item?.[userId] ? clockBlue : clockGray" alt="clockBlue" @click="userActivityClick" class="ml-5px">
                             </template>
-                            <img v-if="item?.isPrivateSpace" :src="round_clock" alt="time" title="Private project" class="ml-5px">
+                            <img v-if="item?.isPrivateSpace" :src="round_clock" alt="time" :title="$t('Projects.private_project')" class="ml-5px">
                             {{item?.[userId]}}
                         </div>
                     </div>
@@ -163,7 +163,7 @@
                     <input
                         type="text"
                         class="form-control ml-10px project__name-input"
-                        placeholder="Project Name"
+                        :placeholder="$t('ProjectSlider.project_name')"
                         v-model.trim="projectName.value"
                         :id="`${item.id}_input`"
                         @blur="editName = false"

@@ -25,7 +25,7 @@
         </div>
     </div>
     <div class="orDiv">
-        <span>or</span>
+        <span>{{ $t('Channel.or') }}</span>
     </div>
     <div class="form-group mb-10px mr-10px">
         <div class="imagePicker position-re">

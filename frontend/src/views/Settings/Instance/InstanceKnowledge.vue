@@ -4,7 +4,7 @@
         <div v-else-if="!summary" class="ah-empty">{{ $t('Instance.loading') }}</div>
         <template v-else>
             <div v-if="indexerOff" class="in-banner in-banner--warn" data-test="indexer-off"><ShellIcon name="alert" :size="15" /><span>{{ $t('Knowledge.indexer_off') }} <code class="ah-mono">{{ `${summary.indexer.envKey}=tenant` }}</code></span></div>
-            <div v-else class="in-banner in-banner--ok" data-test="indexer-on"><ShellIcon name="check" :size="15" /><span>{{ $t('Knowledge.indexer_on') }} <code class="ah-mono">{{ `${summary.indexer.envKey}=${summary.indexer.mode}` }}</code></span></div>
+            <div v-else class="in-banner in-banner--ok" data-test="indexer-on"><ShellIcon name="check" :size="15" /><span>{{ $t(summary.indexer.mode === 'tenant' ? 'Knowledge.indexer_tenant' : 'Knowledge.indexer_on') }} <code class="ah-mono">{{ `${summary.indexer.envKey}=${summary.indexer.mode}` }}</code></span></div>
             <div v-if="actionError" class="in-banner in-banner--danger" data-test="action-error"><ShellIcon name="alert" :size="15" /><span>{{ actionError }}</span></div>
             <div v-if="nothingErased" class="in-banner in-banner--warn" data-test="erase-nothing"><ShellIcon name="alert" :size="15" /><span>{{ $t('Knowledge.code_nothing_erased') }}</span></div>
 
