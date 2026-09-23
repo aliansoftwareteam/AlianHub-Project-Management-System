@@ -1738,6 +1738,7 @@ export default {
         "runs_limits": "Runs & limits",
         "runs_manual_note": "Runs start from a task, a mention or an assignment. Scheduling is not available yet.",
         "rate_limit": "Rate limit (actions per day)",
+        "rate_limit_hint": "0 means no daily limit.",
         "spend_cap": "Spend cap (USD per month)",
         "cap_hint": "The agent pauses itself at the cap.",
         "model_pin": "Pinned model",

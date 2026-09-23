@@ -16,7 +16,8 @@ const flag = require('./flag');
 // start.
 //
 // Where the number comes from, smallest positive wins, absent or zero meaning
-// "no limit at this level" exactly as `rateLimitPerDay` does:
+// "no limit at this level". `rateLimitPerDay` differs on absent: an agent with
+// none stored gets the default in Agents/dailyRunLimit.js; only 0 means none.
 //
 //   the loop step's own `maxRunsPerHour` — a definition may ask for less
 //   the rule's stored `limits.maxRunsPerHour`, when the run came from a rule

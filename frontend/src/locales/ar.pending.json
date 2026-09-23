@@ -455,6 +455,7 @@
     "Ai.queue_clear": "Queue clear",
     "Ai.queue_clear_body": "{approved} approved, {declined} declined. Nothing is waiting on you.",
     "Ai.rate_limit": "Rate limit (actions per day)",
+    "Ai.rate_limit_hint": "0 means no daily limit.",
     "Ai.recent_audit": "Recent runs",
     "Ai.refused_n": "{n} refused",
     "Ai.remove": "Remove",
