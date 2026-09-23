@@ -5832,6 +5832,9 @@ export default {
         "click": "ક્લિક કરો",
         "No_Record_Found": "કોઈ રેકોર્ડ મળ્યો નથી",
         "total": "કુલ",
+        "tracked": "Tracked",
+        "manual": "Manual",
+        "hours_value": "{time} hrs",
         "screenshot_preview": "સ્ક્રીનશોટ પૂર્વાવલોકન",
         "log_time_found_no_screenshot": "લૉગ સમય મળ્યો છે, પરંતુ આ અવધિ માટે કોઈ સ્ક્રીનશોટ લેવામાં આવ્યો નથી"
     },

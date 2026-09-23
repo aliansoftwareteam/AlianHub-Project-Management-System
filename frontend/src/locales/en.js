@@ -5997,6 +5997,9 @@ export default {
         click: "click",
         No_Record_Found: "No Record Found",
         total: "Total",
+        tracked: "Tracked",
+        manual: "Manual",
+        hours_value: "{time} hrs",
         screenshot_preview: "Screenshot Preview",
         log_time_found_no_screenshot:
             "Log time was found, but no screenshot was captured for this duration.",

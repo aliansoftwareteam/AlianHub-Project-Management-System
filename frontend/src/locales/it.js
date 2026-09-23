@@ -5832,6 +5832,9 @@ export default {
         "click": "clicca",
         "No_Record_Found": "Nessun Record Trovato",
         "total": "Totale",
+        "tracked": "Tracked",
+        "manual": "Manual",
+        "hours_value": "{time} hrs",
         "screenshot_preview": "Anteprima Screenshot",
         "log_time_found_no_screenshot": "Tempo registrato trovato, ma non è stato catturato nessuno screenshot per questa durata."
     },

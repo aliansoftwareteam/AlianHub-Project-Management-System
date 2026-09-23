@@ -5832,6 +5832,9 @@ export default {
         "click": "点击",
         "No_Record_Found": "未找到记录",
         "total": "总计",
+        "tracked": "Tracked",
+        "manual": "Manual",
+        "hours_value": "{time} hrs",
         "screenshot_preview": "截图预览",
         "log_time_found_no_screenshot": "找到记录的时间，但此时段未捕获截图。"
     },

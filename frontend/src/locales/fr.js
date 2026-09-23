@@ -5832,6 +5832,9 @@ export default {
         "click": "cliquez",
         "No_Record_Found": "Aucun Enregistrement Trouvé",
         "total": "Total",
+        "tracked": "Tracked",
+        "manual": "Manual",
+        "hours_value": "{time} hrs",
         "screenshot_preview": "Aperçu de la capture d'écran",
         "log_time_found_no_screenshot": "Le temps de journalisation a été trouvé, mais aucune capture d'écran n'a été prise pour cette durée"
     },

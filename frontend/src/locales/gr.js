@@ -5832,6 +5832,9 @@ export default {
         "click": "κάντε κλικ",
         "No_Record_Found": "Δεν βρέθηκε καταγραφή",
         "total": "Σύνολο",
+        "tracked": "Tracked",
+        "manual": "Manual",
+        "hours_value": "{time} hrs",
         "screenshot_preview": "Προεπισκόπηση Στιγμιότυπου Οθόνης",
         "log_time_found_no_screenshot": "Η καταγραφή του χρόνου βρέθηκε, αλλά δεν καταγράφηκε στιγμιότυπο οθόνης για αυτή τη διάρκεια."
     },

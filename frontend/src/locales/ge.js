@@ -5832,6 +5832,9 @@ export default {
         "click": "Klicken",
         "No_Record_Found": "Kein Eintrag gefunden",
         "total": "Gesamt",
+        "tracked": "Tracked",
+        "manual": "Manual",
+        "hours_value": "{time} hrs",
         "screenshot_preview": "Screenshot-Vorschau",
         "log_time_found_no_screenshot": "Es wurden Log-Zeiten gefunden, aber für diese Dauer wurde kein Screenshot erfasst."
     },

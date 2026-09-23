@@ -5832,6 +5832,9 @@ export default {
         "click": "клик",
         "No_Record_Found": "Записи не найдены",
         "total": "Итого",
+        "tracked": "Tracked",
+        "manual": "Manual",
+        "hours_value": "{time} hrs",
         "screenshot_preview": "Предпросмотр скриншота",
         "log_time_found_no_screenshot": "Время зарегистрировано, но скриншот не был захвачен для этого периода."
     },
