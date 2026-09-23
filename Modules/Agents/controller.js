@@ -64,7 +64,13 @@ const idempotencyKeyOf = (req) => {
     return raw;
 };
 
-const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, REFUSAL } = access;
+const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, hiddenTaskIdsFor, canSeeTaskOf, REFUSAL } = access;
+
+/* The projects the caller may open and, inside them, the tasks a private sprint keeps from them. */
+const readScopeOf = async (companyId, caller) => {
+    const projectIds = await visibleProjectIdsFor(companyId, caller);
+    return { projectIds, hiddenTaskIds: await hiddenTaskIdsFor(companyId, caller, projectIds) };
+};
 
 const refuseUnlessManager = (res, caller, agentsMessage) => {
     if (!caller.human) return fail(res, agentsMessage, 403);
@@ -356,8 +362,8 @@ exports.listRuns = async (req, res) => {
         if (!companyId) return fail(res, 'companyId is required.');
         const q = req.query || {};
         if (q.errorType && !PROVIDER_ERROR_TYPES.includes(String(q.errorType))) return fail(res, `errorType must be one of: ${PROVIDER_ERROR_TYPES.join(', ')}.`, 400);
-        const projectIds = await visibleProjectIdsFor(companyId, await callerOf(req, companyId));
-        const [rows, summary] = await Promise.all([runs.list(companyId, { ...q, projectIds }), runs.summary(companyId, { projectId: q.projectId, projectIds })]);
+        const readScope = await readScopeOf(companyId, await callerOf(req, companyId));
+        const [rows, summary] = await Promise.all([runs.list(companyId, { ...q, ...readScope }), runs.summary(companyId, { projectId: q.projectId, ...readScope })]);
         return res.send({ status: true, statusText: 'Runs fetched.', data: rows || [], summary });
     } catch (e) { logger.error(`listRuns: ${e.message}`); return fail(res, e.message, 500); }
 };
@@ -368,8 +374,8 @@ exports.runSummary = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
         const q = req.query || {};
-        const projectIds = await visibleProjectIdsFor(companyId, await callerOf(req, companyId));
-        const [live, counts] = await Promise.all([runs.summary(companyId, { projectId: q.projectId, projectIds }), runs.countsByStatus(companyId, { projectId: q.projectId, agentId: q.agentId, projectIds })]);
+        const readScope = await readScopeOf(companyId, await callerOf(req, companyId));
+        const [live, counts] = await Promise.all([runs.summary(companyId, { projectId: q.projectId, ...readScope }), runs.countsByStatus(companyId, { projectId: q.projectId, agentId: q.agentId, ...readScope })]);
         return res.send({ status: true, statusText: 'Run summary fetched.', data: { ...live, counts } });
     } catch (e) { logger.error(`runSummary: ${e.message}`); return fail(res, e.message, 500); }
 };
@@ -384,6 +390,7 @@ exports.getRun = async (req, res) => {
         const caller = await callerOf(req, companyId);
         const visible = await visibleProjectIdsFor(companyId, caller);
         if (visible && !visible.includes(String(run.projectId || ''))) return fail(res, 'Run not found.', 404);
+        if (!(await canSeeTaskOf(companyId, caller, run))) return fail(res, 'Run not found.', 404);
         const auditRows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ 'meta.runId': String(run._id) }, {}, { sort: { createdAt: 1 }, limit: 200 }] }, 'find')
             .then((rows) => auditChain.foldRows(companyId, rows)).catch(() => []);
         const plain = typeof run.toObject === 'function' ? run.toObject() : { ...run };
@@ -566,8 +573,8 @@ exports.listProposals = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
         const q = req.query || {};
-        const projectIds = await visibleProjectIdsFor(companyId, await callerOf(req, companyId));
-        const out = await proposals.list(companyId, { status: q.status === 'all' ? undefined : (q.status || 'pending'), bucket: q.bucket, agentId: q.agentId, limit: q.limit, projectIds });
+        const readScope = await readScopeOf(companyId, await callerOf(req, companyId));
+        const out = await proposals.list(companyId, { status: q.status === 'all' ? undefined : (q.status || 'pending'), bucket: q.bucket, agentId: q.agentId, limit: q.limit, ...readScope });
         return res.send({ status: true, statusText: 'Proposals fetched.', data: out.proposals, counts: out.counts });
     } catch (e) { logger.error(`listProposals: ${e.message}`); return fail(res, e.message, 500); }
 };
