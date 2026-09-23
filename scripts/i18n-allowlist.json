@@ -33,7 +33,6 @@
     "frontend/src/components/molecules/IconPicker/IconPicker.vue": 4,
     "frontend/src/components/molecules/Pages/PagePresenter.vue": 1,
     "frontend/src/components/molecules/ProjectsListingSetting/ProjectsListingSetting.vue": 1,
-    "frontend/src/components/molecules/Setting/SettingAutoCloseProjects.vue": 8,
     "frontend/src/components/molecules/Setting/SettingCompanyDetails.vue": 3,
     "frontend/src/components/molecules/Setting/SettingCurrencys.vue": 1,
     "frontend/src/components/molecules/Setting/SettingTaskPriority.vue": 1,

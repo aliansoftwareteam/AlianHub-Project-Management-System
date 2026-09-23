@@ -6,16 +6,13 @@
         screenshot-retention delete — no confirmation dialog is needed.
     -->
     <div v-if="isOwner" class="acp-card">
-        <h2 class="task_priority_wrapper_value">Auto-close inactive projects</h2>
-        <p class="acp-subtitle">
-            When enabled, a project with no logged time and no task activity for the selected period is
-            automatically closed every night. Closing is reversible — you can reopen a project any time.
-        </p>
+        <h2 class="task_priority_wrapper_value">{{ $t('Settings.auto_close_heading') }}</h2>
+        <p class="acp-subtitle">{{ $t('Settings.auto_close_subtitle') }}</p>
 
         <div class="acp-row">
             <div class="acp-row-label">
-                <span class="font-weight-500">Enable auto-close</span>
-                <span class="acp-row-hint">Off by default. Inactive projects are closed on the next nightly run.</span>
+                <span class="font-weight-500">{{ $t('Settings.auto_close_toggle_label') }}</span>
+                <span class="acp-row-hint">{{ $t('Settings.auto_close_toggle_hint') }}</span>
             </div>
             <label class="acp-switch" :class="{ disabled: isBusy }">
                 <input type="checkbox" :checked="policy.enabled" :disabled="isBusy" @change="onToggle($event.target.checked)" />
@@ -25,20 +22,20 @@
 
         <div class="acp-row">
             <div class="acp-row-label">
-                <span class="font-weight-500">Inactivity period</span>
-                <span class="acp-row-hint">How long a project must be quiet (no time logs, no task changes) before it auto-closes.</span>
+                <span class="font-weight-500">{{ $t('Settings.auto_close_window_label') }}</span>
+                <span class="acp-row-hint">{{ $t('Settings.auto_close_window_hint') }}</span>
             </div>
             <select class="acp-select" :value="policy.inactiveMonths" :disabled="!policy.enabled || isBusy" @change="onWindowChange(Number($event.target.value))">
-                <option v-for="n in validInactiveMonths" :key="n" :value="n">{{ n === 1 ? '1 month' : `${n} months` }}</option>
+                <option v-for="n in validInactiveMonths" :key="n" :value="n">{{ $t('Settings.auto_close_months_option', { n }, n) }}</option>
             </select>
         </div>
 
         <div v-if="policy.lastRunAt || policy.enabled" class="acp-stats">
             <template v-if="policy.lastRunAt">
-                Last run {{ formatRelative(policy.lastRunAt) }} — closed {{ (policy.lastRunStats && policy.lastRunStats.closedCount) || 0 }} project(s).
+                {{ $t('Settings.auto_close_last_run', { when: formatRelative(policy.lastRunAt), count: lastRunClosedCount }, lastRunClosedCount) }}
             </template>
             <template v-else>
-                Enabled — the nightly run hasn't closed any projects yet.
+                {{ $t('Settings.auto_close_not_run_yet') }}
             </template>
         </div>
     </div>
@@ -48,9 +45,11 @@
 import { ref, computed, watch, inject } from 'vue';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
+import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import { isOwnerOrAdmin } from "@/utils/roles";
 
+const { t } = useI18n();
 const $toast = useToast();
 const { getters } = useStore();
 const userId = inject('$userId');
@@ -63,6 +62,7 @@ const isOwner = computed(() => isOwnerOrAdmin(Number(companyUser.value && compan
 const policy = ref({ enabled: false, inactiveMonths: 1, lastRunAt: null, lastRunStats: null });
 const validInactiveMonths = ref([1, 2, 3, 6]);
 const isBusy = ref(false);
+const lastRunClosedCount = computed(() => (policy.value.lastRunStats && policy.value.lastRunStats.closedCount) || 0);
 
 async function loadPolicy() {
     try {
@@ -86,13 +86,13 @@ async function persistPolicy(patch) {
         const data = res && res.data;
         if (data && data.status) {
             policy.value = data.data.policy;
-            $toast.success('Auto-close settings saved', { position: 'top-right' });
+            $toast.success(t('Settings.auto_close_saved'), { position: 'top-right' });
         } else {
-            $toast.error((data && data.message) || 'Could not save auto-close settings', { position: 'top-right' });
+            $toast.error((data && data.message) || t('Settings.auto_close_save_failed'), { position: 'top-right' });
         }
     } catch (err) {
         console.error('[autoCloseProjects] persistPolicy failed', err);
-        $toast.error('Could not save auto-close settings', { position: 'top-right' });
+        $toast.error(t('Settings.auto_close_save_failed'), { position: 'top-right' });
     } finally {
         isBusy.value = false;
     }
@@ -113,11 +113,11 @@ async function onWindowChange(nextMonths) {
 function formatRelative(dateLike) {
     if (!dateLike) return '';
     const days = Math.floor((Date.now() - new Date(dateLike).getTime()) / (24 * 60 * 60 * 1000));
-    if (days <= 0) return 'today';
-    if (days === 1) return 'yesterday';
-    if (days < 30) return `${days} days ago`;
+    if (days <= 0) return t('Settings.auto_close_today');
+    if (days === 1) return t('Settings.auto_close_yesterday');
+    if (days < 30) return t('Settings.auto_close_days_ago', { n: days }, days);
     const months = Math.floor(days / 30);
-    return `${months} month${months === 1 ? '' : 's'} ago`;
+    return t('Settings.auto_close_months_ago', { n: months }, months);
 }
 
 // Watch isOwner (not one-shot onMounted) — companyUserDetail may hydrate async.
