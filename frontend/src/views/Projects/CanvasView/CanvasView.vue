@@ -1,7 +1,7 @@
 <template>
   <div class="cv-view ah-page">
     <div class="cv-view__bar">
-      <span class="cv-view__title">Canvas</span>
+      <span class="cv-view__title">{{ $t('Views.canvas_title') }}</span>
       <div class="cv-view__chips">
         <button
           v-for="w in WIDGETS"
@@ -15,7 +15,7 @@
     </div>
 
     <div class="cv-view__board">
-      <div v-if="!hasTasks" class="cv-view__empty">No tasks yet — widgets fill in as the project grows.</div>
+      <div v-if="!hasTasks" class="cv-view__empty">{{ $t('Views.canvas_empty') }}</div>
       <div v-else class="cv-view__grid">
         <template v-for="w in WIDGETS">
           <div v-if="enabled.includes(w.key)" :key="w.key" class="cv-card" :class="'cv-card--' + w.key">
@@ -23,7 +23,7 @@
 
             <div v-if="w.key === 'summary'" class="cv-card__big">
               <div class="cv-card__num">{{ stats.total }}</div>
-              <div class="cv-card__sub">{{ stats.donePct }}% complete</div>
+              <div class="cv-card__sub">{{ $t('Views.canvas_pct_complete', { pct: stats.donePct }) }}</div>
               <div class="cv-bar"><div class="cv-bar__fill is-done" :style="{ width: stats.donePct + '%' }"></div></div>
             </div>
 
@@ -45,11 +45,11 @@
 
             <div v-else-if="w.key === 'overdue'" class="cv-card__big">
               <div class="cv-card__num" :class="{ danger: stats.overdue > 0 }">{{ stats.overdue }}</div>
-              <div class="cv-card__sub">overdue & open</div>
+              <div class="cv-card__sub">{{ $t('Views.canvas_overdue_open') }}</div>
             </div>
 
             <div v-else-if="w.key === 'upcoming'" class="cv-card__list">
-              <div v-if="!stats.upcoming.length" class="cv-card__muted">Nothing due in the next 7 days.</div>
+              <div v-if="!stats.upcoming.length" class="cv-card__muted">{{ $t('Views.canvas_nothing_due') }}</div>
               <div v-for="t in stats.upcoming" :key="t.id" class="cv-up">
                 <span class="cv-up__name" :title="t.name">{{ t.name }}</span>
                 <span class="cv-up__date">{{ t.due }}</span>
