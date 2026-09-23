@@ -260,6 +260,24 @@ exports.restoreBackup = async (req, res) => {
     }
 };
 
+exports.orphanDatabases = async (req, res) => {
+    try {
+        return ok(res, 'Orphaned company databases.', { databases: await backups.findOrphanDatabases() });
+    } catch (error) {
+        return fail(res, 500, error.message);
+    }
+};
+
+exports.dropOrphanDatabase = async (req, res) => {
+    try {
+        const dropped = await backups.dropOrphanDatabase({ name: req.params.name, confirm: String(req.body?.confirm || '') });
+        return ok(res, `Database ${dropped.name} dropped.`, dropped);
+    } catch (error) {
+        if (!error.statusCode) logger.error(`orphan database drop failed: ${error.message}`);
+        return fail(res, error.statusCode || 500, error.message);
+    }
+};
+
 exports.deleteBackup = (req, res) => {
     try {
         backups.deleteBackup(req.params.name);
