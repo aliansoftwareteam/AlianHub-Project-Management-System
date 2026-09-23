@@ -39,6 +39,7 @@ const res = () => {
 };
 
 const storedOnUpdate = async (uid, data) => {
+    MongoDbCrudOpration.mockClear();
     MongoDbCrudOpration.mockImplementation(async (companyId, query, op) => (op === 'findOne' ? EXISTING : { _id: COMMENT }));
     await update({ headers: { companyid: COMPANY }, uid, body: { id: COMMENT, data } }, res());
     return MongoDbCrudOpration.mock.calls.find(([, , op]) => op === 'findOneAndUpdate')[1].data[1].$set;

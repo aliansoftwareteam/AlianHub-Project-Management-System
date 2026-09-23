@@ -190,6 +190,10 @@ describe('editing a comment', () => {
     it('stores only the mentions of active members who can see the thread, never the author', async () => {
         const id = await comment(member, `${mention(admin, 'Ada Admin')} first draft`);
         await recordOnceSaved(id);
+        await noticesOnceSent(id, admin.uid);
+        await quiet();
+        const noticesOf = async () => (await db().collection('notifications').find({ comments_id: id }).toArray()).map((row) => String(row._id)).sort();
+        const noticesBefore = await noticesOf();
         const stranger = new ObjectId().toHexString();
 
         const res = await member.api.put('/api/v1/comments', {
@@ -205,6 +209,6 @@ describe('editing a comment', () => {
 
         await quiet();
         expect(await mentionRecords(id)).toHaveLength(1);
-        expect(await pushNotices(id, owner.uid)).toEqual([]);
+        expect(await noticesOf()).toEqual(noticesBefore);
     });
 });
