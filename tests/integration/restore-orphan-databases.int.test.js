@@ -26,7 +26,8 @@ describe('restoring a backup taken before a company existed', () => {
             const restored = await api.post(`/api/v2/instance/backups/${name}/restore`, { confirm: name });
             expect(restored.status).toBe(200);
             const orphans = restored.body.data.orphanedDatabases;
-            expect(orphans).toEqual([{ name: laterId, sizeOnDisk: expect.any(Number) }]);
+            // Other suites share this Mongo and can leave company databases of their own behind.
+            expect(orphans).toContainEqual({ name: laterId, sizeOnDisk: expect.any(Number) });
             expect(orphans.map((db) => db.name)).not.toContain(state.companyId);
 
             expect(await client.db('global').collection('companies').findOne({ _id: later })).toBeNull();
@@ -35,7 +36,8 @@ describe('restoring a backup taken before a company existed', () => {
 
             const listed = await api.get('/api/v2/instance/orphan-databases');
             expect(listed.status).toBe(200);
-            expect(listed.body.data.databases.map((db) => db.name)).toEqual([laterId]);
+            expect(listed.body.data.databases.map((db) => db.name)).toContain(laterId);
+            expect(listed.body.data.databases.map((db) => db.name)).not.toContain(state.companyId);
 
             const unconfirmed = await api.post(`/api/v2/instance/orphan-databases/${laterId}/drop`, { confirm: 'yes' });
             expect(unconfirmed.status).toBe(400);
@@ -49,7 +51,7 @@ describe('restoring a backup taken before a company existed', () => {
             expect(dropped.status).toBe(200);
             expect(dropped.body.data).toMatchObject({ name: laterId });
             expect(await databaseNames()).not.toContain(laterId);
-            expect((await api.get('/api/v2/instance/orphan-databases')).body.data.databases).toEqual([]);
+            expect((await api.get('/api/v2/instance/orphan-databases')).body.data.databases.map((db) => db.name)).not.toContain(laterId);
         } finally {
             await api.delete(`/api/v2/instance/backups/${name}`);
             await client.db(laterId).dropDatabase();
