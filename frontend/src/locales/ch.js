@@ -294,6 +294,8 @@ export default {
         "email_invalid": "That doesn't look like an email address.",
         "password_required": "Enter your password.",
         "password_mismatch": "That password doesn't match this email.",
+        "credentials_mismatch": "That email and password don't match. Check both, or reset your password.",
+        "account_blocked": "This account is blocked. Ask your administrator to unblock it.",
         "attempts_left": "{n} attempts left.",
         "account_unknown": "No account with that email. Check the spelling, or create one.",
         "too_many_attempts": "Too many attempts. Wait a few minutes, then try again.",
