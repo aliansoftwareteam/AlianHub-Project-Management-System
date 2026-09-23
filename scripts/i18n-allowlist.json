@@ -42,7 +42,6 @@
     "frontend/src/components/molecules/TemplateSelectForm/TemplateSelectForm.vue": 1,
     "frontend/src/components/molecules/ToolTip/ToolTip.vue": 1,
     "frontend/src/components/organisms/ActiveWorkTableCard/ActiveWorkTableCard.vue": 2,
-    "frontend/src/components/organisms/AiTaskCreator/AiTaskCreator.vue": 26,
     "frontend/src/components/organisms/BarChartsCardComponent/BarChartsCardComponent.vue": 1,
     "frontend/src/components/organisms/EmployeeWorkloadReportCard/EmployeeWorkloadReportCard.vue": 19,
     "frontend/src/components/organisms/Header/Header.vue": 6,
