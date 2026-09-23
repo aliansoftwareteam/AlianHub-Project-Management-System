@@ -160,7 +160,7 @@ onMounted(() => {
 .agile-report__toggle button:first-child { border-radius: var(--r-chip) 0 0 var(--r-chip); }
 .agile-report__toggle button:last-child { border-radius: 0 var(--r-chip) var(--r-chip) 0; border-left: none; }
 /* --surface, not white: dark --brand is a light lavender that white sits on at 2.6:1. */
-.agile-report__toggle button.active { background: var(--brand); color: var(--surface); border-color: var(--brand); }
+.agile-report__toggle button.active { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
 .agile-report__pdf { margin-left: auto; border: 1px solid var(--brand); color: var(--brand); background: var(--surface); border-radius: var(--r-chip); padding: 6px 14px; font-size: 13px; cursor: pointer; }
 .agile-report__pdf:disabled { opacity: 0.5; cursor: not-allowed; }
 .agile-report__msg { color: var(--ink-2); font-size: 14px; padding: 40px; text-align: center; }

@@ -71,7 +71,7 @@
                     <div class="pl2__bar-fill" :style="{ width: progressPct(project) + '%' }"></div>
                 </div>
 
-                <span class="ah-avatar ah-avatar--sm" :style="{ background: swatch(project) }" :title="ownerName(project)">{{ ownerInitial(project) }}</span>
+                <span class="ah-avatar ah-avatar--sm" :style="{ background: swatch(project), color: '#fff' }" :title="ownerName(project)">{{ ownerInitial(project) }}</span>
 
                 <div class="pl2__menu" @click.stop>
                     <button

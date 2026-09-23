@@ -17,7 +17,7 @@
 .av2-ws { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .av2-ws .ah-field { flex: 1; }
 .av2-ws-mark {
-    width: 44px; height: 44px; flex: none; border-radius: 10px; background: var(--brand); color: #fff;
+    width: 44px; height: 44px; flex: none; border-radius: 10px; background: var(--brand); color: var(--on-brand);
     display: grid; place-items: center; font: 700 16px/1 var(--font-ui);
 }
 .av2-ws .ah-input { height: 44px; }
