@@ -230,6 +230,88 @@ describe('due and start date notifications are built on the server from stored f
     });
 });
 
+const START = '2026-09-25T00:00:00.000Z';
+const PREV_START = '2026-09-10T00:00:00.000Z';
+
+const moveBody = (extra = {}) => ({
+    action: 'updateStartDateAndDueDate',
+    commonDateFormatString: 'DD/MM/YYYY',
+    timeZone: 'UTC',
+    userData: USER,
+    notificationObj: { key: 'task_due_date', projectId: OPEN_PROJECT, taskId: OPEN_TASK, sprintId: SPRINT, message: CLIENT_MESSAGE },
+    firebaseObj: { DueDate: DUE, dueDateDeadLine: [{ date: DUE }], startDate: START },
+    task: { _id: OPEN_TASK, sprintId: SPRINT, sprintArray: { id: SPRINT }, TaskName: HTML },
+    project: clientProject({ ProjectName: HTML }),
+    ...extra,
+});
+
+describe('a task moved on the calendar is described on the server from stored fields', () => {
+    test('both dates set on a task that has neither are named, and the client message is ignored', async () => {
+        const result = await call(PATCH, moveBody());
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(storedTask()).toMatchObject({ DueDate: DUE, startDate: START, dueDateDeadLine: [{ date: DUE }] });
+        expect(onlyServerText()).toBe(templates.taskStartAndDueDateChange({ ProjectName: 'Parity', TaskName: 'Task 01', startDate: '25/09/2026', dueDate: '01/10/2026' }));
+        expect(historyRows().map((row) => row.Key)).toEqual(['Project_StartDate_DueDate']);
+    });
+
+    test('both dates moved name the stored dates they replace', async () => {
+        hold({ startDate: new Date(PREV_START), DueDate: new Date(PREV), dueDateDeadLine: [{ date: new Date(PREV) }] });
+        const result = await call(PATCH, moveBody({ firebaseObj: { DueDate: DUE, dueDateDeadLine: [{ date: PREV }, { date: DUE }], startDate: START } }));
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        const message = onlyServerText();
+        expect(message).toBe(templates.taskStartAndDueDateChange({ ProjectName: 'Parity', TaskName: 'Task 01', previousStartDate: '10/09/2026', startDate: '25/09/2026', previousDueDate: '15/09/2026', dueDate: '01/10/2026' }));
+        expect(message).toMatch(/Start Date of <strong>Task 01<\/strong> is changed from .*10\/09\/2026.* to .*25\/09\/2026.* and Due Date is changed from .*15\/09\/2026.* to .*01\/10\/2026/);
+    });
+
+    test('a move that only changes the due date names the due date alone', async () => {
+        hold({ startDate: new Date(START), DueDate: new Date(PREV), dueDateDeadLine: [{ date: new Date(PREV) }] });
+        const result = await call(PATCH, moveBody({ firebaseObj: { DueDate: DUE, dueDateDeadLine: [{ date: PREV }, { date: DUE }], startDate: START } }));
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        const message = onlyServerText();
+        expect(message).toBe(templates.taskDueDateChange({ ProjectName: 'Parity', TaskName: 'Task 01', previousDate: '15/09/2026', changedDate: '01/10/2026' }));
+        expect(message).not.toContain('Start Date');
+    });
+
+    test('a move that only changes the start date names the start date alone', async () => {
+        hold({ startDate: new Date(PREV_START), DueDate: new Date(DUE), dueDateDeadLine: [{ date: new Date(DUE) }] });
+        const result = await call(PATCH, moveBody({ firebaseObj: { DueDate: DUE, dueDateDeadLine: [{ date: DUE }, { date: DUE }], startDate: START } }));
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        const message = onlyServerText();
+        expect(message).toBe(templates.taskStartDateChange({ ProjectName: 'Parity', TaskName: 'Task 01', formetedStartDate: '10/09/2026', newDate: '25/09/2026' }));
+        expect(message).not.toContain('Due Date');
+    });
+
+    test('a body without the task or project name still writes the row and names the stored task', async () => {
+        const result = await call(PATCH, moveBody({ project: clientProject(), task: { _id: OPEN_TASK, sprintId: SPRINT, sprintArray: { id: SPRINT } } }));
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(historyRows().map((row) => row.Key)).toEqual(['Project_StartDate_DueDate']);
+        expect(onlyServerText()).toBe(templates.taskStartAndDueDateChange({ ProjectName: 'Parity', TaskName: 'Task 01', startDate: '25/09/2026', dueDate: '01/10/2026' }));
+    });
+
+    test('the dates are shown in the format and time zone the caller uses', async () => {
+        const result = await call(PATCH, moveBody({ timeZone: 'Asia/Kolkata', commonDateFormatString: 'YYYY-MM-DD', firebaseObj: { DueDate: IST_MIDNIGHT, dueDateDeadLine: [{ date: IST_MIDNIGHT }], startDate: '2026-09-24T18:30:00.000Z' } }));
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        const message = onlyServerText();
+        expect(message).toContain('>2026-09-25</span>');
+        expect(message).toContain('>2026-10-01</span>');
+    });
+
+    test('a move that changes neither date sends no notification', async () => {
+        hold({ startDate: new Date(START), DueDate: new Date(DUE), dueDateDeadLine: [{ date: new Date(DUE) }] });
+        const result = await call(PATCH, moveBody({ firebaseObj: { DueDate: DUE, dueDateDeadLine: [{ date: DUE }, { date: DUE }], startDate: START } }));
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(notices()).toEqual([]);
+        expect(historyRows()).toHaveLength(1);
+    });
+
+    test('a caller that asks for no notification still gets none', async () => {
+        const result = await call(PATCH, moveBody({ notificationObj: {} }));
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(notices()).toEqual([]);
+        expect(historyRows()).toHaveLength(1);
+    });
+});
+
 describe('a body without the task name still writes the history row', () => {
     test('an attachment added with a bare taskData', async () => {
         const result = await call(PATCH, { action: 'updateAttachments', companyId: CID, sprintId: SPRINT, taskId: OPEN_TASK, taskData: { _id: OPEN_TASK, sprintId: SPRINT }, operation: 'add', data: { id: 'a1', filename: 'plan.pdf' }, userData: USER, projectData: { id: OPEN_PROJECT } });
@@ -262,7 +344,7 @@ describe('a body without the task name still writes the history row', () => {
     test.each([
         'createTask', 'taskNameEdit', 'taskTotalEstimate', 'taskStatusChange', 'taskPriorityChange', 'taskTypeChage',
         'taskAssigneeAdd', 'taskAssigneeRemove', 'taskAssigneeReplace', 'taskAttachmentAdd', 'taskAttachmentRemove',
-        'taskDueDateAdd', 'taskDueDateChange', 'taskStartDateAdd', 'taskStartDateChange',
+        'taskDueDateAdd', 'taskDueDateChange', 'taskStartDateAdd', 'taskStartDateChange', 'taskStartAndDueDateChange',
     ])('%s renders an empty body instead of throwing', (name) => {
         expect(() => templates[name]({})).not.toThrow();
         expect(templates[name]({})).not.toContain('undefined');

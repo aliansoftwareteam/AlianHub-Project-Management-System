@@ -6544,6 +6544,11 @@ export default {
         You_deleted_this_message: "You deleted this message",
         no_user_found: "No User Found",
         unlock_comment_view: "To Unlock Comment View",
+        agent_tag: "AGENT",
+        an_agent: "An agent",
+        ai_assistant: "AI assistant",
+        cited_page: "page",
+        cited_page_hidden: "a page you cannot open",
     },
     PlaceHolder: {
         enter_task_type: "Enter Task Type",
