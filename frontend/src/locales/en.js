@@ -1687,7 +1687,7 @@ export default {
         skills_open_library: "Open the skill library",
         available_actions_note: "Every action a skill may emit, and what the guard does with it.",
         no_runs_month: "No runs this month.",
-        month_runs: "This month: {runs} runs · ${usd}",
+        month_runs: "This month: {runs} run · ${usd} | This month: {runs} runs · ${usd}",
         paused_toast: "{name} paused.",
         resumed_toast: "{name} resumed.",
         all_paused: "All agents paused.",
