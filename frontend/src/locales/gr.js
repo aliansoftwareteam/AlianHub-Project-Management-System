@@ -6386,7 +6386,12 @@ export default {
         "This_message_is_deleted": "Αυτό το μήνυμα έχει διαγραφεί",
         "You_deleted_this_message": "Διαγράψατε αυτό το μήνυμα",
         "no_user_found": "Δεν βρέθηκε χρήστης",
-        "unlock_comment_view": "Για να ξεκλειδώσετε την προβολή σχολίων"
+        "unlock_comment_view": "Για να ξεκλειδώσετε την προβολή σχολίων",
+        "agent_tag": "AGENT",
+        "an_agent": "An agent",
+        "ai_assistant": "AI assistant",
+        "cited_page": "page",
+        "cited_page_hidden": "a page you cannot open"
     },
     "PlaceHolder": {
         "enter_task_type": "Εισάγετε Τύπο Εργασίας",

@@ -6386,7 +6386,12 @@ export default {
         "This_message_is_deleted": "Это сообщение удалено",
         "You_deleted_this_message": "Вы удалили это сообщение",
         "no_user_found": "Пользователь не найден",
-        "unlock_comment_view": "Для разблокировки просмотра комментариев"
+        "unlock_comment_view": "Для разблокировки просмотра комментариев",
+        "agent_tag": "AGENT",
+        "an_agent": "An agent",
+        "ai_assistant": "AI assistant",
+        "cited_page": "page",
+        "cited_page_hidden": "a page you cannot open"
     },
     "PlaceHolder": {
         "enter_task_type": "Введите тип задачи",
