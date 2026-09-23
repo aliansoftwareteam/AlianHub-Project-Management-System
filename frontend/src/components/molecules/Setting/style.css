@@ -252,7 +252,7 @@ h2.task_priority_wrapper_value {
     line-height: 27px;
     letter-spacing: 0px;
     text-align: left;
-    color: var(--ink);
+    color: inherit;
     margin: 30px 0px 10px;
 }
 

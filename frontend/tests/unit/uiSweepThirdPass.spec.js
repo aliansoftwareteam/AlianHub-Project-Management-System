@@ -83,12 +83,16 @@ describe('Settings → Time tracking', () => {
 describe('Settings → General in dark mode', () => {
     const css = read('components/molecules/Setting/style.css');
 
-    test('section headings on the canvas follow the theme', () => {
-        expect(ruleBody(css, 'h2.task_priority_wrapper_value')).toMatch(/color:\s*var\(--ink\)/);
+    test('section headings inherit: theme ink on the canvas, dark ink inside a white card', () => {
+        expect(ruleBody(css, 'h2.task_priority_wrapper_value')).toMatch(/color:\s*inherit/);
     });
 
-    test('the white sections keep dark ink for the text they inherit', () => {
+    test('the white sections and cards keep dark ink for the text they inherit', () => {
         expect(ruleBody(css, '.mySettingSection')).toMatch(/color:\s*#17161c/);
+        const card = (rel, sel) => { const vue = read(rel); return ruleBody(vue.slice(vue.indexOf('<style')), sel); };
+        expect(card('components/molecules/Setting/SettingScreenshotRetention.vue', '.screenshot-retention-card')).toMatch(/color:\s*#17161c/);
+        expect(card('components/molecules/Setting/SettingTimeReminder.vue', '.time-reminder-card')).toMatch(/color:\s*#17161c/);
+        expect(card('components/molecules/Setting/SettingAutoCloseProjects.vue', '.acp-card')).toMatch(/color:\s*#17161c/);
     });
 });
 
