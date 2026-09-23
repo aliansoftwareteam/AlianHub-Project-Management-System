@@ -50,6 +50,28 @@ describe('a board card on a phone', () => {
     });
 });
 
+describe('the project calendar grid', () => {
+    const css = read('views/Projects/ProjectCalendarView/style.css');
+    const phone = read('views/Projects/ProjectCalendarView/calendar-phone.css');
+
+    test('draws each day card on the frame, so no rounded cell corners meet across the collapsed table', () => {
+        expect(ruleBody(css, '.cv__grid :deep(.fc-daygrid-day)')).not.toMatch(/border-radius|border:/);
+        const frame = ruleBody(css, '.cv__grid :deep(.fc-daygrid-day-frame)');
+        expect(frame).toMatch(/border-radius:\s*10px/);
+        expect(frame).toMatch(/min-height:\s*100%/);
+        expect(ruleBody(css, '.cv__grid :deep(.fc-scrollgrid-sync-table td)')).toMatch(/padding:\s*3px/);
+        expect(phone).not.toMatch(/:deep\(\.fc-daygrid-day\)\s*\{/);
+    });
+
+    test('the legacy sprint stylesheet no longer paints the other-month day strip', () => {
+        const legacy = read('components/organisms/SprinstList/style.css');
+        const selectors = (legacy.match(/[^{}]+\{[^}]*#fafbfc[^}]*\}/gi) || [])
+            .flatMap((block) => block.split('{')[0].split(',').map((s) => s.trim()));
+        expect(selectors.length).toBeGreaterThan(0);
+        expect(selectors.filter((s) => !s.startsWith('.calendar__view-wrapper'))).toEqual([]);
+    });
+});
+
 describe('the setup checklist outside Home', () => {
     test('brings its own stylesheet, so Instance → Health renders it styled on a direct visit', () => {
         expect(read('components/molecules/Home/SetupChecklist.vue')).toMatch(/import\s+["']\.\/style\.css["']/);
