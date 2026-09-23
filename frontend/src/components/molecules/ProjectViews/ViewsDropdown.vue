@@ -56,7 +56,7 @@
 <script setup>
 // UTILS
 import { addView } from '@/components/molecules/EmbedView/helper.js'
-import { addPrivateView, groupViews, viewTagKey } from './helper.js'
+import { addPrivateView, groupViews, viewTagKey, privateViewHistory } from './helper.js'
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import * as env from '@/config/env';
 import { projectComponentsIcons } from '@/composable/commonFunction';
@@ -188,27 +188,6 @@ watch(() => getters['projectData/projects']?.data?.find((x) => x._id === Data.va
     Data.value = getters['projectData/projects']?.data?.find((x) => x._id === Data.value?._id)
 })
 
-// This function is used to manage all the checklist hostory for the project and tasks
-const manageHistory = async (type, key, message) => {
-    const axiosData = {
-        "type": type,
-        "companyId": companyId.value,
-        "projectId": Data.value._id,
-        "taskId": null,
-        "object": {
-            "sprintId": null,
-            "key": key,
-            "message": message
-        },
-        "userData": userData
-    };
-    await apiRequest("post", env.HANDLE_HISTORY, axiosData).then((result) => {
-        if(result.data.status) {
-            console.info(result.data.statusText)
-        }
-    });
-}
-
 const handleSubmit = (item) =>{
     if(isAdded(item)) {
         toast.error(t("Toast.View_Already_Added"), {position:'top-right'})
@@ -231,9 +210,9 @@ const handleSubmit = (item) =>{
             console.error(err.statusText)
         })
     }
-    // Call history API
-    const msg =  `<b>${userData.Employee_Name}</b> has added the <b> ${isPin.value ? 'pinned' : ''} ${isPrivate.value ? 'private' : ''} View </b> as <b>${item?.name}</b>`;
-    manageHistory("project", "Project_Name", msg);
+    if(isPrivate.value) {
+        privateViewHistory(companyId.value, Data.value._id, `<b>${userData.Employee_Name}</b> has added the <b> ${isPin.value ? 'pinned' : ''} private View </b> as <b>${item?.name}</b>`);
+    }
     emits('closeDropdown')
 }
 

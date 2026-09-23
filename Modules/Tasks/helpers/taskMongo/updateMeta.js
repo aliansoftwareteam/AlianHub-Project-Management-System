@@ -22,6 +22,7 @@ const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const { taskNotFound, escapeText, TaskWriteRefusal } = require('../taskWriteFields');
+const { recordCustomFieldValue, recordTaskTag } = require('../taskItemHistory');
 
 const storedFileName = (storedTask, data) => {
     const stored = ((storedTask && storedTask.attachments) || []).find((file) => file && file.id !== undefined && file.id === data.id);
@@ -39,8 +40,7 @@ const checklistItemIds = (operation, data, history) => {
 };
 module.exports = {
 
-    /* -------------- UPDATE TAGS -----------------*/
-    updateTags({companyId, projectId, sprintId, taskId, tagId, operation}) {
+    updateTags({companyId, taskId, tagId, operation, userData, storedTask}) {
         return new Promise((resolve, reject) => {
             try {
 
@@ -80,6 +80,10 @@ module.exports = {
                     }
                     socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'task' });
                     resolve({status: true, statusText: `Tag updated successfully`});
+                    if (storedTask && userData) {
+                        recordTaskTag({ companyId, task: storedTask, tagId, operation, actor: userData })
+                            .catch((error) => logger.error(`task tag history: ${error && error.message}`));
+                    }
                 }).catch(reject);
 
             } catch (error) {
@@ -269,7 +273,7 @@ module.exports = {
         })
     },
 
-    updateTaskCustomField({companyId,taskId,updateDetail,customFieldId}) {
+    updateTaskCustomField({companyId,taskId,updateDetail,customFieldId,userData,storedTask}) {
         return new Promise((resolve,reject) => {
             try {
                 const query = {
@@ -287,6 +291,10 @@ module.exports = {
                 .then((result) => {
                     socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[`customField.${customFieldId}`]: updateDetail}, module: 'task' });
                     resolve({status: true,data: result, statusText: "Custom Field Update Successfully"});
+                    if (result && storedTask && userData) {
+                        recordCustomFieldValue({ companyId, task: storedTask, customFieldId, updateDetail, actor: userData })
+                            .catch((error) => logger.error(`custom field value history: ${error && error.message}`));
+                    }
                 })
                 .catch((error) => {
                     logger.error(`Error in Updating Custom Field: ${error.message}`);

@@ -786,26 +786,6 @@ export function useConvertDate() {
     }
 }
 
-export function useHistoryNotification() {
-
-    function addHistory(obj) {
-        apiRequest("post", env.HANDLE_HISTORY, obj)
-        .catch((error) => {
-            console.error("ERROR in addHistory: ", error);
-        })
-    }
-    function addNotification(obj) {
-        apiRequest("post", env.HANDLE_NOTIFICATION, obj)
-        .catch((error) => {
-            console.error("ERROR in notification: ", error);
-        })
-    }
-
-    return {
-        addHistory,
-        addNotification
-    }
-}
 export function draggble() {
     function generateOrder (prev, next) {
         try{
