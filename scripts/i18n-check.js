@@ -67,6 +67,23 @@ function checkLocales() {
     });
 }
 
+/* Key order is deliberately not checked: resolving a merge conflict by keeping
+   both sides' keys in any order must pass; the next backfill re-sorts them. */
+function checkPending(dir = LOCALES_DIR) {
+    return fs.readdirSync(dir)
+        .filter((name) => name.endsWith('.pending.json'))
+        .map((name) => {
+            try {
+                const parsed = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
+                if (!parsed.keys || typeof parsed.keys !== 'object' || Array.isArray(parsed.keys)) return { file: name, error: 'no "keys" object' };
+                return null;
+            } catch (error) {
+                return { file: name, error: error.message };
+            }
+        })
+        .filter(Boolean);
+}
+
 /* --- hardcoded text in templates --- */
 const ATTRS = ['title', 'placeholder', 'placeHolder', 'aria-label'];
 const IGNORED_TEXT = /^[\s\d\W_]*$/;
@@ -169,6 +186,7 @@ function main(argv) {
     const { over, shrinkable } = compareToAllowlist(scan, readAllowlist());
     const hardcodedTotal = Object.values(scan).reduce((n, list) => n + list.length, 0);
     const failing = locales.filter((l) => l.missing.length);
+    const brokenPending = checkPending();
 
     if (json) {
         console.log(JSON.stringify({ locales: locales.map((l) => ({ code: l.code, present: l.present, total: l.total, missing: l.missing.length, extra: l.extra.length })), hardcoded: { files: Object.keys(scan).length, findings: hardcodedTotal, over } }, null, 2));
@@ -186,9 +204,10 @@ function main(argv) {
         console.error(`\n${failing.length} locale(s) miss keys that en.js has. Run: npm run i18n:backfill`);
     }
     if (over.length) console.error(`\n${over.length} file(s) added hardcoded text. Wrap it in $t() or, for a deliberate exception, raise scripts/i18n-allowlist.json.`);
-    return failing.length || over.length ? 1 : 0;
+    brokenPending.forEach((p) => console.error(`\n${p.file} is not valid pending JSON (${p.error}). Keep both sides' keys, then run: npm run i18n:backfill`));
+    return failing.length || over.length || brokenPending.length ? 1 : 0;
 }
 
-module.exports = { loadLocale, flatten, localeFiles, checkLocales, scanTemplate, scanHardcoded, readAllowlist, compareToAllowlist, writeAllowlist, SOURCE_LOCALE, LOCALES_DIR };
+module.exports = { loadLocale, flatten, localeFiles, checkLocales, checkPending,scanTemplate, scanHardcoded, readAllowlist, compareToAllowlist, writeAllowlist, SOURCE_LOCALE, LOCALES_DIR };
 
 if (require.main === module) process.exit(main(process.argv.slice(2)));
