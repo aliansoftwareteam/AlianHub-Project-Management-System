@@ -119,6 +119,98 @@ async function rollbackMigration({ store, migrations, makeContext, logger = cons
     }
 }
 
+const errorText = (error) => String((error && error.message) || error);
+
+function groupWrites(writes) {
+    const groups = new Map();
+    for (const w of writes) {
+        const key = [w.collection, w.op, (w.filter || []).join(','), w.update || ''].join('|');
+        if (!groups.has(key)) groups.set(key, { collection: w.collection, op: w.op, calls: 0, dbs: new Set(), documents: 0, upserts: 0, filter: w.filter || [], update: w.update || null });
+        const group = groups.get(key);
+        group.calls += 1;
+        group.dbs.add(w.db);
+        group.documents = group.documents === null || w.documents === null || w.documents === undefined ? null : group.documents + w.documents;
+        group.upserts += w.upserts || 0;
+    }
+    return [...groups.values()].map(({ dbs, ...group }) => ({ ...group, databases: dbs.size }));
+}
+
+function cannotDryRunReason(id, journal) {
+    const [read] = journal.readsAfterWrite;
+    if (read) {
+        const by = read.writtenBy === id ? 'this migration' : read.writtenBy;
+        const more = journal.readsAfterWrite.length - 1;
+        return `reads ${read.collection} (${read.op}) after ${by} would write it (${read.writeOp})${more ? `, and ${more} more like it` : ''}`;
+    }
+    const [op] = journal.unsupported;
+    return op ? `uses ${op.op} on ${op.collection}, which a dry run cannot record` : null;
+}
+
+/* Runs every pending up() with the driver-level guard recording instead of writing, so the plan
+ * comes from the migration's own code. No lock and no schema_versions row: nothing is applied.
+ * A migration that reads what it (or an earlier pending one) would have written sees the old
+ * data, so its plan would mislead; it is reported as cannot-dry-run instead. */
+async function dryRunMigrations({ store, migrations, makeContext, guard }) {
+    const results = [];
+    try {
+        guard.refuse();
+        const { pending } = planRuns(migrations, await store.all());
+        guard.forget();
+        for (const migration of pending) {
+            const ctx = makeContext();
+            guard.record(migration.id);
+            let error = null;
+            try {
+                await migration.up(ctx);
+            } catch (e) {
+                error = errorText(e);
+            }
+            const journal = guard.take();
+            const outcome = { id: migration.id, scope: migration.scope, writes: groupWrites(journal.writes) };
+            const reason = cannotDryRunReason(migration.id, journal);
+            if (reason) Object.assign(outcome, { status: 'cannot-dry-run', reason });
+            else if (error) Object.assign(outcome, { status: 'failed', error });
+            else outcome.status = 'plan';
+            results.push(outcome);
+        }
+    } finally {
+        guard.off();
+    }
+    return { results };
+}
+
+/* Runs the optional verify(ctx) of every applied migration with every write refused. verify
+ * resolves to a list of problems, empty while the migration's guarantee still holds. */
+async function verifyMigrations({ store, migrations, makeContext, guard }) {
+    try {
+        guard.refuse();
+        const { applied, pending } = planRuns(migrations, await store.all());
+        const appliedIds = new Set(applied.map((r) => r._id));
+        const results = [];
+        for (const migration of migrations.filter((m) => appliedIds.has(m.id))) {
+            if (typeof migration.verify !== 'function') {
+                results.push({ id: migration.id, status: 'no-check', problems: [] });
+                continue;
+            }
+            guard.take();
+            let problems = [];
+            let error = null;
+            try {
+                const found = await migration.verify(makeContext());
+                problems = Array.isArray(found) ? found.map(String) : [];
+            } catch (e) {
+                error = errorText(e);
+            }
+            const { writes } = guard.take();
+            if (writes.length) error = `tried to write: ${[...new Set(writes.map((w) => `${w.op} on ${w.collection}`))].join(', ')}`;
+            results.push({ id: migration.id, status: error || problems.length ? 'fail' : 'pass', problems, error });
+        }
+        return { results, notApplied: pending.map((m) => m.id) };
+    } finally {
+        guard.off();
+    }
+}
+
 async function migrationStatus({ store, migrations }) {
     const { applied, pending, failed } = planRuns(migrations, await store.all());
     return {
@@ -142,6 +234,14 @@ function liveDeps() {
         migrations: listMigrations(),
         makeContext: () => buildContext({ MongoDbCrudOpration, SCHEMA_TYPE, dbCollections, settingsCollectionDocs, logger, listCompanies }),
         logger,
+        /* Set before the first model compiles, or Mongoose's own index and collection
+         * creation would land in the plan as if the migration asked for it. */
+        installWriteGuard() {
+            const mongoose = require('mongoose');
+            mongoose.set('autoIndex', false);
+            mongoose.set('autoCreate', false);
+            return require('./writeGuard').installWriteGuard(mongoose.mongo);
+        },
     };
 }
 
@@ -182,4 +282,4 @@ async function runMigrationsAtBoot({ auto = process.env.MIGRATIONS_AUTO !== 'fal
     }
 }
 
-module.exports = { LOCK_ID, LOCK_TTL_MS, listMigrations, validateMigration, planRuns, buildContext, runMigrations, rollbackMigration, migrationStatus, refreshMigrationState, liveDeps, runMigrationsAtBoot };
+module.exports = { LOCK_ID, LOCK_TTL_MS, listMigrations, validateMigration, planRuns, buildContext, runMigrations, rollbackMigration, dryRunMigrations, verifyMigrations, migrationStatus, refreshMigrationState, liveDeps, runMigrationsAtBoot };
