@@ -3,6 +3,8 @@ const mockDb = require('./fixtures/fakeMongo').create();
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
+jest.mock('../Modules/Tasks/helpers/taskReadAccess', () => ({ canReadTask: jest.fn(async () => true) }));
+jest.mock('../Modules/Comments/helpers/threadWriteAccess', () => ({ ...jest.requireActual('../Modules/Comments/helpers/threadWriteAccess'), canChangeComment: jest.fn(async () => ({ allowed: true })) }));
 jest.mock('../Config/permissionGuard', () => ({ ROLE_OWNER: 1, ROLE_ADMIN: 2, getRoleType: jest.fn(async (c, uid) => (uid === 'owner1' ? 1 : 3)), isPrivileged: (r) => r === 1 || r === 2 }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(async (c, uid) => (uid === 'outsider' ? ['p9'] : ['p1'])) }));
@@ -126,6 +128,34 @@ describe('project visibility', () => {
         expect(rows(SCHEMA_TYPE.TASKS)[0].statusType).toBe('open');
         expect(auditRows(audit.ACTION_UNDONE)).toHaveLength(1);
         expect(auditRows(audit.ACTION_REFUSED)).toHaveLength(0);
+    });
+});
+
+describe('target visibility', () => {
+    const { canReadTask } = require('../Modules/Tasks/helpers/taskReadAccess');
+    const { canChangeComment } = require('../Modules/Comments/helpers/threadWriteAccess');
+
+    it('refuses a member who can see the project but not the task, and records the refusal', async () => {
+        canReadTask.mockResolvedValueOnce(false);
+        const row = await seedStatusAction(seedRun());
+        const r = res();
+        await auditCtrl.undoAuditLog(req(row._id, 'u2'), r);
+        expect(r.code).toBe(403);
+        expect(r.body).toMatchObject({ status: false, reason: 'target_not_visible' });
+        expect(canReadTask).toHaveBeenCalledWith(C, 'u2', expect.objectContaining({ ProjectID: 'p1' }));
+        expect(rows(SCHEMA_TYPE.TASKS)[0].statusType).toBe('close');
+        expect(auditRows(audit.ACTION_REFUSED).map((x) => x.meta.reason)).toEqual(['target_not_visible']);
+    });
+
+    it('refuses a comment whose thread the undoer cannot open', async () => {
+        const COMMENT_ID = '6f0000000000000000000901';
+        mockDb.seed(SCHEMA_TYPE.COMMENTS, { _id: COMMENT_ID, projectId: 'p1', sprintId: 's1', taskId: TASK_ID, message: 'hi' });
+        canChangeComment.mockResolvedValueOnce({ allowed: false, statusCode: 404 });
+        const id = await audit.recordAction(C, agentActor(null), { action: 'task.comment', reason: 'test', params: {}, entityType: 'task', entityId: TASK_ID, undo: { kind: 'comment', commentId: COMMENT_ID, taskId: TASK_ID } });
+        const row = rows(SCHEMA_TYPE.AUDIT_LOGS).find((x) => String(x._id) === String(id));
+        const out = await undo.undoAuditRow(C, row, { kind: 'human', userId: 'u2' }, '');
+        expect(out).toMatchObject({ ok: false, reason: 'target_not_visible', status: 403 });
+        expect(rows(SCHEMA_TYPE.COMMENTS)[0].isDeleted).toBeUndefined();
     });
 });
 
