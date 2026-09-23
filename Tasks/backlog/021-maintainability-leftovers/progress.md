@@ -31,4 +31,4 @@ None.
 ### 2026-09-23 — 007 follow-ups
 - Run-history drawer on the automations list (History button per rule). The runs endpoint answers the newest 50 and does not page, so the drawer says so at 50 rather than paging.
 - `POST /api/v2/automations/:id/dry-run { taskId }`: owner/admin (the edit gate), task must be in a project the caller can open (404 otherwise). Only reads; a no-write test fails when a save, a socket emit, a fetch or an action run is put back into the handler.
-- Not changed: `GET /:id/runs` still has no project-visibility filter, and each run carries its envelope (a trimmed task snapshot). A member can read runs of rules that fire in private projects. Worth its own fix.
+- Not changed here: the runs endpoint itself; its access rules are being reviewed separately.
