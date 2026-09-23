@@ -170,7 +170,7 @@ import ReportsTabs from '@/views/Projects/Reports/ReportsTabs.vue';
 
 defineOptions({ name: 'CustomReportBuilder' });
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const { getters } = useStore();
 
 // The server refuses billable amounts below owner/admin; offering the metric would only produce an error.
@@ -232,6 +232,7 @@ const activeFilters = computed(() => Object.keys(cfg.filters).map((key) => {
     if (key === 'project') return { key, label: `${t('Reports.dim_project')} = ${projectLabel(value)}` };
     if (key === 'range') return { key, label: `${t('Reports.f_date')} = ${t(`Reports.range_${value}`)}` };
     if (key === 'billable') return { key, label: `${t('Reports.f_billable')} = ${t(value === 'yes' ? 'Reports.yes' : 'Reports.no')}` };
+    if (key === 'status') return { key, label: `${t('Reports.dim_status')} = ${te(`Reports.status_type_${value}`) ? t(`Reports.status_type_${value}`) : value}` };
     return { key, label: `${key} = ${value}` };
 }));
 
@@ -294,10 +295,16 @@ const payload = () => ({
     filters: { ...cfg.filters },
 });
 
+// Grouping by status groups on the stored status type (default_active, active, close).
+const labelRows = (list) => list.map((row) => {
+    const key = `Reports.status_type_${row.key}`;
+    return cfg.dimension === 'status' && te(key) ? { ...row, label: t(key) } : row;
+});
+
 const runPreview = async () => {
     try {
         const body = (await apiRequest('post', `${env.CUSTOM_REPORT}/run`, payload()))?.data;
-        rows.value = (body && body.data && body.data.result) || [];
+        rows.value = labelRows((body && body.data && body.data.result) || []);
         unit.value = (body && body.data && body.data.unit) || 'count';
     } catch (e) { rows.value = []; }
 };
@@ -349,7 +356,7 @@ const loadSaved = async () => {
         cfg.filters = { ...(c.filters || {}) };
         reportName.value = body.data.report ? body.data.report.name : '';
         currentSavedId.value = String(id);
-        rows.value = body.data.result || [];
+        rows.value = labelRows(body.data.result || []);
         unit.value = body.data.unit || 'count';
     } catch (e) { message.value = t('Reports.load_failed'); }
 };

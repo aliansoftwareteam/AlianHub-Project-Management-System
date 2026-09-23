@@ -232,6 +232,7 @@ html, body, #app {
     background: transparent;
     cursor: pointer;
     white-space: nowrap;
+    text-decoration: none;
     transition: background var(--t-state) var(--ease), border-color var(--t-state) var(--ease), color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
 }
 .ah-btn:focus-visible { outline: none; box-shadow: var(--focus); }

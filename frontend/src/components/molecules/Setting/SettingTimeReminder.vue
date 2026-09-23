@@ -226,6 +226,7 @@ watch(
     margin-top: 24px;
     padding: 20px;
     background: #ffffff;
+    color: #17161c;
     border: 1px solid #e5e7eb;
     border-radius: 10px;
 }

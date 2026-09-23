@@ -45,3 +45,6 @@
     .team__row--head { display: none; }
     .team__load { max-width: 200px; }
 }
+@media (max-width: 767px) {
+    .team .parity-count { display: none; }
+}

@@ -1,4 +1,5 @@
-.fb {
+/* Two classes: tokens.css makes every .ah-page a flex column and may load after this file. */
+.ah-page.fb {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;
     align-items: start;
@@ -162,7 +163,7 @@
 .fb__empty-panel { display: flex; flex-direction: column; gap: 10px; }
 
 @media (max-width: 1279px) {
-    .fb { grid-template-columns: minmax(0, 1fr); }
+    .ah-page.fb { grid-template-columns: minmax(0, 1fr); }
     .fb__main { border-inline-end: none; }
     .fb__panel { position: static; border-top: 1px solid var(--hairline); }
 }

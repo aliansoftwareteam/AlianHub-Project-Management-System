@@ -384,7 +384,7 @@ const loadTryTasks = async () => {
     if (!tryProjectId.value) return;
     try {
         const body = await apiRequest('post', `${env.TASK}/find`, {
-            findQuery: { $match: { deletedStatusKey: 0, mainChat: { $ne: true }, ProjectID: tryProjectId.value } },
+            findQuery: { $match: { deletedStatusKey: 0, mainChat: { $ne: true }, ProjectID: { objId: { $in: [tryProjectId.value] } } } },
         });
         tryTasks.value = (Array.isArray(body?.data) ? body.data : []).slice(0, 200);
     } catch (e) { tryTasks.value = []; }
@@ -495,7 +495,8 @@ const loadRules = async () => {
 const loadProjects = async () => {
     try {
         const body = (await apiRequest('get', env.PROJECT))?.data;
-        projects.value = body?.data || [];
+        const list = Array.isArray(body) ? body : (body && body.data) || [];
+        projects.value = list.filter((p) => p && p.deletedStatusKey !== 1 && p.deletedStatusKey !== 2);
     } catch (e) { projects.value = []; }
 };
 

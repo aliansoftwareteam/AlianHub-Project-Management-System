@@ -105,19 +105,19 @@ onMounted(load);
 
 <style scoped>
 .scim-settings { padding: 20px; }
-.scim-card { background: #fff; border: 1px solid #e6e7ee; border-radius: 10px; padding: 20px; max-width: 720px; }
+.scim-card { background: #fff; color: #17161c; border: 1px solid #e6e7ee; border-radius: 10px; padding: 20px; max-width: 720px; }
 .scim-head { display: flex; align-items: center; justify-content: space-between; }
 .scim-sub { color: #6b7280; font-size: 13px; margin: 6px 0 18px; }
 .scim-row { margin-bottom: 14px; display: flex; flex-direction: column; gap: 5px; }
 .scim-row > label { font-size: 13px; font-weight: 600; color: #3a3f52; }
 .scim-row .form-control { max-width: 280px; }
-.scim-hint { color: #9aa0b4; font-size: 12px; }
+.scim-hint { color: #6b7280; font-size: 12px; }
 .scim-switch { flex-direction: row !important; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
 .scim-urls { background: #f7f8fc; border-radius: 8px; padding: 12px 14px; margin: 8px 0 16px; }
 .scim-url-title { font-size: 12px; font-weight: 700; color: #3a3f52; margin-bottom: 8px; }
 .scim-url { font-size: 12px; margin-bottom: 6px; display: flex; flex-direction: column; gap: 2px; }
 .scim-url code { background: #fff; border: 1px solid #e6e7ee; border-radius: 5px; padding: 4px 8px; word-break: break-all; }
-.scim-muted { color: #9aa0b4; }
+.scim-muted { color: #6b7280; }
 .scim-token-warn { font-size: 12px; color: #9a6b00; background: #fff8e6; border: 1px solid #f3e2b3; border-radius: 6px; padding: 8px 10px; margin-top: 8px; display: flex; align-items: center; gap: 10px; }
 .scim-actions { display: flex; align-items: center; gap: 12px; }
 .scim-btn { background: #2f3a8f; color: #fff; border: none; border-radius: 7px; padding: 8px 16px; font-size: 13px; cursor: pointer; }

@@ -27,12 +27,26 @@ const rawPost = async (path, body) => {
 const signUp = async (email) => {
     const created = await anonymous.post('/api/v2/createUser', { firstName: 'Mia', lastName: 'Mailer', email, password: PASSWORD });
     expect(created.body.status).toBe(true);
-    return String(created.body.statusText._id);
+    const id = String(created.body.statusText._id);
+    await settledToken(id);
+    return id;
 };
 
 const verificationTokenOf = async (id) => {
     const account = await users().findOne({ _id: new ObjectId(id) }, { projection: { verificationToken: 1 } });
     return account && account.verificationToken;
+};
+/* Signing up mails its own verification link in the background, which rewrites the token; wait for
+ * that write so it cannot land on top of the token a test sets. */
+const settledToken = async (id) => {
+    const deadline = Date.now() + 5000;
+    let previous = await verificationTokenOf(id);
+    for (;;) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const current = await verificationTokenOf(id);
+        if ((current && current === previous) || Date.now() > deadline) return current;
+        previous = current;
+    }
 };
 
 /* The answer does not wait for the mail, so the new link lands just after it. */
