@@ -1305,6 +1305,8 @@ export default {
         "detail": "Detail",
         "reject": "Reject",
         "why": "Why?",
+        "agent_tag": "AGENT",
+        "approval_types": "Approval types",
         "confirm_reject": "Confirm reject",
         "cancel": "Cancel",
         "reject_reason_ph": "Reason (the requester sees this)",
