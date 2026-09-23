@@ -13,7 +13,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
             return { isTrackerUser: true };
         }
         if (type === 'users') return { _id: query._id, Employee_Name: 'Someone' };
-        if (type === 'timesheets' && method === 'findOne') {
+        if (method === 'findOne' && query && query._id) {
             const id = String(query._id && query._id.$in ? query._id.$in[0] : query._id);
             const session = mockDb.sessions[id];
             return session && session.companyId === dbName ? { _id: id, ...session } : null;
@@ -63,7 +63,7 @@ const addSession = (owner, companyId = COMPANY) => {
 };
 
 /* Same fields, in the same order, as TrackerController.ScreenShotCapture in time-tracker-app. */
-function trackerForm(timeSheetId, filePath) {
+function trackerForm(timeSheetId, filePath, type = 'timesheets') {
     const form = new FormData();
     form.append('strokes', '[]');
     form.append('companyId', COMPANY);
@@ -73,7 +73,7 @@ function trackerForm(timeSheetId, filePath) {
     form.append('memoName', 'qa capture');
     form.append('screenShotTime', String(Date.now()));
     form.append('key', '0');
-    form.append('type', 'timesheets');
+    form.append('type', type);
     form.append('projectId', hex());
     form.append('path', filePath);
     form.append('file', new Blob([SCREENSHOT], { type: 'image/png' }), 'screenshot.png');
@@ -81,7 +81,7 @@ function trackerForm(timeSheetId, filePath) {
     return form;
 }
 
-const base64Body = (timeSheetId, filePath) => JSON.stringify({
+const base64Body = (timeSheetId, filePath, type = 'timesheets') => JSON.stringify({
     companyId: COMPANY,
     timeSheetId,
     path: filePath,
@@ -92,7 +92,7 @@ const base64Body = (timeSheetId, filePath) => JSON.stringify({
     memoName: 'qa capture',
     screenShotTime: String(Date.now()),
     strokes: '[]',
-    type: 'timesheets',
+    type,
 });
 
 let server;
@@ -127,16 +127,16 @@ beforeEach(() => {
     mockUploads.length = 0;
 });
 
-const capture = (version, timeSheetId, filePath) => (version === 'v2'
+const capture = (version, timeSheetId, filePath, type) => (version === 'v2'
     ? fetch(`${baseURL}/api/v2/timetracker/capture`, {
         method: 'POST',
         headers: { companyid: COMPANY, 'content-type': 'application/json' },
-        body: base64Body(timeSheetId, filePath),
+        body: base64Body(timeSheetId, filePath, type),
     })
     : fetch(`${baseURL}/api/${version}/timetracker/capture`, {
         method: 'POST',
         headers: { companyid: COMPANY },
-        body: trackerForm(timeSheetId, filePath),
+        body: trackerForm(timeSheetId, filePath, type),
     }));
 
 const storedFile = (filePath) => fs.existsSync(path.join(STORAGE_ROOT, COMPANY, filePath));
@@ -169,6 +169,17 @@ describe.each(['v2', 'v3', 'v4'])('a %s tracker capture', (version) => {
         const timeSheetId = addSession(ME, OTHER_COMPANY);
         const filePath = trackerPath();
         const res = await capture(version, timeSheetId, filePath);
+
+        expect(res.status).toBe(403);
+        expect(mockDb.updates).toHaveLength(0);
+        expect(mockUploads).toHaveLength(0);
+        expect(storedFile(filePath)).toBe(false);
+    });
+
+    it('is refused when the request names a collection other than the timesheets, and writes nothing', async () => {
+        const timeSheetId = addSession(ME);
+        const filePath = trackerPath();
+        const res = await capture(version, timeSheetId, filePath, 'projects');
 
         expect(res.status).toBe(403);
         expect(mockDb.updates).toHaveLength(0);
