@@ -20,6 +20,8 @@ const { publishFormSubmitted } = require('../Automations/engine/formEvent');
 // why conditional logic, one-question-per-page and a signature pad are not
 // offered: each would need script on a page anonymous traffic can reach.
 
+const STORED_TASK_FIELDS = { TaskKey: 1, TaskName: 1, statusType: 1, statusKey: 1, Task_Priority: 1 };
+
 /* No script of ours, and none of theirs. The page is built from escaped values,
  * and this is the backstop if any of them were ever missed. */
 const CSP = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; "
@@ -503,13 +505,15 @@ exports.submitForm = async (req, res) => {
             data: [{ _id: form._id }, { $inc: { submissionCount: 1 } }, {}],
         }, 'updateOne').catch(() => {});
 
-        // taskMongo.create resolves only { status, id }; the key is assigned inside it.
+        // taskMongo.create resolves only { status, id }; the key and the defaults are set inside
+        // it, so the rule this submission fires is handed the row as stored.
         const taskId = String(result.id || data._id);
         const created = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [{ _id: new mongoose.Types.ObjectId(taskId) }, { TaskKey: 1 }],
+            data: [{ _id: new mongoose.Types.ObjectId(taskId) }, STORED_TASK_FIELDS],
         }, 'findOne').catch(() => null);
-        const taskKey = String((created && created.TaskKey) || '');
+        const storedTask = created && typeof created.toObject === 'function' ? created.toObject() : created;
+        const taskKey = String((storedTask && storedTask.TaskKey) || '');
 
         if (stored && stored._id) {
             await MongoDbCrudOpration(companyId, {
@@ -523,7 +527,7 @@ exports.submitForm = async (req, res) => {
             form,
             submissionId: stored && stored._id,
             answers: mapped.record,
-            task: { ...data, _id: taskId, TaskKey: taskKey || data.TaskKey },
+            task: storedTask ? { ...storedTask, _id: taskId } : { ...data, _id: taskId },
             actor: { kind: 'system' },
         });
 

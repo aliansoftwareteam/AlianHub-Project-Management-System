@@ -53,6 +53,7 @@ const buildFormEnvelope = ({ companyId, form, submissionId, answers, task, actor
             ? { kind: 'task', id: taskId, key: (task && task.TaskKey) || null }
             : { kind: 'form', id: form && form._id ? String(form._id) : null, key: (form && form.title) || null },
         data: {
+            ...(taskId ? { _id: taskId } : {}),
             formId: form && form._id ? String(form._id) : null,
             formTitle: (form && form.title) || null,
             submissionId: submissionId ? String(submissionId) : null,
