@@ -4231,6 +4231,7 @@ export default {
         restore_project: "Restore Project",
         delete_project: "Delete Project",
         items_per_page: "Items Per Page",
+        showing_entries: "Showing {from} to {to} of {total} entries",
         Assignee: "Assignee",
         Project_Created_Date: "Project Created Date",
         Project_Status: "Project Status",

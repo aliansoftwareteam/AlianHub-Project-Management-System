@@ -4173,6 +4173,7 @@ export default {
         "restore_project": "प्रोजेक्ट पुनर्स्थापित करें",
         "delete_project": "प्रोजेक्ट हटाएं",
         "items_per_page": "प्रति पृष्ठ आइटम",
+        "showing_entries": "Showing {from} to {to} of {total} entries",
         "Assignee": "आसाइन किया गया व्यक्ति",
         "Project_Created_Date": "प्रोजेक्ट निर्माण तिथि",
         "Project_Status": "प्रोजेक्ट स्थिति",

@@ -5581,6 +5581,7 @@
     "Projects.share_expires_on": "Expires",
     "Projects.share_with": "Share With",
     "Projects.show": "Show",
+    "Projects.showing_entries": "Showing {from} to {to} of {total} entries",
     "Projects.sort_by": "Sort by",
     "Projects.source_fiverr": "Fiverr",
     "Projects.source_other": "Other",

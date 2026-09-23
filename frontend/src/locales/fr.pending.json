@@ -4775,6 +4775,7 @@
     "Projects.select_sprint": "Sprint",
     "Projects.share_expires_on": "Expires",
     "Projects.show": "Show",
+    "Projects.showing_entries": "Showing {from} to {to} of {total} entries",
     "Projects.source_fiverr": "Fiverr",
     "Projects.source_other": "Other",
     "Projects.source_required": "Select where this project came from.",

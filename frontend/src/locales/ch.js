@@ -4173,6 +4173,7 @@ export default {
         "restore_project": "恢复项目",
         "delete_project": "删除项目",
         "items_per_page": "每页条目数",
+        "showing_entries": "Showing {from} to {to} of {total} entries",
         "Assignee": "负责人",
         "Project_Created_Date": "项目创建日期",
         "Project_Status": "项目状态",

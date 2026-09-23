@@ -4173,6 +4173,7 @@ export default {
         "restore_project": "Ανάκτηση Έργου",
         "delete_project": "Διαγραφή Έργου",
         "items_per_page": "Αντικείμενα ανά Σελίδα",
+        "showing_entries": "Showing {from} to {to} of {total} entries",
         "Assignee": "Ανατεθειμένος",
         "Project_Created_Date": "Ημερομηνία Δημιουργίας Έργου",
         "Project_Status": "Κατάσταση Έργου",

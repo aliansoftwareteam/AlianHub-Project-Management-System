@@ -4173,6 +4173,7 @@ export default {
         "restore_project": "Projekt wiederherstellen",
         "delete_project": "Projekt löschen",
         "items_per_page": "Elemente pro Seite",
+        "showing_entries": "Showing {from} to {to} of {total} entries",
         "Assignee": "Zugewiesene Person",
         "Project_Created_Date": "Projekt Erstellungsdatum",
         "Project_Status": "Projektstatus",

@@ -4173,6 +4173,7 @@ export default {
         "restore_project": "Восстановить проект",
         "delete_project": "Удалить проект",
         "items_per_page": "Элементов на странице",
+        "showing_entries": "Showing {from} to {to} of {total} entries",
         "Assignee": "Исполнитель",
         "Project_Created_Date": "Дата создания проекта",
         "Project_Status": "Статус проекта",
