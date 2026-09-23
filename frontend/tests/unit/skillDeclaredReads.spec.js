@@ -20,23 +20,25 @@ const SECRETS = '/api/v2/secrets';
 const ACCESS = '/api/v2/instance/access';
 
 const num = (min, max, def) => ({ type: 'number', min, max, default: def });
-const externalParams = (formats) => ({
+const LINK_PARAMS = { hosts: { type: 'hosts', max: 4 }, link: { type: 'input', values: ['pr_link', 'public_url', 'linked_doc'] } };
+const externalParams = (formats, extra = {}) => ({
     host: { type: 'host', required: true },
-    path: { type: 'path', required: true, maxLength: 2000 },
+    path: { type: 'path', required: true, ...(extra.link ? { unless: 'link' } : {}), maxLength: 2000 },
     method: { type: 'enum', values: ['GET'], default: 'GET' },
     maxBytes: num(1024, 524288, 262144),
     timeoutMs: num(500, 10000, 8000),
     maxRedirects: num(0, 3, 1),
     credential: { type: 'secret_handle', kind: 'skill_read' },
     format: { type: 'enum', values: formats, default: formats[0] },
+    ...extra,
 });
 const TASK_READER = { key: 'task', params: { maxChars: num(200, 20000, 6000) }, fields: ['key', 'title', 'brief', 'chars'] };
 const EXTERNAL = [
-    { key: 'url', external: true, params: externalParams(['text', 'diff']), fields: ['status', 'text', 'bytes'] },
+    { key: 'url', external: true, params: externalParams(['text', 'diff'], LINK_PARAMS), fields: ['status', 'text', 'bytes'] },
     { key: 'api', external: true, params: externalParams(['json', 'text', 'diff']), fields: ['status', 'json', 'text', 'bytes'] },
 ];
 const catalogues = (on) => ({
-    inputs: [{ key: 'pr_link', label: 'PR link', description: '' }, { key: 'brief', label: 'Brief', description: '' }],
+    inputs: [{ key: 'pr_link', label: 'PR link', description: '' }, { key: 'public_url', label: 'Public URL', description: '' }, { key: 'brief', label: 'Brief', description: '' }],
     readers: on ? [TASK_READER, ...EXTERNAL] : [TASK_READER],
     actions: [{ key: 'task.comment', risk: 'low', required: ['body'] }],
     partials: [],
@@ -309,5 +311,144 @@ describe('Skill editor: declared reads', () => {
         READ_ERROR_CODES.forEach((code) => expect(ai[`skill_read_err_${code}`]).toBeTruthy());
         HOST_STATES.forEach((state) => expect(ai[`skill_read_chip_${state}`]).toBeTruthy());
         HOST_REASONS.forEach((reason) => expect(ai[`skill_read_host_${reason}`]).toBeTruthy());
+    });
+});
+
+const PR_SUMMARY_HOSTS = ['patch-diff.githubusercontent.com', 'gitlab.com'];
+const linkSkill = (params = {}, inputs = ['pr_link']) => ({
+    key: 'pr.summary',
+    name: 'Reviewer',
+    inputs,
+    gather: [{ reader: 'url', as: 'pr', params: { host: 'github.com', hosts: [...PR_SUMMARY_HOSTS], link: 'pr_link', format: 'diff', maxRedirects: 2, ...params } }],
+    prompt: { partials: [], instructions: 'Review.', template: '{{gather.pr.text}}', output: '{}' },
+    emit: [{ action: 'task.comment', params: { body: '{{answer.summary}}' } }],
+});
+const pathSkill = (params = {}, inputs) => {
+    const skill = linkSkill({ path: '/repos/{{input.pr_link}}', ...params }, inputs);
+    delete skill.gather[0].params.link;
+    return skill;
+};
+
+const saved = () => apiRequest.mock.calls.find(([m, url]) => m === 'put' && url.startsWith('/api/v2/agents/skills'))[2];
+const clickSave = async (wrapper) => {
+    await wrapper.find('.ah-btn--primary').trigger('click');
+    await flushPromises();
+};
+const refuse = (errors) => () => Promise.reject(Object.assign(new Error('x'), {
+    response: { status: 400, data: { status: false, statusText: 'The skill has errors.', data: { errors } } },
+}));
+
+describe('Skill editor: link and extra hosts of a declared read', () => {
+    beforeEach(() => {
+        hostStates['github.com'] = { state: 'allowed' };
+        hostStates['patch-diff.githubusercontent.com'] = { state: 'allowed' };
+        hostStates['gitlab.com'] = { state: 'not_listed' };
+    });
+
+    it('offers neither to an api reader, whose catalogue takes no link or hosts', async () => {
+        const wrapper = await open();
+        expect(wrapper.find('[data-test="read-link"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="read-hosts"]').exists()).toBe(false);
+    });
+
+    it('reloads a saved link and extra hosts, with the path hidden while a link is read', async () => {
+        const wrapper = await open({ skill: linkSkill() });
+        expect(wrapper.find('[data-test="read-link"]').element.value).toBe('pr_link');
+        expect(wrapper.find('[data-test="read-path"]').exists()).toBe(false);
+        expect(wrapper.findAll('[data-test="read-extra-host"]').map((i) => i.element.value)).toEqual(PR_SUMMARY_HOSTS);
+    });
+
+    it('checks each extra host against the allowlist like the main host', async () => {
+        const wrapper = await open({ skill: linkSkill() });
+        const asked = calls(CHECK).map(([, url]) => decodeURIComponent(url.split('host=')[1]));
+        expect(asked).toEqual(expect.arrayContaining(['github.com', ...PR_SUMMARY_HOSTS]));
+        const chips = wrapper.findAll('[data-test="read-extra-host-state"]');
+        expect(chips.map((c) => c.text())).toEqual([t('Ai.skill_read_chip_allowed'), t('Ai.skill_read_chip_not_listed')]);
+    });
+
+    it('offers only the link inputs the skill declares', async () => {
+        const wrapper = await open({ skill: linkSkill({}, ['pr_link', 'brief']) });
+        expect(wrapper.findAll('[data-test="read-link"] option').map((o) => o.element.value)).toEqual(['', 'pr_link']);
+    });
+
+    it('says which inputs to declare when no link input is declared', async () => {
+        const wrapper = await open({ skill: pathSkill({}, ['brief']) });
+        expect(wrapper.findAll('[data-test="read-link"] option').map((o) => o.element.value)).toEqual(['']);
+        expect(wrapper.find('[data-test="read-link-hint"]').text()).toBe(t('Ai.skill_read_link_none_declared', { inputs: 'pr_link, public_url, linked_doc' }));
+    });
+
+    it('saves the link and extra hosts as they were loaded', async () => {
+        const wrapper = await open({ skill: linkSkill() });
+        await clickSave(wrapper);
+        expect(saved().gather[0].params).toEqual({ host: 'github.com', hosts: PR_SUMMARY_HOSTS, link: 'pr_link', format: 'diff', maxRedirects: 2 });
+    });
+
+    it('saves a link in place of the path, and the path again once the link is cleared', async () => {
+        const wrapper = await open({ skill: pathSkill({ hosts: [] }) });
+        expect(wrapper.find('[data-test="read-path"]').exists()).toBe(true);
+        await wrapper.find('[data-test="read-link"]').setValue('pr_link');
+        expect(wrapper.find('[data-test="read-path"]').exists()).toBe(false);
+        await clickSave(wrapper);
+        expect(saved().gather[0].params).toEqual({ host: 'github.com', link: 'pr_link', format: 'diff', maxRedirects: 2 });
+
+        apiRequest.mockClear();
+        await wrapper.find('[data-test="read-link"]').setValue('');
+        expect(wrapper.find('[data-test="read-path"]').element.value).toBe('/repos/{{input.pr_link}}');
+        await clickSave(wrapper);
+        expect(saved().gather[0].params).toEqual({ host: 'github.com', path: '/repos/{{input.pr_link}}', format: 'diff', maxRedirects: 2 });
+    });
+
+    it('adds and removes extra hosts up to the catalogue limit, leaving blank rows out of the save', async () => {
+        const wrapper = await open({ skill: linkSkill() });
+        const add = () => wrapper.find('[data-test="read-add-host"]');
+        await add().trigger('click');
+        await wrapper.findAll('[data-test="read-extra-host"]')[2].setValue('api.github.com');
+        await add().trigger('click');
+        expect(wrapper.findAll('[data-test="read-extra-host"]')).toHaveLength(4);
+        expect(add().attributes('disabled')).toBeDefined();
+        await wrapper.findAll('[data-test="read-extra-host-remove"]')[1].trigger('click');
+        expect(wrapper.findAll('[data-test="read-extra-host"]').map((i) => i.element.value)).toEqual(['patch-diff.githubusercontent.com', 'api.github.com', '']);
+        expect(add().attributes('disabled')).toBeUndefined();
+        await clickSave(wrapper);
+        expect(saved().gather[0].params.hosts).toEqual(['patch-diff.githubusercontent.com', 'api.github.com']);
+    });
+
+    it('leaves the hosts list out of the save once every extra host is removed', async () => {
+        const wrapper = await open({ skill: linkSkill({ hosts: ['gitlab.com'] }) });
+        await wrapper.find('[data-test="read-extra-host-remove"]').trigger('click');
+        await clickSave(wrapper);
+        expect(saved().gather[0].params).not.toHaveProperty('hosts');
+    });
+
+    it('shows the save refusals next to the link and each extra host, in the reader\'s language', async () => {
+        saveResult = refuse([
+            { field: 'gather[0].params.hosts[0]', code: 'host_not_allowed', host: '*.githubusercontent.com', reason: 'wildcard', message: 'server words 1' },
+            { field: 'gather[0].params.hosts[1]', code: 'host_not_allowed', host: 'gitlab.com', message: 'server words 2' },
+            { field: 'gather[0].params.link', code: 'undeclared_input', message: 'server words 3' },
+            { field: 'gather[0].params.hosts', code: 'invalid_params', message: 'server words 4' },
+        ]);
+        const wrapper = await open({ skill: linkSkill() });
+        await clickSave(wrapper);
+        expect(wrapper.findAll('[data-test="read-extra-host-error"]').map((e) => e.text())).toEqual([
+            t('Ai.skill_read_host_wildcard', { host: '*.githubusercontent.com' }),
+            t('Ai.skill_read_err_host_not_allowed', { host: 'gitlab.com' }),
+        ]);
+        expect(wrapper.find('[data-test="read-link-error"]').text()).toBe(t('Ai.skill_read_err_link_undeclared', { input: 'pr_link' }));
+        expect(wrapper.find('[data-test="read-hosts-error"]').text()).toBe(t('Ai.skill_read_err_hosts_max', { max: 4 }));
+        expect(wrapper.text()).not.toMatch(/server words/);
+    });
+
+    it('translates a link input the reader does not take', async () => {
+        saveResult = refuse([{ field: 'gather[0].params.link', code: 'invalid_params', message: 'server words' }]);
+        const wrapper = await open({ skill: linkSkill() });
+        await clickSave(wrapper);
+        expect(wrapper.find('[data-test="read-link-error"]').text()).toBe(t('Ai.skill_read_err_link_invalid'));
+    });
+
+    it('says a path or a link is needed when a url read has neither', async () => {
+        saveResult = refuse([{ field: 'gather[0].params.path', code: 'required', message: 'required' }]);
+        const wrapper = await open({ skill: pathSkill({ path: '' }) });
+        await clickSave(wrapper);
+        expect(wrapper.find('[data-test="read-path-error"]').text()).toBe(t('Ai.skill_read_err_path_or_link'));
     });
 });

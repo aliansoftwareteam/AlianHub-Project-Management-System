@@ -17,11 +17,40 @@
             <span v-if="errorAt('host')" class="ah-field__error" data-test="read-host-error">{{ errorAt('host') }}</span>
         </div>
 
-        <div class="ah-field">
+        <div v-if="spec.link" class="ah-field">
+            <label class="ah-field__label" :for="`${id}-link`">{{ $t('Ai.skill_read_link') }}</label>
+            <select :id="`${id}-link`" :value="params.link || ''" class="ah-input ah-mono" :class="{ 'ah-input--error': errorAt('link') }" data-test="read-link" @change="set('link', $event.target.value)">
+                <option value="">{{ $t('Ai.skill_read_link_none') }}</option>
+                <option v-for="input in linkInputs" :key="input" :value="input">{{ input }}</option>
+            </select>
+            <span v-if="!linkInputs.length" class="ah-field__hint" data-test="read-link-hint">{{ $t('Ai.skill_read_link_none_declared', { inputs: (spec.link.values || []).join(', ') }) }}</span>
+            <span v-else class="ah-field__hint" data-test="read-link-hint">{{ $t('Ai.skill_read_link_hint') }}</span>
+            <span v-if="errorAt('link')" class="ah-field__error" data-test="read-link-error">{{ errorAt('link') }}</span>
+        </div>
+
+        <div v-if="!(spec.link && params.link)" class="ah-field">
             <label class="ah-field__label" :for="`${id}-path`">{{ $t('Ai.skill_read_path') }}</label>
             <input :id="`${id}-path`" :value="params.path || ''" type="text" class="ah-input ah-mono" :class="{ 'ah-input--error': errorAt('path') }" data-test="read-path" :placeholder="$t('Ai.skill_read_path_placeholder')" autocomplete="off" spellcheck="false" @input="set('path', $event.target.value)" />
             <span class="ah-field__hint" data-test="read-path-help">{{ $t('Ai.skill_read_path_hint', { placeholders: placeholderList }) }}</span>
             <span v-if="errorAt('path')" class="ah-field__error" data-test="read-path-error">{{ errorAt('path') }}</span>
+        </div>
+
+        <div v-if="spec.hosts" class="ah-field" data-test="read-hosts">
+            <span class="ah-field__label">{{ $t('Ai.skill_read_hosts') }}</span>
+            <span class="ah-field__hint">{{ $t('Ai.skill_read_hosts_hint', { max: spec.hosts.max }) }}</span>
+            <SkillReadExtraHost
+                v-for="(host, j) in extraHosts"
+                :id="`${id}-hosts${j}`"
+                :key="j"
+                :position="j + 1"
+                :host="host"
+                :instance-admin="instanceAdmin"
+                :error="errorAt(`hosts[${j}]`)"
+                @update="(value) => setHost(j, value)"
+                @remove="removeHost(j)"
+            />
+            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm sk-read__add" data-test="read-add-host" :disabled="extraHosts.length >= spec.hosts.max" @click="addHost">{{ $t('Ai.skill_read_hosts_add') }}</button>
+            <span v-if="errorAt('hosts')" class="ah-field__error" data-test="read-hosts-error">{{ errorAt('hosts') }}</span>
         </div>
 
         <div class="sk-editor__row">
@@ -59,11 +88,10 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
-import { apiRequest } from "@/services";
-import * as env from "@/config/env";
-import { CAPS, HOST_REASONS, HOST_STATES, credentialsForHost } from "./declaredReads";
+import { computed, inject } from "vue";
+import { CAPS, credentialsForHost, linkChoices } from "./declaredReads";
+import { useHostCheck } from "./useHostCheck";
+import SkillReadExtraHost from "./SkillReadExtraHost.vue";
 
 defineOptions({ name: "SkillDeclaredRead" });
 
@@ -74,11 +102,11 @@ const props = defineProps({
     secrets: { type: Array, default: () => [] },
     instanceAdmin: { type: Boolean, default: false },
     placeholders: { type: Array, default: () => [] },
+    inputs: { type: Array, default: () => [] },
     errorFor: { type: Function, default: () => "" }
 });
 const emit = defineEmits(["set"]);
 
-const { t } = useI18n();
 const cid = inject("$companyId", "");
 
 const id = computed(() => `sk-read${props.index}`);
@@ -86,45 +114,19 @@ const spec = computed(() => props.reader.params || {});
 const caps = computed(() => CAPS.filter((name) => spec.value[name]).map((name) => ({ name, ...spec.value[name] })));
 const credentials = computed(() => credentialsForHost(props.secrets, props.params.host));
 const placeholderList = computed(() => props.placeholders.map((p) => `{{${p}}}`).join(", "));
+const linkInputs = computed(() => linkChoices(spec.value.link, props.inputs, props.params.link));
+const extraHosts = computed(() => (Array.isArray(props.params.hosts) ? props.params.hosts : []));
 
 const errorAt = (name) => props.errorFor(`gather[${props.index}].params.${name}`);
 
 const set = (name, value) => emit("set", name, value);
 const setNumber = (name, text) => set(name, text === "" ? "" : Number(text));
 
-const CHECK_DELAY_MS = 400;
-const state = ref("");
-const reason = ref("");
-let timer = null;
-let asked = 0;
+const setHost = (at, value) => set("hosts", extraHosts.value.map((host, i) => (i === at ? value : host)));
+const removeHost = (at) => set("hosts", extraHosts.value.filter((_, i) => i !== at));
+const addHost = () => set("hosts", [...extraHosts.value, ""]);
 
-const TONE = { allowed: "ah-chip--ok", not_listed: "ah-chip--warn", not_declarable: "ah-chip--danger" };
-const chip = computed(() => (state.value ? { text: t(`Ai.skill_read_chip_${state.value}`), tone: TONE[state.value] || "" } : null));
-const reasonText = computed(() => t(`Ai.skill_read_host_${HOST_REASONS.includes(reason.value) ? reason.value : "invalid"}`, { host: props.params.host || "" }));
-
-/* Only the latest answer lands: a slow reply for an earlier spelling must not overwrite the current one. */
-const check = async (host) => {
-    asked += 1;
-    const mine = asked;
-    if (!host) { state.value = ""; return; }
-    state.value = "checking";
-    try {
-        const res = await apiRequest("get", `${env.AGENT_SKILL_EGRESS_CHECK}?host=${encodeURIComponent(host)}`);
-        if (mine !== asked) return;
-        const data = res?.data?.status ? res.data.data : null;
-        state.value = data && HOST_STATES.includes(data.state) ? data.state : "unchecked";
-        reason.value = data?.reason || "";
-    } catch (e) {
-        if (mine === asked) state.value = "unchecked";
-    }
-};
-
-watch(() => props.params.host, (host) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => check(host), CHECK_DELAY_MS);
-});
-onMounted(() => check(props.params.host));
-onBeforeUnmount(() => clearTimeout(timer));
+const { state, chip, reasonText } = useHostCheck(() => props.params.host);
 </script>
 
 <style>
@@ -134,4 +136,6 @@ onBeforeUnmount(() => clearTimeout(timer));
 .sk-read__host .ah-input { flex: 1; }
 .sk-read__caps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .sk-read__link { color: var(--brand); }
+.sk-read__extra { display: flex; flex-direction: column; gap: 4px; }
+.sk-read__add { align-self: flex-start; }
 </style>

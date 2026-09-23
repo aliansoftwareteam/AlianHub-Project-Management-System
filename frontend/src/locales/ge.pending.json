@@ -1,7 +1,7 @@
 {
   "locale": "ge",
   "machineTranslated": false,
-  "updatedAt": "2026-09-22T13:02:54.819Z",
+  "updatedAt": "2026-09-23T12:06:44.873Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6614,6 +6614,20 @@
     "Ai.skill_read_host_placeholder": "api.example.com",
     "Ai.skill_read_path_placeholder": "/repos/{'{{'}input.pr_link{'}}'}",
     "WorkflowBuilder.no_approved_clients": "no outside agent is approved here",
-    "Workflows.type_external_agent": "Outside agent"
+    "Workflows.type_external_agent": "Outside agent",
+    "Ai.skill_read_link": "Read the task's link",
+    "Ai.skill_read_link_none": "None: build the URL from the host and path",
+    "Ai.skill_read_link_hint": "Reads the whole URL the task carries, in place of a path. The link must point at the host above or one of the other hosts; a link to any other host skips the run.",
+    "Ai.skill_read_link_none_declared": "To read a link from the task, tick one of these under \"What the task must carry\": {inputs}.",
+    "Ai.skill_read_hosts": "Other hosts",
+    "Ai.skill_read_hosts_hint": "Up to {max} more exact hosts this read may reach: where a redirect goes, or another host the task's link may point at. Each one is checked against the egress allowlist like the host above.",
+    "Ai.skill_read_hosts_placeholder": "other.example.com",
+    "Ai.skill_read_hosts_item": "Other host {n}",
+    "Ai.skill_read_hosts_remove": "Remove other host {n}",
+    "Ai.skill_read_hosts_add": "Add a host",
+    "Ai.skill_read_err_link_undeclared": "The skill does not ask the task for \"{input}\". Tick it under \"What the task must carry\", or choose another link.",
+    "Ai.skill_read_err_link_invalid": "This read cannot take that link; choose one from the list.",
+    "Ai.skill_read_err_hosts_max": "List at most {max} other hosts.",
+    "Ai.skill_read_err_path_or_link": "Give a path, or choose a link to read."
   }
 }
