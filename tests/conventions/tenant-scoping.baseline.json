@@ -9,8 +9,6 @@
   "EmailIn/controller.js": 2,
   "Integrations/controller.js": 2,
   "Mcp/server.js": 1,
-  "Milestone/controller/crud.js": 14,
-  "Milestone/controller/status.js": 15,
   "SSO/config.js": 2,
   "SSO/oidc.js": 1,
   "SSO/saml.js": 4,
