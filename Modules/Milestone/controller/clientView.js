@@ -6,6 +6,7 @@ const socketEmitter = require('../../../event/socketEventEmitter');
 const { buildClientView } = require('../helpers/clientProjection');
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const billing = require('./billing');
+const { canPostToThread } = require('../../Comments/helpers/threadWriteAccess');
 
 // Client view (handoff 19d). The ONE place the guest payload is assembled.
 //
@@ -129,6 +130,7 @@ exports.postClientMessage = async (req, res) => {
             return res.send({ status: false, statusText: 'A valid projectId and an authenticated user are required.' });
         }
         if (!message) return res.send({ status: false, statusText: 'Write a message first.' });
+        if (!(await canPostToThread(companyId, uid, { projectId })).allowed) return res.send({ status: false, statusText: 'Project not found.' });
 
         const contract = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PROJECT_CONTRACTS,

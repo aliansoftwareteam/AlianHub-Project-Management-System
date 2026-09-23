@@ -1,6 +1,10 @@
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
+jest.mock('../Modules/Comments/helpers/threadWriteAccess', () => ({
+    ...jest.requireActual('../Modules/Comments/helpers/threadWriteAccess'),
+    canPostToThread: jest.fn(async () => ({ allowed: true, match: {} })),
+}));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 jest.mock('../Config/permissionGuard', () => ({ ROLE_OWNER: 1, ROLE_ADMIN: 2, getRoleType: jest.fn(async () => 1), isPrivileged: (r) => r === 1 || r === 2 }));
