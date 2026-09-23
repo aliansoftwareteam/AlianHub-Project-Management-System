@@ -253,6 +253,9 @@ onMounted(load);
 <style scoped>
 .al { background: var(--canvas); }
 .al__bar { display: flex; align-items: center; gap: 12px; padding: 12px 24px; border-bottom: 1px solid var(--hairline); background: var(--surface); flex-wrap: wrap; }
+.al__bar .ah-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.al__bar .ah-tabs::-webkit-scrollbar { display: none; }
+.al__bar .ah-tab { flex: none; white-space: nowrap; }
 .al__search { display: flex; align-items: center; gap: 7px; padding: 0 10px; height: 30px; border: 1px solid var(--border); border-radius: var(--r-input); background: var(--surface); color: var(--ink-3); flex: 1; max-width: 320px; }
 .al__search-input { border: 0; background: transparent; outline: none; flex: 1; font: var(--text-small); color: var(--ink); }
 .al__chip-x { border: 0; background: transparent; cursor: pointer; color: inherit; font-size: 14px; line-height: 1; padding: 0 0 0 4px; }

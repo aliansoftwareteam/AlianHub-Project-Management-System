@@ -20,3 +20,13 @@ describe('Ask landing', () => {
         expect(body).toMatch(/box-sizing:\s*border-box/);
     });
 });
+
+describe('Audit log on a phone', () => {
+    const vue = read('views/Settings/Audit/AuditLog.vue');
+
+    test('the filter tabs stay on one line and scroll inside the bar instead of running past the screen', () => {
+        expect(ruleBody(vue, '.al__bar .ah-tabs')).toMatch(/max-width:\s*100%/);
+        expect(ruleBody(vue, '.al__bar .ah-tabs')).toMatch(/overflow-x:\s*auto/);
+        expect(ruleBody(vue, '.al__bar .ah-tab')).toMatch(/white-space:\s*nowrap/);
+    });
+});
