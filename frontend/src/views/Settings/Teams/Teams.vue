@@ -24,7 +24,7 @@
                             <button
                                 type="button"
                                 class="tm__mark"
-                                :style="{ color: row.teamColor?.color || '#fff', background: row.teamColor?.bgColor || 'var(--brand)' }"
+                                :style="{ color: row.teamColor?.bgColor ? (row.teamColor.color || '#fff') : 'var(--on-brand)', background: row.teamColor?.bgColor || 'var(--brand)' }"
                                 :aria-label="$t('Settings.team_color')"
                                 :disabled="editPermission !== true"
                                 @click="row.isPopupOpen = !row.isPopupOpen"

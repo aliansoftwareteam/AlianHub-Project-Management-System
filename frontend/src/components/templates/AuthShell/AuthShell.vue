@@ -40,10 +40,10 @@
                         <span class="ah-mono">{{ today }}</span>
                     </div>
                     <div class="auth__shot-group"><span class="ah-label">{{ $t('Home.today') }} · 3</span></div>
-                    <div class="auth__shot-row"><span class="auth__shot-box"></span><span>Redesign onboarding flow</span><em class="ah-mono">Website Revamp</em></div>
-                    <div class="auth__shot-row"><span class="auth__shot-box"></span><span>Fix payment webhook retries</span><em class="ah-mono">Mobile v2</em></div>
+                    <div class="auth__shot-row"><span class="auth__shot-box"></span><span>{{ $t('Auth.proof_task_1') }}</span><em class="ah-mono">{{ $t('Auth.proof_project_1') }}</em></div>
+                    <div class="auth__shot-row"><span class="auth__shot-box"></span><span>{{ $t('Auth.proof_task_2') }}</span><em class="ah-mono">{{ $t('Auth.proof_project_2') }}</em></div>
                     <div class="auth__shot-group"><span class="ah-label auth__shot-over">{{ $t('Home.overdue') }} · 1</span></div>
-                    <div class="auth__shot-row"><span class="auth__shot-box"></span><span>Review guest permission matrix</span><em class="ah-mono auth__shot-late">Aug 29</em></div>
+                    <div class="auth__shot-row"><span class="auth__shot-box"></span><span>{{ $t('Auth.proof_task_3') }}</span><em class="ah-mono auth__shot-late">{{ $t('Auth.proof_task_3_due') }}</em></div>
                 </div>
             </div>
         </aside>

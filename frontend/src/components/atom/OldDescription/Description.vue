@@ -1,8 +1,8 @@
 <template>
     <div class="description-wrapper mobile__bg--withPadding">
         <div class="d-flex align-items-center justify-content-between description-padding">
-            <h4 class="task-details-subtitle black" :class="{'font-size-16 font-weight-600' : clientWidth <=767 , 'font-size-14 font-weight-700' : clientWidth > 767 }" >Description</h4>
-            <p class="blue cursor-pointer font-size-16 font-weight-700 m-0" v-if="clientWidth <=767" @click="editPermission === true ? toggleDescriptionEdit() : ''">Edit</p>
+            <h4 class="task-details-subtitle black" :class="{'font-size-16 font-weight-600' : clientWidth <=767 , 'font-size-14 font-weight-700' : clientWidth > 767 }" >{{ $t('Description.description') }}</h4>
+            <p class="blue cursor-pointer font-size-16 font-weight-700 m-0" v-if="clientWidth <=767" @click="editPermission === true ? toggleDescriptionEdit() : ''">{{ $t('Description.edit') }}</p>
         </div>
         <div class="description-main">
             <div>
@@ -14,7 +14,7 @@
                     <div v-if="description">
                         <span class="ql-editor" v-if="description!== ''" v-html="richHtml(description)"></span>
                     </div>
-                    <span v-else class="task-detail-subdesc">Add a Description...</span>
+                    <span v-else class="task-detail-subdesc">{{ $t('Description.add_description_prompt') }}</span>
                 </div>
                 <div v-else>
                     <div>
@@ -23,7 +23,7 @@
                             class="description-editor"
                             name="description"
                             @text-change="checkDescription()"
-                            placeholder="Add description..."
+                            :placeholder="$t('Description.add_description_ph')"
                             v-model="editorDescription"
                             ref="editor"
                             @keypress.enter.prevent="saveDescription()"
@@ -41,13 +41,13 @@
                 class="outline-primary mr-10px"
                 @click="toggleDescriptionEdit()"
             >
-                Cancel
+                {{ $t('Description.cancel') }}
             </button>
             <button
                 class="btn-primary"
                 @click="saveDescription()"
             >
-                Save
+                {{ $t('Description.save') }}
             </button>
         </div>
     </div>

@@ -594,11 +594,11 @@ describe('AI project generator', () => {
         expect(tasksMode.body.statusText).toBe('targetSprintId required for tasks mode');
     });
 
-    it('refuses the generator without a session and ignores a body company the caller is not in', async () => {
+    it('refuses the generator without a session or with a body company the caller is not in', async () => {
         expect((await anonymousWithCompany.post('/api/v1/ai/project/execute', {})).status).toBe(401);
         const { api } = await loginAs('owner');
         const res = await api.post('/api/v1/ai/project/execute', { companyId: OTHER_COMPANY, plan: { project: {} } });
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
     });
 
     it('adds sprints to a project the owner can open', async () => {

@@ -32,6 +32,7 @@ const { leaseMs, heartbeatMs } = require('./flag');
 
 const LOG_PREFIX = '[workflow-engine]';
 const CAPACITY_RETRY_MS = 5000;
+const HEARTBEAT_RETRY_MS = 1000;
 const WORKER_ID = `${process.pid}:${crypto.randomBytes(4).toString('hex')}`;
 
 /* Under STEP_CREDENTIALS the engine records its own steps as itself, on behalf
@@ -48,24 +49,41 @@ const stepActor = (run, workerId = WORKER_ID) => (stepCredential.enabled()
     });
 
 /* Renews the lease while a slow step runs. A false answer means the lease was
- * taken; the executor is told so it can stop, and the settle would refuse the
- * write anyway. */
+ * taken or has lapsed; the executor is told so it can stop, and the settle would
+ * refuse the write anyway. A beat that throws proves nothing about the lease, so
+ * it is retried sooner rather than a whole interval later: at the default a third
+ * of the lease, two misses would otherwise leave the next beat past the lease. */
 const startHeartbeat = (claim, lost, beat) => {
     const every = heartbeatMs();
-    const timer = setInterval(async () => {
+    let timer = null;
+    let stopped = false;
+    let failures = 0;
+    const schedule = (delay) => {
+        if (stopped) return;
+        timer = setTimeout(once, delay);
+        if (timer.unref) timer.unref();
+    };
+    const once = async () => {
         try {
             const held = await beat();
+            failures = 0;
             if (!held) {
                 lost.value = true;
-                clearInterval(timer);
                 logger.warn(`${LOG_PREFIX} ${claim.runId}/${claim.stepId}: lease lost while the step was still running`);
+                return;
             }
+            schedule(every);
         } catch (error) {
+            failures += 1;
             logger.error(`${LOG_PREFIX} ${claim.runId}/${claim.stepId}: heartbeat failed: ${error.message}`);
+            schedule(Math.min(every, HEARTBEAT_RETRY_MS * 2 ** (failures - 1)));
         }
-    }, every);
-    if (timer.unref) timer.unref();
-    return () => clearInterval(timer);
+    };
+    schedule(every);
+    return () => {
+        stopped = true;
+        clearTimeout(timer);
+    };
 };
 
 /* A failed step either comes back later or fails for good, whatever stage failed. */

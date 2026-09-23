@@ -12,7 +12,8 @@ const { isEncrypted } = require('../utils/secretField');
 const PLAIN = 'PlaintextVerificationToken1';
 const SECOND = 'SecondVerificationToken22';
 const res = () => { const r = { body: null }; r.send = (b) => { r.body = b; return r; }; r.json = r.send; r.status = () => r; return r; };
-const req = (body, extra = {}) => ({ headers: { companyid: 'c1' }, body, uid: 'u1', params: {}, ...extra });
+const COMPANY = '6f0000000000000000000c01';
+const req = (body, extra = {}) => ({ headers: { companyid: COMPANY }, body, uid: 'u1', params: {}, ...extra });
 
 beforeAll(() => { process.env.JWT_SECRET = 'test-secret'; });
 
@@ -43,10 +44,10 @@ describe('integration secrets at rest', () => {
 
     test('the slack command decrypts at the point of use', async () => {
         const ok = res();
-        await ctrl.slackCommand({ params: { companyId: 'c1' }, body: { token: SECOND, text: 'help' } }, ok);
+        await ctrl.slackCommand({ params: { companyId: COMPANY }, body: { token: SECOND, text: 'help' } }, ok);
         expect(ok.body.text).toMatch(/alianhub/i);
         const bad = res();
-        await ctrl.slackCommand({ params: { companyId: 'c1' }, body: { token: 'wrong', text: 'help' } }, bad);
+        await ctrl.slackCommand({ params: { companyId: COMPANY }, body: { token: 'wrong', text: 'help' } }, bad);
         expect(bad.body.text).toMatch(/verification failed/i);
     });
 
