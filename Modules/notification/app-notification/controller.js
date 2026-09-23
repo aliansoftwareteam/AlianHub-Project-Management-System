@@ -16,27 +16,6 @@ const resolveRecipient = (req, res, claimedUserId) => {
     return String(req.uid);
 }
 
-exports.sendMessage = async (req, res) => {
-    try {
-        const { data } = req.body
-
-        const params = {
-            type: SCHEMA_TYPE.MENTIONS,
-            data: data
-        };
-
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, "save");
-
-        return res.status(200).json({ status: true, data: response || {} });
-
-    } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while send message on mentions",
-            error: error
-        });
-    }
-}
-
 exports.getMentionsMessages = async (req, res) => {
     try {
         const { mentions, lastMention, firstMention, loadMore } = req.query;

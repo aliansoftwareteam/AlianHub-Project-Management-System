@@ -2077,38 +2077,6 @@ async function sendMessageFun(messageData,isReset = true) {
                         updateCount(false, 1, (msg?.mentionIds || []));
                     }
 
-                    if(!edited && msg.mentionIds.length) {
-                        let mentionsRefObj = {
-                            mentionIds: msg.mentionIds,
-                            type: !props.taskId.length ? "project" : "task",
-                            projectId: projectData.value._id,
-                            userId: userId.value,
-                            notSeen: msg.mentionIds,
-                            taskId: props.taskId,
-                            sprintId: props.sprintId,
-                            folderId: props.folderId ? props.folderId : "",
-                            mainChat: props?.mainChat ? true : false
-                        }
-
-                        let keys = ["id", "type", "mediaSize", "mediaURL", "mediaName", "mediaOriginalName", "message", 'reply_id', 'reply_mediaName', 'reply_mediaOriginalName', 'reply_mediaURL', 'reply_mediaSize', 'reply_message', 'reply_type', 'reply_userId'];
-                        Object.keys(msg).forEach((key) => {
-                            if(keys.includes(key)) {
-                                mentionsRefObj[`comment_${key}`] = msg[key];
-                            }
-                        })
-
-                        const params = {
-                            data: {
-                                ...mentionsRefObj, 
-                                createdAt: new Date(),
-                                updatedAt: new Date()
-                            }
-                        }
-                        apiRequest("post", `${env.APP_NOTIFICATION}/comment`, params).catch((error) => {
-                            console.error(`Error in while send message comment on sendMessageFun hook => ${error}`);
-                        })
-                    }
-
                     if(!edited) {
                         if(props.mainChat) {
                             sendNotification(msg, msg.mentionIds || []);

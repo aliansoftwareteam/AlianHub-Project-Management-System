@@ -6,6 +6,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { isPerson } = require('../../Users/helpers/reportingLine');
 const { activeMemberIds } = require('../../notification/activeMembers');
 const { HandleBothNotification } = require('../../Tasks/helpers/handleNotification');
+const { handleNotificationtFun } = require('../../notification/prepare-notification-data/controllerV2');
 const { projectActor } = require('../../Project/helpers/projectHistory');
 const { parseMentionIds, mentionsEveryone } = require('./parseMentions');
 const { commentThreadAccess } = require('./threadAccess');
@@ -13,6 +14,10 @@ const { threadOf } = require('./threadWriteAccess');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const ACCESS_BATCH = 20;
+const COPIED_COMMENT_FIELDS = [
+    'message', 'mediaName', 'mediaOriginalName', 'mediaSize', 'mediaURL',
+    'reply_id', 'reply_message', 'reply_type', 'reply_userId', 'reply_mediaName', 'reply_mediaOriginalName', 'reply_mediaSize', 'reply_mediaURL',
+];
 
 const companyPeople = async (companyId) => {
     const seats = await MongoDbCrudOpration(companyId, {
@@ -34,10 +39,11 @@ const threadReaders = async (companyId, thread, userIds) => {
 
 const activeThreadReaders = async (companyId, thread, userIds) => threadReaders(companyId, thread, await activeMemberIds(companyId, userIds));
 
-/* "everyone" means the people who can open the thread, never the author. */
+/* "everyone" means the people who can open the thread; the author is never a recipient. */
 const resolveMentionIds = async (companyId, authorId, thread, message) => {
-    const named = parseMentionIds(message);
-    const everyone = mentionsEveryone(message) ? (await companyPeople(companyId)).filter((uid) => uid !== String(authorId || '')) : [];
+    const author = String(authorId || '');
+    const named = parseMentionIds(message).filter((uid) => uid !== author);
+    const everyone = mentionsEveryone(message) ? (await companyPeople(companyId)).filter((uid) => uid !== author) : [];
     if (!named.length && !everyone.length) return [];
     return activeThreadReaders(companyId, thread, [...named, ...everyone]);
 };
@@ -52,21 +58,79 @@ const noticeTypeOf = async (companyId, thread) => {
     return { type: OBJECT_ID.test(thread.taskId) ? 'tasks' : 'project' };
 };
 
-const notifyCommentThread = async (companyId, comment, mentionIds) => {
-    const thread = threadOf(comment);
-    const { type, isGroupChat } = await noticeTypeOf(companyId, thread);
+const folderOf = (comment) => (comment.folderId ? String(comment.folderId) : '');
+
+const recordMentions = (companyId, comment, thread, notice, mentionIds) => {
+    const copied = Object.fromEntries(COPIED_COMMENT_FIELDS
+        .filter((key) => comment[key] !== undefined && comment[key] !== null)
+        .map((key) => [`comment_${key}`, comment[key]]));
+    return MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.MENTIONS,
+        data: {
+            ...copied,
+            comment_type: comment.type || 'text',
+            comment_id: String(comment._id),
+            mentionIds,
+            notSeen: mentionIds,
+            userId: String(comment.userId),
+            projectId: thread.projectId,
+            sprintId: thread.sprintId,
+            taskId: thread.taskId,
+            folderId: folderOf(comment),
+            type: thread.taskId ? 'task' : 'project',
+            mainChat: notice.type === 'chat',
+        },
+    }, 'save');
+};
+
+/* Settings group each key under a notice type, so an unknown type finds no preference and sends
+ * nothing. A sprint channel's chat link names the sprint, as the thread notice does. */
+const notifyMentioned = (companyId, comment, thread, notice, mentionIds) => handleNotificationtFun({ body: {
+    key: COMMENTS_IM_MENTIONS_IN,
+    type: notice.type,
+    message: comment.message || '',
+    companyId,
+    projectId: thread.projectId,
+    ...(notice.type === 'project' ? {} : {
+        taskId: thread.taskId === 'default' ? thread.sprintId : thread.taskId,
+        sprintId: thread.sprintId,
+        folderId: folderOf(comment),
+    }),
+    userId: String(comment.userId),
+    assigneeUsers: mentionIds,
+    notSeen: mentionIds,
+    isSelected: false,
+    changeType: 'mention',
+    comments_id: String(comment._id),
+} });
+
+/* The mentioned members are told directly, so the thread notice leaves them out rather than repeat it. */
+const notifyCommentThread = async (companyId, comment, thread, notice, mentionIds) => {
+    const mentioned = new Set(mentionIds.map(String));
     await HandleBothNotification({
-        type,
-        isGroupChat,
+        type: notice.type,
+        isGroupChat: notice.isGroupChat,
         companyId,
         projectId: thread.projectId,
-        ...(type === 'project' ? {} : { taskId: thread.taskId, sprintId: thread.sprintId, folderId: comment.folderId ? String(comment.folderId) : '' }),
+        ...(notice.type === 'project' ? {} : { taskId: thread.taskId, sprintId: thread.sprintId, folderId: folderOf(comment) }),
         object: { key: COMMENTS_IM_MENTIONS_IN, message: comment.message || '' },
         userData: await projectActor(companyId, comment.userId),
         comments_id: String(comment._id),
         mentionUserId: mentionIds,
-        keepRecipients: (userIds) => activeThreadReaders(companyId, thread, userIds),
+        keepRecipients: async (userIds) => (await activeThreadReaders(companyId, thread, userIds)).filter((uid) => !mentioned.has(String(uid))),
     });
 };
 
-module.exports = { resolveMentionIds, notifyCommentThread };
+/* Resolves with the failures, so one failed delivery never stops the others. */
+const deliverMentions = async (companyId, comment, mentionIds) => {
+    const thread = threadOf(comment);
+    const notice = await noticeTypeOf(companyId, thread);
+    const outcomes = await Promise.allSettled([
+        recordMentions(companyId, comment, thread, notice, mentionIds),
+        notifyMentioned(companyId, comment, thread, notice, mentionIds),
+        notifyCommentThread(companyId, comment, thread, notice, mentionIds),
+    ]);
+    return outcomes.filter((outcome) => outcome.status === 'rejected').map((outcome) => outcome.reason);
+};
+
+module.exports = { resolveMentionIds, deliverMentions };
