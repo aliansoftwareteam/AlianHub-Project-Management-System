@@ -8,13 +8,12 @@ const chain = require('./chain');
 const { AMENDED_ACTION } = require('./helpers/chainRules');
 const outsideActors = require('./outsideActors');
 const { VIA_EXTERNAL } = require('../Agents/actor');
+const { pinSessionTenant } = require('../../Config/tenant');
 
 const AUDIT_EXPORT_HARD_CAP = 100000;
 const AUDIT_EXPORT_PAGE_SIZE = 1000;
 const AUDIT_CSV_HEADER = ['time', 'actorType', 'actor', 'agent', 'run', 'event', 'entity', 'reason', 'cost_usd', 'undone_at'];
 const PERMISSION_REFUSED = 'permission.refused';
-
-const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId);
 
 /* Each agent action row carries the deadline the undo route will enforce, so the
  * list can show it instead of computing one. Runs are read once per page. */
@@ -45,8 +44,8 @@ const withUndoState = async (companyId, uid, rows) => {
 // the company's undo window is open; an agent token may not.
 exports.undoAuditLog = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const { resolveActor, isAgent } = require('../Agents/actor');
         const { undoAuditRow } = require('../Agents/undo');
         const agentAudit = require('../Agents/agentAudit');
@@ -167,8 +166,8 @@ async function* plannedRows(companyId, q, plan, { integrity }) {
 // Owner/admin only. Filterable + paginated, newest first; under AUDIT_CHAIN each row carries its integrity state.
 exports.listAuditLogs = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const roleType = await getRoleType(companyId, req.uid);
         if (!isPrivileged(roleType)) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
 
@@ -224,8 +223,8 @@ const auditCsvLine = (r, withIntegrity) => {
 exports.exportAuditCsv = async (req, res) => {
     let streaming = false;
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const roleType = await getRoleType(companyId, req.uid);
         if (!isPrivileged(roleType)) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
 

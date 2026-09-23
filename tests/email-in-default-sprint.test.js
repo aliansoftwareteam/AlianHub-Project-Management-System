@@ -33,7 +33,7 @@ const seedSprint = (hex, extra = {}) => mockDbFor(COMPANY).crud(COMPANY, {
 const createInbox = async (body) => {
     const sent = {};
     await controller.createInbox(
-        { headers: { companyid: COMPANY }, body },
+        { headers: { companyid: COMPANY }, uid: 'u1', body },
         { send: (payload) => { sent.payload = payload; } },
     );
     return sent.payload;

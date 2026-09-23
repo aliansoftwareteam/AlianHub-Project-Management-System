@@ -5,6 +5,7 @@ const { removeCache } = require('../../utils/commonFunctions');
 const logger = require('../../Config/loggerConfig');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo'); // canonical task create
 const R = require('./helpers/emailInRules');
+const { pinSessionTenant } = require('../../Config/tenant');
 
 // AUTO-01 — email-to-task. An inbox doc lives in the GLOBAL db (keyed by token)
 // so the unauthenticated inbound webhook can resolve token -> company without
@@ -14,7 +15,6 @@ const R = require('./helpers/emailInRules');
 
 const GLOBAL = SCHEMA_TYPE.GOLBAL;
 const DOMAIN = process.env.EMAIL_IN_DOMAIN || 'inbox.alianhub.com';
-const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
 const withAddress = (doc) => {
@@ -73,11 +73,18 @@ const resolveDefaultSprint = async (companyId, projectId) => {
 // caller only needs to pick a project.
 exports.createInbox = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const b = req.body || {};
+        const creatorId = String(req.uid || '');
+        if (!creatorId) return res.status(401).send({ status: false, statusText: 'A signed-in user is required.' });
+        const claimedCreator = b.userData && b.userData.id;
+        if (claimedCreator && String(claimedCreator) !== creatorId) {
+            return res.status(403).send({ status: false, statusText: 'An inbox can only create tasks as you.' });
+        }
         const projectId = (b.projectData && b.projectData._id) || b.projectId;
-        if (!companyId || !projectId || !oid(projectId)) {
-            return res.send({ status: false, statusText: 'companyId and a valid projectId are required.' });
+        if (!projectId || !oid(projectId)) {
+            return res.send({ status: false, statusText: 'A valid projectId is required.' });
         }
         const project = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(projectId) }] }, 'findOne').catch(() => null);
         if (!project) return res.send({ status: false, statusText: 'Project not found.' });
@@ -112,11 +119,11 @@ exports.createInbox = async (req, res) => {
             templateSnapshot: tmpl,
             projectSnapshot: { _id: projObj._id, CompanyId: companyId, ProjectCode: projObj.ProjectCode, ProjectName: projObj.ProjectName },
             userSnapshot: {
-                id: b.userData && b.userData.id, Employee_Name: b.userData && b.userData.Employee_Name,
+                id: creatorId, Employee_Name: b.userData && b.userData.Employee_Name,
                 companyOwnerId: b.userData && b.userData.companyOwnerId,
             },
             enabled: true,
-            createdBy: (b.userData && b.userData.id) || '',
+            createdBy: creatorId,
             receivedCount: 0,
             deletedStatusKey: 0,
         };
@@ -129,8 +136,8 @@ exports.createInbox = async (req, res) => {
 // GET /api/v1/email-in/inboxes?projectId=
 exports.listInboxes = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const q = { companyId: String(companyId), deletedStatusKey: { $ne: 1 } };
         if (req.query && req.query.projectId && oid(req.query.projectId)) q.ProjectID = oid(req.query.projectId);
         const rows = await MongoDbCrudOpration(GLOBAL, { type: SCHEMA_TYPE.EMAIL_INBOXES, data: [q, {}, { sort: { createdAt: -1 } }] }, 'find');
@@ -141,8 +148,8 @@ exports.listInboxes = async (req, res) => {
 // PUT /api/v1/email-in/inboxes/:id  { enabled?, name? }
 exports.updateInbox = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const set = {};
         if (req.body.enabled !== undefined) set.enabled = !!req.body.enabled;
         if (req.body.name !== undefined) set.name = String(req.body.name).slice(0, 120);
@@ -160,8 +167,8 @@ exports.updateInbox = async (req, res) => {
 // DELETE /api/v1/email-in/inboxes/:id
 exports.deleteInbox = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         await MongoDbCrudOpration(GLOBAL, {
             type: SCHEMA_TYPE.EMAIL_INBOXES,
             data: [{ _id: oid(req.params.id), companyId: String(companyId) }, { $set: { deletedStatusKey: 1, enabled: false } }],
