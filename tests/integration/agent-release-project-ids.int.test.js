@@ -101,4 +101,35 @@ describe('agent release proposals and agent project lists show only projects the
             expect(whatsOf(data)).toEqual(expect.arrayContaining([marker.hiddenTask, marker.hiddenProject, marker.sprint, marker.joined, marker.open]));
         });
     });
+
+    const agentIn = (list, id) => list.find((a) => String(a._id || a.id) === id);
+
+    describe('GET /api/v2/agents', () => {
+        it('lists only the projects the member can open, and still says the agent is scoped', async () => {
+            const list = ok(await member.api.get('/api/v2/agents'));
+            expect(agentIn(list, scopedAgentId).projectIds).toEqual([String(joined._id)]);
+            expect(agentIn(list, hiddenOnlyAgentId)).toMatchObject({ projectIds: [], projectScoped: true });
+            expect(JSON.stringify(list)).not.toContain(String(hidden._id));
+        });
+
+        it.each(['owner', 'admin'])('lists every project for the %s', async (role) => {
+            const list = ok(await { owner, admin }[role].api.get('/api/v2/agents'));
+            expect(agentIn(list, scopedAgentId).projectIds).toEqual([String(hidden._id), String(joined._id)]);
+            expect(agentIn(list, hiddenOnlyAgentId).projectIds).toEqual([String(hidden._id)]);
+        });
+    });
+
+    describe('GET /api/v2/agents/team', () => {
+        it('shows the member only the agent projects they can open', async () => {
+            const data = ok(await member.api.get('/api/v2/agents/team'));
+            expect(agentIn(data.agents, scopedAgentId).projectIds).toEqual([String(joined._id)]);
+            expect(agentIn(data.agents, hiddenOnlyAgentId)).toMatchObject({ projectIds: [], projectScoped: true });
+            expect(JSON.stringify(data.agents)).not.toContain(String(hidden._id));
+        });
+
+        it('keeps every agent project for the owner', async () => {
+            const data = ok(await owner.api.get('/api/v2/agents/team'));
+            expect(agentIn(data.agents, scopedAgentId).projectIds).toEqual([String(hidden._id), String(joined._id)]);
+        });
+    });
 });
