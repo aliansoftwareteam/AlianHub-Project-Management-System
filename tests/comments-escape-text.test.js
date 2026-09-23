@@ -6,6 +6,12 @@ jest.mock('../common-storage/common-server.js', () => ({ handleTaskAttachmentsDu
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({ handleNotificationtFun: jest.fn() }));
 jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(), isPrivileged: () => false }));
+jest.mock('../Modules/Comments/helpers/threadWriteAccess', () => ({
+    threadOf: () => ({}),
+    canPostToThread: async () => ({ allowed: true }),
+    canChangeComment: async () => ({ allowed: true }),
+    changesThreadOrAuthor: () => false,
+}));
 
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { save, update } = require('../Modules/Comments/controller');

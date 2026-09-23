@@ -11,6 +11,8 @@ const { escapeCommentFields } = require("./helpers/plainText");
 const { handleNotificationtFun } = require("../notification/prepare-notification-data/controllerV2");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 const { sprintIdentities, visibleSprintExpr } = require("../Sprints/helpers/sprintVisibility");
+const { commentThreadAccess, refuseThread } = require("./helpers/threadAccess");
+const { threadOf, canPostToThread, canChangeComment, changesThreadOrAuthor } = require("./helpers/threadWriteAccess");
 
 /* @mention delivery: record the mention (feeds the in-app "mentions" tab, which
  * queries the mentions collection by mentionIds) and fire the notification
@@ -75,6 +77,9 @@ exports.save = async (req, res) => {
         // SEC (AHE-3834) — the author is the authenticated caller, never a client-supplied
         // userId. Legit callers already send their own id, so this is transparent.
         if (req.uid) convertData.userId = req.uid;
+        const companyId = req.headers['companyid'];
+        const access = await canPostToThread(companyId, req.uid, threadOf(convertData));
+        if (!access.allowed) return refuseThread(res, access);
         // @mentions: extract the [Name](userId) tokens the editor inserts so the
         // comment records who was mentioned (drives the mention notification).
         const mentionIds = parseMentionIds(convertData.message);
@@ -87,7 +92,6 @@ exports.save = async (req, res) => {
             }
         }
 
-        const companyId = req.headers['companyid'];
         const response = await MongoDbCrudOpration(companyId, query, "save");
         if (data?.objId?.projectId && data?.objId?.taskId && data?.objId?.sprintId) {
             socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments', companyId });
@@ -143,8 +147,12 @@ exports.update = async (req, res) => {
             { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: new mongoose.Types.ObjectId(id) }] },
             'findOne'
         );
-        if (!existingComment) {
-            return res.status(404).json({ status: false, message: 'Comment not found.' });
+        const commentNotFound = () => res.status(404).json({ status: false, message: 'Comment not found.' });
+        if (!existingComment) return commentNotFound();
+        const access = await canChangeComment(req.headers['companyid'], req.uid, existingComment);
+        if (!access.allowed) return commentNotFound();
+        if (changesThreadOrAuthor(existingComment, data)) {
+            return res.status(400).json({ status: false, message: 'A comment cannot move to another thread or author.' });
         }
         const isOwner = String(existingComment.userId) === String(req.uid);
         const changedKeys = Object.keys(data || {});
@@ -216,10 +224,14 @@ exports.getPaginatedMessages = async (req, res) => {
             tabLeaveTime = null
         } = req.query;
 
+        const access = await commentThreadAccess(req.headers['companyid'], req.uid, { projectId, sprintId, taskId });
+        if (!access.allowed) return refuseThread(res, access);
+
         const searchResultMatch = {
             $match: {
                 $and: [
                     { projectId: new mongoose.Types.ObjectId(projectId) },
+                    access.match,
                     // BUG-032 / #86 fix: align soft-delete handling with the other
                     // comment-listing endpoints (searchMessageFromMainChat /
                     // searchComments). Without this filter, soft-deleted comments
@@ -278,6 +290,9 @@ exports.searchMessageFromMainChat = async (req, res) => {
     try {
         const { searchText, projectId, sprintId, taskId, skip = 0, limit = 25, isPinnedMessage, sort = 'asc' } = req.query;
 
+        const access = await commentThreadAccess(req.headers['companyid'], req.uid, { projectId, sprintId, taskId });
+        if (!access.allowed) return refuseThread(res, access);
+
         const query = {
             type: SCHEMA_TYPE.COMMENTS,
             data: [
@@ -304,7 +319,8 @@ exports.searchMessageFromMainChat = async (req, res) => {
                     // isDeleted field. Using `$ne: true` keeps them in results
                     // while still excluding soft-deleted ones (consistent with
                     // searchComments).
-                    isDeleted: { $ne: true }
+                    isDeleted: { $ne: true },
+                    $and: [access.match]
                 },
                 {},
                 // Oldest-first stays the default so the existing pinned-messages /
