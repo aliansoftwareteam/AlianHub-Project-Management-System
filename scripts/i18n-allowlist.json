@@ -21,7 +21,6 @@
     "frontend/src/components/molecules/ActivityLogContent/ActivityContent.vue": 1,
     "frontend/src/components/molecules/AdvanceSearch/MainComponent.vue": 1,
     "frontend/src/components/molecules/AiWriteDescription/AiWriteDescription.vue": 1,
-    "frontend/src/components/molecules/BulkActionBar/BulkActionBar.vue": 23,
     "frontend/src/components/molecules/DashBoardCard/DashBoardCard.vue": 2,
     "frontend/src/components/molecules/DropDown/CustomDropDown.vue": 1,
     "frontend/src/components/molecules/EstimateHourTable/EstimateHourTable.vue": 1,
