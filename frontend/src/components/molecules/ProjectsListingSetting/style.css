@@ -214,3 +214,15 @@ span.everyone-wrapper {
     .projectInfoDiv {padding: 20px 15px;}
     .p_sharewith:after ,  .p_owner:after, .p_sharewith:after, .p_status:after, .p_erpApp:after, .p_requiredViews:after, .task_type_status:after, .task_type_status_todo:after{content: '';background: #cfcfcf;width: 40%;height: 1px;display: block;margin: 20px auto;}
 }
+/* Apps is a list of names with a sentence each; in an 18% column it squeezed to one word per line.
+   It gets its own row under the other columns, laid out as a grid. Last in the file so it wins over
+   the width rules in the media queries above. */
+.project_status_info_area { flex-wrap: wrap; }
+.p_erpApp { order: 1; flex: 1 0 100%; width: 100%; padding: 0; margin-top: 16px; border-right: 0; text-align: left; }
+.p__erpApp-wrapper { width: auto; min-width: 0; }
+.pls__apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 2px 16px; }
+/* The card stays white in dark mode (legacy), so the list keeps the light-theme ink. */
+.pls__apps { --ink: #17161c; --ink-2: rgba(0, 0, 0, .55); --surface-hover: rgba(0, 0, 0, .04); }
+@media (min-width: 577px) {
+    .p_erpApp { padding-top: 14px; border-top: 1px solid #CFCFCF; }
+}

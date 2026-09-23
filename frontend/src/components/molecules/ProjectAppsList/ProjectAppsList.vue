@@ -1,13 +1,13 @@
 <template>
-    <ul class="pal" :class="{ 'is-disabled': disabled }">
-        <li v-for="app in apps" :key="app.key" class="pal__row">
-            <img :src="iconFor(app.key)" alt="" class="pal__icon" />
-            <label class="pal__text" :for="`pal-${uid}-${app.key}`">
-                <span class="pal__title">{{ label(app, 'title') }}</span>
+    <ul class="appl" :class="{ 'is-disabled': disabled }">
+        <li v-for="app in apps" :key="app.key" class="appl__row">
+            <img :src="iconFor(app.key)" alt="" class="appl__icon" />
+            <label class="appl__text" :for="`appl-${uid}-${app.key}`">
+                <span class="appl__title">{{ label(app, 'title') }}</span>
                 <span class="ah-small ah-muted">{{ label(app, 'desc') }}</span>
             </label>
             <Toggle
-                :id="`pal-${uid}-${app.key}`"
+                :id="`appl-${uid}-${app.key}`"
                 width="30"
                 :modelValue="modelValue.includes(app.key)"
                 :disabled="disabled"
@@ -55,12 +55,12 @@ const onToggle = (key) => {
 </script>
 
 <style scoped>
-.pal { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-family: var(--font-ui); }
-.pal__row { display: flex; align-items: center; gap: 12px; padding: 8px 6px; border-radius: 8px; }
-.pal__row:hover { background: var(--surface-hover); }
-.pal__icon { width: 18px; height: 18px; flex: none; }
-.pal__text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; margin: 0; cursor: pointer; }
-.pal__title { font: 500 13px/1.3 var(--font-ui); color: var(--ink); }
-.pal.is-disabled { opacity: .6; }
-.pal.is-disabled .pal__text { cursor: default; }
+.appl { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-family: var(--font-ui); }
+.appl__row { display: flex; align-items: center; gap: 12px; padding: 8px 6px; border-radius: 8px; }
+.appl__row:hover { background: var(--surface-hover); }
+.appl__icon { width: 18px; height: 18px; flex: none; }
+.appl__text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; margin: 0; cursor: pointer; }
+.appl__title { font: 500 13px/1.3 var(--font-ui); color: var(--ink); }
+.appl.is-disabled { opacity: .6; }
+.appl.is-disabled .appl__text { cursor: default; }
 </style>
