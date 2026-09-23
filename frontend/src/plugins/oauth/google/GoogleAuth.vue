@@ -105,10 +105,7 @@ const login = async (userInfo) => {
         const object = {
             email: userInfo.email,
             googleId: userInfo.sub,
-            // Forward the signed Google ID token so the backend can verify the
-            // identity server-side (google-auth-library) instead of trusting the
-            // client-supplied email/sub. Without this, login is rejected when
-            // the server runs in hardened mode.
+            // The server takes the identity from this token alone.
             idToken: userInfo.idToken,
             isLoginType: "frontend",
             authProvider: "google"
@@ -191,9 +188,9 @@ const login = async (userInfo) => {
         } else if(error?.response?.data?.message === "User not found"){
             $toast.error('User not found', { position: 'top-right' });
         } else {
-            $toast.error(t("Toast.something_went_wrong"), { position: 'top-right' });
+            $toast.error(error?.response?.data?.message || t("Toast.something_went_wrong"), { position: 'top-right' });
         }
-        
+
         localStorage.removeItem("updateToken");
         localStorage.removeItem("userId");
         localStorage.removeItem("isLogging");
@@ -210,6 +207,7 @@ const signup = async (userInfo) => {
             lastName: userInfo.family_name,
             email: userInfo.email,
             googleId: userInfo.sub,
+            idToken: userInfo.idToken,
             assignCompany: props.companyID,
             companyUserDocID: props.companyUserDocID
         };

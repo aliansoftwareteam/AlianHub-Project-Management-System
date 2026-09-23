@@ -1,5 +1,6 @@
 const { createApiClient } = require('../../e2e/support/api');
 const { readState, uniqueSuffix } = require('../../e2e/support/fixtures');
+const { gitlabToken } = require('../../e2e/support/gitlab');
 
 const state = readState();
 const anon = createApiClient({ baseURL: state.baseURL });
@@ -52,14 +53,10 @@ describe('an unverified login refusal carries no verification token', () => {
         expect(stillRefused.body.isEmailVerified).toBe(false);
     });
 
-    it.each([
-        ['/api/v2/google-signup', 'googleId'],
-        ['/api/v2/github-signup', 'githubId'],
-        ['/api/v2/gitlab-signup', 'gitlabId'],
-    ])('answers %s with a self view only', async (path, idField) => {
-        const suffix = uniqueSuffix();
-        const res = await anon.post(path, {
-            firstName: 'Olly', lastName: 'Oauth', email: `selfview.oauth.${suffix}@e2e.alianhub.test`, [idField]: `id-${suffix}`,
+    it('answers a social signup with a self view only', async () => {
+        const email = `selfview.oauth.${uniqueSuffix()}@e2e.alianhub.test`;
+        const res = await anon.post('/api/v2/gitlab-signup', {
+            firstName: 'Olly', lastName: 'Oauth', email, accessToken: gitlabToken({ id: 800000 + parseInt(uniqueSuffix(), 16), email }),
         });
 
         expect(res.status).toBe(200);

@@ -61,7 +61,7 @@
                 </button>
             </header>
             <div class="st__content ah-scroll">
-                <router-view v-if="!accessPending" />
+                <router-view v-if="!accessPending && !routeHidden" />
             </div>
         </div>
 
@@ -192,8 +192,11 @@ const groups = computed(() => rawGroups.value
 const currentItem = computed(() => rawGroups.value
     .flatMap((g) => g.items.map((i) => ({ ...i, group: g.key })))
     .find((i) => i.names.includes(route.name)));
-const accessPending = computed(() => (currentItem.value?.group === "instance" && instanceAdmin.value === null)
+// Enforcement, Egress, Instruction guard and Knowledge are tabs of the instance console with no nav item of their own.
+const inInstance = computed(() => route.matched.some((r) => r.name === "Instance"));
+const accessPending = computed(() => ((currentItem.value?.group === "instance" || inInstance.value) && instanceAdmin.value === null)
     || (currentItem.value?.key === "agent-clients" && oauthOn.value === null));
+const routeHidden = computed(() => Boolean(currentItem.value && !currentItem.value.show) || (inInstance.value && instanceAdmin.value === false));
 
 const pageTitle = computed(() => {
     if (route.name === "changePassword") return label("settingslider.Change Password");
@@ -204,7 +207,7 @@ const pageTitle = computed(() => {
 
 function guardRoute() {
     if (accessPending.value) return;
-    if (currentItem.value && !currentItem.value.show) router.replace(to("My Profile"));
+    if (routeHidden.value) router.replace(to("My Profile"));
 }
 
 onMounted(guardRoute);
