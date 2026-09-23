@@ -4818,6 +4818,7 @@ export default {
     },
     "UserTimesheet": {
         "back_projects": "प्रोजेक्ट्स पर वापस जाएं",
+        "project_estimate_changed": "A task in this project had its estimated hours changed",
         "user_timesheet": "उपयोगकर्ता टाइमशीट",
         "back": "वापस",
         "tracked_time": "ट्रैक किया गया समय",

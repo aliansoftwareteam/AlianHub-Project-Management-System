@@ -4818,6 +4818,7 @@ export default {
     },
     "UserTimesheet": {
         "back_projects": "Zurück zu Projekten",
+        "project_estimate_changed": "A task in this project had its estimated hours changed",
         "user_timesheet": "Benutzer-Zeiterfassungsblatt",
         "back": "Zurück",
         "tracked_time": "Verfolgte Zeit",

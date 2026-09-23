@@ -6001,6 +6001,7 @@
     "Trash.tasks": "Tasks",
     "Trash.title": "Trash",
     "Trash.unknown_project": "—",
+    "UserTimesheet.project_estimate_changed": "A task in this project had its estimated hours changed",
     "VarianceReport.actual": "Actual",
     "VarianceReport.estimated": "Estimated",
     "VarianceReport.export_csv": "Export CSV",

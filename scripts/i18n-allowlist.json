@@ -16,7 +16,7 @@
     "frontend/src/components/atom/TimesheetView/LogDetailView/LogDetailViewBodyComponent.vue": 2,
     "frontend/src/components/atom/TimesheetView/LogDetailView/LogDetailViewHeaderComponent.vue": 5,
     "frontend/src/components/atom/TimesheetView/LogDetailView/LogdetailViewBodyScreenShot.vue": 2,
-    "frontend/src/components/atom/TimesheetView/ProjectTimeSheetView/ProjectTimesheetTrComponent.vue": 9,
+    "frontend/src/components/atom/TimesheetView/ProjectTimeSheetView/ProjectTimesheetTrComponent.vue": 8,
     "frontend/src/components/molecules/ActivityLogContent/ActivityContent.vue": 1,
     "frontend/src/components/molecules/AdvanceSearch/MainComponent.vue": 1,
     "frontend/src/components/molecules/AiWriteDescription/AiWriteDescription.vue": 1,

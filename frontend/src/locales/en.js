@@ -4924,6 +4924,7 @@ export default {
     },
     UserTimesheet: {
         back_projects: "Back to Projects",
+        project_estimate_changed: "A task in this project had its estimated hours changed",
         user_timesheet: "User Timesheet",
         back: "Back",
         tracked_time: "Tracked Time",

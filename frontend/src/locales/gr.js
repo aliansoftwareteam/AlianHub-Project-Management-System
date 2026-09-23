@@ -4818,6 +4818,7 @@ export default {
     },
     "UserTimesheet": {
         "back_projects": "Πίσω στα Έργα",
+        "project_estimate_changed": "A task in this project had its estimated hours changed",
         "user_timesheet": "Χρονολόγιο Χρήστη",
         "back": "Πίσω",
         "tracked_time": "Καταγεγραμμένος Χρόνος",

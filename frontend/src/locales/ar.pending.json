@@ -7514,6 +7514,7 @@
     "UserTimesheet.milestone_reports": "Milestone Reports",
     "UserTimesheet.no_records_found": "No records found",
     "UserTimesheet.planned": "Planned",
+    "UserTimesheet.project_estimate_changed": "A task in this project had its estimated hours changed",
     "UserTimesheet.project_timesheet": "Project Timesheet",
     "UserTimesheet.task_planning": "Task Planning",
     "UserTimesheet.task_remaining_planning": "Remaining Hours",
