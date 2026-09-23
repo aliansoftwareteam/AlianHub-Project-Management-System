@@ -227,7 +227,7 @@ onMounted(load);
 .pto { padding: 20px; }
 .pto-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px; }
 @media (max-width: 800px) { .pto-grid { grid-template-columns: 1fr; } }
-.pto-card { background: #fff; border: 1px solid #e6e7ee; border-radius: 10px; padding: 18px; }
+.pto-card { background: #fff; color: #17161c; border: 1px solid #e6e7ee; border-radius: 10px; padding: 18px; }
 .pto-form-title { margin: 0 0 16px; }
 .pto-days { color: #3a3f52; font-size: 13px; }
 .pto-days b { font-weight: 700; }
@@ -248,7 +248,7 @@ onMounted(load);
 .pto-badge.pending { background: #fff8e6; color: #9a6b00; }
 .pto-badge.approved { background: #e7f6ee; color: #1c7a43; }
 .pto-badge.rejected { background: #fdecec; color: #c0392b; }
-.pto-empty { text-align: center; color: #9aa0b4; padding: 20px; }
+.pto-empty { text-align: center; color: #6b7280; padding: 20px; }
 .pto-rowactions { display: flex; gap: 6px; justify-content: flex-end; }
 .pto-btn { background: #2f3a8f; color: #fff; border: none; border-radius: 7px; padding: 8px 16px; font-size: 13px; cursor: pointer; }
 .pto-btn:disabled { opacity: .55; cursor: default; }

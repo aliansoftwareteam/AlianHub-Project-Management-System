@@ -51,6 +51,20 @@ describe('Settings → Templates in dark mode', () => {
     });
 });
 
+describe('Settings → Time off and SCIM cards', () => {
+    const styles = (rel) => { const vue = read(rel); return vue.slice(vue.indexOf('<style')); };
+
+    test('the white cards carry dark ink, so dark mode does not put light text on them', () => {
+        expect(ruleBody(styles('views/Settings/TimeOff/TimeOff.vue'), '.pto-card')).toMatch(/color:\s*#17161c/);
+        expect(ruleBody(styles('views/Settings/Scim/ScimSettings.vue'), '.scim-card')).toMatch(/color:\s*#17161c/);
+    });
+
+    test('hints and empty text drop the 2.6:1 grey', () => {
+        expect(read('views/Settings/TimeOff/TimeOff.vue')).not.toMatch(/#9aa0b4/i);
+        expect(read('views/Settings/Scim/ScimSettings.vue')).not.toMatch(/#9aa0b4/i);
+    });
+});
+
 describe('Docs hub', () => {
     const vue = read('views/Pages/PagesSpace.vue');
     const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));
