@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const logger = require("../../Config/loggerConfig");
 const { normalizeAuditEntry, retentionCutoff, retentionDaysAtLeast, RETENTION_DEFAULT_DAYS } = require("./helpers/auditRules");
 const chain = require("./chain");
+const { tenantOf } = require("../../Config/tenant");
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
@@ -26,9 +27,19 @@ const sessionActorName = async (uid) => {
     return (user && user.Employee_Name) || '';
 };
 
+// A SCIM request carries no session; its company is the one its bearer token was issued for.
+const auditCompanyOf = (req) => {
+    if (req.scimCompanyId) return String(req.scimCompanyId);
+    try {
+        return tenantOf(req);
+    } catch (e) {
+        return '';
+    }
+};
+
 /* The actor is whoever the session says; a name or id in the request body is only the client's claim. */
 const recordAuditFromReq = (req, entry) => {
-    const companyId = req.headers['companyid'] || (req.body && req.body.companyId);
+    const companyId = auditCompanyOf(req);
     const actorId = req.uid ? String(req.uid) : '';
     const forwarded = req.headers['x-forwarded-for'] || req.ip;
     const ip = forwarded ? String(forwarded).split(',')[0] : '';

@@ -28,14 +28,13 @@ const logger = require('../../Config/loggerConfig');
 const P = require('./helpers/cloudProviders');
 const R = require('./helpers/cloudStorageRules');
 const { encryptToken, decryptToken } = require('./helpers/cloudCrypto');
+const { pinSessionTenant } = require('../../Config/tenant');
 
 const LOG_PREFIX = '[cloud-storage]';
 
 // Import cap. Mirrors the intent of the normal upload limit: without it, a
 // pointer to a 5 GB Drive file would stream straight into Wasabi.
 const MAX_IMPORT_BYTES = Number(process.env.CLOUD_STORAGE_MAX_IMPORT_BYTES || 100 * 1024 * 1024);
-
-const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
 
 // Caller identity comes from the JWT middleware only. Never from the body —
 // a forgeable userId here would let one user read another's Drive tokens.
@@ -127,9 +126,10 @@ const credentialsChanged = (provider, before = {}, after = {}) => {
  */
 exports.getSettings = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const userId = userOf(req);
-        if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        if (!userId) return res.send({ status: false, statusText: 'An authenticated user is required.' });
 
         const rows = [];
         for (const key of P.PROVIDER_KEYS) {
@@ -165,11 +165,12 @@ exports.getSettings = async (req, res) => {
 
 exports.saveSettings = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const userId = userOf(req);
         const provider = String(req.params.provider || '');
         if (!P.isProvider(provider)) return res.send({ status: false, statusText: 'Unknown provider.' });
-        if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        if (!userId) return res.send({ status: false, statusText: 'An authenticated user is required.' });
 
         const existing = await loadAppConfig(companyId, userId, provider);
         const check = P.sanitizeAppConfig(provider, (req.body || {}).config, existing.config);
@@ -205,11 +206,12 @@ exports.saveSettings = async (req, res) => {
  */
 exports.clearSettings = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const userId = userOf(req);
         const provider = String(req.params.provider || '');
         if (!P.isProvider(provider)) return res.send({ status: false, statusText: 'Unknown provider.' });
-        if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        if (!userId) return res.send({ status: false, statusText: 'An authenticated user is required.' });
 
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS,
@@ -236,9 +238,9 @@ exports.clearSettings = async (req, res) => {
  */
 exports.listProviders = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const userId = userOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
         if (!userId) return res.send({ status: false, statusText: 'Not authenticated.' });
 
         const out = [];
@@ -282,11 +284,12 @@ exports.listProviders = async (req, res) => {
  */
 exports.authUrl = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const userId = userOf(req);
         const provider = String(req.params.provider || '');
         if (!P.isProvider(provider)) return res.send({ status: false, statusText: 'Unknown provider.' });
-        if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        if (!userId) return res.send({ status: false, statusText: 'An authenticated user is required.' });
         if (!apiBase()) return res.send({ status: false, statusText: 'APIURL is not configured on the server, so the OAuth redirect URI cannot be built.' });
 
         const own = await loadAppConfig(companyId, userId, provider);
@@ -445,11 +448,12 @@ const getAccessToken = async (companyId, userId, provider) => {
  */
 exports.pickerToken = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const userId = userOf(req);
         const provider = String(req.params.provider || '');
         if (!P.isProvider(provider)) return res.send({ status: false, statusText: 'Unknown provider.' });
-        if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        if (!userId) return res.send({ status: false, statusText: 'An authenticated user is required.' });
 
         const meta = P.byKey(provider);
         if (!meta.oauth) {
@@ -488,11 +492,12 @@ exports.thumbnail = async (req, res) => {
     // the handler and brought the process down via unhandledRejection.
     const provider = String((req.params || {}).provider || '');
     try {
-        const companyId = companyOf(req);
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const userId = userOf(req);
         const fileId = R.clip((req.query || {}).fileId, 512);
         if (!P.isProvider(provider)) return res.send({ status: false, statusText: 'Unknown provider.' });
-        if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        if (!userId) return res.send({ status: false, statusText: 'An authenticated user is required.' });
         if (!fileId) return res.send({ status: false, statusText: 'fileId is required.' });
 
         const request = P.thumbnailRequestFor(provider, fileId);
@@ -531,11 +536,12 @@ exports.thumbnail = async (req, res) => {
  */
 exports.disconnect = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const userId = userOf(req);
         const provider = String(req.params.provider || '');
         if (!P.isProvider(provider)) return res.send({ status: false, statusText: 'Unknown provider.' });
-        if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        if (!userId) return res.send({ status: false, statusText: 'An authenticated user is required.' });
 
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS,
@@ -562,12 +568,13 @@ exports.disconnect = async (req, res) => {
 exports.importFile = async (req, res) => {
     let tmpPath = '';
     try {
-        const companyId = companyOf(req);
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const userId = userOf(req);
         const provider = String(req.params.provider || '');
         const body = req.body || {};
         if (!P.isProvider(provider)) return res.send({ status: false, statusText: 'Unknown provider.' });
-        if (!companyId || !userId) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        if (!userId) return res.send({ status: false, statusText: 'An authenticated user is required.' });
 
         const fileId = R.clip(body.fileId, 512);
         const storagePath = R.clip(body.path, 1024);
