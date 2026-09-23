@@ -96,7 +96,7 @@ describe('POST /createproject takes the creator from the session', () => {
     });
 
     it('refuses a request without a signed-in user and writes nothing', async () => {
-        const res = await post(projectBody(), undefined);
+        const res = await post(projectBody(), null);
 
         expect(res.statusCode).toBe(401);
         expect(res.body).toMatchObject({ status: false });
