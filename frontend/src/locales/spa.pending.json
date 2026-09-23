@@ -1,7 +1,7 @@
 {
   "locale": "spa",
   "machineTranslated": false,
-  "updatedAt": "2026-09-23T16:00:44.781Z",
+  "updatedAt": "2026-09-23T16:06:44.664Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -421,6 +421,7 @@
     "Ai.queue_clear": "Queue clear",
     "Ai.queue_clear_body": "{approved} approved, {declined} declined. Nothing is waiting on you.",
     "Ai.rate_limit": "Rate limit (actions per day)",
+    "Ai.rate_limit_hint": "0 means no daily limit.",
     "Ai.recent_audit": "Recent runs",
     "Ai.refused_n": "{n} refused",
     "Ai.remove": "Remove",

@@ -38,7 +38,7 @@ The `task-manager` skill in [.claude/skills/task-manager/](.claude/skills/task-m
 ### Rule 3 — Every user-visible string goes through i18n
 
 - Templates never ship bare text, `title`, `placeholder` or `aria-label`: use `$t('Namespace.key')` / `t(...)` with the key added to `frontend/src/locales/en.js` under the feature's namespace.
-- After adding keys to `en.js`, run `npm run i18n:backfill` — it fills every other locale (machine-translated when `TRANSLATE_API_KEY` is set, English copy otherwise) and records the keys in `<locale>.pending.json` for review.
+- After adding keys to `en.js`, run `npm run i18n:backfill` — it fills every other locale (machine-translated when `TRANSLATE_API_KEY` is set, English copy otherwise) and records the keys in `<locale>.pending.json` for review. Pending files are sorted and timestamp-free so different keys merge cleanly; on a conflict keep both sides' keys and re-run the backfill.
 - `npm run i18n:check` (also `tests/conventions/i18n-check.test.js`) fails when a locale lacks a key or a `.vue` file grows past its baseline in `scripts/i18n-allowlist.json`; the baseline may only shrink.
 
 ### Rule 4 — Every merge to beta is a numbered build
