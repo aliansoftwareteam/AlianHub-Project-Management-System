@@ -104,6 +104,12 @@ describe('Project and Tracker timesheets', () => {
     });
 });
 
+describe('Integrations hub', () => {
+    test('secondary text on the white panel drops the 2.3:1 grey', () => {
+        expect(read('views/Integrations/IntegrationsHub.vue')).not.toMatch(/#9aa0b4/i);
+    });
+});
+
 describe('Docs hub', () => {
     const vue = read('views/Pages/PagesSpace.vue');
     const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));
