@@ -42,6 +42,7 @@ describe('a signup request never grants instance ownership', () => {
 
         const created = await anonymous.post('/api/v2/createUser', {
             firstName: 'Ivy', lastName: 'Invitee', email, password: state.password, isInvitation: true, assignCompany: state.companyId, ...GRANTS,
+            memberId: String(invite.body.data._id), linkId: invite.body.data.linkId,
         });
         expect(created.body.status).toBe(true);
         expect(created.body.statusText.isEmailVerified).toBe(true);

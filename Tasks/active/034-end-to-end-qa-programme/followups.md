@@ -113,8 +113,8 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 87 | Step credentials: two renewals completing during one check's row read can refuse an action; with the flag on, two failed heartbeats in a row lose the step. | #782 — **Closed** by #889 |
 | 88 | Brand logos from `/api/v1/getlogo` go out with their real type and without `nosniff` or the sandbox policy (operator-supplied files). | #785 review — **Closed** by #878 |
 | 89 | The report endpoint's per-address cap and rate limit use `req.ip`; behind a proxy that is not on loopback, set `TRUST_PROXY`. | #785 review |
-| 90 | Knowledge console figures read every chunk document; an index-only count needs a stored size field. | #788 |
-| 91 | A re-index file step over many attachments can outlive the walk lease (duplicate extraction only). | #788 |
+| 90 | Knowledge console figures read every chunk document; an index-only count needs a stored size field. **Closed** by #895: chunks store `textBytes`, the figures are answered from a covering index, and migration 043 sizes older chunks. | #788 |
+| 91 | A re-index file step over many attachments can outlive the walk lease (duplicate extraction only). **Closed** by #895: the lease is renewed after each attachment; a stuck or dead walker is still taken over. | #788 |
 | 92 | Agent notes: on a repeat sighting by another starter the first starter stays on the note while the second's references merge in. **Closed** by #893 (2026-09-23): each starter's sighting is its own note. | #787 |
 | 93 | Files: non-ASCII names inside spreadsheets are misread by the parser; the API-token and MCP caller paths for file passages are not yet reviewed. | #783. **Closed** by #888 (2026-09-23). |
 | 94 | Owner sweeps for the new Sprint 7 and 8 screens: the Knowledge tab (#788) and the security policy card (#785), in addition to follow-up 83. | interface rows |

@@ -204,6 +204,7 @@ module.exports.PROJECT_DASHBOARD = '/api/v1/project-dashboard';
 module.exports.TIMESHEET = '/api/v1/timesheet';
 module.exports.TIMESHEET_APPROVAL = '/api/v2/timesheet-approval';
 module.exports.SSO_CONFIG = '/api/v2/sso/config';
+module.exports.SSO_VERIFY_DOMAIN = '/api/v2/sso/config/verify-domain';
 module.exports.AUDIT_LOGS = '/api/v1/audit-logs';
 module.exports.AUDIT_UNDO = '/api/v1/audit-logs/:id/undo';
 module.exports.AGENTS = '/api/v2/agents';

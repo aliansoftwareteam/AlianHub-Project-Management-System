@@ -49,7 +49,7 @@ const chunk = (over = {}) => {
 };
 
 const expectBlanked = (row) => expect(row).toMatchObject({
-    deleted: true, text: '', title: '', headingPath: [], embedding: [], embeddingModel: null, contentHash: EMPTY_HASH,
+    deleted: true, text: '', textBytes: 0, title: '', headingPath: [], embedding: [], embeddingModel: null, contentHash: EMPTY_HASH,
 });
 
 const seedTask = (over = {}) => mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Task', CompanyId: C, ProjectID: P1, sprintId: S1, deletedStatusKey: 0, updatedAt: daysAgo(60), ...over });
