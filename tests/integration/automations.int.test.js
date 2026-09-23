@@ -346,6 +346,34 @@ describe('automation rules (v2)', () => {
         }
     });
 
+    it('dry-runs a switched-on rule against a stored task without commenting or recording a run', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const { project, task } = await projectWithTask(owner);
+        const body = `E2E dry run ${uniqueSuffix()} on {{task.TaskName}}`;
+        const rule = await createRule(owner.api, unnamed(commenterFor(project._id, body)));
+        try {
+            await owner.api.patch(`/api/v2/automations/${rule._id}/enabled`, { enabled: true });
+            const res = await owner.api.post(`/api/v2/automations/${rule._id}/dry-run`, { taskId: task._id });
+            expect(res.status).toBe(200);
+            expect(res.body.data).toMatchObject({ matched: true, inScope: true, task: { id: task._id } });
+            const rendered = body.replace('{{task.TaskName}}', res.body.data.task.name);
+            expect(res.body.data.task.name).toBeTruthy();
+            expect(res.body.data.actions).toEqual([expect.objectContaining({ action: 'add_comment', wouldRun: true, params: { body: rendered } })]);
+
+            const miss = await owner.api.post(`/api/v2/automations/${rule._id}/dry-run`, { taskId: MISSING_ID });
+            expect(miss.status).toBe(404);
+            expect((await member.api.post(`/api/v2/automations/${rule._id}/dry-run`, { taskId: task._id })).status).toBe(403);
+
+            await sleep(1500);
+            expect((await owner.api.get(`/api/v2/automations/${rule._id}/runs`)).body.data).toEqual([]);
+            expect(await commentsSaying(owner.api, { project, task, body: rendered })).toHaveLength(0);
+        } finally {
+            await owner.api.patch(`/api/v2/automations/${rule._id}/enabled`, { enabled: false });
+            await removeRule(owner.api, rule._id);
+        }
+    });
+
     it('AUT-03 keeps private-project tasks out of a guest backtest', async () => {
         const owner = await loginAs('owner');
         const guest = await loginAs('guest');
