@@ -127,6 +127,8 @@ const addComment = async (companyId, taskId, body, context = {}) => {
             // Attribution written with the row: the post-insert update the agent path
             // used to rely on never applied, so agent comments read as "automation".
             ...(context.actorType ? { actorType: context.actorType, agentId: context.agentId || null, viaAccount: context.viaAccount || null, runId: context.runId || null } : {}),
+            // The thread shows userId as a member; an agent's userId is its agentId or the person it acts for.
+            ...(context.actorType === 'agent' ? { isAgent: true, agentName: context.agentName || 'Agent' } : {}),
         },
     }, 'save');
 

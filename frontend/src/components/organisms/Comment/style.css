@@ -59,6 +59,9 @@
     width: 25px;
     height: 25px;
 }
+.message__agent-avatar {
+    font-size: 12px;
+}
 .white__space-nowrap{
     white-space: nowrap !important;
 }
