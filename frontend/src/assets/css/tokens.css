@@ -363,6 +363,22 @@ html, body, #app {
 }
 .ah-tab.is-active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
 
+/* Phone hit areas: the small shared controls keep their drawn size and get a transparent ::before
+   that makes the tappable box at least 32 px. :where() keeps position: relative at zero specificity,
+   so a control that positions itself keeps its own value. .ah-check draws its tick with ::after. */
+@media (max-width: 767px) {
+    :where(.ah-btn--sm, .ah-tab, .ah-switch, .ah-check, .tv-pill) { position: relative; }
+    .ah-btn--sm::before, .ah-tab::before, .ah-switch::before, .ah-check::before, .tv-pill::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: max(100%, 32px);
+        height: max(100%, 32px);
+        transform: translate(-50%, -50%);
+    }
+}
+
 .ah-pop {
     background: var(--surface);
     border: 1px solid var(--hairline);

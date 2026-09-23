@@ -270,6 +270,24 @@ describe('Project and Tracker timesheet bodies', () => {
     });
 });
 
+describe('phone hit areas on the shared small controls', () => {
+    const css = read('assets/css/tokens.css');
+    const phone = css.slice(css.indexOf('@media (max-width: 767px) {\n    :where(.ah-btn--sm'));
+
+    test('a transparent ::before makes each at least 32 px without changing its drawn size', () => {
+        expect(phone).toMatch(/:where\(\.ah-btn--sm, \.ah-tab, \.ah-switch, \.ah-check, \.tv-pill\) \{ position: relative; \}/);
+        const rule = ruleBody(phone, '.tv-pill::before');
+        expect(rule).toMatch(/width:\s*max\(100%, 32px\)/);
+        expect(rule).toMatch(/height:\s*max\(100%, 32px\)/);
+        expect(rule).not.toMatch(/background|border|box-shadow/);
+    });
+
+    test('the tick of .ah-check keeps ::after to itself', () => {
+        expect(phone).not.toMatch(/\.ah-check::after/);
+        expect(css).toMatch(/\.ah-check:checked::after \{/);
+    });
+});
+
 describe('Settings → Projects apps column', () => {
     test('the app list does not share class names with the global search palette', () => {
         const vue = read('components/molecules/ProjectAppsList/ProjectAppsList.vue');
