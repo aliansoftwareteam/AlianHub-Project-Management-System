@@ -101,6 +101,8 @@
 .gv__chart :deep(.gantt_line_wrapper div) { background: var(--ink-3); }
 .gv__chart :deep(.gv-link-critical .gantt_line_wrapper div),
 .gv__chart :deep(.gantt_line_wrapper.gv-link-critical div) { background: var(--danger); }
+.gv__chart :deep(.gv-link-collision .gantt_line_wrapper div) { background: var(--warn); }
+.gv__chart :deep(.gv-link-collision .gantt_link_arrow_right) { border-left-color: var(--warn); }
 
 .gv__chart :deep(.gv-baseline) {
     position: absolute;
