@@ -69,6 +69,14 @@ describe('the calendar controls in the project toolbar', () => {
         expect(ruleBody(css, '.pft .monthly-calendar-view')).toMatch(/color:\s*var\(--ink\)\s*!important/);
     });
 
+    test('on a phone the filter pill is sized by its content, not a percentage', () => {
+        const phone = css.slice(css.indexOf('@media (max-width: 767px)'));
+        const rule = ruleBody(phone, '.pft .top-filter-section');
+        expect(rule).toMatch(/box-sizing:\s*border-box/);
+        expect(rule).toMatch(/width:\s*auto/);
+        expect(rule).toMatch(/min-width:\s*40px/);
+    });
+
     test('the previous and next chevrons have no white disc', () => {
         expect(ruleBody(css, '.pft .calendar-button .fc-icon::before')).toMatch(/background:\s*transparent/);
     });

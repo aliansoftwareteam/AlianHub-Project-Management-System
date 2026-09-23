@@ -130,5 +130,8 @@
     .pft .border-groupBy, .pft .ai_button, .pft .pft__mode-chip, .pft .calendar-button, .pft__search-toggle,
     .pft .assignee-filter.manage__filter-users, .pft .pft__input.form-control { min-height: 40px !important; height: 40px !important; line-height: 38px; }
     .pft .pft__icon-btn { width: 40px !important; }
+    /* The legacy rule sizes the filter pill as a percentage of a shrink-to-fit parent, which
+       collapsed its button to 13px and let the pill spill over the search toggle. */
+    .pft .top-filter-section { box-sizing: border-box; width: auto; max-width: none; min-width: 40px; }
     .pft .assignee-filter .assignee-user, .pft .assignee-filter .assignee-status { height: 38px !important; }
 }
