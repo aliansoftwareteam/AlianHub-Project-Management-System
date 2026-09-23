@@ -2,7 +2,6 @@ import { ref, inject } from 'vue';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
-import { useGetterFunctions } from '@/composable';
 import { storageQueryBuilder, generateFileName } from '@/utils/storageQueryBuild.js';
 import * as env from '@/config/env';
 import { apiRequest, apiRequestWithoutCompnay } from '@/services';
@@ -11,9 +10,7 @@ export function useProjectAvatar(projectData) {
     const { commit } = useStore();
     const $toast = useToast();
     const { t } = useI18n();
-    const { getUser } = useGetterFunctions();
 
-    const userId = inject('$userId');
     const companyId = inject('$companyId');
 
     const showColorAvatar = ref(false);
@@ -121,24 +118,6 @@ export function useProjectAvatar(projectData) {
             resetFormData();
             savingAvatar.value = false;
             showColorAvatar.value = false;
-            const user = getUser(userId.value);
-            const userData = {
-                id: user.id,
-                Employee_Name: user.Employee_Name,
-                companyOwnerId: user.companyOwnerId,
-            };
-            const historyObj = {
-                key: 'Project_EndDate',
-                message: `<b>${userData.Employee_Name}</b> has changed <b> ${updateObject.type === 'color' ? 'color' : 'avatar'} </b> </b>.`,
-            };
-            apiRequest('post', env.HANDLE_HISTORY, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: projectData.value._id,
-                taskId: null,
-                object: historyObj,
-                userData,
-            });
             commit('projectData/projectLocalUpdate', { itemData: { ...updateObject }, projectId: projectData.value._id, key: 'ProjectIcon', subKey: '', userId: '' });
             $toast.success(t('Toast.Project_avatar_updated_successfully'), { position: 'top-right' });
         } catch (error) {

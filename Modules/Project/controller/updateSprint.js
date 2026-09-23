@@ -1,6 +1,8 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-handler/mongoQueries");
 const scrumRules = require("../../Sprints/scrumRules");
+const { recordSprintFavourite } = require("../../Sprints/helpers/sprintHistory");
+const logger = require("../../../Config/loggerConfig");
 
 exports.updateSprint = async(req,res) => {
     try {
@@ -76,17 +78,22 @@ exports.updateSprint = async(req,res) => {
             ]
         }
         
+        const companyId = req.headers['companyid'];
+        const previous = req.body.updateObject.favouriteTasks
+            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: sprintId }] }, 'findOne').catch(() => null)
+            : null;
         let mongoObj = {
             type: SCHEMA_TYPE.SPRINTS,
             data: data
         }
-        const sprint = await MongoDbCrudOpration(req.headers['companyid'], mongoObj, 'findOneAndUpdate');
-        
+        const sprint = await MongoDbCrudOpration(companyId, mongoObj, 'findOneAndUpdate');
+
         if (!sprint) {
-            
             return res.status(400).json({ message: "sprint not updated" });
         }
 
+        recordSprintFavourite({ companyId, previous, updateObject: req.body.updateObject, key, actorId: req.uid })
+            .catch((error) => logger.error(`sprint favourite history failed: ${(error && error.message) || error}`));
         return res.status(200).json(sprint);
     } catch (error) {
         return res.status(500).json({ message: "An error occurred while update the sprint",error:error });

@@ -6,6 +6,7 @@ const { PROJECT_SOURCES, normaliseSource, sourceOrDefault, cleanProposalId, nume
 const { TRASHED, quotaStatus, syncProjectQuota } = require('../helpers/projectQuota');
 const logger = require('../../../Config/loggerConfig');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
+const { recordProjectChanges } = require('../helpers/projectHistory');
 
 exports.updateProjectInternal = async (companyId, projectId, updateObject, key, arrayFilters) => {
     // Trashing and restoring a project are the only writes that change what a company
@@ -169,6 +170,8 @@ exports.updateProject = async (req, res) => {
             updateObject.skills = await resolveProjectSkills(companyId, updateObject.skills);
         }
         exports.updateProjectInternal(companyId, projectId, updateObject, key, arrayFilters).then((project) => {
+            recordProjectChanges({ companyId, projectId, actorId: req.uid, previous: project, updateObject, key, timeZone: req.body.timeZone })
+                .catch((error) => logger.error(`project history after update failed: ${(error && error.message) || error}`));
             return res.status(200).json(project);
         }).catch((error) => {
             return res.status(500).json({ message: "An error occurred while fetching the project",error:error });

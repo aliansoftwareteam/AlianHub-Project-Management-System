@@ -1,5 +1,6 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType.js");
-const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
+const { removeCache } = require("../../utils/commonFunctions.js");
+const { MongoDbCrudOpration, dropCompanyDatabase } = require("../../utils/mongo-handler/mongoQueries.js");
 const iCtr = require('../ImportSettings/controller.js');
 const { ensureNotificationDefaults } = require('../notification/defaults');
 const vectorStore = require('../Knowledge/vectorStore');
@@ -718,20 +719,6 @@ exports.checkFreeCompanyCounts = (userId) => {
     });
 };
 
-/* A dedicated short-lived connection, built the way mongoConnector builds every other one.
- * mongoose.connect would instead open the process-wide default connection, which nothing else
- * in this app uses and which refuses to reopen for a second company once it is active. */
-const dropCompanyDatabase = async (companyId) => {
-    const baseUrl = String(process.env.MONGODB_URL || '').replace(/\/+$/, '');
-    const connStr = baseUrl.startsWith('mongodb+srv') ? `${baseUrl}/${companyId}` : `${baseUrl}/${companyId}?authSource=admin`;
-    const connection = await mongoose.createConnection(connStr).asPromise();
-    try {
-        await connection.dropDatabase();
-    } finally {
-        await connection.close();
-    }
-};
-
 /* Destroys the tenant's whole database, so it is gated harder than any other company write:
  * the owner of the company the verified session names, who has typed that company's name back.
  * The role is read against the pinned tenant, not the header, so the company being judged and
@@ -771,6 +758,8 @@ exports.deleteCompany = async (req, res) => {
             ],
         };
         await updateUserFun(dbCollections.GLOBAL, findObj, "updateMany", companyId, '', true);
+        // A cached membership or role would let the next request pass and reopen, so recreate, the database.
+        removeCache(companyId, true);
 
         logger.info(`Company ${companyId} deleted by ${req.uid}`);
         return res.send({ status: true, statusText: "Done" });

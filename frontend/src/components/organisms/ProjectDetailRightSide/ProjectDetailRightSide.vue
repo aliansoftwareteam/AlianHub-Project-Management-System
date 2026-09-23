@@ -7,7 +7,7 @@
                 <ProjectStatus
                     class="d-flex nohover__project-rightside d-inline-block text-ellipsis"
                     :projectKey="projectData.status"
-                    @update:projectstatus="(val,val1) => updateStatus(val,val1)"
+                    @update:projectstatus="(val,val1) => updateStatus(val1)"
                 />
             </div>
              <!-- v-if="checkPermission('project.project_status_change',projectData?.isGlobalPermission)!== null" -->
@@ -57,7 +57,7 @@
                 <ProjectType
                     class="hover__on-projectrightside text-ellipsis"
                     :projectData="projectData"
-                    @selected="updateType($event,projectData.ProjectType)"
+                    @selected="updateType($event)"
                 />
             </div>
             <div class="d-flex project-right-side-label" v-if="projectData.ProjectType === 'Hourly'">
@@ -66,7 +66,7 @@
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_currency',projectData?.isGlobalPermission) !== null">
                 <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.currency')}}</h4>
-                <Currency :projectData="projectData" @selected="updateCurrency($event,projectData?.ProjectCurrency?.name)"  class="hover__on-projectrightside text-ellipsis" />
+                <Currency :projectData="projectData" @selected="updateCurrency($event)"  class="hover__on-projectrightside text-ellipsis" />
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_amount',projectData?.isGlobalPermission) !== null">
                 <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.amount')}}</h4>
@@ -130,7 +130,7 @@
                     :maxDate="projectData.EndDate ? projectData.EndDate.seconds ? new Date(projectData.EndDate.seconds * 1000) : new Date(projectData.EndDate) : ''"
                     :calenderImage="false"
                     :InputDesign="false"
-                    @SelectedDate="($event) => updateStartDate($event,projectData?.StartDate)"
+                    @SelectedDate="updateStartDate"
                     :startDateChanges="startDateWarning"
                     :position="`right`"
                 ></StartEndDate>
@@ -151,7 +151,7 @@
                     :maxDate="''"
                     :calenderImage="false"
                     :InputDesign="false"
-                    @SelectedDate="($event) => updateEndDate($event,projectData?.EndDate)"
+                    @SelectedDate="updateEndDate"
                     :position="`right`"
                 ></StartEndDate>
                 <template v-else>
@@ -167,7 +167,7 @@
                     id="due-date-project"
                     :displyDate="projectData.DueDate ? projectData.DueDate : ''"
                     :isShowDateAndicon="true"
-                    @SelectedDate="($event) => updateDueDate($event,projectData.DueDate)"
+                    @SelectedDate="updateDueDate"
                     :position="`right`"
                 />
                 <template v-else>
@@ -247,7 +247,6 @@ import BillingPeriod from '@/components/atom/BillingPeriod/BillingPeriod.vue';
 import { defineProps , inject ,computed,ref,nextTick,defineEmits } from 'vue';
 import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
 import ProjectStatus from '@/components/molecules/ProjectStatus/ProjectStatus.vue'
-import { projectAssignee, projectAssigneeRemove, projectCurrency, projectDueDateAdd, projectDueDateChange, projectEndDateAdd, projectEndDateChange, projectStartDateAdd, projectStartDateChange, projectStatus, projectType } from '@/utils/NotificationTemplate';
 import { useConvertDate, useCustomComposable, useGetterFunctions } from '@/composable';
 import StartEndDate from '@/components/molecules/FixMilestoneDate/FixMilestoneDate.vue';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
@@ -325,7 +324,7 @@ const getCommaSeperatedNumber = (n)=> {
 };
 
 // project status update
-const updateStatus = (oldVal, newval) => {
+const updateStatus = (newval) => {
     const object = {
         updateObject : {
             status: newval.value,
@@ -335,44 +334,6 @@ const updateStatus = (oldVal, newval) => {
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
         if(res.status === 200){
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-            let historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b> Status</b> as <b>${newval.name}</b>.`,
-                'key' : 'Project_Status',
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-            let notifyObj = {
-                'ProjectName' : props.projectData.ProjectName,
-                'backColor' : oldVal.backgroundColor,
-                'color':oldVal.textColor,
-                'statusName':oldVal.name,
-                'bgColor':newval.backgroundColor,
-                'textColor':newval.textColor,
-                'newStatusName':newval.name
-            }
-            let notificationObject = {
-                message: projectStatus(notifyObj),
-                key: "project_status_change",
-            };
-            
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: props.projectData._id,
-                object: notificationObject,
-                userData: userData,
-                changeType:'status',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
             $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -386,64 +347,19 @@ const updateStatus = (oldVal, newval) => {
 
 // update the assignee in project
 const updateAssignee = (type, user) => {
-    var historyObj = {};
-    let object = {};
-    if (type === "add") {
-        object = {
-            key:"$addToSet",
-            updateObject : {
-                AssigneeUserId: user.id
-            }
-        }
-        historyObj.key = "Project_Assignee_Add";
-        historyObj.message = `<b>${userData.Employee_Name}</b> has added the <b>${getUser(user.id).Employee_Name}</b> to <b>Assignee</b>.`;
-    } else {
-        object = {
-            key:"$pull",
-            updateObject : {
+    const object = type === "add"
+        ? { key: "$addToSet", updateObject: { AssigneeUserId: user.id } }
+        : {
+            key: "$pull",
+            updateObject: {
                 AssigneeUserId: user.id,
-                    ...(props.projectData.LeadUserId.includes(user.id) && { LeadUserId: user.id })
+                ...(props.projectData.LeadUserId.includes(user.id) && { LeadUserId: user.id })
             }
-        }
-        historyObj.key = "Project_Assignee_Removed";
-        historyObj.message = `<b>${userData.Employee_Name}</b> has removed the <b>${getUser(user.id).Employee_Name}</b> to <b>Assignee</b>.`;
-    }
-    let notifyObj = {
-        'projectName' : props.projectData.ProjectName,
-        'Employee_Name' : user.label,
-        type : type,
-        name : user.label
-    }
-    let notificationObject = {
-        message: type === 'add' ? projectAssignee(notifyObj) : projectAssigneeRemove(notifyObj),
-        key: "project_assignee",
-    };
-    
+        };
 
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
         if(res.status === 200){
             $toast.success(t(`Toast.Assignee ${type === "add" ? 'added' : 'removed'} successfully`),{position: 'top-right'});
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: props.projectData._id,
-                object: notificationObject,
-                userData: userData,
-                mentionUserId:[user.id],
-                changeType:'assignee',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData},projectId:props.projectData._id,key:'AssigneeChange',subKey: type === 'add' ? 'add' : 'remove',userId: user.id});
         }else{
             $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -456,7 +372,7 @@ const updateAssignee = (type, user) => {
 }
 
 // update the type of project
-const updateType = (type,val) => {
+const updateType = (type) => {
     let object = {
         updateObject : {
             ProjectType: type.label,...((type.label === 'Hourly' && !props.projectData.BillingPeriod) && {BillingPeriod: "Monthly" })
@@ -466,39 +382,6 @@ const updateType = (type,val) => {
         if(res.status === 200){
             emit('rightSideBarEmit','projectType',object);
             sourceEditable.value = false;
-            let historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b> Type</b> as <b>${type.label}</b>.`,
-                'key' : 'Project_Type',
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-            let notifyObj = {
-                'ProjectName' : props.projectData.ProjectName,
-                'previousType': val,
-                'name':type.label
-            }
-            let notificationObject = {
-                message: projectType(notifyObj),
-                key: "project_type"
-            };
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: props.projectData._id,
-                object: notificationObject,
-                userData: userData,
-                changeType:'project_type',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
@@ -512,7 +395,7 @@ const updateType = (type,val) => {
 }
 
 // update the currency of project
-const updateCurrency = (currency,oldVal) => {
+const updateCurrency = (currency) => {
     if (props.projectData && props.projectData.ProjectCurrency) {
         if (currency.code !== props.projectData.ProjectCurrency.code) {
             let object = {
@@ -551,39 +434,6 @@ const updateCurrency = (currency,oldVal) => {
         if(res.status === 200){
             emit('rightSideBarEmit','currency',currency);
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-            let historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b> Currency</b> as <b>${currency.name}</b>.`,
-                'key' : 'Project_Currency',
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-            let notifyObj = {
-                'ProjectName' : props.projectData.ProjectName,
-                'ProjectCurrency': oldVal,
-                'name':currency.name
-            }
-            let notificationObject = {
-                message: projectCurrency(notifyObj),
-                key: "project_currency"
-            };
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: props.projectData._id,
-                object: notificationObject,
-                userData: userData,
-                changeType:'currency',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
             $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -596,7 +446,7 @@ const updateCurrency = (currency,oldVal) => {
 }
 
 // update the duedate of project
-const updateDueDate = (event,oldVal) => {
+const updateDueDate = (event) => {
     let newdueDateDeadLine = [];
     if(props.projectData.dueDateDeadLine && props.projectData.dueDateDeadLine.length > 0) {
         props.projectData.dueDateDeadLine.forEach((date) => {
@@ -611,48 +461,12 @@ const updateDueDate = (event,oldVal) => {
         updateObject : {
             DueDate: event.dateVal,
             dueDateDeadLine: newdueDateDeadLine,
-        }
+        },
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
     }
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
         if(res.status === 200){
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-            let historyObj = {
-                key : "Project_DueDate",
-                message : `<b>${userData.Employee_Name}</b> has changed <b> Due Date</b> as <b>DATE_${new Date(event.dateVal).getTime()}</b>.`
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-            let notifyObj = {
-                'ProjectName' : props.projectData.ProjectName,
-            }
-            if(oldVal){
-                notifyObj.previousDate=convertDateFormat(oldVal,'DD MMM[,] YYYY',{showDayName: false})
-                notifyObj.changedDate=convertDateFormat(event.dateVal,'DD MMM[,] YYYY',{showDayName: false})
-            }else{
-                notifyObj.changedDate=convertDateFormat(event.dateVal,'DD MMM[,] YYYY',{showDayName: false})
-            }
-            let notificationObject = {
-                message: oldVal ? projectDueDateChange(notifyObj) : projectDueDateAdd(notifyObj),
-                key: "project_due_date"
-            };
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: props.projectData._id,
-                object: notificationObject,
-                userData: userData,
-                changeType:'due_date',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
             $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -665,15 +479,12 @@ const updateDueDate = (event,oldVal) => {
 }
 
 // update the startdate of project
-const updateStartDate = (event,oldVal) => {
-    let object = {
+const updateStartDate = (event) => {
+    const object = {
         updateObject : {
             StartDate: event.dateVal
-        }
-    } 
-    let historyObj = {
-        key : "Project_StartDate",
-        message : `<b>${userData.Employee_Name}</b> has changed <b> Start Date</b> as <b>DATE_${new Date(event.dateVal).getTime()}</b>.`
+        },
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
     }
     if(props.projectData.ProjectType === 'Hourly'){
         let getStartDate = new Date(event.dateVal).getTime()
@@ -694,57 +505,24 @@ const updateStartDate = (event,oldVal) => {
                     startDateWarning.value = props.projectData.StartDate
                     return;
                 }else{
-                    commonStartDateUpdateFun(event,object,historyObj,oldVal);
+                    commonStartDateUpdateFun(event,object);
                 }
             }else{
-                commonStartDateUpdateFun(event,object,historyObj,oldVal);
+                commonStartDateUpdateFun(event,object);
             }
         }).catch((err)=>{
             console.error("ERROR",err)
-            commonStartDateUpdateFun(event);
+            commonStartDateUpdateFun(event,object);
         });
     }else{
-        commonStartDateUpdateFun(event,object,historyObj,oldVal);
+        commonStartDateUpdateFun(event,object);
     }
 }
 
-const commonStartDateUpdateFun = (event,object,historyObj,oldVal) =>{
+const commonStartDateUpdateFun = (event,object) =>{
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((response) => {
         if(response.status === 200){
             emit('rightSideBarEmit','startDate', event.dateVal);
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-            let notifyObj = {
-                'ProjectName' : props.projectData.ProjectName,
-            }
-            if(oldVal){
-                notifyObj.formetedStartDate=convertDateFormat(oldVal,'DD MMM[,] YYYY',{showDayName: false})
-                notifyObj.newDate=convertDateFormat(event.dateVal,'DD MMM[,] YYYY',{showDayName: false})
-            }else{
-                notifyObj.formetedStartDate=convertDateFormat(event.dateVal,'DD MMM[,] YYYY',{showDayName: false})
-            }
-            let notificationObject = {
-                message: oldVal ? projectStartDateChange(notifyObj) : projectStartDateAdd(notifyObj),
-                key: "project_start_date"
-            };
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: props.projectData._id,
-                object: notificationObject,
-                userData: userData,
-                changeType:'start_date',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
@@ -757,51 +535,15 @@ const commonStartDateUpdateFun = (event,object,historyObj,oldVal) =>{
 }
 
 // update the enddate of project
-const updateEndDate = (event,oldVal) => {
+const updateEndDate = (event) => {
     const object = {
         updateObject : {
             EndDate: event.dateVal
-        }
+        },
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
     }
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
         if(res.status === 200){
-            let historyObj = {
-                key : "Project_EndDate",
-                message : `<b>${userData.Employee_Name}</b> has changed <b> End Date</b> as <b>DATE_${new Date(event.dateVal).getTime()}</b>.`
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-            let notifyObj = {
-                'ProjectName' : props.projectData.ProjectName,
-            }
-            if(oldVal){
-                notifyObj.formatedDate=convertDateFormat(oldVal,'DD MMM[,] YYYY',{showDayName: false})
-                notifyObj.newDate=convertDateFormat(event.dateVal,'DD MMM[,] YYYY',{showDayName: false})
-            }else{
-                notifyObj.formatedDate=convertDateFormat(event.dateVal,'DD MMM[,] YYYY',{showDayName: false})
-            }
-            let notificationObject = {
-                message: oldVal ? projectEndDateChange(notifyObj) : projectEndDateAdd(notifyObj),
-                key: "project_end_date"
-            };
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: props.projectData._id,
-                object: notificationObject,
-                userData: userData,
-                changeType:'end_date',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
