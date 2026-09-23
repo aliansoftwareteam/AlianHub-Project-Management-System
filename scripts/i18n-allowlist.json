@@ -85,7 +85,6 @@
     "frontend/src/views/PersonalList/PersonalList.vue": 1,
     "frontend/src/views/Projects/GanttView/GanttView.vue": 1,
     "frontend/src/views/Projects/MapView/MapView.vue": 9,
-    "frontend/src/views/Projects/Reports/BurndownChart.vue": 6,
     "frontend/src/views/Settings/Instance/InstanceHealth.vue": 1,
     "frontend/src/views/Settings/Language/Language.vue": 2,
     "frontend/src/views/Settings/Projects/Projects.vue": 4,

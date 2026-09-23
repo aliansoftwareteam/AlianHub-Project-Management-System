@@ -2,14 +2,14 @@
   <div class="agile-report">
     <div class="agile-report__bar">
       <select v-model="selectedSprintId" class="agile-report__select" @change="load">
-        <option value="">Select a sprint…</option>
+        <option value="">{{ $t('Reports.burndown_select_sprint') }}</option>
         <option v-for="s in sprintOptions" :key="s._id" :value="s._id">{{ s.name }}</option>
       </select>
       <div class="agile-report__toggle">
-        <button :class="{ active: metric === 'points' }" @click="metric = 'points'">Points</button>
-        <button :class="{ active: metric === 'count' }" @click="metric = 'count'">Tasks</button>
+        <button :class="{ active: metric === 'points' }" @click="metric = 'points'">{{ $t('Reports.burndown_points') }}</button>
+        <button :class="{ active: metric === 'count' }" @click="metric = 'count'">{{ $t('Reports.burndown_tasks') }}</button>
       </div>
-      <button class="agile-report__pdf" :disabled="!hasData" @click="exportPdf">Export PDF</button>
+      <button class="agile-report__pdf" :disabled="!hasData" @click="exportPdf">{{ $t('Reports.export_pdf') }}</button>
     </div>
     <!-- Only a real sprint has a box to name. A plain list charts from its
          oldest task to today and has nothing to say here. -->
@@ -18,9 +18,9 @@
       <span class="agile-report__range">{{ box.range }}</span>
       <span v-if="box.goal" class="agile-report__goal">{{ box.goal }}</span>
     </div>
-    <div v-if="loading" class="agile-report__msg">Loading…</div>
-    <div v-else-if="!selectedSprintId" class="agile-report__msg">Pick a sprint to see its burndown.</div>
-    <div v-else-if="!hasData" class="agile-report__msg">{{ emptyMsg || 'No data for this sprint yet.' }}</div>
+    <div v-if="loading" class="agile-report__msg">{{ $t('Reports.loading') }}</div>
+    <div v-else-if="!selectedSprintId" class="agile-report__msg">{{ $t('Reports.burndown_pick_sprint') }}</div>
+    <div v-else-if="!hasData" class="agile-report__msg">{{ emptyMsg || $t('Reports.burndown_no_data') }}</div>
     <ApexChart v-else ref="chartRef" type="line" height="360" :options="chartOptions" :series="series" />
   </div>
 </template>
@@ -31,6 +31,7 @@ export default { name: 'BurndownChart' };
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import { downloadReportPdf, chartImage } from './reportsPdf';
 
@@ -39,6 +40,7 @@ const props = defineProps({
     sprints: { type: Array, default: () => [] },
 });
 
+const { t } = useI18n();
 const selectedSprintId = ref('');
 const metric = ref('points'); // 'points' | 'count'
 const loading = ref(false);
@@ -56,7 +58,7 @@ const sprintOptions = computed(() =>
         .filter((s) => s && s._id)
         .filter((s) => !s.isFolder && !s.isBacklog && s.mainChat !== true)
         .filter((s) => s.deletedStatusKey !== 1)
-        .map((s) => ({ _id: s._id, name: s.name || s.sprintName || 'Sprint' }))
+        .map((s) => ({ _id: s._id, name: s.name || s.sprintName || t('Reports.sprint') }))
 );
 
 const hasData = computed(() => !!(data.value && data.value.days && data.value.days.length));
@@ -85,9 +87,9 @@ const idealKey = computed(() => (metric.value === 'points' ? 'idealPoints' : 'id
 const series = computed(() => {
     const days = (data.value && data.value.days) || [];
     return [
-        { name: 'Ideal', data: days.map((d) => Number(d[idealKey.value]) || 0) },
+        { name: t('Reports.burndown_ideal'), data: days.map((d) => Number(d[idealKey.value]) || 0) },
         {
-            name: metric.value === 'points' ? 'Remaining points' : 'Remaining tasks',
+            name: metric.value === 'points' ? t('Reports.burndown_remaining_points') : t('Reports.burndown_remaining_tasks'),
             // null = a day the sprint has not reached. Coercing it to 0 would
             // draw a running sprint as finished for the rest of its box.
             data: days.map((d) => (d[actualKey.value] === null || d[actualKey.value] === undefined ? null : Number(d[actualKey.value]))),
@@ -103,9 +105,9 @@ const chartOptions = computed(() => ({
     stroke: { curve: 'straight', width: [2, 3], dashArray: [6, 0] },
     markers: { size: 0 },
     xaxis: { categories: categories.value, labels: { rotate: -45, hideOverlappingLabels: true } },
-    yaxis: { min: 0, title: { text: metric.value === 'points' ? 'Points remaining' : 'Tasks remaining' } },
+    yaxis: { min: 0, title: { text: metric.value === 'points' ? t('Reports.burndown_points_remaining') : t('Reports.burndown_tasks_remaining') } },
     legend: { position: 'top' },
-    title: { text: data.value && data.value.sprintName ? `Burndown — ${data.value.sprintName}` : 'Sprint burndown' },
+    title: { text: data.value && data.value.sprintName ? t('Reports.burndown_chart_title', { sprint: data.value.sprintName }) : t('Reports.burndown_chart_title_default') },
 }));
 
 const load = async () => {
@@ -119,11 +121,11 @@ const load = async () => {
             if (!hasData.value) emptyMsg.value = res.data.statusText || '';
         } else {
             data.value = null;
-            emptyMsg.value = (res.data && res.data.statusText) || 'Could not load burndown.';
+            emptyMsg.value = (res.data && res.data.statusText) || t('Reports.burndown_load_failed');
         }
     } catch (e) {
         data.value = null;
-        emptyMsg.value = 'Could not load burndown.';
+        emptyMsg.value = t('Reports.burndown_load_failed');
     } finally {
         loading.value = false;
     }
@@ -133,14 +135,13 @@ const exportPdf = async () => {
     const image = await chartImage(chartRef);
     const isPoints = metric.value === 'points';
     await downloadReportPdf('burndown', {
-        title: 'Sprint Burndown',
+        title: t('Reports.burndown_pdf_title'),
         subtitle: (data.value && data.value.sprintName) || '',
         filename: `burndown-${(data.value && data.value.sprintName) || 'sprint'}`,
         image,
-        meta: [
-            `Metric: ${isPoints ? 'Story points' : 'Task count'}`,
-            `Total ${isPoints ? 'points' : 'tasks'}: ${isPoints ? (data.value && data.value.totalPoints) || 0 : (data.value && data.value.totalCount) || 0}`,
-        ],
+        meta: isPoints
+            ? [t('Reports.burndown_pdf_metric_points'), t('Reports.burndown_pdf_total_points', { n: (data.value && data.value.totalPoints) || 0 })]
+            : [t('Reports.burndown_pdf_metric_tasks'), t('Reports.burndown_pdf_total_tasks', { n: (data.value && data.value.totalCount) || 0 })],
     });
 };
 
