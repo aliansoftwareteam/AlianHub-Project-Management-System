@@ -67,8 +67,8 @@
                     </div>
 
                     <div class="aipg-card">
-                        <label class="aipg-field-label">Workspace</label>
-                        <p class="aipg-helper">Choose who can see this project once it's created.</p>
+                        <label class="aipg-field-label">{{ $t('AiProject.workspace_label') }}</label>
+                        <p class="aipg-helper">{{ $t('AiProject.workspace_hint') }}</p>
                         <div class="aipg-privacy-row">
                             <button
                                 type="button"
@@ -78,8 +78,8 @@
                                 @click="isPrivateSpace = false">
                                 <span class="aipg-privacy-icon" aria-hidden="true">🌐</span>
                                 <span class="aipg-privacy-text">
-                                    <strong>Public</strong>
-                                    <span class="aipg-privacy-sub">Everyone in the workspace can view</span>
+                                    <strong>{{ $t('AiProject.privacy_public') }}</strong>
+                                    <span class="aipg-privacy-sub">{{ $t('AiProject.privacy_public_sub') }}</span>
                                 </span>
                             </button>
                             <button
@@ -90,8 +90,8 @@
                                 @click="isPrivateSpace = true">
                                 <span class="aipg-privacy-icon" aria-hidden="true">🔒</span>
                                 <span class="aipg-privacy-text">
-                                    <strong>Private</strong>
-                                    <span class="aipg-privacy-sub">Only you and invited members</span>
+                                    <strong>{{ $t('AiProject.privacy_private') }}</strong>
+                                    <span class="aipg-privacy-sub">{{ $t('AiProject.privacy_private_sub') }}</span>
                                 </span>
                             </button>
                         </div>
@@ -128,22 +128,22 @@
                     </div>
 
                     <div class="aipg-card">
-                        <label class="aipg-field-label">Attach a brief <span class="aipg-muted">— optional</span></label>
-                        <p class="aipg-helper">PDF, DOCX, TXT, or MD — up to 10 MB.</p>
+                        <label class="aipg-field-label">{{ $t('AiProject.attach_brief') }} <span class="aipg-muted">{{ $t('AI.ai_optional') }}</span></label>
+                        <p class="aipg-helper">{{ $t('AiProject.attach_hint') }}</p>
                         <label class="aipg-file-drop" :class="{ 'is-disabled': loading || briefUploading }">
                             <input ref="fileInput" type="file" accept=".pdf,.docx,.txt,.md" @change="onFileChosen" :disabled="loading || briefUploading"/>
                             <span v-if="briefUploading" class="aipg-file-drop-inner">
                                 <span class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                                Reading file…
+                                {{ $t('AiProject.reading_file') }}
                             </span>
                             <span v-else-if="briefId" class="aipg-file-drop-inner aipg-file-drop-ok">
                                 <span class="aipg-tick" aria-hidden="true">✓</span>
                                 {{ briefFile?.name }}
-                                <button class="aipg-btn-link" type="button" :disabled="loading" @click.prevent="clearBrief">Remove</button>
+                                <button class="aipg-btn-link" type="button" :disabled="loading" @click.prevent="clearBrief">{{ $t('AiProject.remove') }}</button>
                             </span>
                             <span v-else class="aipg-file-drop-inner aipg-muted">
                                 <span class="aipg-upload-icon" aria-hidden="true">↑</span>
-                                Click to choose a file
+                                {{ $t('AiProject.choose_file') }}
                             </span>
                         </label>
                     </div>
@@ -151,7 +151,9 @@
                     <transition name="aipg-fade">
                         <div v-if="error" class="aipg-alert aipg-alert-danger">
                             <div>{{ error }}</div>
-                            <p class="aipg-alert-hint">Click <strong>{{ $t('AiProject.continue') }}</strong> again — the AI will retry from your description.</p>
+                            <i18n-t keypath="AiProject.retry_hint" tag="p" class="aipg-alert-hint">
+                                <template #action><strong>{{ $t('AiProject.continue') }}</strong></template>
+                            </i18n-t>
                         </div>
                     </transition>
 
@@ -175,13 +177,13 @@
                             :disabled="!canGenerate || !hasSource || loading || briefUploading || clarifyLoading"
                             @click="onGeneratePlan">
                             <span v-if="loading || clarifyLoading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ clarifyLoading ? $t('AiProject.analyzing') : (loading ? $t('AiProject.generating_plan') : 'Re-Generate Plan') }}
+                            {{ clarifyLoading ? $t('AiProject.analyzing') : (loading ? $t('AiProject.generating_plan') : $t('AiProject.regenerate_plan')) }}
                         </button>
                         <button
                             class="aipg-btn aipg-btn-primary"
                             :disabled="!hasSource || loading || briefUploading || clarifyLoading"
                             @click="onNextWithExistingPlan">
-                            Next →
+                            {{ $t('AiProject.next') }}
                         </button>
                     </div>
                     <div v-else-if="hasGeneratedQuestions" class="aipg-actions aipg-actions-split">
@@ -190,13 +192,13 @@
                             :disabled="!canGenerate || !hasSource || loading || briefUploading || clarifyLoading"
                             @click="onRegenerateQuestions">
                             <span v-if="clarifyLoading || loading" class="aipg-spinner aipg-spinner-sm" aria-hidden="true"></span>
-                            {{ clarifyLoading ? $t('AiProject.analyzing') : (loading ? $t('AiProject.generating_plan') : 'Re-Generate Questions') }}
+                            {{ clarifyLoading ? $t('AiProject.analyzing') : (loading ? $t('AiProject.generating_plan') : $t('AiProject.regenerate_questions')) }}
                         </button>
                         <button
                             class="aipg-btn aipg-btn-primary"
                             :disabled="!hasSource || loading || briefUploading || clarifyLoading"
                             @click="onNextWithExistingQuestions">
-                            Next →
+                            {{ $t('AiProject.next') }}
                         </button>
                     </div>
                     <div v-else class="aipg-actions">
@@ -276,14 +278,14 @@
                                 :disabled="loading"/>
                             <code class="aipg-code-pill">{{ plan.project.ProjectCode }}</code>
                             <span class="aipg-ml-auto aipg-helper">
-                                {{ totals.sprints }} sprints · {{ totals.tasks }} tasks
+                                {{ $t('AiProject.sprint_count', { n: totals.sprints }, totals.sprints) }} · {{ $t('AiProject.task_count', { n: totals.tasks }, totals.tasks) }}
                                 <!-- Cost is omitted, not zeroed, when the model
                                      has no price on file — a wrong number is
                                      worse than no number. -->
                                 <template v-if="runUsage">
                                     ·
                                     <span class="aipg-usage" :title="usageTooltip">
-                                        {{ formatTokens(runUsage.totalTokens) }} tokens<template
+                                        {{ $t('AiProject.token_count', { n: formatTokens(runUsage.totalTokens) }, runUsage.totalTokens) }}<template
                                             v-if="runUsage.costUsd !== null"> · {{ formatCost(runUsage.costUsd) }}</template>
                                     </span>
                                 </template>
@@ -323,7 +325,7 @@
                                     maxlength="80"
                                     :disabled="loading"
                                     @click.stop/>
-                                <span class="aipg-pill aipg-ml-auto">{{ sprint.tasks.length }} tasks</span>
+                                <span class="aipg-pill aipg-ml-auto">{{ $t('AiProject.task_count', { n: sprint.tasks.length }, sprint.tasks.length) }}</span>
                             </summary>
                             <ul class="aipg-task-list">
                                 <li v-for="(task, ti) in sprint.tasks" :key="'t-'+si+'-'+ti" class="aipg-task">
@@ -338,7 +340,7 @@
                                     <details class="aipg-task-desc">
                                         <summary class="aipg-task-desc-trigger">
                                             <span class="aipg-chevron aipg-chevron-sm" aria-hidden="true">›</span>
-                                            Description
+                                            {{ $t('AiProject.task_description') }}
                                         </summary>
                                         <pre class="aipg-task-desc-body">{{ renderTaskDescription(task) }}</pre>
                                     </details>
@@ -389,17 +391,17 @@
                     <div class="aipg-progress-list">
                         <div class="aipg-progress-row" :class="rowClass('project')">
                             <span class="aipg-progress-icon"><span v-html="stepIcon('project')" /></span>
-                            <span class="aipg-progress-label">Project</span>
+                            <span class="aipg-progress-label">{{ $t('AiProject.progress_project') }}</span>
                             <span class="aipg-progress-status">{{ stepStatusLabel('project') }}</span>
                         </div>
                         <div class="aipg-progress-row" :class="rowClass('sprint')">
                             <span class="aipg-progress-icon"><span v-html="stepIcon('sprint')" /></span>
-                            <span class="aipg-progress-label">Sprints</span>
+                            <span class="aipg-progress-label">{{ $t('AiProject.progress_sprints') }}</span>
                             <span class="aipg-progress-status">{{ progress.sprintsDone }} / {{ progress.totalSprints || '…' }}</span>
                         </div>
                         <div class="aipg-progress-row" :class="rowClass('tasks')">
                             <span class="aipg-progress-icon"><span v-html="stepIcon('tasks')" /></span>
-                            <span class="aipg-progress-label">Tasks</span>
+                            <span class="aipg-progress-label">{{ $t('AiProject.progress_tasks') }}</span>
                             <span class="aipg-progress-status" data-test="progress-tasks">{{ progress.tasksDone }} / {{ progress.totalTasks || '…' }}</span>
                         </div>
                     </div>
@@ -441,13 +443,13 @@
                 <section v-else-if="step === 'error'" class="aipg-section">
                     <div class="aipg-exec-head">
                         <span class="aipg-error-tick" aria-hidden="true">!</span>
-                        <h4 class="aipg-exec-title">Something went wrong</h4>
+                        <h4 class="aipg-exec-title">{{ $t('AiProject.error_title') }}</h4>
                     </div>
-                    <div class="aipg-alert aipg-alert-danger">{{ error || 'Unknown error' }}</div>
-                    <p v-if="rolledBack" class="aipg-helper">All partial creates have been rolled back.</p>
+                    <div class="aipg-alert aipg-alert-danger">{{ error || $t('AiProject.unknown_error') }}</div>
+                    <p v-if="rolledBack" class="aipg-helper">{{ $t('AiProject.rolled_back') }}</p>
                     <div class="aipg-actions aipg-actions-split">
-                        <button class="aipg-btn aipg-btn-ghost" @click="onClose">Close</button>
-                        <button class="aipg-btn aipg-btn-primary" @click="onRetry">Back to plan</button>
+                        <button class="aipg-btn aipg-btn-ghost" @click="onClose">{{ $t('AiProject.close') }}</button>
+                        <button class="aipg-btn aipg-btn-primary" @click="onRetry">{{ $t('AiProject.back_to_plan') }}</button>
                     </div>
                 </section>
             </div>
@@ -570,7 +572,7 @@ export default defineComponent({
         });
         const createdProjectId = ref(null);
 
-        const placeholderText = 'e.g. "A 3-month SaaS launch for a 5-person team building an invoicing tool with Stripe billing. Kanban workflow. GitHub + Slack integrations. MVP in 6 weeks; full launch in 12."';
+        const placeholderText = computed(() => t('AiProject.describe_placeholder'));
 
         const canGenerate = computed(() => description.value.trim().length >= 20);
         const hasSource = computed(() => PROJECT_SOURCES.includes(source.value));
@@ -709,9 +711,9 @@ export default defineComponent({
         const usageTooltip = computed(() => {
             const u = runUsage.value;
             if (!u) return '';
-            const parts = [`${formatTokens(u.inputTokens)} in · ${formatTokens(u.outputTokens)} out`];
+            const parts = [t('AiProject.usage_split', { input: formatTokens(u.inputTokens), output: formatTokens(u.outputTokens) })];
             if (u.model) parts.push(u.model);
-            if (u.costUsd === null) parts.push('no price on file for this model');
+            if (u.costUsd === null) parts.push(t('AiProject.usage_no_price'));
             return parts.join(' — ');
         });
 
@@ -789,9 +791,9 @@ export default defineComponent({
 
         function stepStatusLabel(name) {
             const state = progress[name] || (name === 'tasks' ? progress.tasksState : progress[`${name}State`]);
-            if (state === 'done') return 'Done';
-            if (state === 'active') return 'In progress';
-            return 'Pending';
+            if (state === 'done') return t('AiProject.status_done');
+            if (state === 'active') return t('AiProject.status_in_progress');
+            return t('AiProject.status_pending');
         }
 
         async function onFileChosen(evt) {
@@ -808,7 +810,7 @@ export default defineComponent({
                     briefStats.charCount = result.charCount;
                     briefStats.truncated = result.truncated;
                 } else {
-                    error.value = (result && result.statusText) || 'Brief upload failed';
+                    error.value = (result && result.statusText) || t('AiProject.upload_failed');
                 }
             } catch (e) {
                 error.value = friendlyErr(e);
@@ -897,12 +899,12 @@ export default defineComponent({
                     assumptions: briefAssumptions.value,
                 });
                 if (!result || !result.status) {
-                    error.value = (result && result.statusText) || 'Plan generation failed. Please try again.';
+                    error.value = (result && result.statusText) || t('AiProject.plan_failed');
                     step.value = retryStep;
                     return;
                 }
                 if (!result.plan) {
-                    error.value = 'The AI did not return a plan. Please try again.';
+                    error.value = t('AiProject.plan_empty');
                     step.value = retryStep;
                     return;
                 }
@@ -1142,7 +1144,7 @@ export default defineComponent({
                     guide: guideForExecute(),
                 });
                 if (!result || !result.status || !result.jobId) {
-                    error.value = (result && result.statusText) || 'Execute failed';
+                    error.value = (result && result.statusText) || t('AiProject.execute_failed');
                     return;
                 }
                 applyOutcome(result);
@@ -1193,7 +1195,7 @@ export default defineComponent({
                     // it, which would hide the queued-runs summary and the guide link.
                     step.value = 'done';
                 } else if (payload.event === 'error') {
-                    error.value = payload.error || 'Execution failed';
+                    error.value = payload.error || t('AiProject.execute_failed');
                     rolledBack.value = !!payload.rolledBack;
                     step.value = 'error';
                 }
@@ -1278,10 +1280,10 @@ export default defineComponent({
         }
 
         function friendlyErr(e) {
-            if (!e) return 'Unknown error';
+            if (!e) return t('AiProject.unknown_error');
             if (e.response && e.response.data && e.response.data.statusText) return e.response.data.statusText;
             if (e.message) return e.message;
-            try { return String(e); } catch (_e) { return 'Unknown error'; }
+            try { return String(e); } catch (_e) { return t('AiProject.unknown_error'); }
         }
 
         onBeforeUnmount(() => {
