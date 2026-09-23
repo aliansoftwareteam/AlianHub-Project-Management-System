@@ -7,7 +7,13 @@ const mongoose = require("mongoose");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { myCache } = require("../../../Config/config");
 
-exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId, sprintId, object, userData, changeType = '', changeData = {},comments_id = "", mentionUserId = [],isGroupChat} = {}) => {
+const narrowRecipients = async (keepRecipients, users, leader = '') => {
+    if (typeof keepRecipients !== 'function') return { users, leader };
+    const kept = new Set((await keepRecipients([...new Set([...users, leader].filter(Boolean).map(String))])).map(String));
+    return { users: users.filter((id) => kept.has(String(id))), leader: leader && kept.has(String(leader)) ? leader : '' };
+};
+
+exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId, sprintId, object, userData, changeType = '', changeData = {},comments_id = "", mentionUserId = [],isGroupChat, keepRecipients} = {}) => {
     return new Promise(async (resolve, reject) => {
         try {
             let projectPath = `${companyId}/${companyId}/${dbCollections.PROJECTS}/${projectId}`
@@ -112,10 +118,8 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                     users = Array.from(new Set([...taskData.AssigneeUserId, ...(taskData.LeadUserId || []), ...watchers]));
                 }
 
-                var leaderId = ""
-                if (taskData?.LeadUserId !== undefined && taskData?.LeadUserId != "") {
-                    leaderId = taskData.LeadUserId
-                }
+                const taskRecipients = await narrowRecipients(keepRecipients, users, taskData?.Task_Leader || "");
+                users = taskRecipients.users;
 
                 const obj = {
                     "createdAt": new Date(),
@@ -132,7 +136,7 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                     "sprintId": sprintId || "",
                     "updatedAt": new Date(),
                     "companyId": companyId || "",
-                    "task_leader_ID": taskData?.Task_Leader || "",
+                    "task_leader_ID": taskRecipients.leader,
                     "changeType": changeType || "",
                     "changeData": changeData || {},
                     "comments_id": comments_id ? comments_id : ""
@@ -160,6 +164,7 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                 const includeOwner = ownerId && !ownerIgnoringProject;
                 let users = [];
                 users = Array.from(new Set([...filteredIds, ...(includeOwner ? [ownerId] : [])]));
+                users = (await narrowRecipients(keepRecipients, users)).users;
                 const obj = {
                     "createdAt": new Date(),
                     "key": object.key,
@@ -235,6 +240,8 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                 } else {
                     users = Array.from(new Set([...(chatData?.AssigneeUserId || []), ...watchers]));
                 }
+                const chatRecipients = await narrowRecipients(keepRecipients, users, chatData?.Task_Leader || '');
+                users = chatRecipients.users;
 
                 const obj = {
                     createdAt: new Date(),
@@ -251,7 +258,7 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                     sprintId: sprintId || "",
                     updatedAt: new Date(),
                     companyId: companyId || "",
-                    task_leader_ID: chatData?.Task_Leader || "",
+                    task_leader_ID: chatRecipients.leader,
                     changeType: changeType || "",
                     changeData: changeData || {},
                     comments_id: comments_id || ""
