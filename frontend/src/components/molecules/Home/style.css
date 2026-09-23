@@ -43,7 +43,7 @@
 .ah-tbtn {
     display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px;
     border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
-    font: 500 12px/1 var(--font-ui); color: var(--ink); cursor: pointer; white-space: nowrap;
+    font: 500 12px/1 var(--font-ui); color: var(--ink); cursor: pointer; white-space: nowrap; text-decoration: none;
     transition: background var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
 }
 .ah-tbtn:hover { background: var(--surface-hover); }
