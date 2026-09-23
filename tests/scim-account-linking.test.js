@@ -233,4 +233,15 @@ describe('a deactivated seat SCIM left for someone outside the company', () => {
         const again = await send(scim.patchUser, { params: { id: uid }, body: { Operations: [{ op: 'replace', value: { active: true } }] } });
         expect(again.body.active).toBe(true);
     });
+
+    it('still reactivates a member SCIM deactivated from an active seat, whatever brought them in', async () => {
+        seedSeat(A, OUTSIDER, 'pat@outside.test');
+
+        await send(scim.patchUser, { params: { id: OUTSIDER }, body: { Operations: [{ op: 'replace', value: { active: false } }] } });
+        expect(rowFor(A, 'pat@outside.test')).toMatchObject({ status: SCIM_DEACTIVATED, isDelete: true });
+
+        const again = await send(scim.patchUser, { params: { id: OUTSIDER }, body: { Operations: [{ op: 'replace', value: { active: true } }] } });
+        expect(again.body.active).toBe(true);
+        expect(rowFor(A, 'pat@outside.test')).toMatchObject({ status: SEAT_ACTIVE, isDelete: false });
+    });
 });
