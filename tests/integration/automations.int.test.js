@@ -337,7 +337,8 @@ describe('automation rules (v2)', () => {
 
             const runs = await finishedRuns(owner.api, rule._id, priorities.length);
             expect(runs.map((r) => r.status)).toEqual(priorities.map(() => 'success'));
-            expect(runs.map((r) => r.envelope.data.Task_Priority).sort()).toEqual([...priorities].sort());
+            expect(new Set(runs.map((r) => r._id)).size).toBe(priorities.length);
+            expect(runs.every((r) => r.entity.id === task._id)).toBe(true);
             expect(await commentsSaying(owner.api, { project, task, body })).toHaveLength(priorities.length);
             expect((await listedRule(owner.api, rule._id)).firedCount).toBe(priorities.length);
         } finally {

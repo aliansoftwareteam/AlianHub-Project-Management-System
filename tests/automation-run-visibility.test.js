@@ -147,7 +147,7 @@ describe('GET /api/v2/automations/:id/runs', () => {
             steps: [], startedAt: new Date(),
         });
         const [run] = (await listRuns(MEMBER)).body.data;
-        expect(run.entity).toEqual({ kind: 'schedule' });
+        expect(run.entity).toEqual({ kind: 'schedule', id: 'sched' });
         expect(run.envelope).toEqual({ scope: { projectId: null }, data: {} });
     });
 
