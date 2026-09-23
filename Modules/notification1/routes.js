@@ -5,6 +5,7 @@ const planHistory = require('../EstimatedTime/helpers/planHistory');
 const projectHistory = require('../Project/helpers/projectHistory');
 const projectItemHistory = require('../Project/helpers/projectItemHistory');
 const taskItemHistory = require('../Tasks/helpers/taskItemHistory');
+const filterHistory = require('../AdvancedGlobalFilter/helpers/filterHistory');
 
 const NOTIFICATION_TYPES = ['project', 'tasks', 'task', 'chat'];
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -15,6 +16,7 @@ const SERVER_BUILT_HISTORY = [
     ...projectHistory.SERVER_BUILT_HISTORY,
     ...projectItemHistory.SERVER_BUILT_HISTORY,
     ...taskItemHistory.SERVER_BUILT_HISTORY,
+    ...filterHistory.SERVER_BUILT_HISTORY,
 ];
 const SERVER_BUILT_NOTIFICATIONS = [planHistory.NOTIFICATION_KEY, ...projectHistory.SERVER_BUILT_NOTIFICATIONS];
 const keyOf = (body) => (isPlainObject(body) && isPlainObject(body.object) ? body.object.key : undefined);
