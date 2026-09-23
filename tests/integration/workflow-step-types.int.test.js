@@ -31,6 +31,7 @@ const stepTypes = require('../../Modules/Workflows/stepTypes');
 
 const COMPANY = crypto.randomBytes(12).toString('hex');
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const EVERY_TIMER_BUT_THE_DATE = ['hrtime', 'nextTick', 'performance', 'queueMicrotask', 'setImmediate', 'clearImmediate', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'];
 
 let client;
 const calls = [];
@@ -273,19 +274,30 @@ describe('a wait and a timer', () => {
     });
 
     it('fires at the moment a timer names, and not before', async () => {
-        const at = new Date(Date.now() + 250);
-        const run = await startRun([
-            { id: 'until', type: stepTypes.TIMER, dependsOn: [], config: { at: at.toISOString() } },
-            { id: 'after', type: 'probe', dependsOn: ['until'] },
-        ]);
+        // Only the clock the engine reads is held; the driver's timers stay real. A moment 250ms ahead of a
+        // wall clock can pass while a loaded machine is still creating the run.
+        jest.useFakeTimers({ doNotFake: EVERY_TIMER_BUT_THE_DATE });
+        try {
+            const at = new Date(Date.now() + 250);
+            const run = await startRun([
+                { id: 'until', type: stepTypes.TIMER, dependsOn: [], config: { at: at.toISOString() } },
+                { id: 'after', type: 'probe', dependsOn: ['until'] },
+            ]);
 
-        await engine.tick(COMPANY, run._id);
-        expect(calls).toEqual([]);
-        expect(new Date((await row(run._id, 'until')).waitUntil).toISOString()).toBe(at.toISOString());
+            await engine.tick(COMPANY, run._id);
+            expect(calls).toEqual([]);
+            expect(new Date((await row(run._id, 'until')).waitUntil).toISOString()).toBe(at.toISOString());
 
-        expect((await drive(run._id)).status).toBe('success');
-        expect(Date.now()).toBeGreaterThanOrEqual(at.getTime());
-        expect(calls).toEqual(['after']);
+            jest.setSystemTime(at.getTime() - 1);
+            await engine.tick(COMPANY, run._id);
+            expect(calls).toEqual([]);
+
+            jest.setSystemTime(at);
+            expect((await drive(run._id)).status).toBe('success');
+            expect(calls).toEqual(['after']);
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it('refuses a timer that names no moment', async () => {
