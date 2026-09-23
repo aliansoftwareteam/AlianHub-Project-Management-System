@@ -83,3 +83,20 @@ describe('a project custom field', () => {
         ].sort());
     });
 });
+
+describe('a project attachment', () => {
+    it('is recorded and notified from the stored file and project names', async () => {
+        await db().collection('projects').updateOne({ _id: new ObjectId(String(project._id)) }, { $set: { [`watchers.${owner.uid}`]: 'all_activity' } });
+        const record = { id: `a${uniqueSuffix()}`, filename: `brief ${uniqueSuffix()}.pdf`, url: `Project/${project._id}/ProjectAttachment/brief.pdf`, extension: 'pdf', size: 10, type: 'application/pdf', createdAt: new Date().toISOString(), userId: owner.uid };
+        const res = await owner.api.put(`/api/v1/project/${project._id}`, { updateObject: { attachments: record }, key: '$push' });
+        expect(res.status).toBe(200);
+
+        const ownerName = await nameOf(owner.uid);
+        const [row] = await rowsOf(() => historyOf('Project_Attachment'), 'the attachment row');
+        expect(row.Message).toBe(`<b>${ownerName}</b> has attached <b>${record.filename}</b> on <b>${project.ProjectName}</b>.`);
+        const removed = await owner.api.put(`/api/v1/project/${project._id}`, { updateObject: { attachments: { id: record.id } }, key: '$pull' });
+        expect(removed.status).toBe(200);
+        const rows = await waitFor(async () => { const found = await historyOf('Project_Attachment'); return found.length >= 2 ? found : null; }, 'the removal row');
+        expect(rows.map((found) => found.Message)).toContain(`<b>${ownerName}</b> has deleted <b>${record.filename}</b> on <b>${project.ProjectName}</b>.`);
+    });
+});

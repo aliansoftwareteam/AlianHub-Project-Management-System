@@ -316,9 +316,9 @@ describe('the generic routes leave project changes to the server', () => {
     });
 
     test('a task row under a project key and project rows the server does not build still go through', async () => {
-        await post('/api/v1/handleHistory', { ...historyBody('Project_Attachment') });
+        await post('/api/v1/handleHistory', { ...historyBody('Project_Filter') });
         await post('/api/v1/handleHistory', { ...historyBody('Project_Name') });
         await post('/api/v1/handleHistory', { ...historyBody('Project_Status'), type: 'task', taskId: '6f0000000000000000000b01' });
-        expect(historyRows().map((row) => row.Key)).toEqual(['Project_Attachment', 'Project_Name', 'Project_Status']);
+        expect(historyRows().map((row) => row.Key)).toEqual(['Project_Filter', 'Project_Name', 'Project_Status']);
     });
 });

@@ -112,6 +112,34 @@ describe('a project detail change is described on the server', () => {
     });
 });
 
+describe('a project attachment is described on the server', () => {
+    const { HandleBothNotification } = require('../Modules/Tasks/helpers/handleNotification');
+    const notices = () => HandleBothNotification.mock.calls.map(([args]) => args);
+
+    test('attaching names the stored file and project, and notifies with the web app wording', async () => {
+        await update({ updateObject: { attachments: { id: 'a1', filename: `spec ${HTML}.pdf`, url: 'Project/x/spec.pdf' } }, key: '$push' }, MEMBER);
+        expect(messages()).toEqual([['Project_Attachment', `<b>Max Member</b> has attached <b>spec ${ESCAPED}.pdf</b> on <b>Parity</b>.`]]);
+        expect(historyRows()[0].UserId).toBe(MEMBER);
+        expect(notices()).toHaveLength(1);
+        expect(notices()[0]).toMatchObject({ type: 'project', projectId: PROJECT, changeType: 'name', changeData: { url: `spec ${ESCAPED}.pdf`, ProjectName: 'Parity' } });
+        expect(notices()[0].object).toEqual({ key: 'attachments', message: `<p><strong>spec ${ESCAPED}.pdf</strong> attached on <strong>Parity</strong> project.</p>` });
+    });
+
+    test('removing names the stored file, whatever the request calls it', async () => {
+        mockDb.store[SCHEMA_TYPE.PROJECTS][0].attachments = [{ id: 'a1', filename: 'brief.docx' }];
+        await update({ updateObject: { attachments: { id: 'a1', filename: HTML } }, key: '$pull' });
+        expect(messages()).toEqual([['Project_Attachment', '<b>Olivia Owner</b> has deleted <b>brief.docx</b> on <b>Parity</b>.']]);
+        expect(notices()[0].object).toEqual({ key: 'attachments', message: '<p><strong>brief.docx</strong> removed on <strong>Parity</strong>.</p>' });
+        expect(notices()[0].changeData).toEqual({ removeFileName: 'brief.docx', ProjectName: 'Parity' });
+    });
+
+    test('removing a file the project does not hold is not described', async () => {
+        await update({ updateObject: { attachments: { id: 'zz' } }, key: '$pull' });
+        expect(messages()).toEqual([]);
+        expect(notices()).toEqual([]);
+    });
+});
+
 describe('a custom field definition is described on the server', () => {
     test('creating a project field names the new title for the signed-in user', async () => {
         const r = await fieldRoute('insertCustomField', {
@@ -135,7 +163,18 @@ describe('a custom field definition is described on the server', () => {
 });
 
 describe('the generic history route leaves these changes to the server', () => {
-    test.each(['Project_Source', 'Project_ProposalId', 'Project_Skills', 'Project_CustomField'])('a %s row sent by the web app is not stored', async (key) => {
+    test('an attachments notification sent by the web app is not sent', async () => {
+        const { HandleBothNotification } = require('../Modules/Tasks/helpers/handleNotification');
+        const r = await post('/api/v1/handleNotification', {
+            type: 'project', companyId: CID, projectId: PROJECT,
+            object: { key: 'attachments', message: `<p>${HTML}</p>` },
+            userData: { id: MEMBER, Employee_Name: 'Max Member', companyOwnerId: OWNER },
+        });
+        expect(r.body).toMatchObject({ status: true });
+        expect(HandleBothNotification).not.toHaveBeenCalled();
+    });
+
+    test.each(['Project_Source', 'Project_ProposalId', 'Project_Skills', 'Project_CustomField', 'Project_Attachment'])('a %s row sent by the web app is not stored', async (key) => {
         const r = await post('/api/v1/handleHistory', {
             type: 'project', companyId: CID, projectId: PROJECT, taskId: null,
             object: { key, message: `<b>${HTML}</b>` },

@@ -4,10 +4,11 @@ import path from 'path';
 
 const SRC = path.resolve(__dirname, '../../src');
 
-describe('project detail and custom field changes leave their history text to the server', () => {
+describe('project detail, attachment and custom field changes leave their history text to the server', () => {
     it.each([
         'components/organisms/ProjectDetailRightSide/ProjectDetailRightSide.vue',
         'components/molecules/TaskDetailTab/TaskDetailTab.vue',
+        'views/Projects/ProjectDetail/ProjectDetail.vue',
     ])('%s posts no history or notification text', (file) => {
         const source = fs.readFileSync(path.join(SRC, file), 'utf8');
         expect(source).not.toMatch(/HANDLE_HISTORY|HANDLE_NOTIFICATION/);
