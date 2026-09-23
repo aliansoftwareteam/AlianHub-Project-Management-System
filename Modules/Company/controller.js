@@ -630,6 +630,9 @@ exports.checkFreeCompanyCountsApi = (req,res) => {
                 statusText: "Bad request, userId is required."
             });
         }
+        if (String(userId) !== String(req.uid || '')) {
+            return res.json({ status: true, statusText: "Success", isFree: true, companies: [] });
+        }
         exports.checkFreeCompanyCounts(userId).then((result) => {
             res.json({
                 status: true,
