@@ -146,3 +146,43 @@ describe('GET /api/v1/wasabi/retriveUserProfile/:companyId/:path', () => {
         expect(headers['Cache-Control']).toMatch(/^private\b/);
     });
 });
+
+describe('verifyCompanyMembership', () => {
+    const { verifyCompanyMembership } = require('../Config/jwt');
+    const OTHER_COMPANY = '6f0000000000000000000c02';
+    let seats;
+    const membershipReads = () => MongoDbCrudOpration.mock.calls.map(([db, obj]) => `${db}/${obj.type}`);
+
+    beforeEach(() => {
+        seats = new Set();
+        MongoDbCrudOpration.mockImplementation(async (db, obj) => {
+            const filter = obj.data[0];
+            if (obj.type === dbCollections.USERS) return String(filter._id) === CALLER && filter.AssignCompany === COMPANY ? { _id: CALLER } : null;
+            if (obj.type === dbCollections.COMPANY_USERS) return seats.has(`${db}:${filter.userId}`) && filter.status === 2 ? { _id: 'seat' } : null;
+            return null;
+        });
+    });
+
+    it('needs an active seat as well as the listed company', async () => {
+        expect(await verifyCompanyMembership(CALLER, COMPANY)).toBe(false);
+        myCache.flushAll();
+        seats.add(`${COMPANY}:${CALLER}`);
+        expect(await verifyCompanyMembership(CALLER, COMPANY)).toBe(true);
+    });
+
+    it('reads nothing more once the answer is cached', async () => {
+        seats.add(`${COMPANY}:${CALLER}`);
+        await verifyCompanyMembership(CALLER, COMPANY);
+        const first = membershipReads().length;
+        await verifyCompanyMembership(CALLER, COMPANY);
+        await verifyCompanyMembership(CALLER, COMPANY);
+
+        expect(first).toBe(2);
+        expect(membershipReads()).toHaveLength(first);
+    });
+
+    it('opens no company database for a company the account does not list', async () => {
+        expect(await verifyCompanyMembership(CALLER, OTHER_COMPANY)).toBe(false);
+        expect(membershipReads()).toEqual([`global/${dbCollections.USERS}`]);
+    });
+});

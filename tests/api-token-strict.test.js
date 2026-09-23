@@ -114,6 +114,7 @@ beforeEach(() => {
     mockDb.calls.length = 0;
     strict(false);
     mockDb.seed('users', { _id: USER_ID, AssignCompany: COMPANY });
+    mockDb.seed('company_users', { userId: USER_ID, status: 2, isDelete: false });
     boot();
 });
 

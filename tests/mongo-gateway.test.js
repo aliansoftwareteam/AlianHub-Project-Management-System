@@ -27,13 +27,15 @@ const loggedTimeBody = (overrides = {}) => ({
     ...overrides,
 });
 
-const gatewayCalls = () => mockDb.calls.filter((call) => call.type !== dbCollections.SESSIONS && call.type !== dbCollections.USERS);
+const MEMBERSHIP_READS = [dbCollections.SESSIONS, dbCollections.USERS, dbCollections.COMPANY_USERS];
+const gatewayCalls = () => mockDb.calls.filter((call) => !MEMBERSHIP_READS.includes(call.type));
 
 const resetStore = () => {
     myCache.flushAll();
     mockDb.calls.length = 0;
     Object.keys(mockDb.store).forEach((type) => { delete mockDb.store[type]; });
     mockDb.seed(dbCollections.USERS, { _id: USER, AssignCompany: COMPANY });
+    mockDb.seed(dbCollections.COMPANY_USERS, { userId: USER, status: 2, isDelete: false });
     mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-1', LogTimeDuration: 30 });
     mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-1', LogTimeDuration: 15 });
     mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-2', LogTimeDuration: 99 });
