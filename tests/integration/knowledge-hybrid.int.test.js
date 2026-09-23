@@ -100,6 +100,7 @@ describe('hybrid retrieval with embeddings from the instance key', () => {
     it('embeds a page as it is indexed, answers a question from it, and books the query embedding once per question to the asker', async () => {
         const member = await loginAs('member');
         const word = token();
+        const since = new Date();
         const pageId = await createLongPage(owner, { word, visibility: 'project', projectId: state.projects.shared._id });
 
         const chunks = await poll(async () => {
@@ -108,7 +109,7 @@ describe('hybrid retrieval with embeddings from the instance key', () => {
         });
         expect(chunks).toBeTruthy();
         expect(chunks.some((c) => c.text.includes(word))).toBe(true);
-        expect(await embedRows({ userId: null })).not.toHaveLength(0);
+        expect(await embedRows({ userId: null, at: { $gte: since } })).not.toHaveLength(0);
 
         const before = (await embedRows({ userId: member.uid })).length;
         expect(await found(member, word, pageId)).toBe(true);
