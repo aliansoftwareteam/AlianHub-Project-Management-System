@@ -61,7 +61,7 @@ const totals = ref({ total: 0, atRisk: 0, missed: 0 });
 const loading = ref(false);
 const error = ref('');
 
-const headline = computed(() => t('Reports.milestones_head', {
+const headline = computed(() => t('Reports.milestones_summary', {
     total: totals.value.total || 0,
     risk: totals.value.atRisk || 0,
     missed: totals.value.missed || 0,

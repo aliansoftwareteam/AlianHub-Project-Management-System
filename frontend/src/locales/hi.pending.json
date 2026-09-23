@@ -5404,7 +5404,7 @@
     "Reports.milestones_empty_body": "A milestone appears here once it has a due or end date to be judged on.",
     "Reports.milestones_empty_title": "No dated milestones yet",
     "Reports.milestones_footnote": "Slip is measured against the first date recorded for the milestone. Every change is in the activity log with who moved it.",
-    "Reports.milestones_head": "{total} · {risk} at risk · {missed} missed",
+    "Reports.milestones_summary": "{total} dated · {risk} at risk · {missed} missed",
     "Reports.milestones_title": "Milestones",
     "Reports.missed": "missed",
     "Reports.monthly": "Monthly",

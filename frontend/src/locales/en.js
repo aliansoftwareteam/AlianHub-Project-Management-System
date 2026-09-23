@@ -2609,7 +2609,7 @@ export default {
         band_todo: "to do",
 
         milestones_title: "Milestones",
-        milestones_head: "{total} · {risk} at risk · {missed} missed",
+        milestones_summary: "{total} dated · {risk} at risk · {missed} missed",
         col_milestone: "Milestone",
         col_baseline: "Baseline",
         col_now: "Now",

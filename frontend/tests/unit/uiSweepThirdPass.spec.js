@@ -161,6 +161,15 @@ describe('Settings → General company phone', () => {
     });
 });
 
+describe('Milestones report headline', () => {
+    test('labels the first count', async () => {
+        const en = (await import('../../src/locales/en.js')).default;
+        expect(en.Reports.milestones_summary).toBe('{total} dated · {risk} at risk · {missed} missed');
+        expect(en.Reports.milestones_head).toBeUndefined();
+        expect(read('views/Projects/Reports/MilestonesReportPage.vue')).toMatch(/t\('Reports\.milestones_summary'/);
+    });
+});
+
 describe('Docs hub', () => {
     const vue = read('views/Pages/PagesSpace.vue');
     const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));
