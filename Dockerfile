@@ -41,6 +41,7 @@ COPY package.json /app/package.json
 COPY Modules/Pages/helpers/pageContent.js /app/Modules/Pages/helpers/pageContent.js
 COPY Modules/Agents/workKinds.js /app/Modules/Agents/workKinds.js
 COPY Modules/Agents/engine/egressRules.js /app/Modules/Agents/engine/egressRules.js
+COPY Modules/Agents/dailyRunLimit.js /app/Modules/Agents/dailyRunLimit.js
 
 # Build the SPA bundle. webpack needs more than Node's default ~2 GB heap for
 # this bundle (same setting as ci.yml).
