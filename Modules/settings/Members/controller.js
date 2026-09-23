@@ -429,7 +429,7 @@ exports.rootUpdateMember = async (req, res) => {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [
                 { _id: new mongoose.Types.ObjectId(id) },
-                { $set: accepted },
+                { $set: { ...accepted, linkId: '' } },
                 { returnDocument: 'after' }
             ]
         }, 'findOneAndUpdate');
