@@ -349,6 +349,13 @@ exports.taskStartDateChange = (obj) => {
     return `<p>In <strong>${escapeText(obj.ProjectName)}</strong> Project, Start Date of <strong>${escapeText(obj.TaskName)}</strong> is changed from <strong><span style="background-color: rgb(236 238 255);color: #2F3990;border-radius: 5px;padding-right: 5px;padding-left: 5px;">${shown(obj.formetedStartDate)}</span></strong> to <strong><span style="background-color: rgb(236 238 255);color: #2F3990;border-radius: 5px;padding-right: 5px;padding-left: 5px;">${shown(obj.newDate)}</span></strong>.</p>`;
 }
 
+const datePill = (date) => `<strong><span style="background-color: rgb(236 238 255);color: #2F3990;border-radius: 5px;padding-right: 5px;padding-left: 5px;">${shown(date)}</span></strong>`;
+const dateMove = (previous, next) => (previous ? `is changed from ${datePill(previous)} to ${datePill(next)}` : `is added as ${datePill(next)}`);
+
+exports.taskStartAndDueDateChange = (obj) => {
+    return `<p>In <strong>${escapeText(obj.ProjectName)}</strong> Project, Start Date of <strong>${escapeText(obj.TaskName)}</strong> ${dateMove(obj.previousStartDate, obj.startDate)} and Due Date ${dateMove(obj.previousDueDate, obj.dueDate)}.</p>`;
+}
+
 // For Task End Date Add //
 exports.taskEndDateAdd = (obj) => {
     return `<p>In <strong>${escapeText(obj.ProjectName)}</strong> Project, End Date of <strong>${escapeText(obj.TaskName)}</strong> is added as <strong><span style="background-color: rgb(236 238 255);color: #2F3990;border-radius: 5px;padding-right: 5px;padding-left: 5px;">${shown(obj.formatedDate)}</span></strong>.</p>`;
