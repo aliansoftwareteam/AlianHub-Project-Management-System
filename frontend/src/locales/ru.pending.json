@@ -1,7 +1,6 @@
 {
   "locale": "ru",
   "machineTranslated": false,
-  "updatedAt": "2026-09-23T16:23:41.349Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -877,6 +876,8 @@
     "AiLanding.read_join": ", ",
     "AiLanding.read_line": "{n} open tasks you can see — {parts}.",
     "AiLanding.read_line_capped": "Your {n} most recently updated open tasks — {parts}.",
+    "AiLanding.read_line_capped_plain": "Your {n} most recently updated open tasks.",
+    "AiLanding.read_line_plain": "{n} open tasks you can see.",
     "AiLanding.read_part": "{n} {work}",
     "AiLanding.read_sub": "Classified the way the router classifies them: a scoped query and a set of rules. No model was called to draw this.",
     "AiLanding.rest_line": "{n} more {work}, so no agent is offered for them. Give one a brief and it joins the work above.",

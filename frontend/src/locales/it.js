@@ -3306,6 +3306,8 @@ export default {
         "no_model_note": "Asking needs a connected model. The read below still holds — it is a query, not a guess.",
         "read_line": "{n} open tasks you can see — {parts}.",
         "read_line_capped": "Your {n} most recently updated open tasks — {parts}.",
+        "read_line_plain": "{n} open tasks you can see.",
+        "read_line_capped_plain": "Your {n} most recently updated open tasks.",
         "read_part": "{n} {work}",
         "read_join": ", ",
         "read_sub": "Classified the way the router classifies them: a scoped query and a set of rules. No model was called to draw this.",

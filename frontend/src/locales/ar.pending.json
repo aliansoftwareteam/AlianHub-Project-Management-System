@@ -1,7 +1,6 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-23T16:23:41.045Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_available_on_paid_plans_upgrade_now": "AI is only available for purchase on our paid plans. Upgrade and add AI now!",
@@ -911,6 +910,8 @@
     "AiLanding.read_join": ", ",
     "AiLanding.read_line": "{n} open tasks you can see — {parts}.",
     "AiLanding.read_line_capped": "Your {n} most recently updated open tasks — {parts}.",
+    "AiLanding.read_line_capped_plain": "Your {n} most recently updated open tasks.",
+    "AiLanding.read_line_plain": "{n} open tasks you can see.",
     "AiLanding.read_part": "{n} {work}",
     "AiLanding.read_sub": "Classified the way the router classifies them: a scoped query and a set of rules. No model was called to draw this.",
     "AiLanding.rest_line": "{n} more {work}, so no agent is offered for them. Give one a brief and it joins the work above.",
