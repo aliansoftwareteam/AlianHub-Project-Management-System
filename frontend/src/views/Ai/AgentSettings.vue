@@ -131,7 +131,7 @@
                                 <div class="ai-audit__row">
                                     <span class="ah-mono ai-audit__at">{{ time(run.startedAt) }}</span>
                                     <span class="ai-audit__what">{{ run.skill || run.trigger || $t('Ai.run') }}</span>
-                                    <span class="ah-chip" :class="runChip(run)">{{ run.status }}</span>
+                                    <span class="ah-chip" :class="runChip(run)" data-test="run-status">{{ runStatus(run) }}</span>
                                     <span v-if="run.revertedAt" class="ah-chip ah-chip--dark">{{ $t('Ai.reverted_chip') }}</span>
                                     <span v-if="refusalCount(run)" class="ah-chip ah-chip--warn">{{ $t('Ai.refused_n', { n: refusalCount(run) }) }}</span>
                                     <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="toggleRun(run._id)">{{ expandedRun === run._id ? $t('Ai.hide_details') : $t('Ai.run_details') }}</button>
@@ -188,7 +188,7 @@ import * as env from "@/config/env";
 
 defineOptions({ name: "AgentSettingsPage" });
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const $toast = useToast();
 const route = useRoute();
 const router = useRouter();
@@ -236,6 +236,7 @@ const allowedKeys = computed(() => {
 const preview = computed(() => splitPreview(allowedKeys.value, registryManifest.value.actions));
 
 const time = (at) => (at ? moment(at).format("HH:mm") : "");
+const runStatus = (run) => (te(`Ai.run_status_${run.status}`) ? t(`Ai.run_status_${run.status}`) : run.status);
 const runChip = (run) => (run.status === "failed" ? "ah-chip--danger" : run.status === "running" ? "ah-chip--brand" : run.status === "skipped" ? "ah-chip--warn" : "ah-chip--ok");
 const toggleRun = (id) => { expandedRun.value = expandedRun.value === id ? "" : id; };
 

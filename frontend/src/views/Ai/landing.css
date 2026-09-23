@@ -1,7 +1,7 @@
 /* The AI section's landing: one composer, and the open backlog read back as
    work that can be started. Tokens only — tokens.css is the source of truth. */
 
-.land { display: flex; justify-content: center; width: 100%; }
+.land { display: flex; justify-content: center; width: 100%; box-sizing: border-box; }
 .land__col { width: 100%; max-width: 880px; display: flex; flex-direction: column; gap: var(--sp-7); }
 
 .land__hero { display: flex; flex-direction: column; align-items: center; gap: var(--sp-4); text-align: center; padding-top: var(--sp-6); }

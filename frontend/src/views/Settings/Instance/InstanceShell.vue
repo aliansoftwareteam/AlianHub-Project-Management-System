@@ -59,6 +59,8 @@ watch(() => route.name, revealActiveTab);
 .in__tabs .ah-tab { text-decoration: none; flex: none; display: inline-flex; align-items: center; white-space: nowrap; }
 .in .ah-toolbar > .ah-btn { flex: none; }
 .in__body { flex: 1; min-height: 0; overflow: auto; padding: 16px 20px 32px; display: flex; flex-direction: column; gap: 16px; }
+/* Each tab renders one root element, so the body's gap never reaches the cards inside it. */
+.in__body > * { display: flex; flex-direction: column; gap: 16px; }
 .in-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .in-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
 .in-card__head { display: flex; align-items: center; gap: 8px; }

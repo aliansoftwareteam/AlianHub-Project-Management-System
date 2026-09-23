@@ -61,4 +61,7 @@ const skillReach = (skills = [], tasks = []) => (Array.isArray(skills) ? skills 
     };
 });
 
-module.exports = { backlogRead, skillReach, KIND_ORDER };
+/* With every task unshaped there is nothing to list after the dash, so the line stops at the count. */
+const readLineKey = ({ capped = false, hasParts = true } = {}) => `AiLanding.read_line${capped ? '_capped' : ''}${hasParts ? '' : '_plain'}`;
+
+module.exports = { backlogRead, skillReach, readLineKey, KIND_ORDER };

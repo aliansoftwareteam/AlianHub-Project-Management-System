@@ -13,23 +13,27 @@
             <template v-else>
                 <p class="ah-small" data-test="csp-total">{{ $t('ContentSecurity.total', { n: summary.total, days: summary.days }) }}</p>
                 <div class="cs-tables">
-                    <table class="in-table">
-                        <thead><tr><th>{{ $t('ContentSecurity.col_source') }}</th><th>{{ $t('ContentSecurity.col_directive') }}</th><th>{{ $t('ContentSecurity.col_reports') }}</th><th>{{ $t('ContentSecurity.col_last_seen') }}</th></tr></thead>
-                        <tbody>
-                            <tr v-for="row in summary.hosts" :key="`${row.blockedHost} ${row.directive}`" data-test="csp-host-row">
-                                <td class="ah-mono">{{ row.blockedHost }}</td>
-                                <td class="ah-mono">{{ row.directive }}</td>
-                                <td>{{ row.count }}</td>
-                                <td>{{ formatWhen(row.lastSeen) }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <table class="in-table">
-                        <thead><tr><th>{{ $t('ContentSecurity.col_directive') }}</th><th>{{ $t('ContentSecurity.col_reports') }}</th></tr></thead>
-                        <tbody>
-                            <tr v-for="row in summary.directives" :key="row.directive" data-test="csp-directive-row"><td class="ah-mono">{{ row.directive }}</td><td>{{ row.count }}</td></tr>
-                        </tbody>
-                    </table>
+                    <div class="cs-scroll">
+                        <table class="in-table">
+                            <thead><tr><th>{{ $t('ContentSecurity.col_source') }}</th><th>{{ $t('ContentSecurity.col_directive') }}</th><th>{{ $t('ContentSecurity.col_reports') }}</th><th>{{ $t('ContentSecurity.col_last_seen') }}</th></tr></thead>
+                            <tbody>
+                                <tr v-for="row in summary.hosts" :key="`${row.blockedHost} ${row.directive}`" data-test="csp-host-row">
+                                    <td class="ah-mono">{{ row.blockedHost }}</td>
+                                    <td class="ah-mono">{{ row.directive }}</td>
+                                    <td>{{ row.count }}</td>
+                                    <td>{{ formatWhen(row.lastSeen) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="cs-scroll">
+                        <table class="in-table">
+                            <thead><tr><th>{{ $t('ContentSecurity.col_directive') }}</th><th>{{ $t('ContentSecurity.col_reports') }}</th></tr></thead>
+                            <tbody>
+                                <tr v-for="row in summary.directives" :key="row.directive" data-test="csp-directive-row"><td class="ah-mono">{{ row.directive }}</td><td>{{ row.count }}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
                 <p class="ah-small">{{ $t('ContentSecurity.rollout') }} <code class="ah-mono">{{ EXTRA_KEY }}</code></p>
             </template>
@@ -68,6 +72,7 @@ onMounted(async () => {
 
 <style scoped>
 .cs-tables { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.cs-scroll { min-width: 0; overflow-x: auto; }
 .cs-policy summary { cursor: pointer; }
 .cs-policy .in-pre { margin-top: 8px; }
 @media (max-width: 900px) { .cs-tables { grid-template-columns: 1fr; } }

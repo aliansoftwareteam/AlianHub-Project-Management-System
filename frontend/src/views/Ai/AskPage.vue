@@ -264,7 +264,7 @@ import { useAgents, reasonOf, autonomyOf } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
 import { routeTasks, routingTotals } from "./agentFit";
 import { refusalText } from "./fitText";
-import { backlogRead, skillReach } from "./backlogRead";
+import { backlogRead, readLineKey, skillReach } from "./backlogRead";
 import { messageKey } from "./askWhy";
 
 defineOptions({ name: "AskPage" });
@@ -321,7 +321,7 @@ const capped = computed(() => read.value.total >= BACKLOG_LIMIT);
 const readLine = computed(() => {
     const parts = read.value.groups.map((g) => t("AiLanding.read_part", { n: g.tasks.length, work: t(`AiLanding.kind_${g.labelKey}`) }));
     if (read.value.needsPerson) parts.push(t("AiLanding.read_part", { n: read.value.needsPerson, work: t("AiLanding.kind_person") }));
-    return t(capped.value ? "AiLanding.read_line_capped" : "AiLanding.read_line", { n: read.value.total, parts: parts.join(t("AiLanding.read_join")) });
+    return t(readLineKey({ capped: capped.value, hasParts: parts.length > 0 }), { n: read.value.total, parts: parts.join(t("AiLanding.read_join")) });
 });
 
 const restLine = computed(() => t("AiLanding.rest_line", { n: read.value.unshaped, work: t("AiLanding.kind_general") }));
