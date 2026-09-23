@@ -110,7 +110,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); });
 });
 
 beforeEach(() => {

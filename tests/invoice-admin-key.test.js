@@ -25,7 +25,7 @@ beforeAll(async () => {
 afterAll(async () => {
     if (previousKey === undefined) delete process.env.INSTANCE_ADMIN_KEY;
     else process.env.INSTANCE_ADMIN_KEY = previousKey;
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); });
 });
 
 const find = (headers) => fetch(`${baseURL}/api/v1/invoice/find`, {
