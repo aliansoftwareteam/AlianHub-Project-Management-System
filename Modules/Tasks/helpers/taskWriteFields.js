@@ -141,7 +141,7 @@ const CREATE = spec({
 const TASK_ACTION_FIELDS = Object.freeze({
     create: CREATE,
     createSubTaskWithAi: spec({ params: ['companyId', 'userId', 'subTitles', 'sprintObj', 'projectData', 'userData', 'parentTask', 'type'], owns: PLACEMENT_FIELDS, company: [...companyId, ...projectCompany], ids: [['parentTask', 'id'], ['parentTask', 'ProjectID']] }),
-    createMultipleTasks: spec({ params: ['tasks', 'userData', 'projectData', 'indexObj', 'statusArray', 'sprint', 'eventId'], owns: PLACEMENT_FIELDS, company: projectCompany, fieldNames: [['indexObj', 'indexName']], ids: PROJECT_DATA, objects: [['indexObj']] }),
+    createMultipleTasks: spec({ params: ['tasks', 'userData', 'projectData', 'indexObj', 'statusArray', 'sprint', 'eventId'], owns: PLACEMENT_FIELDS, company: projectCompany, fieldNames: [['indexObj', 'indexName']], ids: PROJECT_DATA, objects: [['indexObj']], attachments: 'imported' }),
 
     updateStatus: spec({ params: ['newStatus', 'prevStatus', 'projectData', 'task', 'isUpdateTask', ...HISTORY_USER], writes: { newStatus: STATUS_FIELDS }, company: projectCompany, ids: [...TASK, ['prevStatus', 'taskId']], task: TASK[0], project: PROJECT_DATA, taskIds: [...TASK, ['prevStatus', 'taskId']], taskNames: [['prevStatus', 'taskName']], held: holdsField(['newStatus', 'statusKey'], 'statusKey') }),
     updatePriority: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'priorityObj', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['Task_Priority', 'Updated_At'] }, company: projectCompany, ids: [...TASK_DATA, ['priorityObj', 'taskId']], task: TASK_DATA[0], project: PROJECT_DATA, taskIds: [...TASK_DATA, ['priorityObj', 'taskId']], taskNames: [['priorityObj', 'taskName']], held: holdsField(['firebaseObj', 'Task_Priority'], 'Task_Priority') }),
@@ -425,11 +425,16 @@ const visibleTaskOf = async (req, company, taskId) => {
     return stored;
 };
 
-/* A new task has no id yet and its body's origin is the client's word, so only its placement counts. */
+/* A new or imported task has no id yet and its body's origin is the client's word, so only its placement counts. */
 const attachmentsWritten = (taskSpec, { payload, task }) => {
     if (taskSpec.attachments === 'created') {
         const data = payload.data || {};
         return { task: { ProjectID: data.ProjectID, sprintId: data.sprintId }, actor: payload.user, records: Array.isArray(data.attachments) ? data.attachments : [] };
+    }
+    if (taskSpec.attachments === 'imported') {
+        const rows = Array.isArray(payload.tasks) ? payload.tasks : [];
+        const records = rows.flatMap((row) => (isPlainObject(row) && Array.isArray(row.attachments) ? row.attachments : []));
+        return { task: { ProjectID: valueAt(payload, ['projectData', '_id']), sprintId: valueAt(payload, ['sprint', 'id']) }, actor: payload.userData, records };
     }
     if (taskSpec.attachments === 'added' && payload.operation === 'add') {
         return { task, actor: payload.userData, records: [payload.data] };
