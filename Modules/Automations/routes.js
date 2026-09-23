@@ -12,6 +12,7 @@ exports.init = (app) => {
     app.put('/api/v2/automations/:id', ctrl.updateRuleV2);
     app.patch('/api/v2/automations/:id/enabled', ctrl.setRuleEnabled);
     app.get('/api/v2/automations/:id/runs', ctrl.listRuns);
+    app.post('/api/v2/automations/:id/dry-run', ctrl.dryRun);
     app.delete('/api/v2/automations/:id', ctrl.deleteRule);
 
     app.post('/api/v1/automations/preview', ctrl.preview);

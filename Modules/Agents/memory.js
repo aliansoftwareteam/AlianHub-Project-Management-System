@@ -5,7 +5,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const { COVERAGE_POINT_LABELS } = require('../AIProjectGenerator/promptBuilder');
-const { hasInstruction } = require('../AICore/instructionGuard');
+const { hasInstruction, fresh: freshGuard } = require('../AICore/instructionGuard');
 const knowledgeMemory = require('../Knowledge/memory/publish');
 
 // What the workspace already decided and what each person prefers, on the
@@ -448,6 +448,7 @@ async function fromBrief({ companyId, projectId, projectName, approvedBrief, ass
     const written = [];
     try {
         if (!companyId || !projectId) return written;
+        await freshGuard();
         const items = [];
         const sections = sectionsOf(approvedBrief);
         for (const [point, kind] of BRIEF_SECTIONS) {
@@ -507,6 +508,7 @@ async function rememberApprovedChanges({ companyId, projectId, proposal, applied
             const title = (await taskTitle(companyId, p.taskId)) || subtaskLabels[0];
             texts.push(`Approved ${subtaskLabels.length} subtask${subtaskLabels.length === 1 ? '' : 's'} under "${title}"`);
         }
+        if (texts.length) await freshGuard();
         for (const text of texts) {
             if (skipInstruction(`rememberApprovedChanges ${projectId}`, text)) continue;
             // eslint-disable-next-line no-await-in-loop
@@ -723,6 +725,7 @@ async function rememberForAgent({ companyId, runId, text, derivedFrom }) {
     const clean = sanitise(text);
     if (!clean) throw invalid('text is required');
     const refs = refsOf(derivedFrom);
+    await freshGuard();
     if (skipInstruction(`rememberForAgent ${run.agentId}`, clean)) return null;
     const external = refs.filter((ref) => ref.external);
     const tainted = run.tainted || external.length > 0;

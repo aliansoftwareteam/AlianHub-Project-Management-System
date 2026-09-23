@@ -4,6 +4,9 @@
     background: var(--canvas);
     font: var(--text-small);
 }
+/* Chat.vue's root is also ".ah-page.cv", which tokens.css turns into a row for its sidebar.
+   The calendar stacks its bar over its body, so it restates the column with the same classes. */
+.ah-page.cv { flex-direction: column; }
 
 .cv__bar {
     height: 40px;
