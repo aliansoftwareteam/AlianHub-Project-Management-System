@@ -127,12 +127,29 @@ const liveFor = async (companyId, agent) => {
     return createRevision(companyId, a._id, { snapshot: snapshotOf(a), state: STATE.LIVE, createdBy: a.ownerId || null, source: SOURCE.BOOTSTRAP });
 };
 
+/* A flag can swap a code skill for its built-in seed under the same key (pr.summary with
+ * PR_SUMMARY_AS_DATA), so the code file's hash would name a skill that did not run. */
+const seedRefOf = (key) => {
+    // eslint-disable-next-line global-require
+    const live = require('./skills').getSkill(key);
+    if (!live || live.kind !== 'generic') return null;
+    // eslint-disable-next-line global-require
+    const { SEEDS, documentOf } = require('./skills/seeds');
+    const seed = Object.values(SEEDS).find((s) => s.key === live.key);
+    if (!seed) return null;
+    return { key: String(key), hash: crypto.createHash('sha256').update(JSON.stringify(documentOf(seed))).digest('hex').slice(0, 16), n: null };
+};
+
 const pinnedSkillRef = async (companyId, key) => {
     try {
         // eslint-disable-next-line global-require
         const skill = await require('./skillRecord').getSkill(companyId, key);
         if (skill && skill.source === 'data') return { key: String(key), hash: null, n: Number(skill.version) };
     } catch (e) { logger.error(`[agent-revisions] skill ${key} not resolved: ${e.message}`); }
+    try {
+        const seed = seedRefOf(key);
+        if (seed) return seed;
+    } catch (e) { logger.error(`[agent-revisions] seed ${key} not hashed: ${e.message}`); }
     return skillRefOf(key);
 };
 
