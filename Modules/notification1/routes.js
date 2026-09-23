@@ -14,7 +14,11 @@ function notificationBodyError(body) {
     return '';
 }
 
+const { notificationAsSessionUser } = require('./sessionActor');
+
 exports.init = (app) => {
+    app.post('/api/v1/handleNotification', notificationAsSessionUser);
+
     /**
      * @swagger
     *  components:
