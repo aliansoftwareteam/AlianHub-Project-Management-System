@@ -8,6 +8,7 @@ const { updateRemainingTime } = require("../LogTime/controllerV2/helpers");
 const { resolveSheetScope, SHEET_PERMISSION, scopedEstimateMatch } = require("../TimeSheet/helpers/timeScope");
 const { scopeEstimatePipeline, TimesheetQueryRefused } = require("../TimeSheet/helpers/timesheetQueryScope");
 const { buildEstimateWrite, EstimateWriteRefused } = require("./helpers/estimateWriteScope");
+const { previousPlanOf, recordPlanChange } = require("./helpers/planHistory");
 
 /* The same grant that decides who may plan another person's time decides who may read it. */
 const ESTIMATE_SCOPE_PERMISSIONS = [SHEET_PERMISSION.workload, SHEET_PERMISSION.project];
@@ -58,6 +59,7 @@ exports.updateEstimatedTime = async(req,res) => {
             return res.status(error.statusCode).json({ status: false, statusText: error.statusCode === 403 ? "Forbidden" : "Bad Request", message: error.message });
         }
 
+        const previous = await previousPlanOf(companyId, write.data[0]).catch(() => null);
         const mongoObj = {
             type: SCHEMA_TYPE.ESTIMATES_TIME,
             data: write.data
@@ -72,6 +74,8 @@ exports.updateEstimatedTime = async(req,res) => {
             // the (already persisted) planning row.
             Promise.resolve(updateRemainingTime(companyId, estimatedTime.TaskId))
                 .catch((error) => loggerConfig.error(`updateRemainingTime after planning save failed: ${error.message || error}`));
+            recordPlanChange({ companyId, actorId: req.uid, previous, saved: estimatedTime, timeZone: req.body.timeZone })
+                .catch((error) => loggerConfig.error(`planning history after save failed: ${error.message || error}`));
         }
         return res.status(200).json(estimatedTime);
     } catch (error) {
