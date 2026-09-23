@@ -154,8 +154,8 @@ describe('Custom report grouped by status', () => {
 describe('Settings → General company phone', () => {
     const vue = read('components/molecules/Setting/SettingCompanyDetails.vue');
 
-    test('a company with no phone opens without a validation error', () => {
-        expect(vue).toMatch(/number === "undefined" \|\| number === "null"\) \{\s*phoneError\.value = '';/);
+    test('a company with no phone, or the wizard\'s "N/A", opens without a validation error', () => {
+        expect(vue).toMatch(/\["", "undefined", "null", "N\/A"\]\.includes\(number\)\) \{\s*phoneError\.value = '';/);
     });
 
     test('the error goes through i18n', async () => {

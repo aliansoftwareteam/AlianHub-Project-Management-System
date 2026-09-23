@@ -447,8 +447,9 @@ const SaveChangeToDb = async () => {
 }
 
 function phoneValidation (number) {
-    // Callers pass String(value), so a company with no phone arrives as "undefined".
-    if (number === "" || number === "undefined" || number === "null") {
+    // The setup wizard stores "N/A" (the schema requires a phone), and callers pass
+    // String(value), so a missing number arrives as "undefined".
+    if (["", "undefined", "null", "N/A"].includes(number)) {
         phoneError.value = '';
         return;
     }
