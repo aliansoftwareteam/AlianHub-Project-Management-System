@@ -266,12 +266,13 @@ describe('verify for 004-task-type-icons', () => {
         async forEachCompany(fn) { await fn('c1'); return 1; },
     });
 
-    it('passes when every type carries an icon and a unique integer key and every task points at its key', async () => {
+    it('passes when every type shows an icon and has a unique integer key and every task points at its key', async () => {
+        const uploaded = { key: 3, value: 'task', name: 'Task', iconType: 'upload', iconValue: '', iconColor: null, taskImage: 'setting/task_type/task.png' };
         const rows = {
-            projects: [{ _id: 'p1', ProjectName: 'Acme client work', taskTypeCounts: [icon(1, 'bug'), icon(2, 'story')] }],
+            projects: [{ _id: 'p1', ProjectName: 'Acme client work', taskTypeCounts: [icon(1, 'bug'), icon(2, 'story'), uploaded] }],
             tasks: [{ ProjectID: 'p1', TaskType: 'bug', TaskTypeKey: 1 }],
-            settings: { settings: [icon(1, 'bug')] },
-            templates: [{ _id: 'tpl1', taskTypes: [icon(1, 'bug')] }],
+            settings: { settings: [icon(1, 'bug'), { key: 2, value: 'task', taskImage: 'setting/task_type/task.png' }] },
+            templates: [{ _id: 'tpl1', taskTypes: [icon(1, 'bug'), { key: 2, value: 'task', taskImage: 'setting/task_type/task.png' }] }],
         };
         expect(await verifyTaskTypeIcons(ctxFor(rows), 'c1')).toEqual([]);
         expect(await taskTypeIconsMigration.verify(ctxFor(rows))).toEqual([]);

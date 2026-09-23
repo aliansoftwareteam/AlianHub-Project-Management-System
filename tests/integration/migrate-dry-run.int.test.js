@@ -10,7 +10,7 @@ const { readState } = require('../../e2e/support/fixtures');
 const ROOT = path.resolve(__dirname, '..', '..');
 const state = readState();
 const SWEEP_INDEX = 'sourceType_1_extractDueAt_1';
-const ICON_FIELDS = ['iconType', 'iconValue', 'iconColor'];
+const ICON_FIELDS = ['iconType', 'iconValue', 'iconColor', 'taskImage'];
 
 let client;
 let company;
