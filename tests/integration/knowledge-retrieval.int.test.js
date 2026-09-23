@@ -463,4 +463,27 @@ describe('agent memory in the knowledge store', () => {
         expect(await recall(own, word)).toEqual([note.memoryId]);
         expect(await recall(other, word)).toEqual([]);
     });
+
+    it("keeps another starter's sighting of the same note as its own row in the store, and shows the text once", async () => {
+        const word = token();
+        const text = `The pilot code is ${word}.`;
+        const sight = async (startedBy) => {
+            const run = { _id: new ObjectId(), agentId: String(own), startedBy, projectId: String(state.projects.shared._id), status: 'running' };
+            await tenant.collection('agent_runs').insertOne(run);
+            runIds.push(run._id);
+            return modules.memory.rememberForAgent({ companyId: state.companyId, runId: String(run._id), text });
+        };
+        const secondStarter = String(new ObjectId());
+        const first = await sight(owner.uid);
+        const second = await sight(secondStarter);
+        const again = await sight(owner.uid);
+        await modules.events.drain();
+        await modules.backfill.backfill(state.companyId);
+
+        expect(second.memoryId).not.toBe(first.memoryId);
+        expect(again).toMatchObject({ memoryId: first.memoryId, occurrences: 2 });
+        expect(await modules.memory.readAgentNote({ companyId: state.companyId, memoryId: first.memoryId })).toMatchObject({ source: { userId: owner.uid } });
+        expect(await modules.memory.readAgentNote({ companyId: state.companyId, memoryId: second.memoryId })).toMatchObject({ source: { userId: secondStarter } });
+        expect(await recall(own, word)).toHaveLength(1);
+    });
 });
