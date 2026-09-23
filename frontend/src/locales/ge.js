@@ -1317,6 +1317,7 @@ export default {
         "leave_overlap": "{names} also off in this window.",
         "agent_section": "Agent proposals",
         "agent_empty": "No agent proposals yet. When an AI agent proposes a change that needs sign-off, it queues here.",
+        "agent_load_failed": "Agent proposals didn't load. Refresh to try again.",
         "queue_empty_title": "Queue clear",
         "queue_empty": "Nothing waiting for you. Submitted timesheets and leave requests show up here.",
         "no_access": "Only owners and admins review approvals.",
