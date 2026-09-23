@@ -32,7 +32,7 @@ const importedRows = (name) => client.db(state.companyId).collection('tasks').fi
 
 const importTask = (name, attachments) => owner.api.patch('/api/v1/importTasks', {
     action: 'createMultipleTasks',
-    tasks: [{ _id: 'row-1', TaskName: name, status: 'To Do', ParentTaskId: '', ...(attachments ? { attachments } : {}) }],
+    tasks: [{ _id: 'row-1', TaskName: name, status: 'To Do', ParentTaskId: '', Task_Leader: owner.uid, ...(attachments ? { attachments } : {}) }],
     userData: { id: owner.uid },
     projectData: { _id: project._id, CompanyId: state.companyId, lastTaskId: project.lastTaskId || 0, ProjectName: project.ProjectName, ProjectCode: project.ProjectCode },
     indexObj: { indexName: 'groupByStatusIndex', searchKey: 'statusKey', searchValue: '1' },
