@@ -139,6 +139,7 @@ const projectFilter = ref(route.query.projectId ? { id: route.query.projectId, n
 const tabs = [
     { key: "all", label: "Audit.tab_all" },
     { key: "agent", label: "Audit.tab_agents" },
+    { key: "outside", label: "Audit.tab_outside_agents" },
     { key: "gated", label: "Audit.tab_gated" },
     { key: "undone", label: "Audit.tab_undone" },
     { key: "refused", label: "Audit.tab_refusals" }
@@ -154,7 +155,15 @@ const todayLabel = computed(() => t("Audit.today_events", {
 }));
 
 const isAgent = (row) => row.meta && row.meta.actorType === "agent";
-const actorName = (row) => (isAgent(row) ? row.meta.agentName || t("Audit.an_agent") : row.actorName || getUser(row.actorId)?.Employee_Name || t("Audit.someone"));
+const outsideAgentName = ({ clientName, delegatedByName }) => t("Audit.outside_agent_for", {
+    client: clientName || t("Audit.an_outside_agent"),
+    person: delegatedByName || t("Audit.a_member")
+});
+const actorName = (row) => {
+    if (row.outsideAgent) return outsideAgentName(row.outsideAgent);
+    if (isAgent(row)) return row.meta.agentName || t("Audit.an_agent");
+    return row.actorName || getUser(row.actorId)?.Employee_Name || t("Audit.someone");
+};
 const initial = (row) => actorName(row).charAt(0).toUpperCase();
 const eventAction = (row) => (row.meta && row.meta.action) || row.action;
 const isRefusal = (row) => REFUSALS.includes(row.action);
@@ -170,6 +179,7 @@ const deadline = (at) => (at ? moment(at).format("D MMM HH:mm") : "");
 const query = (extra = {}) => {
     const q = { page: page.value, limit: 25, ...extra };
     if (scope.value === "agent") q.actorType = "agent";
+    if (scope.value === "outside") q.actorType = "outside_agent";
     if (scope.value === "gated") q.gated = "true";
     if (scope.value === "undone") q.undone = "true";
     if (scope.value === "refused") q.refused = "true";
