@@ -5749,7 +5749,7 @@
     "Settings.sso_domain_verified": "Verified",
     "Settings.sso_domain_verified_toast": "{d} is verified.",
     "Settings.sso_domains": "Email domains",
-    "Settings.sso_domains_hint": "People with these domains are sent to SSO",
+    "Settings.sso_domains_hint": "People on a verified domain can sign in with SSO. Everyone else needs an invitation.",
     "Settings.sso_email_hint": "2FA available per person",
     "Settings.sso_email_password": "Email & password",
     "Settings.sso_enable": "Enable single sign-on",

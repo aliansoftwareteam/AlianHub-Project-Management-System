@@ -5473,7 +5473,7 @@ export default {
         "sso_domain_verified_toast": "{d} is verified.",
         "sso_domain_ph": "acme.studio — press Enter",
         "sso_domains": "Email domains",
-        "sso_domains_hint": "People with these domains are sent to SSO",
+        "sso_domains_hint": "People on a verified domain can sign in with SSO. Everyone else needs an invitation.",
         "sso_email_hint": "2FA available per person",
         "sso_email_password": "Email & password",
         "sso_enable": "Enable single sign-on",
