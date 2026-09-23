@@ -595,6 +595,13 @@ const schema = {
         isEnabled: { type: Boolean, default: false, required: false },
         displayName: { type: String, default: '', required: false },
         domains: { type: [String], default: [], required: false },
+        // Published as the TXT record _alianhub-sso.<domain> to prove the company controls a domain.
+        domainVerificationToken: { type: String, required: false },
+        verifiedDomains: {
+            type: [{ _id: false, domain: { type: String, required: true }, verifiedAt: { type: Date, required: true } }],
+            default: [],
+            required: false,
+        },
         enforcement: { type: String, default: 'optional', required: false },
         autoProvisionUsers: { type: Boolean, default: true, required: false },
         defaultRoleType: { type: Number, default: 3, required: false },

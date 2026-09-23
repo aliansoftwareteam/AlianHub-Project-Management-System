@@ -7,6 +7,7 @@ exports.init = (app) => {
     // Admin config — owner/admin enforced in-controller (holds IdP secrets).
     app.get('/api/v2/sso/config', config.getSsoConfig);
     app.put('/api/v2/sso/config', config.setSsoConfig);
+    app.post('/api/v2/sso/config/verify-domain', config.verifySsoDomain);
 
     // Login page — unauthenticated, secret-free (must be auth-exempt).
     app.get('/api/v2/sso/public', config.getPublicSsoConfig);
