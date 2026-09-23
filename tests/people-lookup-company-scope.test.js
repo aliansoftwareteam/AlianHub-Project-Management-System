@@ -131,3 +131,18 @@ describe('POST /api/v2/company/create', () => {
         expect(savedCompany().userId).toBe(CALLER);
     });
 });
+
+describe('GET /api/v1/wasabi/retriveUserProfile/:companyId/:path', () => {
+    it('lets no shared cache keep the signed address it answers with', async () => {
+        const wasabi = require('../Modules/storage/wasabi/controller');
+        const path = `${CALLER}_1_photo.png`;
+        myCache.set(`imageExists:${path}`, 'https://signed.example/photo', 60);
+        const headers = {};
+        const res = { set: (key, value) => { headers[key] = value; }, send: jest.fn() };
+
+        await wasabi.getUserProfilePresignedUrl({ params: { companyId: COMPANY, path } }, res);
+
+        expect(res.send).toHaveBeenCalledWith(expect.objectContaining({ status: true }));
+        expect(headers['Cache-Control']).toMatch(/^private\b/);
+    });
+});

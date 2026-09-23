@@ -92,6 +92,11 @@ describe('reading an avatar under USER_PROFILES', () => {
         expect(await bucketAccess.mayReadProfileImage({ uid: COLLEAGUE, aud: COMPANY_A }, AVATAR)).toBe(false);
     });
 
+    it('refuses a colleague once the image owner has left, even while their account still lists the company', async () => {
+        activeSeats[COMPANY_A] = [COLLEAGUE];
+        expect(await bucketAccess.mayReadProfileImage(session(COLLEAGUE), AVATAR)).toBe(false);
+    });
+
     it('resolves a legacy name through the user record that points at it', async () => {
         users[OWNER_OF_A] = { Employee_profileImage: LEGACY_AVATAR };
         expect(await bucketAccess.mayReadProfileImage(session(COLLEAGUE), LEGACY_AVATAR)).toBe(true);
