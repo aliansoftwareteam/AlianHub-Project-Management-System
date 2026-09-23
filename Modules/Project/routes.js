@@ -11,6 +11,7 @@ const tagsCtrl = require('./controller/tags');
 const getQueryCtrl = require('./controller/getQueryFun');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { projectUpdateNamesOnlyMembers } = require('./helpers/projectPeople');
+const { sprintUpdateNamesOnlyMembers } = require('../Sprints/helpers/sprintPeople');
 const { READ, requireProjectAccess, keepVisibleProjects, projectIdsFrom, fieldsOf, permissionsForProjectUpdate, DELETE_OR_CLOSE } = require('../../Config/projectAccess');
 
 const CHECKLIST_ASSIGN_KEYS = ['assigneeAdd', 'assigneeRemove'];
@@ -36,7 +37,7 @@ exports.init = (app) => {
         projectIds: projectIdsFrom({ records: [[SCHEMA_TYPE.SPRINTS, (req) => req.params.id]], direct: (req) => req.body && req.body.updateObject && req.body.updateObject.projectId }),
         permissions: sprintUpdatePermissions,
         passMissing: () => true,
-    }), projectSprintUpdateCtrl.updateSprint);
+    }), sprintUpdateNamesOnlyMembers, projectSprintUpdateCtrl.updateSprint);
     app.post('/api/v1/project/filter/create', manageGlobalFilterCtrl.saveFilter);
     app.get('/api/v1/project/filter/:userId', manageGlobalFilterCtrl.getFilter);
     app.delete('/api/v1/project/filter/delete/:cid/:id', manageGlobalFilterCtrl.deleteFilter);
