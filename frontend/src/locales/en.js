@@ -5758,6 +5758,7 @@ export default {
         agents_candidate_wrong_tone: "Prefers a different tone — ask before rewriting",
         agents_candidate_needs_person: "Wants a person to handle this kind of work",
         agents_candidate_not_now: "Prefers proposals batched, not one at a time",
+        phone_invalid: "Enter a valid phone number.",
         phone_placeholder: "eg. 000-000-0000",
         company_profile: "Company Profile",
         image_dimensions: "{width}x{height}px",

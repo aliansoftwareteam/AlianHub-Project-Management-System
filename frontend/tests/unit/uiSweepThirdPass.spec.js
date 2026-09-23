@@ -147,6 +147,20 @@ describe('Custom report grouped by status', () => {
     });
 });
 
+describe('Settings → General company phone', () => {
+    const vue = read('components/molecules/Setting/SettingCompanyDetails.vue');
+
+    test('a company with no phone opens without a validation error', () => {
+        expect(vue).toMatch(/number === "undefined" \|\| number === "null"\) \{\s*phoneError\.value = '';/);
+    });
+
+    test('the error goes through i18n', async () => {
+        const en = (await import('../../src/locales/en.js')).default;
+        expect(en.Settings.phone_invalid).toBe('Enter a valid phone number.');
+        expect(vue).not.toMatch(/Please enter valid number/);
+    });
+});
+
 describe('Docs hub', () => {
     const vue = read('views/Pages/PagesSpace.vue');
     const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));

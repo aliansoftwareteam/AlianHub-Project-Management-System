@@ -447,7 +447,9 @@ const SaveChangeToDb = async () => {
 }
 
 function phoneValidation (number) {
-    if(number === ""){
+    // Callers pass String(value), so a company with no phone arrives as "undefined".
+    if (number === "" || number === "undefined" || number === "null") {
+        phoneError.value = '';
         return;
     }
     let code = countryCodeObj.value.isoCode;
@@ -456,7 +458,7 @@ function phoneValidation (number) {
     if (result.isValid) {
         phoneError.value = '';
     } else {
-        phoneError.value = "Please enter valid number";
+        phoneError.value = t('Settings.phone_invalid');
     }
 
     return result.isValid;

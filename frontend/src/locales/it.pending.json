@@ -5757,6 +5757,7 @@
     "Settings.now": "now",
     "Settings.open_menu": "Open settings menu",
     "Settings.people_count": "{n} people",
+    "Settings.phone_invalid": "Enter a valid phone number.",
     "Settings.phone_placeholder": "eg. 000-000-0000",
     "Settings.prefs_error": "Could not save your preferences.",
     "Settings.project_skills": "Project Skills",
