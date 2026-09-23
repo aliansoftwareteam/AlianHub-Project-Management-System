@@ -19,7 +19,6 @@ jest.mock('google-auth-library', () => ({
 
 const axios = require('axios');
 const https = require('https');
-const { EventEmitter } = require('events');
 const { dbCollections } = require('../Config/collections');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { myCache } = require('../Config/config');
@@ -129,22 +128,7 @@ beforeEach(() => {
     });
     jest.spyOn(axios, 'get').mockImplementation(answerProvider);
     jest.spyOn(axios, 'post').mockImplementation(async (url) => { throw new Error(`unexpected provider call ${url}`); });
-    jest.spyOn(https, 'request').mockImplementation((options, onResponse) => {
-        const request = new EventEmitter();
-        request.end = () => {
-            answerProvider(`https://${options.host}${options.path}`, options).then(
-                (answered) => ({ statusCode: answered.status, body: JSON.stringify(answered.data) }),
-                (error) => ({ statusCode: (error.response && error.response.status) || 500, body: '{}' }),
-            ).then(({ statusCode, body }) => {
-                const response = new EventEmitter();
-                response.statusCode = statusCode;
-                onResponse(response);
-                response.emit('data', body);
-                response.emit('end');
-            });
-        };
-        return request;
-    });
+    jest.spyOn(https, 'request').mockImplementation(() => { throw new Error('no network in tests'); });
     seedAccount(VICTIM);
     seedAccount(SPARE);
 });

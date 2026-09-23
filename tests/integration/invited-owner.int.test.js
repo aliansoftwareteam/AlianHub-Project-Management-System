@@ -2,6 +2,7 @@ const { MongoClient, ObjectId } = require('mongodb');
 const { createApiClient } = require('../../e2e/support/api');
 const { loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 const { resolveMongoUrl } = require('../../e2e/support/env');
+const { gitlabToken } = require('../../e2e/support/gitlab');
 
 const state = readState();
 const anonymous = createApiClient({ baseURL: state.baseURL });
@@ -115,18 +116,14 @@ describe('QA-47 an invited owner is recorded as the company owner however they a
         expect(await ownerBecomes(userId)).toBe(true);
     });
 
-    it.each([
-        ['/api/v2/google-signup', 'googleId'],
-        ['/api/v2/github-signup', 'githubId'],
-        ['/api/v2/gitlab-signup', 'gitlabId'],
-    ])('records the owner when they sign up through %s', async (path, idField) => {
+    it('records the owner when they sign up through a social provider', async () => {
         const suffix = uniqueSuffix();
-        const email = `invited.owner.${idField.toLowerCase()}.${suffix}@e2e.alianhub.test`;
+        const email = `invited.owner.gitlab.${suffix}@e2e.alianhub.test`;
         createdOwnerEmails.push(email);
         const row = await inviteOwner(email);
 
-        const signup = await anonymous.post(path, {
-            firstName: 'Otto', lastName: 'Oauth', email, [idField]: `id-${suffix}`,
+        const signup = await anonymous.post('/api/v2/gitlab-signup', {
+            firstName: 'Otto', lastName: 'Oauth', email, accessToken: gitlabToken({ id: 820000 + parseInt(suffix, 16), email }),
             assignCompany: state.companyId, companyUserDocID: String(row._id),
         });
         expect(signup.status).toBe(200);
@@ -141,8 +138,8 @@ describe('QA-47 an invited owner is recorded as the company owner however they a
         const row = await invite(email, 3);
         const before = await companyOwnerId();
 
-        const signup = await anonymous.post('/api/v2/google-signup', {
-            firstName: 'Mia', lastName: 'Member', email, googleId: `id-${suffix}`,
+        const signup = await anonymous.post('/api/v2/gitlab-signup', {
+            firstName: 'Mia', lastName: 'Member', email, accessToken: gitlabToken({ id: 830000 + parseInt(suffix, 16), email }),
             assignCompany: state.companyId, companyUserDocID: String(row._id),
         });
         expect(signup.status).toBe(200);

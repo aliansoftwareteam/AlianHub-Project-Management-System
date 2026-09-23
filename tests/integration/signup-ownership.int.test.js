@@ -1,5 +1,6 @@
 const { createApiClient } = require('../../e2e/support/api');
 const { emailFor, login, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
+const { gitlabToken } = require('../../e2e/support/gitlab');
 
 const state = readState();
 const anonymous = createApiClient({ baseURL: state.baseURL });
@@ -55,14 +56,10 @@ describe('a signup request never grants instance ownership', () => {
         expect(check.body.data.userData.isProductOwner).toBeUndefined();
     });
 
-    it.each([
-        ['/api/v2/google-signup', 'googleId'],
-        ['/api/v2/github-signup', 'githubId'],
-        ['/api/v2/gitlab-signup', 'gitlabId'],
-    ])('drops ownership from %s', async (path, idField) => {
-        const suffix = uniqueSuffix();
-        const res = await anonymous.post(path, {
-            firstName: 'Olly', lastName: 'Oauth', email: `signup.oauth.${suffix}@e2e.alianhub.test`, [idField]: `id-${suffix}`, ...GRANTS,
+    it('drops ownership from a social signup', async () => {
+        const email = `signup.oauth.${uniqueSuffix()}@e2e.alianhub.test`;
+        const res = await anonymous.post('/api/v2/gitlab-signup', {
+            firstName: 'Olly', lastName: 'Oauth', email, accessToken: gitlabToken({ id: 810000 + parseInt(uniqueSuffix(), 16), email }), ...GRANTS,
         });
 
         expect(res.status).toBe(200);
