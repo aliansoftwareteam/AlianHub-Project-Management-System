@@ -71,15 +71,13 @@ import { ref,inject,onMounted,computed } from 'vue';
 // components
 import InputText from '@/components/atom/InputText/InputText.vue'
 import {addView} from './helper.js'
-import { addPrivateView } from "@/components/molecules/ProjectViews/helper.js"
+import { addPrivateView, privateViewHistory } from "@/components/molecules/ProjectViews/helper.js"
 
 // UTILS
 import {useCustomComposable , useGetterFunctions } from "@/composable";
 import { useToast } from 'vue-toast-notification';
 import { Embeds } from "./Embeds.js";
 import { useStore } from 'vuex';
-import * as env from '@/config/env';
-import { apiRequest } from '../../../services';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 // assets
@@ -217,24 +215,9 @@ const HandleSubmit = () => {
             }
         }
 
-        // Call history API
-        const axiosData = {
-            "type": "project",
-            "companyId": companyId.value,
-            "projectId": props.projectData._id,
-            "taskId": null,
-            "object": {
-                "sprintId": null,
-                "key": "Project_Name",
-                "message": `<b>${userData.Employee_Name}</b> has added the <b> ${isPin.value ? 'pinned' : ''} ${isPrivate.value ? 'private' : ''} Embed View </b> as <b>${inputValues.value.name.value}</b>`
-            },
-            "userData": userData
-        };
-        apiRequest("post", env.HANDLE_HISTORY, axiosData).then((result) => {
-            if(result.data.status) {
-                console.info(result.data.statusText)
-            }
-        });
+        if(isPrivate.value) {
+            privateViewHistory(companyId.value, props.projectData._id, `<b>${userData.Employee_Name}</b> has added the <b> ${isPin.value ? 'pinned' : ''} private Embed View </b> as <b>${inputValues.value.name.value}</b>`);
+        }
 
         emits('closeDropdown')
     }

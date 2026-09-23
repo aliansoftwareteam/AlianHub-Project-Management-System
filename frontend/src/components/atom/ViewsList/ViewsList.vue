@@ -78,17 +78,14 @@ import { useToast } from 'vue-toast-notification';
 // UTILS
 import { deleteView , editView} from '@/components/molecules/EmbedView/helper';
 import { useRoute , useRouter } from 'vue-router';
-import * as env from '@/config/env';
 import { useStore } from 'vuex';
-import { useGetterFunctions, useCustomComposable } from '@/composable';
+import { useCustomComposable } from '@/composable';
 import { projectComponentsIcons } from '@/composable/commonFunction';
 
 // COMPONENTS
 import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
-import { apiRequest } from '../../../services';
 
-const {getUser} = useGetterFunctions();
 const viewDefaultIcon = require("@/assets/images/svg/list_home_icon.svg");
 const pin = require("@/assets/images/svg/pin.svg")
 const activePin = require("@/assets/images/svg/active-pin.svg")
@@ -97,25 +94,17 @@ const dots  = require("@/assets/images/svg/PriorityIcon/dotsIcon.svg")
 const isDropDownVisible = ref(false)
 const deleteImage = require('@/assets/images/svg/delete-red.svg')
 const isDelete = ref(false)
-const userId = inject('$userId')
 const route = useRoute();
 const router = useRouter();
 const companyId = inject('$companyId')
-const companyOwner = computed(() => getters["settings/companyOwnerDetail"])
 const project = inject("selectedProject")
 const {checkPermission} = useCustomComposable();
-const {getters,commit} = useStore()
+const {commit} = useStore()
 // The per-view triple-dot menu only renders when the user has this permission.
 // The hover width-increase exists to make room for that menu, so gate it on the
 // same permission -- a user without the menu should not get a pointless gap.
 const hasViewMenu = computed(() => checkPermission('project.view_list', project.value?.isGlobalPermission) === true);
 const toast = useToast()
-const user = getUser(userId.value);
-const userData = {
-    id: user.id,
-    Employee_Name: user.Employee_Name,
-    companyOwnerId: companyOwner.value.userId
-}
 
 // PROPS
 const props = defineProps({
@@ -144,7 +133,6 @@ const props = defineProps({
 const commentBadge = computed(() => (props.commentCount > 99 ? '+99' : props.commentCount));
 
 const editOptions = (type) =>{
-    let historyObj = ''
     if(type === 'Pin') {
         let item = props.item
         if(props.item?.isPin){
@@ -153,20 +141,12 @@ const editOptions = (type) =>{
             }).catch((err) => {
                 console.error(err)
             })
-            historyObj = {
-                'message': `<b> ${userData.Employee_Name} </b> has Unpinned the <b> ${item?.name} View </b>`,
-                'key' : 'Project_Name',
-            }
         } else {
             editView({cid:companyId.value, pid: project.value?._id}, item, true, 'isPin').then((res)=>{
                 commit('projectData/projectLocalUpdate', {itemData: res.data,projectId: project.value?._id,key:"ProjectView",subKey:"edit",userId: ''});
             }).catch((err) =>{
                 console.error(err)
             })
-            historyObj = {
-                'message': `<b> ${userData.Employee_Name} </b> has pinned the <b> ${item?.name} View </b>`,
-                'key' : 'Project_Name',
-            }
         }
     }
 
@@ -181,10 +161,6 @@ const editOptions = (type) =>{
             toast.success(res.statusText, {position:'top-right'})
             isDelete.value = false
         })
-        historyObj = {
-            'message': `<b> ${userData.Employee_Name} </b> has Deleted the <b> ${props.item?.name} View </b>`,
-            'key' : 'Project_Name',
-        }
     }
     if(type === 'AddDefault') {
         let item = props.item;
@@ -194,33 +170,14 @@ const editOptions = (type) =>{
             }).catch((err) => {
                 console.error(err)
             })
-            historyObj = {
-                'message': `<b> ${userData.Employee_Name} </b> has added the <b> ${item?.name} </b>as Default View`,
-                'key' : 'Project_Name',
-            }
         } else {
             editView({cid: companyId.value, pid: project.value?._id}, item, false, 'setAsDefault').then((res)=>{
                 commit('projectData/projectLocalUpdate', {itemData: res.data,projectId: project.value?._id,key:"ProjectView",subKey:"edit",userId: ''});
             }).catch((err) => {
                 console.error(err)
             })
-            historyObj = {
-                'message': `<b> ${userData.Employee_Name} </b> has removed the <b> ${item?.name} </b>as Default View `,
-                'key' : 'Project_Name',
-            }
         }
     }
-    apiRequest("post", env.HANDLE_HISTORY, {
-        "type": 'project',
-        "companyId": companyId.value,
-        "projectId": project.value._id,
-        "taskId": null,
-        "object": historyObj,
-        "userData": userData
-    })
-    .catch((error) => {
-        console.error("ERROR in update project history: ", error);
-    })
 }
 
 // EMITS

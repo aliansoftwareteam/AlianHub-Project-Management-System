@@ -170,7 +170,7 @@ exports.updateProject = async (req, res) => {
             updateObject.skills = await resolveProjectSkills(companyId, updateObject.skills);
         }
         exports.updateProjectInternal(companyId, projectId, updateObject, key, arrayFilters).then((project) => {
-            recordProjectChanges({ companyId, projectId, actorId: req.uid, previous: project, updateObject, key, timeZone: req.body.timeZone })
+            recordProjectChanges({ companyId, projectId, actorId: req.uid, previous: project, updateObject, key, arrayFilters, timeZone: req.body.timeZone })
                 .catch((error) => logger.error(`project history after update failed: ${(error && error.message) || error}`));
             return res.status(200).json(project);
         }).catch((error) => {

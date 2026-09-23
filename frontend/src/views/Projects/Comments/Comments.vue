@@ -1004,32 +1004,12 @@ function addToCheckList(msg) {
                     const axiosParams = {
                         id: projectData.value._id,
                         checklistItem: x,
-                        operation: 'push'
+                        operation: 'push',
+                        origin: 'comment'
                     }
 
                     apiRequest("post", `${env.PROJECTS_CHECKLIST}`, axiosParams).then(() => {
                         resolve();
-                        if(x.parentId){
-                            const user = getUser(userId.value)
-    
-                            const userData = {
-                                id: user.id,
-                                Employee_Name: user.Employee_Name,
-                                companyOwnerId: companyOwner.value.userId,
-                            }
-                            let historyObj = {
-                                key : props.taskId ? "Task_Comment" : "Project_Comment",
-                                message : `<b>${userData.Employee_Name}</b> has added <b>${x.name}</b> checklist from <b>(${projectData.value.ProjectName} ${props.folderName ? '/' + props.folderName : ''}${props.sprintName ? '/' + props.sprintName : ''}${props.taskId ? '/' + props.title : ''})</b> ${props.taskId ? 'task' : 'project'}.`
-                            }
-                            apiRequest("post", env.HANDLE_HISTORY, {
-                                "type": props.taskId ? 'task':'project',
-                                "companyId": companyId.value,
-                                "projectId": projectData.value._id,
-                                "taskId": props.taskId ? props.taskId : null,
-                                "object": historyObj,
-                                "userData": userData
-                            })
-                        }
                     })
                     .catch((error) => {
                         reject(error)

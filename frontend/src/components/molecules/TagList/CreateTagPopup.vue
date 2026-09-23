@@ -52,7 +52,7 @@
                                 <img :src="saveimage" class="saveTagColorImage cursor-pointer" @click="()=>HandleColors('save',index,item)"/>
                                 <img :src="cancelimage" class="deleteTagImage cursor-pointer ml-5px" @click="()=>HandleColors('cancel',index)"/>
                             </div>
-                            <div class="d-flex justify-content-between w-100" v-else @click="addTag(item.uid,item.tagName)">
+                            <div class="d-flex justify-content-between w-100" v-else @click="addTag(item.uid)">
                                 <span class="tag_name"  :title="item.tagName" :style="{color:item.tagColor}" >{{item.tagName}}</span>
                                 <span @click.stop="()=>dropdown(item)"><img  :src="threedots" class="cursor-pointer p0x-5px ml-auto mt-7px tagname__threedots" :class="[{'threedots': clientWidth > 767}]" alt=""/> </span> 
                             </div>
@@ -115,11 +115,9 @@ import InputText from "@/components/atom/InputText/InputText.vue";
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
 
 // utility 
-import * as env from '@/config/env';
 import { createTag,addTaskTag,updateTag,deleteTag} from "./helper.js";
-import { useCustomComposable , useGetterFunctions } from "@/composable";
+import { useCustomComposable } from "@/composable";
 import { useToast } from 'vue-toast-notification';
-import { apiRequest } from '../../../services';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 
@@ -142,7 +140,7 @@ const tasksTagsArray = ref([])
 const tagColor = ref('#000000')
 const tagBgColor = ref('#000000')
 const toast = useToast()
-const {makeUniqueId , checkApps,sanitizeInput, checkPermission } = useCustomComposable();
+const {makeUniqueId , checkApps, checkPermission } = useCustomComposable();
 const searchtag =  ref()
 const Did = ref("custom"+makeUniqueId(5));
 const renameimage = require("@/assets/images/editmilestone.png")
@@ -159,18 +157,6 @@ const clickDropDown = ref()
 const sendMethod = () =>{
     clickDropDown.value.click()
 }
-const {getUser} = useGetterFunctions();
-const userId = inject('$userId')
-const user = getUser(userId.value);
-
-const userData = {
-    id: user.id,
-    Employee_Name: user.Employee_Name,
-    companyOwnerId: user.companyOwnerId
-}
-
-
-
 defineExpose({sendMethod})
 
 const props = defineProps({
@@ -205,25 +191,6 @@ const getRandomColor = () => {
 }
 
 projectArray.value = { ...props.project.tagsArray }
-
-const ActivityLog = (message, taskId = null) =>{
-    let historyObj =  {
-        "sprintId": taskId ? props.task?.sprintId : null,
-        'message': message,
-        'key' : taskId ? 'task' : 'Project_Name',
-    }
-    apiRequest("post", env.HANDLE_HISTORY, {
-        "type": taskId ? 'task' : 'project',
-        "companyId": companyId.value,
-        "projectId": props.project._id,
-        "taskId": taskId,
-        "object": historyObj,
-        "userData": userData
-    })
-    .catch((error) => {
-        console.error("ERROR in update project history: ", error);
-    })
-}
 
 watchEffect(()=>{
     array.value = props.project.tagsArray || [];
@@ -286,8 +253,7 @@ const checkSameName = (e,val,state,i,item) => {
             }
             let colors = getRandomColor()   
             const obj = {tagBgColor:colors.tagBgColor , tagColor:colors.tagColor , tagName:value,uid:makeUniqueId(12)}
-            createTag(ids.value,obj)
-            addTag(obj.uid,obj.tagName)
+            createTag(ids.value,obj).then(() => addTag(obj.uid))
             toast.success(t("Toast.Tag_Created_successfully"),{position:"top-right"})
             array.value.push(obj)
             searchtag.value = ""
@@ -312,24 +278,20 @@ const checkSameName = (e,val,state,i,item) => {
                 renameErrorMessage.value = t('Tour.Tag_name_required');
                 return
             }
-            let Name = array.value[i].tagName
             array.value[i].tagName = reNameVal.value
             updateTag(ids.value, oldVal.value, {...item,tagName:reNameVal.value})
-            ActivityLog(`<b>${userData.Employee_Name}</b> has renamed the Tag from <b>  ${Name}  </b> to <b>${reNameVal.value} </b>`)
             editStatus.value = undefined
         }
     }
 }
 
-const addTag = (payload,tagName) =>{
+const addTag = (payload) =>{
     addTaskTag(ids.value,payload).then((data)=>{
         isSpinner.value = data
         errorMessage.value = ""
     }).catch((error)=>{
         toast.error(error,{position: "top-right"})
     })
-    ActivityLog(`<b>${userData.Employee_Name}</b> has added the <b> ${tagName} Tag </b> in <b>${sanitizeInput(props.task?.TaskName)}</b> Task`)
-    ActivityLog(`<b>${userData.Employee_Name}</b> has added the <b> ${tagName} Tag </b>`, props.task?._id)
 }
 
 //  Handling deletion of Tags
@@ -341,7 +303,6 @@ const deleteTags = (payload) =>{
     if (index !== -1) {
         dataArray.splice(index, 1)
     }
-    ActivityLog(`<b>${userData.Employee_Name}</b> has deleted the <b> ${payload.tagName} Tag </b>`)
 }
 
 //  Handling colors Changes
