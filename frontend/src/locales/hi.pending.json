@@ -6549,6 +6549,7 @@
     "Ai.skill_read_err_link_invalid": "This read cannot take that link; choose one from the list.",
     "Ai.skill_read_err_hosts_max": "List at most {max} other hosts.",
     "Ai.skill_read_err_path_or_link": "Give a path, or choose a link to read.",
+    "Time.agent_load_failed": "Agent proposals didn't load. Refresh to try again.",
     "Comments.agent_tag": "AGENT",
     "Comments.an_agent": "An agent",
     "Comments.ai_assistant": "AI assistant",

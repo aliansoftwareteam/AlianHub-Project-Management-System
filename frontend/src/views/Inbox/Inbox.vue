@@ -212,6 +212,7 @@ import { useStore } from 'vuex';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
+import { sendProposalDecision } from '@/composable/agentProposals';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useHelper } from '@/components/organisms/Header/helper';
@@ -551,12 +552,10 @@ const removeRowSoft = (it) => {
 };
 const openReminders = () => openPanel('reminders');
 const openAiInbox = () => router.push({ name: 'AiInbox', params: { cid: companyId?.value } }).catch(() => {});
-// Agent proposals decide through the agent API so the audit row, undo window and
-// run closure are the same whichever Inbox the person used.
 const decideProposal = async (it, verb) => {
     busy.value = true;
     try {
-        const res = await apiRequest('post', `${env.AGENT_PROPOSALS}/${it.proposalId}/${verb}`, {});
+        const res = await sendProposalDecision(it.proposalId, verb);
         if (!res?.data?.status) { $toast.error(res?.data?.statusText || t('Inbox.action_failed'), { position: 'top-right' }); return; }
         removeRow(it);
         loadCounts();
