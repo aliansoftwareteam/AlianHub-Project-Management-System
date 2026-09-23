@@ -99,8 +99,8 @@ describe('the workspace egress allowlist', () => {
     it('refuses an agent fetch to an unlisted host before it leaves the box, and audits the host only', async () => {
         const started = Date.now();
         const res = await owner.api.post('/api/v2/agents/skills/pr.summary/dry-run', { taskId: task._id });
-        expect(res.status >= 400 || res.body.status === false).toBe(true);
-        expect(JSON.stringify(res.body)).toMatch(new RegExp(`${PR_HOST}.*allow`, 'i'));
+        expect(res.status).toBe(200);
+        expect(res.body.data).toMatchObject({ ran: false, gathered: null, skipped: expect.stringMatching(new RegExp(`${PR_HOST}.*allow`, 'i')) });
         expect(Date.now() - started).toBeLessThan(5000);
 
         const refusal = await waitFor(() => audits.findOne(ours({ action: 'agent.egress_refused', entityId: PR_HOST, actorId: owner.uid })), 'the refusal audit row');

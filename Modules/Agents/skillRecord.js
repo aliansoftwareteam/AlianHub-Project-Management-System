@@ -11,7 +11,7 @@ const { validateSkill, riskOf } = require('./skills/validateSkill');
 const { effectiveActions } = require('./skills/effectiveActions');
 const { requirementDetail } = require('./skills/inputRules');
 const { catalogues } = require('./skills/catalogues');
-const { checkDeclaredReads } = require('./skills/externalReads');
+const { checkDeclaredReads, unavailableOf } = require('./skills/externalReads');
 
 const isLive = (doc) => Boolean(doc) && doc.enabled !== false && !doc.retiredAt;
 
@@ -46,6 +46,7 @@ const codeEntry = (skill) => ({
     emits: [...(skill.emits || [])],
     risk: riskOf(skill.emits || []),
     enabled: true,
+    unavailable: unavailableOf(skill.slug, skill.reads || []),
     version: null,
 });
 
@@ -62,6 +63,7 @@ const dataEntry = (doc) => ({
     risk: doc.risk || riskOf(doc.emits || []),
     model: doc.model || null,
     enabled: doc.enabled !== false,
+    unavailable: unavailableOf(doc.key, (doc.gather || []).map((s) => s.reader)),
     version: doc.version,
     retiredAt: doc.retiredAt || null,
     updatedAt: doc.updatedAt || null,
@@ -127,7 +129,7 @@ const manifestSkill = async (agent, entry, resolve) => {
     const skill = key ? await resolve(key) : null;
     const own = entry && typeof entry === 'object' ? entry : {};
     const base = { key, name: String(own.name || (skill && skill.name) || key), enabled: own.enabled !== false };
-    if (!skill) return { ...base, resolved: false, source: null, version: null, inputs: [], requires: null, emits: [], risk: null, effectiveActions: [] };
+    if (!skill) return { ...base, resolved: false, source: null, version: null, inputs: [], requires: null, emits: [], risk: null, effectiveActions: [], unavailable: null };
     const source = skill.source || SOURCE.CODE;
     return {
         ...base,
@@ -139,6 +141,7 @@ const manifestSkill = async (agent, entry, resolve) => {
         emits: [...(skill.emits || [])],
         risk: skill.risk || riskOf(skill.emits || []),
         effectiveActions: effectiveActions(agent, skill),
+        unavailable: unavailableOf(skill.slug || key, skill.reads || []),
     };
 };
 
