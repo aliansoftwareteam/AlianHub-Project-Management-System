@@ -10,6 +10,7 @@ const { removeCache } = require('../../../utils/commonFunctions');
 const R = require('../helpers/weekRules');
 
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
+const { acceptedMemberIds } = require('../../../utils/companyMembers');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const safeZone = (z) => (z && DateTime.local().setZone(z).isValid ? z : 'UTC');
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
@@ -54,6 +55,7 @@ exports.getWorkloadGrid = async (req, res) => {
                 userIds = [String(req.uid)];
             }
         }
+        userIds = await acceptedMemberIds(companyId, userIds);
         const projectIds = Array.isArray(b.projectIds) ? b.projectIds.map(String).filter(Boolean) : [];
         const rangeStart = new Date(`${b.start}T00:00:00.000Z`);
         const rangeEnd = new Date(`${b.end}T23:59:59.999Z`);

@@ -10,6 +10,7 @@ const { getRoleType } = require('../../../Config/permissionGuard');
 const { ROLE_GUEST } = require('../../../Config/roleTypes');
 const { resolveRate } = require('../../TimeSheet/helpers/billingRules');
 const math = require('../helpers/billingMath');
+const { memberProfiles, activeMemberIds } = require('../../../utils/companyMembers');
 
 // Billing contract + milestone rollups (handoff 19a / 19b).
 //
@@ -42,18 +43,12 @@ const refuseGuest = async (req, res) => {
 
 const contractCacheKey = (projectId, companyId) => `billingContract:${projectId}:${companyId}`;
 
-/* User display names live in the GLOBAL users collection, not the per-company
- * one. Best-effort: an unresolved name is omitted, never an error. */
-const resolveUserNames = async (userIds) => {
-    const ids = [...new Set((userIds || []).map(String).filter(isObjectIdString))];
+/* Best-effort: an unresolved name is omitted, never an error. */
+const resolveUserNames = async (companyId, userIds) => {
     const out = new Map();
-    if (!ids.length) return out;
     try {
-        const users = await MongoDbCrudOpration('global', {
-            type: SCHEMA_TYPE.USERS,
-            data: [{ _id: { $in: ids } }, 'Employee_Name Employee_FName Employee_LName'],
-        }, 'find');
-        (users || []).forEach((u) => {
+        const users = await memberProfiles(companyId, userIds, { Employee_Name: 1, Employee_FName: 1, Employee_LName: 1 });
+        users.forEach((u) => {
             const name = u.Employee_Name || [u.Employee_FName, u.Employee_LName].filter(Boolean).join(' ');
             if (name) out.set(String(u._id), String(name));
         });
@@ -62,6 +57,12 @@ const resolveUserNames = async (userIds) => {
     }
     return out;
 };
+
+const signOffRefused = async (companyId, signOffUserId) => {
+    if (!signOffUserId) return false;
+    return !(await activeMemberIds(companyId, [signOffUserId])).length;
+};
+const SIGN_OFF_REFUSAL = 'The sign-off person has to be a member of this workspace.';
 
 const toEpoch = (value) => {
     if (value === null || value === undefined || value === '') return 0;
@@ -238,7 +239,7 @@ const buildBillingContext = async (companyId, projectId) => {
     });
 
     const { paid, invoiced } = milestoneIdsByInvoiceStatus(invoices);
-    const signOffNames = await resolveUserNames((milestones || []).map((m) => m.signOffUserId));
+    const signOffNames = await resolveUserNames(companyId, (milestones || []).map((m) => m.signOffUserId));
     const rows = (milestones || []).map((m) => {
         const id = String(m._id);
         const stats = milestoneStats(m, tasks || [], minutesByTask);
@@ -437,6 +438,7 @@ exports.createBillingMilestone = async (req, res) => {
             return res.send({ status: false, statusText: 'A milestone amount must be a non-negative number.' });
         }
 
+        if (await signOffRefused(companyId, signOffUserId)) return res.send({ status: false, statusText: SIGN_OFF_REFUSAL });
         const existing = await loadMilestones(companyId, projectId);
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.MILESTONE,
@@ -496,7 +498,10 @@ exports.updateBillingMilestone = async (req, res) => {
         }
         if (body.dueDate !== undefined) { set.dueDate = toEpoch(body.dueDate); set.endDate = toEpoch(body.dueDate); }
         if (body.startDate !== undefined) set.startDate = toEpoch(body.startDate);
-        if (body.signOffUserId !== undefined) set.signOffUserId = String(body.signOffUserId || '');
+        if (body.signOffUserId !== undefined) {
+            if (await signOffRefused(companyId, body.signOffUserId)) return res.send({ status: false, statusText: SIGN_OFF_REFUSAL });
+            set.signOffUserId = String(body.signOffUserId || '');
+        }
         if (body.taskIds !== undefined) {
             set.taskIds = Array.isArray(body.taskIds) ? body.taskIds.map(String).filter(isObjectIdString).slice(0, 500) : [];
         }
@@ -612,7 +617,7 @@ exports.getHourlyBilling = async (req, res) => {
 
         const people = [...byUser.values()].sort((a, b) => b.approvedMinor - a.approvedMinor);
         const userIds = people.map((p) => p.userId).filter(isObjectIdString);
-        const nameById = await resolveUserNames(userIds);
+        const nameById = await resolveUserNames(companyId, userIds);
         people.forEach((p) => { p.name = nameById.get(p.userId) || ''; });
 
         const approvedMinor = people.reduce((t, p) => t + p.approvedMinor, 0);

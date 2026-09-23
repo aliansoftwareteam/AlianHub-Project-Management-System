@@ -177,7 +177,7 @@ exports.getInvoice = async (req, res) => {
                 data: [{ _id: { $in: timelogIds } }, '_id TicketID Loggeduser LogTimeDuration LogStartTime LogDescription'],
             }, 'find') : [],
         ]);
-        const names = await billing.resolveUserNames((timelogs || []).map((l) => String(l.Loggeduser)));
+        const names = await billing.resolveUserNames(companyId, (timelogs || []).map((l) => String(l.Loggeduser)));
 
         return res.send({
             status: true,
@@ -287,7 +287,7 @@ exports.draftFromMonth = async (req, res) => {
             return res.send({ status: false, statusText: `No billable time logged on this project in ${label}.` });
         }
 
-        const names = await billing.resolveUserNames([...byUser.keys()]);
+        const names = await billing.resolveUserNames(companyId, [...byUser.keys()]);
         const lines = [...byUser.values()].map((row) => {
             const rateMinor = math.toMinor(resolveRate({ entry: { Loggeduser: row.userId, ProjectId: projectId }, rates: rates || [] }));
             const qtyMilli = math.minutesToMilliHours(row.minutes);
