@@ -51,15 +51,6 @@ const update = async (body, uid = OWNER, projectId = PROJECT) => {
     return r;
 };
 
-const handlers = {};
-const app = { post: (path, ...fns) => { handlers[`POST ${path}`] = fns[fns.length - 1]; }, get: () => {}, put: () => {} };
-require('../Modules/notification1/routes').init(app);
-const post = async (path, body, uid = MEMBER) => {
-    const r = reply();
-    await handlers[`POST ${path}`]({ headers: { companyid: CID }, body, uid }, r);
-    await settle();
-    return r;
-};
 
 const seed = (over = {}) => {
     mockDb.seed(SCHEMA_TYPE.PROJECTS, {
@@ -278,46 +269,5 @@ describe('a watch mode change is described from the stored watchers', () => {
         expect(await describe$({ [`watchers.${MEMBER}`]: 'participating_mentions' }, undefined, MEMBER)).toEqual([]);
         expect(await describe$({ [`watchers.${OWNER}`]: 1 }, '$unset')).toEqual([]);
         expect(await describe$({ [`watchers.${MEMBER}`]: 'all_activity' })).toEqual([]);
-    });
-});
-
-describe('the generic routes leave project changes to the server', () => {
-    const historyBody = (key) => ({
-        type: 'project',
-        companyId: CID,
-        projectId: PROJECT,
-        taskId: null,
-        object: { key, message: `<b>${HTML}</b>` },
-        userData: { id: MEMBER, Employee_Name: 'Max Member', companyOwnerId: OWNER },
-    });
-
-    test.each([
-        'Project_Status', 'Project_Assignee_Add', 'Project_Assignee_Removed', 'Assignee_Changed', 'Project_Type', 'Project_Currency',
-        'Project_DueDate', 'Project_StartDate', 'Project_EndDate', 'Project_Watchers', 'Project_Created', 'Create_Sprint',
-    ])('a %s history row sent by the web app is not stored', async (key) => {
-        const r = await post('/api/v1/handleHistory', historyBody(key));
-        expect(r.body).toMatchObject({ status: true });
-        expect(historyRows()).toEqual([]);
-    });
-
-    test.each([
-        'project_name', 'project_close', 'project_status_change', 'project_assignee', 'project_type', 'project_currency',
-        'project_due_date', 'project_start_date', 'project_end_date', 'project_create', 'project_sprint_create', 'project_folder_create',
-    ])('a %s notification sent by the web app is not sent', async (key) => {
-        const r = await post('/api/v1/handleNotification', {
-            type: 'project',
-            companyId: CID,
-            projectId: PROJECT,
-            userData: { id: MEMBER, Employee_Name: 'Max Member', companyOwnerId: OWNER },
-            object: { key, message: `<p>${HTML}</p>` },
-        });
-        expect(r.body).toMatchObject({ status: true });
-        expect(HandleBothNotification).not.toHaveBeenCalled();
-    });
-
-    test('a task row under a project key and project rows the server does not build still go through', async () => {
-        await post('/api/v1/handleHistory', { ...historyBody('Project_Name') });
-        await post('/api/v1/handleHistory', { ...historyBody('Project_Status'), type: 'task', taskId: '6f0000000000000000000b01' });
-        expect(historyRows().map((row) => row.Key)).toEqual(['Project_Name', 'Project_Status']);
     });
 });

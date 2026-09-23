@@ -19,11 +19,10 @@ vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: (id) => (
 vi.mock('@/components/molecules/EmbedView/helper.js', () => ({ editView, deleteView }));
 vi.mock('@/components/molecules/ProjectViews/helper.js', async (importOriginal) => ({ ...(await importOriginal()), editPrivateName, deletePrivateView }));
 
-import * as env from '@/config/env';
 import { useEmbedViews } from '@/views/Projects/composables/useEmbedViews';
 
 const SRC = path.resolve(__dirname, '../../src');
-const posted = () => apiRequest.mock.calls.filter(([method, url]) => method === 'post' && [env.HANDLE_HISTORY, env.HANDLE_NOTIFICATION].includes(url));
+const posted = () => apiRequest.mock.calls.filter(([method, url]) => method === 'post' && /\/api\/v1\/handle(History|Notification)$/.test(String(url)));
 
 const withEmbedViews = (views) => {
     let api;

@@ -77,7 +77,7 @@ describe('a task custom field value', () => {
         expect(row.Message).toBe(`<b>${memberName}</b> has added value in <b> ${field.fieldTitle}</b> Custom Field as <b>AB &lt;img src=x onerror=alert&#40;1&#41;&gt;</b>.`);
 
         const history = await crafted('task', 'Project_Category', String(task._id));
-        expect(history.body.status).toBe(true);
+        expect(history.status).toBe(404);
         await quiet();
         expect((await historyOf({ TaskId: String(task._id), Key: 'Project_Category' })).map((found) => found.Message)).toEqual([row.Message]);
     });

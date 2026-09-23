@@ -70,17 +70,3 @@ describe('a saved filter change made from a project', () => {
         expect(messages()).toEqual([]);
     });
 });
-
-describe('the generic history route leaves filter changes to the server', () => {
-    const handlers = {};
-    const app = { post: (path, ...fns) => { handlers[`POST ${path}`] = fns[fns.length - 1]; }, get: () => {}, put: () => {} };
-    require('../Modules/notification1/routes').init(app);
-
-    test('a Project_Filter row sent by the web app is not stored', async () => {
-        const r = await call(handlers['POST /api/v1/handleHistory'], {
-            body: { type: 'project', companyId: CID, projectId: PROJECT, taskId: null, object: { key: 'Project_Filter', message: `<b>${HTML}</b>` }, userData: { id: MEMBER } },
-        });
-        expect(r.body).toMatchObject({ status: true });
-        expect(messages()).toEqual([]);
-    });
-});

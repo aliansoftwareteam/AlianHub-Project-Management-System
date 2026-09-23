@@ -6,8 +6,6 @@ const { employeeNameOf, escapeText } = require('../../Tasks/helpers/taskWriteFie
 const HISTORY_KEY = 'Project_Filter';
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 
-const SERVER_BUILT_HISTORY = [{ type: 'project', key: HISTORY_KEY }];
-
 /* A saved filter belongs to a person, not a project; the row goes to the project it was changed from, when the caller can see it. */
 const recordFilterChange = async ({ companyId, uid, projectId, filter, verb }) => {
     if (!filter || !OBJECT_ID.test(String(projectId || ''))) return;
@@ -19,4 +17,4 @@ const recordFilterChange = async ({ companyId, uid, projectId, filter, verb }) =
         .catch((error) => logger.error(`saved filter history: ${(error && error.message) || JSON.stringify(error)}`));
 };
 
-module.exports = { HISTORY_KEY, SERVER_BUILT_HISTORY, recordFilterChange };
+module.exports = { HISTORY_KEY, recordFilterChange };
