@@ -187,6 +187,60 @@ describe('the lease', () => {
         expect(calls.filter((c) => c.type === PROGRESS)).toEqual([]);
     });
 
+    it('does not read rows as verified through a stored position whose row is gone', async () => {
+        const a = start();
+        const b = start();
+        await writeRows(a, 1, 8);
+        await a.annotateIntegrity(CID, page(5, 6), { budget: 20 });
+
+        const hold = holdFirstWalk();
+        const walking = a.annotateIntegrity(CID, page(5, 6), { budget: 20 });
+        await hold.reached();
+        mockDb.store[SCHEMA_TYPE.AUDIT_LOGS] = auditRows().filter((r) => !(r.chain && r.chain.seq >= 7));
+        const deferred = await b.annotateIntegrity(CID, page(5, 6), { budget: 20 });
+        hold.release();
+        await walking;
+
+        expect(deferred).toEqual([{ state: 'unverified' }, { state: 'unverified' }]);
+    });
+
+    it('never overwrites the progress once its lease has passed to another server', async () => {
+        const a = start();
+        await writeRows(a, 1, 6);
+        await a.annotateIntegrity(CID, page(5, 6), { budget: 20 });
+        const before = { ...progressDocs()[0] };
+
+        const hold = holdFirstWalk();
+        const walking = a.annotateIntegrity(CID, page(5, 6), { budget: 20 });
+        await hold.reached();
+        const until = new Date(Date.now() + 5000);
+        plantLease(until, 'another-server', 'lease-2');
+        hold.release();
+        await walking;
+
+        expect(progressDocs()[0]).toMatchObject({ leaseId: 'lease-2', leaseUntil: until, gen: before.gen, mac: before.mac });
+    });
+
+    it('lets the lease go when its walk fails', async () => {
+        const a = start();
+        const b = start();
+        await writeRows(a, 1, 6);
+        await a.annotateIntegrity(CID, page(5, 6), { budget: 20 });
+
+        const real = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async (companyId, query, method) => {
+            if (isRangeWalk({ type: query.type, method, data: query.data })) {
+                mockDb.crud.mockImplementation(real);
+                throw new Error('the database went away');
+            }
+            return real(companyId, query, method);
+        });
+        await expect(a.annotateIntegrity(CID, page(5, 6), { budget: 20 })).rejects.toThrow('the database went away');
+
+        const { calls } = await callsDuring(() => b.annotateIntegrity(CID, page(5, 6), { budget: 20 }));
+        expect(calls.filter(isRangeWalk).length).toBeGreaterThan(0);
+    });
+
     it('takes over a lease that has run out', async () => {
         const a = start();
         const b = start();
