@@ -598,7 +598,19 @@ const schema = {
         // Published as the TXT record _alianhub-sso.<domain> to prove the company controls a domain.
         domainVerificationToken: { type: String, required: false },
         verifiedDomains: {
-            type: [{ _id: false, domain: { type: String, required: true }, verifiedAt: { type: Date, required: true } }],
+            type: [{
+                _id: false,
+                domain: { type: String, required: true },
+                verifiedAt: { type: Date, required: true },
+                // Set by the daily re-check (Modules/SSO/domainRecheck.js); consecutive checks that found no record.
+                lastCheckedAt: { type: Date, required: false },
+                failedChecks: { type: Number, required: false },
+            }],
+            default: [],
+            required: false,
+        },
+        lapsedDomains: {
+            type: [{ _id: false, domain: { type: String, required: true }, lapsedAt: { type: Date, required: true } }],
             default: [],
             required: false,
         },

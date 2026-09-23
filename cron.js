@@ -12,6 +12,7 @@ const reminders = require("./Modules/Reminders/controller");
 const timeReminders = require("./Modules/TimeSheet/controller/timeReminders");
 const auditRecorder = require("./Modules/Audit/recorder");
 const scheduledReports = require("./Modules/ScheduledReports/controller");
+const ssoDomainRecheck = require("./Modules/SSO/domainRecheck");
 
 // UTC unless the operator pins another zone: the only choice that survives a DST
 // switch, a container reboot or a base-image swap without shifting schedules.
@@ -37,6 +38,7 @@ job('autoArchive', '0 1 * * *', () => autoArchive.runAutoArchiveForAllCompanies(
 job('auditRetention', '0 2 * * *', () => auditRecorder.runAuditRetentionForAllCompanies());
 job('auditChainMirror', '* * * * *', () => require('./Modules/Audit/chain').flushMirrors());
 job('projectAutoClose', '0 3 * * *', () => projectClose.runAutoCloseForAllCompanies());
+job('ssoDomainRecheck', '30 3 * * *', () => ssoDomainRecheck.runSsoDomainRecheckForAllCompanies());
 job('taskIndex', '0 * * * *', () => taskIndexRef.createUnIndexTask());
 job('scheduledReports', '0 * * * *', () => scheduledReports.runScheduledReportsForAllCompanies());
 job('recurringTasks', '*/15 * * * *', () => recurringTasks.runRecurringForAllCompanies());

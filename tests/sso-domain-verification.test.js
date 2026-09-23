@@ -60,7 +60,7 @@ describe('saving the SSO config', () => {
         const token = configRow().domainVerificationToken;
         expect(token).toMatch(/^[a-f0-9]{32,}$/);
         expect(recordFor(res, 'acme.test')).toEqual({
-            domain: 'acme.test', name: '_alianhub-sso.acme.test', value: `alianhub-sso-verification=${token}`, verifiedAt: null,
+            domain: 'acme.test', name: '_alianhub-sso.acme.test', value: `alianhub-sso-verification=${token}`, verifiedAt: null, failedChecks: 0, lapsedAt: null,
         });
         expect(recordFor(res, 'other.test').name).toBe('_alianhub-sso.other.test');
         expect(configRow().verifiedDomains || []).toEqual([]);
