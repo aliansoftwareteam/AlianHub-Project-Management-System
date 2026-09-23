@@ -19,7 +19,8 @@ const REQUIRED_FIELDS = ['isFirst', 'isFirstWithRecord', 'taskId', 'projectId', 
  */
 exports.updateTaskIndex = async (req,res) => {
     try {
-        if (!pinSessionTenant(req, res)) return;
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
         const payload = await prepareOrRefuse(req, res, TASK_INDEX_FIELDS, 'taskIndex');
         if (!payload) return;
         req.body = payload;
@@ -31,7 +32,7 @@ exports.updateTaskIndex = async (req,res) => {
         let taskData = {
             relevantIndex: req.body.relevantIndex,
             projectId: req.body.projectId,
-            companyId: req.body.companyId,
+            companyId,
             taskId: req.body.taskId,
             isFirst: req.body.isFirst,
             indexName: req.body.indexName,
@@ -165,7 +166,8 @@ exports.updateTaskIndexWhenLoad = async (req,res) => {
             }))
             return;
         }
-        if (!pinSessionTenant(req, res)) return;
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
         const payload = await prepareOrRefuse(req, res, TASK_INDEX_ONLOAD_FIELDS, 'updateTaskIndexOnload');
         if (!payload) return;
         req.body = payload;
@@ -177,7 +179,7 @@ exports.updateTaskIndexWhenLoad = async (req,res) => {
                 }
             ]
         }
-        MongoDbCrudOpration(req.body.companyId,obj,"findOne").then((rep)=>{
+        MongoDbCrudOpration(companyId,obj,"findOne").then((rep)=>{
             if (!rep) {
                 res.status(404).send({ status: false, statusText: 'Task not found' });
                 return;
@@ -208,15 +210,15 @@ exports.updateTaskIndexWhenLoad = async (req,res) => {
                         type: SCHEMA_TYPE.TASKS,
                         data: [taskObj]
                     }
-                    MongoDbCrudOpration(req.body.companyId, objSh, 'aggregate').then((resp)=>{
+                    MongoDbCrudOpration(companyId, objSh, 'aggregate').then((resp)=>{
                         if (resp && resp[0].results && resp[0].results.length) {
-                            exports.updateIndex(req.body.taskUpdate,req.body.companyId,rep,resp[0].results[0]).then((response)=>{
+                            exports.updateIndex(req.body.taskUpdate,companyId,rep,resp[0].results[0]).then((response)=>{
                                 res.send(response)
                             }).catch((error)=>{
                                 res.send(error)
                             })
                         } else {
-                            exports.update0Index(req.body.taskUpdate,req.body.companyId,rep).then((response)=>{
+                            exports.update0Index(req.body.taskUpdate,companyId,rep).then((response)=>{
                                 res.send(response)
                             }).catch((error)=>{
                                 res.send(error)
@@ -247,15 +249,15 @@ exports.updateTaskIndexWhenLoad = async (req,res) => {
                             { $limit: 1 }
                         ]]
                     }
-                    MongoDbCrudOpration(req.body.companyId,object,"aggregate").then((task) => {
+                    MongoDbCrudOpration(companyId,object,"aggregate").then((task) => {
                         if (task.length > 0) {
-                            exports.updateIndex(req.body.taskUpdate,req.body.companyId,rep,task[0]).then((response)=>{
+                            exports.updateIndex(req.body.taskUpdate,companyId,rep,task[0]).then((response)=>{
                                 res.send(response)
                             }).catch((error)=>{
                                 res.send(error)
                             })
                         } else {
-                            exports.update0Index(req.body.taskUpdate,req.body.companyId,rep).then((response)=>{
+                            exports.update0Index(req.body.taskUpdate,companyId,rep).then((response)=>{
                                 res.send(response)
                             }).catch((error)=>{
                                 res.send(error)

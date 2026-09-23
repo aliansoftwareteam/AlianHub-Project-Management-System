@@ -605,7 +605,9 @@ async function contextFor({ companyId, projectId, userId, maxChars = 2000 } = {}
  * who started the run, the projects of the run and of every source, and the taint, which a repeat
  * sighting can add to but never clear. Content from outside the workspace (a web page, a tool
  * result, a performance read) has no project to hold it to, so it taints the note. A tainted note,
- * whatever tainted its run, goes only to runs of the person whose run formed it. */
+ * whatever tainted its run, goes only to runs of the person whose run formed it. A note belongs to
+ * one starter: another starter's sighting of the same text forms a note of its own, so what one
+ * person's run read never changes who may read the other's, and erasing one leaves the other. */
 const AGENT_NOTE = 'agent.note';
 const AGENT_ROOT = 'agent';
 const AGENT_NOTE_LIMIT = 10000;
@@ -617,6 +619,7 @@ const FILE_REF = /^file:([0-9a-fA-F]{24}):([A-Za-z0-9_-]{1,64})$/;
 const EXTERNAL_REF = /^(web|tool|performance):(\S{1,200})$/;
 
 const agentNamespaceOf = (agentId) => [AGENT_ROOT, String(agentId), 'note'];
+const agentNoteKey = (text, startedBy) => `${slug(text)}@${startedBy || 'event'}`;
 const idsOf = (list) => [...new Set((Array.isArray(list) ? list : [list]).map((id) => String(id == null ? '' : id)).filter((id) => OBJECT_ID.test(id)))];
 const union = (a, b) => [...new Set([...(a || []), ...(b || [])])];
 const sameTaint = (a, b) => `${a.kind}:${a.ref}` === `${b.kind}:${b.ref}`;
@@ -731,7 +734,7 @@ async function rememberForAgent({ companyId, runId, text, derivedFrom }) {
     const tainted = run.tainted || external.length > 0;
     const taintSources = mergeTaint(run.taintSources, external.map((ref) => ({ kind: ref.external, ref: ref.id })));
     const ns = agentNamespaceOf(run.agentId);
-    const key = slug(clean);
+    const key = agentNoteKey(clean, run.startedBy);
     const s = await store(companyId);
     const existing = await s.get(ns, key);
     const prev = existing && existing.value ? existing.value : null;

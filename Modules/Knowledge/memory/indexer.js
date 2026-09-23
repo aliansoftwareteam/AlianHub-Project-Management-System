@@ -39,7 +39,8 @@ const refOf = (ref) => {
 };
 
 /* Who wrote each document the note came from, as erasure counts them: a private page is its
- * author's, a comment its writer's. A shared page, a task or a call makes nobody the owner. */
+ * author's, a comment its writer's. A shared page, a task or a call makes nobody the owner. A note
+ * only its starter's runs can read (starter-only, or formed in no project) is that starter's too. */
 const derivedOf = async (companyId, note) => {
     const refs = note.derivedFrom.map(refOf).filter((ref) => ref && isObjectId(ref.sourceId));
     const pageIds = refs.filter((ref) => ref.sourceType === 'page').map((ref) => oid(ref.sourceId));
@@ -50,7 +51,9 @@ const derivedOf = async (companyId, note) => {
     ]);
     const privateOwners = (pages || []).filter((p) => asText(p.visibility) === 'private' && p.createdBy).map((p) => asText(p.createdBy));
     const writers = (comments || []).filter((c) => c.userId).map((c) => asText(c.userId));
-    const authors = [...new Set([...privateOwners, ...writers])];
+    const starter = asText(note.source && note.source.userId);
+    const personal = isObjectId(starter) && (note.starterOnly === true || !note.projectIds.length);
+    const authors = [...new Set([...privateOwners, ...writers, ...(personal ? [starter] : [])])];
     const onlyPrivate = refs.length > 0 && refs.every((ref) => ref.sourceType === 'page') && privateOwners.length === refs.length && new Set(privateOwners).size === 1;
     return { authors, onlyPrivateOf: onlyPrivate ? privateOwners[0] : '' };
 };
