@@ -108,10 +108,7 @@ const login = async (userInfo) => {
         const object = {
             email: userInfo.email,
             githubId: userInfo.githubId,
-            // Forward the GitHub access token so the backend can re-verify the
-            // identity against GitHub's /user API instead of trusting the
-            // client-supplied id/email. Without this, login is rejected in the
-            // default (strict) server mode.
+            // The server takes the identity from this token alone.
             accessToken: userInfo.accessToken,
             isLoginType: "frontend",
             authProvider: "github"
@@ -194,9 +191,9 @@ const login = async (userInfo) => {
         } else if(error?.response?.data?.message === "User not found"){
             $toast.error('User not found', { position: 'top-right' });
         } else {
-            $toast.error(t("Toast.something_went_wrong"), { position: 'top-right' });
+            $toast.error(error?.response?.data?.message || t("Toast.something_went_wrong"), { position: 'top-right' });
         }
-        
+
         localStorage.removeItem("updateToken");
         localStorage.removeItem("userId");
         localStorage.removeItem("isLogging");
@@ -218,6 +215,7 @@ const signup = async (userInfo) => {
             lastName: userInfo.lastName,
             email: userInfo.email,
             githubId: userInfo.githubId,
+            accessToken: userInfo.accessToken,
             assignCompany: companyId,
             companyUserDocID: companyUserDocID
         };

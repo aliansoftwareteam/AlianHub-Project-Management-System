@@ -110,9 +110,7 @@ const login = async (userInfo) => {
         const object = {
             email: userInfo.email,
             gitlabId: userInfo.gitlabId,
-            // Forward the GitLab access token so the backend can re-verify the
-            // identity against GitLab's /user API instead of trusting the
-            // client-supplied id/email. Required in the default (strict) mode.
+            // The server takes the identity from this token alone.
             accessToken: userInfo.accessToken,
             isLoginType: "frontend",
             authProvider: "gitlab"
@@ -195,7 +193,7 @@ const login = async (userInfo) => {
         } else if(error?.response?.data?.message === "User not found"){
             $toast.error('User not found', { position: 'top-right' });
         } else {
-            $toast.error(t("Toast.something_went_wrong"), { position: 'top-right' });
+            $toast.error(error?.response?.data?.message || t("Toast.something_went_wrong"), { position: 'top-right' });
         }
 
         localStorage.removeItem("updateToken");
@@ -219,6 +217,7 @@ const signup = async (userInfo) => {
             lastName: userInfo.lastName,
             email: userInfo.email,
             gitlabId: userInfo.gitlabId,
+            accessToken: userInfo.accessToken,
             assignCompany: companyId,
             companyUserDocID: companyUserDocID
         };
