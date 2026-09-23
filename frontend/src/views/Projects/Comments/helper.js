@@ -6,6 +6,7 @@ import { useToast } from "vue-toast-notification"
 const $toast = useToast();
 const { makeUniqueId } = useCustomComposable();
 import { i18n } from "@/locales/main";
+import { isAgentComment } from "@/utils/commentSide";
 const t = i18n.global.t;
 
 
@@ -343,7 +344,7 @@ function sameTime(data, data2){
     return data && new Date(data.createdAt).setSeconds(0, 0) && new Date(data.createdAt).setSeconds(0, 0) === new Date(data2.createdAt).setSeconds(0, 0);
 }
 function sameUser(data, data2){
-    return data && data.userId && data.userId === data2.userId;
+    return data && data.userId && data.userId === data2.userId && isAgentComment(data) === isAgentComment(data2);
 }
 export const showUserInfo = (data, data2 = null) => {
     let show = true

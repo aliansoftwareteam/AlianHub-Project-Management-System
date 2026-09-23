@@ -133,6 +133,7 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 107 | A second review finding, in the manual time-log routes, is open; details in the owner's private notes. The fix is in progress (branch `fix/manual-logtime-owner`). **Closed** by #828 (build 301). | 2026-09-23 sweep |
 | 108 | `tests/integration/external-agent-step-audit.int.test.js` waits 15 s for a revoked step to fail, but a waiting `external_agent` step re-checks on a 30 s poll; under CI load it can still read `running`. Wake the step in the test or wait longer than one poll. **Closed** by #833 (build 300): the run, not the step, was read between two writes; the test now awaits the tick the close starts. | #824 rerun |
 | 109 | Owner decision: should logging a **new** manual time entry into an approved timesheet period be refused? Today only edits and deletes check the lock (#828 kept that). Refusing new entries is more consistent but changes behaviour for everyone logging their own time. | #828 |
+| 110 | `pr.summary` runs its code version unless **both** `SKILL_EXTERNAL_READS` and `PR_SUMMARY_AS_DATA` are on, and nothing on screen says which ran; only the replay's fetch row tells. Either retire the code version (see 103) or show the version on the run. | 2026-09-23 acceptance run |
 
 ## Owner decisions recorded
 

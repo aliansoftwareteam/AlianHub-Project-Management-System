@@ -61,6 +61,14 @@ to the same allowlist — every model with a price on file, served by a provider
 instance has configured — and both are checked when they are saved, so an unpriced or
 unreachable model is a refusal in the settings form, not a failed run later.
 
+`askModel` sends the pin whatever the router flag says: the skill's pin first, since it
+is scoped to that one skill, then the agent's. It picks the pin's provider with
+`getProvider({ provider, pinned: true })` and puts `model` and `pinned: true` on the chat
+options, and the decision records `requested.pinned: true`. The pin is checked again at
+call time; one whose price or provider has gone since it was saved is not sent. The
+configured model answers instead and the decision records the pin under `skipped` with
+reason `pin_dropped`, the same record the router writes when failover drops a pin.
+
 An adapter declares what differs about its vendor in `capabilities`; `normalise.js`
 turns those plus the caller's options into the model id, output ceiling, temperature
 and structured-output mode the vendor wants. `tests/ai-provider-contract.test.js`

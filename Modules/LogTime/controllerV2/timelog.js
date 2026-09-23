@@ -19,32 +19,20 @@ const loggerConfig = require('../../../Config/loggerConfig');
 const socketEmitter = require('../../../event/socketEventEmitter.js');
 const { handleFileUploadForTrackerSS,handleuploadMainFileForbase64Thumbnail } = require(`../../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const { pinSessionTenant } = require('../../../Config/tenant');
-/**
- * Add and Edit Manual Log Time
- * @param {Objcet} req
- * @param {Object} res
- * @returns
- */
-exports.getTimelog = (req, res) => {
-    if (!pinSessionTenant(req, res)) return;
-   if (!(req.body && req.body.userId)) {
-        res.send({
-            status: false,
-            statusText: "userId is required"
-        })
-        return;
-    }
-    const { type = SCHEMA_TYPE.TIMESHEET, companyId } = req.body;
-    var startDate = new Date(); // Create a new Date object
+const { trackerUser } = require('./sessionUser');
 
-    // Set hours, minutes, and seconds to zero
+exports.getTimelog = async (req, res) => {
+    const companyId = pinSessionTenant(req, res);
+    if (!companyId) return;
+    const actor = await trackerUser(req, res);
+    if (!actor) return;
+    const { type = SCHEMA_TYPE.TIMESHEET } = req.body;
+    var startDate = new Date();
     startDate.setHours(0);
     startDate.setMinutes(0);
     startDate.setSeconds(0);
     startDate.setMilliseconds(0);
-    var endDate = new Date(); // Create a new Date object
-
-    // Set hours, minutes, and seconds to zero
+    var endDate = new Date();
     endDate.setHours(23);
     endDate.setMinutes(59);
     endDate.setSeconds(59);
@@ -59,16 +47,14 @@ exports.getTimelog = (req, res) => {
     let obj = {
         type: type,
         data: [{
-            Loggeduser: {
-                $in: req.body.userId
-            },
+            Loggeduser: actor.id,
             createdAt: {
-                $gte: startDate.getTime(), // Greater than or equal to start date
-                $lte: endDate.getTime(),   // Less than or equal to end date
+                $gte: startDate.getTime(),
+                $lte: endDate.getTime(),
             }
         }]
     }
-    MongoDbCrudOpration(req.body.companyId, obj, "find")
+    MongoDbCrudOpration(companyId, obj, "find")
         .then((data) => {
             res.send({
                 status: true,

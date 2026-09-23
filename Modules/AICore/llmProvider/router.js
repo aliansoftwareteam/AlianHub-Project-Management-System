@@ -62,6 +62,13 @@ async function runOnce(adapter, opts, probe) {
     }
 }
 
+/* A pin dropped before the call still names the model on the decision, so the
+ * replay row says what was asked for and why it was not sent. */
+const pinnedModelOf = (opts) => (opts && opts.pinned === true && opts.model) || (opts && opts.droppedPin) || null;
+const recordDroppedPin = (call, provider, opts) => {
+    if (opts && opts.droppedPin) call.skip(provider, opts.droppedPin, decision.SKIP.PIN_DROPPED);
+};
+
 /* One adapter, one attempt, no breaker and no bucket: the flag-off path. */
 const observedCache = new WeakMap();
 
@@ -93,7 +100,9 @@ function observed(adapter) {
         embed: (opts) => observedEmbed(adapter, metre, opts),
         async chat(opts) {
             const model = resolveModel(adapter, opts);
-            const forThis = { ...opts, [decision.KEY]: decision.begin({ routerEnabled: false, provider: adapter.name, model: null }) };
+            const call = decision.begin({ routerEnabled: false, provider: adapter.name, model: pinnedModelOf(opts) });
+            recordDroppedPin(call, adapter.name, opts);
+            const forThis = { ...opts, [decision.KEY]: call };
             const startedAt = Date.now();
             try {
                 const result = await metre.chat(forThis);
@@ -175,7 +184,8 @@ function routed(primary, registry) {
         embed: (opts) => observed(primary).embed(opts),
         async chat(opts) {
             const reasons = [];
-            const call = decision.begin({ routerEnabled: true, provider: primary.name, model: opts && opts.model });
+            const call = decision.begin({ routerEnabled: true, provider: primary.name, model: (opts && opts.model) || pinnedModelOf(opts) });
+            recordDroppedPin(call, primary.name, opts);
             let lastError = null;
             for (const adapter of candidates) {
                 if (adapter !== primary && opts && opts.model) call.skip(adapter.name, opts.model, decision.SKIP.PIN_DROPPED);

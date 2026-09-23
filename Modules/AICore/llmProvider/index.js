@@ -32,12 +32,13 @@ function configuredAdapter() {
     throw new Error(`No LLM provider is configured. Set one of ${PROVIDER_NAMES.join(', ')} (AI_API_KEY+AI_MODEL, ANTHROPIC_API_KEY+ANTHROPIC_MODEL, DEEPSEEK_API_KEY+DEEPSEEK_MODEL, GOOGLE_API_KEY+GOOGLE_MODEL), and optionally LLM_PROVIDER.`);
 }
 
-/* A provider named by the caller only wins while AI_MODEL_ROUTER is on. With
- * the flag at its default the configured provider answers every call, so the
- * registry changes nothing until a policy is there to drive it. */
+/* A provider named by the caller only wins while AI_MODEL_ROUTER is on, or
+ * when it serves a model an agent or skill pinned. With the flag at its default
+ * the configured provider answers every other call, so the registry changes
+ * nothing until a policy is there to drive it. */
 function selectAdapter(selection) {
     const asked = selection && selection.provider ? String(selection.provider).trim().toLowerCase() : '';
-    if (!asked || !routerEnabled()) return configuredAdapter();
+    if (!asked || !(routerEnabled() || selection.pinned === true)) return configuredAdapter();
     const adapter = adapterFor(asked);
     if (!adapter) throw new Error(`Unknown LLM provider "${asked}"; known providers are ${PROVIDER_NAMES.join(', ')}`);
     if (!adapter.isConfigured) throw new Error(`LLM provider "${asked}" is not configured (missing API key or model env var)`);
@@ -50,7 +51,7 @@ function selectAdapter(selection) {
  * flag is on it is also behind the breaker, the token bucket and failover to
  * the next configured provider; with the flag off it is one adapter and one
  * attempt, exactly as before, with the outcome recorded for the console.
- * @param {{provider?: string}} [selection]
+ * @param {{provider?: string, pinned?: boolean}} [selection]
  * @returns {import('./types').LlmProvider}
  */
 function getProvider(selection) {

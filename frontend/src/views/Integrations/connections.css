@@ -17,7 +17,7 @@
 .conn__mark--dark { background: var(--rail); color: #fff; }
 .conn__mark--orange { background: #e2683c; color: #fff; }
 .conn__mark--purple { background: #4a154b; color: #fff; }
-.conn__mark--brand { background: var(--brand); color: #fff; }
+.conn__mark--brand { background: var(--brand); color: var(--on-brand); }
 .conn__id { flex: 1; min-width: 0; }
 .conn__name { display: flex; align-items: center; gap: 7px; }
 .conn__name strong { font: 600 13px/1.2 var(--font-ui); }

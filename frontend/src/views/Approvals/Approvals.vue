@@ -3,7 +3,7 @@
         <div class="tv-head">
             <h1 class="tv-title">{{ $t('Time.approvals') }}</h1>
             <span v-if="count" class="ap__count">{{ count }}</span>
-            <nav class="tv-tabs ap__tabs" aria-label="Approval types">
+            <nav class="tv-tabs ap__tabs" :aria-label="$t('Time.approval_types')">
                 <button v-for="f in filters" :key="f.key" type="button" class="tv-tab" :class="{ 'is-active': filter === f.key }" @click="filter = f.key">{{ $t(f.label) }}</button>
             </nav>
         </div>
@@ -26,7 +26,7 @@
                             <div class="ap__title">{{ card.title }}</div>
                             <div class="ap__sub">{{ card.sub }}</div>
                         </div>
-                        <span v-if="card.kind === 'agent'" class="ah-chip ah-chip--agent">AGENT</span>
+                        <span v-if="card.kind === 'agent'" class="ah-chip ah-chip--agent">{{ $t('Time.agent_tag') }}</span>
                     </div>
 
                     <div v-if="card.kind === 'timesheet'" class="ap__facts">
@@ -272,7 +272,7 @@ onMounted(() => { if (isManager.value) load(); });
 <style src="../Timesheet/timeV2.css"></style>
 <style scoped>
 .ap { max-width: 720px; }
-.ap__count { background: var(--brand); color: #fff; font: 700 10px/1 var(--font-ui); padding: 4px 7px; border-radius: 9px; }
+.ap__count { background: var(--brand); color: var(--on-brand); font: 700 10px/1 var(--font-ui); padding: 4px 7px; border-radius: 9px; }
 .ap__tabs { margin-left: 4px; }
 .ap__list { display: flex; flex-direction: column; gap: 10px; }
 .ap__card { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border-radius: 14px; }

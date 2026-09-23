@@ -5,6 +5,7 @@
     --brand-tint: rgba(47, 57, 144, .10);
     --brand-ring: rgba(47, 57, 144, .12);
     --brand-border: rgba(47, 57, 144, .35);
+    --on-brand: #ffffff;
 
     --ink: #17161c;
     --ink-2: rgba(0, 0, 0, .55);
@@ -86,6 +87,8 @@
     --brand-tint: rgba(168, 146, 255, .16);
     --brand-ring: rgba(168, 146, 255, .22);
     --brand-border: rgba(168, 146, 255, .35);
+    /* Dark --brand is a light lavender: white on it is 2.55:1, dark ink 7.38:1. */
+    --on-brand: #111114;
     --ink: #f2f1f6;
     --ink-2: rgba(255, 255, 255, .62);
     --ink-3: rgba(255, 255, 255, .42);
@@ -167,11 +170,6 @@ html, body, #app {
    redesigned views opt in with .ah-page. */
 :root[data-theme="dark"] .ah-app__view { color: #17161c; }
 :root[data-theme="dark"] .ah-app__view .ah-page { color: var(--ink); }
-/* Dark --brand is a light lavender; white text on it is 2.55:1. Dark ink reads at 9:1. */
-:root[data-theme="dark"] .ah-btn--primary,
-:root[data-theme="dark"] .ah-tbtn--primary,
-:root[data-theme="dark"] .hc-setup__cta { color: #111114; }
-:root[data-theme="dark"] .ah-btn--primary:hover:not(:disabled) { color: #111114; }
 /* Legacy Projects.vue wraps the redesigned List/Board/Table in white panels. Darken them only
    when a redesigned page is inside; legacy views keep their light panels and dark ink. */
 :root[data-theme="dark"] .section-right.bg-white:has(.ah-page),
@@ -233,8 +231,8 @@ html, body, #app {
 }
 .ah-btn:focus-visible { outline: none; box-shadow: var(--focus); }
 .ah-btn:disabled { opacity: .55; cursor: not-allowed; }
-.ah-btn--primary { background: var(--brand); color: #fff; }
-.ah-btn--primary:hover:not(:disabled) { background: var(--brand-deep); }
+.ah-btn--primary { background: var(--brand); color: var(--on-brand); }
+.ah-btn--primary:hover:not(:disabled) { background: var(--brand-deep); color: var(--on-brand); }
 .ah-btn--secondary { background: var(--surface); border-color: var(--border); }
 .ah-btn--secondary:hover:not(:disabled) { background: var(--surface-hover); }
 .ah-btn--outline { border-color: var(--brand); color: var(--brand); background: var(--brand-tint); }
@@ -310,11 +308,11 @@ html, body, #app {
 .ah-avatar {
     width: 24px; height: 24px; border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
-    background: var(--brand); color: #fff;
+    background: var(--brand); color: var(--on-brand);
     font: 600 11px/1 var(--font-ui);
     flex: none; overflow: hidden; object-fit: cover;
 }
-.ah-avatar--agent { border-radius: 6px; background: var(--agent); }
+.ah-avatar--agent { border-radius: 6px; background: var(--agent); color: #fff; }
 .ah-avatar--sm { width: 20px; height: 20px; font-size: 9.5px; }
 .ah-avatar--lg { width: 32px; height: 32px; font-size: 13px; }
 .ah-avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -399,6 +397,15 @@ html, body, #app {
 .ah-scroll { scrollbar-width: thin; scrollbar-color: rgba(0, 0, 0, .18) transparent; }
 .ah-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
 .ah-scroll::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, .18); border-radius: 8px; }
+
+.ah-spin {
+    display: inline-block; flex: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+    border-top-color: currentColor;
+    animation: ah-spin .8s linear infinite;
+}
+@keyframes ah-spin { to { transform: rotate(360deg); } }
 
 .ah-fade-enter-active, .ah-fade-leave-active { transition: opacity var(--t-state) var(--ease); }
 .ah-fade-enter-from, .ah-fade-leave-to { opacity: 0; }

@@ -6,6 +6,7 @@ const { jitProvisionUser } = require('../SSO/provisioning');
 const { removeCache } = require('../../utils/commonFunctions');
 const logger = require('../../Config/loggerConfig');
 const { SEAT_ACTIVE } = require('../../Config/seatStatus');
+const knowledgeEvents = require('../Knowledge/ingest/events');
 
 // scimRules.isActive reads this back as "not active"; isDelete is what keeps the seat out of the guards.
 const SCIM_DEACTIVATED = 0;
@@ -30,6 +31,15 @@ const getGlobalUsersByIds = (uids) => {
     return MongoDbCrudOpration(dbCollections.GLOBAL, {
         type: SCHEMA_TYPE.USERS, data: [{ _id: { $in: ids } }],
     }, 'find');
+};
+
+const holdsSeat = (row) => Boolean(row) && Number(row.status) === SEAT_ACTIVE && row.isDelete !== true;
+
+// The members screen publishes these too; without them the knowledge index would keep a deprovisioned
+// member's private pages until its next periodic re-check.
+const announceSeatChange = (companyId, uid, before, active) => {
+    if (!active) knowledgeEvents.publishMemberDeparted(companyId, uid);
+    else if (!holdsSeat(before)) knowledgeEvents.publishMemberActivated(companyId, uid);
 };
 
 const clearUserCaches = (companyId, uid) => {
@@ -57,11 +67,11 @@ const provision = async (companyId, { email, firstName, lastName, externalId, ac
         data: [{ userId: String(uid) }, { $set: set }],
     }, 'updateOne');
     clearUserCaches(companyId, uid);
+    announceSeatChange(companyId, uid, existing, active !== false);
     return { uid, created: !existing };
 };
 
-// Activate / deactivate a membership for THIS company only (the global user may
-// belong to other companies). Returns the updated membership, or null if absent.
+// THIS company only: the global user may belong to other companies.
 const setActive = async (companyId, uid, active) => {
     const cu = await getCompanyUser(companyId, uid);
     if (!cu) return null;
@@ -70,6 +80,7 @@ const setActive = async (companyId, uid, active) => {
         data: [{ userId: String(uid) }, { $set: { status: active ? SEAT_ACTIVE : SCIM_DEACTIVATED, isDelete: !active } }],
     }, 'updateOne');
     clearUserCaches(companyId, uid);
+    announceSeatChange(companyId, uid, cu, active);
     return getCompanyUser(companyId, uid);
 };
 
@@ -87,7 +98,6 @@ const updateName = async (uid, { givenName, familyName }) => {
     }, 'updateOne');
 };
 
-// List memberships (optionally filtered by email), newest first, paginated.
 const listMembers = async (companyId, email, skip, limit) => {
     const match = email ? { userEmail: String(email).toLowerCase() } : {};
     const pipeline = [

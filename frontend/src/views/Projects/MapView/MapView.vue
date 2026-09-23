@@ -332,6 +332,6 @@ watch(() => props.sprints, () => ensureTasksLoaded(), { deep: true });
 .map-view__dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
 .map-view__item-name { flex: 1 1 auto; font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .map-view__place { border: 1px solid var(--brand); color: var(--brand); background: var(--surface); border-radius: var(--r-chip); font-size: 12px; padding: 3px 8px; cursor: pointer; white-space: nowrap; }
-.map-view__place:hover { background: var(--brand); color: var(--surface); }
+.map-view__place:hover { background: var(--brand); color: var(--on-brand); }
 .map-view__all-placed { font-size: 12px; color: var(--ink-2); padding: 8px 0; }
 </style>
