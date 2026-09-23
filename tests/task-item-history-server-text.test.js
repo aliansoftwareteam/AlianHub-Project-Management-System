@@ -133,6 +133,16 @@ describe('a project checklist change', () => {
         ]);
     });
 
+    test('items the comment box turns into a checklist keep its wording and name the stored project', async () => {
+        const fromComment = (checklistItem) => projectItems().describeChecklistChange({
+            actor, previous: items, body: { operation: 'push', origin: 'comment', checklistItem }, projectName: HTML,
+        });
+        expect(await fromComment({ id: 'c9', name: 'Checklist' })).toEqual([]);
+        expect(await fromComment({ id: 'i9', parentId: 'c9', name: 'Call the client' })).toEqual([
+            { key: 'Project_Comment', message: `<b>Olivia Owner</b> has added <b>Call the client</b> checklist from <b>(${ESCAPED} )</b> project.` },
+        ]);
+    });
+
     test('checking an item names the item that was clicked, not the children it carried', async () => {
         const next = items.map((item) => (item.id === 'c1' ? item : { ...item, isChecked: true }));
         expect(await describeChange({ operation: 'update', key: 'isChecked', checklistItem: next })).toEqual([

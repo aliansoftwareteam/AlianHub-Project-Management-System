@@ -46,6 +46,12 @@ describe('task item changes leave their history text to the server', () => {
         expect(source).not.toMatch(/HANDLE_HISTORY|HANDLE_NOTIFICATION/);
     });
 
+    it('the comment box saves its checklist items and posts no history text', () => {
+        const source = fs.readFileSync(path.join(SRC, 'views/Projects/Comments/Comments.vue'), 'utf8');
+        expect(source).not.toMatch(/HANDLE_HISTORY/);
+        expect(source).toMatch(/operation: 'push',\s*origin: 'comment'/);
+    });
+
     it('a custom field value saved from the task detail posts no history text', () => {
         const source = fs.readFileSync(path.join(SRC, 'components/molecules/TaskDetailTab/TaskDetailTab.vue'), 'utf8');
         expect(source).not.toContain("'Project_Category'");
