@@ -76,6 +76,34 @@ describe('a due date change', () => {
     });
 });
 
+describe('a task moved on the calendar', () => {
+    it('stores the notification text the server builds and names both dates', async () => {
+        const task = await freshTask();
+        const res = await member.api.patch('/api/v2/tasks', {
+            action: 'updateStartDateAndDueDate',
+            commonDateFormatString: 'DD/MM/YYYY',
+            timeZone: 'UTC',
+            userData: memberUser(),
+            notificationObj: { key: 'task_due_date', projectId: project._id, taskId: String(task._id), sprintId: task.sprintId, message: `<p>${HTML}</p>` },
+            firebaseObj: { DueDate: DUE, dueDateDeadLine: [{ date: DUE }], startDate: '2026-09-25T00:00:00.000Z' },
+            task: { _id: String(task._id), sprintId: task.sprintId },
+            project: { _id: project._id, CompanyId: state.companyId, ProjectName: HTML, ProjectCode: project.ProjectCode },
+        });
+        expect([res.status, res.body.status]).toEqual([200, true]);
+        const saved = await stored(task._id);
+        expect([new Date(saved.startDate).toISOString(), new Date(saved.DueDate).toISOString()]).toEqual(['2026-09-25T00:00:00.000Z', DUE]);
+
+        const [notice] = await waitFor(async () => { const rows = await noticesOf(task._id, 'task_due_date'); return rows.length ? rows : null; }, 'the calendar move notification');
+        expect(notice.message).toContain(`In <strong>${project.ProjectName}</strong> Project, Start Date of <strong>${task.TaskName}</strong> is added as`);
+        expect(notice.message).toContain('>25/09/2026</span>');
+        expect(notice.message).toContain('and Due Date is added as');
+        expect(notice.message).toContain('>01/10/2026</span>');
+        expect(notice.message).not.toMatch(/img|onerror/);
+        const rows = await waitFor(async () => { const found = await historyOf(task._id); return found.some((row) => row.Key === 'Project_StartDate_DueDate') ? found : null; }, 'the calendar move history row');
+        expect(rows.filter((row) => row.Key === 'Project_StartDate_DueDate')).toHaveLength(1);
+    });
+});
+
 describe('a body without the task name', () => {
     it('still writes the history row with the stored name', async () => {
         const task = await freshTask();

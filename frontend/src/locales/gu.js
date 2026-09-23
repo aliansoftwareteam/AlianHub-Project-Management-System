@@ -6389,7 +6389,12 @@ export default {
         "This_message_is_deleted": "આ સંદેશ કાઢી નાખવામાં આવ્યો છે",
         "You_deleted_this_message": "તમે આ સંદેશ કાઢી નાખ્યો છે",
         "no_user_found": "કોઈ વપરાશકર્તા મળ્યો નથી",
-        "unlock_comment_view": "ટિપ્પણી દૃશ્ય અનલૉક કરવા માટે"
+        "unlock_comment_view": "ટિપ્પણી દૃશ્ય અનલૉક કરવા માટે",
+        "agent_tag": "AGENT",
+        "an_agent": "An agent",
+        "ai_assistant": "AI assistant",
+        "cited_page": "page",
+        "cited_page_hidden": "a page you cannot open"
     },
     "PlaceHolder": {
         "enter_task_type": "કાર્ય પ્રકાર દાખલ કરો",

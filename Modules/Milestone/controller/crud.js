@@ -11,13 +11,17 @@ const { settingsCollectionDocs } = require("../../../Config/collections");
 
 const { addMilestoneHistoryNotification, updateMilestoneNotification, deleteMilestoneNotification, addMilestoneHistory, updateMilestoneHistory } = require('./helpers');
 const { pinSessionTenant } = require('../../../Config/tenant');
+const { milestoneUser } = require('./sessionUser');
 exports.addMilestone = async (req, res) => {
     try{
         if(!req.body){
             res.send({status: false, statusText: 'Request body is required'});
             return;
         }
-        if (!pinSessionTenant(req, res)) return;
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
+        const user = await milestoneUser(req, res, companyId);
+        if (!user) return;
         if(!req.body.projectId){
             res.send({status: false, statusText: 'project Id is required'});
             return;
@@ -30,16 +34,12 @@ exports.addMilestone = async (req, res) => {
             res.send({status: false, statusText: 'ProjectName is required'});
             return;
         }
-        if(!(req.body.userDetail && Object.keys(req.body.userDetail).length)){
-            res.send({status: false, statusText: 'userDetail is required'});
-            return;
-        }
         let historyObj ={};
         let notificationObj = {};
         let milestoneStatusObj = req.body.milestoneStatusObj ? req.body.milestoneStatusObj : '';
         let milestoneObject = req.body.milestoneObject ? JSON.parse(JSON.stringify(req.body.milestoneObject)) : '';
         let milestoneName = milestoneObject.milestoneName ? milestoneObject.milestoneName : '';
-        historyObj.message = `<b>${req.body.userDetail.Employee_Name}</b> has created new milestone as <b>${milestoneName}</b> in <b>${req.body.ProjectName}</b> project.`;
+        historyObj.message = `<b>${user.Employee_Name}</b> has created new milestone as <b>${milestoneName}</b> in <b>${req.body.ProjectName}</b> project.`;
         historyObj.key = 'Project_Milestone_Changed';
         notificationObj.message = `<p>In Project <strong>${req.body.ProjectName}</strong> a new Milestone named <strong>${milestoneName}</strong> is Created.</p>`;
         notificationObj.key = 'project_milestone';
@@ -100,16 +100,16 @@ exports.addMilestone = async (req, res) => {
         let updateObject = {
             "milestoneAmount": milestoneObject.amount
         }
-        await updateProjectInternal(req.body.companyId, req.body.projectId, updateObject, "$inc", []).then(async() => {
-            await MongoDbCrudOpration(req.body.companyId,obj, "save").then((response) => {
-                removeCache(`milestone:${req.body.projectId}:${req.body.companyId}`);
+        await updateProjectInternal(companyId, req.body.projectId, updateObject, "$inc", []).then(async() => {
+            await MongoDbCrudOpration(companyId,obj, "save").then((response) => {
+                removeCache(`milestone:${req.body.projectId}:${companyId}`);
                 res.send({
                     status: true,
                     statusText: "Milestone Added",
                     data:response
                 });
-                addMilestoneHistoryNotification(req.body.companyId, req.body.projectId,req.body.userDetail,milestoneStatusObj,historyObj,notificationObj,milestoneName,req.body.ProjectName);
-                addMilestoneHistory(milestoneObject,req.body.companyId, req.body.projectId,req.body.userDetail,milestoneStatusObj,req.body.cuurencyValue);
+                addMilestoneHistoryNotification(companyId, req.body.projectId,user,milestoneStatusObj,historyObj,notificationObj,milestoneName,req.body.ProjectName);
+                addMilestoneHistory(milestoneObject,companyId, req.body.projectId,user,milestoneStatusObj,req.body.cuurencyValue);
             }).catch((error)=>{
                 return res.send({status: false, statusText: error});
             });
@@ -128,7 +128,10 @@ exports.updateMilestone = async (req, res) => {
             res.send({status: false, statusText: 'Request body is required'});
             return;
         }
-        if (!pinSessionTenant(req, res)) return;
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
+        const user = await milestoneUser(req, res, companyId);
+        if (!user) return;
         if(!req.body.projectId){
             res.send({status: false, statusText: 'project Id is required'});
             return;
@@ -139,10 +142,6 @@ exports.updateMilestone = async (req, res) => {
         }
         if(!(req.body.ProjectName)){
             res.send({status: false, statusText: 'ProjectName is required'});
-            return;
-        }
-        if(!(req.body.userDetail && Object.keys(req.body.userDetail).length)){
-            res.send({status: false, statusText: 'userDetail is required'});
             return;
         }
         if(req.body?.fixOrHourlyMilCheck === false){
@@ -206,7 +205,7 @@ exports.updateMilestone = async (req, res) => {
         let updateObject = {
             "milestoneAmount": req.body.onlyNumber
         }
-        await updateProjectInternal(req.body.companyId, req.body.projectId, updateObject, "$inc", []).then(async() => {
+        await updateProjectInternal(companyId, req.body.projectId, updateObject, "$inc", []).then(async() => {
             let obj = {
                 type:SCHEMA_TYPE.MILESTONE,
                 data: [
@@ -214,8 +213,8 @@ exports.updateMilestone = async (req, res) => {
                     {...typsObj}
                 ]
             }
-            await MongoDbCrudOpration(req.body.companyId,obj, "updateOne").then(() => {
-                removeCache(`milestone:${req.body.projectId}:${req.body.companyId}`);
+            await MongoDbCrudOpration(companyId,obj, "updateOne").then(() => {
+                removeCache(`milestone:${req.body.projectId}:${companyId}`);
                 res.send({
                     status: true,
                     statusText: "Milestone Update",
@@ -223,8 +222,8 @@ exports.updateMilestone = async (req, res) => {
                 });
                 let prevMilestoneName = req.body.prevMilestoneName.milestoneName;
                 let milestoneName = req.body.milestoneObject.milestoneName;
-                updateMilestoneNotification(prevMilestoneName,req.body.milestoneStatusObj,req.body.companyId, req.body.projectId,req.body.userDetail,milestoneName,req.body.milestoneObject,req.body.ProjectName,req.body.statusObj);
-                updateMilestoneHistory(req.body.companyId,req.body.projectId,req.body.userDetail,req.body.prevMilestoneName,req.body.milestoneObject,req.body.cuurencyValue);
+                updateMilestoneNotification(prevMilestoneName,req.body.milestoneStatusObj,companyId, req.body.projectId,user,milestoneName,req.body.milestoneObject,req.body.ProjectName,req.body.statusObj);
+                updateMilestoneHistory(companyId,req.body.projectId,user,req.body.prevMilestoneName,req.body.milestoneObject,req.body.cuurencyValue);
             }).catch((err)=>{
                 return res.send({
                     status: false,
@@ -249,7 +248,10 @@ exports.deleteMilestone = async (req, res) => {
             res.send({status: false, statusText: 'Request body is required'});
             return;
         }
-        if (!pinSessionTenant(req, res)) return;
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
+        const user = await milestoneUser(req, res, companyId);
+        if (!user) return;
         if(!req.body.projectId){
             res.send({status: false, statusText: 'project Id is required'});
             return;
@@ -262,21 +264,17 @@ exports.deleteMilestone = async (req, res) => {
             res.send({status: false, statusText: 'ProjectName is required'});
             return;
         }
-        if(!(req.body.userDetail && Object.keys(req.body.userDetail).length)){
-            res.send({status: false, statusText: 'userDetail is required'});
-            return;
-        }
         let milestoneName = req.body.milestoneObjForDelete.milestoneName;
         let historyObj ={};
         let notificationObj = {};
-        historyObj.message = `<b>${req.body.userDetail.Employee_Name}</b> has deleted milestone <b>${milestoneName}</b> in <b>${req.body.ProjectName}</b> project.`;
+        historyObj.message = `<b>${user.Employee_Name}</b> has deleted milestone <b>${milestoneName}</b> in <b>${req.body.ProjectName}</b> project.`;
         historyObj.key = 'Project_Milestone_delete';
         notificationObj.message = `<p>In Project <strong>${req.body.ProjectName}</strong> a Milestone named <strong>${milestoneName}</strong> is deleted.</p>`;
         notificationObj.key = 'project_milestone';
         let updateObject = {
             "milestoneAmount": -req.body.onlyNumber
         }
-        await updateProjectInternal(req.body.companyId, req.body.projectId, updateObject, "$inc", []).then(async() => {
+        await updateProjectInternal(companyId, req.body.projectId, updateObject, "$inc", []).then(async() => {
             let obj = {
                 type: SCHEMA_TYPE.MILESTONE,
                 data: [
@@ -285,14 +283,14 @@ exports.deleteMilestone = async (req, res) => {
                     }
                 ]
             }
-            await MongoDbCrudOpration(req.body.companyId, obj, "deleteOne").then((response)=>{
-                removeCache(`milestone:${req.body.projectId}:${req.body.companyId}`);
+            await MongoDbCrudOpration(companyId, obj, "deleteOne").then((response)=>{
+                removeCache(`milestone:${req.body.projectId}:${companyId}`);
                 res.send({
                     status: true,
                     statusText: "Milestone Delete",
                     data:response
                 });
-                deleteMilestoneNotification(req.body.companyId, req.body.projectId,req.body.userDetail,req.body.milestoneObjForDelete,historyObj,notificationObj);
+                deleteMilestoneNotification(companyId, req.body.projectId,user,req.body.milestoneObjForDelete,historyObj,notificationObj);
             }).catch((err)=>{
                 return res.send({status: false, statusText: err});
             })

@@ -6389,7 +6389,12 @@ export default {
         "This_message_is_deleted": "此消息已被删除",
         "You_deleted_this_message": "您已删除此消息",
         "no_user_found": "未找到用户",
-        "unlock_comment_view": "解锁评论视图"
+        "unlock_comment_view": "解锁评论视图",
+        "agent_tag": "AGENT",
+        "an_agent": "An agent",
+        "ai_assistant": "AI assistant",
+        "cited_page": "page",
+        "cited_page_hidden": "a page you cannot open"
     },
     "PlaceHolder": {
         "enter_task_type": "输入任务类型",
