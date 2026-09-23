@@ -11,6 +11,7 @@ const mongoose = require("mongoose");
 const { updateCompanyFun } = require("../../Company/controller/updateCompany.js");
 const { getUserByQueyFun } = require("../../Users/controller.js");
 const { updateMemberFunction } = require('../../settings/Members/controller.js');
+const { memberRowView } = require('../../settings/Members/membershipGuard.js');
 const logger = require("../../../Config/loggerConfig.js");
 const { emitListener } = require("../../Company/eventController.js");
 const { newLinkToken } = require("../helpers/linkToken");
@@ -158,7 +159,8 @@ exports.sendInvitationEmailFun = (bodyData) => {
              * @param {String} mail - Mail Template which is need to send for email
              * @returns
             */
-            const sendMailFunction = (mailObj,data) => {
+            const sendMailFunction = (mailObj,row) => {
+                const data = memberRowView(row);
                 try {
                     sendMail.SendEmail(mailObj.subject, mailObj.mail, email, true, (result) => {
                         if(result.status) {
@@ -378,7 +380,8 @@ exports.sendInvitationEmail = (req,res) => {
          * @param {String} mail - Mail Template which is need to send for email
          * @returns
         */
-        const sendMailFunction = (mailObj,data) => {
+        const sendMailFunction = (mailObj,row) => {
+            const data = memberRowView(row);
             sendMail.SendEmail(mailObj.subject, mailObj.mail, email, true, (result) => {
                 if(result.status) {
                     res.send({
