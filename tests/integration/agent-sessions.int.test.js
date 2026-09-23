@@ -186,7 +186,7 @@ describe('outside agent sessions with EXTERNAL_AGENT_SESSIONS on', () => {
 
         const stored = await mongo.db(state.companyId).collection('tasks').findOne({ _id: new (require('mongodb').ObjectId)(task._id) });
         expect(stored.AssigneeUserId).toEqual([owner.uid]);
-        const notified = await waitFor(() => mongo.db(state.companyId).collection('notifications').findOne({ changeType: 'agent_session_assigned', notSeen: owner.uid }));
+        const notified = await waitFor(() => mongo.db(state.companyId).collection('notifications').findOne({ changeType: 'agent_session_assigned', notSeen: owner.uid, 'changeData.sessionId': sessionId }));
         expect(notified).toMatchObject({ assigneeUsers: [owner.uid], changeData: { clientName: 'S10S7 coding agent', taskName: task.name, sessionId } });
         expect(notified.message).not.toContain('S10S7');
         const audited = await waitFor(() => mongo.db(state.companyId).collection('audit_logs').findOne({ action: 'agent_session.delegated', entityId: task._id }));
