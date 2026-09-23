@@ -398,6 +398,29 @@ exports.sendTaskNotification = async (userId, taskName) => {
 
 ---
 
+## Adding a Database Migration
+
+Add `migrations/NNN-name.js`; the runner applies it at boot (or `npm run migrate`) and records it in `global.schema_versions`.
+
+```javascript
+module.exports = {
+  id: '043-example',              // must equal the file name
+  scope: 'company',               // or 'global'
+  async up(ctx) {
+    await ctx.forEachCompany(async (companyId) => {
+      await ctx.company(companyId, { type: ctx.SCHEMA_TYPE.TASKS, data: [{ /* filter */ }, { $set: { /* ... */ } }] }, 'updateMany');
+    });
+  },
+  // Optional: resolves to a list of problems, [] while the guarantee holds. Runs with writes refused.
+  async verify(ctx) { return []; },
+};
+```
+
+- `npm run migrate -- up --dry-run` runs `up` with every write refused and recorded, and prints what it would write. Read before you write only data `up` has not written yet: a read of a collection the migration (or an earlier pending one) already wrote is reported as **cannot dry-run**.
+- `npm run migrate -- verify` runs `verify` on applied migrations; problems name records by id and count, never by names or other values. `004-task-type-icons` is the example.
+
+---
+
 ## Debugging Common Issues
 
 ### MongoDB Query Not Returning Data
