@@ -28,6 +28,7 @@ const skillRecord = require('./skillRecord');
 const { buildTrace } = require('./runTrace');
 const workflows = require('../Workflows');
 const knowledgeMemory = require('../Knowledge/memory/publish');
+const { DEFAULT_RATE_LIMIT_PER_DAY } = require('./dailyRunLimit');
 
 const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId) || '';
 // 'mention' is a run started by @naming the agent in a comment (13b); it is
@@ -145,7 +146,7 @@ exports.createAgent = async (req, res) => {
         if (await refuseSkills(res, companyId, set)) return undefined;
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENTS,
-            data: { autonomy: 1, spendCapUsd: 30, paused: false, account: 'workspace', deletedStatusKey: 0, projectIds: [], ...set, ownerId: actor.userId },
+            data: { autonomy: 1, spendCapUsd: 30, rateLimitPerDay: DEFAULT_RATE_LIMIT_PER_DAY, paused: false, account: 'workspace', deletedStatusKey: 0, projectIds: [], ...set, ownerId: actor.userId },
         }, 'save');
         await revisions.recordCreate(companyId, saved, { actor });
         return res.send({ status: true, statusText: 'Agent created.', data: saved });
