@@ -38,6 +38,14 @@ describe('Accounts → token rows on a phone', () => {
     });
 });
 
+describe('Instance console tabs', () => {
+    test('the cards inside a tab are spaced like the tab body, not stacked edge to edge', () => {
+        const body = ruleBody(read('views/Settings/Instance/InstanceShell.vue'), '.in__body > *');
+        expect(body).toMatch(/flex-direction:\s*column/);
+        expect(body).toMatch(/gap:\s*16px/);
+    });
+});
+
 describe('Instance → Enforcement', () => {
     test('the workspace mode select keeps room for its value inside the table ("Rep" at 1280 px)', () => {
         expect(ruleBody(read('views/Settings/Instance/InstanceEnforcement.vue'), '.in-table .en-select')).toMatch(/min-width:\s*1[0-9]{2}px/);
