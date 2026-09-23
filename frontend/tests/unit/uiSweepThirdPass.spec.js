@@ -210,3 +210,56 @@ describe('Docs hub', () => {
         expect(ruleBody(phone, '.hub__btn-label')).toMatch(/display:\s*none/);
     });
 });
+
+describe('fields that set their own size next to .ah-input', () => {
+    const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
+        const full = path.join(dir, d.name);
+        if (d.isDirectory()) return walk(full);
+        return /\.(vue|css)$/.test(d.name) ? [full] : [];
+    });
+    const files = walk(SRC);
+    const vues = files.filter((f) => f.endsWith('.vue')).map((f) => ({ f, text: fs.readFileSync(f, 'utf8') }));
+
+    const sizedWith = new Set();
+    for (const { text } of vues) {
+        for (const m of text.matchAll(/[\s<]class="([^"]*)"/g)) {
+            const list = m[1].split(/\s+/);
+            if (list.includes('ah-input')) list.filter((c) => c && !c.startsWith('ah-')).forEach((c) => sizedWith.add(c));
+        }
+    }
+
+    // A scoped block adds a [data-v] attribute and already out-specifies .ah-input; an @import inside one does not.
+    const scopedSrc = new Set();
+    const unscoped = [];
+    for (const { f, text } of vues) {
+        for (const m of text.matchAll(/<style([^>]*)>([\s\S]*?)<\/style>/g)) {
+            const attrs = m[1];
+            const src = /src="([^"]+)"/.exec(attrs);
+            if (src && /\bscoped\b/.test(attrs)) scopedSrc.add(path.resolve(path.dirname(f), src[1]));
+            else if (!/\bscoped\b/.test(attrs)) unscoped.push({ f, css: m[2] });
+        }
+    }
+    files.filter((f) => f.endsWith('.css') && !scopedSrc.has(f)).forEach((f) => unscoped.push({ f, css: fs.readFileSync(f, 'utf8') }));
+
+    test('no unscoped single-class rule sizes an .ah-input field, which would depend on stylesheet order', () => {
+        const offenders = [];
+        for (const { f, css } of unscoped) {
+            for (const m of css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+                if (!/(^|;)\s*(width|height|padding[\w-]*|font(-size)?|max-width|min-width)\s*:/.test(m[2])) continue;
+                for (const selector of m[1].split(',').map((s) => s.trim())) {
+                    const single = /^\.([\w-]+)$/.exec(selector);
+                    if (single && sizedWith.has(single[1])) offenders.push(`${path.relative(SRC, f)}: ${selector}`);
+                }
+            }
+        }
+        expect(offenders).toEqual([]);
+    });
+
+    test('the sweep\'s fields keep their sizes with two classes', () => {
+        expect(ruleBody(read('views/Settings/SecurityPermissions/style.css'), '.ah-input.sp__search')).toMatch(/max-width:\s*320px/);
+        expect(ruleBody(read('views/Settings/Members/style.css'), '.ah-input.mbv__select')).toMatch(/width:\s*auto/);
+        expect(ruleBody(read('views/Settings/Teams/style.css'), '.ah-input.tm__name-input')).toMatch(/height:\s*30px/);
+        expect(ruleBody(read('views/Billing/style.css'), '.ah-input.billing__pick')).toMatch(/width:\s*240px/);
+        expect(ruleBody(read('views/Timesheet/timeV2.css'), '.ah-input.tv-input-mono')).toMatch(/font:/);
+    });
+});

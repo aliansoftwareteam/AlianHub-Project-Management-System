@@ -98,7 +98,7 @@
 .iw__col-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .iw__col-sample { font: 400 10.5px var(--font-mono); color: var(--ink-label); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .iw__arrow { text-align: center; color: var(--ink-3); }
-.iw__select { height: 30px; padding: 0 8px; font: var(--text-small); }
+.ah-input.iw__select { height: 30px; padding: 0 8px; font: var(--text-small); }
 .iw__col-error { grid-column: 1 / -1; font: 400 11.5px var(--font-ui); color: var(--danger-ink); }
 
 .iw__group { display: flex; flex-direction: column; gap: 5px; }

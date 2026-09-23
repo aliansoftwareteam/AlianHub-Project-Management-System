@@ -15,7 +15,7 @@
 .tm__name { border: 0; background: transparent; padding: 0; color: var(--ink); font: 600 13px/1.3 var(--font-ui); cursor: pointer; text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tm__name:disabled { cursor: default; }
 .tm__name:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
-.tm__name-input { height: 30px; font-size: 13px; }
+.ah-input.tm__name-input { height: 30px; font-size: 13px; }
 .tm__assignee { align-self: flex-start; }
 .tm__note { padding: 11px 13px; font: 400 12px/1.5 var(--font-ui); color: var(--ink-label); }
 @media (max-width: 767px) { .tm__grid { grid-template-columns: 1fr; } }

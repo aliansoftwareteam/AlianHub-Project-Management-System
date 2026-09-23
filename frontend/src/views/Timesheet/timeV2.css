@@ -35,7 +35,7 @@
 .tv-dark .tv-spark, .tv-dark .tv-link { color: #a892ff; }
 .tv-pill { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: var(--r-chip); font: 500 11px/1 var(--font-mono); color: var(--ink-2); background: rgba(0, 0, 0, .05); }
 :root[data-theme="dark"] .tv-pill { background: rgba(255, 255, 255, .08); }
-.tv-input-mono { font: 600 16px/1 var(--font-mono); }
+.ah-input.tv-input-mono { font: 600 16px/1 var(--font-mono); }
 .tv-empty { border: 1px dashed var(--border); border-radius: 10px; padding: 18px; color: var(--ink-2); background: var(--surface-2); display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .tv-empty strong { color: var(--ink); font-weight: 600; }
 .tv-desktop-only { margin: 20px; }
