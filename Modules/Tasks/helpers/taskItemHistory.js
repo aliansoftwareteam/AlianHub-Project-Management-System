@@ -4,6 +4,7 @@ const logger = require('../../../Config/loggerConfig');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { HandleHistory } = require('./helper');
 const { escapeText } = require('./taskWriteFields');
+const { fieldValueText, customFieldDefinitionOf } = require('../../CustomField/helpers/customFieldText');
 
 const HISTORY = Object.freeze({
     CUSTOM_FIELD_VALUE: 'Project_Category',
@@ -16,36 +17,6 @@ const SERVER_BUILT_HISTORY = [HISTORY.CUSTOM_FIELD_VALUE, HISTORY.TASK_TAG].map(
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
-
-const instantOf = (value) => {
-    if (value === undefined || value === null || value === '') return null;
-    const millis = new Date(value).getTime();
-    return Number.isNaN(millis) ? null : millis;
-};
-
-/* The web app printed the value it was handed; a date becomes DATE_ so the activity log shows it in the reader's format. */
-const fieldValueText = (definition, detail) => {
-    const value = detail ? detail.fieldValue : undefined;
-    switch (definition.fieldType) {
-        case 'dropdown': {
-            const chosen = [].concat(value === undefined || value === null ? [] : value).map(String);
-            return (definition.fieldOptions || [])
-                .filter((option) => option && chosen.includes(String(option.id)))
-                .map((option) => option.value || option.label || '')
-                .join(', ');
-        }
-        case 'date': {
-            const millis = instantOf(value);
-            return millis === null ? '' : `DATE_${millis}`;
-        }
-        case 'checkbox':
-            return String(value === true || value === 'true');
-        case 'phone':
-            return [detail && detail.fieldCode, value].filter(Boolean).join(' ');
-        default:
-            return value === undefined || value === null ? '' : String(value);
-    }
-};
 
 const describeCustomFieldValue = ({ actor, definition, next, previous }) => {
     if (!definition || !next) return null;
@@ -74,21 +45,9 @@ const describeTaskTag = ({ actor, tag, taskName, operation, held }) => {
     };
 };
 
-const byId = (id) => ({ _id: new mongoose.Types.ObjectId(String(id)) });
-
-/* Project-level definitions live in the company database, the ones shared by every company in the global one. */
-const customFieldDefinitionOf = async (companyId, fieldId) => {
-    if (!OBJECT_ID.test(String(fieldId))) return null;
-    for (const database of [companyId, 'global']) {
-        const found = await MongoDbCrudOpration(database, { type: SCHEMA_TYPE.CUSTOM_FIELDS, data: [byId(fieldId)] }, 'findOne').catch(() => null);
-        if (found) return plain(found);
-    }
-    return null;
-};
-
 const projectTagsOf = async (companyId, projectId) => {
     if (!OBJECT_ID.test(String(projectId))) return [];
-    const project = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [byId(projectId), { tagsArray: 1 }] }, 'findOne').catch(() => null);
+    const project = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: new mongoose.Types.ObjectId(String(projectId)) }, { tagsArray: 1 }] }, 'findOne').catch(() => null);
     return (project && plain(project).tagsArray) || [];
 };
 

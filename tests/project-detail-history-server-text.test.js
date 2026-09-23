@@ -26,6 +26,7 @@ const OWNER = '6f0000000000000000000001';
 const MEMBER = '6f0000000000000000000003';
 const PROJECT = '6f0000000000000000000a01';
 const FIELD = '6f0000000000000000000cf1';
+const NEW_FIELD = '6f0000000000000000000cf2';
 const HTML = '<img src=x onerror=alert(1)>';
 const ESCAPED = '&lt;img src=x onerror=alert&#40;1&#41;&gt;';
 
@@ -73,6 +74,7 @@ beforeEach(() => {
         customField: { [FIELD]: { _id: FIELD, fieldValue: 'old' } },
     });
     mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: FIELD, fieldTitle: 'Client code', fieldType: 'text', type: 'project', global: false, projectId: [PROJECT] });
+    mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: NEW_FIELD, fieldTitle: 'Region', fieldType: 'text', type: 'project', global: false, projectId: [PROJECT] });
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: OWNER, Employee_Name: 'Olivia Owner' });
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: MEMBER, Employee_Name: 'Max Member' });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1 });
@@ -97,9 +99,11 @@ describe('a project detail change is described on the server', () => {
         expect(messages()).toEqual([['Project_Skills', '<b>Olivia Owner</b> has changed <b> Skills</b> as <b>Vue.js, Node.js</b>.']]);
     });
 
+    /* fakeMongo answers the old document as a shallow copy that shares nested objects, so this project starts with no custom field values. */
     test('a project custom field value names the stored field and the new value', async () => {
-        await update({ updateObject: { [`customField.${FIELD}`]: { _id: FIELD, fieldValue: `new ${HTML}` } } });
-        expect(messages()).toEqual([['Project_CustomField', `<b>Olivia Owner</b> has added value in <b> Client code</b> Custom Field as <b>new ${ESCAPED}</b> for project.`]]);
+        delete mockDb.store[SCHEMA_TYPE.PROJECTS][0].customField;
+        await update({ updateObject: { [`customField.${NEW_FIELD}`]: { _id: NEW_FIELD, fieldValue: `new ${HTML}` } } });
+        expect(messages()).toEqual([['Project_CustomField', `<b>Olivia Owner</b> has added value in <b> Region</b> Custom Field as <b>new ${ESCAPED}</b> for project.`]]);
     });
 
     test('unchanged values are not described', async () => {

@@ -7,6 +7,9 @@ const { HandleHistory } = require('../../Tasks/helpers/helper');
 const { HandleBothNotification } = require('../../Tasks/helpers/handleNotification');
 const { shownDate } = require('../../Tasks/helpers/notificationTemplate');
 const { employeeNameOf, escapeText } = require('../../Tasks/helpers/taskWriteFields');
+const projectSkills = require('../../settings/ProjectSkills/helper');
+const { fieldValueText, customFieldDefinitionOf } = require('../../CustomField/helpers/customFieldText');
+const { sourceOrDefault } = require('./projectSourceRules');
 
 /* The web app filed reopen, avatar, colour and sharing rows under the end-date key; they keep it so older rows and new ones read alike. */
 const SETTINGS_KEY = 'Project_EndDate';
@@ -25,6 +28,10 @@ const HISTORY = Object.freeze({
     WATCHERS: 'Project_Watchers',
     CREATED: 'Project_Created',
     SPRINT: 'Create_Sprint',
+    SOURCE: 'Project_Source',
+    PROPOSAL_ID: 'Project_ProposalId',
+    SKILLS: 'Project_Skills',
+    CUSTOM_FIELD: 'Project_CustomField',
 });
 
 const NOTICE = Object.freeze({
@@ -46,6 +53,7 @@ const NOTICE = Object.freeze({
 const SERVER_BUILT_HISTORY = [
     HISTORY.STATUS, HISTORY.ASSIGNEE_ADD, HISTORY.ASSIGNEE_REMOVE, 'Assignee_Changed', HISTORY.TYPE, HISTORY.CURRENCY,
     HISTORY.DUE_DATE, HISTORY.START_DATE, HISTORY.END_DATE, HISTORY.WATCHERS, HISTORY.CREATED, HISTORY.SPRINT,
+    HISTORY.SOURCE, HISTORY.PROPOSAL_ID, HISTORY.SKILLS, HISTORY.CUSTOM_FIELD,
 ].map((key) => ({ type: 'project', key }));
 const SERVER_BUILT_NOTIFICATIONS = Object.values(NOTICE);
 
@@ -213,12 +221,53 @@ const watchModeChanged = ({ A, set, previous, actor }) => {
     return [{ history: { key: HISTORY.WATCHERS, message: `<b>${A}</b> has watchers activity as a <b>${WATCH_LABELS[next] || 'Ignore'}</b>` } }];
 };
 
-const SET_CHANGES = [renamed, statusChanged, trashedOrRestored, typeChanged, currencyChanged, datesChanged, iconChanged, sharingChanged, watchModeChanged];
+const SOURCE_LABELS = { upwork: 'Upwork', fiverr: 'Fiverr', other: 'Other' };
 
-const describeProjectChanges = async ({ previous, updateObject, key, actor, nameOf = employeeNameOf, timeZone }) => {
+const sourceChanged = ({ A, set, previous }) => {
+    if (!has(set, 'source') || set.source === sourceOrDefault(previous.source)) return [];
+    return [{ history: { key: HISTORY.SOURCE, message: `<b>${A}</b> has changed <b> Source</b> as <b>${escapeText(SOURCE_LABELS[set.source] || set.source)}</b>.` } }];
+};
+
+const proposalIdChanged = ({ A, set, previous }) => {
+    if (!has(set, 'proposalId') || String(set.proposalId || '') === String(previous.proposalId || '')) return [];
+    return [{ history: { key: HISTORY.PROPOSAL_ID, message: `<b>${A}</b> has changed <b> Proposal ID</b> as <b>${escapeText(set.proposalId) || 'N/A'}</b>.` } }];
+};
+
+const skillsChanged = async ({ A, set, previous, skillNamesOf }) => {
+    if (!has(set, 'skills') || !Array.isArray(set.skills)) return [];
+    if (JSON.stringify(set.skills) === JSON.stringify(Array.from(previous.skills || []))) return [];
+    const names = (await skillNamesOf(set.skills)).map(escapeText);
+    return [{ history: { key: HISTORY.SKILLS, message: `<b>${A}</b> has changed <b> Skills</b> as <b>${names.join(', ') || 'N/A'}</b>.` } }];
+};
+
+const CUSTOM_FIELD_PREFIX = 'customField.';
+
+const customFieldsChanged = async ({ A, set, previous, definitionOf }) => {
+    const fieldIds = Object.keys(set).filter((field) => field.startsWith(CUSTOM_FIELD_PREFIX)).map((field) => field.slice(CUSTOM_FIELD_PREFIX.length));
+    const entries = await Promise.all(fieldIds.map(async (fieldId) => {
+        const definition = await definitionOf(fieldId);
+        if (!definition) return null;
+        const shown = fieldValueText(definition, set[`${CUSTOM_FIELD_PREFIX}${fieldId}`]);
+        const before = previous.customField && previous.customField[fieldId];
+        if (before && fieldValueText(definition, before) === shown) return null;
+        return { history: { key: HISTORY.CUSTOM_FIELD, message: `<b>${A}</b> has added value in <b> ${escapeText(definition.fieldTitle)}</b> Custom Field as <b>${escapeText(shown)}</b> for project.` } };
+    }));
+    return entries.filter(Boolean);
+};
+
+const SET_CHANGES = [
+    renamed, statusChanged, trashedOrRestored, typeChanged, currencyChanged, datesChanged, iconChanged, sharingChanged, watchModeChanged,
+    sourceChanged, proposalIdChanged, skillsChanged, customFieldsChanged,
+];
+
+const describeProjectChanges = async ({
+    previous, updateObject, key, actor, nameOf = employeeNameOf, timeZone, companyId,
+    skillNamesOf = (slugs) => projectSkills.skillNamesOf(companyId, slugs),
+    definitionOf = (fieldId) => customFieldDefinitionOf(companyId, fieldId),
+}) => {
     if (!previous || !updateObject || typeof updateObject !== 'object') return [];
-    const ctx = { A: actor.Employee_Name, P: escapeText(previous.ProjectName), previous, updateObject, key, actor, nameOf, timeZone };
-    if (!key || key === '$set') return SET_CHANGES.flatMap((change) => change({ ...ctx, set: updateObject }));
+    const ctx = { A: actor.Employee_Name, P: escapeText(previous.ProjectName), previous, updateObject, key, actor, nameOf, timeZone, skillNamesOf, definitionOf };
+    if (!key || key === '$set') return (await Promise.all(SET_CHANGES.map((change) => change({ ...ctx, set: updateObject })))).flat();
     return assigneeChanged(ctx);
 };
 
@@ -258,7 +307,7 @@ const send = ({ companyId, projectId, actor, entries }) => Promise.all(entries.f
 const recordProjectChanges = async ({ companyId, projectId, actorId, previous, updateObject, key, timeZone }) => {
     if (!previous) return;
     const actor = await projectActor(companyId, actorId);
-    const entries = await describeProjectChanges({ previous, updateObject, key, actor, timeZone });
+    const entries = await describeProjectChanges({ previous, updateObject, key, actor, timeZone, companyId });
     if (entries.length) await send({ companyId, projectId, actor, entries });
 };
 

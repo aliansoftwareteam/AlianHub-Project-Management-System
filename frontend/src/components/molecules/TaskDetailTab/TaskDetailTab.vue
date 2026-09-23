@@ -674,11 +674,6 @@ const insertCustomField = (detail) => {
 } 
 const customFieldStore = async(object,isEdit) => {
     let value = JSON.parse(JSON.stringify(object))
-    let userData = {
-        id: user.id,
-        name: user.Employee_Name,
-        companyOwnerId: companyOwner.value._id,
-    }
     if(!isEdit){
         try {
             value.global = false;
@@ -696,18 +691,6 @@ const customFieldStore = async(object,isEdit) => {
                     value._id = res?.data?._id || '';
                     commit("settings/mutateFinalCustomFields", {data: value || {},op: "added"});
                     $toast.success(t("Toast.Field_Added_Successfully"), {position: 'top-right' });
-                    let historyObj = {
-                        'message': `<b>${userData.name}</b> has Created <b> Custom Field </b> as <b>${value.fieldTitle}</b> for task.`,
-                        'key' : 'Project_CustomField',
-                    }
-                    apiRequest("post", env.HANDLE_HISTORY, {
-                        "type": 'project',
-                        "companyId": companyId.value,
-                        "projectId": props.task.ProjectID,
-                        "taskId": null,
-                        "object": historyObj,
-                        "userData": userData
-                    })
                 }else{
                     $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
                 }
@@ -724,7 +707,6 @@ const customFieldStore = async(object,isEdit) => {
         }
     }else{
         try {
-            const oldFieldValue = customFieldObject.value.fieldTitle
             value.updatedAt = new Date();
             const object = {
                 type: "updateOne",
@@ -737,20 +719,6 @@ const customFieldStore = async(object,isEdit) => {
             await apiRequest("put",env.CUSTOM_FIELD,object).then((res) => {
                 if(res.status === 200){
                     commit("settings/mutateFinalCustomFields", {data: {...customFieldObject.value,...value} || {},op: "modified"});
-                    if(oldFieldValue !== value.fieldTitle){
-                        let historyObj = {
-                            'message': `<b>${userData.name}</b> has Edited <b> Custom Field </b> from <b>${oldFieldValue}</b> to <b>${value.fieldTitle}</b> for task.`,
-                            'key' : 'Project_CustomField',
-                        }
-                        apiRequest("post", env.HANDLE_HISTORY, {
-                            "type": 'project',
-                            "companyId": companyId.value,
-                            "projectId": props.task.ProjectID,
-                            "taskId": null,
-                            "object": historyObj,
-                            "userData": userData
-                        })
-                    }
                     $toast.success(t("Toast.Field_Updated_Successfully"), {position: 'top-right' })
                 }else{
                     $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });

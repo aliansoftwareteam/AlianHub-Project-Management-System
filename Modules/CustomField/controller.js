@@ -3,6 +3,8 @@ const { removeCache } = require("../../utils/commonFunctions");
 const { dbCollections } = require("../../Config/collections");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
+const logger = require("../../Config/loggerConfig");
+const { recordFieldCreated, recordFieldRenamed } = require("./helpers/customFieldHistory");
 
 exports.insertCustomField = async (req, res) => {
     try {
@@ -20,6 +22,8 @@ exports.insertCustomField = async (req, res) => {
         }
 
         const response = await this.insertCustomFieldPromise(updateObject, type, companyId);
+        recordFieldCreated({ companyId, field: response, actorId: req.uid })
+            .catch((error) => logger.error(`custom field created history: ${error && error.message}`));
 
         return res.status(200).json(response);
     } catch (error) {
@@ -108,15 +112,21 @@ exports.updateCustomField = async (req, res) => {
             updatedAt: currentDate
         };
 
+        const filter = { _id: new mongoose.Types.ObjectId(id) };
+        const previous = await MongoDbCrudOpration(companyId, { type: dbCollections.CUSTOM_FIELDS, data: [filter] }, 'findOne');
         const query = {
             type: dbCollections.CUSTOM_FIELDS,
             data:[
-                { _id: new mongoose.Types.ObjectId(id) },
+                filter,
                 { [key]: updateObjectDate },
             ]
         };
         const response = await MongoDbCrudOpration(companyId, query, type);
         removeCache(`customField:${companyId}`);
+        if (previous && key === '$set') {
+            recordFieldRenamed({ companyId, previous, next: updateObject, actorId: req.uid })
+                .catch((error) => logger.error(`custom field renamed history: ${error && error.message}`));
+        }
         return res.status(200).json(response);
     } catch (error) {
         console.error(`Error updating or inserting custom field:`, error);
