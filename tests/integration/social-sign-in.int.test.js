@@ -26,6 +26,7 @@ const passwordAccount = async () => {
     expect(invite.status).toBe(200);
     const created = await anonymous.post('/api/v2/createUser', {
         firstName: 'Vic', lastName: 'Tim', email, password: state.password, isInvitation: true, assignCompany: state.companyId,
+        memberId: String(invite.body.data._id), linkId: invite.body.data.linkId,
     });
     expect(created.body.status).toBe(true);
     return { email, userId: String(created.body.statusText._id) };
