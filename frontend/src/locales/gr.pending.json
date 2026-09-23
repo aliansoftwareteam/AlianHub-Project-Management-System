@@ -1,6 +1,7 @@
 {
   "locale": "gr",
   "machineTranslated": false,
+  "updatedAt": "2026-09-23T15:57:26.323Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -1799,6 +1800,11 @@
     "Clips.untitled": "Untitled clip",
     "Clips.video_badge": "Video",
     "Comment.enter_task_name": "Enter task name",
+    "Comments.agent_tag": "AGENT",
+    "Comments.ai_assistant": "AI assistant",
+    "Comments.an_agent": "An agent",
+    "Comments.cited_page": "page",
+    "Comments.cited_page_hidden": "a page you cannot open",
     "Common.select_all_tasks": "Select all tasks in group",
     "Common.select_task": "Select task",
     "ConnectedApps.empty": "You have not connected any app.",

@@ -20,8 +20,8 @@ const ensureAgents = () => {
 };
 
 export function useProvenanceActors() {
-    const { getters } = useStore();
-    const people = computed(() => getters["users/users"] || []);
+    const store = useStore();
+    const people = computed(() => (store && store.getters["users/users"]) || []);
 
     const personOf = (actorId) => people.value.find((user) => String(user._id) === String(actorId)) || null;
     const agentOf = (agentId) => agents.value.find((agent) => String(agent._id) === String(agentId)) || null;
