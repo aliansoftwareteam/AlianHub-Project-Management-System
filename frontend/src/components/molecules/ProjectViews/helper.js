@@ -105,3 +105,17 @@ export const editPrivateName = (ids, data, name) => {
         }
     })
 }
+
+/* Private views are saved on the member, not the project, so their project history row is still written from here. */
+export const privateViewHistory = (companyId, projectId, message) => {
+    apiRequest("post", env.HANDLE_HISTORY, {
+        type: 'project',
+        companyId,
+        projectId,
+        taskId: null,
+        object: { key: 'Project_Name', message },
+        userData: {},
+    }).catch((error) => {
+        console.error("ERROR in private view history: ", error);
+    });
+};

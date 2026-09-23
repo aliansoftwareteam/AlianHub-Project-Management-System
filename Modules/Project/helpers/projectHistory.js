@@ -280,20 +280,68 @@ const attachmentsChanged = ({ A, P, previous, updateObject, key }) => {
     }];
 };
 
+const VIEW_FIELD = /^ProjectRequiredComponent\.\$\[elementIndex\]\.(isPin|setAsDefault|name)$/;
+const isEmbed = (view) => has(view, 'url') || has(view, 'html');
+const storedView = (previous, viewId) => (previous.ProjectRequiredComponent || []).find((view) => view && viewId !== undefined && idOf(view) === String(viewId));
+
+const viewAdded = ({ A, previous, updateObject }) => {
+    const view = updateObject.ProjectRequiredComponent;
+    if (!view || typeof view !== 'object' || storedView(previous, idOf(view))) return [];
+    const pinned = view.isPin ? 'pinned' : '';
+    const N = escapeText(view.name);
+    return [{ history: { key: HISTORY.NAME, message: `<b>${A}</b> has added the <b> ${pinned}  ${isEmbed(view) ? 'Embed View' : 'View'} </b> as <b>${N}</b>` } }];
+};
+
+const viewRemoved = ({ A, previous, updateObject }) => {
+    const view = storedView(previous, idOf(updateObject.ProjectRequiredComponent || ''));
+    if (!view) return [];
+    const N = escapeText(view.name);
+    return [{
+        history: {
+            key: HISTORY.NAME,
+            message: isEmbed(view) ? `<b> ${A} </b> has deleted the  <b> Embed View ${N} </b>` : `<b> ${A} </b> has Deleted the <b> ${N} View </b>`,
+        },
+    }];
+};
+
+const VIEW_EDITS = {
+    isPin: ({ A, N, value }) => `<b> ${A} </b> has ${value ? 'pinned' : 'Unpinned'} the <b> ${N} View </b>`,
+    setAsDefault: ({ A, N, value }) => (value ? `<b> ${A} </b> has added the <b> ${N} </b>as Default View` : `<b> ${A} </b> has removed the <b> ${N} </b>as Default View `),
+    name: ({ A, N, value }) => `<b>${A}</b> has changed the  <b> Embed View name </b> as <b> ${escapeText(value)} </b>  from <b>${N} </b>`,
+};
+
+/* The view list edits one view at a time, naming it through the elementIndex array filter. */
+const viewEdited = ({ A, set, previous, arrayFilters }) => {
+    const filter = (arrayFilters || []).find((entry) => entry && has(entry, 'elementIndex._id'));
+    const view = filter && storedView(previous, filter['elementIndex._id']);
+    if (!view) return [];
+    return Object.keys(set).flatMap((field) => {
+        const match = VIEW_FIELD.exec(field);
+        if (!match) return [];
+        const [, name] = match;
+        const value = set[field];
+        const before = name === 'name' ? String(view.name) : Boolean(view[name]);
+        if ((name === 'name' ? String(value) : Boolean(value)) === before) return [];
+        return [{ history: { key: HISTORY.NAME, message: VIEW_EDITS[name]({ A, N: escapeText(view.name), value }) } }];
+    });
+};
+
 const SET_CHANGES = [
     renamed, statusChanged, trashedOrRestored, typeChanged, currencyChanged, datesChanged, iconChanged, sharingChanged, watchModeChanged,
-    sourceChanged, proposalIdChanged, skillsChanged, customFieldsChanged,
+    sourceChanged, proposalIdChanged, skillsChanged, customFieldsChanged, viewEdited,
 ];
 
 const describeProjectChanges = async ({
-    previous, updateObject, key, actor, nameOf = employeeNameOf, timeZone, companyId,
+    previous, updateObject, key, arrayFilters, actor, nameOf = employeeNameOf, timeZone, companyId,
     skillNamesOf = (slugs) => projectSkills.skillNamesOf(companyId, slugs),
     definitionOf = (fieldId) => customFieldDefinitionOf(companyId, fieldId),
 }) => {
     if (!previous || !updateObject || typeof updateObject !== 'object') return [];
-    const ctx = { A: actor.Employee_Name, P: escapeText(previous.ProjectName), previous, updateObject, key, actor, nameOf, timeZone, skillNamesOf, definitionOf };
+    const ctx = { A: actor.Employee_Name, P: escapeText(previous.ProjectName), previous, updateObject, key, arrayFilters, actor, nameOf, timeZone, skillNamesOf, definitionOf };
     if (!key || key === '$set') return (await Promise.all(SET_CHANGES.map((change) => change({ ...ctx, set: updateObject })))).flat();
     if (['$push', '$pull'].includes(key) && has(updateObject, 'attachments')) return attachmentsChanged(ctx);
+    if (key === '$addToSet' && has(updateObject, 'ProjectRequiredComponent')) return viewAdded(ctx);
+    if (key === '$pull' && has(updateObject, 'ProjectRequiredComponent')) return viewRemoved(ctx);
     return assigneeChanged(ctx);
 };
 
@@ -330,10 +378,10 @@ const send = ({ companyId, projectId, actor, entries }) => Promise.all(entries.f
         : null,
 ]));
 
-const recordProjectChanges = async ({ companyId, projectId, actorId, previous, updateObject, key, timeZone }) => {
+const recordProjectChanges = async ({ companyId, projectId, actorId, previous, updateObject, key, arrayFilters, timeZone }) => {
     if (!previous) return;
     const actor = await projectActor(companyId, actorId);
-    const entries = await describeProjectChanges({ previous, updateObject, key, actor, timeZone, companyId });
+    const entries = await describeProjectChanges({ previous, updateObject, key, arrayFilters, actor, timeZone, companyId });
     if (entries.length) await send({ companyId, projectId, actor, entries });
 };
 

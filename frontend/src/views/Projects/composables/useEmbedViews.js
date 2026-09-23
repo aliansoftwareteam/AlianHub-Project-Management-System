@@ -4,9 +4,7 @@ import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
 import { useGetterFunctions } from '@/composable';
 import { deleteView, editView } from '@/components/molecules/EmbedView/helper.js';
-import { deletePrivateView, editPrivateName } from '@/components/molecules/ProjectViews/helper.js';
-import * as env from '@/config/env';
-import { apiRequest } from '@/services';
+import { deletePrivateView, editPrivateName, privateViewHistory } from '@/components/molecules/ProjectViews/helper.js';
 
 /**
  * Embed-view CRUD helpers.
@@ -61,6 +59,7 @@ export function useEmbedViews(projectData, embedViews, companyUser, renameValue,
         }
         if (element.isPrivate) {
             editPrivateName({ cid: companyId.value, uid: companyUser.value._id, uniqueId: element.id }, element, renameValue.value.name.trim());
+            privateViewHistory(companyId.value, projectData.value._id, `<b>${userData.Employee_Name}</b> has changed the  <b> Embed View name </b> as <b> ${renameValue.value.name.trim()} </b>  from <b>${element?.name} </b>`);
         } else {
             editView({ cid: companyId.value, pid: projectData.value._id }, element, renameValue.value.name.trim(), 'name').then((res) => {
                 commit('projectData/projectLocalUpdate', { itemData: res.data, projectId: projectData.value._id, key: 'ProjectView', subKey: 'edit', userId: '' });
@@ -71,20 +70,6 @@ export function useEmbedViews(projectData, embedViews, companyUser, renameValue,
                 selectedEmbedView.value.name = renameValue.value.name;
             }
         }
-        const historyObj = {
-            message: `<b>${userData.Employee_Name}</b> has changed the  <b> Embed View name </b> as <b> ${renameValue.value.name.trim()} </b>  from <b>${element?.name} </b>`,
-            key: 'Project_Name',
-        };
-        apiRequest('post', env.HANDLE_HISTORY, {
-            type: 'project',
-            companyId: companyId.value,
-            projectId: projectData.value._id,
-            taskId: null,
-            object: historyObj,
-            userData,
-        }).catch((error) => {
-            console.error('ERROR in update project history: ', error);
-        });
         renameValue.value = { name: '', id: '' };
     };
 
@@ -95,28 +80,14 @@ export function useEmbedViews(projectData, embedViews, companyUser, renameValue,
             Employee_Name: user.Employee_Name,
             companyOwnerId: getters['settings/companyOwnerDetail'].userId,
         };
-        const historyObj = {
-            message: `<b> ${userData.Employee_Name} </b> has deleted the  <b> Embed View ${openDelete.value.data.name} </b>`,
-            key: 'Project_Name',
-        };
-
         if (openDelete.value.data.isPrivate) {
+            privateViewHistory(companyId.value, projectData.value._id, `<b> ${userData.Employee_Name} </b> has deleted the  <b> Embed View ${openDelete.value.data.name} </b>`);
             deletePrivateView({ cid: companyId.value, uid: companyUser.value._id, uniqueId: openDelete.value.data.id }).then(() => {
                 $toast.success(t('Toast.View_Deleted_Successfully'), { position: 'top-right' });
             }).catch((err) => {
                 console.error(err.statusText);
             });
             openDelete.value.flag = false;
-            apiRequest('post', env.HANDLE_HISTORY, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: projectData.value._id,
-                taskId: null,
-                object: historyObj,
-                userData,
-            }).catch((error) => {
-                console.error('ERROR in update project history: ', error);
-            });
             return;
         }
 
@@ -126,16 +97,6 @@ export function useEmbedViews(projectData, embedViews, companyUser, renameValue,
             console.error(err.statusText);
         });
         openDelete.value.flag = false;
-        apiRequest('post', env.HANDLE_HISTORY, {
-            type: 'project',
-            companyId: companyId.value,
-            projectId: projectData.value._id,
-            taskId: null,
-            object: historyObj,
-            userData,
-        }).catch((error) => {
-            console.error('ERROR in update project history: ', error);
-        });
         $toast.success(t('Toast.View_Deleted_Successfully'), { position: 'top-right' });
     };
 
