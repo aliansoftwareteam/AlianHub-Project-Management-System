@@ -52,10 +52,11 @@
                             <span class="team__name">{{ person.name }}</span>
                         </span>
                         <span class="team__now">
-                            <span v-if="person.timer" class="team__timer ah-mono"><span class="ah-dot ah-dot--ok"></span>{{ elapsed(person.timer.elapsedMs) }}</span>
+                            <span v-if="person.timer && person.timer.elapsedMs !== null" class="team__timer ah-mono"><span class="ah-dot ah-dot--ok"></span>{{ elapsed(person.timer.elapsedMs) }}</span>
                             <span>{{ nowLine(person) }}</span>
                         </span>
-                        <span class="team__load">
+                        <span v-if="person.load === null" class="team__load ah-small">{{ $t('Parity.hours_not_shared') }}</span>
+                        <span v-else class="team__load">
                             <span class="team__bar"><span class="team__bar-fill" :class="loadClass(person.load)" :style="{ width: `${Math.min(100, person.load)}%` }"></span></span>
                             <span class="ah-mono team__load-num">{{ person.load }}%</span>
                         </span>
@@ -134,7 +135,7 @@ const error = ref("");
 const showStandup = ref(false);
 const showBalance = ref(false);
 
-const headline = computed(() => t("Parity.team_headline", {
+const headline = computed(() => t(totals.value.load === null ? "Parity.team_headline_no_load" : "Parity.team_headline", {
     p: totals.value.people || 0,
     a: totals.value.agents || 0,
     load: totals.value.load || 0
@@ -154,6 +155,7 @@ const clock = (at) => (at ? new Date(at).toLocaleTimeString([], { hour: "2-digit
 
 const nowLine = (person) => {
     if (person.status === "away" && person.pto) return t("Parity.pto_until", { date: String(person.pto.to).slice(0, 10) });
+    if (person.nowOnHidden) return t("Parity.busy_on_task");
     if (person.nowOn) return person.nowOn;
     return t("Parity.nothing_in_progress");
 };
@@ -161,6 +163,7 @@ const nowLine = (person) => {
 const agentNow = (agent) => {
     if (agent.paused) return t("Parity.agent_paused");
     if (!agent.run) return t("Parity.agent_idle");
+    if (agent.run.hidden) return t("Parity.agent_on", { task: t("Parity.busy_on_task"), min: Math.round(agent.run.elapsedMs / 60000) });
     return t("Parity.agent_on", { task: agent.run.taskKey || agent.run.taskName || agent.run.id.slice(-6), min: Math.round(agent.run.elapsedMs / 60000) });
 };
 
