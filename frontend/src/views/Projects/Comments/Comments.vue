@@ -150,7 +150,7 @@
                         <InputText
                             class="input__taskname-value"
                             v-model="formData.taskName.value"
-                            placeholder="Enter task name"
+                            :placeholder="$t('Comment.enter_task_name')"
                             :maxLength="250"
                             :minLength="3"
                             :isOutline="false"

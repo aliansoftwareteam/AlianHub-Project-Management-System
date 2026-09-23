@@ -1,7 +1,7 @@
 {
   "locale": "ru",
   "machineTranslated": false,
-  "updatedAt": "2026-09-23T15:27:43.707Z",
+  "updatedAt": "2026-09-23T15:57:26.432Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6547,6 +6547,32 @@
     "Ai.skill_read_err_link_invalid": "This read cannot take that link; choose one from the list.",
     "Ai.skill_read_err_hosts_max": "List at most {max} other hosts.",
     "Ai.skill_read_err_path_or_link": "Give a path, or choose a link to read.",
-    "Time.agent_load_failed": "Agent proposals didn't load. Refresh to try again."
+    "Time.agent_load_failed": "Agent proposals didn't load. Refresh to try again.",
+    "Views.timeline_title": "Timeline",
+    "Views.timeline_empty": "No scheduled tasks yet — give a task a start & due date to see it on the timeline.",
+    "Views.unscheduled_tray": "Unscheduled ({n})",
+    "Views.whiteboard_title": "Whiteboard",
+    "Views.whiteboard_cards": "{n} cards",
+    "Views.auto_arrange": "Auto-arrange",
+    "Views.whiteboard_empty": "No tasks yet — tasks appear here as movable cards.",
+    "Views.canvas_title": "Canvas",
+    "Views.canvas_empty": "No tasks yet — widgets fill in as the project grows.",
+    "Views.canvas_pct_complete": "{pct}% complete",
+    "Views.canvas_overdue_open": "overdue & open",
+    "Views.canvas_nothing_due": "Nothing due in the next 7 days.",
+    "Reports.cfd_last_days": "Cumulative flow — last {days} days",
+    "Reports.cfd_no_history": "No task history yet.",
+    "Reports.velocity_last_sprints": "Last {n} completed sprints — committed vs completed (points)",
+    "Reports.velocity_skipped": "{n} older sprint(s) skipped — no commitment was recorded when they ran.",
+    "Reports.velocity_empty": "No completed sprints yet. Velocity is measured from what a sprint committed to when it started, so a sprint has to be started and completed before it appears here.",
+    "Reports.export_pdf": "Export PDF",
+    "Reports.loading": "Loading…",
+    "Projects.all_views": "All Views",
+    "Projects.archived_notice": "Project is currently archived",
+    "projectDashboard.clear": "Clear",
+    "Comment.enter_task_name": "Enter task name",
+    "Views.mindmap_title": "Mind Map",
+    "Views.mindmap_nodes": "{n} nodes",
+    "Views.mindmap_empty": "No tasks yet — add tasks to see the project mind map."
   }
 }
