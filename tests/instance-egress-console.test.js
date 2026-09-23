@@ -232,6 +232,19 @@ describe('with the flag on', () => {
             expect(changeAudits(CID_A)).toHaveLength(0);
         });
 
+        it.each([['0x.0x.0x.0x'], ['1.2.3.4.5'], ['docs.0x10'], ['127.0.0.1.'], ['::ffff:0:a00:1']])('refuses %s, a host that spells an address, and stores nothing', async (entry) => {
+            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com', entry], version: 0 });
+            expect(res.status).toBe(400);
+            expect(res.body.data.errors).toEqual([{ entry, reason: 'address' }]);
+            expect(listOf(CID_A)).toBeUndefined();
+        });
+
+        it.each([['localhost.'], ['vault.internal.'], ['Printer.Local.']])('refuses %s, a private name with a trailing dot', async (entry) => {
+            const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: [entry], version: 0 });
+            expect(res.status).toBe(400);
+            expect(res.body.data.errors).toEqual([{ entry, reason: 'private' }]);
+        });
+
         it.each([[{ version: 0 }, 'hosts_not_list'], [{ hosts: 'docs.example.com', version: 0 }, 'hosts_not_list'], [{ hosts: null, version: 0 }, 'hosts_not_list'], [{ hosts: [{ host: 'docs.example.com' }], version: 0 }, 'entries_refused']])('refuses a body of %j as %s', async (body, code) => {
             const res = await asOwner('PUT', `${BASE}/${CID_A}`, body);
             expect(res.status).toBe(400);
@@ -371,6 +384,12 @@ describe('with the flag on', () => {
             await settle();
             expect(changeAudits(CID_A)).toHaveLength(1);
             expect(changeAudits(CID_A)[0]).toMatchObject({ actorId: 'instance-admin-key', meta: { via: 'admin_key' } });
+        });
+
+        it('a list the key saved before it had its own actor still names the key', async () => {
+            seedList(CID_A, ['docs.example.com'], { updatedBy: 'key' });
+            const res = await asOwner('GET', BASE);
+            expect(workspace(res.body.data, CID_A)).toMatchObject({ updatedBy: 'instance-admin-key', updatedByName: '' });
         });
 
         it('an owner session stays the owner', async () => {

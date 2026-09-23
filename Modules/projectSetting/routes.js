@@ -16,7 +16,6 @@ exports.init = (app) => {
     *        type: object
     *        required:
     *         - projectId
-    *         - companyId
     *         - taskTypeKey
     *         - oldTaskType
     *        properties:
@@ -26,8 +25,8 @@ exports.init = (app) => {
     *           description: The projectId of project.
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: The companyId of project.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         taskTypeKey:
     *           type: array
     *           required: true
@@ -64,7 +63,6 @@ exports.init = (app) => {
     *        type: object
     *        required:
     *         - projectId
-    *         - companyId
     *         - taskTypeKey
     *         - oldTaskStatus
     *        properties:
@@ -74,8 +72,8 @@ exports.init = (app) => {
     *           description: The projectId.
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: The companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         taskStatusKey:
     *           type: array
     *           required: true

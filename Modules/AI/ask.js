@@ -43,16 +43,25 @@ const orRegex = (terms, fields) => {
     return { $or: fields.map((f) => ({ [f]: rx })) };
 };
 
+/* An API token narrowed to some projects asks inside them only, as it does over MCP. An empty list
+ * is a token that is not narrowed. */
+const tokenProjectIdsOf = (req) => (req.apiToken && Array.isArray(req.apiToken.projectIds) ? req.apiToken.projectIds.map(String) : []);
+
+const openProjects = async (companyId, uid, tokenProjectIds = []) => {
+    const projects = await visibleProjects(companyId, uid);
+    return tokenProjectIds.length ? projects.filter((p) => tokenProjectIds.includes(String(p._id))) : projects;
+};
+
 /* Gather the material, from the visible projects only. Returns the sources the
  * answer is allowed to cite — the same list the screen shows before you ask. */
-const gather = async (companyId, uid, { question, projectId, limit = MAX_PER_TYPE }) => {
-    const projects = await visibleProjects(companyId, uid);
+const gather = async (companyId, uid, { question, projectId, limit = MAX_PER_TYPE, tokenProjectIds = [] }) => {
+    const projects = await openProjects(companyId, uid, tokenProjectIds);
     let ids = projects.map((p) => String(p._id));
     if (projectId && ids.includes(String(projectId))) ids = [String(projectId)];
     const nameById = {};
     projects.forEach((p) => { nameById[String(p._id)] = p.ProjectName || ''; });
     if (await knowledgeFlag.enabledFor(companyId)) {
-        return { sources: await askSources({ companyId, uid, question, projectId, projects, limit: limit + Math.min(6, limit) }), projects, scopedProjectIds: ids };
+        return { sources: await askSources({ companyId, uid, question, projectId, projects, limit: limit + Math.min(6, limit), tokenProjectIds }), projects, scopedProjectIds: ids };
     }
     if (!ids.length) return { sources: [], projects, scopedProjectIds: ids };
 
@@ -139,7 +148,7 @@ const ask = async (req, res) => {
         if (!String(question || '').trim()) return res.send({ status: false, statusText: 'Ask a question first.', code: 'question_required' });
 
         const research = mode === 'research';
-        const gathered = await gather(companyId, uid, { question, projectId, limit: research ? MAX_PER_TYPE * 2 : MAX_PER_TYPE });
+        const gathered = await gather(companyId, uid, { question, projectId, limit: research ? MAX_PER_TYPE * 2 : MAX_PER_TYPE, tokenProjectIds: tokenProjectIdsOf(req) });
         const roleType = await getRoleType(companyId, uid).catch(() => null);
 
         // The sources come back whether or not a model is configured: the screen
@@ -208,7 +217,7 @@ const sources = async (req, res) => {
         const companyId = req.headers['companyid'] || '';
         const uid = req.uid;
         if (!companyId || !uid) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.', code: 'unauthenticated' });
-        const projects = await visibleProjects(companyId, uid);
+        const projects = await openProjects(companyId, uid, tokenProjectIdsOf(req));
         const connections = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data: [{ deletedStatusKey: { $ne: 1 }, enabled: true }, 'type name'],
         }, 'find').catch(() => []);

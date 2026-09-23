@@ -121,10 +121,13 @@ const showActionError = (e) => {
     else actionError.value = message(e);
 };
 
+const STALE = "stale_version";
+
 const save = async (w, hosts) => {
     busy.value = true;
     actionError.value = "";
     actionEntry.value = "";
+    let outcome = "saved";
     try {
         await put(`${env.INSTANCE_EGRESS}/${w.companyId}`, { hosts, version: w.version || 0 });
         $toast.success(t("Egress.saved", { name: w.name || w.companyId }));
@@ -132,10 +135,12 @@ const save = async (w, hosts) => {
         draftErrors[w.companyId] = "";
     } catch (e) {
         showActionError(e);
+        outcome = e?.response?.data?.code === STALE ? STALE : "refused";
     } finally {
         busy.value = false;
         await load();
     }
+    return outcome;
 };
 
 const add = (w) => {
@@ -157,10 +162,16 @@ const add = (w) => {
     return save(w, [...w.hosts, hosts[0]]);
 };
 
-const remove = (w, host) => {
+/* A stale add keeps its text in the box; a stale removal is made again once on the fresh list, since taking a host
+ * off only narrows it. Not when that would now empty the list, which reopens the workspace and needs its own confirm. */
+const remove = async (w, host) => {
     const hosts = w.hosts.filter((h) => h !== host);
     if (!hosts.length && !window.confirm(t("Egress.clear_confirm", { name: w.name || w.companyId }))) return;
-    return save(w, hosts);
+    if ((await save(w, hosts)) !== STALE) return;
+    const fresh = summary.value?.workspaces?.find((x) => x.companyId === w.companyId);
+    if (!fresh || !fresh.hosts.includes(host)) return;
+    const rest = fresh.hosts.filter((h) => h !== host);
+    if (rest.length) await save(fresh, rest);
 };
 
 onMounted(load);

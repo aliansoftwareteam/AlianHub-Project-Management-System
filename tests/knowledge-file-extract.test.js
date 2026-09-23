@@ -6,7 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
-const { pdfOf, docxOf, xlsxOf, zipDeclaring, lyingZipOf } = require('./fixtures/knowledgeFiles');
+const { pdfOf, docxOf, xlsxOf, workbookXmlOf, zipDeclaring, lyingZipOf } = require('./fixtures/knowledgeFiles');
 const extractor = require('../Modules/Knowledge/ingest/extract/extractor');
 const { limits } = require('../Modules/Knowledge/ingest/extract/limits');
 
@@ -376,6 +376,42 @@ describe('text encodings and markers', () => {
         const be = Buffer.from('Tide tables.', 'utf16le').swap16();
         await expect(extractor.extractText({ buffer: Buffer.concat([Buffer.from([0xfe, 0xff]), be]), kind: 'text' })).rejects.toMatchObject({ code: 'type_mismatch' });
         await expect(extractor.extractText({ buffer: Buffer.from('Tide tables.', 'utf16le'), kind: 'text' })).rejects.toMatchObject({ code: 'type_mismatch' });
+    });
+
+    const NAMES = ['Café', 'Müller', '東京', 'Ελληνικά', 'Launch 🚀', 'Øresund'];
+    const csvOf = (encode) => ({ kind: 'csv', buffer: encode(`Name,Note\r\n${NAMES.map((name) => `${name},ok`).join('\r\n')}\r\n`) });
+    const readsNames = (text) => expect(text).toBe(['Name | Note', ...NAMES.map((name) => `${name} | ok`)].join('\n'));
+
+    it('reads names that are not ASCII from a workbook, its sheet name included', async () => {
+        const out = await extractor.extractText({ buffer: xlsxOf({ 'Données 東京': NAMES.map((name) => [name]) }), kind: 'xlsx' });
+        expect(out.text).toBe(['## Données 東京', ...NAMES].join('\n'));
+    });
+
+    it('reads characters a workbook writes as numeric references, those past the basic plane included', async () => {
+        const buffer = await workbookXmlOf({
+            sheetName: 'Plan &#x1F4CA;',
+            strings: ['Caf&#233;', 'M&#xFC;ller', '&#x6771;&#x4EAC;', 'Launch &#x1F680;', 'Launch &#128640;', '&#x20BB7;&#x91CE;&#x5BB6;', 'Tom &amp;#x1F680;'],
+        });
+        const out = await extractor.extractText({ buffer, kind: 'xlsx' });
+        expect(out.text).toBe(['## Plan 📊', 'Café', 'Müller', '東京', 'Launch 🚀', 'Launch 🚀', '𠮷野家', 'Tom &#x1F680;'].join('\n'));
+    });
+
+    it('reads a csv in UTF-8 with or without a byte order mark, and in UTF-16 LE with one', async () => {
+        readsNames((await extractor.extractText(csvOf((text) => Buffer.from(text)))).text);
+        readsNames((await extractor.extractText(csvOf((text) => Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(text)])))).text);
+        readsNames((await extractor.extractText(csvOf((text) => Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')])))).text);
+    });
+
+    it('reads a csv or text file saved in the Windows Western code page, which is not UTF-8', async () => {
+        const PAST_LATIN1 = { '€': 0x80, '“': 0x93, '”': 0x94, '–': 0x96 };
+        const western = (text) => Buffer.from([...text].map((ch) => PAST_LATIN1[ch] || ch.charCodeAt(0)));
+        const out = await extractor.extractText({ buffer: western('Name,Note\r\nCafé,ok\r\nMüller,ok\r\nØresund,“quoted” – €5\r\n'), kind: 'csv' });
+        expect(out.text).toBe('Name | Note\nCafé | ok\nMüller | ok\nØresund | “quoted” – €5');
+        expect((await extractor.extractText({ buffer: western('Grüße aus Malmö'), kind: 'text' })).text).toBe('Grüße aus Malmö');
+    });
+
+    it('keeps reading valid UTF-8 as UTF-8, even where its bytes would also spell Western text', async () => {
+        expect((await extractor.extractText({ buffer: Buffer.from('Café Müller'), kind: 'text' })).text).toBe('Café Müller');
     });
 
     it('reads a .txt that mentions %PDF- near its start as the text it is', async () => {

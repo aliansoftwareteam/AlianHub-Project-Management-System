@@ -127,6 +127,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useTimer, formatClock, formatMinutes, formatHm } from '@/composable/useTimer';
+import { timeLogFailureKey } from '@/composable/timeLogFailure';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import NotFound from '@/views/NotFound.vue';
 import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
@@ -341,7 +342,7 @@ const stopTimer = async () => {
         if (stopped) flash(t('Time.logged_ok', { h: formatHm(stopped.minutes), task: stopped.taskName }));
         await load();
     } catch (e) {
-        error.value = t('Time.log_failed');
+        error.value = t(timeLogFailureKey(e, 'Time.log_failed'));
     } finally {
         busy.value.timer = false;
     }

@@ -149,6 +149,9 @@
 .ask__cites { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
 .ask__cite { display: flex; gap: 8px; align-items: baseline; font: var(--text-small); color: var(--ink-label); }
 .ask__cite-ref { font: var(--text-data); color: var(--brand); flex: none; }
+a.ask__cite-ref { text-decoration: none; }
+a.ask__cite-ref:hover { text-decoration: underline; }
+a.ask__cite-ref:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
 .ask__foot { margin-top: auto; display: flex; gap: 14px; font: var(--text-small); color: var(--ink-2); flex-wrap: wrap; }
 
 @media (max-width: 1280px) {
