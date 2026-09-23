@@ -32,7 +32,7 @@ afterAll(async () => {
         if (value === undefined) delete process.env[name];
         else process.env[name] = value;
     });
-    if (server) await new Promise((resolve) => server.close(resolve));
+    if (server) await new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); });
 });
 
 beforeEach(() => { handlerCalls = 0; });

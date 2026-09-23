@@ -39,7 +39,7 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-    await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve))));
+    await Promise.all(servers.map((server) => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); })));
     fs.rmSync(distDir, { recursive: true, force: true });
 });
 

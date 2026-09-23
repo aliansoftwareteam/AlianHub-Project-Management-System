@@ -576,7 +576,7 @@ describe('the stored route', () => {
     const serve = async (app) => {
         const server = app.listen(0, '127.0.0.1');
         await new Promise((resolve) => server.once('listening', resolve));
-        return { base: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((resolve) => server.close(resolve)) };
+        return { base: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }) };
     };
 
     test('is the pattern Express matched, never the concrete path or its query string', async () => {

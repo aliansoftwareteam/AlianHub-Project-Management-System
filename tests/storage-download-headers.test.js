@@ -83,7 +83,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); });
     for (const bucket of [PUBLIC_BUCKET, PRIVATE_BUCKET]) fs.rmSync(path.join(STORAGE_ROOT, bucket), { recursive: true, force: true });
 });
 

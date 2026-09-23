@@ -105,7 +105,7 @@ describe.each(['server', 'wasabi'])('time tracker captures on %s storage', (stor
         baseURL = `http://127.0.0.1:${server.address().port}`;
     });
 
-    afterAll(() => new Promise((resolve) => server.close(resolve)));
+    afterAll(() => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }));
 
     const capture = (companyHeader, fields, version = 'v4') => fetch(`${baseURL}/api/${version}/timeTracker/capture`, {
         method: 'POST',
