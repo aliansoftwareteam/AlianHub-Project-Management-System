@@ -48,6 +48,7 @@ describe('Settings → Instance → Knowledge on a phone', () => {
     test('a workspace card head wraps instead of pushing its button off screen', () => {
         expect(ruleBody(scoped, '.in-card__head')).toMatch(/flex-wrap:\s*wrap/);
         expect(ruleBody(scoped, '.in-card__title')).toMatch(/overflow-wrap:\s*anywhere/);
+        expect(ruleBody(scoped, '.in-card__title')).toMatch(/flex:\s*1 1 160px/);
     });
 });
 
