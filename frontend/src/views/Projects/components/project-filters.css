@@ -94,7 +94,11 @@
     background: var(--surface); color: var(--ink); font: var(--text-small);
 }
 .pft .calendar-button:hover { background: var(--surface-hover); }
-.pft .monthly-calendar-view { font: 600 12.5px/32px var(--font-ui); color: var(--ink); width: auto !important; padding: 0 6px; }
+/* The legacy .monthly-calendar rule sets its colour with !important, and the legacy chevrons
+   paint their own white discs; both stood out on the dark toolbar. */
+.pft .monthly-calendar-view { font: 600 12.5px/32px var(--font-ui); color: var(--ink) !important; width: auto !important; padding: 0 6px; }
+.pft .calendar-button .fc-icon,
+.pft .calendar-button .fc-icon::before { background: transparent; }
 
 @media (max-width: 1279px) {
     .pft .task-filtersearch { flex: 1 1 auto; min-width: 0; }

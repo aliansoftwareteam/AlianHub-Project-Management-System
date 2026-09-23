@@ -62,6 +62,18 @@ describe('project header icons in dark mode', () => {
     });
 });
 
+describe('the calendar controls in the project toolbar', () => {
+    const css = read('views/Projects/components/project-filters.css');
+
+    test('the month title beats the legacy !important grey', () => {
+        expect(ruleBody(css, '.pft .monthly-calendar-view')).toMatch(/color:\s*var\(--ink\)\s*!important/);
+    });
+
+    test('the previous and next chevrons have no white disc', () => {
+        expect(ruleBody(css, '.pft .calendar-button .fc-icon::before')).toMatch(/background:\s*transparent/);
+    });
+});
+
 describe('legacy blocks inside the task panel in dark mode', () => {
     const css = read('components/organisms/TaskDetailOverlay/style.css');
     const dark = (selector) => ruleBody(css, `:root[data-theme="dark"] .ah-detail__panel ${selector}`);
