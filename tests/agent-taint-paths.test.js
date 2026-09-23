@@ -33,6 +33,7 @@ const findingMemory = require('../Modules/Agents/engine/findingMemory');
 const runs = require('../Modules/Agents/runs');
 const policy = require('../Modules/Agents/policy');
 const readers = require('../Modules/Agents/skills/readers');
+const egressAllowlist = require('../Modules/Agents/engine/egressAllowlist');
 const runAgent = require('../Modules/Automations/engine/actions/runAgent');
 const taint = require('../Modules/Agents/taint');
 
@@ -82,7 +83,14 @@ beforeEach(() => {
 afterEach(() => { mem.reset(); persistence.useMongo(); delete process.env.AGENT_TAINT_ROUTING; });
 
 describe('1. a generic skill that fetches marks the run through fetchPage', () => {
-    it('pr.summary is tainted by its own fetch at gather, before its model call, and the replay row carries it', async () => {
+    let listed;
+    beforeEach(() => {
+        process.env.SKILL_EXTERNAL_READS = 'on';
+        listed = jest.spyOn(egressAllowlist, 'hostsFor').mockResolvedValue(['github.com']);
+    });
+    afterEach(() => { delete process.env.SKILL_EXTERNAL_READS; listed.mockRestore(); });
+
+    it('pr.summary is tainted by its own declared read at gather, before its model call, and the replay row carries it', async () => {
         const run = await start();
         const out = await execute(run);
         expect(out).toMatchObject({ status: 'done', outcome: '1 change(s) applied' });
@@ -101,6 +109,16 @@ describe('1. a generic skill that fetches marks the run through fetchPage', () =
         expect(JSON.stringify(runRow(run._id))).not.toMatch(/taint/i);
         expect(JSON.stringify(replays()[0])).not.toMatch(/taint/i);
         expect(perform.mock.calls[0][0]).not.toHaveProperty('taint');
+    });
+
+    it('with external reads off, a pr.summary run fails with the reason and fetches nothing', async () => {
+        process.env.SKILL_EXTERNAL_READS = 'off';
+        const run = await start();
+        const out = await execute(run);
+        expect(out).toMatchObject({ status: 'failed', error: expect.stringContaining('external_reads_not_available') });
+        expect(runRow(run._id)).toMatchObject({ status: 'failed', error: expect.stringMatching(/pr\.summary.*declares an external read/) });
+        expect(safeFetch).not.toHaveBeenCalled();
+        expect(chat).not.toHaveBeenCalled();
     });
 
     it('fetchPage notes every fetch into the collector of the run it happens in, so a gather that drops the marker still taints', async () => {
