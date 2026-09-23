@@ -128,7 +128,7 @@ watch(isOwner, (val) => {
 </script>
 
 <style scoped>
-.acp-card { margin-top: 24px; padding: 20px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; }
+.acp-card { margin-top: 24px; padding: 20px; background: #ffffff; color: #17161c; border: 1px solid #e5e7eb; border-radius: 10px; }
 .acp-subtitle { margin: 4px 0 16px 0; color: #6b7280; font-size: 13px; line-height: 1.5; }
 .acp-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-top: 1px solid #f3f4f6; }
 .acp-row-label { display: flex; flex-direction: column; gap: 2px; max-width: 70%; }

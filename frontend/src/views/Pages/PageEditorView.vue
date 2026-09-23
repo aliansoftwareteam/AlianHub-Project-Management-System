@@ -12,16 +12,16 @@
             <span class="ah-toolbar__spacer"></span>
             <span v-if="editorName" class="pev__editing">
                 <span class="ah-avatar ah-avatar--sm">{{ editorInitials }}</span>
-                <span class="ah-small">{{ $t('Projects.page_edited_by', { who: editorName, when: relativeTime(page.updatedAt, t) }) }}</span>
+                <span class="ah-small">{{ $t('Projects.page_edited_by_ago', { who: editorName, when: relativeTime(page.updatedAt, t) }) }}</span>
             </span>
             <button type="button" class="ah-btn ah-btn--sm ah-btn--outline" @click="doc && doc.askAi()">
                 <ShellIcon name="ai" :size="13" />{{ $t('Docs.ask_about_doc') }}
             </button>
-            <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="doc && doc.present()">
-                <ShellIcon name="play" :size="11" />{{ $t('Docs.present') }}
+            <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary pev__icon-btn" :aria-label="$t('Docs.present')" @click="doc && doc.present()">
+                <ShellIcon name="play" :size="11" /><span class="pev__btn-label">{{ $t('Docs.present') }}</span>
             </button>
-            <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="doc && doc.openShare()">
-                <ShellIcon name="share" :size="13" />{{ $t('Docs.share') }}
+            <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary pev__icon-btn" :aria-label="$t('Docs.share')" @click="doc && doc.openShare()">
+                <ShellIcon name="share" :size="13" /><span class="pev__btn-label">{{ $t('Docs.share') }}</span>
             </button>
         </div>
 
@@ -142,6 +142,7 @@ onMounted(() => {
     .pev__editing { display: none; }
 }
 @media (max-width: 767px) {
-    .pev__crumb { display: none; }
+    .pev__crumb, .pev__crumb-title, .pev__btn-label { display: none; }
+    .pev__icon-btn { width: 32px; height: 32px; padding: 0; }
 }
 </style>

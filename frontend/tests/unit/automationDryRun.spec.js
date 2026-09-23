@@ -35,6 +35,7 @@ const PLAN = {
 
 const ok = (data) => Promise.resolve({ data: { status: true, data } });
 let dryRunAnswer;
+let projectsAnswer;
 
 const open = async (roleType = 1) => {
     apiRequest.mockImplementation((method, url, body) => {
@@ -43,6 +44,7 @@ const open = async (roleType = 1) => {
         if (url.endsWith('/compile')) return ok({ sentence: RULE.sentence, errors: [], ambiguities: [], grammar: {} });
         if (url.endsWith('/dry-run')) return dryRunAnswer(body);
         if (url.endsWith('/find')) return Promise.resolve({ data: [{ _id: 't1', TaskName: 'Fix login', TaskKey: 'WEB-7' }] });
+        if (url === '/api/v1/project') return projectsAnswer();
         if (method === 'get') return ok([{ _id: 'p1', ProjectName: 'Web' }]);
         return ok([]);
     });
@@ -68,6 +70,24 @@ describe('AutomationsPage — test a saved rule on a task', () => {
     beforeEach(() => {
         apiRequest.mockReset();
         dryRunAnswer = () => ok(PLAN);
+        projectsAnswer = () => ok([{ _id: 'p1', ProjectName: 'Web' }]);
+    });
+
+    it('asks for the project\'s tasks by ObjectId: ProjectID is stored as one, so a plain string matches nothing', async () => {
+        const wrapper = await open();
+        await editRule(wrapper);
+        await pickTask(wrapper);
+        const findCall = apiRequest.mock.calls.find(([, url]) => url.endsWith('/find'));
+        expect(findCall[2].findQuery.$match.ProjectID).toEqual({ objId: { $in: ['p1'] } });
+    });
+
+    it('lists projects from GET /api/v1/project, which answers a bare array', async () => {
+        projectsAnswer = () => Promise.resolve({ data: [{ _id: 'p1', ProjectName: 'Web' }, { _id: 'p2', ProjectName: 'Gone', deletedStatusKey: 1 }] });
+        const wrapper = await open();
+        await editRule(wrapper);
+        const options = wrapper.find('[data-test="dry-run-project"]').findAll('option').map((o) => o.text());
+        expect(options).toContain('Web');
+        expect(options).not.toContain('Gone');
     });
 
     it('is not offered for a rule that has not been saved yet', async () => {

@@ -447,7 +447,10 @@ const SaveChangeToDb = async () => {
 }
 
 function phoneValidation (number) {
-    if(number === ""){
+    // The setup wizard stores "N/A" (the schema requires a phone), and callers pass
+    // String(value), so a missing number arrives as "undefined".
+    if (["", "undefined", "null", "N/A"].includes(number)) {
+        phoneError.value = '';
         return;
     }
     let code = countryCodeObj.value.isoCode;
@@ -456,7 +459,7 @@ function phoneValidation (number) {
     if (result.isValid) {
         phoneError.value = '';
     } else {
-        phoneError.value = "Please enter valid number";
+        phoneError.value = t('Settings.phone_invalid');
     }
 
     return result.isValid;
