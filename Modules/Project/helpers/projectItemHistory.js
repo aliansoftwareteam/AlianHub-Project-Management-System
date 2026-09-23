@@ -11,7 +11,6 @@ const HISTORY = Object.freeze({
     TAG: 'Project_Name',
 });
 
-/* Project_Comment was the comment box's key for the checklist it creates; the checklist route now records those items itself. */
 const SERVER_BUILT_HISTORY = [
     HISTORY.CHECKLIST, HISTORY.CHECKLIST_ASSIGN, HISTORY.CHECKLIST_UNASSIGN, HISTORY.CHECKLIST_CHECKED, HISTORY.CHECKLIST_FROM_COMMENT,
 ].map((key) => ({ type: 'project', key }));
@@ -21,9 +20,15 @@ const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && 
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
 const sameId = (a, b) => a !== undefined && a !== null && String(a) === String(b);
 
-const pushed = ({ A, body }) => {
+/* The comment box names only the items under the checklist it creates, and says which project they came from. */
+const pushedFromComment = ({ A, item, projectName }) => (item.parentId
+    ? [{ key: HISTORY.CHECKLIST_FROM_COMMENT, message: `<b>${A}</b> has added <b>${escapeText(item.name)}</b> checklist from <b>(${escapeText(projectName)} )</b> project.` }]
+    : []);
+
+const pushed = ({ A, body, projectName }) => {
     const item = body.checklistItem;
     if (!isPlainObject(item)) return [];
+    if (body.origin === 'comment') return pushedFromComment({ A, item, projectName });
     if (!item.parentId) return [{ key: HISTORY.CHECKLIST, message: `<b>${A}</b> has created new checklist` }];
     return [{ key: HISTORY.CHECKLIST, message: `<b>${A}</b> has created new checklist item ${itemName(escapeText(item.name))}` }];
 };
@@ -75,8 +80,8 @@ const assigneeChanged = async ({ A, body, previous, nameOf }) => {
 
 const CHECKLIST_UPDATES = { name: renamed, isChecked: checked, assigneeAdd: assigneeChanged, assigneeRemove: assigneeChanged };
 
-const describeChecklistChange = async ({ actor, previous, body, nameOf = employeeNameOf }) => {
-    const ctx = { A: actor.Employee_Name, body: body || {}, previous: (previous || []).filter(isPlainObject), nameOf };
+const describeChecklistChange = async ({ actor, previous, body, projectName = '', nameOf = employeeNameOf }) => {
+    const ctx = { A: actor.Employee_Name, body: body || {}, previous: (previous || []).filter(isPlainObject), projectName, nameOf };
     if (ctx.body.operation === 'push') return pushed(ctx);
     if (ctx.body.operation === 'delete') return removed(ctx);
     if (ctx.body.operation === 'update' && Object.hasOwn(CHECKLIST_UPDATES, ctx.body.key)) return CHECKLIST_UPDATES[ctx.body.key](ctx);
@@ -108,7 +113,8 @@ const write = (companyId, projectId, actor, entries) => Promise.all(entries.map(
 const recordChecklistChange = async ({ companyId, projectId, actorId, previous, body }) => {
     if (!previous) return;
     const actor = await sessionActorOf(actorId);
-    const entries = await describeChecklistChange({ actor, previous: plain(previous).checklistArray, body });
+    const stored = plain(previous);
+    const entries = await describeChecklistChange({ actor, previous: stored.checklistArray, body, projectName: stored.ProjectName });
     if (entries.length) await write(companyId, projectId, actor, entries);
 };
 
