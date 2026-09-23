@@ -18,11 +18,9 @@ describe('invitation preview link token', () => {
         expect(linkTokenAccepted(TOKEN, `${TOKEN}a`)).toBe(false);
     });
 
-    /* Invitations sent before the link carried a token: the link in the inbox has none to
-     * present, so those keep working until they are accepted or resent. */
-    it('accepts an invitation sent before links carried a token', () => {
-        expect(linkTokenAccepted('', '')).toBe(true);
-        expect(linkTokenAccepted(undefined, undefined)).toBe(true);
-        expect(linkTokenAccepted('', 'anything')).toBe(true);
+    it('refuses every token for an invitation that stores none', () => {
+        expect(linkTokenAccepted('', '')).toBe(false);
+        expect(linkTokenAccepted(undefined, undefined)).toBe(false);
+        expect(linkTokenAccepted('', 'anything')).toBe(false);
     });
 });

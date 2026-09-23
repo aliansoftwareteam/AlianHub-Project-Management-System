@@ -14,13 +14,14 @@ async function invite(ownerApi, role = 2) {
     });
     const row = res.body && res.body.data;
     if (!row || !row._id) throw new Error(`invite failed (${res.status}): ${JSON.stringify(res.body).slice(0, 300)}`);
-    return { email, memberId: String(row._id) };
+    return { email, memberId: String(row._id), linkId: row.linkId };
 }
 
 async function register(invited) {
     const anon = createApiClient({ baseURL: state.baseURL });
     assertOk(await anon.post('/api/v2/createUser', {
         firstName: 'Seat', lastName: 'Test', email: invited.email, password: PASSWORD, isInvitation: true, assignCompany: companyId,
+        memberId: invited.memberId, linkId: invited.linkId,
     }), `register ${invited.email}`);
     const session = await login(state.baseURL, invited.email);
     return { ...invited, uid: session.uid, api: createApiClient({ baseURL: state.baseURL, accessToken: session.accessToken, companyId }) };

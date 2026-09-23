@@ -12,17 +12,10 @@
             <router-link :to="{ name: 'Log-in' }" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg">{{ $t('Auth.log_in') }}</router-link>
         </div>
 
-        <div v-else-if="stage === 'already'" class="av2-auth-card">
-            <div class="auth__glyph av2-glyph-ok"><ShellIcon name="check" :size="15" /></div>
-            <h2 class="auth__h">{{ $t('Auth.verify_already_title') }}</h2>
-            <p class="auth__p">{{ $t('Auth.verify_already_body') }}</p>
-            <router-link :to="{ name: 'Log-in' }" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg">{{ $t('Auth.log_in') }}</router-link>
-        </div>
-
         <div v-else-if="stage === 'resent'" class="av2-auth-card">
             <div class="auth__glyph auth__glyph--brand">✉</div>
             <h2 class="auth__h">{{ $t('Auth.magic_sent_title') }}</h2>
-            <i18n-t keypath="Auth.verify_first_body" tag="p" class="auth__p"><template #email><strong>{{ email }}</strong></template></i18n-t>
+            <p class="auth__p">{{ $t('Auth.verify_resent_body') }}</p>
             <div class="auth__links" style="margin-top:28px"><router-link :to="{ name: 'Log-in' }">{{ $t('Auth.back_to_login') }}</router-link></div>
         </div>
 
@@ -61,7 +54,6 @@ const router = useRouter();
 const $toast = useToast();
 
 const stage = ref("checking");
-const email = ref("");
 const message = ref("");
 const canResend = ref(false);
 const busy = ref(false);
@@ -72,11 +64,8 @@ onMounted(async () => {
         const result = await axios.post(env.API_URI + env.VERIFY_EMAIL, { uid: route.params.id, token: route.params.token });
         const data = result.data || {};
         if (data.showResendVerification) {
-            email.value = data.email || "";
             canResend.value = true;
             stage.value = "expired";
-        } else if (!data.status && data.alreadyVarified) {
-            stage.value = "already";
         } else if (!data.status) {
             message.value = data.statusText || "";
             stage.value = "expired";

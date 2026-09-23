@@ -88,6 +88,7 @@ const pack = (lines, maxChars) => {
 };
 
 const contentHashOf = (headingPath, text) => crypto.createHash('sha256').update(JSON.stringify([headingPath, text])).digest('hex');
+const textBytesOf = (text) => Buffer.byteLength(String(text || ''), 'utf8');
 
 const chunkHtml = (rawTitle, html, maxChars) => {
     const title = inlineText(rawTitle);
@@ -137,4 +138,4 @@ const chunkTranscript = (call, { maxChars = MAX_CHUNK_CHARS } = {}) => {
     return piecesOf([title], [title, ...linesOf(call && call.summary), ...items, ...linesOf(call && call.transcript)], maxChars);
 };
 
-module.exports = { MAX_CHUNK_CHARS, chunkPage, chunkText, chunkGuide, guideMarkdown, guideTitle, chunkComment, chunkTranscript, contentHashOf, htmlOf };
+module.exports = { MAX_CHUNK_CHARS, chunkPage, chunkText, chunkGuide, guideMarkdown, guideTitle, chunkComment, chunkTranscript, contentHashOf, textBytesOf, htmlOf };

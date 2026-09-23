@@ -393,3 +393,30 @@ describe('display names come from stored rows, and what the request must supply 
         expect(messages()[0]).not.toContain('undefined');
     });
 });
+
+describe('a total estimate change names the estimate the task held', () => {
+    const estimateBody = (obj, totalEstimatedTime = 180) => ({ action: 'updateTaskTotalEstimate', firebaseObj: { totalEstimatedTime }, projectData: clientProject(), taskData: { _id: OPEN_TASK, sprintId: SPRINT }, obj, userData: USER });
+
+    test('the previous estimate comes from the stored task, not the request', async () => {
+        hold({ totalEstimatedTime: 120 });
+        const result = await call(PATCH, estimateBody({ previousEstimatedTime: HTML, reason: 'Scope grew' }));
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(historyRows().map((row) => row.Message)).toEqual(['<b>Olivia Owner</b> has updated total estimated time from <b>02h 00m</b> to <b>03h 00m</b>. <b>Reason:</b> Scope grew']);
+        expect(storedTask()).toMatchObject({ totalEstimatedTime: 180, estimateChangedFlag: true });
+    });
+
+    test('a first estimate is not flagged as a change even when the request names a previous one', async () => {
+        const result = await call(PATCH, estimateBody({ previousEstimatedTime: 500 }, 60));
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(historyRows().map((row) => row.Message)).toEqual(['<b>Olivia Owner</b> has updated total estimated time from <b>00h 00m</b> to <b>01h 00m</b>.']);
+        expect(storedTask().estimateChangedFlag).toBeUndefined();
+    });
+
+    test('a re-estimate is flagged even when the request leaves the previous one out', async () => {
+        hold({ totalEstimatedTime: 30 });
+        const result = await call(PATCH, estimateBody({}, 45));
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(historyRows().map((row) => row.Message)).toEqual(['<b>Olivia Owner</b> has updated total estimated time from <b>00h 30m</b> to <b>00h 45m</b>.']);
+        expect(storedTask().estimateChangedFlag).toBe(true);
+    });
+});

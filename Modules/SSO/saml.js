@@ -2,7 +2,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const logger = require("../../Config/loggerConfig");
 const { extractIdentity } = require("./helpers/ssoRules");
-const { jitProvisionUser } = require("./provisioning");
+const { ssoSignInUser, SSO_NOT_ALLOWED } = require("./provisioning");
 const { finalizeSsoSession } = require("./ssoSession");
 
 // `samlify` (+ its schema validator) are lazy-required so app load never breaks
@@ -81,17 +81,10 @@ exports.samlAcs = async (req, res) => {
         const claims = { ...(extract.attributes || {}), nameID: extract.nameID };
         const id = extractIdentity(claims, (cfg.saml && cfg.saml.attributeMap) || {});
         if (!id.valid) return res.redirect('/login?ssoError=identity');
-        const uid = await jitProvisionUser({
-            companyId,
-            email: id.email,
-            firstName: id.firstName,
-            lastName: id.lastName,
-            externalId: id.externalId,
-            defaultRoleType: cfg.defaultRoleType,
-            autoProvision: cfg.autoProvisionUsers !== false,
-        });
+        const uid = await ssoSignInUser({ companyId, cfg, identity: id });
         return finalizeSsoSession(req, res, uid, `/${companyId}`);
     } catch (error) {
+        if (error && error.code === SSO_NOT_ALLOWED) return res.redirect('/login?ssoError=not_allowed');
         logger.error(`samlAcs: ${error.message || error}`);
         return res.redirect('/login?ssoError=callback');
     }
