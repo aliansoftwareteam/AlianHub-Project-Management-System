@@ -52,8 +52,12 @@ beforeAll(async () => {
     B = String(project._id);
     taskB = (await withRetry(() => createTask(owner.api, { project, name: 'TokP task in B', user: state.users.owner, companyOwnerId: owner.userId })))._id;
     taskA = state.tasks[0]._id;
-    const stored = await owner.api.get(`/api/v1/task/${taskB}`);
-    taskBKey = stored.body.TaskKey;
+    // The key is set by a follow-up write after the task is created, so a busy run can read it before it lands.
+    for (let attempt = 0; attempt < 50 && !taskBKey; attempt += 1) {
+        if (attempt) await new Promise((resolve) => setTimeout(resolve, 200));
+        taskBKey = (await owner.api.get(`/api/v1/task/${taskB}`)).body.TaskKey;
+    }
+    expect(taskBKey).toEqual(expect.stringMatching(/-\d+$/));
 
     clients = {
         ownerNarrowed: await mintAgentToken(owner, [A]),
