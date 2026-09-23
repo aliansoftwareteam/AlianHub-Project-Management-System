@@ -115,7 +115,7 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 89 | The report endpoint's per-address cap and rate limit use `req.ip`; behind a proxy that is not on loopback, set `TRUST_PROXY`. | #785 review |
 | 90 | Knowledge console figures read every chunk document; an index-only count needs a stored size field. | #788 |
 | 91 | A re-index file step over many attachments can outlive the walk lease (duplicate extraction only). | #788 |
-| 92 | Agent notes: on a repeat sighting by another starter the first starter stays on the note while the second's references merge in. | #787 |
+| 92 | Agent notes: on a repeat sighting by another starter the first starter stays on the note while the second's references merge in. **Closed** by #893 (2026-09-23): each starter's sighting is its own note. | #787 |
 | 93 | Files: non-ASCII names inside spreadsheets are misread by the parser; the API-token and MCP caller paths for file passages are not yet reviewed. | #783 |
 | 94 | Owner sweeps for the new Sprint 7 and 8 screens: the Knowledge tab (#788) and the security policy card (#785), in addition to follow-up 83. | interface rows |
 | 95 | A local full integration run shows an order dependency between the egress allowlist suite and the declared-reads suite; each passes alone and CI passes. | #795 run |
