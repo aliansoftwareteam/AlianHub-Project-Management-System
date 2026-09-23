@@ -244,6 +244,7 @@ import {generateFileName} from '@/utils/storageQueryBuild.js';
 import ImagesPreviewer from "@/components/organisms/ImagePreviewer/ImagesPreviewer.vue";
 import { storageHelper } from "@/composable/commonFunction";
 import { ROLE_ADMIN } from "@/utils/roles";
+import { isOnViewerSide } from "@/utils/commentSide";
 
 const { t } = useI18n();
 
@@ -655,9 +656,9 @@ function tabSyncDataGet () {
                 response.data.data.forEach((docData)=> {
                     let index = messages.value.findIndex((x) => x._id === docData._id);
                     if(index > -1) {
-                        messages.value[index] = {...docData, sent: docData.userId === userId.value};
+                        messages.value[index] = {...docData, sent: isOnViewerSide(docData, userId.value)};
                     } else {
-                        let obj = {...docData, sent: docData.userId === userId.value};
+                        let obj = {...docData, sent: isOnViewerSide(docData, userId.value)};
                         if(messages.value.length > 1 && obj.createdAt !== undefined && new Date(obj.createdAt).setHours(0,0,0,0) !== new Date(messages.value[messages.value.length-1].createdAt).setHours(0,0,0,0)) {
                             obj.showDifference= true;
                         }
@@ -1284,7 +1285,7 @@ function findMessageIndexById(data = {}) {
 }
 
 function decorateIncomingMessage(docData) {
-    const obj = {...docData, sent: docData.userId === userId.value};
+    const obj = {...docData, sent: isOnViewerSide(docData, userId.value)};
     const messageText = obj.message || "";
     obj.overflow = (obj.type === 'text' || obj.type === 'link')
         ? messageText.length > 465
@@ -1468,7 +1469,7 @@ function getPaginatedMessages(...args) {
 
                         messages.value.unshift({
                             ...docData,
-                            sent: docData.userId === userId.value,
+                            sent: isOnViewerSide(docData, userId.value),
                             createdAt: docData.createdAt,
                             updatedAt: docData.updatedAt
                         });

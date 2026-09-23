@@ -21,7 +21,7 @@
 .auth__brand { display: flex; align-items: center; gap: 9px; text-decoration: none; color: var(--ink); }
 .auth__brand:hover { text-decoration: none; color: var(--ink); }
 .auth__logo { width: 24px; height: 24px; object-fit: contain; border-radius: 6px; }
-.auth__mark { width: 24px; height: 24px; border-radius: 6px; background: var(--brand); color: #fff; font: 700 12px/24px var(--font-ui); text-align: center; }
+.auth__mark { width: 24px; height: 24px; border-radius: 6px; background: var(--brand); color: var(--on-brand); font: 700 12px/24px var(--font-ui); text-align: center; }
 .auth__name { font: 600 14px/1 var(--font-ui); letter-spacing: -.2px; }
 .auth__top-right { font: var(--text-small); }
 .auth__top-right a { color: var(--brand); font-weight: 600; text-decoration: none; }
@@ -113,12 +113,12 @@
 
 /* proof panel */
 .auth__proof {
-    background: var(--brand); color: #fff; padding: 44px 0 0 48px; overflow: hidden; position: relative;
+    background: var(--brand); color: var(--on-brand); padding: 44px 0 0 48px; overflow: hidden; position: relative;
     display: flex; flex-direction: column;
 }
-.auth__proof-label { color: rgba(255, 255, 255, .7); letter-spacing: .08em; text-transform: uppercase; font-size: 10.5px; margin-bottom: 18px; }
+.auth__proof-label { color: var(--on-brand); opacity: .78; letter-spacing: .08em; text-transform: uppercase; font-size: 10.5px; margin-bottom: 18px; }
 .auth__proof-title { font: 700 30px/1.15 var(--font-ui); letter-spacing: -.8px; margin: 0 48px 12px 0; max-width: 520px; }
-.auth__proof-sub { font: 400 14px/1.5 var(--font-ui); color: rgba(255, 255, 255, .78); margin: 0 48px 34px 0; max-width: 460px; }
+.auth__proof-sub { font: 400 14px/1.5 var(--font-ui); color: var(--on-brand); opacity: .78; margin: 0 48px 34px 0; max-width: 460px; }
 .auth__shot {
     flex: 1; display: flex; background: #fff; color: var(--ink); border-radius: 12px 0 0 0;
     box-shadow: 0 30px 80px rgba(0, 0, 0, .35); min-height: 300px; overflow: hidden;

@@ -2,7 +2,7 @@
     <div class="ah-page in">
         <div class="ah-toolbar">
             <div class="ah-toolbar__title">{{ $t('Instance.group') }}</div>
-            <div class="ah-tabs in__tabs">
+            <div ref="strip" class="ah-tabs in__tabs">
                 <router-link v-for="tab in tabs" :key="tab.name" :to="{ name: tab.name, params: { cid } }" class="ah-tab" :class="{ 'is-active': route.name === tab.name }">
                     {{ $t(tab.label) }}
                 </router-link>
@@ -19,7 +19,7 @@
 </template>
 
 <script setup>
-import { computed, inject } from "vue";
+import { computed, inject, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useInstanceApi } from "./useInstanceApi";
@@ -44,11 +44,20 @@ const tabs = [
     { name: "InstanceStats", label: "Instance.nav_stats", anchor: "reference" },
 ];
 const anchor = computed(() => tabs.find((t) => t.name === route.name)?.anchor || "install");
+
+const strip = ref(null);
+const revealActiveTab = () => nextTick(() => strip.value?.querySelector(".is-active")?.scrollIntoView?.({ block: "nearest", inline: "nearest" }));
+onMounted(revealActiveTab);
+watch(() => route.name, revealActiveTab);
 </script>
 
 <style>
-.in__tabs { margin-left: 12px; }
-.in__tabs .ah-tab { text-decoration: none; }
+/* Ten tabs outgrow a narrow toolbar; the strip scrolls on its own so the page never does. */
+.in .ah-toolbar__title { flex: none; }
+.in__tabs { margin-left: 12px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.in__tabs::-webkit-scrollbar { display: none; }
+.in__tabs .ah-tab { text-decoration: none; flex: none; display: inline-flex; align-items: center; white-space: nowrap; }
+.in .ah-toolbar > .ah-btn { flex: none; }
 .in__body { flex: 1; min-height: 0; overflow: auto; padding: 16px 20px 32px; display: flex; flex-direction: column; gap: 16px; }
 .in-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .in-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }

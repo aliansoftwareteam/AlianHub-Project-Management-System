@@ -116,7 +116,7 @@ async function gather({ skillSlug = 'qa-review', task, companyId, memory, starte
  * context and hand back a summary plus the changes the run should propose or apply. */
 async function analyseGeneric(skill, { task, context, budget, spend, agent }) {
     const started = Date.now();
-    const asked = await askModel(skill, { prompt: skill.buildUserPrompt({ task, context }), budget, spend });
+    const asked = await askModel(skill, { prompt: skill.buildUserPrompt({ task, context }), budget, spend, agent });
     if (asked.refused) return refused(skill, asked, started);
     const { raw: answer, model, degraded, usage } = asked;
     if (!answer && !context.fallback) {
@@ -133,7 +133,7 @@ async function analyseGeneric(skill, { task, context, budget, spend, agent }) {
 
 /* The page audit: ground → analyse → verify → emit. The caller writes; this
  * only decides WHAT. `onExternal` hears about the fetched page before the model does. */
-async function analyseAudit(skill, { task, context, budget, spend, companyId, onExternal }) {
+async function analyseAudit(skill, { task, context, budget, spend, companyId, agent, onExternal }) {
     const started = Date.now();
     const { url } = context;
     let auditResult;
@@ -147,7 +147,7 @@ async function analyseAudit(skill, { task, context, budget, spend, companyId, on
     }
     if (typeof onExternal === 'function') await onExternal(taint.fetched(url));
 
-    const asked = await askModel(skill, { prompt: skill.buildUserPrompt({ task, audit: auditResult }), budget, spend });
+    const asked = await askModel(skill, { prompt: skill.buildUserPrompt({ task, audit: auditResult }), budget, spend, agent });
     if (asked.refused) return refused(skill, asked, started);
     const { raw, model, degraded, usage } = asked;
 
@@ -179,7 +179,7 @@ async function analyseAudit(skill, { task, context, budget, spend, companyId, on
 async function analyse({ skillSlug = 'qa-review', task, context, budget = {}, spend, companyId, agent, onExternal }) {
     const tenant = companyId || (spend && spend.companyId);
     const skill = await requireSkill(tenant, skillSlug);
-    return skill.kind === 'generic' ? analyseGeneric(skill, { task, context, budget, spend, agent }) : analyseAudit(skill, { task, context, budget, spend, companyId: tenant, onExternal });
+    return skill.kind === 'generic' ? analyseGeneric(skill, { task, context, budget, spend, agent }) : analyseAudit(skill, { task, context, budget, spend, companyId: tenant, agent, onExternal });
 }
 
 async function run({ skillSlug = 'qa-review', task, companyId, budget = {}, spend, agent }) {

@@ -411,7 +411,3 @@ const sendMagicLink = async () => {
     }
 };
 </script>
-
-<style>
-.ah-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; animation: auth-spin .8s linear infinite; }
-</style>
