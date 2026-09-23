@@ -296,7 +296,6 @@ const proposalIdEditable = ref(false);
 //computed
 const users = computed(() => getters["users/users"]);
 const teams = computed(() => getters["settings/teams"]);
-const projectSkills = computed(() => getters["settings/projectSkills"]);
 // Projects created before the field exists read as the default rather than blank.
 const projectSource = computed(() => props.projectData?.source || DEFAULT_SOURCE);
 const isUpworkSource = computed(() => projectSource.value === 'upwork');
@@ -304,18 +303,11 @@ const isUpworkSource = computed(() => projectSource.value === 'upwork');
 // extra line would push into the field below it.
 const proposalIdHint = computed(() => (isUpworkSource.value ? t('Projects.proposal_id_format_hint') : ''));
 const currentCompany = computed(() => getters["settings/selectedCompany"]);
-const companyOwner = computed(() => { return getters["settings/companyOwnerDetail"];});
 const showCustomField = computed(() => checkPermission("project.project_custom_field", props?.projectData?.isGlobalPermission, {gettersVal: getters}));
 const canEditDetails = computed(() => checkPermission('project.project_details', props?.projectData?.isGlobalPermission) === true);
 
 //user detail
-const user = getUser(userId.value);
 const createdByUser = getUser(props?.projectData?.projectCreatedBy || '');
-const userData = {
-    id: user.id,
-    Employee_Name: user.Employee_Name,
-    companyOwnerId: user.companyOwnerId
-}
 
 // convert the number into us formate 
 const getCommaSeperatedNumber = (n)=> {
@@ -599,18 +591,6 @@ const updateSource = (source) => {
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
         if(res.status === 200){
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-            let historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b> Source</b> as <b>${t('Projects.source_' + source)}</b>.`,
-                'key' : 'Project_Source',
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
             $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -651,18 +631,6 @@ const updateProposalId = ({value}) => {
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
         if(res.status === 200){
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-            let historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b> Proposal ID</b> as <b>${newValue || 'N/A'}</b>.`,
-                'key' : 'Project_ProposalId',
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
             $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -684,22 +652,6 @@ const updateSkills = (slugs) => {
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
         if(res.status === 200){
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-            const skillNames = slugs.map((slug) => {
-                const match = projectSkills.value.find((s) => s.slug === slug);
-                return match ? match.name : slug;
-            });
-            let historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b> Skills</b> as <b>${skillNames.join(', ') || 'N/A'}</b>.`,
-                'key' : 'Project_Skills',
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
             $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -718,21 +670,21 @@ const submitHandler = async (value,detail,id,edit) => {
             if(detail.fieldType === 'date'){
                 try{
                     detail.fieldValue = new Date(value);
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
             }else if(detail.fieldType === 'dropdown'){
                 detail.fieldValue = [value.id];
                 try {
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
             }else if(detail.fieldType === 'number' || detail.fieldType === 'money'){
                 try{
                     detail.fieldValue = String(value);
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
@@ -755,7 +707,7 @@ const submitHandler = async (value,detail,id,edit) => {
                                     detail.fieldFlag = detail.fieldFlag ? detail.fieldFlag : detail.fieldCountryObject.code;
                                 }
                             }
-                            insertCustomField(detail,value);
+                            insertCustomField(detail);
                         } catch(error){
                             console.error('ERROR',error);
                         }
@@ -765,7 +717,7 @@ const submitHandler = async (value,detail,id,edit) => {
         } else if(detail.fieldType === 'checkbox'){
             try{
                 detail.fieldValue = value;
-                insertCustomField(detail,value);
+                insertCustomField(detail);
             } catch(error){
                 console.error('ERROR',error);
             }
@@ -774,13 +726,8 @@ const submitHandler = async (value,detail,id,edit) => {
 };
 
 // insert or update the value of custom field in the project
-const insertCustomField = async(detail,data) => {
+const insertCustomField = async(detail) => {
     let updateDetail = {};
-    let userData = {
-        id: user?.id || '',
-        name: user?.Employee_Name || '',
-        companyOwnerId: companyOwner?.value?._id || '',
-    }
     updateDetail.fieldValue = detail.fieldValue;
     if(detail.fieldType === "phone"){
         updateDetail.fieldCode = detail?.fieldCode;
@@ -791,18 +738,6 @@ const insertCustomField = async(detail,data) => {
 
     await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${props.projectData._id}`,{updateObject: { [`customField.${detail._id}`]: updateDetail }}).then((res) => {
         if(res.status === 200){
-            let historyObj = {
-                'message': `<b>${userData.name}</b> has added value in <b> ${detail.fieldTitle}</b> Custom Field as <b>${data.value ? data.value : data}</b> for project.`,
-                'key' : 'Project_CustomField'
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
             $toast.success(t('Toast.Custom_field_updated_successfully'), {position: 'top-right' });
             const localUpdateCustomfield = props.projectData
             localUpdateCustomfield.customField = {
@@ -825,11 +760,6 @@ const insertCustomField = async(detail,data) => {
 // add the new custom field or edit the custom field
 const customFieldStore = async(object,isEdit) => {    
     let value = JSON.parse(JSON.stringify(object))
-    let userData = {
-        id: user.id,
-        name: user.Employee_Name,
-        companyOwnerId: companyOwner.value._id,
-    }
     if(!isEdit){       
         value.global = false;
         value.projectId = [props.projectData._id];
@@ -846,21 +776,6 @@ const customFieldStore = async(object,isEdit) => {
                 value._id = res?.data?._id || '';
                 commit("settings/mutateFinalCustomFields", {data: value || {},op: "added"});
                 $toast.success(t('Toast.Field_Added_Successfully'), {position: 'top-right' });
-                let historyObj = {
-                    'message': `<b>${userData.name}</b> has Created <b> Custom Field </b> as <b>${value.fieldTitle}</b> for project.`,
-                    'key' : 'Project_CustomField',
-                }
-                apiRequest("post", env.HANDLE_HISTORY, {
-                    "type": 'project',
-                    "companyId": companyId.value,
-                    "projectId": props.projectData._id,
-                    "taskId": null,
-                    "object": historyObj,
-                    "userData": userData
-                }).catch((err)=>{
-                    $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
-                    console.error("Error",err)
-                });
             }else{
                 $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
             }
@@ -872,7 +787,6 @@ const customFieldStore = async(object,isEdit) => {
             console.error("Error inserting the custom field",err)
         });
     }else{
-        const oldFieldValue = customFieldObject.value.fieldTitle
         value.updatedAt = new Date();
         const object = {
             type: "updateOne",
@@ -883,20 +797,6 @@ const customFieldStore = async(object,isEdit) => {
         await apiRequest("put",env.CUSTOM_FIELD,object).then((res) => {
             if(res.status === 200){
                 commit("settings/mutateFinalCustomFields", {data: {...customFieldObject.value,...value} || {},op: "modified"});
-                if(oldFieldValue !== value.fieldTitle){
-                    let historyObj = {
-                        'message': `<b>${userData.name}</b> has Edited <b> Custom Field </b> from <b>${oldFieldValue}</b> to <b>${value.fieldTitle}</b> for project.`,
-                        'key' : 'Project_CustomField',
-                    }
-                    apiRequest("post", env.HANDLE_HISTORY, {
-                        "type": 'project',
-                        "companyId": companyId.value,
-                        "projectId": props.projectData._id,
-                        "taskId": null,
-                        "object": historyObj,
-                        "userData": userData
-                    })
-                }
                 $toast.success(t('Toast.Field_Updated_Successfully'), {position: 'top-right' })
             }else{
                 $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });

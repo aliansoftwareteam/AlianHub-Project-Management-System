@@ -42,12 +42,10 @@
 
 <script setup>
     //import
-    import * as env from '@/config/env';
     import taskClass from "@/utils/TaskOperations";
     import { useToast } from "vue-toast-notification";
-    import { apiRequest } from '../../../../../services';
     import { computed, nextTick, ref, inject } from 'vue';
-    import { useCustomComposable,useGetterFunctions } from '@/composable';
+    import { useCustomComposable } from '@/composable';
     import DateComponentListing from '../../atom/customFieldViewColumn/dateComponentViewColumn.vue';
     import EmailComponentListing from '../../atom/customFieldViewColumn/emailComponentViewColumn.vue';
     import PhoneComponentListing from '../../atom/customFieldViewColumn/phoneComponentViewColumn.vue';
@@ -61,7 +59,6 @@
     import { useStore } from 'vuex';
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
-    const { getUser } = useGetterFunctions();
 
     const {checkPermission, checkApps} = useCustomComposable();
     const $toast = useToast()
@@ -130,16 +127,9 @@
     const taskId = ref('');
     const customFieldId = ref('');
     //inject
-    const userId = inject('$userId');
     const companyId = inject("$companyId");
     const customFieldPermission = computed(() => checkPermission("task.task_custom_field", props.projectData.isGlobalPermission, {gettersVal: getters}))
-    const companyOwner = computed(() => {
-        return getters["settings/companyOwnerDetail"];
-    });
 
-    //getUser
-    const user = getUser(userId.value);
-    
     // function
     const getView = (val) => {
         switch(val){
@@ -171,21 +161,21 @@
             if(detail.fieldType === 'date'){
                 try{
                     detail.fieldValue = new Date(value);
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
             }else if(detail.fieldType === 'dropdown'){
                 detail.fieldValue = [value.id];
                 try {
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
             }else if(detail.fieldType === 'number' || detail.fieldType === 'money'){
                 try{
                     detail.fieldValue = String(value);
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
@@ -208,7 +198,7 @@
                                     detail.fieldFlag = detail.fieldFlag ? detail.fieldFlag : detail.fieldCountryObject.code;
                                 }
                             }
-                            insertCustomField(detail,value);
+                            insertCustomField(detail);
                         } catch(error){
                             console.error('ERROR',error);
                         }
@@ -218,7 +208,7 @@
         } else if(detail.fieldType === 'checkbox'){
             try{
                 detail.fieldValue = value;
-                insertCustomField(detail,value);
+                insertCustomField(detail);
             } catch(error){
                 console.error('ERROR',error);
             }
@@ -229,12 +219,7 @@
         }
     };
 
-    const insertCustomField = (detail,data) => {
-        let userData = {
-            id: user.id,
-            name: user.Employee_Name,
-            companyOwnerId: companyOwner.value._id,
-        }
+    const insertCustomField = (detail) => {
         let updateDetail = {};
         updateDetail.fieldValue = detail.fieldValue;
         if(detail.fieldType === "phone"){
@@ -245,21 +230,6 @@
         updateDetail._id = detail._id;
         taskClass.updateTaskCustomField({taskId: props.task._id, customFieldId: detail._id, updateDetail: updateDetail,companyId:companyId.value,taskObj:props.task,detail:detail}).then((res) => {
             if(res.status){
-                let historyObj = {
-                    'message': `<b>${userData.name}</b> has added value in <b> ${detail.fieldTitle}</b> Custom Field as <b>${data.value ? data.value : data}</b>.`,
-                    'key' : 'Project_Category',
-                    'sprintId' : props.task.sprintId
-                }
-                apiRequest("post", env.HANDLE_HISTORY, {
-                    "type": 'task',
-                    "companyId": companyId.value,
-                    "projectId": props.task.ProjectID,
-                    "taskId": props.task._id,
-                    "object": historyObj,
-                    "userData": userData
-                }).catch((err) =>{
-                    console.error("Error in updating the notification",err);
-                });
                 if(detail.fieldType !== "phone"){
                     customFieldId.value = "";
                 }

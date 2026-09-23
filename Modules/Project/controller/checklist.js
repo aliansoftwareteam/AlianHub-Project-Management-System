@@ -2,6 +2,8 @@ const mongoose = require("mongoose")
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { removeCache } = require('../../../utils/commonFunctions');
+const logger = require('../../../Config/loggerConfig');
+const { recordChecklistChange } = require('../helpers/projectItemHistory');
 
 /**
  * Helper function for build update query object based on the specific key
@@ -71,11 +73,14 @@ exports.handleChecklist = async (req, res) => {
             ]
         }
 
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'updateOne');
+        const companyId = req.headers['companyid'];
+        const previous = await MongoDbCrudOpration(companyId, params, 'findOneAndUpdate');
 
         removeCache('UserProjectData:', true);
 
-        if (response) {
+        if (previous) {
+            recordChecklistChange({ companyId, projectId: id, actorId: req.uid, previous, body: req.body })
+                .catch((error) => logger.error(`project checklist history: ${error && error.message}`));
             return res.status(200).json({ status: true });
         } else {
             return res.status(404).json({ status: false });

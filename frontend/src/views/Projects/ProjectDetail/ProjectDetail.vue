@@ -99,13 +99,12 @@
     import * as env from '@/config/env';
     import { apiRequest, apiRequestWithoutCompnay } from '../../../services'
     import Swal from 'sweetalert2';
-    import { useCustomComposable, useGetterFunctions } from '@/composable';
+    import { useCustomComposable } from '@/composable';
     import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
     import { buildCloudAttachment, isCloudAttachment, cloudTypeOf, CLOUD_PROVIDERS } from '@/utils/cloudAttachment';
     import { importCloudFile } from '@/composable/cloudPicker';
     import { useI18n } from 'vue-i18n';
     import ProjectDetailRightSide from '@/components/organisms/ProjectDetailRightSide/ProjectDetailRightSide.vue';
-    import { projectAttachmentAdd , projectAttachmentChange } from '@/utils/NotificationTemplate';
 
     const companyId = inject('$companyId');
     const $toast = useToast();
@@ -120,7 +119,7 @@
         isvisible:{type:Boolean,default:() => true}
     });
     const projectData = inject('selectedProject');
-    const { checkPermission, makeUniqueId, checkApps, getAppState, checkBucketStorage, sanitizeInput } = useCustomComposable();
+    const { checkPermission, makeUniqueId, checkApps, getAppState, checkBucketStorage } = useCustomComposable();
     const { getters,commit } = useStore();
     const checkList = computed(() => projectData.value.checklistArray)
     const currentCompany = computed(() => getters["settings/selectedCompany"])
@@ -129,13 +128,6 @@
     const billingPeriodPro = ref('');
     const startDateProject = ref({});
     const isAttachmentSpinner = ref(false);
-    const {getUser} = useGetterFunctions();
-    const user = getUser(userId.value);
-    const userData = {
-        id: user.id,
-        Employee_Name: user.Employee_Name,
-        companyOwnerId: user.companyOwnerId
-    }
     watch(() => props.billingPeriod, (newval) => {
         billingPeriodPro.value = newval;
     });
@@ -227,24 +219,6 @@
                 projectData.value.attachments.push(record);
                 commit('projectData/projectLocalUpdate', { op: "modified", itemData: { ...projectData.value } });
                 attached += 1;
-
-                // History is best-effort — a failure here must not make a
-                // successful attach look failed.
-                try {
-                    await apiRequest("post", env.HANDLE_HISTORY, {
-                        "type": 'project',
-                        "companyId": companyId.value,
-                        "projectId": projectdata._id,
-                        "taskId": null,
-                        "object": {
-                            key: "Project_Attachment",
-                            message: `<b>${userData.Employee_Name}</b> has attached <b>${record.filename}</b> on <b>${sanitizeInput(projectdata.ProjectName)}</b>.`,
-                        },
-                        "userData": userData,
-                    });
-                } catch (error) {
-                    console.error("ERROR in cloud attachment history", error);
-                }
             } catch (error) {
                 console.error("Error attaching cloud file to project: ", error);
             }
@@ -334,51 +308,16 @@
                                     key: '$push'
                                 }
 
-                                apiRequest("put", `${env.PROJECT}/${projectdata._id}`, params).then(() => {                                    
+                                apiRequest("put", `${env.PROJECT}/${projectdata._id}`, params).then(() => {
                                     projectData.value.attachments.push(imagObj)
                                     commit('projectData/projectLocalUpdate', { op: "modified", itemData: { ...projectData.value } });
-
-                                    let historyObj = {
-                                        key : "Project_Attachment",
-                                        message : `<b>${userData.Employee_Name}</b> has attached <b>${file.name}</b> on <b>${sanitizeInput(projectdata.ProjectName)}</b>.`
-                                    }
-                                    apiRequest("post", env.HANDLE_HISTORY, {
-                                        "type": 'project',
-                                        "companyId": companyId.value,
-                                        "projectId": projectdata._id,
-                                        "taskId": null,
-                                        "object": historyObj,
-                                        "userData": userData
-                                    }).then(() => {
-                                        count.value++;
-                                        countFun(fileList[count.value]);
-                                    })
+                                    count.value++;
+                                    countFun(fileList[count.value]);
                                 })
                                 .catch((err) => {
                                     count.value++;
                                     countFun(fileList[count.value]);
                                     console.error(err, "Error in upload project attachment");
-                                })
-                                let notifyObj = {
-                                    url: file.name,
-                                    ProjectName : projectdata.ProjectName
-                                }
-                                let notificationObject = {
-                                    message: projectAttachmentAdd(notifyObj),
-                                    key: "attachments",
-                                };
-                                
-                                apiRequest("post", env.HANDLE_NOTIFICATION, {
-                                    type: 'project',
-                                    companyId: companyId.value,
-                                    projectId: projectdata._id,
-                                    object: notificationObject,
-                                    userData: userData,
-                                    changeType:'name',
-                                    changeData: notifyObj
-                                })
-                                .catch((error) => {
-                                    console.error("ERROR in update notification", error);
                                 })
                                 isUpload = true;
                             } catch (error) {
@@ -442,39 +381,6 @@
                             projectData.value.attachments.splice(indx, 1)
                         }
                         commit('projectData/projectLocalUpdate', { op: "modified", itemData: { ...projectData.value } });
-                        let historyObj = {
-                            key : "Project_Attachment",
-                            message : `<b>${userData.Employee_Name}</b> has deleted <b>${attachment.filename}</b> on <b>${sanitizeInput(projectData.value.ProjectName)}</b>.`
-                        }
-                        apiRequest("post", env.HANDLE_HISTORY, {
-                            "type": 'project',
-                            "companyId": companyId.value,
-                            "projectId": projectData.value._id,
-                            "taskId": null,
-                            "object": historyObj,
-                            "userData": userData
-                        })
-                        let notifyObj = {
-                                removeFileName: attachment.filename,
-                                ProjectName : projectData.ProjectName
-                            }
-                            let notificationObject = {
-                                message: projectAttachmentChange(notifyObj),
-                                key: "attachments",
-                            };
-                            
-                            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                                type: 'project',
-                                companyId: companyId.value,
-                                projectId: projectData._id,
-                                object: notificationObject,
-                                userData: userData,
-                                changeType:'name',
-                                changeData: notifyObj
-                            })
-                            .catch((error) => {
-                                console.error("ERROR in update notification", error);
-                            })
                         $toast.success(t('Toast.Attchments_deleted_successfully'),{position: 'top-right'});
                     })
                 };

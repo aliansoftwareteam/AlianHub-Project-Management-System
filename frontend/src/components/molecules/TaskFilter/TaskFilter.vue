@@ -116,7 +116,6 @@ const { getUser } = useGetterFunctions();
 const { getters } = useStore();
 const priorities = computed(() => getters["settings/companyPriority"]);
 const $toast = useToast();
-const companyOwner = computed(() => getters["settings/companyOwnerDetail"]);
 
 // Props
 const props = defineProps({
@@ -219,15 +218,6 @@ const prioritiesArray = computed(() => {
         return { ...x, finalValue: x.value}
     })?.sort((a, b) => a?.name.localeCompare(b?.name));
 });
-function getUserData() {
-    const user = getUser(userId.value);
-    return {
-        id: user.id,
-        Employee_Name: user.Employee_Name,
-        companyOwnerId: companyOwner.value.id,
-    };
-}
-const userData = getUserData();
 
 // Mounted
 onMounted(() => {
@@ -255,32 +245,6 @@ const getFiltersData = async () => {
 };
 
 /**
- * This function is used to manage all the task history for the project and tasks
- * @param {*} type 
- * @param {*} key 
- * @param {*} message 
- */
-const manageHistory = async (type, key, message) => {
-    const axiosData = {
-        "type": type,
-        "companyId": companyId.value,
-        "projectId": props.projectData.id,
-        "taskId": null,
-        "object": {
-            "sprintId": null,
-            "key": key,
-            "message": message
-        },
-        "userData": getUserData()
-    };
-    await apiRequest("post", env.HANDLE_HISTORY, axiosData).then((result) => {
-        if(result.data.status) {
-            console.info(result.data.statusText)
-        }
-    });
-}
-
-/**
  * This function is used for the handle update event
  * @param {*} obj 
  */
@@ -290,13 +254,11 @@ const handleUpdate = async (obj) => {
         { $set: obj?.name ? { name: obj.name } : { filters: obj.filters } }
     ]
 
-    await apiRequest("put", `${env.TASK_GLOBAL_FILTER}/update`, params).then((result) => {
+    await apiRequest("put", `${env.TASK_GLOBAL_FILTER}/update?projectId=${props.projectData?.id || ''}`, params).then((result) => {
         if (result.status) {
             getFiltersData();
             $toast.success(t('Toast.Filter_update_successfully'), { position: 'top-right' });
 
-            const msg = `<b>${userData.Employee_Name}</b> has been updated <b>${selectedRow.value.name}</b> filter`;
-            manageHistory('project', "Project_Filter", msg);
         }
     });
 }
@@ -535,7 +497,7 @@ const deleteFilter = (row) => {
 
 const handleConfirm = async (val) => {
     if (val) {
-        await apiRequest("delete", `${env.TASK_GLOBAL_FILTER}/delete/${companyId.value}/${selectedRow.value._id}`).then((result) => {
+        await apiRequest("delete", `${env.TASK_GLOBAL_FILTER}/delete/${companyId.value}/${selectedRow.value._id}?projectId=${props.projectData?.id || ''}`).then((result) => {
             if (result.status) {
                 const index = filters.value.findIndex(x => x._id === selectedRow.value._id);
                 if (index !== -1) {
@@ -543,10 +505,6 @@ const handleConfirm = async (val) => {
                 }
                 $toast.success(t("Toast.Filter_deleted_successfully"), { position: 'top-right' });
                 isConfirm.value = false;
-
-                // Filter history
-                const msg = `<b>${userData.Employee_Name}</b> has been deleted <b>${selectedRow.value.name}</b> filter`;
-                manageHistory('project', "Project_Filter", msg);
             }
         });
     }

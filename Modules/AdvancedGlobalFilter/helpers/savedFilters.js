@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const logger = require("../../../Config/loggerConfig");
+const { recordFilterChange } = require("./filterHistory");
 
 // A saved filter belongs to the user who saved it and nobody shares one, so every
 // read and write is bound to req.uid; ids in the path or body only ever narrow it.
@@ -75,6 +76,8 @@ const updateFilter = async (req, res) => {
         if (!response) {
             return refuse(res, 404, 'Saved filter not found.');
         }
+        recordFilterChange({ companyId: req.headers['companyid'], uid: ownerOf(req), projectId: req.query && req.query.projectId, filter: response, verb: 'updated' })
+            .catch((error) => logger.error(`saved filter history: ${error && error.message}`));
         return res.status(200).json({ status: true });
     } catch (error) {
         logger.error(`ERROR in update filter: ${error.message}`);
@@ -95,10 +98,12 @@ const deleteFilter = async (req, res) => {
         const response = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.GLOBALFILTER,
             data: [{ _id: new mongoose.Types.ObjectId(String(id)), userId: ownerOf(req) }],
-        }, 'deleteOne');
-        if (!response || !response.deletedCount) {
+        }, 'findOneAndDelete');
+        if (!response) {
             return refuse(res, 404, 'Saved filter not found.');
         }
+        recordFilterChange({ companyId, uid: ownerOf(req), projectId: req.query && req.query.projectId, filter: response, verb: 'deleted' })
+            .catch((error) => logger.error(`saved filter history: ${error && error.message}`));
         return res.status(200).json({ status: true });
     } catch (error) {
         logger.error(`ERROR in delete filter: ${error.message}`);

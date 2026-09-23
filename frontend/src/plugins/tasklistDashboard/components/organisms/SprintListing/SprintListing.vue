@@ -330,19 +330,6 @@ function updateSprintAPICALL(updateData = null,historyObj) {
             .then((resp) => {
                 if(resp.data.status) {
                     commit('projectData/mutateSprints', {op: "modified", data: resp.data.data});
-                    // let historyObj = {
-                    //     message: `<b>${userData.Employee_Name}</b> has ${type} <b>${props.sprint.name}</b> sprint ${props.sprint?.folderId === null ? '' : `in <b>${props.sprint.isFolder ? props.sprint?.folderName : ""}</b> folder`} in <b>${project.value.ProjectName}</b> project.`,
-                    //     key: "project_sprint_removed",
-                    //     sprintId: props.sprint._id,
-                    // }
-                    // apiRequest("post", env.HANDLE_HISTORY, {
-                    //     "type": 'project',
-                    //     "companyId": companyId.value,
-                    //     "projectId": props.projectData._id,
-                    //     "taskId": null,
-                    //     "object": historyObj,
-                    //     "userData": userData
-                    // })
                     $toast.success(t(`Toast.Sprint updated successfully`), {position: "top-right"})
                 }
                 assigneeInProgress.value = false;

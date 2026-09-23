@@ -7,6 +7,9 @@ const { HandleHistory } = require('../../Tasks/helpers/helper');
 const { HandleBothNotification } = require('../../Tasks/helpers/handleNotification');
 const { shownDate } = require('../../Tasks/helpers/notificationTemplate');
 const { employeeNameOf, escapeText } = require('../../Tasks/helpers/taskWriteFields');
+const projectSkills = require('../../settings/ProjectSkills/helper');
+const { fieldValueText, customFieldDefinitionOf } = require('../../CustomField/helpers/customFieldText');
+const { sourceOrDefault } = require('./projectSourceRules');
 
 /* The web app filed reopen, avatar, colour and sharing rows under the end-date key; they keep it so older rows and new ones read alike. */
 const SETTINGS_KEY = 'Project_EndDate';
@@ -25,6 +28,11 @@ const HISTORY = Object.freeze({
     WATCHERS: 'Project_Watchers',
     CREATED: 'Project_Created',
     SPRINT: 'Create_Sprint',
+    SOURCE: 'Project_Source',
+    PROPOSAL_ID: 'Project_ProposalId',
+    SKILLS: 'Project_Skills',
+    CUSTOM_FIELD: 'Project_CustomField',
+    ATTACHMENT: 'Project_Attachment',
 });
 
 const NOTICE = Object.freeze({
@@ -40,12 +48,14 @@ const NOTICE = Object.freeze({
     CREATED: 'project_create',
     SPRINT_CREATED: 'project_sprint_create',
     FOLDER_CREATED: 'project_folder_create',
+    ATTACHMENTS: 'attachments',
 });
 
 /* Project_Name is left out: views and tags still post their own rows under it. Assignee_Changed is the key the project header used. */
 const SERVER_BUILT_HISTORY = [
     HISTORY.STATUS, HISTORY.ASSIGNEE_ADD, HISTORY.ASSIGNEE_REMOVE, 'Assignee_Changed', HISTORY.TYPE, HISTORY.CURRENCY,
     HISTORY.DUE_DATE, HISTORY.START_DATE, HISTORY.END_DATE, HISTORY.WATCHERS, HISTORY.CREATED, HISTORY.SPRINT,
+    HISTORY.SOURCE, HISTORY.PROPOSAL_ID, HISTORY.SKILLS, HISTORY.CUSTOM_FIELD, HISTORY.ATTACHMENT,
 ].map((key) => ({ type: 'project', key }));
 const SERVER_BUILT_NOTIFICATIONS = Object.values(NOTICE);
 
@@ -213,12 +223,125 @@ const watchModeChanged = ({ A, set, previous, actor }) => {
     return [{ history: { key: HISTORY.WATCHERS, message: `<b>${A}</b> has watchers activity as a <b>${WATCH_LABELS[next] || 'Ignore'}</b>` } }];
 };
 
-const SET_CHANGES = [renamed, statusChanged, trashedOrRestored, typeChanged, currencyChanged, datesChanged, iconChanged, sharingChanged, watchModeChanged];
+const SOURCE_LABELS = { upwork: 'Upwork', fiverr: 'Fiverr', other: 'Other' };
 
-const describeProjectChanges = async ({ previous, updateObject, key, actor, nameOf = employeeNameOf, timeZone }) => {
+const sourceChanged = ({ A, set, previous }) => {
+    if (!has(set, 'source') || set.source === sourceOrDefault(previous.source)) return [];
+    return [{ history: { key: HISTORY.SOURCE, message: `<b>${A}</b> has changed <b> Source</b> as <b>${escapeText(SOURCE_LABELS[set.source] || set.source)}</b>.` } }];
+};
+
+const proposalIdChanged = ({ A, set, previous }) => {
+    if (!has(set, 'proposalId') || String(set.proposalId || '') === String(previous.proposalId || '')) return [];
+    return [{ history: { key: HISTORY.PROPOSAL_ID, message: `<b>${A}</b> has changed <b> Proposal ID</b> as <b>${escapeText(set.proposalId) || 'N/A'}</b>.` } }];
+};
+
+const skillsChanged = async ({ A, set, previous, skillNamesOf }) => {
+    if (!has(set, 'skills') || !Array.isArray(set.skills)) return [];
+    if (JSON.stringify(set.skills) === JSON.stringify(Array.from(previous.skills || []))) return [];
+    const names = (await skillNamesOf(set.skills)).map(escapeText);
+    return [{ history: { key: HISTORY.SKILLS, message: `<b>${A}</b> has changed <b> Skills</b> as <b>${names.join(', ') || 'N/A'}</b>.` } }];
+};
+
+const CUSTOM_FIELD_PREFIX = 'customField.';
+
+const customFieldsChanged = async ({ A, set, previous, definitionOf }) => {
+    const fieldIds = Object.keys(set).filter((field) => field.startsWith(CUSTOM_FIELD_PREFIX)).map((field) => field.slice(CUSTOM_FIELD_PREFIX.length));
+    const entries = await Promise.all(fieldIds.map(async (fieldId) => {
+        const definition = await definitionOf(fieldId);
+        if (!definition) return null;
+        const shown = fieldValueText(definition, set[`${CUSTOM_FIELD_PREFIX}${fieldId}`]);
+        const before = previous.customField && previous.customField[fieldId];
+        if (before && fieldValueText(definition, before) === shown) return null;
+        return { history: { key: HISTORY.CUSTOM_FIELD, message: `<b>${A}</b> has added value in <b> ${escapeText(definition.fieldTitle)}</b> Custom Field as <b>${escapeText(shown)}</b> for project.` } };
+    }));
+    return entries.filter(Boolean);
+};
+
+const attachmentsChanged = ({ A, P, previous, updateObject, key }) => {
+    const record = updateObject.attachments;
+    if (!record || typeof record !== 'object') return [];
+    if (key === '$push') {
+        const F = escapeText(record.filename);
+        return [{
+            history: { key: HISTORY.ATTACHMENT, message: `<b>${A}</b> has attached <b>${F}</b> on <b>${P}</b>.` },
+            notice: { key: NOTICE.ATTACHMENTS, message: `<p><strong>${F}</strong> attached on <strong>${P}</strong> project.</p>` },
+            changeType: 'name',
+            changeData: { url: F, ProjectName: P },
+        }];
+    }
+    const stored = record.id === undefined ? null : (previous.attachments || []).find((file) => file && String(file.id) === String(record.id));
+    if (!stored) return [];
+    const F = escapeText(stored.filename);
+    return [{
+        history: { key: HISTORY.ATTACHMENT, message: `<b>${A}</b> has deleted <b>${F}</b> on <b>${P}</b>.` },
+        notice: { key: NOTICE.ATTACHMENTS, message: `<p><strong>${F}</strong> removed on <strong>${P}</strong>.</p>` },
+        changeType: 'name',
+        changeData: { removeFileName: F, ProjectName: P },
+    }];
+};
+
+const VIEW_FIELD = /^ProjectRequiredComponent\.\$\[elementIndex\]\.(isPin|setAsDefault|name)$/;
+const isEmbed = (view) => has(view, 'url') || has(view, 'html');
+const storedView = (previous, viewId) => (previous.ProjectRequiredComponent || []).find((view) => view && viewId !== undefined && idOf(view) === String(viewId));
+
+const viewAdded = ({ A, previous, updateObject }) => {
+    const view = updateObject.ProjectRequiredComponent;
+    if (!view || typeof view !== 'object' || storedView(previous, idOf(view))) return [];
+    const pinned = view.isPin ? 'pinned' : '';
+    const N = escapeText(view.name);
+    return [{ history: { key: HISTORY.NAME, message: `<b>${A}</b> has added the <b> ${pinned}  ${isEmbed(view) ? 'Embed View' : 'View'} </b> as <b>${N}</b>` } }];
+};
+
+const viewRemoved = ({ A, previous, updateObject }) => {
+    const view = storedView(previous, idOf(updateObject.ProjectRequiredComponent || ''));
+    if (!view) return [];
+    const N = escapeText(view.name);
+    return [{
+        history: {
+            key: HISTORY.NAME,
+            message: isEmbed(view) ? `<b> ${A} </b> has deleted the  <b> Embed View ${N} </b>` : `<b> ${A} </b> has Deleted the <b> ${N} View </b>`,
+        },
+    }];
+};
+
+const VIEW_EDITS = {
+    isPin: ({ A, N, value }) => `<b> ${A} </b> has ${value ? 'pinned' : 'Unpinned'} the <b> ${N} View </b>`,
+    setAsDefault: ({ A, N, value }) => (value ? `<b> ${A} </b> has added the <b> ${N} </b>as Default View` : `<b> ${A} </b> has removed the <b> ${N} </b>as Default View `),
+    name: ({ A, N, value }) => `<b>${A}</b> has changed the  <b> Embed View name </b> as <b> ${escapeText(value)} </b>  from <b>${N} </b>`,
+};
+
+/* The view list edits one view at a time, naming it through the elementIndex array filter. */
+const viewEdited = ({ A, set, previous, arrayFilters }) => {
+    const filter = (arrayFilters || []).find((entry) => entry && has(entry, 'elementIndex._id'));
+    const view = filter && storedView(previous, filter['elementIndex._id']);
+    if (!view) return [];
+    return Object.keys(set).flatMap((field) => {
+        const match = VIEW_FIELD.exec(field);
+        if (!match) return [];
+        const [, name] = match;
+        const value = set[field];
+        const before = name === 'name' ? String(view.name) : Boolean(view[name]);
+        if ((name === 'name' ? String(value) : Boolean(value)) === before) return [];
+        return [{ history: { key: HISTORY.NAME, message: VIEW_EDITS[name]({ A, N: escapeText(view.name), value }) } }];
+    });
+};
+
+const SET_CHANGES = [
+    renamed, statusChanged, trashedOrRestored, typeChanged, currencyChanged, datesChanged, iconChanged, sharingChanged, watchModeChanged,
+    sourceChanged, proposalIdChanged, skillsChanged, customFieldsChanged, viewEdited,
+];
+
+const describeProjectChanges = async ({
+    previous, updateObject, key, arrayFilters, actor, nameOf = employeeNameOf, timeZone, companyId,
+    skillNamesOf = (slugs) => projectSkills.skillNamesOf(companyId, slugs),
+    definitionOf = (fieldId) => customFieldDefinitionOf(companyId, fieldId),
+}) => {
     if (!previous || !updateObject || typeof updateObject !== 'object') return [];
-    const ctx = { A: actor.Employee_Name, P: escapeText(previous.ProjectName), previous, updateObject, key, actor, nameOf, timeZone };
-    if (!key || key === '$set') return SET_CHANGES.flatMap((change) => change({ ...ctx, set: updateObject }));
+    const ctx = { A: actor.Employee_Name, P: escapeText(previous.ProjectName), previous, updateObject, key, arrayFilters, actor, nameOf, timeZone, skillNamesOf, definitionOf };
+    if (!key || key === '$set') return (await Promise.all(SET_CHANGES.map((change) => change({ ...ctx, set: updateObject })))).flat();
+    if (['$push', '$pull'].includes(key) && has(updateObject, 'attachments')) return attachmentsChanged(ctx);
+    if (key === '$addToSet' && has(updateObject, 'ProjectRequiredComponent')) return viewAdded(ctx);
+    if (key === '$pull' && has(updateObject, 'ProjectRequiredComponent')) return viewRemoved(ctx);
     return assigneeChanged(ctx);
 };
 
@@ -255,10 +378,10 @@ const send = ({ companyId, projectId, actor, entries }) => Promise.all(entries.f
         : null,
 ]));
 
-const recordProjectChanges = async ({ companyId, projectId, actorId, previous, updateObject, key, timeZone }) => {
+const recordProjectChanges = async ({ companyId, projectId, actorId, previous, updateObject, key, arrayFilters, timeZone }) => {
     if (!previous) return;
     const actor = await projectActor(companyId, actorId);
-    const entries = await describeProjectChanges({ previous, updateObject, key, actor, timeZone });
+    const entries = await describeProjectChanges({ previous, updateObject, key, arrayFilters, actor, timeZone, companyId });
     if (entries.length) await send({ companyId, projectId, actor, entries });
 };
 

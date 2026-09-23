@@ -409,6 +409,6 @@ describe('PRJ-05: DELETE /api/v1/project/filter/delete/:cid/:id', () => {
     it('deletes within the session company', async () => {
         const res = response();
         await deleteFilter(request({ params: { cid: C, id: oid() } }), res);
-        expect(mockDb.calls[0]).toMatchObject({ companyId: C, method: 'deleteOne' });
+        expect(mockDb.calls[0]).toMatchObject({ companyId: C, method: 'findOneAndDelete' });
     });
 });
