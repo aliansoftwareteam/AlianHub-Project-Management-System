@@ -3,8 +3,6 @@
   "Auth/controller/loginSession.js": 1,
   "Auth/controller/sendInvitation.js": 2,
   "Mcp/server.js": 1,
-  "SSO/oidc.js": 1,
-  "SSO/saml.js": 4,
   "Users/controller.js": 1,
   "createProject/controller.js": 2,
   "notification/prepare-notification-data/controllerV2.js": 1,

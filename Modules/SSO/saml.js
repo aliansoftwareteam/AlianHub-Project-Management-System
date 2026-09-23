@@ -53,7 +53,7 @@ const buildIdp = (cfg) => {
 /* GET /api/v2/sso/saml/initiate?companyId= — redirect to the IdP. */
 exports.samlInitiate = async (req, res) => {
     try {
-        const companyId = req.query.companyId || req.headers['companyid'];
+        const companyId = req.query.companyId || req.headers['companyid']; // tenant-scoping: sign-in starts before any session; the company only picks which IdP to redirect to
         if (!companyId) return res.status(400).send('companyId is required');
         const cfg = await loadConfig(companyId);
         if (!cfg || cfg.provider !== 'saml') return res.status(404).send('SAML SSO is not configured for this company');
@@ -70,7 +70,7 @@ exports.samlInitiate = async (req, res) => {
 /* POST /api/v2/sso/saml/acs?companyId= — IdP posts the signed assertion here. */
 exports.samlAcs = async (req, res) => {
     try {
-        const companyId = req.query.companyId || (req.body && req.body.companyId);
+        const companyId = req.query.companyId || (req.body && req.body.companyId); // tenant-scoping: the IdP posts here before any session; the company only picks whose IdP certificate must have signed the response
         if (!companyId) return res.redirect('/login?ssoError=config');
         const cfg = await loadConfig(companyId);
         if (!cfg || cfg.provider !== 'saml') return res.redirect('/login?ssoError=config');
@@ -93,7 +93,7 @@ exports.samlAcs = async (req, res) => {
 /* GET /api/v2/sso/saml/metadata?companyId= — SP metadata for the IdP admin. */
 exports.samlMetadata = async (req, res) => {
     try {
-        const companyId = req.query.companyId || req.headers['companyid'];
+        const companyId = req.query.companyId || req.headers['companyid']; // tenant-scoping: public SP metadata for the IdP admin; it names the company but holds none of its data
         if (!companyId) return res.status(400).send('companyId is required');
         const sp = buildSp(companyId);
         res.type('application/xml');
