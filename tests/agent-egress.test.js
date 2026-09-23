@@ -19,7 +19,7 @@ describe('agent egress — private-host rule', () => {
          '::ffff:127.0.0.1', '::ffff:169.254.169.254', '::ffff:10.0.0.1', '::ffff:7f00:1'].forEach((ip) => {
             expect([ip, isPrivateAddress(ip)]).toEqual([ip, true]);
         });
-        ['8.8.8.8', '203.0.113.10', '172.32.0.1', '100.128.0.1', '2606:4700::1111', '::ffff:8.8.8.8'].forEach((ip) => {
+        ['8.8.8.8', '93.184.215.14', '172.32.0.1', '100.128.0.1', '2606:4700::1111', '::ffff:8.8.8.8'].forEach((ip) => {
             expect([ip, isPrivateAddress(ip)]).toEqual([ip, false]);
         });
     });
@@ -44,15 +44,15 @@ describe('agent egress — private-host rule', () => {
         });
 
         it('rejects when ANY resolved address is private', async () => {
-            lookup.mockResolvedValue([{ address: '203.0.113.10', family: 4 }, { address: '169.254.169.254', family: 4 }]);
+            lookup.mockResolvedValue([{ address: '93.184.215.14', family: 4 }, { address: '169.254.169.254', family: 4 }]);
             await expect(resolvePublic('http://split-horizon.example.com/')).rejects.toThrow(/private|reserved/i);
             lookup.mockResolvedValue([{ address: '2606:4700::1111', family: 6 }, { address: '::ffff:127.0.0.1', family: 6 }]);
             await expect(resolvePublic('http://mapped.example.com/')).rejects.toThrow(/private|reserved/i);
         });
 
         it('returns the validated address so the connection can be pinned to it', async () => {
-            lookup.mockResolvedValue([{ address: '203.0.113.10', family: 4 }]);
-            await expect(resolvePublic('https://example.com/x')).resolves.toMatchObject({ address: '203.0.113.10', family: 4 });
+            lookup.mockResolvedValue([{ address: '93.184.215.14', family: 4 }]);
+            await expect(resolvePublic('https://example.com/x')).resolves.toMatchObject({ address: '93.184.215.14', family: 4 });
         });
 
         it('only allows http and https', async () => {
