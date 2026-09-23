@@ -88,6 +88,7 @@ function checkPending(dir = LOCALES_DIR) {
 const ATTRS = ['title', 'placeholder', 'placeHolder', 'aria-label'];
 const IGNORED_TEXT = /^[\s\d\W_]*$/;
 const WORD = /[A-Za-z]{2,}/;
+const CHAR_REF = /&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);/gi;
 
 function walk(dir, out = []) {
     fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
@@ -116,7 +117,7 @@ function scanTemplate(template) {
     const findings = [];
     const lineOf = (index) => template.slice(0, index).split('\n').length;
     const flag = (index, kind, raw) => {
-        const value = raw.replace(/\{\{[\s\S]*?\}\}/g, ' ').replace(/\s+/g, ' ').trim();
+        const value = raw.replace(/\{\{[\s\S]*?\}\}/g, ' ').replace(CHAR_REF, ' ').replace(/\s+/g, ' ').trim();
         if (value && WORD.test(value) && !IGNORED_TEXT.test(value)) findings.push({ line: lineOf(index), kind, value });
     };
 

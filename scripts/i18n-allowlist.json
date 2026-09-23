@@ -3,7 +3,6 @@
     "frontend/src/components/atom/Attachments/Attachments.vue": 1,
     "frontend/src/components/atom/BillingPeriod/BillingPeriod.vue": 1,
     "frontend/src/components/atom/CreateTask/CreateTask.vue": 1,
-    "frontend/src/components/atom/CroppingTool/CroppingTool.vue": 1,
     "frontend/src/components/atom/DragDropField/DragDropField.vue": 2,
     "frontend/src/components/atom/FixMilestoneTd/FixMilestoneTd.vue": 3,
     "frontend/src/components/atom/HourlyMilestoneInput/HourlyMilestoneInput.vue": 2,
@@ -17,10 +16,8 @@
     "frontend/src/components/atom/TimesheetView/LogDetailView/LogDetailViewBodyComponent.vue": 2,
     "frontend/src/components/atom/TimesheetView/LogDetailView/LogDetailViewHeaderComponent.vue": 5,
     "frontend/src/components/atom/TimesheetView/LogDetailView/LogdetailViewBodyScreenShot.vue": 2,
-    "frontend/src/components/atom/TimesheetView/ProjectTimeSheetView/ProjectTimesheetTrComponent.vue": 9,
-    "frontend/src/components/molecules/ActivityLogContent/ActivityContent.vue": 1,
+    "frontend/src/components/atom/TimesheetView/ProjectTimeSheetView/ProjectTimesheetTrComponent.vue": 1,
     "frontend/src/components/molecules/AdvanceSearch/MainComponent.vue": 1,
-    "frontend/src/components/molecules/AiWriteDescription/AiWriteDescription.vue": 1,
     "frontend/src/components/molecules/BulkActionBar/BulkActionBar.vue": 23,
     "frontend/src/components/molecules/DashBoardCard/DashBoardCard.vue": 2,
     "frontend/src/components/molecules/DropDown/CustomDropDown.vue": 1,
@@ -77,7 +74,6 @@
     "frontend/src/plugins/tasklistDashboard/components/organisms/Task/Task.vue": 1,
     "frontend/src/plugins/tasklistDashboard/components/organisms/TaskItemList/TaskItemList.vue": 1,
     "frontend/src/plugins/tasklistDashboard/views/DashBoardList/DashBoardList.vue": 2,
-    "frontend/src/views/Approvals/Approvals.vue": 2,
     "frontend/src/views/Authentication/Login/Login.vue": 1,
     "frontend/src/views/Billing/Billing.vue": 1,
     "frontend/src/views/Changelog/Changelog.vue": 3,
@@ -96,8 +92,6 @@
     "frontend/src/views/Settings/TimeOff/TimeOff.vue": 1,
     "frontend/src/views/Settings/TimeTracking/TimeTracking.vue": 1,
     "frontend/src/views/Setup/SetupWizard.vue": 1,
-    "frontend/src/views/Timesheet/ProjectTimesheet/ProjectTimesheet.vue": 4,
-    "frontend/src/views/Timesheet/TimesheetTabs.vue": 1,
-    "frontend/src/views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue": 4
+    "frontend/src/views/Timesheet/TimesheetTabs.vue": 1
   }
 }
