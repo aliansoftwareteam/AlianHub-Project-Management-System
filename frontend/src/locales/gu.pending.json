@@ -1,7 +1,7 @@
 {
   "locale": "gu",
   "machineTranslated": false,
-  "updatedAt": "2026-09-23T16:06:43.549Z",
+  "updatedAt": "2026-09-23T16:08:32.048Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6569,6 +6569,17 @@
     "Automations.step_no_change": "no change needed",
     "Automations.duration_ms": "{n} ms",
     "Automations.duration_s": "{n} s",
-    "Automations.duration_min": "{n} min"
+    "Automations.duration_min": "{n} min",
+    "Automations.dry_run": "Test on a task",
+    "Automations.dry_running": "Testing…",
+    "Automations.dry_run_on": "Test the saved rule on",
+    "Automations.dry_run_pick_project": "a project…",
+    "Automations.dry_run_pick_task": "a task…",
+    "Automations.dry_run_saved_only": "Tests the saved version of this rule against the task as it is now. Nothing is changed and no action runs.",
+    "Automations.dry_run_matched": "Would run",
+    "Automations.dry_run_not_matched": "Would not run",
+    "Automations.dry_run_would_run": "would run",
+    "Automations.dry_run_would_not_run": "would not run",
+    "Automations.dry_run_failed": "Could not test this rule."
   }
 }

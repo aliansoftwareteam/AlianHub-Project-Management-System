@@ -106,6 +106,51 @@
                         </button>
                     </div>
                     <p v-if="backtest" class="ah-small">{{ backtest.basis }}</p>
+
+                    <div v-if="editingId" class="au__try">
+                        <div class="au__slots">
+                            <span class="au__kw">{{ $t('Automations.dry_run_on') }}</span>
+                            <select v-model="tryProjectId" class="au__slot" data-test="dry-run-project" @change="loadTryTasks">
+                                <option value="">{{ $t('Automations.dry_run_pick_project') }}</option>
+                                <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || '—' }}</option>
+                            </select>
+                            <select v-if="tryProjectId" v-model="tryTaskId" class="au__slot" data-test="dry-run-task">
+                                <option value="">{{ $t('Automations.dry_run_pick_task') }}</option>
+                                <option v-for="task in tryTasks" :key="task._id" :value="String(task._id)">{{ task.TaskKey ? `${task.TaskKey} · ${task.TaskName}` : task.TaskName }}</option>
+                            </select>
+                            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!tryTaskId || dryRunning" data-test="dry-run" @click="runDryRun">
+                                {{ dryRunning ? $t('Automations.dry_running') : $t('Automations.dry_run') }}
+                            </button>
+                        </div>
+                        <p class="ah-small">{{ $t('Automations.dry_run_saved_only') }}</p>
+                        <p v-if="dryRunError" class="ah-field__error" data-test="dry-run-error">{{ dryRunError }}</p>
+
+                        <div v-if="dryRunResult" class="au__plan" data-test="dry-run-result">
+                            <span class="ah-chip" :class="dryRunResult.matched ? 'ah-chip--ok' : 'ah-chip--warn'" data-test="dry-run-verdict">
+                                {{ dryRunResult.matched ? $t('Automations.dry_run_matched') : $t('Automations.dry_run_not_matched') }}
+                            </span>
+                            <ul class="au__plan-reasons">
+                                <li v-for="(reason, i) in dryRunResult.reasons" :key="i">{{ reason }}</li>
+                            </ul>
+                            <ol class="au__plan-actions">
+                                <li v-for="step in dryRunResult.actions" :key="step.id" class="au__plan-action" data-test="dry-run-action">
+                                    <span class="ah-mono">{{ step.id }}</span>
+                                    <span>{{ step.label }}</span>
+                                    <span class="ah-chip" :class="step.wouldRun ? 'ah-chip--ok' : ''">
+                                        {{ step.wouldRun ? $t('Automations.dry_run_would_run') : $t('Automations.dry_run_would_not_run') }}
+                                    </span>
+                                    <dl v-if="step.params && Object.keys(step.params).length" class="au__plan-params">
+                                        <template v-for="(value, key) in step.params" :key="key">
+                                            <dt>{{ paramLabel(step.action, key) }}</dt>
+                                            <dd>{{ shownParam(value) }}</dd>
+                                        </template>
+                                    </dl>
+                                    <p v-if="step.note" class="ah-small au__plan-note">{{ step.note }}</p>
+                                </li>
+                            </ol>
+                            <p class="ah-small">{{ dryRunResult.basis }}</p>
+                        </div>
+                    </div>
                 </div>
             </template>
 
@@ -142,6 +187,7 @@
 <script setup>
 import { ref, reactive, computed, nextTick, onMounted } from 'vue';
 import { useStore } from 'vuex';
+import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
@@ -169,6 +215,12 @@ const sentence = ref('');
 const sentenceInput = ref(null);
 const backtest = ref(null);
 const runsRule = ref(null);
+const tryProjectId = ref('');
+const tryTaskId = ref('');
+const tryTasks = ref([]);
+const dryRunning = ref(false);
+const dryRunResult = ref(null);
+const dryRunError = ref('');
 
 const scopeChoice = ref('all');
 const conditions = ref([]);
@@ -194,6 +246,7 @@ const OP_LABELS = {
 const opLabel = (op) => OP_LABELS[op] || op;
 
 const { getters } = useStore();
+const { t } = useI18n();
 const canManage = computed(() => [1, 2].includes(Number(getters['settings/companyUserDetail']?.roleType)));
 const activeCount = computed(() => rules.value.filter((r) => r.enabled).length);
 const triggerDef = computed(() => manifest.triggers.find((t) => t.key === draft.trigger.event) || null);
@@ -316,7 +369,48 @@ const test = async () => {
     }
 };
 
+const resetDryRun = () => {
+    tryProjectId.value = '';
+    tryTaskId.value = '';
+    tryTasks.value = [];
+    dryRunResult.value = null;
+    dryRunError.value = '';
+};
+
+const loadTryTasks = async () => {
+    tryTaskId.value = '';
+    tryTasks.value = [];
+    dryRunResult.value = null;
+    if (!tryProjectId.value) return;
+    try {
+        const body = await apiRequest('post', `${env.TASK}/find`, {
+            findQuery: { $match: { deletedStatusKey: 0, mainChat: { $ne: true }, ProjectID: tryProjectId.value } },
+        });
+        tryTasks.value = (Array.isArray(body?.data) ? body.data : []).slice(0, 200);
+    } catch (e) { tryTasks.value = []; }
+};
+
+const runDryRun = async () => {
+    if (!editingId.value || !tryTaskId.value) return;
+    dryRunning.value = true;
+    dryRunResult.value = null;
+    dryRunError.value = '';
+    try {
+        const body = (await apiRequest('post', `${env.AUTOMATIONS_V2}/${editingId.value}/dry-run`, { taskId: tryTaskId.value }))?.data;
+        if (body?.status) dryRunResult.value = body.data;
+        else dryRunError.value = body?.statusText || t('Automations.dry_run_failed');
+    } catch (e) {
+        dryRunError.value = e?.response?.data?.statusText || t('Automations.dry_run_failed');
+    } finally {
+        dryRunning.value = false;
+    }
+};
+
+const paramLabel = (actionKey, key) => schemaOf(actionKey)[key]?.label || key;
+const shownParam = (value) => (value !== null && typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''));
+
 const startNew = async () => {
+    resetDryRun();
     errors.value = [];
     ambiguities.value = [];
     backtest.value = null;
@@ -335,6 +429,7 @@ const startNew = async () => {
 };
 
 const edit = (rule) => {
+    resetDryRun();
     errors.value = [];
     ambiguities.value = [];
     backtest.value = null;
