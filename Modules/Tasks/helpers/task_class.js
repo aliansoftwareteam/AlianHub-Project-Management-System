@@ -2,6 +2,7 @@ const { dbCollections } = require('../../../Config/collections')
 const { HandleHistory} = require("./helper")
 const { taskNameEdit, taskPriorityChange, taskStatusChange, shownStatus, shownPriority } = require('./notificationTemplate')
 const { HandleBothNotification } = require("./handleNotification")
+const { escapeText } = require('./taskWriteFields')
 const logger = require("../../../Config/loggerConfig")
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries")
 const { default: mongoose } = require("mongoose")
@@ -271,7 +272,7 @@ class Task {
                     }
                     let historyObj = {
                         key: "task_name_edit",
-                        message : `<b>${userData.Employee_Name}</b> has changed <b> Task name</b> from <b>${obj.previousTaskName}</b> to <b>${firebaseObj.TaskName}</b>.`,
+                        message : `<b>${userData.Employee_Name}</b> has changed <b> Task name</b> from <b>${escapeText(obj.previousTaskName)}</b> to <b>${escapeText(firebaseObj.TaskName)}</b>.`,
                         sprintId: taskData.sprintArray.id
                     };
                     HandleHistory('task',projectData.CompanyId, projectData._id,taskData._id,historyObj, userData).then(async () => {});

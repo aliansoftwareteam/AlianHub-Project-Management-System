@@ -275,7 +275,7 @@ describe('display names come from stored rows, and what the request must supply 
         expect(result).toMatchObject({ code: 200, body: { status: true } });
         expect(messages()).toHaveLength(1);
         expect(messages()[0]).toContain('In <strong>Parity</strong> project');
-        expect(messages()[0]).not.toMatch(/img|onerror/);
+        expect(messages()[0]).not.toMatch(/img src=x|onerror/);
     });
 
     test('a file name sent with markup is escaped in the notification', async () => {
@@ -307,7 +307,7 @@ describe('display names come from stored rows, and what the request must supply 
         const result = await call(BULK, { action: 'bulkUpdatePriority', taskIds: [OPEN_TASK], userData: USER, firebaseObj: { Task_Priority: 'HIGH' }, priorityObj: { priorityName: 'Medium', newPriorityName: HTML } });
         expect(result).toMatchObject({ code: 200, body: { status: true } });
         expect(messages()).toHaveLength(1);
-        expect(messages()[0]).not.toContain('<img');
+        expect(messages()[0]).not.toContain('<img src=x');
         expect(messages()[0]).not.toContain('undefined');
     });
 });

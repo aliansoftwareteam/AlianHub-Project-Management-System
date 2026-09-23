@@ -3,7 +3,7 @@ const { dbCollections } = require('../../../../Config/collections')
 const { sanitizeInput } = require("../../../serviceFunction");
 const { HandleHistory,HandleTask,convertToSubTaskFunction, moveTaskFunction, convertToListSubTask,mergeSubTask, duplicateSubTaskFunction, addHistoryCollection, removeCommentCount,updateHistoryCollection, updateTimesheetCollection, updateEstimatedTimeCollection} = require("../mongo_helper")
 
-const { createTask, taskAssigneeAdd, taskAssigneeRemove,taskAssigneeReplace, taskNameEdit, taskPriorityChange, taskStatusChange, taskAttachmentAdd, taskAttachmentRemove, taskTypeChage, taskTotalEstimate, shownStatus, shownPriority } = require('../notificationTemplate')
+const { createTask, taskAssigneeAdd, taskAssigneeRemove,taskAssigneeReplace, taskNameEdit, taskPriorityChange, taskStatusChange, taskAttachmentAdd, taskAttachmentRemove, taskTypeChage, taskTotalEstimate, shownStatus, shownPriority, shownDate, taskDueDateAdd, taskDueDateChange, taskStartDateAdd, taskStartDateChange } = require('../notificationTemplate')
 const { HandleBothNotification } = require("../handleNotification")
 const logger = require("../../../../Config/loggerConfig")
 const { addSprintFun, updateSprintFun } = require("../../../Sprints/controller")
@@ -24,17 +24,53 @@ const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const completionStore = require('../completionStore.js');
 
 const { recordCompletion } = require('./recordCompletion.js');
+const { escapeText } = require('../taskWriteFields');
+
+const DUE_DATE_NOTICE = 'task_due_date';
+
+const instantOf = (value) => {
+    const raw = value && typeof value === 'object' && !(value instanceof Date) ? value.date : value;
+    if (raw === undefined || raw === null || raw === '') return null;
+    const millis = new Date(raw).getTime();
+    return Number.isNaN(millis) ? null : millis;
+};
+
+const noticeAsked = (obj) => Boolean(obj) && typeof obj === 'object' && Object.keys(obj).length > 0;
+
+/* A history-only update runs after the date was written, so the stored list may already end with it. */
+const dueDateNotice = ({ project, task, storedTask, firebaseObj, isUpdateTask, commonDateFormatString, timeZone }) => {
+    const due = instantOf(firebaseObj.DueDate);
+    if (due === null) return null;
+    const shown = (millis) => shownDate(millis, commonDateFormatString, timeZone);
+    const earlier = ((storedTask || task).dueDateDeadLine || []).map(instantOf).filter((millis) => millis !== null);
+    if (isUpdateTask === false && earlier[earlier.length - 1] === due) earlier.pop();
+    const names = { ProjectName: project.ProjectName, TaskName: task.TaskName };
+    const message = earlier.length
+        ? taskDueDateChange({ ...names, previousDate: shown(earlier[earlier.length - 1]), changedDate: shown(due) })
+        : taskDueDateAdd({ ...names, lastDate: shown(due) });
+    return { key: DUE_DATE_NOTICE, message };
+};
+
+const startDateNotice = ({ project, task, storedTask, firebaseObj, isUpdateTask, commonDateFormatString, timeZone }) => {
+    const start = instantOf(firebaseObj.startDate);
+    if (start === null) return null;
+    const shown = (millis) => shownDate(millis, commonDateFormatString, timeZone);
+    const previous = isUpdateTask === false ? null : instantOf((storedTask || task).startDate);
+    const names = { ProjectName: project.ProjectName, TaskName: task.TaskName };
+    const message = previous === null
+        ? taskStartDateAdd({ ...names, formetedStartDate: shown(start) })
+        : taskStartDateChange({ ...names, formetedStartDate: shown(previous), newDate: shown(start) });
+    return { key: DUE_DATE_NOTICE, message };
+};
 
 module.exports = {
 
-    /* -------------- UPDATE DUE DATE FUNCTION FOR TASK -----------------*/
-
-    updateDueDate({commonDateFormatString ,firebaseObj, project, task, obj,userData, isUpdateTask}) {
+    updateDueDate({commonDateFormatString, timeZone, firebaseObj, project, task, storedTask, obj, userData, isUpdateTask}) {
         return new Promise((resolve,reject) => {
             try {
-                // MAKE CHANGES FOR DUE DATE
+                const notification = noticeAsked(obj) ? dueDateNotice({ project, task, storedTask, firebaseObj, isUpdateTask, commonDateFormatString, timeZone }) : null;
                 if (isUpdateTask === false) {
-                    if (obj && Object.keys(obj).length > 0) {
+                    if (notification) {
                         HandleBothNotification({
                             type:'tasks',
                             userData,
@@ -43,7 +79,7 @@ module.exports = {
                             taskId: task._id,
                             folderId: task.folderObjId || "",
                             sprintId: task.sprintId,
-                            object: obj
+                            object: notification
                         })
                         .catch((error) => {
                             logger.error(`ERROR in notification Update Due Date: ${error.message}`);
@@ -81,7 +117,7 @@ module.exports = {
                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
                         resolve({status: true, statusText: "Due Date updated successfully"});
     
-                        if (obj && Object.keys(obj).length > 0) {
+                        if (notification) {
                             HandleBothNotification({
                                 type:'tasks',
                                 userData,
@@ -90,7 +126,7 @@ module.exports = {
                                 taskId: task._id,
                                 folderId: task.folderObjId || "",
                                 sprintId: task.sprintId,
-                                object: obj
+                                object: notification
                             })
                             .catch((error) => {
                                 logger.error(`ERROR in notification Update Due Date: ${error.message}`);
@@ -117,14 +153,12 @@ module.exports = {
         })
     },
 
-    /* -------------- UPDATE Start DATE FUNCTION FOR TASK -----------------*/
-
-    updateStartDate({commonDateFormatString ,firebaseObj, project, task, obj,userData,isUpdateTask = true,isHistory=true}) {
+    updateStartDate({commonDateFormatString, timeZone, firebaseObj, project, task, storedTask, obj, userData, isUpdateTask = true, isHistory = true}) {
         return new Promise((resolve,reject) => {
             try {
-                // MAKE CHANGES FOR START DATE
+                const notification = noticeAsked(obj) ? startDateNotice({ project, task, storedTask, firebaseObj, isUpdateTask, commonDateFormatString, timeZone }) : null;
                 if (isUpdateTask == false) {
-                    if (obj && Object.keys(obj).length > 0) {
+                    if (notification) {
                         HandleBothNotification({
                             type:'tasks',
                             userData,
@@ -133,7 +167,7 @@ module.exports = {
                             taskId: task._id,
                             folderId: task.folderObjId || "",
                             sprintId: task.sprintId,
-                            object: obj
+                            object: notification
                         })
                         .catch((error) => {
                             logger.error(`ERROR in update Start Date : ${error.message}`);
@@ -171,7 +205,7 @@ module.exports = {
                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
                         resolve({status: true, statusText: "Start Date updated successfully"});
     
-                        if (obj && Object.keys(obj).length > 0) {
+                        if (notification) {
                             HandleBothNotification({
                                 type:'tasks',
                                 userData,
@@ -180,7 +214,7 @@ module.exports = {
                                 taskId: task._id,
                                 folderId: task.folderObjId || "",
                                 sprintId: task.sprintId,
-                                object: obj
+                                object: notification
                             })
                             .catch((error) => {
                                 logger.error(`ERROR in update Start Date : ${error.message}`);
@@ -524,8 +558,8 @@ module.exports = {
                     socketEmitter.emit('update', { type: "update", data: result , updatedFields: firebaseObj, module: 'task' });
                     resolve({status: true, statusText: "Task name updated successfully"});
 
-                    const sanitizedOldTaskName = sanitizeInput(obj.previousTaskName);
-                    const sanitizedNewTaskName = sanitizeInput(firebaseObj.TaskName);
+                    const sanitizedOldTaskName = escapeText(obj.previousTaskName);
+                    const sanitizedNewTaskName = escapeText(firebaseObj.TaskName);
                     let editTaskObj = {
                         'ProjectName' : projectData.ProjectName,
                         'previousTaskName' : obj.previousTaskName,
