@@ -69,7 +69,6 @@
     "frontend/src/plugins/tasklistDashboard/components/organisms/Task/Task.vue": 1,
     "frontend/src/plugins/tasklistDashboard/components/organisms/TaskItemList/TaskItemList.vue": 1,
     "frontend/src/plugins/tasklistDashboard/views/DashBoardList/DashBoardList.vue": 2,
-    "frontend/src/views/Approvals/Approvals.vue": 2,
     "frontend/src/views/Authentication/Login/Login.vue": 1,
     "frontend/src/views/Billing/Billing.vue": 1,
     "frontend/src/views/Chat/ChatSidebar.vue": 1,
