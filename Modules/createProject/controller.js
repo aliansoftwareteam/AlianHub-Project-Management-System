@@ -63,10 +63,11 @@ const { stepProjectCount } = require("../Project/helpers/projectQuota");
 exports.checkProjectPlan = (req) => {
     return new Promise(async(resolve,reject) => {
         try {
+            const companyId = req.body.CompanyId;
             let projectIncObj = {
                 type: SCHEMA_TYPE.COMPANIES,
                 data: [
-                    { _id : new mongoose.Types.ObjectId(req.body.CompanyId)},
+                    { _id : new mongoose.Types.ObjectId(companyId)},
                     { $inc: {'projectCount.projectCount': 1} },
                     {
                         returnDocument : 'after'
@@ -79,7 +80,7 @@ exports.checkProjectPlan = (req) => {
                 projectIncObj.data[1].$inc = {...projectIncObj.data[1].$inc,'projectCount.publicCount': 1 }
             }
 
-            const companyData = await updateCompanyFun(SCHEMA_TYPE.GOLBAL,projectIncObj,"findOneAndUpdate",req.body.CompanyId,true)
+            const companyData = await updateCompanyFun(SCHEMA_TYPE.GOLBAL,projectIncObj,"findOneAndUpdate",companyId,true)
             .then((respone) => respone)
             .catch((error) => {
                 reject({status : false,error:error,countRollBack:false});
@@ -107,8 +108,10 @@ const failureReason = (outcome) => {
 const namesOtherCompany = (body, companyId) => [body.CompanyId, body.companyId]
     .some((value) => value !== undefined && value !== null && value !== '' && String(value) !== companyId);
 
-// The HTTP entry pins the tenant here, not inside createProject: PersonalList, the setup demo
-// project and the demo seeder call createProject in-process with a body they built themselves.
+const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
+
+// The HTTP entry pins the tenant and the creator here, not inside createProject: PersonalList, the
+// setup demo project and the demo seeder call createProject in-process with a body they built themselves.
 exports.createProjectFun = async(req, res) => {
     let companyId;
     try {
@@ -120,7 +123,11 @@ exports.createProjectFun = async(req, res) => {
     if (namesOtherCompany(body, companyId)) {
         return res.status(403).send({ status: false, statusText: 'You do not have access to this company', message: 'Forbidden' });
     }
-    req.body = { ...body, CompanyId: companyId };
+    const creator = String(req.uid || '');
+    if (!OBJECT_ID.test(creator)) {
+        return res.status(401).send({ status: false, statusText: 'A signed-in user is required.', message: 'A signed-in user is required.' });
+    }
+    req.body = { ...body, CompanyId: companyId, projectCreatedBy: creator };
     const { isPrivateSpace } = req.body;
     try {
         exports.checkProjectPlan(req).then((data) => {
@@ -166,7 +173,8 @@ exports.createProject = async (req) => {
                 reject({status: false, statusText: 'req body is requried'});
                 return;
             }
-            if(!req.body.CompanyId){
+            const companyId = req.body.CompanyId;
+            if(!companyId){
                 reject({status: false, statusText: 'company Id is requried'});    
                 return;
             }
@@ -196,11 +204,11 @@ exports.createProject = async (req) => {
                 return;
             }
             const collectionPromises = [
-                MongoDbCrudOpration(req.body.CompanyId, {type: dbCollections.SETTINGS,data: [{name : settingsCollectionDocs.PROJECT_STATUS}]}, "find"),
-                MongoDbCrudOpration(req.body.CompanyId, {type: dbCollections.SETTINGS,data: [{name : settingsCollectionDocs.TASK_STATUS}]}, "find"),
-                MongoDbCrudOpration(req.body.CompanyId, {type: dbCollections.SETTINGS,data: [{name : settingsCollectionDocs.TASK_TYPE}]}, "find"),
-                MongoDbCrudOpration(req.body.CompanyId, {type: dbCollections.APPS,data: [{}]}, "find"),
-                MongoDbCrudOpration(req.body.CompanyId, {type: dbCollections.PROJECT_TAB_COMPONENTS,data: [{}]}, "find")
+                MongoDbCrudOpration(companyId, {type: dbCollections.SETTINGS,data: [{name : settingsCollectionDocs.PROJECT_STATUS}]}, "find"),
+                MongoDbCrudOpration(companyId, {type: dbCollections.SETTINGS,data: [{name : settingsCollectionDocs.TASK_STATUS}]}, "find"),
+                MongoDbCrudOpration(companyId, {type: dbCollections.SETTINGS,data: [{name : settingsCollectionDocs.TASK_TYPE}]}, "find"),
+                MongoDbCrudOpration(companyId, {type: dbCollections.APPS,data: [{}]}, "find"),
+                MongoDbCrudOpration(companyId, {type: dbCollections.PROJECT_TAB_COMPONENTS,data: [{}]}, "find")
             ]
             Promise.allSettled(collectionPromises).then(async(results) => {
                 let rejected = results.filter((x) => x.status === 'rejected');
@@ -481,7 +489,7 @@ exports.createProject = async (req) => {
                             }
                         }else{
                             try{
-                                await MongoDbCrudOpration(req.body.CompanyId, {type: dbCollections.PROJECT_TEMPLATES,data: [{_id: new mongoose.Types.ObjectId(createProjectObject.TemplateId)}]}, "findOne").then((res)=> {
+                                await MongoDbCrudOpration(companyId, {type: dbCollections.PROJECT_TEMPLATES,data: [{_id: new mongoose.Types.ObjectId(createProjectObject.TemplateId)}]}, "findOne").then((res)=> {
                                     if(Object.keys(res).length <= 0){
                                         reject({status: false, statusText: 'error in getting template without category'})
                                         return;
@@ -512,7 +520,7 @@ exports.createProject = async (req) => {
                     // Every branch above can leave an entry whose view the company's catalogue does
                     // not carry, and the project view bar cannot render an entry with no id.
                     createProjectObject.ProjectRequiredComponent = withViewIds(createProjectObject.ProjectRequiredComponent, tabComponentsArray);
-                    createProjectObject.skills = await resolveProjectSkills(req.body.CompanyId, createProjectObject.skills);
+                    createProjectObject.skills = await resolveProjectSkills(companyId, createProjectObject.skills);
                     createProjectObject.DueDate = createProjectObject.DueDate ? new Date(createProjectObject.DueDate) : '';
                     createProjectObject.viewColumn = [
                         {
@@ -582,14 +590,14 @@ exports.createProject = async (req) => {
                         type: dbCollections.PROJECTS,
                         data: createProjectObject
                     }
-                    MongoDbCrudOpration(req.body.CompanyId, finalObj, "save").then(async (respone) => {
+                    MongoDbCrudOpration(companyId, finalObj, "save").then(async (respone) => {
                         const newSettingsRows = [
                             [settingsCollectionDocs.PROJECT_STATUS, projectStatusArrayCheck],
                             [settingsCollectionDocs.TASK_STATUS, TaskStatusArrayCheck],
                             [settingsCollectionDocs.TASK_TYPE, TaskTypeStatusArrayCheck],
                         ].filter(([, rows]) => rows && rows.length > 0);
                         try {
-                            await Promise.all(newSettingsRows.map(([name, rows]) => MongoDbCrudOpration(req.body.CompanyId, {
+                            await Promise.all(newSettingsRows.map(([name, rows]) => MongoDbCrudOpration(companyId, {
                                 type: dbCollections.SETTINGS,
                                 data: [
                                     { name },
@@ -601,7 +609,7 @@ exports.createProject = async (req) => {
                             }, "updateOne")));
                         } catch (err) {
                             logger.error(`add template settings: ${err}`);
-                            exports.deleteProject(respone, req.body.CompanyId);
+                            exports.deleteProject(respone, companyId);
                             reject({status: false, statusText: 'error in creating project'});
                             return;
                         }
@@ -610,20 +618,20 @@ exports.createProject = async (req) => {
                         if(customFieldVal.length > 0) {
                             const finalCustonArray = customFieldVal.map((ele)=>{return {...ele,userId:createProjectObject?.projectCreatedBy || '',type:'task',global:false,projectId:[respone?._id?.toString()]}});
                             try {
-                                customResponce = await MongoDbCrudOpration(req.body.CompanyId, { type: dbCollections.CUSTOM_FIELDS, data: [finalCustonArray] }, "insertMany");
+                                customResponce = await MongoDbCrudOpration(companyId, { type: dbCollections.CUSTOM_FIELDS, data: [finalCustonArray] }, "insertMany");
                             } catch (e) {
                                 logger.error(`error in add create project: ${e}`);
-                                exports.deleteProject(respone, req.body.CompanyId);
+                                exports.deleteProject(respone, companyId);
                                 reject({status: false, statusText: 'error in creating project'});
                                 return;
                             }
-                            removeCache(`customField:${req.body.CompanyId}`);
+                            removeCache(`customField:${companyId}`);
                         }
 
                         // Awaited because clients create their first task straight from this response and a task needs a sprint.
                         const sprintRes = await addSprintFun({
                             body: {
-                                companyId: req.body.CompanyId,
+                                companyId,
                                 projectId: respone._id,
                                 sprintName: 'List',
                                 userData:{},
@@ -632,7 +640,7 @@ exports.createProject = async (req) => {
                         }).catch((err) => err || { status: false });
                         if (!(sprintRes && sprintRes.status === true && sprintRes.data && sprintRes.data._id)) {
                             logger.error(`Create Sprint Error: ${failureReason(sprintRes)}`);
-                            exports.deleteProject(respone, req.body.CompanyId);
+                            exports.deleteProject(respone, companyId);
                             reject({status: false, statusText: 'error in creating project'});
                             return;
                         }

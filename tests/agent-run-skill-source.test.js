@@ -11,7 +11,7 @@ const proposals = require('../Modules/Agents/proposals');
 
 const C = '6f0000000000000000000c01';
 const AGENT_ID = '6f0000000000000000000a01';
-const FLAGS = ['SKILL_EXTERNAL_READS', 'PR_SUMMARY_AS_DATA'];
+const FLAGS = ['SKILL_EXTERNAL_READS'];
 
 const agent = () => ({ _id: AGENT_ID, name: 'Reviewer', ownerId: 'owner1', autonomy: 1, allowedActions: ['task.comment'], projectIds: [], skills: [{ key: 'pr.summary', enabled: true }], account: 'workspace', paused: false });
 const start = async (skill = 'pr.summary') => (await runs.start(C, { agent: agent(), skill, trigger: 'manual', startedBy: 'u1' })).run;
@@ -26,20 +26,18 @@ beforeEach(() => {
 });
 
 describe('the skill source a run records at start', () => {
-    it('is the built-in data seed when both flags are on', async () => {
-        FLAGS.forEach((k) => { process.env[k] = 'on'; });
+    it('is the built-in seed for pr.summary with external reads on', async () => {
+        process.env.SKILL_EXTERNAL_READS = 'on';
         expect((await start()).skillSource).toEqual({ kind: 'seed' });
     });
 
-    it('is the built-in code skill when the flags are off', async () => {
-        FLAGS.forEach((k) => { delete process.env[k]; });
-        expect((await start()).skillSource).toEqual({ kind: 'code' });
+    it('is still the seed for pr.summary with external reads off, since no code version is left', async () => {
+        delete process.env.SKILL_EXTERNAL_READS;
+        expect((await start()).skillSource).toEqual({ kind: 'seed' });
     });
 
-    it('is the code skill when only PR_SUMMARY_AS_DATA is on', async () => {
-        delete process.env.SKILL_EXTERNAL_READS;
-        process.env.PR_SUMMARY_AS_DATA = 'on';
-        expect((await start()).skillSource).toEqual({ kind: 'code' });
+    it('is the code skill for a skill that ships as code', async () => {
+        expect((await start('qa-review')).skillSource).toEqual({ kind: 'code' });
     });
 
     it('is a seed for a skill that only ships as data', async () => {
