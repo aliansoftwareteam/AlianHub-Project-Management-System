@@ -94,6 +94,7 @@ import * as env from '@/config/env';
 import taskClass from '@/utils/TaskOperations';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { criticalPath } from '@/views/Projects/composables/criticalPath';
+import { fsCollisionLinks } from '@/views/Projects/composables/ganttCollisions';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 
 defineOptions({ name: 'GanttView' });
@@ -181,6 +182,9 @@ const critical = computed(() => criticalPath(scheduled.value.map((task) => ({
 }))));
 // The toggle decides what is painted, not what is known: Replan reads the chain either way.
 const criticalIds = computed(() => (showCritical.value ? new Set(critical.value.path) : new Set()));
+const collisionLinks = computed(() => fsCollisionLinks(scheduled.value.map((task) => ({
+    id: String(task._id), startDate: task.startDate, DueDate: task.DueDate, blocks: blocksOf(task),
+}))));
 
 /* The last dated plan the task carried before this one. Only a real earlier date
  * counts — an invented baseline would read as a slip that never happened. */
@@ -491,7 +495,12 @@ onMounted(async () => {
             return classes.join(' ');
         };
         gantt.templates.grid_row_class = (start, end, task) => (String(task.id).startsWith('sp_') ? 'gv-grid-group' : '');
-        gantt.templates.link_class = (link) => (criticalIds.value.has(String(link.source)) && criticalIds.value.has(String(link.target)) ? 'gv-link-critical' : '');
+        gantt.templates.link_class = (link) => {
+            const classes = [];
+            if (criticalIds.value.has(String(link.source)) && criticalIds.value.has(String(link.target))) classes.push('gv-link-critical');
+            if (collisionLinks.value.has(`${link.source}_${link.target}`)) classes.push('gv-link-collision');
+            return classes.join(' ');
+        };
         applyScales(zoom.value);
 
         gantt.init(ganttEl.value);
