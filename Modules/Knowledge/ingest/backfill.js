@@ -9,6 +9,7 @@ const { ORIGINS, AGENT, MEMBER } = require('../origin');
 const { serviceStamp } = require('../../Agents/serviceIdentity');
 const indexer = require('./indexer');
 const vectorStore = require('../vectorStore');
+const purge = require('./purge');
 
 // Indexes what a company already had before its indexer was switched on, one source at a time.
 // Each source saves its own progress after every batch in knowledge_index_state, so a restart or
@@ -303,8 +304,8 @@ const resumeAll = async () => {
 };
 
 /* Each run also re-embeds a batch of what a hybrid company's chunks still lack, so a failed
- * embed or a model change is caught up without anyone touching the source, and takes up the
- * files owed a retry. */
+ * embed or a model change is caught up without anyone touching the source, takes up the files
+ * owed a retry, and once a day purges the tombstones past their retention. */
 const backfillAll = async (options) => {
     if (flag.indexer.mode() === 'off') return { companies: 0, reembedded: {} };
     let ran = 0;
@@ -315,6 +316,7 @@ const backfillAll = async (options) => {
         await resumeFiles(companyId);
         await keepAlive(companyId).catch((error) => logger.error(`${LOG_PREFIX} ${companyId}: heartbeat: ${error.message}`));
         if (await runOnce(companyId, options)) ran += 1;
+        await purge.purgeDue(companyId).catch((error) => logger.error(`${LOG_PREFIX} ${companyId}: tombstone purge: ${error.message}`));
         const count = await indexer.reembedMissing(companyId).catch((error) => {
             logger.error(`${LOG_PREFIX} ${companyId}: re-embedding sweep: ${error.message}`);
             return null;
