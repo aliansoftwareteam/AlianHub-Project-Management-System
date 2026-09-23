@@ -64,7 +64,7 @@ describe('REP-04 webhook url validation refuses private hosts', () => {
         });
 
         it('creates a webhook whose host resolves publicly', async () => {
-            lookup.mockResolvedValue([{ address: '203.0.113.10', family: 4 }]);
+            lookup.mockResolvedValue([{ address: '93.184.215.14', family: 4 }]);
             const r = await call(ctrl.createWebhook, { body: { name: 'Slack', url: 'https://hooks.example.com/a', events: ['task.created'] } });
             expect(r.body.status).toBe(true);
             expect(mockDb.store[T]).toHaveLength(1);

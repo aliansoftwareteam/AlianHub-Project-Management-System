@@ -13,63 +13,60 @@ const DEFAULTS = Object.freeze({ timeoutMs: 10000, maxBytes: 1024 * 1024, maxRed
 
 const BLOCKED_SUFFIXES = ['.local', '.internal'];
 
+/* The IANA special-purpose blocks that are not globally reachable. IPv6 transition blocks are judged by the IPv4
+ * address they carry instead (carriedV4). */
 const V4_RESERVED = [
-    ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16],
-    ['172.16.0.0', 12], ['192.168.0.0', 16], ['224.0.0.0', 4], ['240.0.0.0', 4],
+    ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12],
+    ['192.0.0.0', 24], ['192.0.2.0', 24], ['192.88.99.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15],
+    ['198.51.100.0', 24], ['203.0.113.0', 24], ['224.0.0.0', 4], ['240.0.0.0', 4],
 ];
 
 const v4ToInt = (ip) => ip.split('.').reduce((n, o) => (n * 256) + Number(o), 0);
 const inV4Block = (ip, [base, bits]) => (v4ToInt(ip) >>> (32 - bits)) === (v4ToInt(base) >>> (32 - bits));
 
-const isPrivateV4 = (ip) => ip === '255.255.255.255' || V4_RESERVED.some((block) => inV4Block(ip, block));
+const isPrivateV4 = (ip) => V4_RESERVED.some((block) => inV4Block(ip, block));
+
+const dottedTailAsWords = (ip) => ip.replace(/(\d+)\.(\d+)\.(\d+)\.(\d+)$/, (m, a, b, c, d) => `${((Number(a) << 8) | Number(b)).toString(16)}:${((Number(c) << 8) | Number(d)).toString(16)}`);
 
 const expandV6 = (ip) => {
-    const [head, tail = ''] = ip.split('::');
+    const [head, tail = ''] = dottedTailAsWords(ip).split('::');
     const left = head ? head.split(':') : [];
     const right = tail ? tail.split(':') : [];
     const fill = Array(8 - left.length - right.length).fill('0');
     return [...left, ...fill, ...right].map((h) => parseInt(h || '0', 16));
 };
 
-const mappedV4 = (ip) => {
-    const m = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
-    if (m) return m[1];
-    const words = expandV6(ip);
-    if (words.slice(0, 5).every((w) => w === 0) && words[5] === 0xffff) {
-        return [words[6] >> 8, words[6] & 0xff, words[7] >> 8, words[7] & 0xff].join('.');
-    }
-    return null;
-};
+const V6_RESERVED = [
+    ['100::', 64], ['2001:2::', 48], ['2001:db8::', 32], ['3fff::', 20], ['5f00::', 16], ['64:ff9b:1::', 48],
+    ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8],
+].map(([base, bits]) => [expandV6(base), bits]);
 
-const dottedTailAsWords = (ip) => ip.replace(/(\d+)\.(\d+)\.(\d+)\.(\d+)$/, (m, a, b, c, d) => `${((Number(a) << 8) | Number(b)).toString(16)}:${((Number(c) << 8) | Number(d)).toString(16)}`);
+const inV6Block = (words, [base, bits]) => base.every((word, i) => {
+    const take = Math.min(16, Math.max(0, bits - (i * 16)));
+    const mask = take ? (0xffff << (16 - take)) & 0xffff : 0;
+    return (words[i] & mask) === (word & mask);
+});
+
 const v4From = (hi, lo) => [hi >> 8, hi & 0xff, lo >> 8, lo & 0xff].join('.');
+const zero = (words) => words.every((w) => w === 0);
 
-/* NAT64 (64:ff9b::/96), 6to4 (2002::/16) and IPv4-compatible (::/96) addresses are delivered to the IPv4
- * address they carry, so that address decides. Judging the whole range private instead would refuse every
- * IPv4-only site on a DNS64 network. */
-const carriedV4 = (ip) => {
-    const words = expandV6(dottedTailAsWords(ip));
-    if (words[0] === 0x64 && words[1] === 0xff9b && words.slice(2, 6).every((w) => w === 0)) return v4From(words[6], words[7]);
-    if (words[0] === 0x2002) return v4From(words[1], words[2]);
-    if (words.slice(0, 6).every((w) => w === 0)) return v4From(words[6], words[7]);
-    return null;
+/* Transition addresses are delivered to the IPv4 address they carry, so that address decides. Judging the whole
+ * range private instead would refuse every IPv4-only site on a DNS64 network. Teredo carries two: the server,
+ * and the client with its bits inverted. */
+const carriedV4 = (words) => {
+    if (zero(words.slice(0, 5)) && words[5] === 0xffff) return [v4From(words[6], words[7])];
+    if (zero(words.slice(0, 4)) && words[4] === 0xffff && words[5] === 0) return [v4From(words[6], words[7])];
+    if (words[0] === 0x64 && words[1] === 0xff9b && zero(words.slice(2, 6))) return [v4From(words[6], words[7])];
+    if (zero(words.slice(0, 6))) return [v4From(words[6], words[7])];
+    if (words[0] === 0x2002) return [v4From(words[1], words[2])];
+    if (words[0] === 0x2001 && words[1] === 0) return [v4From(words[2], words[3]), v4From(words[6] ^ 0xffff, words[7] ^ 0xffff)];
+    return [];
 };
 
 const isPrivateV6 = (ip) => {
-    const bare = ip.replace(/%.*$/, '');
-    const mapped = mappedV4(bare);
-    if (mapped) return isPrivateV4(mapped);
-    const words = expandV6(bare);
-    if (words.every((w) => w === 0)) return true;
-    if (words.slice(0, 7).every((w) => w === 0) && words[7] === 1) return true;
-    // Flag off keeps the rule as it shipped: these ranges passed it, and closing them changes what is fetched today.
-    const carried = egressContext.isOn() ? carriedV4(bare) : null;
-    if (carried) return isPrivateV4(carried);
-    const top = words[0];
-    if ((top & 0xfe00) === 0xfc00) return true;
-    if ((top & 0xffc0) === 0xfe80) return true;
-    if ((top & 0xff00) === 0xff00) return true;
-    return false;
+    const words = expandV6(ip.replace(/%.*$/, ''));
+    if (V6_RESERVED.some((block) => inV6Block(words, block))) return true;
+    return carriedV4(words).some(isPrivateV4);
 };
 
 const isPrivateAddress = (ip) => {
@@ -79,19 +76,33 @@ const isPrivateAddress = (ip) => {
     return true;
 };
 
-const stripBrackets = (host) => String(host || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
+// `host.` and `host` are the same host to DNS, so every name and allowlist comparison uses the form without the dot.
+const canonicalHost = (host) => String(host || '').trim().toLowerCase().replace(/\.+$/, '').replace(/^\[|\]$/g, '');
 
-/* Hostnames that never deserve a DNS round trip. Non-dotted-quad numeric forms
- * (`127.1`, `0x7f000001`, `2130706433`) are treated as literals too: the URL
- * parser normalises them, but a stray string reaching here should not pass. */
+/* A URL parser reads any host whose last label is a number as an IPv4 address (`127.1`, `0x7f000001`, `0x.0x.0x.0x`)
+ * or refuses it, so such a host is never a name: it is judged as the address it parses to, and refused if it does
+ * not parse. */
+const ENDS_IN_NUMBER = /(^|\.)(\d+|0x[0-9a-f]*)$/;
+
+const numericHostAddress = (host) => {
+    try {
+        const parsed = canonicalHost(new URL(`http://${host}/`).hostname);
+        return net.isIP(parsed) ? parsed : null;
+    } catch (e) {
+        return null;
+    }
+};
+
+/* Hostnames that never deserve a DNS round trip. */
 const isBlockedHostname = (hostname) => {
-    const host = stripBrackets(hostname);
+    const host = canonicalHost(hostname);
     if (!host) return true;
     if (host === 'localhost' || host.endsWith('.localhost')) return true;
     if (BLOCKED_SUFFIXES.some((s) => host.endsWith(s))) return true;
     if (net.isIP(host)) return isPrivateAddress(host);
-    if (/^(0x[0-9a-f]+|\d+)(\.(0x[0-9a-f]+|\d+)){0,3}$/i.test(host)) {
-        try { return isBlockedHostname(new URL(`http://${host}/`).hostname); } catch (e) { return true; }
+    if (ENDS_IN_NUMBER.test(host)) {
+        const address = numericHostAddress(host);
+        return address ? isPrivateAddress(address) : true;
     }
     return false;
 };
@@ -112,11 +123,11 @@ const resolveError = (code, message) => Object.assign(new Error(message), { code
  * instance owner chose; the resolved address is still checked and pinned. */
 async function resolvePublic(url, { allowlist } = {}) {
     const u = parseHttpUrl(url);
-    const host = stripBrackets(u.hostname);
+    const host = canonicalHost(u.hostname);
     if (isBlockedHostname(host) && !(allowlist && allowlist.allowsHost(host))) throw resolveError(RESOLVE_ERROR.PRIVATE_HOST, `${u.hostname} is a private, local or internal host — agents do not fetch it`);
     let answers;
     try {
-        answers = await dns.promises.lookup(host, { all: true, verbatim: true });
+        answers = await dns.promises.lookup(u.hostname.replace(/^\[|\]$/g, ''), { all: true, verbatim: true });
     } catch (e) {
         throw resolveError(RESOLVE_ERROR.DNS_FAILED, `could not resolve ${u.hostname}: ${e.code || e.message}`);
     }
@@ -173,7 +184,7 @@ async function egressGate({ companyId, actor }) {
     const hosts = await store.hostsFor(companyId);
     if (!hosts.length) return null;
     const refuse = (u, hop, reason) => {
-        const host = stripBrackets(u.hostname);
+        const host = canonicalHost(u.hostname);
         store.recordRefusal(companyId, { actor, host, port: portOf(u), reason, hop });
         if (reason === REFUSAL.UNLISTED) throw new Error(`${host} is not on this workspace's egress allowlist — the instance owner can allow it under Instance > Egress`);
         throw new Error(`${host} is a private, local or internal host — agents do not fetch it, listed or not`);
@@ -188,7 +199,7 @@ async function egressGate({ companyId, actor }) {
             if (error.code !== RESOLVE_ERROR.PRIVATE_ADDRESS) return;
             let u;
             try { u = parseHttpUrl(url); } catch (e) { return; }
-            store.recordRefusal(companyId, { actor, host: stripBrackets(u.hostname), port: portOf(u), reason: REFUSAL.PRIVATE_ADDRESS, hop });
+            store.recordRefusal(companyId, { actor, host: canonicalHost(u.hostname), port: portOf(u), reason: REFUSAL.PRIVATE_ADDRESS, hop });
         },
     };
 }

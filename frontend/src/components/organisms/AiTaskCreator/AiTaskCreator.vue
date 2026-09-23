@@ -17,32 +17,32 @@
                     <div class="aitc__head-left">
                         <span class="aitc__badge" aria-hidden="true">✨</span>
                         <div>
-                            <div class="aitc__title">Plan with AI</div>
-                            <div class="aitc__subtitle">Draft sprints and tasks for this project from your requirements — you review before anything is created.</div>
+                            <div class="aitc__title">{{ $t('AiTask.title') }}</div>
+                            <div class="aitc__subtitle">{{ $t('AiTask.subtitle') }}</div>
                         </div>
                     </div>
-                    <button class="aitc__close" @click="close()" aria-label="Close">&#10005;</button>
+                    <button class="aitc__close" @click="close()" :aria-label="$t('AiTask.close')">&#10005;</button>
                 </div>
 
                 <!-- STEP: input -->
                 <div v-if="step === 'input'" class="aitc__body">
                     <!-- What should AI create? -->
                     <div class="aitc__modes">
-                        <button type="button" class="aitc__mode" :class="{ 'aitc__mode--on': mode === 'full' }" @click="mode = 'full'">Sprints + tasks</button>
+                        <button type="button" class="aitc__mode" :class="{ 'aitc__mode--on': mode === 'full' }" @click="mode = 'full'">{{ $t('AiTask.mode_full') }}</button>
                         <button
                             type="button"
                             class="aitc__mode"
                             :class="{ 'aitc__mode--on': mode === 'tasks' }"
                             :disabled="!sprints.length"
-                            :title="!sprints.length ? 'This project has no sprints yet — create a sprint first' : ''"
+                            :title="!sprints.length ? $t('AiTask.no_sprints_hint') : ''"
                             @click="mode = 'tasks'"
-                        >Tasks only</button>
-                        <button type="button" class="aitc__mode" :class="{ 'aitc__mode--on': mode === 'sprints' }" @click="mode = 'sprints'">Sprints only</button>
+                        >{{ $t('AiTask.mode_tasks') }}</button>
+                        <button type="button" class="aitc__mode" :class="{ 'aitc__mode--on': mode === 'sprints' }" @click="mode = 'sprints'">{{ $t('AiTask.mode_sprints') }}</button>
                     </div>
 
                     <!-- Target sprint (tasks-only mode) -->
                     <div v-if="mode === 'tasks'" class="aitc__sprint-pick">
-                        <label class="aitc__field-label">Add tasks to sprint</label>
+                        <label class="aitc__field-label">{{ $t('AiTask.target_sprint') }}</label>
                         <select v-model="targetSprintId" class="aitc__select">
                             <option v-for="s in sprints" :key="s.id" :value="s.id">{{ s.name }}</option>
                         </select>
@@ -59,27 +59,27 @@
                     </div>
 
                     <div v-if="mode === 'full'" class="aitc__chips">
-                        <span class="aitc__chips-label">Try:</span>
-                        <button type="button" class="aitc__chip" @click="requirements = 'Build a Shopify clothing store: home, collection, product, cart and checkout pages, plus store policies and theme setup.'">Shopify store</button>
-                        <button type="button" class="aitc__chip" @click="requirements = 'Mobile app MVP: onboarding, signup/login, home feed, profile and settings — design + build per screen, with the supporting API endpoints.'">Mobile app MVP</button>
-                        <button type="button" class="aitc__chip" @click="requirements = 'REST API for a tasks service: auth endpoints and full CRUD for tasks and projects, with validation and tests.'">REST API</button>
-                        <button type="button" class="aitc__chip" @click="requirements = 'Marketing launch campaign: landing page, email sequence, social content calendar and analytics setup.'">Marketing campaign</button>
+                        <span class="aitc__chips-label">{{ $t('AiTask.try') }}</span>
+                        <button type="button" class="aitc__chip" @click="requirements = $t('AiTask.example_shopify_prompt')">{{ $t('AiTask.example_shopify') }}</button>
+                        <button type="button" class="aitc__chip" @click="requirements = $t('AiTask.example_mobile_prompt')">{{ $t('AiTask.example_mobile') }}</button>
+                        <button type="button" class="aitc__chip" @click="requirements = $t('AiTask.example_api_prompt')">{{ $t('AiTask.example_api') }}</button>
+                        <button type="button" class="aitc__chip" @click="requirements = $t('AiTask.example_marketing_prompt')">{{ $t('AiTask.example_marketing') }}</button>
                     </div>
 
                     <!-- Advanced (optional): extra things AI can create when needed -->
                     <div v-if="mode !== 'sprints'" class="aitc__advanced">
-                        <span class="aitc__advanced-label">Advanced (optional)</span>
+                        <span class="aitc__advanced-label">{{ $t('AiTask.advanced') }}</span>
                         <label class="aitc__opt">
                             <input type="checkbox" v-model="features.subtasks" />
-                            <span>Break tasks into sub-tasks</span>
+                            <span>{{ $t('AiTask.opt_subtasks') }}</span>
                         </label>
                         <label class="aitc__opt">
                             <input type="checkbox" v-model="features.links" />
-                            <span>Link related tasks</span>
+                            <span>{{ $t('AiTask.opt_links') }}</span>
                         </label>
                         <label class="aitc__opt">
                             <input type="checkbox" v-model="features.epics" />
-                            <span>Organize into epics</span>
+                            <span>{{ $t('AiTask.opt_epics') }}</span>
                         </label>
                         <!-- Temporarily hidden until the custom-field render is fixed; backend support stays in place and re-enables by uncommenting.
                         <label class="aitc__opt">
@@ -93,7 +93,7 @@
                     <div v-if="error" class="aitc__error">{{ error }}</div>
 
                     <div class="aitc__actions">
-                        <button class="aitc__btn aitc__btn--ghost" @click="close()">Cancel</button>
+                        <button class="aitc__btn aitc__btn--ghost" @click="close()">{{ $t('AiTask.cancel') }}</button>
                         <button class="aitc__btn aitc__btn--ai" :disabled="!canGenerate" @click="generate()">
                             <span aria-hidden="true">✨</span> {{ generateLabel }}
                         </button>
@@ -103,23 +103,23 @@
                 <!-- STEP: generating -->
                 <div v-else-if="step === 'generating'" class="aitc__body aitc__center">
                     <div class="aitc__orb" aria-hidden="true"></div>
-                    <p class="aitc__status">{{ progressMsg || 'Generating…' }}</p>
-                    <p class="aitc__sub">This can take up to a minute for a detailed plan.</p>
+                    <p class="aitc__status">{{ progressMsg || $t('AiTask.generating') }}</p>
+                    <p class="aitc__sub">{{ $t('AiTask.generating_sub') }}</p>
                 </div>
 
                 <!-- STEP: preview -->
                 <div v-else-if="step === 'preview'" class="aitc__body">
                     <div class="aitc__preview-head">
-                        <span class="aitc__preview-hint">Review — uncheck anything you don't want.</span>
-                        <span class="aitc__selected-pill">{{ selectedCount }} selected</span>
+                        <span class="aitc__preview-hint">{{ $t('AiTask.review_hint') }}</span>
+                        <span class="aitc__selected-pill">{{ $t('AiTask.selected', { n: selectedCount }) }}</span>
                         <span v-if="runUsage" class="aitc__usage" :title="usageTooltip">
-                            {{ formatTokens(runUsage.totalTokens) }} tokens<template
+                            {{ $t('AiTask.token_count', { n: formatTokens(runUsage.totalTokens) }, runUsage.totalTokens) }}<template
                                 v-if="runUsage.costUsd !== null"> · {{ formatCost(runUsage.costUsd) }}</template>
                         </span>
                     </div>
-                    <div v-if="plan.links && plan.links.length" class="aitc__links-note">🔗 {{ plan.links.length }} task link{{ plan.links.length === 1 ? '' : 's' }} will be created</div>
-                    <div v-if="plan.epics && plan.epics.length" class="aitc__links-note">📁 {{ plan.epics.length }} epic{{ plan.epics.length === 1 ? '' : 's' }} will be created</div>
-                    <div v-if="plan.customFields && plan.customFields.length" class="aitc__links-note">🏷️ {{ plan.customFields.length }} custom field{{ plan.customFields.length === 1 ? '' : 's' }} will be created</div>
+                    <div v-if="plan.links && plan.links.length" class="aitc__links-note">🔗 {{ $t('AiTask.links_note', { n: plan.links.length }, plan.links.length) }}</div>
+                    <div v-if="plan.epics && plan.epics.length" class="aitc__links-note">📁 {{ $t('AiTask.epics_note', { n: plan.epics.length }, plan.epics.length) }}</div>
+                    <div v-if="plan.customFields && plan.customFields.length" class="aitc__links-note">🏷️ {{ $t('AiTask.fields_note', { n: plan.customFields.length }, plan.customFields.length) }}</div>
                     <div class="aitc__plan style-scroll">
                         <!-- full: sprints, each with its tasks -->
                         <template v-if="mode === 'full'">
@@ -143,7 +143,7 @@
 
                         <!-- tasks: flat list into the chosen sprint -->
                         <template v-else-if="mode === 'tasks'">
-                            <div class="aitc__sprint-name"><span>Adding to: {{ targetSprintName || 'sprint' }}</span></div>
+                            <div class="aitc__sprint-name"><span>{{ $t('AiTask.adding_to', { sprint: targetSprintName || $t('AiTask.sprint_fallback') }) }}</span></div>
                             <div v-for="(task, ti) in (plan.tasks || [])" :key="ti">
                                 <label class="aitc__task" :class="{ 'aitc__task--off': !task.__selected }">
                                     <input type="checkbox" v-model="task.__selected" />
@@ -166,7 +166,7 @@
                     </div>
                     <div v-if="error" class="aitc__error">{{ error }}</div>
                     <div class="aitc__actions">
-                        <button class="aitc__btn aitc__btn--ghost" @click="step = 'input'">Back</button>
+                        <button class="aitc__btn aitc__btn--ghost" @click="step = 'input'">{{ $t('AiTask.back') }}</button>
                         <button class="aitc__btn aitc__btn--ai" :disabled="selectedCount === 0" @click="create()">{{ createLabel }}</button>
                     </div>
                 </div>
@@ -174,7 +174,7 @@
                 <!-- STEP: creating -->
                 <div v-else-if="step === 'creating'" class="aitc__body aitc__center">
                     <div class="aitc__orb" aria-hidden="true"></div>
-                    <p class="aitc__status">{{ progressMsg || 'Creating…' }}</p>
+                    <p class="aitc__status">{{ progressMsg || $t('AiTask.creating') }}</p>
                 </div>
             </div>
         </div>
@@ -184,6 +184,7 @@
 <script setup>
 import { ref, computed, watch, defineProps, defineEmits } from 'vue';
 import { useToast } from 'vue-toast-notification';
+import { useI18n } from 'vue-i18n';
 import { useAiTaskGenerator } from '@/composable/aiTaskGenerator';
 
 const props = defineProps({
@@ -197,6 +198,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'done']);
 
 const $toast = useToast();
+const { t } = useI18n();
 const { generateTasks, executeTasks, subscribeToProgress } = useAiTaskGenerator();
 
 const step = ref('input');          // input | generating | preview | creating
@@ -226,9 +228,9 @@ const formatCost = (n) => (n >= 0.01 ? `$${n.toFixed(2)}` : `$${n.toFixed(4)}`);
 const usageTooltip = computed(() => {
     const u = runUsage.value;
     if (!u) return '';
-    const parts = [`${formatTokens(u.inputTokens)} in · ${formatTokens(u.outputTokens)} out`];
+    const parts = [t('AiTask.usage_split', { input: formatTokens(u.inputTokens), output: formatTokens(u.outputTokens) })];
     if (u.model) parts.push(u.model);
-    if (u.costUsd === null) parts.push('no price on file for this model');
+    if (u.costUsd === null) parts.push(t('AiTask.usage_no_price'));
     return parts.join(' — ');
 });
 const progressMsg = ref('');
@@ -256,27 +258,27 @@ const selectedCount = computed(() => {
 });
 
 const inputLabel = computed(() => {
-    if (mode.value === 'tasks') return 'What tasks should I add?';
-    if (mode.value === 'sprints') return 'What sprints should I create?';
-    return 'What should this project include?';
+    if (mode.value === 'tasks') return t('AiTask.input_label_tasks');
+    if (mode.value === 'sprints') return t('AiTask.input_label_sprints');
+    return t('AiTask.input_label_full');
 });
 
 const inputPlaceholder = computed(() => {
-    if (mode.value === 'tasks') return 'e.g. Add the auth API endpoints — login, signup, refresh, logout — each with validation and tests.';
-    if (mode.value === 'sprints') return 'e.g. Break this project into delivery phases: setup, core features, polish, and launch.';
-    return 'e.g. Build a customer onboarding flow — signup, email verification, profile setup, and a welcome dashboard. Node + Vue.';
+    if (mode.value === 'tasks') return t('AiTask.placeholder_tasks');
+    if (mode.value === 'sprints') return t('AiTask.placeholder_sprints');
+    return t('AiTask.placeholder_full');
 });
 
 const generateLabel = computed(() => {
-    if (mode.value === 'tasks') return 'Generate tasks';
-    if (mode.value === 'sprints') return 'Generate sprints';
-    return 'Generate plan';
+    if (mode.value === 'tasks') return t('AiTask.generate_tasks');
+    if (mode.value === 'sprints') return t('AiTask.generate_sprints');
+    return t('AiTask.generate_plan');
 });
 
 const createLabel = computed(() => {
     const n = selectedCount.value;
-    if (mode.value === 'sprints') return `Create ${n} sprint${n === 1 ? '' : 's'}`;
-    return `Create ${n} task${n === 1 ? '' : 's'}`;
+    if (mode.value === 'sprints') return t('AiTask.create_sprints', { n }, n);
+    return t('AiTask.create_tasks', { n }, n);
 });
 
 const canGenerate = computed(() => {
@@ -331,7 +333,7 @@ function planHasContent(p) {
 async function generate() {
     if (!canGenerate.value) return;
     error.value = '';
-    progressMsg.value = `${generateLabel.value}…`;
+    progressMsg.value = t('AiTask.progress_label', { label: generateLabel.value });
     step.value = 'generating';
     try {
         const res = await generateTasks(props.projectId, {
@@ -342,14 +344,14 @@ async function generate() {
         });
         const p = res && res.plan;
         if (!planHasContent(p)) {
-            throw new Error('The AI did not return anything. Try rephrasing your requirements.');
+            throw new Error(t('AiTask.empty_plan'));
         }
         selectAll(p);
         plan.value = p;
         planUsage.value = (res && res.usage) || null;
         step.value = 'preview';
     } catch (e) {
-        error.value = (e && e.message) || 'Generation failed. Please try again.';
+        error.value = (e && e.message) || t('AiTask.generate_failed');
         step.value = 'input';
     }
 }
@@ -393,7 +395,7 @@ async function create() {
     const payload = buildSelectedPlan();
     if (!payloadHasContent(payload)) return;
     error.value = '';
-    progressMsg.value = 'Creating…';
+    progressMsg.value = t('AiTask.creating');
     step.value = 'creating';
     try {
         const res = await executeTasks(props.projectId, {
@@ -402,15 +404,15 @@ async function create() {
             targetSprintId: mode.value === 'tasks' ? targetSprintId.value : '',
         });
         if (!res || !res.status || !res.jobId) {
-            throw new Error((res && res.statusText) || 'Could not start creation.');
+            throw new Error((res && res.statusText) || t('AiTask.start_failed'));
         }
         subscribeToProgress(res.jobId, (raw) => {
             let pl = raw;
             if (pl && pl.data) pl = pl.data;
             if (!pl) return;
             if (pl.event === 'progress') {
-                if (pl.step === 'sprint') progressMsg.value = 'Creating sprints…';
-                else if (pl.step === 'tasks') progressMsg.value = `Creating tasks… ${pl.completed || 0}/${pl.total || 0}`;
+                if (pl.step === 'sprint') progressMsg.value = t('AiTask.creating_sprints');
+                else if (pl.step === 'tasks') progressMsg.value = t('AiTask.creating_tasks', { done: pl.completed || 0, total: pl.total || 0 });
             } else if (pl.event === 'complete') {
                 const totals = pl.totals || {};
                 $toast.success(successMessage(totals), { position: 'top-right' });
@@ -418,22 +420,22 @@ async function create() {
                 reset();
                 emit('update:modelValue', false);
             } else if (pl.event === 'error') {
-                error.value = pl.error || 'Creation failed. Please try again.';
+                error.value = pl.error || t('AiTask.create_failed');
                 step.value = 'preview';
             }
         });
     } catch (e) {
-        error.value = (e && e.message) || 'Creation failed. Please try again.';
+        error.value = (e && e.message) || t('AiTask.create_failed');
         step.value = 'preview';
     }
 }
 
 function successMessage(totals) {
-    const t = totals.tasks || 0;
-    const s = totals.sprints || 0;
-    if (mode.value === 'sprints') return `Created ${s} sprint${s === 1 ? '' : 's'} with AI`;
-    if (mode.value === 'tasks') return `Created ${t} task${t === 1 ? '' : 's'} with AI`;
-    return `Created ${t} task${t === 1 ? '' : 's'} in ${s} sprint${s === 1 ? '' : 's'} with AI`;
+    const tasks = totals.tasks || 0;
+    const sprints = totals.sprints || 0;
+    if (mode.value === 'sprints') return t('AiTask.success_sprints', { n: sprints }, sprints);
+    if (mode.value === 'tasks') return t('AiTask.success_tasks', { n: tasks }, tasks);
+    return t('AiTask.success_full', { tasks: t('AiTask.task_count', { n: tasks }, tasks), sprints: t('AiTask.sprint_count', { n: sprints }, sprints) });
 }
 </script>
 
