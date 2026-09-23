@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { dbCollections } = require('../../Config/collections');
@@ -20,8 +21,10 @@ const ANCHOR_LOOKBACK = 20;
 const QUEUE_LIMIT = 1000;
 const WRITE_TIMEOUT_MS = 15 * 1000;
 const INDEX_CONFLICT_CODES = [85, 86];
+const PROGRESS_LEASE_MS = 15 * 1000;
+const PROGRESS_CACHE_MS = 1000;
 
-const { AUDIT_LOGS, AUDIT_CHAIN_HEADS, AUDIT_CHAIN_ANCHORS, GOLBAL } = SCHEMA_TYPE;
+const { AUDIT_LOGS, AUDIT_CHAIN_HEADS, AUDIT_CHAIN_ANCHORS, AUDIT_CHAIN_PROGRESS, GOLBAL } = SCHEMA_TYPE;
 
 const db = (database, type, data, method) => MongoDbCrudOpration(String(database), { type, data }, method);
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
@@ -386,6 +389,69 @@ const newestAnchor = async (companyId, key) => {
 };
 
 const cursors = new Map();
+const SERVER_ID = crypto.randomUUID();
+const PROGRESS_ID = 'progress';
+const progressGens = new Map();
+const heldLeases = new Map();
+
+const progressFilter = (extra = {}) => ({ _id: PROGRESS_ID, ...extra });
+
+const readProgressDoc = async (companyId) => plain(await db(companyId, AUDIT_CHAIN_PROGRESS, [progressFilter()], 'findOne'));
+
+/* A copy older than one this server has already read is a replay, and is read as no progress at all. */
+const trustedProgress = (companyId, key, doc) => {
+    const progress = rules.progressOf(key, companyId, doc);
+    if (!progress || progress.gen < (progressGens.get(companyId) || 0)) return null;
+    progressGens.set(companyId, progress.gen);
+    return progress;
+};
+
+/*
+ * Takes the company's verification lease unless another server holds it; losing a race to take it reads as held.
+ * While another server holds it, what was read is reused for up to a second rather than read again.
+ */
+const claimProgress = async (companyId, key) => {
+    const now = Date.now();
+    const cached = heldLeases.get(companyId);
+    if (cached && now - cached.at < PROGRESS_CACHE_MS && rules.leaseHeldByOther(key, companyId, cached.doc, SERVER_ID, now, PROGRESS_LEASE_MS)) {
+        return { held: true, doc: cached.doc };
+    }
+    heldLeases.delete(companyId);
+    const doc = await readProgressDoc(companyId);
+    if (rules.leaseHeldByOther(key, companyId, doc, SERVER_ID, now, PROGRESS_LEASE_MS)) {
+        heldLeases.set(companyId, { doc, at: now });
+        return { held: true, doc };
+    }
+    const lease = { owner: SERVER_ID, leaseId: crypto.randomUUID(), leaseUntil: new Date(now + PROGRESS_LEASE_MS) };
+    lease.leaseMac = rules.leaseMac(key, companyId, lease);
+    if (!doc) {
+        try {
+            await db(companyId, AUDIT_CHAIN_PROGRESS, { _id: PROGRESS_ID, ...lease }, 'save');
+            return { held: false, doc: null, lease };
+        } catch (error) {
+            if (!(error && error.code === 11000)) throw error;
+            return { held: true, doc: await readProgressDoc(companyId) };
+        }
+    }
+    const taken = plain(await db(companyId, AUDIT_CHAIN_PROGRESS, [
+        progressFilter({ leaseId: doc.leaseId ? doc.leaseId : { $exists: false } }),
+        { $set: lease },
+        { new: true },
+    ], 'findOneAndUpdate'));
+    return taken ? { held: false, doc: taken, lease } : { held: true, doc: await readProgressDoc(companyId) };
+};
+
+/* Written only while this lease is still the one stored, so a server whose lease ran out never overwrites another's. */
+const saveProgress = async (companyId, key, lease, cursor, brokenAt, readGen) => {
+    const gen = Math.max(readGen, progressGens.get(companyId) || 0) + 1;
+    const r = await db(companyId, AUDIT_CHAIN_PROGRESS, [
+        progressFilter({ leaseId: lease.leaseId }),
+        { $set: { ...rules.progressDoc(key, companyId, cursor, brokenAt, gen), at: new Date(), leaseUntil: null } },
+    ], 'updateOne');
+    if (r && r.matchedCount > 0) progressGens.set(companyId, gen);
+};
+
+const releaseProgress = (companyId, lease) => db(companyId, AUDIT_CHAIN_PROGRESS, [progressFilter({ leaseId: lease.leaseId }), { $set: { leaseUntil: null } }], 'updateOne');
 
 /*
  * A remembered position is trusted only while the row it names is unchanged and nothing is missing from the
@@ -437,23 +503,11 @@ const report = (start, last, complete, brokenAt, checked) => ({
 });
 
 /*
- * Resuming keeps two positions per company in memory: the tip, verified once and then only extended, so new
- * rows cost one step each; and a re-walk that re-checks the stretch up to the tip a budget at a time, starting
- * over each time it reaches it. Nothing held in the database can move either of them.
+ * Resuming keeps two positions per company: the tip, verified once and then only extended, so new rows cost one
+ * step each; and a re-walk that re-checks the stretch up to the tip a budget at a time, starting over each time
+ * it reaches it. A break leaves both where they were.
  */
-const walk = async (companyId, key, { budget, pageSize, resume, countWindow }) => {
-    const [companyHead, globalHead] = await Promise.all([readHead(companyId), readHead(companyId, GOLBAL)]);
-    const anchor = await newestAnchor(companyId, key);
-    const start = anchor || rules.GENESIS;
-    const headsBreak = async (last) => (await headBreak(companyId, key, start, last, companyHead)) || headBreak(companyId, key, start, last, globalHead);
-
-    if (!resume) {
-        const full = await walkFrom(companyId, key, start, { budget, pageSize });
-        const brokenAt = full.brokenAt != null ? full.brokenAt : (full.complete ? await headsBreak(full.last) : null);
-        return report(start, full.last, full.complete, brokenAt, full.checked);
-    }
-
-    const saved = cursors.get(companyId);
+const resumeFrom = async (companyId, key, start, saved, headsBreak, { budget, pageSize, countWindow }) => {
     const cursor = saved && saved.anchorSeq === start.seq && await positionHolds(companyId, start, saved.tip, countWindow)
         ? saved
         : { anchorSeq: start.seq, tip: start, rewalk: null };
@@ -467,8 +521,56 @@ const walk = async (companyId, key, { budget, pageSize, resume, countWindow }) =
         brokenAt = again.brokenAt;
         rewalk = again.complete ? null : again.last;
     }
-    if (brokenAt == null) cursors.set(companyId, { anchorSeq: start.seq, tip: ahead.last, rewalk });
-    return report(start, ahead.last, ahead.complete, brokenAt, checked);
+    return {
+        found: report(start, ahead.last, ahead.complete, brokenAt, checked),
+        next: brokenAt == null ? { anchorSeq: start.seq, tip: ahead.last, rewalk } : (saved || cursor),
+    };
+};
+
+/* While another server walks, this one reads what that server last stored instead of walking the same range. */
+const deferTo = async (companyId, start, progress, countWindow) => {
+    const usable = progress && progress.cursor.anchorSeq === start.seq ? progress : null;
+    const last = usable && await positionHolds(companyId, start, usable.cursor.tip, countWindow) ? usable.cursor.tip : start;
+    return report(start, last, false, usable ? usable.brokenAt : null, 0);
+};
+
+/*
+ * With AUDIT_CHAIN on, the position is one document per company that every server reads and, under a short
+ * lease, moves. It is signed with the key, so nothing written without the key can move it. With AUDIT_CHAIN
+ * off it stays in this process's memory, as before.
+ */
+const resumeWalk = async (companyId, key, start, headsBreak, options) => {
+    if (!isOn()) {
+        const { found, next } = await resumeFrom(companyId, key, start, cursors.get(companyId), headsBreak, options);
+        if (found.brokenAt == null) cursors.set(companyId, next);
+        return found;
+    }
+    const claim = await claimProgress(companyId, key);
+    const progress = trustedProgress(companyId, key, claim.doc);
+    if (claim.held) return deferTo(companyId, start, progress, options.countWindow);
+    let outcome;
+    try {
+        outcome = await resumeFrom(companyId, key, start, progress && progress.cursor, headsBreak, options);
+    } catch (error) {
+        await quietly(`releasing the verification lease ${companyId}`, releaseProgress(companyId, claim.lease));
+        throw error;
+    }
+    await quietly(`progress ${companyId}`, saveProgress(companyId, key, claim.lease, outcome.next, outcome.found.brokenAt, progress ? progress.gen : 0));
+    return outcome.found;
+};
+
+const walk = async (companyId, key, { budget, pageSize, resume, countWindow }) => {
+    const [companyHead, globalHead] = await Promise.all([readHead(companyId), readHead(companyId, GOLBAL)]);
+    const anchor = await newestAnchor(companyId, key);
+    const start = anchor || rules.GENESIS;
+    const headsBreak = async (last) => (await headBreak(companyId, key, start, last, companyHead)) || headBreak(companyId, key, start, last, globalHead);
+
+    if (!resume) {
+        const full = await walkFrom(companyId, key, start, { budget, pageSize });
+        const brokenAt = full.brokenAt != null ? full.brokenAt : (full.complete ? await headsBreak(full.last) : null);
+        return report(start, full.last, full.complete, brokenAt, full.checked);
+    }
+    return resumeWalk(companyId, key, start, headsBreak, { budget, pageSize, countWindow });
 };
 
 const verifyChain = async (companyId, { budget = Infinity, pageSize = PAGE_SIZE, resume = false, countWindow = COUNT_WINDOW } = {}) => {
