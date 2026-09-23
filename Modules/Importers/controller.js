@@ -10,6 +10,7 @@ const { validateTrelloInput, parseTrelloBoard } = require('./helpers/trelloRules
 const { validateAsanaInput, parseAsanaExport } = require('./helpers/asanaRules');
 const { validateMondayInput, parseMondayExport } = require('./helpers/mondayRules');
 const { importTargetAccess, previewAccess, refuseImport } = require('./helpers/importAccess');
+const { findCompanyMembers, activeMemberIdSet } = require('./helpers/companyMembers');
 const { sessionActor } = require('../Tasks/helpers/taskWriteFields');
 const { pinSessionTenant } = require('../../Config/tenant');
 
@@ -104,11 +105,26 @@ const loadImportContext = async (companyId, projectId) => {
     return { project, statusArray };
 };
 
+// A CSV person mapping carries user ids chosen by the client.
+const keepMemberAssignees = async (companyId, tasks) => {
+    const assigned = tasks.flatMap((task) => (Array.isArray(task.AssigneeUserId) ? task.AssigneeUserId : []));
+    if (!assigned.length) return;
+    let members = new Set();
+    try {
+        members = await activeMemberIdSet(companyId, assigned);
+    } catch (error) {
+        logger.error(`[importers] assignee membership check failed: ${error.message}`);
+    }
+    tasks.forEach((task) => {
+        if (Array.isArray(task.AssigneeUserId)) task.AssigneeUserId = task.AssigneeUserId.filter((id) => members.has(String(id)));
+    });
+};
+
 /* Map the parser's rich card data onto each task into the shapes the task
  * create path persists (S3-01): resolve member emails → assignees, build
  * checklistArray + attachment link-references, and fold Trello labels into the
- * description (there is no programmatic tag-create path). Mutates `tasks`; a
- * no-op for CSV/Jira tasks, which carry none of these fields. */
+ * description (there is no programmatic tag-create path). Mutates `tasks`.
+ * Every assignee, whatever the source, must hold an active seat in the company. */
 const enrichImportTasks = async (companyId, tasks) => {
     const emails = Array.from(new Set(
         tasks.flatMap((t) => (Array.isArray(t.memberEmails) ? t.memberEmails : [])).filter(Boolean),
@@ -116,11 +132,8 @@ const enrichImportTasks = async (companyId, tasks) => {
     const emailToId = {};
     if (emails.length) {
         try {
-            const users = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
-                type: SCHEMA_TYPE.USERS,
-                data: [{ Employee_Email: { $in: emails } }, { _id: 1, Employee_Email: 1 }],
-            }, 'find');
-            (users || []).forEach((u) => {
+            const users = await findCompanyMembers(companyId, { Employee_Email: { $in: emails } }, { _id: 1, Employee_Email: 1 });
+            users.forEach((u) => {
                 if (u && u.Employee_Email) emailToId[String(u.Employee_Email).toLowerCase()] = String(u._id);
             });
         } catch (error) {
@@ -133,6 +146,10 @@ const enrichImportTasks = async (companyId, tasks) => {
             const ids = task.memberEmails.map((e) => emailToId[String(e).toLowerCase()]).filter(Boolean);
             if (ids.length) task.AssigneeUserId = Array.from(new Set([...(task.AssigneeUserId || []), ...ids]));
         }
+    });
+    await keepMemberAssignees(companyId, tasks);
+
+    tasks.forEach((task) => {
         if (Array.isArray(task.checklists) && task.checklists.length) {
             task.checklistArray = task.checklists.map((cl) => ({
                 id: new mongoose.Types.ObjectId().toString(),
@@ -265,7 +282,7 @@ exports.importFromCsv = async (req, res) => {
         const ctx = await loadImportContext(companyId, projectId);
         if (ctx.error) return res.send({ status: false, statusText: ctx.error });
 
-        const directory = await loadUserDirectory(rows, mapping);
+        const directory = await loadUserDirectory(companyId, rows, mapping);
         const statusArray = options.createMissingStatuses
             ? await createMissingStatuses(companyId, ctx.project, ctx.statusArray, rows, mapping)
             : ctx.statusArray;
@@ -371,10 +388,9 @@ exports.importFromMonday = async (req, res) => {
     }
 };
 
-/* The people a CSV names, resolved to real users so the mapping step can say
- * which ones it could not match. Only the values actually present in the file
- * are looked up. */
-const loadUserDirectory = async (rows, mapping) => {
+/* The people a CSV names, resolved among the company's members so the mapping
+ * step can say which ones it could not match. */
+const loadUserDirectory = async (companyId, rows, mapping) => {
     const column = mapping && mapping.assignee;
     const wanted = new Set();
     (rows || []).forEach((row) => {
@@ -384,11 +400,8 @@ const loadUserDirectory = async (rows, mapping) => {
     });
     if (!wanted.size) return [];
     try {
-        const users = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
-            type: SCHEMA_TYPE.USERS,
-            data: [{ $or: [{ Employee_Email: { $in: [...wanted] } }, { Employee_Name: { $in: [...wanted] } }] }, { _id: 1, Employee_Email: 1, Employee_Name: 1 }],
-        }, 'find');
-        return (users || []).map((user) => ({ id: String(user._id), email: user.Employee_Email || '', name: user.Employee_Name || '' }));
+        const users = await findCompanyMembers(companyId, { $or: [{ Employee_Email: { $in: [...wanted] } }, { Employee_Name: { $in: [...wanted] } }] }, { _id: 1, Employee_Email: 1, Employee_Name: 1 });
+        return users.map((user) => ({ id: String(user._id), email: user.Employee_Email || '', name: user.Employee_Name || '' }));
     } catch (error) {
         logger.error(`[importers] user directory lookup failed: ${error.message}`);
         return [];
@@ -411,7 +424,7 @@ exports.previewCsv = async (req, res) => {
         const ctx = await loadImportContext(companyId, projectId);
         if (ctx.error) return res.send({ status: false, statusText: ctx.error });
 
-        const directory = await loadUserDirectory(rows, mapping);
+        const directory = await loadUserDirectory(companyId, rows, mapping);
         const report = validateCsvRows({
             rows,
             mapping,
