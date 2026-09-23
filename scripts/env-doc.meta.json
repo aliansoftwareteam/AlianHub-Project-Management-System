@@ -459,11 +459,6 @@
     "description": "GitHub OAuth app client secret.",
     "secret": true
   },
-  "GITHUB_OAUTH_REQUIRED": {
-    "group": "integrations",
-    "description": "\"true\" requires server-side verification via GitHub /user (recommended)",
-    "default": "true"
-  },
   "GITHUB_TOKEN": {
     "group": "integrations",
     "description": "Token used to read release notes from GitHub for the changelog page.",
@@ -487,11 +482,6 @@
     "group": "integrations",
     "description": "GitLab OAuth app client secret.",
     "secret": true
-  },
-  "GITLAB_OAUTH_REQUIRED": {
-    "group": "integrations",
-    "description": "\"true\" requires server-side verification via GitLab /user (recommended)",
-    "default": "true"
   },
   "GLOBAL_RATE_LIMIT_PER_MIN": {
     "group": "security",
@@ -524,11 +514,6 @@
   "GOOGLE_OAUTH_CLIENT_ID": {
     "group": "integrations",
     "description": "Google OAuth client id accepted when verifying Google sign-in tokens."
-  },
-  "GOOGLE_OAUTH_REQUIRED": {
-    "group": "integrations",
-    "description": "\"true\" rejects logins that fail id-token verification (recommended)",
-    "default": "true"
   },
   "GOOGLE_OAUTH_URL": {
     "group": "integrations",
