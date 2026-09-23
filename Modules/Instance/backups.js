@@ -23,6 +23,7 @@ const FORMAT = 'alianhub-backup';
 const FORMAT_VERSION = 1;
 const NAME_RX = /^[a-z0-9.-]+-\d{8}-\d{6}\.tar\.gz$/;
 const DB_RX = /^(global|[a-f0-9]{24})$/;
+const COMPANY_DB_RX = /^[a-f0-9]{24}$/;
 const ENTRY_RX = /^(global|[a-f0-9]{24})\/([A-Za-z0-9_.-]+)\.jsonl$/;
 const INSERT_BATCH = 500;
 const FIRST_SEEN_FIELDS = [apiTokenStrictSince.FIELD, maxLifetimeSince.FIELD];
@@ -58,6 +59,16 @@ function validateManifest(manifest) {
  * created after the backup outlives it. */
 const staleCollections = (live, listed) => live.filter((name) => !listed.includes(name));
 
+/* Pure: company databases on the server that no company row or user assignment
+ * names. A restore never drops these itself: they may hold the only copy of a
+ * company created after the backup. */
+const orphanDatabases = (databases, referencedIds) => {
+    const referenced = new Set(referencedIds.map(String));
+    return databases
+        .filter((db) => COMPANY_DB_RX.test(db.name) && !referenced.has(db.name))
+        .map((db) => ({ name: db.name, sizeOnDisk: Number(db.sizeOnDisk) || 0 }));
+};
+
 const isValidName = (name) => NAME_RX.test(String(name || ''));
 const resolveBackup = (name) => (isValidName(name) ? path.join(BACKUP_DIR, path.basename(name)) : null);
 
@@ -73,6 +84,50 @@ async function listCollections(db) {
 
 async function listCompanies() {
     return MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: [{}, { _id: 1, Cst_CompanyName: 1 }] }, 'find');
+}
+
+async function referencedCompanyIds(globalDb) {
+    const [companies, assigned] = await Promise.all([
+        globalDb.collection(SCHEMA_TYPE.COMPANIES).distinct('_id'),
+        globalDb.collection(SCHEMA_TYPE.USERS).distinct('AssignCompany'),
+    ]);
+    return [...companies, ...assigned];
+}
+
+async function findOrphanDatabases() {
+    const globalDb = await nativeDb('global');
+    const { databases } = await globalDb.admin().listDatabases({ authorizedDatabases: true });
+    return orphanDatabases(databases, await referencedCompanyIds(globalDb));
+}
+
+const httpError = (statusCode, message) => Object.assign(new Error(message), { statusCode });
+
+async function dropOrphanDatabase({ name, confirm }) {
+    if (!COMPANY_DB_RX.test(String(name || ''))) throw httpError(400, 'Not a company database name.');
+    if (confirm !== name) throw httpError(400, 'Type the database name to confirm the drop.');
+    const orphan = (await findOrphanDatabases()).find((db) => db.name === name);
+    if (!orphan) throw httpError(409, 'That database is not orphaned: a company or user still references it, or it does not exist.');
+    const globalDb = await nativeDb('global');
+    await globalDb.client.db(name).dropDatabase();
+    for (const entry of connectionRegistry.connections.filter((c) => c.db === name)) {
+        connectionRegistry.connections.splice(connectionRegistry.connections.indexOf(entry), 1);
+        try { entry.connection.close(); } catch (e) { /* already closed */ }
+    }
+    logger.warn(`orphaned company database ${name} (${orphan.sizeOnDisk} bytes) dropped by the instance owner`);
+    return orphan;
+}
+
+async function scanOrphansAfterRestore() {
+    try {
+        const orphans = await findOrphanDatabases();
+        if (orphans.length) {
+            logger.warn(`restore: ${orphans.length} company database(s) have no company after the restore and were kept: ${orphans.map((db) => `${db.name} (${db.sizeOnDisk} bytes)`).join(', ')}. Review them under Settings, Instance, Backups.`);
+        }
+        return { orphanedDatabases: orphans };
+    } catch (error) {
+        logger.error(`restore: could not list company databases: ${error.message}`);
+        return { orphanedDatabases: [], orphanCheckError: error.message };
+    }
 }
 
 async function* jsonlOf(db, collection) {
@@ -258,7 +313,7 @@ async function restoreBackup({ name, confirm }) {
         const run = await migrations.runMigrations(migrations.liveDeps());
         await migrations.refreshMigrationState();
         require('../Setup/controller').resetInstalledFlag();
-        return { restored: counters, safetyBackup: safety.name, migrations: run };
+        return { restored: counters, safetyBackup: safety.name, migrations: run, ...(await scanOrphansAfterRestore()) };
     } finally {
         state.maintenance = false;
     }
@@ -271,6 +326,6 @@ function deleteBackup(name) {
 }
 
 module.exports = {
-    BACKUP_DIR, FORMAT, FORMAT_VERSION, NAME_RX, ENTRY_RX, backupName, buildManifest, validateManifest, staleCollections, isValidName, resolveBackup,
-    createBackup, listBackups, readManifest, walkArchive, restoreBackup, deleteBackup, resetMongoConnections, readFirstSeen, keepEarliestFirstSeen,
+    BACKUP_DIR, FORMAT, FORMAT_VERSION, NAME_RX, ENTRY_RX, backupName, buildManifest, validateManifest, staleCollections, orphanDatabases, isValidName, resolveBackup,
+    createBackup, listBackups, findOrphanDatabases, dropOrphanDatabase, readManifest, walkArchive, restoreBackup, deleteBackup, resetMongoConnections, readFirstSeen, keepEarliestFirstSeen,
 };

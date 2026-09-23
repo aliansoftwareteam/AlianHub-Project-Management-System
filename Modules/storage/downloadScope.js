@@ -11,6 +11,7 @@ const { isTaskOwnKey } = require('../../common-storage/taskFileKeys');
 const { safeRelativePath } = require('../../utils/uploadConfig');
 const { REPORT, scopeMode: mode, countReported: countCategory, reportedCounts } = require('../../common-storage/storedFileScope');
 const logger = require('../../Config/loggerConfig');
+const { narrowingFor } = require('../../Config/tokenNarrowing');
 
 const SERVER_STORAGE = 'server';
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -217,7 +218,8 @@ function requireStoredFileRead(pickBucketId, pickPath, { storage, skipBucket = (
             verdict = { allowed: false, type: 'error', reason: 'error' };
         }
         if (verdict.allowed) return next();
-        if (mode() === REPORT) {
+        // Report mode exists to learn what enforcing would break for the web app; a token narrowed to some projects was never given the rest.
+        if (mode() === REPORT && !narrowingFor(req.uid)) {
             const count = countReported(verdict.type, verdict.reason);
             logger.warn(`stored-file download would be refused (layout: ${verdict.type}, reason: ${verdict.reason}, reported so far for this layout and reason: ${count})`);
             return next();

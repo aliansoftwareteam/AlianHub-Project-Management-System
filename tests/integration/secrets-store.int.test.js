@@ -88,7 +88,7 @@ describe('the tenant secrets store through the real routes', () => {
         expect(webhookSecret).toMatch(/^[a-f0-9]{48}$/);
 
         await withDb(async (db) => {
-            const connection = await db.collection('integration_connections').findOne({ type: 'github', deletedStatusKey: { $ne: 1 } });
+            const connection = await db.collection('integration_connections').findOne({ _id: new (require('mongodb').ObjectId)(connected.body.data._id) });
             connectionId = connection._id;
             expect(connection.config).toEqual({ repo: 'acme/app' });
             expect(connection.secretHandles.token).toMatch(/^sec_[a-f0-9]{24}$/);

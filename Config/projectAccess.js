@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { getRoleType, isPrivileged, evaluatePermission, isWritable, fineGrainedEnforced } = require('./permissionGuard');
 const logger = require('./loggerConfig');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
+const { allowsProject } = require('./tokenNarrowing');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const TEAM_PREFIX = 'tId_';
@@ -103,6 +104,7 @@ const decideProjectAccess = async (companyId, uid, projectId, { mode = WRITE, pe
     const user = String(uid || '');
     const id = String(projectId || '');
     if (!OBJECT_ID.test(company) || !OBJECT_ID.test(user) || !OBJECT_ID.test(id)) return NOT_FOUND;
+    if (!allowsProject(user, id)) return NOT_FOUND;
 
     const roleType = await getRoleType(company, user);
     if (roleType === null) return NOT_FOUND;

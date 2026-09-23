@@ -232,4 +232,12 @@
     .hc-setup__ring { order: 1; }
     .hc-setup__cta { order: 2; margin-left: auto; min-height: 44px; }
     .hc-setup__dismiss { order: 4; min-height: 44px; }
+    .home .ah-tbtn--icon { width: 40px; }
+    .hc-tab { min-height: 36px; }
+    .hc-group__sort { min-height: 32px; }
+    .hc-agenda__nav button { min-width: 32px; min-height: 32px; }
+    .hp-days button { min-height: 36px; }
+    .hp-panel__close { padding: 13px; margin: -13px -13px -13px auto; }
+    .hs-label__btn { min-width: 32px; min-height: 32px; margin: -8px 0; justify-content: center; align-items: center; }
+    .hs-item__chev { min-width: 32px; min-height: 32px; margin: -8px -8px -8px auto; justify-content: center; align-items: center; }
 }

@@ -1,7 +1,7 @@
 <template>
     <div class="ig-wrap">
         <div class="ig-topbar">
-            <router-link :to="{ name: 'Home', params: { cid: cid } }" class="ig-home" title="Home">
+            <router-link :to="{ name: 'Home', params: { cid: cid } }" class="ig-home" :title="$t('IntegrationsHub.home')">
                 <img src="@/assets/images/svg/Home.svg" alt="Home" />
             </router-link>
             <h1 class="ig-title">{{ $t('IntegrationsHub.title') }}</h1>
@@ -34,7 +34,7 @@
                         <div class="ig-row">
                             <select v-model="newProjectId" class="form-control">
                                 <option value="">{{ $t('IntegrationsHub.email_select') }}</option>
-                                <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || '(untitled)' }}</option>
+                                <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || $t('IntegrationsHub.untitled_project') }}</option>
                             </select>
                             <button class="ig-btn" :disabled="!newProjectId || busy" @click="createInbox">{{ busy ? $t('IntegrationsHub.creating') : $t('IntegrationsHub.email_create') }}</button>
                         </div>
@@ -147,17 +147,17 @@
                                 <label class="ig-lbl">{{ $t('IntegrationsHub.auto_when') }}</label>
                                 <select v-model="ruleForm.projectId" class="form-control">
                                     <option value="">{{ $t('IntegrationsHub.auto_any_project') }}</option>
-                                    <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || '(untitled)' }}</option>
+                                    <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || $t('IntegrationsHub.untitled_project') }}</option>
                                 </select>
                                 <select v-model="ruleForm.condPriority" class="form-control ig-mt6">
                                     <option value="">{{ $t('IntegrationsHub.auto_any_priority') }}</option>
-                                    <option value="LOW">LOW</option><option value="MEDIUM">MEDIUM</option><option value="HIGH">HIGH</option>
+                                    <option value="LOW">{{ $t('IntegrationsHub.priority_low') }}</option><option value="MEDIUM">{{ $t('IntegrationsHub.priority_medium') }}</option><option value="HIGH">{{ $t('IntegrationsHub.priority_high') }}</option>
                                 </select>
                             </div>
                             <div>
                                 <label class="ig-lbl">{{ $t('IntegrationsHub.auto_then') }}</label>
                                 <select v-model="ruleForm.actionPriority" class="form-control">
-                                    <option value="LOW">LOW</option><option value="MEDIUM">MEDIUM</option><option value="HIGH">HIGH</option>
+                                    <option value="LOW">{{ $t('IntegrationsHub.priority_low') }}</option><option value="MEDIUM">{{ $t('IntegrationsHub.priority_medium') }}</option><option value="HIGH">{{ $t('IntegrationsHub.priority_high') }}</option>
                                 </select>
                             </div>
                         </div>
@@ -194,7 +194,7 @@
                             </select>
                             <select v-if="calScope === 'project'" v-model="calProjectId" class="form-control">
                                 <option value="">{{ $t('IntegrationsHub.email_select') }}</option>
-                                <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || '(untitled)' }}</option>
+                                <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || $t('IntegrationsHub.untitled_project') }}</option>
                             </select>
                             <button class="ig-btn" :disabled="busy || (calScope === 'project' && !calProjectId)" @click="createFeed">{{ busy ? $t('IntegrationsHub.creating') : $t('IntegrationsHub.cal_create') }}</button>
                         </div>
@@ -238,7 +238,7 @@
                         <label class="ig-lbl">{{ $t('IntegrationsHub.slack_token') }}</label>
                         <input v-model="slackForm.verification_token" type="password" class="form-control" autocomplete="off" :placeholder="connectedFor('slack') ? '••••••••••' : ''" />
                         <label class="ig-lbl">{{ $t('IntegrationsHub.slack_channel') }}</label>
-                        <input v-model="slackForm.default_channel" class="form-control" placeholder="#general" />
+                        <input v-model="slackForm.default_channel" class="form-control" :placeholder="$t('IntegrationsHub.slack_channel_ph')" />
                         <div class="ig-row ig-mt10">
                             <button class="ig-btn" :disabled="busy || !slackForm.verification_token.trim()" @click="connectSlack">{{ busy ? $t('IntegrationsHub.creating') : (connectedFor('slack') ? $t('IntegrationsHub.mp_reconfigure') : $t('IntegrationsHub.slack_connect')) }}</button>
                             <button v-if="connectedFor('slack')" class="ig-mini del" @click="disconnect(connectedFor('slack'))">{{ $t('IntegrationsHub.mp_disconnect') }}</button>

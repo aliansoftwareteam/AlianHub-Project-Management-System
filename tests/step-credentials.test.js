@@ -41,6 +41,7 @@ const store = require('../Modules/Workflows/store');
 const engine = require('../Modules/Workflows/engine');
 const stepCredential = require('../Modules/Workflows/stepCredential');
 const agentRunner = require('../Modules/Workflows/agentRun');
+const executors = require('../Modules/Workflows/executors');
 const agentRuns = require('../Modules/Agents/runs');
 const automationTools = require('../Modules/Automations/engine/tools');
 const automationRegistry = require('../Modules/Automations/engine/registry');
@@ -605,6 +606,8 @@ describe('an action under a step credential', () => {
 
 describe('a heartbeat that extends the lease', () => {
     const T0 = Date.UTC(2030, 0, 1, 12, 0, 0);
+    // Half the 10 s heartbeat a 30 s lease is given.
+    const GRACE_MS = 5000;
     const until = async (condition) => { for (let i = 0; i < 200 && !condition(); i++) await sleep(5); }; // eslint-disable-line no-await-in-loop
 
     beforeEach(() => {
@@ -696,7 +699,7 @@ describe('a heartbeat that extends the lease', () => {
         expect(new Date(held.row.leaseExpiresAt).getTime()).toBe(T0 + 61000);
     });
 
-    it('keeps the credential it replaced good until the next heartbeat, and no longer', async () => {
+    it('keeps the credential it replaced good until a re-mint at least the grace after it was replaced, and no longer', async () => {
         freezeClockAt(T0);
         const run = seedRun('r1');
         const held = {};
@@ -708,6 +711,11 @@ describe('a heartbeat that extends the lease', () => {
                     await args.keepAlive();
                     held.second = args.stepCredential();
                     held.firstAfterOne = await stepCredential.check(C, held.first, presented);
+                    jest.setSystemTime(T0 + GRACE_MS - 1);
+                    held.keptInsideGrace = await args.keepAlive();
+                    held.insideGrace = args.stepCredential();
+                    held.firstInsideGrace = await stepCredential.check(C, held.first, presented);
+                    jest.setSystemTime(T0 + GRACE_MS);
                     await args.keepAlive();
                     held.third = args.stepCredential();
                     held.row = { ...(await store.getStep(C, 'r1', 'sAgent')) };
@@ -720,21 +728,26 @@ describe('a heartbeat that extends the lease', () => {
             steps: await store.listSteps(C, 'r1'),
         });
         expect(held.firstAfterOne.ok).toBe(true);
+        expect(held.keptInsideGrace).toBe(true);
+        expect(held.insideGrace).toBe(held.second);
+        expect(held.firstInsideGrace.ok).toBe(true);
+        expect(held.third).not.toBe(held.second);
         expect(held.row).toMatchObject({ credentialId: jwt.decode(held.third).jti, previousCredentialId: jwt.decode(held.second).jti });
         expect(held.firstAfterTwo).toMatchObject({ ok: false, code: stepCredential.REFUSAL.SUPERSEDED });
         expect(held.secondAfterTwo.ok).toBe(true);
         expect(held.thirdAfterTwo.ok).toBe(true);
     });
 
-    it('takes two heartbeats at once one after the other, so the step always holds the credential the row names', async () => {
+    it('takes two heartbeats at once one after the other and re-mints once, so the step always holds the credential the row names', async () => {
         freezeClockAt(T0);
         const run = seedRun('r1');
         const held = {};
+        const beats = jest.spyOn(store, 'heartbeat');
         await engine.runStep(C, run, (await store.listSteps(C, 'r1'))[0], {
             context: {
                 runAgent: async (args) => {
                     held.first = args.stepCredential();
-                    await Promise.all([args.keepAlive(), args.keepAlive()]);
+                    held.kept = await Promise.all([args.keepAlive(), args.keepAlive()]);
                     held.now = args.stepCredential();
                     held.row = { ...(await store.getStep(C, 'r1', 'sAgent')) };
                     return { runId: 'ar1', status: 'done', costUsd: 0, findings: [] };
@@ -742,9 +755,61 @@ describe('a heartbeat that extends the lease', () => {
             },
             steps: await store.listSteps(C, 'r1'),
         });
+        expect(held.kept).toEqual([true, true]);
+        expect(beats.mock.calls.filter(([, options]) => options.set && options.set.credentialId)).toHaveLength(1);
+        expect(held.now).not.toBe(held.first);
         expect(held.row.credentialId).toBe(jwt.decode(held.now).jti);
-        expect(held.row.previousCredentialId).not.toBe(jwt.decode(held.first).jti);
-        expect(held.row.previousCredentialId).not.toBe(held.row.credentialId);
+        expect(held.row.previousCredentialId).toBe(jwt.decode(held.first).jti);
+    });
+
+    it('passes a credential that was current when its check began, although two renewals completed while the check read the row', async () => {
+        freezeClockAt(T0);
+        seedRun('r1');
+        const minted = await claimAndMint('r1', { lease: 30000, now: new Date(T0) });
+        const held = stepCredential.hold(C, minted.claim, minted);
+        const first = held.token();
+        jest.setSystemTime(T0 + 10000);
+        const readStep = store.getStep;
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        jest.spyOn(store, 'getStep').mockImplementationOnce(async (...args) => { await gate; return readStep(...args); });
+        const verdict = stepCredential.check(C, first, { action: 'task.get', actor: agentActor() });
+        expect(await held.renew()).toBe(true);
+        expect(await held.renew()).toBe(true);
+        release();
+        expect(await verdict).toMatchObject({ ok: true });
+        expect(store.getStep).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops passing that credential once a later renewal re-mints at least the grace after the first', async () => {
+        freezeClockAt(T0);
+        seedRun('r1');
+        const minted = await claimAndMint('r1', { lease: 30000, now: new Date(T0) });
+        const held = stepCredential.hold(C, minted.claim, minted);
+        const first = held.token();
+        jest.setSystemTime(T0 + 10000);
+        await held.renew();
+        await held.renew();
+        jest.setSystemTime(T0 + 10000 + GRACE_MS);
+        await held.renew();
+        expect(await stepCredential.check(C, first, { action: 'task.get', actor: agentActor() })).toMatchObject({ ok: false, code: stepCredential.REFUSAL.SUPERSEDED });
+        expect((await stepCredential.check(C, held.token(), { action: 'task.get', actor: agentActor() })).ok).toBe(true);
+    });
+
+    it('never extends the lease past the credential the step holds when a renewal inside the grace does not re-mint', async () => {
+        freezeClockAt(T0);
+        seedRun('r1');
+        const minted = await claimAndMint('r1', { lease: 30000, now: new Date(T0) });
+        const held = stepCredential.hold(C, minted.claim, minted);
+        jest.setSystemTime(T0 + 10000);
+        await held.renew();
+        const renewed = jwt.decode(held.token());
+        jest.setSystemTime(T0 + 10000 + GRACE_MS - 1);
+        expect(await held.renew()).toBe(true);
+        expect(jwt.decode(held.token()).jti).toBe(renewed.jti);
+        const row = await store.getStep(C, 'r1', 'sAgent');
+        expect(new Date(row.leaseExpiresAt).getTime()).toBeLessThanOrEqual(renewed.exp * 1000);
+        expect(new Date(row.leaseExpiresAt).getTime()).toBeGreaterThan(Date.now());
     });
 
     it('lets an agent step that outlives its first credential act under the re-minted one', async () => {
@@ -793,6 +858,82 @@ describe('a heartbeat that extends the lease', () => {
         expect((await actions.perform({ companyId: C, actor: built, action: 'task.comment', params: { body: 'x' } })).auditId).toBeTruthy();
         await expect(actions.perform({ companyId: C, actor: copy, action: 'task.comment', params: { body: 'x' } }))
             .rejects.toMatchObject({ name: 'RefusedError', message: expect.stringContaining(stepCredential.REFUSAL.MISSING) });
+    });
+});
+
+describe('the engine heartbeat while a step runs', () => {
+    const T0 = Date.UTC(2030, 0, 1, 12, 0, 0);
+    const LEASE_MS = 30000;
+    const EVERY_MS = 10000;
+    const flush = async () => { for (let i = 0; i < 20; i++) await new Promise((resolve) => setImmediate(resolve)); }; // eslint-disable-line no-await-in-loop
+    const advanceTo = async (at) => {
+        while (Date.now() < at) {
+            await jest.advanceTimersByTimeAsync(Math.min(250, at - Date.now())); // eslint-disable-line no-await-in-loop
+            await flush(); // eslint-disable-line no-await-in-loop
+        }
+    };
+    const presented = () => ({ action: 'task.get', actor: agentActor() });
+
+    const start = async () => {
+        const run = seedRun('r1');
+        const agent = {};
+        let release;
+        const done = new Promise((resolve) => { release = resolve; });
+        const execute = executors.get('agent_run');
+        jest.spyOn(executors, 'get').mockImplementation(() => (input) => { agent.args = input.context; return execute(input); });
+        const running = engine.runStep(C, run, (await store.listSteps(C, 'r1'))[0], {
+            context: { runAgent: async (args) => { agent.first = args.stepCredential(); await done; return { runId: 'ar1', status: 'done', costUsd: 0, findings: [] }; } },
+            steps: await store.listSteps(C, 'r1'),
+        });
+        for (let i = 0; i < 50 && !agent.args; i++) await flush(); // eslint-disable-line no-await-in-loop
+        return { agent, finish: () => { release(); return running; } };
+    };
+
+    beforeEach(() => {
+        flag(true);
+        process.env.WORKFLOW_LEASE_MS = String(LEASE_MS);
+        jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'queueMicrotask'], now: T0 });
+    });
+
+    it('rides out two failed heartbeats in a row while the lease is still live', async () => {
+        const beats = jest.spyOn(store, 'heartbeat')
+            .mockRejectedValueOnce(new Error('connection reset'))
+            .mockRejectedValueOnce(new Error('operation timed out'));
+        const step = await start();
+        expect(step.agent.args).toBeTruthy();
+        await advanceTo(T0 + LEASE_MS + 5000);
+        expect(beats.mock.calls.length).toBeGreaterThanOrEqual(3);
+        expect(step.agent.args.leaseLost()).toBe(false);
+        const row = await store.getStep(C, 'r1', 'sAgent');
+        expect(new Date(row.leaseExpiresAt).getTime()).toBeGreaterThan(Date.now());
+        expect((await stepCredential.check(C, step.agent.args.stepCredential(), presented())).ok).toBe(true);
+        expect((await step.finish()).outcome).toBe('success');
+    });
+
+    it('ends the step at the first refused heartbeat, and beats no more', async () => {
+        const beats = jest.spyOn(store, 'heartbeat').mockResolvedValueOnce(false);
+        const step = await start();
+        await advanceTo(T0 + EVERY_MS);
+        expect(step.agent.args.leaseLost()).toBe(true);
+        await advanceTo(T0 + 3 * LEASE_MS);
+        expect(beats).toHaveBeenCalledTimes(1);
+        await step.finish();
+    });
+
+    it('backs off while heartbeats fail, and loses the step only once its lease has lapsed', async () => {
+        const write = store.heartbeat;
+        const beats = jest.spyOn(store, 'heartbeat').mockImplementation((...args) => (Date.now() <= T0 + LEASE_MS ? Promise.reject(new Error('connection refused')) : write(...args)));
+        const step = await start();
+        await advanceTo(T0 + LEASE_MS - 1);
+        expect(step.agent.args.leaseLost()).toBe(false);
+        expect(beats.mock.calls.length).toBeLessThanOrEqual(8);
+        await advanceTo(T0 + LEASE_MS + EVERY_MS);
+        expect(step.agent.args.leaseLost()).toBe(true);
+        const row = await store.getStep(C, 'r1', 'sAgent');
+        expect(new Date(row.leaseExpiresAt).getTime()).toBe(T0 + LEASE_MS);
+        expect(row.credentialId).toBe(jwt.decode(step.agent.first).jti);
+        expect(await stepCredential.check(C, step.agent.first, presented())).toMatchObject({ ok: false, code: stepCredential.REFUSAL.EXPIRED });
+        await step.finish();
     });
 });
 

@@ -196,7 +196,6 @@ describe('the audit hash chain through real routes', () => {
 
     it('filters to permission refusals, and reads an unchained row written after the chain started as broken', async () => {
         const marker = `[QA chain] ${uniqueSuffix()}`;
-        // Other suites count permission.refused rows in this shared database, so this one goes again at once.
         const inserted = await audits.insertOne({ action: 'permission.refused', actorId: 'qa-chain', actorName: '', entityType: 'permission', entityId: 'task.task_priority', entityName: marker, meta: { mode: 'enforce', reason: 'denied' }, ip: '', createdAt: new Date(), updatedAt: new Date() });
         try {
             const body = await list({ refused: 'true' });

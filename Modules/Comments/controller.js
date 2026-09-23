@@ -11,6 +11,7 @@ const { escapeCommentFields } = require("./helpers/plainText");
 const { handleNotificationtFun } = require("../notification/prepare-notification-data/controllerV2");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 const { sprintIdentities, visibleSprintExpr } = require("../Sprints/helpers/sprintVisibility");
+const { commentThreadAccess, refuseThread } = require("./helpers/threadAccess");
 
 /* @mention delivery: record the mention (feeds the in-app "mentions" tab, which
  * queries the mentions collection by mentionIds) and fire the notification
@@ -216,10 +217,14 @@ exports.getPaginatedMessages = async (req, res) => {
             tabLeaveTime = null
         } = req.query;
 
+        const access = await commentThreadAccess(req.headers['companyid'], req.uid, { projectId, sprintId, taskId });
+        if (!access.allowed) return refuseThread(res, access);
+
         const searchResultMatch = {
             $match: {
                 $and: [
                     { projectId: new mongoose.Types.ObjectId(projectId) },
+                    access.match,
                     // BUG-032 / #86 fix: align soft-delete handling with the other
                     // comment-listing endpoints (searchMessageFromMainChat /
                     // searchComments). Without this filter, soft-deleted comments
@@ -278,6 +283,9 @@ exports.searchMessageFromMainChat = async (req, res) => {
     try {
         const { searchText, projectId, sprintId, taskId, skip = 0, limit = 25, isPinnedMessage, sort = 'asc' } = req.query;
 
+        const access = await commentThreadAccess(req.headers['companyid'], req.uid, { projectId, sprintId, taskId });
+        if (!access.allowed) return refuseThread(res, access);
+
         const query = {
             type: SCHEMA_TYPE.COMMENTS,
             data: [
@@ -304,7 +312,8 @@ exports.searchMessageFromMainChat = async (req, res) => {
                     // isDeleted field. Using `$ne: true` keeps them in results
                     // while still excluding soft-deleted ones (consistent with
                     // searchComments).
-                    isDeleted: { $ne: true }
+                    isDeleted: { $ne: true },
+                    $and: [access.match]
                 },
                 {},
                 // Oldest-first stays the default so the existing pinned-messages /

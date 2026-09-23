@@ -6,7 +6,7 @@
                 <div class="d-flex align-items-center">
                     <p class="user_hrs_name" :title="trData.projectName">{{ trData.projectName }}</p>
                     <!-- AHE — red dot: a task in this project had its estimated hours re-updated. -->
-                    <span v-if="trData.hasEstimateChanged" title="A task in this project had its estimated hours changed" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#E5484D;margin-left:6px;flex:none;"></span>
+                    <span v-if="trData.hasEstimateChanged" :title="$t('UserTimesheet.project_estimate_changed')" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#E5484D;margin-left:6px;flex:none;"></span>
                     <img v-if="trData.status == 'close' || !(trData.deletedStatusKey == 0 || trData.deletedStatusKey == undefined)" :src="logk_icon" alt="loclIcon" class="ml-5px"/>
                 </div>
                 <div>

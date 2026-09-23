@@ -33,6 +33,28 @@
             </table>
         </section>
 
+        <section v-if="orphans.length" class="ah-card in-card">
+            <div class="in-card__head"><ShellIcon name="alert" :size="16" /><span class="in-card__title">{{ $t('Instance.orphans_title') }}</span></div>
+            <p class="ah-small">{{ $t('Instance.orphans_lead') }}</p>
+            <table class="in-table">
+                <thead><tr><th>{{ $t('Instance.orphan_database') }}</th><th>{{ $t('Instance.size') }}</th><th></th></tr></thead>
+                <tbody>
+                    <tr v-for="o in orphans" :key="o.name">
+                        <td class="ah-mono">{{ o.name }}</td>
+                        <td>{{ formatBytes(o.sizeOnDisk) }}</td>
+                        <td>
+                            <div v-if="dropping === o.name" class="in-actions">
+                                <input v-model.trim="dropConfirm" type="text" class="ah-input ah-mono" autocomplete="off" :aria-label="$t('Instance.restore_type', { name: o.name })" :placeholder="$t('Instance.restore_type', { name: o.name })" />
+                                <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="busy || dropConfirm !== o.name" @click="dropOrphan(o)">{{ $t('Instance.orphan_drop_go') }}</button>
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="dropping = null">{{ $t('Instance.cancel') }}</button>
+                            </div>
+                            <button v-else type="button" class="ah-btn ah-btn--outline ah-btn--sm" :disabled="busy" @click="askDrop(o)">{{ $t('Instance.orphan_drop') }}</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
         <section v-if="restoring" class="ah-card in-card in-restore">
             <div class="in-card__head"><ShellIcon name="alert" :size="16" /><span class="in-card__title">{{ $t('Instance.restore_title', { name: restoring.name }) }}</span></div>
             <p class="ah-small">{{ $t('Instance.restore_lead') }}</p>
@@ -78,6 +100,9 @@ const notice = ref("");
 const restoring = ref(null);
 const manifest = ref(null);
 const confirm = ref("");
+const orphans = ref([]);
+const dropping = ref(null);
+const dropConfirm = ref("");
 
 async function load() {
     error.value = "";
@@ -87,6 +112,30 @@ async function load() {
         dir.value = data.dir;
     } catch (e) {
         error.value = message(e);
+    }
+    await loadOrphans();
+}
+
+async function loadOrphans() {
+    try { orphans.value = (await get(env.INSTANCE_ORPHAN_DATABASES)).databases; } catch (e) { $toast.error(message(e)); }
+}
+
+function askDrop(o) {
+    dropping.value = o.name;
+    dropConfirm.value = "";
+}
+
+async function dropOrphan(o) {
+    busy.value = true; error.value = ""; notice.value = "";
+    try {
+        await post(`${env.INSTANCE_ORPHAN_DATABASES}/${o.name}/drop`, { confirm: dropConfirm.value });
+        notice.value = t("Instance.orphan_dropped", { name: o.name, size: formatBytes(o.sizeOnDisk) });
+        dropping.value = null;
+        await loadOrphans();
+    } catch (e) {
+        error.value = message(e);
+    } finally {
+        busy.value = false;
     }
 }
 
@@ -115,6 +164,7 @@ async function restore() {
     try {
         const data = await post(`${env.INSTANCE_BACKUPS}/${restoring.value.name}/restore`, { confirm: confirm.value });
         notice.value = t("Instance.restore_done", { docs: data.restored.documents, colls: data.restored.collections, safety: data.safetyBackup });
+        if (data.orphanedDatabases?.length) notice.value += ` ${t("Instance.restore_orphans", { n: data.orphanedDatabases.length })}`;
         restoring.value = null;
         await load();
     } catch (e) {

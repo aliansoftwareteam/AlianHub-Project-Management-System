@@ -14,8 +14,9 @@ const visibleSet = require('../visibleSet');
 // formed in is in the run's visible set and every source it names still passes that source's own
 // recheck for this run, so a note is never wider than what it came from. A note formed outside any
 // project, from content outside the workspace, or naming a source that cannot be checked, goes
-// only to runs of the person who started the note's run. The chunk search narrows by agent;
-// recheck() reads the live notes it matched and decides.
+// only to runs of the person who started the note's run. Each starter's sighting of the same text
+// is its own note, so a run that may read several of them is shown the text once. The chunk search
+// narrows by agent; recheck() reads the live notes it matched and decides.
 
 const EXCERPT_LENGTH = 300;
 const TEXT_INDEX_MISSING = 27;
@@ -142,9 +143,13 @@ const recheck = async ({ set, passages }) => {
         && admissible(set, { projectIds: note.projectIds, startedBy: note.source && note.source.userId, starterOnly: note.starterOnly }));
     const passing = await passingRefs(set, candidates);
     const admitted = new Set(candidates.filter((note) => sourcesAdmit(set, note, passing)).map((note) => note.memoryId));
+    const shown = new Set();
     return passages.flatMap((p) => {
         const note = live.get(String(p.sourceId));
         if (!note || !admitted.has(note.memoryId)) return [];
+        const sameText = agentMemory.slug(note.text);
+        if (shown.has(sameText)) return [];
+        shown.add(sameText);
         return [{
             ...p,
             title: TITLE,
