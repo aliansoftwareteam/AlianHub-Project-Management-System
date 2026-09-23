@@ -118,15 +118,18 @@ const centralHeader = ({ name, flags, crc, size }, offset) => {
  * An archive of stored entries holding at most `budget` inflated bytes. The first pass inflates
  * each entry only to measure it and lets it go; the second inflates it again straight into the
  * output, so what is held at once is the output and one entry, never every entry beside it.
+ * `rewrite(name, content)` may change an entry on its way in, and must return the same bytes for
+ * the same entry on both passes; the budget counts what was inflated.
  */
-const inflateWithin = (buffer, budget) => {
+const inflateWithin = (buffer, budget, { rewrite = (name, content) => content } = {}) => {
     const entries = entriesOf(buffer);
     let used = 0;
     const measured = entries.map((entry) => {
-        const content = inflateEntry(buffer, entry, budget - used);
-        used += content.length;
+        const inflated = inflateEntry(buffer, entry, budget - used);
+        used += inflated.length;
         if (used > budget) throw refusal('inflated_too_large', 'The archive inflates past the budget.');
-        return { name: entry.name, flags: entry.flags, crc: crc32(content), size: content.length };
+        const content = rewrite(entry.name, inflated);
+        return { name: entry.name, flags: entry.flags, crc: crc32(content), size: content.length, inflatedSize: inflated.length };
     });
     const directorySize = measured.reduce((sum, file) => sum + 46 + file.name.length, 0);
     const out = Buffer.allocUnsafe(measured.reduce((sum, file) => sum + 30 + file.name.length + file.size, 0) + directorySize + 22);
@@ -137,7 +140,9 @@ const inflateWithin = (buffer, budget) => {
         offsets.push(offset);
         offset += localHeader(file).copy(out, offset);
         offset += file.name.copy(out, offset);
-        const content = inflateEntry(buffer, entry, file.size);
+        const inflated = inflateEntry(buffer, entry, file.inflatedSize);
+        if (inflated.length !== file.inflatedSize) throw damaged();
+        const content = rewrite(entry.name, inflated);
         if (content.length !== file.size) throw damaged();
         offset += content.copy(out, offset);
     });
