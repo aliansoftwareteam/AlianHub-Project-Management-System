@@ -95,7 +95,7 @@ exports.updateChannelsCounts = (companyId, private, type) => {
 exports.addSprintFun = (req) => {
     try {
         return new Promise(async(resolve, reject) => {
-            const {companyId, projectId, folder, sprintName, userData, projectName, isPreCompany = false, mainChat = false, private = false, sendMessage = true, AssigneeUserId = [], icon = {},from = '',taskSprintObj = {}} = req.body;
+            const {companyId, projectId, folder, sprintName, userData, isPreCompany = false, mainChat = false, private = false, sendMessage = true, AssigneeUserId = [], icon = {},from = '',taskSprintObj = {}} = req.body;
             const sprintObject = {
                 tasks : 0,
                 private: private,
