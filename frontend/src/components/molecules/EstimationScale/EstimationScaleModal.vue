@@ -2,19 +2,19 @@
     <div v-if="modelValue" class="esc__overlay" @click.self="$emit('update:modelValue', false)">
         <div class="esc__card">
             <div class="d-flex align-items-center justify-content-between esc__head">
-                <span class="font-size-16 font-weight-700">Story point scale</span>
+                <span class="font-size-16 font-weight-700">{{ $t('Projects.estimation_scale_title') }}</span>
                 <span class="cursor-pointer font-size-16 esc__close" @click="$emit('update:modelValue', false)">&#10005;</span>
             </div>
-            <div class="font-size-12 gray81 esc__hint">Choose the point values the estimation picker offers for this project.</div>
+            <div class="font-size-12 gray81 esc__hint">{{ $t('Projects.estimation_scale_hint') }}</div>
             <select v-model="scale" class="esc__select font-size-13">
-                <option value="fibonacci">Fibonacci (1, 2, 3, 5, 8, 13, 21)</option>
-                <option value="linear">Linear (1 – 10)</option>
-                <option value="tshirt">T-shirt (1, 2, 3, 5, 8)</option>
-                <option value="hours">Hours (1, 2, 4, 8, 16, 24, 40)</option>
+                <option value="fibonacci">{{ $t('Projects.estimation_scale_fibonacci') }}</option>
+                <option value="linear">{{ $t('Projects.estimation_scale_linear') }}</option>
+                <option value="tshirt">{{ $t('Projects.estimation_scale_tshirt') }}</option>
+                <option value="hours">{{ $t('Projects.estimation_scale_hours') }}</option>
             </select>
             <div class="d-flex justify-content-end esc__actions">
-                <button class="btn_btn esc__ghost-btn font-size-13 mr-10px" @click="$emit('update:modelValue', false)">Cancel</button>
-                <button class="btn-primary font-size-13" :disabled="isSaving" @click="save">{{ isSaving ? 'Saving…' : 'Save' }}</button>
+                <button class="btn_btn esc__ghost-btn font-size-13 mr-10px" @click="$emit('update:modelValue', false)">{{ $t('Projects.cancel') }}</button>
+                <button class="btn-primary font-size-13" :disabled="isSaving" @click="save">{{ isSaving ? $t('Projects.estimation_scale_saving') : $t('Projects.save') }}</button>
             </div>
         </div>
     </div>
@@ -28,6 +28,7 @@ export default { name: 'EstimationScaleModal' };
 import { ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
+import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 
 const props = defineProps({
@@ -38,6 +39,7 @@ const emit = defineEmits(['update:modelValue']);
 
 const store = useStore();
 const $toast = useToast();
+const { t } = useI18n();
 const scale = ref('fibonacci');
 const isSaving = ref(false);
 
@@ -56,14 +58,14 @@ function save() {
             // Reflect the change in the store so the points picker (which reads
             // project.estimationScale) updates without a reload.
             store.commit('projectData/mutateProjects', [{ op: 'modified', data: { ...props.projectData, estimationScale: scale.value } }]);
-            $toast.success(response.data.statusText || 'Estimation scale updated', { position: 'top-right' });
+            $toast.success(response.data.statusText || t('Projects.estimation_scale_updated'), { position: 'top-right' });
             emit('update:modelValue', false);
         } else {
-            $toast.error(response.data?.statusText || 'Could not update the scale', { position: 'top-right' });
+            $toast.error(response.data?.statusText || t('Projects.estimation_scale_failed'), { position: 'top-right' });
         }
     }).catch((error) => {
         console.error('ERROR in estimation scale save: ', error);
-        $toast.error('Could not update the scale', { position: 'top-right' });
+        $toast.error(t('Projects.estimation_scale_failed'), { position: 'top-right' });
     }).finally(() => { isSaving.value = false; });
 }
 </script>

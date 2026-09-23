@@ -36,9 +36,9 @@
                     <div class="chg__body">
                         <div class="chg__row">
                             <span class="chg__name">{{ headline(release) }}</span>
-                            <span v-if="index === 0" class="ah-chip ah-chip--brand ah-chip--mono chg__chip">NEW</span>
+                            <span v-if="index === 0" class="ah-chip ah-chip--brand ah-chip--mono chg__chip">{{ $t('Changelog.new_badge') }}</span>
                             <span v-if="release.version === currentVersion" class="ah-chip ah-chip--mono chg__chip">{{ $t('Changelog.installed') }}</span>
-                            <span v-if="release.selfHost?.notes?.length" class="ah-chip ah-chip--ok ah-chip--mono chg__chip">SELF-HOST</span>
+                            <span v-if="release.selfHost?.notes?.length" class="ah-chip ah-chip--ok ah-chip--mono chg__chip">{{ $t('Changelog.self_host_badge') }}</span>
                             <span
                                 class="ah-chip ah-chip--mono chg__chip"
                                 :class="release.selfHost?.upgradeNeeded || release.selfHost?.breaking ? 'ah-chip--warn' : 'ah-chip--ok'"
@@ -74,7 +74,7 @@
 
             <div class="chg__foot">
                 {{ $t('Inbox.chg_footer') }}
-                <a v-if="repoUrl" :href="`${repoUrl}/releases.atom`" target="_blank" rel="noopener noreferrer" class="chg__link">RSS</a>
+                <a v-if="repoUrl" :href="`${repoUrl}/releases.atom`" target="_blank" rel="noopener noreferrer" class="chg__link">{{ $t('Changelog.rss') }}</a>
             </div>
         </div>
     </div>
