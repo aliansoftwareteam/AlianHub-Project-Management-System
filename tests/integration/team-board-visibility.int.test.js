@@ -172,3 +172,58 @@ describe('GET /api/v2/agents/team shows task names and logged hours only where t
         expect(typeof data.totals.load).toBe('number');
     });
 });
+
+describe('the agent pipeline and release screens leave out tasks in a private sprint the viewer is not on', () => {
+    let client;
+    let db;
+    let owner;
+    let member;
+    let sprintId;
+    let hiddenName;
+    let openName;
+
+    beforeAll(async () => {
+        client = await MongoClient.connect(resolveMongoUrl());
+        db = client.db(state.companyId);
+        [owner, member] = await Promise.all(['owner', 'member'].map(loginAs));
+        const everyone = Object.values(state.users).map((u) => u.userId);
+        const suffix = uniqueSuffix();
+        const project = await createProject(owner.api, { assigneeIds: everyone, createdBy: owner.uid });
+        hiddenName = `[QA ship] private-sprint task ${suffix}`;
+        openName = `[QA ship] open task ${suffix}`;
+        const hiddenTask = await createTask(owner.api, { project, name: hiddenName, user: state.users.owner, companyOwnerId: owner.uid });
+        const openTask = await createTask(owner.api, { project, name: openName, user: state.users.owner, companyOwnerId: owner.uid });
+        const taskIds = [hiddenTask._id, openTask._id];
+
+        ({ insertedId: sprintId } = await db.collection('sprints').insertOne({
+            name: `[QA ship] private ${suffix}`, projectId: new ObjectId(String(project._id)), private: true, AssigneeUserId: [owner.uid], deletedStatusKey: 0,
+        }));
+        await db.collection('tasks').updateOne({ _id: new ObjectId(hiddenTask._id) }, { $set: { sprintId, sprintArray: { id: String(sprintId), name: 'private' } } });
+        await db.collection('tasks').updateMany({ _id: { $in: taskIds.map((id) => new ObjectId(id)) } }, { $set: { statusType: 'done', updatedAt: new Date() } });
+        await db.collection('agent_runs').insertMany(taskIds.map((taskId) => ({
+            agentId: String(new ObjectId()), agentName: '[QA ship] agent', taskId: String(taskId), projectId: String(project._id), status: 'done', startedAt: new Date(), finishedAt: new Date(),
+        })));
+    });
+
+    afterAll(async () => {
+        await db.collection('agent_runs').deleteMany({ agentName: '[QA ship] agent' });
+        await db.collection('sprints').deleteOne({ _id: sprintId });
+        await client.close();
+    });
+
+    const namesOn = async (session, path) => {
+        const res = await session.api.get(path);
+        expect(res.status).toBe(200);
+        expect(res.body.status).toBe(true);
+        return res.body.data.tasks.map((t) => t.name);
+    };
+
+    it.each(['/api/v2/agents/pipeline?limit=100', '/api/v2/agents/release'])('%s hides the task from a member and keeps it for the owner', async (path) => {
+        const seenByMember = await namesOn(member, path);
+        expect(seenByMember).toContain(openName);
+        expect(seenByMember).not.toContain(hiddenName);
+
+        const seenByOwner = await namesOn(owner, path);
+        expect(seenByOwner).toEqual(expect.arrayContaining([openName, hiddenName]));
+    });
+});
