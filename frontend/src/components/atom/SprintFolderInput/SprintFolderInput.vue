@@ -29,9 +29,9 @@
 
 <script setup>
 // PACKAGE
-import { computed, ref, defineEmits, defineProps, inject, onMounted, nextTick } from "vue";
+import { ref, defineEmits, defineProps, inject, onMounted, nextTick } from "vue";
 import { useStore } from "vuex";
-import { useCustomComposable, useGetterFunctions } from "@/composable";
+import { useCustomComposable } from "@/composable";
 import { useValidation } from "@/composable/Validation";
 import * as env from '@/config/env';
 import { useToast } from "vue-toast-notification";
@@ -39,17 +39,14 @@ import { apiRequest } from '../../../services';
 import { dbCollections } from "../../../utils/Collections";
 import { sprintPlanPermission } from "@/composable/commonFunction";
 import { useI18n } from "vue-i18n";
-import { createFolders, createSprints } from "@/utils/NotificationTemplate";
 const { t } = useI18n();
 
 // UTILS
-const userId = inject('$userId');
 const companyId = inject('$companyId');
 const clientWidth = inject("$clientWidth");
 const projectData = inject('selectedProject');
-const {getters,commit} = useStore();
+const {commit} = useStore();
 const  { checkErrors , checkAllFields } = useValidation();
-const {getUser} = useGetterFunctions();
 const {makeUniqueId} = useCustomComposable();
 const $toast = useToast();
 const { checkPerProjectSprintPermission } = sprintPlanPermission();
@@ -102,9 +99,6 @@ onMounted(() => {
 	})
 })
 
-const companyOwner = computed(() => {
-    return getters["settings/companyOwnerDetail"];
-})
 
 // SPRINT OPERATIONS
 function createEditSprint() {
@@ -140,18 +134,10 @@ function createEditSprint() {
 						return;
 					}
 		
-					let user = getUser(userId.value);
-		
 					const axiosData = {
 						companyId: companyId.value,
 						projectId: projectData.value._id,
 						sprintName: listName.value.value,
-						userData: {
-							id: user.id,
-							Employee_Name: user.Employee_Name,
-							companyOwnerId: companyOwner.value.userId
-						},
-						projectName: projectData.value.ProjectName
 					}
 		
 					if(props.folder) {
@@ -166,7 +152,6 @@ function createEditSprint() {
 					let endPoint = "";
 					if(props.item !== null) {
 						endPoint = env.SPRINT+"/"+props.item.id;
-						axiosData.prevData = props.item;
 					} else {
 						endPoint = env.SPRINT;
 					}
@@ -184,29 +169,6 @@ function createEditSprint() {
 							emit("updateData",res?.data?.data,"Sprint");
 						}
 						if(res.data.status === true){
-							if(!props.item){
-								let notifyObj = {
-									'ProjectName' : projectData.value.ProjectName,
-									'sprintName' : listName.value.value
-								}
-								let notificationObject = {
-									message: createSprints(notifyObj),
-									key: "project_sprint_create",
-								};
-								
-								apiRequest("post", env.HANDLE_NOTIFICATION, {
-									type: 'project',
-									companyId: companyId.value,
-									projectId: projectData.value._id,
-									object: notificationObject,
-									userData: axiosData.userData,
-									changeType:'sprint_create',
-                                    changeData: notifyObj
-								})
-								.catch((error) => {
-									console.error("ERROR in update notification", error);
-								})
-							}
 							$toast.success(t(`Toast.Sprint ${props.item !== null ? 'updated' : 'created'} successfully`), {position: "top-right"})
 							emit('cancel');
 							listName.value.value = "";
@@ -269,23 +231,15 @@ function createEditFolder() {
 				return;
 			}
 
-			let user = getUser(userId.value);
 			const axiosData = {
 				companyId: companyId.value,
 				projectId: projectData.value._id,
 				folderName: listName.value.value,
-				userData: {
-					id: user.id,
-					Employee_Name: user.Employee_Name,
-					companyOwnerId: companyOwner.value.userId
-				},
-				projectName: projectData.value.ProjectName
 			}
 
 			let endPoint = "";
 			if(props.item !== null) {
 				endPoint = env.FOLDER+"/"+props.item.id;
-				axiosData.prevFolderName = props.item.name;
 			} else {
 				endPoint = env.FOLDER;
 			}
@@ -303,29 +257,6 @@ function createEditFolder() {
 					emit("updateData",result?.data?.data,"Folder");
 				}
 				if(result.data.status){
-					if(!props.item){
-						let notifyObj = {
-							'ProjectName' : projectData.value.ProjectName,
-							'sprintFolderName' : listName.value.value
-						}
-						let notificationObject = {
-							message: createFolders(notifyObj),
-							key: "project_folder_create",
-						};
-						
-						apiRequest("post", env.HANDLE_NOTIFICATION, {
-							type: 'project',
-							companyId: companyId.value,
-							projectId: projectData.value._id,
-							object: notificationObject,
-							userData: axiosData.userData,
-							changeType:'sprint_create',
-							changeData: notifyObj
-						})
-						.catch((error) => {
-							console.error("ERROR in update notification", error);
-						});
-					}
 					$toast.success(t(`Toast.Folder ${props.item !== null ? 'updated' : 'created'} successfully`), {position: "top-right"})
 					emit('cancel');
 					listName.value.value = "";
