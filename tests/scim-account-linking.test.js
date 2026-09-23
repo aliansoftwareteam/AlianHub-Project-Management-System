@@ -83,7 +83,7 @@ beforeEach(() => {
 
 describe('the company member schema', () => {
     it('declares the SCIM name and external id kept on the member row', () => {
-        ['scimGivenName', 'scimFamilyName', 'scimExternalId'].forEach((path) => expect(companyUserSchema.path(path)).toBeTruthy());
+        ['scimGivenName', 'scimFamilyName', 'scimExternalId', 'scimDeactivatedSeatAt'].forEach((path) => expect(companyUserSchema.path(path)).toBeTruthy());
     });
 });
 

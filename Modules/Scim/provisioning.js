@@ -82,9 +82,10 @@ const onVerifiedDomain = async (companyId, email) => {
 };
 
 /* SCIM before #911 left a deactivated seat for any address it was sent, so a deactivated row proves that
- * someone was one of the company's people only when they came in through an invitation or own the company. */
+ * someone was one of the company's people only when SCIM took it from a live seat, they came in through an
+ * invitation, or they own the company. */
 const wasMemberBeforeDeactivation = (row) => Boolean(row) && Number(row.status) === SCIM_DEACTIVATED
-    && (row.sendInvitationTime != null || Number(row.roleType) === ROLE_OWNER);
+    && (row.scimDeactivatedSeatAt != null || row.sendInvitationTime != null || Number(row.roleType) === ROLE_OWNER);
 
 /* A SCIM token speaks for its company's own people only: a member it deactivated earlier, or an address on
  * a domain the company verified for SSO. Everyone else gets the invitation any admin would send. */
@@ -154,7 +155,11 @@ const setActive = async (companyId, id, active) => {
         return getCompanyUser(companyId, cu._id);
     }
     if (active && !(await mayReactivate(companyId, cu))) return cu;
-    await updateRow(companyId, cu, { status: active ? SEAT_ACTIVE : SCIM_DEACTIVATED, isDelete: !active });
+    await updateRow(companyId, cu, {
+        status: active ? SEAT_ACTIVE : SCIM_DEACTIVATED,
+        isDelete: !active,
+        ...(!active && holdsSeat(cu) ? { scimDeactivatedSeatAt: new Date() } : {}),
+    });
     clearUserCaches(companyId, cu.userId);
     announceSeatChange(companyId, cu.userId, cu, active);
     return getCompanyUser(companyId, cu._id);

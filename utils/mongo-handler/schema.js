@@ -2669,6 +2669,8 @@ const schema = {
         scimExternalId: { type: String, required: false },
         scimGivenName: { type: String, required: false },
         scimFamilyName: { type: String, required: false },
+        // Set when SCIM deactivates a live seat; a deactivated row without it may never have been a membership.
+        scimDeactivatedSeatAt: { type: Date, required: false },
         // The userId of this member's manager in the same company. Empty means no
         // reporting line is recorded, which is the normal state for most workspaces.
         managerId: {
