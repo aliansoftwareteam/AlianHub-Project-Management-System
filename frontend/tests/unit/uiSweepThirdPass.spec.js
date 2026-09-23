@@ -170,6 +170,15 @@ describe('Milestones report headline', () => {
     });
 });
 
+describe('My settings → working hours', () => {
+    test('start → end sit on one row: the sizes out-specify .ah-input', () => {
+        const css = read('views/Settings/MySettings/style.css');
+        expect(ruleBody(css, '.ms__wh .ms__time')).toMatch(/width:\s*110px/);
+        expect(ruleBody(css, '.ms__wh .ms__cap-input')).toMatch(/width:\s*72px/);
+        expect(ruleBody(css, '.ms__wh .ms__wh-tz')).toMatch(/max-width:\s*320px/);
+    });
+});
+
 describe('Docs hub', () => {
     const vue = read('views/Pages/PagesSpace.vue');
     const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));
