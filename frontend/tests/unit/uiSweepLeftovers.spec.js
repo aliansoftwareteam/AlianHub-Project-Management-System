@@ -33,3 +33,10 @@ describe('instance console cards', () => {
         expect(ruleBody(vue, '.in-card > p')).toMatch(/margin:\s*0/);
     });
 });
+
+describe('the setup checklist outside Home', () => {
+    test('brings its own stylesheet, so Instance → Health renders it styled on a direct visit', () => {
+        expect(read('components/molecules/Home/SetupChecklist.vue')).toMatch(/import\s+["']\.\/style\.css["']/);
+        expect(ruleBody(read('components/molecules/Home/style.css'), '.hc-setup')).toMatch(/display:\s*flex/);
+    });
+});
