@@ -639,7 +639,7 @@ describe('an erasure naming nothing that exists', () => {
     });
 
     it('erases a person who holds or held a seat here even with nothing indexed, recording the exclusion', async () => {
-        g().seed('company_users', { userId: ALICE, companyId: CID_A, roleType: 3, status: 2 });
+        mockDbFor(CID_A).seed('company_users', { userId: ALICE, roleType: 3, status: 2, isDelete: true });
         const res = await asOwner('POST', `${BASE}/${CID_A}/erase/person`, { userId: ALICE, confirm: ALICE });
         expect(res.body.code).toBe(CODE.NOTHING_ERASED);
         expect(mockDbFor(CID_A).store[SCHEMA_TYPE.KNOWLEDGE_EXCLUSIONS]).toHaveLength(1);
