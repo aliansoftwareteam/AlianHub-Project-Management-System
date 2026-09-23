@@ -76,7 +76,7 @@
     border-radius: 4px;
     display: grid;
     place-items: center;
-    color: #fff;
+    color: var(--on-brand);
     font: 600 10px/1 var(--font-mono);
     min-height: 0;
     transition: height var(--t-state) var(--ease);

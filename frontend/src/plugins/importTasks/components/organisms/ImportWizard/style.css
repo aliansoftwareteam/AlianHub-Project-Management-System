@@ -40,7 +40,7 @@
     border: none;
     cursor: default;
 }
-.iw__step.is-active { background: var(--brand); color: #fff; }
+.iw__step.is-active { background: var(--brand); color: var(--on-brand); }
 .iw__step.is-done { cursor: pointer; color: var(--ink); }
 .iw__close { margin-inline-start: 4px; }
 

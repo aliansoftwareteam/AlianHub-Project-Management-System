@@ -373,7 +373,7 @@ const writesLine = (agent) => {
 
 const spendLine = (agent) => {
     const row = (spend.value.agents || []).find((a) => a.agentId === String(agent._id));
-    return row && row.runs ? t("Ai.month_runs", { runs: row.runs, usd: Number(row.usd || 0).toFixed(2) }) : t("Ai.no_runs_month");
+    return row && row.runs ? t("Ai.month_runs", { runs: row.runs, usd: Number(row.usd || 0).toFixed(2) }, Number(row.runs) || 0) : t("Ai.no_runs_month");
 };
 
 const coded = (code, sentence) => (messageKey(code) ? t(messageKey(code)) : sentence || "");

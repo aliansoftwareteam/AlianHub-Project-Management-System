@@ -180,6 +180,7 @@ import AgentRunDetail from "./AgentRunDetail.vue";
 import AgentRevisionHistory from "./AgentRevisionHistory.vue";
 import { useAgents, refusalCount } from "./useAgents";
 import { splitPreview } from "./policyPreview";
+import { changedFields, formFromAgent, skillsPayload } from "./agentSavePatch";
 import { useAgentAccess } from "./agentAccess";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
@@ -203,7 +204,8 @@ const skills = ref([]);
 const namedKeys = ref(new Set());
 const recentRuns = ref([]);
 const deleteConfirm = ref("");
-const form = reactive({ autonomy: 1, rateLimitPerDay: 40, spendCapUsd: 30, model: "", projectIds: [] });
+const form = reactive(formFromAgent({}));
+const saved = ref({});
 const projects = computed(() => (getters["projectData/projects"]?.data || []).filter((p) => !p.deletedStatusKey));
 const pinnableModels = ref([]);
 const openRunCount = computed(() => (activeRuns.value[String(route.params.id)] || []).length);
@@ -254,11 +256,7 @@ const load = async () => {
         return;
     }
     agent.value = found;
-    form.autonomy = Number(found.autonomy ?? 1);
-    form.rateLimitPerDay = Number(found.rateLimitPerDay || 40);
-    form.spendCapUsd = Number(found.spendCapUsd || 30);
-    form.model = found.model || "";
-    form.projectIds = (found.projectIds || []).map(String);
+    Object.assign(form, formFromAgent(found));
     // Every live skill in the manifest is offered; the ones this agent already
     // names keep their own state and sit first.
     const chosen = (found.skills || []).map((s) => ({
@@ -277,25 +275,27 @@ const load = async () => {
         .filter((s) => !named.has(s.key) && !s.retiredAt && s.enabled !== false)
         .map((s) => ({ key: s.key, name: s.name, emits: s.emits || [], requires: s.requires || null, source: s.source, model: s.model || null, resolved: true, enabled: false }));
     skills.value = [...chosen, ...offered];
+    saved.value = currentSettings();
 
     await Promise.all([reloadRuns(), loadPinnableModels()]);
     loadingAgent.value = false;
 };
 
+// Actions are the manifest's to state, so only the skill choice is stored.
+const currentSettings = () => JSON.parse(JSON.stringify({ ...form, skills: skillsPayload(skills.value, namedKeys.value) }));
+
 const save = async () => {
+    const current = currentSettings();
+    const patch = changedFields(saved.value, current);
+    if (!Object.keys(patch).length) {
+        $toast.info(t("Ai.nothing_changed"), { position: "top-right" });
+        return;
+    }
     busy.value = true;
     error.value = "";
     try {
-        await saveAgent({
-            _id: agent.value._id,
-            autonomy: form.autonomy,
-            rateLimitPerDay: form.rateLimitPerDay,
-            spendCapUsd: form.spendCapUsd,
-            model: form.model,
-            projectIds: form.projectIds,
-            // Actions are the manifest's to state, so only the choice is stored.
-            skills: skills.value.filter((s) => s.enabled || namedKeys.value.has(s.key)).map((s) => ({ key: s.key, name: s.name, enabled: s.enabled }))
-        });
+        await saveAgent({ _id: agent.value._id, ...patch });
+        saved.value = current;
         $toast.success(t("Ai.saved"), { position: "top-right" });
         revisionsKey.value += 1;
     } catch (e) {

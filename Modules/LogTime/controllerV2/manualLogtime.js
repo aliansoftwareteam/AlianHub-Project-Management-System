@@ -37,7 +37,8 @@ const findEntry = (companyId, type, timeSheetId) => (OBJECT_ID.test(String(timeS
 const entryDay = (entry) => new Date((Number(entry.LogStartTime) || 0) * 1000);
 
 exports.manualLogTime = async (req, res) => {
-    if (!pinSessionTenant(req, res)) return;
+    const companyId = pinSessionTenant(req, res);
+    if (!companyId) return;
     if (!(req.body && req.body.logTimeDate)) {
         res.send({
             status: false,
@@ -164,7 +165,6 @@ exports.manualLogTime = async (req, res) => {
     const actor = await actingUser(req);
     if (!actor) return refuse(res, 401, SIGNED_IN_REQUIRED);
     const uid = actor.id;
-    const companyId = req.body.companyId;
     const storedEntry = req.body.isEdit === true ? await findEntry(companyId, type, req.body.timeSheetId) : null;
     const owner = String(req.body.userId || (storedEntry && storedEntry.Loggeduser) || uid);
     const allowed = await mayWriteTimeOf(companyId, uid, [
@@ -208,7 +208,7 @@ exports.manualLogTime = async (req, res) => {
                 {new : true}
             ]
         }
-        MongoDbCrudOpration(req.body.companyId, obj, "findOneAndUpdate")
+        MongoDbCrudOpration(companyId, obj, "findOneAndUpdate")
             .then((response) => {
                 let historyObj = {
                     'message': `<b>${escapeHtml(actor.Employee_Name)}</b> has edited <b>${req.body.timeDuration} hrs (DATE_${new Date(req.body.logTimeDate).getTime()} from TIMESTAMP_${data.LogStartTime * 1000} to TIMESTAMP_${data.LogEndTime * 1000}) </b> logged hours`,
@@ -218,7 +218,7 @@ exports.manualLogTime = async (req, res) => {
                 let userData = {
                     id: uid
                 }
-                hlp.HandleHistory("Logtask", req.body.companyId, req.body.projectId, req.body.ticketId, historyObj, userData).then(() => {
+                hlp.HandleHistory("Logtask", companyId, req.body.projectId, req.body.ticketId, historyObj, userData).then(() => {
                     let notiObj = {
                         userName: actor.Employee_Name,
                         timeDuration: req.body.timeDuration,
@@ -237,7 +237,7 @@ exports.manualLogTime = async (req, res) => {
                     }
                     HandleBothNotification({
                         type: 'task',
-                        companyId: req.body.companyId,
+                        companyId,
                         projectId: req.body.projectId,
                         taskId: req.body.taskId,
                         folderId: req.body.folderId ? req.body.folderId : "",
@@ -248,8 +248,8 @@ exports.manualLogTime = async (req, res) => {
                         .catch((error) => {
                             logger.error(`Notification Set Error: ${error}`);
                         })
-                    updateProjectForTimelog(req.body.companyId, req.body.projectId, true, Math.floor(new Date().getTime() / 1000));
-                    updateRemainingTime(req.body.companyId,req.body.ticketId);
+                    updateProjectForTimelog(companyId, req.body.projectId, true, Math.floor(new Date().getTime() / 1000));
+                    updateRemainingTime(companyId,req.body.ticketId);
                     res.send({
                         status: true,
                         statusText: "Logtime added successfully",
@@ -273,9 +273,9 @@ exports.manualLogTime = async (req, res) => {
             type: type,
             data: data
         }
-        MongoDbCrudOpration(req.body.companyId, obj, "save")
+        MongoDbCrudOpration(companyId, obj, "save")
             .then((response) => {
-                findAndUpdateProjectOrTaskStartDate({companyId:req.body.companyId,userId:owner,projectId:req.body.projectId,taskId:req.body.ticketId,startDateForProjectOrTask:new Date(req.body.logTimeDate)});
+                findAndUpdateProjectOrTaskStartDate({companyId,userId:owner,projectId:req.body.projectId,taskId:req.body.ticketId,startDateForProjectOrTask:new Date(req.body.logTimeDate)});
                 let historyObj = {
                     'message': `<b>${escapeHtml(actor.Employee_Name)}</b> has added <b>${req.body.timeDuration} hrs (DATE_${new Date(req.body.logTimeDate).getTime()} from TIMESTAMP_${data.LogStartTime * 1000} to TIMESTAMP_${data.LogEndTime * 1000}) </b> logged hours
                 `,
@@ -285,7 +285,7 @@ exports.manualLogTime = async (req, res) => {
                 let userData = {
                     id: uid
                 }
-                hlp.HandleHistory("Logtask", req.body.companyId, req.body.projectId, req.body.ticketId, historyObj, userData).then(() => {
+                hlp.HandleHistory("Logtask", companyId, req.body.projectId, req.body.ticketId, historyObj, userData).then(() => {
 
                     let notiObj = {
                         userName: actor.Employee_Name,
@@ -307,7 +307,7 @@ exports.manualLogTime = async (req, res) => {
 
                     HandleBothNotification({
                         type: 'task',
-                        companyId: req.body.companyId,
+                        companyId,
                         projectId: req.body.projectId,
                         taskId: req.body.taskId,
                         folderId: req.body.folderId ? req.body.folderId : "",
@@ -319,8 +319,8 @@ exports.manualLogTime = async (req, res) => {
                         logger.error(`Notification Set Error: ${error}`);
 
                     })
-                    updateProjectForTimelog(req.body.companyId, req.body.projectId, true, Math.floor(new Date().getTime() / 1000));
-                    updateRemainingTime(req.body.companyId,req.body.ticketId);
+                    updateProjectForTimelog(companyId, req.body.projectId, true, Math.floor(new Date().getTime() / 1000));
+                    updateRemainingTime(companyId,req.body.ticketId);
                     res.send({
                         status: true,
                         statusText: "Logtime added successfully",
@@ -362,7 +362,8 @@ const getTimeStamp = (timezone, date, time) => {
  */
 
 exports.deleteManualLogtime = async (req, res) => {
-    if (!pinSessionTenant(req, res)) return;
+    const companyId = pinSessionTenant(req, res);
+    if (!companyId) return;
     if (!(req.body && req.body.timeSheetId)) {
         res.send({
             status: false,
@@ -447,7 +448,6 @@ exports.deleteManualLogtime = async (req, res) => {
         })
         return;
     }
-    let companyId = req.body.companyId
     let type = req.body.type || SCHEMA_TYPE.TIMESHEET
 
     const actor = await actingUser(req);
@@ -494,7 +494,7 @@ exports.deleteManualLogtime = async (req, res) => {
             let userData = {
                 id: uid
             }
-            hlp.HandleHistory("Logtask", req.body.companyId, req.body.projectId, req.body.ticketId, historyObj, userData).then(() => {
+            hlp.HandleHistory("Logtask", companyId, req.body.projectId, req.body.ticketId, historyObj, userData).then(() => {
                 let notiObj = {
                     userName: actor.Employee_Name,
                     strtLogTime: req.body.startLogTime,
@@ -512,7 +512,7 @@ exports.deleteManualLogtime = async (req, res) => {
                 }
                 HandleBothNotification({
                     type: 'task',
-                    companyId: req.body.companyId,
+                    companyId,
                     projectId: req.body.projectId,
                     taskId: req.body.ticketId,
                     folderId: req.body.folderId ? req.body.folderId : "",
@@ -523,8 +523,8 @@ exports.deleteManualLogtime = async (req, res) => {
                     .catch((error) => {
                         logger.error(`Notification Set Error: ${error}`);
                     })
-                updateProjectForTimelog(req.body.companyId, req.body.projectId, true, Math.floor(new Date().getTime() / 1000));
-                updateRemainingTime(req.body.companyId,req.body.ticketId);
+                updateProjectForTimelog(companyId, req.body.projectId, true, Math.floor(new Date().getTime() / 1000));
+                updateRemainingTime(companyId,req.body.ticketId);
                 res.send({
                     status: true,
                     statusText: "Logtime deleted successfully"

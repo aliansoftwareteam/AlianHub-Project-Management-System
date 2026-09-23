@@ -16,7 +16,7 @@
     width: 30px; height: 30px; border-radius: 8px;
     background: var(--brand);
     display: flex; align-items: center; justify-content: center;
-    color: #fff; font: 700 14px/1 var(--font-ui);
+    color: var(--on-brand); font: 700 14px/1 var(--font-ui);
     margin-bottom: 14px; text-decoration: none; overflow: hidden; flex: none;
 }
 :root[data-theme="dark"] .ah-rail__mark { background: #2F3990; }
