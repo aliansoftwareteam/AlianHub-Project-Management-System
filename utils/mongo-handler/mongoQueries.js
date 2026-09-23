@@ -1,6 +1,8 @@
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { dbCollections } = require('../../Config/collections');
+const mongoose = require('mongoose');
 const { handleConnection } = require("../../middlewares/mongoConnector/mongoConnection")
+const { connections, checkConnectionExists, closeConnection } = require("../../middlewares/mongoConnector/helper")
 const {
     timeSheetSchema,
     historySchema,
@@ -659,6 +661,51 @@ exports.tableType = (type) => {
     }
 }
 
+/* connection.model() given a collection name compiles a fresh model on every call, and each
+ * compile fires an unawaited createCollection + createIndexes: every query also wrote to its
+ * database, and one of those writes landing after a dropDatabase recreated the database.
+ * Keyed by schema too, because two schema types share the customField collection. */
+const compiledModels = new WeakMap();
+
+const compiledModel = (database, table, schema) => {
+    if (!compiledModels.has(database)) compiledModels.set(database, new Map());
+    const bySchema = compiledModels.get(database);
+    if (!bySchema.has(schema)) bySchema.set(schema, new Map());
+    const byTable = bySchema.get(schema);
+    if (!byTable.has(table)) byTable.set(table, database.model(table, schema, table));
+    return byTable.get(table);
+};
+
+const modelsOn = (database) => [...(compiledModels.get(database) || new Map()).values()].flatMap((byTable) => [...byTable.values()]);
+
+const settleSchemaInit = async (database) => {
+    let settled = 0;
+    while (modelsOn(database).length > settled) {
+        const models = modelsOn(database);
+        settled = models.length;
+        await Promise.allSettled(models.map((model) => model.init()));
+    }
+};
+
+/* Retires the pooled connection first, so no schema init it started can reach the database after
+ * the drop, and a dedicated connection drops it: mongoose.connect would open the process-wide
+ * default connection, which refuses to reopen for a second company once active. */
+exports.dropCompanyDatabase = async (companyId) => {
+    const pooled = checkConnectionExists({ connections, db: companyId });
+    if (pooled) {
+        await settleSchemaInit(pooled.connection);
+        closeConnection(companyId);
+    }
+    const baseUrl = String(process.env.MONGODB_URL || '').replace(/\/+$/, '');
+    const connStr = baseUrl.startsWith('mongodb+srv') ? `${baseUrl}/${companyId}` : `${baseUrl}/${companyId}?authSource=admin`;
+    const connection = await mongoose.createConnection(connStr).asPromise();
+    try {
+        await connection.dropDatabase();
+    } finally {
+        await connection.close();
+    }
+};
+
 /**
  * MongoDb CrudOpration Insert, Update, Delete
  * @param {Object} Data - Object Which Contain SchemaType And Data Array Which is need to perform opration in db
@@ -688,7 +735,7 @@ exports.MongoDbCrudOpration = (companyId, data, method) => {
                 let table = this.tableType(data.type)
                 var myVariable = this.checkType(data.type)
                 if (method === 'save') {
-                    const Model = database.model(table, myVariable, table);
+                    const Model = compiledModel(database, table, myVariable);
                     const newDocument = new Model(data.data);
                     newDocument.save().then((res) => {
                         resolve(res)
@@ -697,15 +744,15 @@ exports.MongoDbCrudOpration = (companyId, data, method) => {
                     });
                 }
                 else if (method === 'createIndex') {
-                    const model = database.model(table, myVariable, table)
+                    const model = compiledModel(database, table, myVariable)
                     model.collection.createIndex(...data.data).then(resolve).catch(reject)
                 }
                 else if (method === 'dropIndex') {
-                    const model = database.model(table, myVariable, table)
+                    const model = compiledModel(database, table, myVariable)
                     model.collection.dropIndex(...data.data).then(resolve).catch(reject)
                 }
                 else if (method == "find") {
-                    const model = database.model(table, myVariable, table)
+                    const model = compiledModel(database, table, myVariable)
                     model[method].apply(model, data.data).then((res) => {
                         resolve(res)
                     }).catch((err) => {
@@ -713,7 +760,7 @@ exports.MongoDbCrudOpration = (companyId, data, method) => {
                     })
                 }
                 else {
-                    const model = database.model(table, myVariable, table)
+                    const model = compiledModel(database, table, myVariable)
                     model[method].apply(model, data.data).then((res) => {
                         resolve(res)
                     }).catch((err) => {

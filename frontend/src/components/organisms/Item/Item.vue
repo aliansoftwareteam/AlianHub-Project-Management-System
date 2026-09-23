@@ -246,14 +246,13 @@
 // PACKAGES
 import { defineEmits, defineProps, defineComponent, ref, inject, computed, nextTick, watch, onMounted } from 'vue';
 import { useProjects } from "@/composable/projects"
-import { useCustomComposable, useGetterFunctions, useHistoryNotification } from '@/composable';
+import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useValidation } from '@/composable/Validation';
 import { useToast } from 'vue-toast-notification';
 import moment from 'moment';
 import { useStore } from 'vuex';
 import * as env from '@/config/env';
 import { apiRequest } from '../../../services'
-import { EditProjectName } from '@/utils/NotificationTemplate';
 
 // COMPONENTS
 import SubItem from '@/components/molecules/SubItem/SubItem.vue'
@@ -266,7 +265,6 @@ import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
 import Spinner from "@/components/atom/SpinnerComp/SpinnerComp.vue"
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import { useI18n } from "vue-i18n";
-import { closeProject } from '@/utils/NotificationTemplate';
 const { t } = useI18n();
 // import Skelaton from '@/components/atom/Skelaton/Skelaton/.vue';
 
@@ -290,12 +288,11 @@ const  { checkErrors , checkAllFields } = useValidation();
 const userId = inject('$userId');
 const companyId = inject('$companyId');
 const {markFavourite} = useProjects();
-const {showCounts, checkPermission,sanitizeInput} = useCustomComposable();
+const {showCounts, checkPermission} = useCustomComposable();
 const clientWidth = inject('$clientWidth');
 const showArchivedProjects = inject('showArchivedProjects');
 const $toast = useToast()
 const {getUser} = useGetterFunctions()
-const {addHistory} = useHistoryNotification();
 
 defineComponent({
     name: "Item-Component",
@@ -610,59 +607,11 @@ function renameProject() {
     .then(async (valid) => {
         if(valid) {
             editName.value = false;
-            const prevProjectName = sanitizeInput(propItem.value.ProjectName);
-            const newProjectName = sanitizeInput(projectName.value.value);
             const updateObj = { ProjectName: projectName.value.value };
             try {
                 await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${propItem.value._id}`,{updateObject: updateObj})
                 $toast.success(t("Toast.Project_name_updated_successfully"), {position: 'top-right'});
-                const user = getUser(userId.value);
-                const userData = {
-                    id: user.id,
-                    Employee_Name: user.Employee_Name,
-                    companyOwnerId: user.companyOwnerId
-                }
-
-                // Call history API
-                const axiosData = {
-                    "type": "project",
-                    "companyId": companyId.value,
-                    "projectId": propItem.value._id,
-                    "taskId": null,
-                    "object": {
-                        "sprintId": null,
-                        "key": "Project_Name",
-                        "message": `<b>${userData.Employee_Name}</b> has changed the name of <b>${prevProjectName}</b> to <b>${newProjectName}</b>`
-                    },
-                    "userData": userData
-                };
-                apiRequest("post", env.HANDLE_HISTORY, axiosData).then((result) => {
-                    if(result.data.status) {
-                        console.info(result.data.statusText)
-                    }
-                });
                 emits('projectAction',{...propItem.value,ProjectName: projectName.value.value},'ProjectName');
-                let notifyObj = {
-                        TaskName: newProjectName,
-                        previousTaskName: prevProjectName
-                    }
-                    let notificationObject = {
-                        message: EditProjectName(notifyObj),
-                        key: "project_name",
-                    };
-                    
-                    apiRequest("post", env.HANDLE_NOTIFICATION, {
-                        type: 'project',
-                        companyId: companyId.value,
-                        projectId: propItem.value._id,
-                        object: notificationObject,
-                        userData: userData,
-                        changeType:'name',
-                        changeData: notifyObj
-                    })
-                    .catch((error) => {
-                        console.error("ERROR in update notification", error);
-                    })
                 resetProjectName();   
             } catch (error) {
                 console.error(`Error while renaming project`,error);
@@ -689,53 +638,8 @@ async function updateProject(value = null) {
         showSidebar.value = false;
         showSpinner.value = false;
         updateChildTasks(value !== null);
-        const user = getUser(userId.value);
-        const userData = {
-            id: user.id,
-            Employee_Name: user.Employee_Name,
-            companyOwnerId: user.companyOwnerId
-        }
-
-        let type = `${value !== null ? 'restored' : archive.value === 0 ? 'closed' : 'deleted'}`;
-
+        const type = `${value !== null ? 'restored' : archive.value === 0 ? 'closed' : 'deleted'}`;
         $toast.success(t(`Toast.Project ${type} successfully`), {position: 'top-right'});
-
-        var historyObj = {
-            'message': `<b>${userData.Employee_Name}</b> has ${type} the <b>${sanitizeInput(propItem.value.ProjectName)}</b> Project`,
-            'key' : 'Project_Name',
-        }
-        addHistory({
-            "type": 'project',
-            "companyId": companyId.value,
-            "projectId": propItem.value._id,
-            "taskId": null,
-            "object": historyObj,
-            "userData": userData
-        });
-
-        if(type === 'closed'){            
-            let notifyObj = {
-                'projectName' : propItem.value.ProjectName ||' ',
-                'userName' : userData?.Employee_Name || ''
-            }
-            let notificationObject = {
-                message: closeProject(notifyObj),
-                key: "project_close",
-            };
-            
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: propItem.value._id,
-                object: notificationObject,
-                userData: userData,
-                changeType:'project_close',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
-        }
         emits('projectAction',{...propItem.value,...updateObject},value === null || archive.value === 0 ? 'RemoveProject' : 'AddProject');
     } catch (error) {
         showSidebar.value = false;

@@ -44,7 +44,9 @@ const loadOwnCompanyIds = async (uid) => {
         type: SCHEMA_TYPE.USERS,
         data: [{ _id: new mongoose.Types.ObjectId(String(uid)) }, { AssignCompany: 1 }]
     }, 'findOne');
-    return ownCompanyIds(user);
+    const listed = ownCompanyIds(user);
+    const seated = await Promise.all(listed.map((companyId) => findSeat(companyId, uid).catch(() => null)));
+    return listed.filter((companyId, index) => Boolean(seated[index]));
 };
 
 const isInstanceAdminRequest = async (req) => !req.apiToken && isInstanceOwner(req.uid);

@@ -13,6 +13,7 @@ const { pinSessionTenant } = require('../../../Config/tenant');
 const { resolveSheetScope, SHEET_PERMISSION } = require('../../TimeSheet/helpers/timeScope');
 const { actingUser } = require('../../Sprints/helpers/actingUser');
 const { escapeHtml } = require('../../../utils/escapeHtml');
+const { nonMembersOf, NOT_A_MEMBER } = require('../../../Config/companyMembers');
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const NOT_YOUR_TIME = "You can't log or change time for this person.";
@@ -176,6 +177,8 @@ exports.manualLogTime = async (req, res) => {
         logger.warn(`manualLogtime refused: ${uid} for ${owner} in ${companyId}`);
         return refuse(res, 403, NOT_YOUR_TIME);
     }
+    const newlyNamed = owner !== uid && !(storedEntry && String(storedEntry.Loggeduser) === owner);
+    if (newlyNamed && (await nonMembersOf(companyId, [owner])).length) return refuse(res, 400, NOT_A_MEMBER);
     const diffArr = req.body.timeDuration.split(':');
     const diffMin = (+diffArr[0]) * 60 + (+diffArr[1]);
     let data = {

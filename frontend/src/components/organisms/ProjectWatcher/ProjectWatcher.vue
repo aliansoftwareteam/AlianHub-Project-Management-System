@@ -88,7 +88,6 @@ import { apiRequest } from '@/services';
 
 // UTILS
 const userId = inject("$userId")
-const companyId = inject('$companyId');
 const {getters,commit} = useStore();
 const {getUser} = useGetterFunctions();
 const {debounce} = useCustomComposable();
@@ -184,32 +183,16 @@ function addWatchers(uid, type) {
         updateProject(updateObj, `Watchers ${type === "add" ? 'added' : 'removed'} successfully`);
     } else {
         updateObj = {[`watchers.${uid}`]: 1}
-        updateProject(updateObj, `Watchers ${type === "add" ? 'added' : 'removed'} successfully`,{},{},'$unset');
+        updateProject(updateObj, `Watchers ${type === "add" ? 'added' : 'removed'} successfully`,'$unset');
     }
 }
 
 function changeWatchType() {
-    const user = getUser(userId.value);
-    const userData = {
-        id: user.id,
-        Employee_Name: user.Employee_Name,
-        companyOwnerId: user.companyOwnerId
-    }
-    let historyObj = { 
-        key : "Project_Watchers"
-    }
-    if(watchType.value === 'all_activity'){
-        historyObj.message = `<b>${userData.Employee_Name}</b> has watchers activity as a <b>All Activity</b> </b>`
-    }else if(watchType.value === 'participating_mentions') {
-        historyObj.message = `<b>${userData.Employee_Name}</b> has watchers activity as a <b>Participating and @mentions</b> </b>`
-    }else{
-        historyObj.message = `<b>${userData.Employee_Name}</b> has watchers activity as a <b>Ignore</b> </b>`
-    }
     let updateObj = {[`watchers.${userId.value}`]: watchType.value}
-    updateProject(updateObj, `Watch type updated successfully`,historyObj,userData)
+    updateProject(updateObj, `Watch type updated successfully`)
 }
 
-async function updateProject(updateObj = null, successMessage = '',historyObj = {},userData = {},key = '') {
+async function updateProject(updateObj = null, successMessage = '',key = '') {
     if(inProcess.value) return;
     inProcess.value = true;
     if(!updateProject) return;
@@ -221,16 +204,6 @@ async function updateProject(updateObj = null, successMessage = '',historyObj = 
         await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${props.projectId}`,reqbody);
         commit('projectData/projectLocalUpdate', {itemData: {watchType: watchType.value},projectId:props.projectId,key:"ProjectWatcher",subKey:key ? key : '$set',userId: userId.value});
         inProcess.value = false;
-        if(historyObj && Object.keys(historyObj).length > 0){
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectId,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-        }
         $toast.success(successMessage, {position: "top-right"})
     } catch (error) {
         console.error("Error update project watcher",error);
