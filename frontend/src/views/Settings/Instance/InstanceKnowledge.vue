@@ -482,6 +482,8 @@ onMounted(load);
 </script>
 
 <style scoped>
+.in-card__head { flex-wrap: wrap; }
+.in-card__title { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
 .kn-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .kn-figures { display: flex; flex-direction: column; gap: 14px; border-top: 1px solid var(--hairline); padding-top: 12px; }
 .kn-section { display: flex; flex-direction: column; gap: 8px; }
