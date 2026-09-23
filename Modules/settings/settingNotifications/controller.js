@@ -5,6 +5,8 @@ const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueri
 const mongoose = require("mongoose");
 const { ensureNotificationDefaults } = require("../../notification/defaults");
 
+const OBJECT_ID_RE = /^[0-9a-f]{24}$/i;
+
 exports.updateNotifications = async (req, res) => {
     try {
         const { id,key,valueToUpdate,fieldToUpdate,elementKey,userId } = req.body;
@@ -15,7 +17,6 @@ exports.updateNotifications = async (req, res) => {
                 error: "Company ID is required in headers."
             });
         }
-        // Validate parameters
         if (!id || !key || !fieldToUpdate || !elementKey || !userId) {
             return res.status(400).json({
                 message: "An error occurred while updating the notifications.",
@@ -23,7 +24,6 @@ exports.updateNotifications = async (req, res) => {
             });
         }
 
-        // Validate body keys
         const allowedKeys = ["id","key","fieldToUpdate","elementKey","valueToUpdate","userId","refreshToken"];
         const invalidKeys = Object.keys(req.body).filter((key) => !allowedKeys.includes(key));
         if (invalidKeys.length > 0) {
@@ -50,7 +50,6 @@ exports.updateNotifications = async (req, res) => {
             ]
         };
 
-        // Execute query
         const response = await MongoDbCrudOpration(companyId, query, "updateOne");
         removeCache(`notification:${userId}:${companyId}`);
         return res.status(200).json(response);
@@ -73,7 +72,13 @@ exports.getNotifications = async (req, res) => {
                 error: "Company ID and User Id is required."
             });
         }
-        
+        if (!OBJECT_ID_RE.test(id)) {
+            return res.status(400).json({ status: false, message: "A valid user id is required." });
+        }
+        if (id !== String(req.uid || "")) {
+            return res.status(403).json({ status: false, message: "You can only read your own notification settings." });
+        }
+
         const cacheKey = `notification:${id}:${companyId}`;
         const value = myCache.get(cacheKey);
 

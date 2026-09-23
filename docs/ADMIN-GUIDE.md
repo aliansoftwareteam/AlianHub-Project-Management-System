@@ -35,6 +35,8 @@ What the compose file gives you:
 
 Anything else (mail, storage, AI, sign-in providers) is configured later from the app, or put in `.env` next to the compose file — the file is read by `docker compose` and passed to the container.
 
+The containers are named `alianhub`, `alianhub-mongo` and `alianhub-coturn`. Set `ALIANHUB_APP_CONTAINER`, `ALIANHUB_MONGO_CONTAINER` or `ALIANHUB_COTURN_CONTAINER` in `.env` to use other names, for example when a second copy runs on the same host.
+
 ### Bare metal (Node 20 + MongoDB)
 
 ```bash
@@ -196,7 +198,7 @@ Choose an archive, read its manifest (date, version, workspaces) and type its na
 3. drops every collection of each database named in the archive, including ones created after the backup, refills the ones the archive holds, and the files if they were included;
 4. reruns migrations, clears caches and reconnects to the database.
 
-Restore an archive taken by the same or an older version, never a newer one. A restore drill on a throwaway instance is the only way to know your backups work: run a second copy (`docker compose -p drill up -d` with a fresh volume), upload an archive there, restore it, log in.
+Restore an archive taken by the same or an older version, never a newer one. A restore drill on a throwaway instance is the only way to know your backups work: install a second copy on a **separate machine or VM**, upload an archive there, restore it, log in. Do not run the drill as a second Compose project on the same host (`docker compose -p drill`): the volumes in `docker-compose.yml` have fixed names (`alianhub_mongo_data`, `alianhub_storage`), so the second project would attach to the live data, and restoring there would overwrite it.
 
 ### Alternatives
 
