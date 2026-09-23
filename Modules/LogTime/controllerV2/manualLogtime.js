@@ -198,6 +198,9 @@ exports.manualLogTime = async (req, res) => {
                return res.send({ status: false, statusText: "This timesheet period is approved and locked — the entry can't be edited." });
            }
        }
+       if (await isPeriodLocked({ companyId, userId: owner, date: entryDay(data) })) {
+           return res.send({ status: false, statusText: "This timesheet period is approved and locked — time can't be added to it.", code: 'period_locked' });
+       }
        let obj = {
             type: type,
             data: [
