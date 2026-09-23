@@ -62,4 +62,8 @@ describe('hardcoded template text', () => {
             throw new Error(`Hardcoded text added:\n  ${lines.join('\n  ')}\nWrap it in $t() or raise scripts/i18n-allowlist.json deliberately.`);
         }
     });
+
+    test('the allowlist is empty: every template string goes through $t()', () => {
+        expect(readAllowlist().files).toEqual({});
+    });
 });

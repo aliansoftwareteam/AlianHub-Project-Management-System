@@ -103,7 +103,7 @@
                 />
             </div>
             <div v-else class="ah-field" style="margin-bottom:16px">
-                <input v-model.trim="twoFactor.code" type="text" class="ah-input" :class="{ 'ah-input--error': twoFactor.error }" placeholder="xxxxx-xxxxx" maxlength="20" />
+                <input v-model.trim="twoFactor.code" type="text" class="ah-input" :class="{ 'ah-input--error': twoFactor.error }" :placeholder="$t('Auth.two_factor_code_placeholder')" maxlength="20" />
             </div>
             <div v-if="twoFactor.error" class="ah-field__error" style="margin:-8px 0 14px"><ShellIcon name="x" :size="12" />{{ twoFactor.error }}</div>
 
