@@ -140,6 +140,39 @@ describe('a project attachment is described on the server', () => {
     });
 });
 
+describe('a project view change is described on the server', () => {
+    const describeProjectChanges = (...args) => require('../Modules/Project/helpers/projectHistory').describeProjectChanges(...args);
+    const actor = { id: OWNER, Employee_Name: 'Olivia Owner' };
+    const board = { _id: 'v1', keyName: 'ProjectKanban', name: 'Board', isPin: false, setAsDefault: false };
+    const sheet = { _id: 'v2', id: 'v2', type: 'Sheets', url: 'https://docs.google.com/spreadsheets/d/x', name: 'Budget sheet', isPin: true };
+    const previous = { _id: PROJECT, ProjectName: 'Parity', ProjectRequiredComponent: [board, sheet] };
+    const history = async (args) => (await describeProjectChanges({ previous, actor, companyId: CID, ...args })).map((entry) => entry.history.message);
+    const edit = (field, value, viewId) => ({ updateObject: { [`ProjectRequiredComponent.$[elementIndex].${field}`]: value }, arrayFilters: [{ 'elementIndex._id': viewId }] });
+
+    test('adding a view or an embed keeps the web app wording', async () => {
+        expect(await history({ key: '$addToSet', updateObject: { ProjectRequiredComponent: { _id: 'v3', keyName: 'Calendar', name: `Cal ${HTML}`, isPin: true } } }))
+            .toEqual([`<b>Olivia Owner</b> has added the <b> pinned  View </b> as <b>Cal ${ESCAPED}</b>`]);
+        expect(await history({ key: '$addToSet', updateObject: { ProjectRequiredComponent: { _id: 'v4', type: 'Anything_html', html: '<p>x</p>', name: 'Notes', isPin: false } } }))
+            .toEqual(['<b>Olivia Owner</b> has added the <b>   Embed View </b> as <b>Notes</b>']);
+        expect(await history({ key: '$addToSet', updateObject: { ProjectRequiredComponent: { ...board } } })).toEqual([]);
+    });
+
+    test('pinning, defaulting and renaming name the stored view', async () => {
+        expect(await history(edit('isPin', true, 'v1'))).toEqual(['<b> Olivia Owner </b> has pinned the <b> Board View </b>']);
+        expect(await history(edit('isPin', false, 'v2'))).toEqual(['<b> Olivia Owner </b> has Unpinned the <b> Budget sheet View </b>']);
+        expect(await history(edit('setAsDefault', true, 'v1'))).toEqual(['<b> Olivia Owner </b> has added the <b> Board </b>as Default View']);
+        expect(await history(edit('name', `Q3 ${HTML}`, 'v2'))).toEqual([`<b>Olivia Owner</b> has changed the  <b> Embed View name </b> as <b> Q3 ${ESCAPED} </b>  from <b>Budget sheet </b>`]);
+        expect(await history(edit('isPin', false, 'v1'))).toEqual([]);
+        expect(await history(edit('isPin', true, 'zz'))).toEqual([]);
+    });
+
+    test('removing names the stored view', async () => {
+        expect(await history({ key: '$pull', updateObject: { ProjectRequiredComponent: { _id: 'v1' } } })).toEqual(['<b> Olivia Owner </b> has Deleted the <b> Board View </b>']);
+        expect(await history({ key: '$pull', updateObject: { ProjectRequiredComponent: { _id: 'v2' } } })).toEqual(['<b> Olivia Owner </b> has deleted the  <b> Embed View Budget sheet </b>']);
+        expect(await history({ key: '$pull', updateObject: { ProjectRequiredComponent: { _id: 'zz' } } })).toEqual([]);
+    });
+});
+
 describe('a custom field definition is described on the server', () => {
     test('creating a project field names the new title for the signed-in user', async () => {
         const r = await fieldRoute('insertCustomField', {

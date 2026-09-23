@@ -100,3 +100,27 @@ describe('a project attachment', () => {
         expect(rows.map((found) => found.Message)).toContain(`<b>${ownerName}</b> has deleted <b>${record.filename}</b> on <b>${project.ProjectName}</b>.`);
     });
 });
+
+describe('a project view', () => {
+    it('is recorded by the server when it is added and pinned', async () => {
+        const view = { _id: `v${uniqueSuffix()}`, id: 'x', keyName: 'Calendar', name: `Cal ${uniqueSuffix()}`, isPin: false, setAsDefault: false, viewStatus: true };
+        const added = await owner.api.put(`/api/v1/project/${project._id}`, { updateObject: { ProjectRequiredComponent: view }, key: '$addToSet' });
+        expect(added.status).toBe(200);
+        const pinned = await owner.api.put(`/api/v1/project/${project._id}`, {
+            updateObject: { 'ProjectRequiredComponent.$[elementIndex].isPin': true },
+            arrayFilters: [{ 'elementIndex._id': view._id }],
+        });
+        expect(pinned.status).toBe(200);
+
+        const ownerName = await nameOf(owner.uid);
+        const rows = await waitFor(async () => {
+            const found = (await historyOf('Project_Name')).filter((row) => row.Message.includes(view.name));
+            return found.length >= 2 ? found : null;
+        }, 'the view rows');
+        expect(rows.map((row) => row.Message).sort()).toEqual([
+            `<b>${ownerName}</b> has added the <b>   View </b> as <b>${view.name}</b>`,
+            `<b> ${ownerName} </b> has pinned the <b> ${view.name} View </b>`,
+        ].sort());
+    });
+});
+
