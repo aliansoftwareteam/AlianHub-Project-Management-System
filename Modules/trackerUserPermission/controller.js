@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const { updateMemberFunction } = require('../settings/Members/controller.js');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+const { pinSessionTenant } = require('../../Config/tenant');
 
 exports.handleTrackerUserPermission = (req,res) => {
     try {
@@ -12,15 +13,12 @@ exports.handleTrackerUserPermission = (req,res) => {
             res.send({status: false, message: 'req body is requried'});
             return;
         }
-        if(!req.body.CompanyId){
-            res.send({status: false, message: 'Company Id is requried'});    
-            return;
-        }
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
         if(!req.body.DataObj){
             res.send({status: false, message: 'DataObj is requried'});
             return;
         }
-        const companyId = String(req.headers.companyid || '');
         getRoleType(companyId, req.uid).then((roleType) => {
             if (!isPrivileged(roleType)) {
                 res.status(403).send({status: false, message: 'Only an owner or admin can change tracker access'});

@@ -161,7 +161,7 @@ exports.init = (app) => {
 	app.post("/api/v1/wasabi/uploadFile", upload.single("file"), refuseUpload(wasabiUploadRefusal), ctrl.uploadFileWasabi);
 	app.post("/api/v1/wasabi/uploadFile_64", refuseUpload(wasabiUploadRefusal), (req, res) => {
         try {
-            const values = ["companyId", "path", "base64String", "replaceFile", "key"].map((key) => req.body[key]);
+            const values = [req.storageBucket, ...["path", "base64String", "replaceFile", "key"].map((key) => req.body[key])];
             values.push(isProfileUpload(req.body));
             if(!values.length) {
                 return res.status(400).json("Req data missing")
@@ -222,7 +222,7 @@ exports.init = (app) => {
     /**
      * delete file from wasabi api.
      */
-	app.post("/api/v1/wasabi/deleteFile", ctrl.deleteFileWasabi);
+	app.post("/api/v1/wasabi/deleteFile", requireOwnBucket(bodyField('companyId')), ctrl.deleteFileWasabi);
     app.post("/api/v1/getUserProfile", requireSafeObjectPath(bodyField('path')), requireProfileImageRead(bodyField('path')), handleProfileGetForUser);
     app.post("/api/v1/getTaskTypeImage", ...signedRead, handleTaskTypeImageGet);
 }

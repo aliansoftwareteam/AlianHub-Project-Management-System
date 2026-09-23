@@ -136,12 +136,21 @@ const PROFILE_WRITE = { allows: (req, filePath) => mayWriteProfileImage(req.uid,
 const PROFILE_REMOVAL = { allows: (req, filePath) => mayRemoveProfileImage(req.uid, filePath), refusal: 'You can only change your own profile image' };
 const PROFILE_READ = { allows: mayReadProfileImage, refusal: 'You do not have access to this file' };
 
+/* Handlers read the bucket from here, never from the body: the body only names a bucket, and this
+ * is set once the caller's access to that bucket has been checked. */
+const grantBucket = (req, bucketId) => {
+    req.storageBucket = String(bucketId);
+    return null;
+};
+
+const refuseUnverifiedBucket = (res) => refuse(res, 403, 'You do not have access to this bucket');
+
 async function accessRefusal(req, bucketId, filePath, profileRule) {
     if (!req.uid) return refusal(401, 'Unauthorized');
     if (String(bucketId || '') === USER_PROFILES_BUCKET) {
-        return (await profileRule.allows(req, filePath)) ? null : refusal(403, profileRule.refusal);
+        return (await profileRule.allows(req, filePath)) ? grantBucket(req, bucketId) : refusal(403, profileRule.refusal);
     }
-    return (await belongsToCompany(req, bucketId)) ? null : refusal(403, 'You do not have access to this bucket');
+    return (await belongsToCompany(req, bucketId)) ? grantBucket(req, bucketId) : refusal(403, 'You do not have access to this bucket');
 }
 
 async function uploadRefusal(req, bucketId, filePath) {
@@ -195,7 +204,10 @@ function requireOwnBucket(pickBucketId) {
         if (!req.uid) return refuse(res, 401, 'Unauthorized');
         const bucketId = String(pickBucketId(req) || '');
         try {
-            if (await belongsToCompany(req, bucketId)) return next();
+            if (await belongsToCompany(req, bucketId)) {
+                grantBucket(req, bucketId);
+                return next();
+            }
         } catch (error) {
             return refuse(res, 500, error.message);
         }
@@ -220,6 +232,7 @@ module.exports = {
     mayReadProfileImage,
     uploadRefusal,
     isProfileUpload,
+    refuseUnverifiedBucket,
     refuseBeforeWrite,
     refuseUpload,
     requireBucketWrite,

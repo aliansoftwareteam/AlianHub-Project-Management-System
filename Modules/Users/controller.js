@@ -2,6 +2,7 @@ const { myCache } = require("../../Config/config.js");
 const { dbCollections } = require("../../Config/collections.js");
 const logger = require("../../Config/loggerConfig");
 const { SCHEMA_TYPE } = require("../../Config/schemaType.js");
+const { pinSessionTenant } = require("../../Config/tenant");
 const { removeCache } = require("../../utils/commonFunctions.js");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
 const mongoose = require("mongoose")
@@ -201,13 +202,8 @@ exports.getUserById = async(req, res) => {
 exports.getUserByQuey = async(req, res) => {
     try {
         if (!req.uid) return refuse(res, 401, 'Unauthorized');
-        const headerCompany = req.headers['companyid'];
-        const bodyCompany = req.body.companyId;
-        const companyId = String(headerCompany || bodyCompany || '');
-        if (!isObjectId(companyId)) return refuse(res, 400, 'companyId is required');
-        if (headerCompany && bodyCompany && String(bodyCompany) !== companyId) {
-            return refuse(res, 403, 'You do not have access to this company');
-        }
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const { verifyCompanyMembership } = require("../../Config/jwt.js");
         if (!(await verifyCompanyMembership(String(req.uid), companyId))) {
             return refuse(res, 403, 'You do not have access to this company');

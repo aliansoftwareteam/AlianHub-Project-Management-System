@@ -64,7 +64,7 @@ const { recordProjectCreated } = require("../Project/helpers/projectHistory");
 exports.checkProjectPlan = (req) => {
     return new Promise(async(resolve,reject) => {
         try {
-            const companyId = req.body.CompanyId;
+            const companyId = req.body.CompanyId; // tenant-scoping: internal payload; createProjectFun and the AI project generator pass the verified session tenant
             let projectIncObj = {
                 type: SCHEMA_TYPE.COMPANIES,
                 data: [
@@ -178,7 +178,7 @@ exports.createProject = async (req) => {
                 reject({status: false, statusText: 'req body is requried'});
                 return;
             }
-            const companyId = req.body.CompanyId;
+            const companyId = req.body.CompanyId; // tenant-scoping: internal payload; createProjectFun pins CompanyId to the session tenant and other callers build it from trusted data
             if(!companyId){
                 reject({status: false, statusText: 'company Id is requried'});    
                 return;
