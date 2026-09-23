@@ -6,7 +6,6 @@ const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../common-st
 const { replaceObjectKey } = require("../Auth/helper");
 const socketEmitter = require('../../event/socketEventEmitter');
 const { escapeRegex } = require("../../utils/escapeRegex");
-const { parseMentionIds } = require("./helpers/parseMentions");
 const { escapeCommentFields } = require("./helpers/plainText");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 const { sprintIdentities, visibleSprintExpr } = require("../Sprints/helpers/sprintVisibility");
@@ -115,6 +114,11 @@ exports.update = async (req, res) => {
             }
         }
 
+        const changes = { ...data };
+        delete changes.mentionIds;
+        const mentionIds = changes.message !== undefined
+            ? await resolveMentionIds(req.headers['companyid'], existingComment.userId, threadOf(existingComment), changes.message)
+            : undefined;
         const params = {
             type: SCHEMA_TYPE.COMMENTS,
             data: [
@@ -123,8 +127,8 @@ exports.update = async (req, res) => {
                 },
                 {
                     $set: {
-                        ...data,
-                        ...(data.message !== undefined ? { mentionIds: parseMentionIds(data.message) } : {}),
+                        ...changes,
+                        ...(mentionIds ? { mentionIds } : {}),
                         ...((data.taskId && data.taskId !== 'default') ? { taskId: new mongoose.Types.ObjectId(data.taskId) } : {})
                     }
                 },
