@@ -73,6 +73,14 @@ describe('AutomationsPage — test a saved rule on a task', () => {
         projectsAnswer = () => ok([{ _id: 'p1', ProjectName: 'Web' }]);
     });
 
+    it('asks for the project\'s tasks by ObjectId: ProjectID is stored as one, so a plain string matches nothing', async () => {
+        const wrapper = await open();
+        await editRule(wrapper);
+        await pickTask(wrapper);
+        const findCall = apiRequest.mock.calls.find(([, url]) => url.endsWith('/find'));
+        expect(findCall[2].findQuery.$match.ProjectID).toEqual({ objId: { $in: ['p1'] } });
+    });
+
     it('lists projects from GET /api/v1/project, which answers a bare array', async () => {
         projectsAnswer = () => Promise.resolve({ data: [{ _id: 'p1', ProjectName: 'Web' }, { _id: 'p2', ProjectName: 'Gone', deletedStatusKey: 1 }] });
         const wrapper = await open();
