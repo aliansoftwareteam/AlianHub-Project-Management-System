@@ -103,15 +103,15 @@ const companiesOf = (uid) => cached(`profileImageOwnerCompanies:${uid}`, async (
     return ((owner && owner.AssignCompany) || []).map(String);
 });
 
-/* Avatars are shown all over the app, so a colleague may read one; someone with no live
- * seat in any company the owner belongs to may not. */
+/* Avatars are shown all over the app, so a colleague may read one: both people hold a live
+ * seat in the same company. AssignCompany alone can outlive a removed seat. */
 async function mayReadAvatar(req, name) {
     const uid = String(req.uid || '').toLowerCase();
     const ownerId = await profileImageOwner(name);
     if (!ownerId) return false;
     if (ownerId === uid) return true;
     for (const companyId of await companiesOf(ownerId)) {
-        if (await belongsToCompany(req, companyId)) return true;
+        if (await belongsToCompany(req, companyId) && await hasActiveSeat(ownerId, companyId)) return true;
     }
     return false;
 }

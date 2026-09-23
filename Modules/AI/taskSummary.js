@@ -5,8 +5,8 @@ const { visibleTask, TASK_NOT_FOUND } = require('./taskAccess');
 const logger = require('../../Config/loggerConfig');
 const { myCache } = require('../../Config/config');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
-const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { memberProfiles } = require('../../utils/companyMembers');
 
 const { FEATURES } = require('../AICore/features');
 
@@ -70,17 +70,10 @@ async function loadComments(companyId, taskId) {
     return { total, comments: comments || [] };
 }
 
-async function resolveNames(userIds) {
-    const ids = Array.from(new Set(userIds.filter(Boolean).map(String)))
-        .filter((id) => mongoose.Types.ObjectId.isValid(id))
-        .map((id) => new mongoose.Types.ObjectId(id));
-    if (!ids.length) return {};
+async function resolveNames(companyId, userIds) {
     try {
-        const users = await MongoDbCrudOpration(dbCollections.GLOBAL, {
-            type: SCHEMA_TYPE.USERS,
-            data: [{ _id: { $in: ids } }, { Employee_Name: 1 }],
-        }, 'find');
-        return (users || []).reduce((acc, user) => {
+        const users = await memberProfiles(companyId, userIds, { Employee_Name: 1 });
+        return users.reduce((acc, user) => {
             acc[String(user._id)] = user.Employee_Name || 'Someone';
             return acc;
         }, {});
@@ -166,7 +159,7 @@ async function summarizeTask({ companyId, uid, taskId, force = false }) {
         const hit = !force && myCache.get(key);
         if (hit) return { status: true, data: { ...hit, cached: true } };
 
-        const names = await resolveNames(comments.map((c) => c.userId));
+        const names = await resolveNames(companyId, comments.map((c) => c.userId));
         const summary = await askModel(buildThread({ task, comments, names }), { feature: FEATURES.TASK_SUMMARY, companyId });
         if (!summary) return { status: false, reason: 'no summary returned' };
 

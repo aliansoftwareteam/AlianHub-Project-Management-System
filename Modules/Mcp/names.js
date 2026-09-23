@@ -1,5 +1,6 @@
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { dbCollections } = require('../../Config/collections');
+const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { oid } = require('../Automations/engine/tools');
 const scope = require('../Agents/scope');
@@ -36,7 +37,7 @@ const resolver = async (ctx, { projectIds = [], sprintIds = [], userIds = [] }) 
     const [projects, sprints, members, identities, role] = await Promise.all([
         openIds.length ? find(ctx.companyId, SCHEMA_TYPE.PROJECTS, { _id: { $in: oids(openIds) } }, { ProjectName: 1, taskTypeCounts: 1 }) : [],
         sprintList.length ? find(ctx.companyId, SCHEMA_TYPE.SPRINTS, { _id: { $in: oids(sprintList) } }, { name: 1, sprintName: 1, private: 1, AssigneeUserId: 1 }) : [],
-        userList.length ? find(ctx.companyId, SCHEMA_TYPE.COMPANY_USERS, { userId: { $in: userList }, isDelete: { $ne: true } }, { userId: 1 }) : [],
+        userList.length ? find(ctx.companyId, SCHEMA_TYPE.COMPANY_USERS, { userId: { $in: userList }, ...ACTIVE_SEAT }, { userId: 1 }) : [],
         sprintList.length ? sprintIdentities(ctx.companyId, String(ctx.userId)) : [],
         sprintList.length ? getRoleType(ctx.companyId, String(ctx.userId)) : null,
     ]);

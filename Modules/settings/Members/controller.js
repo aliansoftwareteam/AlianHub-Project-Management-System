@@ -6,7 +6,7 @@ const { removeCache } = require('../../../utils/commonFunctions');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const reportingLine = require('../../Users/helpers/reportingLine');
 const { getRoleType, isPrivileged, invalidateRoleCache, ROLE_OWNER } = require('../../../Config/permissionGuard');
-const { judgeMemberUpdate, judgeInvitationAcceptance } = require('./membershipGuard');
+const { judgeMemberUpdate, judgeInvitationAcceptance, memberRowView } = require('./membershipGuard');
 const { SEAT_CANCELLED } = require('../../../Config/seatStatus');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
 
@@ -78,14 +78,14 @@ exports.getMembers = async (req, res) => {
                 'FromCache': 'true',
                 'cacheExpireTime': myCache.getTtl(cacheKey)
             });
-            return res.status(200).json({ status: true, data: JSON.parse(hasCache) });
+            return res.status(200).json({ status: true, data: JSON.parse(hasCache).map(memberRowView) });
         }
 
         const response = await MongoDbCrudOpration(companyId, params, 'find');
         myCache.set(cacheKey, JSON.stringify(response), 604800);
 
         if (response) {
-            return res.status(200).json({ status: true, data: response });
+            return res.status(200).json({ status: true, data: response.map(memberRowView) });
         } else {
             return res.status(404).json({ status: false });
         }
@@ -341,7 +341,7 @@ exports.updateMember = async (req, res) => {
         }
         socketEmitter.emit('update', {
             type: 'update',
-            data: { data: response },
+            data: { data: memberRowView(response) },
             updatedFields: { ...data },
             module: 'companyUsers'
         });
@@ -353,7 +353,7 @@ exports.updateMember = async (req, res) => {
             });
         } catch (e) { /* audit is best-effort */ }
 
-        return res.status(200).json({ status: true, statusText: 'Member updated.', data: response });
+        return res.status(200).json({ status: true, statusText: 'Member updated.', data: memberRowView(response) });
     } catch (error) {
         return res.status(500).json({
             status: false,

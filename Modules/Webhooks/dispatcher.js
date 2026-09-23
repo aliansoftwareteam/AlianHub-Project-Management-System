@@ -1,6 +1,6 @@
-const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { memberProfiles } = require('../../utils/companyMembers');
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { supersedesPending } = require('../../event/domainEventBus');
@@ -148,23 +148,12 @@ async function deliverToHook(companyId, hook, body, attempt) {
     }
 }
 
-// Resolve user ids → display names. Users live in the 'global' DB. Best-effort:
-// any miss or error just yields an empty map (caller falls back to a count).
-async function resolveUserNames(ids) {
-    const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
-    if (!list.length) return {};
-    const objectIds = [];
-    list.forEach((id) => {
-        try { objectIds.push(new mongoose.Types.ObjectId(String(id))); } catch (e) { /* skip non-ObjectId ids */ }
-    });
-    if (!objectIds.length) return {};
+// Best-effort: any miss or error just yields an empty map (caller falls back to a count).
+async function resolveUserNames(companyId, ids) {
     try {
-        const users = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
-            type: SCHEMA_TYPE.USERS,
-            data: [{ _id: { $in: objectIds } }, { Employee_Name: 1 }],
-        }, 'find');
+        const users = await memberProfiles(companyId, Array.isArray(ids) ? ids : [ids], { Employee_Name: 1 });
         const map = {};
-        (users || []).forEach((u) => { if (u && u._id) map[String(u._id)] = u.Employee_Name; });
+        users.forEach((u) => { if (u && u._id) map[String(u._id)] = u.Employee_Name; });
         return map;
     } catch (error) {
         logger.error(`${LOG_PREFIX} could not resolve user names: ${error.message}`);
@@ -212,7 +201,7 @@ async function flush(companyId, event, doc, changedKeys) {
     const userIds = [];
     if (Array.isArray(fullDoc.AssigneeUserId)) userIds.push(...fullDoc.AssigneeUserId);
     if (fullDoc.Task_Leader) userIds.push(fullDoc.Task_Leader);
-    const nameMap = userIds.length ? await resolveUserNames(userIds) : {};
+    const nameMap = userIds.length ? await resolveUserNames(companyId, userIds) : {};
     data.assigneeNames = (Array.isArray(fullDoc.AssigneeUserId) ? fullDoc.AssigneeUserId : [])
         .map((id) => nameMap[String(id)]).filter(Boolean);
     if (fullDoc.Task_Leader) data.leadName = nameMap[String(fullDoc.Task_Leader)] || null;

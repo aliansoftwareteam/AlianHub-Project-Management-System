@@ -509,7 +509,7 @@ exports.getPresignedUrl  = async (req,res) => {
             const value = myCache.get(cacheKey);
             
             if (value) {
-                res.set('Cache-Control', 'public, max-age=43200');
+                res.set('Cache-Control', 'private, max-age=43200');
                 res.send({
                     status: true, 
                     statusText: value,
@@ -517,7 +517,7 @@ exports.getPresignedUrl  = async (req,res) => {
             } else {
                 const url = await getSignedUrl(s3Client, command, { expiresIn: 86400 });
                 myCache.set( cacheKey, url, 1200 );
-                res.set('Cache-Control', 'public, max-age=43200')
+                res.set('Cache-Control', 'private, max-age=43200')
                 res.send({
                     status: true, 
                     statusText: url,
@@ -558,7 +558,7 @@ exports.getUserProfilePresignedUrl  = async (req,res) => {
     const cacheKey = `imageExists:${req.params.path}`;
     const value = myCache.get(cacheKey);
     if (value) {
-        res.set('Cache-Control', 'public, max-age=86400');
+        res.set('Cache-Control', 'private, max-age=86400');
         res.send({
             status: true, 
             statusText: value,
@@ -572,7 +572,7 @@ exports.getUserProfilePresignedUrl  = async (req,res) => {
             });
             const url = await getSignedUrl(s3Client, command, { expiresIn: 86400 });
             myCache.set( cacheKey, url, 1200 );
-            res.set('Cache-Control', 'public, max-age=86400')
+            res.set('Cache-Control', 'private, max-age=86400')
             res.send({
                 status: true, 
                 statusText: url,

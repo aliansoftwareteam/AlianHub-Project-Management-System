@@ -119,8 +119,19 @@ const guardGrants = (rowsOf) => async (req, res, next) => {
 const guardInvitation = guardGrants((body) => [body]);
 const guardUserImport = guardGrants((body) => (Array.isArray(body.users) ? body.users : []));
 
+/* An invitation row carries the invitee's account id when the address is already registered
+ * somewhere. Until the seat is accepted that id is not the company's to see. */
+const memberRowView = (row) => {
+    if (!row || typeof row !== 'object') return row;
+    const plain = JSON.parse(JSON.stringify(row));
+    if (Number(plain.status) === ACTIVE) return plain;
+    const { userId, ...rest } = plain;
+    return rest;
+};
+
 module.exports = {
     SELF_SERVICE_FIELDS,
+    memberRowView,
     judgeMemberUpdate,
     judgeInvitationAcceptance,
     isOwnInvitationAcceptance,

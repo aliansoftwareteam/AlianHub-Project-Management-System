@@ -470,13 +470,23 @@ exports.sendMailAfterCompanyCreation = (allSettledRes, companyId, req) => {
     }
 };
 
-/**
- * Create Company V2
- * @param {Object} req 
- * @param {Object} res 
- */
-exports.createCompanyV2 = (req, res) => {
+const NEW_COMPANY_PLAN = () => ({
+    totalProjects: 0,
+    isInactive: false,
+    isFree: true,
+    subscriptionData: { storage: 0, trackers: 0, users: 5 },
+    totalData: { storage: 0, trackers: 0, users: 1 },
+});
+
+exports.createCompanyV2 = async (req, res) => {
     try {
+        if (!req.uid) return res.status(401).json({ status: false, statusText: "Unauthorized" });
+        const account = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+            type: SCHEMA_TYPE.USERS,
+            data: [{ _id: new mongoose.Types.ObjectId(String(req.uid)) }, { Employee_Email: 1 }]
+        }, 'findOne');
+        if (!(account && account.Employee_Email)) return res.status(401).json({ status: false, statusText: "Unauthorized" });
+        req.body = { ...(req.body || {}), ...NEW_COMPANY_PLAN(), userId: String(req.uid), email: account.Employee_Email };
         exports.companyValidation(req.body, async(validation) => {
             if (!validation.status) {
                 res.json(validation);
@@ -629,6 +639,9 @@ exports.checkFreeCompanyCountsApi = (req,res) => {
                 status: false,
                 statusText: "Bad request, userId is required."
             });
+        }
+        if (String(userId) !== String(req.uid || '')) {
+            return res.json({ status: true, statusText: "Success", isFree: true, companies: [] });
         }
         exports.checkFreeCompanyCounts(userId).then((result) => {
             res.json({

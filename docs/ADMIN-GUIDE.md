@@ -181,6 +181,18 @@ npm run migrate -- verify       # re-check what the applied ones guarantee, read
 
 Take a backup before upgrading; the Upgrade page says so and the Backups page is one click away.
 
+### Upgrade note: company access needs an active seat
+
+A request that names a company is accepted only while the account holds an active seat in that company's member list. Being listed on the account (`users.AssignCompany`) is no longer enough. Installs that created members before seats existed, or that removed members without taking the company off the account, can have accounts listed on a company with no active seat. Those accounts lose access to that company after the upgrade.
+
+List them before upgrading. The check is read-only and creates no seats:
+
+```bash
+node scripts/seat-check.js
+```
+
+It prints each company, account and seat state (`none`, `invited`, `removed`) and exits 1 when it lists anyone. If someone listed should still be a member, an owner or admin invites them again from **Settings › Members**.
+
 ---
 
 ## Backup-restore
@@ -294,4 +306,4 @@ answers `200 {"status":"ok", "db":{"ok":true,...}}` or `503 {"status":"degraded"
 
 ### Scripts
 
-`npm run setup` (first install), `npm start`, `npm run migrate:status`, `npm run migrate` (`-- up --dry-run`, `-- verify`), `npm test`.
+`npm run setup` (first install), `npm start`, `npm run migrate:status`, `npm run migrate` (`-- up --dry-run`, `-- verify`), `node scripts/seat-check.js` (read-only list of company memberships without an active seat), `npm test`.

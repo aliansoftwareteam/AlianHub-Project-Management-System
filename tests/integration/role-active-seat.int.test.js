@@ -44,7 +44,8 @@ describe('a role comes from a live company seat', () => {
 
         const pending = await user.api.get('/api/v1/audit-logs');
         expect(pending.status).toBe(403);
-        expect(pending.body).toMatchObject({ status: false, statusText: 'Owner/admin only.' });
+        expect(pending.body.status).toBe(false);
+        expect(pending.body.data).toBeUndefined();
 
         await accept(user);
 
@@ -62,7 +63,8 @@ describe('a role comes from a live company seat', () => {
 
         const res = await user.api.get('/api/v1/audit-logs');
         expect(res.status).toBe(403);
-        expect(res.body).toMatchObject({ status: false, statusText: 'Owner/admin only.' });
+        expect(res.body.status).toBe(false);
+        expect(res.body.data).toBeUndefined();
     });
 });
 
