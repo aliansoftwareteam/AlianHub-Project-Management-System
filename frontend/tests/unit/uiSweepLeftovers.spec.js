@@ -24,3 +24,12 @@ describe('coloured chips in dark mode', () => {
         expect(ruleBody(css, '.ah-chip')).toMatch(/background:\s*var\(--fill\)/);
     });
 });
+
+describe('instance console cards', () => {
+    const vue = read('views/Settings/Instance/InstanceShell.vue');
+
+    test('paragraphs inside a card take the card gap only', () => {
+        expect(ruleBody(vue, '.in-card')).toMatch(/gap:\s*8px/);
+        expect(ruleBody(vue, '.in-card > p')).toMatch(/margin:\s*0/);
+    });
+});
