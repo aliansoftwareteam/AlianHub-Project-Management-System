@@ -97,6 +97,7 @@ describe('purging tombstoned chunks', () => {
 
         expect(result).toMatchObject({ purged: 1 });
         expect(rows().map((r) => r._id).sort()).toEqual([recent._id, alive._id].sort());
+        expect(rowOf(CHUNKS, old._id)).toBeUndefined();
     });
 
     it('keeps 30 days by default and reads the period from KNOWLEDGE_TOMBSTONE_RETENTION_DAYS', async () => {
@@ -208,6 +209,11 @@ describe('when the purge runs', () => {
         await backfill.backfillAll();
 
         expect(rows().filter((r) => r.deleted === true)).toEqual([]);
+    });
+
+    it("keeps every reason the indexer reads back from a tombstone", () => {
+        [...indexer.SKIPPED_FILE_REASONS, ...indexer.RETRIED_FILE_REASONS, indexer.TASK_DELETED, 'departed']
+            .forEach((reason) => expect(purge.KEPT_REASONS).toContain(reason));
     });
 
     it('reads the partial index the chunk schema declares for it', () => {
