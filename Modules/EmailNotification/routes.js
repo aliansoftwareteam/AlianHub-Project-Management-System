@@ -1,26 +1,15 @@
-const {SendEmail} = require("../service");
-const logger = require("../../Config/loggerConfig")
+const rateLimit = require('express-rate-limit');
+const { sendSupportMail } = require('./supportMail');
+
+const supportMailLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => String(req.uid || req.ip),
+    message: { status: false, statusText: 'Too many support mails. Try again later.' },
+});
+
 exports.init = (app) => {
-    app.post("/api/v2/sendMail", (req, res) => {
-        try {
-            const {subject, html, toMail, isHtml} = req.body;
-            SendEmail(subject, html, toMail, isHtml, (result) => {
-                if(result.status) {
-                    res.send({
-                        status: true,
-                        statusText: "Email sent successfully."
-                    });
-                } else {
-                    console.error(result.error);
-                    logger.error(`Error Try Catch ${result.error}`);
-                    res.send({
-                        status: false,
-                        statusText: result.error
-                    });
-                }
-            })
-        } catch (error) {
-            res.status(400).send({status: false, statusText: error?.message})
-        }
-    })
+    app.post('/api/v2/support-mail', supportMailLimiter, sendSupportMail);
 };

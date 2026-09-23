@@ -27,9 +27,20 @@ const record = () => {
 const mailRoutes = () => {
     const { app, routes } = record();
     require('../Modules/EmailNotification/routes').init(app);
-    require('../Modules/notification/sendEmail/routes').init(app);
     return routes;
 };
+
+const routeFiles = (dir, out = []) => {
+    for (const entry of fs.readdirSync(dir)) {
+        const full = path.join(dir, entry);
+        if (fs.statSync(full).isDirectory()) routeFiles(full, out);
+        else if (/routes\d*\.js$/.test(entry)) out.push(full);
+    }
+    return out;
+};
+
+const everyRegisteredPath = () => routeFiles(path.join(__dirname, '..', 'Modules'))
+    .flatMap((file) => [...fs.readFileSync(file, 'utf8').matchAll(/app\.(?:get|post|put|patch|delete|all)\(\s*['"`]([^'"`]+)/g)].map((m) => m[1]));
 
 const callSupportMail = (body) => new Promise((resolve) => {
     const res = { statusCode: 200 };
@@ -51,7 +62,8 @@ beforeEach(() => {
 
 describe('mail routes', () => {
     it('registers no route that mails whatever address the request names', () => {
-        const paths = mailRoutes().map((route) => route.path);
+        const paths = everyRegisteredPath();
+        expect(paths.length).toBeGreaterThan(100);
         expect(paths).not.toContain('/api/v2/sendMail');
         expect(paths).not.toContain('/api/v2/single-notification-email');
     });
