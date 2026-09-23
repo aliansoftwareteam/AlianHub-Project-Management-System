@@ -105,7 +105,6 @@ module.exports.PROJECTS_CHECKLIST = '/api/v1/project/checklist';
 module.exports.API_PROJECT_STATUS_TEMPLATE = '/api/v1/project-status-template';
 module.exports.RESTRICTED_EXTENSIONS = '/api/v1/restricted-extensions';
 module.exports.USER_ID_COLLECTION = '/api/v1/collection/userid';
-module.exports.APP_NOTIFICATION = '/api/v1/app-notification';
 module.exports.API_MEMBERS = '/api/v1/members';
 module.exports.API_IMPORT_USER = '/api/v1/importUser';
 module.exports.API_ROOT_MEMBERS = '/api/v1/root-members';
