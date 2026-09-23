@@ -35,6 +35,8 @@ What the compose file gives you:
 
 Anything else (mail, storage, AI, sign-in providers) is configured later from the app, or put in `.env` next to the compose file — the file is read by `docker compose` and passed to the container.
 
+The containers are named `alianhub`, `alianhub-mongo` and `alianhub-coturn`. Set `ALIANHUB_APP_CONTAINER`, `ALIANHUB_MONGO_CONTAINER` or `ALIANHUB_COTURN_CONTAINER` in `.env` to use other names, for example when a second copy runs on the same host.
+
 ### Bare metal (Node 20 + MongoDB)
 
 ```bash
