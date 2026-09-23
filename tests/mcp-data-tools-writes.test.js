@@ -104,3 +104,34 @@ describe('timelog.create writes one entry for the person behind the agent', () =
         expect(rows(SCHEMA_TYPE.TIMESHEET)).toHaveLength(0);
     });
 });
+
+describe('agent timers follow the approved-period lock', () => {
+    it('refuses to start a timer on a day inside an approved period, and writes nothing', async () => {
+        const now = Date.now();
+        const day = (ms) => { const d = new Date(ms); d.setHours(0, 0, 0, 0); return d; };
+        mockDb.seed(SCHEMA_TYPE.TIMESHEET_APPROVAL, {
+            userId: ME, status: 'approved', deletedStatusKey: 0, periodStart: day(now - 86400000), periodEnd: day(now + 86400000),
+        });
+        await expect(perform('timelog.start', { taskId: task._id })).rejects.toMatchObject({ deterministic: true, message: expect.stringMatching(/approved/) });
+        expect(rows(SCHEMA_TYPE.TIMESHEET)).toHaveLength(0);
+    });
+
+    it('starts a timer on an open day', async () => {
+        await perform('timelog.start', { taskId: task._id });
+        expect(rows(SCHEMA_TYPE.TIMESHEET)).toHaveLength(1);
+    });
+
+    it('refuses to stop a timer whose start day is inside an approved period, leaving it running', async () => {
+        const start = Date.parse('2026-09-02T09:00:00Z') / 1000;
+        const running = mockDb.seed(SCHEMA_TYPE.TIMESHEET, {
+            Loggeduser: ME, TicketID: task._id, ProjectId: P_A, LogStartTime: start, LogEndTime: start, LogTimeDuration: 0, startTimeTracker: start,
+        });
+        mockDb.seed(SCHEMA_TYPE.TIMESHEET_APPROVAL, {
+            userId: ME, status: 'approved', deletedStatusKey: 0, periodStart: new Date(2026, 7, 31), periodEnd: new Date(2026, 8, 6),
+        });
+        await expect(perform('timelog.stop', { taskId: task._id })).rejects.toMatchObject({ deterministic: true, message: expect.stringMatching(/approved/) });
+        const [entry] = rows(SCHEMA_TYPE.TIMESHEET);
+        expect(String(entry._id)).toBe(String(running._id));
+        expect(entry).toMatchObject({ LogTimeDuration: 0, startTimeTracker: start });
+    });
+});
