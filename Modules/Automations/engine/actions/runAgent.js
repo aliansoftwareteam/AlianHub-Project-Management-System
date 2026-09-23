@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../../../utils/mongo-handler/mongoQu
 const skillIndex = require('../../../Agents/skills');
 const taint = require('../../../Agents/taint');
 const logger = require('../../../../Config/loggerConfig');
+const { ruleOwner } = require('../tools');
 
 // The bridge between the two engines (ADR 002): an agent is one more automation
 // action, not a second system. A rule-triggered run goes through the same
@@ -26,12 +27,6 @@ const findAgent = (companyId, ref) => {
         ? { _id: new mongoose.Types.ObjectId(wanted) }
         : { name: new RegExp(`^${escapeRe(wanted)}$`, 'i') };
     return MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ ...match, deletedStatusKey: { $ne: 1 } }] }, 'findOne');
-};
-
-const ruleOwner = async (companyId, ruleId) => {
-    if (!OBJECT_ID.test(String(ruleId || ''))) return null;
-    const rule = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ _id: new mongoose.Types.ObjectId(String(ruleId)) }, 'createdBy'] }, 'findOne').catch(() => null);
-    return rule && rule.createdBy ? String(rule.createdBy) : null;
 };
 
 const recordLoopRefusal = (companyId, agent, { taskId, context, check }) => require('../../../Agents/agentAudit').recordRefusal(companyId,

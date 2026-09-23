@@ -44,6 +44,7 @@ const execute = async ({ companyId, run, step, context = {} }) => {
             ...forTool(context),
             task: entity.data || {},
             runId: String(run._id),
+            actingUserId: run.startedBy || null,
             ruleId: run.ruleId || null,
             ruleName: run.ruleName || run.name || '',
             traceId: run.traceId || null,

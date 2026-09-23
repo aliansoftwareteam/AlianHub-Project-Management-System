@@ -13,6 +13,7 @@ const completionStore = require('../Tasks/helpers/completionStore');
 const { emitPageChange } = require('../Pages/helpers/pageEvents');
 const { escapeCommentText } = require('../Comments/helpers/plainText');
 const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
+const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
 
 // The single place an agent's action is executed. MCP tools, approved proposals
 // and workspace-agent runs all call perform(): registry check → pending audit
@@ -109,7 +110,7 @@ const context = (actor, action, depth) => {
     const a = attribution(actor);
     return {
         ruleId: null, ruleName: a.label, runId: actor.runId || null, action: `agent.${action}`, depth: clampDepth(depth),
-        userId: String(actor.userId || a.actorId || ''), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null,
+        userId: String(actor.userId || a.actorId || ''), actingUserId: String(actor.userId || ''), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null,
         agentName: a.actorType === 'agent' ? a.label : null,
         auditedByCaller: true,
     };
@@ -319,6 +320,17 @@ const executors = {
     },
 };
 
+const COMMENT_ACTIONS = new Set(['task.comment', 'comment.create', 'chat.post']);
+
+/* A task that does not exist is left to the executor, which reports it as not found. */
+const threadMay = async (companyId, actor, action, params) => {
+    if (!COMMENT_ACTIONS.has(action) || !OBJECT_ID.test(String(params.taskId || ''))) return true;
+    const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(params.taskId) }, { ProjectID: 1, sprintId: 1 }] }, 'findOne');
+    if (!task) return true;
+    return (await canPostToThread(companyId, actor && actor.userId, tools.commentThreadOf(task))).allowed;
+};
+const THREAD_REFUSAL = 'not_visible: the task\'s comment thread is not one the person behind this agent can open';
+
 const refusal = async (companyId, actor, { action, params, reason, ip, entityType, entityId, taint }) => {
     const auditId = await audit.recordRefusal(companyId, actor, { action, reason, params, entityType, entityId: entityId || params.taskId, ip, taint });
     return new RefusedError(reason, auditId);
@@ -345,6 +357,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip, taint });
     const holder = await permissions.holderMay(companyId, actor, action, params);
     if (!holder.allowed) throw await refusal(companyId, actor, { action, params, reason: holder.reason, ip, taint });
+    if (!(await threadMay(companyId, actor, action, params))) throw await refusal(companyId, actor, { action, params, reason: THREAD_REFUSAL, ip, taint });
     if (!check.action.write) return { result: null, auditId: null, undo: null };
     const exec = executors[action];
     if (!exec) throw new tools.DeterministicError(`${action} has no executor`);

@@ -9,7 +9,10 @@ const { validateCsvInput, validateCsvRows, transformCsvRows, TARGETS } = require
 const { validateTrelloInput, parseTrelloBoard } = require('./helpers/trelloRules');
 const { validateAsanaInput, parseAsanaExport } = require('./helpers/asanaRules');
 const { validateMondayInput, parseMondayExport } = require('./helpers/mondayRules');
+const { importTargetAccess, previewAccess, refuseImport } = require('./helpers/importAccess');
 const { findCompanyMembers, activeMemberIdSet } = require('./helpers/companyMembers');
+const { sessionActor } = require('../Tasks/helpers/taskWriteFields');
+const { pinSessionTenant } = require('../../Config/tenant');
 
 // Jira importer. The client parses the Jira CSV export (the xlsx lib reads
 // CSV) and posts plain rows; the server maps statuses/priorities and feeds
@@ -18,14 +21,18 @@ const { findCompanyMembers, activeMemberIdSet } = require('./helpers/companyMemb
 // importJobs.
 
 /* POST /api/v2/imports/jira
- * body: { rows, projectId, sprintId, sprintName?, folderId?, folderName?, userData } */
+ * body: { rows, projectId, sprintId } */
 exports.importFromJira = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
-        const { rows, projectId, sprintId, sprintName, folderId, folderName, userData } = req.body || {};
-        const userId = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        const { rows, projectId, sprintId } = req.body || {};
+        const userId = String(req.uid || '');
         const check = validateImportInput({ companyId, projectId, sprintId, rows, userId });
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
+
+        const target = await importTargetAccess(companyId, userId, { projectId, sprintId });
+        if (!target.allowed) return refuseImport(res, target);
 
         const ctx = await loadImportContext(companyId, projectId);
         if (ctx.error) return res.send({ status: false, statusText: ctx.error });
@@ -33,7 +40,7 @@ exports.importFromJira = async (req, res) => {
         const { tasks, skipped } = transformJiraRows({ rows, statusNames: ctx.statusArray.map((status) => status.name), leaderId: userId });
         if (!tasks.length) return res.send({ status: false, statusText: 'No importable rows found (a Summary column is required).' });
 
-        const out = await finishImport(companyId, { source: 'jira', project: ctx.project, sprintId, sprintName, folderId, folderName, userData, statusArray: ctx.statusArray, tasks, skipped });
+        const out = await finishImport(companyId, { source: 'jira', project: ctx.project, sprint: target.sprint, actor: await sessionActor(req), statusArray: ctx.statusArray, tasks, skipped });
         return res.send(out);
     } catch (error) {
         logger.error(`ERROR in jira import: ${error.message}`);
@@ -200,8 +207,9 @@ const createImportComments = async (companyId, projectData, sprintId, folderId, 
 
 /* Record the job, feed the bulk-create pipeline, update the job. Returns the
  * response envelope. Identical create path to the Jira importer. */
-const finishImport = async (companyId, { source, project, sprintId, sprintName, folderId, folderName, userData, statusArray, tasks, skipped }) => {
-    const userId = String((userData && (userData.id || userData._id)) || '');
+const finishImport = async (companyId, { source, project, sprint, actor, statusArray, tasks, skipped }) => {
+    const userId = actor.id;
+    const sprintId = sprint.id;
     const job = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.IMPORT_JOBS,
         data: {
@@ -224,11 +232,6 @@ const finishImport = async (companyId, { source, project, sprintId, sprintName, 
         ProjectCode: project.ProjectCode,
         lastTaskId: project.lastTaskId,
     };
-    const sprint = { id: sprintId, name: sprintName || '' };
-    if (folderId) {
-        sprint.folderId = folderId;
-        sprint.folderName = folderName || '';
-    }
     // S3-01: fold Trello rich data (checklists, attachments, members, labels)
     // onto each task before creation; comments are added after (they need ids).
     await enrichImportTasks(companyId, tasks);
@@ -237,13 +240,13 @@ const finishImport = async (companyId, { source, project, sprintId, sprintName, 
     try {
         const result = await taskMongo.createMultipleTasks({
             tasks: tasksWithSprint,
-            userData: { id: userId, Employee_Name: (userData && userData.Employee_Name) || '', companyOwnerId: (userData && userData.companyOwnerId) || '' },
+            userData: actor,
             projectData,
             indexObj: {},
             statusArray,
             sprint,
         });
-        await createImportComments(companyId, projectData, sprintId, folderId, tasksWithSprint, userId)
+        await createImportComments(companyId, projectData, sprintId, sprint.folderId, tasksWithSprint, userId)
             .catch((commentErr) => logger.error(`[importers] comment import error: ${commentErr.message}`));
         const createdCount = Array.isArray(result?.data) ? result.data.length : tasks.length;
         await MongoDbCrudOpration(companyId, {
@@ -262,20 +265,24 @@ const finishImport = async (companyId, { source, project, sprintId, sprintName, 
 };
 
 /* POST /api/v2/imports/csv
- * body: { rows, mapping?, projectId, sprintId, sprintName?, folderId?, folderName?, userData } */
+ * body: { rows, mapping?, projectId, sprintId } */
 exports.importFromCsv = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
-        const { rows, mapping, projectId, sprintId, sprintName, folderId, folderName, userData } = req.body || {};
-        const userId = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        const { rows, mapping, projectId, sprintId } = req.body || {};
+        const userId = String(req.uid || '');
         const check = validateCsvInput({ companyId, projectId, sprintId, rows, userId });
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
+
+        const options = req.body.options || {};
+        const target = await importTargetAccess(companyId, userId, { projectId, sprintId, addsStatuses: Boolean(options.createMissingStatuses) });
+        if (!target.allowed) return refuseImport(res, target);
 
         const ctx = await loadImportContext(companyId, projectId);
         if (ctx.error) return res.send({ status: false, statusText: ctx.error });
 
         const directory = await loadUserDirectory(companyId, rows, mapping);
-        const options = req.body.options || {};
         const statusArray = options.createMissingStatuses
             ? await createMissingStatuses(companyId, ctx.project, ctx.statusArray, rows, mapping)
             : ctx.statusArray;
@@ -289,7 +296,7 @@ exports.importFromCsv = async (req, res) => {
         });
         if (!tasks.length) return res.send({ status: false, statusText: 'No importable rows found (a task-name column is required).' });
 
-        const out = await finishImport(companyId, { source: 'csv', project: ctx.project, sprintId, sprintName, folderId, folderName, userData, statusArray, tasks, skipped });
+        const out = await finishImport(companyId, { source: 'csv', project: ctx.project, sprint: target.sprint, actor: await sessionActor(req), statusArray, tasks, skipped });
         return res.send(out);
     } catch (error) {
         logger.error(`ERROR in csv import: ${error.message}`);
@@ -298,14 +305,18 @@ exports.importFromCsv = async (req, res) => {
 };
 
 /* POST /api/v2/imports/trello
- * body: { board, projectId, sprintId, sprintName?, folderId?, folderName?, userData } */
+ * body: { board, projectId, sprintId } */
 exports.importFromTrello = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
-        const { board, projectId, sprintId, sprintName, folderId, folderName, userData } = req.body || {};
-        const userId = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        const { board, projectId, sprintId } = req.body || {};
+        const userId = String(req.uid || '');
         const check = validateTrelloInput({ companyId, projectId, sprintId, board, userId });
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
+
+        const target = await importTargetAccess(companyId, userId, { projectId, sprintId });
+        if (!target.allowed) return refuseImport(res, target);
 
         const ctx = await loadImportContext(companyId, projectId);
         if (ctx.error) return res.send({ status: false, statusText: ctx.error });
@@ -313,7 +324,7 @@ exports.importFromTrello = async (req, res) => {
         const { tasks, skipped } = parseTrelloBoard({ board, statusNames: ctx.statusArray.map((status) => status.name), leaderId: userId });
         if (!tasks.length) return res.send({ status: false, statusText: 'No importable cards found.' });
 
-        const out = await finishImport(companyId, { source: 'trello', project: ctx.project, sprintId, sprintName, folderId, folderName, userData, statusArray: ctx.statusArray, tasks, skipped });
+        const out = await finishImport(companyId, { source: 'trello', project: ctx.project, sprint: target.sprint, actor: await sessionActor(req), statusArray: ctx.statusArray, tasks, skipped });
         return res.send(out);
     } catch (error) {
         logger.error(`ERROR in trello import: ${error.message}`);
@@ -322,14 +333,18 @@ exports.importFromTrello = async (req, res) => {
 };
 
 /* POST /api/v2/imports/asana
- * body: { asana, projectId, sprintId, sprintName?, folderId?, folderName?, userData } */
+ * body: { asana, projectId, sprintId } */
 exports.importFromAsana = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
-        const { asana, projectId, sprintId, sprintName, folderId, folderName, userData } = req.body || {};
-        const userId = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        const { asana, projectId, sprintId } = req.body || {};
+        const userId = String(req.uid || '');
         const check = validateAsanaInput({ companyId, projectId, sprintId, asana, userId });
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
+
+        const target = await importTargetAccess(companyId, userId, { projectId, sprintId });
+        if (!target.allowed) return refuseImport(res, target);
 
         const ctx = await loadImportContext(companyId, projectId);
         if (ctx.error) return res.send({ status: false, statusText: ctx.error });
@@ -337,7 +352,7 @@ exports.importFromAsana = async (req, res) => {
         const { tasks, skipped } = parseAsanaExport({ asana, statusNames: ctx.statusArray.map((status) => status.name), leaderId: userId });
         if (!tasks.length) return res.send({ status: false, statusText: 'No importable tasks found.' });
 
-        const out = await finishImport(companyId, { source: 'asana', project: ctx.project, sprintId, sprintName, folderId, folderName, userData, statusArray: ctx.statusArray, tasks, skipped });
+        const out = await finishImport(companyId, { source: 'asana', project: ctx.project, sprint: target.sprint, actor: await sessionActor(req), statusArray: ctx.statusArray, tasks, skipped });
         return res.send(out);
     } catch (error) {
         logger.error(`ERROR in asana import: ${error.message}`);
@@ -346,14 +361,18 @@ exports.importFromAsana = async (req, res) => {
 };
 
 /* POST /api/v2/imports/monday
- * body: { rows, mapping?, projectId, sprintId, sprintName?, folderId?, folderName?, userData } */
+ * body: { rows, mapping?, projectId, sprintId } */
 exports.importFromMonday = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
-        const { rows, mapping, projectId, sprintId, sprintName, folderId, folderName, userData } = req.body || {};
-        const userId = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        const { rows, mapping, projectId, sprintId } = req.body || {};
+        const userId = String(req.uid || '');
         const check = validateMondayInput({ companyId, projectId, sprintId, rows, userId });
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
+
+        const target = await importTargetAccess(companyId, userId, { projectId, sprintId });
+        if (!target.allowed) return refuseImport(res, target);
 
         const ctx = await loadImportContext(companyId, projectId);
         if (ctx.error) return res.send({ status: false, statusText: ctx.error });
@@ -361,7 +380,7 @@ exports.importFromMonday = async (req, res) => {
         const { tasks, skipped } = parseMondayExport({ rows, mapping, statusNames: ctx.statusArray.map((status) => status.name), leaderId: userId });
         if (!tasks.length) return res.send({ status: false, statusText: 'No importable rows found (a task-name column is required).' });
 
-        const out = await finishImport(companyId, { source: 'monday', project: ctx.project, sprintId, sprintName, folderId, folderName, userData, statusArray: ctx.statusArray, tasks, skipped });
+        const out = await finishImport(companyId, { source: 'monday', project: ctx.project, sprint: target.sprint, actor: await sessionActor(req), statusArray: ctx.statusArray, tasks, skipped });
         return res.send(out);
     } catch (error) {
         logger.error(`ERROR in monday import: ${error.message}`);
@@ -394,10 +413,13 @@ const loadUserDirectory = async (companyId, rows, mapping) => {
  * Step 3 of the wizard: per-row validation with nothing written. */
 exports.previewCsv = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const { rows, mapping, projectId, options } = req.body || {};
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
         if (!Array.isArray(rows) || !rows.length) return res.send({ status: false, statusText: 'rows must be a non-empty array.' });
+
+        const project = await previewAccess(companyId, req.uid, projectId);
+        if (!project.allowed) return refuseImport(res, project);
 
         const ctx = await loadImportContext(companyId, projectId);
         if (ctx.error) return res.send({ status: false, statusText: ctx.error });

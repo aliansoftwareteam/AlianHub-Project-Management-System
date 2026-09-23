@@ -8,9 +8,7 @@ const socketEmitter = require("../../../event/socketEventEmitter");
 const logger = require("../../../Config/loggerConfig");
 const { QueryRefused, validatePipeline, visibilityStage } = require("./taskQueryGuard");
 const { WriteRefused, parseCascade, assertCanCascade, cascadeFilter } = require("./taskWriteGuard");
-const { canReadProject } = require("../../../Config/projectAccess");
-const { getRoleType, isPrivileged } = require("../../../Config/permissionGuard");
-const { canSeeSprintById } = require("../../Sprints/helpers/sprintVisibility");
+const { canReadTask } = require("./taskReadAccess");
 
 const refuse = (res, statusCode, statusText, message, extra = {}) => res.status(statusCode).json({ status: false, statusText, message, ...extra });
 
@@ -58,13 +56,7 @@ exports.getTask = async (req, res) => {
         const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(id) }] }, "findOne");
         if (!task) return taskNotFound(res);
 
-        const access = await canReadProject(companyId, req.uid, task.ProjectID);
-        if (!access.allowed && !access.missing) return taskNotFound(res);
-
-        const roleType = await getRoleType(companyId, req.uid);
-        if (!isPrivileged(roleType) && !(await canSeeSprintById(companyId, req.uid, task.sprintId))) {
-            return taskNotFound(res);
-        }
+        if (!(await canReadTask(companyId, req.uid, task))) return taskNotFound(res);
         return res.status(200).json(task);
     } catch (error) {
         logger.error(`getTask error: ${error.message || error}`);

@@ -3,6 +3,8 @@ const mockDb = require('./fixtures/fakeMongo').create();
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
+jest.mock('../Modules/Tasks/helpers/taskReadAccess', () => ({ canReadTask: jest.fn(async () => true) }));
+jest.mock('../Modules/Comments/helpers/threadWriteAccess', () => ({ ...jest.requireActual('../Modules/Comments/helpers/threadWriteAccess'), canChangeComment: jest.fn(async () => ({ allowed: true })) }));
 jest.mock('../Config/permissionGuard', () => ({ ROLE_OWNER: 1, ROLE_ADMIN: 2, getRoleType: jest.fn(async (c, uid) => (uid === 'owner1' ? 1 : 3)), isPrivileged: (r) => r === 1 || r === 2 }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(async () => ['p1']) }));
