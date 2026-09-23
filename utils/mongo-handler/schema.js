@@ -677,6 +677,13 @@ const schema = {
         leaseUntil: { type: Date, required: false },
         pending: { type: Object, required: false },
     },
+    // One document, _id "key", in the global database: the fingerprint of the AUDIT_CHAIN_KEY the chain was
+    // started with (Modules/Audit/keyGuard.js). Never the key itself.
+    auditChainKey: {
+        _id: { type: String, required: true },
+        fingerprint: { type: String, required: true },
+        at: { type: Date, required: false },
+    },
     // Per-company SCIM 2.0 provisioning config — managed by Modules/Scim (SEC-05).
     // The IdP-held bearer token is stored only as a bcrypt hash; the company is
     // resolved from the token itself, so SCIM requests carry no companyId header.
