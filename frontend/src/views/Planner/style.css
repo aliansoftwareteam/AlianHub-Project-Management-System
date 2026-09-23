@@ -1,13 +1,10 @@
 .planner { background: var(--canvas); }
 .planner .ah-toolbar__date { font: var(--text-data); color: var(--ink-2); }
 .planner__sidebar-toggle { display: none; }
-
-.planner__main {
-    flex: 1;
-    min-height: 0;
-    display: grid;
-    grid-template-columns: 1fr 300px;
-}
+.planner__range { display: inline-flex; align-items: center; gap: 2px; }
+.planner__range button { border: 0; border-radius: 6px; padding: 4px 6px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.planner__range button:hover { background: var(--surface-hover); color: var(--ink); }
+.planner__range button:focus-visible { outline: none; box-shadow: var(--focus); }
 
 .planner__grid-wrap {
     min-width: 0;
@@ -162,8 +159,6 @@
 .planner__card-meta--danger { color: var(--danger-ink); }
 
 @media (max-width: 1280px) {
-    .planner__main { grid-template-columns: 1fr; }
-    .planner__tray { display: none; }
     .planner__sidebar-toggle { display: inline-flex; }
 }
 /* 24d — one day, a tray under it, and every target big enough for a thumb. */

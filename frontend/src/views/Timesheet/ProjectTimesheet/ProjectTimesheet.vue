@@ -768,8 +768,20 @@
     .page-content {
         padding: 15px;
     }
+    /* The legacy title strip carries the shared timesheet tabs, so it follows the theme. */
     .page-title {
         width: 100%;
+        background-color: var(--surface);
+        border-bottom: 1px solid var(--hairline);
+        color: var(--ink);
+    }
+    .pro_route_link a { color: var(--ink); }
+    .ts-legacy-tabs { align-self: stretch; margin: 0 16px 0 0; }
+    .ts-legacy-tabs :deep(.tv-tab) { display: flex; align-items: center; }
+    @media (max-width: 767px) {
+        .page-title { flex-wrap: wrap; }
+        .ts-legacy-tabs { margin: 0; padding: 0 8px; }
+        .ts-legacy-tabs :deep(.tv-tab) { min-height: 40px; }
     }
     ul.breadcrumb.title_strip {
         margin: 0;
@@ -777,8 +789,7 @@
         display: flex;
         align-items: center;
         height: 61px;
-        background-color: #fff;
-        border-bottom: 1px solid #DAE1E7;
+        background-color: transparent;
         width: 100%;
         padding-left: 15px;
     }

@@ -16,7 +16,7 @@
 .nt__quiet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .nt__quiet-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--ink-label); font: var(--text-small); }
 .nt__quiet-row.is-off, .nt__check-row.is-off { opacity: .55; }
-.nt__time { width: 96px; height: 32px; padding: 0 8px; }
+.nt__quiet-row .nt__time { width: 96px; height: 32px; padding: 0 8px; }
 .nt__quiet-note { margin-left: auto; }
 .nt__check-row { display: flex; align-items: center; gap: 7px; color: var(--ink-label); font: var(--text-small); cursor: pointer; }
 .nt__switch-card { padding: 11px 13px; display: flex; align-items: center; gap: 10px; line-height: 1.45; }

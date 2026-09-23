@@ -450,7 +450,8 @@ const loadSideLists = async () => {
         apiRequest('get', env.AGENTS).catch(() => null),
         apiRequest('get', `${env.AUTOMATIONS_V2}/registry`).catch(() => null),
     ]);
-    projects.value = projectBody?.data?.data || [];
+    const projectList = Array.isArray(projectBody?.data) ? projectBody.data : (projectBody?.data?.data || []);
+    projects.value = projectList.filter((p) => p && p.deletedStatusKey !== 1 && p.deletedStatusKey !== 2);
     agents.value = agentBody?.data?.data || [];
     actions.value = registryBody?.data?.data?.actions || [];
     await loadApprovedClients();
