@@ -4807,6 +4807,10 @@ export default {
         description: "Description",
         edit: "Edit",
         add_description: "Add a Description",
+        add_description_prompt: "Add a Description...",
+        add_description_ph: "Add description...",
+        cancel: "Cancel",
+        save: "Save",
         show_more: "Show More",
         show_less: "Show Less",
         description_placeholder:

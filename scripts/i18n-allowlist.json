@@ -10,7 +10,6 @@
     "frontend/src/components/atom/HourlyMilestoneTr/HourlyMilestoneTr.vue": 3,
     "frontend/src/components/atom/ImagePreview/ImagePreview.vue": 9,
     "frontend/src/components/atom/MilestoneReportThead/MilestoneReportThead.vue": 1,
-    "frontend/src/components/atom/OldDescription/Description.vue": 6,
     "frontend/src/components/atom/PreviewTimelogScreenShot/ScreenShotActivity.vue": 1,
     "frontend/src/components/atom/StoryPoints/StoryPoints.vue": 2,
     "frontend/src/components/atom/TimesheetView/LogDetailView/LogDetailViewBodyComponent.vue": 2,
