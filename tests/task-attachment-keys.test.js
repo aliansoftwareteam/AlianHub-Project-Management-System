@@ -177,6 +177,58 @@ describe('creating a task with attachments', () => {
     });
 });
 
+const IMPORTED = 'Imported with attachments';
+const importTasks = (attachments) => call('PATCH /api/v1/importTasks', {
+    action: 'createMultipleTasks',
+    tasks: [{ _id: 'row-1', TaskName: IMPORTED, status: 'To Do', ParentTaskId: '', ...(attachments ? { attachments } : {}) }],
+    userData: { id: OWNER },
+    projectData: { _id: PROJECT, CompanyId: CID, ProjectCode: 'PAR', ProjectName: 'Parity', taskTypeCounts: TYPE_LIST },
+    indexObj: {},
+    statusArray: [{ name: 'To Do', key: 1, type: 'default_active' }],
+    sprint: { id: SPRINT, name: 'Sprint 1' },
+    eventId: 'ev_import',
+});
+const importedUrls = () => {
+    const imported = mockDb.store.tasks.find((task) => task.TaskName === IMPORTED);
+    return imported ? (imported.attachments || []).map((item) => item.url) : null;
+};
+
+describe('importing tasks with attachments', () => {
+    it('imports tasks that carry no attachments', async () => {
+        expect((await importTasks()).code).toBe(200);
+        expect(importedUrls()).toEqual([]);
+    });
+
+    it.each([
+        ['a file filed in the destination sprint\'s folder', `Project/${PROJECT}/Sprint/${SPRINT}/Attachment/voice-note.webm`],
+        ['a cloud link', 'https://drive.example.com/file/d/abc'],
+        ['the importer\'s own clip', `Clips/${CID}/${OWNER}/clip-1.webm`],
+    ])('accepts %s', async (_label, url) => {
+        expect((await importTasks([{ id: 'i1', url }])).code).toBe(200);
+        expect(importedUrls()).toEqual([url]);
+    });
+
+    it.each([
+        ['a file in an existing task\'s folder', foreign],
+        ['a key outside every layout', 'backups/company.zip'],
+    ])('in enforce mode refuses %s and imports nothing', async (_label, url) => {
+        expect(await importTasks([{ id: 'i1', url }])).toMatchObject(REFUSAL);
+        expect(importedUrls()).toBeNull();
+    });
+
+    it.each([
+        ['a file in an existing task\'s folder', foreign, 'other_task'],
+        ['a key outside every layout', 'backups/company.zip', 'unknown'],
+    ])('in report mode imports %s and counts one warning', async (_label, url, reason) => {
+        process.env.STORAGE_DOWNLOAD_SCOPE = 'report';
+        expect((await importTasks([{ id: 'i1', url }])).code).toBe(200);
+        expect(importedUrls()).toEqual([url]);
+        const lines = logger.warn.mock.calls.map(([line]) => line).filter((line) => line.startsWith('attachment write would be refused'));
+        expect(lines).toHaveLength(1);
+        expect(lines[0]).toMatch(new RegExp(`reason: ${reason}\\b`));
+    });
+});
+
 describe('duplicating a task', () => {
     const duplicate = () => call('PATCH /api/v2/tasks', {
         action: 'duplicateTask', companyId: CID, projectData: { id: PROJECT, ProjectCode: 'PAR', ProjectName: 'Parity' },
