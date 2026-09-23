@@ -5,6 +5,8 @@ const mockDb = require('./fixtures/fakeMongo').create();
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
+jest.mock('../Modules/Tasks/helpers/taskReadAccess', () => ({ canReadTask: jest.fn(async () => true) }));
+jest.mock('../Modules/Comments/helpers/threadWriteAccess', () => ({ ...jest.requireActual('../Modules/Comments/helpers/threadWriteAccess'), canChangeComment: jest.fn(async () => ({ allowed: true })) }));
 jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0 } }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
@@ -817,6 +819,7 @@ describe('agent audit rows under the chain', () => {
     });
 
     it('reports a markUndone failure instead of swallowing it', async () => {
+        mockDb.seed(SCHEMA_TYPE.COMMENTS, { _id: '6f0000000000000000000d01', projectId: 'p1', taskId: TASK, message: 'hi' });
         const id = await agentAudit.recordAction(CID, actor, { action: 'task.comment', params: { taskId: TASK, projectId: 'p1' }, undo: { kind: 'comment', commentId: '6f0000000000000000000d01', taskId: TASK }, entityId: TASK });
         const row = await agentAudit.findById(CID, id);
         const undo = require('../Modules/Agents/undo');

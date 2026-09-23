@@ -76,7 +76,7 @@
                                 <span v-if="row.meta && row.meta.runId" class="ah-mono al__run">{{ $t('Audit.run_n', { n: String(row.meta.runId).slice(-4) }) }}</span>
                                 <span v-if="row.meta && row.meta.tainted" class="ah-chip ah-chip--warn" :title="taintTitle(row)" data-test="tainted">{{ $t('Audit.tainted') }}</span>
                                 <span v-if="row.meta && row.meta.undoneAt" class="ah-chip ah-chip--warn">{{ $t('Audit.undone_at', { t: time(row.meta.undoneAt) }) }}</span>
-                                <template v-else-if="row.meta && row.meta.undoable && row.undoReason !== 'project_not_visible'">
+                                <template v-else-if="row.meta && row.meta.undoable && !['project_not_visible', 'target_not_visible'].includes(row.undoReason)">
                                     <button
                                         type="button"
                                         class="ah-btn ah-btn--ghost ah-btn--sm"

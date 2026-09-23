@@ -7,28 +7,35 @@ const budget = require('./budget');
 const scope = require('./scope');
 const { emitPageChange } = require('../Pages/helpers/pageEvents');
 const knowledgeEvents = require('../Knowledge/ingest/events');
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
+const { canChangeComment } = require('../Comments/helpers/threadWriteAccess');
+const { canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
+const { pageVisibleTo } = require('../Pages/helpers/pageRules');
 
 // Undo replays the inverse action and logs it as the person who pressed Undo.
 // Only the descriptors perform() wrote are understood; anything else is
 // "not undoable" rather than a guess. Every path that undoes — a single audit
 // row, a proposal, a whole run — goes through undoStateOf, so the company's
-// undo window and the caller's project visibility are checked exactly once.
+// undo window and the caller's view of the project and the target are checked exactly once.
 
 const HOUR_MS = 60 * 60 * 1000;
 const REASON = Object.freeze({
-    WINDOW_PASSED: 'undo_window_passed', NOT_VISIBLE: 'project_not_visible', ALREADY_UNDONE: 'already_undone', NOT_UNDOABLE: 'not_undoable',
+    WINDOW_PASSED: 'undo_window_passed', NOT_VISIBLE: 'project_not_visible', TARGET_NOT_VISIBLE: 'target_not_visible', ALREADY_UNDONE: 'already_undone', NOT_UNDOABLE: 'not_undoable',
     PENDING: 'action_pending', FAILED: 'action_failed', UNRECORDABLE: 'undo_unrecordable',
 });
 const MESSAGES = {
     [REASON.WINDOW_PASSED]: (s) => `The undo window closed at ${s.undoUntil}.`,
     [REASON.NOT_VISIBLE]: () => 'You cannot see the project this action touched.',
+    [REASON.TARGET_NOT_VISIBLE]: () => 'You cannot see what this action touched.',
     [REASON.ALREADY_UNDONE]: () => 'Already undone.',
     [REASON.NOT_UNDOABLE]: () => 'not undoable',
     [REASON.PENDING]: () => 'The action was never confirmed in the audit log; reconcile it by hand before undoing.',
     [REASON.FAILED]: () => 'The action failed and changed nothing.',
     [REASON.UNRECORDABLE]: () => 'This undo could not be recorded in the audit log right now, so it was not run.',
 };
-const STATUS_OF = { [REASON.WINDOW_PASSED]: 410, [REASON.NOT_VISIBLE]: 403, [REASON.UNRECORDABLE]: 503 };
+const STATUS_OF = { [REASON.WINDOW_PASSED]: 410, [REASON.NOT_VISIBLE]: 403, [REASON.TARGET_NOT_VISIBLE]: 403, [REASON.UNRECORDABLE]: 503 };
+const AUDITED_REFUSALS = [REASON.WINDOW_PASSED, REASON.NOT_VISIBLE, REASON.TARGET_NOT_VISIBLE];
 
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
@@ -128,6 +135,28 @@ const projectIdOfRow = async (companyId, row, run) => {
     return '';
 };
 
+const findRow = (companyId, type, id, fields) => (oid(id)
+    ? MongoDbCrudOpration(companyId, { type, data: [{ _id: oid(id) }, fields] }, 'findOne')
+    : null);
+
+const taskReadable = async (companyId, uid, taskId) => canReadTask(companyId, uid,
+    await findRow(companyId, SCHEMA_TYPE.TASKS, taskId, { ProjectID: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1 }));
+
+/* The project on the row is the one the action was filed under, which need not be where the target
+ * sits, so the target is read again: a comment by its thread, a page by its privacy, everything else
+ * by its task. Moving a task back also lands it in its previous sprint. */
+const targetVisible = async (companyId, uid, u) => {
+    if (u.kind === 'comment') {
+        const comment = await findRow(companyId, SCHEMA_TYPE.COMMENTS, u.commentId, { projectId: 1, sprintId: 1, taskId: 1 });
+        return Boolean(comment) && (await canChangeComment(companyId, uid, comment)).allowed;
+    }
+    if (u.kind === 'page') return pageVisibleTo(await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1 }), uid);
+    if (u.kind === 'subtask') return taskReadable(companyId, uid, u.subtaskId);
+    if (!(await taskReadable(companyId, uid, u.taskId))) return false;
+    if (u.kind !== 'sprint' || isPrivileged(await getRoleType(companyId, uid))) return true;
+    return canSeeSprintById(companyId, uid, u.previous && u.previous.sprintId);
+};
+
 /* ctx lets a caller that already holds the run, the settings or the caller's
  * visible projects pass them in instead of re-reading them per row. */
 const undoContext = async (companyId, actor, ctx = {}) => ({
@@ -149,6 +178,7 @@ const undoStateOf = async (companyId, row, actor, ctx = {}) => {
     if (!isUndoable(row)) return state(REASON.NOT_UNDOABLE, undoUntil, projectId);
     if (!projectId || !full.visibleProjectIds.includes(projectId)) return state(REASON.NOT_VISIBLE, undoUntil, projectId);
     if (Date.now() >= undoUntil.getTime()) return state(REASON.WINDOW_PASSED, undoUntil, projectId);
+    if (!(await targetVisible(companyId, actor.userId, row.meta.undo))) return state(REASON.TARGET_NOT_VISIBLE, undoUntil, projectId);
     return state('', undoUntil, projectId);
 };
 
@@ -156,7 +186,7 @@ const messageOf = (state) => (MESSAGES[state.reason] || (() => state.reason))(st
 const statusOf = (reason) => STATUS_OF[reason] || 409;
 
 const refuse = async (companyId, actor, state, { entityType, entityId, action, ip }) => {
-    if (state.reason === REASON.WINDOW_PASSED || state.reason === REASON.NOT_VISIBLE) {
+    if (AUDITED_REFUSALS.includes(state.reason)) {
         await audit.recordRefusal(companyId, actor, { action: action || 'undo', reason: state.reason, params: { undoUntil: state.undoUntil }, entityType, entityId, path: '', ip });
     }
     return { ok: false, reason: state.reason, message: messageOf(state), undoUntil: state.undoUntil, status: statusOf(state.reason) };
