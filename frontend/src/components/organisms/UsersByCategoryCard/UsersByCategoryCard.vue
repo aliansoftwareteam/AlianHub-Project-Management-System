@@ -15,7 +15,7 @@
                 <rect x="6" y="32" width="30" height="7" rx="2" fill="#F1F3F9"/>
             </svg>
             <p class="ubc-config-title">{{ $t('dashboardCard.users_by_category_card_title') }}</p>
-            <p class="ubc-config-text">Open this card's settings (the ⚙ icon) and assign your task types to categories (Development, Marketing, UI/UX, QA) to see the task count per person.</p>
+            <p class="ubc-config-text">{{ $t('UsersByCategory.config_text') }}</p>
         </div>
 
         <!-- Configured but nothing logged in the window -->
@@ -26,8 +26,8 @@
         <!-- Data -->
         <template v-else>
             <div class="ubc-head">
-                <span class="ubc-users-badge">{{ report.userCount }} {{ report.userCount === 1 ? 'user' : 'users' }}</span>
-                <span v-if="loading" class="ubc-refreshing"><span class="ubc-mini-spinner" aria-hidden="true"></span>Loading…</span>
+                <span class="ubc-users-badge">{{ $t('UsersByCategory.user_count', { n: report.userCount }, report.userCount) }}</span>
+                <span v-if="loading" class="ubc-refreshing"><span class="ubc-mini-spinner" aria-hidden="true"></span>{{ $t('UsersByCategory.loading') }}</span>
             </div>
 
             <!-- Short explanatory note so the numbers read as task counts. -->
@@ -42,13 +42,13 @@
 
             <!-- Summary: team split as a horizontal stacked bar + legend -->
             <div class="ubc-summary">
-                <div class="ubc-stack" :title="`Total ${report.totals.grand} ${report.totals.grand === 1 ? 'task' : 'tasks'}`">
+                <div class="ubc-stack" :title="$t('UsersByCategory.total_title', { n: report.totals.grand }, report.totals.grand)">
                     <span
                         v-for="seg in summarySegments"
                         :key="seg.key"
                         class="ubc-stack-seg"
                         :style="{ width: seg.pct + '%', background: seg.color }"
-                        :title="`${seg.label}: ${seg.count} ${seg.count === 1 ? 'task' : 'tasks'} (${Math.round(seg.pct)}%)`"
+                        :title="$t('UsersByCategory.segment_title', { label: seg.label, n: seg.count, pct: Math.round(seg.pct) }, seg.count)"
                     ></span>
                 </div>
                 <div class="ubc-legend">
@@ -65,7 +65,7 @@
                 <table class="ubc-table">
                     <thead>
                         <tr>
-                            <th class="ubc-th-user" @click="setSort('userName')">User {{ sortIndicator('userName') }}</th>
+                            <th class="ubc-th-user" @click="setSort('userName')">{{ $t('UsersByCategory.col_user') }} {{ sortIndicator('userName') }}</th>
                             <th v-for="col in columns" :key="col.key" class="ubc-th-num" @click="setSort(col.key)">
                                 <span class="ubc-col-dot" :style="{ background: col.color }"></span>{{ col.label }} {{ sortIndicator(col.key) }}
                             </th>
@@ -90,7 +90,7 @@
                     </tbody>
                     <tfoot>
                         <tr class="ubc-total-row">
-                            <td class="ubc-total-label">Total</td>
+                            <td class="ubc-total-label">{{ $t('UsersByCategory.total') }}</td>
                             <td v-for="col in columns" :key="col.key" class="ubc-td-num">{{ colTotal(col) }}</td>
                         </tr>
                     </tfoot>

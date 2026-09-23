@@ -343,7 +343,7 @@ html, body, #app {
 .ah-check:checked { background: var(--brand); border-color: var(--brand); }
 .ah-check:checked::after {
     content: ""; width: 8px; height: 5px;
-    border: 2px solid #fff; border-top: 0; border-right: 0;
+    border: 2px solid var(--on-brand); border-top: 0; border-right: 0;
     transform: rotate(-45deg) translate(1px, -1px);
 }
 .ah-check:focus-visible { outline: none; box-shadow: var(--focus); }
