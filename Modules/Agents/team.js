@@ -4,6 +4,7 @@ const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const runs = require('./runs');
+const { visibilityStage } = require('../Tasks/helpers/taskQueryGuard');
 
 // The Team board (handoff 13h): who is on what right now, people and agents in
 // one list.
@@ -59,10 +60,28 @@ const activePto = async (companyId) => {
     return rows || [];
 };
 
-const inProgressTasks = async (companyId) => {
+/* The filter the viewer's own task list applies: {} for company-wide readers. */
+const taskFilterFor = async (companyId, viewerId) => {
+    const stage = await visibilityStage(companyId, viewerId);
+    return stage ? stage.$match : {};
+};
+
+const visibleProjectIdsOf = (taskFilter) => (taskFilter.ProjectID ? taskFilter.ProjectID.$in.map(String) : undefined);
+
+const tasksById = async (companyId, ids, taskFilter) => {
+    const wanted = [...new Set(ids.map((id) => String(id || '')).filter(Boolean))].map(oid).filter(Boolean);
+    const rows = wanted.length
+        ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ ...taskFilter, _id: { $in: wanted } }, { TaskName: 1, TaskKey: 1 }] }, 'find').catch(() => [])
+        : [];
+    const byId = {};
+    (rows || []).forEach((t) => { byId[String(t._id)] = t; });
+    return byId;
+};
+
+const inProgressTasks = async (companyId, taskFilter) => {
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
-        data: [{ deletedStatusKey: { $ne: 1 }, statusType: { $nin: ['close', 'done', 'default_close'] }, AssigneeUserId: { $exists: true, $ne: [] } },
+        data: [{ ...taskFilter, deletedStatusKey: { $ne: 1 }, statusType: { $nin: ['close', 'done', 'default_close'] }, AssigneeUserId: { $exists: true, $ne: [] } },
                { TaskName: 1, TaskKey: 1, AssigneeUserId: 1, ProjectID: 1, statusType: 1, status: 1, updatedAt: 1, totalEstimatedTime: 1 },
                { sort: { updatedAt: -1 }, limit: 400 }],
     }, 'find').catch(() => []);
@@ -76,17 +95,20 @@ const assigneeIds = (task) => {
 };
 
 /* One row per person and per agent, with what each is doing at this moment and
- * how loaded they are this week. */
-const board = async (companyId, { hoursPerWeek = 40 } = {}) => {
+ * how loaded they are this week. A task the viewer cannot open is never named:
+ * the row says only that its person or agent is busy. */
+const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
+    const taskFilter = await taskFilterFor(companyId, viewerId);
+    const scoped = Object.keys(taskFilter).length > 0;
     const [members, timers, weekMinutes, pto, tasks, agents, openRuns, recentRuns] = await Promise.all([
         MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMPANY_USERS, data: [{ isDelete: { $ne: true } }, { userId: 1, userEmail: 1, roleType: 1, status: 1 }] }, 'find').catch(() => []),
         liveTimers(companyId),
         loggedThisWeek(companyId),
         activePto(companyId),
-        inProgressTasks(companyId),
+        inProgressTasks(companyId, taskFilter),
         MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { createdAt: 1 } }] }, 'find').catch(() => []),
         runs.list(companyId, { status: 'open', limit: 50 }),
-        runs.list(companyId, { limit: 60 }),
+        runs.list(companyId, { limit: 60, projectIds: visibleProjectIdsOf(taskFilter) }),
     ]);
 
     const userIds = (members || []).map((m) => String(m.userId || '')).filter(Boolean);
@@ -99,12 +121,7 @@ const board = async (companyId, { hoursPerWeek = 40 } = {}) => {
     const profileById = {};
     (profiles || []).forEach((p) => { profileById[String(p._id)] = p; });
 
-    const taskIds = [...new Set((timers || []).map((t) => String(t.TicketID || '')).filter(Boolean))];
-    const timerTasks = taskIds.length
-        ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds.map(oid).filter(Boolean) } }, { TaskName: 1, TaskKey: 1 }] }, 'find').catch(() => [])
-        : [];
-    const timerTaskById = {};
-    (timerTasks || []).forEach((t) => { timerTaskById[String(t._id)] = t; });
+    const timerTaskById = await tasksById(companyId, (timers || []).map((t) => t.TicketID), taskFilter);
 
     const timerByUser = {};
     (timers || []).forEach((t) => { if (!timerByUser[String(t.Loggeduser)]) timerByUser[String(t.Loggeduser)] = t; });
@@ -130,6 +147,7 @@ const board = async (companyId, { hoursPerWeek = 40 } = {}) => {
         const minutes = Number(weekMinutes[uid] || 0);
         const onLeaveNow = leave && new Date(leave.startDate) <= new Date() && new Date(leave.endDate) >= new Date();
         const timerTask = timer ? timerTaskById[String(timer.TicketID)] : null;
+        const timerHidden = Boolean(scoped && timer && !timerTask);
         return {
             kind: 'person',
             id: uid,
@@ -138,8 +156,14 @@ const board = async (companyId, { hoursPerWeek = 40 } = {}) => {
             avatar: profile.Employee_profileImageURL || '',
             roleType: m.roleType,
             online: Boolean(profile.isOnline),
-            timer: timer ? { taskId: String(timer.TicketID || ''), taskName: timerTask ? timerTask.TaskName : '', elapsedMs: Math.max(0, now - (Number(timer.LogStartTime) || 0) * 1000) } : null,
-            nowOn: timer && timerTask ? timerTask.TaskName : (mine[0] ? mine[0].TaskName : ''),
+            timer: timer ? {
+                taskId: timerHidden ? '' : String(timer.TicketID || ''),
+                taskName: timerTask ? timerTask.TaskName : '',
+                hidden: timerHidden,
+                elapsedMs: Math.max(0, now - (Number(timer.LogStartTime) || 0) * 1000),
+            } : null,
+            nowOn: timerTask ? timerTask.TaskName : (!timerHidden && mine[0] ? mine[0].TaskName : ''),
+            nowOnHidden: timerHidden,
             openTasks: mine.length,
             loggedHours: hours(minutes * 60000),
             capacityHours: hoursPerWeek,
@@ -151,12 +175,8 @@ const board = async (companyId, { hoursPerWeek = 40 } = {}) => {
 
     const runsByAgent = {};
     (openRuns || []).forEach((r) => { if (!runsByAgent[String(r.agentId)]) runsByAgent[String(r.agentId)] = r; });
-    const runTaskIds = [...new Set((openRuns || []).map((r) => String(r.taskId || '')).filter(Boolean))];
-    const runTasks = runTaskIds.length
-        ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: runTaskIds.map(oid).filter(Boolean) } }, { TaskName: 1, TaskKey: 1 }] }, 'find').catch(() => [])
-        : [];
-    const runTaskById = {};
-    (runTasks || []).forEach((t) => { runTaskById[String(t._id)] = t; });
+    const runTaskById = await tasksById(companyId, [...(openRuns || []), ...(recentRuns || [])].map((r) => r.taskId), taskFilter);
+    const hiddenTask = (taskId) => scoped && Boolean(taskId) && !runTaskById[String(taskId)];
 
     const agentRows = (agents || []).map((a) => {
         const run = runsByAgent[String(a._id)];
@@ -173,13 +193,22 @@ const board = async (companyId, { hoursPerWeek = 40 } = {}) => {
             allowedActions: a.allowedActions || [],
             projectIds: (a.projectIds || []).map(String),
             spend: { usd: Math.round(Number(month.usd || 0) * 100) / 100, cap: Number(a.spendCapUsd || 0), runs: Number(month.runs || 0) },
-            run: run ? { id: String(run._id), status: run.status, taskId: String(run.taskId || ''), taskKey: task ? task.TaskKey : '', taskName: task ? task.TaskName : '', startedAt: run.startedAt, elapsedMs: Math.max(0, now - new Date(run.startedAt || now).getTime()) } : null,
+            run: run ? {
+                id: hiddenTask(run.taskId) ? '' : String(run._id),
+                status: run.status,
+                taskId: hiddenTask(run.taskId) ? '' : String(run.taskId || ''),
+                taskKey: task ? task.TaskKey : '',
+                taskName: task ? task.TaskName : '',
+                hidden: hiddenTask(run.taskId),
+                startedAt: run.startedAt,
+                elapsedMs: Math.max(0, now - new Date(run.startedAt || now).getTime()),
+            } : null,
             nowOn: run && task ? `${task.TaskKey || task.TaskName}` : '',
             status: a.paused ? 'paused' : (run ? 'running' : 'idle'),
         };
     });
 
-    const activity = (recentRuns || []).slice(0, 12).map((r) => ({
+    const activity = (recentRuns || []).filter((r) => !hiddenTask(r.taskId)).slice(0, 12).map((r) => ({
         at: r.finishedAt || r.startedAt,
         kind: 'agent',
         who: r.agentName || '',
@@ -214,6 +243,7 @@ const standup = (data) => {
     working.forEach((p) => {
         const bits = [];
         if (p.timer && p.timer.taskName) bits.push(`on "${p.timer.taskName}" right now`);
+        else if (p.nowOnHidden) bits.push('busy on a task right now');
         else if (p.nowOn) bits.push(`next up "${p.nowOn}"`);
         if (p.openTasks) bits.push(`${p.openTasks} open task${p.openTasks === 1 ? '' : 's'}`);
         if (p.loggedHours) bits.push(`${p.loggedHours}h logged this week`);
