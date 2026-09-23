@@ -20,7 +20,7 @@ const OWNER = '6f0000000000000000000001';
 const TASK = '6f0000000000000000000701';
 const DAY = 24 * 60 * 60 * 1000;
 const actor = { kind: 'agent', userId: 'u1', agentId: '6f0000000000000000000a01', agentName: 'Reviewer', runId: '6f0000000000000000000c01', viaAccount: 'workspace' };
-const CHAINED_ONLY_READS = [SCHEMA_TYPE.AUDIT_CHAIN_HEADS, SCHEMA_TYPE.AUDIT_CHAIN_ANCHORS];
+const CHAINED_ONLY_READS = [SCHEMA_TYPE.AUDIT_CHAIN_HEADS, SCHEMA_TYPE.AUDIT_CHAIN_ANCHORS, SCHEMA_TYPE.AUDIT_CHAIN_PROGRESS];
 
 /* The cached check for a company's chained history, which decides whether appended changes are read. */
 const isHistoryProbe = (c) => (c.type === SCHEMA_TYPE.AUDIT_CHAIN_HEADS && c.method === 'findOne')
