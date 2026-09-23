@@ -132,4 +132,18 @@ describe('agent release proposals and agent project lists show only projects the
             expect(agentIn(data.agents, scopedAgentId).projectIds).toEqual([String(hidden._id), String(joined._id)]);
         });
     });
+
+    describe('GET /api/v2/agents/routable', () => {
+        const namesOf = async (session) => ok(await session.api.get(`/api/v2/agents/routable?projectId=${open._id}&limit=100`)).map((t) => t.TaskName);
+
+        it('leaves out a task in a private sprint the member is not on', async () => {
+            const names = await namesOf(member);
+            expect(names).toContain(marker.openTaskName);
+            expect(names).not.toContain(marker.sprintTaskName);
+        });
+
+        it('keeps it for the owner', async () => {
+            expect(await namesOf(owner)).toEqual(expect.arrayContaining([marker.openTaskName, marker.sprintTaskName]));
+        });
+    });
 });
