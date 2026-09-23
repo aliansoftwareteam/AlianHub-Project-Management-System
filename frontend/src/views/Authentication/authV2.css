@@ -37,4 +37,3 @@
 .av2-glyph-danger { background: var(--danger-bg); color: var(--danger-ink); }
 .av2-hint { font: var(--text-small); color: var(--ink-2); margin: -6px 0 0; }
 .av2-auth-card .ah-input { height: 44px; font-size: 13.5px; }
-.ah-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .35); border-top-color: #fff; animation: auth-spin .8s linear infinite; }

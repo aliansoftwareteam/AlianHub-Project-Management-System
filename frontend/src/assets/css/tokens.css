@@ -398,6 +398,15 @@ html, body, #app {
 .ah-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
 .ah-scroll::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, .18); border-radius: 8px; }
 
+.ah-spin {
+    display: inline-block; flex: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+    border-top-color: currentColor;
+    animation: ah-spin .8s linear infinite;
+}
+@keyframes ah-spin { to { transform: rotate(360deg); } }
+
 .ah-fade-enter-active, .ah-fade-leave-active { transition: opacity var(--t-state) var(--ease); }
 .ah-fade-enter-from, .ah-fade-leave-to { opacity: 0; }
 .ah-slide-right-enter-active, .ah-slide-right-leave-active { transition: transform var(--t-panel) var(--ease), opacity var(--t-panel) var(--ease); }
