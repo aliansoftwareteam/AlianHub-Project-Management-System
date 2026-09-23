@@ -30,6 +30,10 @@ describe('Accounts → token rows on a phone', () => {
         expect(body).not.toMatch(/word-break:\s*break-all/);
     });
 
+    test('stacked form fields keep space between a field and whatever follows it', () => {
+        expect(ruleBody(css, '.acct-page .ah-field + *')).toMatch(/margin-top:\s*12px/);
+    });
+
     test('an expiry chip wraps inside the card instead of running past it', () => {
         const body = ruleBody(css, '.acct-token__flags .ah-chip');
         expect(body).toMatch(/max-width:\s*100%/);
