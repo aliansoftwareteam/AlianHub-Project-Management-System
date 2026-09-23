@@ -19,4 +19,4 @@ One pull request per step; tick with the merge commit.
 | 2026-09-22 | S3 merged: #815 (build 284), each declared-read fetch is a replay row (capped at 32 KB, sha256 of the scrubbed body); #818 (build 285) closed test server connections so the replay suite stops reusing a closing socket. S4 merged: #816 (build 287), declared reads in the Skill editor with the live allowlist check. S5 merged: #819 (build 288), `pr.summary` as a data skill seed that must cite what it read; the code skill stays until the flag defaults on. |
 
 ## Last step
-Every slice merged (S0–S5, builds 262–288). The exit gate waits on the owner's sweep of the Skill editor's declared reads and a real `pr.summary` run (needs `AI_API_KEY`). `SKILL_EXTERNAL_READS` stays off until then.
+Every slice merged (S0–S5, builds 262–288). The exit gate waits on the owner's sweep of the Skill editor's declared reads and a real `pr.summary` run (the model key is set; the run needs the flag on and the owner's go-ahead). `SKILL_EXTERNAL_READS` stays off until then.
