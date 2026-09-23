@@ -38,6 +38,12 @@ describe('Accounts → token rows on a phone', () => {
     });
 });
 
+describe('Instance → Enforcement', () => {
+    test('the workspace mode select keeps room for its value inside the table ("Rep" at 1280 px)', () => {
+        expect(ruleBody(read('views/Settings/Instance/InstanceEnforcement.vue'), '.in-table .en-select')).toMatch(/min-width:\s*1[0-9]{2}px/);
+    });
+});
+
 describe('Audit log on a phone', () => {
     const vue = read('views/Settings/Audit/AuditLog.vue');
 

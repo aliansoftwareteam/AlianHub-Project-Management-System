@@ -271,6 +271,7 @@ onMounted(load);
 <style scoped>
 .en-scroll { overflow-x: auto; }
 .en-select { max-width: 200px; }
+.in-table .en-select { min-width: 120px; }
 .in-table .ah-small { display: block; color: var(--ink-2); }
 .in-table .ah-chip + .ah-chip { margin-left: 6px; }
 </style>
