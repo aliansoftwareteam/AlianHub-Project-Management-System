@@ -8,62 +8,11 @@ const socketEmitter = require('../../event/socketEventEmitter');
 const { escapeRegex } = require("../../utils/escapeRegex");
 const { parseMentionIds } = require("./helpers/parseMentions");
 const { escapeCommentFields } = require("./helpers/plainText");
-const { handleNotificationtFun } = require("../notification/prepare-notification-data/controllerV2");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 const { sprintIdentities, visibleSprintExpr } = require("../Sprints/helpers/sprintVisibility");
 const { commentThreadAccess, refuseThread } = require("./helpers/threadAccess");
 const { threadOf, canPostToThread, canChangeComment, changesThreadOrAuthor } = require("./helpers/threadWriteAccess");
-const { resolveMentionIds, notifyCommentThread } = require("./helpers/commentNotifications");
-
-/* @mention delivery: record the mention (feeds the in-app "mentions" tab, which
- * queries the mentions collection by mentionIds) and fire the notification
- * pipeline (in-app + push + email) targeted at the mentioned users — NOT the
- * task watchers. Best-effort: never throws, so it can't break comment save. */
-const notifyMentions = async (companyId, comment, mentionIds) => {
-    const mentionerId = String(comment.userId || comment.createdBy || '');
-    const taskId = comment.taskId && String(comment.taskId) !== 'default' ? String(comment.taskId) : '';
-    const projectId = String(comment.projectId || '');
-    const sprintId = comment.sprintId ? String(comment.sprintId) : '';
-
-    await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.MENTIONS,
-        data: {
-            comment_id: String(comment._id),
-            comment_message: comment.message || '',
-            comment_type: taskId ? 'task' : 'project',
-            mentionIds,
-            userId: mentionerId,
-            projectId,
-            taskId,
-            sprintId,
-            type: 'mention',
-            notSeen: mentionIds,
-        },
-    }, 'save').catch((err) => logger.error(`[mentions] record save failed: ${err.message}`));
-
-    try {
-        await handleNotificationtFun({ body: {
-            createdAt: new Date(),
-            key: "comments_I'm_@mentioned_in",
-            message: comment.message || '',
-            projectId,
-            taskId,
-            type: 'task',
-            userId: mentionerId,
-            assigneeUsers: mentionIds,
-            folderId: comment.folderId ? String(comment.folderId) : '',
-            isSelected: false,
-            notSeen: mentionIds,
-            sprintId,
-            updatedAt: new Date(),
-            companyId,
-            changeType: 'mention',
-            comments_id: String(comment._id),
-        } });
-    } catch (err) {
-        logger.error(`[mentions] notification dispatch failed: ${err.message}`);
-    }
-};
+const { resolveMentionIds, deliverMentions } = require("./helpers/commentNotifications");
 
 /**
  * This endpoint is used to save data in comments collection
@@ -102,10 +51,10 @@ exports.save = async (req, res) => {
             socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments_project', companyId });
         }
         if (mentionIds.length && response && response._id) {
-            notifyMentions(companyId, response, mentionIds)
-                .catch((err) => logger.error(`[mentions] notify failed: ${err.message}`));
-            notifyCommentThread(companyId, response, mentionIds)
-                .catch((err) => logger.error(`[mentions] thread notice failed: ${(err && err.message) || JSON.stringify(err)}`));
+            const saved = typeof response.toObject === "function" ? response.toObject() : response;
+            deliverMentions(companyId, { ...saved, folderId: convertData.folderId }, mentionIds)
+                .then((failures) => failures.forEach((err) => logger.error(`[mentions] delivery failed: ${(err && err.message) || JSON.stringify(err)}`)))
+                .catch((err) => logger.error(`[mentions] delivery failed: ${err.message}`));
         }
         if (response) {
             return res.status(200).json({ status: true, data: response || {}  });
