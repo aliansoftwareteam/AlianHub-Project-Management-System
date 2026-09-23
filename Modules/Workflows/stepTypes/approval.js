@@ -4,6 +4,7 @@ const store = require('../store');
 const flag = require('../flag');
 const { waitUntil } = require('./waiting');
 const { num, deterministic, descendantsOf, skipAll } = require('./graph');
+const { nonMembersOf, NOT_A_MEMBER } = require('../../../Config/companyMembers');
 
 // A person is a step.
 //
@@ -50,11 +51,21 @@ const granted = (request, escalated) => ({
     escalated,
 });
 
+/* A saved workflow was checked when it was saved; the people it names may have left since. */
+const refuseOutsiders = async (companyId, step, named) => {
+    const people = Object.entries(named).filter(([, userId]) => userId);
+    const outside = new Set(await nonMembersOf(companyId, people.map(([, userId]) => userId)));
+    const field = people.find(([, userId]) => outside.has(String(userId)));
+    if (field) throw deterministic(`step ${step.stepId} ${field[0]}: ${NOT_A_MEMBER}`);
+};
+
 const execute = async ({ companyId, run, step }) => {
     const config = step.config || {};
     const now = new Date();
 
-    const opened = (await approvals.get(companyId, run._id, step.stepId)) || await approvals.open(companyId, {
+    const existing = await approvals.get(companyId, run._id, step.stepId);
+    if (!existing) await refuseOutsiders(companyId, step, { ownerUserId: config.ownerUserId, escalateToUserId: config.escalateToUserId });
+    const opened = existing || await approvals.open(companyId, {
         runId: run._id,
         stepId: step.stepId,
         workflowId: run.workflowId,
@@ -80,6 +91,10 @@ const execute = async ({ companyId, run, step }) => {
     const escalateAt = request.escalateAt ? new Date(request.escalateAt) : null;
 
     if (escalateAt && !request.escalatedAt && escalateAt <= now) {
+        await refuseOutsiders(companyId, step, { escalateToUserId: request.escalateToUserId }).catch(async (error) => {
+            if (error.deterministic) await approvals.expire(companyId, { runId: run._id, stepId: step.stepId, at: now });
+            throw error;
+        });
         request = (await approvals.escalate(companyId, { runId: run._id, stepId: step.stepId, toUserId: request.escalateToUserId, at: now })) || request;
     }
 

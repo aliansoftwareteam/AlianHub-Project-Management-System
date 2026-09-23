@@ -114,6 +114,7 @@ beforeEach(() => {
     mockCrud.mockImplementation(async (companyId, { type, data }, method) => {
         if (type === 'users' && method === 'findOne') return { _id: ME, Employee_Name: 'Session Person' };
         if (type === 'company_users' && method === 'findOne') return { isTrackerUser: 1 };
+        if (type === 'company_users' && method === 'find') return data[0].userId.$in.map((userId) => ({ userId }));
         if (type === 'timesheet_approval' && method === 'findOne') return approvalMatching(data[0]);
         if (type === 'timesheets' && method === 'findOne') return stored;
         if (method === 'save') return { _id: 'new', id: 'new', ...data };

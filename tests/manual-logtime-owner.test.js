@@ -97,6 +97,7 @@ beforeEach(() => {
     mockLocked.mockResolvedValue(false);
     mockCrud.mockImplementation(async (companyId, { type, data }, method) => {
         if (type === 'users' && method === 'findOne') return { _id: ME, Employee_Name: SESSION_NAME };
+        if (type === 'company_users' && method === 'find') return data[0].userId.$in.map((userId) => ({ userId }));
         if (type === 'timesheets' && method === 'findOne') return stored;
         if (method === 'save') return { _id: 'new', ...data };
         if (method === 'findOneAndUpdate') return { _id: ENTRY, ...data[1].$set };
