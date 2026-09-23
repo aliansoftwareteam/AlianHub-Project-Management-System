@@ -1,3 +1,4 @@
+const { Types } = require('mongoose');
 // REP-02 — pure custom-report config validation + Mongo pipeline builder.
 // SAFETY: only allow-listed dimensions / metrics / filter-fields ever reach the
 // database. The user's config supplies KEYS (validated against these maps) and
@@ -95,6 +96,12 @@ const validateConfig = (cfg = {}) => {
     };
 };
 
+// Tasks hold ProjectID as an ObjectId while the report sends ids as strings; match either form.
+const ID_FILTERS = new Set(['project', 'sprint']);
+const eitherIdForm = (value) => (typeof value === 'string' && /^[0-9a-fA-F]{24}$/.test(value)
+    ? { $in: [value, new Types.ObjectId(value)] }
+    : value);
+
 const monthsAgoSeconds = (months, nowMs) => {
     const d = new Date(nowMs);
     d.setMonth(d.getMonth() - months);
@@ -106,7 +113,7 @@ const buildTaskPipeline = (cfg) => {
     const filters = (cfg && cfg.filters) || {};
     for (const k of Object.keys(filters)) {
         const field = FILTERS[k];
-        if (field) match[field] = filters[k];
+        if (field) match[field] = ID_FILTERS.has(k) ? eitherIdForm(filters[k]) : filters[k];
     }
     return [
         { $match: match },
