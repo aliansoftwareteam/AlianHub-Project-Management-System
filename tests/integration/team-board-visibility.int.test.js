@@ -96,6 +96,12 @@ describe('GET /api/v2/agents/team shows task names and logged hours only where t
         await client.close();
     });
 
+    const grantMemberEveryone = async (permission) => {
+        const roles = [...workloadRule.roles.filter((role) => role.key !== 3), { key: 3, permission }];
+        const res = await owner.api.put('/api/v1/securityPermissions', { type: 'updateOne', key: '$set', id: workloadRule._id, updateObject: { roles } });
+        expect(res.status).toBe(200);
+    };
+
     it.each(['member', 'guest'])('never names a task the %s cannot open', async (role) => {
         const session = { member, guest }[role];
         const data = await boardAs(session);
@@ -121,6 +127,35 @@ describe('GET /api/v2/agents/team shows task names and logged hours only where t
     it('still names a task the member can open', async () => {
         const data = await boardAs(member);
         expect(personOf(data, 'member').nowOn).toBe(sharedName);
+    });
+
+    it('shows a member without the workload "Everyone" grant only their own hours', async () => {
+        await grantMemberEveryone(null);
+        const data = await boardAs(member);
+        expect(personOf(data, 'member').loggedHours).toBe(0.5);
+        const ownerRow = personOf(data, 'owner');
+        expect(ownerRow.loggedHours).toBeNull();
+        expect(ownerRow.load).toBeNull();
+        expect(ownerRow.timer.elapsedMs).toBeNull();
+        expect(data.totals.load).toBeNull();
+        expect(data.standup.balance.free).not.toContain(ownerRow.name);
+    });
+
+    it('hides everyone else\'s hours from a guest', async () => {
+        const data = await boardAs(guest);
+        expect(personOf(data, 'owner').loggedHours).toBeNull();
+        expect(personOf(data, 'member').loggedHours).toBeNull();
+        expect(personOf(data, 'guest').loggedHours).toBe(0);
+    });
+
+    it('shows others\' hours on the projects the member can open once the grant is "Everyone"', async () => {
+        await grantMemberEveryone(2);
+        const data = await boardAs(member);
+        expect(personOf(data, 'owner').loggedHours).toBe(2);
+        expect(personOf(data, 'member').loggedHours).toBe(0.5);
+        expect(typeof personOf(data, 'owner').timer.elapsedMs).toBe('number');
+        expect(JSON.stringify(data)).not.toContain(privateName);
+        await grantMemberEveryone(null);
     });
 
     it.each(['owner', 'admin'])('keeps full detail for the %s', async (role) => {
