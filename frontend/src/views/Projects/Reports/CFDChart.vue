@@ -1,11 +1,11 @@
 <template>
   <div class="agile-report">
     <div class="agile-report__bar">
-      <span class="agile-report__label">Cumulative flow — last {{ days }} days</span>
-      <button class="agile-report__pdf" :disabled="!hasData" @click="exportPdf">Export PDF</button>
+      <span class="agile-report__label">{{ $t('Reports.cfd_last_days', { days }) }}</span>
+      <button class="agile-report__pdf" :disabled="!hasData" @click="exportPdf">{{ $t('Reports.export_pdf') }}</button>
     </div>
-    <div v-if="loading" class="agile-report__msg">Loading…</div>
-    <div v-else-if="!hasData" class="agile-report__msg">No task history yet.</div>
+    <div v-if="loading" class="agile-report__msg">{{ $t('Reports.loading') }}</div>
+    <div v-else-if="!hasData" class="agile-report__msg">{{ $t('Reports.cfd_no_history') }}</div>
     <ApexChart v-else ref="chartRef" type="area" height="360" :options="chartOptions" :series="series" />
   </div>
 </template>
