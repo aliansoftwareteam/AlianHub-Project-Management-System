@@ -10,8 +10,8 @@
             <div class="ewr-chips-row">
                 <!-- User count badge — sits under the card title; reflects the
                      number of employees currently shown (after search filter). -->
-                <span class="ewr-count-badge" :title="`${sortedEmployees.length} ${sortedEmployees.length === 1 ? 'user' : 'users'}`">
-                    {{ sortedEmployees.length }} {{ sortedEmployees.length === 1 ? 'user' : 'users' }}
+                <span class="ewr-count-badge" :title="$t('dashboardCard.ewr_user_count', { n: sortedEmployees.length }, sortedEmployees.length)">
+                    {{ $t('dashboardCard.ewr_user_count', { n: sortedEmployees.length }, sortedEmployees.length) }}
                 </span>
                 <span v-if="cardObject.taskType && cardObject.taskType !== 'all'" class="ewr-chip" :title="$t('dashboardCard.task_type')">
                     <span class="ewr-chip-label">{{ cardObject.taskType }}</span>
@@ -20,12 +20,12 @@
                 <!-- Search box -->
                 <span v-if="isLoading" class="ewr-chip ewr-chip-loading">
                     <span class="ewr-mini-spinner" aria-hidden="true"></span>
-                    Refreshing…
+                    {{ $t('dashboardCard.ewr_refreshing') }}
                 </span>
                 <!-- Time Period filter — moved out of the edit-card config so it's
                      a quick, always-visible control. Drives the same
                      resolveDateRange() → fetch path the config field used. -->
-                <span class="ewr-period-box" title="Time period">
+                <span class="ewr-period-box" :title="$t('dashboardCard.timerange')">
                     <svg class="ewr-period-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <rect x="3.5" y="5" width="17" height="15" rx="2" stroke="currentColor" stroke-width="1.7"/>
                         <line x1="3.5" y1="9.5" x2="20.5" y2="9.5" stroke="currentColor" stroke-width="1.7"/>
@@ -33,7 +33,7 @@
                         <line x1="16" y1="3" x2="16" y2="6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
                     </svg>
                     <select v-model.number="timerange" class="ewr-period-select" @change="onTimerangeChange">
-                        <option v-for="opt in TIMERANGE_OPTIONS" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
+                        <option v-for="opt in TIMERANGE_OPTIONS" :key="opt.id" :value="opt.id">{{ $t(opt.labelKey) }}</option>
                     </select>
                     <svg class="ewr-period-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                         <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
@@ -48,27 +48,27 @@
                         v-model="searchQuery"
                         class="ewr-search-input"
                         type="text"
-                        placeholder="Search employee…"
+                        :placeholder="$t('dashboardCard.ewr_search_placeholder')"
                         autocomplete="off"
                     />
                     <span
                         v-if="searchQuery"
                         class="ewr-search-clear"
-                        title="Clear search"
+                        :title="$t('dashboardCard.ewr_clear_search')"
                         @click="searchQuery = ''"
                     >&#x2715;</span>
                 </span>
                 <!-- Colour legend for the Logged Hours column. The red/amber
                      highlights only ever render on the Logged column, so the
                      legend is hidden whenever that column is toggled off. -->
-                <span v-if="showLoggedCol" class="ewr-legend" title="Logged Hours colour meaning">
+                <span v-if="showLoggedCol" class="ewr-legend" :title="$t('dashboardCard.ewr_legend_title')">
                     <span class="ewr-legend-item">
                         <span class="ewr-legend-dot ewr-legend-dot-estimate"></span>
-                        Over estimate
+                        {{ $t('dashboardCard.ewr_over_estimate') }}
                     </span>
                     <span class="ewr-legend-item">
                         <span class="ewr-legend-dot ewr-legend-dot-planned"></span>
-                        Over planned
+                        {{ $t('dashboardCard.ewr_over_planned') }}
                     </span>
                 </span>
             </div>
@@ -87,17 +87,17 @@
                             <tr>
                                 <th class="ewr-th-expand"></th>
                                 <th class="ewr-th-name" @click="setSort('name')">
-                                    Employee {{ sortIndicator('name') }}
+                                    {{ $t('dashboardCard.ewr_col_employee') }} {{ sortIndicator('name') }}
                                 </th>
-                                <th class="ewr-th-project">Project</th>
+                                <th class="ewr-th-project">{{ $t('dashboardCard.ewr_col_project') }}</th>
                                 <th v-if="showLoggedCol" class="ewr-th-num" @click="setSort('loggedMinutes')">
-                                    Logged Hours {{ sortIndicator('loggedMinutes') }}
+                                    {{ $t('dashboardCard.tss_col_logged') }} {{ sortIndicator('loggedMinutes') }}
                                 </th>
                                 <th v-if="showPlannedCol" class="ewr-th-num" @click="setSort('plannedMinutes')">
-                                    Planned Hours {{ sortIndicator('plannedMinutes') }}
+                                    {{ $t('dashboardCard.tss_col_planned') }} {{ sortIndicator('plannedMinutes') }}
                                 </th>
                                 <th v-if="showEstimateCol" class="ewr-th-num" @click="setSort('commonEstimateMinutes')">
-                                    Estimate Hours {{ sortIndicator('commonEstimateMinutes') }}
+                                    {{ $t('dashboardCard.ewr_col_estimate') }} {{ sortIndicator('commonEstimateMinutes') }}
                                 </th>
                             </tr>
                         </thead>
@@ -139,11 +139,11 @@
                                     </td>
                                     <td v-if="showPlannedCol" class="ewr-td-num">
                                         <span v-if="row.plannedMinutes">{{ formatMinutes(row.plannedMinutes) }}</span>
-                                        <span v-else class="ewr-missing" title="No planned hours">—</span>
+                                        <span v-else class="ewr-missing" :title="$t('dashboardCard.ewr_no_planned')">—</span>
                                     </td>
                                     <td v-if="showEstimateCol" class="ewr-td-num">
                                         <span v-if="row.commonEstimateMinutes">{{ formatMinutes(row.commonEstimateMinutes) }}</span>
-                                        <span v-else class="ewr-missing" title="No estimate set">—</span>
+                                        <span v-else class="ewr-missing" :title="$t('dashboardCard.ewr_no_estimate')">—</span>
                                     </td>
                                 </tr>
 
@@ -151,7 +151,7 @@
                                 <template v-if="expanded[row._id]">
                                     <tr v-if="!row.tasks.length" class="ewr-task-tr ewr-task-first ewr-task-last">
                                         <td></td>
-                                        <td :colspan="emptyTaskColspan" class="ewr-no-tasks">No tasks for this employee in current filter.</td>
+                                        <td :colspan="emptyTaskColspan" class="ewr-no-tasks">{{ $t('dashboardCard.ewr_no_tasks') }}</td>
                                     </tr>
                                     <tr
                                         v-for="(t, tIndex) in row.tasks"
@@ -162,12 +162,12 @@
                                             'ewr-task-first': tIndex === 0,
                                             'ewr-task-last': tIndex === row.tasks.length - 1,
                                         }"
-                                        :title="isLoggedOverEstimate(t.loggedMinutes, t.commonEstimateMinutes) ? `Over estimate by ${formatMinutes(t.loggedMinutes - t.commonEstimateMinutes)}` : ''">
+                                        :title="isLoggedOverEstimate(t.loggedMinutes, t.commonEstimateMinutes) ? $t('dashboardCard.ewr_over_estimate_by', { time: formatMinutes(t.loggedMinutes - t.commonEstimateMinutes) }) : ''">
                                         <td></td>
                                         <td class="ewr-td-task-name">
-                                            <img v-if="t.isSubTask" :src="subTaskIcon" class="ewr-subtask-icon" title="Sub task" alt="sub task" />
+                                            <img v-if="t.isSubTask" :src="subTaskIcon" class="ewr-subtask-icon" :title="$t('dashboardCard.ewr_subtask')" :alt="$t('dashboardCard.ewr_subtask')" />
                                             <!-- Green "Running" badge appears next to tasks with an active tracker. -->
-                                            <span v-if="t.isTracking" class="ewr-running-badge" title="Tracker is currently running">Running</span>
+                                            <span v-if="t.isTracking" class="ewr-running-badge" :title="$t('dashboardCard.ewr_running_title')">{{ $t('dashboardCard.ewr_running') }}</span>
                                             <span
                                                 class="ewr-task-name ewr-task-name-link"
                                                 :title="t.TaskName"
@@ -195,7 +195,7 @@
                         <tfoot v-if="showTotalRow">
                             <tr class="ewr-total-row">
                                 <td></td>
-                                <td class="ewr-total-label">Total</td>
+                                <td class="ewr-total-label">{{ $t('dashboardCard.ewr_total') }}</td>
                                 <td></td>
                                 <td v-if="showLoggedCol" class="ewr-td-num">{{ formatMinutes(totals.logged) }}</td>
                                 <td v-if="showPlannedCol" class="ewr-td-num">{{ formatMinutes(totals.planned) }}</td>
@@ -225,6 +225,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch, inject, nextTick, provide } from 'vue';
 import { useStore } from 'vuex';
+import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import { teamIdToUserId } from '@/composable/commonFunction';
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
@@ -249,6 +250,7 @@ const props = defineProps({
 const userId = inject('$userId');
 const companyId = inject('$companyId');
 const { getters } = useStore();
+const { t } = useI18n();
 // Teams (for expanding "tId_*" team selections into member user ids).
 const teamsArr = getters['settings/teams'] || [];
 // User profile lookup — reads Employee_profileImageURL directly from the
@@ -332,7 +334,7 @@ function formatMinutes(min) {
 
 function projectCountLabel(count) {
     if (!count) return '—';
-    return `${count} project${count === 1 ? '' : 's'}`;
+    return t('dashboardCard.ewr_project_count', { n: count }, count);
 }
 
 // True when logged time has blown past the (existing) estimate.
@@ -353,10 +355,10 @@ function loggedHighlightClass(logged, planned, estimate) {
 function loggedHighlightTitle(logged, planned, estimate) {
     const l = Number(logged) || 0;
     if (Number(estimate) > 0 && l > Number(estimate)) {
-        return `${formatMinutes(l - Number(estimate))} over estimate`;
+        return t('dashboardCard.ewr_logged_over_estimate', { time: formatMinutes(l - Number(estimate)) });
     }
     if (Number(planned) > 0 && l > Number(planned)) {
-        return `${formatMinutes(l - Number(planned))} over planned`;
+        return t('dashboardCard.ewr_logged_over_planned', { time: formatMinutes(l - Number(planned)) });
     }
     return '';
 }
@@ -367,14 +369,14 @@ const TIMERANGE_OPTIONS = [
     // "Current" is a live view: only employees with a running tracker
     // right now. It pivots on today's range for hour context, but the
     // backend further restricts the rows to active-tracker pairs.
-    { id: 8, label: 'Current' },
-    { id: 1, label: 'Today' },
-    { id: 2, label: 'Yesterday' },
-    { id: 3, label: 'This Week' },
-    { id: 4, label: 'Last Week' },
-    { id: 5, label: 'This Month' },
-    { id: 6, label: 'Last Month' },
-    { id: 7, label: 'Last 30 Days' },
+    { id: 8, labelKey: 'dashboardCard.ewr_current' },
+    { id: 1, labelKey: 'dashboardCard.today' },
+    { id: 2, labelKey: 'dashboardCard.yesterday' },
+    { id: 3, labelKey: 'dashboardCard.this_week' },
+    { id: 4, labelKey: 'dashboardCard.last_week' },
+    { id: 5, labelKey: 'dashboardCard.this_month' },
+    { id: 6, labelKey: 'dashboardCard.last_month' },
+    { id: 7, labelKey: 'dashboardCard.last_30_days' },
 ];
 // Id of the special "Current" (live trackers) option.
 const CURRENT_TIMERANGE_ID = 8;
@@ -386,9 +388,9 @@ function onTimerangeChange() {
     fetchReport();
 }
 const emptyStateText = computed(() => {
-    if (searchQuery.value) return `No employees match "${searchQuery.value}".`;
-    if (timerange.value === CURRENT_TIMERANGE_ID) return 'No one is currently working on a task.';
-    return 'No employees match this filter.';
+    if (searchQuery.value) return t('dashboardCard.ewr_empty_search', { query: searchQuery.value });
+    if (timerange.value === CURRENT_TIMERANGE_ID) return t('dashboardCard.ewr_empty_current');
+    return t('dashboardCard.ewr_empty_filter');
 });
 
 // ─── Sorting ─────────────────────────────────────────────────────
