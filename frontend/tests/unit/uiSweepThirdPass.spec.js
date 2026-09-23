@@ -19,3 +19,17 @@ describe('buttons rendered as links', () => {
         expect(ruleBody(read('components/molecules/Home/style.css'), '.ah-tbtn')).toMatch(/text-decoration:\s*none/);
     });
 });
+
+describe('Planner', () => {
+    const css = read('views/Planner/style.css');
+
+    test('the unscheduled tray is never hidden: it lives in the sidebar the toggle opens', () => {
+        expect(css).not.toMatch(/\.planner__tray\s*\{\s*display:\s*none/);
+    });
+
+    test('the week range buttons drop the browser button chrome', () => {
+        const rule = ruleBody(css, '.planner__range button');
+        expect(rule).toMatch(/border:\s*0/);
+        expect(rule).toMatch(/background:\s*transparent/);
+    });
+});
