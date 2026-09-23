@@ -11,6 +11,7 @@ const { looksLikeToken, hasScope } = require('../Modules/ApiTokens/helpers/apiTo
 const { bearerRefusal } = require('../Modules/ApiTokens/helpers/bearerRules');
 const { sessionTokenQuery, readAccessSession, sessionCacheKey } = require('../Modules/Auth/helpers/refreshTokenRules');
 const { readCookie, clearOptions } = require('./cookies');
+const { ACTIVE_SEAT } = require('./seatStatus');
 
 // Mongo ObjectId pattern — used to reject regex/control characters in the
 // `companyid` request header before any token-membership check.
@@ -48,6 +49,14 @@ const getMembershipCacheTtlSeconds = () => {
     return raw;
 };
 
+const holdsActiveSeat = async (uid, companyId) => {
+    const seat = await mongoC.MongoDbCrudOpration(String(companyId), {
+        type: dbCollections.COMPANY_USERS,
+        data: [{ userId: String(uid), ...ACTIVE_SEAT }, { _id: 1 }],
+    }, 'findOne');
+    return Boolean(seat);
+};
+
 const verifyCompanyMembership = async (uid, companyId) => {
     if (!uid || !companyId) return false;
     if (!OBJECT_ID_PATTERN.test(String(uid)) || !OBJECT_ID_PATTERN.test(String(companyId))) {
@@ -66,7 +75,9 @@ const verifyCompanyMembership = async (uid, companyId) => {
             }],
         };
         const resData = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, 'findOne');
-        const isMember = !!(resData && resData._id);
+        // Removing a member retires the seat but can leave AssignCompany behind, so the seat decides.
+        // It is read only after AssignCompany matched, so a header naming any other id opens no connection.
+        const isMember = !!(resData && resData._id) && await holdsActiveSeat(uid, companyId);
         const ttl = getMembershipCacheTtlSeconds();
         // node-cache keeps a value set with a TTL of 0 forever.
         if (ttl > 0) myCache.set(cacheKey, isMember, ttl);
