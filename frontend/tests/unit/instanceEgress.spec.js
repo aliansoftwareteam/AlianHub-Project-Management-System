@@ -194,6 +194,55 @@ describe('InstanceEgress', () => {
         expect(wrapper.findAll(`[data-test="host-${CID_A}"]`).map((chip) => chip.text())).toEqual(['docs.example.com', 'other-tab.example.com']);
     });
 
+    describe('a removal refused as stale', () => {
+        const staleOnce = (fresh) => {
+            let loads = 0;
+            let puts = 0;
+            return {
+                summaryData: () => { loads += 1; return loads === 1 ? summary() : fresh; },
+                put: () => { puts += 1; return puts === 1 ? refused(409, 'Stale.', { version: 5 }, 'stale_version') : ok({}); },
+            };
+        };
+        const removeDocs = async (wrapper) => {
+            await wrapper.find(`button[data-test="remove-${CID_A}-docs.example.com"]`).trigger('click');
+            await flushPromises();
+        };
+
+        it('is made again on the fresh list rather than dropped', async () => {
+            const fresh = summary({ workspaces: [ws(CID_A, 'Acme', { hosts: ['docs.example.com', '*.api.example.com', 'other-tab.example.com'], version: 5 })] });
+            const wrapper = await mountWith(staleOnce(fresh));
+            await removeDocs(wrapper);
+            expect(calls('put').map(([, , body]) => body)).toEqual([
+                { hosts: ['*.api.example.com'], version: 4 },
+                { hosts: ['*.api.example.com', 'other-tab.example.com'], version: 5 },
+            ]);
+            expect(wrapper.find('[data-test="action-error"]').exists()).toBe(false);
+        });
+
+        it('is not made again when the host is already gone', async () => {
+            const fresh = summary({ workspaces: [ws(CID_A, 'Acme', { hosts: ['*.api.example.com'], version: 5 })] });
+            const wrapper = await mountWith(staleOnce(fresh));
+            await removeDocs(wrapper);
+            expect(calls('put')).toHaveLength(1);
+        });
+
+        it('is not made again when it would now empty the list, which reopens the workspace', async () => {
+            const fresh = summary({ workspaces: [ws(CID_A, 'Acme', { hosts: ['docs.example.com'], version: 5 })] });
+            const wrapper = await mountWith(staleOnce(fresh));
+            await removeDocs(wrapper);
+            expect(calls('put')).toHaveLength(1);
+            expect(wrapper.find('[data-test="action-error"]').text()).toBe('Egress.code_stale_version');
+        });
+
+        it('is made again once only', async () => {
+            const fresh = summary({ workspaces: [ws(CID_A, 'Acme', { hosts: ['docs.example.com', 'other-tab.example.com'], version: 5 })] });
+            const wrapper = await mountWith({ summaryData: () => fresh, put: () => refused(409, 'Stale.', { version: 6 }, 'stale_version') });
+            await removeDocs(wrapper);
+            expect(calls('put')).toHaveLength(2);
+            expect(wrapper.find('[data-test="action-error"]').text()).toBe('Egress.code_stale_version');
+        });
+    });
+
     it('says a port-less entry allows any port and plain http', async () => {
         const wrapper = await mountWith();
         expect(wrapper.find('[data-test="port-help"]').text()).toBe('Egress.port_help');

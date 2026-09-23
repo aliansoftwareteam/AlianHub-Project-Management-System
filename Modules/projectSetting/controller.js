@@ -8,17 +8,17 @@ const { updateCommentSprint } = require("../Comments/controller");
 const fp = `${__dirname}/`;
 const mongoose = require("mongoose");
 const socketEmitter = require('../../event/socketEventEmitter');
+const { pinSessionTenant } = require('../../Config/tenant');
 
 
 exports.changeTaskType = async (req, res) => {
     try {
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: "CompanyId is required"
-            })
+        if (!req.body) {
+            res.send({ status: false, statusText: "Request body is required" });
             return;
         }
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
         if (!(req.body && req.body.projectId)) {
             res.send({
                 status: false,
@@ -44,7 +44,7 @@ exports.changeTaskType = async (req, res) => {
         let tasks = [];
         let promisesArr = [];
     
-        await MongoDbCrudOpration(req.body.companyId, {type: dbCollections.TASKS,data: [{'ProjectID': req.body.projectId,'TaskTypeKey': { $in: req.body.taskTypeKey }}]}, "find")
+        await MongoDbCrudOpration(companyId, {type: dbCollections.TASKS,data: [{'ProjectID': req.body.projectId,'TaskTypeKey': { $in: req.body.taskTypeKey }}]}, "find")
         .then(async(result) => {
             result.map((x) => {
                 tasks.push(x)
@@ -54,9 +54,6 @@ exports.changeTaskType = async (req, res) => {
             promisesArr.push(
                 new Promise((resolve1, reject1) => {
                     try {
-                        // BUG-017 / #71 fix: body has no `await` (it uses
-                        // .then/.catch on MongoDbCrudOpration), so the
-                        // `async` keyword was misleading. Plain forEach.
                         req.body.taskTypeKey.forEach((key) => {
                             if(key === task.TaskTypeKey){
                                 let newStatus = req.body.oldTaskType.filter((y) => y.key === key)[0]?.convertType;
@@ -80,7 +77,7 @@ exports.changeTaskType = async (req, res) => {
                                             }
                                         ]
                                     }
-                                    MongoDbCrudOpration(req.body.companyId,updateObj,"findOneAndUpdate").then((result) => {
+                                    MongoDbCrudOpration(companyId,updateObj,"findOneAndUpdate").then((result) => {
                                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj , module: 'task'});
                                         resolve1()
                                     })
@@ -117,13 +114,12 @@ exports.changeTaskType = async (req, res) => {
 
 exports.changeTaskStatus = async (req, res) => {
     try {
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: "CompanyId is required"
-            })
+        if (!req.body) {
+            res.send({ status: false, statusText: "Request body is required" });
             return;
         }
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
         if (!(req.body && req.body.projectId)) {
             res.send({
                 status: false,
@@ -149,20 +145,15 @@ exports.changeTaskStatus = async (req, res) => {
         let tasks = [];
         let promisesArr = [];
     
-        await MongoDbCrudOpration(req.body.companyId, {type: dbCollections.TASKS,data: [{ProjectID: req.body.projectId,'statusKey': { $in:  req.body.taskStatusKey }}]}, "find").then((result) => {
+        await MongoDbCrudOpration(companyId, {type: dbCollections.TASKS,data: [{ProjectID: req.body.projectId,'statusKey': { $in:  req.body.taskStatusKey }}]}, "find").then((result) => {
             result.map((x) => {
                 tasks.push(x)
             })
         })
-        // BUG-017 / #71 fix: this outer forEach only pushes synchronously
-        // constructed Promise objects, no `await` — drop the `async`.
         tasks.forEach((task) => {
             promisesArr.push(
                 new Promise((resolve, reject) => {
                     try {
-                        // BUG-017 / #71 fix: same shape as the changeTaskType
-                        // version above — inner body uses .then/.catch, no
-                        // `await`, so `async` is misleading.
                         req.body.taskStatusKey.forEach((key) => {
                             if(key === task.statusKey){
                                 let newStatus = req.body.oldTaskStatus.filter((y) => y.key === key)[0]?.convertStatus;
@@ -190,7 +181,7 @@ exports.changeTaskStatus = async (req, res) => {
                                             }
                                         ]
                                     }
-                                    MongoDbCrudOpration(req.body.companyId,updateObj,"findOneAndUpdate").then((result) => {
+                                    MongoDbCrudOpration(companyId,updateObj,"findOneAndUpdate").then((result) => {
                                         socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj , module: 'task'});
                                         resolve();
                                     })
@@ -306,8 +297,10 @@ async function batchUpdate(updateArray, cid) {
 
 exports.migrateSprintsFun = async (req, res) => {
     try {
-        let projects = await MongoDbCrudOpration(req.body.companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{}] }, "find");
-        let mainChat = await MongoDbCrudOpration(req.body.companyId, { type: SCHEMA_TYPE.MAIN_CHATS, data: [{}] }, "find");
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
+        let projects = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{}] }, "find");
+        let mainChat = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.MAIN_CHATS, data: [{}] }, "find");
         projects = projects.concat(mainChat);
         logger.info(`projects length: ${projects.length}`);
 
@@ -320,7 +313,7 @@ exports.migrateSprintsFun = async (req, res) => {
                     resolveMigration();
                     return;
                 }
-                exports.migrateProject(project, req.body.companyId)
+                exports.migrateProject(project, companyId)
                     .then(() => {
                         count++;
                         countFunction(projects[count]);

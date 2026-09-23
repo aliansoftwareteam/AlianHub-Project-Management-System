@@ -651,27 +651,6 @@ span.duedate-new .due-date span, span.key-new {
         padding: 10px 8px;
     }
 }
-@media(max-width:767px) {
-    table.fc-scrollgrid.fc-scrollgrid-liquid {
-        min-width: fit-content !important;
-        width: 1050px !important;
-    }
-     .fc-theme-standard td, .fc-theme-standard th {
-        border: 1px solid #DAE1E7;
-    }
-    .fc-theme-standard td {
-        height: 100px;
-    }
-    .fc-scroller.fc-scroller-liquid-absolute {
-        overflow: hidden !important;
-    }
-    .fc th .fc-scroller-harness .fc-scroller {
-        overflow: hidden !important;
-    }
-    .fc-view-harness.fc-view-harness-active{
-        height: 644px !important;
-    }
-}
 @supports (-webkit-touch-callout: none) {
     @media screen and (max-device-width: 767px) and (orientation: portrait) {
         .vc-popover-content-wrapper {
