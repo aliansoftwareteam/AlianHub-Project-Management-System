@@ -6,6 +6,7 @@ const { resolveToken, logTokenActivity } = require('./controller');
 const { hasScope } = require('./helpers/apiTokenRules');
 const { visibilityStage } = require('../Tasks/helpers/taskQueryGuard');
 const { visibleProjectIds } = require('../Agents/scope');
+const { runNarrowed } = require('../../Config/tokenNarrowing');
 
 // Token-authenticated public REST namespace (/api/public-v1/*). Fully
 // self-contained: its own middleware, zero coupling with the session-JWT
@@ -37,7 +38,7 @@ const tokenAuth = async (req, res, next) => {
                 ip: req.ip || '',
             });
         });
-        return next();
+        return runNarrowed(tokenDoc, () => next());
     } catch (error) {
         logger.error(`ERROR in token auth: ${error.message}`);
         return res.status(500).send({ status: false, statusText: 'Token verification failed.' });

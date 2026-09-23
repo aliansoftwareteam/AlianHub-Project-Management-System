@@ -130,6 +130,23 @@ describe('the visible-project set and the task visibility stage', () => {
         }
     });
 
+    it('leaves what the same request computes for someone else alone', async () => {
+        const { runNarrowed } = require('../Config/tokenNarrowing');
+        const { visibleProjectIds } = require('../Modules/Agents/scope');
+        const seen = await runNarrowed(TOKENS[OWNER_NARROWED], async () => ({
+            owner: await visibleProjectIds(C, OWNER),
+            member: await visibleProjectIds(C, MEMBER),
+        }));
+        expect(seen.owner).toEqual([String(A._id)]);
+        expect(seen.member.sort()).toEqual([String(A._id), String(B._id)].sort());
+    });
+
+    it('reads a token with an empty list as not narrowed', async () => {
+        TOKENS[OWNER_NARROWED].projectIds = [];
+        const res = await publicApi(OWNER_NARROWED, '/api/public-v1/projects');
+        expect(res.body.data).toHaveLength(2);
+    });
+
     it('finds no task outside the list, for an owner as for a member', async () => {
         for (const raw of [OWNER_NARROWED, MEMBER_NARROWED]) {
             expect((await publicApi(raw, '/api/public-v1/tasks/:key', { params: { key: 'B-1' } })).statusCode).toBe(404);
@@ -195,5 +212,13 @@ describe('stored files', () => {
         expect((await signed(OWNER_NARROWED, keyOf(B, taskB))).body).not.toBe(REACHED);
         expect((await signed(OWNER_NARROWED, keyOf(A, taskA))).body).toBe(REACHED);
         expect((await signed(OWNER_FULL, keyOf(A, taskB))).body).toBe(REACHED);
+    });
+
+    it('holds an object store link to the key\'s project', async () => {
+        const link = (raw, key) => viaJwt(raw, 'POST', '/api/v1/wasabi/retriveObject', [], { body: { companyId: C, path: key } });
+        expect((await link(OWNER_NARROWED, keyOf(B, taskB))).statusCode).toBe(404);
+        expect((await link(OWNER_NARROWED, 'companyIcon/logo.png')).statusCode).toBe(404);
+        expect((await link(OWNER_NARROWED, keyOf(A, taskA))).body).toBe(REACHED);
+        expect((await link(OWNER_FULL, keyOf(B, taskB))).body).toBe(REACHED);
     });
 });
