@@ -2,7 +2,6 @@ import { ref, inject } from 'vue';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
-import { useCustomComposable, useGetterFunctions, useHistoryNotification } from '@/composable';
 import { useProjects } from '@/composable/projects';
 import * as env from '@/config/env';
 import { apiRequest } from '@/services';
@@ -17,9 +16,6 @@ export function useProjectLifecycle(projectData) {
     const { commit } = useStore();
     const $toast = useToast();
     const { t } = useI18n();
-    const { sanitizeInput } = useCustomComposable();
-    const { getUser } = useGetterFunctions();
-    const { addHistory, addNotification } = useHistoryNotification();
     const { markFavourite } = useProjects();
 
     const userId = inject('$userId');
@@ -82,41 +78,8 @@ export function useProjectLifecycle(projectData) {
             showSpinner.value = false;
             const ProjectId = JSON.parse(JSON.stringify(projectData.value._id));
             updateChildTasks(value !== null, ProjectId);
-            const user = getUser(userId.value);
-            const userData = {
-                id: user.id,
-                Employee_Name: user.Employee_Name,
-                companyOwnerId: user.companyOwnerId,
-            };
-
             const type = value !== null ? 'restored' : archive.value === MODE_CLOSE ? 'closed' : archive.value === MODE_ARCHIVE ? 'archived' : 'deleted';
-
             $toast.success(t(`Toast.Project ${type} successfully`), { position: 'top-right' });
-
-            const notificationObject = {
-                message: `<p><strong>${userData.Employee_Name}</strong> has ${type} the <strong>${sanitizeInput(projectData.value.ProjectName)}</strong> Project</p>`,
-                key: 'project_close',
-                projectId: projectData.value._id,
-            };
-            const historyObj = {
-                message: `<b>${userData.Employee_Name}</b> has ${type} the <b>${sanitizeInput(projectData.value.ProjectName)}</b> Project`,
-                key: 'Project_Name',
-            };
-            addHistory({
-                type: 'project',
-                companyId: companyId.value,
-                projectId: projectData.value._id,
-                taskId: null,
-                object: historyObj,
-                userData,
-            });
-            addNotification({
-                type: 'project',
-                companyId: companyId.value,
-                projectId: projectData.value._id,
-                object: notificationObject,
-                userData,
-            });
             commit('projectData/projectLocalUpdate', { itemData: { ...projectData.value, ...updateObject }, projectId: projectData.value._id, key: value === null ? 'RemoveProject' : 'AddProject', subKey: '', userId: '' });
         } catch (error) {
             showSidebar.value = false;

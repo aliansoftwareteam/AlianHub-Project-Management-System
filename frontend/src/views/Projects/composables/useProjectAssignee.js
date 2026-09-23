@@ -1,31 +1,18 @@
-import { ref, inject } from 'vue';
+import { ref } from 'vue';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
-import { useGetterFunctions } from '@/composable';
-import { projectAssignee, projectAssigneeRemove } from '@/utils/NotificationTemplate';
 import * as env from '@/config/env';
 import { apiRequest } from '@/services';
 
 export function useProjectAssignee(projectData) {
-    const { commit, getters } = useStore();
+    const { commit } = useStore();
     const $toast = useToast();
-    const { getUser } = useGetterFunctions();
-
-    const userId = inject('$userId');
-    const companyId = inject('$companyId');
 
     const assigneeInProgress = ref({});
 
     async function changeAssignee(type, user) {
         if (assigneeInProgress.value[user.id] && assigneeInProgress.value[user.id] === type) return;
         assigneeInProgress.value[user.id] = type;
-
-        const usr = getUser(userId.value);
-        const userData = {
-            id: usr.id,
-            Employee_Name: usr.Employee_Name,
-            companyOwnerId: getters['settings/companyOwnerDetail'].userId,
-        };
 
         let obj;
         let key;
@@ -56,39 +43,6 @@ export function useProjectAssignee(projectData) {
 
             const msg = `Assignee ${type === 'add' ? 'added' : 'removed'} successfully`;
             $toast.success(msg, { position: 'top-right' });
-
-            const historyObj = {
-                message: `<b>${userData.Employee_Name}</b> ${type === 'add' ? 'added' : 'removed'} the <b>Assignee</b> to <b>${user.label}</b>`,
-                key: 'Assignee_Changed',
-            };
-            const notifyObj = {
-                projectName: projectData.value.ProjectName,
-                Employee_Name: user.label,
-            };
-            const notificationObject = {
-                message: type === 'add' ? projectAssignee(notifyObj) : projectAssigneeRemove(notifyObj),
-                key: 'project_assignee',
-            };
-            apiRequest('post', env.HANDLE_HISTORY, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: projectData.value._id,
-                taskId: null,
-                object: historyObj,
-                userData,
-            }).catch((error) => {
-                console.error('ERROR in update history', error);
-            });
-            apiRequest('post', env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: projectData.value._id,
-                object: notificationObject,
-                userData,
-                mentionUserId: [user.id],
-            }).catch((error) => {
-                console.error('ERROR in update notification', error);
-            });
         } catch (error) {
             console.error('Error in update project', error);
         }

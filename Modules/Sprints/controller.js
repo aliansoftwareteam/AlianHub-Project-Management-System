@@ -11,10 +11,16 @@ const { getCachedCompanyData } = require('../../utils/planHelper');
 const { stepCompanyCounters } = require("../Company/helpers/companyCounters");
 const scrumRules = require("./scrumRules");
 const { escapeHtml } = require("../../utils/escapeHtml");
+const { storedNames, notifySprintCreated, notifyFolderCreated } = require("./helpers/sprintHistory");
 
 exports.addSprint = (req, res) => {
     exports.addSprintFun(req).then((data) => {
         res.json(data);
+        const { companyId, projectId, sprintName, mainChat, isPreCompany } = req.body;
+        if (data && data.status === true && !mainChat && !isPreCompany) {
+            notifySprintCreated({ companyId, projectId, sprintName, actorId: req.uid })
+                .catch((error) => logger.error(`sprint created notification failed: ${(error && error.message) || error}`));
+        }
     }).catch((error) => {
         res.json(error);
     })
@@ -89,7 +95,7 @@ exports.updateChannelsCounts = (companyId, private, type) => {
 exports.addSprintFun = (req) => {
     try {
         return new Promise(async(resolve, reject) => {
-            const {companyId, projectId, folder, sprintName, userData, projectName, isPreCompany = false, mainChat = false, private = false, sendMessage = true, AssigneeUserId = [], icon = {},from = '',taskSprintObj = {}} = req.body;
+            const {companyId, projectId, folder, sprintName, userData, isPreCompany = false, mainChat = false, private = false, sendMessage = true, AssigneeUserId = [], icon = {},from = '',taskSprintObj = {}} = req.body;
             const sprintObject = {
                 tasks : 0,
                 private: private,
@@ -140,20 +146,20 @@ exports.addSprintFun = (req) => {
             } else {
                 const hasPermission = await exports.getPerProjectCount(companyId,projectId,dbCollections.SPRINTS);
                 if(hasPermission) {
-                    MongoQ.MongoDbCrudOpration(companyId, obj, "save").then((responsee) => {
+                    MongoQ.MongoDbCrudOpration(companyId, obj, "save").then(async (responsee) => {
                         resolve({ status: true, statusText: "Sprint added successfully",data: responsee});
                         if(mainChat) return
-    
-                        // Call history function
+
+                        const stored = await storedNames(companyId, { projectId, folderId: folder && folder.folderId });
                         let historyObj = {};
                         if(folder && folder.folderId !== "") {
                             historyObj = {
-                                'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has created new <b>Sprint</b> as <b>${escapeHtml(sprintName)}</b> in <b>${escapeHtml(folder.folderName)}</b> folder in <b>${escapeHtml(projectName)}</b> project ${from !== '' ? `from the (<b>${taskSprintObj.taskFodlerName ? "/" + escapeHtml(taskSprintObj.taskFodlerName) : ""}${escapeHtml(taskSprintObj.taskSprintName)}/${escapeHtml(sprintName)}</b>) task.` : ''}.`,
+                                'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has created new <b>Sprint</b> as <b>${escapeHtml(sprintName)}</b> in <b>${escapeHtml(stored.folderName)}</b> folder in <b>${escapeHtml(stored.projectName)}</b> project ${from !== '' ? `from the (<b>${taskSprintObj.taskFodlerName ? "/" + escapeHtml(taskSprintObj.taskFodlerName) : ""}${escapeHtml(taskSprintObj.taskSprintName)}/${escapeHtml(sprintName)}</b>) task.` : ''}.`,
                                 'key' : 'Sub_Sprint_Created',
                             }
                         } else {
                             historyObj = {
-                                'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has created new <b>Sprint</b> as <b>${escapeHtml(sprintName)}</b> in <b>${escapeHtml(projectName)}</b> project ${from !== '' ? `from the (<b>${escapeHtml(taskSprintObj.taskSprintName)}/${escapeHtml(sprintName)}</b>) task.` : ''}.`,
+                                'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has created new <b>Sprint</b> as <b>${escapeHtml(sprintName)}</b> in <b>${escapeHtml(stored.projectName)}</b> project ${from !== '' ? `from the (<b>${escapeHtml(taskSprintObj.taskSprintName)}/${escapeHtml(sprintName)}</b>) task.` : ''}.`,
                                 'key' : 'Create_Sprint',
                             }
                         }
@@ -181,11 +187,11 @@ exports.addSprintFun = (req) => {
  * Rename the sprint named in the route. The sprint id is taken from req.params.id and
  * never from the body: read endpoints return sprints as `_id`, so keying the update on
  * `prevData.id` renamed nothing whenever a client handed the server its own object back,
- * and answered success anyway. `prevData.name` is still read, but only for history text.
+ * and answered success anyway. History names the sprint's stored name, not `prevData`.
  */
 exports.editSprintName = (req, res) => {
     try {
-        const {companyId, projectId, folder = null, sprintName, userData, projectName, prevData = {}, mainChat = false} = req.body;
+        const {companyId, projectId, sprintName, userData, mainChat = false} = req.body;
         const { id } = req.params;
 
         const object = {
@@ -197,7 +203,9 @@ exports.editSprintName = (req, res) => {
             ]
         };
 
-        MongoQ.MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((response) => {
+        const before = { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: new mongoose.Types.ObjectId(id) }, { name: 1, folderId: 1 }] };
+        MongoQ.MongoDbCrudOpration(companyId, before, "findOne").catch(() => null).then(async (previous) => {
+            const response = await MongoQ.MongoDbCrudOpration(companyId, object, "findOneAndUpdate");
             if (!response) {
                 res.send({ status: false, statusText: "Sprint not found" });
                 return;
@@ -206,14 +214,16 @@ exports.editSprintName = (req, res) => {
             res.send({status: true, statusText: "Sprint_updated_successfully", data: response});
             if (mainChat) return;
 
-            const previousName = prevData.name || '';
-            const historyObj = folder && folder.folderId !== ""
+            const folderId = previous && previous.folderId ? String(previous.folderId) : '';
+            const stored = await storedNames(companyId, { projectId, folderId });
+            const previousName = (previous && previous.name) || '';
+            const historyObj = folderId
                 ? {
-                    'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has changed <b>Sprint</b> name from <b>${escapeHtml(previousName)}</b> to <b>${escapeHtml(sprintName)}</b> in <b>${escapeHtml(folder.folderName)}</b> folder in <b>${escapeHtml(projectName)}</b> project.`,
+                    'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has changed <b>Sprint</b> name from <b>${escapeHtml(previousName)}</b> to <b>${escapeHtml(sprintName)}</b> in <b>${escapeHtml(stored.folderName)}</b> folder in <b>${escapeHtml(stored.projectName)}</b> project.`,
                     'key' : 'Sub_Sprint_Created',
                 }
                 : {
-                    'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has changed <b>Sprint</b> name from <b>${escapeHtml(previousName)}</b> to <b>${escapeHtml(sprintName)}</b> in <b>${escapeHtml(projectName)}</b> project.`,
+                    'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has changed <b>Sprint</b> name from <b>${escapeHtml(previousName)}</b> to <b>${escapeHtml(sprintName)}</b> in <b>${escapeHtml(stored.projectName)}</b> project.`,
                     'key' : 'Create_Sprint',
                 };
 
@@ -223,7 +233,7 @@ exports.editSprintName = (req, res) => {
             });
         }).catch((error)=>{
             logger.error(`EDIT SPRINT ERROR : ${error}`);
-            res.send({status: false, statusText: "Error in sprit update"});
+            if (!res.headersSent) res.send({status: false, statusText: "Error in sprit update"});
         });
     } catch (error) {
         logger.error(error.message);
@@ -522,9 +532,8 @@ exports.updateSprintFun = (req) => {
 
 exports.addFolder = (req, res) => {
     try {
-        const {companyId, projectId, folderName, userData, projectName, mainChat = false} = req.body;
+        const {companyId, projectId, folderName, userData, mainChat = false} = req.body;
 
-        // const folderId = makeUniqueId(6);
         const updateObject = {
             name: folderName,
             projectId : new mongoose.Types.ObjectId(projectId),
@@ -539,11 +548,13 @@ exports.addFolder = (req, res) => {
             data: updateObject
         }
 
-        MongoQ.MongoDbCrudOpration(companyId, obj, "save").then((doc) => {
+        MongoQ.MongoDbCrudOpration(companyId, obj, "save").then(async (doc) => {
             res.send({status: true, statusText: "Folder added successfully",data:doc});
             if(mainChat) return;
 
-            // Call history function
+            notifyFolderCreated({ companyId, projectId, folderName, actorId: req.uid })
+                .catch((error) => logger.error(`folder created notification failed: ${(error && error.message) || error}`));
+            const { projectName } = await storedNames(companyId, { projectId });
             const historyObject = {
                 'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has created new <b>Folder</b> as <b>${escapeHtml(folderName)}</b> in <b>${escapeHtml(projectName)}</b> project.`,
                 'key' : 'Create_Folder',
@@ -562,7 +573,7 @@ exports.addFolder = (req, res) => {
 
 exports.editFolderName = (req, res) => {
     try {
-        const {companyId, projectId, folderName, prevFolderName, userData, projectName, mainChat = false} = req.body;
+        const {companyId, projectId, folderName, userData, mainChat = false} = req.body;
         const {id} = req.params;
 
         const queryObject = {
@@ -583,7 +594,8 @@ exports.editFolderName = (req, res) => {
             ]
         }
 
-        MongoQ.MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((response) => {
+        storedNames(companyId, { projectId, folderId: id }).then(async (stored) => {
+            const response = await MongoQ.MongoDbCrudOpration(companyId, obj, "findOneAndUpdate");
             if (!response) {
                 res.send({ status: false, statusText: "Folder not found" });
                 return;
@@ -592,32 +604,18 @@ exports.editFolderName = (req, res) => {
             res.send({status: true, statusText: "Folder renamed successfully",data:response});
             if(mainChat) return;
 
-            // Call history function
             let historyObj = {
-                'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has changed <b>Folder</b> name from <b>${escapeHtml(prevFolderName)}</b> to <b>${escapeHtml(folderName)}</b> in <b>${escapeHtml(projectName)}</b> project.`,
+                'message': `<b>${escapeHtml(userData.Employee_Name)}</b> has changed <b>Folder</b> name from <b>${escapeHtml(stored.folderName)}</b> to <b>${escapeHtml(folderName)}</b> in <b>${escapeHtml(stored.projectName)}</b> project.`,
                 'key' : 'Create_Folder',
             }
             HandleHistoryref.HandleHistory('project', companyId, projectId, null, historyObj, userData)
             .catch((error) => {
                 logger.error("ERROR in handle history", error.message);
             });
-
-            // Call notification function
-            // let notifyObj = {
-            //     'ProjectName' : projectName,
-            //     'sprintFolderName' : folderName,
-            //     'previousFolder' : prevFolderName
-            // } 
-            // let notificationObject = {
-            //     'message': editFolder(notifyObj),
-            //     'key': 'project_folder_create'
-            // }
-            // HandleNotification({type:'project', companyId, projectId:projectId, folderId: id, object:notificationObject, userData})
-            // .catch((error) => {
-            //     logger.error(error.message);
-            //     res.send({status: false, statusText: error.message});
-            // })
-        })
+        }).catch((error) => {
+            logger.error(`EDIT FOLDER ERROR : ${error}`);
+            if (!res.headersSent) res.send({status: false, statusText: "Error in folder update"});
+        });
     } catch (error) {
         logger.error(error.message);
         res.send({status: false, statusText: error.message});

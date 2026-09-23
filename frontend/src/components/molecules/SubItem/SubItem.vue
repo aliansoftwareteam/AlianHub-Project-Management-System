@@ -521,7 +521,6 @@ function moveToFolder(folder) {
 
 function markFavourite() {
     spinner.value = true;
-    const userData = getUserData();
     const isFavouriteOutsideFolder = (sprintId) => {
         if(props.subItems && props.subItems.length){
             let data = props.subItems.find((e)=> (e?._id ? e?._id : e?.id) === sprintId);
@@ -537,25 +536,6 @@ function markFavourite() {
         spinner.value = false;
         emit("updateFolderAndSprint",results?.data,'Sprint');
         $toast.success(t(`Toast.${!favourite.value ? "Added_to_favourite" : "Removed_from_favourite"}`), {position: "top-right"});
-
-        // Call history API
-        const axiosData = {
-            "type": "project",
-            "companyId": companyId.value,
-            "projectId": project.value._id,
-            "taskId": null,
-            "object": {
-                "sprintId": props.data.id,
-                "key": "Create_Sprint",
-                "message": `<b>${userData.Employee_Name}</b> has set <b>${props.data.name}</b> sprint as favorite in <b>${project.value.ProjectName}</b> project.`
-            },
-            "userData": userData
-        };
-        apiRequest("post", env.HANDLE_HISTORY, axiosData).then((result) => {
-            if(result.data.status) {
-                console.info(result.data.statusText)
-            }
-        });
     }).catch((error)=>{
         console.error(error)
     })
