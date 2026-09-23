@@ -62,7 +62,7 @@
 
             <button v-if="canCreate && !createSubTask" type="button" class="stx__add" @click="createSubTask = true">
                 <span class="stx__add-plus">+</span>{{ $t('Members.add_subtask') }}
-                <span class="stx__add-hint">· <span class="ah-kbd">Tab</span> {{ $t('Members.add_subtask_hint') }} <span class="ah-kbd">↵</span> {{ $t('Members.add_subtask_hint_end') }}</span>
+                <span class="stx__add-hint">· <span class="ah-kbd">{{ $t('Common.key_tab') }}</span> {{ $t('Members.add_subtask_hint') }} <span class="ah-kbd">↵</span> {{ $t('Members.add_subtask_hint_end') }}</span>
             </button>
         </template>
 

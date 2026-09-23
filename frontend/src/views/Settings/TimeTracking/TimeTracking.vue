@@ -32,7 +32,7 @@
                     </div>
                     </div>  
                 </div>
-                <a :href="selectedData?.downloadUrl" ref="anchor" download hidden >click</a>
+                <a :href="selectedData?.downloadUrl" ref="anchor" download hidden >{{ $t('TimeTracker.click') }}</a>
             </div>
         </div>
     </div>

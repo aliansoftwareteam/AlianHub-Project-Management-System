@@ -12,7 +12,7 @@
         />
     </template>
     <template v-else-if="chartData.length === 0 && !isLoading">
-        <span class="font-size-14">No data found</span>
+        <span class="font-size-14">{{ $t('dashboardCard.no_data_found') }}</span>
     </template>
 </template>
 

@@ -62,7 +62,7 @@
                                     <DropDown @isVisible="handleOutsideClick" :bodyClass="{'custom__field__dropdown':true}">
                                         <template #button>
                                             <div class="project_bg d-flex GunPowder font-size-13" @click="handelSubmit(index)">
-                                                <span v-if="item?.global" class="project_ellipsis">All Projects</span>
+                                                <span v-if="item?.global" class="project_ellipsis">{{ $t('CustomField.all_projects') }}</span>
                                                 <span v-else-if="item?.projectId && item?.projectId?.length" class="project_ellipsis">
                                                     <template
                                                         v-for="(id, ind) in item?.projectId"
@@ -97,7 +97,7 @@
                                             </div>
                                             <div v-else>
                                                 <DropDownOption>
-                                                    <span>No record found</span>
+                                                    <span>{{ $t('CustomField.no_record_found') }}</span>
                                                 </DropDownOption>
                                             </div>
                                         </template>

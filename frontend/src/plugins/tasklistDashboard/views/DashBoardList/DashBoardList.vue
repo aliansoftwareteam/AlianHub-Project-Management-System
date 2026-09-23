@@ -44,7 +44,7 @@
                 <div class="d-flex align-items-center justify-content-start filter-list">
                     <div class="position-re task-fitler-search" id="projectviewfiltersearch_driver">
                         <input type="text" :placeHolder="$t('PlaceHolder.search')" class="form-control search-datas-das" v-model="taskSearch">
-                        <DropDown :id="cardUID" title="Search In" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
+                        <DropDown :id="cardUID" :title="$t('Projects.search_in')" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
                         <template #head>
                             <h4 class="black font-size-13 font-weight-500 p-10px m-0 search__in" :class="{'border-bottom': containerWidth > 767}">
                                 {{$t('Projects.search_in')}}
@@ -101,7 +101,7 @@
                         <div class="new-row item_head">
                             <div class="new-col1 colum-1-calss" :style="`${containerWidth > sideScrollWidth ? 'border:0px' : ''};`" :class="[{'new-col-mobile' : containerWidth < 768}]">
                                 <div class="common-section head heading">
-                                    <span class="font-size-12 dark-gray font-weight-500">Title</span>
+                                    <span class="font-size-12 dark-gray font-weight-500">{{ $t('Projects.col_title') }}</span>
                                 </div>
                             </div>
                             <div class="new-col2" v-if="containerWidth > 768">

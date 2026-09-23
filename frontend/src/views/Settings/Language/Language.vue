@@ -20,7 +20,7 @@
                         @click="form.language = locale.code"
                     >
                         <span>{{ locale.label }}</span>
-                        <span v-if="locale.dir === 'rtl'" class="lang__rtl-tag">RTL</span>
+                        <span v-if="locale.dir === 'rtl'" class="lang__rtl-tag">{{ $t('Language.rtl_tag') }}</span>
                     </button>
                 </div>
 
@@ -55,7 +55,7 @@
         <div class="lang__previews">
             <div class="ah-card" dir="ltr">
                 <div class="ah-card__body lang__preview">
-                    <div class="ah-label">LTR</div>
+                    <div class="ah-label">{{ $t('Language.preview_ltr') }}</div>
                     <div class="lang__task">
                         <span class="lang__task-box"></span>
                         <span class="lang__task-name">{{ $t('Language.sample_task_en') }}</span>

@@ -22,7 +22,7 @@
                 <section class="ah-card in-card">
                     <div class="in-card__head"><span class="ah-dot" :class="health.db.ok ? 'ah-dot--ok' : 'ah-dot--danger'"></span><span class="in-card__title">{{ $t('Instance.card_db') }}</span></div>
                     <dl class="in-kv">
-                        <dt>{{ $t('Instance.latency') }}</dt><dd class="ah-mono">{{ health.db.latencyMs ?? '—' }} ms</dd>
+                        <dt>{{ $t('Instance.latency') }}</dt><dd class="ah-mono">{{ $t('Instance.latency_ms', { ms: health.db.latencyMs ?? '—' }) }}</dd>
                         <dt v-if="health.db.error">{{ $t('Instance.error') }}</dt><dd v-if="health.db.error" class="ah-mono">{{ health.db.error }}</dd>
                     </dl>
                 </section>

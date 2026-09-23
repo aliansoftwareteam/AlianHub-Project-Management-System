@@ -774,7 +774,8 @@ export default {
         "overdue_since": "Overdue · {date}",
         "tracking_short": "tracking {time}",
         "this_week": "This week",
-        "access_denied": "You don't have access to Home."
+        "access_denied": "You don't have access to Home.",
+        "views_nav": "Views"
     },
     "Portfolio": {
         "new": "New portfolio",
@@ -1107,7 +1108,8 @@ export default {
         "legacy_nav": "Use the old top bar",
         "new_nav": "Try the new navigation",
         "skip_to_content": "Skip to content",
-        "palette_esc": "ESC"
+        "palette_esc": "ESC",
+        "primary_nav": "Primary"
     },
     "Docs": {
         "docs": "Docs",
@@ -1252,7 +1254,10 @@ export default {
         "select_task": "Select task",
         "select_all_tasks": "Select all tasks in group",
         "close": "Close",
-        "key_esc": "Esc"
+        "key_esc": "Esc",
+        "key_enter": "Enter",
+        "key_shift_enter": "Shift + Enter",
+        "key_tab": "Tab"
     },
     "Time": {
         "loading": "Loading…",
@@ -3011,7 +3016,9 @@ export default {
         "error_save": "Your language could not be saved.",
         "monday": "Monday",
         "sunday": "Sunday",
-        "saturday": "Saturday"
+        "saturday": "Saturday",
+        "rtl_tag": "RTL",
+        "preview_ltr": "LTR"
     },
     "Parity": {
         "nav_connections": "Connections",
@@ -3840,7 +3847,8 @@ export default {
         "ext_never": "Never available to an agent",
         "ext_same_treatment": "External agents get the same treatment as yours: allow-listed actions, everything through the AI Inbox, full audit.",
         "mob_tap_slot": "Tap a time to place {task}",
-        "mob_cancel": "Cancel"
+        "mob_cancel": "Cancel",
+        "ext_mcp_mark": "MCP"
     },
     "Gaps": {
         "wip_note": "Saved for everyone on this project. Over the limit warns, it never blocks a move.",
@@ -4533,7 +4541,11 @@ export default {
         "select_billing_period": "Select Billing Period",
         "sprint_data_required": "SPRINT DATA REQUIRED",
         "export_csv": "CSV",
-        "export_xlsx": "XLSX"
+        "export_xlsx": "XLSX",
+        "just_now": "Just now",
+        "private_project": "Private project",
+        "points_total": "{n} pts",
+        "col_title": "Title"
     },
     "Watcher": {
         "ignore": "नज़रअंदाज करें",
@@ -5130,7 +5142,8 @@ export default {
         "Projects": "प्रोजेक्ट्स",
         "task_planning": "कार्य योजना",
         "task_remaining_planning": "शेष घंटे",
-        "planned": "योजना बनाई गई"
+        "planned": "योजना बनाई गई",
+        "views_nav": "Timesheet views"
     },
     "TimesheetApproval": {
         "submit": "Submit timesheet",
@@ -5210,7 +5223,10 @@ export default {
         "max_should_be_greater_than_min": "अधिकतम मान न्यूनतम से अधिक होना चाहिए",
         "min_should_be_less_than_max": "न्यूनतम मान अधिकतम से कम होना चाहिए",
         "separator": "विभाजक",
-        "countryCode": "देश कोड बदलने के लिए इसे चालू करें।"
+        "countryCode": "देश कोड बदलने के लिए इसे चालू करें।",
+        "field_is_required": "{field} is required",
+        "all_projects": "All Projects",
+        "no_record_found": "No record found"
     },
     "Category": {
         "cateory_name": "श्रेणी नाम",
@@ -6728,7 +6744,8 @@ export default {
         "details_project": "Belongs to",
         "details_slack": "Mirrored to Slack",
         "load_failed": "Could not load. Try again.",
-        "something_wrong": "Something went wrong. Try again."
+        "something_wrong": "Something went wrong. Try again.",
+        "dnd_short": "DND"
     },
     "Comments": {
         "unread_message": "अवाचित संदेश",
@@ -7059,7 +7076,8 @@ export default {
         "client_contacts": "Client contacts",
         "client_contacts_hint": "Whoever is listed here gets the sign-off tasks and sees the client view.",
         "saved": "Saved",
-        "save_failed": "That could not be saved."
+        "save_failed": "That could not be saved.",
+        "views_nav": "Billing views"
     },
     "Tour": {
         "Tag_name_required": "Tag name is required.",
@@ -8225,7 +8243,12 @@ export default {
         "ewr_logged_over_planned": "{time} over planned",
         "ewr_empty_search": "No employees match \"{query}\".",
         "ewr_empty_current": "No one is currently working on a task.",
-        "ewr_empty_filter": "No employees match this filter."
+        "ewr_empty_filter": "No employees match this filter.",
+        "lwt_people_working_now": "{n} person working now | {n} people working now",
+        "lwt_tracker_running": "Tracker running",
+        "no_data_found": "No data found",
+        "milestone_clear_status_filter": "Clear status filter",
+        "tcb_group_logged_time_by": "Group logged time by"
     },
     "designationMapping": {
         "title": "पदनाम मानचित्रण",
@@ -8250,7 +8273,8 @@ export default {
         "user_limit_100": "आप एक बार में अधिकतम 100 उपयोगकर्ताओं को आयात कर सकते हैं।"
     },
     "importUserButton": {
-        "import_user_processing": "आपके उपयोगकर्ताओं को आयात किया जा रहा है"
+        "import_user_processing": "आपके उपयोगकर्ताओं को आयात किया जा रहा है",
+        "import_users": "Import Users"
     },
     "timeForecastingReport": {
         "project_name": "परियोजना का नाम",
@@ -9056,7 +9080,8 @@ export default {
         "agent_key_missing": "No key",
         "agent_saved": "AI agent settings saved.",
         "agent_save_failed": "AI agent settings were not saved.",
-        "agent_load_failed": "Could not load AI agent settings."
+        "agent_load_failed": "Could not load AI agent settings.",
+        "latency_ms": "{ms} ms"
     },
     "Routing": {
         "nav": "Routing policy",

@@ -218,7 +218,7 @@
             </template>
             <template #footer>
                 <div class="text-right">
-                    <button class="btn-primary p0x-15px" @click="showConfirmModal = false">ok</button>
+                    <button class="btn-primary p0x-15px" @click="showConfirmModal = false">{{ $t('ProjectDetails.ok') }}</button>
                 </div>
             </template>
         </ConfirmModal>

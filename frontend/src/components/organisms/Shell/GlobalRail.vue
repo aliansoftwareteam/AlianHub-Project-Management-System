@@ -1,5 +1,5 @@
 <template>
-    <nav class="ah-rail" aria-label="Primary" @keydown="onKeydown">
+    <nav class="ah-rail" :aria-label="$t('Shell.primary_nav')" @keydown="onKeydown">
         <router-link :to="{ name: 'Home', params: { cid: companyId } }" class="ah-rail__mark" :title="productName">
             <img v-if="logoOk" :src="railLogo" alt="" @error="logoOk = false" />
             <span v-else>{{ productInitial }}</span>

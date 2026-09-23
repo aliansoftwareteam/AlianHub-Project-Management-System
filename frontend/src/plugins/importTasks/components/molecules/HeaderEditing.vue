@@ -39,7 +39,7 @@
                                     <template #options>
                                         <!-- Search Box -->
                                         <DropDownOption>
-                                            <input type="text" placeholder="Search" v-model="search[index]"
+                                            <input type="text" :placeholder="$t('PlaceHolder.search')" v-model="search[index]"
                                                 class="p6px-8px border-gray border-radius-4-px font-size-14" />
                                         </DropDownOption>
                                         <!-- Filtered Options -->

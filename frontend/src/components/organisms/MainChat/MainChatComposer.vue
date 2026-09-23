@@ -108,7 +108,7 @@
                 </template>
                 <template v-else>
                     <span>{{ $t('Chat.command_hint') }}</span>
-                    <span><span class="ah-kbd">Enter</span>{{ editing ? $t('MainChat.save') : $t('MainChat.enter_send') }} · <span class="ah-kbd">Shift + Enter</span>{{ $t('MainChat.shift_enter') }}</span>
+                    <span><span class="ah-kbd">{{ $t('Common.key_enter') }}</span>{{ editing ? $t('MainChat.save') : $t('MainChat.enter_send') }} · <span class="ah-kbd">{{ $t('Common.key_shift_enter') }}</span>{{ $t('MainChat.shift_enter') }}</span>
                 </template>
             </div>
 

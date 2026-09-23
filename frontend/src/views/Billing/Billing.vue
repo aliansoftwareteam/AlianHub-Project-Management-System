@@ -3,7 +3,7 @@
         <header class="ah-toolbar billing__bar">
             <h1 class="billing__title">{{ $t('Billing.title') }} · {{ projectName }}</h1>
             <span v-if="clientLine" class="billing__client ah-mono">{{ clientLine }}</span>
-            <nav class="billing__tabs" aria-label="Billing views">
+            <nav class="billing__tabs" :aria-label="$t('Billing.views_nav')">
                 <button type="button" class="billing__tab" :class="{ 'is-active': tab === 'contract' }" @click="setTab('contract')">
                     {{ $t('Billing.tab_contract') }}
                 </button>
