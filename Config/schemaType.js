@@ -118,6 +118,7 @@ const SCHEMA_TYPE = {
     AUDIT_CHAIN_ANCHORS: "audit_chain_anchors",
     AUDIT_CHAIN_PROGRESS: "audit_chain_progress",
     AUDIT_REDACTIONS: "audit_redactions",
+    AUDIT_CHAIN_KEY: "audit_chain_key",
     EGRESS_ALLOWLISTS: "egress_allowlists",
     INSTRUCTION_PATTERNS: "instruction_patterns",
     SECRETS: "secrets",

@@ -35,6 +35,8 @@ What the compose file gives you:
 
 Anything else (mail, storage, AI, sign-in providers) is configured later from the app, or put in `.env` next to the compose file — the file is read by `docker compose` and passed to the container.
 
+The containers are named `alianhub`, `alianhub-mongo` and `alianhub-coturn`. Set `ALIANHUB_APP_CONTAINER`, `ALIANHUB_MONGO_CONTAINER` or `ALIANHUB_COTURN_CONTAINER` in `.env` to use other names, for example when a second copy runs on the same host.
+
 ### Bare metal (Node 20 + MongoDB)
 
 ```bash
@@ -167,9 +169,15 @@ npm start
 Migrations run automatically at boot before the server starts listening; each one is recorded in `global.schema_versions` with its duration and, for per-company steps, the outcome per company. A failed migration does not stop the server: `/health` reports `migrationError`, the Upgrade page shows which step failed and why, and the next boot (or **Run pending migrations**) retries it. Set `MIGRATIONS_AUTO=false` to run them by hand instead:
 
 ```bash
-npm run migrate:status   # what is applied and what is pending
-npm run migrate          # apply what is pending
+npm run migrate:status          # what is applied and what is pending
+npm run migrate -- up --dry-run  # what the pending ones would write, without writing it
+npm run migrate                 # apply what is pending
+npm run migrate -- verify       # re-check what the applied ones guarantee, read-only
 ```
+
+`up --dry-run` runs each pending migration's own code with every database write refused at the driver and recorded instead, then prints, per migration, each collection it would write, the operation, how many calls in how many databases, how many documents match, and the field names of the filter and update. Values and documents are never printed. Nothing is marked applied and no lock is taken. A migration that reads back what it (or an earlier pending one) would have written is listed as **cannot dry-run** with the collection it reads, because its plan would describe the old data. It exits 1 only when a migration throws under the dry run.
+
+`verify` runs the optional `verify` check of every applied migration with writes refused and prints `pass`, `fail` (with the problems, by record id and count) or `no check`. It exits 1 when any check fails.
 
 Take a backup before upgrading; the Upgrade page says so and the Backups page is one click away.
 
@@ -190,7 +198,7 @@ Choose an archive, read its manifest (date, version, workspaces) and type its na
 3. drops every collection of each database named in the archive, including ones created after the backup, refills the ones the archive holds, and the files if they were included;
 4. reruns migrations, clears caches and reconnects to the database.
 
-Restore an archive taken by the same or an older version, never a newer one. A restore drill on a throwaway instance is the only way to know your backups work: run a second copy (`docker compose -p drill up -d` with a fresh volume), upload an archive there, restore it, log in.
+Restore an archive taken by the same or an older version, never a newer one. A restore drill on a throwaway instance is the only way to know your backups work: install a second copy on a **separate machine or VM**, upload an archive there, restore it, log in. Do not run the drill as a second Compose project on the same host (`docker compose -p drill`): the volumes in `docker-compose.yml` have fixed names (`alianhub_mongo_data`, `alianhub_storage`), so the second project would attach to the live data, and restoring there would overwrite it.
 
 ### Alternatives
 
@@ -286,4 +294,4 @@ answers `200 {"status":"ok", "db":{"ok":true,...}}` or `503 {"status":"degraded"
 
 ### Scripts
 
-`npm run setup` (first install), `npm start`, `npm run migrate:status`, `npm run migrate`, `npm test`.
+`npm run setup` (first install), `npm start`, `npm run migrate:status`, `npm run migrate` (`-- up --dry-run`, `-- verify`), `npm test`.
