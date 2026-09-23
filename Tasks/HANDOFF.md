@@ -35,6 +35,21 @@ Updated 2026-09-23. Read this first, then `Tasks/index.md`. Overwrite this file 
 
 ## Owner decisions recorded
 
+- **2026-09-23 (answered as a set of 13):**
+  1. A new manual time entry in an approved timesheet period is refused, like edits and deletes (follow-up 109).
+  2. 40 stays the default daily run limit for every agent: an agent with no stored limit is capped at 40 a day on the server too; a stored 0 means no limit (#861).
+  3. `SKILL_EXTERNAL_READS` alone runs the data version of `pr.summary`; `PR_SUMMARY_AS_DATA` and the code skill `prReview.js` are removed (follow-ups 103, 110).
+  4. The unmerged `@Alian` mentions branch (`feat/alian-mentions-6d61`) is abandoned; the branch is left in place, not deleted.
+  5. Under `MCP_OAUTH=both`, personal tokens keep working on `/mcp` for one more release, then OAuth only (follow-up 98).
+  6. MCP discovery methods stay scope-free, as the MCP spec expects (follow-up 98).
+  7. `AUDIT_CHAIN_KEY` cannot change; the server refuses to start if it does (follow-up 76). Key rotation will not be built.
+  8. Stored-file downloads switch to enforce once seven days with real download traffic show no reported refusals. Checked 2026-09-23: no downloads at all since #794 (2026-09-21), so not switched yet.
+  9. The sample and fixture tasks in "AlianHub Redesign" were moved to Trash (AR-1 to AR-8, AR-54 to AR-57; restorable).
+  10. The test skill `qa.brief.summary` (retired) and agent "QA brief summariser" (deleted) from the acceptance run are removed.
+  11. English-only locale keys stay English until a `TRANSLATE_API_KEY` is set (follow-up 57).
+  12. The owner edits the draft held-out question set before the Sprint 7 comparison runs.
+  13. Sprint 9 waits until Sprint 7's comparison passes.
+- **2026-09-23:** when no verified-open work remains, free agent slots go to UI/UX improvements.
 - **2026-09-16 to 18, Sprints 7 and 8:** enforcement mode per workspace with the instance value as default, ready to enforce after 14 days without a would-be denial; a departed member's private pages leave the knowledge index while shared content stays; erasure by person removes their private pages and their comments, never transcripts; agent-drafted pages are indexed and ranked below pages people wrote; erasure redacts personal fields in audit rows outside the hash; an audit row that changes is appended as a new chained row; the chain hash is keyed with `AUDIT_CHAIN_KEY`; existing API tokens without an expiry get 30 days; owners and admins see the workspace's tokens still needing an expiry; embeddings come from OpenAI `text-embedding-3-small`; an agent retrieves as the run's starter limited to the agent's projects; hosted vectors live in MongoDB Atlas Vector Search per tenant; the owner writes the held-out question set.
 - Tasks 014 and 016 closed with only their member browser sweep outstanding (2026-09-12); the `agent` label in `Modules/Agents/taskSplit.js` stays (2026-09-12).
 - Only owners and admins delete agents (#620). `REFRESH_TOKEN_REUSE_GRACE_SECONDS` defaults to 10 (#609). The `e2e` job runs on pushes to `beta` (#634). Webhooks reach private hosts only through an instance-owner allowlist (#647). Timesheet reads respect an admin's "Everyone" grant per screen (#635). `project.project_create` is enforced for API tokens but not for web sessions (#637). A private sprint is visible to its assignees plus owners and admins (#656).
