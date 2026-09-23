@@ -408,8 +408,20 @@ last action. A lease that has already lapsed is neither extended nor re-minted.
 Two heartbeats at once are taken one after the other. The row keeps the current
 id (`credentialId`) and the one it replaced (`previousCredentialId`), and only
 those two are accepted: a credential in flight during a re-mint still passes,
-anything older is refused. So no credential is good for longer than one lease
-(`WORKFLOW_LEASE_MS`, 17 minutes by default). Neither id is in any API answer.
+anything older is refused. Re-mints are at least a grace apart (30 seconds, or
+half the heartbeat interval if that is shorter): a heartbeat or `keepAlive`
+inside the grace of the last re-mint confirms the claim and re-mints nothing, so
+a credential read just before two renewals is still named by the row. A
+replaced credential therefore passes for at least the grace and is refused
+within the grace plus one heartbeat, and never past its own expiry, so no
+credential is good for longer than one lease (`WORKFLOW_LEASE_MS`, 17 minutes by
+default). Neither id is in any API answer.
+
+A heartbeat that is answered `false` (the claim was taken, settled, or its lease
+has lapsed) ends the hold and tells the executor its lease is lost. One that
+throws (a database blip, a timeout) says nothing about the lease, so it is
+retried after 1, 2, 4… seconds, capped at the heartbeat interval, until a beat is
+answered; the step is lost only when that answer is `false`.
 The credential travels in the executor context as something a step asks for,
 rides on the actor of the agent run as a non-enumerable property (a copy of the
 actor carries `stepScoped: true` and no credential, and is refused), and is
