@@ -119,7 +119,7 @@ describe.each([
     });
 
     it('refuses a request without a signed-in user', async () => {
-        const r = await call(handler(), startBody(), undefined);
+        const r = await call(handler(), startBody(), null);
 
         expect(r.code).toBe(401);
         expect(calls('save')).toHaveLength(0);
