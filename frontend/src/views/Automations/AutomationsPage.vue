@@ -495,7 +495,8 @@ const loadRules = async () => {
 const loadProjects = async () => {
     try {
         const body = (await apiRequest('get', env.PROJECT))?.data;
-        projects.value = body?.data || [];
+        const list = Array.isArray(body) ? body : (body && body.data) || [];
+        projects.value = list.filter((p) => p && p.deletedStatusKey !== 1 && p.deletedStatusKey !== 2);
     } catch (e) { projects.value = []; }
 };
 
