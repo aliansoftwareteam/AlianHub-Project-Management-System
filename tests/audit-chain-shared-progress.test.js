@@ -124,7 +124,8 @@ describe('verification progress shared between servers', () => {
         await a.annotateIntegrity(CID, page(3), { budget: 20 });
         const { auditChainProgressSchema } = require('../utils/mongo-handler/createSchema');
         const declared = Object.keys(auditChainProgressSchema.paths);
-        const stored = Object.keys(progressDocs()[0]).filter((k) => k !== '__v');
+        // The fake stamps createdAt on every save; the real schema has no timestamps.
+        const stored = Object.keys(progressDocs()[0]).filter((k) => k !== '__v' && k !== 'createdAt');
         expect(stored.filter((k) => !declared.includes(k))).toEqual([]);
         ['seq', 'hash', 'at', 'leaseUntil', 'owner', 'leaseId', 'leaseMac', 'mac', 'gen', 'anchorSeq', 'rewalkSeq', 'rewalkHash', 'brokenAt'].forEach((k) => expect(declared).toContain(k));
     });
