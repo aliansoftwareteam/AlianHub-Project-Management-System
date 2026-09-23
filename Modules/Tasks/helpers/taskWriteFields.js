@@ -539,5 +539,6 @@ module.exports = {
     prepareTaskRequest,
     prepareOrRefuse,
     sessionActor,
+    employeeNameOf,
     sendFailure,
 };
