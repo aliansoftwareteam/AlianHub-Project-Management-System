@@ -39,8 +39,8 @@
                         <div class="ah-field">
                             <label class="ah-field__label" for="sso-provider">{{ $t('Sso.provider') }}</label>
                             <select id="sso-provider" class="ah-input" v-model="form.provider">
-                                <option value="oidc">OIDC (OpenID Connect)</option>
-                                <option value="saml">SAML 2.0</option>
+                                <option value="oidc">{{ $t('Sso.provider_oidc') }}</option>
+                                <option value="saml">{{ $t('Sso.provider_saml') }}</option>
                             </select>
                         </div>
                         <div class="ah-field">
@@ -51,7 +51,7 @@
                         <template v-if="form.provider === 'oidc'">
                             <div class="ah-field sso__span">
                                 <label class="ah-field__label" for="sso-disc">{{ $t('Sso.discovery_url') }}</label>
-                                <input id="sso-disc" class="ah-input ah-mono" :class="{ 'ah-input--error': errors.discoveryUrl }" v-model.trim="form.oidc.discoveryUrl" placeholder="https://idp/.well-known/openid-configuration" @input="errors.discoveryUrl = ''" />
+                                <input id="sso-disc" class="ah-input ah-mono" :class="{ 'ah-input--error': errors.discoveryUrl }" v-model.trim="form.oidc.discoveryUrl" :placeholder="$t('Sso.discovery_url_ph')" @input="errors.discoveryUrl = ''" />
                                 <div v-if="errors.discoveryUrl" class="ah-field__error">{{ errors.discoveryUrl }}</div>
                             </div>
                             <div class="ah-field">
@@ -66,13 +66,13 @@
                             </div>
                             <div class="ah-field sso__span">
                                 <label class="ah-field__label" for="sso-scopes">{{ $t('Sso.scopes') }}</label>
-                                <input id="sso-scopes" class="ah-input ah-mono" v-model.trim="form.oidc.scopes" placeholder="openid email profile" />
+                                <input id="sso-scopes" class="ah-input ah-mono" v-model.trim="form.oidc.scopes" :placeholder="$t('Sso.scopes_ph')" />
                             </div>
                         </template>
                         <template v-else>
                             <div class="ah-field sso__span">
                                 <label class="ah-field__label" for="sso-entry">{{ $t('Sso.entry_point') }}</label>
-                                <input id="sso-entry" class="ah-input ah-mono" :class="{ 'ah-input--error': errors.entryPoint }" v-model.trim="form.saml.entryPoint" placeholder="https://idp/sso/saml" @input="errors.entryPoint = ''" />
+                                <input id="sso-entry" class="ah-input ah-mono" :class="{ 'ah-input--error': errors.entryPoint }" v-model.trim="form.saml.entryPoint" :placeholder="$t('Sso.entry_point_ph')" @input="errors.entryPoint = ''" />
                                 <div v-if="errors.entryPoint" class="ah-field__error">{{ errors.entryPoint }}</div>
                             </div>
                             <div class="ah-field sso__span">
@@ -81,7 +81,7 @@
                             </div>
                             <div class="ah-field sso__span">
                                 <label class="ah-field__label" for="sso-cert">{{ $t('Sso.idp_cert') }}</label>
-                                <textarea id="sso-cert" class="ah-input ah-textarea ah-mono" :class="{ 'ah-input--error': errors.idpCert }" rows="4" v-model.trim="form.saml.idpCert" placeholder="-----BEGIN CERTIFICATE-----" @input="errors.idpCert = ''"></textarea>
+                                <textarea id="sso-cert" class="ah-input ah-textarea ah-mono" :class="{ 'ah-input--error': errors.idpCert }" rows="4" v-model.trim="form.saml.idpCert" :placeholder="$t('Sso.idp_cert_ph')" @input="errors.idpCert = ''"></textarea>
                                 <div v-if="errors.idpCert" class="ah-field__error">{{ errors.idpCert }}</div>
                             </div>
                         </template>
@@ -94,7 +94,7 @@
                             </div>
                             <div class="sso__value">
                                 <span class="sso__value-label">{{ $t('Settings.sso_attributes') }}</span>
-                                <span class="sso__value-text">email · firstName · lastName</span>
+                                <span class="sso__value-text">{{ $t('Sso.attributes_list') }}</span>
                             </div>
                         </div>
 

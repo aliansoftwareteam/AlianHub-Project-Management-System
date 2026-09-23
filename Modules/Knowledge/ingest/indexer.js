@@ -1014,6 +1014,8 @@ module.exports = {
     EMBED_RETRY_ATTEMPTS,
     FILE_EXTRACT_ATTEMPTS,
     RETRIED_FILE_REASONS: RETRIED,
+    SKIPPED_FILE_REASONS: Object.values(SKIPPED),
+    TASK_DELETED,
     REEMBED_BATCH,
     embedRetries,
     flushEmbedRetries,

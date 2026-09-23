@@ -214,8 +214,11 @@ onBeforeUnmount(() => {
 .pbe :deep(.cdx-list),
 .pbe :deep(.cdx-checklist__item-text),
 .pbe :deep(.tc-cell) { font: 400 14.5px/1.65 var(--font-ui); color: var(--ink); }
-.pbe :deep(.cdx-checklist__item-checkbox-check) { border-color: var(--border); border-radius: 4px; }
+.pbe :deep(.cdx-checklist__item-checkbox-check) { background: var(--surface); border-color: var(--border); border-radius: 4px; }
 .pbe :deep(.cdx-checklist__item--checked .cdx-checklist__item-checkbox-check) { background: var(--brand); border-color: var(--brand); }
+.pbe :deep(.cdx-checklist__item--checked .cdx-checklist__item-checkbox-check svg path) { stroke: var(--on-brand); }
+/* The plugin's hover fill (#0059AB) outranks the rule above; under the dark-ink tick it drops to 2.7:1. */
+:root[data-theme="dark"] .pbe :deep(.cdx-checklist__item--checked .cdx-checklist__item-checkbox:hover .cdx-checklist__item-checkbox-check) { background: var(--brand-deep); border-color: var(--brand-deep); }
 .pbe :deep(.ce-code__textarea) {
     font: 400 12.5px/1.6 var(--font-mono);
     background: var(--surface-2);
