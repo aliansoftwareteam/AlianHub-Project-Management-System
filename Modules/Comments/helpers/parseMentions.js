@@ -1,10 +1,8 @@
-// Extract mentioned user ids from a comment body. The comment editor inserts a
-// mention as the markdown-style token "[Display Name](userId)" where userId is
-// the user's 24-hex id (see the frontend CommentInput `addMention`). Only 24-hex
-// ids count as mentions, so an ordinary link like "[docs](https://…)" is never
-// mistaken for one. Pure — no I/O — shared by the controller and the tests.
+// The comment editor inserts a mention as "[Display Name](userId)", and "[All](everyone)" for
+// everyone. Only 24-hex ids count, so an ordinary link like "[docs](https://…)" is never one.
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
+const EVERYONE = /\[[^\]]*\]\(\s*everyone\s*\)/;
 
 const parseMentionIds = (message) => {
     if (!message || typeof message !== 'string') return [];
@@ -18,4 +16,6 @@ const parseMentionIds = (message) => {
     return Array.from(ids);
 };
 
-module.exports = { parseMentionIds };
+const mentionsEveryone = (message) => typeof message === 'string' && EVERYONE.test(message);
+
+module.exports = { parseMentionIds, mentionsEveryone };

@@ -47,7 +47,7 @@ const withComposable = (use) => {
     return api;
 };
 
-const postedText = () => apiRequest.mock.calls.filter(([method, url]) => method === 'post' && [env.HANDLE_HISTORY, env.HANDLE_NOTIFICATION].includes(url));
+const postedText = () => apiRequest.mock.calls.filter(([method, url]) => method === 'post' && /\/api\/v1\/handle(History|Notification)$/.test(String(url)));
 
 beforeEach(() => {
     apiRequest.mockReset();

@@ -205,13 +205,13 @@ describe('messages/inbox — unread comment counts (MSG-05)', () => {
 });
 
 describe('messages/inbox — handleNotification (MSG-06)', () => {
-    it('MSG-06 responds promptly to a partial body', async () => {
+    it('MSG-06 the retired route answers a partial body at once', async () => {
         const member = await loginAs('member');
         const responded = member.api.post('/api/v1/handleNotification', {});
         const timedOut = new Promise((resolve) => setTimeout(() => resolve(null), 4000));
         const res = await Promise.race([responded, timedOut]);
         expect(res).not.toBeNull();
-        expect([res.status, res.body.status]).toEqual([400, false]);
+        expect(res.status).toBe(404);
     }, 10000);
 });
 

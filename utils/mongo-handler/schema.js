@@ -4020,7 +4020,7 @@ const schema = {
         isDelete:{
             type:Boolean,
             required: false,
-            default:''
+            default:false
         },
         fieldCountryObject:{
             type:Object,

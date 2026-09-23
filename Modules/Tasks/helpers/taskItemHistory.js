@@ -12,8 +12,6 @@ const HISTORY = Object.freeze({
     PROJECT_TAG: 'Project_Name',
 });
 
-const SERVER_BUILT_HISTORY = [HISTORY.CUSTOM_FIELD_VALUE, HISTORY.TASK_TAG].map((key) => ({ type: 'task', key }));
-
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
@@ -77,7 +75,6 @@ const recordTaskTag = async ({ companyId, task, tagId, operation, actor }) => {
 
 module.exports = {
     HISTORY,
-    SERVER_BUILT_HISTORY,
     describeCustomFieldValue,
     describeTaskTag,
     recordCustomFieldValue,

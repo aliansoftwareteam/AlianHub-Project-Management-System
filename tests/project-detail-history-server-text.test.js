@@ -53,15 +53,6 @@ const fieldRoute = async (handler, body, uid = OWNER) => {
     return r;
 };
 
-const handlers = {};
-const app = { post: (path, ...fns) => { handlers[`POST ${path}`] = fns[fns.length - 1]; }, get: () => {}, put: () => {} };
-require('../Modules/notification1/routes').init(app);
-const post = async (path, body) => {
-    const r = reply();
-    await handlers[`POST ${path}`]({ headers: { companyid: CID }, body, uid: MEMBER }, r);
-    await settle();
-    return r;
-};
 
 const historyRows = () => clone(mockDb.store[SCHEMA_TYPE.HISTORY] || []);
 const messages = () => historyRows().map((row) => [row.Key, row.Message]);
@@ -192,28 +183,5 @@ describe('a custom field definition is described on the server', () => {
         await fieldRoute('updateCustomField', { type: 'updateOne', key: '$set', id: FIELD, updateObject: { fieldTitle: 'Client ref', fieldDescription: 'x' } });
         await fieldRoute('insertCustomField', { type: 'save', updateObject: { fieldTitle: 'Shared', fieldType: 'text', type: 'task', global: true } });
         expect(historyRows()).toHaveLength(1);
-    });
-});
-
-describe('the generic history route leaves these changes to the server', () => {
-    test('an attachments notification sent by the web app is not sent', async () => {
-        const { HandleBothNotification } = require('../Modules/Tasks/helpers/handleNotification');
-        const r = await post('/api/v1/handleNotification', {
-            type: 'project', companyId: CID, projectId: PROJECT,
-            object: { key: 'attachments', message: `<p>${HTML}</p>` },
-            userData: { id: MEMBER, Employee_Name: 'Max Member', companyOwnerId: OWNER },
-        });
-        expect(r.body).toMatchObject({ status: true });
-        expect(HandleBothNotification).not.toHaveBeenCalled();
-    });
-
-    test.each(['Project_Source', 'Project_ProposalId', 'Project_Skills', 'Project_CustomField', 'Project_Attachment'])('a %s row sent by the web app is not stored', async (key) => {
-        const r = await post('/api/v1/handleHistory', {
-            type: 'project', companyId: CID, projectId: PROJECT, taskId: null,
-            object: { key, message: `<b>${HTML}</b>` },
-            userData: { id: MEMBER, Employee_Name: 'Max Member', companyOwnerId: OWNER },
-        });
-        expect(r.body).toMatchObject({ status: true });
-        expect(historyRows()).toEqual([]);
     });
 });

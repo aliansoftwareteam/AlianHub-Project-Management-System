@@ -82,7 +82,7 @@ describe('a project rename', () => {
 });
 
 describe('closing a project', () => {
-    it('names the stored project and is not written a second time by the generic routes', async () => {
+    it('names the stored project and is not written a second time through the retired generic routes', async () => {
         const project = await freshProject('close');
         const stored = await storedProject(project._id);
         const close = (stored.projectStatusData || []).find((status) => status.type === 'close');
@@ -106,7 +106,7 @@ describe('closing a project', () => {
             object: { key: 'project_close', message: `<p>${HTML}</p>` },
             userData: { id: owner.uid, Employee_Name: 'Olivia Owner', companyOwnerId: owner.uid },
         });
-        expect([history.body.status, notification.body.status]).toEqual([true, true]);
+        expect([history.status, notification.status]).toEqual([404, 404]);
         await quiet();
         expect(await historyOf(project._id, 'Project_EndDate')).toEqual([]);
         expect([...new Set((await noticesOf(project._id, 'project_close')).map((sent) => sent.message))]).toEqual([notice.message]);

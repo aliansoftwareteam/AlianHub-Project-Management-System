@@ -51,14 +51,6 @@ const NOTICE = Object.freeze({
     ATTACHMENTS: 'attachments',
 });
 
-/* Project_Name is left out: views and tags still post their own rows under it. Assignee_Changed is the key the project header used. */
-const SERVER_BUILT_HISTORY = [
-    HISTORY.STATUS, HISTORY.ASSIGNEE_ADD, HISTORY.ASSIGNEE_REMOVE, 'Assignee_Changed', HISTORY.TYPE, HISTORY.CURRENCY,
-    HISTORY.DUE_DATE, HISTORY.START_DATE, HISTORY.END_DATE, HISTORY.WATCHERS, HISTORY.CREATED, HISTORY.SPRINT,
-    HISTORY.SOURCE, HISTORY.PROPOSAL_ID, HISTORY.SKILLS, HISTORY.CUSTOM_FIELD, HISTORY.ATTACHMENT,
-].map((key) => ({ type: 'project', key }));
-const SERVER_BUILT_NOTIFICATIONS = Object.values(NOTICE);
-
 const NOTICE_DATE_FORMAT = 'DD MMM, YYYY';
 const DEFAULT_WATCH = 'participating_mentions';
 const WATCH_LABELS = { all_activity: 'All Activity', participating_mentions: 'Participating and @mentions' };
@@ -413,8 +405,6 @@ const projectNameOf = async (companyId, projectId) => {
 module.exports = {
     HISTORY,
     NOTICE,
-    SERVER_BUILT_HISTORY,
-    SERVER_BUILT_NOTIFICATIONS,
     describeProjectChanges,
     recordProjectChanges,
     recordProjectCreated,

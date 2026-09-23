@@ -2,9 +2,8 @@ import { inject } from 'vue';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
-import { useGetterFunctions } from '@/composable';
 import { deleteView, editView } from '@/components/molecules/EmbedView/helper.js';
-import { deletePrivateView, editPrivateName, privateViewHistory } from '@/components/molecules/ProjectViews/helper.js';
+import { deletePrivateView, editPrivateName } from '@/components/molecules/ProjectViews/helper.js';
 
 /**
  * Embed-view CRUD helpers.
@@ -17,12 +16,10 @@ import { deletePrivateView, editPrivateName, privateViewHistory } from '@/compon
  * @param selectedEmbedView ref shared with the parent (currently-active embed view)
  */
 export function useEmbedViews(projectData, embedViews, companyUser, renameValue, openDelete, selectedEmbedView) {
-    const { commit, getters } = useStore();
+    const { commit } = useStore();
     const $toast = useToast();
     const { t } = useI18n();
-    const { getUser } = useGetterFunctions();
 
-    const userId = inject('$userId');
     const companyId = inject('$companyId');
 
     const copyToClipboard = (id) => {
@@ -33,13 +30,6 @@ export function useEmbedViews(projectData, embedViews, companyUser, renameValue,
     };
 
     const editViewName = (element) => {
-        const user = getUser(userId.value);
-        const userData = {
-            id: user.id,
-            Employee_Name: user.Employee_Name,
-            companyOwnerId: getters['settings/companyOwnerDetail'].userId,
-        };
-
         if (renameValue.value.name.trim() == element.name.trim()) {
             renameValue.value = { name: '', id: '' };
             return;
@@ -59,7 +49,6 @@ export function useEmbedViews(projectData, embedViews, companyUser, renameValue,
         }
         if (element.isPrivate) {
             editPrivateName({ cid: companyId.value, uid: companyUser.value._id, uniqueId: element.id }, element, renameValue.value.name.trim());
-            privateViewHistory(companyId.value, projectData.value._id, `<b>${userData.Employee_Name}</b> has changed the  <b> Embed View name </b> as <b> ${renameValue.value.name.trim()} </b>  from <b>${element?.name} </b>`);
         } else {
             editView({ cid: companyId.value, pid: projectData.value._id }, element, renameValue.value.name.trim(), 'name').then((res) => {
                 commit('projectData/projectLocalUpdate', { itemData: res.data, projectId: projectData.value._id, key: 'ProjectView', subKey: 'edit', userId: '' });
@@ -74,14 +63,7 @@ export function useEmbedViews(projectData, embedViews, companyUser, renameValue,
     };
 
     const deleteEmbedView = () => {
-        const user = getUser(userId.value);
-        const userData = {
-            id: user.id,
-            Employee_Name: user.Employee_Name,
-            companyOwnerId: getters['settings/companyOwnerDetail'].userId,
-        };
         if (openDelete.value.data.isPrivate) {
-            privateViewHistory(companyId.value, projectData.value._id, `<b> ${userData.Employee_Name} </b> has deleted the  <b> Embed View ${openDelete.value.data.name} </b>`);
             deletePrivateView({ cid: companyId.value, uid: companyUser.value._id, uniqueId: openDelete.value.data.id }).then(() => {
                 $toast.success(t('Toast.View_Deleted_Successfully'), { position: 'top-right' });
             }).catch((err) => {

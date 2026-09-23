@@ -13,6 +13,7 @@ const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 const { sprintIdentities, visibleSprintExpr } = require("../Sprints/helpers/sprintVisibility");
 const { commentThreadAccess, refuseThread } = require("./helpers/threadAccess");
 const { threadOf, canPostToThread, canChangeComment, changesThreadOrAuthor } = require("./helpers/threadWriteAccess");
+const { resolveMentionIds, notifyCommentThread } = require("./helpers/commentNotifications");
 
 /* @mention delivery: record the mention (feeds the in-app "mentions" tab, which
  * queries the mentions collection by mentionIds) and fire the notification
@@ -78,16 +79,15 @@ exports.save = async (req, res) => {
         // userId. Legit callers already send their own id, so this is transparent.
         if (req.uid) convertData.userId = req.uid;
         const companyId = req.headers['companyid'];
-        const access = await canPostToThread(companyId, req.uid, threadOf(convertData));
+        const thread = threadOf(convertData);
+        const access = await canPostToThread(companyId, req.uid, thread);
         if (!access.allowed) return refuseThread(res, access);
-        // @mentions: extract the [Name](userId) tokens the editor inserts so the
-        // comment records who was mentioned (drives the mention notification).
-        const mentionIds = parseMentionIds(convertData.message);
+        const mentionIds = await resolveMentionIds(companyId, convertData.userId, thread, convertData.message);
         const query = {
             type: SCHEMA_TYPE.COMMENTS,
             data: {
                 ...convertData,
-                ...(mentionIds.length ? { mentionIds } : {}),
+                mentionIds,
                 ...(convertData.taskId !== 'default' ? { taskId: convertData.taskId } : {})
             }
         }
@@ -102,8 +102,10 @@ exports.save = async (req, res) => {
             socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments_project', companyId });
         }
         if (mentionIds.length && response && response._id) {
-            notifyMentions(req.headers['companyid'], response, mentionIds)
+            notifyMentions(companyId, response, mentionIds)
                 .catch((err) => logger.error(`[mentions] notify failed: ${err.message}`));
+            notifyCommentThread(companyId, response, mentionIds)
+                .catch((err) => logger.error(`[mentions] thread notice failed: ${(err && err.message) || JSON.stringify(err)}`));
         }
         if (response) {
             return res.status(200).json({ status: true, data: response || {}  });
