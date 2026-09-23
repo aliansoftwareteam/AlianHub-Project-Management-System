@@ -14,7 +14,7 @@ const vectorStore = require('../vectorStore');
 const extractor = require('./extract/extractor');
 const { limits: fileLimits } = require('./extract/limits');
 const fileSweep = require('./fileSweep');
-const { chunkPage, chunkText, chunkGuide, guideMarkdown, guideTitle, chunkComment, chunkTranscript, contentHashOf } = require('./chunker');
+const { chunkPage, chunkText, chunkGuide, guideMarkdown, guideTitle, chunkComment, chunkTranscript, contentHashOf, textBytesOf } = require('./chunker');
 
 // Writes source chunks into the store. Callers check KNOWLEDGE_INDEXER first; nothing here
 // reads that flag, so the backfill, the event handlers and a re-index share one write path.
@@ -476,7 +476,7 @@ const ingest = async (companyId, sourceType, row, context = {}) => {
     let behind = false;
     for (const piece of pieces) {
         const stored = byOrdinal.get(piece.ordinal);
-        const chunk = { ...metadata, ...piece, ...vectorFields(stored, piece, vectors, wantedModel), deleted: false, deletedAt: null, tombstoneReason: '', sourceUpdatedAt };
+        const chunk = { ...metadata, ...piece, textBytes: textBytesOf(piece.text), ...vectorFields(stored, piece, vectors, wantedModel), deleted: false, deletedAt: null, tombstoneReason: '', sourceUpdatedAt };
         if (unchanged(stored, chunk, wantedModel)) {
             result.unchanged += 1;
             behind = behind || time(stored.sourceUpdatedAt) < time(sourceUpdatedAt);
@@ -523,6 +523,7 @@ const markLeftOut = async (companyId, sourceType, decision) => {
         ordinal: 0,
         headingPath: [],
         text: '',
+        textBytes: 0,
         contentHash: contentHashOf([], ''),
         embedding: [],
         embeddingModel: null,
@@ -555,7 +556,7 @@ const recordFileOutcome = async (companyId, row, { reason, attempts = 0 }) => {
         { ...where, ordinal: 0 },
         {
             $set: { ...metadata, deleted: true, tombstoneReason: reason, extractAttempts: attempts, sourceUpdatedAt: RULES.file.versionOf(row), ...(retryAt ? { extractDueAt: retryAt } : {}) },
-            $setOnInsert: { headingPath: [], text: '', contentHash: contentHashOf([], ''), embedding: [], embeddingModel: null, pieceCount, deletedAt: new Date() },
+            $setOnInsert: { headingPath: [], text: '', textBytes: 0, contentHash: contentHashOf([], ''), embedding: [], embeddingModel: null, pieceCount, deletedAt: new Date() },
         },
         { upsert: true },
     ], 'updateOne');
@@ -700,6 +701,7 @@ const markFilesPending = async (companyId, taskId) => {
             ordinal: 0,
             headingPath: [],
             text: '',
+            textBytes: 0,
             contentHash: contentHashOf([], ''),
             deleted: true,
             deletedAt: now,
@@ -769,8 +771,9 @@ const resumeFiles = async (companyId, { now = Date.now(), limit = FILE_SWEEP_BAT
 };
 
 /* Brings a task's files in line with the attachments its row carries now: each one synced, and
- * any file still indexed under the task whose attachment is gone taken out. */
-const syncTaskFiles = async (companyId, taskId, { priority = 'live' } = {}) => {
+ * any file still indexed under the task whose attachment is gone taken out. A caller walking under
+ * a lease passes `onProgress`, asked after each file, and the step stops once it answers false. */
+const syncTaskFiles = async (companyId, taskId, { priority = 'live', onProgress = null } = {}) => {
     const out = { indexed: 0, skipped: 0, removed: 0 };
     if (!isObjectId(taskId)) return out;
     const task = await byId(companyId, SCHEMA_TYPE.TASKS, taskId, 'attachments');
@@ -789,10 +792,12 @@ const syncTaskFiles = async (companyId, taskId, { priority = 'live' } = {}) => {
         const result = await syncFile(companyId, sourceId, { priority });
         if (result && result.leftOut) out.skipped += 1;
         else out.indexed += 1;
+        if (onProgress && !(await onProgress())) return { ...out, stopped: true };
     }
     for (const sourceId of gone) {
         await syncFile(companyId, sourceId, { priority });
         out.removed += 1;
+        if (onProgress && !(await onProgress())) return { ...out, stopped: true };
     }
     return out;
 };

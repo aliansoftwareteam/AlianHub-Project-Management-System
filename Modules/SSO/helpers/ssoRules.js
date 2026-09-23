@@ -2,6 +2,10 @@
 
 const SSO_PROVIDERS = Object.freeze(['oidc', 'saml']);
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const DOMAIN_RE = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+const MAX_DOMAINS = 50;
+const DOMAIN_TXT_PREFIX = '_alianhub-sso';
+const DOMAIN_TXT_VALUE_PREFIX = 'alianhub-sso-verification=';
 
 /* Validate an admin's SSO config payload. Returns { valid, reason }. */
 const validateSsoConfig = ({ provider, oidc, saml } = {}) => {
@@ -51,4 +55,52 @@ const extractIdentity = (claims = {}, map = {}) => {
     return { valid: true, reason: '', email, firstName, lastName, externalId };
 };
 
-module.exports = { SSO_PROVIDERS, validateSsoConfig, publicSsoView, extractIdentity };
+const normalizeDomain = (domain) => String(domain == null ? '' : domain).trim().toLowerCase().replace(/\.$/, '');
+
+const normalizeDomains = (list) => {
+    if (!Array.isArray(list)) return [];
+    const out = [];
+    list.map(normalizeDomain).forEach((d) => { if (DOMAIN_RE.test(d) && !out.includes(d)) out.push(d); });
+    return out.slice(0, MAX_DOMAINS);
+};
+
+const domainOfEmail = (email) => {
+    const at = String(email || '').lastIndexOf('@');
+    return at < 0 ? '' : normalizeDomain(String(email).slice(at + 1));
+};
+
+const domainTxtRecord = (domain, token) => ({ name: `${DOMAIN_TXT_PREFIX}.${domain}`, value: `${DOMAIN_TXT_VALUE_PREFIX}${token}` });
+
+/* resolveTxt answers each record as an array of chunks; a long record arrives split. */
+const txtRecordsInclude = (records, value) => (Array.isArray(records) ? records : [])
+    .some((chunks) => (Array.isArray(chunks) ? chunks.join('') : String(chunks)).trim() === value);
+
+/* A verification only counts while its domain is still listed. */
+const keepVerifications = (verifiedDomains, domains) => {
+    const listed = normalizeDomains(domains);
+    const kept = [];
+    (Array.isArray(verifiedDomains) ? verifiedDomains : []).forEach((v) => {
+        const domain = normalizeDomain(v && v.domain);
+        if (v && v.verifiedAt && listed.includes(domain) && !kept.some((k) => k.domain === domain)) kept.push({ domain, verifiedAt: v.verifiedAt });
+    });
+    return kept;
+};
+
+const verifiedDomainsOf = (cfg) => (cfg ? keepVerifications(cfg.verifiedDomains, cfg.domains).map((v) => v.domain) : []);
+
+const isVerifiedDomain = (cfg, domain) => Boolean(domain) && verifiedDomainsOf(cfg).includes(normalizeDomain(domain));
+
+const domainRecordsOf = (cfg) => {
+    if (!cfg || !cfg.domainVerificationToken) return [];
+    const verified = keepVerifications(cfg.verifiedDomains, cfg.domains);
+    return normalizeDomains(cfg.domains).map((domain) => {
+        const hit = verified.find((v) => v.domain === domain);
+        return { domain, ...domainTxtRecord(domain, cfg.domainVerificationToken), verifiedAt: hit ? hit.verifiedAt : null };
+    });
+};
+
+module.exports = {
+    SSO_PROVIDERS, validateSsoConfig, publicSsoView, extractIdentity,
+    normalizeDomain, normalizeDomains, domainOfEmail, domainTxtRecord, txtRecordsInclude,
+    keepVerifications, verifiedDomainsOf, isVerifiedDomain, domainRecordsOf,
+};

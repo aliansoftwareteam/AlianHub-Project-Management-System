@@ -14,7 +14,7 @@ const DEFAULT_RETENTION_DAYS = 30;
 const RUN_EVERY_MS = DAY_MS;
 
 const BLANK = Object.freeze({
-    text: '', title: '', headingPath: [], embedding: [], embeddingModel: null, contentHash: contentHashOf([], ''),
+    text: '', textBytes: 0, title: '', headingPath: [], embedding: [], embeddingModel: null, contentHash: contentHashOf([], ''),
 });
 
 /* 0 turns the purge off; anything that is not a whole number of days keeps the default. */

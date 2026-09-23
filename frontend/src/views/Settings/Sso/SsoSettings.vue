@@ -109,6 +109,33 @@
                             </div>
                             <div v-if="errors.domains" class="ah-field__error">{{ errors.domains }}</div>
                         </div>
+
+                        <div v-if="domainRecords.length" class="sso__verify sso__span">
+                            <div class="ah-small">{{ $t('Settings.sso_verify_hint') }}</div>
+                            <div v-for="r in domainRecords" :key="r.domain" class="sso__verify-row">
+                                <div class="sso__verify-head">
+                                    <span class="sso__provider-name">{{ r.domain }}</span>
+                                    <span v-if="r.verifiedAt" class="ah-chip ah-chip--ok">{{ $t('Settings.sso_domain_verified') }}</span>
+                                    <template v-else>
+                                        <span class="ah-chip">{{ $t('Settings.sso_domain_unverified') }}</span>
+                                        <button type="button" class="sso__link" :disabled="verifying === r.domain" @click="verifyDomain(r.domain)">{{ verifying === r.domain ? $t('Settings.sso_verifying') : $t('Settings.sso_verify') }}</button>
+                                    </template>
+                                </div>
+                                <div v-if="!r.verifiedAt" class="sso__values">
+                                    <div class="sso__value">
+                                        <span class="sso__value-label">{{ $t('Settings.sso_txt_name') }}</span>
+                                        <span class="sso__value-text">{{ r.name }}</span>
+                                        <button type="button" class="sso__link" @click="copy(r.name)">{{ $t('Settings.copy') }}</button>
+                                    </div>
+                                    <div class="sso__value">
+                                        <span class="sso__value-label">{{ $t('Settings.sso_txt_value') }}</span>
+                                        <span class="sso__value-text">{{ r.value }}</span>
+                                        <button type="button" class="sso__link" @click="copy(r.value)">{{ $t('Settings.copy') }}</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-if="verifyError" class="ah-field__error">{{ verifyError }}</div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -183,6 +210,8 @@ const saveError = ref("");
 const saveOk = ref(false);
 const savedConfig = ref(null);
 const domainDraft = ref("");
+const verifying = ref("");
+const verifyError = ref("");
 const errors = reactive({ discoveryUrl: "", clientId: "", clientSecret: "", entryPoint: "", idpCert: "", domains: "" });
 const form = reactive({
     provider: "oidc", isEnabled: false, autoProvisionUsers: true, defaultRoleType: 3,
@@ -213,6 +242,8 @@ const copyValues = computed(() => {
         { label: t("Settings.sso_entity_id"), value: `${origin}/api/v2/sso/saml/metadata?companyId=${cid.value}` }
     ];
 });
+
+const domainRecords = computed(() => (savedConfig.value && Array.isArray(savedConfig.value.domainRecords) ? savedConfig.value.domainRecords : []));
 
 const initiateUrl = computed(() => `${origin}/api/v2/sso/${(savedConfig.value && savedConfig.value.provider) || form.provider}/initiate?companyId=${cid.value}`);
 const loginPreviewUrl = computed(() => `${origin}/#/login`);
@@ -291,6 +322,25 @@ async function save() {
     }
 }
 
+async function verifyDomain(domain) {
+    if (verifying.value) return;
+    verifying.value = domain;
+    verifyError.value = "";
+    try {
+        const body = (await apiRequest("post", env.SSO_VERIFY_DOMAIN, { domain }))?.data;
+        if (body?.status) {
+            savedConfig.value = body.data || savedConfig.value;
+            $toast.success(t("Settings.sso_domain_verified_toast", { d: domain }), { position: "top-right" });
+        } else {
+            verifyError.value = t("Settings.sso_verify_failed", { d: domain });
+        }
+    } catch (error) {
+        verifyError.value = t("Toast.something_went_wrong");
+    } finally {
+        verifying.value = "";
+    }
+}
+
 function testSignIn() {
     window.open(initiateUrl.value, "_blank", "noopener");
 }
@@ -337,6 +387,9 @@ onMounted(load);
 .sso__chip-input { flex: 1; min-width: 140px; border: 0; background: transparent; color: var(--ink); font: 400 13px/1 var(--font-ui); height: 26px; }
 .sso__chip-input:focus { outline: none; }
 .sso__chip-input::placeholder { color: var(--ink-3); }
+.sso__verify { display: flex; flex-direction: column; gap: 8px; }
+.sso__verify-row { display: flex; flex-direction: column; gap: 6px; }
+.sso__verify-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sso__enf { display: flex; flex-direction: column; gap: 8px; }
 .sso__radio { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; color: var(--ink-label); font: var(--text-small); }
 .sso__radio input { margin: 3px 0 0; accent-color: var(--brand); flex: none; }
