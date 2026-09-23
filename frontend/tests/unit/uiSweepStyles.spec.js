@@ -40,3 +40,18 @@ describe('the "available, not enabled" app teaser', () => {
         expect(rule).toMatch(/box-sizing:\s*border-box/);
     });
 });
+
+describe('legacy blocks inside the task panel in dark mode', () => {
+    const css = read('components/organisms/TaskDetailOverlay/style.css');
+    const dark = (selector) => ruleBody(css, `:root[data-theme="dark"] .ah-detail__panel ${selector}`);
+
+    test.each([
+        ['.black', /color:\s*var\(--ink\)/],
+        ['.blue', /color:\s*var\(--brand\)/],
+        ['.add_description_button', /background:\s*var\(--surface-2\)/],
+        ['.app-teaser-banner__title', /color:\s*var\(--ink\)/],
+        ['.app-teaser-banner__cta', /color:\s*var\(--brand\)/],
+    ])('%s takes its colour from the theme tokens', (selector, expected) => {
+        expect(dark(selector)).toMatch(expected);
+    });
+});
