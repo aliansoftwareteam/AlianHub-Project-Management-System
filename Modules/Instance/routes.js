@@ -2,6 +2,7 @@ const ctrl = require('./controller');
 const enforcement = require('./enforcement');
 const csp = require('./csp');
 const egress = require('./egress');
+const instructionPatterns = require('./instructionPatterns');
 const knowledge = require('./knowledge');
 const auditRedaction = require('./auditRedaction');
 const { requireInstanceAdmin } = require('./guard');
@@ -44,6 +45,9 @@ exports.init = (app) => {
     app.put(`${admin}/enforcement/:companyId/mode`, enforcement.setMode);
     app.get(`${admin}/egress`, egress.summary);
     app.put(`${admin}/egress/:companyId`, egress.setHosts);
+    app.get(`${admin}/instruction-patterns`, instructionPatterns.summary);
+    app.post(`${admin}/instruction-patterns`, instructionPatterns.add);
+    app.delete(`${admin}/instruction-patterns/:id`, instructionPatterns.remove);
     app.get(`${admin}/knowledge`, knowledge.summary);
     app.get(`${admin}/knowledge/:companyId`, knowledge.workspace);
     app.post(`${admin}/knowledge/:companyId/reindex`, knowledge.reindex);

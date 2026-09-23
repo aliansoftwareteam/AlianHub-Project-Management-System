@@ -78,7 +78,7 @@ This is the Automations engine's shape applied to skills, deliberately. A rule i
 
 ### 3. The registry stays hybrid
 
-`getSkill(slug)` resolves a company's data skills first, then the built-in code skills. Code skills remain for work that needs an evidence layer the vocabulary cannot express: `qa-review` measures fourteen page facts in `engine/pageAudit.js` and gates every finding against a fact that actually failed, and `pr.summary` fetches an external pull request. Both keep that guarantee.
+`getSkill(slug)` resolves a company's data skills first, then the built-in code skills. Code skills remain for work that needs an evidence layer the vocabulary cannot express: `qa-review` measures fourteen page facts in `engine/pageAudit.js` and gates every finding against a fact that actually failed, and it keeps that guarantee. `pr.summary` was code until phase 4 and is now only its built-in seed, which reads the pull request through a declared `url` read and runs while `SKILL_EXTERNAL_READS` is on; with the flag off it is listed as unavailable.
 
 The migration is the proof of the vocabulary: `brief.parse`, `digest.ceo` and `project.guide` are re-expressed as seeded data skills. If one of them cannot be, the vocabulary is wrong and we learn it in the first slice rather than the fourth.
 

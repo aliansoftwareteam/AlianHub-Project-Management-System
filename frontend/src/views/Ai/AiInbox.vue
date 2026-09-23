@@ -92,6 +92,7 @@
                     <div class="ai-detail__crumb">
                         <span>{{ selected.agentName }}</span>
                         <span v-if="selected.runId">· {{ $t('Ai.run_n', { n: String(selected.runId).slice(-4) }) }}</span>
+                        <span v-if="selectedSkillSource">· <span data-test="proposal-skill-source">{{ selectedSkillSource }}</span></span>
                         <span>· {{ shortTime(selected.createdAt) }}</span>
                     </div>
                     <h2 class="ai-detail__what">{{ selected.what }}</h2>
@@ -162,6 +163,7 @@ import { useWorkflowApprovals } from "./useWorkflowApprovals";
 import { useAgents, reasonOf } from "./useAgents";
 import { DECLINE_REASONS } from "./episodeText";
 import { taintSourcesLine, taintSourcesOf } from "./taintText";
+import { skillSourceLabel } from "./skillSourceText";
 import { useAgentAccess } from "./agentAccess";
 
 defineOptions({ name: "AiInboxPage" });
@@ -207,6 +209,7 @@ const declineReasonValue = computed(() => declineReason.value || declineNote.val
 
 const canDecide = computed(() => !selected.value || selected.value.gate !== GATE_OWNER_ADMIN || canManage.value);
 const taintLine = (marker) => taintSourcesLine(t, taintSourcesOf(marker));
+const selectedSkillSource = computed(() => skillSourceLabel(t, selected.value?.skillSource));
 
 const tabs = computed(() => [
     { key: "pending", label: "Ai.waiting", count: counts.value.waiting || 0 },
