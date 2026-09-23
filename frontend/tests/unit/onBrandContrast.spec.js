@@ -77,6 +77,7 @@ describe('text on the brand fill', () => {
 
     test('the page checklist tick uses --on-brand, with a dark hover fill it can read on', () => {
         const vue = read('components/molecules/Pages/PageBlockEditor.vue');
+        expect(vue).toMatch(/\.pbe :deep\(\.cdx-checklist__item-checkbox-check\) \{ background: var\(--surface\);/);
         expect(vue).toMatch(/cdx-checklist__item-checkbox-check svg path\) \{ stroke: var\(--on-brand\); \}/);
         expect(vue).toMatch(/:root\[data-theme="dark"\] \.pbe :deep\(\.cdx-checklist__item--checked \.cdx-checklist__item-checkbox:hover \.cdx-checklist__item-checkbox-check\) \{ background: var\(--brand-deep\)/);
     });
