@@ -93,9 +93,9 @@ const documentExists = async (companyId, sourceType, id) => {
 /* A seat in any state counts, so a departed member can still be erased. */
 const personExists = async (companyId, userId) => {
     const company = String(companyId);
-    const seat = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+    const seat = await MongoDbCrudOpration(company, {
         type: SCHEMA_TYPE.COMPANY_USERS,
-        data: [{ userId: { $in: [userId, new mongoose.Types.ObjectId(userId)] }, companyId: { $in: [company, new mongoose.Types.ObjectId(company)] } }, '_id', { lean: true }],
+        data: [{ userId: { $in: [userId, new mongoose.Types.ObjectId(userId)] } }, '_id', { lean: true }],
     }, 'findOne');
     return Boolean(seat) || hasChunks(company, { createdBy: userId });
 };
