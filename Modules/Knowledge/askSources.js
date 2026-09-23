@@ -11,7 +11,7 @@ const askSources = async ({ companyId, uid, question, projectId, projects, limit
     return passages.map((p) => ({
         kind: p.sourceType,
         id: p.sourceId,
-        ref: `${p.sourceType}:${p.sourceId.slice(-6)}`,
+        ref: p.taskKey || `${p.sourceType}:${p.sourceId.slice(-6)}`,
         title: p.title,
         project: nameById[p.projectId] || '',
         projectId: p.projectId,
