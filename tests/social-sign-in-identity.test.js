@@ -26,7 +26,7 @@ const loginSession = require('../Modules/Auth/controller/loginSession');
 const createUser = require('../Modules/Auth/controller/createUser');
 
 const COMPANY = '6f0000000000000000000c01';
-const VICTIM = { _id: '6f00000000000000000000a1', email: 'victim@example.test' };
+const MEMBER = { _id: '6f00000000000000000000a1', email: 'member@example.test' };
 const LINKED = { _id: '6f00000000000000000000a2', email: 'linked@example.test' };
 const SPARE = { _id: '6f00000000000000000000a3', email: 'spare@example.test' };
 
@@ -129,7 +129,7 @@ beforeEach(() => {
     jest.spyOn(axios, 'get').mockImplementation(answerProvider);
     jest.spyOn(axios, 'post').mockImplementation(async (url) => { throw new Error(`unexpected provider call ${url}`); });
     jest.spyOn(https, 'request').mockImplementation(() => { throw new Error('no network in tests'); });
-    seedAccount(VICTIM);
+    seedAccount(MEMBER);
     seedAccount(SPARE);
 });
 
@@ -140,40 +140,40 @@ describe.each(Object.keys(PROVIDERS))('%s sign-in binds to the provider identity
     const login = (credentials, extra = {}) => signIn({ authProvider: provider, isLoginType: 'frontend', ...credentials, ...extra });
 
     it('refuses a provider account with no email when the body names another account', async () => {
-        const { refused, req } = await login(token(9001), { email: VICTIM.email, [idField]: '9001' });
+        const { refused, req } = await login(token(9001), { email: MEMBER.email, [idField]: '9001' });
 
         expect(refused).toBe(true);
         expect(req.errorMessageObject.message).toBeTruthy();
         expect(allSessions()).toHaveLength(0);
-        expect(authOf(VICTIM._id)[idField]).toBeUndefined();
+        expect(authOf(MEMBER._id)[idField]).toBeUndefined();
     });
 
     it('refuses an email the provider has not verified', async () => {
-        const { refused } = await login(token(9002, { email: VICTIM.email, verified: false }), { email: VICTIM.email, [idField]: '9002' });
+        const { refused } = await login(token(9002, { email: MEMBER.email, verified: false }), { email: MEMBER.email, [idField]: '9002' });
 
         expect(refused).toBe(true);
         expect(allSessions()).toHaveLength(0);
-        expect(authOf(VICTIM._id)[idField]).toBeUndefined();
+        expect(authOf(MEMBER._id)[idField]).toBeUndefined();
     });
 
     it('refuses when the body names an email other than the verified one', async () => {
-        const { refused } = await login(token(9003, { email: 'someone.else@example.test' }), { email: VICTIM.email, [idField]: '9003' });
+        const { refused } = await login(token(9003, { email: 'someone.else@example.test' }), { email: MEMBER.email, [idField]: '9003' });
 
         expect(refused).toBe(true);
         expect(allSessions()).toHaveLength(0);
-        expect(authOf(VICTIM._id)[idField]).toBeUndefined();
+        expect(authOf(MEMBER._id)[idField]).toBeUndefined();
     });
 
     it('signs in the account already bound to the provider id, whatever email the body names', async () => {
         seedAccount(LINKED, { [idField]: '9004' });
 
-        const { refused, payload } = await login(token(9004), { email: VICTIM.email, [idField]: '9004' });
+        const { refused, payload } = await login(token(9004), { email: MEMBER.email, [idField]: '9004' });
 
         expect(refused).toBe(false);
         expect(String(payload.uid)).toBe(LINKED._id);
         expect(sessionsOf(LINKED._id)).toHaveLength(1);
-        expect(sessionsOf(VICTIM._id)).toHaveLength(0);
-        expect(authOf(VICTIM._id)[idField]).toBeUndefined();
+        expect(sessionsOf(MEMBER._id)).toHaveLength(0);
+        expect(authOf(MEMBER._id)[idField]).toBeUndefined();
     });
 
     it('trusts the verified provider id over the id the body sends', async () => {
@@ -196,28 +196,28 @@ describe.each(Object.keys(PROVIDERS))('%s sign-in binds to the provider identity
     });
 
     it('links an unbound account found by the verified email and signs it in', async () => {
-        const { refused, payload } = await login(token(9008, { email: 'Victim@Example.test' }), { email: VICTIM.email, [idField]: '9008' });
+        const { refused, payload } = await login(token(9008, { email: 'Member@Example.test' }), { email: MEMBER.email, [idField]: '9008' });
 
         expect(refused).toBe(false);
-        expect(String(payload.uid)).toBe(VICTIM._id);
-        expect(sessionsOf(VICTIM._id)).toHaveLength(1);
-        expect(authOf(VICTIM._id)[idField]).toBe('9008');
+        expect(String(payload.uid)).toBe(MEMBER._id);
+        expect(sessionsOf(MEMBER._id)).toHaveLength(1);
+        expect(authOf(MEMBER._id)[idField]).toBe('9008');
     });
 
     it('refuses a token the provider does not accept', async () => {
-        const { refused } = await login({ accessToken: 'forged', idToken: 'forged' }, { email: VICTIM.email, [idField]: '9009' });
+        const { refused } = await login({ accessToken: 'forged', idToken: 'forged' }, { email: MEMBER.email, [idField]: '9009' });
 
         expect(refused).toBe(true);
         expect(allSessions()).toHaveLength(0);
-        expect(authOf(VICTIM._id)[idField]).toBeUndefined();
+        expect(authOf(MEMBER._id)[idField]).toBeUndefined();
     });
 
     it('refuses a sign-in without a provider token', async () => {
-        const { refused } = await login({}, { email: VICTIM.email, [idField]: '9010' });
+        const { refused } = await login({}, { email: MEMBER.email, [idField]: '9010' });
 
         expect(refused).toBe(true);
         expect(allSessions()).toHaveLength(0);
-        expect(authOf(VICTIM._id)[idField]).toBeUndefined();
+        expect(authOf(MEMBER._id)[idField]).toBeUndefined();
     });
 });
 
@@ -225,20 +225,20 @@ describe('github verified email', () => {
     it('ignores the public profile email and uses only a verified address from the email list', async () => {
         const { refused } = await signIn({
             authProvider: 'github',
-            ...PROVIDERS.github.token(9101, { publicEmail: VICTIM.email }),
-            email: VICTIM.email,
+            ...PROVIDERS.github.token(9101, { publicEmail: MEMBER.email }),
+            email: MEMBER.email,
             githubId: '9101',
         });
 
         expect(refused).toBe(true);
-        expect(authOf(VICTIM._id).githubId).toBeUndefined();
+        expect(authOf(MEMBER._id).githubId).toBeUndefined();
     });
 
     it('refuses when the email list cannot be read and no account is bound to the id', async () => {
         const { refused } = await signIn({
             authProvider: 'github',
-            ...PROVIDERS.github.token(9102, { email: VICTIM.email, emailsDenied: true, publicEmail: VICTIM.email }),
-            email: VICTIM.email,
+            ...PROVIDERS.github.token(9102, { email: MEMBER.email, emailsDenied: true, publicEmail: MEMBER.email }),
+            email: MEMBER.email,
         });
 
         expect(refused).toBe(true);
@@ -248,7 +248,7 @@ describe('github verified email', () => {
 
 describe('google id token', () => {
     it('verifies the token against the configured client id', async () => {
-        await signIn({ authProvider: 'google', ...PROVIDERS.google.token(9201, { email: VICTIM.email }), email: VICTIM.email });
+        await signIn({ authProvider: 'google', ...PROVIDERS.google.token(9201, { email: MEMBER.email }), email: MEMBER.email });
 
         expect(mockVerifyIdToken).toHaveBeenCalledWith(expect.objectContaining({ audience: 'google-client.apps.test' }));
     });
@@ -257,7 +257,7 @@ describe('google id token', () => {
         const saved = process.env.GOOGLE_CLIENT_ID;
         delete process.env.GOOGLE_CLIENT_ID;
         try {
-            const { refused } = await signIn({ authProvider: 'google', ...PROVIDERS.google.token(9202, { email: VICTIM.email }), email: VICTIM.email });
+            const { refused } = await signIn({ authProvider: 'google', ...PROVIDERS.google.token(9202, { email: MEMBER.email }), email: MEMBER.email });
             expect(refused).toBe(true);
             expect(allSessions()).toHaveLength(0);
         } finally {

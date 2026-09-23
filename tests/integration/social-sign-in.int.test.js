@@ -20,7 +20,7 @@ const gitlabLogin = (identity, email) => anonymous.post('/api/v2/auth/login', {
 
 /* A verified password account with no GitLab link, made the way the fixtures make invitees. */
 const passwordAccount = async () => {
-    const email = `social.victim.${uniqueSuffix()}@e2e.alianhub.test`;
+    const email = `social.member.${uniqueSuffix()}@e2e.alianhub.test`;
     const { api } = await owner();
     const invite = await api.post('/api/v2/sendInvitationEmail', { email, companyId: state.companyId, companyName: 'E2E Workspace', role: 3, designation: 0 });
     expect(invite.status).toBe(200);
@@ -33,18 +33,18 @@ const passwordAccount = async () => {
 
 describe('social sign-in through /api/v2/auth/login binds to the provider identity', () => {
     it('refuses a provider account with no email that names another account', async () => {
-        const victim = await passwordAccount();
+        const member = await passwordAccount();
 
-        const res = await gitlabLogin({ id: gitlabIdFor() }, victim.email);
+        const res = await gitlabLogin({ id: gitlabIdFor() }, member.email);
 
         expect(res.status).toBe(400);
         expect(res.body.accessToken).toBeUndefined();
     });
 
     it('refuses an email the provider has not confirmed', async () => {
-        const victim = await passwordAccount();
+        const member = await passwordAccount();
 
-        const res = await gitlabLogin({ id: gitlabIdFor(), email: victim.email, confirmed: false }, victim.email);
+        const res = await gitlabLogin({ id: gitlabIdFor(), email: member.email, confirmed: false }, member.email);
 
         expect(res.status).toBe(400);
         expect(res.body.accessToken).toBeUndefined();
@@ -69,10 +69,10 @@ describe('social sign-in through /api/v2/auth/login binds to the provider identi
     });
 
     it('refuses a token GitLab does not accept', async () => {
-        const victim = await passwordAccount();
+        const member = await passwordAccount();
 
         const res = await anonymous.post('/api/v2/auth/login', {
-            authProvider: 'gitlab', accessToken: 'not-a-gitlab-token', gitlabId: String(gitlabIdFor()), email: victim.email,
+            authProvider: 'gitlab', accessToken: 'not-a-gitlab-token', gitlabId: String(gitlabIdFor()), email: member.email,
         });
 
         expect(res.status).toBe(400);
