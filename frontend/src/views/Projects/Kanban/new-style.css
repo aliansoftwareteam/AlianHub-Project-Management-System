@@ -33,6 +33,8 @@
     accent-color: var(--brand);
     margin: 0;
 }
+/* A native checkbox paints its unchecked box white unless the element itself opts into the dark scheme. */
+:root[data-theme="dark"] .kanban-card-multi-select input[type="checkbox"] { color-scheme: dark; }
 
 .kanban-board .kanban-column {
     flex: 0 0 262px;

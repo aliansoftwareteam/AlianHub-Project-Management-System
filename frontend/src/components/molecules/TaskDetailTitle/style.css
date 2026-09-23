@@ -8,8 +8,9 @@
     width: 15px;
     height: 15px;
     margin: 0px 0px 0px 10px;
-
 }
+/* copy.png is a black glyph; inverting it keeps it visible on the dark panel. */
+:root[data-theme="dark"] .task-name .copy-icon { filter: invert(1); }
 .task-name .title-name {
     text-overflow: ellipsis;
     overflow: hidden;

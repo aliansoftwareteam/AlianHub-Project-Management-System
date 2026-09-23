@@ -70,6 +70,7 @@ body:has(.calender-menu-class-duedate):after {
     background-position: 0% 0%;
     padding-right: 0 !important;
 }
+:root[data-theme="dark"] .calendar-comp { color: var(--ink); }
 .calendar-comp-white {
     background-image: url('@/assets/images/svg/white-icon-cal.svg');
     background-repeat: no-repeat;
