@@ -23,6 +23,11 @@ const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const { taskNotFound, escapeText, TaskWriteRefusal } = require('../taskWriteFields');
 
+const storedFileName = (storedTask, data) => {
+    const stored = ((storedTask && storedTask.attachments) || []).find((file) => file && file.id !== undefined && file.id === data.id);
+    return stored ? stored.filename : data.filename;
+};
+
 const isPlainItemId = (value) => (typeof value === 'string' && value.trim() !== '' && !value.startsWith('$')) || (typeof value === 'number' && Number.isFinite(value));
 
 /* The ids a checklist operation filters or pulls by; each must be one plain id, never a condition. */
@@ -130,7 +135,7 @@ module.exports = {
     },
 
     /* -------------- UPDATE ATTACHMENTS -----------------*/
-    updateAttachments({companyId, sprintId, taskId, taskData, id = "", operation, data = {}, userData, projectData}) {
+    updateAttachments({companyId, sprintId, taskId, taskData, id = "", operation, data = {}, userData, projectData, storedTask}) {
         return new Promise((resolve, reject) => {
             try {
 
@@ -169,7 +174,7 @@ module.exports = {
                     let notificationObject = {};
                     if(operation === "add") {
                         historyObj = {
-                            message: `<b>${userData.Employee_Name}</b> has attached <b>${escapeHtml(data.filename)}</b> on <b>${sanitizeInput(taskData.TaskName)}</b>.`,
+                            message: `<b>${userData.Employee_Name}</b> has attached <b>${escapeHtml(data.filename)}</b> on <b>${escapeText(taskData.TaskName)}</b>.`,
                             key: "Task_Attachment",
                             sprintId: taskData.sprintId,
                         }
@@ -182,8 +187,9 @@ module.exports = {
                             key: "task_attachments",
                         }
                     } else if(operation === "remove") {
+                        const removedName = storedFileName(storedTask, data);
                         historyObj = {
-                            message: `<b>${escapeHtml(data.filename)}</b> removed from <b>${sanitizeInput(taskData.TaskName)}</b>&apos;s attchments.`,
+                            message: `<b>${escapeHtml(removedName)}</b> removed from <b>${escapeText(taskData.TaskName)}</b>&apos;s attchments.`,
                             key: "Task_Attachment_Remove",
                             sprintId: taskData.sprintId,
                         }
@@ -191,7 +197,7 @@ module.exports = {
                             'message': taskAttachmentRemove({
                                 'ProjectName': projectData.ProjectName,
                                 'TaskName': taskData.TaskName,
-                                'removeFileName': data.filename
+                                'removeFileName': removedName
                             }),
                             'key': 'task_attachments',
                         }

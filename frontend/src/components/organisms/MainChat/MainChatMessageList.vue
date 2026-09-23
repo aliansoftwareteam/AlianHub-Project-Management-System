@@ -99,6 +99,7 @@ import { computed, defineProps, defineEmits, inject, nextTick, onMounted, ref, w
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'vuex';
 import { useGetterFunctions } from '@/composable';
+import { isAgentComment } from '@/utils/commentSide';
 import MainChatMessage from './MainChatMessage.vue';
 import MainChatAvatar from './MainChatAvatar.vue';
 import MainChatIcon from './MainChatIcon.vue';
@@ -203,6 +204,7 @@ const rows = computed(() => {
 
         const sameRun = !!previous
             && previous.userId === message.userId
+            && isAgentComment(previous) === isAgentComment(message)
             && !previous.isDeleted
             && !message.isDeleted
             && Math.abs(timeOf(message) - timeOf(previous)) < GROUP_WINDOW;
@@ -236,7 +238,7 @@ function isFormerMember(user) {
 }
 
 function senderName(message) {
-    if (message.sent) return t('MainChat.you');
+    if (message.sent && !isAgentComment(message)) return t('MainChat.you');
     const user = getUser(message.userId) || {};
     if (isFormerMember(user)) return t('MainChat.former_member');
     return user.Employee_Name || '';

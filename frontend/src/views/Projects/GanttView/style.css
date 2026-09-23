@@ -120,7 +120,7 @@
 .gv__chart :deep(.gv-owner) {
     display: inline-grid; place-items: center;
     width: 20px; height: 20px; border-radius: 50%;
-    background: var(--brand); color: #fff;
+    background: var(--brand); color: var(--on-brand);
     font: 600 9px/1 var(--font-ui);
 }
 .gv__chart :deep(.gv-unassigned) { font: var(--text-data); color: var(--ink-3); font-size: 10px; }

@@ -51,7 +51,7 @@
 }
 .driver-popover.ah-tour .driver-popover-navigation-btns button:hover,
 .driver-popover.ah-tour .ah-tour__skip:hover { background: var(--surface-hover); }
-.driver-popover.ah-tour .driver-popover-next-btn { background: var(--brand) !important; color: #fff !important; border-color: var(--brand) !important; }
+.driver-popover.ah-tour .driver-popover-next-btn { background: var(--brand) !important; color: var(--on-brand) !important; border-color: var(--brand) !important; }
 .driver-popover.ah-tour .driver-popover-next-btn:hover { background: var(--brand-deep) !important; }
 .driver-popover.ah-tour .driver-popover-prev-btn { display: none !important; }
 .driver-popover.ah-tour .ah-tour__meta { margin-left: auto; font: 400 11.5px/1 var(--font-ui); color: var(--ink-2); white-space: nowrap; }

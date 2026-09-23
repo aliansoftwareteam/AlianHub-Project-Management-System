@@ -54,12 +54,7 @@
   top: 26px;
   box-shadow: var(--shadow-card);
   background-color: var(--brand)!important;
-  color: #fff;
-}
-/* Dark --brand is a light lavender; white on it is 2.55:1, so the pill takes
- * dark ink there, the same way tokens.css handles .ah-btn--primary. */
-:root[data-theme="dark"] .convert_dateformat{
-  color: var(--canvas);
+  color: var(--on-brand);
 }
 .msg__initaluser{
   height: 65px;

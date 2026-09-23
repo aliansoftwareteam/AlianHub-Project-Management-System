@@ -47,7 +47,7 @@
     border-radius: 7px;
     display: grid; place-items: center;
     font: 700 11px/1 var(--font-ui);
-    color: #fff;
+    color: var(--surface);
     background: var(--ink);
 }
 .pipe-stage__bar { height: 5px; border-radius: 99px; background: var(--ink); }
@@ -56,8 +56,11 @@
 .pipe-stage__body code { font: var(--text-data); background: var(--surface-hover); padding: 1px 5px; border-radius: 4px; }
 
 .pipe-stage--brand .pipe-stage__n, .pipe-stage--brand .pipe-stage__bar { background: var(--brand); }
+.pipe-stage--brand .pipe-stage__n { color: var(--on-brand); }
 .pipe-stage--warn .pipe-stage__n, .pipe-stage--warn .pipe-stage__bar { background: var(--warn); }
 .pipe-stage--danger .pipe-stage__n, .pipe-stage--danger .pipe-stage__bar { background: var(--danger); }
+/* --warn is the same orange in both themes, and only dark ink clears 4.5:1 on it. */
+.pipe-stage--warn .pipe-stage__n { color: #111114; }
 
 .pipe-actor {
     padding: 9px 11px;
