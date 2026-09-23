@@ -1,7 +1,7 @@
 {
   "locale": "ge",
   "machineTranslated": false,
-  "updatedAt": "2026-09-23T15:38:14.807Z",
+  "updatedAt": "2026-09-23T16:06:43.483Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6632,6 +6632,24 @@
     "Time.agent_load_failed": "Agent proposals didn't load. Refresh to try again.",
     "Ai.nothing_changed": "Nothing changed, so nothing was saved.",
     "Time.agent_tag": "AGENT",
-    "Time.approval_types": "Approval types"
+    "Time.approval_types": "Approval types",
+    "Automations.runs_open": "History",
+    "Automations.runs_title": "Run history",
+    "Automations.runs_close": "Close run history",
+    "Automations.runs_loading": "Loading runs…",
+    "Automations.runs_error": "Could not load this automation's runs.",
+    "Automations.runs_empty": "This automation has not run yet.",
+    "Automations.runs_limit": "Showing the {n} most recent runs.",
+    "Automations.outcome_applied": "Actions applied",
+    "Automations.outcome_skipped": "Skipped",
+    "Automations.outcome_failed": "Failed",
+    "Automations.outcome_retrying": "Retrying",
+    "Automations.outcome_running": "Matched, running",
+    "Automations.outcome_queued": "Matched, queued",
+    "Automations.stopped_at_condition": "A condition in step {id} did not hold.",
+    "Automations.step_no_change": "no change needed",
+    "Automations.duration_ms": "{n} ms",
+    "Automations.duration_s": "{n} s",
+    "Automations.duration_min": "{n} min"
   }
 }

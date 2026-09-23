@@ -128,11 +128,14 @@
                     ><span class="au__knob"></span></button>
                     <span class="au__rule-text">{{ r.sentence || r.summary }}</span>
                     <span class="au__rule-count ah-mono">{{ $t('Parity.fired_n', { n: r.firedCount || 0 }) }}</span>
+                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="open-runs" @click="runsRule = r">{{ $t('Automations.runs_open') }}</button>
                     <button v-if="canManage" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="edit(r)">{{ $t('Automations.edit') }}</button>
                     <button v-if="canManage" type="button" class="ah-btn ah-btn--ghost ah-btn--sm au__delete" @click="remove(r)">{{ $t('Automations.delete') }}</button>
                 </div>
             </template>
         </div>
+
+        <RunHistoryDrawer v-if="runsRule" :rule="runsRule" :triggers="manifest.triggers" :actions="manifest.actions" @close="runsRule = null" />
     </div>
 </template>
 
@@ -142,6 +145,7 @@ import { useStore } from 'vuex';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import RunHistoryDrawer from './RunHistoryDrawer.vue';
 
 // Automations (handoff 13d). You describe the rule in a sentence; the compiled
 // rule sits beside it and either can be edited. The compiler is a deterministic
@@ -164,6 +168,7 @@ const grammar = ref({});
 const sentence = ref('');
 const sentenceInput = ref(null);
 const backtest = ref(null);
+const runsRule = ref(null);
 
 const scopeChoice = ref('all');
 const conditions = ref([]);

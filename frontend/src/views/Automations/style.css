@@ -80,3 +80,31 @@
     .au__rule { flex-wrap: wrap; }
     .au__slot { max-width: 100%; }
 }
+
+.au-runs { position: fixed; inset: 0; z-index: 60; }
+.au-runs__scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, .28); }
+.au-runs__panel {
+    position: absolute; inset: 0 0 0 auto;
+    width: min(100vw, 460px);
+    display: flex; flex-direction: column;
+    background: var(--surface);
+    border-left: 1px solid var(--hairline);
+    box-shadow: var(--shadow-pop);
+}
+.au-runs__head { display: flex; align-items: flex-start; gap: 10px; padding: 16px 18px 12px; border-bottom: 1px solid var(--hairline); }
+.au-runs__heading { flex: 1; min-width: 0; }
+.au-runs__rule { margin: 4px 0 0; color: var(--ink-2); overflow-wrap: anywhere; }
+.au-runs__body { flex: 1; min-height: 0; overflow: auto; padding: 12px 18px 18px; }
+.au-runs__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.au-runs__row { padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 9px; display: flex; flex-direction: column; gap: 5px; font: var(--text-body); }
+.au-runs__meta { display: flex; justify-content: space-between; gap: 10px; color: var(--ink-2); font: var(--text-small); }
+.au-runs__trigger { color: var(--ink-2); }
+.au-runs__task { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.au-runs__key { border: 0; background: none; padding: 0; color: var(--brand); cursor: pointer; flex: none; }
+.au-runs__key:hover { text-decoration: underline; }
+.au-runs__key:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
+.au-runs__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.au-runs__outcome { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.au-runs__steps { flex-basis: 100%; margin: 0; padding-left: 18px; font: var(--text-small); color: var(--ink-2); }
+.au-runs__error { flex-basis: 100%; margin: 0; font: var(--text-small); color: var(--danger-ink); overflow-wrap: anywhere; }
+.au-runs__limit { margin: 10px 0 0; }
