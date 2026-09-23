@@ -11,7 +11,7 @@ const { MongoDbCrudOpration } = require("../../../../utils/mongo-handler/mongoQu
 const { default: mongoose } = require("mongoose")
 const { updateUnReadCommentsCountFun } = require("../../../notification-count/controller")
 const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../../../common-storage/common-${process.env.STORAGE_TYPE}.js`)
-const { isTaskStoredFile } = require('../../../../common-storage/taskFileKeys');
+const { isTaskStoredFile, taskAttachmentKey } = require('../../../../common-storage/taskFileKeys');
 const { buildQueryObject, buildHistoryObject, convertToDisplayFormat } = require("../helper");
 const socketEmitter = require('../../../../event/socketEventEmitter');
 const { addCommentCollection, updateCommentCollection } = require('../../../Comments/controller')
@@ -21,6 +21,25 @@ const { emitListener } = require("../../../Company/eventController.js");
 const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
+
+/* The download check judges a task attachment by the task its folder names, and the merged task is
+ * soft-deleted, so its files are copied into the kept task's folder. Only the merged task's own folder
+ * qualifies: the server copy takes the whole folder, and a sprint or form folder holds other tasks' files.
+ * A failed copy keeps the old key, still judged by the merged task. */
+const rehomeMergedAttachments = (companyId, source, kept) => Promise.all((source.attachments || []).map(async (attachment) => {
+    const url = attachment && attachment.url;
+    const own = taskAttachmentKey(url);
+    if (!own || own.taskId !== String(source._id).toLowerCase()) return attachment;
+    const rehomed = `Project/${kept.ProjectID}/Sprint/${kept._id}/Attachment/${url.slice(url.lastIndexOf('/') + 1)}`;
+    try {
+        await handleTaskAttachmentsDuplicateFunctionality(companyId, url, rehomed);
+        return { ...attachment, url: rehomed };
+    } catch (error) {
+        logger.error(`merge could not copy an attachment to the kept task: ${error.message || error}`);
+        return attachment;
+    }
+}));
+
 module.exports = {
 
     mergeTask({companyId, projectData, taskId, mergeTaskId,oldProject,isSubTask,userData}) {
@@ -37,8 +56,8 @@ module.exports = {
                         data: [{ _id : new mongoose.Types.ObjectId(mergeTaskId)}]
                     }
                     await MongoDbCrudOpration(companyId,query,"findOne")
-                    .then((mergeTask) => {
-                        /* Soft delete task */
+                    .then(async (mergeTask) => {
+                        const movedAttachments = await rehomeMergedAttachments(companyId, task, mergeTask);
                         let deletedObj = {
                             type: SCHEMA_TYPE.TASKS,
                             data: [
@@ -58,7 +77,7 @@ module.exports = {
                         })
 
                         let finalAttach = mergeTask.attachments ? mergeTask.attachments : [];
-                        finalAttach = finalAttach.concat(task.attachments || []);
+                        finalAttach = finalAttach.concat(movedAttachments);
                         let firstDEs = mergeTask.description !== undefined ? `${mergeTask.TaskName} :  ${mergeTask.description}` : '';
                         let secondDes = task.description !== undefined ? `${task.TaskName} :  ${task.description}` : '';
                         let firstRawDes = mergeTask.rawDescription !== undefined ? `${mergeTask.TaskName} :  ${mergeTask.rawDescription}` : '';

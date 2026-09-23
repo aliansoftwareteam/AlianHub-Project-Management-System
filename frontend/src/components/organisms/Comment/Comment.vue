@@ -8,8 +8,14 @@
         </div>
         <div class="message d-flex align-items-center mt-1" :style="{marginTop: (!showMessageTime ? '5px' : '')}" :class="{'right-message': message.sent, 'justify-content-between': !message.sent}">
             <div class="d-flex" :style="{paddingLeft: (!message.sent && !showUser ? '35px' : '')}">
+                <span
+                    v-if="!message.sent && showUser && agentAuthor"
+                    class="ah-avatar ah-avatar--agent message__profile-image message__agent-avatar mr-10px"
+                    :title="authorName"
+                    aria-hidden="true"
+                >◉</span>
                 <UserProfile
-                    v-if="!message.sent && showUser"
+                    v-else-if="!message.sent && showUser"
                     :showDot="false"
                     class="cursor-pointer profile-image message__profile-image mr-10px"
                     :data="{
@@ -23,8 +29,9 @@
                 <div>
                     <div class="cursor-default mb-5px" :class="{'text-right': message.sent, 'text-left': !message.sent}">
                         <span v-if="showUser" class="font-size-14 font-weight-700 mr-5px color63 show__user">
-                            {{!message.sent ? getUser(message.userId).Employee_Name : ''}}
+                            {{!message.sent ? authorName : ''}}
                         </span>
+                        <span v-if="showUser && !message.sent && agentAuthor" class="ah-chip ah-chip--agent ah-chip--mono mr-5px">{{ $t('Comments.agent_tag') }}</span>
                         <span class="font-size-12 font-weight-300 gray text-lowercase show" v-if="showMessageTime">
                             {{getDateType(new Date(message.createdAt).getTime())}}
                         </span>
@@ -85,7 +92,13 @@
                                     <template v-if="message.hasReply">
                                         <div>
                                             <div @click="$emit('highlight', message.reply)" class="d-flex align-items-center border-radius-10-px cursor-pointer p-10px mb-5px message_replay" :class="{'bg-light-gray': !message.sent, 'bg-fresh-air' : message.sent}">
+                                                <span
+                                                    v-if="replyAgentAuthor"
+                                                    class="ah-avatar ah-avatar--agent message__profile-image message__agent-avatar mr-10px"
+                                                    aria-hidden="true"
+                                                >◉</span>
                                                 <UserProfile
+                                                    v-else
                                                     :showDot="false"
                                                     class="profile-image message__profile-image mr-10px"
                                                     :data="{
@@ -96,7 +109,7 @@
                                                     width="30px"
                                                     :thumbnail="'30x30'"
                                                 />
-                                                <strong class="text-nowrap mr-5px">{{getUser(message.reply_userId).Employee_Name}}: </strong>
+                                                <strong class="text-nowrap mr-5px">{{ replyAuthorName }}: </strong>
                                                 <pre
                                                     class="text-ellipsis text-nowrap white__space-nowrap"
                                                     :title="['link', 'text'].includes(message.reply_type) ? commentPlainText(message?.reply_message) : message?.reply_mediaOriginalName"
@@ -104,8 +117,8 @@
                                                 />
                                             </div>
                                             <pre
-                                                :class="{'para-overflow': message.overflow && !showMore}"
-                                                v-html="commentHtml(message.message, { links: message.type === 'link' })"
+                                                :class="{'para-overflow': message.overflow && !showMore, 'message__agent-body': agentAuthor}"
+                                                v-html="bodyHtml"
                                             />
                                             <div v-if="message.overflow" class="text-center cursor-pointer border-top mt-10px pt-5px text-center" @click="showMore = !showMore">
                                                 <span>{{$t('Permissions.Read')}} {{showMore ? $t('Comments.less') : $t('Comments.more')}}</span>
@@ -114,8 +127,8 @@
                                     </template>
                                     <template v-else>
                                         <pre
-                                            :class="{'para-overflow': message.overflow && !showMore}"
-                                            v-html="commentHtml(message.message, { links: message.type === 'link' })"
+                                            :class="{'para-overflow': message.overflow && !showMore, 'message__agent-body': agentAuthor}"
+                                            v-html="bodyHtml"
                                         />
                                         <div v-if="message.overflow" class="text-center cursor-pointer border-top mt-10px pt-5px text-center" @click="showMore = !showMore">
                                             <span>{{$t('Permissions.Read')}} {{showMore ? $t('Comments.less') : $t('Comments.more')}}</span>
@@ -153,7 +166,7 @@
                         <DropDownOption v-if="message.type === 'text' || message.type === 'link'" @click="$emit('copy', message), $refs[`message_option_${message._id}`].click()">
                             {{$t('Comments.copy_message')  }}
                         </DropDownOption>
-                        <DropDownOption v-if="message.sent" @click="$emit('delete', message), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption v-if="message.sent || message.userId === userId" @click="$emit('delete', message), $refs[`message_option_${message._id}`].click()">
                             {{$t('Projects.delete')}}
                         </DropDownOption>
                         <DropDownOption @click="$emit('reply', message), $refs[`message_option_${message._id}`].click()">
@@ -175,9 +188,13 @@
 
 <script setup>
 // PACKAGES
-import { defineComponent, defineProps, inject, onMounted, ref, watch } from 'vue';
+import { computed, defineComponent, defineProps, inject, onMounted, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useConvertDate, useGetterFunctions } from '@/composable';
+import { useVisiblePages } from '@/composable/useVisiblePages';
+import { useProvenanceActors } from '@/components/molecules/Provenance/useProvenanceActors';
 import { commentHtml, commentPlainText } from '@/utils/commentHtml';
+import { agentAuthorOf, agentReplyHtml, pageRefIds } from '@/utils/agentComment';
 
 // COMPONENTS
 import WasabiImageComp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue"
@@ -250,6 +267,38 @@ const props = defineProps({
 })
 
 const showMore = ref(false);
+
+const { t } = useI18n();
+const visiblePages = useVisiblePages();
+const { ensureAgents, agentName } = useProvenanceActors();
+
+const agentAuthor = computed(() => agentAuthorOf(props.message));
+const replyAgentAuthor = computed(() => agentAuthorOf({ userId: props.message?.reply_userId }));
+
+const agentLabel = (author, row) => {
+    if (author.assistant) return t('Comments.ai_assistant');
+    return author.name || agentName(row) || t('Comments.an_agent');
+};
+
+const authorName = computed(() => (agentAuthor.value
+    ? agentLabel(agentAuthor.value, props.message)
+    : getUser(props.message.userId).Employee_Name));
+
+const replyAuthorName = computed(() => (replyAgentAuthor.value
+    ? agentLabel(replyAgentAuthor.value, {})
+    : getUser(props.message.reply_userId).Employee_Name));
+
+const pageHref = (id) => `${window.location.origin}/${encodeURIComponent(String(companyId?.value || ''))}/pages/${id}`;
+
+const bodyHtml = computed(() => {
+    if (!agentAuthor.value || props.message.type !== 'text') return commentHtml(props.message.message, { links: props.message.type === 'link' });
+    return agentReplyHtml(props.message.message, {
+        pageOf: visiblePages.pageOf,
+        pageHref,
+        pageLabel: t('Comments.cited_page'),
+        hiddenPageLabel: t('Comments.cited_page_hidden'),
+    });
+});
 
 // Reactions render from a local copy so we never mutate the prop directly;
 // socket-driven prop updates (other users reacting) re-sync it via the watch.
@@ -344,12 +393,31 @@ function handleDownloadUrl(url) {
 }
 
 onMounted(async () => {
-    await processUrl(props.message);   
+    if (agentAuthor.value && pageRefIds(props.message.message).length) visiblePages.ensure();
+    if (agentAuthor.value && !agentAuthor.value.name && props.message.agentId) ensureAgents();
+    await processUrl(props.message);
 });
 </script>
 
 <style scoped>
 @import './style.css';
+/* Agent replies are rendered markdown, so the block elements set the spacing, not the source newlines. */
+.message pre.message__agent-body {
+    white-space: normal;
+}
+.message__agent-body :deep(p),
+.message__agent-body :deep(ul),
+.message__agent-body :deep(ol) {
+    margin: 0 0 6px;
+}
+.message__agent-body :deep(ul),
+.message__agent-body :deep(ol) {
+    padding-left: 20px;
+}
+.message__agent-body :deep(.comment-cite--hidden) {
+    font-style: italic;
+    opacity: 0.7;
+}
 @media(min-width:1300px){
     .message_replay{
     max-width: 460px;

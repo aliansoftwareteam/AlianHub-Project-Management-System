@@ -1,11 +1,11 @@
 <template>
   <div class="mm-view ah-page">
     <div class="mm-view__bar">
-      <span class="mm-view__title">Mind Map</span>
-      <span class="mm-view__count">{{ nodeCount }} nodes</span>
+      <span class="mm-view__title">{{ $t('Views.mindmap_title') }}</span>
+      <span class="mm-view__count">{{ $t('Views.mindmap_nodes', { n: nodeCount }) }}</span>
     </div>
     <div class="mm-view__main">
-      <div v-if="!hasTasks" class="mm-view__empty">No tasks yet — add tasks to see the project mind map.</div>
+      <div v-if="!hasTasks" class="mm-view__empty">{{ $t('Views.mindmap_empty') }}</div>
       <div v-else class="mm-view__scroll">
         <svg :width="dims.w" :height="dims.h" class="mm-view__svg">
           <path v-for="(e, i) in edges" :key="'e' + i" :d="edgePath(e)" class="mm-view__edge" />
