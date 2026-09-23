@@ -175,6 +175,40 @@ describe('SCIM provisioning', () => {
         expect((await seatOf(email)).status).toBe(1);
     });
 
+    describe('a deactivated seat that SCIM left for an outside account before #911', () => {
+        const leftByScim = async (name) => {
+            const email = `${name}.${suffix}@${UNVERIFIED}`;
+            const uid = await seedOutsideAccount(email, 'Legacy', 'Outside');
+            await companyDb().collection('company_users').insertOne({
+                companyId: state.companyId, userId: uid, userEmail: email, roleType: 3, designation: 0, status: 0, isDelete: true,
+            });
+            return { email, uid };
+        };
+
+        it('gets the invitation from a SCIM create, not a seat', async () => {
+            const { email, uid } = await leftByScim('legacy-create');
+            const before = await userOf(uid);
+
+            const res = await scim('POST', '/Users', { userName: email, name: { givenName: 'Req', familyName: 'Name' }, active: true });
+
+            expect(res.status).toBe(201);
+            expect(res.body.active).toBe(false);
+            expect(await seatOf(email)).toMatchObject({ status: 1, isDelete: false });
+            expect(await userOf(uid)).toEqual(before);
+        });
+
+        it('stays deactivated after a SCIM activation', async () => {
+            const { email, uid } = await leftByScim('legacy-patch');
+
+            const res = await scim('PATCH', `/Users/${uid}`, { Operations: [{ op: 'replace', value: { active: true } }] });
+
+            expect(res.status).toBe(200);
+            expect(res.body.active).toBe(false);
+            expect(await seatOf(email)).toMatchObject({ status: 0, isDelete: true });
+            expect((await userOf(uid)).AssignCompany).toEqual([OTHER_COMPANY]);
+        });
+    });
+
     it('keeps an IdP rename inside the company', async () => {
         const { userId } = state.users.member;
         const res = await scim('PATCH', `/Users/${userId}`, {
