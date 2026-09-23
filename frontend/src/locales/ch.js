@@ -1542,6 +1542,7 @@ export default {
         "skill_source_yours": "Yours",
         "skill_source_builtin": "Built in",
         "skill_retired": "Retired",
+        "skill_unavailable": "Unavailable",
         "skill_no_description": "No description yet.",
         "skill_needs": "Needs {what}",
         "skill_unresolved": "Not in the library",

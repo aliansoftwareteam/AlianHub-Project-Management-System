@@ -678,6 +678,7 @@
     "Ai.skill_retire_confirm": "Agents and rules keep the key; the skill stops resolving and falls back to the built-in one, if there is one.",
     "Ai.skill_retire_failed": "Could not retire this skill.",
     "Ai.skill_retired": "Retired",
+    "Ai.skill_unavailable": "Unavailable",
     "Ai.skill_risk_computed": "From the actions it emits",
     "Ai.skill_risk_floor": "Risk floor",
     "Ai.skill_risk_hint": "The actions it emits make this {risk}. A floor can only raise it.",

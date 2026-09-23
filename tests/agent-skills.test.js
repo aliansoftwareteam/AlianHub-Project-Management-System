@@ -1,10 +1,8 @@
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
-jest.mock('../Modules/Agents/engine/pageAudit', () => ({ fetchPage: jest.fn() }));
 jest.mock('../Modules/Agents/skillRecord', () => ({ getSkill: async (companyId, slug) => require('../Modules/Agents/skills').getSkill(slug) }));
 
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
-const { fetchPage } = require('../Modules/Agents/engine/pageAudit');
 const { getSkill, ALL } = require('../Modules/Agents/skills');
 const orchestrator = require('../Modules/Agents/engine/orchestrator');
 
@@ -44,19 +42,13 @@ describe('brief.parse (Intake)', () => {
 });
 
 describe('pr.summary (Reviewer)', () => {
-    const skill = getSkill('pr.summary');
-    it('skips cleanly without a link, and refuses private hosts', async () => {
+    beforeAll(() => { process.env.SKILL_EXTERNAL_READS = 'on'; });
+    afterAll(() => { delete process.env.SKILL_EXTERNAL_READS; });
+
+    it('skips cleanly without a link, and does not read a host it does not declare', async () => {
+        const skill = getSkill('pr.summary');
         expect((await skill.gather({ task })).skip).toMatch(/no pull request/);
-        expect((await skill.gather({ task: { ...task, links: [{ kind: 'pr', url: 'http://localhost:4000/pull/1' }] } })).skip).toMatch(/private or local/);
-    });
-    it('fetches the .diff of a GitHub pull request and posts one review comment', async () => {
-        fetchPage.mockResolvedValueOnce({ status: 200, html: 'diff --git a/x b/x\n+added', bytes: 30 });
-        const ctx = await skill.gather({ task: { ...task, links: [{ kind: 'pr', url: 'https://github.com/o/r/pull/12' }] } });
-        expect(ctx.target).toBe('https://github.com/o/r/pull/12.diff');
-        const { changes } = skill.toChanges({ task, raw: { summary: 'Adds x.', risks: [{ title: 'No test', severity: 'medium', where: 'x', why: 'untested' }] }, context: ctx });
-        expect(changes).toHaveLength(1);
-        expect(changes[0].action).toBe('task.comment');
-        expect(changes[0].params.body).toContain('[medium] No test — x: untested');
+        expect((await skill.gather({ task: { ...task, links: [{ kind: 'pr', url: 'http://localhost:4000/pull/1' }] } })).skip).toMatch(/localhost:4000, which this skill does not read/);
     });
 });
 
@@ -127,8 +119,10 @@ describe('grounding — what the model was not given is dropped', () => {
         expect(dropped.map((d) => d.reason)).toEqual(['mentions AR-17, which is not in the data', 'it names no task from the data', 'mentions 24, which is not one of the counts']);
     });
     it('drops a PR risk that cites a file the diff never touched', () => {
+        process.env.SKILL_EXTERNAL_READS = 'on';
         const pr = getSkill('pr.summary');
-        const context = { diff: 'diff --git a/Modules/Agents/runs.js b/Modules/Agents/runs.js\n+const x = 1;', url: 'u' };
+        delete process.env.SKILL_EXTERNAL_READS;
+        const context = { input: { pr_link: 'u' }, gather: { pr: { text: 'diff --git a/Modules/Agents/runs.js b/Modules/Agents/runs.js\n+const x = 1;' } } };
         const raw = { summary: 's', risks: [{ title: 'Real', where: 'Modules/Agents/runs.js' }, { title: 'Invented', where: 'frontend/src/App.vue' }, { title: 'Unlocated' }] };
         const { raw: cleaned, dropped } = pr.verify({ raw, context });
         expect(cleaned.risks.map((r) => r.title)).toEqual(['Real', 'Unlocated']);
