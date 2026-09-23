@@ -9,6 +9,7 @@ const workspaces = require('./workspaces');
 const store = require('./store');
 const { matchesRegistered, isAllowedRedirectUri } = require('./redirectUri');
 const logger = require('../../Config/loggerConfig');
+const { requestAddress } = require('../../utils/requestAddress');
 
 const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
 
@@ -24,7 +25,7 @@ const failed = (res, error, what) => {
 
 const single = (value) => (typeof value === 'string' ? value : '');
 
-const actorOf = (req) => ({ id: String(req.uid || ''), ip: String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0] });
+const actorOf = (req) => ({ id: String(req.uid || ''), ip: requestAddress(req) });
 
 const redirectWith = (res, redirectUri, params) => {
     const url = new URL(redirectUri);

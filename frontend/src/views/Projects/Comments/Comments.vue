@@ -218,7 +218,7 @@
 import { defineComponent, nextTick, onMounted, ref, defineProps, inject, watch, computed, onBeforeUnmount } from "vue";
 import { dbCollections } from "@/utils/Collections";
 import { useConvertDate, useCustomComposable, useGetterFunctions } from "@/composable";
-import { checkFile, renderFiles, showUserInfo, showMessageTime, sendMessage, bakeMessage, uploadToWasabi, deleteFromWasabi, sendMailFromMessage } from "./helper";
+import { checkFile, renderFiles, showUserInfo, showMessageTime, sendMessage, bakeMessage, uploadToWasabi, deleteFromWasabi, sendSupportMail } from "./helper";
 import { useToast } from "vue-toast-notification";
 import { useValidation } from "@/composable/Validation";
 import { useStore } from "vuex";
@@ -430,7 +430,6 @@ const mediaFiles = ref([]);
 const messages = ref([]);
 const showScrollBotton = ref(false);
 const currentTime = ref();
-const customerDetails = ref();
 const documentPath = ref("");
 const projectPath = ref("");
 const commentPath = ref("");
@@ -2120,16 +2119,8 @@ async function sendMessageFun(messageData,isReset = true) {
                 .then((msg) => {
                     resolve("Message Sent", msg);
 
-                    if(props.forSupport) {
-                        if(companyUser?.value?.userEmail !== process.env.VUE_APP_USEREMAIL) {
-                            let subject = "Support from AlianHub"
-                            const mailMessage = changeText(msg.message  || '', '', '');
-                            sendMailFromMessage(customerDetails.value.userEmail, subject, mailMessage);
-                        } else {
-                            let subject = `Support to ${customerDetails.value?.userName || ""}`
-                            const mailMessage = `Email: ${customerDetails.value?.userEmail}\nProduct: ${props.productData?.productName}\n\nMessage:\n${changeText(msg.message  || '', '', '')}`;
-                            sendMailFromMessage(process.env.VUE_APP_SUPPORT_MAIL, subject, mailMessage);
-                        }
+                    if(props.forSupport && companyUser?.value?.userEmail === process.env.VUE_APP_USEREMAIL) {
+                        sendSupportMail(changeText(msg.message || '', '', ''), props.productData?.productName);
                     }
 
                     // INITIALIZE SNAPHOT => IF NOT INITIALIZED

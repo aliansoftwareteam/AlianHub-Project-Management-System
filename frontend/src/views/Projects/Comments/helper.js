@@ -325,18 +325,11 @@ export const deleteFromWasabi = (path, companyId) => {
     })
 }
 
-export function sendMailFromMessage(to, subject, message) {
-    try {
-        const axiosData = {
-            subject, html: message, toMail: to, isHtml: false
-        }
-        apiRequestWithoutCompnay("post", env.SEND_MAIL, axiosData)
+export function sendSupportMail(message, productName) {
+    apiRequestWithoutCompnay("post", env.SUPPORT_MAIL, { message, productName })
         .catch((error) => {
-            console.error("ERROR in send mail comment: ", error);
+            console.error("ERROR in send support mail: ", error);
         })
-    } catch (error) {
-        console.error("ERROR in send mail comment: ", error);
-    }
 }
 
 // --------------- Conditions to Show/Hide user Info ---------------

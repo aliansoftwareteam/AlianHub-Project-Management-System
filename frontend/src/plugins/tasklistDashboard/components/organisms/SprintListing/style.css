@@ -489,7 +489,6 @@ span.duedate-new .due-date span, span.key-new {
 .calendar__view-wrapper .fc-day-future.fc-day-other.fc-daygrid-day .fc-daygrid-day-frame,
 .calendar__view-wrapper td.fc-day.fc-day-sat.fc-day-future.fc-daygrid-day .fc-daygrid-day-frame ,
 .calendar__view-wrapper td.fc-day.fc-day-fri.fc-day-future.fc-day-other.fc-daygrid-day .fc-daygrid-day-frame.fc-scrollgrid-sync-inner,
-.fc-day-past.fc-day-other.fc-daygrid-day .fc-daygrid-day-top,
 .calendar__view-wrapper td.fc-day.fc-day-mon.fc-day-past.fc-daygrid-day .fc-daygrid-day-frame,
 .calendar__view-wrapper td.fc-day.fc-day-tue.fc-day-past.fc-daygrid-day .fc-daygrid-day-frame,
 .calendar__view-wrapper td.fc-day.fc-day-wed.fc-day-past.fc-daygrid-day .fc-daygrid-day-frame,

@@ -1,5 +1,5 @@
 <template>
-    <nav class="ah-tabbar" aria-label="Primary">
+    <nav class="ah-tabbar" :aria-label="$t('Shell.primary_nav')">
         <router-link
             v-for="item in tabs"
             :key="item.key"

@@ -39,11 +39,31 @@ describe('hardcoded template text', () => {
         expect(findings.map((f) => `${f.kind}:${f.value}`)).toEqual(['text:Save']);
     });
 
+    test('a < inside an interpolation does not start a tag', () => {
+        const findings = scanTemplate(`
+            <span>{{ i < 9 ? '0' : '' }}{{ i + 1 }}</span>
+            <span>{{ n < 0 ? 0 : n }} tasks</span>
+        `);
+        expect(findings.map((f) => `${f.kind}:${f.value}`)).toEqual(['text:tasks']);
+    });
+
+    test('code elements are left verbatim, text around them is not', () => {
+        const findings = scanTemplate(`
+            <li>{{ $t('A.b') }} <code class="mono">MONGODB_URL</code></li>
+            <div><code>cd frontend &amp;&amp; npm install</code> then restart</div>
+        `);
+        expect(findings.map((f) => `${f.kind}:${f.value}`)).toEqual(['text:then restart']);
+    });
+
     test('no file exceeds its allowlisted count', () => {
         const { over } = compareToAllowlist(scanHardcoded(), readAllowlist());
         if (over.length) {
             const lines = over.map((o) => `${o.file}: ${o.found} > ${o.allowed}\n    ${o.samples.map((s) => `line ${s.line} ${s.kind}: ${JSON.stringify(s.value)}`).join('\n    ')}`);
             throw new Error(`Hardcoded text added:\n  ${lines.join('\n  ')}\nWrap it in $t() or raise scripts/i18n-allowlist.json deliberately.`);
         }
+    });
+
+    test('the allowlist is empty: every template string goes through $t()', () => {
+        expect(readAllowlist().files).toEqual({});
     });
 });

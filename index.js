@@ -118,7 +118,6 @@ function initializeControllers() {
     require('./Modules/taskIndex/init').init(app);
     require('./Modules/createProject/init.js').init(app);
     require('./Modules/notification-count/init').init(app);
-    require('./Modules/notification/sendEmail/init').init(app);
     require('./Modules/trackerUserPermission/init').init(app);
     require('./Modules/Instance/init').init(app);
     require('./Modules/CspReport/init').init(app);

@@ -7,6 +7,7 @@ const flag = require('../Knowledge/flag');
 const figures = require('../Knowledge/figures');
 const controls = require('../Knowledge/controls');
 const reindex = require('../Knowledge/reindex');
+const { requestAddress } = require('../../utils/requestAddress');
 
 const ENV_KEY = 'KNOWLEDGE_INDEXER';
 const ADMIN_KEY_ACTOR = 'instance-admin-key';
@@ -98,11 +99,6 @@ const userNames = async (ids) => {
 
 const userName = async (id) => (await userNames([id])).get(String(id)) || '';
 
-const clientIp = (req) => {
-    const forwarded = req.headers['x-forwarded-for'] || req.ip;
-    return forwarded ? String(forwarded).split(',')[0] : '';
-};
-
 const byAdminKey = (req) => req.instanceAdmin === 'key';
 const actorOf = (req) => (byAdminKey(req) ? ADMIN_KEY_ACTOR : String(req.uid || ''));
 
@@ -116,7 +112,7 @@ const audit = (req, companyId, { action, entityType, entityId, meta }) => {
         .then((actorName) => recordAudit(companyId, {
             actorId,
             actorName,
-            ip: clientIp(req),
+            ip: requestAddress(req),
             action,
             entityType,
             entityId,

@@ -57,7 +57,7 @@
                                     v-if="clientWidth > 767"
                                     type="button"
                                     class="dropdown-close-btn cursor-pointer"
-                                    aria-label="Close"
+                                    :aria-label="$t('Common.close')"
                                     @click.stop="buttonClick()"
                                 >
                                     <img :src="closeIcon" alt="">

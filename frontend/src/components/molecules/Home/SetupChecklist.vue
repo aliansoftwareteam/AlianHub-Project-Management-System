@@ -1,5 +1,5 @@
 <template>
-    <section class="hc-setup" aria-label="Workspace setup">
+    <section class="hc-setup" :aria-label="$t('Home.setup_label')">
         <div class="hc-setup__ring" :style="{ '--pct': `${Math.round(doneCount / steps.length * 100)}%` }">
             <span>{{ doneCount }}/{{ steps.length }}</span>
         </div>
@@ -22,6 +22,7 @@
 
 <script setup>
 import { computed, defineEmits, defineProps } from "vue";
+import "./style.css";
 
 defineOptions({ name: "SetupChecklist" });
 

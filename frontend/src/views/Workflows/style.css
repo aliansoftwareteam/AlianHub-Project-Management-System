@@ -71,10 +71,10 @@
 .wb__toggle:focus-visible { outline: none; box-shadow: var(--focus); }
 .wb__knob {
     position: absolute; top: 2px; left: 2px;
-    width: 14px; height: 14px; border-radius: 50%; background: #fff;
+    width: 14px; height: 14px; border-radius: 50%; background: var(--knob);
     transition: transform var(--t-state) var(--ease);
 }
-.wb__toggle.is-on .wb__knob { transform: translateX(12px); }
+.wb__toggle.is-on .wb__knob { transform: translateX(12px); background: var(--on-brand); }
 
 @media (max-width: 767px) {
     .wb__row { flex-wrap: wrap; }

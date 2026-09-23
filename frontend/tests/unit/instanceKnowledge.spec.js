@@ -178,6 +178,14 @@ describe('InstanceKnowledge', () => {
         expect(figuresCard.find('[data-test="reason-skipped:too_large"]').text()).toContain('Knowledge.reason_skipped_too_large');
     });
 
+    it('under tenant mode says the indexer runs per workspace, and under all says it is on', async () => {
+        const tenant = await mountWith();
+        expect(tenant.find('[data-test="indexer-on"]').text()).toContain('Knowledge.indexer_tenant');
+        expect(tenant.find('[data-test="indexer-on"]').text()).toContain('KNOWLEDGE_INDEXER=tenant');
+        const all = await mountWith({ summaryData: summary({ indexer: { mode: 'all', envKey: 'KNOWLEDGE_INDEXER' } }) });
+        expect(all.find('[data-test="indexer-on"]').text()).toContain('Knowledge.indexer_on');
+    });
+
     it('with the indexer off, says so and offers erasure only', async () => {
         const off = { indexer: { mode: 'off', envKey: 'KNOWLEDGE_INDEXER' }, modes: { indexer: 'off', retrieval: 'hybrid' } };
         const wrapper = await opened({ summaryData: summary(off), figuresData: figures(off) });

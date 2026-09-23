@@ -1,5 +1,5 @@
 <template>
-    <aside class="hp-panel" aria-label="Planner">
+    <aside class="hp-panel" :aria-label="$t('Home.planner')">
         <div class="hp-panel__head">
             {{ $t('Home.planner') }}
             <button type="button" class="hp-panel__close" :title="$t('Home.hide_planner')" @click="$emit('close')"><ShellIcon name="x" :size="14" /></button>

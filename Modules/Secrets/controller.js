@@ -4,6 +4,7 @@ const store = require('../../Config/secrets');
 const logger = require('../../Config/loggerConfig');
 const { rotateProblem } = require('./helpers/rotateRules');
 const externalReads = require('../Agents/skills/externalReads');
+const { requestAddress } = require('../../utils/requestAddress');
 
 const refuse = (res, code, statusText) => res.status(code).send({ status: false, statusText });
 
@@ -29,7 +30,7 @@ const managerOrRefuse = async (req, res, { probe = false } = {}) => {
     return companyId;
 };
 
-const actorOf = (req) => ({ id: String(req.uid || ''), ip: String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0] });
+const actorOf = (req) => ({ id: String(req.uid || ''), ip: requestAddress(req) });
 
 const failed = (res, error, what) => {
     if (error instanceof store.SecretsStoreError) return refuse(res, error.statusCode, error.message);

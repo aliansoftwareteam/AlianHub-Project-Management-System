@@ -15,6 +15,7 @@ const PROTOCOL_VERSION = '2025-06-18';
 const LATEST_PROTOCOL_VERSION = '2025-11-25';
 const SUPPORTED_PROTOCOL_VERSIONS = Object.freeze([LATEST_PROTOCOL_VERSION, PROTOCOL_VERSION]);
 const buildInfo = require('../../Config/buildInfo');
+const { requestAddress } = require('../../utils/requestAddress');
 
 const rpcError = (id, code, message, data) => ({
     jsonrpc: '2.0', id: id === undefined ? null : id,
@@ -23,7 +24,6 @@ const rpcError = (id, code, message, data) => ({
 const rpcResult = (id, result) => ({ jsonrpc: '2.0', id, result });
 const contentResult = (payload) => ({ content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] });
 
-const ipOf = (req) => String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim();
 
 const NOT_A_MEMBER = 'You are no longer a member of this company';
 
@@ -138,7 +138,7 @@ const calledTool = (req) => {
 };
 
 const refuseForWaitingSteps = (req, raw) => require('../Workflows/externalSession')
-    .refuseRevokedToken(raw, { action: calledTool(req), ip: ipOf(req) })
+    .refuseRevokedToken(raw, { action: calledTool(req), ip: requestAddress(req) })
     .catch((error) => logger.error(`mcp: closing the step sessions of a refused token failed: ${error.message}`));
 
 const authenticate = async (req) => {
@@ -147,7 +147,7 @@ const authenticate = async (req) => {
     if (raw && mode !== mcpOAuth.MODE.OFF && oauthAuth.isAccessToken(raw)) {
         const ctx = await oauthAuth.authenticate(req, raw, { namedCompanies: namedCompanies(req) });
         if (!ctx) await refuseForWaitingSteps(req, raw);
-        return ctx && !ctx.forbidden && !ctx.wrongWorkspace ? { ...ctx, ip: ipOf(req) } : ctx;
+        return ctx && !ctx.forbidden && !ctx.wrongWorkspace ? { ...ctx, ip: requestAddress(req) } : ctx;
     }
     if (mode === mcpOAuth.MODE.ONLY) return null;
     const companyId = namedCompanies(req)[0] || '';
@@ -169,7 +169,7 @@ const authenticate = async (req) => {
         canWrite: hasScope(token, 'write'),
         projectIds: Array.isArray(token.projectIds) ? token.projectIds.map(String) : [],
         allowedActions: Array.isArray(token.allowedActions) && token.allowedActions.length ? token.allowedActions.map(String) : undefined,
-        ip: ipOf(req),
+        ip: requestAddress(req),
     };
 };
 

@@ -4,6 +4,7 @@ const logger = require("../../Config/loggerConfig");
 const { normalizeAuditEntry, retentionCutoff, retentionDaysAtLeast, RETENTION_DEFAULT_DAYS } = require("./helpers/auditRules");
 const chain = require("./chain");
 const { tenantOf } = require("../../Config/tenant");
+const { requestAddress } = require('../../utils/requestAddress');
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
@@ -41,8 +42,7 @@ const auditCompanyOf = (req) => {
 const recordAuditFromReq = (req, entry) => {
     const companyId = auditCompanyOf(req);
     const actorId = req.uid ? String(req.uid) : '';
-    const forwarded = req.headers['x-forwarded-for'] || req.ip;
-    const ip = forwarded ? String(forwarded).split(',')[0] : '';
+    const ip = requestAddress(req);
     sessionActorName(actorId)
         .catch((e) => {
             logger.error(`audit actor lookup ${actorId}: ${e.message || e}`);

@@ -9,6 +9,7 @@ const S = require('./helpers/slackRules');
 const H = require('./helpers/secretHandles');
 const { SecretsStoreError } = require('../../Config/secrets');
 const { pinSessionTenant } = require('../../Config/tenant');
+const { requestAddress } = require('../../utils/requestAddress');
 
 // Secrets go to the store by handle or are sealed into config on every write (H.storeSecrets) and are stripped from every read (R.redact).
 
@@ -18,7 +19,7 @@ const oid = (id) => (OBJECT_ID.test(String(id || '')) ? new mongoose.Types.Objec
 
 const refuse = (res, code, statusText, extra = {}) => res.status(code).send({ status: false, statusText, message: statusText, ...extra });
 
-const actorOf = (req) => ({ id: String(req.uid || ''), ip: String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0] });
+const actorOf = (req) => ({ id: String(req.uid || ''), ip: requestAddress(req) });
 
 const failed = (res, e, what) => {
     logger.error(`${what}: ${e.message}`);

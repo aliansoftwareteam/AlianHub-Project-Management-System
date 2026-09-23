@@ -86,6 +86,19 @@ describe('the audit log integrity indicator', () => {
         expect(plain.find('[data-test="actor-id"]').exists()).toBe(false);
         expect(wrapper.text()).toContain(t('Audit.names_not_checked'));
     });
+
+    it('does not repeat an entity id that is already the shown name', async () => {
+        const wrapper = await open([
+            row('r', { action: 'permission.refused', entityId: 'settings.settings_member_list', entityName: 'settings.settings_member_list', chain: { seq: 1 }, integrity: { state: 'verified' } }),
+            row('u', { entityId: 'e-only', chain: { seq: 2 }, integrity: { state: 'verified' } }),
+        ]);
+        const [refusal, unnamed] = wrapper.findAll('.al__row');
+        expect(refusal.find('.al__entity').text()).toBe('settings.settings_member_list');
+        expect(refusal.find('[data-test="entity-id"]').exists()).toBe(false);
+        expect(unnamed.find('.al__entity').text()).toBe('e-only');
+        expect(unnamed.find('[data-test="entity-id"]').exists()).toBe(false);
+        expect(refusal.find('[data-test="actor-id"]').exists()).toBe(true);
+    });
 });
 
 describe('an approximate total', () => {

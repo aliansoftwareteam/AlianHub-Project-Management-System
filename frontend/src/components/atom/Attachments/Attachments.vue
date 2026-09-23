@@ -32,7 +32,7 @@
                         type="button"
                         class="download-all-btn d-block text-right p-1 blue text-decoration-underline font-weight-500 font-size-14 cursor-pointer"
                         @click="downloadAllImages()"
-                    >Download All</button>
+                    >{{ $t('Attachments.download_all') }}</button>
                 </template>
                 <button v-if="permission === true && !(props.isMainSpinner === true || isLoadingAttachments)"
                     type="button" class="clip-record-btn cursor-pointer mr-10px"

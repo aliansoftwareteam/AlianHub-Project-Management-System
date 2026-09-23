@@ -972,6 +972,10 @@
     "required": true,
     "default": "wasabi"
   },
+  "SUPPORT_MAIL": {
+    "group": "mail",
+    "description": "Mailbox that gets a copy of each message the support account (VUE_APP_USEREMAIL) posts in the support project (VUE_APP_SUPPORT_PROJECTID). Unset: no support mail is sent."
+  },
   "TENANT_PROVIDER_KEYS": {
     "group": "ai",
     "description": "Set to on to let each workspace pay for model calls with its own provider keys: owners and admins set one key per provider under Settings, kept in the secrets store by handle with only the handle on the company row, and every model call and embedding run for that workspace is billed to its key, or to the instance key while none is set. A set key that will not open refuses the call rather than billing the instance owner. Needs SECRETS_STORE with SECRETS_KEY; unset or off keeps every call on the instance keys."
@@ -1117,10 +1121,6 @@
   "VUE_APP_STORAGE_TYPE": {
     "group": "frontend",
     "description": "Storage backend the web app assumes (server or wasabi); mirror STORAGE_TYPE."
-  },
-  "VUE_APP_SUPPORT_MAIL": {
-    "group": "frontend",
-    "description": "Mailbox shown for support requests."
   },
   "VUE_APP_SUPPORT_PROJECTID": {
     "group": "frontend",

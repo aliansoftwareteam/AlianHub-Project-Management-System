@@ -41,7 +41,7 @@
                 />
                 <template v-else>
                     <span v-if="taskValue.DueDate">{{convertDateFormat(taskValue.DueDate,'',{showDayName:false})}}</span>
-                    <span v-else>No Due Date</span>
+                    <span v-else>{{ $t('ProjectDetails.no_due_date') }}</span>
                 </template>
             </div>
             <div @click.stop.prevent v-if="checkApps('Priority',project)">

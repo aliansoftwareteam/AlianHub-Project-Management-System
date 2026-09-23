@@ -17,7 +17,7 @@
                     <span class="pp__count">{{ $t('Docs.slide_of', { n: slides.length ? index + 1 : 0, total: slides.length }) }}</span>
                     <button type="button" class="pp__btn" :disabled="index <= 0" @click="prev"><ShellIcon name="arrowLeft" :size="14" /></button>
                     <button type="button" class="pp__btn" :disabled="index >= slides.length - 1" @click="next"><ShellIcon name="arrowRight" :size="14" /></button>
-                    <button type="button" class="pp__btn pp__btn--strong" @click="$emit('close')">{{ $t('Docs.exit_present') }} <span class="ah-kbd pp__kbd">Esc</span></button>
+                    <button type="button" class="pp__btn pp__btn--strong" @click="$emit('close')">{{ $t('Docs.exit_present') }} <span class="ah-kbd pp__kbd">{{ $t('Common.key_esc') }}</span></button>
                 </div>
             </div>
         </div>

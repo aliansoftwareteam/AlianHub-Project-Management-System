@@ -4,6 +4,7 @@ const config = require("../../Config/config");
 const logger = require("../../Config/loggerConfig");
 const { httpOnlyCookies } = require("../../Config/cookies");
 const serviceCtr = require("../serviceFunction.js");
+const { requestAddress } = require('../../utils/requestAddress');
 
 // SEC-02 — establish a real session for an SSO-authenticated user, then REDIRECT
 // the browser back to the app (the IdP flow is a full-page redirect, not an SPA
@@ -12,8 +13,7 @@ const serviceCtr = require("../serviceFunction.js");
 // redirect instead of JSON). SameSite=Lax so the post-IdP top-level navigation
 // carries the cookies.
 const finalizeSsoSession = (req, res, uid, redirectPath) => {
-    const forwarded = req?.headers['x-forwarded-for'] || req.ip;
-    const clientIp = forwarded ? forwarded?.split(',')[0] : req?.connection?.remoteAddress;
+    const clientIp = requestAddress(req);
     const fail = (reason) => res.redirect(`/login?ssoError=${encodeURIComponent(reason)}`);
     sessionRefusalFor(uid).then((refusal) => {
         if (refusal) return fail('token');

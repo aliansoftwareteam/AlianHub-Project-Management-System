@@ -11,7 +11,7 @@
                     {{ $t('Home.personal_list') }}
                     <span class="personal__only">{{ $t('Home.only_you') }}</span>
                 </div>
-                <nav class="personal__views" aria-label="Views">
+                <nav class="personal__views" :aria-label="$t('Home.views_nav')">
                     <button type="button" class="personal__view" :class="{ 'is-active': view === 'list' }" @click="view = 'list'">{{ $t('Home.list') }}</button>
                     <button type="button" class="personal__view" :class="{ 'is-active': view === 'board' }" @click="view = 'board'">{{ $t('Home.board') }}</button>
                     <router-link class="personal__view" :to="{ name: 'Planner', params: { cid: companyId } }">{{ $t('Home.calendar') }}</router-link>

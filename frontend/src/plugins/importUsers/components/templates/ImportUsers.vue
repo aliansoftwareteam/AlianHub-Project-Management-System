@@ -1,6 +1,6 @@
 <template>
     <div>
-        <Modal v-model="showModal" title="Import Users" :header="true" :footer="true" :styles="modalStyles"
+        <Modal v-model="showModal" :title="$t('importUserButton.import_users')" :header="true" :footer="true" :styles="modalStyles"
             @close="closeModal" :headerClasses="'p-20px blue font-size-18'">
             <template #body>
                 <component :is="steps[currentStep].component" v-bind="steps[currentStep].props" @next-step="handleNext"

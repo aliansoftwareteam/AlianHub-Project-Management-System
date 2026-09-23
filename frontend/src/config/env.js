@@ -3,7 +3,7 @@ module.exports.DEFAULT_STATE_CODE = "GJ";
 module.exports.STORAGE_TYPE = process.env.VUE_APP_STORAGE_TYPE;
 module.exports.AFFILITAION_ON= process.env.VUE_APP_AFFILIATEON
 // API's
-module.exports.SEND_MAIL = "/api/v2/sendMail";
+module.exports.SUPPORT_MAIL = "/api/v2/support-mail";
 module.exports.SEND_INVITATION_EMAIL = "/api/v2/sendInvitationEmail";
 module.exports.SEND_VARIFICATION_EMAIL = "/api/v2/sendVerificationEmail";
 module.exports.INVITATION_CONFIRMATION = "/api/v2/checkPermission";

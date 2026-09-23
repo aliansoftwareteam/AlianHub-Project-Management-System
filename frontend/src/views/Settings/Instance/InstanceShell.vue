@@ -63,6 +63,7 @@ watch(() => route.name, revealActiveTab);
 .in__body > * { display: flex; flex-direction: column; gap: 16px; }
 .in-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .in-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.in-card > p { margin: 0; }
 .in-card__head { display: flex; align-items: center; gap: 8px; }
 .in-card__title { font: 600 13px/1.2 var(--font-ui); color: var(--ink); flex: 1; }
 .in-kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; font: var(--text-small); }

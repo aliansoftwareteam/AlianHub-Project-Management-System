@@ -40,7 +40,7 @@
                 </div>
                 <div class="ah-card__body xd__rows">
                     <div class="xd__row xd__row--bordered">
-                        <span class="xd__mark xd__mark--dark">MCP</span>
+                        <span class="xd__mark xd__mark--dark">{{ $t('Provenance.ext_mcp_mark') }}</span>
                         <div class="xd__id">
                             <div class="xd__name">{{ $t('Provenance.ext_mcp_name') }}</div>
                             <div class="xd__desc ah-mono">{{ mcpUrl }}</div>
