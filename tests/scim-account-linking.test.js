@@ -83,7 +83,7 @@ beforeEach(() => {
 
 describe('the company member schema', () => {
     it('declares the SCIM name and external id kept on the member row', () => {
-        ['scimGivenName', 'scimFamilyName', 'scimExternalId'].forEach((path) => expect(companyUserSchema.path(path)).toBeTruthy());
+        ['scimGivenName', 'scimFamilyName', 'scimExternalId', 'scimDeactivatedSeatAt'].forEach((path) => expect(companyUserSchema.path(path)).toBeTruthy());
     });
 });
 
@@ -183,5 +183,65 @@ describe('SCIM rename', () => {
     it('still reads the shared name for a member the IdP never renamed', async () => {
         const read = await send(scim.getUser, { params: { id: MEMBER } });
         expect(read.body.name).toMatchObject({ givenName: 'Max', familyName: 'Member' });
+    });
+});
+
+/* Before #911 a SCIM POST with active:false left a deactivated seat for any address. Such a row is not a
+ * membership: only an invitation, ownership or a verified domain made someone one of the company's people. */
+describe('a deactivated seat SCIM left for someone outside the company', () => {
+    const SCIM_DEACTIVATED = 0;
+    const leftByScim = (uid, email, over = {}) => seedSeat(A, uid, email, { status: SCIM_DEACTIVATED, isDelete: true, ...over });
+
+    it('does not let a SCIM create seat the account; it gets the invitation', async () => {
+        leftByScim(OUTSIDER, 'pat@outside.test');
+        const before = snapshot(userRow(OUTSIDER));
+
+        const res = await create('pat@outside.test');
+
+        expect(res.code).toBe(201);
+        expect(sendInvitationEmailFun).toHaveBeenCalledWith(expect.objectContaining({ email: 'pat@outside.test', companyId: A }));
+        expect(rowFor(A, 'pat@outside.test').status).toBe(SEAT_PENDING);
+        expect(snapshot(userRow(OUTSIDER))).toEqual(before);
+    });
+
+    it.each([
+        ['PATCH', () => send(scim.patchUser, { params: { id: OUTSIDER }, body: { Operations: [{ op: 'replace', value: { active: true } }] } })],
+        ['PUT', () => send(scim.replaceUser, { params: { id: OUTSIDER }, body: { active: true } })],
+    ])('does not let a %s activation turn it into a seat', async (_verb, activate) => {
+        leftByScim(OUTSIDER, 'pat@outside.test');
+
+        const res = await activate();
+
+        expect(res.code).toBe(200);
+        expect(res.body.active).toBe(false);
+        expect(rowFor(A, 'pat@outside.test')).toMatchObject({ status: SCIM_DEACTIVATED, isDelete: true });
+    });
+
+    it.each([
+        ['came in through an invitation', 'pat@outside.test', OUTSIDER, { sendInvitationTime: Date.parse('2026-08-01T00:00:00Z') }],
+        ['owns the company', 'pat@outside.test', OUTSIDER, { roleType: 1 }],
+        ['is on a verified domain', 'ann@acme.test', ACME_USER, {}],
+    ])('still reactivates a member who %s', async (_why, email, uid, over) => {
+        leftByScim(uid, email, over);
+
+        const created = await create(email);
+        expect(created.code).toBe(201);
+        expect(sendInvitationEmailFun).not.toHaveBeenCalled();
+        expect(rowFor(A, email)).toMatchObject({ status: SEAT_ACTIVE, isDelete: false });
+
+        await send(scim.patchUser, { params: { id: uid }, body: { Operations: [{ op: 'replace', value: { active: false } }] } });
+        const again = await send(scim.patchUser, { params: { id: uid }, body: { Operations: [{ op: 'replace', value: { active: true } }] } });
+        expect(again.body.active).toBe(true);
+    });
+
+    it('still reactivates a member SCIM deactivated from an active seat, whatever brought them in', async () => {
+        seedSeat(A, OUTSIDER, 'pat@outside.test');
+
+        await send(scim.patchUser, { params: { id: OUTSIDER }, body: { Operations: [{ op: 'replace', value: { active: false } }] } });
+        expect(rowFor(A, 'pat@outside.test')).toMatchObject({ status: SCIM_DEACTIVATED, isDelete: true });
+
+        const again = await send(scim.patchUser, { params: { id: OUTSIDER }, body: { Operations: [{ op: 'replace', value: { active: true } }] } });
+        expect(again.body.active).toBe(true);
+        expect(rowFor(A, 'pat@outside.test')).toMatchObject({ status: SEAT_ACTIVE, isDelete: false });
     });
 });

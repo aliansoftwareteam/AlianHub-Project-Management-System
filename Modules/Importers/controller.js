@@ -13,6 +13,8 @@ const { importTargetAccess, previewAccess, refuseImport } = require('./helpers/i
 const { findCompanyMembers, activeMemberIdSet } = require('./helpers/companyMembers');
 const { sessionActor } = require('../Tasks/helpers/taskWriteFields');
 const { pinSessionTenant } = require('../../Config/tenant');
+const socketEmitter = require('../../event/socketEventEmitter');
+const { updateUnReadCommentsCountFun } = require('../notification-count/controller');
 
 // Jira importer. The client parses the Jira CSV export (the xlsx lib reads
 // CSV) and posts plain rows; the server maps statuses/priorities and feeds
@@ -175,17 +177,34 @@ const enrichImportTasks = async (companyId, tasks) => {
     });
 };
 
+/* The people a comment written in the app counts for: the task's watchers and assignees, other than its author. */
+const countImportedComments = async (companyId, { projectId, sprintId, taskId, authorId, count }) => {
+    const task = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [{ _id: new mongoose.Types.ObjectId(taskId) }, { watchers: 1, AssigneeUserId: 1, ParentTaskId: 1 }],
+    }, 'findOne');
+    if (!task) return;
+    const people = [...(task.watchers || []), ...(task.AssigneeUserId || [])].map(String).filter((id) => id !== String(authorId));
+    const userIds = [...await activeMemberIdSet(companyId, people)];
+    if (!userIds.length) return;
+    await updateUnReadCommentsCountFun({ body: {
+        companyId, key: 2, projectId: String(projectId), sprintId: String(sprintId), taskId: String(taskId), userIds, messageCount: count,
+        ...(task.ParentTaskId ? { parentTaskId: String(task.ParentTaskId) } : {}),
+    } });
+};
+
 /* Create the parsed Trello comments on the freshly-created tasks. Each input
  * task was stamped with `createdTaskId` by createMultipleTasks. Best-effort:
  * a failed comment never fails the import. */
 const createImportComments = async (companyId, projectData, sprintId, folderId, tasks, userId) => {
     for (const task of tasks) {
         if (!task.createdTaskId || !Array.isArray(task.comments) || !task.comments.length) continue;
+        let saved = 0;
         for (const c of task.comments) {
             if (!c || !c.text) continue;
             const body = `${c.author ? c.author + ': ' : ''}${c.text}`.slice(0, 10000);
             try {
-                await MongoDbCrudOpration(companyId, {
+                const comment = await MongoDbCrudOpration(companyId, {
                     type: SCHEMA_TYPE.COMMENTS,
                     data: {
                         message: body,
@@ -198,10 +217,15 @@ const createImportComments = async (companyId, projectData, sprintId, folderId, 
                         ...(folderId ? { folderId: new mongoose.Types.ObjectId(folderId) } : {}),
                     },
                 }, 'save');
+                saved += 1;
+                socketEmitter.emit('insert', { type: 'insert', data: comment, updatedFields: {}, module: 'comments', companyId });
             } catch (error) {
                 logger.error(`[importers] comment import failed for task ${task.createdTaskId}: ${error.message}`);
             }
         }
+        if (!saved) continue;
+        await countImportedComments(companyId, { projectId: projectData._id, sprintId, taskId: task.createdTaskId, authorId: userId, count: saved })
+            .catch((error) => logger.error(`[importers] comment count failed for task ${task.createdTaskId}: ${error.message || error.statusText || error}`));
     }
 };
 

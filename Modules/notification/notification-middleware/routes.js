@@ -8,29 +8,24 @@ exports.init = (app) => {
  *    schemas:
  *      send-fcm:
  *        type: object
+ *        description: The company is the caller's session company and the sender is the caller; companyId or senderUserDetail in the body is ignored.
  *        required:
  *          - userIdArray
  *          - key
- *          - companyId
  *          - message
  *          - type
- *          - senderUserDetail
  *          - actionUrl
  *        properties:
  *          userIdArray:
  *            type: array
  *            items:
  *              type: string
- *            description: Array of user IDs to receive the notification
+ *            description: User IDs to notify. Only active members of the session company are sent a push.
  *            example: ["user123", "user456"]
  *          key:
  *            type: string
  *            description: Notification key identifier (e.g., "comments_I'm_@mentioned_in")
  *            example: "comments_I'm_@mentioned_in"
- *          companyId:
- *            type: string
- *            description: Company document ID
- *            example: "company123"
  *          message:
  *            type: string
  *            description: Notification message content
@@ -39,15 +34,6 @@ exports.init = (app) => {
  *            type: string
  *            description: Type of notification (e.g., project, task, comment)
  *            example: "comment"
- *          senderUserDetail:
- *            type: object
- *            description: Details of the user sending the notification
- *            properties:
- *              Employee_Name:
- *                type: string
- *                description: Name of the sender
- *                example: "John Doe"
- *            example: { "Employee_Name": "John Doe" }
  *          actionUrl:
  *            type: string
  *            description: URL path for notification click action
@@ -58,7 +44,7 @@ exports.init = (app) => {
  * @swagger
  *  /api/v1/send-fcm:
  *    post:
- *      description: This API is used to send FCM (Firebase Cloud Messaging) push notifications to eligible users based on their notification settings.
+ *      description: Sends an FCM push to the listed members of the session company whose notification settings allow it. The answer is the same whether or not anyone was sent a push.
  *      tags: [Notifications]
  *      summary: Send FCM Push Notification
  *      requestBody:
@@ -69,7 +55,7 @@ exports.init = (app) => {
  *              $ref: '#/components/schemas/send-fcm'
  *      responses:
  *        "200":
- *          description: Notification sent successfully
+ *          description: Request accepted
  *          content:
  *            application/json:
  *              schema:
@@ -80,16 +66,7 @@ exports.init = (app) => {
  *                    example: true
  *                  message:
  *                    type: string
- *                    example: "Notification sent successfully"
- *                  response:
- *                    type: object
- *                    properties:
- *                      successCount:
- *                        type: integer
- *                        example: 5
- *                      failureCount:
- *                        type: integer
- *                        example: 0
+ *                    example: "Notification processed"
  *        "400":
  *          description: Bad request - validation error
  *          content:
@@ -103,8 +80,8 @@ exports.init = (app) => {
  *                  error:
  *                    type: string
  *                    example: "userIdArray must be a non-empty array"
- *        "500":
- *          description: Internal server error
+ *        "403":
+ *          description: The request names a company the caller's session does not belong to
  *          content:
  *            application/json:
  *              schema:
@@ -115,7 +92,6 @@ exports.init = (app) => {
  *                    example: false
  *                  error:
  *                    type: string
- *                    example: "Failed to send FCM notification"
  */
 
   app.post('/api/v1/send-fcm',sendFcmNotificationsHandler);

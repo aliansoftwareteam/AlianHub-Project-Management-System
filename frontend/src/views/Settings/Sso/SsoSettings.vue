@@ -115,13 +115,19 @@
                             <div v-for="r in domainRecords" :key="r.domain" class="sso__verify-row">
                                 <div class="sso__verify-head">
                                     <span class="sso__provider-name">{{ r.domain }}</span>
-                                    <span v-if="r.verifiedAt" class="ah-chip ah-chip--ok">{{ $t('Settings.sso_domain_verified') }}</span>
+                                    <template v-if="r.verifiedAt">
+                                        <span class="ah-chip ah-chip--ok">{{ $t('Settings.sso_domain_verified') }}</span>
+                                        <span v-if="r.failedChecks" class="ah-chip ah-chip--warn">{{ $t('Settings.sso_domain_failing', { n: r.failedChecks }) }}</span>
+                                    </template>
                                     <template v-else>
-                                        <span class="ah-chip">{{ $t('Settings.sso_domain_unverified') }}</span>
+                                        <span v-if="r.lapsedAt" class="ah-chip ah-chip--danger">{{ $t('Settings.sso_domain_lapsed', { date: shortDate(r.lapsedAt) }) }}</span>
+                                        <span v-else class="ah-chip">{{ $t('Settings.sso_domain_unverified') }}</span>
                                         <button type="button" class="sso__link" :disabled="verifying === r.domain" @click="verifyDomain(r.domain)">{{ verifying === r.domain ? $t('Settings.sso_verifying') : $t('Settings.sso_verify') }}</button>
                                     </template>
                                 </div>
-                                <div v-if="!r.verifiedAt" class="sso__values">
+                                <div v-if="!r.verifiedAt && r.lapsedAt" class="ah-small">{{ $t('Settings.sso_domain_lapsed_hint') }}</div>
+                                <div v-else-if="r.failedChecks" class="ah-small">{{ $t('Settings.sso_domain_failing_hint') }}</div>
+                                <div v-if="!r.verifiedAt || r.failedChecks" class="sso__values">
                                     <div class="sso__value">
                                         <span class="sso__value-label">{{ $t('Settings.sso_txt_name') }}</span>
                                         <span class="sso__value-text">{{ r.name }}</span>
@@ -244,6 +250,11 @@ const copyValues = computed(() => {
 });
 
 const domainRecords = computed(() => (savedConfig.value && Array.isArray(savedConfig.value.domainRecords) ? savedConfig.value.domainRecords : []));
+
+const shortDate = (value) => {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+};
 
 const initiateUrl = computed(() => `${origin}/api/v2/sso/${(savedConfig.value && savedConfig.value.provider) || form.provider}/initiate?companyId=${cid.value}`);
 const loginPreviewUrl = computed(() => `${origin}/#/login`);
