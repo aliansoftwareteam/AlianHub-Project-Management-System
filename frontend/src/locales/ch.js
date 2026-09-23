@@ -54,7 +54,9 @@ export default {
         "report_none": "No sprints to report on yet.",
         "report_moved_out": "moved out",
         "points": "points",
-        "tasks": "tasks"
+        "tasks": "tasks",
+        "story_points_empty": "Points",
+        "story_points_clear": "Clear"
     },
     "generalErrorMessage": {
         "fieldIsRequired": "字段是必填的",
@@ -1104,7 +1106,8 @@ export default {
         "agents_running": "{n} running",
         "legacy_nav": "Use the old top bar",
         "new_nav": "Try the new navigation",
-        "skip_to_content": "Skip to content"
+        "skip_to_content": "Skip to content",
+        "palette_esc": "ESC"
     },
     "Docs": {
         "docs": "Docs",
@@ -1247,7 +1250,9 @@ export default {
     },
     "Common": {
         "select_task": "Select task",
-        "select_all_tasks": "Select all tasks in group"
+        "select_all_tasks": "Select all tasks in group",
+        "close": "Close",
+        "key_esc": "Esc"
     },
     "Time": {
         "loading": "Loading…",
@@ -4524,7 +4529,11 @@ export default {
         "view_options": "Options for the {view} view",
         "search_views": "Search or describe a view to create",
         "no_views_match": "No view matches that search.",
-        "private_view": "Private view"
+        "private_view": "Private view",
+        "select_billing_period": "Select Billing Period",
+        "sprint_data_required": "SPRINT DATA REQUIRED",
+        "export_csv": "CSV",
+        "export_xlsx": "XLSX"
     },
     "Watcher": {
         "ignore": "忽略",
@@ -4568,7 +4577,8 @@ export default {
         "to_unlock_list_view": "解锁列表视图",
         "error_message_for_empty": "请选择至少一个视图。",
         "set_as_default": "设为默认",
-        "remove_as_default": "移除默认"
+        "remove_as_default": "移除默认",
+        "active_of_min": "Active {active} of {total} min"
     },
     "ViewListTag": {
         "ProjectListView": "List",
@@ -4977,7 +4987,8 @@ export default {
         "link_file": "Link the file",
         "importing": "Importing...",
         "import_done": "Imported {name}",
-        "import_failed": "Could not import from {provider}."
+        "import_failed": "Could not import from {provider}.",
+        "download_all": "Download All"
     },
     "ClipRecorder": {
         "record_clip": "Record clip",
@@ -5084,7 +5095,10 @@ export default {
         "white_color_not_allowed": "不允许选择白色，请选择有效颜色",
         "billing": "计费",
         "per_hour": "每小时",
-        "adding_taskPlanning": "添加任务规划"
+        "adding_taskPlanning": "添加任务规划",
+        "hh_placeholder": "hh",
+        "mm_placeholder": "mm",
+        "hh_mm_placeholder": "hh:mm"
     },
     "Comment": {
         "created_by": "创建者",
@@ -5277,7 +5291,8 @@ export default {
         "ai_after_desc_placeholder": "您可以在此继续请求相关更改",
         "try_with_ai": "尝试使用 AI",
         "msg_search_result_found": "以下是一些符合您需求的建议模板。您可以选择其中一个，或者点击以使用 AI 创建",
-        "msg_search_result_not_found": "未找到相关模板。要使用 AI 创建一个，只需点击"
+        "msg_search_result_not_found": "未找到相关模板。要使用 AI 创建一个，只需点击",
+        "back_to_templates": "Back to templates"
     },
     "Settings": {
         "add_new_projects": "添加新项目",
@@ -5574,7 +5589,10 @@ export default {
         "agents_candidate_too_many_changes": "Prefers fewer changes per proposal",
         "agents_candidate_wrong_tone": "Prefers a different tone — ask before rewriting",
         "agents_candidate_needs_person": "Wants a person to handle this kind of work",
-        "agents_candidate_not_now": "Prefers proposals batched, not one at a time"
+        "agents_candidate_not_now": "Prefers proposals batched, not one at a time",
+        "phone_placeholder": "eg. 000-000-0000",
+        "company_profile": "Company Profile",
+        "image_dimensions": "{width}x{height}px"
     },
     "PermissionDesc": {
         "project": "Everything to do with projects. Turning this off hides projects entirely.",
@@ -7196,7 +7214,8 @@ export default {
         "ai_failed": "Couldn't generate a description. Please try again.",
         "ai_optional": "— optional",
         "ai_skills_hint": "Skills this project needs. The AI also suggests skills from your description — you can adjust them on the review step.",
-        "ai_proposal_id_hint": "The won proposal this project came from. Used to tie the project back to the bid it originated from."
+        "ai_proposal_id_hint": "The won proposal this project came from. Used to tie the project back to the bid it originated from.",
+        "you": "You"
     },
     "ScreenshotRetention": {
         "heading": "Auto-delete old screenshots",
@@ -7714,7 +7733,8 @@ export default {
         "enable_app_use_milestones": "启用此应用后，您将能够在<b>项目</b>中使用<b>里程碑</b>",
         "enable_app_use_ai_operations": "启用此应用后，您将能够在<b>项目</b>中使用<b>AI操作</b>",
         "enable_app_manage_time_log": "启用此应用后，您将能够在<b>项目</b>的<b>任务</b>中管理<b>时间日志</b>",
-        "enable_app_manage_custom_fields": "启用此应用后，您将能够在<b>项目</b>中管理<b>自定义字段</b>"
+        "enable_app_manage_custom_fields": "启用此应用后，您将能够在<b>项目</b>中管理<b>自定义字段</b>",
+        "read_more": "Read more"
     },
     "Company": {
         "fill_company_details": "填写您的公司详细信息",

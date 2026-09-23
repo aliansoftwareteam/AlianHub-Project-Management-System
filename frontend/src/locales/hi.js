@@ -54,7 +54,9 @@ export default {
         "report_none": "No sprints to report on yet.",
         "report_moved_out": "moved out",
         "points": "points",
-        "tasks": "tasks"
+        "tasks": "tasks",
+        "story_points_empty": "Points",
+        "story_points_clear": "Clear"
     },
     "generalErrorMessage": {
         "fieldIsRequired": "यह क्षेत्र आवश्यक है",
@@ -1104,7 +1106,8 @@ export default {
         "agents_running": "{n} running",
         "legacy_nav": "Use the old top bar",
         "new_nav": "Try the new navigation",
-        "skip_to_content": "Skip to content"
+        "skip_to_content": "Skip to content",
+        "palette_esc": "ESC"
     },
     "Docs": {
         "docs": "Docs",
@@ -1247,7 +1250,9 @@ export default {
     },
     "Common": {
         "select_task": "Select task",
-        "select_all_tasks": "Select all tasks in group"
+        "select_all_tasks": "Select all tasks in group",
+        "close": "Close",
+        "key_esc": "Esc"
     },
     "Time": {
         "loading": "Loading…",
@@ -4524,7 +4529,11 @@ export default {
         "view_options": "Options for the {view} view",
         "search_views": "Search or describe a view to create",
         "no_views_match": "No view matches that search.",
-        "private_view": "Private view"
+        "private_view": "Private view",
+        "select_billing_period": "Select Billing Period",
+        "sprint_data_required": "SPRINT DATA REQUIRED",
+        "export_csv": "CSV",
+        "export_xlsx": "XLSX"
     },
     "Watcher": {
         "ignore": "नज़रअंदाज करें",
@@ -4568,7 +4577,8 @@ export default {
         "to_unlock_list_view": "सूची दृश्य को अनलॉक करने के लिए",
         "error_message_for_empty": "कृपया कम से कम एक दृश्य चुनें।",
         "set_as_default": "डिफ़ॉल्ट के रूप में सेट करें",
-        "remove_as_default": "डिफ़ॉल्ट के रूप में हटाएं"
+        "remove_as_default": "डिफ़ॉल्ट के रूप में हटाएं",
+        "active_of_min": "Active {active} of {total} min"
     },
     "ViewListTag": {
         "ProjectListView": "List",
@@ -4977,7 +4987,8 @@ export default {
         "link_file": "Link the file",
         "importing": "Importing...",
         "import_done": "Imported {name}",
-        "import_failed": "Could not import from {provider}."
+        "import_failed": "Could not import from {provider}.",
+        "download_all": "Download All"
     },
     "ClipRecorder": {
         "record_clip": "Record clip",
@@ -5084,7 +5095,10 @@ export default {
         "white_color_not_allowed": "सफेद रंग अनुमति नहीं है। कृपया एक वैध रंग चुनें",
         "billing": "बिलिंग",
         "per_hour": "प्रति घंटा",
-        "adding_taskPlanning": "कार्य योजना जोड़ें"
+        "adding_taskPlanning": "कार्य योजना जोड़ें",
+        "hh_placeholder": "hh",
+        "mm_placeholder": "mm",
+        "hh_mm_placeholder": "hh:mm"
     },
     "Comment": {
         "created_by": "द्वारा बनाया गया",
@@ -5277,7 +5291,8 @@ export default {
         "ai_after_desc_placeholder": "यहाँ आप संबंधित बदलावों के लिए कुछ भी पूछ सकते हैं",
         "try_with_ai": "एआई के साथ प्रयास करें",
         "msg_search_result_found": "यहाँ कुछ सुझाए गए टेम्पलेट्स हैं जो आपकी आवश्यकताओं के अनुरूप हैं। आप किसी एक को चुन सकते हैं या AI की मदद से नया बनाने के लिए बस क्लिक करें",
-        "msg_search_result_not_found": "कोई प्रासंगिक टेम्पलेट्स नहीं मिले। AI का उपयोग करके एक बनाने के लिए, बस क्लिक करें"
+        "msg_search_result_not_found": "कोई प्रासंगिक टेम्पलेट्स नहीं मिले। AI का उपयोग करके एक बनाने के लिए, बस क्लिक करें",
+        "back_to_templates": "Back to templates"
     },
     "Settings": {
         "add_new_projects": "नया प्रोजेक्ट जोड़ें",
@@ -5574,7 +5589,10 @@ export default {
         "agents_candidate_too_many_changes": "Prefers fewer changes per proposal",
         "agents_candidate_wrong_tone": "Prefers a different tone — ask before rewriting",
         "agents_candidate_needs_person": "Wants a person to handle this kind of work",
-        "agents_candidate_not_now": "Prefers proposals batched, not one at a time"
+        "agents_candidate_not_now": "Prefers proposals batched, not one at a time",
+        "phone_placeholder": "eg. 000-000-0000",
+        "company_profile": "Company Profile",
+        "image_dimensions": "{width}x{height}px"
     },
     "PermissionDesc": {
         "project": "Everything to do with projects. Turning this off hides projects entirely.",
@@ -7196,7 +7214,8 @@ export default {
         "ai_failed": "Couldn't generate a description. Please try again.",
         "ai_optional": "— optional",
         "ai_skills_hint": "Skills this project needs. The AI also suggests skills from your description — you can adjust them on the review step.",
-        "ai_proposal_id_hint": "The won proposal this project came from. Used to tie the project back to the bid it originated from."
+        "ai_proposal_id_hint": "The won proposal this project came from. Used to tie the project back to the bid it originated from.",
+        "you": "You"
     },
     "ScreenshotRetention": {
         "heading": "Auto-delete old screenshots",
@@ -7714,7 +7733,8 @@ export default {
         "enable_app_use_milestones": "इस ऐप को सक्षम करने से आप इस <b>परियोजना</b> के लिए <b>मील के पत्थर</b> का उपयोग कर सकेंगे।",
         "enable_app_use_ai_operations": "इस ऐप को सक्षम करने से आप इस <b>परियोजना</b> के लिए <b>एआई संचालन</b> का उपयोग कर सकेंगे।",
         "enable_app_manage_time_log": "इस ऐप को सक्षम करने से आप इस <b>परियोजना</b> के <b>कार्य</b> में <b>समय लॉग</b> प्रबंधित कर सकेंगे।",
-        "enable_app_manage_custom_fields": "इस ऐप को सक्षम करने से आप इस <b>परियोजना</b> के लिए <b>कस्टम फ़ील्ड्स</b> प्रबंधित कर सकेंगे।"
+        "enable_app_manage_custom_fields": "इस ऐप को सक्षम करने से आप इस <b>परियोजना</b> के लिए <b>कस्टम फ़ील्ड्स</b> प्रबंधित कर सकेंगे।",
+        "read_more": "Read more"
     },
     "Company": {
         "fill_company_details": "कृपया अपनी कंपनी के विवरण भरें",

@@ -54,7 +54,9 @@ export default {
         "report_none": "No sprints to report on yet.",
         "report_moved_out": "moved out",
         "points": "points",
-        "tasks": "tasks"
+        "tasks": "tasks",
+        "story_points_empty": "Points",
+        "story_points_clear": "Clear"
     },
     "generalErrorMessage": {
         "fieldIsRequired": "Il campo è obbligatorio",
@@ -1104,7 +1106,8 @@ export default {
         "agents_running": "{n} running",
         "legacy_nav": "Use the old top bar",
         "new_nav": "Try the new navigation",
-        "skip_to_content": "Skip to content"
+        "skip_to_content": "Skip to content",
+        "palette_esc": "ESC"
     },
     "Docs": {
         "docs": "Docs",
@@ -1247,7 +1250,9 @@ export default {
     },
     "Common": {
         "select_task": "Select task",
-        "select_all_tasks": "Select all tasks in group"
+        "select_all_tasks": "Select all tasks in group",
+        "close": "Close",
+        "key_esc": "Esc"
     },
     "Time": {
         "loading": "Loading…",
@@ -4524,7 +4529,11 @@ export default {
         "view_options": "Options for the {view} view",
         "search_views": "Search or describe a view to create",
         "no_views_match": "No view matches that search.",
-        "private_view": "Private view"
+        "private_view": "Private view",
+        "select_billing_period": "Select Billing Period",
+        "sprint_data_required": "SPRINT DATA REQUIRED",
+        "export_csv": "CSV",
+        "export_xlsx": "XLSX"
     },
     "Watcher": {
         "ignore": "Ignora",
@@ -4568,7 +4577,8 @@ export default {
         "to_unlock_list_view": "Per sbloccare la vista della lista",
         "error_message_for_empty": "Seleziona almeno una vista",
         "set_as_default": "Imposta come predefinito",
-        "remove_as_default": "Rimuovi como predefinito"
+        "remove_as_default": "Rimuovi como predefinito",
+        "active_of_min": "Active {active} of {total} min"
     },
     "ViewListTag": {
         "ProjectListView": "List",
@@ -4977,7 +4987,8 @@ export default {
         "link_file": "Link the file",
         "importing": "Importing...",
         "import_done": "Imported {name}",
-        "import_failed": "Could not import from {provider}."
+        "import_failed": "Could not import from {provider}.",
+        "download_all": "Download All"
     },
     "ClipRecorder": {
         "record_clip": "Record clip",
@@ -5084,7 +5095,10 @@ export default {
         "white_color_not_allowed": "Il colore bianco non è consentito. Seleziona un colore valido",
         "billing": "Fatturazione",
         "per_hour": "Per ora",
-        "adding_taskPlanning": "Aggiungi Pianificazione delle attività"
+        "adding_taskPlanning": "Aggiungi Pianificazione delle attività",
+        "hh_placeholder": "hh",
+        "mm_placeholder": "mm",
+        "hh_mm_placeholder": "hh:mm"
     },
     "Comment": {
         "created_by": "Creato da",
@@ -5277,7 +5291,8 @@ export default {
         "ai_after_desc_placeholder": "Qui puoi continuare a chiedere modifiche pertinenti",
         "try_with_ai": "Prova con l'IA",
         "msg_search_result_found": "Ecco alcuni modelli suggeriti pertinenti alle tue esigenze. Puoi selezionarne uno oppure fare clic per crearne uno con l'IA",
-        "msg_search_result_not_found": "Nessun modello pertinente trovato. Per crearne uno con l'IA, fai semplicemente clic"
+        "msg_search_result_not_found": "Nessun modello pertinente trovato. Per crearne uno con l'IA, fai semplicemente clic",
+        "back_to_templates": "Back to templates"
     },
     "Settings": {
         "add_new_projects": "Aggiungi Nuovo Progetto",
@@ -5574,7 +5589,10 @@ export default {
         "agents_candidate_too_many_changes": "Prefers fewer changes per proposal",
         "agents_candidate_wrong_tone": "Prefers a different tone — ask before rewriting",
         "agents_candidate_needs_person": "Wants a person to handle this kind of work",
-        "agents_candidate_not_now": "Prefers proposals batched, not one at a time"
+        "agents_candidate_not_now": "Prefers proposals batched, not one at a time",
+        "phone_placeholder": "eg. 000-000-0000",
+        "company_profile": "Company Profile",
+        "image_dimensions": "{width}x{height}px"
     },
     "PermissionDesc": {
         "project": "Everything to do with projects. Turning this off hides projects entirely.",
@@ -7196,7 +7214,8 @@ export default {
         "ai_failed": "Couldn't generate a description. Please try again.",
         "ai_optional": "— optional",
         "ai_skills_hint": "Skills this project needs. The AI also suggests skills from your description — you can adjust them on the review step.",
-        "ai_proposal_id_hint": "The won proposal this project came from. Used to tie the project back to the bid it originated from."
+        "ai_proposal_id_hint": "The won proposal this project came from. Used to tie the project back to the bid it originated from.",
+        "you": "You"
     },
     "ScreenshotRetention": {
         "heading": "Auto-delete old screenshots",
@@ -7714,7 +7733,8 @@ export default {
         "enable_app_use_milestones": "Abilitando questa app sarai in grado di utilizzare <b>Punti di riferimento</b> per questo <b>progetto</b>",
         "enable_app_use_ai_operations": "Abilitando questa app sarai in grado di utilizzare <b>Operazioni AI</b> per questo <b>progetto</b>",
         "enable_app_manage_time_log": "Abilitando questa app sarai in grado di gestire <b>Registro del tempo</b> nei <b>Compiti</b> per questo <b>progetto</b>",
-        "enable_app_manage_custom_fields": "Abilitando questa app sarai in grado di gestire <b>Campi personalizzati</b> per questo <b>progetto</b>"
+        "enable_app_manage_custom_fields": "Abilitando questa app sarai in grado di gestire <b>Campi personalizzati</b> per questo <b>progetto</b>",
+        "read_more": "Read more"
     },
     "Company": {
         "fill_company_details": "Compila i dettagli della tua azienda",

@@ -73,7 +73,7 @@
             </div>
         </template>
         <template v-else>
-            <span class="red">SPRINT DATA REQUIRED</span>
+            <span class="red">{{ $t('Projects.sprint_data_required') }}</span>
         </template>
     </div>
 </template>

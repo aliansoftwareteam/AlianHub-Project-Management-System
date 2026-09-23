@@ -72,7 +72,7 @@
                                     v-model="element.time"
                                     manual-input
                                     class="durationTimepicker timepicker"
-                                    placeholder="hh:mm"
+                                    :placeholder="$t('Milestone.hh_mm_placeholder')"
                                     format="HH:mm"
                                     @blur="element.edit = false"
                                     hide-clear-button

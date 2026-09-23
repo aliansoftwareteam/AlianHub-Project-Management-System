@@ -54,7 +54,7 @@
                                                 :enabledArrowIcon="true"/>
 
                                             <InputText :readonly="!props.editPermission" class="form-control login-input border-topbottom-right-6-px"
-                                                v-model="formData.phoneNumber.value" placeHolder="eg. 000-000-0000"
+                                                v-model="formData.phoneNumber.value" :placeHolder="$t('Settings.phone_placeholder')"
                                                 tabindex="1" @keypress="isNumber($event.event)"
                                                 @keyup="checkErrors({
                                                 'field': formData.phoneNumber,
@@ -75,7 +75,7 @@
                                             {{$t('Settings.country')}}
                                         </label>
                                         <InputText :readonly="true" :style="{ 'pointer-events': !props.editPermission ? 'none' : '' }"  type="text" class="form-control login-input cursor-pointer" v-model="formData.country.value"
-                                            placeHolder="Country" @click="setfocus('country'), visible = !visible"
+                                            :placeHolder="$t('Settings.country')" @click="setfocus('country'), visible = !visible"
                                             @focus="setCurrentSidebarValue('country'), setfocus('country')" @keyup="checkErrors({
                                                 'field': formData.country,
                                                 'name': formData.country.name,
@@ -192,7 +192,7 @@
             </div>
         </div>
         <CroppingTool :image="{ url: formData.companyprofileImage, name: fileName }" :isVisible="isCropper"
-            title="Company Profile"
+            :title="$t('Settings.company_profile')"
             :stencilSize='stencilSize'
             :stencilProps="stencilProps"
             @updateVisible="(val) => isCropper = val"

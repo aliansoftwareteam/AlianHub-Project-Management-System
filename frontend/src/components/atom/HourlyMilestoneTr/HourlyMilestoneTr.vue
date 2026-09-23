@@ -31,7 +31,7 @@
                 </div>
             </td>
             <!-- startdate and endDate -->
-            <td class="padding_top_cal">{{convertDateFormat(props.milestoneArray.startDate,'',{showDayName: false})}} to {{convertDateFormat(props.milestoneArray.endDate,'',{showDayName: false})}}</td>
+            <td class="padding_top_cal">{{ $t('Milestone.date_range', { start: convertDateFormat(props.milestoneArray.startDate,'',{showDayName: false}), end: convertDateFormat(props.milestoneArray.endDate,'',{showDayName: false}) }) }}</td>
             <!-- loggedHours -->
             <td class="padding_top_cal">{{props.userArray[props.milestoneArray._id] ? !props.userArray[props.milestoneArray._id].loggedHours ? `0h 0m` : convertMintuesToHours(props.userArray[props.milestoneArray._id].loggedHours):''}}</td>
             <td>
@@ -43,7 +43,7 @@
                             @update:modelValue="val => hours = val.toString()"
                             type="number"
                             :id="`hours`+hourlyMilestoneIndex"
-                            placeHolder="hh"
+                            :placeHolder="$t('Milestone.hh_placeholder')"
                             :inputId="`hours`+hourlyMilestoneIndex"
                             @input="hours = hours.replace(/^0/g, '')"
                             @keypress="onlyNumberHour($event.event)"
@@ -59,7 +59,7 @@
                             @update:modelValue="val => minute = val.toString()"
                             type="number"
                             :id="`minute`+hourlyMilestoneIndex"
-                            placeHolder="mm"
+                            :placeHolder="$t('Milestone.mm_placeholder')"
                             :inputId="`minute`+hourlyMilestoneIndex"
                             @input="minute = minute.replace(/^0/g, '')"
                             @keypress="onlyNumberHour($event.event)"

@@ -48,7 +48,7 @@
                                             }"
                                             :thumbnail="'30x30'"
                                         />
-                                        <h3>You</h3>
+                                        <h3>{{ $t('AI.you') }}</h3>
                                     </div>
                                     <span>{{item.content}}</span>
                                 </div>

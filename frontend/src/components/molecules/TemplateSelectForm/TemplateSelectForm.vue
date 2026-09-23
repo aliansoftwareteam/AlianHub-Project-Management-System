@@ -54,7 +54,7 @@
     </div>
     <div class="taskStatusRight" :class="rightClass" :id="rightId || undefined" v-show="!isMobile || step === 'list'">
         <div v-if="isMobile && step === 'list'" class="tsf-substep-header d-flex align-items-center">
-            <button type="button" class="tsf-back-btn d-flex align-items-center" @click="step = 'templates'" aria-label="Back to templates">
+            <button type="button" class="tsf-back-btn d-flex align-items-center" @click="step = 'templates'" :aria-label="$t('Templates.back_to_templates')">
                 <svg width="9" height="15" viewBox="0 0 9 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.5 1.5 L2 7.5 L7.5 13.5" stroke="#3845B3" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
             <span class="tsf-active-template text-ellipsis text-capitalize" :title="modelValue && modelValue.TemplateName">{{ modelValue && modelValue.TemplateName }}</span>

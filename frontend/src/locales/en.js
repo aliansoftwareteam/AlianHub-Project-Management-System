@@ -55,6 +55,8 @@ export default {
         report_moved_out: "moved out",
         points: "points",
         tasks: "tasks",
+        story_points_empty: "Points",
+        story_points_clear: "Clear",
     },
     generalErrorMessage: {
         fieldIsRequired: "field is required",
@@ -1127,7 +1129,8 @@ export default {
         agents_running: "{n} running",
         legacy_nav: "Use the old top bar",
         new_nav: "Try the new navigation",
-        skip_to_content: "Skip to content"
+        skip_to_content: "Skip to content",
+        palette_esc: "ESC",
     },
     Docs: {
         docs: "Docs",
@@ -1271,6 +1274,8 @@ export default {
     Common: {
         select_task: "Select task",
         select_all_tasks: "Select all tasks in group",
+        close: "Close",
+        key_esc: "Esc",
     },
     Time: {
         loading: "Loading…",
@@ -4583,6 +4588,10 @@ export default {
         search_views: "Search or describe a view to create",
         no_views_match: "No view matches that search.",
         private_view: "Private view",
+        select_billing_period: "Select Billing Period",
+        sprint_data_required: "SPRINT DATA REQUIRED",
+        export_csv: "CSV",
+        export_xlsx: "XLSX",
     },
     Watcher: {
         ignore: "Ignore",
@@ -4630,6 +4639,7 @@ export default {
         error_message_for_empty: "Please select at least one view",
         set_as_default: "Set as Default",
         remove_as_default: "Remove as Default",
+        active_of_min: "Active {active} of {total} min",
     },
     ViewListTag: {
         ProjectListView: "List",
@@ -5076,6 +5086,7 @@ export default {
         importing: "Importing...",
         import_done: "Imported {name}",
         import_failed: "Could not import from {provider}.",
+        download_all: "Download All",
     },
     ClipRecorder: {
         record_clip: "Record clip",
@@ -5191,6 +5202,9 @@ export default {
         billing: "Billing",
         per_hour: "Per Hour",
         adding_taskPlanning: "Add Task Planning",
+        hh_placeholder: "hh",
+        mm_placeholder: "mm",
+        hh_mm_placeholder: "hh:mm",
     },
     Comment: {
         created_by: "Created by",
@@ -5401,6 +5415,7 @@ export default {
             "Here are some suggested templates relevant to your requirements. You can select any one or to create using AI, simply click",
         msg_search_result_not_found:
             "No relevant templates found. To create one using AI, simply click",
+        back_to_templates: "Back to templates",
     },
     Settings: {
         add_new_projects: "Add New Project",
@@ -5705,6 +5720,9 @@ export default {
         agents_candidate_wrong_tone: "Prefers a different tone — ask before rewriting",
         agents_candidate_needs_person: "Wants a person to handle this kind of work",
         agents_candidate_not_now: "Prefers proposals batched, not one at a time",
+        phone_placeholder: "eg. 000-000-0000",
+        company_profile: "Company Profile",
+        image_dimensions: "{width}x{height}px",
     },
     // One plain sentence per permission, shown under its name on the Security & Permissions
     // screen. Kept here rather than in the seeded `desc` field so companies that already exist
@@ -7423,6 +7441,7 @@ export default {
         ai_optional: "— optional",
         ai_skills_hint: "Skills this project needs. The AI also suggests skills from your description — you can adjust them on the review step.",
         ai_proposal_id_hint: "The won proposal this project came from. Used to tie the project back to the bid it originated from.",
+        you: "You",
     },
     ScreenshotRetention: {
         heading: "Auto-delete old screenshots",
@@ -8029,6 +8048,7 @@ export default {
             "By enabling this app you will be able to manage <b>Time log</b> in <b>Tasks</b> for this <b>project</b>",
         enable_app_manage_custom_fields:
             "By enabling this app you will be able to manage <b>Custom Fields</b> for this <b>project</b>",
+        read_more: "Read more",
     },
     Company: {
         fill_company_details: "Fill in your company details",

@@ -14,7 +14,7 @@
             </div>
             <Sidebar
                 v-model:visible="isVisible"
-                title="Currencies"
+                :title="$t('Settings.currencies')"
                 :enable-search="true"
                 :options="option"
                 :multiSelect="true"

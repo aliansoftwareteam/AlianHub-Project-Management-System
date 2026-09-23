@@ -31,7 +31,7 @@
                     </div>
                     <div class="d-flex align-items-center justify-content-end w-35">
                         <span class="timelogHours black font-roboto-sans">
-                            {{convertedTimeString(data.total,'update')}} hrs
+                            {{ $t('TimeTracker.hours_value', { time: convertedTimeString(data.total,'update') }) }}
                         </span>
                     </div>
                 </div>
@@ -72,7 +72,7 @@
         </div>
         <div class="norecords__found" v-if="dataObj && dataObj.length == 0">
             <div class="norecords__wrapper">
-                <p class="red">No records found</p>
+                <p class="red">{{ $t('UserTimesheet.no_records_found') }}</p>
             </div>
         </div>
     </div>

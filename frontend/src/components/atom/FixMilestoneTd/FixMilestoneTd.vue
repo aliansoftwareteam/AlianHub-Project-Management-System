@@ -40,13 +40,13 @@
                                 </div>
                                 <div class="border-bottom-black">
                                     <span class="d-block dropdown_span">{{currencyMilestone.symbol}} {{getCommaSeperatedNumber(refundedTotalValue(fixMilestoneProps.refundedAmount,fixMilestoneProps.amount))}}
-                                        <span v-if="(fixMilestoneProps?.refundedAmount && fixMilestoneProps.refundedAmount?.length > 0 ? Number(refundedTotalValue(fixMilestoneProps.refundedAmount,fixMilestoneProps.amount)) : '') === (fixMilestoneProps.amount)">All amount refunded</span>
+                                        <span v-if="(fixMilestoneProps?.refundedAmount && fixMilestoneProps.refundedAmount?.length > 0 ? Number(refundedTotalValue(fixMilestoneProps.refundedAmount,fixMilestoneProps.amount)) : '') === (fixMilestoneProps.amount)">{{ $t('Milestone.all_amount_refunded') }}</span>
                                         <span v-else>{{$t('Milestone.total_partially_refunded')}}</span>    
                                     </span>
                                 </div>
                                 <div class="border-bottom-black">
                                     <span class="d-block dropdown_span">{{currencyMilestone.symbol}} {{getCommaSeperatedNumber(fixMilestoneProps.amount)}}  ({{$t('Milestone.actual_amount')}})</span>
-                                    <span class="d-block dropdown_span">{{currencyMilestone.symbol}} {{'-'}} {{getCommaSeperatedNumber(refundedTotalValue(fixMilestoneProps.refundedAmount,fixMilestoneProps.amount))}} (Refund Amount)</span>
+                                    <span class="d-block dropdown_span">{{currencyMilestone.symbol}} {{'-'}} {{getCommaSeperatedNumber(refundedTotalValue(fixMilestoneProps.refundedAmount,fixMilestoneProps.amount))}} ({{ $t('Milestone.refund_amount') }})</span>
                                 </div>
                                 <span class="d-block">{{currencyMilestone.symbol}} {{getCommaSeperatedNumber(refundedTotal(fixMilestoneProps.refundedAmount,fixMilestoneProps.amount))}}</span>
                             </div>
@@ -132,7 +132,7 @@
         <div class="d-flex align-items-center justify-content-between">
             <div>
                 <span v-if="fixMilestoneProps.statusArray && fixMilestoneProps.statusArray.length ? fixMilestoneProps.statusArray[fixMilestoneProps.statusArray.length - 1].milestoneStatusColor.includes('RELEASED'):''">
-                    <span class="refund_cancel_font" v-if="(fixMilestoneProps?.refundedAmount && fixMilestoneProps.refundedAmount?.length > 0 ? Number(refundedTotalValue(fixMilestoneProps.refundedAmount,fixMilestoneProps.amount)) : '') !== (fixMilestoneProps.amount)" @click="permissionData ? refundIndex(fixMilestoneProps._id) : ''">Refund</span>
+                    <span class="refund_cancel_font" v-if="(fixMilestoneProps?.refundedAmount && fixMilestoneProps.refundedAmount?.length > 0 ? Number(refundedTotalValue(fixMilestoneProps.refundedAmount,fixMilestoneProps.amount)) : '') !== (fixMilestoneProps.amount)" @click="permissionData ? refundIndex(fixMilestoneProps._id) : ''">{{ $t('Milestone.refund') }}</span>
                 </span>
                 <span v-else>
                     <span class="refund_cancel_font" v-if="fixMilestoneProps.statusArray && fixMilestoneProps.statusArray.length > 0 ? !fixMilestoneProps.statusArray[fixMilestoneProps.statusArray.length - 1].milestoneStatusColor.includes('CANCELLED'):''" @click="permissionData ? props.planCondition ? $emit('editMilestonetd','cancelstatus',fixMilestoneIndex,true,fixMilestoneProps) : '' : ''">{{$t('Projects.cancel')}}</span>

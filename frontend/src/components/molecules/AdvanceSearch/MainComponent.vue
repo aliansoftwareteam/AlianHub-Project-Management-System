@@ -13,7 +13,7 @@
                 @input="onInput"
             />
             <span v-if="searching" class="pal__spin" aria-hidden="true"></span>
-            <button type="button" class="ah-kbd pal__esc" @click="close">ESC</button>
+            <button type="button" class="ah-kbd pal__esc" @click="close">{{ $t('Shell.palette_esc') }}</button>
         </div>
 
         <div ref="bodyEl" class="pal__body ah-scroll">

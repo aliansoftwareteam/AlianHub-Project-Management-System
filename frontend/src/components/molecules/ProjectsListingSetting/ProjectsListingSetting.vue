@@ -2,7 +2,7 @@
     <div class="projectInfoDiv bg-white" :class="[{'opacity-5 pointer-event-none' : item?.isRestrict === true}]">
         <div class="projectInfoTopLine d-flex align-items-center justify-content-between font-roboto-sans">
             <div class="d-flex align-items-center project__inToplinetextimg-wrapper">
-                <img :class="[{'cursor-pointer' : activeTab === 0}]" :src="item?.favouriteTasks?.filter((x) => x.userId === userId)?.length ? projectStar : blankStar" @click="!item.isRestrict ? updateFavourite(item) : ''" title="favorite"/>
+                <img :class="[{'cursor-pointer' : activeTab === 0}]" :src="item?.favouriteTasks?.filter((x) => x.userId === userId)?.length ? projectStar : blankStar" @click="!item.isRestrict ? updateFavourite(item) : ''" :title="$t('Projects.favourite')"/>
                 <span class="ProjectFirstLatter light-purple d-flex align-items-center justify-content-center font-weight-400 font-roboto-sans white font-size-13 text-uppercase" v-if="item.projectIcon.type === 'color'" :style="[{'background-color': item.projectIcon.type === 'color' ? item.projectIcon.data : ''}]">{{item.ProjectName ? item.ProjectName.charAt(0) : ''}}</span>
                 <WasabiImage
                     v-else
