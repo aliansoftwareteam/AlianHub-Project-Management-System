@@ -1472,6 +1472,7 @@
     "Auth.verify_first_title": "Verify your email first",
     "Auth.verify_ok_body": "You can log in now.",
     "Auth.verify_ok_title": "Email verified",
+    "Auth.verify_resent_body": "We sent a new verification link to your email address. Click it, then log in.",
     "Auth.visibility": "Visibility",
     "Auth.welcome_back": "Welcome back",
     "Auth.work_email": "Work email",

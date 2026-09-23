@@ -177,7 +177,9 @@ const submit = async () => {
             assignCompany: companyIdRoute.value,
             email: email.value,
             password: form.password,
-            isInvitation: true
+            isInvitation: true,
+            memberId: requestId.value,
+            linkId: String(route.query.token || "")
         });
         if (!response.data.status) {
             banner.value = response.data.statusText?.status == 409 ? t("Auth.email_in_use") : t("Auth.server_error");

@@ -69,7 +69,10 @@ describe('INS-01 and INS-02 role and membership changes', () => {
         const invite = await owner.api.post('/api/v2/sendInvitationEmail', { email, companyId: state.companyId, companyName: state.companyName, role: 3, designation: 0 });
         const inviteRow = invite.body.data;
         expect(inviteRow._id).toBeTruthy();
-        await anonymous.post('/api/v2/createUser', { firstName: 'QA', lastName: 'Accept', email, password: state.password, isInvitation: true, assignCompany: state.companyId });
+        await anonymous.post('/api/v2/createUser', {
+            firstName: 'QA', lastName: 'Accept', email, password: state.password, isInvitation: true, assignCompany: state.companyId,
+            memberId: String(inviteRow._id), linkId: inviteRow.linkId,
+        });
         const session = await login(state.baseURL, email);
         const api = createApiClient({ baseURL: state.baseURL, accessToken: session.accessToken, companyId: state.companyId });
 

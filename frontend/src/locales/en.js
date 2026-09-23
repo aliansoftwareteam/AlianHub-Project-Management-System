@@ -464,6 +464,7 @@ export default {
         verify_expired_body: "Check your inbox for the latest verification email, or resend it below.",
         verify_already_title: "Already verified",
         verify_already_body: "This email is already verified. Log in to continue.",
+        verify_resent_body: "We sent a new verification link to your email address. Click it, then log in.",
         invite_checking: "Checking your invitation…",
         invite_invalid_title: "This invitation isn't valid any more",
         invite_invalid_body: "Ask the person who invited you for a new link, or log in if you already have an account.",
