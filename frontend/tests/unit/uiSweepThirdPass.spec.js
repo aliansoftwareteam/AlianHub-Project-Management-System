@@ -80,6 +80,18 @@ describe('Settings → Time tracking', () => {
     });
 });
 
+describe('Settings → General in dark mode', () => {
+    const css = read('components/molecules/Setting/style.css');
+
+    test('section headings on the canvas follow the theme', () => {
+        expect(ruleBody(css, 'h2.task_priority_wrapper_value')).toMatch(/color:\s*var\(--ink\)/);
+    });
+
+    test('the white sections keep dark ink for the text they inherit', () => {
+        expect(ruleBody(css, '.mySettingSection')).toMatch(/color:\s*#17161c/);
+    });
+});
+
 describe('Docs hub', () => {
     const vue = read('views/Pages/PagesSpace.vue');
     const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));
