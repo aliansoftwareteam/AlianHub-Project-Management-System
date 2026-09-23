@@ -41,6 +41,16 @@ describe('the "available, not enabled" app teaser', () => {
     });
 });
 
+describe('Settings → Instance → Knowledge on a phone', () => {
+    const vue = read('views/Settings/Instance/InstanceKnowledge.vue');
+    const scoped = vue.slice(vue.indexOf('<style scoped>'));
+
+    test('a workspace card head wraps instead of pushing its button off screen', () => {
+        expect(ruleBody(scoped, '.in-card__head')).toMatch(/flex-wrap:\s*wrap/);
+        expect(ruleBody(scoped, '.in-card__title')).toMatch(/overflow-wrap:\s*anywhere/);
+    });
+});
+
 describe('legacy blocks inside the task panel in dark mode', () => {
     const css = read('components/organisms/TaskDetailOverlay/style.css');
     const dark = (selector) => ruleBody(css, `:root[data-theme="dark"] .ah-detail__panel ${selector}`);
