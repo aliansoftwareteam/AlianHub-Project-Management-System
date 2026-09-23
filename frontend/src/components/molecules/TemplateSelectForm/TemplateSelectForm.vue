@@ -186,9 +186,8 @@ defineExpose({ closeInputs });
 @import '@/components/templates/CreateProject/style.css';
 </style>
 <style scoped>
-/* Pinned to the top of the wizard's scrolling section (see .wizard-step-fill .taskStatusSection)
-   so Back / template name / Save Template stay visible while the list scrolls under them.
-   Solid background so scrolled rows don't show through. */
+/* Sticky so Back / template name / Save Template stay visible while the list scrolls under
+   them; the solid background keeps scrolled rows from showing through. */
 .tsf-substep-header {
     gap: 6px;
     padding: 2px 0 10px;
