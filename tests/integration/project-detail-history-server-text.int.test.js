@@ -124,3 +124,18 @@ describe('a project view', () => {
     });
 });
 
+describe('a saved task filter changed from a project', () => {
+    it('is recorded in that project with the stored filter name', async () => {
+        const name = `Mine ${uniqueSuffix()}`;
+        const saved = await owner.api.post('/api/v1/task/filter/create', { name, filters: [], filter: 'taskFilter', typeFilter: 'tasks' });
+        expect(saved.status).toBe(200);
+        const filterId = String(saved.body.data._id);
+        const res = await owner.api.put(`/api/v1/task/filter/update?projectId=${project._id}`, [{ _id: filterId }, { $set: { name: 'Renamed' } }]);
+        expect(res.status).toBe(200);
+
+        const ownerName = await nameOf(owner.uid);
+        const [row] = await rowsOf(() => historyOf('Project_Filter'), 'the filter row');
+        expect(row.Message).toBe(`<b>${ownerName}</b> has been updated <b>${name}</b> filter`);
+    });
+});
+

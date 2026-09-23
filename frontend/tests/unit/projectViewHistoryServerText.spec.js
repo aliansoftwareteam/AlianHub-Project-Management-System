@@ -42,10 +42,23 @@ beforeEach(() => {
     [apiRequest, editView, deleteView, deletePrivateView].forEach((fn) => fn.mockImplementation(() => Promise.resolve({ status: true, data: {} })));
 });
 
-describe('project view changes leave their history text to the server', () => {
-    it('the view list posts no history text', () => {
-        const source = fs.readFileSync(path.join(SRC, 'components/atom/ViewsList/ViewsList.vue'), 'utf8');
+describe('project view and saved filter changes leave their history text to the server', () => {
+    it.each([
+        'components/atom/ViewsList/ViewsList.vue',
+        'components/molecules/TaskFilter/TaskFilter.vue',
+        'components/molecules/TaskFilter/HomeTaskFilter.vue',
+    ])('%s posts no history text', (file) => {
+        const source = fs.readFileSync(path.join(SRC, file), 'utf8');
         expect(source).not.toMatch(/HANDLE_HISTORY|HANDLE_NOTIFICATION/);
+    });
+
+    it.each([
+        'components/molecules/TaskFilter/TaskFilter.vue',
+        'components/molecules/TaskFilter/HomeTaskFilter.vue',
+    ])('%s names the open project when it changes a saved filter', (file) => {
+        const source = fs.readFileSync(path.join(SRC, file), 'utf8');
+        expect(source).toMatch(/TASK_GLOBAL_FILTER\}\/update\?projectId=/);
+        expect(source).toMatch(/\/delete\/\$\{companyId\.value\}\/\$\{selectedRow\.value\._id\}\?projectId=/);
     });
 
     it.each([
