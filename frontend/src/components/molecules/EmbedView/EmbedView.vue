@@ -71,10 +71,10 @@ import { ref,inject,onMounted,computed } from 'vue';
 // components
 import InputText from '@/components/atom/InputText/InputText.vue'
 import {addView} from './helper.js'
-import { addPrivateView, privateViewHistory } from "@/components/molecules/ProjectViews/helper.js"
+import { addPrivateView } from "@/components/molecules/ProjectViews/helper.js"
 
 // UTILS
-import {useCustomComposable , useGetterFunctions } from "@/composable";
+import { useCustomComposable } from "@/composable";
 import { useToast } from 'vue-toast-notification';
 import { Embeds } from "./Embeds.js";
 import { useStore } from 'vuex';
@@ -111,14 +111,6 @@ const selectedEmbed = ref({
     image: require("@/assets/images/svg/anything.svg"),
 })
 const embeds = ref(Embeds)
-const {getUser} = useGetterFunctions();
-const companyOwner = computed(() => getters["settings/companyOwnerDetail"])
-const user = getUser(userId.value);
-const userData = {
-    id: user.id,
-    Employee_Name: user.Employee_Name,
-    companyOwnerId: companyOwner.value.userId
-}
 const {makeUniqueId} = useCustomComposable();
 const radioValue = ref('url')
 const inputValues = ref({
@@ -213,10 +205,6 @@ const HandleSubmit = () => {
                     console.error(err.statusText)
                 })
             }
-        }
-
-        if(isPrivate.value) {
-            privateViewHistory(companyId.value, props.projectData._id, `<b>${userData.Employee_Name}</b> has added the <b> ${isPin.value ? 'pinned' : ''} private Embed View </b> as <b>${inputValues.value.name.value}</b>`);
         }
 
         emits('closeDropdown')

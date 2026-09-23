@@ -56,8 +56,8 @@
 <script setup>
 // UTILS
 import { addView } from '@/components/molecules/EmbedView/helper.js'
-import { addPrivateView, groupViews, viewTagKey, privateViewHistory } from './helper.js'
-import { useCustomComposable, useGetterFunctions } from "@/composable";
+import { addPrivateView, groupViews, viewTagKey } from './helper.js'
+import { useCustomComposable } from "@/composable";
 import * as env from '@/config/env';
 import { projectComponentsIcons } from '@/composable/commonFunction';
 
@@ -72,7 +72,6 @@ import { apiRequest } from '../../../services';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 
-const {getUser} = useGetterFunctions();
 const {makeUniqueId} = useCustomComposable();
 const { getters,commit } = useStore();
 const props = defineProps({
@@ -123,15 +122,7 @@ const descriptions = {
 const companyId = inject('$companyId')
 const userId = inject('$userId')
 const companyUser = ref()
-const companyOwner = computed(() => getters["settings/companyOwnerDetail"])
 const Data = ref('')
-const user = getUser(userId.value);
-
-const userData = {
-    id: user?._id,
-    Employee_Name: user.Employee_Name,
-    companyOwnerId: companyOwner.value.userId
-}
 
 onMounted(() => {
     Data.value = {...props.projectData}
@@ -209,9 +200,6 @@ const handleSubmit = (item) =>{
         }).catch((err) => {
             console.error(err.statusText)
         })
-    }
-    if(isPrivate.value) {
-        privateViewHistory(companyId.value, Data.value._id, `<b>${userData.Employee_Name}</b> has added the <b> ${isPin.value ? 'pinned' : ''} private View </b> as <b>${item?.name}</b>`);
     }
     emits('closeDropdown')
 }

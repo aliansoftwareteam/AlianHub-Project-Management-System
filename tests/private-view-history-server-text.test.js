@@ -42,8 +42,8 @@ describe('private view history text', () => {
     it.each([
         ['a rename that keeps the name', 'update', { id: 'v2', name: 'Sheet' }, 'name'],
         ['a rename of a view the member does not have', 'update', { id: 'nope', name: 'X' }, 'name'],
-        ['a removal of a view the member does not have', 'delete', { id: 'nope' }],
-        ['a view added without a project', 'push', { id: 'v5', name: 'Loose' }],
+        ['a removal of a view the member does not have', 'delete', { id: 'nope' }, undefined],
+        ['a view added without a project', 'push', { id: 'v5', name: 'Loose' }, undefined],
     ])('writes nothing for %s', (what, operation, data, key) => {
         expect(describe_(operation, data, key)).toBeNull();
     });
