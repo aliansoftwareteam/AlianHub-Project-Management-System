@@ -5,6 +5,9 @@
 .tv-range { font: 500 10.5px/1 var(--font-mono); color: var(--ink-3); display: inline-flex; align-items: center; gap: 2px; text-transform: uppercase; white-space: nowrap; }
 .tv-range button { border: 0; background: transparent; color: var(--ink-2); cursor: pointer; padding: 4px 5px; font: 600 13px/1 var(--font-mono); border-radius: 5px; }
 .tv-range button:hover { background: var(--surface-hover); color: var(--ink); }
+@media (max-width: 767px) {
+    .tv-range button { min-width: 32px; min-height: 32px; margin: -6px -7px; }
+}
 .tv-tabs { margin-left: 14px; display: flex; gap: 2px; }
 .tv-tab { padding: 6px 10px; color: var(--ink-2); border: 0; border-bottom: 2px solid transparent; background: transparent; cursor: pointer; text-decoration: none; font: 500 12.5px/1.2 var(--font-ui); white-space: nowrap; }
 .tv-tab:hover { color: var(--ink); text-decoration: none; }

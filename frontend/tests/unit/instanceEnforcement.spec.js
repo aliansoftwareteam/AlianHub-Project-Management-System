@@ -77,6 +77,11 @@ describe('InstanceEnforcement', () => {
         expect(wrapper.find('[data-test="cache-note"]').text()).toContain('Enforcement.cache_note');
     });
 
+    it('says a change applies at once when the cache window is zero', async () => {
+        const wrapper = await mountWith({ summaryData: summary({ cacheTtlSeconds: 0 }) });
+        expect(wrapper.find('[data-test="cache-note"]').text()).toBe('Enforcement.cache_note_now');
+    });
+
     it('locks the default when the environment sets it', async () => {
         const wrapper = await mountWith({ summaryData: summary({ instance: { mode: 'report', source: 'env', locked: true, killSwitch: false } }) });
         const select = wrapper.find('select[data-test="instance-default"]');

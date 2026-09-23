@@ -8497,6 +8497,7 @@ export default {
         "source_default": "Built-in default",
         "locked_help": "The environment sets this value, so the console cannot change it. Change it there and restart the server.",
         "cache_note": "A mode change applies on this server at once and on every other server within {seconds} seconds.",
+        "cache_note_now": "A mode change applies on every server at once.",
         "kill_switch": "DISABLE_PERMISSION_ENFORCEMENT is on: every workspace set to enforce runs in report until it is turned off.",
         "workspaces_title": "Workspaces",
         "readiness_rule": "A workspace in report is ready to enforce once its would-be-denial log has been empty for {days} days in a row. Nothing switches by itself: you choose when.",
@@ -8556,6 +8557,7 @@ export default {
         "role_member": "Member",
         "role_none": "No seat",
         "mode_saved": "Mode set for {name}. Other servers pick it up within {seconds} seconds.",
+        "mode_saved_now": "Mode set for {name}. Every server applies it at once.",
         "default_saved": "Instance default set. Other servers apply it when they next start."
     },
     "Egress": {
@@ -8650,6 +8652,7 @@ export default {
         "lead": "What each workspace's knowledge index holds: chunks and sources per type, how far the backfill has got, how fresh the index is, the embedding model, and why files were left out. Open a workspace to see its figures and controls.",
         "no_text_note": "Counts, sizes, times, reasons and ids only: no text from the index is shown here.",
         "indexer_on": "The indexer is on:",
+        "indexer_tenant": "The indexer runs only for workspaces that turn it on, as each card below shows:",
         "indexer_off": "The indexer is off, so nothing is indexed and nothing here can be changed. To turn it on, set this and restart the server:",
         "indexer_label": "Indexer",
         "retrieval_label": "Retrieval",

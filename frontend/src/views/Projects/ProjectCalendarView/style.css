@@ -116,20 +116,26 @@
 }
 .cv__grid :deep(.fc-day-sat .fc-col-header-cell-cushion),
 .cv__grid :deep(.fc-day-sun .fc-col-header-cell-cushion) { color: var(--ink-3); opacity: .65; }
-.cv__grid :deep(.fc-daygrid-day) {
+/* The card is drawn on the frame, not the cell: the table collapses its borders, so rounded
+   cells touched and their cut corners showed the grid through as small diamonds. The cell's
+   padding is the gap between cards. */
+.cv__grid :deep(.fc-daygrid-day) { background: transparent; }
+.cv__grid :deep(.fc-daygrid-day-frame) {
+    padding: 6px;
+    min-height: 100%;
+    box-sizing: border-box;
     background: var(--surface);
     border: 1px solid var(--hairline);
     border-radius: 10px;
     transition: border-color var(--t-state) var(--ease);
 }
-.cv__grid :deep(.fc-daygrid-day-frame) { padding: 6px; min-height: 0; }
-.cv__grid :deep(.fc-day-sat), .cv__grid :deep(.fc-day-sun) { background: rgba(255, 255, 255, .5); }
-:root[data-theme="dark"] .cv__grid :deep(.fc-day-sat),
-:root[data-theme="dark"] .cv__grid :deep(.fc-day-sun) { background: var(--surface-2); }
+.cv__grid :deep(.fc-day-sat .fc-daygrid-day-frame), .cv__grid :deep(.fc-day-sun .fc-daygrid-day-frame) { background: rgba(255, 255, 255, .5); }
+:root[data-theme="dark"] .cv__grid :deep(.fc-day-sat .fc-daygrid-day-frame),
+:root[data-theme="dark"] .cv__grid :deep(.fc-day-sun .fc-daygrid-day-frame) { background: var(--surface-2); }
 .cv__grid :deep(.fc-day-other) { opacity: .55; }
-.cv__grid :deep(.fc-day-today) { border: 1.5px solid var(--brand); background: var(--surface); }
-.cv__grid :deep(.fc-daygrid-day.cv-in-sprint) { box-shadow: inset 0 2px 0 var(--brand-tint); }
-.cv__grid :deep(.fc-daygrid-day.cv-drop) { border: 1px dashed var(--brand); }
+.cv__grid :deep(.fc-day-today .fc-daygrid-day-frame) { border: 1.5px solid var(--brand); background: var(--surface); }
+.cv__grid :deep(.fc-daygrid-day.cv-in-sprint .fc-daygrid-day-frame) { box-shadow: inset 0 2px 0 var(--brand-tint); }
+.cv__grid :deep(.fc-daygrid-day.cv-drop .fc-daygrid-day-frame) { border: 1px dashed var(--brand); }
 .cv__grid :deep(.fc-scrollgrid-sync-table td) { padding: 3px; }
 
 .cv__grid :deep(.fc-daygrid-day-top) { flex-direction: column !important; align-items: flex-start; }

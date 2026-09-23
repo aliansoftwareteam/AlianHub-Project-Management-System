@@ -46,13 +46,13 @@ const emit = defineEmits(["update:modelValue"]);
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--knob);
     box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
     transition: transform var(--t-state) var(--ease);
 }
 .ah-switch--sm .ah-switch__knob { width: 14px; height: 14px; }
 .ah-switch.is-on { background: var(--brand); }
-.ah-switch.is-on .ah-switch__knob { transform: translateX(14px); }
+.ah-switch.is-on .ah-switch__knob { transform: translateX(14px); background: var(--on-brand); }
 .ah-switch--sm.is-on .ah-switch__knob { transform: translateX(12px); }
 .ah-switch:focus-visible { outline: none; box-shadow: var(--focus); }
 .ah-switch.is-disabled, .ah-switch:disabled { opacity: .5; cursor: not-allowed; }

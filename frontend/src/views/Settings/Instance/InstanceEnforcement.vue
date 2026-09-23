@@ -29,7 +29,7 @@
                         <span v-if="summary.instance.locked" class="ah-small">{{ $t('Enforcement.locked_help') }}</span>
                     </div>
                 </div>
-                <p class="ah-small" data-test="cache-note">{{ $t('Enforcement.cache_note', { seconds: summary.cacheTtlSeconds }) }}</p>
+                <p class="ah-small" data-test="cache-note">{{ summary.cacheTtlSeconds > 0 ? $t('Enforcement.cache_note', { seconds: summary.cacheTtlSeconds }) : $t('Enforcement.cache_note_now') }}</p>
             </section>
 
             <section class="ah-card in-card">
@@ -218,7 +218,10 @@ const setMode = (w, mode) => {
     if (mode === w.mode) return;
     return change(
         () => put(`${env.INSTANCE_ENFORCEMENT}/${w.companyId}/mode`, { mode }),
-        () => $toast.success(t("Enforcement.mode_saved", { name: w.name || w.companyId, seconds: summary.value.cacheTtlSeconds })),
+        () => {
+            const seconds = summary.value.cacheTtlSeconds;
+            $toast.success(t(seconds > 0 ? "Enforcement.mode_saved" : "Enforcement.mode_saved_now", { name: w.name || w.companyId, seconds }));
+        },
     );
 };
 

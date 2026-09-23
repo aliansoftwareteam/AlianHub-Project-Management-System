@@ -12,7 +12,7 @@
         <ul class="ah-gs__list">
             <li v-for="item in items" :key="item.key" :class="{ 'is-done': item.done }">
                 <button type="button" class="ah-gs__item" :disabled="item.done" @click="item.go">
-                    <span class="ah-gs__box"><ShellIcon v-if="item.done" name="check" :size="10" /></span>
+                    <span class="ah-gs__box"><ShellIcon v-if="item.done" name="check" :size="10" :stroke="3" /></span>
                     <span>{{ item.label }}</span>
                 </button>
             </li>

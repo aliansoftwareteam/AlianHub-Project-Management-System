@@ -379,13 +379,11 @@ onMounted(load);
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    /* Stays white in both themes: it has to read against the neutral off track
-     * and the --brand on track alike. */
-    background: #fff;
+    background: var(--knob);
     transition: left var(--t-state) var(--ease);
 }
 .rtx__toggle.is-on .rtx__toggle-track { background: var(--brand); }
-.rtx__toggle.is-on .rtx__toggle-knob { left: 14px; }
+.rtx__toggle.is-on .rtx__toggle-knob { left: 14px; background: var(--on-brand); }
 
 .rtx__rule { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .rtx__word { color: var(--ink-2); }

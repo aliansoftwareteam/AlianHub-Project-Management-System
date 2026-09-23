@@ -1,8 +1,7 @@
 @media (max-width: 767px) {
     .cv__main { padding: 8px 6px; }
     .cv__grid :deep(.fc-scrollgrid-sync-table td) { padding: 1px; }
-    .cv__grid :deep(.fc-daygrid-day) { border-radius: 6px; }
-    .cv__grid :deep(.fc-daygrid-day-frame) { padding: 3px 2px; }
+    .cv__grid :deep(.fc-daygrid-day-frame) { padding: 3px 2px; border-radius: 6px; }
     .cv__grid :deep(.fc-col-header-cell) { padding-bottom: 4px; }
     .cv__grid :deep(.fc-col-header-cell-cushion) { padding: 0; font-size: 9.5px; letter-spacing: 0; }
     .cv__grid :deep(.cv__daynum) { font-size: 11px; }

@@ -65,7 +65,7 @@
                                 <span class="ah-mono al__action">{{ eventAction(row) }}</span>
                                 <span v-if="row.entityName || row.entityId" class="al__entity">{{ row.entityName || row.entityId }}</span>
                             </div>
-                            <div v-if="showsHashedIds(row) && row.entityId" class="ah-mono ah-small al__id" data-test="entity-id" :title="$t('Audit.names_not_checked')">{{ row.entityId }}</div>
+                            <div v-if="showsHashedIds(row) && row.entityId && row.entityName && row.entityName !== row.entityId" class="ah-mono ah-small al__id" data-test="entity-id" :title="$t('Audit.names_not_checked')">{{ row.entityId }}</div>
                             <div v-if="row.meta && row.meta.cost && (row.meta.cost.tokens || row.meta.cost.usd)" class="al__cost ah-mono">
                                 {{ $t('Audit.cost', { tokens: row.meta.cost.tokens || 0, usd: Number(row.meta.cost.usd || 0).toFixed(2) }) }}
                             </div>
