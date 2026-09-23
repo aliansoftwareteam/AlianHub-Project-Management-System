@@ -9,6 +9,14 @@ const { importUserNotifications } = require("../../../utils/data");
 const { addAndRemoveUserInMongodbNotificationCount } = require("../../Auth/controller");
 const { toAuthView } = require("../../Users/helpers/userAccessRules");
 const { recordInvitedOwner } = require("../../Company/helpers/recordInvitedOwner");
+const {
+    SocialSignInRefusal,
+    assertClaimedEmail,
+    findAuth,
+    findAuthByProviderId,
+    noVerifiedEmail,
+    verifySocialIdentity,
+} = require("../helpers/socialIdentity");
 const { linkTokenAccepted } = require("./invitationPreview");
 
 
@@ -118,344 +126,78 @@ exports.verifyToken = (req, res) => {
     });
 };
 
-/**
- * Sign up with google
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
-exports.googleSignup = async (req, res) => {
-    try {
-        const { firstName, lastName, email, googleId, assignCompany, companyUserDocID } = req.body;
+const joinInvitedCompany = async ({ companyId, invitation, userId, provider }) => {
+    await mongoRef.MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMPANY_USERS,
+        data: [{ _id: invitation._id }, { $set: { status: 2, userId } }],
+    }, 'findOneAndUpdate');
+    await recordInvitedOwner({ companyId, invitation, userId }).catch((error) => {
+        logger.error(`Record invited owner error in ${provider} signup: ${error}`);
+    });
+    await importUserNotifications(companyId, userId).catch((error) => {
+        logger.error(`Import notification setting error in ${provider} signup: ${error}`);
+    });
+    await addAndRemoveUserInMongodbNotificationCount(companyId, userId, 'Add').catch((error) => {
+        logger.error(`Add user in mongodb notification count error in ${provider} signup: ${error}`);
+    });
+};
 
-        // Validate Required Fields
-        if (!firstName || !lastName || !email || !googleId) {
-            return res.status(400).json({
-                status: false,
-                message: "First name, last name, email, and Google ID are required",
-            });
+/* The account's email is the one the provider verified, which is also the only reason it starts
+ * verified. An invitation admits the account only when the signup presents that invitation row. */
+const socialSignup = (provider) => async (req, res) => {
+    const body = req.body || {};
+    const refuse = (statusCode, message) => res.status(statusCode).json({ status: false, message });
+    try {
+        const { firstName, lastName, assignCompany, companyUserDocID } = body;
+        if (!isFilledString(firstName) || !isFilledString(lastName)) {
+            return refuse(400, 'First name and last name are required');
         }
 
-        const invitation = assignCompany
+        const identity = await verifySocialIdentity(provider, body);
+        if (!identity.email) return refuse(401, noVerifiedEmail(identity));
+        assertClaimedEmail(identity, body.email);
+        const { email, idField, providerId, label } = identity;
+
+        if (await findAuthByProviderId(identity)) {
+            return refuse(409, `This ${label} account is already linked to an account. Sign in instead.`);
+        }
+        if (await findAuth({ email })) {
+            return refuse(409, 'Email already exists');
+        }
+
+        const invitation = assignCompany && companyUserDocID
             ? await exports.findPendingInvitation({ companyId: assignCompany, email, companyUserId: companyUserDocID })
             : null;
         const invitedCompany = invitation ? String(assignCompany) : '';
 
-        // Check if user already exists
-        const findObj = {
+        const authRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, {
             type: dbCollections.USER_AUTH,
-            data: [{ email }],
-        };
+            data: { email, [idField]: providerId, isBlocked: false },
+        }, 'save');
 
-        const existingUser = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, findObj, "findOne");
-
-        if (existingUser) {
-            // If already signed up via Google or Local, just return existing user
-            return res.status(409).json({
-                status: false,
-                message: "Email already exists"
-            });
-        }
-
-        // Create Auth Document (Google Only)
-        const authDoc = {
-            email,
-            googleId,
-            isBlocked: false,
-        };
-
-        const authObj = { type: dbCollections.USER_AUTH, data: authDoc };
-        const authRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, authObj, "save");
-
-        // Update user status in company users
         if (invitedCompany) {
-            const query = {
-                type: SCHEMA_TYPE.COMPANY_USERS,
-                data: [
-                    {
-                        _id: new mongoose.Types.ObjectId(companyUserDocID)
-                    },
-                    {
-                        $set: {
-                            status: 2,
-                            userId: authRes._id
-                        }
-                    }
-                ]
-            }
-            await mongoRef.MongoDbCrudOpration(assignCompany, query, 'findOneAndUpdate');
-
-            await recordInvitedOwner({ companyId: invitedCompany, invitation, userId: authRes._id }).catch((error) => {
-                logger.error(`Record invited owner error in googleSignup hook: ${error}`);
-            });
-
-            // Import notification settings
-            await importUserNotifications(assignCompany, authRes._id).catch((error) => {
-                logger.error(`Import notification setting error in googleSignup hook: ${error}`);
-            });
-
-            // Add notification count object
-            await addAndRemoveUserInMongodbNotificationCount(assignCompany, authRes._id, "add").catch((error) => {
-                logger.error(`Add user in mongodb notification count error in googleSignup hook: ${error}`);
-            });
+            await joinInvitedCompany({ companyId: invitedCompany, invitation, userId: authRes._id, provider });
         }
 
-        // Create User Document
         const userDoc = {
+            ...exports.buildUserDocument({ firstName, lastName, email, assignCompany: invitedCompany }),
             _id: authRes._id,
-            AssignCompany: invitedCompany ? [invitedCompany] : [],
-            Employee_FName: firstName,
-            Employee_LName: lastName,
-            Employee_Email: email,
-            Employee_Name: `${firstName} ${lastName}`,
-            Time_Format: "12",
-            isDeleted: false,
-            isActive: true,
-            isOnline: false,
-            isEmailVerified: true, // Google email is already verified
+            isEmailVerified: true,
         };
-
-        const userObj = { type: dbCollections.USERS, data: userDoc };
-        const userRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, userObj, "save");
+        const userRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.USERS, data: userDoc }, 'save');
 
         return res.status(200).json({
             status: true,
-            message: "Google signup successful",
+            message: `${label} signup successful`,
             data: toAuthView(userRes),
         });
     } catch (error) {
-        logger.error(`Google Signup API Error: ${error.message}`);
-        return res.status(500).json({
-            status: false,
-            message: error.message || "Internal Server Error",
-        });
+        if (error instanceof SocialSignInRefusal) return refuse(error.statusCode, error.message);
+        logger.error(`${provider} signup error: ${error.message}`);
+        return refuse(500, error.message || 'Internal Server Error');
     }
 };
 
-/**
- * Sign up with github
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
-exports.githubSignup = async (req, res) => {
-    try {
-        const { firstName, lastName, email, githubId, assignCompany, companyUserDocID } = req.body;
-
-        // Validate Required Fields
-        if (!firstName || !lastName || !email || !githubId) {
-            return res.status(400).json({
-                status: false,
-                message: "First name, last name, email, and Github ID are required",
-            });
-        }
-
-        const invitation = assignCompany
-            ? await exports.findPendingInvitation({ companyId: assignCompany, email, companyUserId: companyUserDocID })
-            : null;
-        const invitedCompany = invitation ? String(assignCompany) : '';
-
-        // Check if user already exists
-        const findObj = {
-            type: dbCollections.USER_AUTH,
-            data: [{ email }],
-        };
-
-        const existingUser = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, findObj, "findOne");
-
-        if (existingUser) {
-            // If already signed up via Github or Local, just return existing user
-            return res.status(409).json({
-                status: false,
-                message: "Email already exists"
-            });
-        }
-
-        // Create Auth Document (Google Only)
-        const authDoc = {
-            email,
-            githubId,
-            isBlocked: false,
-        };
-
-        const authObj = { type: dbCollections.USER_AUTH, data: authDoc };
-        const authRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, authObj, "save");
-
-        // Update user status in company users
-        if (invitedCompany) {
-            const query = {
-                type: SCHEMA_TYPE.COMPANY_USERS,
-                data: [
-                    {
-                        _id: new mongoose.Types.ObjectId(companyUserDocID)
-                    },
-                    {
-                        $set: {
-                            status: 2,
-                            userId: authRes._id
-                        }
-                    }
-                ]
-            }
-            await mongoRef.MongoDbCrudOpration(assignCompany, query, 'findOneAndUpdate');
-
-            await recordInvitedOwner({ companyId: invitedCompany, invitation, userId: authRes._id }).catch((error) => {
-                logger.error(`Record invited owner error in githubSignup hook: ${error}`);
-            });
-
-            // Import notification settings
-            await importUserNotifications(assignCompany, authRes._id).catch((error) => {
-                logger.error(`Import notification setting error in githubSignup hook: ${error}`);
-            });
-
-            // Add notification count object
-            await addAndRemoveUserInMongodbNotificationCount(assignCompany, authRes._id, "add").catch((error) => {
-                logger.error(`Add user in mongodb notification count error in googleSignup hook: ${error}`);
-            });
-        }
-
-        // Create User Document
-        const userDoc = {
-            _id: authRes._id,
-            AssignCompany: invitedCompany ? [invitedCompany] : [],
-            Employee_FName: firstName,
-            Employee_LName: lastName,
-            Employee_Email: email,
-            Employee_Name: `${firstName} ${lastName}`,
-            Time_Format: "12",
-            isDeleted: false,
-            isActive: true,
-            isOnline: false,
-            isEmailVerified: true, // Github email is already verified
-        };
-
-        const userObj = { type: dbCollections.USERS, data: userDoc };
-        const userRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, userObj, "save");
-
-        return res.status(200).json({
-            status: true,
-            message: "Github signup successful",
-            data: toAuthView(userRes),
-        });
-    } catch (error) {
-        logger.error(`Github Signup API Error: ${error.message}`);
-        return res.status(500).json({
-            status: false,
-            message: error.message || "Internal Server Error",
-        });
-    }
-};
-
-/**
- * Sign up with gitlab
- * @param {*} req
- * @param {*} res
- * @returns
- */
-exports.gitlabSignup = async (req, res) => {
-    try {
-        const { firstName, lastName, email, gitlabId, assignCompany, companyUserDocID } = req.body;
-
-        // Validate Required Fields
-        if (!firstName || !lastName || !email || !gitlabId) {
-            return res.status(400).json({
-                status: false,
-                message: "First name, last name, email, and GitLab ID are required",
-            });
-        }
-
-        const invitation = assignCompany
-            ? await exports.findPendingInvitation({ companyId: assignCompany, email, companyUserId: companyUserDocID })
-            : null;
-        const invitedCompany = invitation ? String(assignCompany) : '';
-
-        // Check if user already exists
-        const findObj = {
-            type: dbCollections.USER_AUTH,
-            data: [{ email }],
-        };
-
-        const existingUser = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, findObj, "findOne");
-
-        if (existingUser) {
-            // If already signed up via GitLab or Local, just return existing user
-            return res.status(409).json({
-                status: false,
-                message: "Email already exists"
-            });
-        }
-
-        // Create Auth Document (GitLab Only)
-        const authDoc = {
-            email,
-            gitlabId,
-            isBlocked: false,
-        };
-
-        const authObj = { type: dbCollections.USER_AUTH, data: authDoc };
-        const authRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, authObj, "save");
-
-        // Update user status in company users
-        if (invitedCompany) {
-            const query = {
-                type: SCHEMA_TYPE.COMPANY_USERS,
-                data: [
-                    {
-                        _id: new mongoose.Types.ObjectId(companyUserDocID)
-                    },
-                    {
-                        $set: {
-                            status: 2,
-                            userId: authRes._id
-                        }
-                    }
-                ]
-            }
-            await mongoRef.MongoDbCrudOpration(assignCompany, query, 'findOneAndUpdate');
-
-            await recordInvitedOwner({ companyId: invitedCompany, invitation, userId: authRes._id }).catch((error) => {
-                logger.error(`Record invited owner error in gitlabSignup hook: ${error}`);
-            });
-
-            // Import notification settings
-            await importUserNotifications(assignCompany, authRes._id).catch((error) => {
-                logger.error(`Import notification setting error in gitlabSignup hook: ${error}`);
-            });
-
-            // Add notification count object
-            await addAndRemoveUserInMongodbNotificationCount(assignCompany, authRes._id, "add").catch((error) => {
-                logger.error(`Add user in mongodb notification count error in gitlabSignup hook: ${error}`);
-            });
-        }
-
-        // Create User Document
-        const userDoc = {
-            _id: authRes._id,
-            AssignCompany: invitedCompany ? [invitedCompany] : [],
-            Employee_FName: firstName,
-            Employee_LName: lastName,
-            Employee_Email: email,
-            Employee_Name: `${firstName} ${lastName}`,
-            Time_Format: "12",
-            isDeleted: false,
-            isActive: true,
-            isOnline: false,
-            isEmailVerified: true, // GitLab email is already verified
-        };
-
-        const userObj = { type: dbCollections.USERS, data: userDoc };
-        const userRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, userObj, "save");
-
-        return res.status(200).json({
-            status: true,
-            message: "Gitlab signup successful",
-            data: toAuthView(userRes),
-        });
-    } catch (error) {
-        logger.error(`Gitlab Signup API Error: ${error.message}`);
-        return res.status(500).json({
-            status: false,
-            message: error.message || "Internal Server Error",
-        });
-    }
-};
+exports.googleSignup = socialSignup('google');
+exports.githubSignup = socialSignup('github');
+exports.gitlabSignup = socialSignup('gitlab');

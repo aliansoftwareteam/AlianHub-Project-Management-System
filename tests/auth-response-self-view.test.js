@@ -9,6 +9,16 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 jest.mock('../Modules/service.js', () => ({ SendEmail: jest.fn((subject, mail, to, flag, cb) => cb({ status: true })) }));
 jest.mock('../utils/data', () => ({ importUserNotifications: jest.fn(async () => undefined) }));
+// These cases are about what a signup answers; tests/social-sign-in-identity.test.js covers the provider check.
+jest.mock('../Modules/Auth/helpers/socialIdentity', () => {
+    const actual = jest.requireActual('../Modules/Auth/helpers/socialIdentity');
+    return {
+        ...actual,
+        verifySocialIdentity: jest.fn(async (provider, body) => ({
+            provider, label: provider, idField: actual.PROVIDERS[provider].idField, providerId: 'provider-id', email: actual.normalEmail(body.email),
+        })),
+    };
+});
 
 const bcrypt = require('bcrypt');
 const { dbCollections } = require('../Config/collections');
@@ -156,10 +166,10 @@ describe.each([
 ])('POST /api/v2/%s', (handler, idField) => {
     it('answers the registrant with a self view only', async () => {
         const res = response();
-        await createUser[handler]({ body: { firstName: 'Ada', lastName: 'Lovelace', email: `${idField}@example.test`, [idField]: 'provider-id', ...SECRETS } }, res);
+        await createUser[handler]({ body: { firstName: 'Ada', lastName: 'Lovelace', email: `${idField.toLowerCase()}@example.test`, [idField]: 'provider-id', ...SECRETS } }, res);
 
         expect(res.statusCode).toBe(200);
-        expect(res.body.data).toMatchObject({ Employee_Email: `${idField}@example.test`, isEmailVerified: true });
+        expect(res.body.data).toMatchObject({ Employee_Email: `${idField.toLowerCase()}@example.test`, isEmailVerified: true });
         expect(res.body.data._id).toBeDefined();
         expect(Object.keys(res.body.data).filter((field) => !rules.AUTH_FIELDS.includes(field))).toEqual([]);
         expect(exposesSecret(res.body)).toBe(false);

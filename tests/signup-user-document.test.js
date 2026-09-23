@@ -11,6 +11,16 @@ jest.mock('../Modules/Company/controller/updateCompany', () => ({ updateCompanyF
 jest.mock('../Modules/Users/controller', () => ({ updateUserFun: jest.fn() }));
 jest.mock('../Modules/Affiliate/controller', () => ({ storeRefferalCode: jest.fn() }));
 jest.mock('../Modules/Setup/demoProject', () => ({ createDemoProject: jest.fn() }));
+// These cases are about which fields a signup stores; tests/social-sign-in-identity.test.js covers the provider check.
+jest.mock('../Modules/Auth/helpers/socialIdentity', () => {
+    const actual = jest.requireActual('../Modules/Auth/helpers/socialIdentity');
+    return {
+        ...actual,
+        verifySocialIdentity: jest.fn(async (provider, body) => ({
+            provider, label: provider, idField: actual.PROVIDERS[provider].idField, providerId: 'provider-id', email: actual.normalEmail(body.email),
+        })),
+    };
+});
 jest.mock('../common-storage/common-server.js', () => ({ handleCreateCompanyDataStorageFun: jest.fn() }));
 
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');

@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { ROOT } = require('./env');
 const { startEmbeddingsStub } = require('./embeddings');
+const { startGitlabStub } = require('./gitlab');
 
 const HEALTH_TIMEOUT_MS = Number(process.env.E2E_HEALTH_TIMEOUT_MS) || 120000;
 const STOP_TIMEOUT_MS = 10000;
@@ -22,7 +23,7 @@ function freePort() {
     });
 }
 
-function serverEnv({ port, mongoUrl, workDir, embeddingsUrl }) {
+function serverEnv({ port, mongoUrl, workDir, embeddingsUrl, gitlabApiUrl }) {
     const baseURL = `http://127.0.0.1:${port}`;
     return {
         PATH: process.env.PATH,
@@ -51,6 +52,7 @@ function serverEnv({ port, mongoUrl, workDir, embeddingsUrl }) {
         KNOWLEDGE_INDEXER: 'tenant',
         // Embeddings go to the harness stub; they only happen once a suite sets AI_API_KEY through the instance settings.
         OPENAI_EMBEDDINGS_URL: embeddingsUrl,
+        GITLAB_BASE_API_URL: gitlabApiUrl,
         AGENT_PERFORMANCE_READ: 'on',
         SKILL_EXTERNAL_READS: 'on',
         GLOBAL_RATE_LIMIT_PER_MIN: 'off',
@@ -111,9 +113,10 @@ async function startServer({ mongoUrl, logFile, env = {} }) {
     };
 
     const embeddings = await startEmbeddingsStub();
+    const gitlab = await startGitlabStub();
     const child = spawn(process.execPath, ['-r', path.join(__dirname, 'ignore-dotenv.js'), 'index.js'], {
         cwd: ROOT,
-        env: { ...serverEnv({ port, mongoUrl, workDir, embeddingsUrl: embeddings.url }), ...env },
+        env: { ...serverEnv({ port, mongoUrl, workDir, embeddingsUrl: embeddings.url, gitlabApiUrl: gitlab.url }), ...env },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
     child.stdout.on('data', record);
@@ -122,6 +125,7 @@ async function startServer({ mongoUrl, logFile, env = {} }) {
     const stop = async ({ companyIds = [] } = {}) => {
         await stopChild(child);
         await embeddings.stop();
+        await gitlab.stop();
         log.end();
         fs.rmSync(workDir, { recursive: true, force: true });
         // Local storage has no configurable root: company files land in <repo>/storage/<companyId>.
