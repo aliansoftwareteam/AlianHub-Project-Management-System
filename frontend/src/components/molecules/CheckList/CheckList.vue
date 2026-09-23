@@ -328,27 +328,6 @@ function manageCheckList () {
     }
 }
 
-// This function is used to manage all the checklist hostory for the project and tasks
-const manageHistory = async (type, key, message) => {
-    const axiosData = {
-        "type": type,
-        "companyId": companyId.value,
-        "projectId": project.value._id,
-        "taskId": props.taskId || null,
-        "object": {
-            "sprintId": props.taskId.length ? props.task.sprintId : null,
-            "key": key,
-            "message": message
-        },
-        "userData": getUserData()
-    };
-    await apiRequest("post", env.HANDLE_HISTORY, axiosData).then((result) => {
-        if(result.data.status) {
-            console.info(result.data.statusText)
-        }
-    });
-}
-
 // This function is used to manage all the expand and collepse event for the parent and sub checklist component
 function handleCollapseExpand (obj) {
     obj.isExpand = !obj.isExpand;
@@ -403,10 +382,6 @@ const addCheckList = async () => {
     await apiRequest("post", `${env.PROJECTS_CHECKLIST}`, params).then(() => {
         checklistArray.value = [...checklistArray.value, { ...dataArray }];
         manageCheckList();
-
-        // Manage checklist history
-        const msg =  `<b>${userData.Employee_Name}</b> has created new checklist`;
-        manageHistory(checklsitType.value, "Task_Checklist", msg);
     }).catch((error) => {
         console.error(`Error in addCheckList hook => ${error}`)
     });
@@ -460,10 +435,6 @@ const addItem = async (obj, child = false) => {
     await apiRequest("post", `${env.PROJECTS_CHECKLIST}`, params).then(() => {
         checklistArray.value = [...checklistArray.value, { ...strArray[0] }];
         manageCheckList();
-
-        // Manage checklist history
-        const msg = `<b>${userData.Employee_Name}</b> has created new checklist item <b class="text-ellipsis vertical-middle d-inline-block" style="max-width:150px" title="${obj.name}">${obj.name}</b>`;
-        manageHistory(checklsitType.value, "Task_Checklist", msg);
         checklistArray.value.forEach((x) => {
             if(x.parentId === obj.parentId) {
                 x.isExpand = true;
@@ -572,10 +543,6 @@ async function handleConfirm(val) {
             const parentIds = getParentIds(item);
             const extractedData = mergeFunctions(item);
             deleteQuery(Object.keys(parentIds),extractedData);
-            if(checklsitType.value === "project") {
-                const msg =  `<b>${userData.Employee_Name}</b> has removed checklist item <b class="text-ellipsis vertical-middle d-inline-block" style="max-width:150px" title="${extractedData.name}">${extractedData.name}</b> and its subitems <b class="text-ellipsis vertical-middle d-inline-block" style="max-width:150px" title="${extractedData.subItemNames.slice(1).join('\n')}">${extractedData.subItemNames.slice(1).join('\n')}</b>`;
-                manageHistory(checklsitType.value, "Task_Checklist", msg);
-            }
             return;
         }
         deleteItems(selectedRow.value);
@@ -623,20 +590,6 @@ const handleChecked = async (item) => {
 
         await apiRequest("post", `${env.PROJECTS_CHECKLIST}`, params).then(() => {
             manageCheckList();
-
-            // Manage checklist history
-            let historyObj = {
-                key : "CheckList_Checked",
-                message : `<b>${userData.Employee_Name}</b> has <b>${item.isChecked ? 'checked' : 'unchecked'}</b> <b>${item.name}</b> checklist.`
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": checklsitType.value === "project" ? 'project' : 'task',
-                "companyId": companyId.value,
-                "projectId": project.value._id,
-                "taskId": checklsitType.value === 'project' ? null : props.taskId,
-                "object": historyObj,
-                "userData": userData
-            })
         }).catch((error) => {
             console.error(`Error in addItem hook => ${error}`) 
         });
@@ -725,11 +678,6 @@ async function changeAssignee(type, {user, data}) {
 
     await apiRequest("post", `${env.PROJECTS_CHECKLIST}`, params).then(() => {
         manageCheckList();
-
-        // Manage checklist history
-        const msg =  `<b>${userData.Employee_Name}</b> has ${type === 'add' || type === "replace" ? 'added': 'removed'} <b>${user.label}</b> ${type === 'add' ? 'into': 'from'} checklist item <b>${data.name}</b>`;
-        const chkType = type === "add" || type === "replace" ? "Task_Checklist_Assign" : "Task_Checklist_Remove";
-        manageHistory(checklsitType.value, chkType, msg);
     }).catch((error) => {
         console.error(`Error in addItem hook => ${error}`) 
     });
@@ -791,10 +739,6 @@ const handleUpdate = async (obj, child = false) => {
         checklistArray.value = dataArray;
         checklistArray.value.forEach((x) => x.isExpand = true);
         manageCheckList();
-
-        // Manage checklist history
-        const msg =  `<b>${userData.Employee_Name}</b> has changed checklist item name from <b>${!child ? obj.name : oldItemName.value}</b> to <b>${name}</b>`;
-        manageHistory(checklsitType.value, "Task_Checklist", msg);
     }).catch((error) => {
         console.error(`Error in addItem hook => ${error}`) 
     });

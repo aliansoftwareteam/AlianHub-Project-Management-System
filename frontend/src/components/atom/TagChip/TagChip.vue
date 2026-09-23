@@ -54,7 +54,7 @@
                     </div>
                     </template>   
             </DropDown> 
-            <img  :src="cross" v-if="checkPermission('task.task_tag',prjectGlobalPermission) === true" class="cursor-pointer tagHover__icon-close ml-5px" alt="" :class="{threedots:showClass}"  @click="removeTag(ids,data), ActivityLog(`<b>${userData.Employee_Name}</b> has removed the Tag <b> ${data?.tagName} </b> Tag`, taskId),ActivityLog(`<b>${userData.Employee_Name}</b> has removed the Tag <b> ${data?.tagName}</b> in <b>${sanitizeInput(taskName)}</b> task.`, null)">
+            <img  :src="cross" v-if="checkPermission('task.task_tag',prjectGlobalPermission) === true" class="cursor-pointer tagHover__icon-close ml-5px" alt="" :class="{threedots:showClass}"  @click="removeTag(ids,data)">
                 <ConfirmationSidebar
                 v-model="showSidebar"
                 :acceptButtonClass="`btn-danger`"
@@ -80,19 +80,16 @@ import InputText from "@/components/atom/InputText/InputText.vue";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
 
 // packages
-import {ref, watchEffect,watch ,computed , inject} from 'vue'
-import { useStore } from 'vuex'
+import {ref, watchEffect,watch , inject} from 'vue'
 
 // utility
-import * as env from '@/config/env';
-import { useCustomComposable , useGetterFunctions } from "@/composable";
+import { useCustomComposable } from "@/composable";
 import {updateTag,deleteTag} from "@/components/molecules/TagList/helper.js";
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 
-const {getters} = useStore()
-const {makeUniqueId,sanitizeInput,checkPermission} = useCustomComposable();
+const {makeUniqueId,checkPermission} = useCustomComposable();
 const clientWidth = inject('$clientWidth');
 const threedots = require("@/assets/images/svg/tagdots.svg")
 const cross = require("@/assets/images/svg/tagcross.svg")
@@ -102,7 +99,6 @@ const deleteimage = require("@/assets/images/Deletemilestone.png")
 const colorimage = require("@/assets/images/palette.png")
 const saveimage = require("@/assets/images/save.png")
 const cancelimage = require("@/assets/images/svg/deletered.svg")
-import { apiRequest } from '../../../services';
 const showSidebar = ref(false)
 const editStatus = ref()
 const tagColor = ref('#000000')
@@ -114,17 +110,6 @@ const renameErrorMessage = ref("")
 const toast = useToast()
 const stringobj = ref()
 const visible = ref()
-const {getUser} = useGetterFunctions();
-const companyId = inject('$companyId')
-const userId = inject('$userId')
-const user = getUser(userId.value);
-const companyOwner = computed(() => getters["settings/companyOwnerDetail"])
-const userData = {
-    id: user.id,
-    Employee_Name: user.Employee_Name,
-    companyOwnerId: companyOwner.value.userId
-}
-
 const props = defineProps({
     data: {
         type: Object,
@@ -172,29 +157,9 @@ watch(visible,()=>{
     showClass.value =  visible.value ? true : false 
 })
 
-const ActivityLog = (message, taskId = null) =>{
-    let historyObj =  {
-        'sprintId': taskId ? props.sprintId : null,
-        'message': message,
-        'key' : taskId ? 'task' : 'Project_Name',
-    }
-    apiRequest("post", env.HANDLE_HISTORY, {
-        "type": taskId ? 'task' : 'project',
-        "companyId": companyId.value,
-        "projectId": props.ids.projectId,
-        "taskId": taskId,
-        "object": historyObj,
-        "userData": userData
-    })
-    .catch((error) => {
-        console.error("ERROR in update project history: ", error);
-    })
-}
-
 const deleteTags = () =>{
     deleteTag(props.ids,Data.value)
     showSidebar.value = false
-    ActivityLog(`<b>${userData.Employee_Name}</b> has deleted the <b> ${Data.value.tagName} Tag </b>`)
     toast.success(t('Toast.Tag_Deleted_successfully'),{position:'top-right'})
     let dataArray = props.tagsArray
     const index = dataArray.findIndex(x => x.uid === Data.value.uid)
@@ -229,7 +194,6 @@ const HandleChange = (e,key) => {
                     return
                 }
                 updateTag(props.ids,Data.value,{ ...Data.value , tagName: renameVal.value })
-                ActivityLog(`<b>${userData.Employee_Name}</b> has renamed the Tag from <b>  ${Data.value?.tagName}  </b> to <b>${renameVal.value} </b>`)
                 editStatus.value = undefined
                 Data.value.tagName = renameVal.value;
             }
@@ -240,7 +204,6 @@ const HandleChange = (e,key) => {
             updateTag(props.ids,Data.value,{...Data.value,tagColor:tagColor.value , tagBgColor:tagBgColor.value})
             Data.value.tagColor = tagColor.value;
             Data.value.tagBgColor = tagColor.value+'35';
-            ActivityLog(`<b>${userData.Employee_Name}</b> has changed the Tag color of ${Data.value?.tagName}`)
             tagColor.value = '#000000'
             tagBgColor.value = '#C8C8C8'
             editStatus.value = undefined
