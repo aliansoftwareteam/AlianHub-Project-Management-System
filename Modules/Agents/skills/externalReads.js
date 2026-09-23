@@ -285,13 +285,20 @@ const readFailure = (e, secret) => {
     return Object.assign(new Error(message), { code: CODE.READ_FAILED });
 };
 
+const notAvailableReason = (skillKey) => `skill "${skillKey}" declares an external read, and external reads are off on this server; an instance owner turns them on with ${FLAG}`;
+
 const notAvailable = (skillKey) => Object.assign(
-    new Error(`${CODE.NOT_AVAILABLE}: skill "${skillKey}" declares an external read, which this server does not run yet; nothing was fetched`),
+    new Error(`${CODE.NOT_AVAILABLE}: ${notAvailableReason(skillKey)}; nothing was fetched`),
     { code: CODE.NOT_AVAILABLE, deterministic: true },
 );
 
+/* What a listing shows for a skill a run would refuse with notAvailable. */
+const unavailableOf = (skillKey, reads = []) => (!enabled() && reads.some(isExternal)
+    ? { code: CODE.NOT_AVAILABLE, reason: notAvailableReason(skillKey) }
+    : null);
+
 module.exports = {
     FLAG, READERS, CREDENTIAL_KIND, HANDLE, MAX_PATH, CODE, HOST_STATE,
-    enabled, checkHost, isExternal, parseDeclaredHost, hostProblem, pathProblem, assertBuilt, buildUrl, forgeDiffUrl, hostError, checkDeclaredReads, notAvailable,
+    enabled, checkHost, isExternal, parseDeclaredHost, hostProblem, pathProblem, assertBuilt, buildUrl, forgeDiffUrl, hostError, checkDeclaredReads, notAvailable, unavailableOf,
     namesHost, listedHosts, admitHop, credentialFor, scrub, readFailure, refusal,
 };

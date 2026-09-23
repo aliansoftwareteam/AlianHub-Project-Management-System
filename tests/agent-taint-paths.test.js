@@ -58,6 +58,7 @@ const proposals = { create: mockCreateProposal };
 const deps = () => ({ proposals, actions: { perform }, actor });
 const runRow = (id) => mockDb.store[SCHEMA_TYPE.AGENT_RUNS].find((r) => String(r._id) === String(id));
 const replays = () => mockDb.store[SCHEMA_TYPE.AI_REPLAYS] || [];
+const modelReplays = () => replays().filter((r) => r.kind !== 'fetch');
 const start = (over = {}) => runs.create(C, { agent: agent(), taskId: TASK._id, projectId: 'p1', skill: 'pr.summary', startedBy: 'u1', ...over });
 const execute = (run, task = TASK) => runs.executeSkill(C, run, agent(), task, deps());
 const planned = (changes) => orchestrator.analyse.mockResolvedValue({ status: 'success', skill: 'plan', changes, summary: 'planned', usage: {}, model: null });
@@ -96,8 +97,9 @@ describe('1. a generic skill that fetches marks the run through fetchPage', () =
         expect(out).toMatchObject({ status: 'done', outcome: '1 change(s) applied' });
         expect(safeFetch).toHaveBeenCalledWith('https://github.com/acme/app/pull/12.diff', expect.any(Object));
         expect(runRow(run._id)).toMatchObject({ tainted: true, taintSources: [{ kind: 'fetch', ref: 'github.com', at: expect.any(Date) }] });
-        expect(replays()).toHaveLength(1);
-        expect(replays()[0]).toMatchObject({ tainted: true, taintSources: [{ kind: 'fetch', ref: 'github.com' }] });
+        expect(replays().filter((r) => r.kind === 'fetch')).toEqual([expect.objectContaining({ tainted: true, fetch: expect.objectContaining({ host: 'github.com' }) })]);
+        expect(modelReplays()).toHaveLength(1);
+        expect(modelReplays()[0]).toMatchObject({ tainted: true, taintSources: [{ kind: 'fetch', ref: 'github.com' }] });
         expect(perform).toHaveBeenCalledWith(expect.objectContaining({ action: 'task.comment', taint: { tainted: true, taintSources: [expect.objectContaining({ ref: 'github.com' })] } }));
         expect(JSON.stringify(runRow(run._id).taintSources)).not.toMatch(/pull\/12|Ignore your rules/);
     });
@@ -107,7 +109,7 @@ describe('1. a generic skill that fetches marks the run through fetchPage', () =
         const run = await start();
         await execute(run);
         expect(JSON.stringify(runRow(run._id))).not.toMatch(/taint/i);
-        expect(JSON.stringify(replays()[0])).not.toMatch(/taint/i);
+        expect(JSON.stringify(modelReplays()[0])).not.toMatch(/taint/i);
         expect(perform.mock.calls[0][0]).not.toHaveProperty('taint');
     });
 
