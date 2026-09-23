@@ -73,6 +73,7 @@ reproducibility. This generalises the existing `AIProjectGenerator/orchestrator.
 **Positive**
 - Zero new services in the self-host install.
 - Automation state lives in the tenant DB, so a tenant restore restores in-flight runs.
+  *Superseded for the job queue by Amendment 1 below.*
 - No third-party licence in the path of a core feature.
 - Reuses `Webhooks/dispatcher.js` event handling and `AIProjectGenerator` LLM plumbing.
 
@@ -90,6 +91,29 @@ reproducibility. This generalises the existing `AIProjectGenerator/orchestrator.
   entity's project.
 - Agent approval mode defaults to `review`, never `auto`.
 - Events carry `depth`; hard stop at 3; automation-authored events ignored by default.
+
+---
+
+## Amendment 1 — the job queue lives on `global` (2026-09-23)
+
+Recorded after the fact: task 005 built it this way, and the code has run it so since.
+
+**Decision.** There is one `@hokify/agenda` instance per install, on the `global` database, in
+`global.automation_jobs` (`Modules/Automations/engine/queue/agendaDriver.js`). Each job row carries
+its `companyId`. The run record, `automation_runs`, stays in the tenant database, and so do rules.
+
+**Why.** `mongoConnector` opens a pool of 10 per company. An Agenda instance per tenant is one
+poller, one connection and one timer per tenant: 500 companies would be 500 pollers before a
+single rule ran, which is the pool-exhaustion risk this ADR already names.
+
+**Consequences.**
+- A tenant restore brings back every completed run, but not that tenant's queued or in-flight
+  jobs. A run interrupted mid-way stays `running` with its step `cursor`, and a retry resumes from it.
+- The same queue carries workflow runs (`Modules/Workflows/queue.js`) and the recurring jobs of
+  the Agents and Knowledge modules, not only automation rules.
+- The `QueueAdapter` seam is unchanged: `AUTOMATION_QUEUE_DRIVER` picks `agenda` (default) or
+  `inline` (tests), `AUTOMATION_CONCURRENCY` defaults to 5, and `AUTOMATION_ENGINE=false` turns
+  the engine off.
 
 ---
 
