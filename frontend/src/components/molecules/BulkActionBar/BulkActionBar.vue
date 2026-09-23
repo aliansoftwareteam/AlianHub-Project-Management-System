@@ -5,19 +5,19 @@
             class="bulk-action-bar"
             :class="{ 'bulk-action-bar--compact': clientWidth <= 767 }"
             role="region"
-            aria-label="Bulk task actions"
+            :aria-label="$t('BulkActions.region')"
             ref="barRef"
         >
             <div class="bulk-action-bar__count">
                 <span class="bulk-action-bar__count-number">{{ selection.count.value }}</span>
-                <span class="bulk-action-bar__count-label">{{ selection.count.value === 1 ? 'task' : 'tasks' }} selected</span>
+                <span class="bulk-action-bar__count-label">{{ $t('BulkActions.selected_label', selection.count.value) }}</span>
             </div>
 
             <div class="bulk-action-bar__divider"></div>
 
             <!-- STATUS -->
             <BulkMenu
-                label="Status"
+                :label="$t('BulkActions.status')"
                 :open="openMenu === 'status'"
                 :disabled="!canChangeStatus"
                 @toggle="toggleMenu('status')"
@@ -27,7 +27,7 @@
                         ref="statusSearchRef"
                         v-model="menuSearch"
                         type="text"
-                        placeholder="Search status"
+                        :placeholder="$t('BulkActions.search_status')"
                         class="bulk-menu__search-input"
                         @click.stop
                     />
@@ -39,13 +39,13 @@
                             :style="`background-color: ${status.bgColor || '#f5f5f5'}; color: ${status.textColor || '#3a3a3a'}`"
                         >{{ status.name }}</span>
                     </button>
-                    <div v-if="!filteredStatuses.length" class="bulk-menu__empty">No matches</div>
+                    <div v-if="!filteredStatuses.length" class="bulk-menu__empty">{{ $t('BulkActions.no_matches') }}</div>
                 </div>
             </BulkMenu>
 
             <!-- PRIORITY -->
             <BulkMenu
-                label="Priority"
+                :label="$t('BulkActions.priority')"
                 :open="openMenu === 'priority'"
                 :disabled="!canChangePriority || !availablePriorities.length"
                 @toggle="toggleMenu('priority')"
@@ -54,7 +54,7 @@
                     <input
                         v-model="menuSearch"
                         type="text"
-                        placeholder="Search priority"
+                        :placeholder="$t('BulkActions.search_priority')"
                         class="bulk-menu__search-input"
                         @click.stop
                     />
@@ -63,13 +63,13 @@
                     <button v-for="p in filteredPriorities" :key="p.value" class="bulk-menu__item" @click="onPriorityPick(p)">
                         <span class="bulk-status-option" style="background-color: #f5f5f5; color: #3a3a3a">{{ p.name }}</span>
                     </button>
-                    <div v-if="!filteredPriorities.length" class="bulk-menu__empty">No matches</div>
+                    <div v-if="!filteredPriorities.length" class="bulk-menu__empty">{{ $t('BulkActions.no_matches') }}</div>
                 </div>
             </BulkMenu>
 
             <!-- ASSIGNEES -->
             <BulkMenu
-                label="Assignees"
+                :label="$t('BulkActions.assignees')"
                 :open="openMenu === 'assignees'"
                 :disabled="!canChangeAssignees || !assigneeUserList.length"
                 @toggle="toggleMenu('assignees')"
@@ -79,7 +79,7 @@
                     <input
                         v-model="menuSearch"
                         type="text"
-                        placeholder="Search people"
+                        :placeholder="$t('BulkActions.search_people')"
                         class="bulk-menu__search-input"
                         @click.stop
                     />
@@ -102,12 +102,12 @@
                                 thumbnail="30x30"
                             />
                             <span class="bulk-menu__row-label">{{ user.label }}</span>
-                            <span v-if="assigneeState(user.id) === 'some'" class="bulk-menu__partial-pill">partial</span>
+                            <span v-if="assigneeState(user.id) === 'some'" class="bulk-menu__partial-pill">{{ $t('BulkActions.partial') }}</span>
                         </span>
                         <span
                             v-if="assigneeState(user.id) !== 'none'"
                             class="bulk-menu__remove"
-                            title="Remove"
+                            :title="$t('BulkActions.remove')"
                             @click.stop="onAssigneeAct('remove', user)"
                         >
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -116,19 +116,19 @@
                             </svg>
                         </span>
                     </button>
-                    <div v-if="!filteredAssignees.length" class="bulk-menu__empty">No matches</div>
+                    <div v-if="!filteredAssignees.length" class="bulk-menu__empty">{{ $t('BulkActions.no_matches') }}</div>
                 </div>
             </BulkMenu>
 
             <!-- DUE DATE — DueDateCompo opens the same calendar used in list/table. -->
             <BulkMenu
-                label="Due date"
+                :label="$t('BulkActions.due_date')"
                 :open="openMenu === 'due'"
                 :disabled="!canChangeDates"
                 @toggle="toggleMenu('due')"
                 width="300px"
             >
-                <div class="bulk-menu__hint">Set a new due date for all selected tasks</div>
+                <div class="bulk-menu__hint">{{ $t('BulkActions.due_hint') }}</div>
                 <div class="bulk-due-content">
                     <div class="bulk-due-input-wrap">
                         <svg class="bulk-due-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -146,12 +146,12 @@
                         />
                     </div>
                 </div>
-                <button class="bulk-due-clear" @click="onDueClear">Clear due date</button>
+                <button class="bulk-due-clear" @click="onDueClear">{{ $t('BulkActions.clear_due') }}</button>
             </BulkMenu>
 
             <!-- TAGS -->
             <BulkMenu
-                label="Tags"
+                :label="$t('BulkActions.tags')"
                 :open="openMenu === 'tags'"
                 :disabled="!canChangeTags || !availableTags.length"
                 @toggle="toggleMenu('tags')"
@@ -161,7 +161,7 @@
                     <input
                         v-model="menuSearch"
                         type="text"
-                        placeholder="Search tags"
+                        :placeholder="$t('BulkActions.search_tags')"
                         class="bulk-menu__search-input"
                         @click.stop
                     />
@@ -179,12 +179,12 @@
                             <span class="bulk-tag-chip" :style="`background:${tag.tagBgColor || '#f4f5f7'}; color:${tag.tagColor || '#3a3a3a'}`">
                                 {{ tag.tagName || tag.name }}
                             </span>
-                            <span v-if="tagState(tag) === 'some'" class="bulk-menu__partial-pill">partial</span>
+                            <span v-if="tagState(tag) === 'some'" class="bulk-menu__partial-pill">{{ $t('BulkActions.partial') }}</span>
                         </span>
                         <span
                             v-if="tagState(tag) !== 'none'"
                             class="bulk-menu__remove"
-                            title="Remove"
+                            :title="$t('BulkActions.remove')"
                             @click.stop="onTagAct('remove', tag)"
                         >
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -193,7 +193,7 @@
                             </svg>
                         </span>
                     </button>
-                    <div v-if="!filteredTags.length" class="bulk-menu__empty">No matches</div>
+                    <div v-if="!filteredTags.length" class="bulk-menu__empty">{{ $t('BulkActions.no_matches') }}</div>
                 </div>
             </BulkMenu>
 
@@ -203,11 +203,11 @@
             <button
                 class="bulk-action-bar__btn"
                 :class="{ 'bulk-action-bar__btn--disabled': !canMove }"
-                :title="canMove ? 'Move selected tasks' : 'No permission to move'"
+                :title="canMove ? $t('BulkActions.move_title') : $t('BulkActions.move_denied')"
                 :disabled="!canMove"
                 @click="canMove && openMove()"
             >
-                <span>Move</span>
+                <span>{{ $t('BulkActions.move') }}</span>
             </button>
 
             <!-- CONVERT TO SUBTASK — opens the same task picker the single
@@ -215,11 +215,11 @@
             <button
                 class="bulk-action-bar__btn"
                 :class="{ 'bulk-action-bar__btn--disabled': !canConvertToSubTask }"
-                :title="canConvertToSubTask ? 'Make selected tasks subtasks of one task' : 'No permission to convert'"
+                :title="canConvertToSubTask ? $t('BulkActions.convert_subtask_title') : $t('BulkActions.convert_denied')"
                 :disabled="!canConvertToSubTask"
                 @click="canConvertToSubTask && (showConvertToSubTask = true, closeMenu())"
             >
-                <span>Convert to Subtask</span>
+                <span>{{ $t('BulkActions.convert_subtask') }}</span>
             </button>
 
             <!-- CONVERT TO TASK — promotes selected subtasks to top level. Reuses
@@ -228,38 +228,38 @@
             <button
                 class="bulk-action-bar__btn"
                 :class="{ 'bulk-action-bar__btn--disabled': !canConvertToTask }"
-                :title="canConvertToTask ? 'Promote selected subtasks to tasks' : 'No permission to convert'"
+                :title="canConvertToTask ? $t('BulkActions.convert_task_title') : $t('BulkActions.convert_denied')"
                 :disabled="!canConvertToTask"
                 @click="canConvertToTask && (showConvertToTask = true, closeMenu())"
             >
-                <span>Convert to Task</span>
+                <span>{{ $t('BulkActions.convert_task') }}</span>
             </button>
 
             <!-- DELETE -->
             <button
                 class="bulk-action-bar__btn bulk-action-bar__btn--danger"
                 :class="{ 'bulk-action-bar__btn--disabled': !canDelete }"
-                :title="canDelete ? 'Delete selected tasks' : 'No permission to delete'"
+                :title="canDelete ? $t('BulkActions.delete_title') : $t('BulkActions.delete_denied')"
                 :disabled="!canDelete"
                 @click="canDelete && (showDeleteConfirm = true, closeMenu())"
             >
-                <span>Delete</span>
+                <span>{{ $t('BulkActions.delete') }}</span>
             </button>
 
             <!-- ARCHIVE -->
             <button
                 class="bulk-action-bar__btn"
                 :class="{ 'bulk-action-bar__btn--disabled': !canArchive }"
-                :title="canArchive ? 'Archive selected tasks' : 'No permission to archive'"
+                :title="canArchive ? $t('BulkActions.archive_title') : $t('BulkActions.archive_denied')"
                 :disabled="!canArchive"
                 @click="canArchive && (showArchiveConfirm = true, closeMenu())"
             >
-                <span>Archive</span>
+                <span>{{ $t('BulkActions.archive') }}</span>
             </button>
 
             <div class="bulk-action-bar__divider"></div>
 
-            <button class="bulk-action-bar__close" @click="selection.clear()" title="Clear selection" aria-label="Clear selection">
+            <button class="bulk-action-bar__close" @click="selection.clear()" :title="$t('BulkActions.clear_selection')" :aria-label="$t('BulkActions.clear_selection')">
                 ✕
             </button>
         </div>
@@ -267,22 +267,22 @@
 
     <ConfirmationSidebar
         v-model="showDeleteConfirm"
-        :title="`Delete ${selection.count.value} ${selection.count.value === 1 ? 'task' : 'tasks'}`"
-        :message="`This will delete ${selection.count.value} ${selection.count.value === 1 ? 'task' : 'tasks'}. Subtasks will be deleted too.`"
+        :title="$t('BulkActions.delete_confirm_title', { n: selection.count.value }, selection.count.value)"
+        :message="$t('BulkActions.delete_confirm_message', { n: selection.count.value }, selection.count.value)"
         :confirmationString="`delete ${selection.count.value} ${selection.count.value === 1 ? 'task' : 'tasks'}`"
         acceptButtonClass="archive-delete-btn-bg-red"
-        acceptButton="Delete"
+        :acceptButton="$t('BulkActions.delete')"
         :showSpinner="isWorking"
         @confirm="performDelete"
     />
 
     <ConfirmationSidebar
         v-model="showArchiveConfirm"
-        :title="`Archive ${selection.count.value} ${selection.count.value === 1 ? 'task' : 'tasks'}`"
-        :message="`Archived tasks can be restored later from the archive view.`"
+        :title="$t('BulkActions.archive_confirm_title', { n: selection.count.value }, selection.count.value)"
+        :message="$t('BulkActions.archive_confirm_message')"
         :confirmationString="`archive ${selection.count.value} ${selection.count.value === 1 ? 'task' : 'tasks'}`"
         acceptButtonClass="archive-confirm-btn"
-        acceptButton="Archive"
+        :acceptButton="$t('BulkActions.archive')"
         :showSpinner="isWorking"
         @confirm="performArchive"
     />
@@ -344,6 +344,7 @@
 import { computed, inject, onBeforeUnmount, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
+import { useI18n } from 'vue-i18n';
 
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
 import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
@@ -361,6 +362,7 @@ const { getters, commit } = store;
 const { getUser } = useGetterFunctions();
 const selection = useTaskSelection();
 const $toast = useToast();
+const { t } = useI18n();
 const { checkPermission, checkApps } = useCustomComposable();
 const projectData = inject('selectedProject', null);
 const clientWidthInj = inject('$clientWidth', null);
@@ -676,27 +678,29 @@ function reportResult(action, response) {
     const skipped = totals.skipped ?? (Array.isArray(data?.skipped) ? data.skipped.length : 0);
     const errors = totals.errors ?? (Array.isArray(data?.errors) ? data.errors.length : 0);
 
-    let msg = `Updated ${updated} ${updated === 1 ? 'task' : 'tasks'}`;
+    const parts = [t('BulkActions.result_updated', { n: updated }, updated)];
     if (skipped) {
         const reasons = Array.isArray(data?.skipped) ? data.skipped.map((s) => s?.reason).filter(Boolean) : [];
         const reasonCount = reasons.reduce((acc, r) => { acc[r] = (acc[r] || 0) + 1; return acc; }, {});
         const topReason = Object.entries(reasonCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
-        const reasonLabel = ({
-            permission: 'insufficient permission',
-            'not-found-or-cross-tenant': 'not found or access denied',
-            'project-not-found': 'project not found',
-            'invalid-id': 'invalid id',
-            'invalid-type': 'invalid operation',
-            'already-in-target': 'already there',
-            'is-the-chosen-parent': 'it is the parent you chose',
-            'already-a-subtask-of-this-parent': 'already a subtask of that task',
-            'carried-with-its-parent': 'moved with its parent task',
-            'already-a-top-level-task': 'already a task, not a subtask',
-            'subtask-moves-with-its-parent': 'a subtask moves with its parent — use Convert to Task or Convert to Subtask',
-        })[topReason] || topReason || 'skipped';
-        msg += ` — ${skipped} skipped (${reasonLabel})`;
+        const reasonKey = ({
+            permission: 'reason_permission',
+            'not-found-or-cross-tenant': 'reason_not_found_or_cross_tenant',
+            'project-not-found': 'reason_project_not_found',
+            'invalid-id': 'reason_invalid_id',
+            'invalid-type': 'reason_invalid_type',
+            'already-in-target': 'reason_already_in_target',
+            'is-the-chosen-parent': 'reason_is_the_chosen_parent',
+            'already-a-subtask-of-this-parent': 'reason_already_a_subtask_of_this_parent',
+            'carried-with-its-parent': 'reason_carried_with_its_parent',
+            'already-a-top-level-task': 'reason_already_a_top_level_task',
+            'subtask-moves-with-its-parent': 'reason_subtask_moves_with_its_parent',
+        })[topReason];
+        const reasonLabel = reasonKey ? t(`BulkActions.${reasonKey}`) : (topReason || t('BulkActions.reason_skipped'));
+        parts.push(t('BulkActions.result_skipped', { n: skipped, reason: reasonLabel }));
     }
-    if (errors) msg += ` — ${errors} failed`;
+    if (errors) parts.push(t('BulkActions.result_failed', { n: errors }));
+    const msg = parts.join(' — ');
     if (errors || skipped) $toast.warning(msg);
     else $toast.success(msg);
 }
@@ -725,14 +729,14 @@ async function runBulk(action, payload, { optimisticDeletedStatus, optimisticFie
         };
         const response = await apiRequest('post', env.V2_TASKS_BULK, body);
         if (response?.data?.status === false) {
-            $toast.error(response?.data?.statusText || `Bulk ${action} failed`);
+            $toast.error(response?.data?.statusText || t('BulkActions.bulk_failed', { action }));
             return;
         }
         reportResult(action, response);
         if (typeof onSuccess === 'function') { try { onSuccess(response); } catch (e) { /* post-success hook is best-effort */ } }
         selection.clear();
     } catch (error) {
-        $toast.error(error?.message || `Bulk ${action} failed`);
+        $toast.error(error?.message || t('BulkActions.bulk_failed', { action }));
     } finally {
         isWorking.value = false;
         showDeleteConfirm.value = false;

@@ -22,11 +22,11 @@
 
         <!-- Error -->
         <div v-else-if="errorMessage" class="cw__error">
-            <p class="cw__error-title">Couldn't draft clarifying questions</p>
+            <p class="cw__error-title">{{ $t('AiProject.clarify_failed') }}</p>
             <p class="cw__error-msg">{{ errorMessage }}</p>
             <div class="cw__error-actions">
-                <button type="button" class="cw__btn cw__btn--ghost" @click="$emit('retry')">Try again</button>
-                <button type="button" class="cw__btn cw__btn--primary" @click="$emit('skip-all')">Skip and generate plan</button>
+                <button type="button" class="cw__btn cw__btn--ghost" @click="$emit('retry')">{{ $t('AiProject.try_again') }}</button>
+                <button type="button" class="cw__btn cw__btn--primary" @click="$emit('skip-all')">{{ $t('AiProject.clarify_skip_all') }}</button>
             </div>
         </div>
 
@@ -35,13 +35,13 @@
             <header class="cw__head">
                 <span class="cw__step">{{ currentIndex + 1 }}/{{ questions.length }}</span>
                 <h3 class="cw__question">
-                    {{ currentQuestion.question }}<span v-if="currentQuestion.required" class="cw__req" aria-label="Required">*</span>
+                    {{ currentQuestion.question }}<span v-if="currentQuestion.required" class="cw__req" :aria-label="$t('AiProject.required')">*</span>
                 </h3>
                 <button
                     type="button"
                     class="cw__close"
                     :disabled="generating"
-                    aria-label="Close"
+                    :aria-label="$t('AiProject.close')"
                     @click="$emit('back')"
                 >×</button>
             </header>
@@ -73,7 +73,7 @@
                     <span class="cw__option-body">
                         <span class="cw__option-label">
                             <span class="cw__option-text">{{ opt.label }}</span>
-                            <span v-if="isRecommended(opt.value)" class="cw__rec">Recommended</span>
+                            <span v-if="isRecommended(opt.value)" class="cw__rec">{{ $t('AiProject.recommended') }}</span>
                         </span>
                         <span v-if="opt.description" class="cw__option-desc">{{ opt.description }}</span>
                     </span>
@@ -103,13 +103,13 @@
                 >
                     <span class="cw__option-body">
                         <span class="cw__option-label">
-                            <span class="cw__option-text">Other</span>
+                            <span class="cw__option-text">{{ $t('AiProject.other') }}</span>
                         </span>
                         <input
                             v-model="otherDraft"
                             type="text"
                             class="cw__other-input"
-                            placeholder="Type your own answer here"
+                            :placeholder="$t('AiProject.other_placeholder')"
                             maxlength="200"
                             @focus="selectOther"
                             @input="onOtherDraftInput"
@@ -129,7 +129,7 @@
                     @click="onBack"
                 >
                     <span class="cw__back-arrow">←</span>
-                    {{ currentIndex > 0 ? 'Previous' : 'Back' }}
+                    {{ currentIndex > 0 ? $t('AiProject.previous') : $t('AiProject.back_plain') }}
                 </button>
                 <span class="cw__spacer"></span>
                 <button
@@ -138,7 +138,7 @@
                     :disabled="generating"
                     @click="onLetAIDecideAll"
                 >
-                    Let AI decide
+                    {{ $t('AiProject.let_ai_decide') }}
                 </button>
                 <button
                     v-if="allowUnknown"
@@ -156,7 +156,7 @@
                     :disabled="generating"
                     @click="onSkip"
                 >
-                    Skip
+                    {{ $t('AiProject.skip') }}
                 </button>
                 <button
                     type="button"
@@ -165,8 +165,8 @@
                     @click="onNext"
                 >
                     <span v-if="generating">{{ $t('AiProject.generating_plan') }}</span>
-                    <span v-else>{{ isLastQuestion ? $t('AiProject.continue') : 'Next' }}</span>
-                    <kbd v-if="!generating" class="cw__kbd cw__kbd--inline">Enter</kbd>
+                    <span v-else>{{ isLastQuestion ? $t('AiProject.continue') : $t('AiProject.clarify_next') }}</span>
+                    <kbd v-if="!generating" class="cw__kbd cw__kbd--inline">{{ $t('AiProject.key_enter') }}</kbd>
                 </button>
             </footer>
         </div>
@@ -175,6 +175,7 @@
 
 <script setup>
 import { defineProps, defineEmits, computed, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const props = defineProps({
     loading: { type: Boolean, default: false },
@@ -185,6 +186,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['submit', 'back', 'retry', 'skip-all']);
+const { t } = useI18n();
 
 // ── Wizard state ────────────────────────────────────────────────────
 // `answers` and `skipped` are keyed by question.id and persist across
@@ -262,8 +264,8 @@ const renderableOptions = computed(() => {
     if (!q) return [];
     if (q.type === 'toggle') {
         return [
-            { value: true, label: 'Yes' },
-            { value: false, label: 'No' },
+            { value: true, label: t('AiProject.option_yes') },
+            { value: false, label: t('AiProject.option_no') },
         ];
     }
     return Array.isArray(q.options) ? q.options : [];
@@ -276,10 +278,10 @@ const showCustomInput = computed(() => {
     return sel === 'custom';
 });
 
-const customPlaceholder = computed(() => 'Type your answer here');
+const customPlaceholder = computed(() => t('AiProject.custom_placeholder'));
 const textPlaceholder = computed(() => {
     const r = currentQuestion.value?.recommended;
-    return typeof r === 'string' && r.length ? r : 'Type your answer here…';
+    return typeof r === 'string' && r.length ? r : t('AiProject.text_placeholder');
 });
 
 const isOtherSelected = computed(() => {

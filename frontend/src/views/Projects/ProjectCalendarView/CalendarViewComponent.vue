@@ -819,4 +819,5 @@
 </script>
 
 <style scoped src="./style.css"></style>
+<style scoped src="./calendar-phone.css"></style>
 <style src="../../../components/organisms/SprinstList/style.css"></style>
