@@ -110,7 +110,7 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 84 | Scope stored-file downloads to records the caller may open, and validate attachment metadata on write. Details in the owner's private notes. | #783 review |
 | 85 | Address ranges the private-address check does not yet cover, and names ending in a dot passing the name check (same with the egress flag on or off). | #784 **Closed** by #880. |
 | 86 | Egress console: refuse exact hosts that encode a private address at save time; older admin-key saves show the actor as `key`; a pending removal is dropped on a stale-save refusal. | #784 **Closed** by #880. |
-| 87 | Step credentials: two renewals completing during one check's row read can refuse an action; with the flag on, two failed heartbeats in a row lose the step. | #782 |
+| 87 | Step credentials: two renewals completing during one check's row read can refuse an action; with the flag on, two failed heartbeats in a row lose the step. | #782 — **Closed** by #889 |
 | 88 | Brand logos from `/api/v1/getlogo` go out with their real type and without `nosniff` or the sandbox policy (operator-supplied files). | #785 review — **Closed** by #878 |
 | 89 | The report endpoint's per-address cap and rate limit use `req.ip`; behind a proxy that is not on loopback, set `TRUST_PROXY`. | #785 review |
 | 90 | Knowledge console figures read every chunk document; an index-only count needs a stored size field. | #788 |
