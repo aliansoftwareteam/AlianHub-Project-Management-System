@@ -57,7 +57,6 @@
     "frontend/src/components/organisms/Task/Task.vue": 2,
     "frontend/src/components/organisms/TaskDetailRightSide/TaskDetailRightSide.vue": 9,
     "frontend/src/components/organisms/TeamCategoryBreakdownCard/TeamCategoryBreakdownCard.vue": 1,
-    "frontend/src/components/organisms/UsersByCategoryCard/UsersByCategoryCard.vue": 4,
     "frontend/src/components/templates/CreateProject/ProjectProfileForm.vue": 1,
     "frontend/src/plugins/customFieldView/component/atom/customFieldTaskView/dateComponentListing.vue": 1,
     "frontend/src/plugins/customFieldView/component/atom/settingCustomField/customFieldList.vue": 3,

@@ -7615,6 +7615,15 @@ export default {
         "invalid_refferal_model_text": "Êtes-vous sûr de vouloir créer une entreprise?",
         "refferal_code_error": "Le code de parrainage n'est pas valide"
     },
+    "UsersByCategory": {
+        "config_text": "Open this card's settings (the ⚙ icon) and assign your task types to categories (Development, Marketing, UI/UX, QA) to see the task count per person.",
+        "user_count": "{n} user | {n} users",
+        "loading": "Loading…",
+        "total_title": "Total {n} task | Total {n} tasks",
+        "segment_title": "{label}: {n} task ({pct}%) | {label}: {n} tasks ({pct}%)",
+        "col_user": "User",
+        "total": "Total"
+    },
     "dashboardCard": {
         "task_type": "Task type",
         "project_scope_all": "All projects",
