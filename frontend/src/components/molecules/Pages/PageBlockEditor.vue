@@ -320,7 +320,7 @@ onBeforeUnmount(() => {
 .pbe :deep(.pb-task__row.is-missing) { color: var(--ink-2); }
 .pbe :deep(.pb-task__check) { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--border); display: inline-grid; place-items: center; color: transparent; flex: none; }
 .pbe :deep(.pb-task__check svg) { width: 10px; height: 10px; }
-.pbe :deep(.pb-task__check.is-done) { background: var(--brand); border-color: var(--brand); color: #fff; }
+.pbe :deep(.pb-task__check.is-done) { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
 .pbe :deep(.pb-task__open) { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; padding: 0; font: 400 13px/1.4 var(--font-ui); color: var(--ink); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pbe :deep(.pb-task__open:hover) { color: var(--brand); }
 .pbe :deep(.pb-task__open.is-done) { text-decoration: line-through; color: var(--ink-2); }

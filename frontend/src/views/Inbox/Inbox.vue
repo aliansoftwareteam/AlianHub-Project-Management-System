@@ -617,7 +617,7 @@ onUnmounted(() => { clearTimeout(liveTimer); clearTimeout(undoTimer); });
 .ibx__navitem:hover { background: var(--surface-hover); }
 .ibx__navitem.is-active { background: var(--brand-tint); color: var(--brand); font-weight: 600; }
 .ibx__navitem--kind { font-weight: 400; }
-.ibx__navcount { margin-left: auto; background: var(--brand); color: #fff; font: 700 10px/1 var(--font-mono); padding: 3px 6px; border-radius: 9px; }
+.ibx__navcount { margin-left: auto; background: var(--brand); color: var(--on-brand); font: 700 10px/1 var(--font-mono); padding: 3px 6px; border-radius: 9px; }
 .ibx__side-foot { margin-top: auto; padding: 0 9px; font-size: 11.5px; line-height: 1.45; color: var(--ink-2); }
 
 .ibx__main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }

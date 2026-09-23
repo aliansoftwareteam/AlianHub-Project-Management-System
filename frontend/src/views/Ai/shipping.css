@@ -56,6 +56,7 @@
 .pipe-stage__body code { font: var(--text-data); background: var(--surface-hover); padding: 1px 5px; border-radius: 4px; }
 
 .pipe-stage--brand .pipe-stage__n, .pipe-stage--brand .pipe-stage__bar { background: var(--brand); }
+.pipe-stage--brand .pipe-stage__n { color: var(--on-brand); }
 .pipe-stage--warn .pipe-stage__n, .pipe-stage--warn .pipe-stage__bar { background: var(--warn); }
 .pipe-stage--danger .pipe-stage__n, .pipe-stage--danger .pipe-stage__bar { background: var(--danger); }
 

@@ -70,7 +70,7 @@
     transition: background var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
 }
 .pv-filter__chip:hover { background: var(--surface-hover); }
-.pv-filter__chip.is-active { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+.pv-filter__chip.is-active { background: var(--brand); border-color: var(--brand); color: var(--on-brand); font-weight: 600; }
 .pv-filter__chip--unchecked { border: 1.5px solid var(--danger); color: var(--danger-ink); font-weight: 600; }
 .pv-filter__chip--unchecked.is-active { background: var(--danger); border-color: var(--danger); color: #fff; }
 

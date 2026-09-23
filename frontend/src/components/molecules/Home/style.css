@@ -49,7 +49,7 @@
 .ah-tbtn:hover { background: var(--surface-hover); }
 .ah-tbtn:focus-visible { outline: none; box-shadow: var(--focus); }
 .ah-tbtn--strong { font-weight: 600; }
-.ah-tbtn--primary { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; padding: 0 12px; }
+.ah-tbtn--primary { background: var(--brand); border-color: var(--brand); color: var(--on-brand); font-weight: 600; padding: 0 12px; }
 .ah-tbtn--primary:hover { background: var(--brand-deep); }
 .ah-tbtn--icon { width: 30px; padding: 0; justify-content: center; color: var(--ink-2); }
 .ah-tbtn--icon.is-active { color: var(--brand); border-color: var(--brand); background: var(--brand-tint); }
@@ -83,7 +83,7 @@
 .hs-item__text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hs-item__count { margin-left: auto; font: 400 11px/1 var(--font-ui); color: var(--ink-3); }
 .hs-item.is-active .hs-item__count { color: var(--brand); }
-.hs-item__badge { margin-left: auto; background: var(--brand); color: #fff; font: 700 10px/1 var(--font-ui); padding: 3px 6px; border-radius: 9px; }
+.hs-item__badge { margin-left: auto; background: var(--brand); color: var(--on-brand); font: 700 10px/1 var(--font-ui); padding: 3px 6px; border-radius: 9px; }
 .hs-item__tag { margin-left: auto; font: 500 10px/1 var(--font-ui); color: var(--brand); }
 .hs-item__lock { margin-left: auto; color: var(--ink-3); display: inline-flex; }
 .hs-item--child { padding: 5px 9px 5px 24px; font-size: 12.5px; color: var(--ink-label); }
@@ -184,7 +184,7 @@
 .hc-setup__steps strong { font-weight: 600; color: var(--ink); }
 .hc-setup__steps button { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; }
 .hc-setup__steps button:hover { color: var(--brand); }
-.hc-setup__cta { padding: 0 12px; height: 30px; background: var(--brand); color: #fff; border: 0; border-radius: 7px; font: 600 12px/1 var(--font-ui); cursor: pointer; white-space: nowrap; }
+.hc-setup__cta { padding: 0 12px; height: 30px; background: var(--brand); color: var(--on-brand); border: 0; border-radius: 7px; font: 600 12px/1 var(--font-ui); cursor: pointer; white-space: nowrap; }
 .hc-setup__cta:hover { background: var(--brand-deep); }
 .hc-setup__dismiss { border: 0; background: transparent; font: 400 12px/1 var(--font-ui); color: var(--ink-3); cursor: pointer; }
 .hc-setup__dismiss:hover { color: var(--ink); }
