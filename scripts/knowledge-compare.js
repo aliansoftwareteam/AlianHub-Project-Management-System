@@ -502,7 +502,7 @@ const main = async (argv, { env = process.env, connect = connectLive, log = cons
 };
 
 module.exports = {
-    ASK_WINDOW, parseArgs, parseExpected, parseQuestions, runComparison, formatReport, toJson, mongoPorts, refuseDevDb, installWriteGuard, main,
+    ASK_WINDOW, parseArgs, parseExpected, parseQuestions, runComparison, formatReport, toJson, mongoPorts, refuseDevDb, installWriteGuard, connectLive, main,
 };
 
 if (require.main === module) {
