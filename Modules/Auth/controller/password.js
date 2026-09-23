@@ -12,9 +12,8 @@ const mongoose = require("mongoose");
 const { removeCache } = require("../../../utils/commonFunctions.js");
 const { updateUserFun } = require("../../Users/controller.js");
 
+const { ACCOUNT_MAIL_ANSWER } = require("../helpers/accountMail");
 
-
-const { sendForgotPassword } = require('./authHelpers');
 exports.changePassword = async (req, res) => {
     try {
         const reqData = req.body;
@@ -88,17 +87,33 @@ exports.changePassword = async (req, res) => {
     }
 };
 
-exports.forgotPassword = (req, res, next) => {
-    try {
-        const reqData = req.body;
-        if (!(reqData && reqData.email)) {
-            res.status(400).json({message: `email is required`});
-            return;
-        }
-        sendForgotPassword(req, res, next);
-    } catch (error) {
-        res.status(400).json({message: error.message ? error.message : error});
+const sendResetLink = async (email, isAdmin) => {
+    const token = generateToken(600);
+    const account = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, {
+        type: dbCollections.USER_AUTH,
+        data: [{ email }, { token }]
+    }, "findOneAndUpdate");
+    if (!(account && account._id)) return;
+    const link = `${config.WEBURL}${isAdmin ? '/admin' : ''}/#/reset-password/${token}`;
+    const mail = require("../../Template/forgotPassword")(email, link);
+    sendMail.SendEmail(mail.subject, mail.mail, email, true, (result) => {
+        if (!result.status) logger.error(`Forgot password email: ${result.error}`);
+    });
+};
+
+/* The same answer whether or not the address has an account; the answer does not wait for the mail. */
+exports.forgotPassword = (req, res) => {
+    const email = req.body && req.body.email;
+    if (!email) {
+        res.status(400).json({message: `email is required`});
+        return;
     }
+    if (typeof email === 'string') {
+        sendResetLink(email, req.body.key === "admin").catch((error) => {
+            logger.error(`Forgot password: ${serviceCtr.mongoErrorMessage(error)}`);
+        });
+    }
+    res.status(200).json({ status: true, message: ACCOUNT_MAIL_ANSWER });
 };
 
 

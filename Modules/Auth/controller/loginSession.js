@@ -21,9 +21,7 @@ const { addAndRemoveUserInMongodbNotificationCount, generateTokenV2Fun, sessionR
 const twoFactorRules = require('../helpers/twoFactorRules');
 const { pinSessionTenant } = require('../../../Config/tenant');
 exports.manageAttempt = (req, res) => {
-    const forwarded = req?.headers['x-forwarded-for'] || req.ip;
-    const clientIp = forwarded ? forwarded?.split(',')[0] : req?.connection?.remoteAddress;
-    helperCtr.manageResetAttempt(clientIp, req.body, (mRes) => {
+    helperCtr.manageResetAttempt(req.ip, req.body, (mRes) => {
         if (!mRes.status) {
             res.status(mRes.statusCode).json({message: mRes.message});
             return;

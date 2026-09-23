@@ -15,7 +15,7 @@
         <div v-else-if="stage === 'resent'" class="av2-auth-card">
             <div class="auth__glyph auth__glyph--brand">✉</div>
             <h2 class="auth__h">{{ $t('Auth.magic_sent_title') }}</h2>
-            <p class="auth__p">{{ $t('Auth.verify_resent_body') }}</p>
+            <p class="auth__p">{{ $t('Auth.verify_resent_if_needed') }}</p>
             <div class="auth__links" style="margin-top:28px"><router-link :to="{ name: 'Log-in' }">{{ $t('Auth.back_to_login') }}</router-link></div>
         </div>
 
@@ -88,8 +88,8 @@ const resend = async () => {
         const result = await axios.post(env.API_URI + env.SEND_VARIFICATION_EMAIL, { uid: route.params.id });
         if (result.data.status === true) stage.value = "resent";
         else resendError.value = result.data.statusText || t("Auth.server_error");
-    } catch {
-        resendError.value = t("Auth.server_error");
+    } catch (error) {
+        resendError.value = error?.response?.status === 429 ? t("Auth.too_many_attempts") : t("Auth.server_error");
     } finally {
         busy.value = false;
     }

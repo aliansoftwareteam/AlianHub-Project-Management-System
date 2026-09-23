@@ -1,7 +1,13 @@
 const mockDb = require('./fixtures/fakeMongo').create();
 
+/* Mongoose reads an update with no operators as $set; the fake only applies operators. */
+const mockAsSet = (q) => {
+    const [filter, update, ...rest] = Array.isArray(q.data) ? q.data : [];
+    const plain = update && typeof update === 'object' && !Object.keys(update).some((key) => key.startsWith('$'));
+    return plain ? { ...q, data: [filter, { $set: update }, ...rest] } : q;
+};
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({
-    MongoDbCrudOpration: (companyId, q, method) => mockDb.crud(companyId, q, method),
+    MongoDbCrudOpration: (companyId, q, method) => mockDb.crud(companyId, method === 'findOneAndUpdate' ? mockAsSet(q) : q, method),
 }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../Modules/service.js', () => ({ SendEmail: jest.fn((subject, html, to, isHtml, cb) => cb({ status: true })) }));

@@ -198,10 +198,29 @@ describe('verification email', () => {
         return { email, uid: String(created.body.statusText._id) };
     };
 
-    // The harness points mail at a closed port, so a resend the server accepts fails at delivery, after every refusal check.
-    const expectDeliveryAttempted = (res) => {
+    const verificationTokenOf = async (uid) => {
+        const client = await MongoClient.connect(resolveMongoUrl());
+        try {
+            const account = await client.db('global').collection('users').findOne({ _id: new ObjectId(uid) }, { projection: { verificationToken: 1 } });
+            return account && account.verificationToken;
+        } finally {
+            await client.close();
+        }
+    };
+
+    // The answer is the same whatever the account's state and does not wait for the mail, so a resend shows as a new stored link.
+    const resend = async (uid, body = { uid }) => {
+        const before = await verificationTokenOf(uid);
+        const res = await anonymous.post('/api/v2/sendVerificationEmail', body);
         expect(res.status).toBe(200);
-        expect(res.body.statusText).toMatch(/ECONNREFUSED/);
+        expect(res.body.status).toBe(true);
+        const deadline = Date.now() + 5000;
+        let after = await verificationTokenOf(uid);
+        while (after === before && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            after = await verificationTokenOf(uid);
+        }
+        expect(after).not.toBe(before);
     };
 
     it('resends with only the account id the login screen gets from an unverified login', async () => {
@@ -210,19 +229,22 @@ describe('verification email', () => {
         expect(login.status).toBe(400);
         expect(login.body.isEmailVerified).toBe(false);
         expect(String(login.body.userData._id)).toBe(uid);
-        expectDeliveryAttempted(await anonymous.post('/api/v2/sendVerificationEmail', { uid: login.body.userData._id }));
+        await resend(uid, { uid: login.body.userData._id });
     });
 
     it('resends with only the account id the verify-email screen reads from the link', async () => {
         const { uid } = await newAccount();
         const verify = await anonymous.post('/api/v2/verifyEmail', { uid, token: 'f'.repeat(64) });
         expect(verify.body.showResendVerification).toBe(true);
-        expectDeliveryAttempted(await anonymous.post('/api/v2/sendVerificationEmail', { uid }));
+        await resend(uid);
     });
 
-    it('refuses an account id that does not exist', async () => {
-        const res = await anonymous.post('/api/v2/sendVerificationEmail', { uid: '000000000000000000000000', email: `someone-${uniqueSuffix()}@e2e.alianhub.test` });
-        expect(res.body.status).toBe(false);
+    it('answers an account id that does not exist as it answers one that does', async () => {
+        const { uid } = await newAccount();
+        const known = await anonymous.post('/api/v2/sendVerificationEmail', { uid });
+        const unknown = await anonymous.post('/api/v2/sendVerificationEmail', { uid: '000000000000000000000000', email: `someone-${uniqueSuffix()}@e2e.alianhub.test` });
+        expect(unknown.status).toBe(known.status);
+        expect(unknown.body).toEqual(known.body);
     });
 
     it('opens no session for an unverified login', async () => {
