@@ -121,6 +121,35 @@ describe('knowledge retrieval behind the tenant switch', () => {
         expect(ids).not.toContain(pageId);
     });
 
+    it('finds a task named by its key first, cites it by the key, and never a key the asker cannot open', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const tasks = client.db(state.companyId).collection('tasks');
+        const named = await tasks.findOne({ _id: new ObjectId(state.tasks[0]._id) });
+        const hiddenKey = `${state.projects.restricted.code}-${9000 + Math.floor(Math.random() * 900)}`;
+        const { insertedId } = await tasks.insertOne({
+            TaskName: `[QA knowledge] owner only ${uniqueSuffix()}`,
+            TaskKey: hiddenKey,
+            ProjectID: new ObjectId(state.projects.restricted._id),
+            deletedStatusKey: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        });
+        try {
+            const found = await ask(member, `What is the status of ${named.TaskKey}?`);
+            expect(found.sources[0]).toMatchObject({ kind: 'task', id: String(named._id), ref: named.TaskKey, title: named.TaskName });
+
+            const refused = await ask(member, `What is the status of ${hiddenKey}?`);
+            expect(refused.sources.map((s) => String(s.id))).not.toContain(String(insertedId));
+            expect(refused.sources.map((s) => s.ref)).not.toContain(hiddenKey);
+
+            const allowed = await ask(owner, `What is the status of ${hiddenKey}?`);
+            expect(allowed.sources[0]).toMatchObject({ kind: 'task', id: String(insertedId), ref: hiddenKey });
+        } finally {
+            await tasks.deleteOne({ _id: insertedId });
+        }
+    });
+
     it('searches as it did before once the company switch is off: page titles only', async () => {
         const owner = await loginAs('owner');
         const word = token();
@@ -462,5 +491,28 @@ describe('agent memory in the knowledge store', () => {
 
         expect(await recall(own, word)).toEqual([note.memoryId]);
         expect(await recall(other, word)).toEqual([]);
+    });
+
+    it("keeps another starter's sighting of the same note as its own row in the store, and shows the text once", async () => {
+        const word = token();
+        const text = `The pilot code is ${word}.`;
+        const sight = async (startedBy) => {
+            const run = { _id: new ObjectId(), agentId: String(own), startedBy, projectId: String(state.projects.shared._id), status: 'running' };
+            await tenant.collection('agent_runs').insertOne(run);
+            runIds.push(run._id);
+            return modules.memory.rememberForAgent({ companyId: state.companyId, runId: String(run._id), text });
+        };
+        const secondStarter = String(new ObjectId());
+        const first = await sight(owner.uid);
+        const second = await sight(secondStarter);
+        const again = await sight(owner.uid);
+        await modules.events.drain();
+        await modules.backfill.backfill(state.companyId);
+
+        expect(second.memoryId).not.toBe(first.memoryId);
+        expect(again).toMatchObject({ memoryId: first.memoryId, occurrences: 2 });
+        expect(await modules.memory.readAgentNote({ companyId: state.companyId, memoryId: first.memoryId })).toMatchObject({ source: { userId: owner.uid } });
+        expect(await modules.memory.readAgentNote({ companyId: state.companyId, memoryId: second.memoryId })).toMatchObject({ source: { userId: secondStarter } });
+        expect(await recall(own, word)).toHaveLength(1);
     });
 });

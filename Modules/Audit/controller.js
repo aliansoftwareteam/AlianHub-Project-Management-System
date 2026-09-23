@@ -6,13 +6,14 @@ const logger = require("../../Config/loggerConfig");
 const { csvRow } = require('../../utils/csv');
 const chain = require('./chain');
 const { AMENDED_ACTION } = require('./helpers/chainRules');
+const outsideActors = require('./outsideActors');
+const { VIA_EXTERNAL } = require('../Agents/actor');
+const { pinSessionTenant } = require('../../Config/tenant');
 
 const AUDIT_EXPORT_HARD_CAP = 100000;
 const AUDIT_EXPORT_PAGE_SIZE = 1000;
 const AUDIT_CSV_HEADER = ['time', 'actorType', 'actor', 'agent', 'run', 'event', 'entity', 'reason', 'cost_usd', 'undone_at'];
 const PERMISSION_REFUSED = 'permission.refused';
-
-const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId);
 
 /* Each agent action row carries the deadline the undo route will enforce, so the
  * list can show it instead of computing one. Runs are read once per page. */
@@ -43,8 +44,8 @@ const withUndoState = async (companyId, uid, rows) => {
 // the company's undo window is open; an agent token may not.
 exports.undoAuditLog = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const { resolveActor, isAgent } = require('../Agents/actor');
         const { undoAuditRow } = require('../Agents/undo');
         const agentAudit = require('../Agents/agentAudit');
@@ -75,6 +76,7 @@ const auditMatch = (q) => {
     if (q.action) match.action = String(q.action);
     if (q.actorType === 'agent') match['meta.actorType'] = 'agent';
     if (q.actorType === 'human') match['meta.actorType'] = { $ne: 'agent' };
+    if (q.actorType === 'outside_agent') match['meta.viaAccount'] = VIA_EXTERNAL;
     if (q.gated === 'true') match.action = 'agent.action_refused';
     if (q.refused === 'true') match.action = PERMISSION_REFUSED;
     if (q.undone === 'true') match['meta.undoneAt'] = { $ne: null };
@@ -160,12 +162,12 @@ async function* plannedRows(companyId, q, plan, { integrity }) {
     }
 }
 
-// GET /api/v1/audit-logs?actorId=&entityType=&entityId=&action=&refused=&from=&to=&page=&limit=
+// GET /api/v1/audit-logs?actorId=&actorType=&entityType=&entityId=&action=&refused=&from=&to=&page=&limit=
 // Owner/admin only. Filterable + paginated, newest first; under AUDIT_CHAIN each row carries its integrity state.
 exports.listAuditLogs = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const roleType = await getRoleType(companyId, req.uid);
         if (!isPrivileged(roleType)) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
 
@@ -185,7 +187,7 @@ exports.listAuditLogs = async (req, res) => {
         // The total counts candidates, so once a page drops one the total may count rows that do not match.
         const approximate = listed.length !== read.length;
         const total = (rows && rows[0] && rows[0].meta && rows[0].meta[0] && rows[0].meta[0].total) || 0;
-        const data = await withUndoState(companyId, req.uid, listed);
+        const data = await outsideActors.nameRows(companyId, await withUndoState(companyId, req.uid, listed));
         const metadata = { total, page, totalPages: Math.ceil(total / limit), ...(approximate ? { approximate: true } : {}), ...(chain.isOn() ? { chain: { on: true } } : {}) };
         return res.send({ status: true, data, metadata });
     } catch (error) {
@@ -207,8 +209,10 @@ const integrityCell = (integrity) => {
 
 const auditCsvLine = (r, withIntegrity) => {
     const m = r.meta || {};
+    const outside = r.outsideAgent;
     return csvRow([
-        r.createdAt ? new Date(r.createdAt).toISOString() : '', m.actorType || 'human', r.actorName || '', m.agentName || '', m.runId || '',
+        r.createdAt ? new Date(r.createdAt).toISOString() : '', m.actorType || 'human',
+        outside ? outsideActors.csvLabel(outside) : r.actorName || '', outside ? outside.clientName || outside.clientId : m.agentName || '', m.runId || '',
         m.action || r.action, r.entityName || r.entityId || '', m.reason || '', (m.cost && m.cost.usd) || '', m.undoneAt ? new Date(m.undoneAt).toISOString() : '',
         ...(withIntegrity ? [integrityCell(r.integrity)] : []),
     ]);
@@ -219,8 +223,8 @@ const auditCsvLine = (r, withIntegrity) => {
 exports.exportAuditCsv = async (req, res) => {
     let streaming = false;
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.status(400).json({ status: false, statusText: 'companyId is required.' });
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const roleType = await getRoleType(companyId, req.uid);
         if (!isPrivileged(roleType)) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
 
@@ -236,20 +240,23 @@ exports.exportAuditCsv = async (req, res) => {
 
         let written = 0;
         let truncated = false;
-        let lines = [];
+        let pending = [];
+        const flush = async () => {
+            if (!pending.length) return;
+            const named = await outsideActors.nameRows(companyId, pending);
+            pending = [];
+            res.write(`\n${named.map((row) => auditCsvLine(row, withIntegrity)).join('\n')}`);
+        };
         for await (const row of plannedRows(companyId, q, plan, { integrity: withIntegrity })) {
             if (written >= cap) {
                 truncated = true;
                 break;
             }
-            lines.push(auditCsvLine(row, withIntegrity));
+            pending.push(row);
             written += 1;
-            if (lines.length >= AUDIT_EXPORT_PAGE_SIZE) {
-                res.write(`\n${lines.join('\n')}`);
-                lines = [];
-            }
+            if (pending.length >= AUDIT_EXPORT_PAGE_SIZE) await flush();
         }
-        if (lines.length) res.write(`\n${lines.join('\n')}`);
+        await flush();
         if (truncated) {
             const note = ['', '', '', '', '', 'export.truncated', `Export truncated at ${cap} rows. Narrow the filter to export the rest.`, '', '', ''];
             res.write(`\n${csvRow([...note, ...(withIntegrity ? [''] : [])])}`);

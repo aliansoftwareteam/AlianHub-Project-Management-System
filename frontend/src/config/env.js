@@ -383,6 +383,7 @@ module.exports.INSTANCE_LOGS = '/api/v2/instance/logs';
 module.exports.INSTANCE_LOG_FILES = '/api/v2/instance/logs/files';
 module.exports.INSTANCE_LOG_DOWNLOAD = '/api/v2/instance/logs/download';
 module.exports.INSTANCE_BACKUPS = '/api/v2/instance/backups';
+module.exports.INSTANCE_ORPHAN_DATABASES = '/api/v2/instance/orphan-databases';
 module.exports.INSTANCE_AI_PROVIDERS = '/api/v2/instance/ai/providers';
 module.exports.INSTANCE_STATS = '/api/v2/instance/stats';
 module.exports.APP_VERSION = '/version';
@@ -393,6 +394,7 @@ module.exports.INSTANCE_AUDIT = '/api/v2/instance/audit';
 module.exports.INSTANCE_ENFORCEMENT = '/api/v2/instance/enforcement';
 module.exports.INSTANCE_CSP = '/api/v2/instance/csp';
 module.exports.INSTANCE_EGRESS = '/api/v2/instance/egress';
+module.exports.INSTANCE_INSTRUCTION_PATTERNS = '/api/v2/instance/instruction-patterns';
 module.exports.INSTANCE_KNOWLEDGE = '/api/v2/instance/knowledge';
 
 // The storage flag is decided by the server at runtime; build-time VUE_APP_STORAGE_TYPE is only the fallback

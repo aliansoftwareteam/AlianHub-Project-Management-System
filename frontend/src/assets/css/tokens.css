@@ -174,6 +174,8 @@ html, body, #app {
    when a redesigned page is inside; legacy views keep their light panels and dark ink. */
 :root[data-theme="dark"] .section-right.bg-white:has(.ah-page),
 :root[data-theme="dark"] .list-view-body.bg-light-gray:has(.ah-page) { background: var(--canvas) !important; }
+/* The redesigned calendar still sits in the legacy SprintsList card, which is always white. */
+:root[data-theme="dark"] .ah-page .sprint:has(.cv) { background-color: var(--surface); border-color: var(--hairline); }
 /* Legacy utility classes inside the redesigned project toolbars (filter trigger, mic, + View). */
 :root[data-theme="dark"] .ph2 .bg-white, :root[data-theme="dark"] .ph2 .btn-white,
 :root[data-theme="dark"] .pft .bg-white, :root[data-theme="dark"] .pft .btn-white { background: var(--surface) !important; color: var(--ink); }
@@ -341,7 +343,7 @@ html, body, #app {
 .ah-check:checked { background: var(--brand); border-color: var(--brand); }
 .ah-check:checked::after {
     content: ""; width: 8px; height: 5px;
-    border: 2px solid #fff; border-top: 0; border-right: 0;
+    border: 2px solid var(--on-brand); border-top: 0; border-right: 0;
     transform: rotate(-45deg) translate(1px, -1px);
 }
 .ah-check:focus-visible { outline: none; box-shadow: var(--focus); }

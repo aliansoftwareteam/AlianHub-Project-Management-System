@@ -4,19 +4,19 @@
             <img :src="toggle" alt="options" class="pr-1 cursor-pointer kiln-toggle" v-if="clientWidth <= 1200" @click="visible = !visible">
             <router-link :to="{name: 'Home', params: {cid: companyId}}" class="kiln-mark">
                 <img :src="headerLogo" class="kiln-mark__logo cursor-pointer" />
-                <span class="kiln-mark__word">Alian<span>Hub</span></span>
+                <span class="kiln-mark__word">{{ $t('Header.wordmark_start') }}<span>{{ $t('Header.wordmark_end') }}</span></span>
             </router-link>
 
             <NavLinks v-if="clientWidth > 1200 && rules && Object.keys(rules).length" :menu="menu" />
         </div>
-        <small title="Open Advance Filter" class="project-list-title-small cursor-pointer d-flex justify-content-between align-items-centers text-nowrap" @click="dispatchEventForFilet" v-if="checkPermission('task.advance_search') == true">
+        <small :title="$t('Header.open_advance_filter')" class="project-list-title-small cursor-pointer d-flex justify-content-between align-items-centers text-nowrap" @click="dispatchEventForFilet" v-if="checkPermission('task.advance_search') == true">
             <template v-if="clientWidth >= 1150">
                 <small class="project-list-title-small-text">{{$t('Projects.search')}}</small>
-                <small>(Ctrl + K)</small>
+                <small>{{ $t('Header.search_shortcut') }}</small>
             </template>
             <template v-else>
                 <small class="project-list-title-small-text">{{$t('Projects.search')}}</small>
-                <small v-if="clientWidth > 990">(Ctrl + K)</small>
+                <small v-if="clientWidth > 990">{{ $t('Header.search_shortcut') }}</small>
             </template>
         </small>
         <div class="d-flex align-items-center justify-content-between z-index-5 header__actions" v-if="clientWidth > 990">
@@ -127,7 +127,6 @@
         <TalkToTextPopover v-model="talkToTextVisible" />
 
         <Sidebar
-            title="Test"
             v-model:visible="visible"
             :left="true"
             className="z-index-6 mobile-header-sidebar"

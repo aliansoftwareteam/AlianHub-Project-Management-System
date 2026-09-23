@@ -94,7 +94,11 @@
     background: var(--surface); color: var(--ink); font: var(--text-small);
 }
 .pft .calendar-button:hover { background: var(--surface-hover); }
-.pft .monthly-calendar-view { font: 600 12.5px/32px var(--font-ui); color: var(--ink); width: auto !important; padding: 0 6px; }
+/* The legacy .monthly-calendar rule sets its colour with !important, and the legacy chevrons
+   paint their own white discs; both stood out on the dark toolbar. */
+.pft .monthly-calendar-view { font: 600 12.5px/32px var(--font-ui); color: var(--ink) !important; width: auto !important; padding: 0 6px; }
+.pft .calendar-button .fc-icon,
+.pft .calendar-button .fc-icon::before { background: transparent; }
 
 @media (max-width: 1279px) {
     .pft .task-filtersearch { flex: 1 1 auto; min-width: 0; }
@@ -126,5 +130,8 @@
     .pft .border-groupBy, .pft .ai_button, .pft .pft__mode-chip, .pft .calendar-button, .pft__search-toggle,
     .pft .assignee-filter.manage__filter-users, .pft .pft__input.form-control { min-height: 40px !important; height: 40px !important; line-height: 38px; }
     .pft .pft__icon-btn { width: 40px !important; }
+    /* The legacy rule sizes the filter pill as a percentage of a shrink-to-fit parent, which
+       collapsed its button to 13px and let the pill spill over the search toggle. */
+    .pft .top-filter-section { box-sizing: border-box; width: auto; max-width: none; min-width: 40px; }
     .pft .assignee-filter .assignee-user, .pft .assignee-filter .assignee-status { height: 38px !important; }
 }

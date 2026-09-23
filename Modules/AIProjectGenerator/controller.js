@@ -24,6 +24,7 @@ const { resolveProjectId, canEditProject } = require('./projectAccess');
 const { resolveProjectSkills, getActiveSkillSlugs } = require('../settings/ProjectSkills/helper');
 const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require('../Project/helpers/projectSourceRules');
 const { normalizePlanColors } = orchestrator;
+const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 
 const PLAN_TTL_SECONDS = 15 * 60;        // 15 min
 const BRIEF_TTL_SECONDS = 30 * 60;       // 30 min
@@ -70,12 +71,6 @@ function cacheKey(kind, uid, id) {
     return `aipg:${kind}:${uid}:${id}`;
 }
 
-function audIncludes(aud, companyId) {
-    if (!aud || !companyId) return false;
-    const list = Array.isArray(aud) ? aud : String(aud).split(',');
-    return list.some((entry) => String(entry).trim() === String(companyId).trim());
-}
-
 function sendError(res, status, message) {
     return res.status(status).send({ status: false, statusText: message });
 }
@@ -93,19 +88,13 @@ function llmErrorToHttpStatus(error) {
 }
 
 function resolveCompanyId(req) {
-    // Prefer the JWT-verified header (set by verifyJWTTokenWithCV2 upstream)
-    // but accept body.companyId/CompanyId for flexibility. We always
-    // cross-check against req.aud before trusting any of them.
-    const candidates = [
-        req.headers && req.headers.companyid,
-        req.body && req.body.companyId,
-        req.body && req.body.CompanyId,
-    ].filter(Boolean);
-    for (const c of candidates) {
-        const s = String(c).trim();
-        if (OBJECT_ID_PATTERN.test(s) && audIncludes(req.aud, s)) return s;
+    if (!req.aud) return null;
+    try {
+        return sessionTenantOf(req);
+    } catch (error) {
+        if (error instanceof TenantError) return null;
+        throw error;
     }
-    return null;
 }
 
 async function loadActiveMembers(companyId) {

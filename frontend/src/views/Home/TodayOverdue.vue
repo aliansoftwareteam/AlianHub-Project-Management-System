@@ -135,6 +135,7 @@ import StatusChip from "@/components/molecules/Home/StatusChip.vue";
 import { homeState } from "@/components/molecules/Home/homeState";
 import { useMyWork } from "@/components/molecules/Home/useMyWork";
 import { useTimer } from "@/components/molecules/Home/useTimer";
+import { timeLogFailureKey } from "@/composable/timeLogFailure";
 import { useAgenda } from "@/components/molecules/Home/useAgenda";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import "@/components/molecules/Home/style.css";
@@ -253,7 +254,7 @@ async function onTimer(task) {
             $toast.info(t("Home.timer_switched", { task: previous }), { position: "top-right" });
         } catch (error) {
             console.error("timer stop failed", error);
-            $toast.error(t("Home.timer_log_failed"), { position: "top-right" });
+            $toast.error(t(timeLogFailureKey(error, "Home.timer_log_failed")), { position: "top-right" });
             return;
         }
     }

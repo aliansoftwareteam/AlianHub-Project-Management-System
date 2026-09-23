@@ -12,20 +12,20 @@
             <!-- Header: total users tracking + search by user name -->
             <div class="lwc-head">
                 <span class="lwc-count">
-                    <span class="lwc-dot"></span>{{ userCount }} {{ userCount === 1 ? 'user' : 'users' }} tracking
-                    <span class="lwc-proj-count">· {{ projectCount }} {{ projectCount === 1 ? 'project' : 'projects' }}</span>
+                    <span class="lwc-dot"></span>{{ $t('dashboardCard.lwt_users_tracking', { count: userCount }, userCount) }}
+                    <span class="lwc-proj-count">· {{ $t('dashboardCard.lwt_project_count', { count: projectCount }, projectCount) }}</span>
                 </span>
-                <input v-model="search" class="lwc-search" type="text" placeholder="Search user…" />
+                <input v-model="search" class="lwc-search" type="text" :placeholder="$t('dashboardCard.tss_search_user_placeholder')" />
             </div>
-            <div v-if="!filteredRows.length" class="lwc-msg">No users match “{{ search }}”.</div>
+            <div v-if="!filteredRows.length" class="lwc-msg">{{ $t('dashboardCard.lwt_no_user_match', { search }) }}</div>
             <div v-else class="lwc-table-wrap">
                 <table class="lwc-table">
                     <thead>
                         <tr>
-                            <th class="lwc-th-user">User</th>
-                            <th class="lwc-th-task">Task</th>
-                            <th class="lwc-th-proj">Project</th>
-                            <th class="lwc-th-memo">Working on</th>
+                            <th class="lwc-th-user">{{ $t('dashboardCard.lwt_user') }}</th>
+                            <th class="lwc-th-task">{{ $t('dashboardCard.lwt_task') }}</th>
+                            <th class="lwc-th-proj">{{ $t('dashboardCard.lwt_project') }}</th>
+                            <th class="lwc-th-memo">{{ $t('dashboardCard.lwt_working_on') }}</th>
                             <th class="lwc-th-num">{{ $t('dashboardCard.lwt_task_logged') }}</th>
                             <th class="lwc-th-num">{{ $t('dashboardCard.lwt_logged_today') }}</th>
                         </tr>
@@ -33,7 +33,7 @@
                     <tbody>
                         <tr v-for="r in filteredRows" :key="r.userId + '|' + r.taskId">
                             <td class="lwc-td-user">
-                                <span class="lwc-dot" title="Tracking now"></span>
+                                <span class="lwc-dot" :title="$t('dashboardCard.lwt_tracking_now')"></span>
                                 <span class="lwc-user-name" :title="r.userName">{{ r.userName }}</span>
                             </td>
                             <td class="lwc-td-task">

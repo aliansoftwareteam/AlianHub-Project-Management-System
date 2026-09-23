@@ -8,7 +8,7 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType")
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose")
 const { updateProjectForTimelog, findAndUpdateProjectOrTaskStartDate, updateRemainingTime } = require('./helpers');
-const { isPeriodLocked } = require('../../TimesheetApproval/helpers/lockGuard');
+const { isPeriodLocked, PERIOD_LOCKED } = require('../../TimesheetApproval/helpers/lockGuard');
 const { pinSessionTenant } = require('../../../Config/tenant');
 const { resolveSheetScope, SHEET_PERMISSION } = require('../../TimeSheet/helpers/timeScope');
 const { actingUser } = require('../../Sprints/helpers/actingUser');
@@ -17,6 +17,7 @@ const { escapeHtml } = require('../../../utils/escapeHtml');
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const NOT_YOUR_TIME = "You can't log or change time for this person.";
 const SIGNED_IN_REQUIRED = 'A signed-in user is required.';
+const NEW_ENTRY_LOCKED = "This timesheet period is approved and locked — time can't be added to it.";
 
 /* Another person's time is writable only where the timesheet screens would show it to the
  * caller, the same test timesheet.read applies to reading it. */
@@ -272,6 +273,9 @@ exports.manualLogTime = async (req, res) => {
                 res.send({ status: false, message: err.message })
             });
     } else {
+        if (await isPeriodLocked({ companyId, userId: owner, date: entryDay(data) })) {
+            return res.send({ status: false, statusText: NEW_ENTRY_LOCKED, code: PERIOD_LOCKED });
+        }
         let obj = {
             type: type,
             data: data

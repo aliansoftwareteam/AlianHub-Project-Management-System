@@ -9,7 +9,8 @@
             <div v-if="cited.length" class="ask__cites">
                 <div class="ah-label">{{ $t('Parity.cited') }}</div>
                 <div v-for="source in cited" :key="source.ref" class="ask__cite">
-                    <span class="ask__cite-ref">{{ source.ref }}</span>
+                    <router-link v-if="linkOf(source)" :to="linkOf(source)" class="ask__cite-ref">{{ source.ref }}</router-link>
+                    <span v-else class="ask__cite-ref">{{ source.ref }}</span>
                     <span>{{ source.title }}<span v-if="source.project" class="ah-muted"> · {{ source.project }}</span></span>
                 </div>
             </div>
@@ -32,13 +33,17 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref } from "vue";
+import { computed, inject, nextTick, ref, unref } from "vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AskWhyPanel from "./AskWhyPanel.vue";
+import { sourceLink } from "./askWhy";
 
 defineOptions({ name: "AskAnswer" });
 
 const props = defineProps({ answer: { type: Object, required: true } });
+
+const companyId = inject("$companyId", "");
+const linkOf = (source) => sourceLink(source, unref(companyId));
 
 const open = ref(false);
 const opener = ref(null);

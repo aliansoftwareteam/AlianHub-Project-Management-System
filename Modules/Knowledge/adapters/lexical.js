@@ -17,6 +17,11 @@ const MIN_REGEX_TERM = 3;
 const EXCERPT_LENGTH = 300;
 const TITLE_LENGTH = 160;
 const TEXT_INDEX_MISSING = 27;
+const MAX_TASK_KEYS = 5;
+
+/* A task key such as OPS-12 is split by the text index into "ops" and "12", which match every
+ * task in the project and many beyond it, so a key is looked up exactly instead. */
+const TASK_KEY = /(?<![\p{L}\p{N}-])[A-Za-z][A-Za-z0-9]*-\d+(?![\p{L}\p{N}-])/gu;
 
 const SOURCES = {
     task: {
@@ -28,6 +33,7 @@ const SOURCES = {
         projectId: (row) => row.ProjectID,
         authorKind: () => 'user',
         origin: origin.ofTask,
+        taskKey: (row) => row.TaskKey,
     },
     page: {
         textIndex: true,
@@ -116,6 +122,9 @@ const regexScore = (source, row, terms) => {
     return terms.filter((t) => haystack.includes(t)).length / terms.length;
 };
 
+/* A form-made task holds a placeholder key until it is filed. */
+const hasKey = (value) => /[A-Za-z0-9]/.test(String(value == null ? '' : value));
+
 const toPassage = (key, row, score, terms) => {
     const source = SOURCES[key];
     const sourceType = source.sourceType || key;
@@ -130,6 +139,7 @@ const toPassage = (key, row, score, terms) => {
         score,
         authorKind: source.authorKind(row),
         origin: source.origin(row),
+        ...(source.taskKey && hasKey(source.taskKey(row)) ? { taskKey: String(source.taskKey(row)).trim() } : {}),
         ...(source.chunked ? { contentHash: row.contentHash || '', ...(row.taskId ? { taskId: String(row.taskId) } : {}) } : {}),
         updatedAt: source.updatedAt ? source.updatedAt(row) : (row.updatedAt || row.createdAt || null),
     };
@@ -194,9 +204,30 @@ const searchChunks = async (companyId, key, clause, query, limit) => {
     }
 };
 
-const searchSource = (companyId, key, clause, query, limit) => (SOURCES[key].chunked
-    ? searchChunks(companyId, key, clause, query, limit)
-    : searchRows(companyId, key, clause, query, limit));
+const taskKeysIn = (query) => {
+    const named = [...new Set(String(query == null ? '' : query).match(TASK_KEY) || [])].slice(0, MAX_TASK_KEYS);
+    return [...new Set(named.flatMap((key) => [key, key.toUpperCase()]))];
+};
+
+/* The access clause is the one the word search runs under, so a key the caller cannot see is
+ * never matched. A named task scores as the source's best and is marked, so retrieval can rank it
+ * above passages from every source. */
+const withNamedTasks = async (companyId, clause, query, limit, found) => {
+    const keys = taskKeysIn(query);
+    if (!keys.length) return found;
+    const rows = await find(companyId, 'task', { ...clause, TaskKey: { $in: keys } }, false, { limit, lean: true });
+    if (!(rows || []).length) return found;
+    const best = Math.max(1, ...found.map((p) => Number(p.score) || 0));
+    const named = rows.map((row) => ({ ...toPassage('task', row, best, words(query)), keyMatch: true }));
+    const namedIds = new Set(named.map((p) => p.id));
+    return [...named, ...found.filter((p) => !namedIds.has(p.id))];
+};
+
+const searchSource = async (companyId, key, clause, query, limit) => {
+    if (SOURCES[key].chunked) return searchChunks(companyId, key, clause, query, limit);
+    const found = await searchRows(companyId, key, clause, query, limit);
+    return key === 'task' ? withNamedTasks(companyId, clause, query, limit, found) : found;
+};
 
 const sourceKeyFor = (sourceType, filter) => ((filter.chunkSources || []).includes(sourceType) ? `${sourceType}Chunk` : sourceType);
 

@@ -8,12 +8,12 @@ const R = require('./helpers/integrationsRules');
 const S = require('./helpers/slackRules');
 const H = require('./helpers/secretHandles');
 const { SecretsStoreError } = require('../../Config/secrets');
+const { pinSessionTenant } = require('../../Config/tenant');
 
 // Secrets go to the store by handle or are sealed into config on every write (H.storeSecrets) and are stripped from every read (R.redact).
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
-const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
 const oid = (id) => (OBJECT_ID.test(String(id || '')) ? new mongoose.Types.ObjectId(String(id)) : null);
 
 const refuse = (res, code, statusText, extra = {}) => res.status(code).send({ status: false, statusText, message: statusText, ...extra });
@@ -29,8 +29,8 @@ const failed = (res, e, what) => {
 // Integrations hold company-wide credentials and data egress, so every write is
 // an owner or admin act; the role is read from company_users, never the body.
 const managerOrRefuse = async (req, res) => {
-    const companyId = companyOf(req);
-    if (!companyId) { refuse(res, 400, 'companyId is required.'); return null; }
+    const companyId = pinSessionTenant(req, res);
+    if (!companyId) return null;
     if (isPrivileged(await getRoleType(companyId, req.uid))) return companyId;
     refuse(res, 403, 'Only an owner or admin can manage integrations.');
     return null;
@@ -43,8 +43,8 @@ exports.listCatalog = async (req, res) => {
 
 exports.listConnections = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return refuse(res, 400, 'companyId is required.');
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { updatedAt: -1 } }],
         }, 'find');

@@ -15,7 +15,7 @@
 
 const logger = require('../../Config/loggerConfig');
 const memoryStore = require('../Agents/memory');
-const { detectIgnoredInstructions } = require('../AICore/instructionGuard');
+const { detectIgnoredInstructions, fresh: freshGuard } = require('../AICore/instructionGuard');
 const { getProvider } = require('../AICore/llmProvider');
 const { FEATURES } = require('../AICore/features');
 const { usageFromResult, addUsage, summarize } = require('../AICore/usage');
@@ -353,6 +353,7 @@ async function draftBrief({ description, additionalRequirements, briefText, answ
 
     const assumptions = [...drafted.value.assumptions];
     for (const r of coversRequired(assumptions, required)) assumptions.push(fallbackAssumption(r));
+    await freshGuard();
     for (const note of detectIgnoredInstructions(description, additionalRequirements, briefText)) {
         const already = assumptions.some((a) => a.point === 'other' && /ignored/i.test(a.text));
         if (!already) assumptions.push(note);

@@ -2,6 +2,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { fetchRules } = require('../settings/securityPermissions/controller');
 const { isPrivileged } = require('../../Config/roleTypes');
+const { allowsProject } = require('../../Config/tokenNarrowing');
 
 // Which projects a given person may open.
 //
@@ -35,7 +36,7 @@ const visibleProjects = async (companyId, uid) => {
         type: SCHEMA_TYPE.PROJECTS,
         data: [{ $or: or, $and: [{ $or: [{ isPersonal: { $ne: true } }, { personalOwner: String(uid) }] }] }, { ProjectName: 1 }],
     }, 'find').catch(() => []);
-    return projects || [];
+    return (projects || []).filter((project) => allowsProject(uid, project._id));
 };
 
 const visibleProjectIds = async (companyId, uid) => (await visibleProjects(companyId, uid)).map((p) => String(p._id));

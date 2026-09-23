@@ -12,6 +12,7 @@ const { default: mongoose } = require('mongoose');
 const {myCache, requestHandler} = require('../../../Config/config');
 const { updateCompanyFun, getCompanyDataFun } = require('../../Company/controller/updateCompany.js');
 const { isProfileUpload } = require('../bucketAccess');
+const { logUploadFailures } = require('../uploadFailures');
 /**
  * S3 client configuration for create bucket
  */
@@ -1019,53 +1020,23 @@ exports.getContentType = (key) => {
     }
 };
 
-/**
- * This funcion is used to upload any public assets into wasabi
- * @param {*} path 
- * @param {*} file 
- * @returns 
- */
 exports.uploadPublicAssetsToWasabi = async (path, file) => {
-    // BUG-024 / #78 fix: async read so we don't block the event loop.
     const fileContent = await fs.promises.readFile(file);
-    const bucketName = process.env.USERPROFILEBUCKET;
     const fileName = `public_assets/${path}`;
-
-    const params = {
-        Bucket: bucketName,
+    await s3Client.send(new PutObjectCommand({
+        Bucket: process.env.USERPROFILEBUCKET,
         Key: fileName,
         Body: fileContent,
         ContentType: exports.getContentType(fileName),
         ACL: "public-read",
-    };
-
-    try {
-        await s3Client.send(new PutObjectCommand(params));
-        return fileName;
-    } catch (error) {
-        // Don’t crash server — just throw error back
-        throw new Error(`Error uploading ${fileName}: ${error.message || error}`);
-    }
+    }));
+    return fileName;
 };
 
 exports.uploadPublicAssetsImagesInWasabi = async (imageArray) => {
-    const results = await Promise.allSettled(
-        imageArray.map(x =>
-            exports.uploadPublicAssetsToWasabi(x.path, x.filePath)
-        )
-    );
-
-    // Collect successful uploads
-    const success = results.filter(r => r.status === "fulfilled").map(r => r.value);
-
-    // Collect failed uploads
-    const failed = results.filter(r => r.status === "rejected").map(r => r.reason);
-
-    if (failed.length > 0) {
-        logger.error("Some uploads failed:", failed);
-    }
-
-    return success; // return only successful public URLs
+    const results = await Promise.allSettled(imageArray.map((x) => exports.uploadPublicAssetsToWasabi(x.path, x.filePath)));
+    logUploadFailures(logger, imageArray, results);
+    return results.filter((r) => r.status === "fulfilled").map((r) => r.value);
 };
 
 exports.uploadPublicAssets = async () => {

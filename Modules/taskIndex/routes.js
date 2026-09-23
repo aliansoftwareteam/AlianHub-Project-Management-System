@@ -12,7 +12,6 @@ exports.init = (app) => {
     *         - isFirst
     *         - isFirstWithRecord
     *         - taskId
-    *         - companyId
     *         - projectId
     *         - sprintId
     *         - relevantIndex
@@ -35,8 +34,8 @@ exports.init = (app) => {
     *           description: The taskId.
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: The companyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header.
     *         projectId: 
     *           type: string
     *           required: true

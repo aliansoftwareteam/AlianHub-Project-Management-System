@@ -14,7 +14,7 @@ jest.mock('../Config/config', () => {
 });
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 jest.mock('../Modules/Agents/skillRecord', () => ({ getSkill: jest.fn(), SOURCE: { CODE: 'code' } }));
-jest.mock('../Modules/Agents/engine/pageAudit', () => ({ audit: jest.fn(), fetchPage: jest.fn(), extractUrl: (text) => (String(text || '').match(/https?:\/\/\S+/) || [null])[0] }));
+jest.mock('../Modules/Agents/engine/pageAudit', () => ({ audit: jest.fn(), postJson: jest.fn(), extractUrl: (text) => (String(text || '').match(/https?:\/\/\S+/) || [null])[0] }));
 
 const http = require('http');
 const dns = require('dns');
@@ -516,9 +516,9 @@ describe('IPv6 transition addresses', () => {
     const CARRYING_PRIVATE = ['64:ff9b::a00:1', '64:ff9b::7f00:1', '64:ff9b::10.0.0.1', '64:ff9b::a9fe:a9fe', '2002:a00:1::1', '2002:7f00:1::', '2002:c0a8:101::5', '::a00:1', '::10.0.0.1', '::169.254.169.254'];
     const CARRYING_PUBLIC = ['64:ff9b::808:808', '2002:808:808::1', '::8.8.8.8'];
 
-    it.each(CARRYING_PRIVATE)('with the flag off %s passes the private rule, as it does today', (ip) => {
-        expect(isPrivateAddress(ip)).toBe(false);
-        expect(isBlockedHostname(`[${ip}]`)).toBe(false);
+    it.each(CARRYING_PRIVATE)('with the flag off %s is private too: the IPv4 address it carries is', (ip) => {
+        expect(isPrivateAddress(ip)).toBe(true);
+        expect(isBlockedHostname(`[${ip}]`)).toBe(true);
     });
 
     describe('with the flag on', () => {
@@ -553,15 +553,12 @@ describe('IPv6 transition addresses', () => {
 });
 
 describe('the agent-facing fetch', () => {
-    const PAGE = { status: 200, html: '<html></html>', bytes: 13 };
     const URL_WITH_SECRET = `https://docs.example.com/pricing?token=${SECRET}`;
     beforeEach(() => {
-        pageAudit.fetchPage.mockResolvedValue(PAGE);
         pageAudit.audit.mockResolvedValue({ ok: true, facts: [] });
     });
 
     it('with the flag off reads with or without a workspace, as before', async () => {
-        expect(await agentFetch.fetchPage(URL_WITH_SECRET)).toBe(PAGE);
         expect(await agentFetch.audit(URL_WITH_SECRET)).toEqual({ ok: true, facts: [] });
         expect(logger.error).not.toHaveBeenCalled();
     });
@@ -573,10 +570,10 @@ describe('the agent-facing fetch', () => {
             ['no egress context', (fn) => fn()],
             ['a context with no company id', (fn) => egressContext.run({ actor: ACTOR }, fn)],
         ])('refuses a read with %s before anything is fetched, and logs the host only', async (_, within) => {
-            await expect(within(() => agentFetch.fetchPage(URL_WITH_SECRET))).rejects.toMatchObject({ code: 'no_workspace', message: expect.stringMatching(/workspace/i) });
-            await expect(within(() => agentFetch.audit(URL_WITH_SECRET))).rejects.toMatchObject({ code: 'no_workspace' });
-            expect(pageAudit.fetchPage).not.toHaveBeenCalled();
+            await expect(within(() => agentFetch.audit(URL_WITH_SECRET))).rejects.toMatchObject({ code: 'no_workspace', message: expect.stringMatching(/workspace/i) });
+            await expect(within(() => agentFetch.postJson(URL_WITH_SECRET, { body: '{}' }))).rejects.toMatchObject({ code: 'no_workspace' });
             expect(pageAudit.audit).not.toHaveBeenCalled();
+            expect(pageAudit.postJson).not.toHaveBeenCalled();
             expect(logger.error).toHaveBeenCalledTimes(2);
             expect(logger.error.mock.calls[0][0]).toContain('docs.example.com');
             expect(JSON.stringify(logger.error.mock.calls)).not.toContain(SECRET);
@@ -585,9 +582,8 @@ describe('the agent-facing fetch', () => {
 
         it('reads inside a workspace context', async () => {
             const within = (fn) => egressContext.run({ companyId: CID_A, actor: ACTOR }, fn);
-            expect(await within(() => agentFetch.fetchPage(URL_WITH_SECRET))).toBe(PAGE);
             expect(await within(() => agentFetch.audit(URL_WITH_SECRET))).toEqual({ ok: true, facts: [] });
-            expect(pageAudit.fetchPage).toHaveBeenCalledWith(URL_WITH_SECRET);
+            expect(pageAudit.audit).toHaveBeenCalledWith(URL_WITH_SECRET);
         });
     });
 });

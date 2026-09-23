@@ -2,12 +2,12 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const store = require('./store');
 const registry = require('../Agents/registry');
-const { leaseMs } = require('./flag');
+const { leaseMs, heartbeatMs } = require('./flag');
 const { STEP_CREDENTIAL_KIND, stepCredentialsEnabled } = require('../Agents/serviceIdentity');
 
-// A replaced credential is not revoked: it stays good until the heartbeat after
-// the one that replaced it, so an action already in flight during a re-mint is
-// not refused, and no credential outlives one lease.
+// A replaced credential is not revoked: it stays good until the first re-mint at
+// least REMINT_GRACE_MS after it was replaced, so an action already in flight
+// during a re-mint is not refused, and no credential outlives one lease.
 
 const ALGORITHM = 'HS256';
 const KEY_SALT = 'alianhub-step-credential';
@@ -105,17 +105,34 @@ const issue = async ({ companyId, run, step, agentOf, now }) => {
     return mint({ companyId, run, step, actions: actionsFor(step, agent), agentId, now });
 };
 
+/* The row names only the current credential and the one it replaced, so two
+ * re-mints close together would refuse an action that read its credential just
+ * before them. A renewal inside the grace of the last re-mint only confirms the
+ * claim, and keeps the lease inside the credential the step holds. Half the
+ * heartbeat at most, so a replaced credential is retired within the grace plus
+ * one heartbeat. */
+const REMINT_GRACE_MS = 30 * 1000;
+const remintGraceMs = () => Math.min(REMINT_GRACE_MS, Math.floor(heartbeatMs() / 2));
+
 /* Renewals are chained: two at once (the timer and a step's own keepAlive) would
  * otherwise each replace the same credential, and the step could end up holding
  * one the row no longer names. A lease that has already lapsed is not renewed. */
 const hold = (companyId, claim, first) => {
     let current = first;
+    let replacedAt = null;
     let queue = Promise.resolve();
     const renewOnce = async ({ now = new Date(), lease = leaseMs() } = {}) => {
+        if (replacedAt !== null && now.getTime() - replacedAt < remintGraceMs()) {
+            const untilCredentialExpires = new Date(current.expiresAt).getTime() - now.getTime();
+            return store.heartbeat(companyId, { ...claim, now, lease: untilCredentialExpires, onlyWhileLive: true });
+        }
         const next = sign(current.claims, new Date(now.getTime() + lease), now);
         const set = { credentialId: next.credentialId, previousCredentialId: current.credentialId, credentialExpiresAt: next.expiresAt };
         const held = await store.heartbeat(companyId, { ...claim, now, lease, set, onlyWhileLive: true });
-        if (held) current = next;
+        if (held) {
+            current = next;
+            replacedAt = now.getTime();
+        }
         return held;
     };
     const renew = (options) => {

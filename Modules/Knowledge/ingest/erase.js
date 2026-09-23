@@ -64,8 +64,8 @@ const excludeTask = (companyId, taskId, options) => exclude(companyId, { kind: '
 const personWhere = (userId) => ({ $or: [{ createdBy: String(userId), sourceType: 'page', visibility: 'private' }, { createdBy: String(userId), sourceType: 'comment' }, { sourceType: 'memory', derivedAuthors: String(userId) }] });
 
 /* A person's private pages and the comments they wrote (owner, 2026-09-17), and an agent's notes
- * formed from either. Their shared pages stay, and so do the calls they were on, which hold other
- * participants' words. */
+ * formed from either or readable only by that person's runs. Their shared pages stay, and so do the
+ * calls they were on, which hold other participants' words. */
 const erasePerson = async (companyId, userId, options = {}) => {
     const id = String(userId || '').trim();
     if (!OBJECT_ID.test(id)) throw new Error('erasePerson needs a valid user id.');

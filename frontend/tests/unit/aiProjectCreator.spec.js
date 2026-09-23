@@ -312,11 +312,11 @@ describe('AiProjectCreator guided flow', () => {
         expect(callsTo(env.AI_PROJECT_EXECUTE)).toHaveLength(0);
         expect(wrapper.vm.step).toBe('input');
         expect(wrapper.text()).toContain('Projects.source_required');
-        expect(buttonByText(wrapper, 'Next →').attributes('disabled')).toBeDefined();
+        expect(buttonByText(wrapper, 'AiProject.next').attributes('disabled')).toBeDefined();
 
         wrapper.vm.source = 'other';
         await nextTick();
-        await buttonByText(wrapper, 'Next →').trigger('click');
+        await buttonByText(wrapper, 'AiProject.next').trigger('click');
         expect(wrapper.vm.step).toBe('preview');
         expect(callsTo(env.AI_PROJECT_PLAN)).toHaveLength(1);
     });

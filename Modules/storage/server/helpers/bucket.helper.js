@@ -7,6 +7,7 @@ const { default: mongoose } = require("mongoose");
 const { SCHEMA_TYPE } = require('../../../../Config/schemaType');
 const thumbnailArray = require('../../../../thumbnail.json');
 const { guardFile, guardBuffer } = require('../../../../utils/imageGuard.js');
+const { logUploadFailures } = require('../../uploadFailures');
 
 exports.iconsThumbnailGenerator = (fpath,companyId,file,bufferString,fileNameWithRan,thumbnailKey) => {
     return new Promise((resolve, reject) => {
@@ -177,43 +178,17 @@ exports.formatBucketSize = (size, unit) => {
     }
 }
 
-// BUG-017 / #71: this helper used `await fs.cp(source, destination, callback)`,
-// but `fs.cp` is callback-style and returns `undefined` — `await undefined`
-// resolves immediately, so the function returned before the copy was done.
-// That made the surrounding `Promise.allSettled(imageArray.map(...))` fix
-// in `uploadIamgesInStorage` toothless on its own. Promisify the callback
-// here so the awaits up the chain actually wait.
-function copyFile(source, destination) {
-    return new Promise((resolve) => {
-        fs.cp(source, destination, (err) => {
-            if (err) {
-                loggerConfig.error('Error copying file:', err);
-            } else {
-                loggerConfig.info('File copied successfully');
-            }
-            resolve();
-        });
-    });
-}
-exports.uploadIamgesInStorage = (imageArray,companyId) => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            // BUG-017 / #71 fix: the previous `imageArray.forEach(async ...)`
-            // didn't wait for the copyFile awaits, so `resolve()` fired
-            // before any file had finished copying. Use `Promise.allSettled`
-            // so independent copies run in parallel and a single failure
-            // doesn't abort the batch.
-            await Promise.allSettled(imageArray.map(async (x) => {
-                const destPath = path.join(__dirname, '../../../../storage', companyId, x.path);
-                const srcPath = path.join(__dirname, '/../../../../wasabiUploadsLocal', x.filePath);
-                await copyFile(srcPath, destPath);
-            }));
-            resolve();
-        } catch (error) {
-            reject(error);
-        }
-    })
-}
+const copyFile = (source, destination) => new Promise((resolve, reject) => {
+    fs.cp(source, destination, (err) => (err ? reject(err) : resolve()));
+});
+
+exports.uploadIamgesInStorage = async (imageArray, companyId) => {
+    const results = await Promise.allSettled(imageArray.map((x) => copyFile(
+        path.join(__dirname, '/../../../../wasabiUploadsLocal', x.filePath),
+        path.join(__dirname, '../../../../storage', companyId, x.path),
+    )));
+    logUploadFailures(loggerConfig, imageArray, results);
+};
 
 exports.uploadTaskTypeImage = (companyId) => {
     return new Promise(async (resolve, reject) => {

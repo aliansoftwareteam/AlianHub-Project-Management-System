@@ -497,6 +497,79 @@ describe('provenance comes from the stored run and the sources, never from the c
     });
 });
 
+describe('a repeat sighting by another starter', () => {
+    const privatePageOf = (userId) => pageIn(P1, { visibility: 'private', createdBy: userId });
+
+    it("keeps each starter's sighting as their own note, and returns neither the other's sources nor projects", async () => {
+        const first = await note(AGENT_A, 'The berth master retires in May.', { run: runOf(AGENT_A, STARTER, P2), derivedFrom: [privatePageOf(STARTER)] });
+        const secondRef = pageIn(P1);
+        const again = await note(AGENT_A, 'The berth master retires in May.', { run: runOf(AGENT_A, MEMBER, P1), derivedFrom: [secondRef] });
+
+        expect(again.memoryId).not.toBe(first.memoryId);
+        expect(again).toMatchObject({ source: { userId: MEMBER }, projectIds: [P1], derivedFrom: [secondRef], occurrences: 1 });
+        expect(liveChunk(first.memoryId)).toMatchObject({ startedBy: STARTER, projectIds: [P2, P1], derivedFrom: first.derivedFrom });
+        expect(liveChunk(again.memoryId)).toMatchObject({ startedBy: MEMBER, projectIds: [P1], derivedFrom: [secondRef] });
+    });
+
+    it("still merges a repeat sighting by the same starter into their note", async () => {
+        const first = await note(AGENT_A, 'The slipway is booked.', { run: runOf(AGENT_A, MEMBER, P1) });
+        const again = await note(AGENT_A, 'The slipway is booked.', { run: runOf(AGENT_A, MEMBER, P1), derivedFrom: [pageIn(P1)] });
+        expect(again).toMatchObject({ memoryId: first.memoryId, occurrences: 2 });
+    });
+
+    it("leaves the first starter's note readable when another starter's sighting names a source they cannot open", async () => {
+        const first = await note(AGENT_A, 'The dry dock floods at spring tide.', { derivedFrom: [pageIn(P1)] });
+        const again = await note(AGENT_A, 'The dry dock floods at spring tide.', { run: runOf(AGENT_A, MEMBER, P1), derivedFrom: [privatePageOf(MEMBER)] });
+        await indexReady();
+
+        expect(await recalledIds(AGENT_A, STARTER, 'dry dock')).toEqual([first.memoryId]);
+        const forMember = await recalledIds(AGENT_A, MEMBER, 'dry dock');
+        expect(forMember).toHaveLength(1);
+        expect([first.memoryId, again.memoryId]).toContain(forMember[0]);
+    });
+
+    it("keeps a tainted sighting on the second starter's note, not the first starter's", async () => {
+        const first = await note(AGENT_A, 'The fuel barge moved to berth four.');
+        const tainted = runOf(AGENT_A, MEMBER, P1, { tainted: true, taintSources: [{ kind: 'email', ref: 'inbound-9' }] });
+        const again = await note(AGENT_A, 'The fuel barge moved to berth four.', { run: tainted });
+        await indexReady();
+
+        expect(liveChunk(first.memoryId)).toMatchObject({ startedBy: STARTER, tainted: false, starterOnly: false, taintRefs: [] });
+        expect(liveChunk(again.memoryId)).toMatchObject({ startedBy: MEMBER, tainted: true, starterOnly: true, taintRefs: ['email:inbound-9'] });
+        const { passages } = await recall(AGENT_A, STARTER, 'fuel barge');
+        expect(passages.map((p) => [p.sourceId, p.origin])).toEqual([[first.memoryId, 'agent']]);
+        expect(await recalledIds(AGENT_A, MEMBER, 'fuel barge')).toHaveLength(1);
+    });
+
+    it("erases the second starter's contribution without taking the first starter's note", async () => {
+        const first = await note(AGENT_A, 'The lock gates are serviced in winter.', { derivedFrom: [pageIn(P1)] });
+        const again = await note(AGENT_A, 'The lock gates are serviced in winter.', { run: runOf(AGENT_A, MEMBER, P1), derivedFrom: [privatePageOf(MEMBER)] });
+
+        await erasePerson(C, MEMBER);
+
+        expect(chunksOf(again.memoryId)).toEqual([]);
+        expect(liveChunk(first.memoryId)).toMatchObject({ startedBy: STARTER, derivedAuthors: [] });
+        await memoryIndexer.sync(C, again.memoryId);
+        expect(chunksOf(again.memoryId)).toEqual([]);
+    });
+
+    it("erases the notes only a starter's own runs could read when that starter is erased, and keeps shared ones", async () => {
+        const external = await note(AGENT_A, 'The tide tables moved online.', { run: runOf(AGENT_A, MEMBER, P1), derivedFrom: ['web:tides.example'] });
+        const loose = await note(AGENT_A, 'The member parks by the gate.', { run: runOf(AGENT_A, MEMBER, null) });
+        const shared = await note(AGENT_A, 'The quay crane is serviced monthly.', { run: runOf(AGENT_A, MEMBER, P1) });
+        const others = await note(AGENT_A, 'The tide tables moved online.', { derivedFrom: ['web:tides.example'] });
+
+        await erasePerson(C, MEMBER);
+
+        expect(chunksOf(external.memoryId)).toEqual([]);
+        expect(chunksOf(loose.memoryId)).toEqual([]);
+        expect(liveChunk(shared.memoryId)).not.toBeNull();
+        expect(liveChunk(others.memoryId)).toMatchObject({ startedBy: STARTER });
+        await memoryIndexer.sync(C, external.memoryId);
+        expect(chunksOf(external.memoryId)).toEqual([]);
+    });
+});
+
 describe('a run started by an event, with no starter', () => {
     it('reads project notes and fails closed for every starter-only note', async () => {
         const shared = await note(AGENT_A, 'The crane inspection is due.');

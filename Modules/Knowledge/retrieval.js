@@ -86,6 +86,14 @@ const byFusedRank = (a, b) => {
     return agentLast(a, b) || ((b.rrf || 0) - (a.rrf || 0)) || (time(b.updatedAt) - time(a.updatedAt));
 };
 
+/* A task the question names by its key is what it asks about, whatever the words around the key
+ * score elsewhere. */
+const namedTasksFirst = (ranked, lexicalRanked) => {
+    const named = new Set(lexicalRanked.filter((p) => p.keyMatch).map((p) => p.id));
+    if (!named.size) return ranked;
+    return [...ranked.filter((p) => named.has(p.id)), ...ranked.filter((p) => !named.has(p.id))];
+};
+
 /* An agent's memory passages are rechecked against the live notes, the rest against their rows;
  * the order of the window is kept. */
 const recheckWindow = async ({ set, passages, onStale }) => {
@@ -186,9 +194,9 @@ const createRetrieve = (adapter) => {
             chunkSources.length || memorySide ? vectorSide(set, String(query), memory.withMemory(filter, memorySide), headroom) : null,
         ]);
         const lexicalRanked = scaleScores([...(found || []), ...recalled]).sort(byRank);
-        const ranked = vector && vector.passages
+        const ranked = namedTasksFirst(vector && vector.passages
             ? fuse([lexicalRanked, vector.passages]).sort(byFusedRank)
-            : weighAgents(lexicalRanked).sort(byRank);
+            : weighAgents(lexicalRanked).sort(byRank), lexicalRanked);
         const onStale = chunkSources.length ? (p) => chunkSources.includes(p.sourceType) && events.requestSync(set.companyId, p.sourceId, p.sourceType) : null;
         const passages = await rechecked({ set, ranked, wanted, onStale });
         return { passages, backend: backendName(adapter, vector), scope: summary };

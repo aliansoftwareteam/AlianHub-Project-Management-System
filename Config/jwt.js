@@ -107,6 +107,7 @@ const verifyApiTokenRequest = async (req, res, next, companyId, rawToken) => {
     try {
         // Lazy require keeps Config/jwt.js independent of module load order.
         const { resolveToken, logTokenActivity } = require('../Modules/ApiTokens/controller');
+        const { holdNarrowedToken } = require('./narrowedTokenRoutes');
 
         const path = String(req.originalUrl || req.path || '').split('?')[0];
         if (path.startsWith(PAT_BLOCKED_PATH_PREFIX) && !PAT_ALLOWED_EXCEPTIONS.includes(path)) {
@@ -163,7 +164,7 @@ const verifyApiTokenRequest = async (req, res, next, companyId, rawToken) => {
             });
         });
 
-        return next();
+        return holdNarrowedToken(req, res, next);
     } catch (error) {
         logger.error(`PAT auth error: ${error.message || error}`);
         return res.status(401).json({

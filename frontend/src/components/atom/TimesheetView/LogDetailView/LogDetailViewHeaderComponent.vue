@@ -67,20 +67,20 @@
             <div class="logdetailview-header-time-container">
                 <div class="d-flex">
                     <div class="circlegreen"></div>
-                    <div class="time-title">Tracked</div>
+                    <div class="time-title">{{ $t('TimeTracker.tracked') }}</div>
                 </div>
-                <div class="time-number">{{convertedTimeString(trackTime,'update') ? convertedTimeString(trackTime,'update') : 0}} hrs</div>
+                <div class="time-number">{{ $t('TimeTracker.hours_value', { time: convertedTimeString(trackTime,'update') ? convertedTimeString(trackTime,'update') : 0 }) }}</div>
             </div>
             <div class="logdetailview-header-time-container">
                 <div class="d-flex">
                     <div class="circlePurple"></div>
-                    <div  class="time-title">Manual</div>
+                    <div  class="time-title">{{ $t('TimeTracker.manual') }}</div>
                 </div>
-                <div class="time-number">{{convertedTimeString(maualTime,'update') ? convertedTimeString(maualTime,'update') : 0}} hrs</div>
+                <div class="time-number">{{ $t('TimeTracker.hours_value', { time: convertedTimeString(maualTime,'update') ? convertedTimeString(maualTime,'update') : 0 }) }}</div>
             </div>
             <div class="logdetailview-header-time-container">
                 <div  class="time-title">{{$t("TimeTracker.total")}}</div>
-                <div class="time-total">{{convertedTimeString(totalTime,'update') ? convertedTimeString(totalTime,'update') : 0}} hrs</div>
+                <div class="time-total">{{ $t('TimeTracker.hours_value', { time: convertedTimeString(totalTime,'update') ? convertedTimeString(totalTime,'update') : 0 }) }}</div>
             </div>
         </div>
     </div>

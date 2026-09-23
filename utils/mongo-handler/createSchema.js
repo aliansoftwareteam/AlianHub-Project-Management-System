@@ -1,5 +1,6 @@
 const { Schema } = require('mongoose');
 const fileSweep = require('../../Modules/Knowledge/ingest/fileSweep');
+const tombstonePurge = require('../../Modules/Knowledge/ingest/purgeFilter');
 const { schema } = require('./schema');
 // P1-SEC-11 — Core entity schemas hardened to `strict: true`. The
 // field lists in `./schema.js` cover every known write path; unknown
@@ -319,6 +320,7 @@ knowledgeChunksSchema.index({ sourceType: 1, taskId: 1 });
 // The vector search's candidate scan: the newest chunks of a source type under one embedding model.
 knowledgeChunksSchema.index({ sourceType: 1, embeddingModel: 1, sourceUpdatedAt: -1 });
 knowledgeChunksSchema.index(fileSweep.INDEX_KEY, fileSweep.INDEX_OPTIONS);
+knowledgeChunksSchema.index(tombstonePurge.INDEX_KEY, tombstonePurge.INDEX_OPTIONS);
 const knowledgeIndexStateSchema = new Schema(schema.knowledgeIndexState, {strict: true, timestamps: true});
 knowledgeIndexStateSchema.index({ sourceType: 1 }, { unique: true });
 const knowledgeExclusionsSchema = new Schema(schema.knowledgeExclusions, {strict: true, timestamps: true});
@@ -328,6 +330,7 @@ const permissionDecisionsSchema = new Schema(schema.permissionDecisions, {strict
 permissionDecisionsSchema.index({ day: 1, mode: 1, method: 1, route: 1, permission: 1, role: 1, scope: 1, reason: 1 }, { unique: true, name: 'decision_key' });
 permissionDecisionsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 const egressAllowlistsSchema = new Schema(schema.egressAllowlists, {strict: true, timestamps: false});
+const instructionPatternsSchema = new Schema(schema.instructionPatterns, {strict: true, timestamps: false});
 const agentSessionsSchema = new Schema(schema.agentSessions, {strict: true, timestamps: false});
 agentSessionsSchema.index({ taskId: 1, createdAt: -1 });
 agentSessionsSchema.index({ state: 1, deliveredAt: 1 });
@@ -497,6 +500,7 @@ module.exports = {
     auditRedactionsSchema,
     auditChainKeySchema,
     egressAllowlistsSchema,
+    instructionPatternsSchema,
     agentSessionsSchema,
     agentSessionEndpointsSchema,
     secretsSchema,

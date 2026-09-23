@@ -655,6 +655,11 @@
     "description": "Knowledge indexer: \"off\" subscribes to nothing and reads or writes no chunk; \"tenant\" ingests page, comment, call-notes, project-guide and task-attachment events into knowledge_chunks (pages and guides split on headings; attachment text extracted off the request path within the KNOWLEDGE_FILE_* limits; tombstoned on delete, on a deleted task or a removed attachment for comments and files, on project trash for pages, comments, guides and files, and on a member's departure for private pages), backfills each source separately, and lets retrieval read a source's passages from the chunks once that source's backfill is complete, for a company whose knowledgeIndexer.mode is \"on\"; \"all\" does so for every company except one set to \"off\".",
     "default": "off"
   },
+  "KNOWLEDGE_TOMBSTONE_RETENTION_DAYS": {
+    "group": "ai",
+    "description": "Days a tombstoned knowledge chunk (a deleted, trashed, departed or removed source) is kept before the knowledge.backfill job removes it, once a day per company. A tombstone the indexer reads back (a deleted task's comments and files, a departed member's agent notes, a file's skip or failure outcome) keeps its row with the text and vector emptied; a file still owed an extraction is left alone. 0 keeps every tombstone.",
+    "default": "30"
+  },
   "KNOWLEDGE_AGENT_MEMORY": {
     "group": "ai",
     "description": "Agent memory in the knowledge index: \"off\" publishes and indexes nothing, so agent notes stay in the LangGraph store only; \"on\", for a company whose knowledge indexer is on, indexes each agent note (agent_memory, namespace agent/<agentId>/note) into knowledge_chunks under scope \"agent\" off the memory events, backfills existing notes in the knowledge.memory.backfill job, and lets an agent's own runs retrieve its notes once that backfill is complete: only within the run's visible set (the starter's projects, narrowed to the agent's), only when every project the note was formed in is in that set, ranked below what people wrote, and with origin \"external\" when a tainted run formed it. People asking through Ask never see agent notes.",
@@ -878,11 +883,6 @@
     "required": true,
     "default": "4000"
   },
-  "PR_SUMMARY_AS_DATA": {
-    "group": "ai",
-    "description": "Runs the pr.summary skill (alias risk.flags) as its built-in data skill instead of the code skill: the same prompt, the same one review comment and the same 30,000-character clip, with the diff fetched as a declared url read of github.com, patch-diff.githubusercontent.com or gitlab.com. Takes effect only while SKILL_EXTERNAL_READS is on. Each of those hosts must be on the workspace egress allowlist (an instance owner adds them under Instance > Egress); a pull request on a host that is not listed or not declared skips the run with the reason. A company's own pr.summary skill still wins. Default \"off\" keeps the code skill.",
-    "default": "off"
-  },
   "PRECOMPANYKEY": {
     "group": "security",
     "description": "Random key for the preset company routes, presented in the x-preset-key header; generated at setup.",
@@ -948,7 +948,7 @@
   },
   "SKILL_EXTERNAL_READS": {
     "group": "security",
-    "description": "Declared external reads in data skills: \"on\" offers the url and api readers in the Skill Library, each naming one exact host, a path template, GET only, at most 512 KB, 10 s and 3 redirects, and optionally the handle of a skill_read workspace secret. A skill is saved only when every declared host is on the workspace egress allowlist (an empty list refuses them all, and private or reserved hosts are refused even when listed), and a raw secret anywhere in the skill body is refused. Running such a skill fails with external_reads_not_available until the run-time slice lands; nothing is fetched. Default \"off\" hides the readers, refuses them on save and leaves every skill as it was.",
+    "description": "Declared external reads in data skills: \"on\" offers the url and api readers in the Skill Library, each naming one exact host, a path template, GET only, at most 512 KB, 10 s and 3 redirects, and optionally the handle of a skill_read workspace secret. A skill is saved only when every declared host is on the workspace egress allowlist (an empty list refuses them all, and private or reserved hosts are refused even when listed), and a raw secret anywhere in the skill body is refused. The built-in pr.summary skill (alias risk.flags) reads its pull request this way from github.com, patch-diff.githubusercontent.com or gitlab.com, each of which must be on the workspace egress allowlist. Default \"off\" hides the readers and refuses them on save; a skill that declares one, pr.summary included, is listed as unavailable with the reason, and running it fails with external_reads_not_available before anything is fetched.",
     "default": "off"
   },
   "SOCKETIO_ADMIN_PASSWORD_HASH": {
