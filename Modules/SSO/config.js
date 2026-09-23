@@ -8,14 +8,10 @@ const {
 } = require("./helpers/ssoRules");
 const { resolveTxt } = require("./helpers/dnsTxt");
 const logger = require("../../Config/loggerConfig");
-
-const companyOf = (req) => req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId);
+const { pinSessionTenant } = require("../../Config/tenant");
 
 // SSO config holds IdP secrets — only owner/admin may read/write it.
-const callerIsAdmin = async (req) => {
-    const roleType = await getRoleType(companyOf(req), req.uid);
-    return isPrivileged(roleType);
-};
+const callerIsAdmin = async (companyId, uid) => isPrivileged(await getRoleType(companyId, uid));
 
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
 const newVerificationToken = () => crypto.randomBytes(20).toString('hex');
@@ -38,9 +34,9 @@ const adminView = (cfg) => (cfg ? { ...cfg, domainRecords: domainRecordsOf(cfg) 
 /* GET /api/v2/sso/config — owner/admin: the full config (incl. secrets they own). */
 exports.getSsoConfig = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
-        if (!(await callerIsAdmin(req))) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        if (!(await callerIsAdmin(companyId, req.uid))) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
         const cfg = await withToken(companyId, await loadConfig(companyId));
         return res.send({ status: true, statusText: 'OK', data: adminView(cfg) });
     } catch (error) {
@@ -52,9 +48,9 @@ exports.getSsoConfig = async (req, res) => {
 /* PUT /api/v2/sso/config — owner/admin: upsert the config. */
 exports.setSsoConfig = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
-        if (!(await callerIsAdmin(req))) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        if (!(await callerIsAdmin(companyId, req.uid))) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
         const { provider, oidc, saml, isEnabled, autoProvisionUsers, defaultRoleType, displayName, domains, enforcement } = req.body || {};
         const check = validateSsoConfig({ provider, oidc, saml });
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
@@ -101,9 +97,9 @@ exports.setSsoConfig = async (req, res) => {
 /* POST /api/v2/sso/config/verify-domain — owner/admin: check the TXT record of one listed domain. */
 exports.verifySsoDomain = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
-        if (!(await callerIsAdmin(req))) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        if (!(await callerIsAdmin(companyId, req.uid))) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
         const domain = normalizeDomain(req.body && req.body.domain);
         const cfg = await withToken(companyId, await loadConfig(companyId));
         if (!cfg || !normalizeDomains(cfg.domains).includes(domain)) {
@@ -131,7 +127,7 @@ exports.verifySsoDomain = async (req, res) => {
 /* GET /api/v2/sso/public?companyId= — unauthenticated; login page only. No secrets. */
 exports.getPublicSsoConfig = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = req.headers['companyid'] || (req.query && req.query.companyId); // tenant-scoping: the login page asks before any session exists, and the answer is the secret-free public view
         if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
         const cfg = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.SSO_CONFIGS, data: [{ deletedStatusKey: 0, isEnabled: true }],
