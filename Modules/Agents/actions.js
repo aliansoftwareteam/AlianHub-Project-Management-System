@@ -14,6 +14,7 @@ const { emitPageChange } = require('../Pages/helpers/pageEvents');
 const { escapeCommentText } = require('../Comments/helpers/plainText');
 const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
 const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
+const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
 
 // The single place an agent's action is executed. MCP tools, approved proposals
 // and workspace-agent runs all call perform(): registry check → pending audit
@@ -216,6 +217,7 @@ const executors = {
         const ids = (Array.isArray(params.assigneeIds) ? params.assigneeIds : [params.assigneeId]).filter((v) => OBJECT_ID.test(String(v || ''))).map(String);
         if (!ids.length) throw new tools.DeterministicError('assigneeIds is required');
         const previous = (task.AssigneeUserId || []).map(String);
+        if ((await nonMembersOf(companyId, ids.filter((id) => !previous.includes(id)))).length) throw new tools.DeterministicError(`assigneeIds: ${NOT_A_MEMBER}`);
         const next = params.replace ? ids : [...new Set([...previous, ...ids])];
         const r = await tools.updateTask(companyId, task._id, { AssigneeUserId: next }, context(actor, 'task.assign', depth));
         return { result: { assignees: next }, undo: { kind: 'assign', taskId: String(task._id), previous }, entityId: task._id, entityName: task.TaskName, task: r.task };
