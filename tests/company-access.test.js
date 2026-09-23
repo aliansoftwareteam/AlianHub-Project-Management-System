@@ -113,6 +113,13 @@ describe('ACC-06 POST /api/v1/admin/company', () => {
         expect(res.body.map((company) => company._id)).toEqual([COMPANY]);
     });
 
+    it('returns nothing for a company whose seat is gone while the account still lists it', async () => {
+        seats[COMPANY] = seats[COMPANY].filter((seat) => seat.userId !== GUEST);
+        const res = await app.call('POST', '/api/v1/admin/company', { token: signSession(GUEST, []), body: { companyIds: [COMPANY] } });
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual([]);
+    });
+
     it('lets the instance owner list every company', async () => {
         const res = await app.call('POST', '/api/v1/admin/company', { token: signSession(OWNER, [COMPANY]), body: { fetchAllCompany: true, companyIds: [] } });
         expect(res.status).toBe(200);
@@ -128,6 +135,14 @@ describe('ACC-06 POST /api/v1/admin/company/find', () => {
         const pipeline = callsOf('aggregate')[0][1].data[0];
         expect(pipeline[0]).toEqual({ $match: { _id: { $in: [new mongoose.Types.ObjectId(COMPANY)] } } });
         expect(pipeline).toHaveLength(2);
+    });
+
+    it('pins the pipeline to no company once the member\'s seat is gone', async () => {
+        seats[COMPANY] = seats[COMPANY].filter((seat) => seat.userId !== GUEST);
+        const findQuery = [{ $match: {} }];
+        const res = await app.call('POST', '/api/v1/admin/company/find', { token: signSession(GUEST, []), body: { findQuery } });
+        expect(res.status).toBe(200);
+        expect(callsOf('aggregate')[0][1].data[0][0]).toEqual({ $match: { _id: { $in: [] } } });
     });
 
     it('refuses a member joining another collection', async () => {
