@@ -135,6 +135,18 @@ describe('Automations list on a phone', () => {
     });
 });
 
+describe('Custom report grouped by status', () => {
+    test('names the status types instead of printing default_active', async () => {
+        const en = (await import('../../src/locales/en.js')).default;
+        expect(en.Reports.status_type_default_active).toBe('To do');
+        expect(en.Reports.status_type_active).toBe('In progress');
+        expect(en.Reports.status_type_close).toBe('Closed');
+        const vue = read('views/CustomReports/CustomReports.vue');
+        expect(vue.match(/rows\.value = labelRows\(/g)).toHaveLength(2);
+        expect(vue).toMatch(/if \(key === 'status'\) return \{ key, label: `\$\{t\('Reports\.dim_status'\)\}/);
+    });
+});
+
 describe('Docs hub', () => {
     const vue = read('views/Pages/PagesSpace.vue');
     const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));
