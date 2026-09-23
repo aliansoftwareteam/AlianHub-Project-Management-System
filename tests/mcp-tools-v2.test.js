@@ -73,8 +73,8 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: SECRET_PROJECT, ProjectName: 'Skunkworks', isPrivateSpace: true });
     mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: SPRINT, name: 'Sprint 1', projectId: PROJECT });
     mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: PRIVATE_SPRINT, name: 'Hush sprint', projectId: PROJECT, private: true, AssigneeUserId: [MATE] });
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: USER, roleType: 'member' });
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MATE, roleType: 'member' });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: USER, roleType: 'member', status: 2 });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MATE, roleType: 'member', status: 2 });
     mockDb.seed(dbCollections.USERS, { _id: USER, Employee_Name: 'Mevil B' });
     mockDb.seed(dbCollections.USERS, { _id: MATE, Employee_Name: 'Asha K' });
     mockDb.seed(dbCollections.USERS, { _id: STRANGER, Employee_Name: 'Outsider' });
@@ -142,6 +142,13 @@ describe('names in results', () => {
     });
 
     it('does not name an assignee who is not a member of this company', async () => {
+        seedTask({ AssigneeUserId: [STRANGER] });
+        const { tasks } = await tools.call(ctxFor(), 'tasks.search', {});
+        expect(tasks[0].assignees).toEqual([{ id: STRANGER, name: null }]);
+    });
+
+    it('does not name someone who was only invited, whose invitation row carries their account id', async () => {
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: STRANGER, roleType: 'member', status: 1 });
         seedTask({ AssigneeUserId: [STRANGER] });
         const { tasks } = await tools.call(ctxFor(), 'tasks.search', {});
         expect(tasks[0].assignees).toEqual([{ id: STRANGER, name: null }]);
