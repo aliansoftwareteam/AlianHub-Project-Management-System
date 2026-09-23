@@ -5,6 +5,8 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const socketEmitter = require('../../event/socketEventEmitter');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
+const { dbCollections } = require('../../Config/collections');
 const {
     canReview, parsePeriod, validateSubmitInput, resolveTransition, validateReason, isObjectIdString,
 } = require('./helpers/approvalRules');
@@ -39,6 +41,16 @@ const computePeriodTotals = async (companyId, userId, periodStart, periodEnd) =>
     return { totalMinutes, entryCount: list.length };
 };
 
+const reviewerNameOf = async (uid) => {
+    if (!isObjectIdString(uid)) return '';
+    const user = await MongoDbCrudOpration(dbCollections.GLOBAL, {
+        type: SCHEMA_TYPE.USERS,
+        data: [{ _id: new mongoose.Types.ObjectId(uid) }, { Employee_Name: 1, Employee_FName: 1, Employee_LName: 1 }],
+    }, 'findOne').catch(() => null);
+    if (!user) return '';
+    return user.Employee_Name || [user.Employee_FName, user.Employee_LName].filter(Boolean).join(' ');
+};
+
 /* Resolve whether the caller can review (owner/admin). { ok, roleType }. */
 const callerCanReview = async (req) => {
     const roleType = await getRoleType(sessionTenantOf(req), actorId(req));
@@ -55,7 +67,7 @@ const readTargetOf = async (req) => {
 };
 
 /* POST /api/v2/timesheet-approval/submit
- * body: { periodStart, periodEnd, periodType?, note?, userId?, userData } */
+ * body: { periodStart, periodEnd, periodType?, note?, userId? } */
 exports.submitTimesheet = async (req, res) => {
     try {
         const companyId = sessionTenantOf(req);
@@ -69,6 +81,9 @@ exports.submitTimesheet = async (req, res) => {
         if (targetUserId !== uid) {
             const { ok } = await callerCanReview(req);
             if (!ok) return res.send({ status: false, statusText: 'You can only submit your own timesheet.' });
+            if ((await nonMembersOf(companyId, [targetUserId])).length) {
+                return res.status(400).send({ status: false, statusText: NOT_A_MEMBER });
+            }
         }
         const check = validateSubmitInput({ userId: targetUserId, periodStart, periodEnd, note });
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
@@ -171,7 +186,7 @@ exports.listPending = async (req, res) => {
     }
 };
 
-/* POST /api/v2/timesheet-approval/:id/review  body: { action, reason?, userData } */
+/* POST /api/v2/timesheet-approval/:id/review  body: { action, reason? } */
 exports.reviewTimesheet = async (req, res) => {
     try {
         const companyId = sessionTenantOf(req);
@@ -183,7 +198,7 @@ exports.reviewTimesheet = async (req, res) => {
         const { ok } = await callerCanReview(req);
         if (!ok) return res.send({ status: false, statusText: 'Only an owner or admin can review timesheets.' });
 
-        const { action, reason, userData } = req.body || {};
+        const { action, reason } = req.body || {};
         const doc = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
             data: [{ _id: new mongoose.Types.ObjectId(id), deletedStatusKey: 0 }],
@@ -193,7 +208,7 @@ exports.reviewTimesheet = async (req, res) => {
         const transition = resolveTransition({ from: doc.status, action });
         if (!transition.valid) return res.send({ status: false, statusText: transition.reason });
 
-        const reviewerName = userData && userData.name ? String(userData.name) : '';
+        const reviewerName = await reviewerNameOf(uid);
         const update = { status: transition.to };
         if (action === 'reject') {
             const reasonCheck = validateReason(reason);
@@ -226,7 +241,6 @@ exports.reviewTimesheet = async (req, res) => {
     }
 };
 
-const { dbCollections } = require('../../Config/collections');
 const { summarize: billableSplit } = require('../TimeSheet/helpers/billableRules');
 const pto = require('../Pto/helpers/ptoRules');
 

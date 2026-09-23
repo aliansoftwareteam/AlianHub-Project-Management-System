@@ -136,18 +136,15 @@ import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
 import EstimateHourTable from '@/components/molecules/EstimateHourTable/EstimateHourTable.vue';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 
-import { useConvertDate, useCustomComposable, useGetterFunctions, useMoment } from '@/composable';
+import { useConvertDate, useCustomComposable } from '@/composable';
 import { useToast } from 'vue-toast-notification';
 import * as env from '@/config/env';
-import { estimatedTimeAdded, estimatedTimeAssignAdded, estimatedTimeAssignUpdated, estimatedTimeUpdated } from '@/utils/NotificationTemplate';
 import { apiRequest } from '../../../services';
 import { useI18n } from "vue-i18n";
 import { isOwnerOrAdmin } from "@/utils/roles";
 const { t } = useI18n();
 
-const {getUser} = useGetterFunctions()
 const {convertDateFormat} = useConvertDate()
-const {changeDateFormate} = useMoment();
 const { getters } = useStore();
 
 defineEmits(['update:dueDate', 'update:startDate'])
@@ -172,10 +169,9 @@ const props = defineProps({
     }
 });
 
-const { checkPermission, addZero } = useCustomComposable();
+const { checkPermission } = useCustomComposable();
 const $toast = useToast();
 const userId = inject('$userId');
-const companyId = inject('$companyId');
 const clientWidth = inject("$clientWidth");
 const currentCompany = computed(() => getters["settings/selectedCompany"])
 const companyUser = ref(getters['settings/companyUserDetail']);
@@ -260,87 +256,11 @@ function showEtaSidebar() {
     }
 }
 
-function getUserData(uid) {
-    let user = getUser(uid);
-    return {
-        id: user._id,
-        Employee_Name: user.Employee_Name,
-        companyOwnerId: user.companyOwnerId,
-    };
-}
 async function saveEta() {
     if(updatedEta.value.length) {
         const estimates = JSON.parse(JSON.stringify(updatedEta.value));
         updatedEta.value = [];
         savingETA.value = true;
-
-        const currentUser = getUserData(userId.value);
-        const saveHistory = (data, update = false) => {
-            const userData = getUserData(data.UserId);
-            const time = `${addZero(Math.floor(data.minutes/60))}:${addZero(Math.floor(data.minutes%60))}`
-            const prevTime = data.prevTime ? `${addZero(Math.floor(data.prevTime/60))}:${addZero(Math.floor(data.prevTime%60))}` : '';
-            let historyObj = {
-                sprintId: props.task.sprintId,
-                key: "Task_Due_Date",
-            };
-            const notificationObj = {
-                loggedUserName: userData.Employee_Name,
-                estimatedTime: prevTime,
-                updateEstimatedTime: time,
-                timeDateData: changeDateFormate(data.timeStamp, 'DD/MM/yyyy'),
-                TaskName: props.task.TaskName,
-                ProjectName: projectData.value.ProjectName,
-            }
-            const finalNotification = {
-                key: "task_estimated_hours",
-            };
-            if(data.UserId === currentUser.id) {
-                if(!update) {
-                    finalNotification.message = estimatedTimeUpdated(notificationObj);
-                    historyObj.message= `<b>${userData.Employee_Name}</b> has added <b>hrs(${time})</b> <b>estimated time</b> for<b> ${notificationObj.timeDateData}</b>.`;
-                } else {
-                    finalNotification.message = estimatedTimeAdded(notificationObj);
-                    historyObj.message= `<b>${userData.Employee_Name}</b> has updated <b>estimated time</b> for <b>${notificationObj.timeDateData}</b> from <b>hrs(${prevTime})</b> to <b>hrs(${time})</b>.`;
-                }
-            } else {
-                notificationObj.userName = currentUser.Employee_Name
-                if(!update) {
-                    finalNotification.message = estimatedTimeAssignUpdated(notificationObj);
-                    historyObj.message= `<b>${currentUser.Employee_Name}</b> updated the <b>estimated time</b> of <b>${userData.Employee_Name}</b> for <b>${notificationObj.timeDateData}</b> from <b>${prevTime}</b> to <b>${time}</b>.`;
-                } else {
-                    finalNotification.message = estimatedTimeAssignAdded(notificationObj);
-                    historyObj.message= `<b>${currentUser.Employee_Name}</b> added <b>hrs(${time})</b> in <b>estimated time</b> of <b>${userData.Employee_Name}</b> for <b>${notificationObj.timeDateData}</b> </b>.`;
-                }
-            }
-
-            // HISTORY
-            apiRequest("post", env.HANDLE_HISTORY, {
-                type: "task",
-                companyId: companyId.value,
-                projectId: props.task.ProjectID,
-                taskId: props.task._id,
-                object: historyObj,
-                userData: currentUser
-            })
-            .catch((error) => {
-                console.error("ERROR in save history: ", error);
-            })
-
-            // NOTIFICATION
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: "tasks",
-                companyId: companyId.value,
-                projectId: props.task.ProjectID,
-                taskId: props.task._id,
-                folderId: props.task?.folderObjId ? props.task?.folderObjId : '',
-                sprintId: props.task.sprintId || '',
-                userData: currentUser,
-                object: finalNotification
-            })
-            .catch((error) => {
-                console.error("ERROR in send notification: ", error);
-            })
-        }
 
         const saves = estimates.map((data) => {
             const planObj = {
@@ -348,7 +268,8 @@ async function saveEta() {
                 taskId: props.task._id,
                 projectId: props.task.ProjectID,
                 minutes: data.minutes,
-                date: new Date(data.timeStamp).toISOString()
+                date: new Date(data.timeStamp).toISOString(),
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             }
 
             const isUpdate = !!(data.id && data.id != null);
@@ -366,11 +287,6 @@ async function saveEta() {
                     }
                     if(!isUpdate) {
                         data.id = docData._id;
-                    }
-                    try {
-                        saveHistory(data, isUpdate);
-                    } catch (error) {
-                        console.error("ERROR", error);
                     }
                 })
                 .catch((error) => {

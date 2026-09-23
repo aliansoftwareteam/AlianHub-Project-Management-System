@@ -67,7 +67,6 @@ const verifyJWTTokenWithCRoute = [
     "/api/v2/custom-fields",
     "/api/v2/single-notification-email",
     "/api/v2/prepare-notification-data",
-    "/api/v2/email-cron-handler",
     "/api/v2/sendInvitationEmail",
     "/api/v2/epics",
     "/api/v2/exports",

@@ -2,6 +2,8 @@
 // tests/scim-rules.test.js. Keeping all parsing/shaping here means the
 // controller + provisioning layers stay thin and the tricky bits are covered.
 
+const { SEAT_PENDING, SEAT_CANCELLED } = require('../../../Config/seatStatus');
+
 const USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const LIST_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:ListResponse';
 const ERROR_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:Error';
@@ -61,23 +63,33 @@ const isActive = (companyUser) => {
     return true;
 };
 
+/* An invitation that is pending or withdrawn is not a membership: the person's shared record stays theirs. */
+const sharedRecordVisible = (companyUser) => {
+    const status = companyUser ? Number(companyUser.status) : NaN;
+    return status !== SEAT_PENDING && status !== SEAT_CANCELLED;
+};
+
 // AlianHub (global user + per-company membership) → SCIM User resource.
 const toScimUser = (globalUser, companyUser, baseUrl) => {
-    const u = globalUser || {};
     const cu = companyUser || {};
-    const id = String(u._id || cu.userId || '');
+    const visible = sharedRecordVisible(cu);
+    const u = visible ? (globalUser || {}) : {};
+    const id = String((visible && (u._id || cu.userId)) || cu._id || '');
     const email = u.Employee_Email || cu.userEmail || '';
+    const renamed = cu.scimGivenName !== undefined || cu.scimFamilyName !== undefined;
+    const givenName = cu.scimGivenName !== undefined ? cu.scimGivenName : (u.Employee_FName || '');
+    const familyName = cu.scimFamilyName !== undefined ? cu.scimFamilyName : (u.Employee_LName || '');
     const resource = {
         schemas: [USER_SCHEMA],
         id,
         userName: email,
         name: {
-            givenName: u.Employee_FName || '',
-            familyName: u.Employee_LName || '',
-            formatted: u.Employee_Name || email,
+            givenName,
+            familyName,
+            formatted: (renamed ? `${givenName} ${familyName}`.trim() : u.Employee_Name) || email,
         },
         emails: email ? [{ value: email, primary: true }] : [],
-        active: isActive(cu),
+        active: visible && isActive(cu),
         meta: { resourceType: 'User' },
     };
     if (baseUrl) resource.meta.location = `${baseUrl}/Users/${id}`;
@@ -129,5 +141,5 @@ const parsePatchOps = (body) => {
 module.exports = {
     USER_SCHEMA, LIST_SCHEMA, ERROR_SCHEMA, PATCH_SCHEMA,
     buildScimToken, parseScimToken, coerceBool, extractEmail, parseUserNameFilter,
-    isActive, toScimUser, listResponse, scimError, parsePatchOps,
+    isActive, sharedRecordVisible, toScimUser, listResponse, scimError, parsePatchOps,
 };

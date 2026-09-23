@@ -75,6 +75,7 @@ const registerAdmin = async (firstName, lastName) => {
     const anon = createApiClient({ baseURL: state.baseURL });
     assertOk(await anon.post('/api/v2/createUser', {
         firstName, lastName, email, password: PASSWORD, isInvitation: true, assignCompany: state.companyId,
+        memberId: String(row._id), linkId: row.linkId,
     }), `register ${email}`);
 
     const session = await login(state.baseURL, email);
