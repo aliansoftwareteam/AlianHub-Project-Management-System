@@ -179,6 +179,14 @@ describe('My settings → working hours', () => {
     });
 });
 
+describe('Team on a phone', () => {
+    test('the headline counts give way so both toolbar buttons fit', () => {
+        const css = read('views/Team/style.css');
+        const phone = css.slice(css.indexOf('@media (max-width: 767px)'));
+        expect(ruleBody(phone, '.team .parity-count')).toMatch(/display:\s*none/);
+    });
+});
+
 describe('Docs hub', () => {
     const vue = read('views/Pages/PagesSpace.vue');
     const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));
