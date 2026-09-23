@@ -22,6 +22,11 @@ describe('tenant ids come from the companyid header, not the request body or que
         expect(stale).toEqual([]);
         expect(total(current)).toBeLessThanOrEqual(total(baseline));
     });
+
+    it('leave no module on the baseline: every remaining read is annotated with its reason', () => {
+        expect(current).toEqual({});
+        expect(baseline).toEqual({});
+    });
 });
 
 describe('a read that is correct by design carries its reason on the same line', () => {
