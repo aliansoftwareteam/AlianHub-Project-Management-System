@@ -9,6 +9,7 @@ const { createNotificationsBody } = require('../notification/prepare-notificatio
 const sendMail = require('../service.js');
 
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
+const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
 const failed = (res, where, e) => {
     if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
     logger.error(`${where}: ${e.message}`);
@@ -69,6 +70,9 @@ exports.createPto = async (req, res) => {
         const privileged = isPrivileged(roleType);
         const body = req.body || {};
         const targetUser = privileged && body.userId ? String(body.userId) : String(req.uid);
+        if (targetUser !== String(req.uid) && (await nonMembersOf(companyId, [targetUser])).length) {
+            return res.status(400).json({ status: false, statusText: NOT_A_MEMBER });
+        }
         const status = privileged && body.status ? body.status : 'pending';
         const check = R.validatePtoEntry({ ...body, userId: targetUser, status });
         if (!check.valid) return res.status(400).json({ status: false, statusText: check.errors.join('; ') });

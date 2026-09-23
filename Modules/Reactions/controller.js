@@ -4,6 +4,12 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const socketEmitter = require('../../event/socketEventEmitter');
 const { validateReactionInput } = require('./helpers/reactionRules');
+const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
+const { canChangeComment } = require('../Comments/helpers/threadWriteAccess');
+
+const canReadTarget = async (companyId, uid, targetType, doc) => (targetType === 'task'
+    ? canReadTask(companyId, uid, doc)
+    : (await canChangeComment(companyId, uid, doc)).allowed);
 
 // Emoji reactions on tasks and comments. Reactions live as an embedded
 // array on the target document — `reactions: [{ emoji, userId, createdAt }]`,
@@ -13,14 +19,14 @@ const { validateReactionInput } = require('./helpers/reactionRules');
 
 /**
  * POST /api/v2/reactions
- * body: { targetType: 'task'|'comment', targetId, emoji, userData, isProjectComment? }
- * companyId comes from the verified header (same convention as /api/v2/tasks/bulk).
+ * body: { targetType: 'task'|'comment', targetId, emoji, isProjectComment? }
+ * The reactor is the authenticated caller, and the target must be one they can read.
  */
 exports.toggleReaction = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
-        const { targetType, targetId, emoji, userData, isProjectComment = false } = req.body || {};
-        const userId = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
+        const { targetType, targetId, emoji, isProjectComment = false } = req.body || {};
+        const userId = String(req.uid || '');
 
         const check = validateReactionInput({ companyId, targetType, targetId, emoji, userId });
         if (!check.valid) {
@@ -31,8 +37,8 @@ exports.toggleReaction = async (req, res) => {
         const targetObjId = new mongoose.Types.ObjectId(targetId);
 
         const doc = await MongoDbCrudOpration(companyId, { type: schemaType, data: [{ _id: targetObjId }] }, 'findOne');
-        if (!doc) {
-            return res.send({ status: false, statusText: 'Target not found.' });
+        if (!doc || !(await canReadTarget(companyId, userId, targetType, doc))) {
+            return res.status(404).json({ status: false, statusText: 'Target not found.' });
         }
 
         const alreadyReacted = (doc.reactions || []).some((reaction) => reaction.emoji === emoji && String(reaction.userId) === userId);

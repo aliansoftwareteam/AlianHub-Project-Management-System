@@ -104,4 +104,18 @@ describe('EstimateHours save', () => {
         expect(toast.success).toHaveBeenCalledWith('Toast.Estimated_time_updated_successfully', { position: 'top-right' });
         expect(toast.error).not.toHaveBeenCalled();
     });
+
+    it('leaves the history and notification text to the server and sends its time zone', async () => {
+        apiRequest.mockImplementation((method) => (method === 'put'
+            ? Promise.resolve({ data: { _id: 'eta-1', Date: estimate.timeStamp, UserId: 'user-1', EstimatedTime: 90 } })
+            : Promise.resolve({ data: [] })));
+
+        const wrapper = await openPlanner();
+        await save(wrapper);
+
+        expect(apiRequest).toHaveBeenCalledWith('put', expect.any(String), expect.objectContaining({
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        }));
+        expect(apiRequest.mock.calls.filter(([method]) => method === 'post')).toEqual([]);
+    });
 });

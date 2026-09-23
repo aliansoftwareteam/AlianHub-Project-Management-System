@@ -7,6 +7,7 @@ jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     MongoDbCrudOpration: async (dbName, { type, data }) => {
         const [query] = data;
+        if (type === 'timesheets') return { Loggeduser: mockAccess.sessionOwner };
         const seated = type === 'company_users' && query.status === 2 && (mockAccess.seats[dbName] || []).includes(String(query.userId));
         return seated ? { _id: 'seat' } : null;
     },
@@ -58,6 +59,7 @@ afterAll(() => {
 beforeEach(() => {
     mockAccess.assigned = { [USER]: [COMPANY_A, COMPANY_B] };
     mockAccess.seats = { [COMPANY_A]: [USER], [COMPANY_B]: [USER] };
+    mockAccess.sessionOwner = USER;
 });
 
 /* Same fields, in the same order, as TrackerController.ScreenShotCapture in time-tracker-app. */

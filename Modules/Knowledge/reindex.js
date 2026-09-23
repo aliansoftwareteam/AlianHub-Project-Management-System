@@ -13,8 +13,10 @@ const backfill = require('./ingest/backfill');
 // chunks only while that status is complete, so resetting it would leave guides and files with
 // nothing to answer from until the walk finished. Each chunk is rewritten in place instead.
 //
-// One server walks at a time, under a lease on the state row that it renews as it goes; another
-// server's job passes a leased walk over and takes up one whose lease ran out.
+// One server walks at a time, under a lease on the state row that it renews as it goes, between
+// rows and, for files, after each attachment of a task, since one task can carry many slow
+// extractions. Another server's job passes a leased walk over and takes up one whose lease ran out;
+// renewing only on progress means a walker stuck on one file still loses the walk.
 
 const RUNNING = 'running';
 const COMPLETE = 'complete';
@@ -109,18 +111,25 @@ const runSource = async (companyId, sourceType, { batchSize = backfill.BATCH_SIZ
     let cursor = state.reindexCursor || '';
     let synced = Number(state.reindexSynced) || 0;
     let renewedAt = Date.now();
+    let lost = false;
     const hold = async () => {
-        renewedAt = Date.now();
-        const held = await indexState(company, [mine, { $set: { reindexLeaseUntil: new Date(renewedAt + LEASE_MS) } }], 'updateOne');
-        return Boolean(held && held.matchedCount);
+        if (lost) return false;
+        const at = Date.now();
+        const held = await indexState(company, [mine, { $set: { reindexLeaseUntil: new Date(at + LEASE_MS) } }], 'updateOne');
+        if (held && held.matchedCount) renewedAt = at;
+        else lost = true;
+        return !lost;
     };
-    const renew = () => (Date.now() - renewedAt < LEASE_MS / 3 ? true : hold());
+    const renew = async () => {
+        if (lost) return false;
+        return Date.now() - renewedAt < LEASE_MS / 3 ? true : hold();
+    };
     try {
         for (let batch = 0; batch < maxBatches; batch += 1) {
             if (batch > 0 && !(await hold())) return null;
             const rows = (await batchOf(company, candidate, cursor, batchSize)) || [];
             for (const row of rows) {
-                await candidate.apply(company, String(row._id));
+                await candidate.apply(company, String(row._id), { onProgress: renew });
                 synced += 1;
                 if (!(await renew())) return null;
             }

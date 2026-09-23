@@ -564,11 +564,13 @@ describe('the cost of the figures', () => {
     it('are cached per workspace for a short time, and read again on refresh or after a control', async () => {
         seedChunk(CID_A);
         await asOwner('GET', `${BASE}/${CID_A}`);
+        const perRead = aggregates().length;
+        expect(perRead).toBeGreaterThan(0);
         const second = await asOwner('GET', `${BASE}/${CID_A}`);
-        expect(aggregates()).toHaveLength(1);
+        expect(aggregates()).toHaveLength(perRead);
         expect(second.body.data.cachedAt).toEqual(expect.any(String));
         await asOwner('GET', `${BASE}/${CID_A}?refresh=1`);
-        expect(aggregates()).toHaveLength(2);
+        expect(aggregates()).toHaveLength(2 * perRead);
         await asOwner('POST', `${BASE}/${CID_A}/erase/document`, { sourceType: 'page', sourceId: PAGE, confirm: PAGE });
         const after = await asOwner('GET', `${BASE}/${CID_A}`);
         expect(after.body.data.totals.chunks).toBe(0);
@@ -597,13 +599,17 @@ describe('the cost of the figures', () => {
         expect(res.body.code).toBe(CODE.FIGURES_TIMED_OUT);
     });
 
-    it('start from an indexed match and never bring whole rows or vectors into the pipeline', async () => {
+    it('start from an indexed match and never bring whole rows, text or vectors into the pipeline', async () => {
         seedChunk(CID_A, { embedding: [1, 2, 3], embeddingModel: 'm' });
         await asOwner('GET', `${BASE}/${CID_A}`);
-        const [pipeline] = aggregates().at(-1).data;
-        expect(Object.keys(pipeline[0])).toEqual(['$match']);
-        expect(pipeline[0].$match).toEqual({ sourceType: { $in: expect.arrayContaining(['page']) } });
-        expect(JSON.stringify(pipeline)).not.toMatch(/\$\$ROOT|\$bsonSize|"embedding"|"\$embedding"/);
+        const pipelines = aggregates().map((call) => call.data[0]);
+        expect(pipelines.length).toBeGreaterThan(0);
+        pipelines.forEach((pipeline) => {
+            expect(Object.keys(pipeline[0])).toEqual(['$match']);
+            expect(pipeline[0].$match.sourceType).toBeDefined();
+            expect(JSON.stringify(pipeline)).not.toMatch(/\$\$ROOT|\$bsonSize|\$strLenBytes|"embedding"|"\$embedding"|"\$text"/);
+        });
+        expect(pipelines[0][0].$match).toEqual({ sourceType: { $in: expect.arrayContaining(['page']) } });
     });
 });
 
