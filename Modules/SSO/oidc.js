@@ -37,7 +37,7 @@ const buildClient = async (cfg) => {
 /* GET /api/v2/sso/oidc/initiate?companyId= — redirect the user to the IdP. */
 exports.oidcInitiate = async (req, res) => {
     try {
-        const companyId = req.query.companyId || req.headers['companyid'];
+        const companyId = req.query.companyId || req.headers['companyid']; // tenant-scoping: sign-in starts before any session; the company only picks the IdP, and the one-time state binds the callback to it
         if (!companyId) return res.status(400).send('companyId is required');
         const cfg = await loadConfig(companyId);
         if (!cfg || cfg.provider !== 'oidc') return res.status(404).send('OIDC SSO is not configured for this company');

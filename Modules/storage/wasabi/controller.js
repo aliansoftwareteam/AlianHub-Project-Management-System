@@ -11,7 +11,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { default: mongoose } = require('mongoose');
 const {myCache, requestHandler} = require('../../../Config/config');
 const { updateCompanyFun, getCompanyDataFun } = require('../../Company/controller/updateCompany.js');
-const { isProfileUpload } = require('../bucketAccess');
+const { isProfileUpload, refuseUnverifiedBucket } = require('../bucketAccess');
 const { logUploadFailures } = require('../uploadFailures');
 /**
  * S3 client configuration for create bucket
@@ -474,13 +474,8 @@ exports.createCompanyDataWasabi =  (companyId, fileName, fileString) => {
  */
 exports.getPresignedUrl  = async (req,res) => {
     try {
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: `Company Id is required`
-            })
-            return;
-        }
+        const bucketId = req.storageBucket;
+        if (!bucketId) return refuseUnverifiedBucket(res);
 
         if (!(req.body && req.body.path)) {
             res.send({
@@ -490,18 +485,8 @@ exports.getPresignedUrl  = async (req,res) => {
             return;
         }
 
-        const aud = req?.aud || "";
-        const isAllowed = aud.split(",").includes(req.body.companyId);
-
-        if (!isAllowed) {
-            res.send({
-                status: false,
-                statusText: `You don't have access to requested bucket`
-            });
-            return;
-        }
         const command = new GetObjectCommand({
-            Bucket: req.body.companyId,
+            Bucket: bucketId,
             Key: req.body.path,
         });
         if (req.body.isCache === true) {
@@ -868,15 +853,10 @@ exports.uploadFileWasabi = async (req,res) => {
         });
         return;
     }
+    const bucketId = req.storageBucket;
+    if (!bucketId) return refuseUnverifiedBucket(res);
     const isUserProfile = isProfileUpload(req.body);
-    if (!isUserProfile && !req.body.companyId) {
-        res.send({
-            status: false,
-            statusText: 'Company id is required'
-        });
-        return;
-    }
-    exports.uploadFileWasabiPromise(req.body.companyId,req.body.path,req.file.path, req.body.replaceFile,req.file,req.body.key,isUserProfile).then((fileName)=>{
+    exports.uploadFileWasabiPromise(bucketId,req.body.path,req.file.path, req.body.replaceFile,req.file,req.body.key,isUserProfile).then((fileName)=>{
         res.send({
             status: true,
             statusText: fileName
@@ -898,13 +878,8 @@ exports.uploadFileWasabi = async (req,res) => {
  * @returns
  */
 exports.deleteFileWasabi = async (req, res) => {
-    if (!(req.body && req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: `Company Id is required`
-        })
-        return;
-    }
+    const bucketId = req.storageBucket;
+    if (!bucketId) return refuseUnverifiedBucket(res);
 
     if (!(req.body && req.body.path)) {
         res.send({
@@ -914,16 +889,8 @@ exports.deleteFileWasabi = async (req, res) => {
         return;
     }
 
-    if (!req.aud.split(",").includes(req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: `You don't have access to requested bucket`
-        });
-        return;
-    }
-
     const command = new DeleteObjectCommand({
-        Bucket: req.body.companyId,
+        Bucket: bucketId,
         Key: req.body.path,
     });
 

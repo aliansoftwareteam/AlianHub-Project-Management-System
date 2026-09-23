@@ -163,16 +163,12 @@ exports.handleTaskTypeImageGet = async (req,res) => {
             });
             return;
         }
-        if(!(req.body || req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: 'companyId is required'
-            });
-            return;
+        if (!req.storageBucket) {
+            return res.status(403).send({ status: false, statusText: 'You do not have access to this bucket' });
         }
-        
+
         const domainUrl = `${req.protocol}://${req.get('host')}`;
-        const signedUrl = await generateSignedUrl(req.body.companyId, req.body.path, domainUrl);
+        const signedUrl = await generateSignedUrl(req.storageBucket, req.body.path, domainUrl);
 
         if(signedUrl) {
             return res.status(200).send({ status:true ,statusText: signedUrl });

@@ -30,7 +30,8 @@ const workflows = require('../Workflows');
 const knowledgeMemory = require('../Knowledge/memory/publish');
 const { DEFAULT_RATE_LIMIT_PER_DAY } = require('./dailyRunLimit');
 
-const companyOf = (req) => req.headers['companyid'] || (req.query && req.query.companyId) || '';
+// Every /api/v2/agents route sits behind the company-header JWT check, so the header is the verified tenant.
+const companyOf = (req) => String(req.headers['companyid'] || '');
 // 'mention' is a run started by @naming the agent in a comment (13b); it is
 // recorded because "who asked for this" is the first question about any run.
 const TRIGGERS = ['manual', 'mention', 'schedule', 'rule', 'assignment'];

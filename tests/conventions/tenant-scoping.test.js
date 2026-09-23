@@ -1,5 +1,5 @@
 const path = require('path');
-const { countTenantReads } = require('./tenant-reads');
+const { countTenantReads, countTenantReadsIn } = require('./tenant-reads');
 const baseline = require('./tenant-scoping.baseline.json');
 
 const MODULES = path.join(__dirname, '..', '..', 'Modules');
@@ -21,5 +21,32 @@ describe('tenant ids come from the companyid header, not the request body or que
         const stale = Object.entries(baseline).filter(([file, n]) => (current[file] || 0) < n).map(([file, n]) => `${file}: ${n} -> ${current[file] || 0}`);
         expect(stale).toEqual([]);
         expect(total(current)).toBeLessThanOrEqual(total(baseline));
+    });
+
+    it('leave no module on the baseline: every remaining read is annotated with its reason', () => {
+        expect(current).toEqual({});
+        expect(baseline).toEqual({});
+    });
+});
+
+describe('a read that is correct by design carries its reason on the same line', () => {
+    it('is not counted when the line says why', () => {
+        expect(countTenantReadsIn('const id = req.query.companyId; // tenant-scoping: pre-session, bound by the signed IdP response')).toBe(0);
+    });
+
+    it('is still counted when the note gives no reason', () => {
+        expect(countTenantReadsIn('const id = req.query.companyId; // tenant-scoping:')).toBe(1);
+        expect(countTenantReadsIn('const id = req.query.companyId; // tenant-scoping: ok')).toBe(1);
+    });
+
+    it('covers only its own line', () => {
+        expect(countTenantReadsIn([
+            '// tenant-scoping: pre-session, bound by the signed IdP response',
+            'const id = req.body.companyId;',
+        ].join('\n'))).toBe(1);
+    });
+
+    it('still counts every unannotated read', () => {
+        expect(countTenantReadsIn('f(req.body.companyId, req.query.CompanyId);\ng(req.body.CompanyId);')).toBe(3);
     });
 });
