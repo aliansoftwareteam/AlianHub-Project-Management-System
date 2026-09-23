@@ -185,16 +185,38 @@ describe('signup honours assignCompany only with a pending invitation', () => {
         expect(String(query.data[0]._id)).toBe(MEMBER_ROW);
     });
 
+    const TOKEN = 'c'.repeat(64);
+    const invited = (extra) => ({ email: 'x@y.z', assignCompany: COMPANY, isInvitation: true, ...extra });
+
     it('drops the company and the verified flag without an invitation', async () => {
         MongoDbCrudOpration.mockResolvedValue(null);
-        const admitted = await createUser.admitInvitee({ email: 'x@y.z', assignCompany: COMPANY, isInvitation: true });
+        const admitted = await createUser.admitInvitee(invited({ memberId: MEMBER_ROW, linkId: TOKEN }));
         expect(admitted).toMatchObject({ assignCompany: '', isInvitation: false });
     });
 
-    it('keeps the company for an invited email', async () => {
-        MongoDbCrudOpration.mockResolvedValue({ _id: MEMBER_ROW });
-        const admitted = await createUser.admitInvitee({ email: 'x@y.z', assignCompany: COMPANY, isInvitation: true });
+    it('keeps the company for the invitation the link names, with its token', async () => {
+        MongoDbCrudOpration.mockResolvedValue({ _id: MEMBER_ROW, linkId: TOKEN });
+        const admitted = await createUser.admitInvitee(invited({ memberId: MEMBER_ROW, linkId: TOKEN }));
         expect(admitted).toMatchObject({ assignCompany: COMPANY, isInvitation: true });
+        expect(admitted).not.toHaveProperty('memberId');
+        expect(admitted).not.toHaveProperty('linkId');
+        expect(String(MongoDbCrudOpration.mock.calls[0][1].data[0]._id)).toBe(MEMBER_ROW);
+    });
+
+    it.each([
+        ['no invitation id or token', {}],
+        ['no token', { memberId: MEMBER_ROW }],
+        ['a wrong token', { memberId: MEMBER_ROW, linkId: 'd'.repeat(64) }],
+    ])('drops the company for an invited email with %s', async (_label, extra) => {
+        MongoDbCrudOpration.mockResolvedValue({ _id: MEMBER_ROW, linkId: TOKEN });
+        const admitted = await createUser.admitInvitee(invited(extra));
+        expect(admitted).toMatchObject({ assignCompany: '', isInvitation: false });
+    });
+
+    it('drops the company when the invitation stores no token', async () => {
+        MongoDbCrudOpration.mockResolvedValue({ _id: MEMBER_ROW, linkId: '' });
+        const admitted = await createUser.admitInvitee(invited({ memberId: MEMBER_ROW, linkId: '' }));
+        expect(admitted).toMatchObject({ assignCompany: '', isInvitation: false });
     });
 
     it('never marks a plain signup verified', async () => {
@@ -212,18 +234,25 @@ describe('invitationPreview', () => {
         expect(MongoDbCrudOpration).not.toHaveBeenCalled();
     });
 
-    it('shows the email of a pending invitation', async () => {
-        MongoDbCrudOpration.mockResolvedValueOnce({ Cst_CompanyName: 'Acme' }).mockResolvedValueOnce({ status: 1, userEmail: 'new@example.com' });
+    const TOKEN = 'e'.repeat(64);
+
+    it('shows the email of a pending invitation to the holder of its token', async () => {
+        MongoDbCrudOpration.mockResolvedValueOnce({ status: 1, userEmail: 'new@example.com', linkId: TOKEN }).mockResolvedValueOnce({ Cst_CompanyName: 'Acme' });
         const res = response();
-        await invitationPreview(request({ body: { companyId: COMPANY, memberId: MEMBER_ROW } }), res);
+        await invitationPreview(request({ body: { companyId: COMPANY, memberId: MEMBER_ROW, linkId: TOKEN } }), res);
         expect(res.body.data).toEqual({ workspaceName: 'Acme', status: 1, email: 'new@example.com' });
     });
 
-    it('withholds the email once the invitation is used', async () => {
-        MongoDbCrudOpration.mockResolvedValueOnce({ Cst_CompanyName: 'Acme' }).mockResolvedValueOnce({ status: 2, userEmail: 'new@example.com' });
+    it.each([
+        ['used', { status: 2, linkId: TOKEN }],
+        ['removed', { status: 3, linkId: TOKEN }],
+        ['deleted', { status: 1, linkId: TOKEN, isDelete: true }],
+        ['stored without a token', { status: 1, linkId: '' }],
+    ])('refuses an invitation that is %s', async (_label, member) => {
+        MongoDbCrudOpration.mockResolvedValueOnce({ userEmail: 'new@example.com', ...member }).mockResolvedValueOnce({ Cst_CompanyName: 'Acme' });
         const res = response();
-        await invitationPreview(request({ body: { companyId: COMPANY, memberId: MEMBER_ROW } }), res);
-        expect(res.body.data.email).toBe('');
+        await invitationPreview(request({ body: { companyId: COMPANY, memberId: MEMBER_ROW, linkId: member.linkId } }), res);
+        expect(res.body).toEqual({ status: false, statusText: 'Invalid invitation link.' });
     });
 });
 

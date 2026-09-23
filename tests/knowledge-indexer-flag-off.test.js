@@ -130,6 +130,7 @@ describe('with KNOWLEDGE_INDEXER unset, nothing new runs, reads or writes', () =
         const comments = require('../Modules/Comments/controller');
         const { executors } = require('../Modules/Agents/actions');
         const { inverses } = require('../Modules/Agents/undo');
+        mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: '6f00000000000000000000d1', projectId: PROJECT, name: 'Open' });
         const task = mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Survey', CompanyId: C, ProjectID: PROJECT, sprintId: '6f00000000000000000000d1', deletedStatusKey: 0 });
         const commentListeners = ['comments:insert', 'comments:update', 'comments_project:insert', 'comments_project:update'].map((name) => socketEmitter.listenerCount(name));
         mockDb.calls.length = 0;

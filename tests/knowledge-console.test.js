@@ -46,8 +46,9 @@ const stateOf = (sourceType, companyId = C) => (db(companyId).store[STATE] || []
 let seq = 0;
 const chunk = (over = {}) => {
     seq += 1;
+    const text = over.text === undefined ? 'Some words here.' : over.text;
     return db(over.companyId || C).seed(CHUNKS, {
-        companyId: C, sourceType: 'page', sourceId: `6f00000000000000000${String(seq).padStart(5, '0')}`, ordinal: 0, text: 'Some words here.', contentHash: `h${seq}`,
+        companyId: C, sourceType: 'page', sourceId: `6f00000000000000000${String(seq).padStart(5, '0')}`, ordinal: 0, text, textBytes: Buffer.byteLength(text), contentHash: `h${seq}`,
         createdBy: ALICE, visibility: 'project', deleted: false, embedding: [], embeddingModel: null, updatedAt: new Date('2026-09-10T00:00:00Z'), ...over,
     });
 };

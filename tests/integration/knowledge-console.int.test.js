@@ -129,13 +129,25 @@ describe('the instance knowledge console', () => {
         ]));
     });
 
-    it('explains the figures aggregation: an index scan on source type, then a fetch of each chunk', async () => {
-        const { figuresPipeline } = require('../../Modules/Knowledge/figuresPipeline');
+    it('explains the figures aggregations over every chunk: answered from the figures index, no chunk fetched', async () => {
+        const { totalsPipeline, sourcesPipeline } = require('../../Modules/Knowledge/figuresPipeline');
         const chunks = tenant.collection('knowledge_chunks');
-        const types = await chunks.distinct('sourceType');
-        const plan = JSON.stringify(await chunks.aggregate(figuresPipeline(types, ['extract:failed'], 3)).explain('queryPlanner'));
-        expect(plan).toMatch(/IXSCAN/);
-        expect(plan).toMatch(/FETCH/);
-        expect(plan).not.toMatch(/COLLSCAN/);
+        const sourceId = `explain-${word}`;
+        await chunks.insertMany([0, 1, 2].map((ordinal) => ({
+            companyId: state.companyId, sourceType: 'page', sourceId, ordinal, text: 'x'.repeat(64), textBytes: 64, contentHash: `h${ordinal}`, deleted: false, embeddingModel: null, updatedAt: new Date(),
+        })));
+        try {
+            const types = await chunks.distinct('sourceType');
+            for (const pipeline of [totalsPipeline(types), sourcesPipeline(types)]) {
+                const plan = JSON.stringify(await chunks.aggregate(pipeline).explain('executionStats'));
+                expect(plan).toMatch(/sourceType_1_deleted_1_sourceId_1_embeddingModel_1_updatedAt_1_textBytes_1/);
+                expect(plan).not.toMatch(/COLLSCAN/);
+                expect(plan).toMatch(/"totalKeysExamined":[1-9]/);
+                expect(plan).toMatch(/"totalDocsExamined":0/);
+                expect(plan).not.toMatch(/"totalDocsExamined":[1-9]/);
+            }
+        } finally {
+            await chunks.deleteMany({ sourceType: 'page', sourceId });
+        }
     });
 });
