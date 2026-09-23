@@ -260,6 +260,9 @@ const executors = {
         if (running) return { result: { timesheetId: String(running._id), alreadyRunning: true }, undo: null, entityId: task._id, entityName: task.TaskName };
         const a = attribution(actor);
         const now = Math.floor(DateTime.utc().toSeconds());
+        if (await isPeriodLocked({ companyId, userId, date: new Date(now * 1000) })) {
+            throw new tools.DeterministicError('today is in an approved timesheet period, which is locked');
+        }
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: {
@@ -278,6 +281,10 @@ const executors = {
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [{ _id: oid(params.timesheetId), TicketID: String(task._id) }] }, 'findOne')
             : await findRunningTimer(companyId, task._id, actor.userId);
         if (!running) throw new tools.DeterministicError('no running timer on this task');
+        const startedAt = new Date((Number(running.LogStartTime) || 0) * 1000);
+        if (await isPeriodLocked({ companyId, userId: running.Loggeduser || actor.userId, date: startedAt })) {
+            throw new tools.DeterministicError('the timer started in an approved timesheet period, which is locked');
+        }
         const now = Math.floor(DateTime.utc().toSeconds());
         const minutes = Math.max(0, Math.round((now - Number(running.LogStartTime || now)) / 60));
         const set = { LogEndTime: now, LogTimeDuration: minutes };
