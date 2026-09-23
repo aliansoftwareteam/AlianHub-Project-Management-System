@@ -50,6 +50,16 @@ describe('Instance console tabs', () => {
     });
 });
 
+describe('Instance → Enforcement → content security policy card', () => {
+    const vue = read('views/Settings/Instance/InstanceCspCard.vue');
+
+    test('each report table scrolls inside its own box, so a phone never scrolls the console sideways', () => {
+        expect(ruleBody(vue, '.cs-scroll')).toMatch(/overflow-x:\s*auto/);
+        expect(ruleBody(vue, '.cs-scroll')).toMatch(/min-width:\s*0/);
+        expect(vue.match(/<div class="cs-scroll">\s*<table class="in-table">/g)).toHaveLength(2);
+    });
+});
+
 describe('Instance → Enforcement', () => {
     test('the workspace mode select keeps room for its value inside the table ("Rep" at 1280 px)', () => {
         expect(ruleBody(read('views/Settings/Instance/InstanceEnforcement.vue'), '.in-table .en-select')).toMatch(/min-width:\s*1[0-9]{2}px/);
