@@ -126,7 +126,7 @@ export async function logTime({ task, minutes, date, endAt, note, billable = tru
     };
     const res = await apiRequest('post', env.ADD_TIMELOG, payload);
     const body = (res && res.data) || {};
-    if (!body.status) throw new Error(body.statusText || 'log_failed');
+    if (!body.status) throw Object.assign(new Error(body.statusText || 'log_failed'), { code: body.code });
     return body.data;
 }
 

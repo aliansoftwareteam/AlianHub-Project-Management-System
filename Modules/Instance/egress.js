@@ -10,6 +10,8 @@ const { isBlockedHostname } = require('../Agents/engine/safeFetch');
 
 const LIST_CHANGED_ACTION = 'agent.egress_allowlist';
 const ADMIN_KEY_ACTOR = 'instance-admin-key';
+// Admin-key saves stored this before the key had an actor of its own.
+const LEGACY_ADMIN_KEY_ACTOR = 'key';
 const WINDOW_DAYS = 7;
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
@@ -31,6 +33,11 @@ const CODE = Object.freeze({
 
 const ok = (res, statusText, data) => res.send({ status: true, statusText, data });
 const fail = (res, status, code, statusText, data) => res.status(status).send({ status: false, statusText, code, ...(data ? { data } : {}) });
+
+const storedActor = (doc) => {
+    const by = (doc && doc.updatedBy) || '';
+    return by === LEGACY_ADMIN_KEY_ACTOR ? ADMIN_KEY_ACTOR : by;
+};
 
 const flagState = () => ({ on: egressContext.isOn(), envKey: egressContext.ENV_KEY });
 
@@ -67,7 +74,7 @@ const describeWorkspace = async (company, since) => {
         name: company.Cst_CompanyName || '',
         hosts: doc && Array.isArray(doc.hosts) ? doc.hosts.map(String) : [],
         updatedAt: (doc && doc.updatedAt) || null,
-        updatedBy: (doc && doc.updatedBy) || '',
+        updatedBy: storedActor(doc),
         refused7d: Number(refused7d) || 0,
         version: store.versionOf(doc),
     };
@@ -158,7 +165,7 @@ exports.setHosts = async (req, res) => {
         const changed = added.length > 0 || removed.length > 0;
         const saved = changed
             ? await store.replaceHosts(id, hosts, actorOf(req), expected)
-            : { hosts: before, updatedAt: (current && current.updatedAt) || null, updatedBy: (current && current.updatedBy) || '', version: expected };
+            : { hosts: before, updatedAt: (current && current.updatedAt) || null, updatedBy: storedActor(current), version: expected };
         if (!saved) return stale(store.versionOf(await store.readList(id)));
         // An emptied list reopens the workspace to every public host, so the row says so rather than leaving it to count: 0.
         const emptied = before.length > 0 && hosts.length === 0;

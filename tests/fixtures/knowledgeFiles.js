@@ -81,6 +81,35 @@ const xlsxOf = (sheets, { bookType = 'xlsx' } = {}) => {
     return XLSX.write(book, { type: 'buffer', bookType });
 };
 
+const XML_HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n';
+const SPREADSHEET_MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+
+/* A one-sheet workbook written part by part, as writers other than SheetJS lay it out: each row
+ * one cell from the shared strings table. `sheetName` and every string go into the XML as given,
+ * so a caller can write a character as a numeric reference. */
+const workbookXmlOf = ({ sheetName, strings }) => zipOf([
+    ['[Content_Types].xml', `${XML_HEAD}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">`
+        + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        + '<Default Extension="xml" ContentType="application/xml"/>'
+        + '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        + '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        + '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>'
+        + '</Types>'],
+    ['_rels/.rels', `${XML_HEAD}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`
+        + `<Relationship Id="rId1" Type="${REL}/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ['xl/workbook.xml', `${XML_HEAD}<workbook xmlns="${SPREADSHEET_MAIN}" xmlns:r="${REL}"><sheets><sheet name="${sheetName}" sheetId="1" r:id="rId1"/></sheets></workbook>`],
+    ['xl/_rels/workbook.xml.rels', `${XML_HEAD}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`
+        + `<Relationship Id="rId1" Type="${REL}/worksheet" Target="worksheets/sheet1.xml"/>`
+        + `<Relationship Id="rId2" Type="${REL}/sharedStrings" Target="sharedStrings.xml"/></Relationships>`],
+    ['xl/sharedStrings.xml', `${XML_HEAD}<sst xmlns="${SPREADSHEET_MAIN}" count="${strings.length}" uniqueCount="${strings.length}">`
+        + strings.map((text) => `<si><t xml:space="preserve">${text}</t></si>`).join('')
+        + '</sst>'],
+    ['xl/worksheets/sheet1.xml', `${XML_HEAD}<worksheet xmlns="${SPREADSHEET_MAIN}"><sheetData>`
+        + strings.map((_, i) => `<row r="${i + 1}"><c r="A${i + 1}" t="s"><v>${i}</v></c></row>`).join('')
+        + '</sheetData></worksheet>'],
+]);
+
 /* A zip whose central directory declares `bytes` of content in one stored entry of zeros. */
 const zipDeclaring = (bytes) => zipOf([['word/document.xml', Buffer.alloc(bytes)]]);
 
@@ -125,4 +154,4 @@ const lyingZipOf = (entries, declared, { store = false } = {}) => {
     return Buffer.concat([...locals, directory, end]);
 };
 
-module.exports = { pdfOf, docxOf, xlsxOf, zipOf, zipDeclaring, lyingZipOf };
+module.exports = { pdfOf, docxOf, xlsxOf, workbookXmlOf, zipOf, zipDeclaring, lyingZipOf };

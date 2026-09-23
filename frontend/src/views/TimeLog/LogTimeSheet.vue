@@ -116,6 +116,7 @@ import moment from 'moment';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useTimer, formatMinutes, formatHm, formatClock } from '@/composable/useTimer';
+import { timeLogFailureKey } from '@/composable/timeLogFailure';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 
 defineOptions({ name: 'LogTimeSheet' });
@@ -336,7 +337,7 @@ const submit = async () => {
         note.value = '';
         loadToday();
     } catch (e) {
-        error.value = t('Time.log_failed');
+        error.value = t(timeLogFailureKey(e, 'Time.log_failed'));
     } finally {
         busy.value = '';
     }

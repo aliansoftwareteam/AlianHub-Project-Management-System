@@ -70,6 +70,9 @@ body:has(.calender-menu-class-duedate):after {
     background-position: 0% 0%;
     padding-right: 0 !important;
 }
+:root[data-theme="dark"] .calendar-comp { color: var(--ink); }
+/* The picked date carries an inline black (red when overdue); only the black gives way. */
+:root[data-theme="dark"] .due_date-listing[style*="color: black"] { color: var(--ink) !important; }
 .calendar-comp-white {
     background-image: url('@/assets/images/svg/white-icon-cal.svg');
     background-repeat: no-repeat;

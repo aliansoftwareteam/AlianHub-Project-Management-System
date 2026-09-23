@@ -20,7 +20,8 @@ const REASON = Object.freeze({
 });
 
 const LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
-const NUMERIC_LABELS = /^(0x[0-9a-f]+|\d+)(\.(0x[0-9a-f]+|\d+)){0,3}$/;
+// A URL parser reads a host whose last label is a number as an IPv4 address, or refuses it: never a name.
+const ENDS_IN_NUMBER = /(^|\.)(\d+|0x[0-9a-f]*)$/;
 const PRIVATE_NAMES = ['localhost', 'local', 'internal'];
 
 /* Suffixes anyone can register a name under, so `*.suffix` would admit every tenant of it, an attacker's
@@ -61,7 +62,7 @@ const isPublicSuffix = (host) => {
 
 const normalizeHost = (host) => String(host || '').trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
 
-const isAddressLike = (host) => host.includes(':') || NUMERIC_LABELS.test(host);
+const isAddressLike = (host) => host.includes(':') || ENDS_IN_NUMBER.test(host);
 
 const isPrivateName = (host) => PRIVATE_NAMES.some((name) => host === name || host.endsWith(`.${name}`));
 
