@@ -92,6 +92,18 @@ describe('Settings → General in dark mode', () => {
     });
 });
 
+describe('Project and Tracker timesheets', () => {
+    const files = ['views/Timesheet/ProjectTimesheet/ProjectTimesheet.vue', 'views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue'];
+
+    test.each(files)('%s: the title strip holds the view tabs and follows the theme', (rel) => {
+        const vue = read(rel);
+        const scoped = vue.slice(vue.indexOf('<style scoped>'));
+        expect(ruleBody(scoped, '.page-title')).toMatch(/background-color:\s*var\(--surface\)/);
+        expect(ruleBody(scoped, '.ts-legacy-tabs')).toMatch(/align-self:\s*stretch/);
+        expect(ruleBody(scoped, 'ul.breadcrumb.title_strip')).toMatch(/background-color:\s*transparent/);
+    });
+});
+
 describe('Docs hub', () => {
     const vue = read('views/Pages/PagesSpace.vue');
     const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));
