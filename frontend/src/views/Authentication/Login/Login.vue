@@ -388,7 +388,7 @@ const handleSubmitResend = () => {
     axios.post(env.API_URI + env.SEND_VARIFICATION_EMAIL, { uid: userData.value._id }).then((result) => {
         if (result.data.status === true) { resendWait.value = 60; $toast.success(t("Toast.Verification_mail_has_been_send_successfully"), { position: "top-right" }); }
         else $toast.error(result.data.statusText, { position: "top-right" });
-    }).catch(() => $toast.error(t("Toast.something_went_wrong"), { position: "top-right" })).finally(() => { busy.value = false; });
+    }).catch((error) => $toast.error(error?.response?.status === 429 ? t("Auth.too_many_attempts") : t("Toast.something_went_wrong"), { position: "top-right" })).finally(() => { busy.value = false; });
 };
 
 /* magic link */

@@ -4,6 +4,8 @@ const sendMail = require("../../service.js");
 const config = require("../../../Config/config");
 const { dbCollections } = require('../../../Config/collections');
 const { newLinkToken } = require('../helpers/linkToken');
+const { ACCOUNT_MAIL_ANSWER } = require('../helpers/accountMail');
+const logger = require('../../../Config/loggerConfig');
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
@@ -55,12 +57,8 @@ exports.sendVerificationEmailPromise = (userId,email) => {
     });
 };
 
-/**
- * Resend the verification link. The address always comes from the account, never from the request.
- * @param {Objcet} req
- * @param {Object} res
- * @returns
- */
+/* The same answer whatever state the account is in; a link goes out only to an account that
+ * still needs one, and the answer does not wait for the mail. */
 exports.sendVerificationEmail = async (req,res) => {
     const uid = String((req.body && req.body.uid) || '');
     if (!OBJECT_ID_PATTERN.test(uid)) {
@@ -69,16 +67,15 @@ exports.sendVerificationEmail = async (req,res) => {
     try {
         const account = await mongoRef.MongoDbCrudOpration("global", {
             type: dbCollections.USERS,
-            data: [{ _id: uid }, { Employee_Email: 1, isEmailVerified: 1 }]
+            data: [{ _id: uid }, { Employee_Email: 1, isEmailVerified: 1, isDeleted: 1 }]
         }, "findOne");
-        if (!account || !account.Employee_Email) {
-            return res.send({ status: false, statusText: "Couldn’t find your Account" });
+        if (account && account.Employee_Email && account.isEmailVerified !== true && account.isDeleted !== true) {
+            exports.sendVerificationEmailPromise(uid, account.Employee_Email).catch((error) => {
+                logger.error(`Resend verification email: ${(error && error.statusText) || error}`);
+            });
         }
-        if (account.isEmailVerified === true) {
-            return res.send({ status: false, statusText: "Your Email is already verified" });
-        }
-        return res.send(await exports.sendVerificationEmailPromise(uid, account.Employee_Email));
     } catch (error) {
-        return res.send({ status: false, statusText: (error && error.statusText) || "Could not send the verification email." });
+        logger.error(`Resend verification email: ${(error && error.message) || error}`);
     }
+    return res.send({ status: true, statusText: ACCOUNT_MAIL_ANSWER });
 };

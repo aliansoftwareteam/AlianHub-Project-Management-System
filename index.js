@@ -12,13 +12,14 @@ const { loadDotEnv, applyEnvMap } = require('./Config/applyEnv.js');
 loadDotEnv();
 const { makeDefaultBrandSettings } = require("./Modules/Admin/common/controller.js");
 const { installCors } = require('./utils/cors.js');
+const { trustProxySetting } = require('./Config/trustProxy.js');
 const { getHealth, versionBody } = require('./Modules/Instance/health.js');
 
 const app = express();
 // Honour X-Forwarded-For from the reverse proxy in front of the process, so rate
 // limiting keys on the client and not on the proxy. TRUST_PROXY takes a hop count
 // or "true" for hosted setups.
-app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
+app.set('trust proxy', trustProxySetting(process.env.TRUST_PROXY));
 
 // CORS allow-list is env-driven; see utils/cors.js.
 installCors(app);

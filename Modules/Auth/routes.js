@@ -1,5 +1,6 @@
 const ctrl = require('./controller');
 const sessionCtr = require('./session');
+const { limitAccountMailRequests } = require('./helpers/accountMail');
 
 exports.init = (app) => {
 
@@ -157,7 +158,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true, message:message
      */
-    app.post('/api/v2/auth/forgot-password', ctrl.forgotPassword, ctrl.manageAttempt);
+    app.post('/api/v2/auth/forgot-password', limitAccountMailRequests, ctrl.forgotPassword);
 
 
     /**
@@ -381,7 +382,7 @@ function initSignup(app) {
     /**
      * Send Verification Mail API
      */
-    app.post("/api/v2/sendVerificationEmail", sendVerifcationCtrl.sendVerificationEmail);
+    app.post("/api/v2/sendVerificationEmail", limitAccountMailRequests, sendVerifcationCtrl.sendVerificationEmail);
 
     /**
      * @swagger
@@ -469,7 +470,7 @@ function initSignup(app) {
     /**
      *  Verify Mail API
      */
-    app.post('/api/v2/sendForgotPasswordEmail', sendForgotPasswordCtrl.sendForgotPasswordEmail);
+    app.post('/api/v2/sendForgotPasswordEmail', limitAccountMailRequests, sendForgotPasswordCtrl.sendForgotPasswordEmail);
 
 
     /**

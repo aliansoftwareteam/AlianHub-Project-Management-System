@@ -4,108 +4,42 @@ const mongoRef = require('../../../utils/mongo-handler/mongoQueries');
 const sendMail = require("../../service.js");
 const config = require("../../../Config/config");
 const { dbCollections } = require('../../../Config/collections');
+const { ACCOUNT_MAIL_ANSWER } = require('../helpers/accountMail');
 
-/**
- * Generate a password-reset token (BUG-005 / #59 fix).
- *
- * The previous implementation built an 8-char alphanumeric token via
- * `Math.random()` — ~48 bits of entropy and not cryptographically secure,
- * which made the reset link feasibly brute-forceable. Replace with 32 bytes
- * (256 bits) of `crypto.randomBytes`, hex-encoded to 64 chars, so the
- * reset URL stays URL-safe without further encoding.
- *
- * Exported for the regression test at .claude/tests/test-bug-005.js.
- */
 exports.generateResetToken = () => crypto.randomBytes(32).toString('hex');
 
-/**
- * Send Forgot Password Email
- * @param {Objcet} req
- * @param {Object} res
- * @returns
- */
+const sendResetLink = async ({ email, token: clientToken, tokenId }) => {
+    const account = await mongoRef.MongoDbCrudOpration('global', {
+        type: dbCollections.USERS,
+        data: [{ Employee_Email: email }]
+    }, "findOne");
+    if (!(account && account._id)) return;
+    const token = exports.generateResetToken();
+    await mongoRef.MongoDbCrudOpration('global', {
+        type: dbCollections.USERS,
+        data: [{ _id: account._id }, { forgotPasswordToken: token, forgotPasswordTokenTime: new Date() }]
+    }, "updateOne");
+    const userEmail = email.toLowerCase();
+    const link = `${config.WEBURL}/#/reset-password/${account._id}/${token}/${clientToken}/${tokenId}`;
+    const mail = require("../../Template/forgotPassword")(userEmail, link);
+    sendMail.SendEmail(mail.subject, mail.mail, userEmail, true, (result) => {
+        if (!result.status) logger.error(`Forgot password email: ${result.error}`);
+    });
+};
+
+/* The same answer whether or not the address has an account; the answer does not wait for the mail. */
 exports.sendForgotPasswordEmail = (req,res) => {
-    try {
-        if (!(req.body && req.body.token)) {
-            res.send({
-                status: false,
-                statusText: `token is required`
-            })
+    const body = req.body || {};
+    for (const field of ['token', 'tokenId', 'email']) {
+        if (!body[field]) {
+            res.send({ status: false, statusText: `${field} is required` });
             return;
         }
-        if (!(req.body && req.body.tokenId)) {
-            res.send({
-                status: false,
-                statusText: `tokenId is required`
-            })
-            return;
-        }
-        if (!(req.body && req.body.email)) {
-            res.send({
-                status: false,
-                statusText: `email is required`
-            })
-            return;
-        }
-        let object = {
-            type: dbCollections.USERS,
-            data: [
-                {
-                    Employee_Email : req.body.email
-                }
-            ]
-        }
-        mongoRef.MongoDbCrudOpration('global', object, "findOne").then((response)=>{
-            let userEmail = req.body.email.toLowerCase();
-            const token = exports.generateResetToken();
-            let obj = {
-                type: dbCollections.USERS,
-                data: [
-                    {
-                        Employee_Email : req.body.email
-                    },
-                    { 
-                        forgotPasswordToken: token,
-                        forgotPasswordTokenTime: new Date(),
-                    }
-                ]
-            }
-            mongoRef.MongoDbCrudOpration('global', obj, "updateOne").then(()=>{
-                let link =  `${config.WEBURL}/#/reset-password/${response._id}/${token}/${req.body.token}/${req.body.tokenId}`
-                let mail = require("../../Template/forgotPassword")(userEmail, link);
-                sendMail.SendEmail(mail.subject, mail.mail, userEmail, true, (result) => {
-                    if(result.status) {
-                        res.send({
-                            status: true,
-                            statusText: "Email sent successfully."
-                        });
-                    } else {
-                        logger.error(`Error Try Catch ${result.error}`);
-                        res.send({
-                            status: false,
-                            statusText: result.error
-                        });
-                    }
-                });
-            }).catch((error)=>{
-                logger.error(`Error Forgot Password: ${error}`)
-                res.send({
-                    status: false,
-                    statusText: error
-                });
-            })
-        }).catch((error)=>{
-            logger.error(`Error Get User In Forgot Password: ${error}`);
-            res.send({
-                status: false,
-                statusText: error
-            })
-        })
-    } catch (error) {
-        logger.error(`Error Try Catch ${error.message}`);
-        res.send({
-            status: false,
-            statusText: error
-        })
     }
-}
+    if ([body.token, body.tokenId, body.email].every((value) => typeof value === 'string')) {
+        sendResetLink(body).catch((error) => {
+            logger.error(`Forgot password: ${(error && error.message) || error}`);
+        });
+    }
+    res.send({ status: true, statusText: ACCOUNT_MAIL_ANSWER });
+};

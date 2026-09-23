@@ -31,7 +31,7 @@
         <div v-else class="av2-auth-card">
             <div class="auth__glyph auth__glyph--brand">✉</div>
             <h2 class="auth__h">{{ $t('Auth.reset_sent_title') }}</h2>
-            <i18n-t keypath="Auth.reset_sent_body" tag="p" class="auth__p"><template #email><strong>{{ email }}</strong></template></i18n-t>
+            <i18n-t keypath="Auth.reset_sent_if_account" tag="p" class="auth__p"><template #email><strong>{{ email }}</strong></template></i18n-t>
             <div class="auth__note">
                 {{ $t('Auth.magic_nothing_yet') }}
                 <button type="button" class="av2-link-btn" :disabled="busy || resendWait > 0" @click="submit">{{ $t('Auth.send_again') }}</button>
@@ -87,8 +87,7 @@ const submit = async () => {
     } catch (err) {
         const msg = err?.response?.data?.message || "";
         const status = err?.response?.status;
-        if (/user not found/i.test(msg)) error.value = t("Auth.no_account_found_for_email");
-        else if (status === 429 || msg === "Auth.too_many_request") error.value = t("Auth.too_many_attempts");
+        if (status === 429 || msg === "Auth.too_many_request") error.value = t("Auth.too_many_attempts");
         else error.value = t("Auth.server_error");
         stage.value = "form";
     } finally {

@@ -21,6 +21,7 @@ const callController = (body) => new Promise((resolve) => {
 });
 
 let account;
+const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 beforeEach(() => {
     SendEmail.mockClear();
@@ -57,17 +58,16 @@ describe('sendVerificationEmail', () => {
         expect(SendEmail).not.toHaveBeenCalled();
     });
 
-    it('refuses an unknown account without sending', async () => {
-        account = null;
-        const payload = await callController({ uid: UID, email: 'attacker@evil.test' });
-        expect(payload.status).toBe(false);
-        expect(SendEmail).not.toHaveBeenCalled();
-    });
-
-    it('refuses an account that is already verified', async () => {
-        account.isEmailVerified = true;
+    it.each([
+        ['an unknown account', () => { account = null; }],
+        ['an account that is already verified', () => { account.isEmailVerified = true; }],
+    ])('answers %s as it answers a sent link, without sending', async (label, arrange) => {
+        const sent = await callController({ uid: UID });
+        SendEmail.mockClear();
+        arrange();
         const payload = await callController({ uid: UID });
-        expect(payload.status).toBe(false);
+        await settle();
+        expect(payload).toEqual(sent);
         expect(SendEmail).not.toHaveBeenCalled();
     });
 });
