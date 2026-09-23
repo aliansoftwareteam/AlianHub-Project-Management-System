@@ -48,7 +48,6 @@
     "frontend/src/components/organisms/Header/Header.vue": 6,
     "frontend/src/components/organisms/Item/Item.vue": 3,
     "frontend/src/components/organisms/ItemList/ItemList.vue": 3,
-    "frontend/src/components/organisms/LiveWorkCard/LiveWorkCard.vue": 8,
     "frontend/src/components/organisms/MainChat/MainChatComposer.vue": 2,
     "frontend/src/components/organisms/MilestoneReportCard/MilestoneReportCard.vue": 1,
     "frontend/src/components/organisms/PieChartCardComponent/PieChartCardComponent.vue": 1,
