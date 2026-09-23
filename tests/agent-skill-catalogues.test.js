@@ -5,8 +5,8 @@ const registry = require('../Modules/Agents/registry');
 const { ALL } = require('../Modules/Agents/skills');
 const C = require('../Modules/Agents/skills/catalogues');
 
-const DATA_EXPRESSIBLE = ['brief.parse', 'digest.ceo', 'project.guide'];
-const EVIDENCE_LAYER = ['qa-review', 'pr.summary'];
+const DATA_EXPRESSIBLE = ['brief.parse', 'digest.ceo', 'project.guide', 'pr.summary'];
+const EVIDENCE_LAYER = ['qa-review'];
 
 describe('the skill vocabulary is closed', () => {
     it('every catalogue is frozen', () => {

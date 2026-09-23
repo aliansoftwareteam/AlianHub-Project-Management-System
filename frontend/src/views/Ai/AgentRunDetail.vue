@@ -46,6 +46,7 @@
                 <router-link v-if="pinnedN > 0" class="ah-chip ah-chip--brand run-detail__revision" :to="revisionLink" data-test="revision-link">{{ $t('Ai.run_revision', { n: pinnedN }) }}</router-link>
                 <span v-else class="ah-chip ah-chip--dark" data-test="revision-zero">{{ $t('Ai.run_revision_zero') }}</span>
                 <span v-if="skillIdentity" class="ah-mono ah-small" data-test="skill-identity">{{ skillIdentity }}</span>
+                <span v-if="skillSource" class="ah-chip ah-chip--dark" data-test="skill-source">{{ skillSource }}</span>
             </div>
 
             <div v-if="run.tainted" class="run-detail__taint" data-test="tainted">
@@ -108,6 +109,7 @@ import { normaliseEpisode, declinedLine as declinedText } from "./episodeText";
 import AgentRunReplay from "./AgentRunReplay.vue";
 import AgentRunTrace from "./AgentRunTrace.vue";
 import { taintKindLabel, taintSourcesOf } from "./taintText";
+import { skillSourceLabel } from "./skillSourceText";
 
 defineOptions({ name: "AgentRunDetail" });
 
@@ -133,6 +135,8 @@ const skillIdentity = computed(() => {
     if (Number.isInteger(s.n) && s.n > 0) return t("Ai.run_skill_identity_n", { key: s.key, n: s.n });
     return s.hash ? t("Ai.run_skill_identity", { key: s.key, hash: s.hash }) : t("Ai.run_skill_identity_nohash", { key: s.key });
 });
+
+const skillSource = computed(() => skillSourceLabel(t, run.value?.skillSource));
 
 const replayPanel = ref(null);
 const viewReplay = (id) => replayPanel.value?.focus(id);

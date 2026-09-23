@@ -123,6 +123,7 @@ const start = async (companyId, { agent, taskId, projectId, skill, trigger, star
                 notifyMe: Boolean(notifyMe),
                 ...(key ? { idempotencyKey: key } : {}),
                 agentRevision: pinned.agentRevision, skillRevision: pinned.skillRevision,
+                ...(pinned.skillSource ? { skillSource: pinned.skillSource } : {}),
                 traceId: traceId || telemetry.traceIdNow() || telemetry.newTraceId(),
             },
         }, 'save');

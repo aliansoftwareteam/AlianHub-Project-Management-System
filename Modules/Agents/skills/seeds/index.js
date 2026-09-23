@@ -4,6 +4,7 @@
 
 const { validateSkill } = require('../validateSkill');
 const { compile } = require('../compile');
+const externalReads = require('../externalReads');
 const briefParse = require('./briefParse');
 const digest = require('./digest');
 const projectGuide = require('./projectGuide');
@@ -23,12 +24,16 @@ const builtInOf = (seed, aliases = []) => ({ ...compile(documentOf(seed)), sourc
 
 const BUILT_IN = [builtInOf(digest, ['risk.today']), builtInOf(projectGuide)];
 
-/* Compiled on first use rather than at boot: the url reader it declares only
- * validates while SKILL_EXTERNAL_READS is on. */
+/* pr.summary reads its pull request through the url reader, which validates only while
+ * SKILL_EXTERNAL_READS is on. With the flag off it is compiled from the seed as written, so it
+ * still lists and resolves for the agents that name it, and compile's gather refuses the run. */
+const PR_REVIEW_ALIASES = ['risk.flags'];
+const PR_REVIEW = Object.freeze({ ...compile({ ...prReview, emits: [...new Set(prReview.emit.map((m) => m.action))] }), source: 'code', aliases: PR_REVIEW_ALIASES });
 let prReviewBuilt = null;
 const prReviewSkill = () => {
-    if (!prReviewBuilt) prReviewBuilt = builtInOf(prReview, ['risk.flags']);
+    if (!externalReads.enabled()) return PR_REVIEW;
+    if (!prReviewBuilt) prReviewBuilt = builtInOf(prReview, PR_REVIEW_ALIASES);
     return prReviewBuilt;
 };
 
-module.exports = { documentOf, BUILT_IN, prReviewSkill, SEEDS: { briefParse, digest, projectGuide, prReview } };
+module.exports = { documentOf, BUILT_IN, PR_REVIEW, prReviewSkill, SEEDS: { briefParse, digest, projectGuide, prReview } };

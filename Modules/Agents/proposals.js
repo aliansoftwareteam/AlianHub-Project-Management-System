@@ -150,6 +150,13 @@ const bucketOf = (p, now = Date.now()) => {
     return now - new Date(p.createdAt || now).getTime() < PRIMARY_AGE_MS ? 'primary' : 'later';
 };
 
+const skillSourcesOfRuns = async (companyId, rows) => {
+    const ids = [...new Set(rows.map((p) => p.runId).filter(Boolean).map(String))].map(oid).filter(Boolean);
+    if (!ids.length) return new Map();
+    const found = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: { $in: ids } }, 'skillSource'] }, 'find').catch(() => []);
+    return new Map((found || []).filter((r) => r.skillSource).map((r) => [String(r._id), r.skillSource]));
+};
+
 /* projectIds, when given, is the caller's visible set; the counts follow the same scope. */
 const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds } = {}) => {
     const scoped = Array.isArray(projectIds) ? { projectId: { $in: projectIds.map(String) } } : {};
@@ -159,7 +166,12 @@ const list = async (companyId, { status, bucket, agentId, limit = 100, projectId
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [match, {}, { sort: { createdAt: -1 }, limit: Math.min(500, Number(limit) || 100) }],
     }, 'find');
-    const shaped = (rows || []).map((p) => { const o = typeof p.toObject === 'function' ? p.toObject() : p; return { ...o, bucket: bucketOf(o), undoAvailable: o.undoUntil ? new Date(o.undoUntil).getTime() > Date.now() : false }; });
+    const sources = await skillSourcesOfRuns(companyId, rows || []);
+    const shaped = (rows || []).map((p) => {
+        const o = typeof p.toObject === 'function' ? p.toObject() : p;
+        const skillSource = o.runId ? sources.get(String(o.runId)) : undefined;
+        return { ...o, bucket: bucketOf(o), undoAvailable: o.undoUntil ? new Date(o.undoUntil).getTime() > Date.now() : false, ...(skillSource ? { skillSource } : {}) };
+    });
     const filtered = bucket ? shaped.filter((p) => p.bucket === bucket) : shaped;
     const counts = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [[{ $match: scoped }, { $group: { _id: '$status', n: { $sum: 1 } } }]],

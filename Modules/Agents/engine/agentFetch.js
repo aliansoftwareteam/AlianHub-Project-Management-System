@@ -63,4 +63,4 @@ const readDeclared = async ({ companyId, actor, url, declaredHosts, credential, 
     return { status: res.status, body, sha256, bytes: res.bytes, hops: res.hops || [], taint: found };
 };
 
-module.exports = { fetchPage: inWorkspace('fetchPage'), audit: inWorkspace('audit'), postJson: inWorkspace('postJson'), readDeclared };
+module.exports = { audit: inWorkspace('audit'), postJson: inWorkspace('postJson'), readDeclared };
