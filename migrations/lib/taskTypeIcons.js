@@ -194,4 +194,54 @@ async function applyTaskTypeIcons(ctx, companyId) {
     return summary;
 }
 
-module.exports = { rekey, mapFor, withIcon, hasIcon, isBadKey, VALUE_MAP, STATUS_LIKE, applyTaskTypeIcons };
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const plainEntries = (list) => (Array.isArray(list) ? list : []).map((e) => (e && e.toObject ? e.toObject() : e)).filter(Boolean);
+/* An uploaded image counts: setup seeds and the task type form still create types that way,
+ * so a check for library icons only would fail every install created after 004 ran. */
+const showsIcon = (e) => hasIcon(e) || Boolean(e && e.taskImage);
+const missingIcons = (entries) => entries.filter((e) => !showsIcon(e)).length;
+
+/* Read-only check of what applyTaskTypeIcons leaves behind. Problems name records by id with
+ * counts, never by project or type name, which can be a client's. */
+async function verifyTaskTypeIcons(ctx, companyId) {
+    const { SCHEMA_TYPE, settingsCollectionDocs } = ctx;
+    const crud = (type, data, method) => ctx.company(companyId, { type, data }, method);
+    const problems = [];
+
+    const projects = await crud(SCHEMA_TYPE.PROJECTS, [{ 'taskTypeCounts.0': { $exists: true } }, { taskTypeCounts: 1 }], 'find');
+    for (const p of projects || []) {
+        const pid = String(p._id);
+        const entries = plainEntries(p.taskTypeCounts);
+        const keys = entries.map((e) => e.key).filter(Number.isInteger);
+        const values = entries.map((e) => String(e.value || '').toLowerCase());
+        const seen = new Set();
+        let offKey = 0;
+        for (const e of entries) {
+            const value = String(e.value || '').toLowerCase();
+            if (!e.value || isBadKey(e.key) || seen.has(value)) continue;
+            seen.add(value);
+            offKey += (await crud(SCHEMA_TYPE.TASKS, [{ ProjectID: pid, TaskType: e.value, TaskTypeKey: { $ne: e.key } }], 'countDocuments')) || 0;
+        }
+        const counts = [
+            [missingIcons(entries), 'type without an icon', 'types without an icon'],
+            [entries.filter((e) => isBadKey(e.key)).length, 'key that is not an integer', 'keys that are not integers'],
+            [keys.length - new Set(keys).size, 'duplicate key', 'duplicate keys'],
+            [values.length - new Set(values).size, 'duplicate type', 'duplicate types'],
+            [offKey, "task off its type's key", "tasks off their type's key"],
+        ].filter(([n]) => n > 0);
+        if (counts.length) problems.push(`project ${pid}: ${counts.map(([n, one, many]) => plural(n, one, many)).join(', ')}`);
+    }
+
+    const settingsDoc = await crud(SCHEMA_TYPE.SETTINGS, [{ name: settingsCollectionDocs.TASK_TYPE }], 'findOne');
+    const catalogueMissing = settingsDoc ? missingIcons(plainEntries(settingsDoc.settings)) : 0;
+    if (catalogueMissing) problems.push(`task type catalogue: ${plural(catalogueMissing, 'type without an icon', 'types without an icon')}`);
+
+    const templates = await crud(SCHEMA_TYPE.TASK_TYPE_TEMPLATES, [{}, { taskTypes: 1 }], 'find');
+    for (const t of templates || []) {
+        const missing = missingIcons(plainEntries(t.taskTypes));
+        if (missing) problems.push(`template ${t._id}: ${plural(missing, 'type without an icon', 'types without an icon')}`);
+    }
+    return problems;
+}
+
+module.exports = { rekey, mapFor, withIcon, hasIcon, isBadKey, VALUE_MAP, STATUS_LIKE, applyTaskTypeIcons, verifyTaskTypeIcons };

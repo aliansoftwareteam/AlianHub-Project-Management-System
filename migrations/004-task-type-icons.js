@@ -1,4 +1,4 @@
-const { applyTaskTypeIcons } = require('./lib/taskTypeIcons');
+const { applyTaskTypeIcons, verifyTaskTypeIcons } = require('./lib/taskTypeIcons');
 
 module.exports = {
     id: '004-task-type-icons',
@@ -12,5 +12,12 @@ module.exports = {
             removeCache(`UserProjectData:${companyId}:`, true);
             return summary;
         });
+    },
+    async verify(ctx) {
+        const problems = [];
+        await ctx.forEachCompany(async (companyId) => {
+            (await verifyTaskTypeIcons(ctx, companyId)).forEach((p) => problems.push(`${companyId} ${p}`));
+        });
+        return problems;
     },
 };
