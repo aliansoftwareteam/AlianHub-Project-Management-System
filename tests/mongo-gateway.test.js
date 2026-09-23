@@ -59,7 +59,7 @@ describe('POST /api/v1/mongoOpration', () => {
         await new Promise((resolve) => { server = app.listen(0, '127.0.0.1', resolve); });
         baseURL = `http://127.0.0.1:${server.address().port}`;
     });
-    afterAll(() => new Promise((resolve) => server.close(resolve)));
+    afterAll(() => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }));
     beforeEach(resetStore);
 
     const post = async (body, headers = {}) => {

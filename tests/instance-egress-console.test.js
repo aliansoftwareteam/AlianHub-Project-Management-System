@@ -72,7 +72,7 @@ beforeAll(async () => {
     baseURL = `http://127.0.0.1:${server.address().port}`;
 });
 
-afterAll(() => new Promise((resolve) => server.close(resolve)));
+afterAll(() => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }));
 
 beforeEach(() => {
     Object.keys(mockDbs).forEach((key) => delete mockDbs[key]);

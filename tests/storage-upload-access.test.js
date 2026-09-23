@@ -170,7 +170,7 @@ describe('POST /api/v1/storage/uploadFile on server storage', () => {
         baseURL = `http://127.0.0.1:${server.address().port}`;
     });
 
-    afterAll(() => new Promise((resolve) => server.close(resolve)));
+    afterAll(() => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }));
 
     const send = ({ uid = USER, aud = COMPANY_A, companyId, filePath }) => {
         const form = new FormData();

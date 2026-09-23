@@ -81,6 +81,7 @@
                                 :secrets="readSecrets"
                                 :instance-admin="instanceAdmin"
                                 :placeholders="placeholders"
+                                :inputs="form.inputs"
                                 :error-for="errorFor"
                                 @set="(name, value) => (step.params[name] = value)"
                             />
@@ -197,7 +198,7 @@ import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 import { useAgents, reasonOf } from "./useAgents";
 import SkillDeclaredRead from "./SkillDeclaredRead.vue";
-import { isExternalReader, offersExternalReads, paramsKeptFor, readErrorText, readerOf, withoutBlanks } from "./declaredReads";
+import { isExternalReader, offersExternalReads, paramsKeptFor, paramsToSave, readErrorText, readerOf } from "./declaredReads";
 
 defineOptions({ name: "SkillEditor" });
 
@@ -315,7 +316,7 @@ const body = () => ({
     model: form.model || null,
     ...(form.risk ? { risk: form.risk } : {}),
     inputs: [...form.inputs],
-    gather: form.gather.map((s) => ({ reader: s.reader, as: s.as || s.reader, params: withoutBlanks(s.params) })),
+    gather: form.gather.map((s) => ({ reader: s.reader, as: s.as || s.reader, params: paramsToSave(props.catalogues, s.reader, s.params) })),
     prompt: { partials: [...form.partials], instructions: form.instructions, template: form.template, output: form.output, maxTokens: props.skill?.prompt?.maxTokens || undefined },
     emit: form.emit.map((m) => ({ action: m.action, ...(m.each ? { each: m.each } : {}), params: { ...m.params } })),
     ...(form.summary ? { summary: form.summary } : {}),

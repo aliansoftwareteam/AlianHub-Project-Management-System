@@ -89,7 +89,7 @@ beforeAll(async () => {
 
 afterAll(() => {
     ENV_KEYS.forEach((key) => { if (saved[key] === undefined) delete process.env[key]; else process.env[key] = saved[key]; });
-    return new Promise((resolve) => server.close(resolve));
+    return new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); });
 });
 
 beforeEach(() => {

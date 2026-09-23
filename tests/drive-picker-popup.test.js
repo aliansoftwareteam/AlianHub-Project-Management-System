@@ -14,7 +14,7 @@ const STATIC_DIR = path.join(__dirname, '..', 'Modules', 'Pickers', 'static');
 const servers = [];
 
 afterAll(async () => {
-    await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve))));
+    await Promise.all(servers.map((server) => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); })));
 });
 
 const serve = async (env) => {

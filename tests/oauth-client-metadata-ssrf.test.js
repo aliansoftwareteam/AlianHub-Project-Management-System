@@ -28,7 +28,7 @@ beforeAll(async () => {
     port = server.address().port;
 });
 
-afterAll(() => new Promise((resolve) => server.close(resolve)));
+afterAll(() => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }));
 
 beforeEach(() => {
     metadataDocument.forget();

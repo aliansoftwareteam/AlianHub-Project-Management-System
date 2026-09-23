@@ -76,7 +76,7 @@ beforeAll(async () => {
     baseURL = `http://127.0.0.1:${server.address().port}`;
 });
 
-afterAll(() => new Promise((resolve) => server.close(resolve)));
+afterAll(() => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }));
 
 describe('storage routes with an access guard', () => {
     it('include every upload route', () => {
