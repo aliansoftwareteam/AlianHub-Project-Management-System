@@ -130,6 +130,8 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 104 | The Skill editor does not yet expose a declared read's `link` and `hosts` params; they can only be set in the skill body. | #816, #819 |
 | 105 | Integration suites share one harness workspace: a suite that reads audit or list rows by action and actor alone can pick up another suite's rows when file order changes. Scope such reads to rows written after the suite starts, as #822 did. | #821, #822 |
 | 106 | Two PRs that each add an environment variable leave `docs/ENV.md` with a stale count after both merge; the branch that merges second must re-run `node scripts/env-doc.js` after taking `beta`. | #820 |
+| 107 | A second review finding, in the manual time-log routes, is open; details in the owner's private notes. The fix is in progress (branch `fix/manual-logtime-owner`). | 2026-09-23 sweep |
+| 108 | `tests/integration/external-agent-step-audit.int.test.js` waits 15 s for a revoked step to fail, but a waiting `external_agent` step re-checks on a 30 s poll; under CI load it can still read `running`. Wake the step in the test or wait longer than one poll. | #824 rerun |
 
 ## Owner decisions recorded
 
