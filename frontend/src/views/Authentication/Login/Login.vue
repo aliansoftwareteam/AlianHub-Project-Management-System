@@ -258,11 +258,6 @@ const handleSubmit = async () => {
     try {
         const user = await apiRequestWithoutSecure("post", env.LOGIN, { email: form.email, password: form.password, isLoginType: "frontend" });
         if (user.status !== 200) throw new Error("server");
-        if (user?.data?.isResetPassword === true) {
-            clearSession();
-            banner.value = { kind: "warn", text: t("Auth.reset_required") };
-            return;
-        }
         if (user?.data?.twoFactorRequired === true && user?.data?.tempToken) {
             twoFactor.tempToken = user.data.tempToken;
             twoFactor.expiresAt = Date.now() + 5 * 60 * 1000;
@@ -281,10 +276,10 @@ const handleSubmit = async () => {
         if (data.isEmailVerified === false) {
             userData.value = data.userData || null;
             step.value = "verify";
-        } else if (msg === "Your email is invalid. Please check and try again" || msg === "User not found") {
-            errors.email = t("Auth.account_unknown");
-        } else if (msg === "Your password is invalid. Please check and try again" || error.error_code === "InvalidPassword" || error.error === "invalid username/password") {
-            errors.password = t("Auth.password_mismatch") + (Number.isFinite(data.attemptsLeft) ? " " + t("Auth.attempts_left", { n: data.attemptsLeft }) : "");
+        } else if (msg === "The email or password is incorrect." || error.error_code === "InvalidPassword" || error.error === "invalid username/password") {
+            errors.password = t("Auth.credentials_mismatch") + (Number.isFinite(data.attemptsLeft) ? " " + t("Auth.attempts_left", { n: data.attemptsLeft }) : "");
+        } else if (msg === "Your email has been blocked. Please contact the administrator.") {
+            banner.value = { kind: "danger", text: t("Auth.account_blocked") };
         } else if (msg === "Auth.too_many_request" || error?.response?.status === 429) {
             errors.password = t("Auth.too_many_attempts");
         } else if (msg === "Email Not Verified") {

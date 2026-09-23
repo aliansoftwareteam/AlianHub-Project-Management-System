@@ -1,6 +1,7 @@
 const mongoC = require("../../../utils/mongo-handler/mongoQueries")
 const { dbCollections } = require('../../../Config/collections');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const config = require("../../../Config/config");
 const logger = require("../../../Config/loggerConfig");
 const serviceCtr = require("../../serviceFunction.js")
@@ -213,6 +214,30 @@ const verifySocialAuth = async (reqData, cb) => {
     }
 };
 
+const SIGN_IN_REFUSED = "The email or password is incorrect.";
+const BLOCKED_ANSWER = "Your email has been blocked. Please contact the administrator.";
+
+/* A missing account still pays for one bcrypt comparison, at the cost new passwords are
+ * hashed with, so the answer's timing does not say whether the address has an account. */
+let standInHash;
+const standInPasswordHash = () => standInHash || (standInHash = bcrypt.hash(crypto.randomBytes(16).toString("hex"), 10));
+
+const mailSetPasswordLink = async (email, isLoginType) => {
+    const token = generateToken(600);
+    const stored = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, {
+        type: dbCollections.USER_AUTH,
+        data: [{ email }, { token }],
+    }, "findOneAndUpdate");
+    if (!stored?._id) return;
+    const base = isLoginType === "admin" ? `${config.WEBURL}/admin` : config.WEBURL;
+    const mail = require("../../Template/passwordExpiredMail")(email, `${base}/#/set-new-password/${token}`);
+    sendMail.SendEmail(mail.subject, mail.mail, email, true, (result) => {
+        if (!result.status) logger.error(`Set password mail was not sent: ${result.error}`);
+    });
+};
+
+/* Blocked and unverified are only said after the right password, so no answer tells someone
+ * without the password that the account exists. */
 const verifyLocalAuth = async (reqData, cb) => {
     if (!reqData.password) {
         cb({ status: false, message: "Password is required" });
@@ -220,78 +245,34 @@ const verifyLocalAuth = async (reqData, cb) => {
     }
 
     try {
-        const obj = {
-            type: dbCollections.USER_AUTH,
-            data: [{ email: reqData.email }],
-        };
+        const email = typeof reqData.email === "string" ? reqData.email : "";
+        const password = String(reqData.password);
+        const resData = email
+            ? await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.USER_AUTH, data: [{ email }] }, "findOne")
+            : null;
 
-        const resData = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "findOne");
-        if (!resData?._id) {
-            cb({ status: false, message: "User not found" });
-            return;
-        }
-
-        if (resData.isBlocked) {
-            cb({
-                status: false,
-                message: "Your email has been blocked. Please contact the administrator.",
-            });
-            return;
-        }
-
-        // If no password set → send reset link
-        if (!resData.passwordHash) {
-            const token = generateToken(600);
-            const updateObject = {
-                type: dbCollections.USER_AUTH,
-                data: [{ email: reqData.email }, { token }],
-            };
-
-            const resUData = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, updateObject, "findOneAndUpdate");
-            if (!resUData?._id) {
-                cb({ status: false, message: "User not found" });
-                return;
+        if (!(resData?._id && resData.passwordHash)) {
+            await bcrypt.compare(password, await standInPasswordHash());
+            if (resData?._id && !resData.isBlocked) {
+                mailSetPasswordLink(email, reqData.isLoginType).catch((error) => logger.error(`Set password mail: ${error.message || error}`));
             }
-
-            let link = `${config.WEBURL}/#/set-new-password/${token}`;
-            if (reqData.isLoginType === "admin") {
-                link = `${config.WEBURL}/admin/#/set-new-password/${token}`;
-            }
-
-            const mail = require("../../Template/passwordExpiredMail")(reqData.email, link);
-            sendMail.SendEmail(mail.subject, mail.mail, reqData.email, true, (result) => {
-                if (result.status) {
-                    cb({
-                        status: true,
-                        data: resData,
-                        isResetPassword: true,
-                    });
-                } else {
-                    cb({
-                        status: false,
-                        message: "Reset password mail was not sent",
-                    });
-                }
-            });
+            cb({ status: false, message: SIGN_IN_REFUSED });
             return;
         }
 
-        // Validate password
-        const checkPassword = resData._id + reqData.password;
-        const isValid = await bcrypt.compare(checkPassword, resData.passwordHash);
+        const isValid = await bcrypt.compare(resData._id + password, resData.passwordHash);
         if (!isValid) {
-            cb({
-                status: false,
-                message: "Your password is invalid. Please check and try again",
-            });
+            cb({ status: false, message: SIGN_IN_REFUSED });
+            return;
+        }
+        if (resData.isBlocked) {
+            cb({ status: false, message: BLOCKED_ANSWER });
             return;
         }
 
         cb({
             status: true,
-            // twoFactorEnabled tells loginAuth whether to gate this login behind
-            // the TOTP second-step. Password login only (Phase 1); the OAuth
-            // paths don't set it, so they are unaffected.
+            // twoFactorEnabled tells loginAuth whether to gate this login behind the TOTP second step.
             data: { ...reqData, _id: resData._id, twoFactorEnabled: !!(resData.twoFactor && resData.twoFactor.enabled) },
             message: "User Login Successfully",
         });
