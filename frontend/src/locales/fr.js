@@ -8497,6 +8497,7 @@ export default {
         "source_default": "Built-in default",
         "locked_help": "The environment sets this value, so the console cannot change it. Change it there and restart the server.",
         "cache_note": "A mode change applies on this server at once and on every other server within {seconds} seconds.",
+        "cache_note_now": "A mode change applies on every server at once.",
         "kill_switch": "DISABLE_PERMISSION_ENFORCEMENT is on: every workspace set to enforce runs in report until it is turned off.",
         "workspaces_title": "Workspaces",
         "readiness_rule": "A workspace in report is ready to enforce once its would-be-denial log has been empty for {days} days in a row. Nothing switches by itself: you choose when.",
@@ -8556,6 +8557,7 @@ export default {
         "role_member": "Member",
         "role_none": "No seat",
         "mode_saved": "Mode set for {name}. Other servers pick it up within {seconds} seconds.",
+        "mode_saved_now": "Mode set for {name}. Every server applies it at once.",
         "default_saved": "Instance default set. Other servers apply it when they next start."
     },
     "Egress": {
