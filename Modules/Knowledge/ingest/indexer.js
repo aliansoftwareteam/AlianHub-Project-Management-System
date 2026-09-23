@@ -771,8 +771,9 @@ const resumeFiles = async (companyId, { now = Date.now(), limit = FILE_SWEEP_BAT
 };
 
 /* Brings a task's files in line with the attachments its row carries now: each one synced, and
- * any file still indexed under the task whose attachment is gone taken out. */
-const syncTaskFiles = async (companyId, taskId, { priority = 'live' } = {}) => {
+ * any file still indexed under the task whose attachment is gone taken out. A caller walking under
+ * a lease passes `onProgress`, asked after each file, and the step stops once it answers false. */
+const syncTaskFiles = async (companyId, taskId, { priority = 'live', onProgress = null } = {}) => {
     const out = { indexed: 0, skipped: 0, removed: 0 };
     if (!isObjectId(taskId)) return out;
     const task = await byId(companyId, SCHEMA_TYPE.TASKS, taskId, 'attachments');
@@ -791,10 +792,12 @@ const syncTaskFiles = async (companyId, taskId, { priority = 'live' } = {}) => {
         const result = await syncFile(companyId, sourceId, { priority });
         if (result && result.leftOut) out.skipped += 1;
         else out.indexed += 1;
+        if (onProgress && !(await onProgress())) return { ...out, stopped: true };
     }
     for (const sourceId of gone) {
         await syncFile(companyId, sourceId, { priority });
         out.removed += 1;
+        if (onProgress && !(await onProgress())) return { ...out, stopped: true };
     }
     return out;
 };
