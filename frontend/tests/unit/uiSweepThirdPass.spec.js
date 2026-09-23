@@ -238,6 +238,26 @@ describe('timesheets and the milestone report without the permission', () => {
     });
 });
 
+describe('upgrade wall', () => {
+    const vue = read('components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue');
+    const css = vue.slice(vue.indexOf('<style scoped>'));
+
+    test('title and message follow the theme instead of fixed black', () => {
+        expect(vue).not.toMatch(/class="[^"]*\bblack\b/);
+        expect(ruleBody(css, '.upw__title')).toMatch(/color:\s*var\(--ink\)/);
+        expect(ruleBody(css, '.upw__message')).toMatch(/color:\s*var\(--ink-label\)/);
+    });
+
+    test('the button keeps white text on a green dark enough to read', () => {
+        expect(vue).not.toMatch(/bg-dark-green-light/);
+        expect(ruleBody(css, '.upw__btn')).toMatch(/background:\s*#15803d;\s*color:\s*#fff/);
+    });
+
+    test('dark mode darkens the legacy project panel the wall sits in', () => {
+        expect(read('assets/css/tokens.css')).toMatch(/:root\[data-theme="dark"\] \.section-right\.bg-white:has\(\.upw\)/);
+    });
+});
+
 describe('fields that set their own size next to .ah-input', () => {
     const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
         const full = path.join(dir, d.name);
