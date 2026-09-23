@@ -1,13 +1,7 @@
 {
-  "AIProjectGenerator/controller.js": 2,
   "Agents/controller.js": 1,
-  "Audit/controller.js": 1,
-  "Audit/recorder.js": 1,
   "Auth/controller/loginSession.js": 1,
   "Auth/controller/sendInvitation.js": 2,
-  "CloudStorage/controller.js": 2,
-  "EmailIn/controller.js": 2,
-  "Integrations/controller.js": 2,
   "Mcp/server.js": 1,
   "SSO/config.js": 2,
   "SSO/oidc.js": 1,
@@ -20,6 +14,5 @@
   "storage/server/controller.js": 6,
   "storage/server/helpers/bucket.helper.js": 1,
   "storage/wasabi/controller.js": 8,
-  "taskIndex/controller.js": 8,
   "trackerUserPermission/controller.js": 1
 }
