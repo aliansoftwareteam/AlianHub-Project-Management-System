@@ -31,8 +31,6 @@ const verifyJWTTokenWithCRoute = [
     "/api/v1/draggablemilestone",
     "/api/v1/updateunreadcommentscount",
     "/api/v1/sendNotification",
-    "/api/v1/handleHistory",
-    "/api/v1/handleNotification",
     "/api/v1/send-fcm",
     "/api/v1/prepare-notification-data",
     "/api/v1/get-tasks",

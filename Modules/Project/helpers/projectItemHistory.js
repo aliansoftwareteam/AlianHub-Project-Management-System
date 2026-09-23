@@ -11,10 +11,6 @@ const HISTORY = Object.freeze({
     TAG: 'Project_Name',
 });
 
-const SERVER_BUILT_HISTORY = [
-    HISTORY.CHECKLIST, HISTORY.CHECKLIST_ASSIGN, HISTORY.CHECKLIST_UNASSIGN, HISTORY.CHECKLIST_CHECKED, HISTORY.CHECKLIST_FROM_COMMENT,
-].map((key) => ({ type: 'project', key }));
-
 const itemName = (name) => `<b class="text-ellipsis vertical-middle d-inline-block" style="max-width:150px" title="${name}">${name}</b>`;
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
@@ -127,7 +123,6 @@ const recordTagDefinitionChange = async ({ companyId, projectId, actorId, previo
 
 module.exports = {
     HISTORY,
-    SERVER_BUILT_HISTORY,
     describeChecklistChange,
     describeTagDefinitionChange,
     recordChecklistChange,

@@ -21,12 +21,11 @@ vi.mock('vuex', () => ({
 vi.mock('@/store/index', () => ({ default: { getters: {}, commit: vi.fn() } }));
 vi.mock('@/locales/main', () => ({ i18n: { global: { t: (key) => key } } }));
 
-import * as env from '@/config/env';
 import TagChip from '@/components/atom/TagChip/TagChip.vue';
 import { createTag, addTaskTag } from '@/components/molecules/TagList/helper.js';
 
 const SRC = path.resolve(__dirname, '../../src');
-const posted = () => apiRequest.mock.calls.filter(([method, url]) => method === 'post' && [env.HANDLE_HISTORY, env.HANDLE_NOTIFICATION].includes(url));
+const posted = () => apiRequest.mock.calls.filter(([method, url]) => method === 'post' && /\/api\/v1\/handle(History|Notification)$/.test(String(url)));
 
 beforeEach(() => {
     apiRequest.mockReset();

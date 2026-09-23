@@ -54,15 +54,6 @@ const save = async (body, uid = MEMBER) => {
     return r;
 };
 
-const handlers = {};
-const app = { post: (path, ...fns) => { handlers[`POST ${path}`] = fns[fns.length - 1]; }, get: () => {}, put: () => {} };
-require('../Modules/notification1/routes').init(app);
-const post = async (path, body, uid = MEMBER) => {
-    const r = reply();
-    await handlers[`POST ${path}`]({ headers: { companyid: CID }, body, uid }, r);
-    await settle();
-    return r;
-};
 
 const everyone = (uid) => ({ uid, roleType: uid === OWNER ? 1 : 3, companyWide: uid === OWNER, everyone: uid === OWNER, visible: uid === OWNER ? null : [PROJECT] });
 
@@ -198,42 +189,5 @@ describe('a planned estimate is described on the server', () => {
         expect(r.code).toBe(403);
         expect(historyRows()).toEqual([]);
         expect(notices()).toEqual([]);
-    });
-});
-
-describe('the generic history and notification routes leave planned estimates to the server', () => {
-    const historyBody = (key) => ({
-        type: 'task',
-        companyId: CID,
-        projectId: PROJECT,
-        taskId: TASK,
-        object: { sprintId: SPRINT, key, message: `<b>${HTML}</b>` },
-        userData: { id: MEMBER, Employee_Name: 'Max Member', companyOwnerId: OWNER },
-    });
-
-    test('a planned estimate history row sent by the web app is not stored', async () => {
-        const r = await post('/api/v1/handleHistory', historyBody('Task_Due_Date'));
-        expect(r.body).toMatchObject({ status: true });
-        expect(historyRows()).toEqual([]);
-    });
-
-    test('a planned estimate notification sent by the web app is not sent', async () => {
-        const r = await post('/api/v1/handleNotification', {
-            type: 'tasks',
-            companyId: CID,
-            projectId: PROJECT,
-            taskId: TASK,
-            sprintId: SPRINT,
-            userData: { id: MEMBER, Employee_Name: 'Max Member', companyOwnerId: OWNER },
-            object: { key: 'task_estimated_hours', message: `<p>${HTML}</p>` },
-        });
-        expect(r.body).toMatchObject({ status: true });
-        expect(HandleBothNotification).not.toHaveBeenCalled();
-    });
-
-    test('other history rows still go through', async () => {
-        const r = await post('/api/v1/handleHistory', historyBody('task_checklist'));
-        expect(r.body).toMatchObject({ status: true });
-        expect(historyRows().map((row) => row.Key)).toEqual(['task_checklist']);
     });
 });

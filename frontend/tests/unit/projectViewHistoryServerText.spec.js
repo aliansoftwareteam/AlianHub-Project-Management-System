@@ -19,11 +19,10 @@ vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: (id) => (
 vi.mock('@/components/molecules/EmbedView/helper.js', () => ({ editView, deleteView }));
 vi.mock('@/components/molecules/ProjectViews/helper.js', async (importOriginal) => ({ ...(await importOriginal()), editPrivateName, deletePrivateView }));
 
-import * as env from '@/config/env';
 import { useEmbedViews } from '@/views/Projects/composables/useEmbedViews';
 
 const SRC = path.resolve(__dirname, '../../src');
-const posted = () => apiRequest.mock.calls.filter(([method, url]) => method === 'post' && [env.HANDLE_HISTORY, env.HANDLE_NOTIFICATION].includes(url));
+const posted = () => apiRequest.mock.calls.filter(([method, url]) => method === 'post' && /\/api\/v1\/handle(History|Notification)$/.test(String(url)));
 
 const withEmbedViews = (views) => {
     let api;
@@ -65,9 +64,9 @@ describe('project view and saved filter changes leave their history text to the 
         'components/molecules/ProjectViews/ViewsDropdown.vue',
         'components/molecules/EmbedView/EmbedView.vue',
         'views/Projects/composables/useEmbedViews.js',
-    ])('%s posts history text only for private views, through the private view helper', (file) => {
+    ])('%s posts no history text, private views included', (file) => {
         const source = fs.readFileSync(path.join(SRC, file), 'utf8');
-        expect(source).not.toMatch(/HANDLE_HISTORY|HANDLE_NOTIFICATION/);
+        expect(source).not.toMatch(/HANDLE_HISTORY|HANDLE_NOTIFICATION|privateViewHistory/);
     });
 
     it('renaming and deleting a project embed view saves it and posts no text', async () => {
@@ -84,15 +83,22 @@ describe('project view and saved filter changes leave their history text to the 
         expect(posted()).toEqual([]);
     });
 
-    it('a private embed view still records its own row, since private views are saved on the member', async () => {
+    it('a private embed view posts no text either, since the member route records it', async () => {
         const view = { _id: 'p1', id: 'p1', name: 'Mine', isPrivate: true };
-        const { api, openDelete } = withEmbedViews([view]);
+        const { api, renameValue, openDelete } = withEmbedViews([view]);
+        renameValue.value = { name: 'Ours', id: 'p1' };
+        api.editViewName(view);
         openDelete.value = { flag: true, data: view };
         api.deleteEmbedView();
         await flushPromises();
 
+        expect(editPrivateName).toHaveBeenCalled();
         expect(deletePrivateView).toHaveBeenCalled();
-        expect(posted()).toHaveLength(1);
-        expect(posted()[0][2]).toMatchObject({ type: 'project', projectId: 'project-1', object: { key: 'Project_Name' } });
+        expect(posted()).toEqual([]);
+    });
+
+    it('the private view helper posts no history text', () => {
+        const source = fs.readFileSync(path.join(SRC, 'components/molecules/ProjectViews/helper.js'), 'utf8');
+        expect(source).not.toMatch(/HANDLE_HISTORY|privateViewHistory/);
     });
 });

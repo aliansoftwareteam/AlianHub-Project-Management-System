@@ -8,15 +8,10 @@ jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () 
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../Modules/Tasks/helpers/handleNotification', () => ({ HandleBothNotification: jest.fn(async () => ({ status: true })) }));
 
-const { SCHEMA_TYPE } = require('../Config/schemaType');
-
 /* Follow-up 111: custom field values, tags and project checklist items are described on the server from stored values. */
 
-const CID = '6f00000000000000000000c1';
 const OWNER = '6f0000000000000000000001';
 const MEMBER = '6f0000000000000000000003';
-const PROJECT = '6f0000000000000000000a01';
-const TASK = '6f0000000000000000000b01';
 const HTML = '<img src=x onerror=alert(1)>';
 const ESCAPED = '&lt;img src=x onerror=alert&#40;1&#41;&gt;';
 const ITEM_NAME = (name) => `<b class="text-ellipsis vertical-middle d-inline-block" style="max-width:150px" title="${name}">${name}</b>`;
@@ -24,27 +19,6 @@ const ITEM_NAME = (name) => `<b class="text-ellipsis vertical-middle d-inline-bl
 const actor = { id: OWNER, Employee_Name: 'Olivia Owner' };
 const taskItems = () => require('../Modules/Tasks/helpers/taskItemHistory');
 const projectItems = () => require('../Modules/Project/helpers/projectItemHistory');
-
-const settle = async () => { for (let i = 0; i < 40; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
-const clone = (value) => JSON.parse(JSON.stringify(value));
-const reply = () => {
-    const r = { code: 200, body: null };
-    r.status = (code) => { r.code = code; return r; };
-    r.json = (body) => { r.body = body; return r; };
-    r.send = r.json;
-    return r;
-};
-
-const handlers = {};
-const app = { post: (path, ...fns) => { handlers[`POST ${path}`] = fns[fns.length - 1]; }, get: () => {}, put: () => {} };
-require('../Modules/notification1/routes').init(app);
-const post = async (path, body) => {
-    const r = reply();
-    await handlers[`POST ${path}`]({ headers: { companyid: CID }, body, uid: MEMBER }, r);
-    await settle();
-    return r;
-};
-const historyRows = () => clone(mockDb.store[SCHEMA_TYPE.HISTORY] || []);
 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
@@ -196,25 +170,5 @@ describe('a project tag definition change', () => {
         expect(describeChange({ operation: 'delete', items: { id: 'zz' } })).toEqual([]);
         expect(describeChange({ operation: 'update', key: 'tagName', items: { id: 't1', tagName: 'Urgent' } })).toEqual([]);
         expect(describeChange({ operation: 'update', key: 'tagName', items: { id: 't1', tagName: HTML } })[0].message).toContain(`<b>${ESCAPED} </b>`);
-    });
-});
-
-describe('the generic history route leaves these changes to the server', () => {
-    const historyBody = (type, key) => ({
-        type,
-        companyId: CID,
-        projectId: PROJECT,
-        taskId: type === 'task' ? TASK : null,
-        object: { key, message: `<b>${HTML}</b>` },
-        userData: { id: MEMBER, Employee_Name: 'Max Member', companyOwnerId: OWNER },
-    });
-
-    test.each([
-        ['task', 'Project_Category'], ['task', 'task'],
-        ['project', 'Task_Checklist'], ['project', 'Task_Checklist_Assign'], ['project', 'Task_Checklist_Remove'], ['project', 'CheckList_Checked'], ['project', 'Project_Comment'],
-    ])('a %s %s row sent by the web app is not stored', async (type, key) => {
-        const r = await post('/api/v1/handleHistory', historyBody(type, key));
-        expect(r.body).toMatchObject({ status: true });
-        expect(historyRows()).toEqual([]);
     });
 });

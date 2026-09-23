@@ -81,7 +81,7 @@ describe('a planned estimate', () => {
         expect(notice.message).not.toMatch(/img|onerror/);
     });
 
-    it('is not written a second time by the generic history route', async () => {
+    it('is not written a second time through the retired generic history route', async () => {
         const task = await freshTask();
         const res = await member.api.post('/api/v1/handleHistory', {
             type: 'task',
@@ -91,7 +91,7 @@ describe('a planned estimate', () => {
             object: { sprintId: task.sprintId, key: 'Task_Due_Date', message: `<b>${HTML}</b>` },
             userData: { id: member.uid, Employee_Name: 'Max Member', companyOwnerId: owner.uid },
         });
-        expect([res.status, res.body.status]).toEqual([200, true]);
+        expect(res.status).toBe(404);
         await new Promise((resolve) => setTimeout(resolve, 500));
         expect(await historyOf(task._id, 'Task_Due_Date')).toEqual([]);
     });

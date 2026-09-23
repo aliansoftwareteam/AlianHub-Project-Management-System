@@ -13,6 +13,11 @@ jest.mock('../Modules/Comments/helpers/threadWriteAccess', () => ({
     changesThreadOrAuthor: () => false,
 }));
 
+jest.mock('../Modules/Comments/helpers/commentNotifications', () => {
+    const { parseMentionIds } = jest.requireActual('../Modules/Comments/helpers/parseMentions');
+    return { resolveMentionIds: async (companyId, authorId, thread, message) => parseMentionIds(message), notifyCommentThread: async () => {} };
+});
+
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { save, update } = require('../Modules/Comments/controller');
 

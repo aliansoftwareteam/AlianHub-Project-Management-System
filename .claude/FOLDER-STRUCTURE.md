@@ -70,7 +70,6 @@ AlianHub-Project-Management-System/
 │   ├── Notes/
 │   ├── notification/
 │   ├── notification-count/
-│   ├── notification1/
 │   ├── OAuth/
 │   ├── Pages/
 │   ├── PersonalList/

@@ -9,6 +9,8 @@ const { getRoleType, isPrivileged, invalidateRoleCache, ROLE_OWNER } = require('
 const { judgeMemberUpdate, judgeInvitationAcceptance, memberRowView } = require('./membershipGuard');
 const { SEAT_CANCELLED, SEAT_PENDING } = require('../../../Config/seatStatus');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
+const { recordPrivateViewChange } = require('./privateViewHistory');
+const logger = require('../../../Config/loggerConfig');
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const ACTIVE = 2;
@@ -244,6 +246,8 @@ exports.handlePrivateView = async (req, res) => {
         });
 
         if (response) {
+            recordPrivateViewChange({ companyId, uid: req.uid, operation, key, data, previous: row })
+                .catch((error) => logger.error(`private view history: ${error && error.message}`));
             return res.status(200).json({ status: true, statusText: 'Private view saved.' });
         } else {
             return res.status(404).json({ status: false, statusText: 'Private view not saved.' });

@@ -73,42 +73,9 @@ describe('POST /api/v2/prepare-notification-data acts for the signed-in user', (
         expect(receivers).toEqual([insider]);
     });
 
-    it('refuses a body that names another company', async () => {
-        const res = await prepare(member, `steer ${tag()}`, { companyId: COMPANY_B });
-        expect([res.status, res.body && res.body.status]).toEqual([403, false]);
-    });
-});
-
-describe('POST /api/v1/handleNotification acts for the signed-in user', () => {
-    const notify = (session, message, userData) => session.api.post('/api/v1/handleNotification', {
-        type: 'project',
-        companyId: session.companyId,
-        projectId: PROJECT._id,
-        object: { key: 'project_milestone', message },
-        userData,
-    });
-
-    it('stores the caller as the sender when userData names someone else', async () => {
-        const message = `project sender ${tag()}`;
-        const res = await notify(member, message, { id: admin.userId, companyOwnerId: owner.userId });
-        expect(res.body).toMatchObject({ status: true });
-
-        const stored = await waitFor(async () => (await rows(message)).find((row) => row.receiverID === owner.userId));
-        expect(stored).toBeTruthy();
-        expect(stored.userId).toBe(member.userId);
-    });
-
-    it('does not add a company owner who holds no seat in the company', async () => {
-        const message = `project owner ${tag()}`;
-        await notify(member, message, { id: member.userId, companyOwnerId: former });
-
-        await settle(2500);
-        expect((await rows(message)).filter((row) => row.receiverID === former)).toEqual([]);
-    });
-
     it('delivers a normal notification that the recipient can read and mark read', async () => {
         const message = `normal flow ${tag()}`;
-        await notify(member, message, { id: member.userId, companyOwnerId: owner.userId });
+        await prepare(member, message, { assigneeUsers: [owner.userId], notSeen: [owner.userId] });
         const stored = await waitFor(async () => (await rows(message)).find((row) => row.receiverID === owner.userId && row.notificationType === 'push'));
         expect(stored).toBeTruthy();
 
@@ -119,5 +86,10 @@ describe('POST /api/v1/handleNotification acts for the signed-in user', () => {
         expect(read.body).toMatchObject({ status: true });
         const after = await client.db(state.companyId).collection('notifications').findOne({ _id: stored._id });
         expect(after.notSeen).not.toContain(owner.userId);
+    });
+
+    it('refuses a body that names another company', async () => {
+        const res = await prepare(member, `steer ${tag()}`, { companyId: COMPANY_B });
+        expect([res.status, res.body && res.body.status]).toEqual([403, false]);
     });
 });

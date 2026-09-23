@@ -1900,85 +1900,39 @@ function filterUsers(users = null) {
 }
 
 function sendNotification(messageData, otherUsers = []) {
-    let receivers = Array.from(new Set([...otherUsers]));
+    const receivers = Array.from(new Set([...otherUsers])).filter((x) => x !== userId.value);
 
-    receivers = receivers?.filter((x) => x !== userId.value) || [];
-
-    // UPDATE COUNTS OF MENTIONS
-    let mentionCounts = {
+    apiRequest("post", env.UPDATE_UNREADREAD_COMMENTS_COUNT, {
         companyId : companyId.value,
         key : 4,
         userIds: receivers,
         readAll: false
-    }
-    apiRequest("post", env.UPDATE_UNREADREAD_COMMENTS_COUNT, mentionCounts).catch((error) => {
+    }).catch((error) => {
         console.error(error,"ERROR");
     })
 
+    if(!props?.mainChat || otherUsers?.length || !props?.watchers?.length || !messageData?.userId) return;
+
+    const userIds = props.watchers.filter((id) => id !== messageData.userId);
+    if(!userIds.length) return;
+
     const user = getUser(userId.value);
-    // const user = getUser(props.creator?.uid);
-    const currentUser = {
-        id: user._id,
-        Employee_Name: user.Employee_Name,
-        companyOwnerId: user.companyOwnerId,
-    }
-    const finalNotification = {
-        key: props?.mainChat ? otherUsers?.length ?  "comments_I'm_@mentioned_in" : "message_create" : "comments_I'm_@mentioned_in",
-        message: messageData.message
-    }
-    if(props.commentType === 'project'){
-        apiRequest("post", env.HANDLE_NOTIFICATION, {
-            type: 'project',
-            companyId: companyId.value,
-            projectId: projectData.value._id,
-            object: finalNotification,
-            userData: currentUser,
-            mentionUserId:messageData?.mentionIds || [],
-            comments_id: messageData._id
-        })
-        .catch((error) => {
-            console.error("ERROR in update notification", error);
-        })
-    } else if(props?.mainChat && !otherUsers?.length) {
-        if(props?.watchers && props?.watchers?.length && messageData?.userId){
-            const userIds = props.watchers;
-            const index = userIds.indexOf(messageData.userId);
-            if (index > -1) {
-                userIds.splice(index, 1);
-            }
-    
-            if(userIds && userIds.length){
-                apiRequest("post", env.SEND_FCM, {
-                    message: messageData.message,
-                    companyId: companyId.value,
-                    userIdArray:userIds,
-                    key: 'message_create',
-                    type:'chat',
-                    senderUserDetail:currentUser,
-                    actionUrl:`${companyId.value}/chat/${messageData.objId.projectId}/${messageData?.objId?.taskId ? messageData.objId.taskId : messageData.objId.sprintId}`
-                })
-                .catch((error) => {
-                    console.error("ERROR in send notification: ", error);
-                })
-            }
-        }
-    } else {
-        apiRequest("post", env.HANDLE_NOTIFICATION, {
-            type: props?.mainChat ? "chat" : "tasks",
-            companyId: companyId.value || '',
-            projectId: projectData?.value?._id || '',
-            taskId: props?.taskId || '',
-            folderId: props?.folderId ? props.folderId : '',
-            sprintId: props?.sprintId || '',
-            userData: currentUser,
-            object: finalNotification,
-            comments_id: messageData?._id,
-            isGroupChat:props?.selectedChat?.TaskName ? false : true
-        })
-        .catch((error) => {
-            console.error("ERROR in send notification: ", error);
-        })
-    }
+    apiRequest("post", env.SEND_FCM, {
+        message: messageData.message,
+        companyId: companyId.value,
+        userIdArray: userIds,
+        key: 'message_create',
+        type: 'chat',
+        senderUserDetail: {
+            id: user._id,
+            Employee_Name: user.Employee_Name,
+            companyOwnerId: user.companyOwnerId,
+        },
+        actionUrl: `${companyId.value}/chat/${messageData.objId.projectId}/${messageData?.objId?.taskId ? messageData.objId.taskId : messageData.objId.sprintId}`
+    })
+    .catch((error) => {
+        console.error("ERROR in send notification: ", error);
+    })
 }
 
 function updateLastMessageTime(msgObj = {}) {
@@ -2044,13 +1998,6 @@ async function sendMessageFun(messageData,isReset = true) {
                     let {mentions, msg} = checkMentions(messageObj.message);
 
                     if(mentions.length) {
-                        if(mentions.includes("everyone")) {
-                            messageObj.mentionIds = users.value
-                                ?.filter((user) => !user.ghostUser && user.id !== messageData.userId)
-                                .map((x) => x.id); 
-                        } else {
-                            messageObj.mentionIds = mentions;
-                        }
                         messageObj.message = msg;
                     }
                 }
