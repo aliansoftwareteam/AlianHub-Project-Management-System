@@ -59,6 +59,7 @@ function seedTemplateSamples (project, createObject, sprintRes) {
 const { resolveProjectSkills } = require("../settings/ProjectSkills/helper");
 const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require("../Project/helpers/projectSourceRules");
 const { stepProjectCount } = require("../Project/helpers/projectQuota");
+const { recordProjectCreated } = require("../Project/helpers/projectHistory");
 
 exports.checkProjectPlan = (req) => {
     return new Promise(async(resolve,reject) => {
@@ -135,6 +136,10 @@ exports.createProjectFun = async(req, res) => {
                 exports.createProject(req).then((cData) => {
                     removeCache("UserProjectData:", true);
                     res.send(cData);
+                    if (cData && cData.status === true && cData.data) {
+                        recordProjectCreated({ companyId, project: cData.data, actorId: creator })
+                            .catch((error) => logger.error(`project created history failed: ${(error && error.message) || error}`));
+                    }
                 })
                 .catch((error) => {
                     exports.removeProjectCount(companyId, isPrivateSpace);

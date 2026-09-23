@@ -240,7 +240,7 @@ const projectActor = async (companyId, uid) => ({
 const logFailure = (what) => (error) => logger.error(`${what}: ${(error && error.message) || JSON.stringify(error)}`);
 
 const send = ({ companyId, projectId, actor, entries }) => Promise.all(entries.flatMap((entry) => [
-    HandleHistory('project', companyId, String(projectId), null, entry.history, actor).catch(logFailure('project history')),
+    entry.history ? HandleHistory('project', companyId, String(projectId), null, entry.history, actor).catch(logFailure('project history')) : null,
     entry.notice
         ? HandleBothNotification({
             type: 'project',
