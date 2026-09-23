@@ -5,6 +5,7 @@ const { recordAudit } = require('../Audit/recorder');
 const guard = require('../AICore/instructionGuard');
 const rules = require('../AICore/instructionPatternRules');
 const store = require('../AICore/instructionPatterns');
+const { requestAddress } = require('../../utils/requestAddress');
 
 const ADDED_ACTION = 'ai.instruction_pattern_added';
 const REMOVED_ACTION = 'ai.instruction_pattern_removed';
@@ -46,11 +47,6 @@ const userNames = async (ids) => {
 const byAdminKey = (req) => req.instanceAdmin === 'key';
 const actorOf = (req) => (byAdminKey(req) ? ADMIN_KEY_ACTOR : String(req.uid || ''));
 
-const clientIp = (req) => {
-    const forwarded = req.headers['x-forwarded-for'] || req.ip;
-    return forwarded ? String(forwarded).split(',')[0] : '';
-};
-
 /* The list is instance-wide, so its rows go to the global database's audit log rather than any one workspace's. */
 const audit = (req, action, row) => {
     const actorId = actorOf(req);
@@ -63,7 +59,7 @@ const audit = (req, action, row) => {
         .then((names) => recordAudit(SCHEMA_TYPE.GOLBAL, {
             actorId,
             actorName: names.get(actorId) || '',
-            ip: clientIp(req),
+            ip: requestAddress(req),
             action,
             entityType: 'instruction_pattern',
             entityId: String(row._id),

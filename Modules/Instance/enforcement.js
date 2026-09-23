@@ -7,6 +7,7 @@ const socketEmitter = require('../../event/socketEventEmitter');
 const enforcement = require('../../Config/permissionEnforcement');
 const { REASONS, KNOWN_DIFFERENCE_REASONS } = require('../../Config/permissionDecisions');
 const { recordAudit } = require('../Audit/recorder');
+const { requestAddress } = require('../../utils/requestAddress');
 
 const { MODES, INHERIT, INSTANCE_ENV_KEY, COMPANY_FIELD, REPORT } = enforcement;
 const READY_AFTER_DAYS = 14;
@@ -191,11 +192,6 @@ const requestedMode = (body, { allowInherit }) => {
     return MODES.includes(value) ? value : null;
 };
 
-const clientIp = (req) => {
-    const forwarded = req.headers['x-forwarded-for'] || req.ip;
-    return forwarded ? String(forwarded).split(',')[0] : '';
-};
-
 const auditModeChange = (req, companyId, company, meta) => {
     const actorId = String(req.uid || '');
     userNames([actorId])
@@ -206,7 +202,7 @@ const auditModeChange = (req, companyId, company, meta) => {
         .then((names) => recordAudit(companyId, {
             actorId,
             actorName: names.get(actorId) || '',
-            ip: clientIp(req),
+            ip: requestAddress(req),
             action: MODE_CHANGED_ACTION,
             entityType: 'company',
             entityId: companyId,

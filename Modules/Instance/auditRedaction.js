@@ -4,6 +4,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { recordAudit } = require('../Audit/recorder');
 const redact = require('../Audit/redact');
+const { requestAddress } = require('../../utils/requestAddress');
 
 const ACTION = 'instance.audit_redact_person';
 const ADMIN_KEY_ACTOR = 'instance-admin-key';
@@ -25,11 +26,6 @@ const canonicalId = (value) => (typeof value === 'string' && OBJECT_ID.test(valu
 
 const byAdminKey = (req) => req.instanceAdmin === 'key';
 const actorOf = (req) => (byAdminKey(req) ? ADMIN_KEY_ACTOR : String(req.uid || ''));
-const clientIp = (req) => {
-    const forwarded = req.headers['x-forwarded-for'] || req.ip;
-    return forwarded ? String(forwarded).split(',')[0] : '';
-};
-
 const userName = async (id) => {
     if (!OBJECT_ID.test(id)) return '';
     const user = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.USERS, data: [{ _id: id }, { Employee_Name: 1 }] }, 'findOne');
@@ -46,7 +42,7 @@ const audit = (req, companyId, pseudonym, meta) => {
         .then((actorName) => recordAudit(companyId, {
             actorId,
             actorName,
-            ip: clientIp(req),
+            ip: requestAddress(req),
             action: ACTION,
             entityType: 'user',
             entityId: pseudonym,
