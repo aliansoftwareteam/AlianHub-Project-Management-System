@@ -6,6 +6,8 @@ const mongoose = require("mongoose")
  * The web app sends this route only from the project close, delete, archive and restore flows
  * (ProjectsListingSetting.vue, Item.vue), and only ever moves deletedStatusKey. The filter may carry
  * $in because the delete cascade matches tasks with no key; JSON turns that undefined into null.
+ * ProjectsListingSetting.vue sends the update already wrapped in $set; wrapping it again would name a
+ * "$set" field that the strict schema drops, so the write would match every task and change none.
  */
 const FILTER_FIELDS = ['ProjectID', 'deletedStatusKey'];
 const UPDATE_FIELD = 'deletedStatusKey';
@@ -72,7 +74,7 @@ exports.projectAlltaskUpdate = async (req,res) => {
                     ...req.body.findObject,
                     ProjectID: new mongoose.Types.ObjectId(projectId),
                 },
-                {$set: req.body.updateObject}
+                {$set: req.body.updateObject.$set || req.body.updateObject}
             ]
         }
         const result = await MongoDbCrudOpration(req.headers['companyid'], mongoObj, 'updateMany');

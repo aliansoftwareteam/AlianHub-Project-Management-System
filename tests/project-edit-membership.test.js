@@ -310,6 +310,18 @@ describe('every other project-mutating route runs the same guard', () => {
         expect(res.body).toMatchObject({ permission: 'project.project_details' });
     });
 
+    it('refuses an assigned member holding neither project delete nor project close on the bulk task update', async () => {
+        seedRules({ 'project.private_projects': 1, 'project.project_details': true, 'project.project_delete': false, 'project.project_close': false });
+        const project = seedProject({ AssigneeUserId: [MEMBER] });
+        const res = await run(
+            routesOf('../Modules/Project/routes')['PUT /api/v1/project/allTask/:id'],
+            request({ params: { id: String(project._id) }, body: { findObject: { deletedStatusKey: 0 }, updateObject: { deletedStatusKey: 8 } } }),
+        );
+        expect(res.statusCode).toBe(403);
+        expect(res.body).toMatchObject({ status: false });
+        expect(res.body.reached).toBeUndefined();
+    });
+
     it('leaves company-level custom fields and non-project trash kinds to their existing checks', async () => {
         seedRules({});
         const global = await run(routesOf('../Modules/CustomField/routes')['POST /api/v1/customField'], request({ body: { type: 'save', updateObject: { global: true } } }));
