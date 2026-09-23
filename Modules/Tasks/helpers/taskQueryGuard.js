@@ -3,6 +3,7 @@ const { dbCollections } = require('../../../Config/collections');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { visibleProjectIds } = require('../../Agents/scope');
 const { hiddenSprintIds } = require('../../Sprints/helpers/sprintVisibility');
+const { narrowingFor } = require('../../../Config/tokenNarrowing');
 
 const MAX_LIMIT = 1000;
 const MAX_STAGES = 40;
@@ -111,14 +112,16 @@ const toObjectIds = (ids) => (ids || [])
     .filter((id) => /^[a-f0-9]{24}$/i.test(String(id)))
     .map((id) => new mongoose.Types.ObjectId(String(id)));
 
-/* Owners and admins keep company-wide task visibility; everyone else sees the projects the
- * sidebar lists for them, minus the private sprints they are not shared with. */
+/* Owners and admins keep company-wide task visibility unless a token narrows them to some projects;
+ * everyone else sees the projects the sidebar lists for them, minus the private sprints they are not
+ * shared with. */
 const visibilityStage = async (companyId, uid) => {
     const roleType = await getRoleType(companyId, uid);
-    if (isPrivileged(roleType)) return null;
+    const privileged = isPrivileged(roleType);
+    if (privileged && !narrowingFor(uid)) return null;
     const ids = roleType === null ? [] : await visibleProjectIds(companyId, uid);
     const projects = toObjectIds(ids);
-    const hidden = await hiddenSprintIds(companyId, uid, projects);
+    const hidden = privileged ? [] : await hiddenSprintIds(companyId, uid, projects);
     return { $match: { ProjectID: { $in: projects }, ...(hidden.length ? { sprintId: { $nin: hidden } } : {}) } };
 };
 
