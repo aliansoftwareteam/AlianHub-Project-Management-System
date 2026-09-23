@@ -89,6 +89,8 @@ const INSTANCE_ROUTES = [
     ['get', '/api/v2/instance/backups/alianhub-14.0.0-20260101-000000.tar.gz/download'],
     ['post', '/api/v2/instance/backups/alianhub-14.0.0-20260101-000000.tar.gz/restore', { confirm: 'alianhub-14.0.0-20260101-000000.tar.gz' }],
     ['delete', '/api/v2/instance/backups/alianhub-14.0.0-20260101-000000.tar.gz'],
+    ['get', '/api/v2/instance/orphan-databases'],
+    ['post', `/api/v2/instance/orphan-databases/${state.companyId}/drop`, { confirm: state.companyId }],
     ['get', '/api/v2/instance/ai/providers'],
     ['get', '/api/v2/instance/stats'],
     ['get', '/api/v2/instance/companies'],

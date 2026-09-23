@@ -1,7 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
-  "updatedAt": "2026-09-23T15:27:43.468Z",
+  "updatedAt": "2026-09-23T16:00:44.491Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_available_on_paid_plans_upgrade_now": "AI is only available for purchase on our paid plans. Upgrade and add AI now!",
@@ -8690,6 +8690,13 @@
     "Ai.skill_read_err_link_invalid": "This read cannot take that link; choose one from the list.",
     "Ai.skill_read_err_hosts_max": "List at most {max} other hosts.",
     "Ai.skill_read_err_path_or_link": "Give a path, or choose a link to read.",
-    "Time.agent_load_failed": "Agent proposals didn't load. Refresh to try again."
+    "Time.agent_load_failed": "Agent proposals didn't load. Refresh to try again.",
+    "Instance.restore_orphans": "{n} company database(s) have no company after the restore. They were kept; review them below.",
+    "Instance.orphans_title": "Company databases with no company",
+    "Instance.orphans_lead": "No company or user on this instance refers to these databases, usually because a restore went back to before the company was created. Nothing drops them automatically. If a restore left them, the safety backup taken just before it still holds them.",
+    "Instance.orphan_database": "Database",
+    "Instance.orphan_drop": "Drop",
+    "Instance.orphan_drop_go": "Drop this database",
+    "Instance.orphan_dropped": "Dropped {name} ({size})."
   }
 }
