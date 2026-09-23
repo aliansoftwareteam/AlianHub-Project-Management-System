@@ -83,6 +83,16 @@ describe('the calendar controls in the project toolbar', () => {
     });
 });
 
+describe('the project calendar layout', () => {
+    test('stacks its bar over the grid even though Chat shares the .ah-page.cv root', () => {
+        const tokens = read('assets/css/tokens.css');
+        expect(tokens).toMatch(/\.ah-page\.cv[,\s]/);
+        const css = read('views/Projects/ProjectCalendarView/style.css');
+        expect(ruleBody(css, '.ah-page.cv')).toMatch(/flex-direction:\s*column/);
+        expect(read('views/Projects/ProjectCalendarView/CalendarViewComponent.vue')).toMatch(/<style scoped src="\.\/style\.css">/);
+    });
+});
+
 describe('the project calendar card in dark mode', () => {
     test('the legacy white sprint card takes the dark surface when it holds the calendar', () => {
         const css = read('assets/css/tokens.css');
