@@ -70,6 +70,7 @@ const OUTSIDE_GATEWAY = {
     'Modules/AICore/llmProvider/anthropicProvider.js': { uses: ['sdk:@anthropic-ai/sdk'], why: 'model provider calls through the Anthropic SDK to the endpoint the instance configures' },
     'Modules/Knowledge/ingest/extract/extractor.js': { uses: ['process'], why: 'starts the thread an uploaded file is parsed in, with an empty environment; nothing is fetched' },
     'Modules/Knowledge/ingest/extract/parseWorker.js': { uses: ['process'], why: 'that thread itself, reading the bytes it was handed; nothing is fetched' },
+    'Modules/AICore/instructionGuard.js': { uses: ['eval'], why: 'runs an owner-added guard pattern in a vm context only so a timeout can stop it; the context holds the pattern and the text, nothing is fetched' },
 };
 
 /* Node modules that reach the network (or run a process that could), as the kind a finding names. */
