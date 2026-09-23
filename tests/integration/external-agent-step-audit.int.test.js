@@ -22,6 +22,7 @@ const chain = require('../../Modules/Audit/chain');
 const tokenHash = require('../../Modules/OAuthServer/tokenHash');
 require('../../Modules/Workflows/stepTypes');
 const workflowStore = require('../../Modules/Workflows/store');
+const queue = require('../../Modules/Workflows/queue');
 const externalSession = require('../../Modules/Workflows/externalSession');
 const lifecycle = require('../../Modules/AgentSessions/lifecycle');
 
@@ -86,6 +87,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+    jest.restoreAllMocks();
     lifecycle.reset();
     await chain.flushMirrors();
     if (client) {
@@ -101,6 +103,17 @@ afterAll(async () => {
 
 describe('a grant revoked while an external_agent step waits', () => {
     it('revokes the session, attributes the refusal to the client and the person, fails the step by name and keeps the chain whole', async () => {
+        // Closing the session wakes the step in the background, and that tick writes the failed step before it
+        // settles the run, so the test waits for the tick itself rather than for the step row.
+        const dispatch = queue.dispatch;
+        const woken = new Promise((resolve) => {
+            jest.spyOn(queue, 'dispatch').mockImplementation((...args) => {
+                const ticked = dispatch(...args);
+                resolve(ticked);
+                return ticked;
+            });
+        });
+
         const closed = await externalSession.refuseRevokedToken(RAW, { action: 'task.comment', ip: '203.0.113.9' });
         expect(closed).toEqual([sessionId]);
 
@@ -114,10 +127,8 @@ describe('a grant revoked while an external_agent step waits', () => {
         });
         expect(typeof refusal.chain.seq).toBe('number');
 
-        const step = await waitFor(async () => {
-            const row = await workflowStore.getStep(COMPANY, runId, STEP);
-            return row && row.status === 'failed' ? row : null;
-        });
+        expect(await woken).toBe('inline');
+        const step = await workflowStore.getStep(COMPANY, runId, STEP);
         expect(step).toMatchObject({ status: 'failed', error: expect.stringMatching(/revoked: the grant behind this session was revoked/) });
         expect((await workflowStore.getRun(COMPANY, runId)).status).toBe('failed');
 
