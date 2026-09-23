@@ -43,6 +43,14 @@ describe('Settings → Custom fields', () => {
     });
 });
 
+describe('Settings → Templates in dark mode', () => {
+    test('the dark tab tint leaves the active tab on the brand colour', () => {
+        const css = read('views/Settings/Template/style.css');
+        expect(css).toMatch(/:root\[data-theme="dark"\] \.tp__tab:not\(\.is-active\)\s*\{/);
+        expect(css).not.toMatch(/:root\[data-theme="dark"\] \.tp__tab\s*\{/);
+    });
+});
+
 describe('Docs hub', () => {
     const vue = read('views/Pages/PagesSpace.vue');
     const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));
