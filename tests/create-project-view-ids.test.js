@@ -76,6 +76,6 @@ describe('createProject wiring', () => {
         // the branches that can leave an entry without an id
         expect(repair).toBeGreaterThan(SRC.indexOf('createProjectObject.ProjectRequiredComponent = res.TemplateRequiredComponent'));
         expect(repair).toBeGreaterThan(SRC.indexOf('createProjectObject.ProjectRequiredComponent = projectRequiredTempComponent'));
-        expect(repair).toBeLessThan(SRC.indexOf('MongoDbCrudOpration(req.body.CompanyId, finalObj, "save")'));
+        expect(repair).toBeLessThan(SRC.indexOf('MongoDbCrudOpration(companyId, finalObj, "save")'));
     });
 });

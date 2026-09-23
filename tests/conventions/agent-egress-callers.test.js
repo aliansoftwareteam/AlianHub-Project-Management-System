@@ -5,7 +5,7 @@ const ROOT = path.join(__dirname, '..', '..');
 /* Everything an agent run can reach: the agents themselves, the workflow and automation engines that start them
  * and hold their tool steps, the MCP server's tools, knowledge retrieval, and the model layer they all call. */
 const SCANNED = ['Modules/Agents', 'Modules/Workflows', 'Modules/Automations', 'Modules/Mcp', 'Modules/Knowledge', 'Modules/AICore', 'Modules/AgentSessions'];
-const FETCH_HELPERS = { safeFetch: ['safeFetch'], pageAudit: ['fetchPage', 'audit', 'postJson'], agentFetch: ['fetchPage', 'audit', 'postJson', 'readDeclared'] };
+const FETCH_HELPERS = { safeFetch: ['safeFetch'], pageAudit: ['fetchPage', 'audit', 'postJson'], agentFetch: ['audit', 'postJson', 'readDeclared'] };
 const CID = '6f00000000000000000000a1';
 const ACTOR = '6f0000000000000000000011';
 
@@ -51,14 +51,6 @@ const FETCHERS = {
         uses: ['helper:agentFetch.*'],
         reach: () => require('../../Modules/AgentSessions/announce').deliver({ companyId: CID, actor: ACTOR, url: 'https://agent.example.com/hooks/alianhub', body: '{}', headers: {} }),
     },
-    'Modules/Agents/skills/prReview.js': {
-        uses: ['helper:agentFetch.fetchPage'],
-        reach: () => {
-            useSkill(require('../../Modules/Agents/skills/prReview'));
-            const task = { _id: 't1', TaskName: 'Review', links: [{ kind: 'pr', url: 'https://github.com/acme/repo/pull/7' }] };
-            return orchestrator().gather({ skillSlug: 'pr.summary', task, companyId: CID, startedBy: ACTOR });
-        },
-    },
 };
 
 // Deliberately outside the workspace gateway: none of these fetches a URL taken from task text.
@@ -70,6 +62,7 @@ const OUTSIDE_GATEWAY = {
     'Modules/AICore/llmProvider/anthropicProvider.js': { uses: ['sdk:@anthropic-ai/sdk'], why: 'model provider calls through the Anthropic SDK to the endpoint the instance configures' },
     'Modules/Knowledge/ingest/extract/extractor.js': { uses: ['process'], why: 'starts the thread an uploaded file is parsed in, with an empty environment; nothing is fetched' },
     'Modules/Knowledge/ingest/extract/parseWorker.js': { uses: ['process'], why: 'that thread itself, reading the bytes it was handed; nothing is fetched' },
+    'Modules/AICore/instructionGuard.js': { uses: ['eval'], why: 'runs an owner-added guard pattern in a vm context only so a timeout can stop it; the context holds the pattern and the text, nothing is fetched' },
 };
 
 /* Node modules that reach the network (or run a process that could), as the kind a finding names. */
@@ -236,7 +229,7 @@ describe('agent fetches go through the workspace egress gateway', () => {
             ['inline pageAudit', "module.exports = (u) => require('../Agents/engine/pageAudit').fetchPage(u);", 'helper:pageAudit.fetchPage'],
             ['inline agentFetch', "module.exports = (u) => require('../../Agents/engine/agentFetch.js').audit(u);", 'helper:agentFetch.audit'],
             ['helper namespace', "const sf = require('./safeFetch');\nmodule.exports = (u) => sf.safeFetch(u);", 'helper:safeFetch.*'],
-            ['helper renamed', "const { fetchPage: read } = require('./agentFetch');\nmodule.exports = read;", 'helper:agentFetch.fetchPage'],
+            ['helper renamed', "const { audit: read } = require('./agentFetch');\nmodule.exports = read;", 'helper:agentFetch.audit'],
             ['helper imported', "import { safeFetch } from '../engine/safeFetch';\nexport default safeFetch;", 'helper:safeFetch.*'],
             ['axios by a template require', 'module.exports = (u) => require(`axios`).get(u);', 'axios'],
             ['https by a template require', 'module.exports = (u) => require(`https`).get(u);', 'http'],
@@ -300,7 +293,7 @@ describe('agent fetches go through the workspace egress gateway', () => {
         });
 
         it('reports a listed file that gains another way out', () => {
-            const file = 'Modules/Agents/skills/prReview.js';
+            const file = 'Modules/AgentSessions/announce.js';
             expect(unexpected(scan({ ...repoFiles, [file]: `${repoFiles[file]}\nconst leak = (u) => fetch(u);\n` }))).toEqual([file]);
         });
 
@@ -348,8 +341,7 @@ describe('agent fetches go through the workspace egress gateway', () => {
         });
 
         it('a read outside the context is refused rather than made under the open rules', async () => {
-            const { fetchPage, audit } = require('../../Modules/Agents/engine/agentFetch');
-            await expect(fetchPage('https://github.com/acme/repo/pull/7.diff')).rejects.toMatchObject({ code: 'no_workspace' });
+            const { audit } = require('../../Modules/Agents/engine/agentFetch');
             await expect(audit('https://example.com/pricing')).rejects.toMatchObject({ code: 'no_workspace' });
             await expect(require('../../Modules/Agents/engine/agentFetch').postJson('https://agent.example.com/hooks/alianhub', { body: '{}' })).rejects.toMatchObject({ code: 'no_workspace' });
             expect(seen).toEqual([]);
