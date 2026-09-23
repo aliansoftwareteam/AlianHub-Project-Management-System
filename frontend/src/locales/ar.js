@@ -1756,6 +1756,7 @@ export default {
         "save": "Save",
         "saving": "Saving…",
         "saved": "Saved.",
+        "nothing_changed": "Nothing changed, so nothing was saved.",
         "cancel": "Cancel",
         "back": "Back",
         "next": "Next",

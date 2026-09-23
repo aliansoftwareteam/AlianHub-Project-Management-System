@@ -1,7 +1,7 @@
 {
   "locale": "fr",
   "machineTranslated": false,
-  "updatedAt": "2026-09-23T12:06:44.772Z",
+  "updatedAt": "2026-09-23T15:36:38.610Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6556,6 +6556,7 @@
     "Ai.skill_read_err_link_undeclared": "The skill does not ask the task for \"{input}\". Tick it under \"What the task must carry\", or choose another link.",
     "Ai.skill_read_err_link_invalid": "This read cannot take that link; choose one from the list.",
     "Ai.skill_read_err_hosts_max": "List at most {max} other hosts.",
-    "Ai.skill_read_err_path_or_link": "Give a path, or choose a link to read."
+    "Ai.skill_read_err_path_or_link": "Give a path, or choose a link to read.",
+    "Ai.nothing_changed": "Nothing changed, so nothing was saved."
   }
 }
