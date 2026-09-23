@@ -185,3 +185,26 @@ describe('marking a mention read', () => {
         expect(await stillUnreadFor(admin.uid)).toBe(false);
     });
 });
+
+describe('editing a comment', () => {
+    it('stores only the mentions of active members who can see the thread, never the author', async () => {
+        const id = await comment(member, `${mention(admin, 'Ada Admin')} first draft`);
+        await recordOnceSaved(id);
+        const stranger = new ObjectId().toHexString();
+
+        const res = await member.api.put('/api/v1/comments', {
+            id,
+            data: { message: `${mention(owner, 'Olivia Owner')} ${mention(guest, 'Gus Guest')} ${mention(member, 'Me')} @[Someone](${stranger}) second draft` },
+        });
+        expect(res.body.status).toBe(true);
+        expect((await stored(id)).mentionIds.map(String)).toEqual([owner.uid]);
+
+        const forged = await member.api.put('/api/v1/comments', { id, data: { mentionIds: [guest.uid] } });
+        expect(forged.body.status).toBe(true);
+        expect((await stored(id)).mentionIds.map(String)).toEqual([owner.uid]);
+
+        await quiet();
+        expect(await mentionRecords(id)).toHaveLength(1);
+        expect(await pushNotices(id, owner.uid)).toEqual([]);
+    });
+});
