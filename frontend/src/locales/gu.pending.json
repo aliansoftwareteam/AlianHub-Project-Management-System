@@ -1,6 +1,7 @@
 {
   "locale": "gu",
   "machineTranslated": false,
+  "updatedAt": "2026-09-23T16:23:41.253Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6120,6 +6121,7 @@
     "Time.overnight_title": "Timer left running overnight",
     "Time.pct_period": "{pct}% this period",
     "Time.per_day": "{h}h/day",
+    "Time.period_locked": "That day is in an approved timesheet period, so time can't be added to it.",
     "Time.pick_date": "Pick a date",
     "Time.pick_task": "Pick a task",
     "Time.prev_month": "Previous month",

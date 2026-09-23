@@ -1,6 +1,7 @@
 {
   "locale": "ar",
   "machineTranslated": false,
+  "updatedAt": "2026-09-23T16:23:41.045Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_available_on_paid_plans_upgrade_now": "AI is only available for purchase on our paid plans. Upgrade and add AI now!",
@@ -7194,6 +7195,7 @@
     "Time.overnight_title": "Timer left running overnight",
     "Time.pct_period": "{pct}% this period",
     "Time.per_day": "{h}h/day",
+    "Time.period_locked": "That day is in an approved timesheet period, so time can't be added to it.",
     "Time.pick_date": "Pick a date",
     "Time.pick_task": "Pick a task",
     "Time.prev_month": "Previous month",

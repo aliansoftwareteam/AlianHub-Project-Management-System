@@ -1342,6 +1342,7 @@ export default {
         hours_required: "Enter the hours to log.",
         task_required: "Pick a task first.",
         log_failed: "Couldn't log time — try again.",
+        period_locked: "That day is in an approved timesheet period, so time can't be added to it.",
         logged_ok: "Logged {h} on {task}.",
         search_tasks: "Search your tasks…",
         no_tasks: "No tasks match.",

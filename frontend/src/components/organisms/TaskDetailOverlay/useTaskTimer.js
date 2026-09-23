@@ -142,7 +142,7 @@ export async function stopTimer() {
     if (elapsedMs < 60000) return { ...entry, logged: false };
     try {
         const response = await apiRequest("post", env.ADD_TIMELOG, toLogPayload(entry, endedAt));
-        return { ...entry, logged: response?.data?.status !== false, statusText: response?.data?.statusText };
+        return { ...entry, logged: response?.data?.status !== false, statusText: response?.data?.statusText, code: response?.data?.code };
     } catch (error) {
         console.error("ERROR in stopTimer: ", error);
         return { ...entry, logged: false };

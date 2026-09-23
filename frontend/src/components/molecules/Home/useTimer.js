@@ -132,7 +132,7 @@ export function useTimer() {
         const snapshot = { taskName: a.taskName, elapsedMs: elapsedMs.value };
         const payload = logPayload(companyId, userId);
         const response = await apiRequest("post", env.ADD_TIMELOG, payload);
-        if (response?.data?.status === false) throw new Error(response.data.statusText || "log failed");
+        if (response?.data?.status === false) throw Object.assign(new Error(response.data.statusText || "log failed"), { code: response.data.code });
         clear();
         return snapshot;
     }

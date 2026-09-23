@@ -28,6 +28,13 @@ const { updateProjectForTimelog, findAndUpdateProjectOrTaskStartDate, updateRema
 const { pinSessionTenant } = require('../../../Config/tenant');
 const { trackerUser, refuse } = require('./sessionUser');
 const { escapeHtml } = require('../../../utils/escapeHtml');
+const { isPeriodLocked, PERIOD_LOCKED } = require('../../TimesheetApproval/helpers/lockGuard');
+
+const START_LOCKED = "This timesheet period is approved and locked — a timer can't start in it.";
+/* A running timer belongs to the day it started, so stopping one that started in an approved
+ * period is refused like any other change to that period, as trimming it already is. */
+const STOP_LOCKED = "This timesheet period is approved and locked — this timer's entry can't be changed.";
+const startsInLockedPeriod = (companyId, userId, startSec) => isPeriodLocked({ companyId, userId, date: new Date((Number(startSec) || 0) * 1000) });
 
 exports.timeTrackerStart = async (req, res) => {
     const companyId = pinSessionTenant(req, res);
@@ -57,6 +64,9 @@ exports.timeTrackerStart = async (req, res) => {
     }
     const utcDateTime = DateTime.utc();
     const timeStamp = Math.floor(utcDateTime.toSeconds());
+    if (await startsInLockedPeriod(companyId, actor.id, timeStamp)) {
+        return res.send({ status: false, statusText: START_LOCKED, code: PERIOD_LOCKED });
+    }
     let type = req.body.type || SCHEMA_TYPE.TIMESHEET
     let data = {
         CreatedAt: utcDateTime.ts,
@@ -154,8 +164,11 @@ exports.timeTrackerStart2 = async (req, res) => {
             }
         ]
     }
-    MongoDbCrudOpration(companyId, object,"findOne").then((cUser)=>{
-        if (cUser.isTrackerUser) {            
+    MongoDbCrudOpration(companyId, object,"findOne").then(async (cUser)=>{
+        if (cUser.isTrackerUser) {
+            if (await startsInLockedPeriod(companyId, actor.id, data.LogStartTime)) {
+                return res.send({ status: false, statusText: START_LOCKED, code: PERIOD_LOCKED });
+            }
             let obj = {
                 type: type,
                 data: data
@@ -289,8 +302,11 @@ exports.endTimeTracker = async (req, res) => {
          }]
     }
     MongoDbCrudOpration(companyId, objGet, "findOne")
-        .then((response) => {
+        .then(async (response) => {
             if (response && String(response.Loggeduser) !== actor.id) return refuse(res, 403, 'You can only track your own time.');
+            if (response && await startsInLockedPeriod(companyId, actor.id, response.LogStartTime)) {
+                return res.send({ status: false, statusText: STOP_LOCKED, code: PERIOD_LOCKED });
+            }
             let trackShots = [];
             let trttt = response.trackShots||[];
             if (response.trackShots && response.trackShots.length) {
