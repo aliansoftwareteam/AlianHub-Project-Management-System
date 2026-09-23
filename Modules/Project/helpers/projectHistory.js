@@ -32,6 +32,7 @@ const HISTORY = Object.freeze({
     PROPOSAL_ID: 'Project_ProposalId',
     SKILLS: 'Project_Skills',
     CUSTOM_FIELD: 'Project_CustomField',
+    ATTACHMENT: 'Project_Attachment',
 });
 
 const NOTICE = Object.freeze({
@@ -47,13 +48,14 @@ const NOTICE = Object.freeze({
     CREATED: 'project_create',
     SPRINT_CREATED: 'project_sprint_create',
     FOLDER_CREATED: 'project_folder_create',
+    ATTACHMENTS: 'attachments',
 });
 
 /* Project_Name is left out: views and tags still post their own rows under it. Assignee_Changed is the key the project header used. */
 const SERVER_BUILT_HISTORY = [
     HISTORY.STATUS, HISTORY.ASSIGNEE_ADD, HISTORY.ASSIGNEE_REMOVE, 'Assignee_Changed', HISTORY.TYPE, HISTORY.CURRENCY,
     HISTORY.DUE_DATE, HISTORY.START_DATE, HISTORY.END_DATE, HISTORY.WATCHERS, HISTORY.CREATED, HISTORY.SPRINT,
-    HISTORY.SOURCE, HISTORY.PROPOSAL_ID, HISTORY.SKILLS, HISTORY.CUSTOM_FIELD,
+    HISTORY.SOURCE, HISTORY.PROPOSAL_ID, HISTORY.SKILLS, HISTORY.CUSTOM_FIELD, HISTORY.ATTACHMENT,
 ].map((key) => ({ type: 'project', key }));
 const SERVER_BUILT_NOTIFICATIONS = Object.values(NOTICE);
 
@@ -255,6 +257,29 @@ const customFieldsChanged = async ({ A, set, previous, definitionOf }) => {
     return entries.filter(Boolean);
 };
 
+const attachmentsChanged = ({ A, P, previous, updateObject, key }) => {
+    const record = updateObject.attachments;
+    if (!record || typeof record !== 'object') return [];
+    if (key === '$push') {
+        const F = escapeText(record.filename);
+        return [{
+            history: { key: HISTORY.ATTACHMENT, message: `<b>${A}</b> has attached <b>${F}</b> on <b>${P}</b>.` },
+            notice: { key: NOTICE.ATTACHMENTS, message: `<p><strong>${F}</strong> attached on <strong>${P}</strong> project.</p>` },
+            changeType: 'name',
+            changeData: { url: F, ProjectName: P },
+        }];
+    }
+    const stored = record.id === undefined ? null : (previous.attachments || []).find((file) => file && String(file.id) === String(record.id));
+    if (!stored) return [];
+    const F = escapeText(stored.filename);
+    return [{
+        history: { key: HISTORY.ATTACHMENT, message: `<b>${A}</b> has deleted <b>${F}</b> on <b>${P}</b>.` },
+        notice: { key: NOTICE.ATTACHMENTS, message: `<p><strong>${F}</strong> removed on <strong>${P}</strong>.</p>` },
+        changeType: 'name',
+        changeData: { removeFileName: F, ProjectName: P },
+    }];
+};
+
 const SET_CHANGES = [
     renamed, statusChanged, trashedOrRestored, typeChanged, currencyChanged, datesChanged, iconChanged, sharingChanged, watchModeChanged,
     sourceChanged, proposalIdChanged, skillsChanged, customFieldsChanged,
@@ -268,6 +293,7 @@ const describeProjectChanges = async ({
     if (!previous || !updateObject || typeof updateObject !== 'object') return [];
     const ctx = { A: actor.Employee_Name, P: escapeText(previous.ProjectName), previous, updateObject, key, actor, nameOf, timeZone, skillNamesOf, definitionOf };
     if (!key || key === '$set') return (await Promise.all(SET_CHANGES.map((change) => change({ ...ctx, set: updateObject })))).flat();
+    if (['$push', '$pull'].includes(key) && has(updateObject, 'attachments')) return attachmentsChanged(ctx);
     return assigneeChanged(ctx);
 };
 
