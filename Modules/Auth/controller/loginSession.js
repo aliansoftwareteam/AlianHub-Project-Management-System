@@ -239,21 +239,18 @@ exports.logout = (req, res) => {
             domain: process.env.NODE_ENV === "production" ? req.hostname : undefined,
             expires: new Date(0)
         }
-        const updateData = [
-            { _id: new mongoose.Types.ObjectId(req.body.id) },
-            {
-                $set: { isOnline: false, lastActive: new Date() }
-            }
-        ];
-        let obj = {
-            type: dbCollections.USERS,
-            data: updateData
+        if (req.uid && mongoose.Types.ObjectId.isValid(String(req.uid))) {
+            await mongoC.MongoDbCrudOpration('global', {
+                type: dbCollections.USERS,
+                data: [
+                    { _id: new mongoose.Types.ObjectId(String(req.uid)) },
+                    { $set: { isOnline: false, lastActive: new Date() } }
+                ]
+            }, "updateOne");
+            removeCache(`UserData:${req.uid}`)
+            removeCache('UserAllData:',true)
         }
-        const cacheKey = `UserData:${req.body.id}`;
-        await mongoC.MongoDbCrudOpration('global', obj, "updateOne");         
-        removeCache(cacheKey)
-        removeCache('UserAllData:',true)
-            
+
         res.cookie("accessToken","deleted",{...deleteCookie})
         res.cookie("refreshToken","deleted",{...deleteCookie})
         
