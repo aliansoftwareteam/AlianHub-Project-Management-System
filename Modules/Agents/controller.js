@@ -388,6 +388,7 @@ exports.getRun = async (req, res) => {
         const pinned = await revisions.forRun(companyId, plain);
         plain.agentRevision = Number(pinned.n);
         plain.skillRevision = plain.skillRevision || null;
+        plain.skillSource = plain.skillSource || null;
         plain.traceId = plain.traceId || null;
         plain.steps = Array.isArray(plain.steps) ? plain.steps : [];
         const { actor } = caller;

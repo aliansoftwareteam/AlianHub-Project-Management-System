@@ -925,6 +925,8 @@ const schema = {
         agentRevision: { type: Number, required: false },
         // { key, hash, n } — the skill identity pinned at start: a data skill's version as n, a code skill's module hash with n null
         skillRevision: { type: Object, required: false },
+        // { kind: code | seed | workspace, version } — which implementation of the skill ran; version only on a workspace copy
+        skillSource: { type: Object, required: false },
         // W3C trace id shared by the run's steps, audit rows, log lines and spans
         traceId: { type: String, required: false },
         // [{ node, startedAt, endedAt, durationMs, spanId, traceId, status: ok | error | interrupted, tokens, costUsd }], one per node execution

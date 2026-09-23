@@ -136,11 +136,31 @@ const pinnedSkillRef = async (companyId, key) => {
     return skillRefOf(key);
 };
 
+/* A compiled seed carries source 'code' (builtInOf in skills/seeds) while a code module
+ * carries none, which is the only thing telling the two apart under one key. */
+const skillSourceOf = (skill) => {
+    if (!skill) return null;
+    if (skill.source === 'data') return { kind: 'workspace', version: Number(skill.version) };
+    return { kind: skill.source === 'code' ? 'seed' : 'code' };
+};
+
+const pinnedSkillSource = async (companyId, key) => {
+    try {
+        // eslint-disable-next-line global-require
+        return skillSourceOf(await require('./skillRecord').getSkill(companyId, key));
+    } catch (e) { logger.error(`[agent-revisions] skill ${key} source not resolved: ${e.message}`); }
+    return null;
+};
+
 /* What a run pins at start. */
 const pinFor = async (companyId, agent, skillKey) => {
     const live = await liveFor(companyId, agent);
     const key = skillKey || skillKeysOf(live && live.snapshot)[0] || null;
-    return { agentRevision: live ? Number(live.n) : 0, skillRevision: key ? await pinnedSkillRef(companyId, key) : null };
+    return {
+        agentRevision: live ? Number(live.n) : 0,
+        skillRevision: key ? await pinnedSkillRef(companyId, key) : null,
+        skillSource: key ? await pinnedSkillSource(companyId, key) : null,
+    };
 };
 
 /* Runs from before revisions carry no number and resolve to a synthetic zero. */
@@ -245,6 +265,6 @@ const rollback = async (companyId, agent, n, { actor, ip, note } = {}) => {
 module.exports = {
     STATE, SOURCE, RUN_FIELDS, SYNTHETIC_ZERO, PROMOTABLE,
     snapshotOf, sameSnapshot, skillKeysOf, skillRefOf, skillRefsOf, loadSkillHashes,
-    listFor, getRevision, findLive, liveFor, pinFor, forRun, applyRevision,
+    listFor, getRevision, findLive, liveFor, pinFor, skillSourceOf, forRun, applyRevision,
     createRevision, recordCreate, recordSave, createDraft, promote, rollback,
 };
