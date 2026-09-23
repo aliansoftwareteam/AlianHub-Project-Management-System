@@ -4,8 +4,8 @@ const logger = require('../../Config/loggerConfig');
 const delegation = require('./delegation');
 const endpoints = require('./endpoints');
 const { publicView } = require('./rules');
+const { requestAddress } = require('../../utils/requestAddress');
 
-const ipOf = (req) => String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim();
 
 const handle = (label, fn) => async (req, res) => {
     try {
@@ -24,7 +24,7 @@ exports.listForTask = handle('list', async (req, res, { companyId, uid }) => {
 
 exports.delegate = handle('delegate', async (req, res, { companyId, uid }) => {
     const body = req.body || {};
-    const { session, delivered } = await delegation.delegate({ companyId, uid, taskId: String(body.taskId || ''), clientId: String(body.clientId || ''), ip: ipOf(req) });
+    const { session, delivered } = await delegation.delegate({ companyId, uid, taskId: String(body.taskId || ''), clientId: String(body.clientId || ''), ip: requestAddress(req) });
     return ok(res, { statusText: delivered ? 'Delegated.' : 'Delegated, but the outside agent could not be told.', data: publicView(session) });
 });
 
@@ -34,6 +34,6 @@ exports.listEndpoints = handle('list endpoints', async (req, res, { companyId, u
 
 exports.saveEndpoint = handle('save endpoint', async (req, res, { companyId, uid }) => {
     const body = req.body || {};
-    const saved = await endpoints.save({ companyId, uid, clientId: String(body.clientId || ''), url: String(body.url || ''), ip: ipOf(req) });
+    const saved = await endpoints.save({ companyId, uid, clientId: String(body.clientId || ''), url: String(body.url || ''), ip: requestAddress(req) });
     return ok(res, { statusText: 'Saved. Keep the secret now; it is not shown again.', data: saved });
 });

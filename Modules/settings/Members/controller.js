@@ -7,7 +7,7 @@ const socketEmitter = require('../../../event/socketEventEmitter');
 const reportingLine = require('../../Users/helpers/reportingLine');
 const { getRoleType, isPrivileged, invalidateRoleCache, ROLE_OWNER } = require('../../../Config/permissionGuard');
 const { judgeMemberUpdate, judgeInvitationAcceptance, memberRowView } = require('./membershipGuard');
-const { SEAT_CANCELLED } = require('../../../Config/seatStatus');
+const { SEAT_CANCELLED, SEAT_PENDING } = require('../../../Config/seatStatus');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
@@ -428,11 +428,14 @@ exports.rootUpdateMember = async (req, res) => {
         const response = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [
-                { _id: new mongoose.Types.ObjectId(id) },
+                { _id: new mongoose.Types.ObjectId(id), status: SEAT_PENDING, isDelete: { $ne: true } },
                 { $set: { ...accepted, linkId: '' } },
                 { returnDocument: 'after' }
             ]
         }, 'findOneAndUpdate');
+        if (!response) {
+            return refuse(res, 403, 'That invitation is no longer valid.');
+        }
 
         clearMemberCaches(companyId, req.uid);
         forgetMembership(companyId, req.uid);

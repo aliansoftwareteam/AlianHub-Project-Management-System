@@ -7,6 +7,7 @@ const egressContext = require('../Agents/engine/egressContext');
 const rules = require('../Agents/engine/egressRules');
 const store = require('../Agents/engine/egressAllowlist');
 const { isBlockedHostname } = require('../Agents/engine/safeFetch');
+const { requestAddress } = require('../../utils/requestAddress');
 
 const LIST_CHANGED_ACTION = 'agent.egress_allowlist';
 const ADMIN_KEY_ACTOR = 'instance-admin-key';
@@ -116,11 +117,6 @@ exports.summary = async (req, res) => {
     }
 };
 
-const clientIp = (req) => {
-    const forwarded = req.headers['x-forwarded-for'] || req.ip;
-    return forwarded ? String(forwarded).split(',')[0] : '';
-};
-
 const byAdminKey = (req) => req.instanceAdmin === 'key';
 const actorOf = (req) => (byAdminKey(req) ? ADMIN_KEY_ACTOR : String(req.uid || ''));
 
@@ -134,7 +130,7 @@ const auditListChange = (req, companyId, company, meta) => {
         .then((names) => recordAudit(companyId, {
             actorId,
             actorName: names.get(actorId) || '',
-            ip: clientIp(req),
+            ip: requestAddress(req),
             action: LIST_CHANGED_ACTION,
             entityType: 'company',
             entityId: companyId,

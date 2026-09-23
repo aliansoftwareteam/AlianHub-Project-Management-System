@@ -9,6 +9,7 @@ const { invalidateCompanyCache } = require('./dispatcher');
 const { resolvePublic } = require('../Agents/engine/safeFetch');
 const { webhookAllowlist } = require('./helpers/privateHostAllowlist');
 const { storeSigningSecret, revokeSigningSecret } = require('./helpers/signingSecret');
+const { requestAddress } = require('../../utils/requestAddress');
 
 const PRIVATE_DESTINATION = 'The webhook url must resolve to a public address, or to a private host the instance owner allows.';
 
@@ -41,7 +42,7 @@ const resolvesPublicly = async (url, allowlist) => {
  */
 const callerId = (req) => String((req && req.uid) || '');
 
-const actorOf = (req) => ({ id: callerId(req), ip: String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0] });
+const actorOf = (req) => ({ id: callerId(req), ip: requestAddress(req) });
 
 /**
  * Match only what this caller owns.

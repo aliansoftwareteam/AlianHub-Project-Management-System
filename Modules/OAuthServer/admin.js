@@ -6,6 +6,7 @@ const grants = require('./grants');
 const approvals = require('./approvals');
 const store = require('./store');
 const logger = require('../../Config/loggerConfig');
+const { requestAddress } = require('../../utils/requestAddress');
 
 const refuse = (res, code, statusText) => res.status(code).send({ status: false, statusText });
 
@@ -26,7 +27,7 @@ const managerOrRefuse = async (req, res) => {
     return companyId;
 };
 
-const actorOf = (req) => ({ id: String(req.uid || ''), ip: String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0] });
+const actorOf = (req) => ({ id: String(req.uid || ''), ip: requestAddress(req) });
 
 const audit = (companyId, req, action, client) => {
     const actor = actorOf(req);

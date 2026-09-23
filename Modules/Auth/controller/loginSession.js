@@ -20,6 +20,7 @@ const { updateUserFun } = require("../../Users/controller.js");
 const { addAndRemoveUserInMongodbNotificationCount, generateTokenV2Fun, sessionRefusalFor, verifyAuth } = require('./authHelpers');
 const twoFactorRules = require('../helpers/twoFactorRules');
 const { pinSessionTenant } = require('../../../Config/tenant');
+const { requestAddress } = require('../../../utils/requestAddress');
 exports.manageAttempt = (req, res) => {
     helperCtr.manageResetAttempt(req.ip, req.body, (mRes) => {
         if (!mRes.status) {
@@ -85,8 +86,7 @@ const finalizeSession = async (req, res, uid, next, onSuccess) => {
         next();
         return;
     }
-    const forwarded = req?.headers['x-forwarded-for'] || req.ip;
-    const clientIp = forwarded ? forwarded?.split(',')[0] : req?.connection?.remoteAddress;
+    const clientIp = requestAddress(req);
     sesstionCtr.insertSessionFun({userId: uid}, req.headers['user-agent'] || "", clientIp, (sData) => {
         if (!(sData && sData.status)) {
             req.errorMessageObject = {message: "unauthorize user"};
@@ -200,8 +200,7 @@ exports.loginAuthTracker = async (req, res) => {
         });
         if (refusal) return invalid();
 
-        const forwarded = req?.headers['x-forwarded-for'] || req.ip;
-        const clientIp = forwarded ? forwarded?.split(',')[0] : req?.connection?.remoteAddress;
+        const clientIp = requestAddress(req);
         sesstionCtr.insertSessionFun({userId: sessionUserId}, req.headers['user-agent'] || "", clientIp, (sData) => {
             if (!(sData && sData.status)) return invalid();
             generateTokenV2Fun(sessionUserId, sData.data.refreshToken, (gData) => {
