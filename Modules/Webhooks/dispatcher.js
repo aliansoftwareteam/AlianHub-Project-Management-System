@@ -17,8 +17,9 @@ const { subscribesTo, classifyTaskEvent, shouldDeliverTask, normalizeChangedFiel
 // - Tenant resolution: task documents carry CompanyId (required on the
 //   schema), which is also the per-company database name.
 // - Debounce: one mutation often fires several emits (counters, indexes…).
-//   Events for the same company+task+event collapse within a short window
-//   and deliver once with the latest document.
+//   The first emit for a company+task+event opens a fixed window; later emits
+//   inside it merge (latest document, union of changed fields) without
+//   extending it. A field moving to a new value flushes the window early.
 // - Delivery: POST with an HMAC-SHA256 signature header; one retry after
 //   30s on network errors / 5xx. Every attempt is logged to webhookLogs.
 
@@ -32,7 +33,7 @@ const CACHE_TTL_MS = 60000;
 // companyId -> { at, hooks } — tiny cache so a burst of task updates doesn't
 // query the webhooks collection per event.
 const hookCache = new Map();
-// `${companyId}:${taskId}:${event}` -> { timer, payload }
+// `${companyId}:${taskId}:${event}` -> { event, companyId, doc, changed, timer }
 const pending = new Map();
 
 // taskId -> the last delivered snapshot (trimmed + name-enriched `data`). Lets a
@@ -233,6 +234,12 @@ async function flush(companyId, event, doc, changedKeys) {
     targets.forEach((hook) => { deliverToHook(companyId, hook, body, 1); });
 }
 
+function deliverPending(key, entry) {
+    flush(entry.companyId, entry.event, entry.doc, entry.changed).catch((error) => {
+        logger.error(`${LOG_PREFIX} flush failed for ${key}: ${error.message}`);
+    });
+}
+
 function onTaskEvent(type) {
     return (payload) => {
         try {
@@ -245,31 +252,26 @@ function onTaskEvent(type) {
             const key = `${companyId}:${String(doc._id)}:${event}`;
             const changedNow = normalizeChangedFields(payload?.updatedFields);
             const existing = pending.get(key);
-            if (existing) clearTimeout(existing.timer);
             if (supersedesPending(existing, doc, changedNow)) {
+                clearTimeout(existing.timer);
                 pending.delete(key);
-                flush(companyId, event, existing.doc, existing.changed).catch((error) => {
-                    logger.error(`${LOG_PREFIX} flush failed: ${error.message}`);
-                });
+                deliverPending(key, existing);
             }
-            // Accumulate the changed field names across every emit collapsed into
-            // this debounce window, so the delivered notification reflects the
-            // whole burst (e.g. status then priority changed back to back).
-            const carried = pending.get(key);
-            const changed = new Set(carried ? carried.changed : []);
-            changedNow.forEach((field) => changed.add(field));
-            pending.set(key, {
-                doc,
-                changed,
-                timer: setTimeout(() => {
-                    const entry = pending.get(key);
-                    pending.delete(key);
-                    if (!entry) return; // key already replaced/cleaned up — nothing to flush
-                    flush(companyId, event, entry.doc, entry.changed).catch((error) => {
-                        logger.error(`${LOG_PREFIX} flush failed: ${error.message}`);
-                    });
-                }, DEBOUNCE_MS),
-            });
+            const open = pending.get(key);
+            if (open) {
+                // The window is fixed from its first emit: re-arming here would let a
+                // steady stream of emits hold delivery back indefinitely.
+                open.doc = doc;
+                changedNow.forEach((field) => open.changed.add(field));
+                return;
+            }
+            const entry = { event, companyId, doc, changed: new Set(changedNow) };
+            entry.timer = setTimeout(() => {
+                if (pending.get(key) !== entry) return;
+                pending.delete(key);
+                deliverPending(key, entry);
+            }, DEBOUNCE_MS);
+            pending.set(key, entry);
         } catch (error) {
             logger.error(`${LOG_PREFIX} event handling failed: ${error.message}`);
         }

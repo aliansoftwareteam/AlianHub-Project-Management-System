@@ -1625,6 +1625,14 @@ const schema = {
         // Moves on with every save; a save names the version it read, so two console tabs cannot drop each other's hosts.
         version: { type: Number, required: false },
     },
+    // Instance-wide, in the global database: patterns the owner added to the instruction guard on top of
+    // the built-in list (Modules/AICore/instructionPatterns.js).
+    instructionPatterns: {
+        source: { type: String, required: true },
+        note: { type: String, required: false },
+        addedBy: { type: String, required: false },
+        addedAt: { type: Date, required: false },
+    },
     // An outside agent delegated a task (Modules/AgentSessions, EXTERNAL_AGENT_SESSIONS). state is offered, active,
     // completed, failed, revoked or unresponsive; the handle is stored only as a hash and dies with the offer.
     agentSessions: {

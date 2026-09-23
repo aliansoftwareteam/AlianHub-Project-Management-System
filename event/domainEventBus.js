@@ -36,7 +36,7 @@ bus.setMaxListeners(50);
 // filtered out still moved, and the engine has to see that.
 const taskSnapshots = createSnapshotStore({ max: 5000 });
 
-// `${companyId}:${entityId}:${type}` -> { timer, doc, changed, actor }
+// `${companyId}:${entityId}:${type}` -> { companyId, doc, changed, emitType, actor, depth, timer }
 const pending = new Map();
 
 let started = false;
@@ -209,11 +209,7 @@ function publish(envelope) {
     record(envelope).catch((error) => logger.error(`${LOG_PREFIX} could not record ${eventLabel(envelope)}: ${failureText(error)}`));
 }
 
-function flush(key) {
-    const entry = pending.get(key);
-    pending.delete(key);
-    if (!entry) return;
-
+function flush(entry) {
     const { companyId, doc, changed, actor, depth, emitType } = entry;
     const type = classifyTaskEvent(emitType, changed);
     if (!type) return;
@@ -240,10 +236,21 @@ const fieldValue = (doc, field) => {
 const supersedesPending = (entry, doc, changedNow) => Boolean(entry) && [...changedNow]
     .some((field) => entry.changed.has(field) && fieldValue(entry.doc, field) !== fieldValue(doc, field));
 
+function flushSafely(entry) {
+    try {
+        flush(entry);
+    } catch (error) {
+        logger.error(`${LOG_PREFIX} flush failed for ${entry.emitType} on task ${entry.doc._id} in company ${entry.companyId}: ${failureText(error)}`);
+    }
+}
+
 /* One user action fires several emits (the write, then counter and index updates).
  * Collapsing them within a window means a status+priority change in the same save
  * produces one envelope carrying both fields, not two envelopes that each see half
- * the change. Same window the webhook dispatcher uses, for the same reason. */
+ * the change. Same window the webhook dispatcher uses, for the same reason.
+ *
+ * The window is fixed from its first emit: re-arming it on every emit let a task
+ * that kept emitting hold its automations back indefinitely. */
 function onTaskEvent(emitType) {
     return (payload) => {
         try {
@@ -253,29 +260,36 @@ function onTaskEvent(emitType) {
             const companyId = String(doc.CompanyId);
             const key = `${companyId}:${String(doc._id)}:${emitType}`;
             const changedNow = normalizeChangedFields(payload?.updatedFields);
+            const actor = resolveActor(payload);
+            const depth = Number(payload?.depth) || 0;
+
             const existing = pending.get(key);
-            if (existing) clearTimeout(existing.timer);
-            if (supersedesPending(existing, doc, changedNow)) flush(key);
+            if (supersedesPending(existing, doc, changedNow)) {
+                clearTimeout(existing.timer);
+                pending.delete(key);
+                flushSafely(existing);
+            }
 
-            const carried = pending.get(key);
-            const changed = new Set(carried ? carried.changed : []);
-            changedNow.forEach((field) => changed.add(field));
+            const open = pending.get(key);
+            if (open) {
+                open.doc = doc;
+                changedNow.forEach((field) => open.changed.add(field));
+                // The loop guard only holds if a merged envelope is never shallower than
+                // an emit it absorbed, so the deepest emit's actor and depth win.
+                if (depth >= open.depth) {
+                    open.actor = actor;
+                    open.depth = depth;
+                }
+                return;
+            }
 
-            pending.set(key, {
-                companyId,
-                doc,
-                changed,
-                emitType,
-                actor: resolveActor(payload),
-                depth: Number(payload?.depth) || 0,
-                timer: setTimeout(() => {
-                    try {
-                        flush(key);
-                    } catch (error) {
-                        logger.error(`${LOG_PREFIX} flush failed for ${emitType} on task ${doc._id} in company ${companyId}: ${failureText(error)}`);
-                    }
-                }, DEBOUNCE_MS),
-            });
+            const entry = { companyId, doc, changed: new Set(changedNow), emitType, actor, depth };
+            entry.timer = setTimeout(() => {
+                if (pending.get(key) !== entry) return;
+                pending.delete(key);
+                flushSafely(entry);
+            }, DEBOUNCE_MS);
+            pending.set(key, entry);
         } catch (error) {
             logger.error(`${LOG_PREFIX} event handling failed: ${failureText(error)}`);
         }

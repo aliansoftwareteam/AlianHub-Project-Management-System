@@ -12,10 +12,12 @@ const { escapeRegex } = require('../../utils/escapeRegex');
 const sentences = require('./helpers/sentenceRules');
 const access = require('./helpers/ruleAccess');
 const { canEditProject } = require('../AIProjectGenerator/projectAccess');
+const dryRunPlan = require('./helpers/dryRun');
 
 const NOT_FOUND = 'Not found.';
 const APPLY_REFUSED = 'You cannot edit every task this automation targets.';
 const V2_NOT_APPLIABLE = 'This automation runs on events and cannot be applied in bulk.';
+const NOT_TASK_RULE = 'This automation does not run on a task event, so it cannot be tested on a task.';
 
 const companyOf = (req) => req.headers['companyid'];
 const oid = (id) => (/^[0-9a-fA-F]{24}$/.test(String(id || '')) ? new mongoose.Types.ObjectId(String(id)) : null);
@@ -358,6 +360,33 @@ exports.listRuns = async (req, res) => {
         }, 'find');
         return res.send({ status: true, data: (rows || []).map(runSummary) });
     } catch (e) { logger.error(`listRuns: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
+};
+
+/* POST /api/v2/automations/:id/dry-run  body: { taskId }
+ * What the saved rule would do to one stored task. Gated like an edit, because
+ * the answer shows the rule's resolved action params; the task must be one the
+ * caller can open, and a hidden one answers 404 exactly like a missing one. */
+exports.dryRun = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        if (!companyId) return refuse(res, 400, 'companyId is required.');
+        const target = await ruleForWrite(req, res, companyId);
+        if (!target) return undefined;
+        const { rule } = target;
+        const trigger = registry.getTrigger(rule.trigger?.event || rule.trigger);
+        if (Number(rule.version) !== 2 || !trigger || trigger.entity !== 'task') return refuse(res, 400, NOT_TASK_RULE);
+        const rawTaskId = req.body && req.body.taskId;
+        if (!rawTaskId) return refuse(res, 400, 'taskId is required.');
+        const taskId = oid(rawTaskId);
+        if (!taskId) return refuse(res, 404, NOT_FOUND);
+        const task = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS, data: [{ _id: taskId, deletedStatusKey: { $ne: 1 } }],
+        }, 'findOne');
+        const visible = (await access.visibleProjectIds(companyId, req.uid)).map(String);
+        if (!task || !visible.includes(String(task.ProjectID))) return refuse(res, 404, NOT_FOUND);
+        const plan = dryRunPlan.plan({ rule, task: task.toObject ? task.toObject() : task, uid: req.uid, triggerLabel: trigger.label });
+        return res.send({ status: true, statusText: plan.matched ? 'The rule would run.' : 'The rule would not run.', data: plan });
+    } catch (e) { logger.error(`dryRun: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
 /* POST /api/v2/automations/compile  body: { sentence?, rule?, name? }
