@@ -7,6 +7,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { sanitizeInput } = require('../../serviceFunction');
 const { BODY_COMPANY_PATHS } = require('../../../Config/taskWritePermissions');
 const { canReadProject } = require('../../../Config/projectAccess');
+const { namedIds, nonMembersOf, NOT_A_MEMBER } = require('../../../Config/companyMembers');
 const { mayAttachKey, taskAttachmentKey, formUploadKey, clipKey } = require('../../../common-storage/taskFileKeys');
 const { REPORT, scopeMode, countReported } = require('../../../common-storage/storedFileScope');
 
@@ -89,6 +90,26 @@ const holdsAssignees = (payload, stored) => {
     return false;
 };
 
+/* A person already on the task stays nameable after their seat ends, so a replacement list or a move keeps them. */
+const newlyNamed = (value, held) => {
+    const already = new Set(namedIds(held || []));
+    return namedIds(value).filter((id) => !already.has(id));
+};
+
+const peopleOnNewTask = (data) => (isPlainObject(data) ? [...namedIds(data.AssigneeUserId || []), ...namedIds(data.watchers || []), ...namedIds(data.Task_Leader || [])] : []);
+
+const PEOPLE = Object.freeze({
+    create: (payload) => peopleOnNewTask(payload.data),
+    createMultipleTasks: (payload) => (Array.isArray(payload.tasks) ? payload.tasks.flatMap(peopleOnNewTask) : []),
+    updateAssignee: (payload, stored) => (payload.type === 'assigneRemove' ? [] : newlyNamed(valueAt(payload, ['firebaseObj', 'AssigneeUserId']), stored.AssigneeUserId)),
+    updateTaskLeader: (payload, stored) => newlyNamed(valueAt(payload, ['firebaseObj', 'Task_Leader']), stored.Task_Leader),
+    updateWatcher: (payload, stored) => (payload.add ? newlyNamed(payload.userId, stored.watchers) : []),
+    updateQueueList: (payload, stored) => (payload.actionType === 'add' ? newlyNamed(payload.userId, stored.queueListArray) : []),
+    carried: (payload, stored) => [...newlyNamed(payload.assignee, stored.AssigneeUserId), ...newlyNamed(payload.watcher, stored.watchers)],
+    bulkUpdateAssignee: (payload) => (payload.type === 'assigneRemove' ? [] : namedIds(payload.employeeId)),
+    bulkDuplicate: (payload) => [...namedIds(payload.assignee || []), ...namedIds(payload.watcher || [])],
+});
+
 const holdsTaskType = (payload, stored) => {
     const claimed = ['TaskType', 'TaskTypeKey'].filter((field) => valueAt(payload, ['newStatus', field]) !== undefined);
     return claimed.length > 0 && claimed.every((field) => sameValue(payload.newStatus[field], stored[field]));
@@ -104,10 +125,11 @@ const holdsTaskType = (payload, stored) => {
  * the `taskNames` paths, and its project's stored name to the `projectNames` paths; with `stored` the handler also gets
  * the stored row as `storedTask`. `held` tells whether the stored task already has the value the body names; an action that takes
  * isUpdateTask records history without writing only when it does. `destination` names the project a move or copy writes
- * into, which must exist. `actor` are the params that receive the signed-in user.
+ * into, which must exist. `people` returns the user ids the write newly names, each of whom must hold a live seat in
+ * the company. `actor` are the params that receive the signed-in user.
  */
-const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, held = null, destination = null, attachments = null, actor }) => Object.freeze({
-    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, project, taskIds, taskNames, projectNames, stored, held, destination, attachments,
+const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, held = null, destination = null, attachments = null, people = null, actor }) => Object.freeze({
+    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, project, taskIds, taskNames, projectNames, stored, held, destination, attachments, people,
     actor: actor || (params.includes('userData') ? ['userData'] : []),
 });
 
@@ -139,12 +161,13 @@ const CREATE = spec({
     objects: [['indexObj']],
     actor: ['user'],
     attachments: 'created',
+    people: PEOPLE.create,
 });
 
 const TASK_ACTION_FIELDS = Object.freeze({
     create: CREATE,
     createSubTaskWithAi: spec({ params: ['companyId', 'userId', 'subTitles', 'sprintObj', 'projectData', 'userData', 'parentTask', 'type'], owns: PLACEMENT_FIELDS, company: [...companyId, ...projectCompany], ids: [['parentTask', 'id'], ['parentTask', 'ProjectID']] }),
-    createMultipleTasks: spec({ params: ['tasks', 'userData', 'projectData', 'indexObj', 'statusArray', 'sprint', 'eventId'], owns: PLACEMENT_FIELDS, company: projectCompany, fieldNames: [['indexObj', 'indexName']], ids: PROJECT_DATA, objects: [['indexObj']], attachments: 'imported' }),
+    createMultipleTasks: spec({ params: ['tasks', 'userData', 'projectData', 'indexObj', 'statusArray', 'sprint', 'eventId'], owns: PLACEMENT_FIELDS, company: projectCompany, fieldNames: [['indexObj', 'indexName']], ids: PROJECT_DATA, objects: [['indexObj']], attachments: 'imported', people: PEOPLE.createMultipleTasks }),
 
     updateStatus: spec({ params: ['newStatus', 'prevStatus', 'projectData', 'task', 'isUpdateTask', ...HISTORY_USER], writes: { newStatus: STATUS_FIELDS }, company: projectCompany, ids: [...TASK, ['prevStatus', 'taskId']], task: TASK[0], project: PROJECT_DATA, taskIds: [...TASK, ['prevStatus', 'taskId']], taskNames: [['prevStatus', 'taskName']], projectNames: PROJECT_DATA_NAME, held: holdsField(['newStatus', 'statusKey'], 'statusKey') }),
     updatePriority: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'priorityObj', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['Task_Priority', 'Updated_At'] }, company: projectCompany, ids: [...TASK_DATA, ['priorityObj', 'taskId']], task: TASK_DATA[0], project: PROJECT_DATA, taskIds: [...TASK_DATA, ['priorityObj', 'taskId']], taskNames: [['priorityObj', 'taskName']], projectNames: PROJECT_DATA_NAME, held: holdsField(['firebaseObj', 'Task_Priority'], 'Task_Priority') }),
@@ -155,11 +178,11 @@ const TASK_ACTION_FIELDS = Object.freeze({
     updateTaskTotalEstimate: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'obj', ...HISTORY_USER], writes: { firebaseObj: ['totalEstimatedTime'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA, taskNames: TASK_NAME }),
     updatePoints: spec({ params: ['firebaseObj', 'projectData', 'taskData', ...HISTORY_USER], writes: { firebaseObj: ['points'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA }),
     updateDates: spec({ params: ['firebaseObj', 'projectData', 'taskData', ...HISTORY_USER], writes: { firebaseObj: ['startDate', 'DueDate'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA }),
-    updateAssignee: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'employeeName', 'type', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['AssigneeUserId'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA, taskNames: TASK_NAME, projectNames: PROJECT_DATA_NAME, held: holdsAssignees }),
-    updateTaskLeader: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'employeeName', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['Task_Leader'] }, company: projectCompany, ids: [...TASK_DATA, ['firebaseObj', 'Task_Leader']], task: TASK_DATA[0], project: PROJECT_DATA, held: holdsField(['firebaseObj', 'Task_Leader'], 'Task_Leader') }),
+    updateAssignee: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'employeeName', 'type', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['AssigneeUserId'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA, taskNames: TASK_NAME, projectNames: PROJECT_DATA_NAME, held: holdsAssignees, people: PEOPLE.updateAssignee }),
+    updateTaskLeader: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'employeeName', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['Task_Leader'] }, company: projectCompany, ids: [...TASK_DATA, ['firebaseObj', 'Task_Leader']], task: TASK_DATA[0], project: PROJECT_DATA, held: holdsField(['firebaseObj', 'Task_Leader'], 'Task_Leader'), people: PEOPLE.updateTaskLeader }),
     updateTaskType: spec({ params: ['newStatus', 'prevStatus', 'projectData', 'taskData', 'isUpdateTask', ...HISTORY_USER], writes: { newStatus: ['TaskType', 'TaskTypeKey', 'taskTypeImage', 'oldTaskTypeImage', 'taskTypeName'] }, company: projectCompany, ids: TASK_DATA, task: TASK_DATA[0], project: PROJECT_DATA, taskNames: TASK_NAME, projectNames: PROJECT_DATA_NAME, held: holdsTaskType }),
 
-    updateWatcher: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'userId', 'add', 'employeeName', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['userId']], task: TASK_ID[0], project: PROJECT_ID }),
+    updateWatcher: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'userId', 'add', 'employeeName', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['userId']], task: TASK_ID[0], project: PROJECT_ID, people: PEOPLE.updateWatcher }),
     updateTags: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'tagId', 'operation'], company: companyId, ids: TASK_ID, scalars: [['tagId']], task: TASK_ID[0], project: PROJECT_ID }),
     updateChecklists: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'operation', 'data', 'historyObj', 'taskData', ...HISTORY_USER], company: companyId, ids: TASK_ID, task: TASK_ID[0], project: PROJECT_ID }),
     AddAiChecklist: spec({ params: ['companyId', 'taskId', 'checklistArray', 'sprintId', 'projectId', ...HISTORY_USER], company: companyId, ids: TASK_ID, task: TASK_ID[0], project: PROJECT_ID }),
@@ -168,15 +191,15 @@ const TASK_ACTION_FIELDS = Object.freeze({
     updateTaskCustomField: spec({ params: ['companyId', 'taskId', 'updateDetail', 'customFieldId'], company: companyId, fieldNames: [['customFieldId']], ids: TASK_ID, task: TASK_ID[0] }),
     updateMarkAsFavourite: spec({ params: ['companyId', 'taskId', 'updateDetail', 'type'], company: companyId, ids: [...TASK_ID, ['updateDetail']], task: TASK_ID[0] }),
     updateLastMessageTime: spec({ params: ['companyId', 'taskId', 'msgObj'], company: companyId, ids: TASK_ID, task: TASK_ID[0] }),
-    updateQueueList: spec({ params: ['CompanyId', 'projectId', 'sprintId', 'taskId', 'userId', 'actionType', 'taskName', ...HISTORY_USER], company: [['CompanyId']], ids: [...TASK_ID, ['userId']], task: TASK_ID[0], project: PROJECT_ID }),
+    updateQueueList: spec({ params: ['CompanyId', 'projectId', 'sprintId', 'taskId', 'userId', 'actionType', 'taskName', ...HISTORY_USER], company: [['CompanyId']], ids: [...TASK_ID, ['userId']], task: TASK_ID[0], project: PROJECT_ID, people: PEOPLE.updateQueueList }),
     updateArchiveDelete: spec({ params: ['companyId', 'projectData', 'sprintId', 'task', 'deletedStatusKey', ...HISTORY_USER], company: companyId, ids: [...TASK, ['task', 'ParentTaskId']], task: TASK[0], project: PROJECT_DATA }),
 
     convertToSubTask: spec({ params: ['companyId', 'projectData', 'sprintId', 'selectedTaskId', 'taskId', 'oldProject', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], ...TASK_ID], task: ['selectedTaskId'] }),
     convertToTask: spec({ params: ['companyId', 'projectData', 'taskId', 'sprintObj', 'parentTaskId', 'oldSprintObj', 'oldProject'], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, ['parentTaskId'], DESTINATION], task: TASK_ID[0], destination: DESTINATION }),
     convertToList: spec({ params: ['companyId', 'projectData', 'taskId', 'folderData', 'sprintObj', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, DESTINATION], task: TASK_ID[0], destination: DESTINATION }),
-    moveTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'moveTaskId', 'oldSprintObj', 'oldProject', 'isSubTask', 'assignee', 'watcher', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['moveTaskId'], DESTINATION], task: ['moveTaskId'], destination: DESTINATION }),
+    moveTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'moveTaskId', 'oldSprintObj', 'oldProject', 'isSubTask', 'assignee', 'watcher', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['moveTaskId'], DESTINATION], task: ['moveTaskId'], destination: DESTINATION, people: PEOPLE.carried }),
     mergeTask: spec({ params: ['companyId', 'projectData', 'taskId', 'mergeTaskId', 'oldProject', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, ['mergeTaskId']], task: TASK_ID[0] }),
-    duplicateTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'selectedTaskId', 'oldProject', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], DESTINATION], task: ['selectedTaskId'], destination: DESTINATION }),
+    duplicateTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'selectedTaskId', 'oldProject', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], DESTINATION], task: ['selectedTaskId'], destination: DESTINATION, people: PEOPLE.carried }),
 
     addTaskRelation: spec({ params: ['companyId', 'taskId', 'relatedTaskId', 'type', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['relatedTaskId']], task: TASK_ID[0] }),
     removeTaskRelation: spec({ params: ['companyId', 'taskId', 'relatedTaskId', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['relatedTaskId']], task: TASK_ID[0] }),
@@ -187,7 +210,7 @@ const TASK_ACTION_FIELDS = Object.freeze({
     bulkUpdatePriority: spec({ params: ['companyId', 'taskIds', 'firebaseObj', 'priorityObj', ...HISTORY_USER], writes: { firebaseObj: ['Task_Priority', 'Updated_At'] }, company: companyId, ids: TASK_IDS }),
     bulkUpdateDueDate: spec({ params: ['companyId', 'taskIds', 'DueDate', 'commonDateFormatString', ...HISTORY_USER], company: companyId, ids: TASK_IDS }),
     bulkUpdateStartDate: spec({ params: ['companyId', 'taskIds', 'startDate', 'commonDateFormatString', ...HISTORY_USER], company: companyId, ids: TASK_IDS }),
-    bulkUpdateAssignee: spec({ params: ['companyId', 'taskIds', 'employeeName', 'employeeId', 'type', ...HISTORY_USER], company: companyId, ids: TASK_IDS }),
+    bulkUpdateAssignee: spec({ params: ['companyId', 'taskIds', 'employeeName', 'employeeId', 'type', ...HISTORY_USER], company: companyId, ids: TASK_IDS, people: PEOPLE.bulkUpdateAssignee }),
     bulkUpdateTags: spec({ params: ['companyId', 'taskIds', 'tagId', 'operation', ...HISTORY_USER], company: companyId, ids: TASK_IDS, scalars: [['tagId']] }),
     bulkArchive: spec({ params: ['companyId', 'taskIds', ...HISTORY_USER], company: companyId, ids: TASK_IDS }),
     bulkRestore: spec({ params: ['companyId', 'taskIds', ...HISTORY_USER], company: companyId, ids: TASK_IDS }),
@@ -196,7 +219,7 @@ const TASK_ACTION_FIELDS = Object.freeze({
     bulkMove: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'projectData', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION }),
     bulkConvertToSubTask: spec({ params: ['companyId', 'taskIds', 'parentTaskId', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, ['parentTaskId']] }),
     bulkConvertToTask: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'projectData', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION }),
-    bulkDuplicate: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'oldProject', 'projectData', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION }),
+    bulkDuplicate: spec({ params: ['companyId', 'taskIds', 'sprintObj', 'oldProject', 'projectData', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_IDS, DESTINATION], destination: DESTINATION, people: PEOPLE.bulkDuplicate }),
 });
 
 /* The pre-v2 class writes through prevStatus.taskId and priorityObj.taskId, not the task object. */
@@ -488,6 +511,10 @@ const prepareTaskRequest = async (req, taskSpec, label) => {
         }
         if (taskSpec.stored) payload.storedTask = stored;
         if (payload.isUpdateTask === false && !(taskSpec.held && taskSpec.held(payload, stored))) refuse(409, 'The task does not hold the change this request records.');
+    }
+    if (taskSpec.people) {
+        const outside = await nonMembersOf(company, taskSpec.people(payload, prepared.task || {}));
+        if (outside.length) refuse(400, NOT_A_MEMBER);
     }
     if (taskSpec.destination) {
         const projectId = valueAt(payload, taskSpec.destination);
