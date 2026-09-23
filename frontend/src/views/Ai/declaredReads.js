@@ -57,13 +57,41 @@ export const readErrorText = (error, t, { catalogues, gather } = {}) => {
     const step = slot && gather ? gather[slot.at] : null;
     if (step && isExternalReader(catalogues, step.reader)) {
         const rule = readerOf(catalogues, step.reader).params?.[slot.name];
-        if (code === "required") return t("Ai.skill_read_err_required");
+        if (code === "required") return rule?.unless ? t(`Ai.skill_read_err_${slot.name}_or_${rule.unless}`) : t("Ai.skill_read_err_required");
+        if (code === "undeclared_input" && rule?.type === "input") return t("Ai.skill_read_err_link_undeclared", { input: step.params?.[slot.name] || "" });
+        if (code === "invalid_params" && rule?.type === "input") return t("Ai.skill_read_err_link_invalid");
+        if (code === "invalid_params" && rule?.type === "hosts") return t("Ai.skill_read_err_hosts_max", { max: rule.max });
         if (code === "invalid_params" && rule?.type === "number") return t("Ai.skill_read_err_range", { min: rule.min, max: rule.max });
     }
     return error.message || "";
 };
 
 export const withoutBlanks = (params) => Object.fromEntries(Object.entries(params || {}).filter(([, v]) => v !== "" && v !== null && v !== undefined));
+
+/* The link inputs the skill declares, plus a saved one it no longer does, so the save still names it and the server says why. */
+export const linkChoices = (rule, declared, current) => {
+    const offered = (rule?.values || []).filter((key) => (declared || []).includes(key));
+    return current && !offered.includes(current) ? [...offered, current] : offered;
+};
+
+/* A param the catalogue takes only without another ("path" unless "link") stays in the form but is not sent,
+ * since the server refuses both at once. */
+export const paramsToSave = (catalogues, reader, params) => {
+    const spec = readerOf(catalogues, reader)?.params || {};
+    const given = withoutBlanks(params);
+    const out = {};
+    Object.entries(given).forEach(([name, value]) => {
+        const rule = spec[name];
+        if (rule?.unless && given[rule.unless] !== undefined) return;
+        if (rule?.type === "hosts" && Array.isArray(value)) {
+            const hosts = value.map((h) => String(h).trim()).filter(Boolean);
+            if (hosts.length) out[name] = hosts;
+            return;
+        }
+        out[name] = value;
+    });
+    return out;
+};
 
 /* A reader change keeps only what the new reader takes; the server refuses the rest by name. */
 export const paramsKeptFor = (catalogues, reader, params) => {
