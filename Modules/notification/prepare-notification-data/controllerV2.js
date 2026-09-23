@@ -11,18 +11,30 @@ const config =  require('../../../Config/config.js');
 const socketEmitter = require('../../../event/socketEventEmitter.js');
 const { getUserProfilePresignedUrlCallBackFunction } = require("../../storage/wasabi/controller.js")
 const { pinSessionTenant } = require('../../../Config/tenant');
+const { activeMemberIds } = require('../activeMembers');
 
 
 
-// The tenant is pinned here rather than in handleNotificationtFun: every other caller of that
-// is an internal one passing a synthetic { body } and no res, so it has no response to refuse on.
-exports.handleNotification = (req, res) => {
-  if (!pinSessionTenant(req, res)) return;
-  exports.handleNotificationtFun(req).then((data) => {
-    res.json(data);
-  }).catch((error) => {
+// The tenant, sender and recipients are pinned here rather than in handleNotificationtFun: every
+// other caller of that is an internal one passing a synthetic { body } it built from trusted data.
+exports.handleNotification = async (req, res) => {
+  const companyId = pinSessionTenant(req, res);
+  if (!companyId) return;
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const claimed = Array.isArray(body.assigneeUsers) ? body.assigneeUsers.map(String) : [];
+    const leader = body.task_leader_ID ? String(body.task_leader_ID) : '';
+    const members = new Set(await activeMemberIds(companyId, [...claimed, leader]));
+    req.body = {
+      ...body,
+      userId: String(req.uid),
+      assigneeUsers: [...new Set(claimed)].filter((id) => members.has(id)),
+      task_leader_ID: members.has(leader) ? leader : '',
+    };
+    res.json(await exports.handleNotificationtFun(req));
+  } catch (error) {
     res.json(error);
-  })
+  }
 }
 
 exports.handleNotificationtFun = (req) => {

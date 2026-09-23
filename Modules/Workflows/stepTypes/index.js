@@ -273,12 +273,29 @@ const validateSteps = (steps = []) => {
     return { valid: errors.length === 0, errors };
 };
 
+const peopleInConfig = (type, config, at) => {
+    const contract = get(type);
+    if (!contract || !isPlainObject(config)) return [];
+    return Object.entries(contract.config)
+        .filter(([field, spec]) => spec.type === 'user' && config[field] !== undefined && config[field] !== null && config[field] !== '')
+        .map(([field]) => ({ path: `${at}.${field}`, id: String(config[field]) }));
+};
+
+/* Every person a definition names in a field its contract types as a user, a fan-out's children included. */
+const peopleIn = (steps = []) => (Array.isArray(steps) ? steps : []).flatMap((step, i) => {
+    if (!isPlainObject(step)) return [];
+    const config = isPlainObject(step.config) ? step.config : {};
+    const own = peopleInConfig(step.type, config, `steps[${i}].config`);
+    return step.type === fanOut.FAN_OUT ? [...own, ...peopleInConfig(config.type, config.config, `steps[${i}].config.config`)] : own;
+});
+
 module.exports = {
     CONTRACTS,
     TYPES: Object.freeze(CONTRACTS.map((contract) => contract.key)),
     get,
     manifest,
     validateSteps,
+    peopleIn,
     blockedReason: waiting.blockedReason,
     waitingOn: waiting.waitingOn,
     AGENT_RUN: agentRun.TYPE,

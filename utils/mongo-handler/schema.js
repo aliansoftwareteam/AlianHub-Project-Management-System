@@ -595,6 +595,13 @@ const schema = {
         isEnabled: { type: Boolean, default: false, required: false },
         displayName: { type: String, default: '', required: false },
         domains: { type: [String], default: [], required: false },
+        // Published as the TXT record _alianhub-sso.<domain> to prove the company controls a domain.
+        domainVerificationToken: { type: String, required: false },
+        verifiedDomains: {
+            type: [{ _id: false, domain: { type: String, required: true }, verifiedAt: { type: Date, required: true } }],
+            default: [],
+            required: false,
+        },
         enforcement: { type: String, default: 'optional', required: false },
         autoProvisionUsers: { type: Boolean, default: true, required: false },
         defaultRoleType: { type: Number, default: 3, required: false },
@@ -1733,6 +1740,8 @@ const schema = {
         title: { type: String, required: false, default: '' },
         headingPath: { type: [String], required: false, default: [] },
         text: { type: String, required: false, default: '' },
+        // UTF-8 length of `text`, stored so the console's figures are summed from an index instead of from the text.
+        textBytes: { type: Number, required: false },
         contentHash: { type: String, required: true },
         // The vector for `text` under `embeddingModel`; empty until a hybrid company embeds it.
         embedding: { type: [Number], required: false, default: [] },
@@ -2643,6 +2652,11 @@ const schema = {
             type: String,
             required: false
         },
+        // What the company's SCIM IdP says about this member. The shared users record belongs to every
+        // company the person is in, so an IdP's rename lands here instead.
+        scimExternalId: { type: String, required: false },
+        scimGivenName: { type: String, required: false },
+        scimFamilyName: { type: String, required: false },
         // The userId of this member's manager in the same company. Empty means no
         // reporting line is recorded, which is the normal state for most workspaces.
         managerId: {

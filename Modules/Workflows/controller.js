@@ -1,6 +1,7 @@
 const logger = require('../../Config/loggerConfig');
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 const { getRoleType } = require('../../Config/permissionGuard');
+const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
 const access = require('../Agents/access');
 const revert = require('../Agents/revert');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
@@ -154,6 +155,17 @@ const validateSteps = (raw) => {
     return steps;
 };
 
+const outsidersIn = async (companyId, steps) => {
+    const named = stepTypes.peopleIn(steps);
+    const outside = new Set(await nonMembersOf(companyId, named.map((person) => person.id)));
+    return named.filter((person) => outside.has(person.id)).map((person) => `${person.path}: ${NOT_A_MEMBER}`);
+};
+
+const refuseOutsiders = async (companyId, steps) => {
+    const errors = await outsidersIn(companyId, steps);
+    if (errors.length) throw invalid(errors.join('; '));
+};
+
 /* The shorthand the product actually starts: one agent, one task. Spelt out as a
  * step so the graph a one-node run executes is the graph a bigger one does. */
 const stepsFor = (body) => {
@@ -209,6 +221,7 @@ exports.startRun = async (req, res) => {
             if (!saved.enabled) return fail(res, 'This workflow is turned off. Turn it on before starting a run.', 409);
         }
         const steps = saved ? validateSteps(saved.steps) : stepsFor(body);
+        await refuseOutsiders(ctx.companyId, steps);
         const dedupeKey = key ? `api:${ctx.caller.actor.userId}:${key}` : null;
 
         const run = await store.createRun(ctx.companyId, {
@@ -491,6 +504,7 @@ exports.createDefinition = async (req, res) => {
         if (!ctx) return undefined;
         if (!requireManager(res, ctx.caller)) return undefined;
         const { errors, value } = definitionFrom(req.body || {});
+        errors.push(...await outsidersIn(ctx.companyId, value.steps));
         if (errors.length) return failFields(res, errors);
         const saved = await definitions.create(ctx.companyId, { ...value, by: ctx.caller.actor.userId });
         return ok(res, 'Workflow saved.', saved);
@@ -507,6 +521,7 @@ exports.updateDefinition = async (req, res) => {
         if (!requireManager(res, ctx.caller)) return undefined;
         if (!OBJECT_ID.test(String(req.params.id || ''))) return fail(res, 'Workflow not found.', 404);
         const { errors, value } = definitionFrom(req.body || {});
+        errors.push(...await outsidersIn(ctx.companyId, value.steps));
         if (errors.length) return failFields(res, errors);
         const updated = await definitions.update(ctx.companyId, req.params.id, { ...value, by: ctx.caller.actor.userId });
         if (!updated) return fail(res, 'Workflow not found.', 404);
@@ -531,7 +546,8 @@ exports.setDefinitionEnabled = async (req, res) => {
         const enabled = (req.body || {}).enabled === true;
         if (enabled) {
             const checked = stepTypes.validateSteps(existing.steps || []);
-            if (!checked.valid) return failFields(res, checked.errors);
+            const errors = [...checked.errors, ...await outsidersIn(ctx.companyId, existing.steps || [])];
+            if (errors.length) return failFields(res, errors);
         }
         const updated = await definitions.setEnabled(ctx.companyId, req.params.id, enabled, ctx.caller.actor.userId);
         return ok(res, enabled ? 'Workflow enabled.' : 'Workflow disabled.', updated);

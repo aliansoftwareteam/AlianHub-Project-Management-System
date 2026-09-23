@@ -9,7 +9,8 @@ const { FEATURES } = require('../AICore/features');
 const backfill = require('./ingest/backfill');
 const indexer = require('./ingest/indexer');
 const vectorStore = require('./vectorStore');
-const { figuresPipeline } = require('./figuresPipeline');
+const fileSweep = require('./ingest/fileSweep');
+const { totalsPipeline, sourcesPipeline, fileReasonsPipeline } = require('./figuresPipeline');
 
 // What the instance console shows of one workspace's index: counts, sizes, times, states and
 // reasons. Nothing here reads or returns a chunk's text, title or file key.
@@ -35,8 +36,26 @@ const count = (companyId, type, where) => MongoDbCrudOpration(String(companyId),
 const chunkSourceTypes = (companyId) => MongoDbCrudOpration(String(companyId), { type: SCHEMA_TYPE.KNOWLEDGE_CHUNKS, data: ['sourceType'] }, 'distinct');
 
 const chunkFacets = async (companyId, sourceTypes, retried, maxAttempts) => {
-    const [facets] = (await chunkRows(companyId, figuresPipeline(sourceTypes, retried, maxAttempts))) || [];
-    return facets || {};
+    const [totals, sources, reasons, pending] = await Promise.all([
+        chunkRows(companyId, totalsPipeline(sourceTypes)),
+        chunkRows(companyId, sourcesPipeline(sourceTypes)),
+        chunkRows(companyId, fileReasonsPipeline(retried, maxAttempts)),
+        count(companyId, SCHEMA_TYPE.KNOWLEDGE_CHUNKS, fileSweep.pendingFilter()),
+    ]);
+    const byModel = new Map();
+    (totals || []).filter((row) => row._id.deleted !== true).forEach((row) => {
+        const model = row._id.embeddingModel || null;
+        byModel.set(model, (byModel.get(model) || 0) + row.chunks);
+    });
+    const { fileReasons = [], fileExhausted = [] } = ((reasons || [])[0]) || {};
+    return {
+        bySource: totals || [],
+        sources: sources || [],
+        byModel: [...byModel].map(([model, chunks]) => ({ _id: model, chunks })),
+        fileReasons,
+        fileExhausted,
+        filesPending: pending,
+    };
 };
 
 const progressOf = async (companyId, sourceType, cursor) => {
@@ -127,7 +146,7 @@ const filesOf = (facets) => {
         reasons: (facets.fileReasons || [])
             .map((row) => ({ reason: String(row._id), count: row.count, exhausted: exhausted.get(row._id) || 0, retryable: retried.includes(row._id) }))
             .sort((a, b) => a.reason.localeCompare(b.reason)),
-        pending: ((facets.filesPending || [])[0] || {}).n || 0,
+        pending: Number(facets.filesPending) || 0,
     };
 };
 
@@ -211,7 +230,7 @@ const readFigures = async (company, now, refresh) => {
 
 const forget = (companyId) => { myCache.del(`${CACHE_PREFIX}${String(companyId)}`); };
 
-/* Held for a minute per workspace, since one read walks every chunk; `refresh` reads again. */
+/* Held for a minute per workspace, since one read walks the whole figures index; `refresh` reads again. */
 const workspaceFigures = async (companyId, { now = Date.now(), refresh = false } = {}) => {
     const company = String(companyId);
     const key = `${CACHE_PREFIX}${company}`;
