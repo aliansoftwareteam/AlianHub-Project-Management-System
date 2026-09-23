@@ -1,44 +1,16 @@
-
 const mongoRef = require('../../../utils/mongo-handler/mongoQueries');
 const { dbCollections } = require('../../../Config/collections');
 
-// BUG-014 / #68 fix: window in minutes the verification token is valid for.
 const VERIFICATION_TOKEN_TTL_MIN = 10;
 
-/**
- * Verify Email
- *
- * Pre-fix this controller had three subtle problems that combined into a
- * verification bypass:
- *
- *   1. Input validation at lines 12–26 used `!req.body.token`, which lets
- *      objects/arrays through (`![]` and `!{}` are `false`). So a JSON body
- *      of `{ token: [] }` passed validation.
- *
- *   2. The final branch `response.verificationToken == req.body.token`
- *      used JavaScript loose-equality. `"" == []` is `true`, so any account
- *      whose stored `verificationToken` is `""` (the value the codebase
- *      sets after a successful verification, or as a fresh-account default)
- *      could be re-verified by anyone who could send `{ uid, token: [] }`.
- *
- *   3. There was no fallback `else`, so unmatched states (e.g. stored
- *      token is `null`/undefined) silently fell off the end and left the
- *      request hanging.
- *
- * Also: the expiry check `new Date(verificationTokenTime).setMinutes(...)`
- * produced an `Invalid Date` when `verificationTokenTime` was missing, and
- * `InvalidDate < new Date()` is `false`, so the expiry check was bypassed
- * for any user without a valid `verificationTokenTime` field.
- *
- * The rewrite below:
- *   - Requires `uid` and `token` to be non-empty strings (rejects arrays,
- *     objects, numbers, etc.).
- *   - Requires the stored `verificationToken` to be a non-empty string.
- *   - Uses strict equality `===` for the token comparison.
- *   - Treats an invalid / missing `verificationTokenTime` as expired
- *     instead of silently bypassing the expiry.
- *   - Sends exactly one response in every branch (no fallthrough hang).
- */
+/* Unknown, already verified and expired accounts get the same answer, and it never carries
+ * the address, so a guessed account id reveals nothing. */
+const LINK_NOT_VALID = Object.freeze({
+    status: false,
+    statusText: 'This link is invalid or has expired.',
+    showResendVerification: true,
+});
+
 exports.verifyEmail = (req, res) => {
     try {
         if (typeof req.body.uid !== 'string' || req.body.uid.length === 0) {
@@ -62,59 +34,19 @@ exports.verifyEmail = (req, res) => {
         };
 
         mongoRef.MongoDbCrudOpration('global', findUser, 'findOne').then((response) => {
-            if (!response) {
-                res.send({
-                    status: false,
-                    statusText: 'Couldn’t find your Account',
-                    showResendVerification: false,
-                });
-                return;
-            }
-
-            // Already verified — clear any stale token and respond.
-            if (response.isEmailVerified === true) {
-                const clearTokenObj = {
-                    type: dbCollections.USERS,
-                    data: [
-                        { _id: req.body.uid },
-                        { $set: { verificationToken: '' } },
-                    ],
-                };
-                mongoRef.MongoDbCrudOpration('global', clearTokenObj, 'findOneAndUpdate').then(() => {
-                    res.send({
-                        status: false,
-                        alreadyVarified: true,
-                        statusText: 'Your email is already verified',
-                        showResendVerification: false,
-                    });
-                }).catch((error) => {
-                    res.send({
-                        status: false,
-                        statusText: error.message,
-                    });
-                });
+            if (!response || response.isEmailVerified === true) {
+                res.send({ ...LINK_NOT_VALID });
                 return;
             }
 
             const storedToken = response.verificationToken;
-            const expiredResponse = {
-                status: false,
-                email: response.Employee_Email,
-                statusText: 'This link is expired',
-                showResendVerification: true,
-            };
-
-            // Stored token must be a non-empty string. Empty string is what
-            // the code stores after a successful verification or for fresh
-            // accounts where verification hasn't been initiated yet — both
-            // states should reject any incoming `token`, not match it.
+            // An empty stored token is what a used or never-started verification leaves; it matches nothing.
             if (typeof storedToken !== 'string' || storedToken.length === 0) {
-                res.send(expiredResponse);
+                res.send({ ...LINK_NOT_VALID });
                 return;
             }
 
-            // Treat a missing / invalid `verificationTokenTime` as expired
-            // rather than silently bypassing the expiry.
+            // A missing or unreadable issue time counts as expired.
             const rawTime = response.verificationTokenTime
                 ? new Date(response.verificationTokenTime)
                 : null;
@@ -122,18 +54,11 @@ exports.verifyEmail = (req, res) => {
             const validUntil = hasValidTime
                 ? new Date(rawTime.getTime() + VERIFICATION_TOKEN_TTL_MIN * 60 * 1000)
                 : null;
-            if (!validUntil || validUntil < new Date()) {
-                res.send(expiredResponse);
+            if (!validUntil || validUntil < new Date() || storedToken !== req.body.token) {
+                res.send({ ...LINK_NOT_VALID });
                 return;
             }
 
-            // Strict equality — both are non-empty strings at this point.
-            if (storedToken !== req.body.token) {
-                res.send(expiredResponse);
-                return;
-            }
-
-            // Success — mark the user verified and clear the token.
             const markVerifiedObj = {
                 type: dbCollections.USERS,
                 data: [
@@ -158,11 +83,8 @@ exports.verifyEmail = (req, res) => {
                     statusText: error.message,
                 });
             });
-        }).catch((error) => {
-            res.send({
-                status: false,
-                statusText: error,
-            });
+        }).catch(() => {
+            res.send({ ...LINK_NOT_VALID });
         });
     } catch (error) {
         res.send({

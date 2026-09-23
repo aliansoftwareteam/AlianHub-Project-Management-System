@@ -31,6 +31,14 @@ describe('hardcoded template text', () => {
         ]);
     });
 
+    test('html character references are not words, but text beside them still is', () => {
+        const findings = scanTemplate(`
+            <span>&nbsp;</span><i class="x"></i>&nbsp;&amp;&#160;&#x2014;<i></i>
+            <span>&nbsp;Save</span>
+        `);
+        expect(findings.map((f) => `${f.kind}:${f.value}`)).toEqual(['text:Save']);
+    });
+
     test('no file exceeds its allowlisted count', () => {
         const { over } = compareToAllowlist(scanHardcoded(), readAllowlist());
         if (over.length) {

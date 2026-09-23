@@ -166,6 +166,7 @@ describe('with the instance default set in the Instance console', () => {
         expect(sent.status).toBe(200);
         const created = await createApiClient({ baseURL: state.baseURL }).post('/api/v2/createUser', {
             firstName: 'Ivy', lastName: 'Invitee', email, password: state.password, isInvitation: true, assignCompany: state.companyId,
+            memberId: String(sent.body.data._id), linkId: sent.body.data.linkId,
         });
         expect(created.body.status).toBe(true);
         const session = await login(state.baseURL, email, state.password);

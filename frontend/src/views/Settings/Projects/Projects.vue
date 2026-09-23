@@ -25,10 +25,10 @@
             <div v-if="clientWidth > 1024" class="pagination">
                   <div class="showingEntries">
                         <div v-if="activeTabProjects === filterActiveProjects">
-                            {{$t('general.showing')}} {{ Math.min((currentPage - 1) * itemsPerPage + 1, filterActiveProjects.length) }}  to {{ Math.min(currentPage * itemsPerPage, filterActiveProjects.length) }} of {{ filterActiveProjects.length }} {{$t('general.entries')}}
+                            {{ $t('Projects.showing_entries', { from: Math.min((currentPage - 1) * itemsPerPage + 1, filterActiveProjects.length), to: Math.min(currentPage * itemsPerPage, filterActiveProjects.length), total: filterActiveProjects.length }) }}
                        </div>
                         <div v-else-if="activeTabProjects === filterCloseProject">
-                            {{$t('general.showing')}} {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, filterCloseProject.length) }} of {{ filterCloseProject.length }} {{$t('general.entries')}}
+                            {{ $t('Projects.showing_entries', { from: (currentPage - 1) * itemsPerPage + 1, to: Math.min(currentPage * itemsPerPage, filterCloseProject.length), total: filterCloseProject.length }) }}
                         </div>
                  </div>
                 <div class="page_button">
@@ -92,10 +92,10 @@
                 <div :class="[clientWidth > 576 ? 'd-flex' : '','justify-content-between','align-items-center']">
                     <div class="showingEntries">
                             <div v-if="activeTabProjects === filterActiveProjects">
-                                {{$t('general.showing')}} {{ Math.min((currentPage - 1) * itemsPerPage + 1, filterActiveProjects.length) }}  to {{ Math.min(currentPage * itemsPerPage, filterActiveProjects.length) }} of {{ filterActiveProjects.length }} {{$t('general.entries')}}
+                                {{ $t('Projects.showing_entries', { from: Math.min((currentPage - 1) * itemsPerPage + 1, filterActiveProjects.length), to: Math.min(currentPage * itemsPerPage, filterActiveProjects.length), total: filterActiveProjects.length }) }}
                            </div>
                             <div v-else-if="activeTabProjects === filterCloseProject">
-                                {{$t('general.showing')}} {{ (currentPage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPage * itemsPerPage, filterCloseProject.length) }} of {{ filterCloseProject.length }} {{$t('general.entries')}}
+                                {{ $t('Projects.showing_entries', { from: (currentPage - 1) * itemsPerPage + 1, to: Math.min(currentPage * itemsPerPage, filterCloseProject.length), total: filterCloseProject.length }) }}
                             </div>
                      </div>
     

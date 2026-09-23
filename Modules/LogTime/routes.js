@@ -3,14 +3,15 @@ const ctrlV2 = require('./controllerV2');
 const multer = require("multer");
 const { DEFAULT_LIMITS } = require('../../utils/uploadConfig');
 const { USER_PROFILES_BUCKET, refuseBeforeWrite, refuseUpload, uploadRefusal } = require('../storage/bucketAccess');
+const { ownSessionRefusal } = require('./controllerV2/sessionUser');
 
 /* The storage engine writes to the bucket named in the body, while the middleware only verified the companyid header. */
-const captureRefusal = (req) => {
+const captureRefusal = async (req) => {
     const { companyId, path } = req.body || {};
     if (!companyId || companyId === USER_PROFILES_BUCKET || companyId !== req.headers.companyid) {
         return { code: 403, statusText: 'You do not have access to this bucket' };
     }
-    return uploadRefusal(req, companyId, path);
+    return (await uploadRefusal(req, companyId, path)) || ownSessionRefusal(req, companyId);
 };
 
 const upload = multer({

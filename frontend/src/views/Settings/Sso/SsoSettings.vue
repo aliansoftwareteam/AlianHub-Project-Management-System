@@ -39,8 +39,8 @@
                         <div class="ah-field">
                             <label class="ah-field__label" for="sso-provider">{{ $t('Sso.provider') }}</label>
                             <select id="sso-provider" class="ah-input" v-model="form.provider">
-                                <option value="oidc">OIDC (OpenID Connect)</option>
-                                <option value="saml">SAML 2.0</option>
+                                <option value="oidc">{{ $t('Sso.provider_oidc') }}</option>
+                                <option value="saml">{{ $t('Sso.provider_saml') }}</option>
                             </select>
                         </div>
                         <div class="ah-field">
@@ -51,7 +51,7 @@
                         <template v-if="form.provider === 'oidc'">
                             <div class="ah-field sso__span">
                                 <label class="ah-field__label" for="sso-disc">{{ $t('Sso.discovery_url') }}</label>
-                                <input id="sso-disc" class="ah-input ah-mono" :class="{ 'ah-input--error': errors.discoveryUrl }" v-model.trim="form.oidc.discoveryUrl" placeholder="https://idp/.well-known/openid-configuration" @input="errors.discoveryUrl = ''" />
+                                <input id="sso-disc" class="ah-input ah-mono" :class="{ 'ah-input--error': errors.discoveryUrl }" v-model.trim="form.oidc.discoveryUrl" :placeholder="$t('Sso.discovery_url_ph')" @input="errors.discoveryUrl = ''" />
                                 <div v-if="errors.discoveryUrl" class="ah-field__error">{{ errors.discoveryUrl }}</div>
                             </div>
                             <div class="ah-field">
@@ -66,13 +66,13 @@
                             </div>
                             <div class="ah-field sso__span">
                                 <label class="ah-field__label" for="sso-scopes">{{ $t('Sso.scopes') }}</label>
-                                <input id="sso-scopes" class="ah-input ah-mono" v-model.trim="form.oidc.scopes" placeholder="openid email profile" />
+                                <input id="sso-scopes" class="ah-input ah-mono" v-model.trim="form.oidc.scopes" :placeholder="$t('Sso.scopes_ph')" />
                             </div>
                         </template>
                         <template v-else>
                             <div class="ah-field sso__span">
                                 <label class="ah-field__label" for="sso-entry">{{ $t('Sso.entry_point') }}</label>
-                                <input id="sso-entry" class="ah-input ah-mono" :class="{ 'ah-input--error': errors.entryPoint }" v-model.trim="form.saml.entryPoint" placeholder="https://idp/sso/saml" @input="errors.entryPoint = ''" />
+                                <input id="sso-entry" class="ah-input ah-mono" :class="{ 'ah-input--error': errors.entryPoint }" v-model.trim="form.saml.entryPoint" :placeholder="$t('Sso.entry_point_ph')" @input="errors.entryPoint = ''" />
                                 <div v-if="errors.entryPoint" class="ah-field__error">{{ errors.entryPoint }}</div>
                             </div>
                             <div class="ah-field sso__span">
@@ -81,7 +81,7 @@
                             </div>
                             <div class="ah-field sso__span">
                                 <label class="ah-field__label" for="sso-cert">{{ $t('Sso.idp_cert') }}</label>
-                                <textarea id="sso-cert" class="ah-input ah-textarea ah-mono" :class="{ 'ah-input--error': errors.idpCert }" rows="4" v-model.trim="form.saml.idpCert" placeholder="-----BEGIN CERTIFICATE-----" @input="errors.idpCert = ''"></textarea>
+                                <textarea id="sso-cert" class="ah-input ah-textarea ah-mono" :class="{ 'ah-input--error': errors.idpCert }" rows="4" v-model.trim="form.saml.idpCert" :placeholder="$t('Sso.idp_cert_ph')" @input="errors.idpCert = ''"></textarea>
                                 <div v-if="errors.idpCert" class="ah-field__error">{{ errors.idpCert }}</div>
                             </div>
                         </template>
@@ -94,7 +94,7 @@
                             </div>
                             <div class="sso__value">
                                 <span class="sso__value-label">{{ $t('Settings.sso_attributes') }}</span>
-                                <span class="sso__value-text">email · firstName · lastName</span>
+                                <span class="sso__value-text">{{ $t('Sso.attributes_list') }}</span>
                             </div>
                         </div>
 
@@ -108,6 +108,33 @@
                                 <input id="sso-domain" class="sso__chip-input" v-model.trim="domainDraft" :placeholder="$t('Settings.sso_domain_ph')" @keydown.enter.prevent="addDomain()" @input="onDomainInput" @blur="addDomain()" />
                             </div>
                             <div v-if="errors.domains" class="ah-field__error">{{ errors.domains }}</div>
+                        </div>
+
+                        <div v-if="domainRecords.length" class="sso__verify sso__span">
+                            <div class="ah-small">{{ $t('Settings.sso_verify_hint') }}</div>
+                            <div v-for="r in domainRecords" :key="r.domain" class="sso__verify-row">
+                                <div class="sso__verify-head">
+                                    <span class="sso__provider-name">{{ r.domain }}</span>
+                                    <span v-if="r.verifiedAt" class="ah-chip ah-chip--ok">{{ $t('Settings.sso_domain_verified') }}</span>
+                                    <template v-else>
+                                        <span class="ah-chip">{{ $t('Settings.sso_domain_unverified') }}</span>
+                                        <button type="button" class="sso__link" :disabled="verifying === r.domain" @click="verifyDomain(r.domain)">{{ verifying === r.domain ? $t('Settings.sso_verifying') : $t('Settings.sso_verify') }}</button>
+                                    </template>
+                                </div>
+                                <div v-if="!r.verifiedAt" class="sso__values">
+                                    <div class="sso__value">
+                                        <span class="sso__value-label">{{ $t('Settings.sso_txt_name') }}</span>
+                                        <span class="sso__value-text">{{ r.name }}</span>
+                                        <button type="button" class="sso__link" @click="copy(r.name)">{{ $t('Settings.copy') }}</button>
+                                    </div>
+                                    <div class="sso__value">
+                                        <span class="sso__value-label">{{ $t('Settings.sso_txt_value') }}</span>
+                                        <span class="sso__value-text">{{ r.value }}</span>
+                                        <button type="button" class="sso__link" @click="copy(r.value)">{{ $t('Settings.copy') }}</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-if="verifyError" class="ah-field__error">{{ verifyError }}</div>
                         </div>
                     </div>
                 </div>
@@ -183,6 +210,8 @@ const saveError = ref("");
 const saveOk = ref(false);
 const savedConfig = ref(null);
 const domainDraft = ref("");
+const verifying = ref("");
+const verifyError = ref("");
 const errors = reactive({ discoveryUrl: "", clientId: "", clientSecret: "", entryPoint: "", idpCert: "", domains: "" });
 const form = reactive({
     provider: "oidc", isEnabled: false, autoProvisionUsers: true, defaultRoleType: 3,
@@ -213,6 +242,8 @@ const copyValues = computed(() => {
         { label: t("Settings.sso_entity_id"), value: `${origin}/api/v2/sso/saml/metadata?companyId=${cid.value}` }
     ];
 });
+
+const domainRecords = computed(() => (savedConfig.value && Array.isArray(savedConfig.value.domainRecords) ? savedConfig.value.domainRecords : []));
 
 const initiateUrl = computed(() => `${origin}/api/v2/sso/${(savedConfig.value && savedConfig.value.provider) || form.provider}/initiate?companyId=${cid.value}`);
 const loginPreviewUrl = computed(() => `${origin}/#/login`);
@@ -291,6 +322,25 @@ async function save() {
     }
 }
 
+async function verifyDomain(domain) {
+    if (verifying.value) return;
+    verifying.value = domain;
+    verifyError.value = "";
+    try {
+        const body = (await apiRequest("post", env.SSO_VERIFY_DOMAIN, { domain }))?.data;
+        if (body?.status) {
+            savedConfig.value = body.data || savedConfig.value;
+            $toast.success(t("Settings.sso_domain_verified_toast", { d: domain }), { position: "top-right" });
+        } else {
+            verifyError.value = t("Settings.sso_verify_failed", { d: domain });
+        }
+    } catch (error) {
+        verifyError.value = t("Toast.something_went_wrong");
+    } finally {
+        verifying.value = "";
+    }
+}
+
 function testSignIn() {
     window.open(initiateUrl.value, "_blank", "noopener");
 }
@@ -337,6 +387,9 @@ onMounted(load);
 .sso__chip-input { flex: 1; min-width: 140px; border: 0; background: transparent; color: var(--ink); font: 400 13px/1 var(--font-ui); height: 26px; }
 .sso__chip-input:focus { outline: none; }
 .sso__chip-input::placeholder { color: var(--ink-3); }
+.sso__verify { display: flex; flex-direction: column; gap: 8px; }
+.sso__verify-row { display: flex; flex-direction: column; gap: 6px; }
+.sso__verify-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sso__enf { display: flex; flex-direction: column; gap: 8px; }
 .sso__radio { display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; color: var(--ink-label); font: var(--text-small); }
 .sso__radio input { margin: 3px 0 0; accent-color: var(--brand); flex: none; }

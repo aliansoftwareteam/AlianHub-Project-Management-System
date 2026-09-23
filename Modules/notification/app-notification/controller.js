@@ -176,35 +176,27 @@ exports.updateMarkRead = async (req, res) => {
     }
 }
 
+// One answer for a notification that does not exist and one that belongs to someone else.
 exports.deleteMarkReadFromGlobal = async (req, res) => {
     try {
         const { id } = req.params;
-
-        if (!id) {
-            return res.status(400).json({
-                status: false,
-                message: `'id' paramter id required`
-            })
+        if (!OBJECT_ID_PATTERN.test(String(id || ''))) {
+            return fail(res, 400, "'id' must be a valid id");
         }
 
         const query = {
             type: SCHEMA_TYPE.NOTIFICATIONS,
-            data: [
-                {
-                    notificationId: id
-                }
-            ],
+            data: [{ notificationId: String(id), receiverID: String(req.uid), companyId: String(req.headers['companyid']) }],
         };
 
         const response = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, query, 'deleteOne');
-
-        return res.status(200).json({ status: true, data: response });
+        if (!response || !response.deletedCount) {
+            return fail(res, 404, "Notification not found.");
+        }
+        return res.status(200).json({ status: true, statusText: "Notification removed." });
 
     } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while delete mark read message from global",
-            error: error.message,
-        });
+        return fail(res, 500, "An error occurred while removing the notification.");
     }
 }
 

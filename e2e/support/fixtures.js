@@ -61,6 +61,7 @@ async function inviteMember({ baseURL, ownerApi, companyId, role, email, firstNa
     const anon = createApiClient({ baseURL });
     const created = await anon.post('/api/v2/createUser', {
         firstName, lastName, email, password: PASSWORD, isInvitation: true, assignCompany: companyId,
+        memberId: String(inviteRow._id), linkId: inviteRow.linkId,
     });
     const user = assertOk(created, `register ${email}`).statusText;
     const userId = String(user._id);
