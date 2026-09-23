@@ -84,7 +84,7 @@ describe('POST /api/v1/handleNotification acts for the signed-in user', () => {
         type: 'project',
         companyId: session.companyId,
         projectId: PROJECT._id,
-        object: { key: 'project_name', message },
+        object: { key: 'project_milestone', message },
         userData,
     });
 

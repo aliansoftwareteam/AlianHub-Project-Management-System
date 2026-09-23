@@ -165,7 +165,7 @@ import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
 const companyId = inject('$companyId');
 const userId = inject("$userId");
-import { useCustomComposable, useGetterFunctions } from "@/composable";
+import { useCustomComposable } from "@/composable";
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 import { projectComponentsIcons } from '@/composable/commonFunction';
@@ -174,7 +174,6 @@ import { apiRequest } from "@/services";
 import * as env from '@/config/env';
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
 import { useI18n } from "vue-i18n";
-import { closeProject } from "@/utils/NotificationTemplate";
 const { t } = useI18n();
 
 const props = defineProps({
@@ -188,8 +187,7 @@ const props = defineProps({
 });
 const {markFavourite} = useProjects();
 const {getters,commit} = useStore();
-const {checkPermission,sanitizeInput} = useCustomComposable();
-const {getUser} = useGetterFunctions();
+const {checkPermission} = useCustomComposable();
 const router = useRouter();
 const $toast = useToast();
 const projectGoToLink = require("@/assets/images/svg/projectGoToLink.svg");
@@ -202,12 +200,6 @@ const isSpinner = ref(false);
 const showSidebar = ref(false);
 
 const users = computed(() => getters["users/users"]);
-const user = getUser(userId.value);
-const userData = {
-    id: user.id,
-    Employee_Name: user.Employee_Name,
-    companyOwnerId: user.companyOwnerId
-}
 const requireComp = computed(() => {
     let arr = getters['settings/projectTabComponents'];
     const removeArr = ["gantt", "timeline","embed"];
@@ -458,41 +450,8 @@ async function colseProject (project,type) {
         commit('projectData/projectLocalUpdate', {itemData:  {...project,...updateObject},projectId:project._id,key:'RemoveProject',subKey: '',userId: ''});
         if(type === 'reopen') {
             restoreChildTasks(project._id);
-            let historyObj = {
-                key : "Project_EndDate",
-                message : `<b>${userData.Employee_Name}</b> has reopened <b>${sanitizeInput(project.ProjectName)}</b> Project</b>.`
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": project._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
         } else {
             restoreChildTasks(project._id, 8);
-        }
-        if(type === 'close'){
-            let notifyObj = {
-                'ProjectName' : project?.ProjectName ||' ',
-                'userName' : userData?.Employee_Name || ''
-            }
-            let notificationObject = {
-                message: closeProject(notifyObj),
-                key: "project_close",
-            };
-            
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: project?._id,
-                object: notificationObject,
-                userData: userData
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
         }
         $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
         showSidebar.value = false;
@@ -512,19 +471,6 @@ async function deleteProject(project, deletedStatusKey) {
         commit('projectData/projectLocalUpdate', {itemData:  {...project,...updateObject},projectId:project._id,key:'RemoveProject',subKey: '',userId: ''});
         deleteChildTasks(project);
         commit('projectData/mutateProjects', [{ op: "modified", data: { ...project, ...updateObject } }]);
-        let historyObj = {
-            key: "Project_EndDate",
-            message: `<b>${userData.Employee_Name}</b> has deleted <b>${sanitizeInput(project.ProjectName)}</b> project</b>.`
-        }
-        apiRequest("post", env.HANDLE_HISTORY, {
-            "type": 'project',
-            "companyId": companyId.value,
-            "projectId": project._id,
-            "taskId": null,
-            "object": historyObj,
-            "userData": userData
-        })
-
         $toast.success(t('Toast.Deleted_successfully'), { position: 'top-right' });
     } catch (error) {
         console.error(error);
@@ -549,18 +495,6 @@ async function unarchiveProject(project) {
         await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${project._id}`,{updateObject: updateObject});
         commit('projectData/projectLocalUpdate', {itemData:  {...project,...updateObject},projectId:project._id,key:'RemoveProject',subKey: '',userId: ''});
         restoreChildTasks(project._id, 7);
-        let historyObj = {
-            key : "Project_EndDate",
-            message : `<b>${userData.Employee_Name}</b> has unarchived <b>${sanitizeInput(project.ProjectName)}</b> project</b>.`
-        }
-        apiRequest("post", env.HANDLE_HISTORY, {
-            "type": 'project',
-            "companyId": companyId.value,
-            "projectId": project._id,
-            "taskId": null,
-            "object": historyObj,
-            "userData": userData
-        })
         $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
     } catch (error) {
         console.error("ERROR in unarchive project: ", error);
@@ -597,18 +531,6 @@ async function updateProjectType (projectObj,isPrivate) {
             };
             await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${projectObj._id}`,{updateObject: queryObj})
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-            let historyObj = {
-                key : "Project_EndDate",
-                message : `<b>${userData.Employee_Name}</b> has changed <b>Share with option</b> as <b>${type}</b></b>.`
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": projectObj._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
             commit('projectData/projectLocalUpdate', {itemData:{...projectObj,isPrivateSpace: isPrivate},projectId:projectObj._id,key:'ProjectTypeChange',subKey:"",userId: ''});
         }
         //If you don't have plans to update private or public projects, that time count is decresed

@@ -1,9 +1,6 @@
-import { createProject } from '@/utils/NotificationTemplate';
 import { apiRequest } from '../../../services';
 import * as env from '@/config/env';
-import { useCustomComposable } from '@/composable';
 import Store from "@/store/index";
-const {sanitizeInput} = useCustomComposable();
 
 export const HandleProject = async (path,dataObj,userData,CompanyId,action) => {
     return new Promise((resolve, reject) => {
@@ -18,41 +15,6 @@ export const HandleProject = async (path,dataObj,userData,CompanyId,action) => {
                     } else {
                         resolve({status: true, id: id, data: projectData, message: "Project created successfully."});
                     }
-                    let historyObj = {
-                        'message': `<b>${userData.Employee_Name}</b> has created new </b> as <b>${sanitizeInput(dataObj.ProjectName)}</b> project`,
-                        'key' : 'Project_Created',
-                    }
-                    let notificationObject = {
-                        'message': createProject({
-                            projectName: dataObj.ProjectName,
-                        }),
-                        'key': 'project_create',
-                        'projectId': id,
-                    }
-                    apiRequest("post", env.HANDLE_HISTORY, {
-                        type: 'project', 
-                        companyId: CompanyId,
-                        projectId: id,
-                        taskId: null,
-                        object: historyObj,
-                        userData: userData,
-                    })
-                    .catch((error) => {
-                        console.error("ERROR in update history", error);
-                    })
-    
-                    apiRequest("post", env.HANDLE_NOTIFICATION, {
-                        type: 'project',
-                        companyId: CompanyId,
-                        projectId: id,
-                        object: notificationObject,
-                        userData: userData,
-                        changeType:'project_create',
-                        changeData: {ProjectName : dataObj.ProjectName}
-                    })
-                    .catch((error) => {
-                        console.error("ERROR in update notification", error);
-                    })
                 }else{
                     resolve({status: false, message: "Error In creating Project."});
                 }
