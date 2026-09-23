@@ -7624,6 +7624,12 @@ export default {
         "col_user": "User",
         "total": "Total"
     },
+    "IconPicker": {
+        "all": "All",
+        "loading": "Loading icons…",
+        "no_results": "No icons found.",
+        "truncated": "Showing first {n} — refine your search."
+    },
     "dashboardCard": {
         "task_type": "Task type",
         "project_scope_all": "All projects",

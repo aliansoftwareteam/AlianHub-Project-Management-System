@@ -27,7 +27,6 @@
     "frontend/src/components/molecules/Home/PlannerPanel.vue": 1,
     "frontend/src/components/molecules/Home/SetupChecklist.vue": 1,
     "frontend/src/components/molecules/HubAiSidebar/HubAiSidebar.vue": 1,
-    "frontend/src/components/molecules/IconPicker/IconPicker.vue": 4,
     "frontend/src/components/molecules/Pages/PagePresenter.vue": 1,
     "frontend/src/components/molecules/ProjectsListingSetting/ProjectsListingSetting.vue": 1,
     "frontend/src/components/molecules/Setting/SettingAutoCloseProjects.vue": 8,

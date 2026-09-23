@@ -14,7 +14,7 @@
                     class="iconpicker__set"
                     :class="{ active: activeSet === 'all' }"
                     @click="activeSet = 'all'"
-                >All</button>
+                >{{ $t('IconPicker.all') }}</button>
                 <button
                     v-for="s in sets"
                     :key="s"
@@ -39,8 +39,8 @@
         </div>
 
         <!-- Results grid -->
-        <div v-if="!ready" class="iconpicker__msg">Loading icons…</div>
-        <div v-else-if="!results.length" class="iconpicker__msg">No icons found.</div>
+        <div v-if="!ready" class="iconpicker__msg">{{ $t('IconPicker.loading') }}</div>
+        <div v-else-if="!results.length" class="iconpicker__msg">{{ $t('IconPicker.no_results') }}</div>
         <div v-else class="iconpicker__grid">
             <button
                 v-for="name in results"
@@ -55,7 +55,7 @@
             </button>
         </div>
         <div v-if="ready && truncated" class="iconpicker__more">
-            Showing first {{ RESULT_LIMIT }} — refine your search.
+            {{ $t('IconPicker.truncated', { n: RESULT_LIMIT }) }}
         </div>
     </div>
 </template>
