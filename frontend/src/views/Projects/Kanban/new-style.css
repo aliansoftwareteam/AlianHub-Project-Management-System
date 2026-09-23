@@ -412,9 +412,10 @@
     .kanban-board .add-task-btn { min-width: 44px; min-height: 44px; }
     /* No hover on touch, so the per-task menu has no other way in — and being
        permanently on screen it needs its own gutter rather than the title's. */
-    .kanban-card .option-list { opacity: 1; visibility: visible; }
+    /* Transparent and 36 px tall so the always-visible menu no longer paints over the due date below it. */
+    .kanban-card .option-list { opacity: 1; visibility: visible; background: transparent; }
     .kanban-board .kanban-card .card-title { padding-right: 46px; }
-    .kanban-card .option-list__trigger { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+    .kanban-card .option-list__trigger { min-width: 44px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
 }
 
 .kanban-board .more-count {

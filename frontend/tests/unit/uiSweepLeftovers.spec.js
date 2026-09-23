@@ -34,6 +34,22 @@ describe('instance console cards', () => {
     });
 });
 
+const phoneBlock = (css) => {
+    const start = css.indexOf('@media (max-width: 767px)');
+    return start === -1 ? '' : css.slice(start);
+};
+
+describe('a board card on a phone', () => {
+    const phone = phoneBlock(read('views/Projects/Kanban/new-style.css'));
+
+    test('the always-visible task menu does not paint over the due date', () => {
+        expect(ruleBody(phone, '.kanban-card .option-list')).toMatch(/background:\s*transparent/);
+        const trigger = ruleBody(phone, '.kanban-card .option-list__trigger');
+        expect(trigger).toMatch(/min-height:\s*36px/);
+        expect(trigger).toMatch(/min-width:\s*44px/);
+    });
+});
+
 describe('the setup checklist outside Home', () => {
     test('brings its own stylesheet, so Instance → Health renders it styled on a direct visit', () => {
         expect(read('components/molecules/Home/SetupChecklist.vue')).toMatch(/import\s+["']\.\/style\.css["']/);
