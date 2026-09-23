@@ -2,18 +2,18 @@
   <div class="map-view ah-page">
     <div class="map-view__bar">
       <span class="map-view__count">
-        {{ placedTasks.length }} placed<template v-if="unplaced.length"> · {{ unplaced.length }} to place</template>
+        {{ $t('Views.map_placed', { n: placedTasks.length }) }}<template v-if="unplaced.length"> · {{ $t('Views.map_to_place', { n: unplaced.length }) }}</template>
       </span>
       <span v-if="placingTask" class="map-view__hint">
-        Click anywhere on the map to place <b>{{ placingTask.TaskName || placingTask.TaskKey }}</b>
-        <button type="button" class="map-view__hint-x" @click="placingId = ''">cancel</button>
+        <i18n-t keypath="Views.map_click_to_place"><template #task><b>{{ placingTask.TaskName || placingTask.TaskKey }}</b></template></i18n-t>
+        <button type="button" class="map-view__hint-x" @click="placingId = ''">{{ $t('Views.map_cancel') }}</button>
       </span>
       <button
         v-if="placedTasks.length"
         type="button"
         class="map-view__clear"
         @click="clearAll"
-      >Clear all</button>
+      >{{ $t('Views.map_clear_all') }}</button>
     </div>
 
     <div class="map-view__main">
@@ -77,7 +77,7 @@
         </svg>
 
         <div v-if="!activeTasks.length" class="map-view__empty">
-          No tasks in this sprint yet.
+          {{ $t('Views.map_empty') }}
         </div>
       </div>
 
@@ -92,10 +92,10 @@
             <span v-if="selectedTask.TaskKey" class="map-view__key">{{ selectedTask.TaskKey }}</span>
             <span class="map-view__coord">{{ fmtLatLng(placements[selectedId].lat, placements[selectedId].lng) }}</span>
           </div>
-          <button type="button" class="map-view__remove" @click="removePlacement(selectedId)">Remove from map</button>
+          <button type="button" class="map-view__remove" @click="removePlacement(selectedId)">{{ $t('Views.map_remove') }}</button>
         </div>
 
-        <h4 class="map-view__side-title">To place ({{ unplaced.length }})</h4>
+        <h4 class="map-view__side-title">{{ $t('Views.map_to_place_title', { n: unplaced.length }) }}</h4>
         <ul class="map-view__list">
           <li
             v-for="t in unplaced"
@@ -106,10 +106,10 @@
             <span class="map-view__dot" :style="{ background: statusColor(t) }"></span>
             <span class="map-view__item-name" :title="t.TaskName">{{ t.TaskName || t.TaskKey }}</span>
             <button type="button" class="map-view__place" @click="startPlacing(t._id)">
-              {{ placingId === String(t._id) ? 'Placing…' : 'Place' }}
+              {{ placingId === String(t._id) ? $t('Views.map_placing') : $t('Views.map_place') }}
             </button>
           </li>
-          <li v-if="!unplaced.length" class="map-view__all-placed">All tasks placed.</li>
+          <li v-if="!unplaced.length" class="map-view__all-placed">{{ $t('Views.map_all_placed') }}</li>
         </ul>
       </aside>
     </div>

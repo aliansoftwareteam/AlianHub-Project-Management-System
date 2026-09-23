@@ -27,8 +27,8 @@ const checkMemory = () => {
 const report = (error) => parentPort.postMessage({ ok: false, code: error && error.code, message: String((error && error.message) || error).slice(0, 300) });
 setInterval(() => { try { checkMemory(); } catch (error) { report(error); } }, 20).unref();
 
-const inflated = () => {
-    const archive = inflateWithin(Buffer.from(bytes), limits.maxUnzippedBytes);
+const inflated = (options) => {
+    const archive = inflateWithin(Buffer.from(bytes), limits.maxUnzippedBytes, options);
     checkMemory();
     return archive;
 };
@@ -51,10 +51,26 @@ const docxText = async () => {
     return { text: result.value || '', partial: false };
 };
 
+/* SheetJS turns a numeric character reference into a single UTF-16 unit, so a character past U+FFFF
+ * written as one (an emoji, a rarer ideograph) reads as some other character. Those are spelled
+ * out in UTF-8 before it sees the part; every other byte stays as it was. */
+const NUMERIC_REFERENCE = /&#(?:x([0-9a-fA-F]{1,8})|([0-9]{1,10}));/g;
+const XML_PART = /\.(?:xml|rels)$/i;
+
+const spellWideReferences = (name, content) => {
+    if (!XML_PART.test(name.toString('latin1')) || !content.includes('&#')) return content;
+    const bytes = content.toString('latin1');
+    const spelled = bytes.replace(NUMERIC_REFERENCE, (reference, hex, decimal) => {
+        const codePoint = hex ? parseInt(hex, 16) : Number(decimal);
+        return codePoint > 0xffff && codePoint <= 0x10ffff ? Buffer.from(String.fromCodePoint(codePoint)).toString('latin1') : reference;
+    });
+    return spelled === bytes ? content : Buffer.from(spelled, 'latin1');
+};
+
 /* The macro part is never loaded and formulas never read, so nothing in a workbook is evaluated. */
 const sheetText = () => {
     const XLSX = require('xlsx');
-    const archive = inflated();
+    const archive = inflated({ rewrite: spellWideReferences });
     const book = XLSX.read(archive, { type: 'buffer', cellFormula: false, cellHTML: false, cellStyles: false, bookVBA: false, bookDeps: false, sheetRows: limits.maxRows + 1 });
     const names = book.SheetNames.slice(0, limits.maxSheets);
     let partial = book.SheetNames.length > names.length;

@@ -116,6 +116,15 @@ describe('AskAnswer', () => {
         expect(cites[0].text()).toContain('page:0000p1');
     });
 
+    it('cites a task by its key and name, linked to the task', () => {
+        const keyed = { ...TASK, ref: 'OPS-12' };
+        const wrapper = mount(AskAnswer, { props: { answer: { ...answer, answer: 'Signed [OPS-12].', cited: [keyed], sources: [keyed] } }, global: withStubs });
+        const cite = wrapper.find('.ask__cite');
+        expect(cite.find('.ask__cite-ref').text()).toBe('OPS-12');
+        expect(cite.text()).toContain('Budget review');
+        expect(cite.findComponent(LinkStub).props('to')).toEqual({ query: { task: 't1' } });
+    });
+
     it('opens the panel from the answer, focuses its close control and closes with Escape', async () => {
         mounted = mount(AskAnswer, { props: { answer }, global: withStubs, attachTo: document.body });
         const opener = mounted.find('[data-test="why-open"]');

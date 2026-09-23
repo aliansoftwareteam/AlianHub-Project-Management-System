@@ -42,11 +42,11 @@
             <div class="top-buttons">
                 <template v-if="clientWidth >= 768">
                     <button class="close button-style" @click="openFile(image)">
-                        <img src="@/assets/images/png/open.png" alt="open" title="open in new tab" width="16px">
+                        <img src="@/assets/images/png/open.png" alt="open" :title="$t('Attachments.open_in_new_tab')" width="16px">
                     </button>
                     <button class="close button-style"
                         @click="downloadFile(image?.path, `${image?.name}`)">
-                        <img src="@/assets/images/svg/download_bottom_wrapper.svg" class="download_icon" alt="download" title="download" width="16px">
+                        <img src="@/assets/images/svg/download_bottom_wrapper.svg" class="download_icon" alt="download" :title="$t('Attachments.download')" width="16px">
                     </button>
                     <button class="close button-style" @click="$emit('close')">
                         <img src="@/assets/images/svg/delete.svg" />
@@ -56,24 +56,24 @@
                     <DropDown :zIndex="999">
                         <template #button>
                             <button class="close button-style">
-                                <img :ref="`my_dd_options`" src="@/assets/images/svg/verticalDropdownthreedots.svg" alt="options" title="actions" width="10px" class="verticalDots">
+                                <img :ref="`my_dd_options`" src="@/assets/images/svg/verticalDropdownthreedots.svg" alt="options" :title="$t('Attachments.actions')" width="10px" class="verticalDots">
                             </button>
                         </template>
                         <template #options>
                             <DropDownOption @click="$refs[`my_dd_options`].click(), openFile(image)">
                                 
                                 <button class="close button-style mr-10px">
-                                    <img src="@/assets/images/png/open.png" alt="open" title="open in new tab" width="16px">
+                                    <img src="@/assets/images/png/open.png" alt="open" :title="$t('Attachments.open_in_new_tab')" width="16px">
                                 </button>
-                                Open in new tab
+                                {{ $t('Attachments.open_in_new_tab') }}
                             </DropDownOption>
                             <DropDownOption
                                 @click="$refs[`my_dd_options`].click(), downloadFile(image?.path, `${image?.name}`)"
                                 style="margin-bottom:0px !important;">
                                 <button class="close button-style mr-10px">
-                                    <img src="@/assets/images/svg/download_bottom_wrapper.svg" class="download_icon" alt="download" title="download" width="16px">
+                                    <img src="@/assets/images/svg/download_bottom_wrapper.svg" class="download_icon" alt="download" :title="$t('Attachments.download')" width="16px">
                                 </button>
-                                Download
+                                {{ $t('Attachments.download') }}
                             </DropDownOption>
                         </template>
                     </DropDown>
@@ -147,7 +147,7 @@
                 <video v-else-if="previewData.type === 'video'" ref="videoRef" :title="previewData.title"
                     class="preview" controls @loadeddata="loadingFile = false">
                     <source :src="previewData.url" :alt="previewData.alt" @error="errorLoad">
-                    Your browser does not support the video tag.
+                    {{ $t('Attachments.video_not_supported') }}
                 </video>
 
                 <!-- Audio -->
@@ -185,7 +185,7 @@
             <!-- ON PREVIEW ERROR -->
             <template v-else>
                 <div v-if="!defaultFailImage" class="no_preview_available">
-                    <span>No preview available</span>
+                    <span>{{ $t('Attachments.no_preview_available') }}</span>
                 </div>
                 <img v-else :src="defaultFailImage" :alt="previewData.alt" :title="previewData.title" class="preview"
                     @error="errorLoad">

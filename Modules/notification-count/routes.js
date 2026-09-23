@@ -9,7 +9,6 @@ exports.init = (app) => {
     *        required:
     *         - read
     *         - key
-    *         - companyId
     *        properties:
     *         read: 
     *           type: boolean
@@ -21,8 +20,8 @@ exports.init = (app) => {
     *           description: Key based on opration.
     *         companyId: 
     *           type: string
-    *           required: true
-    *           description: Id of comapny.
+    *           required: false
+    *           description: Ignored when it matches the companyid header, refused when it names another company.
     *         projectId: 
     *           type: string
     *           required: false
@@ -31,7 +30,7 @@ exports.init = (app) => {
     *           type: array
     *           items:
     *             type: string
-    *           description: UserId's array in which opration is need to perform.
+    *           description: Recipients of a bump; only active members of the company are counted. Read, set and readAll change only the signed-in user's own count.
     *         sprintId: 
     *           type: string
     *           required: false

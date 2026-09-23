@@ -171,9 +171,10 @@ describe('what a task write body names is read the way the handlers read it', ()
 
     it('records a browser session naming another company in report, and lets it through', async () => {
         await setWorkspaceMode('report');
+        const since = new Date();
         const res = await rename(owner.api, target, `session ${uniqueSuffix()}`, { companyId: OTHER_COMPANY });
         expect(res.status).toBe(200);
-        await waitFor(() => decisions.findOne({ mode: 'report', reason: 'company_mismatch', route: '/api/v2/tasks', userIds: owner.uid }), 'a company_mismatch row');
+        await waitFor(() => decisions.findOne({ mode: 'report', reason: 'company_mismatch', route: '/api/v2/tasks', userIds: owner.uid, lastSeen: { $gte: since } }), 'a company_mismatch row');
     });
 });
 

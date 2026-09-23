@@ -14,6 +14,7 @@ let audits;
 let owner;
 let member;
 let admin;
+let since;
 
 const companyRow = () => companies.findOne({ _id: new ObjectId(state.companyId) }, { projection: { permissionEnforcement: 1 } });
 
@@ -28,6 +29,7 @@ const waitFor = async (read, what) => {
 };
 
 beforeAll(async () => {
+    since = new Date();
     client = await MongoClient.connect(resolveMongoUrl());
     companies = client.db('global').collection('companies');
     audits = client.db(state.companyId).collection('audit_logs');
@@ -78,7 +80,7 @@ describe('the enforcement console', () => {
         const mine = summary.body.data.workspaces.find((w) => w.companyId === state.companyId);
         expect(mine).toMatchObject({ mode: 'report', effectiveMode: 'report', streakDays: 0, readyToEnforce: false });
 
-        const audit = await waitFor(() => audits.findOne({ action: 'permission.enforcement_mode', actorId: owner.uid, entityId: state.companyId }), 'the audit row');
+        const audit = await waitFor(() => audits.findOne({ action: 'permission.enforcement_mode', actorId: owner.uid, entityId: state.companyId, createdAt: { $gte: since } }), 'the audit row');
         expect(audit).toMatchObject({ entityType: 'company', meta: expect.objectContaining({ from: 'inherit', to: 'report' }) });
     });
 
