@@ -173,7 +173,7 @@ const showsHashedIds = (row) => Boolean(chainOn.value && row.chain && typeof row
 const integrityKey = (row) => (row.integrity.state === "broken" && row.integrity.brokenAt == null ? "Audit.integrity_broken_row" : "Audit.integrity_" + row.integrity.state);
 const integrityLabel = (row) => t(integrityKey(row), { seq: row.integrity.brokenAt });
 const integrityHint = (row) => t(integrityKey(row) + "_hint", { seq: row.integrity.brokenAt });
-const time = (at) => (at ? moment(at).format("HH:mm") : "");
+const time = (at) => (at ? moment(at).format(moment(at).isSame(moment(), "day") ? "HH:mm" : "D MMM HH:mm") : "");
 const deadline = (at) => (at ? moment(at).format("D MMM HH:mm") : "");
 
 const query = (extra = {}) => {
