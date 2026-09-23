@@ -34,7 +34,7 @@ import { retryNow } from '@/offline';
 defineOptions({ name: 'AppState' });
 
 const props = defineProps({
-    kind: { type: String, default: 'notfound', validator: (v) => ['offline', 'unreachable', 'forbidden', 'notfound'].includes(v) },
+    kind: { type: String, default: 'notfound', validator: (v) => ['offline', 'unreachable', 'forbidden', 'denied', 'notfound'].includes(v) },
     title: { type: String, default: '' },
     body: { type: String, default: '' },
     primaryLabel: { type: String, default: '' },
@@ -45,8 +45,8 @@ const props = defineProps({
 });
 const emit = defineEmits(['primary', 'secondary']);
 
-const ICON = { offline: 'wifiOff', unreachable: 'alert', forbidden: 'lock', notfound: 'search' };
-const SECONDARY = { offline: false, unreachable: true, forbidden: true, notfound: true };
+const ICON = { offline: 'wifiOff', unreachable: 'alert', forbidden: 'lock', denied: 'lock', notfound: 'search' };
+const SECONDARY = { offline: false, unreachable: true, forbidden: true, denied: false, notfound: true };
 
 const router = useRouter();
 const companyId = inject('$companyId', null);
@@ -61,7 +61,7 @@ const goHome = () => {
 const primary = () => {
     emit('primary');
     if (props.kind === 'unreachable' || props.kind === 'offline') retryNow();
-    else if (props.kind === 'notfound') goHome();
+    else if (props.kind === 'notfound' || props.kind === 'denied') goHome();
 };
 const secondary = () => {
     emit('secondary');
@@ -97,7 +97,7 @@ const secondary = () => {
     background: rgba(0, 0, 0, .06); color: var(--ink-2);
 }
 .ah-state__mark--offline, .ah-state__mark--unreachable { background: var(--danger-bg); color: var(--danger-ink); }
-.ah-state__mark--forbidden { background: var(--warn-bg); color: var(--warn-ink); }
+.ah-state__mark--forbidden, .ah-state__mark--denied { background: var(--warn-bg); color: var(--warn-ink); }
 .ah-state__mark--notfound { background: var(--brand-tint); color: var(--brand); }
 .ah-state__code { font: 600 12px/1 var(--font-mono); }
 .ah-state__title { margin: 0; font: 600 14px/1.3 var(--font-ui); color: var(--ink); }

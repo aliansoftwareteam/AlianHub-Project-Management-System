@@ -103,7 +103,7 @@
             </div>
         </div>
         <div v-else class="h-100">
-            <NotFound />
+            <AppState kind="denied" />
         </div>
     </div>
 </template>
@@ -112,7 +112,7 @@
     //import
     import { useStore } from "vuex";
     import * as env from '@/config/env';
-    import NotFound from '../NotFound.vue'
+    import AppState from '@/components/molecules/AppState/AppState.vue'
     import { apiRequest } from "@/services";
     import '@/views/MilestoneReport/MilestoneReport.css';
     import { ref,inject,computed, watch, onMounted } from 'vue';

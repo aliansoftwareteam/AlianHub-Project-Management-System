@@ -211,6 +211,33 @@ describe('Docs hub', () => {
     });
 });
 
+describe('timesheets and the milestone report without the permission', () => {
+    const views = [
+        'views/Timesheet/ProjectTimesheet/ProjectTimesheet.vue',
+        'views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue',
+        'views/Timesheet/UserTimeSheet/UserTimesheet.vue',
+        'views/Timesheet/WorkloadTimesheet/WorkloadTimesheet.vue',
+        'views/MilestoneReport/MilestoneReport.vue',
+    ];
+
+    test.each(views)('%s says "no access" instead of the 404 card', (rel) => {
+        const vue = read(rel);
+        expect(vue).toMatch(/<AppState [^>]*kind="denied"/);
+        expect(vue).not.toMatch(/import NotFound\b/);
+        expect(vue).not.toMatch(/<NotFound\b/);
+    });
+
+    test('the denied state names the screen and only offers the way home', async () => {
+        const en = (await import('../../src/locales/en.js')).default;
+        expect(en.Inbox.state_denied_title).toBe("You don't have access to this screen");
+        expect(en.Inbox.state_denied_primary).toBe('Go home');
+        expect(en.Inbox.state_denied_secondary).toBeUndefined();
+        const state = read('components/molecules/AppState/AppState.vue');
+        expect(state).toMatch(/denied: false/);
+        expect(state).toMatch(/props\.kind === 'notfound' \|\| props\.kind === 'denied'\) goHome\(\)/);
+    });
+});
+
 describe('fields that set their own size next to .ah-input', () => {
     const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
         const full = path.join(dir, d.name);

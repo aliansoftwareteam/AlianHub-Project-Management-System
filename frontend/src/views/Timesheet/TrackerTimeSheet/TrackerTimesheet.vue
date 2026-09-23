@@ -163,7 +163,7 @@
             </div>
         </div>
         <div v-else class="h-100">
-            <NotFound />
+            <AppState kind="denied" />
         </div>
     </div>
 </template>
@@ -182,7 +182,7 @@
     import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
     import * as helper from '@/views/Timesheet/helper';
     import ScreenshotTime from '@/components/atom/TimesheetView/TrackerTimeSheetView/ScreenshotTime'
-    import NotFound from '@/views/NotFound.vue'
+    import AppState from '@/components/molecules/AppState/AppState.vue'
     import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
     import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
     import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
