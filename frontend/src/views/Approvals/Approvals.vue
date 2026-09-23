@@ -12,6 +12,7 @@
         <template v-else>
             <p v-if="error" class="tv-error">{{ error }}</p>
             <p v-else-if="notice" class="tv-ok">{{ notice }}</p>
+            <p v-if="proposalsFailed && filter !== 'timesheet' && filter !== 'leave'" class="tv-error">{{ $t('Time.agent_load_failed') }}</p>
 
             <div class="ap__list">
                 <article v-for="card in visibleCards" :key="card.key" class="tv-card ap__card" :class="{ 'ap__card--agent': card.kind === 'agent' }">
@@ -55,7 +56,7 @@
                     </div>
                 </article>
 
-                <div v-if="filter === 'agent' && !agentProposals.length" class="tv-empty">
+                <div v-if="filter === 'agent' && !agentProposals.length && !proposalsFailed" class="tv-empty">
                     <strong>{{ $t('Time.agent_section') }}</strong>
                     <span>{{ $t('Time.agent_empty') }}</span>
                 </div>
@@ -80,6 +81,7 @@ import * as env from '@/config/env';
 import { useGetterFunctions } from '@/composable';
 import { formatHm } from '@/composable/useTimer';
 import { isOwnerOrAdmin } from "@/utils/roles";
+import { fetchPendingProposals, sendProposalDecision } from '@/composable/agentProposals';
 
 /**
  * @typedef {Object} AgentProposal
@@ -116,6 +118,7 @@ const leave = ref([]);
 const approvedLeave = ref([]);
 /** @type {import('vue').Ref<AgentProposal[]>} */
 const agentProposals = ref([]);
+const proposalsFailed = ref(false);
 const loading = ref(false);
 const error = ref('');
 const notice = ref('');
@@ -170,9 +173,28 @@ const visibleCards = computed(() => cards.value.filter((c) => filter.value === '
 const count = computed(() => cards.value.length);
 
 const bodyOf = (res) => (res && res.data) || {};
+
+/** @returns {AgentProposal} */
+const toAgentProposal = (p) => {
+    const changes = Array.isArray(p.changes) ? p.changes : [];
+    return {
+        id: String(p._id), agentName: p.agentName || '', summary: p.what || '', detail: p.why || '',
+        reversible: changes.length > 0 && changes.every((c) => c && c.reversible), createdAt: p.createdAt,
+    };
+};
+const loadProposals = async () => {
+    proposalsFailed.value = false;
+    try {
+        agentProposals.value = (await fetchPendingProposals()).map(toAgentProposal);
+    } catch (e) {
+        agentProposals.value = [];
+        proposalsFailed.value = true;
+    }
+};
 const load = async () => {
     loading.value = true;
     error.value = '';
+    const proposalsLoaded = loadProposals();
     try {
         const from = moment().format('YYYY-MM-DD');
         const to = moment().add(120, 'days').format('YYYY-MM-DD');
@@ -187,6 +209,7 @@ const load = async () => {
     } catch (e) {
         error.value = t('Time.load_failed');
     } finally {
+        await proposalsLoaded;
         loading.value = false;
     }
 };
@@ -203,6 +226,8 @@ const decide = async (card, action, reason) => {
         if (!body.status) throw new Error(body.statusText);
         leave.value = leave.value.filter((r) => r._id !== card.row._id);
     } else {
+        const body = bodyOf(await sendProposalDecision(card.row.id, action === 'approve' ? 'approve' : 'decline', reason ? { reason } : {}));
+        if (!body.status) throw new Error(body.statusText);
         agentProposals.value = agentProposals.value.filter((r) => r.id !== card.row.id);
     }
 };
