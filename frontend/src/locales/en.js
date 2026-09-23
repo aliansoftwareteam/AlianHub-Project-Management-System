@@ -4924,6 +4924,10 @@ export default {
         refunded_amount_should_not_exceed_amount:
             "The refunded amount field should not be more than the amount",
         total_partially_refunded: "Total partially refunded",
+        all_amount_refunded: "All amount refunded",
+        refund_amount: "Refund Amount",
+        refund: "Refund",
+        date_range: "{start} to {end}",
         field_should_not_be_smaller_than_refund_amount:
             "Field should not be smaller than refund amount",
         white_color_not_allowed:

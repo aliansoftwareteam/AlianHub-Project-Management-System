@@ -6,7 +6,7 @@
     <!-- calendar -->
     <td>
         <div class="position-re">
-            {{convertDateFormat(props.milestoneArray.startDate,'',{showDayName: false})}} to {{convertDateFormat(props.milestoneArray.endDate,'',{showDayName: false})}}
+            {{ $t('Milestone.date_range', { start: convertDateFormat(props.milestoneArray.startDate,'',{showDayName: false}), end: convertDateFormat(props.milestoneArray.endDate,'',{showDayName: false}) }) }}
             <DropDown id="user_detail" class="position-ab user_detail" v-if="props.userArray[props.milestoneArray._id] && props.userArray[props.milestoneArray._id].assigneeArray && props.userArray[props.milestoneArray._id].assigneeArray.length">
                 <template #button>
                     <img :src="userinfo" alt="userinfo" />
@@ -65,18 +65,18 @@
                             <div>
                                 <div class="border-bottom-black">
                                     <span class="d-block dropdown_span" v-for="(temp,ind) in props.milestoneArray.refundedAmount" :key="ind">
-                                        {{currencyMilestone.symbol}} {{getCommaSeperatedNumber(temp.amount)}} Partially refunded
+                                        {{currencyMilestone.symbol}} {{getCommaSeperatedNumber(temp.amount)}} {{$t('Milestone.partially_refunded')}}
                                     </span>
                                 </div>
                                 <div class="border-bottom-black">
                                     <span class="d-block dropdown_span">{{currencyMilestone.symbol}} {{getCommaSeperatedNumber(refundedTotalValue(props.milestoneArray.refundedAmount,props.milestoneArray.amount))}}
-                                        <span v-if="(props.milestoneArray?.refundedAmount && props.milestoneArray.refundedAmount?.length > 0 ? Number(refundedTotalValue(props.milestoneArray.refundedAmount,props.milestoneArray.amount)) : '') === (props.milestoneArray.amount)">All amount refunded</span>
-                                        <span v-else>Total partially refunded</span>
+                                        <span v-if="(props.milestoneArray?.refundedAmount && props.milestoneArray.refundedAmount?.length > 0 ? Number(refundedTotalValue(props.milestoneArray.refundedAmount,props.milestoneArray.amount)) : '') === (props.milestoneArray.amount)">{{$t('Milestone.all_amount_refunded')}}</span>
+                                        <span v-else>{{$t('Milestone.total_partially_refunded')}}</span>
                                     </span>
                                 </div>
                                 <div class="border-bottom-black">
-                                    <span class="d-block dropdown_span">{{currencyMilestone.symbol}} {{getCommaSeperatedNumber(props.milestoneArray.amount)}}  (Actual Amount)</span>
-                                    <span class="d-block dropdown_span">{{currencyMilestone.symbol}} {{'-'}} {{getCommaSeperatedNumber(refundedTotalValue(props.milestoneArray.refundedAmount,props.milestoneArray.amount))}} (Refund Amount)</span>
+                                    <span class="d-block dropdown_span">{{currencyMilestone.symbol}} {{getCommaSeperatedNumber(props.milestoneArray.amount)}}  ({{$t('Milestone.actual_amount')}})</span>
+                                    <span class="d-block dropdown_span">{{currencyMilestone.symbol}} {{'-'}} {{getCommaSeperatedNumber(refundedTotalValue(props.milestoneArray.refundedAmount,props.milestoneArray.amount))}} ({{$t('Milestone.refund_amount')}})</span>
                                 </div>
                                 <span class="d-block">{{currencyMilestone.symbol}} {{getCommaSeperatedNumber(refundedTotal(props.milestoneArray.refundedAmount,props.milestoneArray.amount))}}</span>
                             </div>
@@ -162,7 +162,7 @@
         <div class="d-flex align-items-center justify-content-end">
             <div>
                 <span v-if="props.milestoneArray.statusArray && props.milestoneArray.statusArray.length ? props.milestoneArray.statusArray[props.milestoneArray.statusArray.length - 1].milestoneStatusColor.includes('RELEASED'):''">
-                    <span class="refund_cancel_font cancel_refund" v-if="(props.milestoneArray?.refundedAmount && props.milestoneArray.refundedAmount?.length > 0 ? Number(refundedTotalValue(props.milestoneArray.refundedAmount,props.milestoneArray.amount)) : '') !== (props.milestoneArray.amount)" @click="permissionData ? refundIndex(props.milestoneArray._id) : ''">Refund</span>
+                    <span class="refund_cancel_font cancel_refund" v-if="(props.milestoneArray?.refundedAmount && props.milestoneArray.refundedAmount?.length > 0 ? Number(refundedTotalValue(props.milestoneArray.refundedAmount,props.milestoneArray.amount)) : '') !== (props.milestoneArray.amount)" @click="permissionData ? refundIndex(props.milestoneArray._id) : ''">{{$t('Milestone.refund')}}</span>
                 </span>
                 <span v-else>
                     <span class="refund_cancel_font cancel_refund" v-if="props.milestoneArray.statusArray && props.milestoneArray.statusArray.length > 0 ? !props.milestoneArray.statusArray[props.milestoneArray.statusArray.length - 1].milestoneStatusColor.includes('CANCELLED'):''" @click="permissionData ? props.planCondition ? $emit('editMilestonetd','cancelstatus',props.hourlyMilestoneIndex,true,props.milestoneArray) : '' : ''">{{$t('Projects.cancel')}}</span>
