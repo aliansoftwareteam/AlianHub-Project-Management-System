@@ -72,7 +72,6 @@
     "frontend/src/views/Approvals/Approvals.vue": 2,
     "frontend/src/views/Authentication/Login/Login.vue": 1,
     "frontend/src/views/Billing/Billing.vue": 1,
-    "frontend/src/views/Changelog/Changelog.vue": 3,
     "frontend/src/views/Chat/ChatSidebar.vue": 1,
     "frontend/src/views/Integrations/ExternalData.vue": 1,
     "frontend/src/views/Integrations/IntegrationsHub.vue": 8,
