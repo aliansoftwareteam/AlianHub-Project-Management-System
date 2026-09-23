@@ -111,6 +111,22 @@ describe('switch knobs', () => {
     });
 });
 
+describe('32 px touch targets on a phone', () => {
+    const size = (rule) => rule.match(/min-(?:width|height):\s*32px/g) || [];
+
+    test('project header switcher and ⋯ menu', () => {
+        const phone = phoneBlock(read('views/Projects/components/project-header.css'));
+        expect(size(ruleBody(phone, '.ph2__switch'))).toHaveLength(1);
+        expect(size(ruleBody(phone, '.ph2 .dot-btn'))).toHaveLength(2);
+    });
+
+    test('timesheet week arrows and the "Add hours" hint', () => {
+        expect(size(ruleBody(phoneBlock(read('views/Timesheet/timeV2.css')), '.tv-range button'))).toHaveLength(2);
+        const vue = read('views/Timesheet/UserTimeSheet/UserTimesheet.vue');
+        expect(size(ruleBody(phoneBlock(vue.slice(vue.indexOf('<style scoped>'))), '.ut2-hint__cta'))).toHaveLength(1);
+    });
+});
+
 describe('the setup checklist outside Home', () => {
     test('brings its own stylesheet, so Instance → Health renders it styled on a direct visit', () => {
         expect(read('components/molecules/Home/SetupChecklist.vue')).toMatch(/import\s+["']\.\/style\.css["']/);

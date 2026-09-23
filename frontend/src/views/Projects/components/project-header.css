@@ -205,6 +205,9 @@
     .ph2__viewrow { display: none; }
     .ph2__actions { margin-left: auto; }
     .ph2__project { max-width: 46vw; }
+    /* 32 px touch targets; the negative margins keep the bar's rows as tall as before. */
+    .ph2__switch { min-height: 32px; margin-block: -7px; }
+    .ph2 .dot-btn { min-width: 32px; min-height: 32px; margin: -9px -4px; justify-content: center; }
 }
 
 /* Host-supplied title block (Projects.vue keeps its icon, inline rename and the

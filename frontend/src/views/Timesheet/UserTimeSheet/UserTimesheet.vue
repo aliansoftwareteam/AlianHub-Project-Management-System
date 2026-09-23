@@ -412,5 +412,6 @@ onMounted(() => {
        scroll away with it. Sticky to the scroller's left edge, sized to the viewport. */
     .ut2-grid { overflow: visible; } /* otherwise the grid, not the scroller, is the sticky container */
     .ut2-empty { position: sticky; left: 0; max-width: calc(100vw - 92px); }
+    .ut2-hint__cta { min-height: 32px; margin-block: -9px; }
 }
 </style>
