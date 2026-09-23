@@ -63,8 +63,11 @@ describe('the project calendar grid', () => {
         expect(phone).not.toMatch(/:deep\(\.fc-daygrid-day\)\s*\{/);
     });
 
-    test('the legacy sprint stylesheet no longer paints the other-month day strip', () => {
-        const legacy = read('components/organisms/SprinstList/style.css');
+    test.each([
+        'components/organisms/SprinstList/style.css',
+        'plugins/tasklistDashboard/components/organisms/SprintListing/style.css',
+    ])('%s no longer paints the other-month day strip outside its own wrapper', (file) => {
+        const legacy = read(file);
         const selectors = (legacy.match(/[^{}]+\{[^}]*#fafbfc[^}]*\}/gi) || [])
             .flatMap((block) => block.split('{')[0].split(',').map((s) => s.trim()));
         expect(selectors.length).toBeGreaterThan(0);
