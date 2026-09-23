@@ -58,7 +58,7 @@
                                                     <img v-else class="vertical-middle profile-sm-square mobile-projectlist-icon" :src="projectData.projectIcon.data" alt=""/>
                                                 </template>
                                             </div>
-                                            <DropDown id="project_avail_views" maxHeight="90vh" title="All Views" :bodyClass="{'viewlist-mobile-dropdown' : true}">
+                                            <DropDown id="project_avail_views" maxHeight="90vh" :title="$t('Projects.all_views')" :bodyClass="{'viewlist-mobile-dropdown' : true}">
                                                 <template #button>
                                                     <div
                                                         class="d-flex align-items-center text-nowrap border-top-radius-10-px cursor-pointer h-100"
@@ -333,7 +333,7 @@
                                 <div>
                                     <img src="@/assets/images/Frame.png" alt="fram_img"/>
                                     <h3 class="font-size-22 font-weight-700 text-center line-height-33 black">
-                                        Project is currently archived
+                                        {{ $t('Projects.archived_notice') }}
                                     </h3>
                                 </div>
                             </div>

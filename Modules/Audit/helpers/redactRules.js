@@ -17,15 +17,19 @@ const pseudonymFor = (key, userId) => {
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date);
 const text = (v) => (v === undefined || v === null ? '' : String(v));
 
-/* An address or browser on an agent's row was the person it acted for; an email names the entity before the actor. */
+/* An address or browser on an agent's row was the person it acted for; an email names the entity before the actor.
+ * An outside client's actorName reads "<client> for <person>", so it belongs to the person who delegated too. */
 const ownersOf = (field, ctx) => {
-    if (field === 'actorName') return [ctx.actor];
+    if (field === 'actorName') return [ctx.actor, ctx.delegator];
     if (field === 'ip' || field === 'userAgent') return [ctx.actor, ctx.via];
     if (field === 'entityName') return [ctx.entity];
     return [ctx.entity || ctx.actor];
 };
 
 const entityOf = (entityType, entityId) => (PERSON_ENTITY_TYPES.includes(entityType) ? text(entityId) : '');
+
+/* Only when the client itself is the actor: other rows carry delegatedBy under their own actor's name. */
+const delegatorOf = (row, meta) => (meta.clientId && text(row.actorId) === text(meta.clientId) ? text(meta.delegatedBy || meta.onBehalfOf) : '');
 
 /*
  * `ids` are the person's other identities in this company (their member documents), since member rows may
@@ -48,7 +52,7 @@ const personalPaths = (row, userId, { emails = [], ids = [] } = {}) => {
     };
 
     const meta = isObject(row.meta) ? row.meta : {};
-    const top = { actor: text(row.actorId), entity: entityOf(row.entityType, row.entityId), via: text(meta.onBehalfOf) };
+    const top = { actor: text(row.actorId), entity: entityOf(row.entityType, row.entityId), via: text(meta.onBehalfOf), delegator: delegatorOf(row, meta) };
 
     const walk = (value, path) => {
         if (Array.isArray(value)) {

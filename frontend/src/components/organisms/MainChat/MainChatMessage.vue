@@ -1,7 +1,7 @@
 <template>
     <div
         class="mc-msg"
-        :class="{ 'is-me': message.sent, 'is-cont': continuation, 'is-agent': isAgent, 'is-pending': message.isSending }"
+        :class="{ 'is-me': onMySide,'is-cont': continuation, 'is-agent': isAgent, 'is-pending': message.isSending }"
         :id="message._id || undefined"
         tabindex="-1"
     >
@@ -121,6 +121,7 @@ import ReactionBar from '@/components/atom/ReactionBar/ReactionBar.vue';
 import MainChatAvatar from './MainChatAvatar.vue';
 import MainChatIcon from './MainChatIcon.vue';
 import MainChatMessageBody from './MainChatMessageBody.vue';
+import { isAgentComment } from '@/utils/commentSide';
 
 const props = defineProps({
     message: { type: Object, required: true },
@@ -173,12 +174,13 @@ onBeforeUnmount(() => {
     document.removeEventListener('keydown', onKeydown);
 });
 
-const isAgent = computed(() => props.message.isAgent === true || !!props.message.agentName);
+const isAgent = computed(() => isAgentComment(props.message) || !!props.message.agentName);
+const onMySide = computed(() => props.message.sent && !isAgent.value);
 const displayName = computed(() => (isAgent.value ? (props.message.agentName || props.senderName) : props.senderName) || '—');
 const isText = computed(() => ['text', 'link'].includes(props.message.type) && !props.message.isDeleted);
 const actionable = computed(() => !props.message.isDeleted && !props.message.isSending);
 const hasReactions = computed(() => Array.isArray(props.message.reactions) && props.message.reactions.length > 0);
-const canEdit = computed(() => props.message.sent && ['text', 'link'].includes(props.message.type));
+const canEdit = computed(() => onMySide.value &&['text', 'link'].includes(props.message.type));
 const plainText = computed(() => String(props.message.message || '').replace(/<[^>]*>/g, ''));
 
 const isEdited = computed(() => {

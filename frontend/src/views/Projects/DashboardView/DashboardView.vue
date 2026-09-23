@@ -5,7 +5,7 @@
             <span class="pd-filter-label">{{ $t('projectDashboard.showing') }}</span>
             <span class="pd-chip">
                 {{ activePersonName }}
-                <span class="pd-chip-x" title="Clear" @click="clearPerson">&times;</span>
+                <span class="pd-chip-x" :title="$t('projectDashboard.clear')" @click="clearPerson">×</span>
             </span>
         </div>
 

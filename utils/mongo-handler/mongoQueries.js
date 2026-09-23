@@ -117,6 +117,7 @@ const {
     cspReportsSchema,
     auditChainHeadsSchema,
     auditChainAnchorsSchema,
+    auditChainProgressSchema,
     auditRedactionsSchema,
     egressAllowlistsSchema,
     agentSessionsSchema,
@@ -363,6 +364,8 @@ exports.checkType = (type) => {
             return auditChainHeadsSchema
         case SCHEMA_TYPE.AUDIT_CHAIN_ANCHORS:
             return auditChainAnchorsSchema
+        case SCHEMA_TYPE.AUDIT_CHAIN_PROGRESS:
+            return auditChainProgressSchema
         case SCHEMA_TYPE.AUDIT_REDACTIONS:
             return auditRedactionsSchema
         case SCHEMA_TYPE.EGRESS_ALLOWLISTS:
@@ -621,6 +624,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AUDIT_CHAIN_HEADS}`
         case SCHEMA_TYPE.AUDIT_CHAIN_ANCHORS:
                 return `${dbCollections.AUDIT_CHAIN_ANCHORS}`
+        case SCHEMA_TYPE.AUDIT_CHAIN_PROGRESS:
+                return `${dbCollections.AUDIT_CHAIN_PROGRESS}`
         case SCHEMA_TYPE.AUDIT_REDACTIONS:
                 return `${dbCollections.AUDIT_REDACTIONS}`
         case SCHEMA_TYPE.EGRESS_ALLOWLISTS:
