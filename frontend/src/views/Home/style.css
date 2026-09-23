@@ -20,6 +20,10 @@
     .ah-tbtn { height: 44px; }
     .hc-row { min-height: 44px; }
     .hc-row__meta { max-width: 80px; }
-    .home__planner { width: 100%; }
-    .home__planner-toggle { display: none; }
+    /* The planner opens by default; as an overlay it hid My Work and the agenda on a phone,
+       so it follows them in the page scroll instead. */
+    .home .ah-page__body { flex-direction: column; overflow-y: auto; }
+    .home .ah-page__content { flex: none; overflow: visible; }
+    .home__planner { position: static; width: 100%; height: 480px; box-shadow: none; border-left: 0; border-top: 1px solid var(--hairline); }
+    .home .ah-toolbar__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 }
