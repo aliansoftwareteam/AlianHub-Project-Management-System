@@ -14,7 +14,7 @@ const vectorStore = require('../vectorStore');
 const extractor = require('./extract/extractor');
 const { limits: fileLimits } = require('./extract/limits');
 const fileSweep = require('./fileSweep');
-const { chunkPage, chunkText, chunkGuide, guideMarkdown, guideTitle, chunkComment, chunkTranscript, contentHashOf } = require('./chunker');
+const { chunkPage, chunkText, chunkGuide, guideMarkdown, guideTitle, chunkComment, chunkTranscript, contentHashOf, textBytesOf } = require('./chunker');
 
 // Writes source chunks into the store. Callers check KNOWLEDGE_INDEXER first; nothing here
 // reads that flag, so the backfill, the event handlers and a re-index share one write path.
@@ -476,7 +476,7 @@ const ingest = async (companyId, sourceType, row, context = {}) => {
     let behind = false;
     for (const piece of pieces) {
         const stored = byOrdinal.get(piece.ordinal);
-        const chunk = { ...metadata, ...piece, ...vectorFields(stored, piece, vectors, wantedModel), deleted: false, deletedAt: null, tombstoneReason: '', sourceUpdatedAt };
+        const chunk = { ...metadata, ...piece, textBytes: textBytesOf(piece.text), ...vectorFields(stored, piece, vectors, wantedModel), deleted: false, deletedAt: null, tombstoneReason: '', sourceUpdatedAt };
         if (unchanged(stored, chunk, wantedModel)) {
             result.unchanged += 1;
             behind = behind || time(stored.sourceUpdatedAt) < time(sourceUpdatedAt);
@@ -523,6 +523,7 @@ const markLeftOut = async (companyId, sourceType, decision) => {
         ordinal: 0,
         headingPath: [],
         text: '',
+        textBytes: 0,
         contentHash: contentHashOf([], ''),
         embedding: [],
         embeddingModel: null,
@@ -555,7 +556,7 @@ const recordFileOutcome = async (companyId, row, { reason, attempts = 0 }) => {
         { ...where, ordinal: 0 },
         {
             $set: { ...metadata, deleted: true, tombstoneReason: reason, extractAttempts: attempts, sourceUpdatedAt: RULES.file.versionOf(row), ...(retryAt ? { extractDueAt: retryAt } : {}) },
-            $setOnInsert: { headingPath: [], text: '', contentHash: contentHashOf([], ''), embedding: [], embeddingModel: null, pieceCount, deletedAt: new Date() },
+            $setOnInsert: { headingPath: [], text: '', textBytes: 0, contentHash: contentHashOf([], ''), embedding: [], embeddingModel: null, pieceCount, deletedAt: new Date() },
         },
         { upsert: true },
     ], 'updateOne');
@@ -700,6 +701,7 @@ const markFilesPending = async (companyId, taskId) => {
             ordinal: 0,
             headingPath: [],
             text: '',
+            textBytes: 0,
             contentHash: contentHashOf([], ''),
             deleted: true,
             deletedAt: now,

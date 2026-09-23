@@ -6,7 +6,7 @@ const logger = require('../../../Config/loggerConfig');
 const agentMemory = require('../../Agents/memory');
 const embeddings = require('../embeddings');
 const vectorStore = require('../vectorStore');
-const { contentHashOf } = require('../ingest/chunker');
+const { contentHashOf, textBytesOf } = require('../ingest/chunker');
 
 // An agent's notes in the chunk store, one chunk per note under scope "agent". Callers check the
 // switch first, as for the other sources. Each chunk copies what retrieval filters on: the agent,
@@ -104,6 +104,7 @@ const chunkOf = (companyId, note, derived) => {
         title: TITLE,
         headingPath: [],
         text,
+        textBytes: textBytesOf(text),
         contentHash: contentHashOf([], text),
         deleted: false,
         deletedAt: null,
