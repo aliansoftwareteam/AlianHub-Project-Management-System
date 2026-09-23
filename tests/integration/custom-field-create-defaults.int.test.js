@@ -28,7 +28,6 @@ it('creates a custom field sent without isDelete, stored as not deleted', async 
     });
     expect(res.status).toBe(200);
 
-    const stored = await client.db(state.companyId).collection('customFields').findOne({ _id: new ObjectId(String(res.body._id)) })
-        || await client.db(state.companyId).collection('customField').findOne({ _id: new ObjectId(String(res.body._id)) });
+    const stored = await client.db(state.companyId).collection('customField').findOne({ _id: new ObjectId(String(res.body._id)) });
     expect(stored).toMatchObject({ fieldTitle: title, isDelete: false });
 });
