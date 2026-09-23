@@ -272,7 +272,7 @@ onMounted(() => { if (isManager.value) load(); });
 <style src="../Timesheet/timeV2.css"></style>
 <style scoped>
 .ap { max-width: 720px; }
-.ap__count { background: var(--brand); color: #fff; font: 700 10px/1 var(--font-ui); padding: 4px 7px; border-radius: 9px; }
+.ap__count { background: var(--brand); color: var(--on-brand); font: 700 10px/1 var(--font-ui); padding: 4px 7px; border-radius: 9px; }
 .ap__tabs { margin-left: 4px; }
 .ap__list { display: flex; flex-direction: column; gap: 10px; }
 .ap__card { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border-radius: 14px; }
