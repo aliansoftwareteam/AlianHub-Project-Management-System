@@ -23,7 +23,12 @@ function notificationBodyError(body) {
     return '';
 }
 
+const { notificationAsSessionUser, historyAsSessionUser } = require('./sessionActor');
+
 exports.init = (app) => {
+    app.post('/api/v1/handleHistory', historyAsSessionUser);
+    app.post('/api/v1/handleNotification', notificationAsSessionUser);
+
     /**
      * @swagger
     *  components:
