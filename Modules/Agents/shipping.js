@@ -5,6 +5,7 @@ const { getCatalog } = require('../Integrations/helpers/integrationsRules');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const registry = require('./registry');
 const scope = require('./scope');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 
 // Reads behind the pipeline (28a) and the release screen (28c). Both are views
 // of the same boundary: what an agent may do, what it may only propose, and what
@@ -20,10 +21,10 @@ const ids = (list) => [...new Set((list || []).map((v) => String(v || '')).filte
 const gatedActions = () => registry.ACTIONS.filter((a) => a.gate || a.proposeOnly);
 const gatedKeys = () => gatedActions().map((a) => a.key);
 
-const findTasks = (companyId, taskIds, visible) => (taskIds.length
+const findTasks = (companyId, taskIds, visible, sprints) => (taskIds.length
     ? MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
-        data: [{ _id: { $in: taskIds.map(oid).filter(Boolean) }, ProjectID: { $in: visible }, deletedStatusKey: { $ne: 1 } }, TASK_FIELDS],
+        data: [{ ...sprints, _id: { $in: taskIds.map(oid).filter(Boolean) }, ProjectID: { $in: visible }, deletedStatusKey: { $ne: 1 } }, TASK_FIELDS],
     }, 'find').catch(() => [])
     : Promise.resolve([]));
 
@@ -65,7 +66,7 @@ const shapeProposal = (p) => ({
 const pipelineTasks = async (companyId, uid, { limit = 25 } = {}) => {
     const visible = await scope.visibleProjectIds(companyId, uid);
     if (!visible.length) return { tasks: [], visibleProjects: 0 };
-    const [runs, proposals] = await Promise.all([
+    const [runs, proposals, sprints] = await Promise.all([
         MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENT_RUNS,
             data: [{ taskId: { $ne: null } }, 'taskId projectId agentName status startedAt finishedAt', { sort: { startedAt: -1 }, limit: 300 }],
@@ -74,9 +75,10 @@ const pipelineTasks = async (companyId, uid, { limit = 25 } = {}) => {
             type: SCHEMA_TYPE.AGENT_PROPOSALS,
             data: [{ taskId: { $ne: null } }, 'taskId projectId agentName status createdAt', { sort: { createdAt: -1 }, limit: 300 }],
         }, 'find').catch(() => []),
+        hiddenSprintFilter(companyId, uid, visible),
     ]);
     const touched = ids([...(runs || []).map((r) => r.taskId), ...(proposals || []).map((p) => p.taskId)]);
-    const tasks = await findTasks(companyId, touched, visible);
+    const tasks = await findTasks(companyId, touched, visible, sprints);
     const lastAt = {};
     const runCount = {};
     const proposalCount = {};
@@ -111,11 +113,12 @@ const releaseCandidate = async (companyId, uid, { since } = {}) => {
     const [visible, roleType] = await Promise.all([scope.visibleProjectIds(companyId, uid), getRoleType(companyId, uid)]);
     const privileged = isPrivileged(roleType);
     const keys = gatedKeys();
+    const sprints = visible.length ? await hiddenSprintFilter(companyId, uid, visible) : {};
 
     const doneTasks = visible.length
         ? await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [{ deletedStatusKey: { $ne: 1 }, ProjectID: { $in: visible }, statusType: { $in: [...registry.DONE_STATUS_TYPES] }, updatedAt: { $gte: from } },
+            data: [{ ...sprints, deletedStatusKey: { $ne: 1 }, ProjectID: { $in: visible }, statusType: { $in: [...registry.DONE_STATUS_TYPES] }, updatedAt: { $gte: from } },
                    TASK_FIELDS, { sort: { updatedAt: -1 }, limit: 200 }],
         }, 'find').catch(() => [])
         : [];

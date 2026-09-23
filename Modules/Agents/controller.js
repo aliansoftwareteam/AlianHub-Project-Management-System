@@ -670,9 +670,9 @@ exports.setPolicy = async (req, res) => {
 exports.teamBoard = async (req, res) => {
     try {
         const companyId = companyOf(req);
-        if (!companyId) return fail(res, 'companyId is required.');
+        if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
         const hoursPerWeek = Number(req.query && req.query.hoursPerWeek) > 0 ? Number(req.query.hoursPerWeek) : 40;
-        const data = await team.board(companyId, { hoursPerWeek });
+        const data = await team.board(companyId, { hoursPerWeek, viewerId: req.uid });
         return res.send({ status: true, statusText: 'Team board fetched.', data: { ...data, standup: team.standup(data) } });
     } catch (e) { logger.error(`teamBoard: ${e.message}`); return fail(res, e.message, 500); }
 };

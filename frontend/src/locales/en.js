@@ -3270,6 +3270,7 @@ export default {
 
         team: "Team",
         team_headline: "{p} PEOPLE · {a} AGENTS · {load}% LOAD",
+        team_headline_no_load: "{p} PEOPLE · {a} AGENTS",
         team_empty: "Nobody on the board yet.",
         team_failed: "The team board could not be loaded.",
         generate_standup: "Generate standup",
@@ -3293,6 +3294,8 @@ export default {
         status_idle: "Idle",
         status_paused: "Paused",
         nothing_in_progress: "Nothing in progress",
+        busy_on_task: "Busy on a task",
+        hours_not_shared: "Hours not shared with you",
         pto_until: "PTO until {date}",
         agent_on: "{task} · {min} min in",
         agent_idle: "Waiting for work",
