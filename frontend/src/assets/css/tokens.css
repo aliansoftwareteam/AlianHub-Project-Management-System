@@ -19,6 +19,7 @@
     --surface-hover: rgba(0, 0, 0, .04);
     --fill: rgba(0, 0, 0, .06);
     --track: rgba(0, 0, 0, .07);
+    --knob: #ffffff;
     --rail: #1a1a1a;
     --rail-ink: rgba(255, 255, 255, .72);
     --rail-ink-strong: #ffffff;
@@ -101,6 +102,8 @@
     --surface-hover: rgba(255, 255, 255, .05);
     --fill: rgba(255, 255, 255, .1);
     --track: rgba(255, 255, 255, .1);
+    /* A switch knob on the brand track takes --on-brand; off, a white one glares on the dark surface. */
+    --knob: #d6d4de;
     --rail: #000000;
     --ok: #3ad29f;
     --ok-bg: rgba(58, 210, 159, .14);

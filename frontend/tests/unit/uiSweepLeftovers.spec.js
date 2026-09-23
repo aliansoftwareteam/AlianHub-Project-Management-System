@@ -80,6 +80,34 @@ describe('the getting-started card', () => {
     });
 });
 
+describe('switch knobs', () => {
+    const tokens = read('assets/css/tokens.css');
+    const darkBlock = tokens.slice(tokens.indexOf(':root[data-theme="dark"] {'));
+
+    test('stay white in light mode and turn soft grey in dark', () => {
+        expect(ruleBody(tokens, ':root')).toMatch(/--knob:\s*#ffffff/i);
+        expect(ruleBody(darkBlock, ':root[data-theme="dark"]')).toMatch(/--knob:\s*#d6d4de/i);
+        expect(ruleBody(tokens, ':root')).toMatch(/--on-brand:\s*#ffffff/i);
+    });
+
+    test.each([
+        ['components/molecules/Setting/AhSwitch.vue', '.ah-switch__knob', '.ah-switch.is-on .ah-switch__knob'],
+        ['views/Workflows/style.css', '.wb__knob', '.wb__toggle.is-on .wb__knob'],
+        ['views/Automations/style.css', '.au__knob', '.au__toggle.is-on .au__knob'],
+        ['views/Projects/RecurringTasks/RecurringTasksManager.vue', '.rtx__toggle-knob', '.rtx__toggle.is-on .rtx__toggle-knob'],
+    ])('%s: the knob follows --knob, and --on-brand on the brand track', (file, knob, on) => {
+        const css = read(file);
+        expect(ruleBody(css, knob)).toMatch(/background:\s*var\(--knob\)/);
+        expect(ruleBody(css, on)).toMatch(/background:\s*var\(--on-brand\)/);
+    });
+
+    test('the legacy toggle knob is dark on its coloured track in dark mode only', () => {
+        const css = read('components/atom/Toggle/style.css');
+        expect(ruleBody(css, '.toggle-button')).toMatch(/background-color:\s*#fff/);
+        expect(ruleBody(css, ':root[data-theme="dark"] .toggle-button')).toMatch(/background-color:\s*var\(--on-brand\)/);
+    });
+});
+
 describe('the setup checklist outside Home', () => {
     test('brings its own stylesheet, so Instance → Health renders it styled on a direct visit', () => {
         expect(read('components/molecules/Home/SetupChecklist.vue')).toMatch(/import\s+["']\.\/style\.css["']/);
