@@ -48,12 +48,12 @@ async function createAgent(owner, projectIds) {
 }
 
 /* A run needs a live model to reach waiting_approval, so the rows are written the way runs.start and proposals.create leave them. */
-async function seed(agent, { task }, { startedAt }) {
+async function seed(agent, { task, projectId }, { startedAt }) {
     const client = new MongoClient(resolveMongoUrl(), { serverSelectionTimeoutMS: 5000 });
     try {
         await client.connect();
         const db = client.db(state.companyId);
-        const common = { agentId: String(agent._id), agentName: agent.name, taskId: String(task._id), projectId: String(task.projectId) };
+        const common = { agentId: String(agent._id), agentName: agent.name, taskId: task ? String(task._id) : null, projectId: String(task ? task.projectId : projectId) };
         const run = await db.collection('agent_runs').insertOne({
             ...common, status: 'waiting_approval', trigger: 'manual', startedBy: state.users.owner.userId, startedAt, createdAt: startedAt, updatedAt: startedAt, steps: [],
         });
@@ -118,6 +118,8 @@ describe('agent runs and proposals follow private sprint visibility', () => {
         expect(after.runs.body.summary.agents).toBe(before.member.runs.body.summary.agents);
         expect(after.summary.body.data.counts.waiting_approval).toBe(1);
         expect(after.summary.body.data.waitingApproval).toBe(before.member.summary.body.data.waitingApproval);
+        const byTask = await member.api.get('/api/v2/agents/runs', { query: { taskId: hidden.task._id } });
+        expect(runIds(byTask)).toEqual([]);
     });
 
     it('fills a page of runs from what the caller can see', async () => {
@@ -165,5 +167,28 @@ describe('agent runs and proposals follow private sprint visibility', () => {
         }
         const adminAfter = await readsOf(admin, agent);
         expect(adminAfter.proposals.body.counts.waiting).toBe(before.admin.proposals.body.counts.waiting + 2);
+    });
+});
+
+describe('agent run filters stay inside the caller\'s projects', () => {
+    it('matches nothing when a member filters by a project they cannot open', async () => {
+        const owner = await as('owner');
+        const member = await as('member');
+        const restricted = state.projects.restricted._id;
+        const agent = await createAgent(owner, [restricted]);
+        const { runId } = await seed(agent, { projectId: restricted }, { startedAt: new Date() });
+
+        const [list, summary] = await Promise.all([
+            member.api.get('/api/v2/agents/runs', { query: { projectId: restricted } }),
+            member.api.get('/api/v2/agents/runs/summary', { query: { projectId: restricted, agentId: String(agent._id) } }),
+        ]);
+        expect(list.status).toBe(200);
+        expect(runIds(list)).not.toContain(runId);
+        expect(list.body.summary.waitingApproval).toBe(0);
+        expect(summary.body.data.counts.waiting_approval).toBe(0);
+        expect(summary.body.data.runs.map((r) => String(r._id))).not.toContain(runId);
+
+        const ownerView = await owner.api.get('/api/v2/agents/runs', { query: { projectId: restricted } });
+        expect(runIds(ownerView)).toContain(runId);
     });
 });
