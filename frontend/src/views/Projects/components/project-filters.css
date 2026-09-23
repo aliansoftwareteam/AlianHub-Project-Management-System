@@ -72,8 +72,6 @@
 .pft .assignee-filter .assignee-user { border-right: 1px solid var(--hairline); border-radius: 7px 0 0 7px; }
 .pft .assignee-filter .assignee-status { border-radius: 0 7px 7px 0; }
 .pft .assignee-filter .assignee-user.is-active, .pft .assignee-filter .assignee-status.is-active { background: var(--brand-tint); color: var(--brand); }
-/* No on-brand ink tier exists, so the count is brand type on the button's own
-   tint rather than a filled badge. */
 .pft__count { font: var(--text-label); }
 .pft__mode-chip {
     display: inline-flex; align-items: center; height: 32px; padding: 0 10px; border-radius: 8px;

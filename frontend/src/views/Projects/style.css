@@ -190,7 +190,7 @@
     margin-left: 5px;
     width: 100%;
     max-width: 23px;
-    color: rgb(255, 255, 255);
+    color: var(--on-brand);
     padding-left: 3.7px;
     padding-right: 3.7px;
     font-size: 10px;

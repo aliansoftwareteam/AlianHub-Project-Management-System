@@ -3,7 +3,7 @@
 .ms__profile { display: flex; align-items: center; gap: 12px; }
 .ms__avatar {
     width: 52px; height: 52px; border-radius: 50%; border: 0; padding: 0; overflow: hidden;
-    background: var(--brand); color: #fff; display: grid; place-items: center; cursor: pointer; flex: none;
+    background: var(--brand); color: var(--on-brand); display: grid; place-items: center; cursor: pointer; flex: none;
 }
 .ms__avatar:focus-visible { outline: none; box-shadow: var(--focus); }
 .ms__avatar-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
@@ -24,7 +24,7 @@
     color: var(--ink-label); font: 600 11px/1 var(--font-ui); cursor: pointer;
     transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
 }
-.ms__day.is-on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.ms__day.is-on { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
 .ms__day:focus-visible { outline: none; box-shadow: var(--focus); }
 .ms__time { width: 110px; height: 34px; padding: 0 10px; }
 .ms__arrow { color: var(--ink-3); }

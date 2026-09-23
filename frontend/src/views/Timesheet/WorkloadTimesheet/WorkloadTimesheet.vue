@@ -308,7 +308,7 @@ onMounted(() => {
 .wl__cell.is-drop { border: 1px dashed var(--brand); box-shadow: var(--focus); }
 .wl__cell.is-pto { display: grid; place-items: center; border-color: var(--hairline); }
 .wl__pto { font: 500 9.5px/1 var(--font-mono); color: var(--ink-3); }
-.wl__fill { background: var(--brand); border-radius: 4px; display: grid; place-items: center; color: #fff; font: 600 10px/1 var(--font-mono); min-height: 0; transition: height var(--t-state) var(--ease); }
+.wl__fill { background: var(--brand); border-radius: 4px; display: grid; place-items: center; color: var(--on-brand); font: 600 10px/1 var(--font-mono); min-height: 0; transition: height var(--t-state) var(--ease); }
 .wl__fill.is-tentative { opacity: .5; }
 .wl__fill.is-over { background: var(--danger); }
 .wl__chips { position: absolute; top: 4px; left: 4px; right: 4px; display: flex; flex-direction: column; gap: 2px; pointer-events: none; }
