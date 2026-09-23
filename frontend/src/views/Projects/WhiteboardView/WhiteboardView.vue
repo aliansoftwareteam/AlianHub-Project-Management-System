@@ -1,12 +1,12 @@
 <template>
   <div class="wb-view ah-page">
     <div class="wb-view__bar">
-      <span class="wb-view__title">Whiteboard</span>
-      <span class="wb-view__count">{{ cards.length }} cards</span>
-      <button class="wb-view__btn" type="button" @click="autoArrange">Auto-arrange</button>
+      <span class="wb-view__title">{{ $t('Views.whiteboard_title') }}</span>
+      <span class="wb-view__count">{{ $t('Views.whiteboard_cards', { n: cards.length }) }}</span>
+      <button class="wb-view__btn" type="button" @click="autoArrange">{{ $t('Views.auto_arrange') }}</button>
     </div>
     <div ref="boardEl" class="wb-view__board">
-      <div v-if="!cards.length" class="wb-view__empty">No tasks yet — tasks appear here as movable cards.</div>
+      <div v-if="!cards.length" class="wb-view__empty">{{ $t('Views.whiteboard_empty') }}</div>
       <div
         v-for="c in cards"
         :key="c.id"

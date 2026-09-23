@@ -151,6 +151,7 @@ require('../../Modules/Audit/helpers/chainRules').CHAIN_INDEXES.forEach(([keys, 
 const auditChainHeadsSchema = new Schema(schema.auditChainHeads, {strict: true, timestamps: false});
 const auditChainAnchorsSchema = new Schema(schema.auditChainAnchors, {strict: true, timestamps: true});
 auditChainAnchorsSchema.index({ seq: -1 }, { unique: true, name: 'audit_anchor_seq' });
+const auditChainProgressSchema = new Schema(schema.auditChainProgress, {strict: true, timestamps: false});
 const auditRedactionsSchema = new Schema(schema.auditRedactions, {strict: true, timestamps: true});
 const secretsSchema = new Schema(schema.secrets, {strict: true, timestamps: false});
 secretsSchema.index({ handle: 1 }, { unique: true, name: 'secrets_handle' });
@@ -491,6 +492,7 @@ module.exports = {
     cspReportsSchema,
     auditChainHeadsSchema,
     auditChainAnchorsSchema,
+    auditChainProgressSchema,
     auditRedactionsSchema,
     egressAllowlistsSchema,
     agentSessionsSchema,

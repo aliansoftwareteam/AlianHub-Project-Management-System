@@ -1,6 +1,6 @@
 <template>
     <div>
-        <DropDown title="All Views" :ref="projectAddView" :bodyClass="{'viewlist-mobile-dropdown-new' : true}" maxHeight="unset" v-if="clientWidth <= 768">
+        <DropDown :title="$t('Projects.all_views')" :ref="projectAddView" :bodyClass="{'viewlist-mobile-dropdown-new' : true}" maxHeight="unset" v-if="clientWidth <= 768">
             <template #button>
                 <span ref="all_views_dd"></span>
             </template>

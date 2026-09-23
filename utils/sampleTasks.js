@@ -259,7 +259,7 @@ function buildTaskDocs(project, sprints, rows, startingNumber, ownerId) {
 // Nothing anywhere looks a sprint up by the name "List", so renaming it is safe.
 //
 // Never throws: if a sprint cannot be made, the tasks all fall back to the one that exists.
-async function ensureDemoSprints(project, firstSprint) {
+async function ensureDemoSprints(project, firstSprint, ownerId) {
     const companyId = String(project.CompanyId);
     const sprints = [firstSprint];
     try {
@@ -272,6 +272,10 @@ async function ensureDemoSprints(project, firstSprint) {
         // Required late: Modules/Sprints pulls in a large part of the app.
         // eslint-disable-next-line global-require
         const { addSprintFun } = require('../Modules/Sprints/controller');
+        // eslint-disable-next-line global-require
+        const { loadUserData } = require('../Modules/createProject/sampleProject');
+        // addSprintFun writes a history row, and history requires the user it is attributed to.
+        const userData = await loadUserData(ownerId, companyId);
         for (const name of DEMO_SPRINTS.slice(1)) {
             // eslint-disable-next-line no-await-in-loop
             const res = await addSprintFun({
@@ -279,7 +283,7 @@ async function ensureDemoSprints(project, firstSprint) {
                     companyId,
                     projectId: project._id,
                     sprintName: name,
-                    userData: {},
+                    userData,
                     projectName: project.ProjectName,
                 },
             });
@@ -309,7 +313,7 @@ async function seedSampleTasks(project, sprint, rows, ownerId) {
         // Only the demo project is split across sprints. A template project keeps the single
         // sprint it was created with, which is what every hand-made project gets.
         const wantsSprints = rows.some((r) => r[2] && r[2].sprint !== undefined);
-        const sprints = wantsSprints ? await ensureDemoSprints(project, sprint) : [sprint];
+        const sprints = wantsSprints ? await ensureDemoSprints(project, sprint, leader) : [sprint];
 
         const { docs, comments } = buildTaskDocs(project, sprints, rows, startingNumber, leader);
 
