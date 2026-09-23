@@ -6355,7 +6355,12 @@ export default {
         "This_message_is_deleted": "Diese Nachricht wurde gelöscht",
         "You_deleted_this_message": "Du hast diese Nachricht gelöscht",
         "no_user_found": "Kein Benutzer gefunden",
-        "unlock_comment_view": "Um die Kommentaransicht freizuschalten"
+        "unlock_comment_view": "Um die Kommentaransicht freizuschalten",
+        "agent_tag": "AGENT",
+        "an_agent": "An agent",
+        "ai_assistant": "AI assistant",
+        "cited_page": "page",
+        "cited_page_hidden": "a page you cannot open"
     },
     "PlaceHolder": {
         "enter_task_type": "Aufgabentyp eingeben",
