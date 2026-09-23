@@ -5,6 +5,7 @@ const { recordAudit } = require('../../Audit/recorder');
 const { ACTOR_SERVICE, serviceStamp } = require('../../Agents/serviceIdentity');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
+const { canPostToThread } = require('../../Comments/helpers/threadWriteAccess');
 
 // The only way an action is allowed to touch data.
 //
@@ -96,6 +97,23 @@ const updateTask = async (companyId, taskId, set, context = {}) => {
     return { changed: true, task: updated };
 };
 
+const ruleOwner = async (companyId, ruleId) => {
+    if (!/^[0-9a-fA-F]{24}$/.test(String(ruleId || ''))) return null;
+    const rule = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUTOMATION_RULES, data: [{ _id: oid(ruleId) }, 'createdBy'] }, 'findOne').catch(() => null);
+    return rule && rule.createdBy ? String(rule.createdBy) : null;
+};
+
+const commentThreadOf = (task) => ({
+    projectId: String(task.ProjectID || ''),
+    sprintId: task.sprintId ? String(task.sprintId) : '',
+    taskId: String(task._id),
+});
+
+const THREAD_REFUSED = 'the task\'s comment thread is not one the person this runs for can open';
+
+/* Server-side comments follow the thread rule the web app's comment routes apply, evaluated for
+ * the person the write is made for (`context.actingUserId`); with no person there is nothing to
+ * evaluate, so nothing is written. */
 const addComment = async (companyId, taskId, body, context = {}) => {
     const task = await getTask(companyId, taskId);
     const text = String(body || '').trim();
@@ -103,6 +121,9 @@ const addComment = async (companyId, taskId, body, context = {}) => {
 
     const projectId = oid(task.ProjectID);
     if (!projectId) throw new DeterministicError(`task ${taskId} has no usable project id`);
+
+    const access = await canPostToThread(companyId, context.actingUserId, commentThreadOf(task));
+    if (!access.allowed) throw new DeterministicError(THREAD_REFUSED);
 
     // Field names follow the comments schema exactly: `message` (not Comment),
     // `taskId` / `projectId` lowercase, and `project:false` marking this as a task
@@ -360,4 +381,4 @@ const createTask = async (companyId, projectId, { title, description = '', sprin
     return { changed: true, taskId: String(task._id), key: task.TaskKey || '', title: name };
 };
 
-module.exports = { DeterministicError, getTask, updateTask, addComment, createSubtask, createTask, resolveStatus, oid };
+module.exports = { DeterministicError, getTask, updateTask, addComment, commentThreadOf, ruleOwner, createSubtask, createTask, resolveStatus, oid };

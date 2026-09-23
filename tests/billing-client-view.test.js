@@ -1,4 +1,8 @@
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
+jest.mock('../Modules/Comments/helpers/threadWriteAccess', () => ({
+    ...jest.requireActual('../Modules/Comments/helpers/threadWriteAccess'),
+    canPostToThread: jest.fn(async () => ({ allowed: true, match: {} })),
+}));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 

@@ -2,6 +2,10 @@ process.env.MCP_TOOLS_DATA = 'on';
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
+jest.mock('../Modules/Comments/helpers/threadWriteAccess', () => ({
+    ...jest.requireActual('../Modules/Comments/helpers/threadWriteAccess'),
+    canPostToThread: jest.fn(async () => ({ allowed: true, match: {} })),
+}));
 jest.mock('../Modules/Audit/recorder', () => ({ recordAudit: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
