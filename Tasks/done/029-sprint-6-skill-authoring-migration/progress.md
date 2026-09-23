@@ -203,3 +203,10 @@ The two that remain, both recorded in `Tasks/HANDOFF.md` under owner actions:
 
 ## Last step
 Closed. Sprint 7 (task 030) and Sprint 8 (task 031) are next and the roadmap allows them in parallel.
+
+## 2026-09-23: end-to-end acceptance run
+
+Run on the owner's local server (build 303) with the owner signed in and the model key set. An admin created a skill in the Skill Library (`qa.brief.summary`: reads the task brief, returns `{"summary": ...}`, emits one `task.comment`), assigned it to a new agent ("QA brief summariser", L1, project Local Smoke, actions `task.get` and `task.comment`), and ran it on SMOKE-1. gpt-4o answered in 2.4 s (266 tokens, $0.001); the comment came back as a proposal, and once approved in the Inbox it posted on SMOKE-1 as an agent action. The acceptance bullet is met.
+
+Found on the way and fixed separately: the Skill editor's Model select showed raw objects and sent `[object Object]` (#836); Approvals → AI never loaded agent proposals, and its buttons only hid the card (#837).
+

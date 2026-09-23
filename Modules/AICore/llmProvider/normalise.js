@@ -20,11 +20,12 @@ const DEFAULT_TEMPERATURE = 0.4;
  * is ignored, so the registry can ship before a policy exists to drive it. */
 const routerEnabled = () => String(process.env.AI_MODEL_ROUTER || 'off').trim().toLowerCase() === 'on';
 
-/* The model this call will actually send. A model on the chat options only
- * wins while the router is on; otherwise the adapter's configured model does. */
+/* The model this call will actually send. A model on the chat options wins
+ * while the router is on, or when an agent or skill pinned it; otherwise the
+ * adapter's configured model does. */
 function resolveModel(adapter, opts) {
     const asked = opts && opts.model ? String(opts.model).trim() : '';
-    if (asked && routerEnabled()) return asked;
+    if (asked && (routerEnabled() || opts.pinned === true)) return asked;
     return (adapter && adapter.model) || null;
 }
 
