@@ -1733,6 +1733,8 @@ const schema = {
         title: { type: String, required: false, default: '' },
         headingPath: { type: [String], required: false, default: [] },
         text: { type: String, required: false, default: '' },
+        // UTF-8 length of `text`, stored so the console's figures are summed from an index instead of from the text.
+        textBytes: { type: Number, required: false },
         contentHash: { type: String, required: true },
         // The vector for `text` under `embeddingModel`; empty until a hybrid company embeds it.
         embedding: { type: [Number], required: false, default: [] },
