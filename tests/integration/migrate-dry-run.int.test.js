@@ -51,7 +51,7 @@ beforeAll(async () => {
     const stripped = savedTypes.map((entry) => Object.fromEntries(Object.entries(entry).filter(([key]) => !ICON_FIELDS.includes(key))));
     await company.collection('projects').updateOne({ _id: project._id }, { $set: { taskTypeCounts: stripped } });
 
-    sweepIndex = (await company.collection('knowledge_chunks').indexes()).find((i) => i.name === SWEEP_INDEX);
+    sweepIndex = (await company.collection('knowledge_chunks').indexes().catch(() => [])).find((i) => i.name === SWEEP_INDEX);
     if (sweepIndex) await company.collection('knowledge_chunks').dropIndex(SWEEP_INDEX);
 });
 
