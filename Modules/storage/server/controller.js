@@ -7,6 +7,7 @@ const { generateSignedUrl, checkBucketInDB, uploadStorageThumbnailFile } = requi
 const thumbnailArray = require("../../../thumbnail.json");
 const jwt = require("jsonwebtoken");
 const { sendStoredFile } = require("./helpers/downloadHeaders.js");
+const { refuseUnverifiedBucket } = require("../bucketAccess");
 
 /**
  * @description Create a bucket for the specified database.
@@ -165,13 +166,8 @@ exports.uploadFileOnStorage = async(req, res) => {
         return;
     }
     
-    if (!(req.body && req.body.companyId)) {
-        res.status(400).send({
-            status: false,
-            statusText: 'companyId is required'
-        });
-        return;
-    }
+    const bucketId = req.storageBucket;
+    if (!bucketId) return refuseUnverifiedBucket(res);
 
     if (req.file === undefined || req.file.path === undefined) {
         res.status(400).send({
@@ -186,7 +182,7 @@ exports.uploadFileOnStorage = async(req, res) => {
         let promises = [];
         if(index !== -1) {
             thumbnailArray[index].size.forEach((thu)=>{
-                promises.push(uploadStorageThumbnailFile(req.body.path,thu.height,thu.width,req.body.companyId,req.file))
+                promises.push(uploadStorageThumbnailFile(req.body.path,thu.height,thu.width,bucketId,req.file))
             })
             Promise.allSettled(promises).then(()=>{
                 return res.status(200).send({
@@ -200,7 +196,7 @@ exports.uploadFileOnStorage = async(req, res) => {
                 })
             })
         } else {
-            const filePath = path.join(__dirname, '../../../storage', req.body.companyId, req.body.path)
+            const filePath = path.join(__dirname, '../../../storage', bucketId, req.body.path)
             fs.unlinkSync(filePath);
             return res.status(400).send({
                 status: false,
@@ -398,13 +394,8 @@ exports.uploadBase64FileOnServerStorage = (req,res) => {
             return;
         }
         
-        if (!(req.body && req.body.companyId)) {
-            res.status(400).send({
-                status: false,
-                statusText: 'companyId is required'
-            });
-            return;
-        }
+        const bucketId = req.storageBucket;
+        if (!bucketId) return refuseUnverifiedBucket(res);
     
         if (!(req.body && req.body.base64String)) {
             res.status(400).send({
@@ -414,13 +405,13 @@ exports.uploadBase64FileOnServerStorage = (req,res) => {
             return;
         }
     
-        const bucketDir = path.join(__dirname, '../../../storage', req.body.companyId);
+        const bucketDir = path.join(__dirname, '../../../storage', bucketId);
     
         const dirPath = path.join(bucketDir, req.body.path);
     
         const base64Data = req.body.base64String.replace(/^data:([A-Za-z-+/]+);base64,/, '');
         const buffer = Buffer.from(base64Data, 'base64');
-        iconsThumbnailGenerator(req.body.path,req.body.companyId,{},buffer,path.basename(dirPath),req.body.key || '').then(()=>{
+        iconsThumbnailGenerator(req.body.path,bucketId,{},buffer,path.basename(dirPath),req.body.key || '').then(()=>{
             if (!fs.existsSync(dirPath)) {
                 fs.mkdirSync(path.dirname(dirPath), { recursive: true });
             }

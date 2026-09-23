@@ -389,7 +389,8 @@ const { USER_PROFILES_BUCKET, refuseBeforeWrite, refuseUpload, uploadRefusal } =
 
 const storage = multer.diskStorage({
     destination: function (req, _, cb) {
-        const { path: filepath, companyId: bucketId } = req.body;
+        const filepath = req.body.path;
+        const bucketId = req.storageBucket;
         const safePath = safeRelativePath(filepath);
         const safeBucket = safeRelativePath(bucketId);
         if (!safePath || !safeBucket) {
@@ -417,7 +418,7 @@ const storage = multer.diskStorage({
 exports.storageRef = storage;
 
 const serverUploadRefusal = async (req) => {
-    const bucketId = req.body && req.body.companyId;
+    const bucketId = req.body && req.body.companyId; // tenant-scoping: the bucket an upload claims, checked against the caller's seat right here before anything is written
     const found = await uploadRefusal(req, bucketId, req.body && req.body.path);
     if (found || bucketId === USER_PROFILES_BUCKET) return found;
     const bucket = await exports.checkBucketInDB(bucketId);
