@@ -78,6 +78,7 @@
 
 @media (max-width: 767px) {
     .au__rule { flex-wrap: wrap; }
+    .au__rule-text { flex-basis: calc(100% - 40px); }
     .au__slot { max-width: 100%; }
 }
 

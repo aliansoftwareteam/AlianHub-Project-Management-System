@@ -127,6 +127,14 @@ describe('Doc editor header', () => {
     });
 });
 
+describe('Automations list on a phone', () => {
+    test('the rule sentence keeps a full line instead of one word per line', () => {
+        const css = read('views/Automations/style.css');
+        const phone = css.slice(css.indexOf('@media (max-width: 767px)'));
+        expect(ruleBody(phone, '.au__rule-text')).toMatch(/flex-basis:\s*calc\(100% - 40px\)/);
+    });
+});
+
 describe('Docs hub', () => {
     const vue = read('views/Pages/PagesSpace.vue');
     const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));
