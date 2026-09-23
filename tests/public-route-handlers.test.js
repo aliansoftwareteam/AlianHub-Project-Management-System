@@ -269,11 +269,21 @@ describe('manageTrackerUserPermission', () => {
         expect(spy).not.toHaveBeenCalled();
     });
 
-    it('lets an admin change the session company, whatever the body says', async () => {
+    it('refuses a body naming another company', async () => {
         getRoleType.mockResolvedValue(2);
         const spy = jest.spyOn(trackerPermission, 'updateTrackerUsersAndUser').mockResolvedValue({ status: true });
         const res = response();
         trackerPermission.handleTrackerUserPermission(request({ body }), res);
+        await settle();
+        expect(res.statusCode).toBe(403);
+        expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('lets an admin change the session company', async () => {
+        getRoleType.mockResolvedValue(2);
+        const spy = jest.spyOn(trackerPermission, 'updateTrackerUsersAndUser').mockResolvedValue({ status: true });
+        const res = response();
+        trackerPermission.handleTrackerUserPermission(request({ body: { DataObj: body.DataObj } }), res);
         await settle();
         expect(getRoleType).toHaveBeenCalledWith(COMPANY, USER);
         expect(spy).toHaveBeenCalledWith(body.DataObj, COMPANY);
