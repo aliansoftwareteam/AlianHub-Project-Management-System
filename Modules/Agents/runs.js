@@ -230,12 +230,14 @@ const recordSpend = async (companyId, run, tokens, model) => {
     return { usd, tokens: priced.totalTokens, capReached };
 };
 
-/* projectIds, when given, is the caller's visible set: a projectId outside it matches nothing.
- * hiddenTaskIds are left out whatever other filter names them. */
-const inProjects = (projectIds, hiddenTaskIds) => ({
-    ...(Array.isArray(projectIds) ? { projectId: { $in: projectIds.map(String) } } : {}),
-    ...(Array.isArray(hiddenTaskIds) && hiddenTaskIds.length ? { $and: [{ taskId: { $nin: hiddenTaskIds.map(String) } }] } : {}),
-});
+/* projectIds, when given, is the caller's visible set, and hiddenTaskIds the tasks in it they cannot
+ * read. Both sit under $and so a projectId or taskId filter the caller sends narrows them, never replaces them. */
+const inProjects = (projectIds, hiddenTaskIds) => {
+    const clauses = [];
+    if (Array.isArray(projectIds)) clauses.push({ projectId: { $in: projectIds.map(String) } });
+    if (Array.isArray(hiddenTaskIds) && hiddenTaskIds.length) clauses.push({ taskId: { $nin: hiddenTaskIds.map(String) } });
+    return clauses.length ? { $and: clauses } : {};
+};
 
 const list = async (companyId, { status, projectId, agentId, taskId, errorType, limit = 50, projectIds, hiddenTaskIds } = {}) => {
     const match = { ...inProjects(projectIds, hiddenTaskIds) };
