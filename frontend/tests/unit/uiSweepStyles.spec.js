@@ -74,6 +74,13 @@ describe('the calendar controls in the project toolbar', () => {
     });
 });
 
+describe('the project calendar card in dark mode', () => {
+    test('the legacy white sprint card takes the dark surface when it holds the calendar', () => {
+        const css = read('assets/css/tokens.css');
+        expect(ruleBody(css, ':root[data-theme="dark"] .ah-page .sprint:has(.cv)')).toMatch(/background-color:\s*var\(--surface\)/);
+    });
+});
+
 describe('legacy blocks inside the task panel in dark mode', () => {
     const css = read('components/organisms/TaskDetailOverlay/style.css');
     const dark = (selector) => ruleBody(css, `:root[data-theme="dark"] .ah-detail__panel ${selector}`);

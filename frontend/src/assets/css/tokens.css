@@ -174,6 +174,8 @@ html, body, #app {
    when a redesigned page is inside; legacy views keep their light panels and dark ink. */
 :root[data-theme="dark"] .section-right.bg-white:has(.ah-page),
 :root[data-theme="dark"] .list-view-body.bg-light-gray:has(.ah-page) { background: var(--canvas) !important; }
+/* The redesigned calendar still sits in the legacy SprintsList card, which is always white. */
+:root[data-theme="dark"] .ah-page .sprint:has(.cv) { background-color: var(--surface); border-color: var(--hairline); }
 /* Legacy utility classes inside the redesigned project toolbars (filter trigger, mic, + View). */
 :root[data-theme="dark"] .ph2 .bg-white, :root[data-theme="dark"] .ph2 .btn-white,
 :root[data-theme="dark"] .pft .bg-white, :root[data-theme="dark"] .pft .btn-white { background: var(--surface) !important; color: var(--ink); }
