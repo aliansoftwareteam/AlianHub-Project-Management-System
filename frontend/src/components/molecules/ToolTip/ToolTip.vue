@@ -24,7 +24,7 @@
                     </div>
                     <button v-if="showReadMore && shouldTruncate && !isExpanded" class="read-more-btn"
                         @click.stop.prevent="toggleExpand">
-                        Read more
+                        {{ $t('tooltipText.read_more') }}
                     </button>
                 </div>
             </div>

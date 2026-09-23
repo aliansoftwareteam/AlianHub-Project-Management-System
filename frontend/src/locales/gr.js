@@ -54,7 +54,9 @@ export default {
         "report_none": "No sprints to report on yet.",
         "report_moved_out": "moved out",
         "points": "points",
-        "tasks": "tasks"
+        "tasks": "tasks",
+        "story_points_empty": "Points",
+        "story_points_clear": "Clear"
     },
     "generalErrorMessage": {
         "fieldIsRequired": "Το πεδίο είναι υποχρεωτικό",
@@ -774,7 +776,8 @@ export default {
         "overdue_since": "Overdue · {date}",
         "tracking_short": "tracking {time}",
         "this_week": "This week",
-        "access_denied": "You don't have access to Home."
+        "access_denied": "You don't have access to Home.",
+        "views_nav": "Views"
     },
     "Portfolio": {
         "new": "New portfolio",
@@ -1106,7 +1109,9 @@ export default {
         "agents_running": "{n} running",
         "legacy_nav": "Use the old top bar",
         "new_nav": "Try the new navigation",
-        "skip_to_content": "Skip to content"
+        "skip_to_content": "Skip to content",
+        "palette_esc": "ESC",
+        "primary_nav": "Primary"
     },
     "Docs": {
         "docs": "Docs",
@@ -1249,7 +1254,12 @@ export default {
     },
     "Common": {
         "select_task": "Select task",
-        "select_all_tasks": "Select all tasks in group"
+        "select_all_tasks": "Select all tasks in group",
+        "close": "Close",
+        "key_esc": "Esc",
+        "key_enter": "Enter",
+        "key_shift_enter": "Shift + Enter",
+        "key_tab": "Tab"
     },
     "Time": {
         "loading": "Loading…",
@@ -3008,7 +3018,9 @@ export default {
         "error_save": "Your language could not be saved.",
         "monday": "Monday",
         "sunday": "Sunday",
-        "saturday": "Saturday"
+        "saturday": "Saturday",
+        "rtl_tag": "RTL",
+        "preview_ltr": "LTR"
     },
     "Parity": {
         "nav_connections": "Connections",
@@ -3837,7 +3849,8 @@ export default {
         "ext_never": "Never available to an agent",
         "ext_same_treatment": "External agents get the same treatment as yours: allow-listed actions, everything through the AI Inbox, full audit.",
         "mob_tap_slot": "Tap a time to place {task}",
-        "mob_cancel": "Cancel"
+        "mob_cancel": "Cancel",
+        "ext_mcp_mark": "MCP"
     },
     "Gaps": {
         "wip_note": "Saved for everyone on this project. Over the limit warns, it never blocks a move.",
@@ -4526,7 +4539,15 @@ export default {
         "view_options": "Options for the {view} view",
         "search_views": "Search or describe a view to create",
         "no_views_match": "No view matches that search.",
-        "private_view": "Private view"
+        "private_view": "Private view",
+        "select_billing_period": "Select Billing Period",
+        "sprint_data_required": "SPRINT DATA REQUIRED",
+        "export_csv": "CSV",
+        "export_xlsx": "XLSX",
+        "just_now": "Just now",
+        "private_project": "Private project",
+        "points_total": "{n} pts",
+        "col_title": "Title"
     },
     "Watcher": {
         "ignore": "Αγνόησε",
@@ -4570,7 +4591,8 @@ export default {
         "to_unlock_list_view": "Για να ξεκλειδώσετε την προβολή Λίστας",
         "error_message_for_empty": "Παρακαλώ επιλέξτε τουλάχιστον μία προβολή",
         "set_as_default": "Ορισμός ως προεπιλογή",
-        "remove_as_default": "Αφαίρεση ως προεπιλογή"
+        "remove_as_default": "Αφαίρεση ως προεπιλογή",
+        "active_of_min": "Active {active} of {total} min"
     },
     "ViewListTag": {
         "ProjectListView": "List",
@@ -4979,7 +5001,8 @@ export default {
         "link_file": "Link the file",
         "importing": "Importing...",
         "import_done": "Imported {name}",
-        "import_failed": "Could not import from {provider}."
+        "import_failed": "Could not import from {provider}.",
+        "download_all": "Download All"
     },
     "ClipRecorder": {
         "record_clip": "Record clip",
@@ -5086,7 +5109,10 @@ export default {
         "white_color_not_allowed": "Δεν επιτρέπεται το λευκό χρώμα. Επιλέξτε έγκυρο χρώμα",
         "billing": "Τιμολόγηση",
         "per_hour": "Ανά Ώρα",
-        "adding_taskPlanning": "Προσθήκη προγραμματισμού εργασιών"
+        "adding_taskPlanning": "Προσθήκη προγραμματισμού εργασιών",
+        "hh_placeholder": "hh",
+        "mm_placeholder": "mm",
+        "hh_mm_placeholder": "hh:mm"
     },
     "Comment": {
         "created_by": "Δημιουργήθηκε από",
@@ -5118,7 +5144,8 @@ export default {
         "Projects": "Έργα",
         "task_planning": "Προγραμματισμός εργασιών",
         "task_remaining_planning": "Υπολειπόμενες ώρες",
-        "planned": "Προγραμματισμένο"
+        "planned": "Προγραμματισμένο",
+        "views_nav": "Timesheet views"
     },
     "TimesheetApproval": {
         "submit": "Submit timesheet",
@@ -5198,7 +5225,10 @@ export default {
         "max_should_be_greater_than_min": "Η μέγιστη τιμή πρέπει να είναι μεγαλύτερη από την ελάχιστη",
         "min_should_be_less_than_max": "Η ελάχιστη τιμή πρέπει να είναι μικρότερη από τη μέγιστη",
         "separator": "Διαχωριστικό",
-        "countryCode": "Ενεργοποιήστε το για να τροποποιήσετε τον κωδικό χώρας."
+        "countryCode": "Ενεργοποιήστε το για να τροποποιήσετε τον κωδικό χώρας.",
+        "field_is_required": "{field} is required",
+        "all_projects": "All Projects",
+        "no_record_found": "No record found"
     },
     "Category": {
         "cateory_name": "Όνομα Κατηγορίας",
@@ -5279,7 +5309,8 @@ export default {
         "ai_after_desc_placeholder": "Μπορείτε να συνεχίσετε να ζητάτε σχετικά αιτήματα για αλλαγές",
         "try_with_ai": "Δοκιμάστε με AI",
         "msg_search_result_found": "Ακολουθούν ορισμένα προτεινόμενα πρότυπα που σχετίζονται με τις απαιτήσεις σας. Μπορείτε να επιλέξετε οποιοδήποτε ή να κάνετε απλώς κλικ για να δημιουργήσετε με τεχνητή νοημοσύνη",
-        "msg_search_result_not_found": "Δεν βρέθηκαν σχετικά πρότυπα. Για να δημιουργήσετε ένα με τεχνητή νοημοσύνη, απλώς κάντε κλικ"
+        "msg_search_result_not_found": "Δεν βρέθηκαν σχετικά πρότυπα. Για να δημιουργήσετε ένα με τεχνητή νοημοσύνη, απλώς κάντε κλικ",
+        "back_to_templates": "Back to templates"
     },
     "Settings": {
         "add_new_projects": "Προσθήκη Νέου Έργου",
@@ -5576,7 +5607,10 @@ export default {
         "agents_candidate_too_many_changes": "Prefers fewer changes per proposal",
         "agents_candidate_wrong_tone": "Prefers a different tone — ask before rewriting",
         "agents_candidate_needs_person": "Wants a person to handle this kind of work",
-        "agents_candidate_not_now": "Prefers proposals batched, not one at a time"
+        "agents_candidate_not_now": "Prefers proposals batched, not one at a time",
+        "phone_placeholder": "eg. 000-000-0000",
+        "company_profile": "Company Profile",
+        "image_dimensions": "{width}x{height}px"
     },
     "PermissionDesc": {
         "project": "Everything to do with projects. Turning this off hides projects entirely.",
@@ -6712,7 +6746,8 @@ export default {
         "details_project": "Belongs to",
         "details_slack": "Mirrored to Slack",
         "load_failed": "Could not load. Try again.",
-        "something_wrong": "Something went wrong. Try again."
+        "something_wrong": "Something went wrong. Try again.",
+        "dnd_short": "DND"
     },
     "Comments": {
         "unread_message": "Μη αναγνωσμένα μηνύματα",
@@ -7043,7 +7078,8 @@ export default {
         "client_contacts": "Client contacts",
         "client_contacts_hint": "Whoever is listed here gets the sign-off tasks and sees the client view.",
         "saved": "Saved",
-        "save_failed": "That could not be saved."
+        "save_failed": "That could not be saved.",
+        "views_nav": "Billing views"
     },
     "Tour": {
         "Tag_name_required": "Tag name is required.",
@@ -7198,7 +7234,8 @@ export default {
         "ai_failed": "Couldn't generate a description. Please try again.",
         "ai_optional": "— optional",
         "ai_skills_hint": "Skills this project needs. The AI also suggests skills from your description — you can adjust them on the review step.",
-        "ai_proposal_id_hint": "The won proposal this project came from. Used to tie the project back to the bid it originated from."
+        "ai_proposal_id_hint": "The won proposal this project came from. Used to tie the project back to the bid it originated from.",
+        "you": "You"
     },
     "ScreenshotRetention": {
         "heading": "Auto-delete old screenshots",
@@ -7716,7 +7753,8 @@ export default {
         "enable_app_use_milestones": "Ενεργοποιώντας αυτήν την εφαρμογή, θα μπορείτε να χρησιμοποιήσετε τα <b>Ορόσημα</b> για αυτό το <b>έργο</b>",
         "enable_app_use_ai_operations": "Ενεργοποιώντας αυτήν την εφαρμογή, θα μπορείτε να χρησιμοποιήσετε τις <b>Λειτουργίες Τεχνητής Νοημοσύνης</b> για αυτό το <b>έργο</b>",
         "enable_app_manage_time_log": "Ενεργοποιώντας αυτήν την εφαρμογή, θα μπορείτε να διαχειριστείτε το <b>Ημερολόγιο Χρόνου</b> στις <b>Εργασίες</b> για αυτό το <b>έργο</b>",
-        "enable_app_manage_custom_fields": "Ενεργοποιώντας αυτήν την εφαρμογή, θα μπορείτε να διαχειριστείτε τα <b>Προσαρμοσμένα Πεδία</b> για αυτό το <b>έργο</b>"
+        "enable_app_manage_custom_fields": "Ενεργοποιώντας αυτήν την εφαρμογή, θα μπορείτε να διαχειριστείτε τα <b>Προσαρμοσμένα Πεδία</b> για αυτό το <b>έργο</b>",
+        "read_more": "Read more"
     },
     "Company": {
         "fill_company_details": "Συμπληρώστε τα στοιχεία της εταιρείας σας",
@@ -8207,7 +8245,12 @@ export default {
         "ewr_logged_over_planned": "{time} over planned",
         "ewr_empty_search": "No employees match \"{query}\".",
         "ewr_empty_current": "No one is currently working on a task.",
-        "ewr_empty_filter": "No employees match this filter."
+        "ewr_empty_filter": "No employees match this filter.",
+        "lwt_people_working_now": "{n} person working now | {n} people working now",
+        "lwt_tracker_running": "Tracker running",
+        "no_data_found": "No data found",
+        "milestone_clear_status_filter": "Clear status filter",
+        "tcb_group_logged_time_by": "Group logged time by"
     },
     "designationMapping": {
         "title": "Χαρτογράφηση Θέσεων Εργασίας",
@@ -8232,7 +8275,8 @@ export default {
         "user_limit_100": "Μπορείτε να εισαγάγετε έως και 100 χρήστες ταυτόχρονα."
     },
     "importUserButton": {
-        "import_user_processing": "Οι χρήστες σας εισάγονται"
+        "import_user_processing": "Οι χρήστες σας εισάγονται",
+        "import_users": "Import Users"
     },
     "timeForecastingReport": {
         "project_name": "Όνομα έργου",
@@ -9041,7 +9085,8 @@ export default {
         "agent_key_missing": "No key",
         "agent_saved": "AI agent settings saved.",
         "agent_save_failed": "AI agent settings were not saved.",
-        "agent_load_failed": "Could not load AI agent settings."
+        "agent_load_failed": "Could not load AI agent settings.",
+        "latency_ms": "{ms} ms"
     },
     "Routing": {
         "nav": "Routing policy",

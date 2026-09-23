@@ -3,7 +3,7 @@
     <div class="screenshotActivity__header">
         <div class="screenshotActivity__header-Title">
             <div class="activity_title">{{$t('ViewList.Activity')}}</div>
-            <div class="activity_discription">Active {{activeMinutes}} of {{displayActivity.length}} min</div>
+            <div class="activity_discription">{{ $t('ViewList.active_of_min', { active: activeMinutes, total: displayActivity.length }) }}</div>
         </div>
         <div class="actvity_bar">
             <ScreenShotActivityBar :data="data" :widthData="218" :heightData="11"/>

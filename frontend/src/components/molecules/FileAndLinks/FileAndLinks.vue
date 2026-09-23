@@ -181,7 +181,7 @@
                                     <div class="file-link-name">
                                         <a :href='item.attached'  :class="[{'black' : item.attachedType === 'file','blue' : item.attachedType === 'link'}]"  target=”_blank” class="font-size-14 font-weight-500 text-ellipsis text-decoration-none w-100 d-inline-block pr-5px">{{item.fileName}}</a>
                                         <h4 v-if="item.getFrom != undefined && item.getFrom !== 'description'" class="font-size-14 font-weight-500 m-0 gray81 pt-5px">{{item?.userDetail?.Employee_Name}}</h4>
-                                        <h4 v-else class="font-size-14 font-weight-500 m-0 gray81 pt-5px">Description</h4>
+                                        <h4 v-else class="font-size-14 font-weight-500 m-0 gray81 pt-5px">{{ $t('Description.description') }}</h4>
                                         <div class="d-flex file-link-date">
                                             <div>
                                                 <img v-show="item.getFrom != undefined && item.getFrom == 'comments'" class="cursor-pointer mr-15px" @click="highlightComment(item)"  :src="messageReply">

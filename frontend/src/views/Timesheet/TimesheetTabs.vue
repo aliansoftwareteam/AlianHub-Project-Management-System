@@ -1,5 +1,5 @@
 <template>
-    <nav v-if="tabs.length > 1" class="tv-tabs" aria-label="Timesheet views">
+    <nav v-if="tabs.length > 1" class="tv-tabs" :aria-label="$t('UserTimesheet.views_nav')">
         <router-link
             v-for="tab in tabs"
             :key="tab.key"

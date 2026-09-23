@@ -3,7 +3,7 @@
         <CardSkeleton v-if="loading && !teams.length" :rows="5" />
         <template v-else>
             <div class="tcb-head">
-                <span class="tcb-dim-box" title="Group logged time by">
+                <span class="tcb-dim-box" :title="$t('dashboardCard.tcb_group_logged_time_by')">
                     <select v-model="dimension" class="tcb-dim" @change="load">
                         <option value="type">{{ $t('dashboardCard.dim_type') }}</option>
                         <option value="effort_nature">{{ $t('dashboardCard.dim_effort_nature') }}</option>

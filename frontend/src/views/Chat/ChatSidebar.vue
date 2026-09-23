@@ -45,7 +45,7 @@
                     @click="$emit('select', { kind: 'direct', item: chat })"
                 >
                     <span class="ah-dot" :class="chat.isDnd ? 'ah-dot--danger' : 'ah-dot--ok'"></span>
-                    <span class="cs-row-name">{{ chat.name }}<span v-if="chat.isDnd" class="cs-row-dnd"> · DND</span></span>
+                    <span class="cs-row-name">{{ chat.name }}<span v-if="chat.isDnd" class="cs-row-dnd"> · {{ $t('Chat.dnd_short') }}</span></span>
                     <span v-if="chat.unread" class="cs-count">{{ chat.unread > 99 ? '99+' : chat.unread }}</span>
                 </button>
 

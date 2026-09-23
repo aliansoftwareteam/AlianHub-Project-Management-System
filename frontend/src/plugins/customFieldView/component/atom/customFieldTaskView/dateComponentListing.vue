@@ -29,7 +29,7 @@
                 />
             </div>
             <div v-if="validationError" class="position-ab formkit__error-message">
-                {{props.detail.fieldTitle}} is required
+                {{ $t('CustomField.field_is_required', { field: props.detail.fieldTitle }) }}
             </div>
         </div>
     </div>

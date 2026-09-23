@@ -3,7 +3,7 @@
         <CardSkeleton v-if="loading && !rows.length" :rows="5" />
         <template v-else>
             <div class="lwt-head">
-                <span class="lwt-count">{{ rows.length }} {{ rows.length === 1 ? 'person' : 'people' }} working now</span>
+                <span class="lwt-count">{{ $t('dashboardCard.lwt_people_working_now', { n: rows.length }, rows.length) }}</span>
             </div>
             <div v-if="!rows.length" class="lwt-msg">{{ $t('dashboardCard.no_one_working_now') }}</div>
             <div v-else class="lwt-table-wrap">
@@ -22,7 +22,7 @@
                             <td class="lwt-user">{{ r.user }}</td>
                             <td class="lwt-task">
                                 <div class="lwt-task-line">
-                                    <span class="lwt-running" title="Tracker running">●</span>
+                                    <span class="lwt-running" :title="$t('dashboardCard.lwt_tracker_running')">●</span>
                                     <span class="lwt-task-name" :title="r.task">{{ r.task }}</span>
                                 </div>
                                 <div v-if="r.comment" class="lwt-comment" :title="r.comment">{{ r.comment }}</div>

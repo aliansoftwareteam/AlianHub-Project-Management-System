@@ -31,7 +31,7 @@
                             </div>
                             <div>
                                 <span class="Upload_img_span">
-                                        {{$t('Settings.maximum_image_size')}} <span class="black"><b>250x250px</b></span>.
+                                        {{$t('Settings.maximum_image_size')}} <span class="black"><b>{{ $t('Settings.image_dimensions', { width: 250, height: 250 }) }}</b></span>.
                                 </span>
                             </div>
                         </div>
