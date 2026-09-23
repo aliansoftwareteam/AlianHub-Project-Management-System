@@ -27,8 +27,10 @@ async function ownSessionRefusal(req, companyId) {
     if (!OBJECT_ID.test(uid)) return { code: 401, statusText: 'A signed-in user is required.' };
     const timeSheetId = String((req.body && req.body.timeSheetId) || '');
     if (!OBJECT_ID.test(timeSheetId)) return { code: 403, statusText: NOT_YOUR_TIME };
+    // The capture handlers write to the collection the request names; the tracker only ever names this one.
+    if (req.body.type && req.body.type !== SCHEMA_TYPE.TIMESHEET) return { code: 403, statusText: NOT_YOUR_TIME };
     const session = await MongoDbCrudOpration(companyId, {
-        type: req.body.type || SCHEMA_TYPE.TIMESHEET,
+        type: SCHEMA_TYPE.TIMESHEET,
         data: [{ _id: timeSheetId }, { Loggeduser: 1 }],
     }, 'findOne');
     return session && String(session.Loggeduser) === uid ? null : { code: 403, statusText: NOT_YOUR_TIME };
