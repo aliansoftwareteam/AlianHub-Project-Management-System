@@ -29,6 +29,7 @@ import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useGetterFunctions } from "@/composable";
 import { timerState, elapsedSeconds, formatClock, startTimer, pauseTimer, resumeTimer, stopTimer, isTimerFor } from "./useTaskTimer";
+import { timeLogFailureKey } from "@/composable/timeLogFailure";
 
 defineOptions({ name: "TaskTimerChip" });
 
@@ -84,7 +85,8 @@ async function stop() {
         $toast.success(t("TaskPanel.timer_logged"), { position: "top-right" });
         emit("logged", result);
     } else if (result.statusText) {
-        $toast.error(result.statusText, { position: "top-right" });
+        const key = timeLogFailureKey(result, "");
+        $toast.error(key ? t(key) : result.statusText, { position: "top-right" });
     } else {
         $toast.info(t("TaskPanel.timer_too_short"), { position: "top-right" });
     }

@@ -1,7 +1,7 @@
 {
   "locale": "gu",
   "machineTranslated": false,
-  "updatedAt": "2026-09-23T15:57:26.351Z",
+  "updatedAt": "2026-09-23T16:23:41.253Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -6577,6 +6577,7 @@
     "Comment.enter_task_name": "Enter task name",
     "Views.mindmap_title": "Mind Map",
     "Views.mindmap_nodes": "{n} nodes",
-    "Views.mindmap_empty": "No tasks yet — add tasks to see the project mind map."
+    "Views.mindmap_empty": "No tasks yet — add tasks to see the project mind map.",
+    "Time.period_locked": "That day is in an approved timesheet period, so time can't be added to it."
   }
 }
