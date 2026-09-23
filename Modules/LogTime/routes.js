@@ -39,10 +39,8 @@ exports.init = (app) => {
     *         - ticketId
     *         - projectId
     *         - companyId
-    *         - userId
     *         - isEdit
     *         - timeSheetId
-    *         - userName
     *         - dateFormat
     *         - companyOwnerId
     *         - sprintId
@@ -87,7 +85,7 @@ exports.init = (app) => {
     *         userId: 
     *           type: string
     *           required: true
-    *           description: The userId of user.
+    *           description: Whose time; the signed-in user when left out. Another person needs the Everyone user timesheet permission.
     *         isEdit: 
     *           type: boolean
     *           required: true
@@ -99,7 +97,7 @@ exports.init = (app) => {
     *         userName: 
     *           type: string
     *           required: true
-    *           description: The name of user.
+    *           description: Ignored; history names the signed-in user.
     *         dateFormat: 
     *           type: string
     *           required: true
@@ -167,9 +165,7 @@ exports.init = (app) => {
     *         - ticketId
     *         - projectId
     *         - companyId
-    *         - userId
     *         - timeSheetId
-    *         - userName
     *         - dateFormat
     *         - companyOwnerId
     *         - sprintId
@@ -208,7 +204,7 @@ exports.init = (app) => {
     *         userId: 
     *           type: string
     *           required: true
-    *           description: The userId of user.
+    *           description: Whose time; the signed-in user when left out. Another person needs the Everyone user timesheet permission.
     *         timeSheetId: 
     *           type: string
     *           required: false
@@ -216,7 +212,7 @@ exports.init = (app) => {
     *         userName: 
     *           type: string
     *           required: true
-    *           description: The name of user.
+    *           description: Ignored; history names the signed-in user.
     *         dateFormat: 
     *           type: string
     *           required: true
