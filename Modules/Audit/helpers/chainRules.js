@@ -135,6 +135,48 @@ const markMac = (key, kind, companyId, { seq, hash }) => hmac(key, canonical({ k
 
 const macMatches = (key, kind, companyId, mark) => Boolean(mark) && typeof mark.seq === 'number' && sameHex(mark.mac, markMac(key, kind, companyId, mark));
 
+const progressFields = (doc) => ({
+    anchorSeq: Number(doc.anchorSeq),
+    seq: Number(doc.seq),
+    hash: String(doc.hash || ''),
+    rewalkSeq: doc.rewalkSeq == null ? null : Number(doc.rewalkSeq),
+    rewalkHash: doc.rewalkSeq == null ? null : String(doc.rewalkHash || ''),
+    brokenAt: doc.brokenAt == null ? null : Number(doc.brokenAt),
+    gen: Number(doc.gen),
+});
+
+const progressMac = (key, companyId, doc) => hmac(key, canonical({ kind: 'progress', companyId: String(companyId), ...progressFields(doc) }));
+
+/* The stored progress as a resume cursor, or null when it was not written under the key. */
+const progressOf = (key, companyId, doc) => {
+    if (!doc || typeof doc.seq !== 'number' || typeof doc.gen !== 'number' || !sameHex(doc.mac, progressMac(key, companyId, doc))) return null;
+    const f = progressFields(doc);
+    return {
+        cursor: { anchorSeq: f.anchorSeq, tip: { seq: f.seq, hash: f.hash }, rewalk: f.rewalkSeq == null ? null : { seq: f.rewalkSeq, hash: f.rewalkHash } },
+        brokenAt: f.brokenAt,
+        gen: f.gen,
+    };
+};
+
+const progressDoc = (key, companyId, { anchorSeq, tip, rewalk }, brokenAt, gen) => {
+    const doc = {
+        anchorSeq, seq: tip.seq, hash: tip.hash, rewalkSeq: rewalk ? rewalk.seq : null, rewalkHash: rewalk ? rewalk.hash : null,
+        brokenAt: brokenAt == null ? null : brokenAt, gen,
+    };
+    return { ...doc, mac: progressMac(key, companyId, doc) };
+};
+
+const leaseMark = ({ owner, leaseId, leaseUntil }) => ({ seq: new Date(leaseUntil).getTime(), hash: `${owner}:${leaseId}` });
+const leaseMac = (key, companyId, lease) => markMac(key, 'lease', companyId, leaseMark(lease));
+
+/* Another server's lease binds only while it is signed, unexpired, and no longer than a lease is ever taken for. */
+const leaseHeldByOther = (key, companyId, doc, self, now, leaseMs) => {
+    if (!doc || !doc.owner || doc.owner === self || !doc.leaseId || !doc.leaseUntil) return false;
+    const until = new Date(doc.leaseUntil).getTime();
+    if (!(until > now && until <= now + leaseMs)) return false;
+    return macMatches(key, 'lease', companyId, { ...leaseMark(doc), mac: doc.leaseMac });
+};
+
 /* $set paths agentAudit writes: meta.<key>, or an entity field it learns once the action ran. */
 const amendmentOf = (original, $set) => {
     const set = {};
@@ -222,5 +264,6 @@ const pageIntegrity = ({ key, companyId, report, chainStartedAt = null }, entrie
 module.exports = {
     AMENDED_ACTION, MIN_KEY_LENGTH, PERSONAL_FIELDS, AMENDABLE_ROW_FIELDS, INTEGRITY, GENESIS, CHAIN_INDEXES,
     chainConfig, clean, canonical, hashedContent, rowHash, hashMatches, isChained, markMac, macMatches,
+    progressOf, progressDoc, leaseMac, leaseHeldByOther,
     amendmentOf, trustedAmendments, applyAmendments, inChainOrder, walkLinks, pageIntegrity,
 };

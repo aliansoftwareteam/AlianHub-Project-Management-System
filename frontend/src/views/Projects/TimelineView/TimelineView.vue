@@ -1,15 +1,15 @@
 <template>
   <div class="tl-view ah-page">
     <div class="tl-view__bar">
-      <span class="tl-view__title">Timeline</span>
+      <span class="tl-view__title">{{ $t('Views.timeline_title') }}</span>
       <span class="tl-view__count">
-        {{ scheduled.length }} scheduled<template v-if="unscheduled.length"> · {{ unscheduled.length }} unscheduled</template>
+        {{ $t('Views.scheduled_count', { n: scheduled.length }) }}<template v-if="unscheduled.length"> · {{ $t('Views.unscheduled_count', { n: unscheduled.length }) }}</template>
       </span>
     </div>
 
     <div class="tl-view__main">
       <div v-if="!scheduled.length" class="tl-view__empty">
-        No scheduled tasks yet — give a task a start &amp; due date to see it on the timeline.
+        {{ $t('Views.timeline_empty') }}
       </div>
 
       <div v-else class="tl-view__chart">
@@ -24,7 +24,7 @@
         <!-- rows -->
         <div v-for="t in scheduled" :key="t._id" class="tl-view__row">
           <div class="tl-view__row-label" :title="t.TaskName || t.TaskKey">
-            <span class="tl-view__key" v-if="t.TaskKey">{{ t.TaskKey }}</span>{{ t.TaskName || 'Untitled' }}
+            <span class="tl-view__key" v-if="t.TaskKey">{{ t.TaskKey }}</span>{{ t.TaskName || $t('Views.untitled') }}
           </div>
           <div class="tl-view__row-track">
             <div
@@ -40,7 +40,7 @@
       </div>
 
       <aside v-if="unscheduled.length" class="tl-view__tray">
-        <h4 class="tl-view__tray-title">Unscheduled ({{ unscheduled.length }})</h4>
+        <h4 class="tl-view__tray-title">{{ $t('Views.unscheduled_tray', { n: unscheduled.length }) }}</h4>
         <ul class="tl-view__tray-list">
           <li v-for="t in unscheduled" :key="t._id" class="tl-view__tray-item" :title="t.TaskName || t.TaskKey">
             {{ t.TaskName || t.TaskKey }}

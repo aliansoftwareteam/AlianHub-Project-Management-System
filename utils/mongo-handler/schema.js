@@ -661,6 +661,23 @@ const schema = {
         cutoff: { type: Date, required: false },
         mac: { type: String, required: true },
     },
+    // Where resumed verification has got to, shared by every server (Modules/Audit/chain.js): _id "progress".
+    auditChainProgress: {
+        _id: { type: String, required: true },
+        anchorSeq: { type: Number, required: false },
+        seq: { type: Number, required: false },
+        hash: { type: String, required: false },
+        rewalkSeq: { type: Number, required: false },
+        rewalkHash: { type: String, required: false },
+        brokenAt: { type: Number, required: false },
+        gen: { type: Number, required: false },
+        mac: { type: String, required: false },
+        at: { type: Date, required: false },
+        owner: { type: String, required: false },
+        leaseId: { type: String, required: false },
+        leaseUntil: { type: Date, required: false },
+        leaseMac: { type: String, required: false },
+    },
     // Where an erasure's audit redaction has got to (Modules/Audit/redact.js), keyed by the person's pseudonym.
     auditRedactions: {
         _id: { type: String, required: true },

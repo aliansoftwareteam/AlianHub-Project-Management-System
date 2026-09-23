@@ -31,7 +31,6 @@
             <h3 :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}">{{ $t('Projects.active_status') }}</h3>
             <DragDropField
                 :group="{ name: 'project_status_group' }"
-                class="tsf-fill-list"
                 v-if="theModel.projectStatusField.value && Object.keys(theModel.projectStatusField.value).length > 0"
                 :isDeletable="true" :isChangeColor="true"
                 v-model="theModel.projectStatusField.value.projectActiveStatus"
