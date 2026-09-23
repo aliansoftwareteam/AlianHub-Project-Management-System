@@ -6296,6 +6296,7 @@ export default {
         TimeTracker: "Time Tracker",
         unlock: "Unlock the Universe with Alianhub Tracker on Your Desktop!",
         smooth: "Smoothly track hours spent by users working on projects or tasks with time tracking.",
+        no_builds: "No desktop tracker download is available on this server yet.",
         click: "click",
         No_Record_Found: "No Record Found",
         total: "Total",

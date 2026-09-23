@@ -6131,6 +6131,7 @@ export default {
         "TimeTracker": "સમય ટ્રેકર",
         "unlock": "તમારા ડેસ્કટોપ પર એલિયનહબ ટ્રેકર સાથે બ્રહ્માંડને અનલૉક કરો!",
         "smooth": "સમય ટ્રેકિંગ સાથે પ્રોજેક્ટ્સ અથવા કાર્યો પર કામ કરતા વપરાશકર્તાઓ દ્વારા વિતાવેલા કલાકોને સરળતાથી ટ્રેક કરો.",
+        "no_builds": "No desktop tracker download is available on this server yet.",
         "click": "ક્લિક કરો",
         "No_Record_Found": "કોઈ રેકોર્ડ મળ્યો નથી",
         "total": "કુલ",

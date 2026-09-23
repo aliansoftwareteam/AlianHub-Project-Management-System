@@ -7420,6 +7420,7 @@
     "TimeTracker.hours_value": "{time} hrs",
     "TimeTracker.log_time_found_no_screenshot": "Log time was found, but no screenshot was captured for this duration.",
     "TimeTracker.manual": "Manual",
+    "TimeTracker.no_builds": "No desktop tracker download is available on this server yet.",
     "TimeTracker.screenshot_preview": "Screenshot Preview",
     "TimeTracker.smooth": "Smoothly track hours spent by users working on projects or tasks with time tracking.",
     "TimeTracker.total": "Total",

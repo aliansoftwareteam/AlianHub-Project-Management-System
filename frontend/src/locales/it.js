@@ -6131,6 +6131,7 @@ export default {
         "TimeTracker": "Tracker Tempo",
         "unlock": "Sblocca l'Universo con il Tracker Alianhub sul Tuo Desktop!",
         "smooth": "Monitora facilmente le ore spese dagli utenti sui progetti o compiti con il tracking del tempo.",
+        "no_builds": "No desktop tracker download is available on this server yet.",
         "click": "clicca",
         "No_Record_Found": "Nessun Record Trovato",
         "total": "Totale",

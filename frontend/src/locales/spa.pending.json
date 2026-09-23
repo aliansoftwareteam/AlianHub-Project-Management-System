@@ -6343,6 +6343,7 @@
     "TimeReminder.toggle_label": "Enable daily reminder",
     "TimeTracker.hours_value": "{time} hrs",
     "TimeTracker.manual": "Manual",
+    "TimeTracker.no_builds": "No desktop tracker download is available on this server yet.",
     "TimeTracker.tracked": "Tracked",
     "TimesheetApproval.approvals": "Approvals",
     "TimesheetApproval.approve": "Approve",

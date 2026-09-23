@@ -6131,6 +6131,7 @@ export default {
         "TimeTracker": "समय ट्रैकर",
         "unlock": "अलियनहब ट्रैकर के साथ अपने डेस्कटॉप पर ब्रह्मांड को अनलॉक करें!",
         "smooth": "समय ट्रैकिंग के साथ परियोजनाओं या कार्यों पर काम करते समय उपयोगकर्ताओं द्वारा खर्च किए गए घंटों को आसानी से ट्रैक करें।",
+        "no_builds": "No desktop tracker download is available on this server yet.",
         "click": "क्लिक करें",
         "No_Record_Found": "कोई रिकॉर्ड नहीं मिला",
         "total": "कुल",

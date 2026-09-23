@@ -6131,6 +6131,7 @@ export default {
         "TimeTracker": "时间跟踪器",
         "unlock": "使用 Alianhub 桌面端跟踪器解锁无限可能！",
         "smooth": "流畅地跟踪用户在项目或任务上花费的工时。",
+        "no_builds": "No desktop tracker download is available on this server yet.",
         "click": "点击",
         "No_Record_Found": "未找到记录",
         "total": "总计",

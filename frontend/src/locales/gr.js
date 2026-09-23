@@ -6131,6 +6131,7 @@ export default {
         "TimeTracker": "Χρονόμετρο",
         "unlock": "Ξεκλειδώστε το Σύμπαν με το Alianhub Tracker στην Επιφάνεια Εργασίας σας!",
         "smooth": "Παρακολουθήστε ομαλά τις ώρες που ξοδεύουν οι χρήστες σε έργα ή εργασίες με την παρακολούθηση χρόνου.",
+        "no_builds": "No desktop tracker download is available on this server yet.",
         "click": "κάντε κλικ",
         "No_Record_Found": "Δεν βρέθηκε καταγραφή",
         "total": "Σύνολο",

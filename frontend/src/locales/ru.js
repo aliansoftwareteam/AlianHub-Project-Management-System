@@ -6131,6 +6131,7 @@ export default {
         "TimeTracker": "Трекер времени",
         "unlock": "Разблокируйте вселенную с трекером Alianhub на вашем рабочем столе!",
         "smooth": "Плавно отслеживайте время, затраченное пользователями на проекты или задачи с помощью отслеживания времени.",
+        "no_builds": "No desktop tracker download is available on this server yet.",
         "click": "клик",
         "No_Record_Found": "Записи не найдены",
         "total": "Итого",

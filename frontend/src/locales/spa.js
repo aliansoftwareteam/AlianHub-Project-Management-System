@@ -6131,6 +6131,7 @@ export default {
         "TimeTracker": "Rastreador de Tiempo",
         "unlock": "¡Desbloquea el Universo con Alianhub Tracker en tu Escritorio!",
         "smooth": "Rastrea suavemente las horas que los usuarios pasan trabajando en proyectos o tareas con el seguimiento de tiempo.",
+        "no_builds": "No desktop tracker download is available on this server yet.",
         "click": "haz clic",
         "No_Record_Found": "No se encontró registro",
         "total": "Total",
