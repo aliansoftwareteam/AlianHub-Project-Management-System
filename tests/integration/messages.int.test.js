@@ -187,8 +187,7 @@ describe('messages/inbox — unread comment counts (MSG-05)', () => {
     it('rejects a companyId body value that disagrees with the header', async () => {
         const member = await loginAs('member');
         const res = await member.api.post('/api/v1/updateunreadcommentscount', { companyId: '000000000000000000000001', key: 4, readAll: true });
-        expect(res.body.status).toBe(false);
-        expect(String(res.body.statusText)).toMatch(/mismatch/i);
+        expect([res.status, res.body.status]).toEqual([403, false]);
     });
 
     it('MSG-05 answers unsetCommentCounts with the standard envelope', async () => {

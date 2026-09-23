@@ -121,6 +121,35 @@ describe('knowledge retrieval behind the tenant switch', () => {
         expect(ids).not.toContain(pageId);
     });
 
+    it('finds a task named by its key first, cites it by the key, and never a key the asker cannot open', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const tasks = client.db(state.companyId).collection('tasks');
+        const named = await tasks.findOne({ _id: new ObjectId(state.tasks[0]._id) });
+        const hiddenKey = `${state.projects.restricted.code}-${9000 + Math.floor(Math.random() * 900)}`;
+        const { insertedId } = await tasks.insertOne({
+            TaskName: `[QA knowledge] owner only ${uniqueSuffix()}`,
+            TaskKey: hiddenKey,
+            ProjectID: new ObjectId(state.projects.restricted._id),
+            deletedStatusKey: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        });
+        try {
+            const found = await ask(member, `What is the status of ${named.TaskKey}?`);
+            expect(found.sources[0]).toMatchObject({ kind: 'task', id: String(named._id), ref: named.TaskKey, title: named.TaskName });
+
+            const refused = await ask(member, `What is the status of ${hiddenKey}?`);
+            expect(refused.sources.map((s) => String(s.id))).not.toContain(String(insertedId));
+            expect(refused.sources.map((s) => s.ref)).not.toContain(hiddenKey);
+
+            const allowed = await ask(owner, `What is the status of ${hiddenKey}?`);
+            expect(allowed.sources[0]).toMatchObject({ kind: 'task', id: String(insertedId), ref: hiddenKey });
+        } finally {
+            await tasks.deleteOne({ _id: insertedId });
+        }
+    });
+
     it('searches as it did before once the company switch is off: page titles only', async () => {
         const owner = await loginAs('owner');
         const word = token();

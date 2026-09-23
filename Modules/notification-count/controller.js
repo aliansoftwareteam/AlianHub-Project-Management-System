@@ -3,6 +3,9 @@ const logger = require("../../Config/loggerConfig");
 const { dbCollections } = require('../../Config/collections');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { escapeRegex } = require('../../utils/escapeRegex');
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { ACTIVE_SEAT } = require('../../Config/seatStatus');
+const { pinSessionTenant } = require('../../Config/tenant');
 
 // Key 1 is Project Comments
 // Key 2 is update sprint count and task count
@@ -171,34 +174,60 @@ exports.updateCount = (companyId,userIds, manageQuery, cb) => {
     }
 }
 
-/**
- * 
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
+// Clearing, setting or decrementing a count is the reader's own business; only a bump (a new
+// comment, mention or notification) is sent on behalf of other people.
+const changesOwnCount = (body) => Boolean(body.read || body.set || body.readAll);
 
-exports.updateUnReadCommentsCount = (req, res) => {
-    exports.updateUnReadCommentsCountFun(req).then((cData) => {
-        res.send(cData);
-    })
-    .catch((error) => {
-        // Every rejection below is a { status:false, statusText } object with no
-        // `message`, so this answered `200` with an EMPTY BODY — a rejected write
-        // was indistinguishable from a successful one, and the caller carried on as
-        // though the count had been stored. Report the actual reason, with a status
-        // code the caller can act on.
+const activeMemberIds = async (companyId, userIds) => {
+    const ids = [...new Set(userIds.map(String))];
+    if (!ids.length) return [];
+    const seats = await mongoCm.MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMPANY_USERS,
+        data: [{ userId: { $in: ids }, ...ACTIVE_SEAT }, { userId: 1 }],
+    }, 'find');
+    const active = new Set((seats || []).map((seat) => String(seat.userId)));
+    return ids.filter((id) => active.has(id));
+};
+
+const countTargets = async (req, res, companyId) => {
+    const body = req.body || {};
+    const claimed = Array.isArray(body.userIds) ? body.userIds.filter(Boolean).map(String) : [];
+    if (changesOwnCount(body)) {
+        if (claimed.some((id) => id !== String(req.uid))) {
+            res.status(403).send({ status: false, statusText: 'You can only read or change your own unread counts.' });
+            return null;
+        }
+        return [String(req.uid)];
+    }
+    return activeMemberIds(companyId, claimed);
+};
+
+exports.updateUnReadCommentsCount = async (req, res) => {
+    try {
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
+        const userIds = await countTargets(req, res, companyId);
+        if (!userIds) return;
+        if (!userIds.length) {
+            res.send({ status: true, data: 'No recipients in this company' });
+            return;
+        }
+        res.send(await applyUnreadCount(companyId, { ...req.body, userIds }));
+    } catch (error) {
+        // Rejections are { status: false, statusText } objects without a message; answering them 200 with an
+        // empty body made a refused write look like a stored one.
         const rejected = error && error.status === false;
         res.status(rejected ? 400 : 500).json({
             status: false,
             statusText: (error && (error.statusText || error.message)) || 'Failed to update unread count',
         });
-    });
+    }
 };
-exports.updateUnReadCommentsCountFun = (req) => {
+
+const applyUnreadCount = (companyId, body) => {
     try {
         return new Promise((resolve, reject) => {
-            if (!(req.body && req.body.companyId)) {
+            if (!companyId) {
                 reject({
                     status: false,
                     statusText: "companyId is required"
@@ -206,17 +235,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
                 return;
             }
 
-            // SEC (AHE-3834) — the tenant is the authenticated company (header), not a
-            // client-chosen body value. Blocks mutating another company's unread counts.
-            if (req.headers && req.headers['companyid'] && String(req.body.companyId) !== String(req.headers['companyid'])) {
-                reject({
-                    status: false,
-                    statusText: "companyId mismatch"
-                });
-                return;
-            }
-
-            if (!(req.body && req.body.key)) {
+            if (!body.key) {
                 reject({
                     status: false,
                     statusText: "key is required"  
@@ -224,8 +243,8 @@ exports.updateUnReadCommentsCountFun = (req) => {
                 return;
             }
 
-            if (req.body.key === 1 || req.body.key === 2) {
-                if (!(req.body && req.body.projectId)) {
+            if (body.key === 1 || body.key === 2) {
+                if (!body.projectId) {
                     reject({
                         status: false,
                         statusText: "Project id is required"
@@ -233,7 +252,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
                     return;
                 }
 
-                if (!(req.body && req.body.userIds && req.body.userIds.length)) {
+                if (!(body.userIds && body.userIds.length)) {
                     reject({
                         status: false,
                         statusText: "User ids are required"
@@ -242,15 +261,15 @@ exports.updateUnReadCommentsCountFun = (req) => {
                 }
             }
 
-            if (req.body.key === 2) {
-                if (!(req.body && req.body.sprintId)) {
+            if (body.key === 2) {
+                if (!body.sprintId) {
                     reject({
                         status: false,
                         statusText: "Sprint id is required"
                     });
                     return;
                 }
-                if (!(req.body && req.body.taskId)) {
+                if (!body.taskId) {
                     reject({
                         status: false,
                         statusText: "Task id is required"
@@ -259,8 +278,8 @@ exports.updateUnReadCommentsCountFun = (req) => {
                 }
             }
 
-            if (req.body.key === 3) {
-                if (!(req.body && req.body.messageId)) {
+            if (body.key === 3) {
+                if (!body.messageId) {
                     reject({
                         status: false,
                         statusText: "Message id is required"
@@ -269,8 +288,8 @@ exports.updateUnReadCommentsCountFun = (req) => {
                 }
             }
 
-            if (req.body.key === 4) {
-                if (req.body.readAll === undefined) {
+            if (body.key === 4) {
+                if (body.readAll === undefined) {
                     reject({
                         status: false,
                         statusText: "readAll id is required"
@@ -279,19 +298,19 @@ exports.updateUnReadCommentsCountFun = (req) => {
                 }
             }
 
-            let messageCount = req.body.messageCount !== undefined ? req.body.messageCount : 1;
-            let prevCount = req.body.prevCount || 0;
+            let messageCount = body.messageCount !== undefined ? body.messageCount : 1;
+            let prevCount = body.prevCount || 0;
 
-            if (req.body.key === 1) {
-                const fieldName = `project_${req.body.projectId}_comments`;
+            if (body.key === 1) {
+                const fieldName = `project_${body.projectId}_comments`;
                 let manageQuery = {};
-                if (req.body.read) {
+                if (body.read) {
                     manageQuery = {
                         $unset: {
                             [fieldName]: ""
                         }
                     }
-                } else if (req.body.set) {
+                } else if (body.set) {
                     manageQuery = {
                         $set: {
                             [fieldName]: messageCount
@@ -304,19 +323,19 @@ exports.updateUnReadCommentsCountFun = (req) => {
                         },
                     }
                 }
-                exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {
+                exports.updateCount(companyId,body.userIds, manageQuery, (tData) => {
                     resolve(tData);
                 });
             } 
-            else if (req.body.key === 2) {
-                const sprintFieldName = `sprint_${req.body.projectId}_${req.body.sprintId}_comments`;
-                const taskFieldName = `task_${req.body.projectId}_${req.body.sprintId}_${req.body.taskId}_comments`;
+            else if (body.key === 2) {
+                const sprintFieldName = `sprint_${body.projectId}_${body.sprintId}_comments`;
+                const taskFieldName = `task_${body.projectId}_${body.sprintId}_${body.taskId}_comments`;
                 let parentTaskField = ``;
-                if(req.body.parentTaskId) {
-                    parentTaskField = `parentTask_${req.body.projectId}_${req.body.sprintId}_${req.body.parentTaskId}_comments`
+                if(body.parentTaskId) {
+                    parentTaskField = `parentTask_${body.projectId}_${body.sprintId}_${body.parentTaskId}_comments`
                 }
                 let manageQuery = {};
-                if (req.body.read) {
+                if (body.read) {
                     manageQuery = {
                         $unset: {
                             [taskFieldName]: ""
@@ -327,13 +346,13 @@ exports.updateUnReadCommentsCountFun = (req) => {
                         type: dbCollections.USERID,
                         data: [{
                             userId: {
-                                $in: req.body.userIds
+                                $in: body.userIds
                             }
                         }, {
                             [taskFieldName]: true
                         }]
                     }
-                    mongoCm.MongoDbCrudOpration(req.body.companyId,obj,"find").then((data)=>{
+                    mongoCm.MongoDbCrudOpration(companyId,obj,"find").then((data)=>{
                         if (!(data && data.length)) {
                             reject({
                                 status: false,
@@ -341,12 +360,12 @@ exports.updateUnReadCommentsCountFun = (req) => {
                             });
                             return;
                         }
-                        exports.updateSprintCount(req.body.companyId,data, taskFieldName, sprintFieldName, parentTaskField, -prevCount, (cData) => {
+                        exports.updateSprintCount(companyId,data, taskFieldName, sprintFieldName, parentTaskField, -prevCount, (cData) => {
                             if (!cData.status) {
                                 resolve(cData);
                                 return;
                             }
-                            exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {
+                            exports.updateCount(companyId,body.userIds, manageQuery, (tData) => {
                                 resolve(tData);
                             });
                         });
@@ -356,7 +375,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
                             err: err
                         });
                     })
-                } else if (req.body.set) {
+                } else if (body.set) {
                     const newCount = messageCount - prevCount
                     manageQuery = {
                         $set: {
@@ -377,13 +396,13 @@ exports.updateUnReadCommentsCountFun = (req) => {
                     //
                     // Only added when there is something to increment: an empty $inc
                     // is a MongoDB error.
-                    if (req.body.parentTaskId) {
+                    if (body.parentTaskId) {
                         manageQuery["$inc"] = {
                             [parentTaskField]: newCount
                         }
                     }
 
-                    exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {
+                    exports.updateCount(companyId,body.userIds, manageQuery, (tData) => {
                         resolve(tData);
                         if(newCount < 0){
                             try {
@@ -397,7 +416,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
                                     }]
                                 }
                         
-                                mongoCm.MongoDbCrudOpration(req.body.companyId, obj, "find").then((data) => {
+                                mongoCm.MongoDbCrudOpration(companyId, obj, "find").then((data) => {
                                     if (!(data && data.length)) {
                                         return;
                                     }
@@ -422,7 +441,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
                                             ]
                                         }
                         
-                                        mongoCm.MongoDbCrudOpration(req.body.companyId, updateObj, "findOneAndUpdate")
+                                        mongoCm.MongoDbCrudOpration(companyId, updateObj, "findOneAndUpdate")
                                         .then((updatedDoc) => {
                                             socketEmitter.emit('update', { 
                                                 type: "update", 
@@ -442,7 +461,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
                                 }).catch((error) => {
                                     logger.error(`${error} ERROR IN MONGO QUERY`);
                                 });
-                                if(req.body.parentTaskId) {
+                                if(body.parentTaskId) {
                                     // UNSET PARENT TASK FIELD
                                     let obj = {
                                         type: dbCollections.USERID,
@@ -453,7 +472,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
                                         }]
                                     }
                             
-                                    mongoCm.MongoDbCrudOpration(req.body.companyId, obj, "find").then((data) => {
+                                    mongoCm.MongoDbCrudOpration(companyId, obj, "find").then((data) => {
                                         if (!(data && data.length)) {
                                             return;
                                         }
@@ -478,7 +497,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
                                                 ]
                                             }
                             
-                                            mongoCm.MongoDbCrudOpration(req.body.companyId, updateObj, "findOneAndUpdate")
+                                            mongoCm.MongoDbCrudOpration(companyId, updateObj, "findOneAndUpdate")
                                             .then((updatedDoc) => {
                                                 socketEmitter.emit('update', { 
                                                     type: "update", 
@@ -509,24 +528,24 @@ exports.updateUnReadCommentsCountFun = (req) => {
                         $inc: {
                             // [sprintFieldName]: messageCount,
                             [taskFieldName]: messageCount,
-                            ...(req.body.parentTaskId ? {[parentTaskField]: messageCount} : {})
+                            ...(body.parentTaskId ? {[parentTaskField]: messageCount} : {})
                         }
                     }
 
-                    exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {
+                    exports.updateCount(companyId,body.userIds, manageQuery, (tData) => {
                         resolve(tData);
                     });
                 }
-            } else if (req.body.key === 3) {
-                const fieldName = `message_${req.body.messageId}_counts`;
+            } else if (body.key === 3) {
+                const fieldName = `message_${body.messageId}_counts`;
                 let manageQuery = {};
-                if (req.body.read) {
+                if (body.read) {
                     manageQuery = {
                         $unset: {
                             [fieldName]: ""
                         }
                     }
-                }  else if (req.body.set) {
+                }  else if (body.set) {
                     manageQuery = {
                         $set: {
                             [fieldName]: messageCount
@@ -539,20 +558,20 @@ exports.updateUnReadCommentsCountFun = (req) => {
                         }
                     }
                 }
-                exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {
+                exports.updateCount(companyId,body.userIds, manageQuery, (tData) => {
                     resolve(tData);
                 });
-            } else if (req.body.key === 4) {
+            } else if (body.key === 4) {
                 const fieldName = `mention_counts`;
                 let manageQuery = {};
-                if (req.body.readAll) {
+                if (body.readAll) {
                     manageQuery = {
                         $unset: {
                             [fieldName]: ""
                         }
                     }
                 } else {
-                    if (req.body.read) {
+                    if (body.read) {
                         manageQuery = {
                             $inc: {
                                 [fieldName]: -1
@@ -566,26 +585,26 @@ exports.updateUnReadCommentsCountFun = (req) => {
                         }
                     }
                 }
-                exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {
-                    if (req.body.readAll === false && req.body.read === true) {
-                        exports.updateMentionCount(req.body.companyId,req.body.userIds,fieldName, (cdata) => {
+                exports.updateCount(companyId,body.userIds, manageQuery, (tData) => {
+                    if (body.readAll === false && body.read === true) {
+                        exports.updateMentionCount(companyId,body.userIds,fieldName, (cdata) => {
                             resolve(cdata);
                         })
                     } else {
                         resolve(tData);
                     }
                 });
-            } else if (req.body.key === 5) {
+            } else if (body.key === 5) {
                 const fieldName = `notification_counts`;
                 let manageQuery = {};
-                if (req.body.readAll) {
+                if (body.readAll) {
                     manageQuery = {
                         $unset: {
                             [fieldName]: ""
                         }
                     }
                 } else {
-                    if (req.body.read) {
+                    if (body.read) {
                         manageQuery = {
                             $inc: {
                                 [fieldName]: -1
@@ -599,9 +618,9 @@ exports.updateUnReadCommentsCountFun = (req) => {
                         }
                     }
                 }
-                exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {
-                    if (req.body.readAll === false && req.body.read === true) {
-                        exports.updateMentionCount(req.body.companyId,req.body.userIds,fieldName, (cdata) => {
+                exports.updateCount(companyId,body.userIds, manageQuery, (tData) => {
+                    if (body.readAll === false && body.read === true) {
+                        exports.updateMentionCount(companyId,body.userIds,fieldName, (cdata) => {
                             resolve(cdata);
                         })
                     } else {
@@ -622,6 +641,9 @@ exports.updateUnReadCommentsCountFun = (req) => {
         })
     }
 };
+
+// For server-side callers, which build the body themselves from ids they have already resolved.
+exports.updateUnReadCommentsCountFun = ({ body = {} } = {}) => applyUnreadCount(body.companyId, body);
 
 
 /**
