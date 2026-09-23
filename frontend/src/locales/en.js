@@ -4260,7 +4260,7 @@ export default {
         doc_create_hint: "The doc is linked to this task and opens for editing.",
         create: "Create",
         page_unsaved: "Unsaved changes",
-        page_edited_by: "Edited by {who} on {when}",
+        page_edited_by_ago: "Edited by {who} · {when}",
         page_discard_confirm: "This doc has unsaved changes. Leave without saving?",
         page_unsaved_lost_on_switch: "You switched projects with unsaved changes — they were not saved.",
         forms: "Forms",

@@ -4941,7 +4941,7 @@
     "Projects.page_delete_confirm": "Delete this doc? This cannot be undone.",
     "Projects.page_delete_with_children": "Delete this doc and every sub-page under it? This cannot be undone.",
     "Projects.page_discard_confirm": "This doc has unsaved changes. Leave without saving?",
-    "Projects.page_edited_by": "Edited by {who} on {when}",
+    "Projects.page_edited_by_ago": "Edited by {who} · {when}",
     "Projects.page_saved": "Saved",
     "Projects.page_saving": "Saving…",
     "Projects.page_title_placeholder": "Doc title",

@@ -110,6 +110,23 @@ describe('Integrations hub', () => {
     });
 });
 
+describe('Doc editor header', () => {
+    const vue = read('views/Pages/PageEditorView.vue');
+
+    test('reads "Edited by X · 4m ago", not "on 4m"', async () => {
+        const en = (await import('../../src/locales/en.js')).default;
+        expect(en.Projects.page_edited_by_ago).toBe('Edited by {who} · {when}');
+        expect(en.Projects.page_edited_by).toBeUndefined();
+        expect(vue).toMatch(/\$t\('Projects\.page_edited_by_ago'/);
+    });
+
+    test('on a phone Present and Share keep only their icons, so Share stays on screen', () => {
+        const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));
+        expect(phone).toMatch(/\.pev__btn-label[^{]*\{\s*display:\s*none/);
+        expect(vue).toMatch(/pev__icon-btn" :aria-label="\$t\('Docs\.share'\)"/);
+    });
+});
+
 describe('Docs hub', () => {
     const vue = read('views/Pages/PagesSpace.vue');
     const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));
