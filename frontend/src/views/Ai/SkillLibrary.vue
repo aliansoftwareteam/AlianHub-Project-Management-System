@@ -31,11 +31,13 @@
                                     <span class="ah-chip ah-chip--sm" :class="riskChip(skill.risk)">{{ $t('Ai.risk') }}: {{ skill.risk }}</span>
                                     <span v-if="skill.retiredAt" class="ah-chip ah-chip--sm ah-chip--danger">{{ $t('Ai.skill_retired') }}</span>
                                     <span v-else-if="skill.enabled === false" class="ah-chip ah-chip--sm">{{ $t('Ai.off') }}</span>
+                                    <span v-if="skill.unavailable" class="ah-chip ah-chip--sm ah-chip--warn">{{ $t('Ai.skill_unavailable') }}</span>
                                 </div>
                                 <p class="ai-agent__scope">{{ skill.description || $t('Ai.skill_no_description') }}</p>
                             </div>
                         </div>
 
+                        <p v-if="skill.unavailable" class="ah-small sk-lib__needs">{{ skill.unavailable.reason }}</p>
                         <p class="ah-small sk-lib__needs">{{ $t('Ai.skill_needs', { what: $t(`Ai.req_${skill.requires ? skill.requires.code : 'task'}`) }) }}</p>
 
                         <div class="ai-agent__skills">
