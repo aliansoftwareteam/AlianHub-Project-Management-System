@@ -75,8 +75,8 @@
                     <option value="trash">{{ $t('Docs.trash') }}</option>
                 </select>
                 <span class="ah-toolbar__spacer"></span>
-                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="createDoc({ isWiki: true })">
-                    <ShellIcon name="book" :size="13" />{{ $t('Docs.new_wiki_page') }}
+                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary hub__wiki-btn" :aria-label="$t('Docs.new_wiki_page')" @click="createDoc({ isWiki: true })">
+                    <ShellIcon name="book" :size="13" /><span class="hub__btn-label">{{ $t('Docs.new_wiki_page') }}</span>
                 </button>
                 <button type="button" class="ah-btn ah-btn--sm ah-btn--primary" @click="createDoc({})">
                     <ShellIcon name="plus" :size="13" />{{ $t('Docs.new_doc') }}
@@ -514,7 +514,8 @@ const WikiTable = defineComponent({
 }
 .hub__search { position: relative; }
 .hub__search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
-.hub__search-input { height: 32px; padding-left: 30px; font-size: 12.5px; }
+/* Two classes: .ah-input loads later and would reset the padding under the icon. */
+.hub__search .hub__search-input { height: 32px; padding-left: 30px; font-size: 12.5px; }
 .hub__nav { display: flex; flex-direction: column; gap: 1px; }
 .hub__label { padding: 0 9px 4px; display: flex; align-items: center; }
 .hub__item {
@@ -626,5 +627,7 @@ const WikiTable = defineComponent({
     .hub__wiki-row { grid-template-columns: 1fr 1fr; }
     .hub__row-project { display: none; }
     .hub__stats { display: none; }
+    .hub__btn-label { display: none; }
+    .hub__wiki-btn { width: 32px; height: 32px; padding: 0; }
 }
 </style>

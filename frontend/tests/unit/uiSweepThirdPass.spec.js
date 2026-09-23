@@ -33,3 +33,17 @@ describe('Planner', () => {
         expect(rule).toMatch(/background:\s*transparent/);
     });
 });
+
+describe('Docs hub', () => {
+    const vue = read('views/Pages/PagesSpace.vue');
+    const phone = vue.slice(vue.indexOf('@media (max-width: 767px)'));
+
+    test('the search padding out-specifies .ah-input, so the placeholder clears the icon', () => {
+        expect(ruleBody(vue, '.hub__search .hub__search-input')).toMatch(/padding-left:\s*30px/);
+    });
+
+    test('on a phone the wiki button keeps only its icon, so New doc stays on screen', () => {
+        expect(vue).toMatch(/hub__wiki-btn"[^>]*:aria-label="\$t\('Docs\.new_wiki_page'\)"/);
+        expect(ruleBody(phone, '.hub__btn-label')).toMatch(/display:\s*none/);
+    });
+});
