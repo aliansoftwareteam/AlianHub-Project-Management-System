@@ -51,7 +51,9 @@ describe('the bulk task update accepts every body the web app sends', () => {
         const [filter, update] = updates[0].data;
         expect(String(filter.ProjectID)).toBe(PROJECT);
         expect(filter.deletedStatusKey).toEqual(wire.findObject.deletedStatusKey);
-        expect(update).toEqual({ $set: wire.updateObject });
+        // fakeMongo keeps a nested "$set" field that the strict schema drops, so pin the written field itself.
+        const requested = (wire.updateObject.$set || wire.updateObject).deletedStatusKey;
+        expect(update).toEqual({ $set: { deletedStatusKey: requested } });
     });
 });
 
