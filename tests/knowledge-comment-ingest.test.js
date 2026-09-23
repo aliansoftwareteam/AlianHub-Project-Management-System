@@ -85,6 +85,7 @@ beforeEach(() => {
     ['page', 'comment', 'transcript'].forEach((sourceType) => mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType, status: 'complete', lastSeenOnAt: new Date() }));
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P1, ProjectName: 'One', isPrivateSpace: false, AssigneeUserId: [], deletedStatusKey: 0 });
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: P2, ProjectName: 'Two', isPrivateSpace: false, AssigneeUserId: [], deletedStatusKey: 0 });
+    mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: OPEN_SPRINT, projectId: P1, name: 'Open' });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, status: 2, isDelete: false, roleType: 1 });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, status: 2, isDelete: false, roleType: 3 });
     getRoleType.mockImplementation(async (companyId, uid) => (uid === OWNER ? 1 : 3));
