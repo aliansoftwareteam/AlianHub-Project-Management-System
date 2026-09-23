@@ -1,7 +1,6 @@
 {
   "locale": "ch",
   "machineTranslated": false,
-  "updatedAt": "2026-09-23T16:23:41.086Z",
   "keys": {
     "AI.ai_answer_questions": "Answer a couple of quick questions so the description is accurate:",
     "AI.ai_desc_add_hint": "AI places your addition where you ask, keeps everything else, and shows the full result to review before applying.",
@@ -1470,6 +1469,7 @@
     "Auth.verify_first_title": "Verify your email first",
     "Auth.verify_ok_body": "You can log in now.",
     "Auth.verify_ok_title": "Email verified",
+    "Auth.verify_resent_body": "We sent a new verification link to your email address. Click it, then log in.",
     "Auth.visibility": "Visibility",
     "Auth.welcome_back": "Welcome back",
     "Auth.work_email": "Work email",
