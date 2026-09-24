@@ -8,6 +8,7 @@
                 :checked="selected"
                 :aria-label="data.TaskName"
                 @click="$emit('select', data, $event)"
+                @keydown.shift="$emit('select', data, $event)"
             />
         </span>
 
