@@ -742,7 +742,15 @@ exports.deleteCompany = async (req, res) => {
             return refuse(400, "Type the company name to confirm the deletion.");
         }
 
-        await dropCompanyDatabase(companyId);
+        const companyRow = { _id: new mongoose.Types.ObjectId(companyId) };
+        const markDeleting = (update) => MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: [companyRow, update] }, "updateOne");
+        await markDeleting({ $set: { deletingAt: new Date() } });
+        try {
+            await dropCompanyDatabase(companyId);
+        } catch (error) {
+            await markDeleting({ $unset: { deletingAt: 1 } }).catch(() => {});
+            throw error;
+        }
 
         const delObj = {
             type: SCHEMA_TYPE.COMPANIES,

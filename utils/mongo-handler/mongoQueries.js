@@ -3,6 +3,7 @@ const { dbCollections } = require('../../Config/collections');
 const mongoose = require('mongoose');
 const { handleConnection } = require("../../middlewares/mongoConnector/mongoConnection")
 const { connections, checkConnectionExists, closeConnection } = require("../../middlewares/mongoConnector/helper")
+const { markRetiring, clearRetiring } = require("../../middlewares/mongoConnector/retiring")
 const {
     timeSheetSchema,
     historySchema,
@@ -687,22 +688,29 @@ const settleSchemaInit = async (database) => {
     }
 };
 
-/* Retires the pooled connection first, so no schema init it started can reach the database after
- * the drop, and a dedicated connection drops it: mongoose.connect would open the process-wide
- * default connection, which refuses to reopen for a second company once active. */
+/* Refuses new connections to the company from the start, then retires the pooled one, so neither
+ * a request arriving mid-deletion nor a schema init the pool started can reach the database after
+ * the drop. A dedicated connection drops it: mongoose.connect would open the process-wide default
+ * connection, which refuses to reopen for a second company once active. */
 exports.dropCompanyDatabase = async (companyId) => {
-    const pooled = checkConnectionExists({ connections, db: companyId });
-    if (pooled) {
-        await settleSchemaInit(pooled.connection);
-        closeConnection(companyId);
-    }
-    const baseUrl = String(process.env.MONGODB_URL || '').replace(/\/+$/, '');
-    const connStr = baseUrl.startsWith('mongodb+srv') ? `${baseUrl}/${companyId}` : `${baseUrl}/${companyId}?authSource=admin`;
-    const connection = await mongoose.createConnection(connStr).asPromise();
+    markRetiring(companyId);
     try {
-        await connection.dropDatabase();
-    } finally {
-        await connection.close();
+        const pooled = checkConnectionExists({ connections, db: companyId });
+        if (pooled) {
+            await settleSchemaInit(pooled.connection);
+            closeConnection(companyId);
+        }
+        const baseUrl = String(process.env.MONGODB_URL || '').replace(/\/+$/, '');
+        const connStr = baseUrl.startsWith('mongodb+srv') ? `${baseUrl}/${companyId}` : `${baseUrl}/${companyId}?authSource=admin`;
+        const connection = await mongoose.createConnection(connStr).asPromise();
+        try {
+            await connection.dropDatabase();
+        } finally {
+            await connection.close();
+        }
+    } catch (error) {
+        clearRetiring(companyId);
+        throw error;
     }
 };
 

@@ -2242,6 +2242,11 @@ const schema = {
             type: String,
             required: false
         },
+        // Set before a deletion drops the database; every process refuses to open the company from then on.
+        deletingAt: {
+            type: Date,
+            required: false
+        },
         Cst_City: {
             type: String,
             required: false

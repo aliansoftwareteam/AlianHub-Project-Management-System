@@ -103,4 +103,29 @@ describe('POST /api/v2/company/delete', () => {
         expect(await client.db('global').collection('companies').countDocuments({ _id: new ObjectId(doomed) })).toBe(0);
         expect(await databaseExists(state.companyId)).toBe(true);
     });
+
+    it('keeps the database gone when requests for the company keep arriving while it is deleted', async () => {
+        const owner = state.users.owner;
+        const doomed = await seedCompany('Busy Co', owner.userId);
+        const session = await loginAs('owner');
+        const scoped = session.api.withCompany(doomed);
+        expect((await scoped.get('/api/v2/agents')).status).toBe(200);
+
+        let deleting = true;
+        const hammer = async () => {
+            const statuses = [];
+            while (deleting) statuses.push((await scoped.get('/api/v2/agents')).status);
+            for (let i = 0; i < 3; i += 1) statuses.push((await scoped.get('/api/v2/agents')).status);
+            return statuses;
+        };
+        const hammering = Promise.all([hammer(), hammer(), hammer(), hammer()]);
+        const res = await scoped.post('/api/v2/company/delete', { companyId: doomed, confirm: 'Busy Co' });
+        deleting = false;
+        const statuses = (await hammering).flat();
+
+        expect(res.status).toBe(200);
+        expect(statuses.slice(-3).every((status) => status >= 400 && status < 500)).toBe(true);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        expect(await databaseExists(doomed)).toBe(false);
+    });
 });
