@@ -407,7 +407,7 @@ html, body, #app {
     background: var(--surface);
     flex: none;
 }
-.ah-toolbar__title { font: 600 15px/1.2 var(--font-ui); letter-spacing: -.2px; display: flex; align-items: center; gap: 10px; }
+.ah-toolbar__title { margin: 0; font: 600 15px/1.2 var(--font-ui); letter-spacing: -.2px; display: flex; align-items: center; gap: 10px; }
 .ah-toolbar__spacer { flex: 1; }
 
 .ah-empty {

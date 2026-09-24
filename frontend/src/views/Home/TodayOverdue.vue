@@ -7,7 +7,7 @@
                 <button type="button" class="ah-tbtn ah-tbtn--icon home__sidebar-toggle" :title="$t('Home.show_sidebar')" @click="homeState.sidebarOpen = !homeState.sidebarOpen">
                     <ShellIcon name="sidebar" :size="15" />
                 </button>
-                <div class="ah-toolbar__title">{{ $t('Home.today_overdue') }}</div>
+                <h1 class="ah-toolbar__title">{{ $t('Home.today_overdue') }}</h1>
                 <span class="ah-toolbar__date">{{ todayLabel }}</span>
                 <div class="ah-toolbar__actions">
                     <StatusChip />
