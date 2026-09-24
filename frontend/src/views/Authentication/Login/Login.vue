@@ -178,6 +178,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth, SESSION_EXPIRED_KEY } from "@/services";
 import * as env from "@/config/env";
 import { publicConfig, enabledProviders } from "@/config/publicConfig";
+import { forgetRememberedEmail, readRememberedEmail, saveRememberedEmail } from "@/utils/rememberedLogin";
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -224,23 +225,6 @@ const sessionExpired = () => {
         return false;
     }
 };
-const REMEMBER_KEY = "remember";
-const parseRemembered = () => {
-    try {
-        return JSON.parse(localStorage.getItem(REMEMBER_KEY) || "null");
-    } catch {
-        return null;
-    }
-};
-const readRememberedEmail = () => {
-    const saved = parseRemembered();
-    const email = saved && typeof saved.email === "string" ? saved.email : "";
-    // Entries written before this version also held the password; rewrite them as email-only.
-    if (email) localStorage.setItem(REMEMBER_KEY, JSON.stringify({ email }));
-    else localStorage.removeItem(REMEMBER_KEY);
-    return email;
-};
-
 onMounted(() => {
     const rememberedEmail = readRememberedEmail();
     if (rememberedEmail) { form.email = rememberedEmail; rememberMe.value = true; }
@@ -275,8 +259,8 @@ const handleSubmit = async () => {
     if (!validate()) return;
     banner.value = null;
     busy.value = true;
-    if (rememberMe.value) localStorage.setItem(REMEMBER_KEY, JSON.stringify({ email: form.email }));
-    else localStorage.removeItem(REMEMBER_KEY);
+    if (rememberMe.value) saveRememberedEmail(form.email);
+    else forgetRememberedEmail();
     try {
         const user = await apiRequestWithoutSecure("post", env.LOGIN, { email: form.email, password: form.password, isLoginType: "frontend" });
         if (user.status !== 200) throw new Error("server");
@@ -292,7 +276,7 @@ const handleSubmit = async () => {
         clearSession();
         localStorage.removeItem("userId");
         localStorage.removeItem("isLogging");
-        localStorage.removeItem(REMEMBER_KEY);
+        forgetRememberedEmail();
         const data = error?.response?.data || {};
         const msg = data.message || error.message;
         if (data.isEmailVerified === false) {

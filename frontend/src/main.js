@@ -2,7 +2,9 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import { initTheme } from '@/components/organisms/Shell/shellState'
+import { readRememberedEmail } from '@/utils/rememberedLogin'
 initTheme()
+readRememberedEmail()
 import store from './store'
 import { firebaseConfigured } from '@/config/firebaseInit';
 import ToastPlugin from 'vue-toast-notification';
