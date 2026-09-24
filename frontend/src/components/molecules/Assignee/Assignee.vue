@@ -1,6 +1,16 @@
 <template>
     <div>
-        <div class="d-flex align-items-center" @click.stop.prevent="!showAddUser ? addUser ? openSidebar() : '' : ''" :id="tourId">
+        <div
+            class="d-flex align-items-center"
+            :role="rowOpensPicker ? 'button' : null"
+            :tabindex="rowOpensPicker ? 0 : null"
+            :aria-label="rowOpensPicker ? $t('ProjectDetails.assignee') : null"
+            :aria-haspopup="rowOpensPicker ? 'dialog' : null"
+            @click.stop.prevent="!showAddUser ? addUser ? openSidebar() : '' : ''"
+            @keydown.enter.self.prevent="rowOpensPicker && openSidebar()"
+            @keydown.space.self.prevent="rowOpensPicker && openSidebar()"
+            :id="tourId"
+        >
             <UserProfile
                 v-for="user in detailedUsers.filter((x, index) => index < numOfUsers)"
                 :key="user._id"
@@ -36,7 +46,17 @@
                 </template>
             </DropDown>
 
-            <img v-if="addUser && (showAddUser || !detailedUsers.length)" :src="addUserIcon" alt="add user" :title="$t('Members.adduser')" class="cursor-pointer add__user" @click.stop="addUser ? openSidebar() : ''" :style="{marginLeft: (detailedUsers.length ? '5px' : '0px'), width: imageWidth, height: imageWidth}" />
+            <button
+                v-if="addUser && (showAddUser || !detailedUsers.length)"
+                type="button"
+                class="assignee__add-btn"
+                aria-haspopup="dialog"
+                :aria-label="$t('Members.adduser')"
+                :title="$t('Members.adduser')"
+                @click.stop="openSidebar()"
+            >
+                <img :src="addUserIcon" alt="" class="cursor-pointer add__user" :style="{marginLeft: (detailedUsers.length ? '5px' : '0px'), width: imageWidth, height: imageWidth}" />
+            </button>
             <span v-if="!addUser && !detailedUsers.length" class="font-size-13">N/A</span>
         </div>
 
@@ -241,6 +261,8 @@ const detailedOptions = computed(() => {
     return res;
 });
 
+const rowOpensPicker = computed(() => props.addUser && !props.showAddUser && detailedUsers.value.length > 0);
+
 function openSidebar () {
     visible.value = true;
     let selectedUserArray = [];
@@ -284,4 +306,5 @@ function openSidebar () {
 .add__user{
     min-width: 25px;
 }
+.assignee__add-btn { display: inline-flex; padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; }
 </style>

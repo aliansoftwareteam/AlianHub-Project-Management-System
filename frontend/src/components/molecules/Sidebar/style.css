@@ -68,3 +68,5 @@
     .listsidebar-search {padding: 15.5px 10px;}
     .converted__sidebar .sidebar-body {background-color: #fff !important;}
 }
+.sidebar-close { display: inline-flex; align-items: center; padding: 0; border: 0; background: none; cursor: pointer; }
+.sidebar-content:focus { outline: none; }

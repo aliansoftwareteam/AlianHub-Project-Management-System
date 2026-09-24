@@ -6,7 +6,7 @@
         </div>
 
         <nav class="ai-side__nav" :aria-label="$t('Ai.title')">
-            <router-link v-for="item in everyday" :key="item.name" class="ai-side__item" :to="{ name: item.name, params: { cid: companyId } }">
+            <router-link v-for="item in everyday" :key="item.name" class="ai-side__item" :to="{ name: item.name, params: { cid: companyId } }" :aria-label="$t(item.label)" :title="$t(item.label)">
                 <ShellIcon :name="item.icon" :size="15" />
                 <span>{{ $t(item.label) }}</span>
                 <span v-if="item.count" class="ai-side__count ah-mono">{{ item.count }}</span>
@@ -27,7 +27,7 @@
                     <ShellIcon class="ai-side__caret" :class="{ 'is-open': setupOpen }" name="chevronDown" :size="13" />
                 </button>
                 <div id="ai-side-setup" v-show="setupOpen" class="ai-side__group-body">
-                    <router-link v-for="item in setup" :key="item.name" class="ai-side__item" :to="{ name: item.name, params: { cid: companyId } }">
+                    <router-link v-for="item in setup" :key="item.name" class="ai-side__item" :to="{ name: item.name, params: { cid: companyId } }" :aria-label="$t(item.label)" :title="$t(item.label)">
                         <ShellIcon :name="item.icon" :size="15" />
                         <span>{{ $t(item.label) }}</span>
                     </router-link>

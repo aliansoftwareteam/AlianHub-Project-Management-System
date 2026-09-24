@@ -2,7 +2,12 @@
     <div
         :class="{'bg-light-blue black': selected && highlight, 'bg-light-gray black': selected && !highlight, 'bg-white': !selected, 'bg-blue white': !selected && highlight}"
         class="sidebar_item_main hover-bg-blue hover-white cursor-pointer d-flex align-items-center justify-content-between mobile-listuser"
+        role="option"
+        tabindex="0"
+        :aria-selected="selected ? 'true' : 'false'"
         @click="$emit('select', item)"
+        @keydown.enter.self.prevent="$emit('select', item)"
+        @keydown.space.self.prevent="$emit('select', item)"
     >
         <div class="d-flex align-items-center assignee-userlist text-capitalize">
             <template v-if="item?.teamColor?.color">

@@ -2,7 +2,7 @@
     <Transition name="ah-detail">
         <div v-if="overlayState.open && overlayState.current" class="ah-detail" :class="{ 'is-expanded': isExpanded }">
             <div v-if="!isExpanded" class="ah-detail__scrim" @click="closeTask()"></div>
-            <aside class="ah-detail__panel" role="dialog" aria-modal="false" :aria-label="$t('TaskPanel.dialog_label')" :style="{ width: panelWidth }">
+            <div ref="panelRef" class="ah-detail__panel" role="dialog" :aria-modal="isExpanded ? 'false' : 'true'" :aria-label="$t('TaskPanel.dialog_label')" tabindex="-1" :style="{ width: panelWidth }">
                 <TaskDetailPanel
                     :key="overlayState.current.taskId"
                     :companyId="overlayState.current.companyId"
@@ -17,7 +17,7 @@
                     @expand="expandTask()"
                     @minimize="minimizeTask()"
                 />
-            </aside>
+            </div>
         </div>
     </Transition>
 
@@ -34,13 +34,14 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, watch } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import TaskDetailPanel from "./TaskDetailPanel.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { initTimer } from "./useTaskTimer";
+import { useFocusTrap } from "@/composable/useFocusTrap";
 import {
     overlayState, isExpanded, bindRouter, openTask, closeTask, expandTask, minimizeTask,
     restoreTask, dismissMinimized, TASK_QUERY_KEY
@@ -61,6 +62,9 @@ const userId = inject("$userId");
 const clientWidth = inject("$clientWidth");
 
 bindRouter(router, route);
+
+const panelRef = ref(null);
+useFocusTrap(panelRef, computed(() => overlayState.open && Boolean(overlayState.current) && !isExpanded.value));
 
 const panelWidth = computed(() => {
     if (isExpanded.value || clientWidth.value < 1024) return "100%";

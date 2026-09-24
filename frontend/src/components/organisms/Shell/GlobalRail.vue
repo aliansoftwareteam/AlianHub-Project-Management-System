@@ -5,14 +5,13 @@
             <span v-else>{{ productInitial }}</span>
         </router-link>
 
-        <div class="ah-rail__items" role="list">
+        <div class="ah-rail__items">
             <router-link
                 v-for="item in rail"
                 :key="item.key"
                 :to="item.to"
                 class="ah-rail__item"
                 :class="{ 'is-active': isActive(item) }"
-                role="listitem"
                 :aria-current="isActive(item) ? 'page' : null"
                 :tabindex="focusIndex(item.key)"
             >

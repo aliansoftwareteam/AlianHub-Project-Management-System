@@ -25,6 +25,7 @@
                     type="button"
                     class="ibx__navitem ibx__navitem--kind"
                     :class="{ 'is-active': kind === k }"
+                    :aria-pressed="kind === k ? 'true' : 'false'"
                     @click="switchKind(k)"
                 >{{ $t('Inbox.kind_' + k) }}</button>
             </div>
@@ -32,9 +33,9 @@
             <div class="ibx__side-foot">{{ $t('Inbox.footer_note') }}</div>
         </aside>
 
-        <main class="ibx__main">
+        <section class="ibx__main">
             <div class="ah-toolbar ibx__toolbar">
-                <span class="ah-toolbar__title">{{ $t('Inbox.title') }}</span>
+                <h1 class="ah-toolbar__title">{{ $t('Inbox.title') }}</h1>
                 <div class="ibx__tabs" role="tablist">
                     <button
                         v-for="t in TABS"
@@ -199,7 +200,7 @@
                     <button type="button" class="ibx__undo-btn" @click="runUndo">{{ $t('Inbox.undo') }}</button>
                 </div>
             </transition>
-        </main>
+        </section>
     </div>
 </template>
 

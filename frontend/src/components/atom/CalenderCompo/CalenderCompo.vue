@@ -56,7 +56,15 @@
             </template>
             <!-- for simple date picker -->
             <template #trigger v-if="range === false">
-                <div v-if="!isShowDateAndicon" class="d-flex">
+                <div
+                    v-if="!isShowDateAndicon"
+                    class="d-flex calendar-trigger"
+                    role="button"
+                    tabindex="0"
+                    :aria-label="ariaLabel || $t('errorPage.select_a_date')"
+                    @keydown.enter.self.prevent="openCalendar"
+                    @keydown.space.self.prevent="openCalendar"
+                >
                     <span :title="convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false})" v-if="dateValue != ''" class="cursor-pointer due_date-listing" :style="[{'color':(typeof dateValue == 'string' ? new Date(dateValue).getTime() < new Date().setHours(0, 0, 0, 0) : dateValue < new Date().setHours(0, 0, 0, 0)) && overdue ? 'red' :'black'}]">
                         {{convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false})}}
                     </span>
@@ -72,6 +80,9 @@
                             type="text"
                             :placeholder="convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false})"
                             :id="inputId"
+                            :aria-label="ariaLabel || null"
+                            @keydown.enter.prevent="openCalendar"
+                            @keydown.space.prevent="openCalendar"
                         >
                         <input
                             v-else
@@ -81,6 +92,9 @@
                             :class="[{'calendar-comp':!calenderImage,'calendar-comp-white':calenderImage}]"
                             :placeholder="props.format ? props.format : settingDateFormat"
                             :id="inputId"
+                            :aria-label="ariaLabel || null"
+                            @keydown.enter.prevent="openCalendar"
+                            @keydown.space.prevent="openCalendar"
                         >
                     </div>
                     <div v-else>
@@ -92,6 +106,9 @@
                             type="text"
                             :placeholder="convertDateAndTime(timeFormate,dateValue,props.format)"
                             :id="inputId"
+                            :aria-label="ariaLabel || null"
+                            @keydown.enter.prevent="openCalendar"
+                            @keydown.space.prevent="openCalendar"
                         >
                         <input
                             v-else
@@ -101,6 +118,9 @@
                             :class="[{'bg-transparent border-0 cursor-pointer':!calenderImage,'calendar-comp-white':calenderImage,'text-ellipse':isEllipsis,'d-block':isEllipsis,'mw-150px':isEllipsis,'date_mw':isTask}]"
                             :placeholder="`${props.format} , ${timeFormate?'24 Hour':'AM/PM'}`"
                             :id="inputId"
+                            :aria-label="ariaLabel || null"
+                            @keydown.enter.prevent="openCalendar"
+                            @keydown.space.prevent="openCalendar"
                         >
                     </div>
                 </div>
@@ -196,6 +216,10 @@ const props = defineProps({
         type: Boolean,
         default: false
     },
+    ariaLabel: {
+        type: String,
+        default: ''
+    },
     inputId: {
         type: String,
         default: 'inputId'
@@ -252,6 +276,7 @@ const props = defineProps({
 const dateValue = ref(props.modelValue);
 const prevaldate = ref(null);
 const datePicker = ref('');
+const openCalendar = () => datePicker.value?.openMenu?.();
 const startDateVal = ref('');
 const endDateVal = ref('');
 const dateImage = require('@/assets/images/svg/date_cion.svg');

@@ -1,5 +1,6 @@
 <template>
-    <section class="lv2__group" role="rowgroup">
+    <div class="lv2__group" role="rowgroup">
+        <div role="row" class="lv2__aria-row"><div role="rowheader" class="lv2__aria-row">
         <button type="button" class="lv2__group-head" :aria-expanded="!!item.isExpanded" @click="$emit('toggle')">
             <span class="lv2__caret" :class="{ 'lv2__caret--open': item.isExpanded }" aria-hidden="true">▸</span>
             <span class="lv2__swatch" :style="{ background: swatch }"></span>
@@ -7,6 +8,7 @@
             <span class="lv2__group-meta">{{ headMeta }}</span>
             <span v-if="wip" class="lv2__wip" :class="{ 'lv2__wip--over': wip.over }">{{ $t('List.wip', { used: wip.used, limit: wip.limit }) }}</span>
         </button>
+        </div></div>
 
         <template v-if="item.isExpanded">
             <draggable
@@ -51,9 +53,11 @@
                 </template>
             </draggable>
 
-            <p v-if="!rows.length" class="lv2__empty-group">{{ $t('List.group_empty') }}</p>
+            <div v-if="!rows.length" role="row" class="lv2__aria-row"><div role="cell" class="lv2__aria-row">
+                <p class="lv2__empty-group">{{ $t('List.group_empty') }}</p>
+            </div></div>
 
-            <div v-if="creating" class="lv2__create">
+            <div v-if="creating" role="row" class="lv2__aria-row"><div role="cell" class="lv2__create">
                 <CreateTask
                     :sprint="sprint"
                     :assigneeOptions="project.AssigneeUserId"
@@ -63,12 +67,14 @@
                     @cancel="creating = false"
                     @submit="onCreated"
                 />
-            </div>
-            <button v-else-if="canCreate" type="button" class="lv2__add" @click="creating = true">
-                <span class="lv2__add-plus">+</span>{{ $t('List.add_task_to', { group: groupName }) }}
-            </button>
+            </div></div>
+            <div v-else-if="canCreate" role="row" class="lv2__aria-row"><div role="cell" class="lv2__aria-row">
+                <button type="button" class="lv2__add" @click="creating = true">
+                    <span class="lv2__add-plus">+</span>{{ $t('List.add_task_to', { group: groupName }) }}
+                </button>
+            </div></div>
         </template>
-    </section>
+    </div>
 </template>
 
 <script setup>

@@ -67,7 +67,8 @@
     --shadow-card: 0 2px 6px rgba(0, 0, 0, .04);
     --shadow-pop: 0 18px 44px rgba(0, 0, 0, .18);
     --shadow-modal: 0 30px 80px rgba(0, 0, 0, .35);
-    --focus: 0 0 0 3px var(--brand-ring);
+    /* A solid 2px brand ring: the 12% tint it replaced measured about 1.2:1 against white (WCAG 1.4.11 needs 3:1). */
+    --focus: 0 0 0 2px var(--brand);
 
     --rail-w: 60px;
     --sidebar-w: 236px;
@@ -406,7 +407,7 @@ html, body, #app {
     background: var(--surface);
     flex: none;
 }
-.ah-toolbar__title { font: 600 15px/1.2 var(--font-ui); letter-spacing: -.2px; display: flex; align-items: center; gap: 10px; }
+.ah-toolbar__title { margin: 0; font: 600 15px/1.2 var(--font-ui); letter-spacing: -.2px; display: flex; align-items: center; gap: 10px; }
 .ah-toolbar__spacer { flex: 1; }
 
 .ah-empty {
@@ -436,7 +437,22 @@ html, body, #app {
 .ah-slide-right-enter-active, .ah-slide-right-leave-active { transition: transform var(--t-panel) var(--ease), opacity var(--t-panel) var(--ease); }
 .ah-slide-right-enter-from, .ah-slide-right-leave-to { transform: translateX(24px); opacity: 0; }
 
+/* Transitions only: spinners and progress bars keep turning, since a frozen one reads as "stuck". */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        transition-duration: .01ms !important;
+        transition-delay: 0s !important;
+        scroll-behavior: auto !important;
+    }
+}
+
 .ah-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Zero specificity: a control that draws its own focus state keeps it; one that drew none gets this ring. */
+:where(a[href], button, summary, [role="button"], [role="tab"], [role="option"], [role="menuitem"], [role="link"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+}
 
 /* Compatibility aliases for the Pages components until they are restyled. */
 :root {

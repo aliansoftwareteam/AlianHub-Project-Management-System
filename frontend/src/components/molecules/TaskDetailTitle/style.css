@@ -11,6 +11,23 @@
 }
 /* copy.png is a black glyph; inverting it keeps it visible on the dark panel. */
 :root[data-theme="dark"] .task-name .copy-icon { filter: invert(1); }
+.task-name .title-name__edit {
+    display: block;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: inherit;
+    text-transform: inherit;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: text;
+}
+.task-name .copy-icon__btn { display: inline-flex; align-items: center; padding: 0; border: 0; background: none; cursor: pointer; }
+.task-name .title-name__edit:focus-visible, .task-name .copy-icon__btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
 .task-name .title-name {
     text-overflow: ellipsis;
     overflow: hidden;
