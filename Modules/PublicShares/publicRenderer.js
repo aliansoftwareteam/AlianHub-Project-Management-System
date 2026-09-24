@@ -51,7 +51,8 @@ const PAGE_STYLE = `
     .pg-live{display:flex;flex-direction:column;flex:1;min-height:0}
     .pg-live.is-loading{opacity:.55}
     .dk__bar{display:flex;align-items:center;gap:6px;flex:0 0 46px;height:46px;padding:0 16px;border-bottom:1px solid #eef0f3;font-size:13px;background:#fff;overflow:hidden;white-space:nowrap}
-    .crumb{display:inline-flex;align-items:center;gap:5px;color:#6b7280;text-decoration:none;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+    .crumb{display:inline-block;color:#6b7280;text-decoration:none;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .crumb .ic{margin-right:5px}
     a.crumb:hover{color:#111}
     .crumb.is-last{color:#111;font-weight:600}
     .crumb-sep{color:#c9ccd6}

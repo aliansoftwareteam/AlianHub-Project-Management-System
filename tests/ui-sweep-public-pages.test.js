@@ -38,6 +38,13 @@ describe('public share pages', () => {
         expect(contrast(colour, background)).toBeGreaterThanOrEqual(4.5);
     });
 
+    test('a long page title in the breadcrumb ends in an ellipsis instead of being cut mid-letter', () => {
+        const crumb = /\n {4}\.crumb\{([^}]*)\}/.exec(css)[1];
+        expect(crumb).toMatch(/display:inline-block/);
+        expect(crumb).toMatch(/text-overflow:ellipsis/);
+        expect(crumb).toMatch(/white-space:nowrap/);
+    });
+
     test('the share buttons keep white text at 4.5:1', () => {
         const button = /\n {4}button\{margin-top:14px;background:(#[0-9a-f]{6})/.exec(css);
         expect(contrast('#ffffff', button[1])).toBeGreaterThanOrEqual(4.5);
