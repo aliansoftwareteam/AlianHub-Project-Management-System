@@ -32,6 +32,12 @@ export function taskInGroup(task, item) {
     return task[item.searchKey] === item.searchValue;
 }
 
+export function groupLabel(item) {
+    if (item?.searchKey !== "AssigneeUserId") return item?.name;
+    const names = (item.users || []).map((user) => user?.Employee_Name).filter(Boolean);
+    return names.length ? names.join(", ") : item.name;
+}
+
 export function listSourceTasks({ searched, searchedTasks, storeTasks, sprintId }) {
     if (!searched) return storeTasks || [];
     return (searchedTasks || []).filter((task) => task.sprintId === sprintId);

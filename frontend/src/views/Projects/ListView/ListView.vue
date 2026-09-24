@@ -82,7 +82,7 @@
                                 >
                                     <span class="lv2__caret" aria-hidden="true">▸</span>
                                     <span class="lv2__swatch" :style="{ background: item.textColor || 'var(--ink-3)' }"></span>
-                                    {{ item.name }}
+                                    {{ groupLabel(item) }}
                                     <span class="lv2__collapsed-count">{{ groupCount(sprint, item) }}</span>
                                 </button>
                                 </div></div>
@@ -141,7 +141,7 @@ import { useCustomComposable } from '@/composable';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { useProjectAgentActivity } from './useProjectAgentActivity.js';
 import * as listGroups from './listGroups.js';
-import { groupCountsFor, listSourceTasks } from './listFilter.js';
+import { groupCountsFor, groupLabel, listSourceTasks } from './listFilter.js';
 import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 

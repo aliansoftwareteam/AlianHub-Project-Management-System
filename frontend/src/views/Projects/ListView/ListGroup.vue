@@ -89,7 +89,7 @@ import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { useListDragDrop } from "./useListDragDrop.js";
 import { useProjectAgentActivity } from "./useProjectAgentActivity.js";
 import { hasSubtasks, indexProgress, pendingExpandIds, progressQuery, progressSignature } from "./subtaskProgress";
-import { groupRows, listSourceTasks, searchExpandIds } from "./listFilter";
+import { groupLabel, groupRows, listSourceTasks, searchExpandIds } from "./listFilter";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 
@@ -142,11 +142,7 @@ const groupTasks = computed(() => groupRows(sourceTasks.value, props.item, showA
 const rows = ref([]);
 watch(groupTasks, (value) => { rows.value = [...value]; }, { immediate: true, deep: true });
 
-const groupName = computed(() => {
-    if (props.item.searchKey !== "AssigneeUserId") return props.item.name;
-    const users = props.item.users || [];
-    return users.length ? users.map((user) => user.Employee_Name).join(", ") : props.item.name;
-});
+const groupName = computed(() => groupLabel(props.item));
 const swatch = computed(() => props.item.textColor || "var(--ink-3)");
 
 const estimateHours = computed(() => {

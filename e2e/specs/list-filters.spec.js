@@ -71,7 +71,7 @@ test.describe('List view filters', () => {
         await expect(page.locator('.lv2__row .lv2__name')).toHaveCount(2);
 
         await page.getByRole('button', { name: 'Group by' }).click();
-        await page.locator('#group_by').getByText('Assignee', { exact: true }).click();
+        await page.locator('.drop-down-menu').getByText('Assignee', { exact: true }).click();
         const unassigned = page.locator('.lv2__group').filter({ has: page.locator('.lv2__group-name', { hasText: 'Unassigned' }) });
         await expect(unassigned.locator('.lv2__name')).toHaveText([`Nobody ${suffix}`]);
 

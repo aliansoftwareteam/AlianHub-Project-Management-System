@@ -20,7 +20,7 @@ vi.mock('@/views/Projects/ListView/useProjectAgentActivity.js', () => ({
 vi.mock('@/views/Projects/ListView/useListDragDrop.js', () => ({ useListDragDrop: () => ({ applyDrag: vi.fn() }) }));
 
 import ListGroup from '@/views/Projects/ListView/ListGroup.vue';
-import { groupRows, listSourceTasks, groupCountsFor, taskInGroup, searchExpandIds } from '@/views/Projects/ListView/listFilter';
+import { groupLabel, groupRows, listSourceTasks, groupCountsFor, taskInGroup, searchExpandIds } from '@/views/Projects/ListView/listFilter';
 import { assigneeGroups, assigneeCondition } from '@/views/Projects/taskGroups';
 import en from '@/locales/en';
 
@@ -168,6 +168,14 @@ describe('grouping by assignee', () => {
     test('the server query fetches a member\'s tasks by membership and unassigned tasks by emptiness', () => {
         expect(assigneeCondition(ME)).toEqual({ AssigneeUserId: { $in: [ME] } });
         expect(assigneeCondition('')).toEqual({ AssigneeUserId: { $in: [null, []] } });
+    });
+});
+
+describe('group labels', () => {
+    test('an assignee group reads as the person, collapsed or open; other groups keep their name', () => {
+        expect(groupLabel({ searchKey: 'AssigneeUserId', name: 'Assignee', users: [{ Employee_Name: 'Olivia Owner' }] })).toBe('Olivia Owner');
+        expect(groupLabel({ searchKey: 'AssigneeUserId', name: 'Unassigned', users: [] })).toBe('Unassigned');
+        expect(groupLabel({ searchKey: 'statusKey', name: 'To Do' })).toBe('To Do');
     });
 });
 
