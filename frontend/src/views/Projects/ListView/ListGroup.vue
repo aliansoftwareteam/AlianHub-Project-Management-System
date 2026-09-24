@@ -249,7 +249,6 @@ function onDragChange(event) {
 }
 
 function onCreated(payload) {
-    creating.value = false;
     const created = payload?.data;
     if (!created) return;
     if (props.groupType === 0 && created.statusKey !== props.item.key) {
