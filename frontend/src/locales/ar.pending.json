@@ -1388,7 +1388,7 @@
     "Auth.join_lead": "You're joining {workspace}. Free forever on your own server. No card.",
     "Auth.joining_team": "Joining a team?",
     "Auth.keep_signed_in": "Keep me signed in on this device",
-    "Auth.keep_signed_in_hint": "30-day token, no stored password",
+    "Auth.keep_signed_in_hint": "Remembers your email on this device. Your password is never stored.",
     "Auth.key_required": "Add a short key.",
     "Auth.key_taken": "That key is used by another project.",
     "Auth.lastName": "Last Name",

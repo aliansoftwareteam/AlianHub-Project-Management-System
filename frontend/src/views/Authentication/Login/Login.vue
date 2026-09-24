@@ -178,6 +178,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth, SESSION_EXPIRED_KEY } from "@/services";
 import * as env from "@/config/env";
 import { publicConfig, enabledProviders } from "@/config/publicConfig";
+import { forgetRememberedEmail, readRememberedEmail, saveRememberedEmail } from "@/utils/rememberedLogin";
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -224,14 +225,9 @@ const sessionExpired = () => {
         return false;
     }
 };
-const encode = (str) => Array.from(str).map((c) => c.charCodeAt(0)).join(", ");
-const decode = (src) => String.fromCharCode.apply(null, src.split(","));
-
 onMounted(() => {
-    try {
-        const rem = JSON.parse(localStorage.getItem("remember") || "null");
-        if (rem) { form.email = rem.email; form.password = decode(rem.password); rememberMe.value = true; }
-    } catch { /* ignore */ }
+    const rememberedEmail = readRememberedEmail();
+    if (rememberedEmail) { form.email = rememberedEmail; rememberMe.value = true; }
     if (sessionExpired()) banner.value = { kind: "warn", text: t("Auth.session_expired") };
     if (route.query.reason === "expired") banner.value = { kind: "warn", text: t("Auth.two_factor_session_expired") };
     if (route.query.magic === "invalid") banner.value = { kind: "danger", text: t("Auth.magic_invalid") };
@@ -263,8 +259,8 @@ const handleSubmit = async () => {
     if (!validate()) return;
     banner.value = null;
     busy.value = true;
-    if (rememberMe.value) localStorage.setItem("remember", JSON.stringify({ email: form.email, password: encode(form.password) }));
-    else localStorage.removeItem("remember");
+    if (rememberMe.value) saveRememberedEmail(form.email);
+    else forgetRememberedEmail();
     try {
         const user = await apiRequestWithoutSecure("post", env.LOGIN, { email: form.email, password: form.password, isLoginType: "frontend" });
         if (user.status !== 200) throw new Error("server");
@@ -280,7 +276,7 @@ const handleSubmit = async () => {
         clearSession();
         localStorage.removeItem("userId");
         localStorage.removeItem("isLogging");
-        localStorage.removeItem("remember");
+        forgetRememberedEmail();
         const data = error?.response?.data || {};
         const msg = data.message || error.message;
         if (data.isEmailVerified === false) {
