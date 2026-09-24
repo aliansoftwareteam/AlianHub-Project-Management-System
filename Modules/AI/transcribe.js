@@ -45,9 +45,14 @@ const formFor = (req, model) => {
     return form;
 };
 
+const NOT_CONFIGURED = { status: 503, body: { status: false, statusText: 'Speech-to-text is not configured.' } };
+
+const configured = (compatible) => (compatible
+    ? !!String(process.env.OPENAI_COMPATIBLE_BASE_URL || '').trim()
+    : !!(config.OPENAI_API_KEY || config.AI_API_KEY));
+
 async function viaCompatible(req, model) {
     const baseUrl = String(process.env.OPENAI_COMPATIBLE_BASE_URL || '').trim();
-    if (!baseUrl) return { status: 503, body: { status: false, statusText: 'Speech-to-text is not configured.' } };
     try {
         const response = await compatibleClient.request({ baseUrl, path: '/audio/transcriptions', body: formFor(req, model), apiKey: await apiKeyFor('openai_compatible'), timeoutMs: TRANSCRIBE_TIMEOUT_MS });
         const text = response.data && typeof response.data.text === 'string' ? response.data.text.trim() : '';
@@ -61,7 +66,6 @@ async function viaCompatible(req, model) {
 
 async function viaOpenAi(req, model) {
     const apiKey = config.OPENAI_API_KEY || config.AI_API_KEY;
-    if (!apiKey) return { status: 503, body: { status: false, statusText: 'Speech-to-text is not configured.' } };
     const response = await fetch(`${openaiProvider.baseUrl()}/audio/transcriptions`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}` },
@@ -87,11 +91,13 @@ exports.transcribe = [
                 if (!aiSwitch.isAiOff(error)) throw error;
                 return res.status(403).json({ status: false, code: aiSwitch.AI_OFF, statusText: error.message });
             }
+            const compatible = embeddingProviderName() === 'openai_compatible';
+            if (!configured(compatible)) return res.status(NOT_CONFIGURED.status).json(NOT_CONFIGURED.body);
             if (!req.file || !req.file.buffer || !req.file.buffer.length) {
                 return res.status(400).json({ status: false, statusText: 'No audio received (field name: file).' });
             }
             const model = config.WHISPER_MODEL || process.env.WHISPER_MODEL || 'whisper-1';
-            const outcome = embeddingProviderName() === 'openai_compatible' ? await viaCompatible(req, model) : await viaOpenAi(req, model);
+            const outcome = compatible ? await viaCompatible(req, model) : await viaOpenAi(req, model);
             return res.status(outcome.status).json(outcome.body);
         } catch (e) {
             logger.error(`transcribe error: ${e && e.message ? e.message : e}`);
