@@ -326,6 +326,7 @@ module.exports.GET_CHANGELOG = '/api/v2/changelog';
 module.exports.TASKS_BY_STATUS = '/api/v1/dashboard/tasks-by-status';
 module.exports.INBOX = '/api/v1/inbox';
 module.exports.GLOBAL_SEARCH = '/api/v2/search';
+module.exports.RECENT_VISITS = '/api/v2/recent-visits';
 module.exports.USER_SESSIONS = '/api/v2/users/sessions';
 module.exports.NOTIFICATION_PREFERENCES = '/api/v1/notifications/preferences';
 module.exports.PAGES = '/api/v2/pages';
