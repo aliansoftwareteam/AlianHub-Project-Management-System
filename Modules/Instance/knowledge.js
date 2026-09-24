@@ -43,6 +43,7 @@ const CODE = Object.freeze({
     NOT_HYBRID: 'not_hybrid',
     EMBEDDING_UNCONFIGURED: 'embedding_unconfigured',
     EMBEDDING_PAUSED: 'embedding_paused',
+    AI_OFF: 'ai_off',
     REEMBED_RUNNING: 'reembed_running',
     REINDEX_NOT_RUNNING: 'reindex_not_running',
     NOTHING_ERASED: 'nothing_erased',
@@ -59,6 +60,7 @@ const REFUSALS = {
     [CODE.NOT_HYBRID]: [409, 'Re-embedding needs the workspace in hybrid retrieval mode.'],
     [CODE.EMBEDDING_UNCONFIGURED]: [409, 'No embedding key is configured for the instance.'],
     [CODE.EMBEDDING_PAUSED]: [409, 'Embedding is paused for this workspace: its budget is spent or the provider kept failing.'],
+    [CODE.AI_OFF]: [409, 'AI is turned off for this instance or workspace, so nothing is embedded.'],
     [CODE.REEMBED_RUNNING]: [409, 'A re-embed of this workspace is already running.'],
     [CODE.REINDEX_NOT_RUNNING]: [409, 'No re-index of this source is running.'],
 };

@@ -11,6 +11,7 @@
                 </span>
             </div>
 
+            <AiModelNotice />
             <div class="ai-inbox" :class="{ 'ai-inbox--detail': selected || selectedApproval }">
                 <div class="ai-inbox__list ah-scroll">
                     <div class="ai-inbox__tabs">
@@ -150,6 +151,7 @@
 </template>
 
 <script setup>
+import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vue';
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";

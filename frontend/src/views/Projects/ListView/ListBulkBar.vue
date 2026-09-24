@@ -18,7 +18,7 @@
             </div>
         </span>
 
-        <span class="lv2-bulk__menu-wrap">
+        <span v-if="aiUsable" class="lv2-bulk__menu-wrap">
             <button type="button" class="lv2-bulk__btn lv2-bulk__btn--ai" :disabled="working" @click.stop="toggle('ai')">✦ {{ $t('List.ask_ai') }}</button>
             <div v-if="open === 'ai'" class="lv2-bulk__menu" @click.stop>
                 <button type="button" class="lv2-bulk__item" @click="summarise">{{ $t('List.ai_summarise') }}</button>
@@ -46,6 +46,7 @@
 
 <script setup>
 import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
+import { aiUsable } from "@/composable/aiAvailability";
 import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";

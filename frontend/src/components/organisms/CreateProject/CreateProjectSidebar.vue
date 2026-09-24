@@ -38,7 +38,7 @@
                             </template>
                             <div v-if="search && !shownGlobal.length && !shownCustom.length" class="ah-cp__empty">{{ $t('Auth.no_templates_match') }}</div>
                         </template>
-                        <button type="button" class="ah-cp__tpl" @click="aiOpen = true">
+                        <button v-if="aiUsable" type="button" class="ah-cp__tpl" @click="aiOpen = true">
                             <span class="ah-cp__tpl-icon ah-cp__tpl-icon--agent"><ShellIcon name="ai" :size="15" /></span>
                             <span><span class="ah-cp__tpl-name">{{ $t('Auth.from_description') }}</span><span class="ah-cp__tpl-desc">{{ $t('Auth.from_description_desc') }}</span></span>
                         </button>
@@ -152,6 +152,7 @@
 
 <script setup>
 import { computed, inject, nextTick, onMounted, reactive, ref, watch } from "vue";
+import { aiUsable } from "@/composable/aiAvailability";
 
 defineOptions({ name: "CreateProjectSidebar" });
 import { useRoute, useRouter } from "vue-router";

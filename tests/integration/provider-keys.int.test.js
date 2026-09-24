@@ -99,7 +99,7 @@ describe('workspace provider keys through the real routes', () => {
         expect(await mappingOf()).toMatchObject({ openai: before.openai });
         const listed = await owner.get(ROUTE);
         expect(listed.status).toBe(200);
-        expect(listed.body.data.map((row) => row.provider).sort()).toEqual(['anthropic', 'deepseek', 'google', 'openai']);
+        expect(listed.body.data.map((row) => row.provider).sort()).toEqual(['anthropic', 'deepseek', 'google', 'openai', 'openai_compatible']);
         expect(JSON.stringify(listed.body)).not.toContain(SECOND);
         await withDb(async (db) => {
             expect(JSON.stringify(await db.collection('secrets').find({}).toArray())).not.toContain(SECOND);

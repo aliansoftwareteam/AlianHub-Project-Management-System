@@ -29,6 +29,7 @@
                 -->
                 <SettingScreenshotRetention />
                 <SettingAutoCloseProjects />
+                <SettingAiSwitch />
                 <SettingTimeReminder />
             </div>
         </div>
@@ -48,6 +49,7 @@ import SettingProjectSkills from "@/components/molecules/Setting/SettingProjectS
 import SettingCurrency from "@/components/molecules/Setting/SettingCurrencys.vue";
 import SettingScreenshotRetention from "@/components/molecules/Setting/SettingScreenshotRetention.vue";
 import SettingAutoCloseProjects from "@/components/molecules/Setting/SettingAutoCloseProjects.vue";
+import SettingAiSwitch from "@/components/molecules/Setting/SettingAiSwitch.vue";
 import SettingTimeReminder from "@/components/molecules/Setting/SettingTimeReminder.vue";
 import { defineComponent} from "vue";
 import { useCustomComposable } from '@/composable';

@@ -107,7 +107,7 @@ describe('who may manage workspace provider keys', () => {
             const res = await ask(ctrl.listProviderKeys, uid);
             expect(res.statusCode).toBe(200);
             expect(res.body.status).toBe(true);
-            expect(res.body.data.map((row) => row.provider).sort()).toEqual(['anthropic', 'deepseek', 'google', 'openai']);
+            expect(res.body.data.map((row) => row.provider).sort()).toEqual(['anthropic', 'deepseek', 'google', 'openai', 'openai_compatible']);
             expect(JSON.stringify(res.body)).not.toContain(VALUE);
         }
         const row = (await ask(ctrl.listProviderKeys, OWNER)).body.data.find((r) => r.provider === 'openai');

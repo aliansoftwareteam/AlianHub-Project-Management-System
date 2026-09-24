@@ -126,7 +126,18 @@ function envPricing() {
     return prices;
 }
 
-const pricing = () => ({ ...DEFAULT_PRICING, ...envPricing() });
+/* A model the instance serves itself through the OpenAI-compatible provider costs nothing per
+ * token, so it is priced at zero rather than refused as unpriced. It sits under the defaults, so a
+ * gateway that reuses a vendor model id keeps the vendor's price, and LLM_PRICING overrides both. */
+function selfHostedPricing() {
+    if (!String(process.env.OPENAI_COMPATIBLE_BASE_URL || '').trim()) return {};
+    return Object.fromEntries(['OPENAI_COMPATIBLE_MODEL', 'OPENAI_COMPATIBLE_EMBEDDINGS_MODEL']
+        .map((key) => String(process.env[key] || '').trim().toLowerCase())
+        .filter(Boolean)
+        .map((model) => [model, { input: 0, output: 0 }]));
+}
+
+const pricing = () => ({ ...selfHostedPricing(), ...DEFAULT_PRICING, ...envPricing() });
 
 function emptyUsage() {
     return { inputTokens: 0, outputTokens: 0, totalTokens: 0 };

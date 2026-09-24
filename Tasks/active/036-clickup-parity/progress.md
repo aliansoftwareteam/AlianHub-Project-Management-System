@@ -2,11 +2,12 @@
 
 - [x] 1 Command palette (feat/command-palette-parity)
 - [x] 3 Task detail navigation and quick actions (feat/task-detail-navigation)
-- [ ] 5 Self-hosted AI endpoints
-- [x] 2 Inbox snooze and cleared (PR pending review)
+- [x] 5 Self-hosted AI endpoints (feat/openai-compatible-endpoints)
+- [x] 2 Inbox snooze and cleared (feat/inbox-snooze-cleared)
 
 ## Log
 - 2026-09-24: owner chose items 1, 3, 5 and 2 from the ClickUp comparison; four slices started in parallel.
 - 2026-09-24: slice 2 built on `feat/inbox-snooze-cleared`. Snooze is stored on the notification (per reader on a mention) and returns as unread when due, checked on each Inbox read; "until it changes" returns on the next notice about the same task. Cleared rows are purged 30 days after clearing (TTL on `notifications.clearedAt`; a mention gets `purgeAt` once its last reader clears it). Other = updates stamped `reason: 'watching'` at send time: a task update where the reader is not the creator, an assignee or mentioned, or a project update where they are not a lead or mentioned; mentions, reminders, chat, agent notices and rows sent before this change stay in Primary. Browser-stored Later entries move to a server snooze until tomorrow 9:00 on first load.
 - 2026-09-24: slice 1 built: Cmd+K on macOS and Ctrl+K elsewhere, no plan gate, type chips, location and age, row actions (open, new tab, copy link, Ask AI), recently opened tasks, dialog/listbox semantics and axe check; search rows unchanged in who sees them.
 - 2026-09-24: slice 3 built: previous/next arrows and j/k (arrows on the header) walk the list, board or table the task was opened from, including shown subtasks, with history entries for back, forward and reload; no arrows from Inbox or links; copy key and copy link in the header; one-click complete beside the status; a quiet row under the description for subtask, relation, checklist and file; empty properties read Empty and open in one click or Enter; the overlay stops focusing the comment box on load.
+- 2026-09-24: slice 5 built on feat/openai-compatible-endpoints: OpenAI-compatible provider (chat, embeddings, speech-to-text) behind a dedicated client, OPENAI_BASE_URL, Test connection with the model list, and an instance and workspace AI off switch with no-provider and off states in the UI. Dark mode and 390 px screenshots still to take.

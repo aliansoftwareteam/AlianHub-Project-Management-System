@@ -182,7 +182,7 @@ describe('management', () => {
         seedMapping(COMPANY, { openai: stored.aiProviderKeys.openai, anthropic: made.handle });
         await store.revoke({ companyId: COMPANY, handle: made.handle, actor });
         const listed = await keys.listKeys({ companyId: COMPANY });
-        expect(listed.map((row) => row.provider).sort()).toEqual(['anthropic', 'deepseek', 'google', 'openai']);
+        expect(listed.map((row) => row.provider).sort()).toEqual(['anthropic', 'deepseek', 'google', 'openai', 'openai_compatible']);
         expect(JSON.stringify(listed)).not.toContain(WORKSPACE_VALUE);
         expect(JSON.stringify(listed)).not.toContain(OTHER_VALUE);
         expect(listed.find((row) => row.provider === 'openai')).toMatchObject({ set: true });

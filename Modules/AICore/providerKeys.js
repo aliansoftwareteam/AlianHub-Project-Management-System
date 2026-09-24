@@ -21,6 +21,7 @@ const instanceKeyOf = (provider) => {
         case 'anthropic': return process.env.ANTHROPIC_API_KEY || '';
         case 'deepseek': return config.DEEPSEEK_API_KEY || '';
         case 'google': return process.env.GOOGLE_API_KEY || '';
+        case 'openai_compatible': return process.env.OPENAI_COMPATIBLE_API_KEY || '';
         default: return '';
     }
 };

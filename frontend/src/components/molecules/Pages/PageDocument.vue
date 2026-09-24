@@ -112,7 +112,7 @@
             </div>
 
             <PageComposeRail
-                v-if="mode === 'edit'"
+                v-if="mode === 'edit' && aiUsable"
                 ref="composeRail"
                 :page-id="String(page._id)"
                 :title="draftTitle"
@@ -168,6 +168,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { aiUsable } from "@/composable/aiAvailability";
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'vuex';

@@ -3,6 +3,7 @@
  * takes effect on save. Labels and help are English on purpose: the page
  * translates group and field names through InstanceV2.*, these are the fallback. */
 const { allowlistError } = require('../Webhooks/helpers/privateHostAllowlist');
+const { baseUrlError } = require('../AICore/llmProvider/compatibleClient');
 
 const GROUPS = ['general', 'mail', 'storage', 'ai', 'auth', 'calling', 'security'];
 
@@ -30,9 +31,30 @@ const CATALOG = [
     field('IAM_ENDPOINT', 'storage', 'text', { default: 'https://iam.wasabisys.com', label: 'IAM endpoint', restart: true }),
     field('USERPROFILEBUCKET', 'storage', 'text', { label: 'Public assets bucket', restart: true }),
 
-    field('LLM_PROVIDER', 'ai', 'select', { default: 'openai', options: ['openai', 'anthropic', 'deepseek'], label: 'Provider' }),
+    field('AI_ENABLED', 'ai', 'boolean', {
+        default: 'true',
+        label: 'AI features',
+        help: 'Off stops every AI call on this instance: nothing is sent to any model, AI screens say AI is turned off, and background AI work is skipped.',
+    }),
+    field('LLM_PROVIDER', 'ai', 'select', { default: 'openai', options: ['openai', 'anthropic', 'deepseek', 'openai_compatible'], label: 'Provider' }),
     field('AI_API_KEY', 'ai', 'secret', { label: 'OpenAI API key' }),
     field('AI_MODEL', 'ai', 'text', { default: 'gpt-4.1', label: 'OpenAI model' }),
+    field('OPENAI_BASE_URL', 'ai', 'text', {
+        label: 'OpenAI base URL',
+        help: "Empty uses OpenAI's own API. Set it only to reach OpenAI through a proxy or a regional endpoint.",
+        validate: baseUrlError,
+    }),
+    field('OPENAI_COMPATIBLE_BASE_URL', 'ai', 'text', {
+        label: 'OpenAI-compatible base URL',
+        help: 'A server that speaks the OpenAI API on your own network, e.g. http://localhost:11434/v1 (Ollama), http://host:8000/v1 (vLLM) or http://host:1234/v1 (LM Studio). Private and loopback addresses are allowed here.',
+        validate: baseUrlError,
+    }),
+    field('OPENAI_COMPATIBLE_API_KEY', 'ai', 'secret', { label: 'OpenAI-compatible API key', help: 'Leave empty when the server needs none (Ollama, LM Studio).' }),
+    field('OPENAI_COMPATIBLE_MODEL', 'ai', 'text', { label: 'OpenAI-compatible chat model', help: 'The model name the server knows, e.g. llama3.1:8b.' }),
+    field('OPENAI_COMPATIBLE_EMBEDDINGS_MODEL', 'ai', 'text', {
+        label: 'OpenAI-compatible embeddings model',
+        help: 'Used for knowledge search, e.g. nomic-embed-text. Changing it means re-embedding each workspace under Instance › Knowledge.',
+    }),
     field('ANTHROPIC_API_KEY', 'ai', 'secret', { label: 'Anthropic API key' }),
     field('ANTHROPIC_MODEL', 'ai', 'text', { default: 'claude-sonnet-4-5-20250929', label: 'Anthropic model' }),
     field('DEEPSEEK_API_KEY', 'ai', 'secret', { label: 'DeepSeek API key' }),

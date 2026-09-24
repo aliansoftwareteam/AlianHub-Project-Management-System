@@ -30,7 +30,7 @@ const BILLING_URL = {
     deepseek: 'https://platform.deepseek.com/top_up',
     google: 'https://console.cloud.google.com/billing',
 };
-const LABEL = { openai: 'OpenAI', anthropic: 'Anthropic', deepseek: 'DeepSeek', google: 'Google' };
+const LABEL = { openai: 'OpenAI', anthropic: 'Anthropic', deepseek: 'DeepSeek', google: 'Google', openai_compatible: 'OpenAI-compatible endpoint' };
 
 /* Callers such as the project generator show this message to the person who asked,
  * so the types a person can act on keep a sentence that says what to do. */

@@ -347,6 +347,8 @@ const verifyJWTTokenWithCRoute = [
     '/api/v2/secrets',
     // Workspace provider keys by handle (Modules/ProviderKeys): owner or admin only, never an API token; metadata only.
     '/api/v2/provider-keys',
+    // The AI switch (Modules/AiSwitch): any member reads the state, only an owner or admin changes it.
+    "/api/v2/ai-switch",
     // Not listed, on purpose (Modules/OAuthServer, MCP_OAUTH): /.well-known/oauth-authorization-server and /oauth/* are
     // public by design, since a client reaches them before anyone holds a token and the token endpoint authenticates
     // the client itself; /api/v2/oauth-clients, /api/v2/oauth-client-approvals and /api/v2/oauth-grants check the

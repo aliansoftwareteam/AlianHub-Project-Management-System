@@ -19,7 +19,6 @@ const RETIRED_PATHS = /['"](?:[^'"]*\/)?(?:AIProjectGenerator\/(?:usage|instruct
 /* Not chat completions, so the factory has nothing to offer them yet. Each
  * entry is a follow-up of task 024, not a permanent exception. */
 const ALLOWED_OUTSIDE_CORE = [
-    'Modules/AI/transcribe.js',
     'Modules/Instance/probes.js',
 ];
 

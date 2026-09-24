@@ -3,21 +3,11 @@ const { ADAPTERS, PROVIDER_NAMES, adapterFor, configuredNames, isAnyConfigured, 
 const { routerEnabled } = require('./normalise');
 const { resilient } = require('./router');
 const { noEmbeddings } = require('../providerError');
+const aiSwitch = require('../aiSwitch');
+const providerContext = require('../providerContext');
 const health = require('./health');
 const rateLimit = require('./rateLimit');
-
-/* Embeddings come from OpenAI with the instance key (owner, 2026-09-17), whichever provider
- * answers chat; per-workspace keys follow Sprint 8's secrets store. */
-const EMBEDDING_PROVIDER = 'openai';
-
-const isEmbeddingConfigured = () => Boolean(ADAPTERS[EMBEDDING_PROVIDER].embeddingsConfigured);
-
-/** The embedding adapter behind the spend meter and the health window. */
-function embeddingProvider() {
-    const adapter = ADAPTERS[EMBEDDING_PROVIDER];
-    if (!adapter.embeddingsConfigured) throw noEmbeddings(adapter.name, 'has no embeddings until AI_API_KEY is set');
-    return resilient(adapter, registry);
-}
+const { COMPATIBLE, embeddingProviderName, embeddingModel } = require('./embeddingChoice');
 
 function configuredAdapter() {
     const selected = (process.env.LLM_PROVIDER || '').trim().toLowerCase();
@@ -29,7 +19,18 @@ function configuredAdapter() {
     }
     const fallback = configuredNames()[0];
     if (fallback) return ADAPTERS[fallback];
-    throw new Error(`No LLM provider is configured. Set one of ${PROVIDER_NAMES.join(', ')} (AI_API_KEY+AI_MODEL, ANTHROPIC_API_KEY+ANTHROPIC_MODEL, DEEPSEEK_API_KEY+DEEPSEEK_MODEL, GOOGLE_API_KEY+GOOGLE_MODEL), and optionally LLM_PROVIDER.`);
+    throw new Error(`No LLM provider is configured. Set one of ${PROVIDER_NAMES.join(', ')} (AI_API_KEY+AI_MODEL, ANTHROPIC_API_KEY+ANTHROPIC_MODEL, DEEPSEEK_API_KEY+DEEPSEEK_MODEL, GOOGLE_API_KEY+GOOGLE_MODEL, OPENAI_COMPATIBLE_BASE_URL+OPENAI_COMPATIBLE_MODEL), and optionally LLM_PROVIDER.`);
+}
+
+const isEmbeddingConfigured = () => Boolean(ADAPTERS[embeddingProviderName()].embeddingsConfigured);
+
+/** The embedding adapter behind the spend meter and the health window. */
+function embeddingProvider() {
+    const adapter = ADAPTERS[embeddingProviderName()];
+    if (!adapter.embeddingsConfigured) {
+        throw noEmbeddings(adapter.name, adapter.name === COMPATIBLE ? 'has no embeddings until OPENAI_COMPATIBLE_EMBEDDINGS_MODEL is set' : 'has no embeddings until AI_API_KEY is set');
+    }
+    return resilient(adapter, registry);
 }
 
 /* A provider named by the caller only wins while AI_MODEL_ROUTER is on, or
@@ -58,8 +59,35 @@ function getProvider(selection) {
     return resilient(selectAdapter(selection), registry);
 }
 
+/* False while AI is off for the instance, or for the workspace of the current request as last
+ * read; the spend meter makes the authoritative check before every call. */
 function isAnyProviderConfigured() {
+    if (!aiSwitch.instanceEnabled()) return false;
+    if (aiSwitch.workspaceOffCached(providerContext.companyIdOf())) return false;
     return isAnyConfigured();
+}
+
+const chatProviderName = () => {
+    try {
+        return configuredAdapter().name;
+    } catch (e) {
+        return null;
+    }
+};
+
+/**
+ * What an AI screen should show for this workspace: on, off (and at which level), or
+ * unconfigured. Off wins over unconfigured, since it is a decision someone made.
+ */
+async function availability(companyId) {
+    const instanceEnabled = aiSwitch.instanceEnabled();
+    const workspaceEnabled = await aiSwitch.workspaceEnabled(companyId);
+    const provider = chatProviderName();
+    let state = aiSwitch.STATE.ON;
+    if (!instanceEnabled) state = aiSwitch.STATE.OFF_INSTANCE;
+    else if (!workspaceEnabled) state = aiSwitch.STATE.OFF_WORKSPACE;
+    else if (!provider) state = aiSwitch.STATE.UNCONFIGURED;
+    return { state, instanceEnabled, workspaceEnabled, provider, embeddings: isEmbeddingConfigured() };
 }
 
 /* The instance console's provider row: what the registry knows about a
@@ -80,8 +108,10 @@ module.exports = {
     getProvider,
     isAnyProviderConfigured,
     embeddingProvider,
+    embeddingProviderName,
+    embeddingModel,
     isEmbeddingConfigured,
-    EMBEDDING_PROVIDER,
+    availability,
     selectAdapter,
     routerEnabled,
     adapterFor,

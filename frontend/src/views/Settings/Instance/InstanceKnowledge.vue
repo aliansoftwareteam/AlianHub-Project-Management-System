@@ -253,7 +253,7 @@ const CONFIRM_LABEL = { document: "Knowledge.erase_type_id", person: "Knowledge.
 const FILE_ID = /^[a-f0-9]{24}:[A-Za-z0-9_-]{1,64}$/i;
 const TRANSLATED_CODES = [
     "indexer_off", "workspace_indexer_off", "invalid_company_id", "unknown_workspace", "invalid_source_type", "invalid_document_id", "invalid_user_id",
-    "confirmation_mismatch", "backfill_pending", "backfill_running", "reindex_running", "not_hybrid", "embedding_unconfigured", "embedding_paused", "reembed_running", "server_error",
+    "confirmation_mismatch", "backfill_pending", "backfill_running", "reindex_running", "not_hybrid", "embedding_unconfigured", "embedding_paused", "ai_off", "reembed_running", "server_error",
     "reindex_not_running", "figures_timed_out", "not_found", "invalid_exclusion_id",
 ];
 const STATE_CHIP = { failed: "ah-chip--danger", running: "ah-chip--warn", catching_up: "ah-chip--warn", not_started: "" };

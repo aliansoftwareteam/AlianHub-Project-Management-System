@@ -12,7 +12,8 @@
                     <HeaderComponent v-if="!$route.meta.hideHeader" @change="changeCompany($event)" @filter="handleFilter"/>
                     <div :style="`height: calc(100dvh - ${$route.meta.hideHeader ? '0' : '46'}px);`" class="billing__history-wrapper style-scroll overflow-auto">
                         <CommandPalette v-if="!$route.meta.preventAdvanceSearch" :open="isAdvanceSearch" @close="isAdvanceSearch = false"/>
-                        <router-view/>
+                        <AiUnavailable v-if="aiGated"/>
+                        <router-view v-else/>
                         <TourCom ref="mainTour"/>
                     </div>
                 </template>
@@ -21,7 +22,8 @@
                     <main class="ah-app__main" id="ah-main">
                         <CommandPalette v-if="!$route.meta.preventAdvanceSearch" :open="isAdvanceSearch" @close="isAdvanceSearch = false"/>
                         <div class="ah-app__view billing__history-wrapper style-scroll">
-                            <router-view/>
+                            <AiUnavailable v-if="aiGated"/>
+                            <router-view v-else/>
                         </div>
                         <TourCom ref="mainTour"/>
                         <TaskDetailOverlay />
@@ -118,6 +120,9 @@ import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import { initOffline } from '@/offline';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
+import AiUnavailable from '@/components/molecules/AiUnavailable/AiUnavailable.vue';
+import { aiAvailability, loadAiAvailability } from '@/composable/aiAvailability';
+import { AI_GATE, aiGateFor } from '@/router/ai/gate';
 const {tabSync} = tabSyncHelper();
 const mainTour = ref();
 
@@ -159,6 +164,12 @@ const defaultGhostCustomUser = `${env.API_URI}/api/v1/getlogo?key=ghostuser`;
 const rules = ref({});
 const {connectServer} = socketHelper();
 const currentUser = computed(() => getters["users/currentUser"]);
+const currentCompany = computed(() => getters["settings/selectedCompany"]);
+const aiGated = computed(() => aiGateFor(route.name, aiAvailability.state) === AI_GATE.PAGE);
+
+watch(() => [logged.value, currentCompany.value?._id], ([isLogged, cid]) => {
+    if (isLogged && cid) loadAiAvailability(cid);
+}, { immediate: true });
 
 watch(() => currentUser.value, (val) => {
     if(val?.isVesionUpdate){

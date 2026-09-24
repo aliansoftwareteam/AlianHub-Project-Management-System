@@ -66,13 +66,13 @@
                         <button type="button" class="mc-tool" :title="$t('Chat.cmd_clip')" @click="$emit('command', { name: 'clip', text: '' })">
                             <ShellIcon name="film" :size="13" /><span>{{ $t('Chat.clip') }}</span>
                         </button>
-                        <button type="button" class="mc-tool" :title="$t('Chat.talk_to_text')" @click="$emit('command', { name: 'talk', text: '' })">
+                        <button v-if="aiUsable" type="button" class="mc-tool" :title="$t('Chat.talk_to_text')" @click="$emit('command', { name: 'talk', text: '' })">
                             <ShellIcon name="mic" :size="13" /><span>{{ $t('Chat.talk_to_text') }}</span>
                         </button>
                         <button type="button" class="mc-tool" :title="$t('Chat.voice_note')" @click="startRecording">
                             <ShellIcon name="wave" :size="13" /><span>{{ $t('Chat.voice_note') }}</span>
                         </button>
-                        <button type="button" class="mc-tool mc-tool--ai" :class="{ 'is-on': commandsOpen }" :title="$t('Chat.ask_ai')" @click.stop="commandsOpen = !commandsOpen">
+                        <button v-if="aiUsable" type="button" class="mc-tool mc-tool--ai" :class="{ 'is-on': commandsOpen }" :title="$t('Chat.ask_ai')" @click.stop="commandsOpen = !commandsOpen">
                             <ShellIcon name="ai" :size="13" /><span>{{ $t('Chat.ask_ai') }}</span>
                         </button>
 
@@ -126,6 +126,7 @@
 import { computed, defineProps, defineEmits, defineExpose, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useGetterFunctions } from '@/composable';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import { aiUsable } from "@/composable/aiAvailability";
 import CommentInput from '@/components/atom/CommentInput/CommentInput.vue';
 import MainChatIcon from './MainChatIcon.vue';
 import MainChatRecorder from './MainChatRecorder.vue';

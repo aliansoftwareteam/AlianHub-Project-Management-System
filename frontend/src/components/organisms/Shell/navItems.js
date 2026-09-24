@@ -3,6 +3,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useCustomComposable } from "@/composable";
 import { isAiSectionRoute } from "@/router/ai/section";
+import { aiUsable } from "@/composable/aiAvailability";
 import { isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
 
 const PROJECT_ROUTE_PREFIX = "Project";
@@ -69,7 +70,7 @@ export function useNavItems(companyId) {
                     { key: "notepad", label: "Notepad.title", icon: "notepad", panel: "notepad", show: ready.value },
                     { key: "clips", label: "Clips.title", icon: "clips", panel: "clips", show: ready.value },
                     { key: "reminders", label: "Reminders.header_tooltip", icon: "reminder", panel: "reminders", show: ready.value },
-                    { key: "talk", label: "TalkToText.title", icon: "mic", panel: "talkToText", show: ready.value },
+                    { key: "talk", label: "TalkToText.title", icon: "mic", panel: "talkToText", show: ready.value && aiUsable.value },
                     { key: "tour", label: "Header.take_tour", icon: "tour", panel: "tour", show: ready.value }
                 ]
             },

@@ -11,6 +11,7 @@ const { preflight } = require('./estimate');
 const decision = require('./decision');
 const reservation = require('./reservation');
 const providerContext = require('./providerContext');
+const aiSwitch = require('./aiSwitch');
 const telemetry = require('../../Config/telemetry');
 
 /* The spend ledger: one row per model call, written here and nowhere else, so
@@ -101,6 +102,7 @@ function metered(adapter) {
         get capabilities() { return adapter.capabilities; },
         async chat(opts) {
             const context = contextOf(opts);
+            await aiSwitch.assertAllowed(context.companyId);
             // The model the adapter will send, which is not the configured one
             // once the router lets a caller name a model on the chat options.
             const requestedModel = resolveModel(adapter, opts);
@@ -155,6 +157,7 @@ function metered(adapter) {
          * chat call. They carry no prompt to replay, so no replay row is written. */
         async embed(opts) {
             const context = contextOf(opts);
+            await aiSwitch.assertAllowed(context.companyId);
             const model = String((opts && opts.model) || '').trim() || adapter.model;
             ensurePriced(model, context);
             const texts = Array.isArray(opts && opts.texts) ? opts.texts : [];

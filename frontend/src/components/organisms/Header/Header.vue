@@ -72,7 +72,7 @@
             <div class="position-re" v-if="rules && Object.keys(rules).length">
                 <img src="@/assets/images/svg/reminder_icon.svg" class="cursor-pointer" id="reminder_driver" :title="$t('Reminders.header_tooltip')" @click="reminderVisible = true">
             </div>
-            <div class="position-re" v-if="rules && Object.keys(rules).length">
+            <div class="position-re" v-if="rules && Object.keys(rules).length && aiUsable">
                 <img src="@/assets/images/svg/mic_icon.svg" class="cursor-pointer" id="talk_to_text_driver" :title="$t('TalkToText.title')" @click="talkToTextVisible = true">
             </div>
             <div class="position-re" v-if="rules && Object.keys(rules).length && isOwnerOrAdmin(companyUser.roleType)">
@@ -290,6 +290,7 @@
 <script setup>
 // PACKAGE
 import { computed, defineComponent, defineEmits, inject, onMounted, onUnmounted, ref, watch, watchEffect } from "vue";
+import { aiUsable } from "@/composable/aiAvailability";
 import { useRouter } from "vue-router";
 import {version} from "../../../../../package.json";
 import {useHelper} from "./helper"

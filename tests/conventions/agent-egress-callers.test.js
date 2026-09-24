@@ -60,6 +60,7 @@ const OUTSIDE_GATEWAY = {
     'Modules/AICore/llmProvider/deepseekProvider.js': { uses: ['axios'], why: 'model provider calls to the endpoint the instance configures' },
     'Modules/AICore/llmProvider/googleProvider.js': { uses: ['axios'], why: 'model provider calls to the endpoint the instance configures' },
     'Modules/AICore/llmProvider/anthropicProvider.js': { uses: ['sdk:@anthropic-ai/sdk'], why: 'model provider calls through the Anthropic SDK to the endpoint the instance configures' },
+    'Modules/AICore/llmProvider/compatibleClient.js': { uses: ['axios', 'socket'], why: 'model, embeddings and speech-to-text calls to the OpenAI-compatible base URL only the instance owner configures; net is for isIP' },
     'Modules/Knowledge/ingest/extract/extractor.js': { uses: ['process'], why: 'starts the thread an uploaded file is parsed in, with an empty environment; nothing is fetched' },
     'Modules/Knowledge/ingest/extract/parseWorker.js': { uses: ['process'], why: 'that thread itself, reading the bytes it was handed; nothing is fetched' },
     'Modules/AICore/instructionGuard.js': { uses: ['eval'], why: 'runs an owner-added guard pattern in a vm context only so a timeout can stop it; the context holds the pattern and the text, nothing is fetched' },
