@@ -232,7 +232,7 @@ describe('the metadata columns are sized for content and right-aligned', () => {
 
     test('the header gutter matches the indent, border and padding under it', () => {
         expect(css).toMatch(/\.lv2__cols \{[^}]*padding: 14px 13px 8px 29px/);
-        expect(css).toMatch(/\.lv2__sprint > \.lv2__group,\s*\.lv2__sprint > \.lv2__collapsed-item \{ margin-left: 16px; \}/);
+        expect(css).toMatch(/\.lv2__sprint > \.lv2__group,\s*\.lv2__sprint \.lv2__collapsed-item \{ margin-left: 16px; \}/);
     });
 
     /* A sticky box cannot rise above its containing block, so a padded scroller would

@@ -53,11 +53,13 @@
                     </div>
 
                     <section v-for="sprint in groupedTasks" :key="sprint?.id" class="lv2__sprint" role="presentation" :id="`sprint_${sprint?.id}`">
-                        <button v-if="groupedTasks.length > 1 || !sprint.isExpanded" type="button" class="lv2__sprint-head" :aria-expanded="!!sprint.isExpanded" @click="toggleSprints(sprint?.id)">
+                        <div v-if="groupedTasks.length > 1 || !sprint.isExpanded" role="row" class="lv2__aria-row"><div role="cell" class="lv2__aria-row">
+                        <button type="button" class="lv2__sprint-head" :aria-expanded="!!sprint.isExpanded" @click="toggleSprints(sprint?.id)">
                             <span class="lv2__caret lv2__caret--sprint" aria-hidden="true">{{ sprint.isExpanded ? '▼' : '►' }}</span>
                             <span class="lv2__sprint-name">{{ sprint.name }}</span>
                             <span class="lv2__sprint-meta" :title="$t('List.sprint_total_hint')">{{ sprint.tasks || 0 }}</span>
                         </button>
+                        </div></div>
 
                         <template v-if="sprint.isExpanded">
                             <template v-for="item in (sprint.items || [])" :key="item.key">
@@ -71,8 +73,8 @@
                                     @open="openRow"
                                     @review-agent="reviewAgent"
                                 />
+                                <div v-else role="row" class="lv2__aria-row"><div role="cell" class="lv2__aria-row">
                                 <button
-                                    v-else
                                     type="button"
                                     class="lv2__collapsed-item"
                                     :aria-expanded="false"
@@ -83,6 +85,7 @@
                                     {{ item.name }}
                                     <span class="lv2__collapsed-count">{{ groupCount(sprint, item) }}</span>
                                 </button>
+                                </div></div>
                             </template>
                         </template>
                     </section>

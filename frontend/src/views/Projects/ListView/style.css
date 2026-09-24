@@ -56,8 +56,9 @@
 }
 .lv2__sprint-name { font: var(--text-h2); letter-spacing: -.3px; }
 .lv2__sprint-meta { font: var(--text-data); color: var(--ink-label); }
+.lv2__aria-row { display: contents; }
 .lv2__sprint > .lv2__group,
-.lv2__sprint > .lv2__collapsed-item { margin-left: 16px; }
+.lv2__sprint .lv2__collapsed-item { margin-left: 16px; }
 
 .lv2__group {
     background: var(--surface);
@@ -222,5 +223,5 @@
     /* 16px of a 375px viewport is worth more to the task name than to the indent. */
     .lv2__cols { padding: 12px 13px 8px; }
     .lv2__sprint > .lv2__group,
-    .lv2__sprint > .lv2__collapsed-item { margin-left: 0; }
+    .lv2__sprint .lv2__collapsed-item { margin-left: 0; }
 }
