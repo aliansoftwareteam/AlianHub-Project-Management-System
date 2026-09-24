@@ -51,29 +51,23 @@ async function accessToken(baseURL, session) {
 }
 
 /* The suite sends the proxy's own origin on the request it expects to be accepted, so the app has to know
- * that origin before it starts; the port is therefore reserved here and handed to both. */
-const freePort = () => new Promise((resolve, reject) => {
-    const probe = http.createServer();
-    probe.on('error', reject);
-    probe.listen(0, '127.0.0.1', () => {
-        const { port } = probe.address();
-        probe.close(() => resolve(port));
-    });
-});
-
-function startProxy(target, token, port) {
-    const upstream = new URL(target);
+ * that origin before it starts. The proxy binds first and learns its upstream later, so no other process can
+ * take its port while the app boots. */
+function startProxy() {
+    const route = {};
     const proxy = http.createServer((req, res) => {
         const headers = { ...req.headers };
-        if (!headers.authorization) headers.authorization = `Bearer ${token}`;
-        const forwarded = http.request({ hostname: upstream.hostname, port: upstream.port, path: req.url, method: req.method, headers }, (answer) => {
+        if (!headers.authorization) headers.authorization = `Bearer ${route.token}`;
+        const forwarded = http.request({ hostname: route.upstream.hostname, port: route.upstream.port, path: req.url, method: req.method, headers }, (answer) => {
             res.writeHead(answer.statusCode, answer.headers);
             answer.pipe(res);
         });
         forwarded.on('error', (error) => { res.writeHead(502); res.end(error.message); });
         req.pipe(forwarded);
     });
-    return new Promise((resolve) => proxy.listen(port, '127.0.0.1', () => resolve(proxy)));
+    const forwardTo = (target, token) => Object.assign(route, { upstream: new URL(target), token });
+    const close = () => new Promise((done) => proxy.close(done));
+    return new Promise((resolve) => proxy.listen(0, '127.0.0.1', () => resolve({ port: proxy.address().port, forwardTo, close })));
 }
 
 const run = (command, args, options = {}) => new Promise((resolve, reject) => {
@@ -97,27 +91,26 @@ const runSuite = (entry, url) => run(process.env.CONFORMANCE_NODE || 'node', [en
 async function main() {
     const mongoUrl = resolveMongoUrl();
     await resetDatabase(mongoUrl);
-    const proxyPort = await freePort();
-    const server = await startServer({
-        mongoUrl,
-        logFile: path.join(STATE_DIR, 'conformance-server.log'),
-        env: {
-            MCP_OAUTH: 'both',
-            NODE_ENV: 'development',
-            MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000',
-            CORS_ORIGINS: `http://127.0.0.1:${proxyPort}`,
-        },
-    });
-    let proxy;
+    const proxy = await startProxy();
+    let server;
     try {
+        server = await startServer({
+            mongoUrl,
+            logFile: path.join(STATE_DIR, 'conformance-server.log'),
+            env: {
+                MCP_OAUTH: 'both',
+                NODE_ENV: 'development',
+                MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000',
+                CORS_ORIGINS: `http://127.0.0.1:${proxy.port}`,
+            },
+        });
         const entry = await installSuite();
-        const token = await accessToken(server.baseURL, await setupOwner(server.baseURL));
-        proxy = await startProxy(server.baseURL, token, proxyPort);
-        const code = await runSuite(entry, `http://127.0.0.1:${proxyPort}/mcp`);
+        proxy.forwardTo(server.baseURL, await accessToken(server.baseURL, await setupOwner(server.baseURL)));
+        const code = await runSuite(entry, `http://127.0.0.1:${proxy.port}/mcp`);
         process.exitCode = code;
     } finally {
-        if (proxy) await new Promise((done) => proxy.close(done));
-        await server.stop();
+        await proxy.close();
+        if (server) await server.stop();
     }
 }
 

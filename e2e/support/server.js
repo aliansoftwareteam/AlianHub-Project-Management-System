@@ -10,6 +10,7 @@ const { startGitlabStub } = require('./gitlab');
 
 const HEALTH_TIMEOUT_MS = Number(process.env.E2E_HEALTH_TIMEOUT_MS) || 120000;
 const STOP_TIMEOUT_MS = 10000;
+const START_ATTEMPTS = 5;
 
 function freePort() {
     return new Promise((resolve, reject) => {
@@ -72,17 +73,23 @@ function serverEnv({ port, mongoUrl, workDir, embeddingsUrl, gitlabApiUrl }) {
     };
 }
 
-async function waitForHealth(baseURL, child, logTail) {
+class PortTakenError extends Error {}
+
+async function waitForHealth(baseURL, child, state, logTail) {
     const deadline = Date.now() + HEALTH_TIMEOUT_MS;
     while (Date.now() < deadline) {
+        if (state.portTaken) throw new PortTakenError(`Port of ${baseURL} was taken before the server bound it.`);
         if (child.exitCode !== null) {
             throw new Error(`Server exited with code ${child.exitCode} before /health answered.\n${logTail()}`);
         }
-        try {
-            const res = await fetch(`${baseURL}/health`);
-            if (res.status === 200) return;
-        } catch {}
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // Until our child logs that it is listening, whatever answers on the port is someone else.
+        if (state.listening) {
+            try {
+                const res = await fetch(`${baseURL}/health`);
+                if (res.status === 200) return;
+            } catch {}
+        }
+        await new Promise((resolve) => setTimeout(resolve, state.listening ? 500 : 100));
     }
     throw new Error(`Server did not report healthy within ${HEALTH_TIMEOUT_MS / 1000}s.\n${logTail()}`);
 }
@@ -99,22 +106,29 @@ function stopChild(child) {
     });
 }
 
-async function startServer({ mongoUrl, logFile, env = {} }) {
-    const port = await freePort();
+async function startServerOn(port, { mongoUrl, logFile, env, entry }) {
     const baseURL = `http://127.0.0.1:${port}`;
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'alianhub-e2e-'));
     fs.mkdirSync(path.dirname(logFile), { recursive: true });
     const log = fs.createWriteStream(logFile);
     const tail = [];
+    const state = { listening: false, portTaken: false };
+    const readyLine = `Server ready on ${port}`;
+    const portInUse = new RegExp(`EADDRINUSE[^\\n]*:${port}\\b`);
+    let recent = '';
     const record = (chunk) => {
         log.write(chunk);
         tail.push(...String(chunk).split('\n'));
         tail.splice(0, Math.max(0, tail.length - 60));
+        if (state.listening) return;
+        recent = (recent + chunk).slice(-4096);
+        if (recent.includes(readyLine)) state.listening = true;
+        else if (portInUse.test(recent)) state.portTaken = true;
     };
 
     const embeddings = await startEmbeddingsStub();
     const gitlab = await startGitlabStub();
-    const child = spawn(process.execPath, ['-r', path.join(__dirname, 'ignore-dotenv.js'), 'index.js'], {
+    const child = spawn(process.execPath, ['-r', path.join(__dirname, 'ignore-dotenv.js'), entry], {
         cwd: ROOT,
         env: { ...serverEnv({ port, mongoUrl, workDir, embeddingsUrl: embeddings.url, gitlabApiUrl: gitlab.url }), ...env },
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -135,12 +149,26 @@ async function startServer({ mongoUrl, logFile, env = {} }) {
     };
 
     try {
-        await waitForHealth(baseURL, child, () => `--- last lines of ${logFile} ---\n${tail.join('\n')}`);
+        await waitForHealth(baseURL, child, state, () => `--- last lines of ${logFile} ---\n${tail.join('\n')}`);
     } catch (error) {
         await stop();
         throw error;
     }
     return { baseURL, port, logFile, logDir: path.join(workDir, 'log'), pid: child.pid, embeddingsUrl: embeddings.url, stop };
+}
+
+/* The app needs its own URL in APIURL before it starts, so the port is picked here and can be
+ * taken by another process before the server binds it; that attempt is thrown away for a fresh port.
+ * `port` and `entry` let the harness test drive the collision with a stand-in server. */
+async function startServer({ mongoUrl, logFile, env = {}, port, entry = 'index.js' }) {
+    for (let attempt = 1; ; attempt += 1) {
+        const chosen = attempt === 1 && port ? port : await freePort();
+        try {
+            return await startServerOn(chosen, { mongoUrl, logFile, env, entry });
+        } catch (error) {
+            if (!(error instanceof PortTakenError) || attempt >= START_ATTEMPTS) throw error;
+        }
+    }
 }
 
 module.exports = { startServer };
