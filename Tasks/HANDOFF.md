@@ -2,9 +2,9 @@
 
 Updated 2026-09-24. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (1cb5c72e, `14.36.0-beta.406`)
+## State of `beta` (533121f9, `14.36.0-beta.408`)
 
-- **Overnight 2026-09-23/24: builds 303–406 (#834–#937)**, listed in `docs/BETA-LOG.md`.
+- **Overnight 2026-09-23/24: builds 303–408 (#834–#939)**, listed in `docs/BETA-LOG.md`.
   - **Access and tenant isolation:** comment reads and writes follow project, sprint and chat visibility, including agents, automations and MCP (#896, #899, #900); tokens narrowed to projects are held to them on every REST route (#894); tracker captures apply only to the caller's own session (#901); imports need the same project access as creating a task, undo follows task and thread visibility, and imports resolve people among the company's own members (#904, #905); invitations are accepted only with their link and by the account they were sent to (#908); social sign-in binds the account to the provider's verified identity (#909); notification routes act for the signed-in user in their verified company (#910); SSO and SCIM link existing accounts only through verified domains or existing membership, with DNS domain verification in Settings → Sign-in & SSO (#911); writes that name people accept only active members (#912); people lookups resolve among the company's members and company access needs an active seat (#913); account emails give one answer whatever the account's state (#914); tenant-scoping batches 3–6 (#873, #877, #881, #887); egress host checks (#880); notification settings reads (#870); automation run visibility (#868).
   - **After build 383 (builds 384–403):** writes that name people accept only active members, including projects, sprints and manual time (#918); company reads need an active seat (#916); mail routes send only to company members, password sign-in gives one answer for any failure, and the tracker's pre-login list returns download fields only (#919); stored request addresses follow `TRUST_PROXY` and only pending invitations can be accepted (#922); comment mentions, records and notices are built on the server, and all history and notification text is composed on the server, so the generic `/api/v1/handleHistory`, `/api/v1/handleNotification` and `/api/v1/app-notification/comment` routes are retired (#915, #926, #927, #929); the team board, agent release proposals, agent project lists, and agent runs and proposals show only what the viewer may see (#932, #933, #934); SSO domains are re-checked daily and seats SCIM deactivated for outsiders no longer count as membership (#925); tenant-scoping and hard-coded-text baselines are both empty, with tests that keep them empty (#923, #924, #928); a company's database is no longer recreated after deletion, and each connection compiles its models once (#921); third interface sweep with 21 fixes, including the automation dry run (#931).
   - **Owner decisions implemented:** 1 (#872), 2 (#861), 3 (#874), 7 (#865).
@@ -29,6 +29,7 @@ Updated 2026-09-24. Read this first, then `Tasks/index.md`. Overwrite this file 
 
 ## Owner decisions recorded
 
+- **2026-09-24:** `--ink-3` is retired for text (row 113); company phone, state and city are optional on Settings → General (row 120); agent spend and budget stay visible to members (row 121); the darker upgrade-wall green stands (#937). Still open: whether to review or clear Google sign-in links made before #909.
 - **2026-09-23 (answered as a set of 13):**
   1. A new manual time entry in an approved timesheet period is refused, like edits and deletes (follow-up 109).
   2. 40 stays the default daily run limit for every agent: an agent with no stored limit is capped at 40 a day on the server too; a stored 0 means no limit (#861).
