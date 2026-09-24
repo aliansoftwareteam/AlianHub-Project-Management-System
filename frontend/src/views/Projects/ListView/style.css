@@ -8,6 +8,9 @@
     background: var(--canvas);
     position: relative;
 }
+/* tokens.css gives every .ah-page min-height: 100%, which outranks the height ListView sets
+   under the toolbar: the list ran a toolbar's height past the screen, bulk bar included. */
+.ah-page.lv2 { min-height: 0; }
 
 /* The top inset belongs to the header, not here: a sticky box cannot rise above its
    containing block, so padding-top would leave a strip of rows visible above it. */
