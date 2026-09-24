@@ -96,3 +96,17 @@ export function sprintToLoad(sprints, canExpandFirst) {
 
     return first;
 }
+
+export function assigneeGroups(memberIds, getUser, unassignedName) {
+    const members = [...new Set((memberIds || []).map(String))].map((id) => ({
+        isExpanded: true,
+        name: "Assignee",
+        users: [getUser(id)],
+        value: id
+    }));
+    return [...members, { isExpanded: true, name: unassignedName, users: [], value: "" }];
+}
+
+export function assigneeCondition(value) {
+    return value ? { AssigneeUserId: { $in: [value] } } : { AssigneeUserId: { $in: [null, []] } };
+}

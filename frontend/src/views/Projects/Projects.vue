@@ -681,7 +681,7 @@ const { editProject, projectName, updateProjectName } = useProjectNameEdit(proje
 const { changeAssignee } = useProjectAssignee(projectData);
 const { archive, showSidebar, showSpinner, updateProject, markProjectFavourite } = useProjectLifecycle(projectData);
 const { showColorAvatar, savingAvatar, formData, resetFormData, assignAvatarData, updateImageValue, saveProjectAvatar } = useProjectAvatar(projectData);
-const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, searchTask, collapsed, groupBy, userSidebar, resetFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter } = useProjectSearch(projectData, showArchived);
+const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, searchTask, collapsed, groupBy, userSidebar, resetFilters, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter } = useProjectSearch(projectData, showArchived);
 const { sprintLoading, loadSprintFolderData, selectProject } = useProjectTree(projectData);
 
 const Uid = ref('embed' + makeUniqueId(6));
@@ -709,6 +709,7 @@ const openEmbedView = (item) => {
 
 provide('taskCollapsed', collapsed);
 provide('searchedTask', searchTask);
+provide('clearTaskFilters', clearAllFilters);
 provide('showArchived', showArchived);
 provide('selectedProject', projectData);
 provide('isSupport', ref(false));
@@ -723,6 +724,7 @@ const icons = ref({
 });
 const groupByOptions = ref([
     { label: 'status', image: require('@/assets/images/groupbySattus.png'), id: 0 },
+    { label: 'assignee', image: require('@/assets/images/svg/person.svg'), id: 1 },
     { label: 'priority', image: require('@/assets/images/groupbyFlag.png'), id: 2 },
     { label: 'due_date', image: require('@/assets/images/calendar_month.png'), id: 3 },
 ]);
