@@ -9,7 +9,7 @@
 .sp__role-name { font: 600 13px/1.3 var(--font-ui); color: var(--ink); }
 .sp__role-desc { margin-top: 3px; line-height: 1.45; font-size: 11.5px; }
 .sp__tools { display: flex; align-items: center; gap: 10px; }
-.sp__search { max-width: 320px; height: 34px; }
+.ah-input.sp__search { max-width: 320px; height: 34px; }
 .sp__foot { display: flex; align-items: center; gap: 14px; }
 .sp__foot .ah-btn { margin-left: auto; }
 @media (max-width: 1279px) { .sp__roles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

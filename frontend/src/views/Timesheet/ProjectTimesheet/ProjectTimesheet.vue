@@ -165,7 +165,7 @@
         </div>
     </div>
     <div v-else class="h-100">
-        <NotFound />
+        <AppState kind="denied" />
     </div>
 </div>
 </template>
@@ -186,7 +186,7 @@
     import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
     import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
     import * as helper from '@/views/Timesheet/helper';
-    import NotFound from '@/views/NotFound.vue';
+    import AppState from '@/components/molecules/AppState/AppState.vue';
     import { useRouter } from "vue-router"
     import { apiRequest } from '../../../services';
     import * as env from '@/config/env';
@@ -764,6 +764,7 @@
     }
 </script>
 <style src="../style.css"></style>
+<style src="../legacyTimesheetTheme.css"></style>
 <style scoped>
     .page-content {
         padding: 15px;

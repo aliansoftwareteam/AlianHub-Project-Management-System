@@ -8,7 +8,7 @@
         :message="$t('Upgrades.the_feature_not_available')"
     />
 </div>
-<NotFound v-else-if="!allowed" />
+<AppState v-else-if="!allowed" kind="denied" />
 <div v-else class="ah-page tv-page ut2">
     <div class="tv-head">
         <h1 class="tv-title">{{ $t('Time.my_timesheet') }}</h1>
@@ -129,7 +129,7 @@ import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { useTimer, formatClock, formatMinutes, formatHm } from '@/composable/useTimer';
 import { timeLogFailureKey } from '@/composable/timeLogFailure';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
-import NotFound from '@/views/NotFound.vue';
+import AppState from '@/components/molecules/AppState/AppState.vue';
 import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
 import LogTimeSheet from '@/views/TimeLog/LogTimeSheet.vue';
 import { isOwnerOrAdmin } from "@/utils/roles";

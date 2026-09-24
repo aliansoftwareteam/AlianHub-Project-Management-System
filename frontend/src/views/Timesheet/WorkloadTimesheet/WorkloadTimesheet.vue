@@ -8,7 +8,7 @@
         message="That feature isn’t available on your current plan"
     />
 </div>
-<NotFound v-else-if="!allowed" />
+<AppState v-else-if="!allowed" kind="denied" />
 <div v-else-if="isMobile" class="ah-page tv-page"><div class="tv-empty"><span>{{ $t('Time.desktop_only') }}</span></div></div>
 <div v-else class="wl">
     <div class="ah-toolbar wl__bar">
@@ -113,7 +113,7 @@ import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { formatHm } from '@/composable/useTimer';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
-import NotFound from '@/views/NotFound.vue';
+import AppState from '@/components/molecules/AppState/AppState.vue';
 import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
 
 defineOptions({ name: 'WorkloadTimesheet' });

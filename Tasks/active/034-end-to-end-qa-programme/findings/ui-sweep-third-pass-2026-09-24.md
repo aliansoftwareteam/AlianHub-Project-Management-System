@@ -61,12 +61,12 @@ low = polish.
 | U3-19 | AI hub, AI analytics, Pipeline, Agents as teammates, Connections, External data, Planner | both | all / both | Buttons rendered as router links (`.ah-btn`, `.ah-tbtn`) kept the browser's link underline: "Ask", "AI Agents", "Go to agents", "Route many at once", "Connect", "Calendar · not connected" | low | yes — `866e1354` |
 | U3-20 | Integrations hub | owner | all / both | Category subtitles, notes, the empty-inbox line and counts used `#9aa0b4`, 2.3–2.6:1 on the hub's white panel | low | yes — `2d8cf308` |
 | U3-21 | Milestones report | both | all / both | Headline "0 · 0 at risk · 0 missed": the first count had no label | low | yes — `8e47496a` |
-| U3-22 | Project timesheet, Workload, Tracker timesheet | member | all / both | A member without the timesheet permission gets the 404 card: "This doesn't exist any more. It was deleted, moved, or never existed. Anything it held is in the audit log", with an Audit log button the member cannot open | medium | no — needs a "you don't have access" state; the guard and copy are a product call |
-| U3-23 | Project timesheet, Tracker timesheet (body) | owner | all / dark | The legacy bodies are not dark-aware: Tracker's light panel stops 290 px down with the dark canvas below; legend "Tracked / Manual Time" is 2.5:1; "No records found" is error red for an empty state; the week range is clipped ("Sep 27, 202"); Tracker's hour axis is cut at "6 PM" | medium | no — a re-skin of both legacy views |
-| U3-24 | Settings → Projects | owner | 1280, 390 / both | The Apps column is squeezed: names truncate ("Multipl…", "Time e…", "Milest…") and descriptions break one word per line; in dark mode the column is a dark block inside the white card; status chips use workspace colours on their own tint (1.4–2.8:1, as UIX-18) | medium | no — legacy table layout |
-| U3-25 | Security & permissions (plan-gated), other `UpgradePlan` walls | owner | all / both | The upgrade headline is black on the dark canvas (1.1:1) and "Upgrade Your Plan" is white on green (2.2:1) | medium | no — shared `UpgradePlan` component; button colour is a design call |
-| U3-26 | Many phone screens | both | 390 / both | Shared primitives are under 32 px: `.ah-tab` 26 px (Trash, People, AI health, Connections, Templates tabs, My settings segments), `.ah-switch` 34×20, `.ah-btn--sm` 30 px, `.tv-pill` 22 px (Variance), `.ah-check` 15–20 px, Teams colour swatches 8 px | medium | no — one phone `min-height` rule on the shared primitives (as UIX-19) is a design-system decision |
-| U3-27 | Several (see list) | both | all / both | `.ah-input` in `tokens.css` sets width, height, padding and font at single-class specificity, and chunk stylesheets load in no fixed order, so any single-class size override can lose. Found and fixed: Docs search, working hours, quiet hours (U3-13, U3-17). Same shape, not yet seen broken: `cp__whatif-input`, `billing__month-input`, `billing__pick`, `fb__opt-in`, `fb__search`, `fb__select`, `iw__select`, `lt__search`, `mbv__select`, `pipe-pick__select`, `sp__search`, `tm__name-input`, `ai-decline__note` | medium | no — `:where(.ah-input)` in `tokens.css` would end the class of bug but touches every form; owner call |
+| U3-22 | Project timesheet, Workload, Tracker timesheet | member | all / both | A member without the timesheet permission gets the 404 card: "This doesn't exist any more. It was deleted, moved, or never existed. Anything it held is in the audit log", with an Audit log button the member cannot open | medium | yes — `1ea64f3f`: `AppState` kind `denied` ("You don't have access to this screen", Go home only) on the four timesheets and the legacy milestone report |
+| U3-23 | Project timesheet, Tracker timesheet (body) | owner | all / dark | The legacy bodies are not dark-aware: Tracker's light panel stops 290 px down with the dark canvas below; legend "Tracked / Manual Time" is 2.5:1; "No records found" is error red for an empty state; the week range is clipped ("Sep 27, 202"); Tracker's hour axis is cut at "6 PM" | medium | yes — `c5dfba90`: `legacyTimesheetTheme.css` maps both bodies onto tokens in dark mode; in both themes the tracker panel takes the canvas, the empty state is muted, the range field fits, and the 24-hour strip fits 1280 px |
+| U3-24 | Settings → Projects | owner | 1280, 390 / both | The Apps column is squeezed: names truncate ("Multipl…", "Time e…", "Milest…") and descriptions break one word per line; in dark mode the column is a dark block inside the white card; status chips use workspace colours on their own tint (1.4–2.8:1, as UIX-18) | medium | yes, apart from the status chips (UIX-18) — `ab8f6dc8`, `9e527ad6`: the list shared `.pal*` class names with the global search palette, whose unscoped rules caused the truncation and the dark block; Apps now has its own row as a grid |
+| U3-25 | Security & permissions (plan-gated), other `UpgradePlan` walls | owner | all / both | The upgrade headline is black on the dark canvas (1.1:1) and "Upgrade Your Plan" is white on green (2.2:1) | medium | yes — `71040d19`: headline, plan name and message on `--ink`, `--brand`, `--ink-label`; the button keeps its green at `#15803d` (5:1) |
+| U3-26 | Many phone screens | both | 390 / both | Shared primitives are under 32 px: `.ah-tab` 26 px (Trash, People, AI health, Connections, Templates tabs, My settings segments), `.ah-switch` 34×20, `.ah-btn--sm` 30 px, `.tv-pill` 22 px (Variance), `.ah-check` 15–20 px, Teams colour swatches 8 px | medium | yes, apart from the Teams swatches — `fe7e89a5`: below 768 px a transparent `::before` makes `.ah-btn--sm`, `.ah-tab`, `.ah-switch`, `.ah-check` and `.tv-pill` at least 32 px to tap without changing their drawn size |
+| U3-27 | Several (see list) | both | all / both | `.ah-input` in `tokens.css` sets width, height, padding and font at single-class specificity, and chunk stylesheets load in no fixed order, so any single-class size override can lose. Found and fixed: Docs search, working hours, quiet hours (U3-13, U3-17). Same shape, not yet seen broken: `cp__whatif-input`, `billing__month-input`, `billing__pick`, `fb__opt-in`, `fb__search`, `fb__select`, `iw__select`, `lt__search`, `mbv__select`, `pipe-pick__select`, `sp__search`, `tm__name-input`, `ai-decline__note` | medium | yes — `06e276fa`: the unscoped ones use two classes (`.ah-input.x`): `billing__month-input`, `billing__pick`, `iw__select`, `mbv__select`, `pipe-pick__select`, `sp__search`, `tm__name-input`, `ai-decline__note`, plus `tv-input-mono` (Log time hours); `cp__whatif-input`, `fb__*` and `lt__search` sit in scoped blocks and already out-specify it. A spec fails on any new unscoped single-class size rule next to `.ah-input` |
 | U3-28 | Integrations hub, Chat → Create channel, Settings → Teams → Create team | owner | all / dark | Legacy panels stay light in dark mode. Integrations' panel stops ~50 px short of the bottom at 1280; Create channel shows 15 of 27 icons at 390 (the grid is clipped); Create team's drawer starts 46 px below the top | low | no |
 | U3-29 | Custom report builder, Capacity planning | both | all / dark | Chart bars keep the light-theme navy on the dark card; Capacity's legend says "black line = available hours" while the line is white in dark | low | no |
 | U3-30 | Velocity and flow | both | all / both | The CFD's first rotated date label is cut at the left ("-2026-08-26"); the forecast note reads "0 measured sprint(s), 3 needed" | low | no |
@@ -82,7 +82,7 @@ low = polish.
 | U3-40 | Automations → dry run | owner | all / both | For a rule that is switched off the verdict chip reads "Would run" while the reasons say "The rule is switched off, so it will not run"; the project pickers also offer the owner's "Personal" list project | low | no — verdict wording is a product call |
 | U3-41 | Settings → General | owner | all / both | On a fresh install Save changes is refused until the company phone, state and city are filled ("The phone number field must be a valid phone number", "The state field is required", "The city field is required"): the wizard stores phone "N/A" and empty state and city, so an owner cannot change the tracker limit or date format without entering a company address | medium | no — whether those fields stay required is a product call |
 
-Fixed: 21 (U3-01 to U3-21, in 22 commits). Open: 20 (U3-22 to U3-41).
+Fixed: 27 (U3-01 to U3-27; U3-22 to U3-27 in the follow-up pass below). Open: 14 (U3-28 to U3-41).
 
 ## Before / after
 
@@ -104,6 +104,28 @@ Captured again on the rebuilt bundle (owner, both widths, both themes) for every
 
 Each fix has a regression check in `frontend/tests/unit/uiSweepThirdPass.spec.js` (stylesheet- and
 source-level, as `uiSweepStyles.spec.js`), plus the dry-run cases above.
+
+### Follow-up pass (U3-22 to U3-27)
+
+Own harness on its own Mongo, two manual time logs seeded for the owner, 18 routes (the four
+timesheets, Settings → Projects, Security & permissions, Members, Teams, Templates, My settings,
+Trash, People, AI health, AI pipeline, Connections, Variance, Log time, Billing) × owner and member ×
+1280 and 390 × light and dark, before and after, compared pixel by pixel.
+
+- U3-22: a member on Project, Workload and Tracker timesheet sees the lock card and Go home.
+- U3-23: in dark mode the Project table, filter and date fields, the legend and the tracker strip
+  are on the dark tokens, the current day keeps its brand header; the strip shows 12 AM to 12 AM
+  at 1280 without scrolling.
+- U3-24: app names and descriptions read in full, three per row at 1280, one per row at 390; the
+  other six columns stay on one row.
+- U3-25: forced on the project list, the project timesheet and Chat by switching the plan feature
+  off in the page store; the headline reads in both themes.
+- U3-26: `elementFromPoint` answers across at least 32 px for tabs on Trash, People, AI health,
+  Connections and My settings, small buttons on Templates, Variance and Automations, Variance pills
+  and Notifications checkboxes. Screens that were not meant to change are pixel-identical apart
+  from seeded hours; on Billing at 390 the positioned "Contract settings" button now paints over
+  the card text it already overlapped. Teams colour swatches (8 px) are left as they are.
+- U3-27: no visible change was expected; the spec guards the rule.
 
 ## How to re-run
 

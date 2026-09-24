@@ -368,7 +368,7 @@ onMounted(() => Promise.all([reload(), loadApprovals()]));
 .ai-decline__chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ai-decline__chip { border: 1px solid transparent; cursor: pointer; }
 .ai-decline__chip.is-on { background: var(--brand-tint); color: var(--brand); border-color: var(--brand); }
-.ai-decline__note { max-width: 420px; height: 32px; }
+.ah-input.ai-decline__note { max-width: 420px; height: 32px; }
 .ai-decline__actions { margin-top: 4px; align-items: center; }
 .ai-decline__skip { border: 0; background: transparent; color: var(--ink-2); font: var(--text-small); cursor: pointer; text-decoration: underline; padding: 0 4px; }
 </style>

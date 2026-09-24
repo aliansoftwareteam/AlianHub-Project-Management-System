@@ -4,7 +4,9 @@
     border: 1px solid #DFE1E6;
     /* justify-content: space-between; */
     font-size: 10px;
-    min-width: 1560px;
+    min-width: 1080px;
+    /* Room for the closing "12 AM" label, which sits past the last tick like every other label. */
+    margin-right: 30px;
     /* padding: 5px; */
   }
   
@@ -69,11 +71,12 @@
     height: 75px !important;
 }
 .time__slot-length{
-  right: 0px;
+  left: 100%;
+  white-space: nowrap;
 }
 .colorlightgray.else_condition{
-  left: 28px;
+  left: -2px;
 }
 .time__slot--count.else_condition{
-  left: 0;
+  left: -3px;
 }

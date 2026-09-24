@@ -154,7 +154,7 @@
                         <div class="screenShotTime style-scroll" v-if="finalRange?.length && !subSpinner">
                             <ScreenshotTime v-for="log in finalRange" :key="log.time" :logRangeData="log" :active="selectedSlot === log.time" :trackShots="log.trackShot" @update:getScreenShotDetail="getScreenShotDetailFunction" @toggle="selectedSlot = $event" :id="log.time" />
                         </div>
-                        <div class="screenShotTime red mt-50px text-center" v-if="!finalRange?.length && !subSpinner">
+                        <div class="screenShotTime ts-empty mt-50px text-center" v-if="!finalRange?.length && !subSpinner">
                             {{$t('UserTimesheet.no_records_found')}}
                         </div>
                     </div>
@@ -163,7 +163,7 @@
             </div>
         </div>
         <div v-else class="h-100">
-            <NotFound />
+            <AppState kind="denied" />
         </div>
     </div>
 </template>
@@ -182,7 +182,7 @@
     import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
     import * as helper from '@/views/Timesheet/helper';
     import ScreenshotTime from '@/components/atom/TimesheetView/TrackerTimeSheetView/ScreenshotTime'
-    import NotFound from '@/views/NotFound.vue'
+    import AppState from '@/components/molecules/AppState/AppState.vue'
     import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
     import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
     import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
@@ -752,6 +752,7 @@
     }
 </script>
 <style src="../style.css"></style>
+<style src="../legacyTimesheetTheme.css"></style>
 <style scoped>
 .screenShotTime-skelaton--time {
     font-weight: 500;

@@ -174,9 +174,12 @@ html, body, #app {
 :root[data-theme="dark"] .ah-app__view { color: #17161c; }
 :root[data-theme="dark"] .ah-app__view .ah-page { color: var(--ink); }
 /* Legacy Projects.vue wraps the redesigned List/Board/Table in white panels. Darken them only
-   when a redesigned page is inside; legacy views keep their light panels and dark ink. */
+   when a redesigned page, or the themed upgrade wall (.upw), is inside; legacy views keep their
+   light panels and dark ink. */
 :root[data-theme="dark"] .section-right.bg-white:has(.ah-page),
-:root[data-theme="dark"] .list-view-body.bg-light-gray:has(.ah-page) { background: var(--canvas) !important; }
+:root[data-theme="dark"] .list-view-body.bg-light-gray:has(.ah-page),
+:root[data-theme="dark"] .section-right.bg-white:has(.upw),
+:root[data-theme="dark"] .list-view-body.bg-light-gray:has(.upw) { background: var(--canvas) !important; }
 /* The redesigned calendar still sits in the legacy SprintsList card, which is always white. */
 :root[data-theme="dark"] .ah-page .sprint:has(.cv) { background-color: var(--surface); border-color: var(--hairline); }
 /* Legacy utility classes inside the redesigned project toolbars (filter trigger, mic, + View). */
@@ -359,6 +362,22 @@ html, body, #app {
     transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease);
 }
 .ah-tab.is-active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
+
+/* Phone hit areas: the small shared controls keep their drawn size and get a transparent ::before
+   that makes the tappable box at least 32 px. :where() keeps position: relative at zero specificity,
+   so a control that positions itself keeps its own value. .ah-check draws its tick with ::after. */
+@media (max-width: 767px) {
+    :where(.ah-btn--sm, .ah-tab, .ah-switch, .ah-check, .tv-pill) { position: relative; }
+    .ah-btn--sm::before, .ah-tab::before, .ah-switch::before, .ah-check::before, .tv-pill::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: max(100%, 32px);
+        height: max(100%, 32px);
+        transform: translate(-50%, -50%);
+    }
+}
 
 .ah-pop {
     background: var(--surface);

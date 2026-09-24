@@ -123,7 +123,7 @@
 .billing__hourly { display: flex; flex-direction: column; gap: 12px; }
 .billing__hourly-head { display: flex; align-items: center; gap: 10px; }
 .billing__month { color: var(--ink-3); font-size: 10.5px; }
-.billing__month-input { width: 150px; height: 30px; }
+.ah-input.billing__month-input { width: 150px; height: 30px; }
 .billing__rates, .billing__cap { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
 .billing__rates-head, .billing__cap-head { display: flex; align-items: center; gap: 10px; }
 .billing__rates-hint { margin-left: auto; }
@@ -146,7 +146,7 @@
 
 /* ---------- invoices (19c) ---------- */
 .billing__invoice-bar { display: flex; align-items: center; gap: 8px; }
-.billing__pick { width: 240px; height: 30px; }
+.ah-input.billing__pick { width: 240px; height: 30px; }
 .billing__invoice-list { display: flex; flex-direction: column; gap: 8px; }
 .billing__invoice-card {
     display: grid; grid-template-columns: 130px minmax(0, 1fr) auto 110px;

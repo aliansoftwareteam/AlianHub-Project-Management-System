@@ -7,7 +7,7 @@
 .live, .live-toast, .live-toast__btn { box-sizing: border-box; }
 
 .pipe-pick { display: flex; align-items: center; gap: 8px; }
-.pipe-pick__select { height: 32px; max-width: 320px; padding: 0 10px; font-size: 12.5px; }
+.ah-input.pipe-pick__select { height: 32px; max-width: 320px; padding: 0 10px; font-size: 12.5px; }
 
 .pipe-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 

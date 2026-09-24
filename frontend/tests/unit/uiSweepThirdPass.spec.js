@@ -210,3 +210,169 @@ describe('Docs hub', () => {
         expect(ruleBody(phone, '.hub__btn-label')).toMatch(/display:\s*none/);
     });
 });
+
+describe('timesheets and the milestone report without the permission', () => {
+    const views = [
+        'views/Timesheet/ProjectTimesheet/ProjectTimesheet.vue',
+        'views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue',
+        'views/Timesheet/UserTimeSheet/UserTimesheet.vue',
+        'views/Timesheet/WorkloadTimesheet/WorkloadTimesheet.vue',
+        'views/MilestoneReport/MilestoneReport.vue',
+    ];
+
+    test.each(views)('%s says "no access" instead of the 404 card', (rel) => {
+        const vue = read(rel);
+        expect(vue).toMatch(/<AppState [^>]*kind="denied"/);
+        expect(vue).not.toMatch(/import NotFound\b/);
+        expect(vue).not.toMatch(/<NotFound\b/);
+    });
+
+    test('the denied state names the screen and only offers the way home', async () => {
+        const en = (await import('../../src/locales/en.js')).default;
+        expect(en.Inbox.state_denied_title).toBe("You don't have access to this screen");
+        expect(en.Inbox.state_denied_primary).toBe('Go home');
+        expect(en.Inbox.state_denied_secondary).toBeUndefined();
+        const state = read('components/molecules/AppState/AppState.vue');
+        expect(state).toMatch(/denied: false/);
+        expect(state).toMatch(/props\.kind === 'notfound' \|\| props\.kind === 'denied'\) goHome\(\)/);
+    });
+});
+
+describe('Project and Tracker timesheet bodies', () => {
+    const theme = read('views/Timesheet/legacyTimesheetTheme.css');
+
+    test.each(['views/Timesheet/ProjectTimesheet/ProjectTimesheet.vue', 'views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue'])('%s loads the theme bridge', (rel) => {
+        expect(read(rel)).toMatch(/<style src="\.\.\/legacyTimesheetTheme\.css"><\/style>/);
+    });
+
+    test('dark mode maps the light utilities, the table fills and the hour strip onto tokens', () => {
+        expect(theme).toMatch(/:root\[data-theme="dark"\] :is\(\.project-timesheet-contain, \.time_tracker__timesheet\) :is\(\.bg-white,[^{]*\.dp__input\) \{\s*background-color: var\(--surface\);/);
+        expect(theme).toMatch(/:is\(\.GunPowder, \.color47\):not\(\.current_date \*\) \{ color: var\(--ink-2\) !important; \}/);
+        expect(theme).toMatch(/\.timesheet_table :is\(thead, tfoot, th:not\(\.current_date\), tfoot td\) \{ background-color: var\(--surface-2\) !important;/);
+        expect(theme).toMatch(/\.time_tracker__timesheet \.time__slot--count \{ color: var\(--ink-2\); \}/);
+    });
+
+    test('the tracker panel takes the canvas, so it no longer stops part way down', () => {
+        expect(ruleBody(theme, '.time_tracker__timesheet .bg-light-gray')).toMatch(/background-color:\s*var\(--canvas\)/);
+    });
+
+    test('"No records found" is an empty state, not an error', () => {
+        expect(read('views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue')).toMatch(/class="screenShotTime ts-empty mt-50px text-center" v-if="!finalRange\?\.length/);
+        expect(read('components/atom/TimesheetView/ProjectTimeSheetView/ProjectTimesheetView.vue')).toMatch(/class="ts-empty text-center mt-15px">\{\{\$t\('UserTimesheet\.no_records_found'\)/);
+        expect(theme).toMatch(/\.project-timesheet-contain \.ts-empty,\s*\.time_tracker__timesheet \.ts-empty \{ color: var\(--ink-2\); \}/);
+    });
+
+    test('the week range and the 24-hour strip fit at laptop width', () => {
+        expect(read('components/molecules/RangePickerComp/RangePickerComp.vue')).toMatch(/\.timesheet__wrapper \.range-picker\.rangeComp \{\s*min-width: 265px !important;/);
+        const timebar = read('components/atom/TimesheetView/TrackerTimeSheetView/TimebarComponent.css');
+        expect(ruleBody(timebar, '.time-bar')).toMatch(/min-width:\s*1080px/);
+        expect(ruleBody(timebar, '.time__slot-length')).toMatch(/left:\s*100%/);
+    });
+});
+
+describe('phone hit areas on the shared small controls', () => {
+    const css = read('assets/css/tokens.css');
+    const phone = css.slice(css.indexOf('@media (max-width: 767px) {\n    :where(.ah-btn--sm'));
+
+    test('a transparent ::before makes each at least 32 px without changing its drawn size', () => {
+        expect(phone).toMatch(/:where\(\.ah-btn--sm, \.ah-tab, \.ah-switch, \.ah-check, \.tv-pill\) \{ position: relative; \}/);
+        const rule = ruleBody(phone, '.tv-pill::before');
+        expect(rule).toMatch(/width:\s*max\(100%, 32px\)/);
+        expect(rule).toMatch(/height:\s*max\(100%, 32px\)/);
+        expect(rule).not.toMatch(/background|border|box-shadow/);
+    });
+
+    test('the tick of .ah-check keeps ::after to itself', () => {
+        expect(phone).not.toMatch(/\.ah-check::after/);
+        expect(css).toMatch(/\.ah-check:checked::after \{/);
+    });
+});
+
+describe('Settings → Projects apps column', () => {
+    test('the app list does not share class names with the global search palette', () => {
+        const vue = read('components/molecules/ProjectAppsList/ProjectAppsList.vue');
+        expect(vue).not.toMatch(/\bpal(__|\b)/);
+        expect(read('components/molecules/AdvanceSearch/style.css')).toMatch(/^\.pal \{[^}]*max-height/m);
+    });
+
+    test('apps get their own row as a grid, in dark ink on the white card', () => {
+        const css = read('components/molecules/ProjectsListingSetting/style.css');
+        const last = css.slice(css.lastIndexOf('.project_status_info_area {'));
+        expect(ruleBody(last, '.p_erpApp')).toMatch(/flex:\s*1 0 100%/);
+        expect(last).toMatch(/\.p_erpApp \.p__erpApp-wrapper \.pls__apps \{ display: grid; grid-template-columns: repeat\(auto-fill, minmax\(220px, 1fr\)\)/);
+        expect(last).toMatch(/\.pls__apps \{ --ink: #17161c;/);
+    });
+});
+
+describe('upgrade wall', () => {
+    const vue = read('components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue');
+    const css = vue.slice(vue.indexOf('<style scoped>'));
+
+    test('title and message follow the theme instead of fixed black', () => {
+        expect(vue).not.toMatch(/class="[^"]*\bblack\b/);
+        expect(ruleBody(css, '.upw__title')).toMatch(/color:\s*var\(--ink\)/);
+        expect(ruleBody(css, '.upw__message')).toMatch(/color:\s*var\(--ink-label\)/);
+    });
+
+    test('the button keeps white text on a green dark enough to read', () => {
+        expect(vue).not.toMatch(/bg-dark-green-light/);
+        expect(ruleBody(css, '.upw__btn')).toMatch(/background:\s*#15803d;\s*color:\s*#fff/);
+    });
+
+    test('dark mode darkens the legacy project panel the wall sits in', () => {
+        expect(read('assets/css/tokens.css')).toMatch(/:root\[data-theme="dark"\] \.section-right\.bg-white:has\(\.upw\)/);
+    });
+});
+
+describe('fields that set their own size next to .ah-input', () => {
+    const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
+        const full = path.join(dir, d.name);
+        if (d.isDirectory()) return walk(full);
+        return /\.(vue|css)$/.test(d.name) ? [full] : [];
+    });
+    const files = walk(SRC);
+    const vues = files.filter((f) => f.endsWith('.vue')).map((f) => ({ f, text: fs.readFileSync(f, 'utf8') }));
+
+    const sizedWith = new Set();
+    for (const { text } of vues) {
+        for (const m of text.matchAll(/[\s<]class="([^"]*)"/g)) {
+            const list = m[1].split(/\s+/);
+            if (list.includes('ah-input')) list.filter((c) => c && !c.startsWith('ah-')).forEach((c) => sizedWith.add(c));
+        }
+    }
+
+    // A scoped block adds a [data-v] attribute and already out-specifies .ah-input; an @import inside one does not.
+    const scopedSrc = new Set();
+    const unscoped = [];
+    for (const { f, text } of vues) {
+        for (const m of text.matchAll(/<style([^>]*)>([\s\S]*?)<\/style>/g)) {
+            const attrs = m[1];
+            const src = /src="([^"]+)"/.exec(attrs);
+            if (src && /\bscoped\b/.test(attrs)) scopedSrc.add(path.resolve(path.dirname(f), src[1]));
+            else if (!/\bscoped\b/.test(attrs)) unscoped.push({ f, css: m[2] });
+        }
+    }
+    files.filter((f) => f.endsWith('.css') && !scopedSrc.has(f)).forEach((f) => unscoped.push({ f, css: fs.readFileSync(f, 'utf8') }));
+
+    test('no unscoped single-class rule sizes an .ah-input field, which would depend on stylesheet order', () => {
+        const offenders = [];
+        for (const { f, css } of unscoped) {
+            for (const m of css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+                if (!/(^|;)\s*(width|height|padding[\w-]*|font(-size)?|max-width|min-width)\s*:/.test(m[2])) continue;
+                for (const selector of m[1].split(',').map((s) => s.trim())) {
+                    const single = /^\.([\w-]+)$/.exec(selector);
+                    if (single && sizedWith.has(single[1])) offenders.push(`${path.relative(SRC, f)}: ${selector}`);
+                }
+            }
+        }
+        expect(offenders).toEqual([]);
+    });
+
+    test('the sweep\'s fields keep their sizes with two classes', () => {
+        expect(ruleBody(read('views/Settings/SecurityPermissions/style.css'), '.ah-input.sp__search')).toMatch(/max-width:\s*320px/);
+        expect(ruleBody(read('views/Settings/Members/style.css'), '.ah-input.mbv__select')).toMatch(/width:\s*auto/);
+        expect(ruleBody(read('views/Settings/Teams/style.css'), '.ah-input.tm__name-input')).toMatch(/height:\s*30px/);
+        expect(ruleBody(read('views/Billing/style.css'), '.ah-input.billing__pick')).toMatch(/width:\s*240px/);
+        expect(ruleBody(read('views/Timesheet/timeV2.css'), '.ah-input.tv-input-mono')).toMatch(/font:/);
+    });
+});

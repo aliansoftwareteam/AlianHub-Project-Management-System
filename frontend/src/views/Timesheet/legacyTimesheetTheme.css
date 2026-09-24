@@ -1,0 +1,44 @@
+/* The Project and Tracker timesheet bodies are legacy markup on fixed light utility classes
+   (.bg-white, .bg-light-gray, .GunPowder, .color47 ...). These rules map them onto the theme
+   tokens, scoped to the two views so the utilities keep their meaning everywhere else. */
+.project-timesheet-contain .ts-empty,
+.time_tracker__timesheet .ts-empty { color: var(--ink-2); }
+.time_tracker__timesheet.bg-light-gray,
+.time_tracker__timesheet .bg-light-gray { background-color: var(--canvas); }
+
+:root[data-theme="dark"] :is(.project-timesheet-contain, .time_tracker__timesheet) {
+    color: var(--ink);
+}
+:root[data-theme="dark"] :is(.project-timesheet-contain, .time_tracker__timesheet) :is(.bg-white, .btn-white, .wf_filter, .timesheet_user_filter, .tracker-timesheet-calender-wrapper, .dp__input) {
+    background-color: var(--surface);
+    color: var(--ink);
+    border-color: var(--border);
+}
+:root[data-theme="dark"] :is(.project-timesheet-contain, .time_tracker__timesheet) :is(.link_disable_css, .user_hrs_name, .black) { color: var(--ink); }
+:root[data-theme="dark"] :is(.project-timesheet-contain, .time_tracker__timesheet) :is(.GunPowder, .color47):not(.current_date *) { color: var(--ink-2) !important; }
+:root[data-theme="dark"] :is(.project-timesheet-contain, .time_tracker__timesheet) .blue { color: var(--brand) !important; }
+/* Black arrow and chevron images drawn for a white page. */
+:root[data-theme="dark"] :is(.project-timesheet-contain, .time_tracker__timesheet) :is(.taable_arrow, .left__arrow-img, .right__arrow-img) { filter: invert(1) hue-rotate(180deg); }
+:root[data-theme="dark"] .time_tracker__timesheet .date_format_cal.calendar-comp::placeholder { color: var(--ink) !important; }
+
+/* The legacy table sets its header, footer, weekend and today fills with !important, so the dark
+   fills need it too. The current day's header keeps its brand fill and white text. */
+:root[data-theme="dark"] .project-timesheet-contain .timesheet_table { background-color: var(--surface); color: var(--ink-label); }
+:root[data-theme="dark"] .project-timesheet-contain .timesheet_table :is(th, td) { border-color: var(--hairline); }
+:root[data-theme="dark"] .project-timesheet-contain .timesheet_table td { background-color: var(--surface); color: var(--ink-label); }
+:root[data-theme="dark"] .project-timesheet-contain .timesheet_table td :is(div, p) { color: var(--ink-label); }
+:root[data-theme="dark"] .project-timesheet-contain .timesheet_table::before,
+:root[data-theme="dark"] .project-timesheet-contain .timesheet_table::after,
+:root[data-theme="dark"] .project-timesheet-contain .timesheet_table :is(td, th).fixed::after { background-color: var(--hairline); }
+:root[data-theme="dark"] .project-timesheet-contain .timesheet_table :is(thead, tfoot, th:not(.current_date), tfoot td) { background-color: var(--surface-2) !important; color: var(--ink); }
+:root[data-theme="dark"] .project-timesheet-contain .timesheet_table :is(th:not(.current_date), tfoot td) :is(div, p, span:not(.color47), strong, sup) { color: var(--ink); }
+:root[data-theme="dark"] .project-timesheet-contain .timesheet_table :is(th:not(.current_date), td.parent_data_div).weekoff { background-color: var(--warn-bg) !important; }
+:root[data-theme="dark"] .project-timesheet-contain .timesheet_table .weekoff :is(strong, sup) { color: var(--brand); }
+:root[data-theme="dark"] .project-timesheet-contain .timesheet_table td.current_date { background-color: var(--brand-tint) !important; }
+:root[data-theme="dark"] .project-timesheet-contain .timesheet_table td .inner_div span:last-child { background-color: var(--ok-bg); }
+
+:root[data-theme="dark"] .time_tracker__timesheet .time-bar { border-color: var(--hairline); }
+:root[data-theme="dark"] .time_tracker__timesheet .time-slot { border-color: var(--surface); }
+:root[data-theme="dark"] .time_tracker__timesheet .time-slot.inRange { background-color: var(--brand-tint); border-color: transparent; }
+:root[data-theme="dark"] .time_tracker__timesheet .colorlightgray { color: var(--border); }
+:root[data-theme="dark"] .time_tracker__timesheet .time__slot--count { color: var(--ink-2); }
