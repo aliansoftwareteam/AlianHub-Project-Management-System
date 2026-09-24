@@ -5,7 +5,7 @@
 .personal__view { padding: 8px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-2); font: inherit; cursor: pointer; text-decoration: none; }
 .personal__view:hover { color: var(--ink); text-decoration: none; }
 .personal__view.is-active { border-bottom-color: var(--brand); color: var(--ink); font-weight: 600; }
-.personal__view--muted { cursor: default; color: var(--ink-2); }
+.personal__view--muted { cursor: default; color: var(--ink-2); opacity: .7; }
 .personal__group:disabled { opacity: 1; cursor: default; color: var(--ink-2); }
 .ah-tbtn.is-active { border-color: var(--brand); color: var(--brand); background: var(--brand-tint); }
 

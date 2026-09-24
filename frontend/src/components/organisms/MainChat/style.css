@@ -52,7 +52,7 @@
     transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease);
 }
 .mc-icon-btn:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
-.mc-icon-btn:disabled { color: var(--ink-2); cursor: default; }
+.mc-icon-btn:disabled { color: var(--ink-2); opacity: .55; cursor: default; }
 .mc-icon-btn--on, .mc-icon-btn--on:hover:not(:disabled) { background: var(--brand-tint); color: var(--brand); }
 .mc-icon-btn:focus-visible { outline: none; box-shadow: var(--focus); }
 
@@ -274,7 +274,7 @@
     transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease);
 }
 .mc-tool:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
-.mc-tool:disabled { color: var(--ink-2); cursor: default; }
+.mc-tool:disabled { color: var(--ink-2); opacity: .55; cursor: default; }
 .mc-tool--ai { color: var(--brand); }
 .mc-tool--ai:hover:not(:disabled) { background: var(--brand-tint); color: var(--brand); }
 .mc-tool.is-on { background: var(--brand-tint); color: var(--brand); }
@@ -284,10 +284,10 @@
     font: 600 11.5px/1 var(--font-ui); cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
 }
 .mc-send:hover:not(:disabled) { background: var(--brand-tint); }
-.mc-send:disabled { color: var(--ink-2); cursor: default; }
+.mc-send:disabled { color: var(--ink-2); opacity: .55; cursor: default; }
 .mc-send-more { width: 22px; height: 28px; border: 0; border-radius: 0 7px 7px 0; background: transparent; color: var(--brand); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .mc-send-more:hover:not(:disabled) { background: var(--brand-tint); }
-.mc-send-more:disabled { color: var(--ink-2); cursor: default; }
+.mc-send-more:disabled { color: var(--ink-2); opacity: .55; cursor: default; }
 .mc-send-menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 6; }
 .mc-cmd { position: absolute; left: 16px; right: 16px; bottom: calc(100% - 2px); z-index: 6; max-width: 360px; }
 .mc-cmd .ah-pop__item kbd { margin-left: auto; }

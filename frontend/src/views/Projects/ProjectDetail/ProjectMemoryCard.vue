@@ -205,7 +205,7 @@ watch(() => props.projectId, (id) => {
 .pm__add-text, .pm__edit { flex: 1; min-width: 200px; height: 32px; }
 .pm__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .pm__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font: var(--text-small); color: var(--ink); }
-.pm__row.is-retired .pm__text { color: var(--ink-2); text-decoration: line-through; }
+.pm__row.is-retired .pm__text { color: var(--ink-2); text-decoration: line-through; opacity: .75; }
 .pm__text { flex: 1; min-width: 160px; }
 .pm__none, .pm__empty { margin: 0; }
 .pm__toggle { align-self: flex-start; }

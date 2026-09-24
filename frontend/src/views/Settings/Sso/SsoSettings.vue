@@ -384,7 +384,7 @@ onMounted(load);
 .sso__idp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .sso__idp-head .sso__link { margin-left: auto; }
 .sso__link { border: 0; background: transparent; color: var(--brand); font: 600 12px/1 var(--font-ui); cursor: pointer; padding: 4px 2px; }
-.sso__link:disabled { color: var(--ink-2); cursor: not-allowed; }
+.sso__link:disabled { color: var(--ink-2); opacity: .55; cursor: not-allowed; }
 .sso__link:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
 .sso__form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .sso__span { grid-column: 1 / -1; }

@@ -55,6 +55,22 @@ describe('--ink-3 is retired for text', () => {
         expect(offenders).toEqual([]);
     });
 
+    // These states used --ink-3's lighter tone as their only cue; opacity keeps them distinct.
+    test.each([
+        ['components/organisms/MainChat/style.css', '.mc-icon-btn:disabled', '.55'],
+        ['components/organisms/MainChat/style.css', '.mc-tool:disabled', '.55'],
+        ['components/organisms/MainChat/style.css', '.mc-send:disabled', '.55'],
+        ['components/organisms/MainChat/style.css', '.mc-send-more:disabled', '.55'],
+        ['views/Settings/Sso/SsoSettings.vue', '.sso__link:disabled', '.55'],
+        ['views/PersonalList/style.css', '.personal__view--muted', '.7'],
+        ['views/Projects/ListView/style.css', '.lv2__row.is-sub.is-done .lv2__name', '.75'],
+        ['views/Projects/ProjectDetail/ProjectMemoryCard.vue', '.pm__row.is-retired .pm__text', '.75'],
+    ])('%s %s keeps a visible cue with opacity %s', (file, selector, opacity) => {
+        const rule = block(fs.readFileSync(path.join(SRC, file), 'utf8'), selector);
+        expect(rule).toContain('color: var(--ink-2)');
+        expect(rule).toMatch(new RegExp(`opacity:\\s*${opacity.replace('.', '\\.')}\\s*;`));
+    });
+
     test.each(Object.keys(themes))('--ink-2 reads at 4.5:1 or better on --surface and --canvas in %s', (theme) => {
         const ink2 = tokenIn(themes[theme], '--ink-2');
         for (const surface of ['--surface', '--canvas']) {

@@ -133,7 +133,7 @@
 }
 .lv2__name:hover { color: var(--brand); }
 .lv2__row.is-sub .lv2__name { font-weight: 400; }
-.lv2__row.is-sub.is-done .lv2__name { text-decoration: line-through; color: var(--ink-2); }
+.lv2__row.is-sub.is-done .lv2__name { text-decoration: line-through; color: var(--ink-2); opacity: .75; }
 .lv2__key { font: 500 10px/1 var(--font-mono); color: var(--ink-label); flex: none; }
 .lv2__timer { font: 500 10px/1 var(--font-mono); color: var(--ok-ink); display: inline-flex; align-items: center; gap: 4px; flex: none; }
 .lv2__agent-line {
