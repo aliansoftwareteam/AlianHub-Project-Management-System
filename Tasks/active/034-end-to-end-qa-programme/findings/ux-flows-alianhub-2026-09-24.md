@@ -319,3 +319,15 @@ Frequency: how often a typical team member hits the flow (D daily, W weekly, R r
 | 15 | Invite form: two required selects without defaults, and Send enabled early (F6-c) | 6 | R | low | Default the role to Member; make designation optional, or pre-select the first one. |
 
 **Screenshots** (not committed) are in the worktree under `ux-shots/`, named `<flow>-<step>-<width>.jpg`. There are 130+ files at 1280 and 390.
+
+## The same flows in ClickUp (observed read-only, 2026-09-24)
+
+| Flow | ClickUp | AlianHub today |
+|---|---|---|
+| Create a task from anywhere | A "Create task" icon in the top bar of every screen opens a dialog with the title already focused; the location defaults to the current list; status, assignee, due date, priority and tags sit in one chip row; custom fields stay folded. Click, type, Enter. | Home only; the palette's "New task" opens nothing (rank 4). |
+| Several tasks in a row in a list | An "Add Task" row at the foot of each status group stays open after Enter. | The row closes after each Enter (rank 5). |
+| Change status from the list | The status circle on each row opens a grouped status picker: two clicks, no task opened. | Status changes need the task panel or the bulk bar. |
+| Assignee, due date, priority from the list | Inline cells with empty-state icons, one click each. | Cells exist in Table view; List needs the task panel. |
+| Row actions | On hover: add subtask, rename, tags, copy link, row menu. | Row menu only. |
+| Filter to my work | "Me mode" in the view toolbar, remembered with the view. | "Me" exists but does nothing in List and isn't remembered (ranks 1 and 8). |
+| Park a task while doing something else | Minimised tasks and drafts wait in a bottom tray. | No equivalent (not proposed here). |
