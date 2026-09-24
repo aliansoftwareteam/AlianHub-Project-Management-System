@@ -40,7 +40,7 @@
     white-space: nowrap;
 }
 .sbf__row.is-folder .sbf__name { color: var(--ink); font-weight: 500; }
-.sbf__count { color: var(--ink-3); white-space: nowrap; }
+.sbf__count { color: var(--ink-2); white-space: nowrap; }
 
 .sbf__children { padding-left: 16px; }
 .sbf__tasks { max-height: 231px; overflow: auto; padding-left: 16px; }

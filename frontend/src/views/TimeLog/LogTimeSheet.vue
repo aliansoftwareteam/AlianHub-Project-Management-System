@@ -358,7 +358,7 @@ defineExpose({ formatClock });
 .lt--page { min-height: 100%; }
 .lt__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--hairline); flex: none; }
 .lt__title { font: 600 16px/1.2 var(--font-ui); }
-.lt__sub { font: 500 9.5px/1.2 var(--font-mono); color: var(--ink-3); margin-top: 3px; text-transform: uppercase; }
+.lt__sub { font: 500 9.5px/1.2 var(--font-mono); color: var(--ink-2); margin-top: 3px; text-transform: uppercase; }
 .lt__close { padding: 0 8px; }
 .lt__body { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
 .lt__alert { background: var(--surface); border: 1.5px solid var(--warn); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; }
@@ -369,7 +369,7 @@ defineExpose({ formatClock });
 .lt__task-btn { width: 100%; min-height: 44px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--ink); padding: 0 12px; display: flex; align-items: center; gap: 8px; font: 400 13px/1.2 var(--font-ui); cursor: pointer; text-align: left; }
 .lt__task-btn:focus-visible { outline: none; border-color: var(--brand); box-shadow: var(--focus); }
 .lt__task-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lt__task-name.is-placeholder { color: var(--ink-3); }
+.lt__task-name.is-placeholder { color: var(--ink-2); }
 .lt__pop { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20; max-height: 320px; display: flex; flex-direction: column; }
 .lt__search { margin-bottom: 4px; height: 34px; }
 .lt__pop-list { overflow: auto; min-height: 0; }

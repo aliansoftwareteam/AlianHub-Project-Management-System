@@ -361,7 +361,7 @@ onMounted(load);
 .ai-audit { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .ai-audit__item { display: flex; flex-direction: column; }
 .ai-audit__row { display: flex; align-items: center; gap: 10px; font: var(--text-small); flex-wrap: wrap; }
-.ai-audit__at { color: var(--ink-3); }
+.ai-audit__at { color: var(--ink-2); }
 .ai-audit__what { flex: 1; min-width: 0; color: var(--ink); }
 .ai-danger { border-color: var(--danger-ink, #b42318); }
 </style>

@@ -5,7 +5,7 @@
     color: var(--ink);
     font: var(--text-body);
 }
-.mbv__seats { color: var(--ink-3); }
+.mbv__seats { color: var(--ink-2); }
 
 .mbv__invite {
     display: flex;
@@ -51,7 +51,7 @@
     font: 400 13px/1 var(--font-ui);
     height: 30px;
 }
-.mbv__chip-input::placeholder { color: var(--ink-3); }
+.mbv__chip-input::placeholder { color: var(--ink-2); }
 .ah-input.mbv__select { width: auto; min-width: 140px; height: 42px; }
 
 .mbv__meaning {
@@ -73,7 +73,7 @@
 .mbv__muted { color: var(--ink-2); }
 
 .mbv__bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.mbv__tab-n { margin-left: 6px; color: var(--ink-3); }
+.mbv__tab-n { margin-left: 6px; color: var(--ink-2); }
 .mbv__search {
     margin-left: auto;
     display: flex;

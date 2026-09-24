@@ -13,7 +13,7 @@
 
 .billing__bar { padding: 0 24px; gap: 10px; flex: none; }
 .billing__title { font: 600 18px/1.2 var(--font-ui); letter-spacing: -.3px; margin: 0; }
-.billing__client { color: var(--ink-3); font-size: 10.5px; }
+.billing__client { color: var(--ink-2); font-size: 10.5px; }
 .billing__tabs { display: flex; gap: 2px; margin-left: 14px; }
 .billing__tab {
     display: inline-flex; align-items: center; gap: 6px;
@@ -23,7 +23,7 @@
 }
 .billing__tab:hover { color: var(--ink); }
 .billing__tab.is-active { border-bottom-color: var(--brand); color: var(--ink); font-weight: 600; }
-.billing__count { font-size: 10px; color: var(--ink-3); }
+.billing__count { font-size: 10px; color: var(--ink-2); }
 
 .billing__state { padding: 20px 24px; color: var(--ink-2); margin: 0; }
 
@@ -122,7 +122,7 @@
 /* ---------- hourly (19b) ---------- */
 .billing__hourly { display: flex; flex-direction: column; gap: 12px; }
 .billing__hourly-head { display: flex; align-items: center; gap: 10px; }
-.billing__month { color: var(--ink-3); font-size: 10.5px; }
+.billing__month { color: var(--ink-2); font-size: 10.5px; }
 .ah-input.billing__month-input { width: 150px; height: 30px; }
 .billing__rates, .billing__cap { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
 .billing__rates-head, .billing__cap-head { display: flex; align-items: center; gap: 10px; }
@@ -170,7 +170,7 @@
 }
 .billing__sheet-head { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--hairline); }
 .billing__sheet-title { font-size: 14.5px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-.billing__sheet-period { color: var(--ink-3); font-size: 10.5px; }
+.billing__sheet-period { color: var(--ink-2); font-size: 10.5px; }
 .billing__sheet-body { flex: 1; min-height: 0; overflow: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
 .billing__line { display: grid; grid-template-columns: minmax(0, 1fr) 60px 80px 90px; gap: 10px; align-items: center; }
 .billing__line--head { font: var(--text-label); color: var(--ink-label); border-bottom: 1px solid var(--hairline); padding-bottom: 7px; letter-spacing: .04em; }
@@ -208,12 +208,12 @@
 .billing__client-head { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--hairline); }
 .billing__client-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--brand); flex: none; }
 .billing__client-title { font-size: 14px; font-weight: 600; }
-.billing__client-shared { color: var(--ink-3); font-size: 10.5px; }
+.billing__client-shared { color: var(--ink-2); font-size: 10.5px; }
 .billing__client-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; padding: 22px 26px; }
 .billing__client-col { display: flex; flex-direction: column; gap: 14px; }
 .billing__client-card { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
 .billing__client-card-head { display: flex; align-items: baseline; gap: 10px; }
-.billing__client-count { color: var(--ink-3); font-size: 10.5px; }
+.billing__client-count { color: var(--ink-2); font-size: 10.5px; }
 
 .billing__track { display: flex; align-items: flex-start; }
 .billing__track-step { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
@@ -224,7 +224,7 @@
 .billing__track-bar span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--brand); }
 .billing__track-name { font-size: 11.5px; font-weight: 600; padding-right: 8px; }
 .billing__track-name.is-muted { color: var(--ink-label); }
-.billing__track-meta { font-size: 10px; color: var(--ink-3); padding-right: 8px; }
+.billing__track-meta { font-size: 10px; color: var(--ink-2); padding-right: 8px; }
 .billing__track-meta.is-done { color: var(--ok-ink); }
 .billing__track-meta.is-in_progress { color: var(--brand); }
 
@@ -236,7 +236,7 @@
 .billing__waiting-title { font-weight: 600; }
 
 .billing__update { display: flex; gap: 10px; }
-.billing__update-date { color: var(--ink-3); font-size: 10px; width: 48px; flex: none; }
+.billing__update-date { color: var(--ink-2); font-size: 10px; width: 48px; flex: none; }
 .billing__update-text { flex: 1; color: var(--ink-label); line-height: 1.45; }
 
 .billing__client-invoice { display: flex; align-items: center; gap: 9px; }

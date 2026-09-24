@@ -194,10 +194,10 @@ onMounted(() => { if (!isMobile.value) load(); });
 .cp__hpd .ah-input { width: 56px; height: 30px; padding: 0 8px; }
 .cp__chart { display: flex; flex-direction: column; gap: 12px; }
 .cp__row { display: grid; grid-template-columns: 110px repeat(var(--months), 1fr); gap: 8px; align-items: end; height: 110px; }
-.cp__row--head { height: auto; font: var(--text-label); letter-spacing: .06em; color: var(--ink-3); text-align: center; }
+.cp__row--head { height: auto; font: var(--text-label); letter-spacing: .06em; color: var(--ink-2); text-align: center; }
 .cp__row--whatif { height: 40px; align-items: center; }
 .cp__team { align-self: center; font-weight: 600; display: flex; flex-direction: column; min-width: 0; }
-.cp__team small { font: 500 10.5px/1.2 var(--font-mono); color: var(--ink-3); }
+.cp__team small { font: 500 10.5px/1.2 var(--font-mono); color: var(--ink-2); }
 .cp__team--whatif { color: var(--brand); font-size: 11.5px; }
 .cp__track { position: relative; height: 100%; background: rgba(0, 0, 0, .06); border-radius: 5px; overflow: hidden; }
 :root[data-theme="dark"] .cp__track { background: rgba(255, 255, 255, .08); }

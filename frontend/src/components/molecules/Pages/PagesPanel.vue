@@ -261,7 +261,7 @@ function requestClose() {
 }
 .pg__icon:hover { background: var(--surface-hover); color: var(--ink); }
 .pg__search { position: relative; }
-.pg__search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
+.pg__search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ink-2); pointer-events: none; }
 .pg__search-input { height: 32px; padding-left: 30px; font-size: 12.5px; }
 .pg__tree { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
 .pg__empty { color: var(--ink-2); font-size: 12.5px; padding: 12px 8px; }
@@ -273,10 +273,10 @@ function requestClose() {
 }
 .pg__row:hover { background: var(--surface-hover); }
 .pg__row.is-active { background: var(--brand-tint); color: var(--brand); font-weight: 600; }
-.pg__twisty { flex: 0 0 14px; width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-3); transition: transform var(--t-state) var(--ease); }
+.pg__twisty { flex: 0 0 14px; width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); transition: transform var(--t-state) var(--ease); }
 .pg__twisty.is-open { transform: rotate(90deg); }
 .pg__twisty.is-leaf { cursor: default; }
-.pg__row-icon { flex: none; color: var(--ink-3); }
+.pg__row-icon { flex: none; color: var(--ink-2); }
 .pg__row.is-active .pg__row-icon { color: var(--brand); }
 .pg__row-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pg__row-add { flex: 0 0 auto; width: 20px; height: 20px; border: 0; background: none; padding: 0; color: var(--ink-2); border-radius: 4px; cursor: pointer; opacity: 0; display: inline-flex; align-items: center; justify-content: center; }
@@ -286,7 +286,7 @@ function requestClose() {
 .pg__main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; }
 .pg__blank { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; position: relative; padding: 24px; text-align: center; }
 .pg__blank-close { position: absolute; top: 14px; right: 16px; }
-.pg__blank-icon { color: var(--ink-3); }
+.pg__blank-icon { color: var(--ink-2); }
 .pg__blank-text { margin: 0; }
 .pg__blank-hint { margin: 0 0 6px; max-width: 360px; }
 

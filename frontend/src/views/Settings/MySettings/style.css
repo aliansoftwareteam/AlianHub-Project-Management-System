@@ -28,7 +28,7 @@
 .ms__day.is-on { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
 .ms__day:focus-visible { outline: none; box-shadow: var(--focus); }
 .ms__wh .ms__time { width: 110px; height: 34px; padding: 0 10px; }
-.ms__arrow { color: var(--ink-3); }
+.ms__arrow { color: var(--ink-2); }
 .ms__cap { display: flex; align-items: center; gap: 6px; }
 .ms__wh .ms__cap-input { width: 72px; height: 34px; padding: 0 10px; }
 .ms__theme { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }

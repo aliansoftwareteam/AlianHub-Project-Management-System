@@ -16,14 +16,14 @@
 .ai-agent__skills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
 .ai-agent__today { font: var(--text-small); color: var(--ink-2); }
 .ai-agent__today b { color: var(--ink); font-weight: 600; }
-.ai-agent__needs { color: var(--ink-3); margin: 0; }
+.ai-agent__needs { color: var(--ink-2); margin: 0; }
 .ai-agent__foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--hairline); }
-.ai-agent__trigger { margin-left: auto; font: var(--text-data); color: var(--ink-3); }
+.ai-agent__trigger { margin-left: auto; font: var(--text-data); color: var(--ink-2); }
 .ai-agent--paused { opacity: .72; }
 
 .ai-ladder { margin-top: 16px; }
 .ai-ladder__steps { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.ai-ladder__arrow { color: var(--ink-3); }
+.ai-ladder__arrow { color: var(--ink-2); }
 .ai-ladder__rule { margin-top: 10px; font: var(--text-small); color: var(--ink-2); }
 
 .ai-templates { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
@@ -42,7 +42,7 @@
 .ai-item.is-active { background: var(--brand-tint); }
 .ai-item__top { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
 .ai-item__agent { font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
-.ai-item__time { margin-left: auto; font: var(--text-data); color: var(--ink-3); }
+.ai-item__time { margin-left: auto; font: var(--text-data); color: var(--ink-2); }
 .ai-item__what { font: 600 13px/1.35 var(--font-ui); color: var(--ink); }
 .ai-item__why { font: var(--text-small); color: var(--ink-2); margin-top: 3px; }
 
@@ -53,7 +53,7 @@
 .ai-change { display: flex; align-items: center; gap: 10px; padding: 10px 13px; border: 1px solid var(--hairline); border-radius: 9px; background: var(--surface); margin-bottom: 7px; }
 .ai-change__label { flex: 1; min-width: 0; font: 500 12.5px/1.35 var(--font-ui); }
 .ai-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
-.ai-cost { margin-top: 14px; font: var(--text-data); color: var(--ink-3); }
+.ai-cost { margin-top: 14px; font: var(--text-data); color: var(--ink-2); }
 .ai-detail__empty { display: flex; align-items: center; justify-content: center; height: 100%; padding: 40px; }
 .ai-done { text-align: center; padding: 48px 24px; }
 .ai-done__n { font: var(--text-display); color: var(--ink); }

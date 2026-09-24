@@ -80,7 +80,7 @@
 }
 .lv2__caret {
     font-size: 10px;
-    color: var(--ink-3);
+    color: var(--ink-2);
     width: 10px;
     flex: none;
     transition: transform var(--t-state) var(--ease);
@@ -120,7 +120,7 @@
 .lv2__title--sub { padding-left: 22px; }
 .lv2__disclose {
     background: none; border: 0; padding: 0;
-    font-size: 10px; color: var(--ink-3); cursor: pointer; line-height: 1;
+    font-size: 10px; color: var(--ink-2); cursor: pointer; line-height: 1;
     width: 10px; flex: none;
 }
 .lv2__name {
@@ -133,7 +133,7 @@
 }
 .lv2__name:hover { color: var(--brand); }
 .lv2__row.is-sub .lv2__name { font-weight: 400; }
-.lv2__row.is-sub.is-done .lv2__name { text-decoration: line-through; color: var(--ink-3); }
+.lv2__row.is-sub.is-done .lv2__name { text-decoration: line-through; color: var(--ink-2); }
 .lv2__key { font: 500 10px/1 var(--font-mono); color: var(--ink-label); flex: none; }
 .lv2__timer { font: 500 10px/1 var(--font-mono); color: var(--ok-ink); display: inline-flex; align-items: center; gap: 4px; flex: none; }
 .lv2__agent-line {
@@ -145,7 +145,7 @@
 }
 .lv2__grip {
     opacity: 0;
-    color: var(--ink-3);
+    color: var(--ink-2);
     cursor: grab;
     display: inline-flex;
     flex: none;
@@ -158,7 +158,7 @@
 .lv2__due { color: var(--ink-2); text-transform: capitalize; }
 .lv2__due--overdue { color: var(--danger); }
 .lv2__est { font: 500 11px/1 var(--font-mono); color: var(--ink); }
-.lv2__row.is-sub .lv2__est { color: var(--ink-3); }
+.lv2__row.is-sub .lv2__est { color: var(--ink-2); }
 
 .lv2__risk {
     display: inline-flex; align-items: center; gap: 5px;
@@ -174,7 +174,7 @@
 .lv2__add {
     display: flex; align-items: center; gap: 9px;
     padding: 8px 12px 8px 50px;
-    color: var(--ink-3);
+    color: var(--ink-2);
     font-size: 12.5px;
     background: none; border: 0; width: 100%; text-align: left;
     cursor: pointer;
@@ -196,7 +196,7 @@
 .lv2__collapsed-item:hover { color: var(--ink); }
 .lv2__collapsed-count { font: var(--text-data); color: var(--ink-label); }
 
-.lv2__empty-group { margin: 0; padding: 10px 12px; color: var(--ink-3); font-size: 12px; }
+.lv2__empty-group { margin: 0; padding: 10px 12px; color: var(--ink-2); font-size: 12px; }
 .lv2__skeleton { height: 44px; border-radius: var(--r-card); }
 
 /* Handoff 29b — who did the work, who checked it, who closed it. */

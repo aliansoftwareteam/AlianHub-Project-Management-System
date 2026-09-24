@@ -344,7 +344,7 @@ onMounted(load);
 <style scoped>
 .rtx { display: flex; flex-direction: column; height: 100%; background: var(--canvas); color: var(--ink); font: var(--text-body); }
 .rtx__bar { gap: 10px; }
-.rtx__count { color: var(--ink-3); }
+.rtx__count { color: var(--ink-2); }
 .rtx__body { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; }
 
 .rtx__editor { border: 1.5px solid var(--brand); }
@@ -359,8 +359,8 @@ onMounted(load);
     font: 600 13px/1.3 var(--font-ui);
     outline: none;
 }
-.rtx__name-input::placeholder { color: var(--ink-3); }
-.rtx__project { color: var(--ink-3); white-space: nowrap; }
+.rtx__name-input::placeholder { color: var(--ink-2); }
+.rtx__project { color: var(--ink-2); white-space: nowrap; }
 
 .rtx__toggle { display: inline-flex; align-items: center; cursor: pointer; flex: none; }
 .rtx__toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
@@ -443,7 +443,7 @@ onMounted(load);
 }
 .rtx__row-name { font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rtx__row-sub { font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rtx__next { color: var(--ink-3); white-space: nowrap; }
+.rtx__next { color: var(--ink-2); white-space: nowrap; }
 
 @media (max-width: 767px) {
     .rtx__body { padding: 14px 12px; }

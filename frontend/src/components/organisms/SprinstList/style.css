@@ -744,7 +744,7 @@ span.duedate-new .due-date span, span.key-new {
 .spr__title-wrap { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .spr__title { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .spr__name { font-weight: 600; text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.spr__window { color: var(--ink-3); white-space: nowrap; }
+.spr__window { color: var(--ink-2); white-space: nowrap; }
 .spr__bar { height: 5px; max-width: 200px; border-radius: 99px; background: rgba(0, 0, 0, .07); overflow: hidden; }
 :root[data-theme="dark"] .spr__bar { background: rgba(255, 255, 255, .12); }
 .spr__bar-fill { height: 100%; border-radius: 99px; background: var(--brand); transition: width var(--t-state) var(--ease); }

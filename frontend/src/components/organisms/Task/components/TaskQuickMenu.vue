@@ -121,6 +121,6 @@ const horizontalDots = require('@/assets/images/svg/horizontalDots.svg');
 .tqm__item { display: flex; align-items: center; width: 100%; }
 .tqm__item--ai { color: var(--brand); font-weight: 600; }
 .tqm__item--danger { color: var(--danger); }
-.tqm__hint { margin-left: auto; font: 500 10px/1 var(--font-mono); color: var(--ink-3); }
+.tqm__hint { margin-left: auto; font: 500 10px/1 var(--font-mono); color: var(--ink-2); }
 .tqm__sep { height: 1px; background: var(--hairline); margin: 3px 0; }
 </style>

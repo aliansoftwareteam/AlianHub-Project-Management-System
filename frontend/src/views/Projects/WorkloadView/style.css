@@ -41,7 +41,7 @@
     align-items: stretch;
     height: 74px;
 }
-.wv__row--head { height: auto; font: var(--text-label); letter-spacing: .06em; color: var(--ink-3); text-align: center; }
+.wv__row--head { height: auto; font: var(--text-label); letter-spacing: .06em; color: var(--ink-2); text-align: center; }
 .wv__row--head .is-today { color: var(--brand); }
 
 .wv__person { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -70,7 +70,7 @@
     background: repeating-linear-gradient(45deg, var(--surface-hover) 0 4px, transparent 4px 8px);
     border-color: var(--hairline);
 }
-.wv__pto { font: 500 9.5px/1 var(--font-mono); color: var(--ink-3); }
+.wv__pto { font: 500 9.5px/1 var(--font-mono); color: var(--ink-2); }
 .wv__fill {
     background: var(--brand);
     border-radius: 4px;
@@ -97,7 +97,7 @@
 .wv__chip-task:active { cursor: grabbing; }
 .wv__chip-task--more { color: var(--ink-2); font-family: var(--font-mono); cursor: default; }
 .wv__total { display: grid; place-items: center; font: 600 12px/1 var(--font-mono); }
-.wv__total small { font: 400 10px/1 var(--font-mono); color: var(--ink-3); }
+.wv__total small { font: 400 10px/1 var(--font-mono); color: var(--ink-2); }
 .wv__total.is-over { color: var(--danger); }
 .wv__empty { grid-column: 1 / -1; text-align: center; }
 .wv__error { margin: 0; }

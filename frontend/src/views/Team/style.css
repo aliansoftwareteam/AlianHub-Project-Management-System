@@ -35,7 +35,7 @@
 .team__standup-line { margin: 0 0 6px; font: var(--text-body); line-height: 1.55; color: var(--ink); }
 .team__activity { display: flex; gap: 10px; align-items: baseline; line-height: 1.5; font: var(--text-body); margin-bottom: 7px; }
 .team__activity:last-child { margin-bottom: 0; }
-.team__activity-at { width: 42px; flex: none; color: var(--ink-3); }
+.team__activity-at { width: 42px; flex: none; color: var(--ink-2); }
 
 @media (max-width: 1280px) {
     .team__row { grid-template-columns: 160px 1fr 120px 100px; }

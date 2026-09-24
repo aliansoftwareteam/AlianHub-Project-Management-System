@@ -142,10 +142,10 @@ onMounted(load);
 .tr__row { border-bottom: 1px solid var(--hairline); font: 400 12.5px var(--font-ui); color: var(--ink); transition: background var(--t-state) var(--ease); }
 .tr__row:last-child { border-bottom: 0; }
 .tr__row:hover { background: var(--surface-hover); }
-.tr__row-icon { color: var(--ink-3); }
+.tr__row-icon { color: var(--ink-2); }
 .tr__row-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
 .tr__row-project { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tr__row-time { font: 500 10.5px var(--font-mono); color: var(--ink-3); }
+.tr__row-time { font: 500 10.5px var(--font-mono); color: var(--ink-2); }
 @media (max-width: 767px) {
     .tr { padding: 14px 12px; }
     .tr__cols, .tr__row { grid-template-columns: 20px minmax(0, 1fr) auto; }

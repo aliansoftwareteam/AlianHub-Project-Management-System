@@ -168,7 +168,7 @@
 .live__label { color: var(--ink-2); flex: none; }
 .live__item { display: flex; align-items: center; gap: 6px; flex: none; }
 .live__item strong { color: var(--ink); font-weight: 600; }
-.live__sep { color: var(--ink-3); margin-right: 4px; }
+.live__sep { color: var(--ink-2); margin-right: 4px; }
 .live__avatar { flex: none; }
 .live__pause {
     margin-left: auto;

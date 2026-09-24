@@ -384,20 +384,20 @@ onMounted(load);
 .sso__idp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .sso__idp-head .sso__link { margin-left: auto; }
 .sso__link { border: 0; background: transparent; color: var(--brand); font: 600 12px/1 var(--font-ui); cursor: pointer; padding: 4px 2px; }
-.sso__link:disabled { color: var(--ink-3); cursor: not-allowed; }
+.sso__link:disabled { color: var(--ink-2); cursor: not-allowed; }
 .sso__link:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
 .sso__form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .sso__span { grid-column: 1 / -1; }
 .sso__values { padding: 10px 12px; background: var(--surface-2); border-radius: 8px; display: flex; flex-direction: column; gap: 5px; font: 400 11.5px/1.4 var(--font-mono); color: var(--ink-label); }
 .sso__value { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.sso__value-label { width: 110px; flex: none; color: var(--ink-3); }
+.sso__value-label { width: 110px; flex: none; color: var(--ink-2); }
 .sso__value-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
 .sso__chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 38px; padding: 5px 8px; border: 1.5px solid var(--border); border-radius: var(--r-input); background: var(--surface); }
 .sso__chips:focus-within { border-color: var(--brand); box-shadow: var(--focus); }
 .sso__chip-x { border: 0; background: transparent; color: inherit; font-size: 13px; line-height: 1; cursor: pointer; padding: 0 2px; }
 .sso__chip-input { flex: 1; min-width: 140px; border: 0; background: transparent; color: var(--ink); font: 400 13px/1 var(--font-ui); height: 26px; }
 .sso__chip-input:focus { outline: none; }
-.sso__chip-input::placeholder { color: var(--ink-3); }
+.sso__chip-input::placeholder { color: var(--ink-2); }
 .sso__verify { display: flex; flex-direction: column; gap: 8px; }
 .sso__verify-row { display: flex; flex-direction: column; gap: 6px; }
 .sso__verify-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

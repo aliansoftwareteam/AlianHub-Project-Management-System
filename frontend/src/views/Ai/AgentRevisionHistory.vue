@@ -162,7 +162,7 @@ onMounted(load);
 .ai-revisions__row.is-live { background: var(--brand-tint); }
 .ai-revisions__row.is-highlight td { box-shadow: inset 3px 0 0 var(--brand); }
 .ai-revisions__who, .ai-revisions__what { display: flex; flex-direction: column; gap: 2px; min-width: 140px; }
-.ai-revisions__who .ah-small, .ai-revisions__what .ah-small { color: var(--ink-3); }
+.ai-revisions__who .ah-small, .ai-revisions__what .ah-small { color: var(--ink-2); }
 .ai-revisions__controls { text-align: right; white-space: nowrap; }
 .ai-revisions__diff { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline); }
 .ai-revisions__none { margin: 6px 0 0; color: var(--ink-2); }
