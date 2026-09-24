@@ -61,6 +61,10 @@ describe('public form', () => {
         expect(source).toMatch(/\.intro,\.help,\.footer,\.drop \.hint\{color:\$\{muted\}\}/);
     });
 
+    test('the sent confirmation is announced, since it fades after two seconds', () => {
+        expect(source).toMatch(/<div class="note ok" role="status">/);
+    });
+
     test('unselected rating stars are visible as controls (3:1) in both themes', () => {
         const [, dark, light] = /\.stars label\{color:\$\{dark \? '(#[0-9a-f]{6})' : '(#[0-9a-f]{6})'\}\}/.exec(source);
         expect(contrast(light, '#ffffff')).toBeGreaterThanOrEqual(3);

@@ -168,7 +168,7 @@ const redirectAfterSubmit = (res, token) => res
  * other caller cannot word it differently. */
 const sentBanner = (form) => {
     const thanks = form.successMessage || 'Thanks - your submission has been received.';
-    return `<div class="note ok"><span class="tick">&#10003;</span><span>${escapeHtml(thanks)}</span></div>`;
+    return `<div class="note ok" role="status"><span class="tick">&#10003;</span><span>${escapeHtml(thanks)}</span></div>`;
 };
 
 /* Resolve token -> tenant -> form. The GLOBAL index exists because a public
