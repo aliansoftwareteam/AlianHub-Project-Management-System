@@ -84,6 +84,32 @@ test.describe('accessibility: everyday flows as the owner', () => {
         expect(await blockingViolations(page)).toEqual([]);
     });
 
+    test('List row controls: status circle, inline cells, row actions and menu', async ({ page, state, loginAs }) => {
+        const owner = await loginAs('owner');
+        const suffix = uniqueSuffix();
+        const project = await createProject(owner.api, { name: `A11Y ROW ${suffix}`, assigneeIds: [owner.uid], createdBy: owner.uid });
+        const task = await createTask(owner.api, { project, name: `Row ${suffix}`, user: state.users.owner, companyOwnerId: owner.uid });
+        await page.goto(`/#/${state.companyId}/project/${project._id}/s/${task.sprintId}`);
+        const row = page.locator('.lv2__row:not(.is-sub)').first();
+        await expect(row.getByRole('button', { name: /^Status: .+, change$/ })).toBeVisible();
+        await expect(row.getByRole('button', { name: 'Assignee: none, set' })).toBeAttached();
+        await expect(row.getByRole('button', { name: 'Due date: none, set' })).toBeAttached();
+
+        await row.getByRole('button', { name: /^Status: .+, change$/ }).focus();
+        await expect(row.locator('.lv2__actions')).toBeVisible();
+        expect(await blockingViolations(page)).toEqual([]);
+
+        await row.locator('[data-action="menu"]').click();
+        await expect(row.getByRole('menu')).toBeVisible();
+        expect(await blockingViolations(page)).toEqual([]);
+        await page.keyboard.press('Escape');
+        await expect(row.getByRole('menu')).toHaveCount(0);
+
+        await row.getByRole('button', { name: /^Status: .+, change$/ }).press('Enter');
+        await expect(page.getByRole('dialog', { name: 'Select Task Status' })).toBeVisible();
+        expect(await blockingViolations(page)).toEqual([]);
+    });
+
     test('task detail overlay', async ({ page, state }) => {
         const task = state.tasks[0];
         await page.goto(`/#/${state.companyId}/project/${task.projectId}/s/${task.sprintId}?task=${task._id}`);

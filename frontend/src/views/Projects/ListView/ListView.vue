@@ -46,7 +46,7 @@
                         <span class="lv2__c-title" role="columnheader">{{ $t('List.col_task') }}</span>
                         <span class="lv2__c-assignee" role="columnheader">{{ $t('List.col_assignee') }}</span>
                         <span class="lv2__c-due" role="columnheader">{{ $t('List.col_due') }}</span>
-                        <span class="lv2__c-prio" role="columnheader">{{ $t('List.col_priority') }}</span>
+                        <span class="lv2__c-prio" role="columnheader"><template v-if="rowEdit.showPriority.value">{{ $t('List.col_priority') }}</template></span>
                         <span class="lv2__c-est" role="columnheader">{{ $t('List.col_est') }}</span>
                         <span class="lv2__c-risk" role="columnheader">✦ {{ $t('List.col_risk') }}</span>
                         <span class="lv2__c-done" role="columnheader">{{ $t('Provenance.col_done_by') }}</span>
@@ -121,7 +121,7 @@
 <script setup>
 // PACKAGES
 import { ref, defineProps, defineEmits, nextTick, inject, watch,
-    onMounted, computed
+    onMounted, computed, provide
 } from 'vue';
 import { useStore } from 'vuex';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
@@ -144,6 +144,7 @@ import * as listGroups from './listGroups.js';
 import { groupCountsFor, groupLabel, listSourceTasks } from './listFilter.js';
 import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+import { useListRowEdit } from './useListInlineEdit.js';
 
 // UTILS
 const {getters} = useStore();
@@ -164,6 +165,8 @@ const {
 const { checkPermission } = useCustomComposable();
 const agents = useProjectAgentActivity();
 const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
+const rowEdit = useListRowEdit(project, showArchived);
+provide('listRowEdit', rowEdit);
 
 // EMITS
 defineEmits(['change'])

@@ -1,5 +1,6 @@
 <template>
     <div
+        ref="rowEl"
         class="lv2__row"
         role="row"
         v-bind="taskNavAttrs(data)"
@@ -38,25 +39,67 @@
                 @click.stop
                 @change="$emit('toggle-done', data, $event.target.checked)"
             />
-            <button type="button" class="lv2__name" :title="data.TaskName" @click.stop="open">{{ data.TaskName }}</button>
-            <span v-if="!isSub" class="lv2__key">{{ metaText }}</span>
+            <ListStatusCircle
+                v-else
+                :task="data"
+                :statuses="statuses"
+                :editable="rights.status"
+                @change="(status) => edit.setStatus(data, status, { row: rowEl })"
+            />
+            <input
+                v-if="renaming"
+                ref="renameInput"
+                v-model="draft"
+                type="text"
+                class="lv2__rename"
+                maxlength="250"
+                :aria-label="$t('List.rename_label')"
+                @click.stop
+                @keydown.enter.prevent="saveRename"
+                @keydown.esc.stop.prevent="cancelRename"
+                @blur="saveRename"
+            />
+            <button v-else type="button" class="lv2__name" :title="data.TaskName" @click.stop="open">{{ data.TaskName }}</button>
+            <span v-if="!isSub && !renaming" class="lv2__key">{{ metaText }}</span>
             <span v-if="tracking" class="lv2__timer" :title="$t('List.tracking_now')">● {{ timerText }}</span>
             <button v-if="agentLine" type="button" class="lv2__agent-line" :title="agentLine" @click.stop="$emit('review-agent', proposal)">
                 ✦ {{ agentLine }}
             </button>
+            <ListRowActions
+                v-if="!isSub && edit && !renaming"
+                :task="data"
+                :href="edit.taskHref(data)"
+                :can-rename="rights.rename"
+                :can-subtask="rights.subtask"
+                @rename="startRename"
+                @add-subtask="$emit('add-subtask', data)"
+                @copy-link="edit.copyLink(data)"
+                @copy-key="edit.copyKey && edit.copyKey(data)"
+                @open="open"
+            />
         </div>
 
         <span class="lv2__c-assignee" role="cell">
-            <span v-if="assignee" class="ah-avatar" :title="assignee.Employee_Name">
-                <img v-if="assignee.Employee_profileImageURL" :src="assignee.Employee_profileImageURL" :alt="assignee.Employee_Name" />
-                <template v-else>{{ initial(assignee.Employee_Name) }}</template>
-            </span>
+            <ListAssigneeCell
+                :task="data"
+                :editable="!isSub && rights.assignee"
+                :options="!isSub && rights.assignee ? edit.assigneeOptions(data) : []"
+                :multiple="Boolean(edit && edit.multipleAssignees.value)"
+                @change="(change) => edit.setAssignee(data, change, { row: rowEl })"
+            />
         </span>
 
-        <span class="lv2__due lv2__c-due" role="cell" :class="{ 'lv2__due--overdue': overdue }">{{ dueText }}</span>
+        <span class="lv2__c-due" role="cell">
+            <ListDueCell :task="data" :done="done" :editable="!isSub && rights.due" @change="(date) => edit.setDue(data, date, { row: rowEl })" />
+        </span>
 
         <span class="lv2__c-prio" role="cell">
-            <span v-if="!isSub && priorityName" class="ah-chip" :class="priority.cls">{{ priorityName }}</span>
+            <ListPriorityCell
+                v-if="!isSub && showPriority"
+                :task="data"
+                :editable="rights.priority"
+                @change="(option) => edit.setPriority(data, option, { row: rowEl })"
+            />
         </span>
 
         <span class="lv2__est lv2__c-est" role="cell">{{ estimate }}</span>
@@ -74,12 +117,16 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, inject, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import ProvenanceBadge from "@/components/molecules/Provenance/ProvenanceBadge.vue";
-import { useGetterFunctions } from "@/composable";
-import { dueBucket, dueLabel, fmtEstimate, priorityMeta } from "@/components/molecules/Home/homeFormat";
+import { fmtEstimate } from "@/components/molecules/Home/homeFormat";
+import ListStatusCircle from "./ListStatusCircle.vue";
+import ListAssigneeCell from "./ListAssigneeCell.vue";
+import ListDueCell from "./ListDueCell.vue";
+import ListPriorityCell from "./ListPriorityCell.vue";
+import ListRowActions from "./ListRowActions.vue";
 import { timerState, isTimerFor, elapsedSeconds } from "@/components/organisms/TaskDetailOverlay/useTaskTimer";
 import { taskRisk } from "@/views/Projects/composables/taskRisk";
 import { isClosedTask, subtaskProgress, subtaskTotal } from "./subtaskProgress";
@@ -98,10 +145,16 @@ const props = defineProps({
     proposal: { type: Object, default: null },
     progress: { type: Object, default: null }
 });
-const emit = defineEmits(["open", "select", "toggle-subtasks", "toggle-done", "review-agent"]);
+const emit = defineEmits(["open", "select", "toggle-subtasks", "toggle-done", "review-agent", "add-subtask"]);
 
 const { t } = useI18n();
-const { getUser, getPriority } = useGetterFunctions();
+
+const NO_RIGHTS = { status: false, assignee: false, due: false, priority: false, rename: false, subtask: false };
+const edit = inject("listRowEdit", null);
+const rights = computed(() => edit?.rights.value || NO_RIGHTS);
+const statuses = computed(() => edit?.statuses.value || []);
+const showPriority = computed(() => (edit ? edit.showPriority.value : true));
+const rowEl = ref(null);
 
 const done = computed(() => isClosedTask(props.data));
 const subtaskCount = computed(() => subtaskTotal(props.data, props.progress));
@@ -112,30 +165,6 @@ const metaText = computed(() => {
     if (!progress.value) return key;
     const text = `${progress.value.done}/${progress.value.total}`;
     return key ? `${key} · ${text}` : text;
-});
-
-const assignee = computed(() => {
-    const id = props.data.AssigneeUserId?.[0];
-    return id ? getUser(id) : null;
-});
-const initial = (name) => String(name || "?").trim().charAt(0).toUpperCase();
-
-/* The mock reds "Today" as well as a past date: both are out of runway. */
-const overdue = computed(() => {
-    if (done.value) return false;
-    const bucket = dueBucket(props.data);
-    return bucket === "overdue" || bucket === "today";
-});
-const dueText = computed(() => (props.data.DueDate ? dueLabel(props.data.DueDate, t) : ""));
-
-/* The chip tone keys off the built-in priority key, but the word only ever comes from
- * the company's own vocabulary: a workspace that renames or adds a priority must not
- * have the row state one it never defined. */
-const priority = computed(() => priorityMeta(props.data.Task_Priority));
-const priorityName = computed(() => {
-    if (!props.data.Task_Priority) return "";
-    const name = getPriority(props.data.Task_Priority)?.name;
-    return name && name !== "N/A" ? name : "";
 });
 
 const estimate = computed(() => fmtEstimate(props.data.totalEstimatedTime));
@@ -170,6 +199,32 @@ const agentLine = computed(() => {
 function open() {
     emit("open", props.data);
 }
+
+const renaming = ref(false);
+const draft = ref("");
+const renameInput = ref(null);
+
+function startRename() {
+    draft.value = props.data.TaskName || "";
+    renaming.value = true;
+    nextTick(() => {
+        renameInput.value?.focus();
+        renameInput.value?.select();
+    });
+}
+
+function saveRename() {
+    if (!renaming.value) return;
+    renaming.value = false;
+    edit.rename(props.data, draft.value, { row: rowEl.value });
+    nextTick(() => rowEl.value?.querySelector(".lv2__name")?.focus());
+}
+
+function cancelRename() {
+    renaming.value = false;
+    nextTick(() => rowEl.value?.querySelector(".lv2__name")?.focus());
+}
+
 function onSelect(event) {
     emit("select", props.data, event);
 }

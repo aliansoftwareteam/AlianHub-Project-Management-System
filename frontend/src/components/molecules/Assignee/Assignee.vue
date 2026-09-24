@@ -1,5 +1,6 @@
 <template>
     <div>
+        <slot name="trigger" :open="openSidebar">
         <div
             class="d-flex align-items-center"
             :role="rowOpensPicker ? 'button' : null"
@@ -68,6 +69,7 @@
             </button>
             <span v-if="!addUser && !detailedUsers.length" class="font-size-13">N/A</span>
         </div>
+        </slot>
 
         <Sidebar
             :title="$t('Projects.list_of_user')"

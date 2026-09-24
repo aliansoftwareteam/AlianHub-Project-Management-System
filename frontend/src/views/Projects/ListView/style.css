@@ -203,6 +203,76 @@
 .lv2__empty-group { margin: 0; padding: 10px 12px; color: var(--ink-2); font-size: 12px; }
 .lv2__skeleton { height: 44px; border-radius: var(--r-card); }
 
+/* Task 038 — edit from the row: status circle, inline cells, row actions. */
+.lv2__status {
+    --lv2-status: var(--ink-2);
+    flex: none;
+    width: 24px; height: 24px;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0; border: 0; border-radius: 50%;
+    background: none;
+    cursor: pointer;
+}
+span.lv2__status { cursor: inherit; }
+.lv2__status-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--lv2-status);
+    background: transparent;
+    transition: background var(--t-state) var(--ease);
+}
+.lv2__status.is-done .lv2__status-dot { background: var(--lv2-status); }
+button.lv2__status:hover .lv2__status-dot { background: color-mix(in srgb, var(--lv2-status) 25%, transparent); }
+button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status); }
+
+.lv2__cell-picker { display: inline-flex; }
+.lv2__cell-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    min-width: 24px; min-height: 24px;
+    padding: 0 4px;
+    border: 0; border-radius: 6px;
+    background: none;
+    color: inherit; font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.lv2__cell-btn:hover { background: var(--surface-hover); }
+.lv2__cell-more { font: 500 10px/1 var(--font-mono); color: var(--ink-2); }
+.lv2__cell-empty { color: var(--ink-2); opacity: 0; transition: opacity var(--t-state) var(--ease); }
+.lv2__cell-flag { font-size: 13px; line-height: 1; }
+.lv2__row:hover .lv2__cell-empty,
+.lv2__row:focus-within .lv2__cell-empty { opacity: 1; }
+.lv2__c-assignee-value { display: inline-flex; min-height: 24px; align-items: center; }
+
+.lv2__rename {
+    flex: 1; min-width: 0;
+    padding: 2px 6px;
+    border: 1px solid var(--brand); border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    font: 600 12.5px/1.3 var(--font-ui);
+}
+
+.lv2__actions { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; flex: none; }
+.lv2__act {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px;
+    padding: 0; border: 0; border-radius: 6px;
+    background: none;
+    color: var(--ink-2);
+    font-size: 13px; line-height: 1;
+    cursor: pointer;
+    text-decoration: none;
+    opacity: 0;
+    transition: opacity var(--t-state) var(--ease);
+}
+.lv2__act:hover { background: var(--surface-hover); color: var(--ink); text-decoration: none; }
+.lv2__row:hover .lv2__act,
+.lv2__row:focus-within .lv2__act,
+.lv2__act[aria-expanded="true"] { opacity: 1; }
+.lv2__menu { position: fixed; z-index: 30; }
+.lv2__create--sub { padding-left: 50px; }
+
 /* Handoff 29b — who did the work, who checked it, who closed it. */
 .lv2__c-done { display: flex; align-items: center; min-width: 0; }
 
@@ -216,12 +286,22 @@
     .lv2 { --lv2-cols: 28px minmax(0, 1fr) 56px 64px 72px; }
     .lv2__c-est, .lv2__c-risk { display: none; }
 }
+/* At phone width the title takes the whole first line and assignee, due date and priority
+   fold into a meta line under it, one max-content track each. */
 @media (max-width: 767px) {
-    .lv2 { --lv2-cols: 28px minmax(0, 1fr); }
-    .lv2__c-assignee, .lv2__c-due, .lv2__c-prio { display: none; }
+    .lv2 { --lv2-cols: 28px max-content max-content max-content minmax(0, 1fr); }
+    .lv2__row .lv2__c-title, .lv2__cols .lv2__c-title { grid-column: 2 / -1; }
+    .lv2__row .lv2__c-assignee { grid-row: 2; grid-column: 2; justify-self: start; }
+    .lv2__row .lv2__c-due { grid-row: 2; grid-column: 3; justify-self: start; }
+    .lv2__row .lv2__c-prio { grid-row: 2; grid-column: 4; justify-self: start; }
+    .lv2__cols .lv2__c-assignee, .lv2__cols .lv2__c-due, .lv2__cols .lv2__c-prio {
+        position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+    }
+    .lv2__cell-empty, .lv2__act { opacity: 1; }
+    .lv2__act--hover { display: none; }
     .lv2__scroll { padding: 0 16px 20px; }
     .lv2__row, .lv2__cols { gap: 8px; }
-    .lv2__row { min-height: 44px; }
+    .lv2__row { min-height: 44px; row-gap: 2px; }
     .lv2__add { padding-left: 24px; min-height: 44px; }
     /* 16px of a 375px viewport is worth more to the task name than to the indent. */
     .lv2__cols { padding: 12px 13px 8px; }

@@ -47,7 +47,7 @@
                         <input ref="sidebar_search" type="text" v-model="search" :placeHolder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" class="form-control listsidebar-search font-size-16" @input="$emit('searchChange', search)">
                     </div>
                     <slot name="body">
-                        <div v-if="defaultLayout" class="overflow-y-auto sidebar-options overflow-x-hidden" :role="filteredOptions?.length ? 'listbox' : null" :aria-multiselectable="multiSelect ? 'true' : null" :style="`height: ${!enableSearch ? 'calc(100% - 0px);' : 'calc(100% - 62px);'}`">
+                        <div v-if="defaultLayout" class="overflow-y-auto sidebar-options overflow-x-hidden" :role="filteredOptions?.length ? 'listbox' : null" :aria-label="filteredOptions?.length ? title : null" :aria-multiselectable="multiSelect ? 'true' : null" :style="`height: ${!enableSearch ? 'calc(100% - 0px);' : 'calc(100% - 62px);'}`">
                             <template v-if="!grouped">
                                 <template v-if="filteredOptions?.length">
                                     <SidebarItems

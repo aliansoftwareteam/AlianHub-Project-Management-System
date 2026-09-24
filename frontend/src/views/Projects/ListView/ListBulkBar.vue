@@ -239,8 +239,12 @@ async function summarise() {
     else $toast.success(t("List.ai_summarised", { n: result.done }));
 }
 
+// Pickers and menus close themselves on Esc; the selection stays.
+const OWN_LAYERS = ".dp__menu, [role=\"dialog\"], [role=\"menu\"], [role=\"listbox\"], .lv2__rename";
+
 function onKey(event) {
-    if (event.key !== "Escape") return;
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    if (event.target?.closest?.(OWN_LAYERS)) return;
     if (open.value) { open.value = ""; return; }
     if (selection.hasSelection.value) selection.clear();
 }
