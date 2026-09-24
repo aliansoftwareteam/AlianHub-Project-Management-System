@@ -348,6 +348,12 @@ const onDigitPaste = (e) => {
     codeInputs.value[Math.min(txt.length, 5)]?.focus();
     if (txt.length === 6) submit2fa();
 };
+const rejectCode = () => {
+    twoFactor.error = t("Auth.two_factor_invalid_code");
+    if (twoFactor.isRecovery) return;
+    twoFactor.digits = ["", "", "", "", "", ""];
+    codeInputs.value[0]?.focus();
+};
 const submit2fa = async () => {
     const code = twoFactor.isRecovery ? twoFactor.code.trim() : twoFactor.digits.join("");
     if (!code || (!twoFactor.isRecovery && code.length < 6)) { twoFactor.error = t("Auth.two_factor_enter_code"); return; }
@@ -356,13 +362,13 @@ const submit2fa = async () => {
     busy.value = true;
     try {
         const res = await apiRequestWithoutSecure("post", env.TWO_FA_VALIDATE, { tempToken: twoFactor.tempToken, code });
-        if (res.status !== 200 || !res?.data?.uid) { twoFactor.error = t("Auth.two_factor_invalid_code"); return; }
+        if (res.status !== 200 || !res?.data?.uid) { rejectCode(); return; }
         await proceedAfterAuth(res.data.uid);
     } catch (error) {
         const msg = error?.response?.data?.message;
         if (msg === "Auth.too_many_request") twoFactor.error = t("Toast.Too_many_request");
         else if (typeof msg === "string" && /expired/i.test(msg)) { backToLogin(); banner.value = { kind: "warn", text: t("Auth.two_factor_session_expired") }; }
-        else twoFactor.error = t("Auth.two_factor_invalid_code");
+        else rejectCode();
     } finally {
         busy.value = false;
     }
