@@ -8,6 +8,15 @@
                 </button>
             </Teleport>
 
+            <div v-if="mailFailed" class="mbv__notice" role="alert" data-test="invite-mail-failed">
+                <ShellIcon name="alert" :size="15" />
+                <span class="mbv__notice-text">{{ $t('Members.invite_mail_failed') }}</span>
+                <button v-if="mailFailed.link" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="copyLink(mailFailed.link)">
+                    <ShellIcon name="link" :size="14" /> {{ $t('Members.copy_link') }}
+                </button>
+                <button type="button" class="mbv__notice-x" :aria-label="$t('Members.dismiss_notice')" @click="mailFailed = null">×</button>
+            </div>
+
             <section v-if="canInvite && inviteOpen" class="mbv__invite">
                 <div class="mbv__invite-row">
                     <div class="mbv__chips" :class="{ 'is-error': errors.email }" @click="focusEmail">
@@ -22,6 +31,7 @@
                             type="email"
                             :placeholder="emails.length ? '' : $t('Members.invite_emails_ph')"
                             @keydown="onEmailKey"
+                            :aria-label="$t('Members.invite_emails')"
                             @blur="commitEmail()"
                             @input="errors.email = ''"
                         />
@@ -30,27 +40,26 @@
                         <option :value="null" disabled>{{ $t('Members.invite_role') }}</option>
                         <option v-for="r in inviteRoles" :key="r.key" :value="r.key">{{ r.name }}</option>
                     </select>
-                    <select v-if="designationList.length" v-model="designation" class="ah-input mbv__select" :class="{ 'ah-input--error': errors.designation }" :aria-label="$t('Members.invite_designation')" @change="errors.designation = ''">
-                        <option :value="null" disabled>{{ $t('Members.invite_designation') }}</option>
+                    <select v-if="designationList.length" v-model="designation" class="ah-input mbv__select" :aria-label="$t('Members.invite_designation')">
+                        <option :value="null">{{ $t('Members.invite_designation_optional') }}</option>
                         <option v-for="d in designationList" :key="d.key" :value="d.key">{{ d.name }}</option>
                     </select>
-                    <button type="button" class="ah-btn ah-btn--primary" :disabled="sending" @click="sendInvites()">
+                    <button type="button" class="ah-btn ah-btn--primary" :disabled="!canSend" @click="sendInvites()">
                         {{ sending ? $t('Members.invite_sending') : $t('Members.invite_send') }}
                     </button>
                 </div>
 
                 <div v-if="errors.email" class="ah-field__error">{{ errors.email }}</div>
                 <div v-else-if="errors.role" class="ah-field__error">{{ errors.role }}</div>
-                <div v-else-if="errors.designation" class="ah-field__error">{{ errors.designation }}</div>
 
-                <p class="mbv__meaning">
-                    <template v-if="roleMeaning"><strong>{{ roleName(role) }}:</strong> {{ roleMeaning }}</template>
-                    <span v-if="lastInviteLink" class="mbv__link-wrap">
+                <div class="mbv__meaning">
+                    <p v-if="roleMeaning"><strong>{{ roleName(role) }}:</strong> {{ roleMeaning }}</p>
+                    <p v-if="lastInviteLink">
                         {{ $t('Members.invite_or_link') }}
                         <button type="button" class="mbv__link" @click="copyLink(lastInviteLink)">{{ shortLink(lastInviteLink) }}</button>
-                    </span>
-                    <span v-else class="mbv__muted">{{ $t('Members.no_link_yet') }}</span>
-                </p>
+                    </p>
+                    <p v-else class="mbv__muted">{{ $t('Members.no_link_yet') }}</p>
+                </div>
             </section>
 
             <div class="mbv__bar">
@@ -126,7 +135,7 @@
                             <ShellIcon name="dots" :size="16" />
                         </button>
                         <div v-if="menuFor === item.requestId" class="ah-pop mbv__pop" @click.stop>
-                            <button v-if="item.status !== 2" type="button" class="ah-pop__item" @click="copyLink(inviteLink(item)), menuFor = ''">
+                            <button v-if="item.status !== 2 && inviteLink(item)" type="button" class="ah-pop__item" @click="copyLink(inviteLink(item)), menuFor = ''">
                                 <ShellIcon name="link" :size="15" /> {{ $t('Members.copy_link') }}
                             </button>
                             <button v-if="tab === 1" type="button" class="ah-pop__item" @click="resend(item), menuFor = ''">
@@ -187,9 +196,10 @@ const designation = ref(null);
 const sending = ref(false);
 const menuFor = ref("");
 const lastInviteLink = ref("");
+const mailFailed = ref(null);
 const ssoConfig = ref(null);
 const toolbarReady = ref(false);
-const errors = reactive({ email: "", role: "", designation: "" });
+const errors = reactive({ email: "", role: "" });
 
 const canSeeMembers = computed(() => checkPermission("settings.settings_role_management") !== null
     && checkPermission("settings.settings_designation") !== null
@@ -203,6 +213,8 @@ const company = computed(() => companies.value.find((c) => c._id === companyId.v
 const rolesGetter = computed(() => getters["settings/roles"] || []);
 const inviteRoles = computed(() => (getters["settings/withoutOwnerRoles"] || []).filter((r) => !r.isDelete));
 const designationList = computed(() => (getters["settings/designations"] || []).filter((d) => !d.isDelete && d.key !== 0));
+const hasValidEmail = computed(() => emails.value.length > 0 || EMAIL_RE.test(String(emailDraft.value || "").toLowerCase()));
+const canSend = computed(() => !sending.value && role.value !== null && role.value !== "" && hasValidEmail.value);
 
 const activeList = computed(() => listing.value.filter((u) => !u.isDelete));
 const removedList = computed(() => listing.value.filter((u) => u.isDelete));
@@ -256,7 +268,9 @@ function usesSso(item) {
 }
 
 function inviteLink(item) {
-    return `${window.location.origin}/#/invitation?companyId=${companyId.value}-${item.requestId}`;
+    const rowId = item.requestId || item._id;
+    if (!rowId || !item.linkId) return "";
+    return `${window.location.origin}/#/invitation?companyId=${companyId.value}-${rowId}&token=${encodeURIComponent(item.linkId)}`;
 }
 
 function shortLink(link) {
@@ -314,8 +328,7 @@ async function sendInvites() {
     commitEmail();
     errors.email = emails.value.length ? "" : t("Members.err_email");
     errors.role = role.value === null || role.value === "" ? t("Members.err_role") : "";
-    errors.designation = designationList.value.length && (designation.value === null || designation.value === "") ? t("Members.err_designation") : "";
-    if (errors.email || errors.role || errors.designation) return;
+    if (errors.email || errors.role) return;
 
     sending.value = true;
     for (const mail of [...emails.value]) {
@@ -352,16 +365,23 @@ async function deliverInvite(mail, userDesignation, userRole, isResend) {
             role: userRole,
             isResend
         });
-        if (res.data?.data) {
-            const saved = res.data.data;
+        const saved = res.data?.data;
+        const link = saved ? (res.data.joinLink || inviteLink(saved)) : "";
+        if (saved) {
             commit("settings/mutateCompanyUsers", {
                 data: { ...saved, _id: saved._id, isCurrentUser: saved.userId === userId.value, requestId: saved._id },
                 op: isResend ? "modified" : "added"
             });
-            lastInviteLink.value = `${window.location.origin}/#/invitation?companyId=${companyId.value}-${saved._id}`;
+            if (link) lastInviteLink.value = link;
         }
-        if (res.data?.status) $toast.success(t(`Members.${res.data.statusText}`), { position: "top-right" });
-        else $toast.error(res.data?.statusText || t("Toast.Something_went_wrong_Please_try_again"), { position: "top-right" });
+        if (res.data?.status) {
+            mailFailed.value = null;
+            $toast.success(t(`Members.${res.data.statusText}`), { position: "top-right" });
+        } else if (saved) {
+            mailFailed.value = { email: mail, link };
+        } else {
+            $toast.error(res.data?.statusText || t("Toast.Something_went_wrong_Please_try_again"), { position: "top-right" });
+        }
     } catch (error) {
         console.error("ERROR IN SENDING INVITATION", error);
         $toast.error(t("Toast.Something_went_wrong_Please_try_again"), { position: "top-right" });
@@ -497,6 +517,10 @@ async function loadSso() {
 }
 
 const closeMenus = () => { menuFor.value = ""; };
+
+watch(inviteRoles, (list) => {
+    if (role.value === null && list.some((r) => r.key === ROLE_MEMBER)) role.value = ROLE_MEMBER;
+}, { immediate: true });
 
 watch(() => getters["settings/companyUsers"], () => { listing.value = getCompanyUsers(); }, { deep: true });
 
