@@ -22,6 +22,10 @@ describe('auth card on a phone', () => {
         expect(rule).toMatch(/width:\s*calc\(100% - 32px\)/);
     });
 
+    test('a lone action (Create workspace) spans the row instead of sitting in half of it', () => {
+        expect(ruleBody(css, '.auth__actions > :only-child')).toMatch(/grid-column:\s*1 \/ -1/);
+    });
+
     test('full-width link buttons fit inside the card', () => {
         expect(ruleBody(css, '.auth .ah-btn--block')).toMatch(/box-sizing:\s*border-box/);
     });

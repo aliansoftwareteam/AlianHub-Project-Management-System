@@ -54,6 +54,7 @@
 .auth__pw-eye:hover { color: var(--ink); background: var(--surface-hover); }
 .auth__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
 .auth__actions .ah-btn { height: 40px; }
+.auth__actions > :only-child { grid-column: 1 / -1; }
 .auth__remember { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; font: var(--text-small); }
 .auth__remember label { display: flex; align-items: center; gap: 8px; color: var(--ink); cursor: pointer; }
 .auth__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; font: var(--text-small); }
