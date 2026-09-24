@@ -120,6 +120,7 @@ const paths = {
     users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4.5-6.2"/>',
     smile: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/>',
     bookmark: '<path d="M6 3h12v18l-6-4-6 4z"/>',
+    flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.5"/>',
     screen: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
     film: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>',
