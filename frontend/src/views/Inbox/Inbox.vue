@@ -814,9 +814,11 @@ const focusFirstCard = () => {
     cursor.value = 0;
     focusCursor();
 };
-const stopOnTaskClosed = onTaskClosed(() => {
+// The panel is still in the DOM while it animates out, and the card that opened it may already be gone.
+const stopOnTaskClosed = onTaskClosed(async () => {
+    await nextTick();
     const active = document.activeElement;
-    if (!active || active === document.body || !active.isConnected) focusCursor();
+    if (!active || active === document.body || !active.isConnected || active.closest?.('.ah-detail')) focusCursor();
 });
 
 const migrateLater = async () => {
