@@ -1,11 +1,23 @@
 import { describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { config, flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { ref } from 'vue';
 
-const { updateStatus, stub, projectPayload } = vi.hoisted(() => ({
+const { updateStatus, stub, slotStub, exposed, perms, toast, projectPayload } = vi.hoisted(() => ({
     updateStatus: vi.fn(() => Promise.resolve()),
     stub: (name) => ({ default: { name, render: () => null } }),
+    slotStub: (name, slot, methods = []) => ({
+        default: {
+            name,
+            setup(_, { slots, expose }) {
+                expose(Object.fromEntries(methods.map((method) => [method, (...args) => exposed[`${name}.${method}`](...args)])));
+                return () => (slots[slot] ? slots[slot]() : null);
+            }
+        }
+    }),
+    exposed: {},
+    perms: {},
+    toast: { success: () => {}, error: () => {}, info: () => {}, warning: () => {} },
     projectPayload: {
     _id: 'proj-1',
     isGlobalPermission: false,
@@ -35,13 +47,14 @@ vi.mock('@/services', () => ({
     })
 }));
 vi.mock('@/utils/TaskOperations', () => ({ default: { updateStatus } }));
+vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
 vi.mock('@/composable', () => ({
-    useCustomComposable: () => ({ checkPermission: () => true, checkApps: () => true }),
+    useCustomComposable: () => ({ checkPermission: (key) => (key in perms ? perms[key] : true), checkApps: () => true }),
     useGetterFunctions: () => ({ getUser: () => ({}), getPriority: () => ({}) })
 }));
 vi.mock('@/views/Projects/helper', () => ({ useUpdateTasks: () => ({ updateTaskByGroup: vi.fn() }) }));
 vi.mock('vue-router', () => ({
-    useRouter: () => ({ push: vi.fn(), resolve: () => ({ href: '#' }) }),
+    useRouter: () => ({ push: vi.fn(), resolve: (to) => ({ href: `#/${to.params.cid}/project/${to.params.id}/s/${to.params.sprintId}/${to.params.taskId}` }) }),
     useRoute: () => ({ params: {}, query: {}, name: 'ProjectSprint' })
 }));
 vi.mock('@/components/organisms/TaskDetailOverlay/useTaskOverlay', () => ({ openTask: vi.fn(), setTaskMeta: vi.fn() }));
@@ -49,22 +62,27 @@ vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => stub('ShellIcon'));
 vi.mock('@/components/atom/Skelaton/Skelaton.vue', () => stub('Skelaton'));
 vi.mock('@/components/molecules/TaskDetailTitle/TaskDetailTitle.vue', () => stub('TaskDetailTitle'));
 vi.mock('@/components/molecules/TaskDetailAction/TaskDetailAction.vue', () => stub('TaskDetailAction'));
-vi.mock('@/components/molecules/TaskDetailTab/TaskDetailTab.vue', () => stub('TaskDetailTab'));
-vi.mock('@/components/organisms/TaskDetailRightSide/TaskDetailRightSide.vue', () => stub('TaskDetailRightSide'));
-vi.mock('@/components/organisms/LinkedTasks/LinkedTasks.vue', () => stub('LinkedTasks'));
+vi.mock('@/components/molecules/TaskDetailTab/TaskDetailTab.vue', () => slotStub('TaskDetailTab', 'after-description', ['addChecklist', 'attachFile']));
+vi.mock('@/components/organisms/TaskDetailRightSide/TaskDetailRightSide.vue', () => slotStub('TaskDetailRightSide', 'status'));
+vi.mock('@/components/organisms/LinkedTasks/LinkedTasks.vue', () => slotStub('LinkedTasks', 'none', ['startAdding']));
 vi.mock('@/views/Projects/Comments/Comments.vue', () => stub('Comments'));
 vi.mock('@/components/templates/ActivityLog/ActivityLog.vue', () => stub('ActivityLog'));
 vi.mock('@/components/molecules/Pages/PagesPanel.vue', () => stub('PagesPanel'));
 vi.mock('@/components/atom/TagChip/TagChip.vue', () => stub('TagChip'));
 vi.mock('@/components/molecules/TagList/CreateTagPopup.vue', () => stub('CreateTagPopup'));
 vi.mock('@/components/organisms/TaskDetailOverlay/TaskSummaryBlock.vue', () => stub('TaskSummaryBlock'));
-vi.mock('@/components/organisms/TaskDetailOverlay/TaskSubtaskList.vue', () => stub('TaskSubtaskList'));
+vi.mock('@/components/organisms/TaskDetailOverlay/TaskSubtaskList.vue', () => slotStub('TaskSubtaskList', 'none', ['startCreate']));
 vi.mock('@/components/organisms/TaskDetailOverlay/TaskTimerChip.vue', () => stub('TaskTimerChip'));
 vi.mock('@/components/organisms/TaskDetailOverlay/TaskAgentStrip.vue', () => stub('TaskAgentStrip'));
 
 import TaskDetailPanel from '@/components/organisms/TaskDetailOverlay/TaskDetailPanel.vue';
+import en from '@/locales/en.js';
 
-function mountPanel({ roleType = 1, userId = 'u1', socket = null } = {}) {
+const i18n = config.global.plugins[0];
+i18n.global.setLocaleMessage('en', en);
+const t = i18n.global.t;
+
+function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null } = {}) {
     const store = createStore({
         getters: {
             'settings/companyUserDetail': () => ({ roleType }),
@@ -78,8 +96,8 @@ function mountPanel({ roleType = 1, userId = 'u1', socket = null } = {}) {
         mutations: { 'projectData/setTaskDetailData': () => {}, 'projectData/setTaskdetailPayloadId': () => {} }
     });
     return mount(TaskDetailPanel, {
-        props: { companyId: 'company-1', projectId: 'proj-1', sprintId: 'sprint-1', taskId: 'task-1' },
-        global: { plugins: [store], provide: { $userId: ref(userId), ...(socket ? { $socket: ref(socket) } : {}) } }
+        props: { companyId: 'company-1', projectId: 'proj-1', sprintId: 'sprint-1', taskId: 'task-1', nav },
+        global: { plugins: [store], mocks: { $t: t }, provide: { $userId: ref(userId), ...(socket ? { $socket: ref(socket) } : {}) } }
     });
 }
 
@@ -187,6 +205,154 @@ describe('TaskDetailPanel', () => {
             wrapper.unmount();
             expect(socket.off).toHaveBeenCalledWith('taskDetail_agentSession', expect.any(Function));
             flags.agentSessions = false;
+        });
+    });
+
+    describe('navigation and quick actions', () => {
+        const navAt = (index, total) => ({
+            index,
+            total,
+            prev: index > 0 ? { taskId: `t${index - 1}` } : null,
+            next: index < total - 1 ? { taskId: `t${index + 1}` } : null
+        });
+        const reset = () => {
+            for (const key of Object.keys(perms)) delete perms[key];
+            for (const key of Object.keys(exposed)) delete exposed[key];
+            projectPayload.sprintsObj = [];
+            projectPayload.sprintsfolders = [];
+            projectPayload.tasks[0] = { _id: 'task-1', TaskName: 'Write spec', TaskKey: 'AH-1', statusKey: 'st-open', statusType: 'open', AssigneeUserId: [], isParentTask: true };
+        };
+
+        it('moves to the previous and next task of the view and names both buttons', async () => {
+            reset();
+            const wrapper = mountPanel({ nav: navAt(1, 3) });
+            await flushPromises();
+            const prev = wrapper.get('[data-nav-dir="prev"]');
+            const next = wrapper.get('[data-nav-dir="next"]');
+            expect(prev.attributes('aria-label')).toBe('Previous task');
+            expect(next.attributes('aria-label')).toBe('Next task');
+            expect(wrapper.get('.ah-detail__nav-pos').text()).toBe('2 / 3');
+            await next.trigger('click');
+            await prev.trigger('click');
+            expect(wrapper.emitted('step')).toEqual([[1], [-1]]);
+        });
+
+        it('disables the arrow that would run past either end', async () => {
+            reset();
+            const first = mountPanel({ nav: navAt(0, 2) });
+            await flushPromises();
+            expect(first.get('[data-nav-dir="prev"]').element.disabled).toBe(true);
+            expect(first.get('[data-nav-dir="next"]').element.disabled).toBe(false);
+            const last = mountPanel({ nav: navAt(1, 2) });
+            await flushPromises();
+            expect(last.get('[data-nav-dir="next"]').element.disabled).toBe(true);
+            await last.get('[data-nav-dir="next"]').trigger('click');
+            expect(last.emitted('step')).toBeUndefined();
+        });
+
+        it('shows no arrows when the task was opened from outside a list', async () => {
+            reset();
+            const wrapper = mountPanel({ nav: null });
+            await flushPromises();
+            expect(wrapper.find('[data-nav-dir]').exists()).toBe(false);
+        });
+
+        it('copies the task key, then the link, from the header', async () => {
+            reset();
+            const writeText = vi.fn(() => Promise.resolve());
+            Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+            toast.success = vi.fn();
+            const wrapper = mountPanel();
+            await flushPromises();
+            const key = wrapper.get('button.ah-detail__key');
+            expect(key.text()).toBe('AH-1');
+            expect(key.attributes('aria-label')).toBe('Copy task ID AH-1');
+            await key.trigger('click');
+            await flushPromises();
+            expect(writeText).toHaveBeenLastCalledWith('AH-1');
+            expect(toast.success).toHaveBeenCalledTimes(1);
+
+            const link = wrapper.get('button.ah-detail__copy-link');
+            expect(link.attributes('aria-label')).toBe('Copy task link');
+            await link.trigger('click');
+            await flushPromises();
+            expect(writeText).toHaveBeenLastCalledWith(expect.stringMatching(/#\/company-1\/project\/proj-1\/s\/sprint-1\/task-1$/));
+            expect(toast.success).toHaveBeenCalledTimes(2);
+        });
+
+        it('completes the task from the button beside the status and reopens it', async () => {
+            reset();
+            updateStatus.mockClear();
+            const wrapper = mountPanel();
+            await flushPromises();
+            const complete = wrapper.get('button.ah-detail__complete');
+            expect(complete.attributes('aria-pressed')).toBe('false');
+            await complete.trigger('click');
+            await flushPromises();
+            expect(updateStatus.mock.calls[0][0].newStatus).toMatchObject({ statusKey: 'st-done', statusType: 'close' });
+            expect(complete.attributes('aria-pressed')).toBe('true');
+            await complete.trigger('click');
+            await flushPromises();
+            expect(updateStatus.mock.calls[1][0].newStatus).toMatchObject({ statusKey: 'st-open', statusType: 'open' });
+            expect(complete.attributes('aria-pressed')).toBe('false');
+        });
+
+        it('does not let a member without the status permission complete the task', async () => {
+            reset();
+            perms['task.task_status'] = false;
+            const wrapper = mountPanel();
+            await flushPromises();
+            expect(wrapper.get('button.ah-detail__complete').element.disabled).toBe(true);
+        });
+
+        it('offers subtask, relation, checklist and attachment actions below the description', async () => {
+            reset();
+            exposed['TaskSubtaskList.startCreate'] = vi.fn();
+            exposed['LinkedTasks.startAdding'] = vi.fn();
+            exposed['TaskDetailTab.addChecklist'] = vi.fn();
+            exposed['TaskDetailTab.attachFile'] = vi.fn();
+            const wrapper = mountPanel();
+            await flushPromises();
+            const row = wrapper.get('.ah-detail__quick');
+            expect(row.attributes('role')).toBe('group');
+            const labels = row.findAll('button').map((button) => button.text());
+            expect(labels).toEqual(['Add subtask', 'Relate', 'Checklist', 'Attach']);
+
+            await row.get('[data-action="checklist"]').trigger('click');
+            await flushPromises();
+            expect(exposed['TaskDetailTab.addChecklist']).toHaveBeenCalledTimes(1);
+
+            await row.get('[data-action="subtask"]').trigger('click');
+            await flushPromises();
+            expect(exposed['TaskSubtaskList.startCreate']).toHaveBeenCalledTimes(1);
+            expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toContain('Subtasks');
+        });
+
+        it('opens the relation picker and the file picker from the action row', async () => {
+            reset();
+            exposed['LinkedTasks.startAdding'] = vi.fn();
+            exposed['TaskDetailTab.attachFile'] = vi.fn();
+            const wrapper = mountPanel();
+            await flushPromises();
+            await wrapper.get('[data-action="relate"]').trigger('click');
+            await flushPromises();
+            expect(exposed['LinkedTasks.startAdding']).toHaveBeenCalledTimes(1);
+
+            await wrapper.findAll('[role="tab"]').find((tab) => tab.text().startsWith('Description')).trigger('click');
+            await wrapper.get('[data-action="attach"]').trigger('click');
+            await flushPromises();
+            expect(exposed['TaskDetailTab.attachFile']).toHaveBeenCalledTimes(1);
+        });
+
+        it('hides the actions a member may not use', async () => {
+            reset();
+            perms['task.task_checklist'] = false;
+            perms['task.task_attachments'] = false;
+            perms['task.sub_task_create'] = false;
+            const wrapper = mountPanel();
+            await flushPromises();
+            const labels = wrapper.get('.ah-detail__quick').findAll('button').map((button) => button.text());
+            expect(labels).toEqual(['Relate']);
         });
     });
 });
