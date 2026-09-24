@@ -2220,6 +2220,12 @@ const schema = {
             type: Object,
             required: false
         },
+        // { enabled: false, updatedAt, updatedBy } — the workspace "AI off" switch (Modules/AICore/aiSwitch.js);
+        // absent or enabled:true is on. An Object for the same reason as knowledgeRetrieval below.
+        aiSwitch: {
+            type: Object,
+            required: false
+        },
         // { mode: 'on' | 'off' } — read by Modules/Knowledge/flag.js while KNOWLEDGE_RETRIEVAL is
         // "tenant" or "all"; absent is off under "tenant". An Object, not a nested path: a nested
         // path makes the company document a getter node-cache cannot clone, and every company read fails.

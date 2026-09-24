@@ -87,7 +87,7 @@ describe('the AI unavailable panel', () => {
         expect(wrapper.find('[role="status"]').exists()).toBe(true);
         expect(wrapper.text()).toContain('AiAvailability.unconfigured_title');
         expect(wrapper.text()).toContain('AiAvailability.unconfigured_owner');
-        expect(wrapper.find('a').attributes('href')).toBe('/c1/settings/instance/settings');
+        expect(wrapper.find('a').attributes('href')).toBe('/c1/settings/instance/settings?group=ai');
     });
 
     it('tells a member that AI is not available, with nothing to click', async () => {

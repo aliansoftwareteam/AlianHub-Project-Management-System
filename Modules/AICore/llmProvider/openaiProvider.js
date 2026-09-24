@@ -5,10 +5,12 @@ const { providerTimeoutMs } = require('../../Agents/engine/timeouts');
 const { fromOpenAiCompatible, noEmbeddings } = require('../providerError');
 const { normaliseRequest, STRUCTURED_OUTPUT } = require('./normalise');
 
-const OPENAI_CHAT_URL = 'https://api.openai.com/v1/chat/completions';
-/* Overridable so an Azure deployment, a proxy or a self-hosted server that speaks the same
- * API can answer embeddings; the e2e harness points it at a stub. */
-const embeddingsUrl = () => process.env.OPENAI_EMBEDDINGS_URL || 'https://api.openai.com/v1/embeddings';
+const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
+/* OPENAI_BASE_URL moves every OpenAI call (chat, embeddings, transcription) to a proxy or a
+ * regional endpoint; OPENAI_EMBEDDINGS_URL still wins for embeddings, and the e2e harness points it at a stub. */
+const openaiBaseUrl = () => String(process.env.OPENAI_BASE_URL || DEFAULT_OPENAI_BASE_URL).trim().replace(/\/+$/, '');
+const chatUrl = () => `${openaiBaseUrl()}/chat/completions`;
+const embeddingsUrl = () => process.env.OPENAI_EMBEDDINGS_URL || `${openaiBaseUrl()}/embeddings`;
 /* The endpoint takes up to 2048 inputs; a hundred keeps each request small enough that a
  * retry after a network blip costs little. */
 const EMBED_BATCH_SIZE = 100;
@@ -155,7 +157,7 @@ const openaiProvider = {
 
         let response;
         try {
-            response = await axios.post(OPENAI_CHAT_URL, body, {
+            response = await axios.post(chatUrl(), body, {
                 headers: {
                     Authorization: `Bearer ${await apiKeyFor('openai')}`,
                     'Content-Type': 'application/json',
@@ -185,5 +187,7 @@ const openaiProvider = {
         };
     },
 };
+
+openaiProvider.baseUrl = openaiBaseUrl;
 
 module.exports = openaiProvider;

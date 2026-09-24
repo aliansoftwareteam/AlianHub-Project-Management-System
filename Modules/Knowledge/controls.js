@@ -106,6 +106,7 @@ const reembed = async (companyId) => {
     const company = String(companyId);
     if (!(await flag.hybridFor(company))) return { ok: false, code: 'not_hybrid' };
     const readiness = embeddings.readiness(company);
+    if (readiness === 'off') return { ok: false, code: 'ai_off' };
     if (readiness === 'unconfigured') return { ok: false, code: 'embedding_unconfigured' };
     if (readiness === 'paused') return { ok: false, code: 'embedding_paused' };
     if (reembedding.has(company)) return { ok: false, code: 'reembed_running' };

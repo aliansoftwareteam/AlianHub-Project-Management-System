@@ -1,5 +1,9 @@
 const llmProvider = require('../AICore/llmProvider');
+const { embeddingModel } = require('../AICore/llmProvider/embeddingChoice');
+const aiSwitch = require('../AICore/aiSwitch');
 const { FEATURES } = require('../AICore/features');
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { BUDGET_EXHAUSTED } = require('../AICore/reservation');
 const logger = require('../../Config/loggerConfig');
 const flag = require('./flag');
@@ -14,8 +18,10 @@ const QUERY_TIMEOUT_MS_DEFAULT = 2000;
 const BREAKER_FAILURES = 5;
 const BREAKER_COOLDOWN_MS = 10 * 60 * 1000;
 const EMBED_TIMED_OUT = 'embed_timed_out';
+const EMBEDDING_SIZE_CHANGED = 'embedding_size_changed';
 
-const model = () => String(process.env.KNOWLEDGE_EMBEDDING_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
+/* A self-hosted provider names its own embeddings model; otherwise KNOWLEDGE_EMBEDDING_MODEL or OpenAI's small one. */
+const model = () => embeddingModel() || String(process.env.KNOWLEDGE_EMBEDDING_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
 
 const queryTimeoutMs = () => {
     const ms = Number(process.env.KNOWLEDGE_EMBED_QUERY_TIMEOUT_MS);
@@ -57,15 +63,58 @@ const failed = (companyId, error) => {
     breakers.set(key, breaker);
 };
 
-/* What the question side may do: nothing without a key, nothing while paused. */
+/* What the question side may do: nothing while AI is off, nothing without a key, nothing while paused. */
 const readiness = (companyId) => {
+    if (!aiSwitch.instanceEnabled() || aiSwitch.workspaceOffCached(companyId)) return 'off';
     if (!configured()) return 'unconfigured';
     return paused(companyId) ? 'paused' : 'ready';
 };
 
 /* Whether this company's chunks carry vectors: the hybrid mode of the retrieval switch, an
  * instance key to embed with, and no pause in force. */
-const planFor = async (companyId) => ((await flag.hybridFor(companyId)) && readiness(companyId) === 'ready' ? { model: model() } : null);
+const planFor = async (companyId) => {
+    if (!(await aiSwitch.allowed(companyId))) return null;
+    return (await flag.hybridFor(companyId)) && readiness(companyId) === 'ready' ? { model: model() } : null;
+};
+
+/* Search compares a question only with vectors of the same model, and two vectors of different
+ * sizes score nothing, so a server that starts answering the same model name with another size
+ * would quietly empty the vector side. The first stored vector of the model sets the size; a
+ * different one is refused with the way out. */
+const sizes = new Map();
+
+const storedSize = async (companyId, wanted) => {
+    const key = `${companyId}:${wanted}`;
+    if (sizes.has(key)) return sizes.get(key);
+    let size = 0;
+    try {
+        const row = await MongoDbCrudOpration(String(companyId), {
+            type: SCHEMA_TYPE.KNOWLEDGE_CHUNKS,
+            data: [{ embeddingModel: wanted, 'embedding.0': { $exists: true } }, { embedding: 1 }],
+        }, 'findOne');
+        size = row && Array.isArray(row.embedding) ? row.embedding.length : 0;
+    } catch (error) {
+        logger.warn(`knowledge embeddings: could not read a stored ${wanted} vector for ${companyId}: ${error.message}`);
+        return 0;
+    }
+    if (size) sizes.set(key, size);
+    return size;
+};
+
+const checkSize = async (companyId, wanted, vectors) => {
+    const size = vectors.length && Array.isArray(vectors[0]) ? vectors[0].length : 0;
+    if (!size) return;
+    const expected = await storedSize(companyId, wanted);
+    if (!expected) {
+        sizes.set(`${companyId}:${wanted}`, size);
+        return;
+    }
+    if (expected !== size) {
+        throw Object.assign(new Error(`${wanted} now answers ${size}-dimension vectors, but this workspace stores ${expected}-dimension ones. Set OPENAI_COMPATIBLE_EMBEDDINGS_MODEL to a new model name, then re-embed the workspace under Instance › Knowledge.`), { code: EMBEDDING_SIZE_CHANGED });
+    }
+};
+
+const forgetSizes = () => sizes.clear();
 
 const spendFor = (companyId, userId) => ({ feature: FEATURES.KNOWLEDGE_EMBED, companyId: String(companyId), ...(userId ? { userId: String(userId) } : {}) });
 
@@ -76,10 +125,11 @@ const embedTexts = async (companyId, texts, { userId, timeoutMs } = {}) => {
     const wanted = model();
     try {
         const result = await llmProvider.embeddingProvider().embed({ texts, model: wanted, ...(timeoutMs ? { timeoutMs } : {}), spend: spendFor(companyId, userId) });
+        await checkSize(companyId, wanted, result.embeddings);
         succeeded(companyId);
         return { vectors: result.embeddings, model: wanted };
     } catch (error) {
-        failed(companyId, error);
+        if (!aiSwitch.isAiOff(error)) failed(companyId, error);
         throw error;
     }
 };
@@ -106,6 +156,7 @@ module.exports = {
     BREAKER_FAILURES,
     BREAKER_COOLDOWN_MS,
     EMBED_TIMED_OUT,
+    EMBEDDING_SIZE_CHANGED,
     model,
     queryTimeoutMs,
     configured,
@@ -113,6 +164,7 @@ module.exports = {
     isBudgetRefusal,
     breakerState,
     resetBreaker,
+    forgetSizes,
     planFor,
     embedTexts,
     embedQuery,

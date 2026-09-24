@@ -2,6 +2,7 @@ const openaiProvider = require('./openaiProvider');
 const anthropicProvider = require('./anthropicProvider');
 const deepseekProvider = require('./deepseekProvider');
 const googleProvider = require('./googleProvider');
+const openaiCompatibleProvider = require('./openaiCompatibleProvider');
 const { capabilitiesOf } = require('./normalise');
 const { priceFor } = require('../usage');
 
@@ -16,6 +17,7 @@ const ADAPTERS = Object.freeze({
     anthropic: anthropicProvider,
     deepseek: deepseekProvider,
     google: googleProvider,
+    openai_compatible: openaiCompatibleProvider,
 });
 
 const PROVIDER_NAMES = Object.freeze(Object.keys(ADAPTERS));

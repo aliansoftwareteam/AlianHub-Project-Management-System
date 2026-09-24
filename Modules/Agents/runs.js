@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
 const usage = require('../AICore/usage');
+const aiSwitch = require('../AICore/aiSwitch');
 const { MAX_DEPTH } = require('../../event/domainEventBus');
 const telemetry = require('../../Config/telemetry');
 const { dailyRunLimitOf } = require('./dailyRunLimit');
@@ -50,6 +51,12 @@ const canStart = async (agent, { trigger, viaAccount, companyId, depth } = {}) =
     if (!agent) return { ok: false, reason: 'Agent not found.' };
     if (clampDepth(depth) >= MAX_DEPTH) return { ok: false, reason: LOOP_DEPTH_EXCEEDED, code: LOOP_DEPTH_EXCEEDED, depth: clampDepth(depth), maxDepth: MAX_DEPTH };
     if (agent.paused) return { ok: false, reason: `Agent is paused${agent.pausedReason ? ` (${agent.pausedReason})` : ''}.` };
+    try {
+        await aiSwitch.assertAllowed(companyId);
+    } catch (error) {
+        if (!aiSwitch.isAiOff(error)) throw error;
+        return { ok: false, reason: error.message, code: aiSwitch.AI_OFF };
+    }
     const via = viaAccount || agent.account || 'workspace';
     if (via !== 'local') {
         const price = usage.checkConfiguredModelPriced();

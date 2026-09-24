@@ -115,6 +115,22 @@ describe('chat through the configured base URL', () => {
         expect(usage.priceFor('gpt-4.1').input).toBeGreaterThan(0);
     });
 
+    it('never fails over from the self-hosted server to a vendor, even with the router on', async () => {
+        useCompatible();
+        config.AI_API_KEY = 'sk-proj-OPENAI0123456789';
+        config.AI_MODEL = 'gpt-4.1';
+        process.env.OPENAI_BASE_URL = stub.baseUrl;
+        process.env.AI_MODEL_ROUTER = 'on';
+        process.env.AI_ROUTER_MAX_ATTEMPTS = '1';
+        stub.behave(500);
+        try {
+            await expect(llmProvider.getProvider().chat({ messages: [{ role: 'user', content: 'private' }], spend: SPEND })).rejects.toMatchObject({ provider: 'openai_compatible' });
+            expect(stub.requests.map((r) => r.body.model)).toEqual(['llama3.1:8b']);
+        } finally {
+            delete process.env.AI_ROUTER_MAX_ATTEMPTS;
+        }
+    });
+
     it('turns a failing endpoint into a provider error', async () => {
         useCompatible({ key: 'sk-local-SECRET0123456789' });
         stub.behave(500);

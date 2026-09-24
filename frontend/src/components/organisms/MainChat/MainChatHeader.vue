@@ -12,6 +12,7 @@
 
         <div class="mc-head-actions">
             <button
+                v-if="aiUsable"
                 type="button"
                 class="mc-head-ai"
                 :disabled="summarizing"
@@ -48,6 +49,7 @@
 <script setup>
 import { defineProps, defineEmits } from 'vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import { aiUsable } from "@/composable/aiAvailability";
 import MainChatAvatar from './MainChatAvatar.vue';
 import MainChatIcon from './MainChatIcon.vue';
 

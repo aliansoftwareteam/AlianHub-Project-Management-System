@@ -71,6 +71,7 @@
 
 <script setup>
 import { computed, defineEmits, inject, nextTick, onMounted, ref, watch } from 'vue';
+import { aiUsable } from "@/composable/aiAvailability";
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useStore } from 'vuex';
@@ -105,7 +106,7 @@ const connections = ref([]);
 const recent = ref([]);
 
 const cid = computed(() => companyId?.value || '');
-const hasAi = computed(() => router.hasRoute('AiHub'));
+const hasAi = computed(() => aiUsable.value && router.hasRoute('AiHub'));
 const users = computed(() => getters['users/users'] || []);
 const norm = (s) => String(s || '').toLowerCase();
 const q = computed(() => norm(query.value.trim()));

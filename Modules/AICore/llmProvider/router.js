@@ -165,8 +165,11 @@ async function callCandidate(adapter, opts, reasons) {
 
 /* The registry's insertion order is the fallback preference; the provider the
  * caller (or LLM_PROVIDER) chose goes first. A candidate that is not the
- * primary drops the caller's model, because a model id belongs to one vendor. */
+ * primary drops the caller's model, because a model id belongs to one vendor.
+ * A self-hosted primary never fails over: its whole point is that the prompt
+ * stays on the owner's network, so an outage there must not send it to a vendor. */
 function candidatesFor(primary, registry) {
+    if (primary.name === 'openai_compatible') return [primary];
     const rest = registry.configuredNames()
         .filter((name) => name !== primary.name)
         .map((name) => registry.ADAPTERS[name]);

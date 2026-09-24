@@ -25,7 +25,8 @@
                                 <MainSearchComponent @closeModel="removeKeyListner"/>
                             </template>
                         </AdvanceSearchModal>
-                        <router-view/>
+                        <AiUnavailable v-if="aiGated"/>
+                        <router-view v-else/>
                         <TourCom ref="mainTour"/>
                     </div>
                 </template>
@@ -47,7 +48,8 @@
                             </template>
                         </AdvanceSearchModal>
                         <div class="ah-app__view billing__history-wrapper style-scroll">
-                            <router-view/>
+                            <AiUnavailable v-if="aiGated"/>
+                            <router-view v-else/>
                         </div>
                         <TourCom ref="mainTour"/>
                         <TaskDetailOverlay />
@@ -145,6 +147,9 @@ import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import { initOffline } from '@/offline';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
+import AiUnavailable from '@/components/molecules/AiUnavailable/AiUnavailable.vue';
+import { aiUsable, loadAiAvailability } from '@/composable/aiAvailability';
+import { isAiSectionRoute } from '@/router/ai/section';
 const {tabSync} = tabSyncHelper();
 const mainTour = ref();
 
@@ -191,6 +196,11 @@ const taskList = computed(() => checkPermission('task.task_list'));
 const currentCompany = computed(() => getters["settings/selectedCompany"]);
 const {connectServer} = socketHelper();
 const currentUser = computed(() => getters["users/currentUser"]);
+const aiGated = computed(() => isAiSectionRoute(route.name) && !aiUsable.value);
+
+watch(() => [logged.value, currentCompany.value?._id], ([isLogged, cid]) => {
+    if (isLogged && cid) loadAiAvailability(cid);
+}, { immediate: true });
 
 watch(() => currentUser.value, (val) => {
     if(val?.isVesionUpdate){

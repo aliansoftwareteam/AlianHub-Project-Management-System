@@ -206,6 +206,7 @@
 
 <script setup>
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { aiUsable } from "@/composable/aiAvailability";
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
@@ -258,7 +259,7 @@ const undo = ref(null);
 let undoTimer = null;
 let replyEl = null;
 
-const hasAiHub = computed(() => router.hasRoute('AiHub'));
+const hasAiHub = computed(() => aiUsable.value && router.hasRoute('AiHub'));
 
 // Put aside for later. Held here, per person and per device: the rows themselves
 // stay unread on the server, and Primary is told to leave these out.

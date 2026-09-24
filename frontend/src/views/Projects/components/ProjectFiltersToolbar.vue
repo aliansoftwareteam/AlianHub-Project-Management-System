@@ -65,7 +65,7 @@
                         :title="$t('AI.write_with_ai')"
                         :aria-label="$t('AI.write_with_ai')"
                         @click="$emit('openAi')"
-                        v-if="checkApps('AI',projectData) && checkPermission('artificial_intelligence',projectData?.isGlobalPermission) === true"
+                        v-if="aiUsable && checkApps('AI',projectData) && checkPermission('artificial_intelligence',projectData?.isGlobalPermission) === true"
                     >
                         <ShellIcon name="ai" :size="15" />
                     </button>
@@ -202,6 +202,7 @@
 
 <script setup>
 import { ref, computed, defineProps, defineEmits } from 'vue';
+import { aiUsable } from "@/composable/aiAvailability";
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useRoute } from 'vue-router';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';

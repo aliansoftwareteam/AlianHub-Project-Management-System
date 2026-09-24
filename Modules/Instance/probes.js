@@ -4,6 +4,7 @@ const axios = require('axios');
 const nodemailer = require('nodemailer');
 const { S3Client, HeadBucketCommand } = require('@aws-sdk/client-s3');
 const { withTimeout } = require('./health');
+const compatibleClient = require('../AICore/llmProvider/compatibleClient');
 
 const PROBE_TIMEOUT_MS = 10000;
 const STORAGE_ROOT = path.join(__dirname, '..', '..', 'storage');
@@ -64,21 +65,39 @@ async function probeStorage(values = {}) {
     }
 }
 
+const openaiBase = (values) => String(pick(values, 'OPENAI_BASE_URL') || 'https://api.openai.com/v1').trim().replace(/\/+$/, '');
+
 const AI_ENDPOINTS = {
-    openai: (values) => ({ url: 'https://api.openai.com/v1/models', headers: { Authorization: `Bearer ${pick(values, 'AI_API_KEY')}` }, key: pick(values, 'AI_API_KEY') }),
+    openai: (values) => ({ url: `${openaiBase(values)}/models`, headers: { Authorization: `Bearer ${pick(values, 'AI_API_KEY')}` }, key: pick(values, 'AI_API_KEY') }),
     anthropic: (values) => ({ url: 'https://api.anthropic.com/v1/models', headers: { 'x-api-key': pick(values, 'ANTHROPIC_API_KEY'), 'anthropic-version': '2023-06-01' }, key: pick(values, 'ANTHROPIC_API_KEY') }),
     deepseek: (values) => ({ url: `${pick(values, 'DEEPSEEK_BASE_URL') || 'https://api.deepseek.com'}/models`, headers: { Authorization: `Bearer ${pick(values, 'DEEPSEEK_API_KEY')}` }, key: pick(values, 'DEEPSEEK_API_KEY') }),
 };
 
-async function probeAi(values = {}) {
+const modelIdsOf = (data) => (Array.isArray(data && data.data) ? data.data.map((row) => row && row.id).filter((id) => typeof id === 'string') : []);
+
+/* The owner's own endpoint, often on loopback or the LAN: reached only through the dedicated
+ * client, which allows private addresses for this one configured URL and nothing else. */
+async function probeCompatible(values) {
+    const baseUrl = pick(values, 'OPENAI_COMPATIBLE_BASE_URL');
+    if (!baseUrl) return fail(new Error('Set the base URL of the OpenAI-compatible server first, e.g. http://localhost:11434/v1 for Ollama.'));
     try {
-        const provider = String(pick(values, 'LLM_PROVIDER') || 'openai').toLowerCase();
+        const { models } = await compatibleClient.listModels({ baseUrl, apiKey: pick(values, 'OPENAI_COMPATIBLE_API_KEY'), timeoutMs: PROBE_TIMEOUT_MS });
+        return ok(`Connected: the endpoint serves ${models.length} model${models.length === 1 ? '' : 's'}.`, { provider: 'openai_compatible', models });
+    } catch (error) {
+        return fail(new Error(compatibleClient.describeFailure(error, { timeoutMs: PROBE_TIMEOUT_MS })));
+    }
+}
+
+async function probeAi(values = {}) {
+    const provider = String(pick(values, 'LLM_PROVIDER') || 'openai').toLowerCase();
+    if (provider === 'openai_compatible') return probeCompatible(values);
+    try {
         const build = AI_ENDPOINTS[provider];
         if (!build) return fail(new Error(`Unknown LLM_PROVIDER "${provider}".`));
         const { url, headers, key } = build(values);
         if (!key) return fail(new Error(`No API key set for ${provider}.`));
-        await withTimeout(axios.get(url, { headers, timeout: PROBE_TIMEOUT_MS }), PROBE_TIMEOUT_MS, provider);
-        return ok(`${provider} accepted the API key.`, { provider });
+        const response = await withTimeout(axios.get(url, { headers, timeout: PROBE_TIMEOUT_MS }), PROBE_TIMEOUT_MS, provider);
+        return ok(`${provider} accepted the API key.`, { provider, models: modelIdsOf(response && response.data) });
     } catch (error) {
         const status = error?.response?.status;
         return fail(status === 401 || status === 403 ? new Error('The provider rejected the API key.') : error);

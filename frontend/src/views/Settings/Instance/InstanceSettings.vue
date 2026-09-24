@@ -8,12 +8,18 @@
                     <button v-for="g in groups" :key="g" type="button" class="ah-tab" :class="{ 'is-active': group === g }" @click="group = g">{{ $t(`Instance.group_${g}`) }}</button>
                 </div>
                 <div class="ah-toolbar__spacer"></div>
-                <button v-if="testable" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="test">{{ $t('Instance.test') }}</button>
+                <button v-if="testable" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" data-test="instance-settings-test" @click="test">{{ group === 'ai' ? $t('Instance.test_connection') : $t('Instance.test') }}</button>
                 <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !dirty" @click="save">{{ busy ? $t('Instance.saving') : $t('Instance.save') }}</button>
             </div>
 
             <div v-if="restartKeys.length" class="in-banner in-banner--warn"><ShellIcon name="alert" :size="15" /><span>{{ $t('Instance.restart_needed', { keys: restartKeys.join(', ') }) }}</span></div>
-            <div v-if="testResult" class="in-banner" :class="testResult.ok ? 'in-banner--ok' : 'in-banner--danger'"><ShellIcon :name="testResult.ok ? 'check' : 'alert'" :size="15" /><span>{{ testResult.text }}</span></div>
+            <div v-if="testResult" class="in-banner" :class="testResult.ok ? 'in-banner--ok' : 'in-banner--danger'" role="status"><ShellIcon :name="testResult.ok ? 'check' : 'alert'" :size="15" /><span>{{ testResult.text }}</span></div>
+            <div v-if="testResult && testResult.models.length" class="in-models" data-test="instance-settings-models">
+                <span class="ah-label">{{ $t('Instance.test_models', { n: testResult.models.length }, testResult.models.length) }}</span>
+                <ul class="in-models__list">
+                    <li v-for="model in testResult.models" :key="model"><code class="ah-mono">{{ model }}</code></li>
+                </ul>
+            </div>
             <p class="ah-small">{{ $t('Instance.settings_lead') }} <a :href="guide('configure')" target="_blank" rel="noopener">{{ $t('Instance.guide') }}</a></p>
 
             <section class="ah-card in-card">
@@ -28,7 +34,7 @@
                     </div>
                     <div class="in-field__control">
                         <select v-if="row.type === 'select'" :id="`f-${row.key}`" v-model="draft[row.key]" class="ah-input" :disabled="row.locked">
-                            <option v-for="o in row.options" :key="o" :value="o">{{ o }}</option>
+                            <option v-for="o in row.options" :key="o" :value="o">{{ optionLabel(row, o) }}</option>
                         </select>
                         <label v-else-if="row.type === 'boolean'" class="in-toggle">
                             <input :id="`f-${row.key}`" v-model="draft[row.key]" type="checkbox" class="ah-check" true-value="true" false-value="false" :disabled="row.locked" />
@@ -86,6 +92,7 @@ const testable = computed(() => TESTABLE.includes(group.value));
 const dirty = computed(() => Object.keys(draft).some((k) => draft[k] !== baseline[k]) || Object.values(clear).some(Boolean));
 const label = (row) => (te(`Instance.f_${row.key}`) ? t(`Instance.f_${row.key}`) : row.label);
 const help = (row) => (te(`Instance.h_${row.key}`) ? t(`Instance.h_${row.key}`) : row.help);
+const optionLabel = (row, option) => (te(`Instance.o_${row.key}_${option}`) ? t(`Instance.o_${row.key}_${option}`) : option);
 
 function seed(list) {
     rows.value = list;
@@ -145,7 +152,8 @@ async function test() {
         const values = {};
         for (const row of visible.value) if (!row.locked && !row.secret) values[row.key] = draft[row.key]; else if (row.secret && draft[row.key]) values[row.key] = draft[row.key];
         const res = await apiRequestWithoutCompnay("post", env.INSTANCE_SETTINGS_TEST, { group: group.value, values }).catch((e) => ({ data: { status: false, statusText: message(e) } }));
-        testResult.value = { ok: res?.data?.status === true, text: res?.data?.statusText || t("Instance.test_ok") };
+        const models = Array.isArray(res?.data?.data?.models) ? res.data.data.models : [];
+        testResult.value = { ok: res?.data?.status === true, text: res?.data?.statusText || t("Instance.test_ok"), models };
     } finally {
         busy.value = false;
     }
@@ -159,4 +167,7 @@ onMounted(load);
 .in-toggle { display: inline-flex; align-items: center; gap: 8px; font: var(--text-small); color: var(--ink); cursor: pointer; }
 .in-clear { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .in-list { height: auto; min-height: 88px; resize: vertical; font-family: var(--font-mono, monospace); }
+.in-models { margin: 0 0 12px; }
+.in-models__list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
+.in-models__list code { overflow-wrap: anywhere; }
 </style>
