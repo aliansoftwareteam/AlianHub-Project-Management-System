@@ -1361,6 +1361,7 @@
     "Auth.from_description": "Create from a description",
     "Auth.from_description_desc": "Describe the project and AI drafts the sprints and tasks.",
     "Auth.full_name": "Full name",
+    "Auth.google_unavailable": "Google sign-in didn't load. Check your connection or ad blocker and reload, or log in with your email.",
     "Auth.gs_dismiss": "Dismiss for now",
     "Auth.gs_docs": "Docs →",
     "Auth.gs_invite": "Invite your team",
