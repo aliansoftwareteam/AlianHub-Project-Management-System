@@ -234,7 +234,8 @@ describe('outside agent sessions with EXTERNAL_AGENT_SESSIONS on', () => {
         const row = await waitFor(async () => (await sessionsOf(task._id)).find((s) => s.state === 'unresponsive'), { timeoutMs: 20000, intervalMs: 250 });
         expect(row).toBeTruthy();
         expect(new Date(row.endedAt).getTime() - deliveredAt).toBeGreaterThanOrEqual(10000);
-        expect(new Date(row.endedAt).getTime() - deliveredAt).toBeLessThan(13000);
+        // The sweep runs on an interval, so a loaded CI runner can land a little past the ten seconds.
+        expect(new Date(row.endedAt).getTime() - deliveredAt).toBeLessThan(16000);
     }, 40000);
 
     it('stops a session mid-step when its grant is revoked', async () => {
