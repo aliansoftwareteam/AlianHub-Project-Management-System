@@ -437,6 +437,15 @@ html, body, #app {
 .ah-slide-right-enter-active, .ah-slide-right-leave-active { transition: transform var(--t-panel) var(--ease), opacity var(--t-panel) var(--ease); }
 .ah-slide-right-enter-from, .ah-slide-right-leave-to { transform: translateX(24px); opacity: 0; }
 
+/* Transitions only: spinners and progress bars keep turning, since a frozen one reads as "stuck". */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        transition-duration: .01ms !important;
+        transition-delay: 0s !important;
+        scroll-behavior: auto !important;
+    }
+}
+
 .ah-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* Zero specificity: a control that draws its own focus state keeps it; one that drew none gets this ring. */
