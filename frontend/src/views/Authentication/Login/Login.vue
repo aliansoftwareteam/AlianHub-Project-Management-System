@@ -71,7 +71,7 @@
                 <button type="submit" class="ah-btn ah-btn--primary" :disabled="busy">
                     <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('Auth.loading') : $t('Auth.log_in') }}
                 </button>
-                <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="sendMagicLink">{{ $t('Auth.email_me_link') }}</button>
+                <button v-if="magicLinkOn" type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="sendMagicLink">{{ $t('Auth.email_me_link') }}</button>
             </div>
 
             <div class="auth__remember">
@@ -190,6 +190,7 @@ const brand = computed(() => getters["brandSettingTab/brandSettings"] || {});
 const showRegister = computed(() => router.hasRoute("Sign-up") || router.hasRoute("Signup") || router.hasRoute("Register"));
 const providers = computed(() => enabledProviders());
 const ssoAvailable = computed(() => publicConfig.auth.sso !== false);
+const magicLinkOn = computed(() => publicConfig.auth.magicLink === true);
 
 const step = ref("login");
 const busy = ref(false);

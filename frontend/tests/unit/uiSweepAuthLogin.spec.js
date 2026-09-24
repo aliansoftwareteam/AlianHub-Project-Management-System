@@ -19,6 +19,7 @@ vi.mock('@/plugins/oauth/ProviderButton.vue', () => ({ default: { name: 'Provide
 vi.mock('@/components/templates/AuthShell/AuthShell.vue', () => ({ default: { name: 'AuthShell', template: '<div><slot /></div>' } }));
 
 import Login from '@/views/Authentication/Login/Login.vue';
+import { publicConfig } from '@/config/publicConfig';
 
 const mountLogin = () => mount(Login, {
     attachTo: document.body,
@@ -78,6 +79,18 @@ describe('Login', () => {
         expect(wrapper.find('.auth__banner').text()).toBe('Auth.session_expired');
         expect(sessionStorage.getItem('ah.sessionExpired')).toBeNull();
         wrapper.unmount();
+    });
+
+    it('offers the email login link only when the server has login links switched on', async () => {
+        const off = mountLogin();
+        expect(off.text()).not.toContain('Auth.email_me_link');
+        off.unmount();
+
+        publicConfig.auth.magicLink = true;
+        const on = mountLogin();
+        expect(on.text()).toContain('Auth.email_me_link');
+        on.unmount();
+        publicConfig.auth.magicLink = false;
     });
 
     it('shows no session notice on an ordinary visit', async () => {
