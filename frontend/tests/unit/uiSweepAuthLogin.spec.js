@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 
@@ -6,7 +9,7 @@ const { apiRequestWithoutSecure, route } = vi.hoisted(() => ({
     route: { query: {} },
 }));
 
-vi.mock('@/services', () => ({ apiRequestWithoutSecure, apiRequestWithoutCompnay: vi.fn(), getAuth: vi.fn() }));
+vi.mock('@/services', () => ({ apiRequestWithoutSecure, apiRequestWithoutCompnay: vi.fn(), getAuth: vi.fn(), SESSION_EXPIRED_KEY: 'ah.sessionExpired' }));
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), hasRoute: () => false }), useRoute: () => route }));
 vi.mock('vuex', () => ({ useStore: () => ({ getters: {} }) }));
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key) => key }) }));
@@ -66,5 +69,31 @@ describe('Login', () => {
         expect(wrapper.find('.auth__banner').text()).toBe('Auth.maintenance_login');
         expect(wrapper.text()).not.toContain('Auth.server_error');
         wrapper.unmount();
+    });
+
+    it('explains why the person is back on the login page after their session ran out', async () => {
+        sessionStorage.setItem('ah.sessionExpired', '1');
+        const wrapper = mountLogin();
+        await flushPromises();
+        expect(wrapper.find('.auth__banner').text()).toBe('Auth.session_expired');
+        expect(sessionStorage.getItem('ah.sessionExpired')).toBeNull();
+        wrapper.unmount();
+    });
+
+    it('shows no session notice on an ordinary visit', async () => {
+        const wrapper = mountLogin();
+        await flushPromises();
+        expect(wrapper.find('.auth__banner').exists()).toBe(false);
+        wrapper.unmount();
+    });
+});
+
+describe('automatic sign-outs', () => {
+    const services = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/services/index.js'), 'utf8');
+
+    it('mark the session as expired so the login page can say so', () => {
+        expect(services).not.toMatch(/\blogOut\(\)/);
+        expect(services.match(/logOut\(\{ expired: true \}\)/g)).toHaveLength(4);
+        expect(services).toMatch(/if \(data\?\.expired\)[\s\S]{0,120}sessionStorage\.setItem\(SESSION_EXPIRED_KEY/);
     });
 });

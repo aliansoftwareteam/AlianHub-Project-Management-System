@@ -175,7 +175,7 @@ import { useToast } from "vue-toast-notification";
 import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ProviderButton from "@/plugins/oauth/ProviderButton.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth } from "@/services";
+import { apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth, SESSION_EXPIRED_KEY } from "@/services";
 import * as env from "@/config/env";
 import { publicConfig, enabledProviders } from "@/config/publicConfig";
 
@@ -214,6 +214,15 @@ const clearSession = () => {
     localStorage.removeItem("updateToken");
 };
 const rememberEmail = () => localStorage.setItem("ForgotEmail", form.email);
+const sessionExpired = () => {
+    try {
+        const expired = sessionStorage.getItem(SESSION_EXPIRED_KEY) === "1";
+        sessionStorage.removeItem(SESSION_EXPIRED_KEY);
+        return expired;
+    } catch {
+        return false;
+    }
+};
 const encode = (str) => Array.from(str).map((c) => c.charCodeAt(0)).join(", ");
 const decode = (src) => String.fromCharCode.apply(null, src.split(","));
 
@@ -222,6 +231,7 @@ onMounted(() => {
         const rem = JSON.parse(localStorage.getItem("remember") || "null");
         if (rem) { form.email = rem.email; form.password = decode(rem.password); rememberMe.value = true; }
     } catch { /* ignore */ }
+    if (sessionExpired()) banner.value = { kind: "warn", text: t("Auth.session_expired") };
     if (route.query.reason === "expired") banner.value = { kind: "warn", text: t("Auth.two_factor_session_expired") };
     if (route.query.magic === "invalid") banner.value = { kind: "danger", text: t("Auth.magic_invalid") };
     if (route.query.magic === "disabled") banner.value = { kind: "warn", text: t("Auth.magic_unavailable") };

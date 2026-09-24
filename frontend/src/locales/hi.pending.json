@@ -1384,6 +1384,7 @@
     "Auth.send_again": "send again",
     "Auth.send_reset_link": "Send reset link",
     "Auth.server_error": "Something went wrong on the server. Try again in a moment.",
+    "Auth.session_expired": "Your session expired. Log in again to pick up where you left off.",
     "Auth.set_password_title": "Set your password",
     "Auth.show_password": "Show password",
     "Auth.signing_in": "Signing you in…",

@@ -285,6 +285,7 @@ export default {
         "continue_with": "Continue with {provider}",
         "show_password": "Show password",
         "hide_password": "Hide password",
+        "session_expired": "Your session expired. Log in again to pick up where you left off.",
         "maintenance_login": "Sign-in is paused while the server is under maintenance. Try again in a few minutes.",
         "google_unavailable": "Google sign-in didn't load. Check your connection or ad blocker and reload, or log in with your email.",
         "continue_with_sso": "Continue with SSO (SAML / OIDC)",
