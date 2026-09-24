@@ -3478,6 +3478,8 @@
     "Inbox.state_offline_primary": "Retry now",
     "Inbox.state_offline_title": "You're offline",
     "Inbox.state_retrying": "retrying in {s}s · attempt {n}",
+    "Inbox.state_route_notfound_body": "The link may be mistyped, or what it pointed to was moved or deleted.",
+    "Inbox.state_route_notfound_title": "We can't find that page",
     "Inbox.state_unreachable_body": "Your changes are saved locally and will sync when it's back.",
     "Inbox.state_unreachable_primary": "Retry now",
     "Inbox.state_unreachable_secondary": "Status page",

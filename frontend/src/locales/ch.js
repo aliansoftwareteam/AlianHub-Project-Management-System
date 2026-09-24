@@ -6498,6 +6498,8 @@ export default {
         "state_notfound_body": "It was deleted, moved, or never existed. Anything it held is in the audit log.",
         "state_notfound_primary": "Go home",
         "state_notfound_secondary": "Audit log",
+        "state_route_notfound_title": "We can't find that page",
+        "state_route_notfound_body": "The link may be mistyped, or what it pointed to was moved or deleted.",
         "state_retrying": "retrying in {s}s · attempt {n}",
         "off_title": "Offline",
         "off_keep_working": "you can keep working.",

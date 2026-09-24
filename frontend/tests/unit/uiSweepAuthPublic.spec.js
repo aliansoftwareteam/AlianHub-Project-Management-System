@@ -70,6 +70,15 @@ describe('invitation sign-up', () => {
     });
 });
 
+describe('404 page', () => {
+    test('does not send a signed-out visitor to an audit log, or offer a button that only goes home', () => {
+        expect(read('views/NotFound.vue')).toMatch(/:body="\$t\('Inbox\.state_route_notfound_body'\)"/);
+        const state = read('components/molecules/AppState/AppState.vue');
+        expect(state).toMatch(/notfound: false \}/);
+        expect(state).not.toMatch(/props\.kind === 'forbidden' \|\| props\.kind === 'notfound'\) goHome\(\)/);
+    });
+});
+
 describe('login proof panel', () => {
     test('the product shot takes the theme surface, so its dark-mode text stays readable', () => {
         const rule = ruleBody(read('components/templates/AuthShell/style.css'), '.auth__shot');

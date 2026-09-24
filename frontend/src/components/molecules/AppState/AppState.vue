@@ -46,7 +46,7 @@ const props = defineProps({
 const emit = defineEmits(['primary', 'secondary']);
 
 const ICON = { offline: 'wifiOff', unreachable: 'alert', forbidden: 'lock', denied: 'lock', notfound: 'search' };
-const SECONDARY = { offline: false, unreachable: true, forbidden: true, denied: false, notfound: true };
+const SECONDARY = { offline: false, unreachable: true, forbidden: true, denied: false, notfound: false };
 
 const router = useRouter();
 const companyId = inject('$companyId', null);
@@ -65,7 +65,7 @@ const primary = () => {
 };
 const secondary = () => {
     emit('secondary');
-    if (props.kind === 'forbidden' || props.kind === 'notfound') goHome();
+    if (props.kind === 'forbidden') goHome();
 };
 </script>
 
