@@ -27,6 +27,24 @@ describe('auth card on a phone', () => {
     });
 });
 
+describe('provider buttons', () => {
+    const vueFiles = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) return vueFiles(full);
+        return entry.name.endsWith('.vue') ? [full] : [];
+    });
+
+    test('every component that draws a ShellIcon imports it, so no icon renders as an unknown tag', () => {
+        const missing = vueFiles(SRC)
+            .filter((file) => {
+                const source = fs.readFileSync(file, 'utf8');
+                return /<ShellIcon\b/.test(source) && !/import ShellIcon\b/.test(source);
+            })
+            .map((file) => path.relative(SRC, file));
+        expect(missing).toEqual([]);
+    });
+});
+
 describe('login proof panel', () => {
     test('the product shot takes the theme surface, so its dark-mode text stays readable', () => {
         const rule = ruleBody(read('components/templates/AuthShell/style.css'), '.auth__shot');
