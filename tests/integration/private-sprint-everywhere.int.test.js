@@ -191,3 +191,31 @@ describe('the paths that used to guard at project level only', () => {
         expect(String(asOwner.body.statusText)).toContain('private');
     });
 });
+
+describe('recent visits follow the sprint rule', () => {
+    const visitedIds = async (session) => {
+        const res = await session.api.get('/api/v2/recent-visits');
+        expect(res.body.status).toBe(true);
+        return (res.body.data || []).map((row) => String(row.task._id));
+    };
+
+    it('drops a visited task once its sprint is private to others, and keeps it for those on the sprint', async () => {
+        const owner = await loginAs('owner');
+        const member = await loginAs('member');
+        const guest = await loginAs('guest');
+        const target = await projectWithTask(owner, [owner, member, guest]);
+        const taskId = String(target.task._id);
+
+        for (const session of [owner, member, guest]) {
+            const visit = await session.api.post('/api/v2/recent-visits', { entityType: 'task', entityId: taskId });
+            expect(visit.body.status).toBe(true);
+            expect(await visitedIds(session)).toContain(taskId);
+        }
+
+        await makeSprintPrivate(owner, target, [owner.uid, member.uid]);
+
+        expect(await visitedIds(guest)).not.toContain(taskId);
+        expect(await visitedIds(member)).toContain(taskId);
+        expect(await visitedIds(owner)).toContain(taskId);
+    });
+});
