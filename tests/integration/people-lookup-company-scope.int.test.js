@@ -19,6 +19,8 @@ const companyUsers = () => client.db(state.companyId).collection('company_users'
 /* The fields that differ between any two invitations regardless of who is invited. */
 const VARYING = ['_id', 'userEmail', 'linkId', 'sendInvitationTime', 'createdAt', 'updatedAt'];
 const comparable = (row) => Object.fromEntries(Object.entries(row || {}).filter(([key]) => !VARYING.includes(key)));
+/* A join link carries its own invitation's id and token; only its shape may be compared. */
+const linkShape = (body) => ({ ...body, data: undefined, joinLink: body.joinLink && body.joinLink.replace(/-[0-9a-f]{24}&token=[0-9a-f]+$/, '-<invitation>&token=<token>') });
 
 beforeAll(async () => {
     client = new MongoClient(resolveMongoUrl(), { serverSelectionTimeoutMS: 5000 });
@@ -53,7 +55,7 @@ describe('inviting an address', () => {
 
         expect(outsider.status).toBe(unknown.status);
         expect(comparable(outsider.body.data)).toEqual(comparable(unknown.body.data));
-        expect({ ...outsider.body, data: undefined }).toEqual({ ...unknown.body, data: undefined });
+        expect(linkShape(outsider.body)).toEqual(linkShape(unknown.body));
         expect(JSON.stringify(outsider.body)).not.toContain(outsiderId);
     });
 
