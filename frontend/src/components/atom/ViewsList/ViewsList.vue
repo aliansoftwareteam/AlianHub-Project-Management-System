@@ -221,9 +221,9 @@ defineEmits(['click']);
     align-items: center;
 }
 .dots{
-    height: 20px;
-    width: 20px;
-    padding: 3px;
+    height: 24px;
+    width: 24px;
+    padding: 5px;
     border-radius: 5px;
     box-sizing: border-box;
     cursor: pointer;
