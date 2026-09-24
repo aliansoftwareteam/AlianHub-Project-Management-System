@@ -45,6 +45,13 @@ describe('public share pages', () => {
         expect(crumb).toMatch(/white-space:nowrap/);
     });
 
+    test('a wide table in a shared doc scrolls inside the page instead of widening it on a phone', () => {
+        const table = /\n {4}\.doc table\{([^}]*)\}/.exec(css)[1];
+        expect(table).toMatch(/display:block/);
+        expect(table).toMatch(/max-width:100%/);
+        expect(table).toMatch(/overflow-x:auto/);
+    });
+
     test('the share buttons keep white text at 4.5:1', () => {
         const button = /\n {4}button\{margin-top:14px;background:(#[0-9a-f]{6})/.exec(css);
         expect(contrast('#ffffff', button[1])).toBeGreaterThanOrEqual(4.5);

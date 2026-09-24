@@ -134,7 +134,7 @@ const PAGE_STYLE = `
     .doc iframe.ql-video.ql-align-center{margin-left:auto;margin-right:auto}
     .doc iframe.ql-video.ql-align-right{margin-left:auto}
     .doc a{color:#5b4ccc}
-    .doc table{border-collapse:collapse}
+    .doc table{border-collapse:collapse;display:block;max-width:100%;overflow-x:auto}
     .doc td,.doc th{border:1px solid #e6e6e6;padding:6px 10px}
     /* The editor stores alignment and indent as classes, so the public page has to
        understand them too or every centred heading silently goes left. */
