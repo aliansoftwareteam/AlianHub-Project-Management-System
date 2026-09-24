@@ -26,3 +26,11 @@ describe('auth card on a phone', () => {
         expect(ruleBody(css, '.auth .ah-btn--block')).toMatch(/box-sizing:\s*border-box/);
     });
 });
+
+describe('login proof panel', () => {
+    test('the product shot takes the theme surface, so its dark-mode text stays readable', () => {
+        const rule = ruleBody(read('components/templates/AuthShell/style.css'), '.auth__shot');
+        expect(rule).toMatch(/background:\s*var\(--surface\)/);
+        expect(rule).not.toMatch(/#fff\b/);
+    });
+});
