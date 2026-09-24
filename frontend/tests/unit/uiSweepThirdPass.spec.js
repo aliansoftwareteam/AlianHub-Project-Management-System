@@ -299,7 +299,7 @@ describe('Settings → Projects apps column', () => {
         const css = read('components/molecules/ProjectsListingSetting/style.css');
         const last = css.slice(css.lastIndexOf('.project_status_info_area {'));
         expect(ruleBody(last, '.p_erpApp')).toMatch(/flex:\s*1 0 100%/);
-        expect(last).toMatch(/\.pls__apps \{ display: grid; grid-template-columns: repeat\(auto-fill, minmax\(220px, 1fr\)\)/);
+        expect(last).toMatch(/\.p_erpApp \.p__erpApp-wrapper \.pls__apps \{ display: grid; grid-template-columns: repeat\(auto-fill, minmax\(220px, 1fr\)\)/);
         expect(last).toMatch(/\.pls__apps \{ --ink: #17161c;/);
     });
 });
