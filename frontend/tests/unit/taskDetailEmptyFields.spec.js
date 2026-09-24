@@ -53,7 +53,7 @@ describe('an empty date field', () => {
     const store = createStore({ modules: { settings: { namespaced: true, getters: { companyDateFormat: () => ({ dateFormat: 'DD/MM/YYYY' }) } } } });
     it('reads the empty label and opens the calendar on Enter', async () => {
         openMenu.mockClear();
-        const wrapper = mount(CalenderCompo, { props: { displyDate: '', isShowDateAndicon: true, ariaLabel: 'Due Date', emptyText: 'Empty' }, global: { plugins: [store] } });
+        const wrapper = mount(CalenderCompo, { props: { modelValue: '', isShowDateAndicon: true, ariaLabel: 'Due Date', emptyText: 'Empty' }, global: { plugins: [store] } });
         await flushPromises();
         const input = wrapper.get('input');
         expect(input.attributes('placeholder')).toBe('Empty');
@@ -62,7 +62,7 @@ describe('an empty date field', () => {
     });
 
     it('keeps the date format hint where no empty label is given', async () => {
-        const wrapper = mount(CalenderCompo, { props: { displyDate: '', isShowDateAndicon: true }, global: { plugins: [store] } });
+        const wrapper = mount(CalenderCompo, { props: { modelValue: '', isShowDateAndicon: true }, global: { plugins: [store] } });
         await flushPromises();
         expect(wrapper.get('input').attributes('placeholder')).toBe('DD/MM/YYYY');
     });

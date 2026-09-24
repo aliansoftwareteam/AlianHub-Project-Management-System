@@ -812,5 +812,7 @@ function updateChecklist (array) {
     checklistArray.value = checklistArray.value.concat(array);
     manageCheckList();
 }
+
+defineExpose({ addCheckList });
 </script>
 <style> @import "./style.css"; </style>

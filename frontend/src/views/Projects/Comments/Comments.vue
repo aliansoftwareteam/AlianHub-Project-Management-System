@@ -355,6 +355,10 @@ const props = defineProps({
         type: Boolean,
         default : false
     },
+    focusComposer: {
+        type: Boolean,
+        default: true
+    },
     commentType: {
         type: String,
         default : 'tasks'
@@ -565,9 +569,11 @@ async function initialize() {
 
     // Keyboard-ready without moving the page: a plain focus() scrolls the task
     // overlay down to the composer, past the title and description.
-    nextTick(() => {
-        document.getElementById("message-box")?.focus({ preventScroll: true });
-    })
+    if (props.focusComposer) {
+        nextTick(() => {
+            document.getElementById("message-box")?.focus({ preventScroll: true });
+        })
+    }
 
     // ASSIGN PATHS
     if(props.taskId && props.taskId.length) {

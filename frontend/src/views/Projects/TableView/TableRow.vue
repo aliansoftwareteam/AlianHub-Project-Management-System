@@ -1,5 +1,5 @@
 <template>
-    <div ref="rowRef" class="tv2__row" :class="{ 'is-selected': selected }" role="row" @click="$emit('open', data)">
+    <div ref="rowRef" class="tv2__row" :class="{ 'is-selected': selected }" role="row" v-bind="taskNavAttrs(data)" @click="$emit('open', data)">
         <span role="cell" @click.stop>
             <input
                 v-if="canSelect"
@@ -81,6 +81,7 @@ import { useGetterFunctions } from "@/composable";
 import { taskRisk } from "@/views/Projects/composables/taskRisk";
 import { useTaskSummaries } from "./useTaskSummaries.js";
 import { useTaskCategories } from "./useTaskCategories.js";
+import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
 
 defineOptions({ name: "TableRow" });
 
