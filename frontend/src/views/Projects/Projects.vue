@@ -710,6 +710,7 @@ const openEmbedView = (item) => {
 provide('taskCollapsed', collapsed);
 provide('searchedTask', searchTask);
 provide('clearTaskFilters', clearAllFilters);
+provide('refreshTaskSearch', searchMongoDB);
 provide('showArchived', showArchived);
 provide('selectedProject', projectData);
 provide('isSupport', ref(false));

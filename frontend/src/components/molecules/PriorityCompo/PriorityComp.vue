@@ -1,5 +1,6 @@
 <template>
     <div class="priority__component" :id="tourId">
+        <slot name="trigger" :open="openPicker">
         <div
             class="d-flex align-items-center cursor-pointer"
             :role="permission ? 'button' : null"
@@ -23,6 +24,7 @@
             />
             <span v-if="showName" class="ml-10px">{{ selectedPriority.name }}</span>
         </div>
+        </slot>
         <Sidebar
             :title="$t('Permissions.select_priorities')"
             v-model:visible="visible"
@@ -92,6 +94,7 @@ const props = defineProps({
 })
 
 const visible = ref(false);
+const openPicker = () => { visible.value = true; };
 
 //define computed methods
 const selectedPriority = computed(() => {

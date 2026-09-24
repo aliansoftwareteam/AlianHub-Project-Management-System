@@ -37,6 +37,7 @@
                             @select="onSelect"
                             @toggle-subtasks="toggleSubtasks(task)"
                             @review-agent="$emit('review-agent', $event)"
+                            @add-subtask="startSubtask(task)"
                         />
                         <template v-if="isExpanded(task._id)">
                             <ListRow
@@ -49,6 +50,15 @@
                                 @toggle-done="toggleDone"
                             />
                         </template>
+                        <div v-if="subtaskFor === String(task._id)" role="row" class="lv2__aria-row"><div role="cell" class="lv2__create lv2__create--sub">
+                            <CreateTask
+                                :sprint="{ ...task.sprintArray, id: task.sprintId, folderId: task.folderObjId }"
+                                :taskId="task._id"
+                                :assigneeOptions="subtaskAssignees(task)"
+                                :considerWidth="false"
+                                @cancel="subtaskFor = ''"
+                            />
+                        </div></div>
                     </div>
                 </template>
             </draggable>
@@ -91,6 +101,7 @@ import { useProjectAgentActivity } from "./useProjectAgentActivity.js";
 import { hasSubtasks, indexProgress, pendingExpandIds, progressQuery, progressSignature } from "./subtaskProgress";
 import { groupLabel, groupRows, listSourceTasks, searchExpandIds } from "./listFilter";
 import { apiRequest } from "@/services";
+import { subtaskCreateAssignees } from "@/utils/assigneeOptions";
 import * as env from "@/config/env";
 
 defineOptions({ name: "ListGroup" });
@@ -116,6 +127,7 @@ const taskCollapsed = inject("taskCollapsed", ref(true));
 
 const creating = ref(false);
 const expandedIds = ref([]);
+const subtaskFor = ref("");
 
 const sprintId = computed(() => props.sprint?.id || props.sprint?._id);
 const canCreate = computed(() => !showArchived.value
@@ -230,6 +242,15 @@ function subtasksOf(task) {
 
 function visibleSubtasks(task) {
     return subtasksOf(task).filter((sub) => (showArchived.value ? sub.deletedStatusKey === 2 : !sub.deletedStatusKey));
+}
+
+const companyUsers = computed(() => (getters["settings/companyUsers"] || []).map((x) => x.userId));
+const subtaskAssignees = (task) => subtaskCreateAssignees({ parent: task, project: props.project, companyUsers: companyUsers.value });
+
+function startSubtask(task) {
+    const id = String(task._id);
+    if (!isExpanded(id)) toggleSubtasks(task);
+    subtaskFor.value = id;
 }
 
 function onSelect(task, event) {

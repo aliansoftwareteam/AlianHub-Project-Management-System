@@ -39,9 +39,14 @@ const DONE = { key: 2, name: 'Complete', type: 'close', value: 'complete', bgCol
 const STATUSES = [OPEN, PROGRESS, REVIEW, DONE];
 
 const PRIORITIES = [
-    { name: 'High', value: 'HIGH', statusImage: 'high.png' },
-    { name: 'Medium', value: 'MEDIUM', statusImage: 'medium.png' },
-    { name: 'Low', value: 'LOW', statusImage: 'low.png' }
+    { name: 'High', value: 'HIGH', statusImage: 'taskPriorities/high.png' },
+    { name: 'Medium', value: 'MEDIUM', statusImage: 'taskPriorities/medium.png' },
+    { name: 'Low', value: 'LOW', statusImage: 'taskPriorities/low.png' }
+];
+
+const USERS = [
+    { _id: 'u1', Employee_Name: 'Olivia Owner', Employee_profileImageURL: '' },
+    { _id: 'u2', Employee_Name: 'Max Member', Employee_profileImageURL: '' }
 ];
 
 const task = (over = {}) => ({
@@ -54,7 +59,8 @@ const baseStore = () => createStore({
     getters: {
         'settings/companyPriority': () => PRIORITIES,
         'settings/companyMembers': () => [],
-        'settings/companyUsers': () => [],
+        'settings/companyUsers': () => USERS.map((u) => ({ userId: u._id, isDelete: false })),
+        'users/users': () => USERS,
         'settings/teams': () => [],
         'settings/companyOwnerDetail': () => ({ userId: 'u1' }),
         'projectData/currentProjectDetails': () => ({ taskStatusData: STATUSES }),

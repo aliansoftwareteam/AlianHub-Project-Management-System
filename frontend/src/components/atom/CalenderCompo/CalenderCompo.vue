@@ -57,6 +57,7 @@
             </template>
             <!-- for simple date picker -->
             <template #trigger v-if="range === false">
+                <slot name="trigger" :value="dateValue">
                 <div
                     v-if="!isShowDateAndicon"
                     class="d-flex calendar-trigger"
@@ -125,6 +126,7 @@
                         >
                     </div>
                 </div>
+                </slot>
             </template>
         </VueDatePicker>
         <!-- <VueDatePicker
