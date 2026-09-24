@@ -21,9 +21,9 @@
                 </i18n-t>
                 <span v-else>{{ $t('Home.empty_today_generic') }}</span>
             </div>
-            <form v-if="showAdd || !groups.today.length" class="hc-add" @submit.prevent="submitAdd">
+            <form v-if="showAdd || addUsed || !groups.today.length" class="hc-add" @submit.prevent="submitAdd">
                 <span class="hc-add__plus">+</span>
-                <input ref="addInput" v-model="draft" type="text" :placeholder="$t('Home.add_task_today')" :disabled="adding" maxlength="250" />
+                <input ref="addInput" v-model="draft" type="text" :placeholder="$t('Home.add_task_today')" :readonly="adding" :aria-busy="adding ? 'true' : 'false'" maxlength="250" />
                 <span v-if="draft.trim().length >= 3" class="hc-add__hint">↵</span>
             </form>
 
@@ -78,6 +78,8 @@ const tabs = ["to_do", "done", "delegated"];
 const activeTab = ref("to_do");
 const draft = ref("");
 const addInput = ref(null);
+// Once used, the field stays even after today's list fills, so the next task needs no click.
+const addUsed = ref(false);
 
 const groups = computed(() => props.work.groups.value);
 
@@ -102,7 +104,8 @@ function cycleSort() {
 
 function submitAdd() {
     const name = draft.value.trim();
-    if (name.length < 3) return;
+    if (name.length < 3 || props.adding) return;
+    addUsed.value = true;
     emit("add", name);
     draft.value = "";
 }

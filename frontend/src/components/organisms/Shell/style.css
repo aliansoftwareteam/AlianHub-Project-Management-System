@@ -40,6 +40,9 @@
 .ah-rail__item.is-active .ah-rail__tile { background: #fff; color: var(--rail); }
 :root[data-theme="dark"] .ah-rail__item.is-active .ah-rail__tile { background: #fff; color: #000; }
 .ah-rail__label { font: 500 9.5px/1 var(--font-ui); letter-spacing: .01em; }
+.ah-rail__item--new { margin-bottom: 6px; }
+.ah-rail__item--new .ah-rail__tile, .ah-rail__item--new:hover .ah-rail__tile { background: var(--brand); color: var(--on-brand); }
+:root[data-theme="dark"] .ah-rail__item--new .ah-rail__tile { background: #2F3990; color: #fff; }
 .ah-rail__foot { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
 .ah-rail__agents {
     display: flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px;

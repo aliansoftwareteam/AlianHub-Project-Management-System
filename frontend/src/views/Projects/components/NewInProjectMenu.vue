@@ -1,5 +1,5 @@
 <template>
-    <div v-if="canList || canFolder" class="nip">
+    <div v-if="canTask || canList || canFolder" class="nip">
         <button
             type="button"
             class="ah-btn ah-btn--secondary ah-btn--sm"
@@ -8,6 +8,9 @@
             @click.stop="open = !open"
         >+ {{ $t('Projects.new') }}</button>
         <div v-if="open" class="ah-pop nip__pop" role="menu" @click.stop>
+            <button v-if="canTask" type="button" class="ah-pop__item" role="menuitem" @click="newTask">
+                <ShellIcon name="plus" :size="14" />{{ $t('Projects.new_menu_task') }}
+            </button>
             <button v-if="canList" type="button" class="ah-pop__item" role="menuitem" @click="start('sprint')">
                 <ShellIcon name="layout" :size="14" />{{ $t('Projects.new_list') }}
             </button>
@@ -39,6 +42,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { useCustomComposable } from '@/composable';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import SprintFolderInput from '@/components/atom/SprintFolderInput/SprintFolderInput.vue';
+import { openQuickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 
 const props = defineProps({
     projectData: { type: Object, required: true }
@@ -52,12 +56,19 @@ const open = ref(false);
 const mode = ref('');
 
 const canList = computed(() => checkPermission('project.project_sprint_create', props.projectData?.isGlobalPermission) === true);
+const canTask = computed(() => checkPermission('task.task_create', props.projectData?.isGlobalPermission) === true
+    && checkPermission('task.task_list', props.projectData?.isGlobalPermission) === true);
 const canFolder = computed(() => checkPermission('project.project_folder_create', props.projectData?.isGlobalPermission) === true);
 
 const subItems = computed(() => [
     ...Object.values(props.projectData?.sprintsfolders || {}).map((f) => ({ ...f, name: f.name || f.folderName })),
     ...Object.values(props.projectData?.sprintsObj || {})
 ]);
+
+const newTask = () => {
+    open.value = false;
+    openQuickCreate({ projectId: props.projectData?._id, sprintId: route.params.sprintId });
+};
 
 const start = (kind) => {
     open.value = false;
