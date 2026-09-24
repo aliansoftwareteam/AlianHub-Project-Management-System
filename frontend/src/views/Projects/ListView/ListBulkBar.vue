@@ -355,12 +355,13 @@ onBeforeUnmount(() => {
 .lv2 > .lv2-bulk .lv2-bulk__menu { top: auto; bottom: calc(100% + 8px); }
 
 @media (max-width: 767px) {
-    .lv2-bulk { padding: 0 16px; gap: 10px; overflow-x: auto; }
-    /* The tab bar is border-box, so --tabbar-h already includes its safe-area padding. */
-    .lv2 > .lv2-bulk { position: fixed; bottom: var(--tabbar-h); }
+    .lv2-bulk { padding: 0 16px; gap: 10px; overflow-x: auto; white-space: nowrap; }
+    .lv2-bulk > * { flex: none; }
+    .lv2 > .lv2-bulk { position: fixed; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px)); }
+    .lv2 > .lv2-bulk ~ .lv2__scroll { padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px)); }
     /* The bar scrolls sideways here, which would clip a menu positioned inside it. */
-    .lv2 > .lv2-bulk .lv2-bulk__menu { position: fixed; left: 16px; right: 16px; bottom: calc(var(--tabbar-h) + 48px); }
-    .lv2-undo { bottom: calc(var(--tabbar-h) + 12px); }
+    .lv2 > .lv2-bulk .lv2-bulk__menu { position: fixed; left: 16px; right: 16px; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 48px); }
+    .lv2-undo { bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 12px); }
 }
 
 </style>
