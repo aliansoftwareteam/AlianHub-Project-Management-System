@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { visibleProjectIds } = require("../Agents/scope");
+const { hiddenSprintFilter } = require("../Sprints/helpers/sprintVisibility");
 
 // One document per user+entity, upserted on every visit.
 
@@ -54,8 +55,9 @@ exports.recordVisit = async (req, res) => {
 
 /**
  * GET /api/v2/recent-visits
- * The caller's newest task visits with task summaries. Tasks that were deleted, or
- * that moved to a project the caller can no longer open, drop out.
+ * The caller's newest task visits with task summaries. Tasks that were deleted, that
+ * moved to a project the caller can no longer open, or that sit in a private sprint the
+ * caller is not on, drop out.
  */
 exports.listVisits = async (req, res) => {
     try {
@@ -77,11 +79,13 @@ exports.listVisits = async (req, res) => {
             return res.send({ status: true, statusText: 'No recent visits.', data: [] });
         }
 
-        const projectIds = (await visibleProjectIds(companyId, owner.uid)).map((id) => new mongoose.Types.ObjectId(String(id)));
+        const visible = await visibleProjectIds(companyId, owner.uid);
+        const projectIds = visible.map((id) => new mongoose.Types.ObjectId(String(id)));
+        const sprintClause = await hiddenSprintFilter(companyId, owner.uid, visible);
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
             data: [
-                { _id: { $in: visits.map((visit) => visit.entityId) }, ProjectID: { $in: projectIds }, deletedStatusKey: { $ne: 1 } },
+                { _id: { $in: visits.map((visit) => visit.entityId) }, ProjectID: { $in: projectIds }, deletedStatusKey: { $ne: 1 }, ...sprintClause },
                 'TaskName TaskKey status statusType ProjectID sprintId folderObjId deletedStatusKey',
             ],
         }, 'find');
