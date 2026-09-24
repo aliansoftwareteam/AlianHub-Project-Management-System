@@ -82,7 +82,7 @@
 .auth__p strong { color: var(--ink); }
 .auth__code { display: flex; gap: 8px; margin-bottom: 18px; }
 .auth__code input {
-    width: 44px; height: 48px; text-align: center; border: 1.5px solid var(--border); border-radius: var(--r-input);
+    flex: 1 1 0; min-width: 0; max-width: 44px; height: 48px; text-align: center; border: 1.5px solid var(--border); border-radius: var(--r-input);
     font: 600 20px/1 var(--font-mono); color: var(--ink); background: var(--surface);
 }
 .auth__code input:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus); }
@@ -151,6 +151,7 @@
     .ah-input { height: 44px; font-size: 14px; }
     .auth__provider, .auth__actions .ah-btn { height: 44px; }
     .auth__pw-eye { width: 34px; height: 34px; right: 5px; }
+    .auth--single .auth__form { padding: 20px 18px 16px; }
 }
 /* Same approach as the shared controls in tokens.css: text links keep their drawn size and get a
    transparent ::before that makes them at least 32 px to tap. */

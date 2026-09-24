@@ -36,6 +36,14 @@ describe('auth card on a phone', () => {
         expect(ruleBody(small, '.auth__pw-eye')).toMatch(/width:\s*34px;\s*height:\s*34px/);
     });
 
+    test('the six two-factor boxes share the card width instead of a fixed 44 px each', () => {
+        const rule = ruleBody(css, '.auth__code input');
+        expect(rule).toMatch(/flex:\s*1 1 0/);
+        expect(rule).toMatch(/min-width:\s*0/);
+        expect(rule).toMatch(/max-width:\s*44px/);
+        expect(rule).not.toMatch(/(^|[\s;])width:\s*44px/);
+    });
+
     test('full-width link buttons fit inside the card', () => {
         expect(ruleBody(css, '.auth .ah-btn--block')).toMatch(/box-sizing:\s*border-box/);
     });
