@@ -147,7 +147,8 @@ import { aiOff } from '@/composable/aiAvailability';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { toggleTheme, shellState } from '@/components/organisms/Shell/shellState';
 import { isMacPlatform } from './paletteKeys';
-import { CHIPS, RECORD_CHIPS, chipAllows, projectPath, relativeAge, taskLocation, taskPath } from './paletteRows';
+import { CHIPS, RECORD_CHIPS, chipAllows, commandLeads, projectPath, relativeAge, taskLocation, taskPath } from './paletteRows';
+import { openQuickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 import '@/components/molecules/AdvanceSearch/style.css';
 
 defineOptions({ name: 'CommandPalette' });
@@ -228,12 +229,12 @@ const NAV = computed(() => [
 ].filter((n) => n.route && router.hasRoute(n.route) && n.show !== false));
 
 const COMMANDS = computed(() => [
-    { key: 'new-task', label: t('Inbox.cmd_new_task'), icon: 'plus', show: allowed('project.project_list') },
+    { key: 'new-task', label: t('Inbox.cmd_new_task'), icon: 'plus' },
     { key: 'new-project', label: t('Inbox.cmd_new_project'), icon: 'projects', show: allowed('project.project_list') },
     { key: 'start-timer', label: t('Inbox.cmd_start_timer'), icon: 'play', show: !!timesheetRoute() },
     { key: 'toggle-theme', label: shellState.theme === 'dark' ? t('Shell.theme_light') : t('Shell.theme_dark'), icon: shellState.theme === 'dark' ? 'sun' : 'moon' },
     { key: 'logout', label: t('Shell.logout'), icon: 'logout' },
-].filter((c) => c.show !== false));
+].filter((c) => c.show !== false).map((c) => ({ ...c, alias: c.key.replace(/-/g, ' ') })));
 
 const initialOf = (name) => String(name || '?').trim().charAt(0).toUpperCase();
 const projectName = (id) => (getters['projectData/projects']?.data || []).find((p) => String(p._id) === String(id))?.ProjectName || '';
@@ -276,6 +277,11 @@ const groups = computed(() => {
         return out;
     }
 
+    const commands = COMMANDS.value.filter((c) => matches(c.label, c.alias)).slice(0, 3);
+    const addCommands = () => add('commands', t('Inbox.group_commands'), commands.map(commandRow));
+    const commandsLead = commandLeads(query.value, commands.flatMap((c) => [c.label, c.alias]));
+    if (commandsLead) addCommands();
+
     if (q.value.length >= 2) {
         add('tasks', t('Palette.chip_tasks'), records.value.tasks.map((task) => taskRow(task)));
         add('projects', t('Palette.chip_projects'), records.value.projects.map(projectRow));
@@ -288,11 +294,11 @@ const groups = computed(() => {
             id: `app:${c._id}`, kind: 'app', icon: /github|gitlab/i.test(c.type) ? 'github' : 'integrations', iconClass: 'pal__icon--dark',
             title: c.name, sub: t('Inbox.app_connected'), to: router.hasRoute('IntegrationsHub') ? to('IntegrationsHub') : to('Integrations'),
         })));
-        if (hasAi.value) {
-            add('ask', t('Inbox.group_ask'), [{ id: 'ask', kind: 'ask', icon: 'ai', iconClass: 'pal__icon--brand', bold: true, title: t('Inbox.ask_query', { q: query.value.trim() }), hint: '↵' }]);
-        }
     }
-    add('commands', t('Inbox.group_commands'), COMMANDS.value.filter((c) => matches(c.label, c.key)).slice(0, 3).map(commandRow));
+    if (!commandsLead) addCommands();
+    if (q.value.length >= 2 && hasAi.value) {
+        add('ask', t('Inbox.group_ask'), [{ id: 'ask', kind: 'ask', icon: 'ai', iconClass: 'pal__icon--brand', bold: true, title: t('Inbox.ask_query', { q: query.value.trim() }), hint: '↵' }]);
+    }
     return out;
 });
 const flat = computed(() => groups.value.flatMap((g) => g.rows));
@@ -368,7 +374,8 @@ const command = (key) => {
     if (key === 'toggle-theme') { toggleTheme(); close(); return; }
     if (key === 'logout') { close(); logOut({ islogOut: true }); return; }
     window.dispatchEvent(new CustomEvent('ah:command', { detail: { command: key, query: query.value.trim() } }));
-    if (key === 'new-task' || key === 'new-project') return go({ name: 'Projects', params: { cid: cid.value }, query: { create: key === 'new-task' ? 'task' : 'project', name: query.value.trim() || undefined } });
+    if (key === 'new-task') { close(); openQuickCreate(); return; }
+    if (key === 'new-project') return go({ name: 'Projects', params: { cid: cid.value }, query: { create: 'project', name: query.value.trim() || undefined } });
     if (key === 'start-timer') { const r = timesheetRoute(); return r ? go(to(r)) : close(); }
     return close();
 };

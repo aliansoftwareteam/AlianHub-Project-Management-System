@@ -12,6 +12,7 @@
                     <HeaderComponent v-if="!$route.meta.hideHeader" @change="changeCompany($event)" @filter="handleFilter"/>
                     <div :style="`height: calc(100dvh - ${$route.meta.hideHeader ? '0' : '46'}px);`" class="billing__history-wrapper style-scroll overflow-auto">
                         <CommandPalette v-if="!$route.meta.preventAdvanceSearch" :open="isAdvanceSearch" @close="isAdvanceSearch = false"/>
+                        <QuickCreateTask />
                         <AiUnavailable v-if="aiGated"/>
                         <router-view v-else/>
                         <TourCom ref="mainTour"/>
@@ -21,6 +22,7 @@
                     <GlobalRail v-if="!$route.meta.hideHeader" @change="changeCompany($event)" />
                     <main class="ah-app__main" id="ah-main">
                         <CommandPalette v-if="!$route.meta.preventAdvanceSearch" :open="isAdvanceSearch" @close="isAdvanceSearch = false"/>
+                        <QuickCreateTask />
                         <div class="ah-app__view billing__history-wrapper style-scroll">
                             <AiUnavailable v-if="aiGated"/>
                             <router-view v-else/>
@@ -96,6 +98,7 @@ import '@/components/organisms/Shell/style.css'
 import CallOverlay from '@/components/organisms/CallOverlay/CallOverlay.vue'
 import Modal from "@/components/atom/Modal/Modal.vue"
 import CommandPalette from '@/components/molecules/AdvanceSearch/CommandPalette.vue'
+import QuickCreateTask from '@/components/organisms/QuickCreateTask/QuickCreateTask.vue'
 import { PALETTE_OPEN_EVENT, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys'
 import { useStore } from 'vuex';
 import axios from 'axios'

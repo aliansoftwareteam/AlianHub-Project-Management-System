@@ -13,6 +13,16 @@ export function chipAllows(chip, kind) {
     return KIND_OF_CHIP[chip] === kind;
 }
 
+const COMMAND_LEAD_MIN = 3;
+
+/* Commands go first when the query starts one of their labels, so "new task" + Enter runs
+ * the command rather than a record search or Ask AI. */
+export function commandLeads(query, labels) {
+    const q = String(query || '').trim().toLowerCase();
+    if (q.length < COMMAND_LEAD_MIN) return false;
+    return (labels || []).some((label) => String(label || '').toLowerCase().startsWith(q));
+}
+
 export function relativeAge(value, t, now = Date.now()) {
     if (!value) return '';
     const time = new Date(value).getTime();
