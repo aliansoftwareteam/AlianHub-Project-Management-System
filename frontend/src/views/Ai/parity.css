@@ -60,7 +60,7 @@
 .picker__row-top { display: flex; align-items: center; gap: 7px; }
 .picker__row-top strong { font: 600 13px/1.2 var(--font-ui); }
 .picker__row-why { font: var(--text-small); color: var(--ink-label); line-height: 1.45; }
-.picker__row-needs { color: var(--ink-3); }
+.picker__row-needs { color: var(--ink-2); }
 .picker__cap { margin-left: 24px; }
 .picker__cap .ah-input { width: 90px; }
 .picker__row-over { color: var(--danger-ink); }
@@ -68,7 +68,7 @@
 .picker__row-limit { color: var(--warn-ink); }
 .picker__fit { margin-left: auto; color: var(--ink-2); }
 .picker__fit--good { color: var(--ok-ink); }
-.picker__fit--off { color: var(--ink-3); }
+.picker__fit--off { color: var(--ink-2); }
 .picker__explain { margin-top: auto; padding: 12px 14px; }
 .picker__explain p { font: var(--text-small); color: var(--ink-label); line-height: 1.55; margin: 8px 0 0; }
 
@@ -97,7 +97,7 @@
 .mention__msg-body { font: var(--text-body); line-height: 1.5; min-width: 0; }
 .mention__who { font-weight: 600; }
 .mention__at { color: var(--brand); font-weight: 600; }
-.mention__time { color: var(--ink-3); font: var(--text-data); margin-left: 6px; }
+.mention__time { color: var(--ink-2); font: var(--text-data); margin-left: 6px; }
 
 /* 30c — how an assignment ends */
 .outcome { display: flex; flex-direction: column; gap: 8px; padding: 13px 15px; }
@@ -118,7 +118,7 @@
 .route__row { display: flex; align-items: center; gap: 9px; padding: 6px 0; font: var(--text-body); }
 .route__row--refused { color: var(--warn-ink); }
 .route__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.route__arrow { color: var(--ink-3); }
+.route__arrow { color: var(--ink-2); }
 .route__to { width: 160px; flex: none; display: flex; align-items: center; gap: 6px; }
 .route__to strong { font-weight: 600; }
 .route__foot { display: flex; align-items: center; gap: 10px; padding-top: 10px; margin-top: 4px; border-top: 1px solid var(--hairline); }
@@ -134,7 +134,7 @@
 .ask__box { padding: 12px 14px; border: 1.5px solid var(--brand); box-shadow: var(--focus); border-radius: var(--r-card); background: var(--surface); display: flex; flex-direction: column; gap: 8px; }
 .ask__input { width: 100%; border: 0; background: transparent; color: var(--ink); font: var(--text-body); resize: vertical; min-height: 44px; padding: 0; }
 .ask__input:focus { outline: none; }
-.ask__input::placeholder { color: var(--ink-3); }
+.ask__input::placeholder { color: var(--ink-2); }
 .ask__sources { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .ask__go { margin-left: auto; }
 .ask__cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }

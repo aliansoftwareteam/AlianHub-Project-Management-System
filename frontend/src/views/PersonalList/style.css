@@ -5,14 +5,14 @@
 .personal__view { padding: 8px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-2); font: inherit; cursor: pointer; text-decoration: none; }
 .personal__view:hover { color: var(--ink); text-decoration: none; }
 .personal__view.is-active { border-bottom-color: var(--brand); color: var(--ink); font-weight: 600; }
-.personal__view--muted { cursor: default; color: var(--ink-3); }
+.personal__view--muted { cursor: default; color: var(--ink-2); opacity: .7; }
 .personal__group:disabled { opacity: 1; cursor: default; color: var(--ink-2); }
 .ah-tbtn.is-active { border-color: var(--brand); color: var(--brand); background: var(--brand-tint); }
 
 .personal__add { display: flex; align-items: center; gap: 9px; padding: 0 12px; height: 42px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; font: 400 13px/1 var(--font-ui); position: relative; }
 .personal__add.is-focused { border-color: var(--brand); box-shadow: var(--focus); }
 .personal__add input[type="text"] { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; color: var(--ink); outline: none; height: 100%; }
-.personal__add input[type="text"]::placeholder { color: var(--ink-3); }
+.personal__add input[type="text"]::placeholder { color: var(--ink-2); }
 .personal__date { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
 .personal__table { padding: 6px 0; gap: 0; overflow: hidden; }
@@ -26,11 +26,11 @@
 .personal__name:hover { color: var(--brand); }
 .personal__mono { font: 500 11px/1 var(--font-mono); color: var(--ink-label); }
 .personal__mono--danger { color: var(--danger); }
-.personal__mono--faint { color: var(--ink-3); }
+.personal__mono--faint { color: var(--ink-2); }
 .personal__status { display: flex; align-items: center; gap: 6px; font: 400 12px/1.2 var(--font-ui); }
 .personal__status-dot { width: 8px; height: 8px; border-radius: 2px; flex: none; }
 .personal__empty { padding: 14px 16px; font: 400 13px/1.4 var(--font-ui); color: var(--ink-2); }
-.personal__new { display: grid; grid-template-columns: 28px 1fr; gap: 12px; padding: 12px 16px; width: 100%; border: 0; background: transparent; font: 400 13px/1.2 var(--font-ui); color: var(--ink-3); cursor: pointer; text-align: left; align-items: center; }
+.personal__new { display: grid; grid-template-columns: 28px 1fr; gap: 12px; padding: 12px 16px; width: 100%; border: 0; background: transparent; font: 400 13px/1.2 var(--font-ui); color: var(--ink-2); cursor: pointer; text-align: left; align-items: center; }
 .personal__new .hc-add__plus { text-align: center; }
 .personal__new:hover { color: var(--ink); background: var(--surface-hover); }
 .personal__foot { margin: 0; font: 400 12.5px/1.5 var(--font-ui); color: var(--ink-2); }
@@ -39,12 +39,12 @@
 .personal__col { width: 256px; flex: none; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 160px; transition: background var(--t-state) var(--ease); }
 .personal__col.is-over { background: var(--brand-tint); }
 .personal__col-head { display: flex; align-items: center; gap: 8px; font: 600 12.5px/1.2 var(--font-ui); color: var(--ink); padding: 2px 4px 6px; }
-.personal__col-count { margin-left: auto; color: var(--ink-3); }
+.personal__col-count { margin-left: auto; color: var(--ink-2); }
 .personal__card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 9px; padding: 9px 11px; display: flex; flex-direction: column; gap: 6px; cursor: grab; box-shadow: var(--shadow-card); }
 .personal__card:hover { border-color: var(--border); }
 .personal__card-title { font: 400 13px/1.35 var(--font-ui); color: var(--ink); }
 .personal__card-meta { display: flex; align-items: center; gap: 8px; }
-.personal__col-empty { font: 400 12px/1.4 var(--font-ui); color: var(--ink-3); padding: 8px 4px; }
+.personal__col-empty { font: 400 12px/1.4 var(--font-ui); color: var(--ink-2); padding: 8px 4px; }
 
 @media (max-width: 1279px) { .personal__sidebar-toggle { display: inline-flex; } }
 @media (max-width: 991px) {

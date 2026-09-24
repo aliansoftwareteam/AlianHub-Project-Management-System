@@ -19,7 +19,7 @@
     border-bottom: 1px solid var(--hairline);
 }
 .cv__month { color: var(--ink-2); letter-spacing: .04em; }
-.cv__show { color: var(--ink-3); margin-right: 2px; }
+.cv__show { color: var(--ink-2); margin-right: 2px; }
 .cv__filter {
     height: 26px;
     padding: 0 10px;
@@ -112,10 +112,10 @@
 .cv__grid :deep(.fc-col-header-cell) { padding-bottom: 6px; }
 .cv__grid :deep(.fc-col-header-cell-cushion) {
     font: var(--text-label); letter-spacing: .06em; text-transform: uppercase;
-    color: var(--ink-3); text-decoration: none; padding: 0 4px;
+    color: var(--ink-2); text-decoration: none; padding: 0 4px;
 }
 .cv__grid :deep(.fc-day-sat .fc-col-header-cell-cushion),
-.cv__grid :deep(.fc-day-sun .fc-col-header-cell-cushion) { color: var(--ink-3); opacity: .65; }
+.cv__grid :deep(.fc-day-sun .fc-col-header-cell-cushion) { color: var(--ink-2); opacity: .65; }
 /* The card is drawn on the frame, not the cell: the table collapses its borders, so rounded
    cells touched and their cut corners showed the grid through as small diamonds. The cell's
    padding is the gap between cards. */
@@ -140,7 +140,7 @@
 
 .cv__grid :deep(.fc-daygrid-day-top) { flex-direction: column !important; align-items: flex-start; }
 .cv__grid :deep(.fc-daygrid-day-number) { padding: 0; width: 100%; }
-.cv__grid :deep(.cv__daynum) { font: var(--text-data); color: var(--ink-3); }
+.cv__grid :deep(.cv__daynum) { font: var(--text-data); color: var(--ink-2); }
 .cv__grid :deep(.fc-day-today .cv__daynum) { color: var(--brand); font-weight: 600; }
 .cv__grid :deep(.cv__pto) {
     display: block; margin-top: 4px;
@@ -158,7 +158,7 @@
 .cv__grid :deep(.fc-daygrid-event-harness) { margin-top: 3px; }
 .cv__grid :deep(.fc-daygrid-event) { border: 0; background: transparent; padding: 0; margin: 0; }
 .cv__grid :deep(.fc-daygrid-event:focus) { box-shadow: var(--focus); }
-.cv__grid :deep(.fc-daygrid-more-link) { font-size: 10.5px; color: var(--ink-3); padding: 0 7px; }
+.cv__grid :deep(.fc-daygrid-more-link) { font-size: 10.5px; color: var(--ink-2); padding: 0 7px; }
 .cv__grid :deep(.fc-popover) { border: 1px solid var(--hairline); border-radius: 10px; box-shadow: var(--shadow-pop); background: var(--surface); }
 .cv__grid :deep(.fc-popover-header) { background: var(--surface-2); color: var(--ink); font: var(--text-h3); }
 .cv__grid :deep(.fc-highlight) { background: var(--brand-tint); }

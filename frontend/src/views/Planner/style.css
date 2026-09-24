@@ -64,7 +64,7 @@
     right: 8px;
     text-align: right;
     font: var(--text-data);
-    color: var(--ink-3);
+    color: var(--ink-2);
 }
 
 .planner__col {
@@ -122,7 +122,7 @@
 }
 .ah-sidebar > .planner__tray { flex: 1; }
 .planner__tray-list { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; overflow: auto; }
-.planner__tray-count { color: var(--ink-3); }
+.planner__tray-count { color: var(--ink-2); }
 .planner__tray-empty { margin: 0 14px; }
 .planner__card--picked { border-color: var(--brand); box-shadow: 0 0 0 1.5px var(--brand-ring), var(--shadow-card); }
 .planner__tray-title {

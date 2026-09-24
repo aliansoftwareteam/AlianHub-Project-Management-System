@@ -210,7 +210,7 @@ const groups = computed(() => {
 .pm__agent { font: var(--text-data); }
 .pm__never { color: var(--danger-ink); font-weight: 600; text-decoration: line-through; }
 .pm__read { color: var(--ok-ink); font-weight: 600; }
-.pm__dash { color: var(--ink-3); }
+.pm__dash { color: var(--ink-2); }
 .pm__empty { margin: 14px; }
 .pm__upgrade { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--hairline); }
 .pm__upgrade a { text-decoration: none; }

@@ -84,5 +84,5 @@ const pick = (key) => {
 .imd__source:hover { border-color: var(--brand); }
 .imd__mark { flex: none; width: 34px; height: 34px; border-radius: 8px; color: #fff; display: flex; align-items: center; justify-content: center; font: 700 11px/1 var(--font-ui); }
 .imd__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.imd__chev { color: var(--ink-3); flex: none; }
+.imd__chev { color: var(--ink-2); flex: none; }
 </style>

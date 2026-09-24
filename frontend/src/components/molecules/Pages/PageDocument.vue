@@ -577,7 +577,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
     border: 0; outline: none; background: transparent; padding: 0;
     font: 700 27px/1.2 var(--font-ui); letter-spacing: -.7px; color: var(--ink);
 }
-.pd__title::placeholder { color: var(--ink-3); }
+.pd__title::placeholder { color: var(--ink-2); }
 .pd__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pd__count { font: var(--text-data); padding: 1px 5px; border-radius: 6px; background: var(--brand-tint); color: var(--brand); }
 .pd__icon {

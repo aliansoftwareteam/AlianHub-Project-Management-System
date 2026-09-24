@@ -18,7 +18,7 @@
     font: var(--text-label);
     letter-spacing: .06em;
     text-transform: uppercase;
-    color: var(--ink-3);
+    color: var(--ink-2);
     white-space: nowrap;
 }
 
@@ -114,7 +114,7 @@
     padding: 2px;
     line-height: 0;
     cursor: pointer;
-    color: var(--ink-3);
+    color: var(--ink-2);
     flex: none;
     border-radius: 4px;
 }
@@ -138,7 +138,7 @@
     white-space: nowrap;
     cursor: help;
 }
-.pl2__health--unknown { color: var(--ink-3); }
+.pl2__health--unknown { color: var(--ink-2); }
 
 .pl2__sprint {
     color: var(--ink-label);
@@ -170,7 +170,7 @@
 .pl2__dots {
     border: 0;
     background: none;
-    color: var(--ink-3);
+    color: var(--ink-2);
     cursor: pointer;
     padding: 4px;
     line-height: 0;

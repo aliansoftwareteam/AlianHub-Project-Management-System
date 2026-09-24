@@ -202,10 +202,10 @@ onMounted(load);
 .sec__body { display: flex; flex-direction: column; gap: 10px; }
 .sec__scroll { overflow-x: auto; }
 .sec__table { width: 100%; border-collapse: collapse; font: var(--text-small); }
-.sec__table th { text-align: left; font: var(--text-label); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); padding: 4px 8px; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+.sec__table th { text-align: left; font: var(--text-label); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); padding: 4px 8px; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
 .sec__table td { padding: 6px 8px; border-bottom: 1px solid var(--hairline); color: var(--ink); vertical-align: middle; white-space: nowrap; }
 .sec__name { font-weight: 600; white-space: normal; min-width: 180px; }
-.is-revoked td { color: var(--ink-3); }
+.is-revoked td { color: var(--ink-2); }
 .sec__chip { margin-left: 6px; }
 .sec__actions { text-align: right; }
 .sec__link { border: 0; background: transparent; color: var(--brand); font: 600 12px/1 var(--font-ui); cursor: pointer; padding: 4px 2px; margin-left: 8px; }
@@ -215,7 +215,7 @@ onMounted(load);
 .sec__rotate-row td { background: var(--surface-2); white-space: normal; }
 .sec__rotate { display: flex; flex-direction: column; gap: 6px; max-width: 520px; }
 .sec__rotate-actions { display: flex; gap: 8px; }
-.sec__hosts { display: block; font-weight: 400; color: var(--ink-3); }
+.sec__hosts { display: block; font-weight: 400; color: var(--ink-2); }
 .sec__create { display: flex; flex-direction: column; gap: 6px; max-width: 520px; padding-top: 12px; border-top: 1px solid var(--hairline); }
 .sec__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 </style>

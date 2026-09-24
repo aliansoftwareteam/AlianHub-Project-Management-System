@@ -8,7 +8,7 @@
 .acct-note { font: var(--text-small); color: var(--ink-2); margin: 0; }
 .acct-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 .acct-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.acct-where { font: var(--text-data); color: var(--ink-3); display: block; margin-top: 4px; word-break: break-all; }
+.acct-where { font: var(--text-data); color: var(--ink-2); display: block; margin-top: 4px; word-break: break-all; }
 
 .acct-callout { padding: 12px 14px; border-radius: var(--r-card); font: var(--text-small); line-height: 1.6; }
 .acct-callout--ok { background: var(--ok-bg); color: var(--ok-ink); }

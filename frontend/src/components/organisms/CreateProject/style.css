@@ -42,7 +42,7 @@
 .ah-cp__status--ok { background: var(--ok-bg); color: var(--ok-ink); }
 .ah-cp__sample { padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; }
 .ah-cp__sample-row { display: flex; align-items: center; gap: 9px; }
-.ah-cp__sample-row .ah-mono { margin-left: auto; color: var(--ink-3); font-size: 10px; }
+.ah-cp__sample-row .ah-mono { margin-left: auto; color: var(--ink-2); font-size: 10px; }
 .ah-cp__sample-row--more { color: var(--ink-2); }
 .ah-cp__box { width: 13px; height: 13px; flex: none; border: 1.5px solid var(--border); border-radius: 4px; }
 .ah-cp__form { display: flex; flex-direction: column; gap: 10px; }

@@ -466,7 +466,7 @@ onMounted(() => {
 <style scoped>
 .pd { display: flex; flex-direction: column; height: 100%; background: var(--canvas); color: var(--ink); font: var(--text-body); }
 .pd__bar { gap: 10px; }
-.pd__count { color: var(--ink-3); }
+.pd__count { color: var(--ink-2); }
 .pd__search {
     display: flex;
     align-items: center;

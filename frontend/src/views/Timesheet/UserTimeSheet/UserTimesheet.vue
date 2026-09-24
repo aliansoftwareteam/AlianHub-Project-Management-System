@@ -380,12 +380,12 @@ onMounted(() => {
 .ut2-grid.is-loading { opacity: .6; }
 .ut2-row { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(var(--days), 64px) 70px; gap: 6px; padding: 10px 14px; align-items: center; text-align: center; font: 500 12px/1.2 var(--font-mono); border-bottom: 1px solid var(--hairline); }
 .ut2-row:last-child { border-bottom: 0; }
-.ut2-row--head { padding: 9px 14px; font: var(--text-label); letter-spacing: .06em; color: var(--ink-3); }
+.ut2-row--head { padding: 9px 14px; font: var(--text-label); letter-spacing: .06em; color: var(--ink-2); }
 .ut2-row--head .is-today { color: var(--brand); }
 .ut2-row--total { background: var(--surface-2); font-weight: 600; border-bottom: 0; }
 .ut2-row--total .ut2-task { font: 600 12.5px/1.2 var(--font-ui); }
 .ut2-row--total .is-today { color: var(--brand); }
-.ut2-row .is-empty { color: var(--ink-3); }
+.ut2-row .is-empty { color: var(--ink-2); }
 .ut2-row .is-off { opacity: .7; }
 .ut2-task { text-align: left; font: 400 12.5px/1.3 var(--font-ui); display: flex; align-items: center; gap: 8px; min-width: 0; }
 .ut2-task__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -395,7 +395,7 @@ onMounted(() => {
 .ut2-cell { height: 30px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; transition: background var(--t-state) var(--ease), border-color var(--t-state) var(--ease); }
 .ut2-cell:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--hairline); }
 .ut2-cell:disabled { cursor: default; }
-.ut2-cell.is-empty { color: var(--ink-3); }
+.ut2-cell.is-empty { color: var(--ink-2); }
 .ut2-cell.is-live { color: var(--ok); font-weight: 600; }
 .ut2-cell.is-today:not(.is-live):not(.is-empty) { color: var(--brand); }
 .ut2-total { font-weight: 600; }

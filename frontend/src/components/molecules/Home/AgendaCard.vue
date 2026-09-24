@@ -17,7 +17,7 @@
             <div class="hc-block" :class="`hc-block--${item.kind}`" :title="item.title">
                 <template v-if="item.kind === 'reminder'">{{ $t('Home.reminder_prefix', { title: item.title }) }}</template>
                 <template v-else-if="item.kind === 'focus'">{{ $t('Home.focus_prefix', { title: item.title || durationLabel(item) }) }}</template>
-                <template v-else>{{ item.title }} <span class="ah-mono" style="color: var(--ink-3); font-size: 10.5px">({{ durationLabel(item) }})</span></template>
+                <template v-else>{{ item.title }} <span class="ah-mono" style="color: var(--ink-2); font-size: 10.5px">({{ durationLabel(item) }})</span></template>
             </div>
         </div>
     </section>

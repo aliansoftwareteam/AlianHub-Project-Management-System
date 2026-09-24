@@ -235,7 +235,7 @@ onBeforeUnmount(() => document.removeEventListener("keydown", onKey));
 .css__moving { display: flex; flex-direction: column; gap: 5px; }
 .css__list { margin: 0; padding: 0; list-style: none; max-height: 132px; overflow-y: auto; }
 .css__list li { padding: 4px 0; border-bottom: 1px solid var(--hairline); font-size: 12.5px; }
-.css__key { display: inline-block; min-width: 74px; color: var(--ink-3); }
+.css__key { display: inline-block; min-width: 74px; color: var(--ink-2); }
 .css__stranded { margin: 0; }
 
 .css__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

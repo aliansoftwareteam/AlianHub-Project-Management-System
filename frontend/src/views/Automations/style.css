@@ -14,7 +14,7 @@
 .au__spark { color: var(--brand); flex: none; }
 .au__sentence-input { flex: 1; border: 0; background: transparent; color: var(--ink); font: var(--text-body); padding: 0; }
 .au__sentence-input:focus { outline: none; }
-.au__sentence-input::placeholder { color: var(--ink-3); }
+.au__sentence-input::placeholder { color: var(--ink-2); }
 .au__grammar { margin: 0; }
 
 .au__ambiguous { padding: 11px 13px; background: var(--warn-bg); border-radius: var(--r-card); display: flex; flex-direction: column; gap: 7px; }
@@ -42,7 +42,7 @@
 .au__slot--text { cursor: text; min-width: 140px; }
 .au__add { border: 1px dashed var(--border); color: var(--ink-2); background: none; border-radius: var(--r-chip); padding: 3px 10px; font: var(--text-small); cursor: pointer; }
 .au__add:hover { color: var(--ink); }
-.au__x { border: 0; background: none; color: var(--ink-3); font-size: 17px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.au__x { border: 0; background: none; color: var(--ink-2); font-size: 17px; line-height: 1; cursor: pointer; padding: 0 4px; }
 .au__x:hover { color: var(--danger-ink); }
 .au__warn { margin: 0; font: var(--text-small); color: var(--warn-ink); background: var(--warn-bg); border-radius: 6px; padding: 7px 10px; }
 .au__save { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

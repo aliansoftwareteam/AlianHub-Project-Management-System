@@ -39,7 +39,7 @@
     min-width: 0;
 }
 
-.ph2__sep { color: var(--ink-3); }
+.ph2__sep { color: var(--ink-2); }
 .ph2__switch {
     max-width: none;
     min-width: 0;
@@ -61,7 +61,7 @@
 .ph2__range {
     font: var(--text-label);
     letter-spacing: .06em;
-    color: var(--ink-3);
+    color: var(--ink-2);
     white-space: nowrap;
 }
 
@@ -71,7 +71,7 @@
     padding: 3px;
     line-height: 0;
     cursor: pointer;
-    color: var(--ink-3);
+    color: var(--ink-2);
     border-radius: 5px;
     flex: none;
 }
@@ -81,7 +81,7 @@
 
 .ph2__code {
     font: var(--text-data);
-    color: var(--ink-3);
+    color: var(--ink-2);
     text-transform: uppercase;
     padding-left: 10px;
     border-left: 1px solid var(--hairline);
@@ -226,7 +226,7 @@
 }
 .ph2__title-slot .key-wapper .key-text {
     font: var(--text-data);
-    color: var(--ink-3);
+    color: var(--ink-2);
     border-left: 1px solid var(--hairline);
 }
 .ph2__title-slot .inital-box {

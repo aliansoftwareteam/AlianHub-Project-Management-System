@@ -216,7 +216,7 @@ const footerLeft = computed(() => [freshness.value, meta.note || props.footerNot
     border: 0;
     border-radius: var(--r-chip);
     background: transparent;
-    color: var(--ink-3);
+    color: var(--ink-2);
     cursor: pointer;
     transition: color var(--t-state) var(--ease), background var(--t-state) var(--ease);
 }

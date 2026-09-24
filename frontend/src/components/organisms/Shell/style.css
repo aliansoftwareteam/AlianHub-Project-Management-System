@@ -69,7 +69,7 @@
 .ah-rail__me-text { display: flex; flex-direction: column; min-width: 0; }
 .ah-rail__me-text strong { font: 600 13px/1.3 var(--font-ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ah-rail__me-text .ah-small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ah-rail__version { padding: 8px 10px 4px; color: var(--ink-3); cursor: pointer; text-align: right; }
+.ah-rail__version { padding: 8px 10px 4px; color: var(--ink-2); cursor: pointer; text-align: right; }
 .ah-rail__billing .list-dropdown-item, .ah-rail__billing > div { padding: 8px 10px; border-radius: 7px; }
 .ah-pop__item.is-disabled { opacity: .5; cursor: default; }
 

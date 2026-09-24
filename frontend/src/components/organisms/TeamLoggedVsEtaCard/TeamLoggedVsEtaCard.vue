@@ -186,7 +186,7 @@ onMounted(load);
 .tle__name--click:hover .tle__label { text-decoration: underline; }
 .tle__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tle__key { font: var(--text-data); color: var(--brand); flex: none; }
-.tle__caret { color: var(--ink-3); transition: transform var(--t-state) var(--ease); flex: none; }
+.tle__caret { color: var(--ink-2); transition: transform var(--t-state) var(--ease); flex: none; }
 .tle__caret.is-open { transform: rotate(90deg); }
 .tle__bar { position: relative; display: flex; flex: 1 1 auto; min-width: 0; }
 .tle__marker { position: absolute; top: -2px; bottom: -2px; border-left: 2px solid var(--ink); }

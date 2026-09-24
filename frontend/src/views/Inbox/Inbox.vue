@@ -629,7 +629,7 @@ onUnmounted(() => { clearTimeout(liveTimer); clearTimeout(undoTimer); });
 }
 .ibx__tab.is-active { color: var(--ink); font-weight: 600; border-bottom-color: var(--brand); }
 .ibx__tabcount { font: 500 10px/1 var(--font-mono); color: var(--ink-2); margin-left: 2px; }
-.ibx__keys { color: var(--ink-3); font-size: 10.5px; letter-spacing: .12em; }
+.ibx__keys { color: var(--ink-2); font-size: 10.5px; letter-spacing: .12em; }
 .ibx__markall { border: 0; background: transparent; font: 600 12px/1 var(--font-ui); color: var(--brand); cursor: pointer; padding: 8px 0 8px 10px; }
 .ibx__markall:disabled { opacity: .45; cursor: default; }
 

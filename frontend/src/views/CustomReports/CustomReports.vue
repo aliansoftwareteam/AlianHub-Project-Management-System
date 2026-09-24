@@ -440,7 +440,7 @@ onMounted(() => {
 .rp-builder { flex: 1; min-height: 0; }
 .rp-name { border: 0; background: transparent; font: 600 18px/1.2 var(--font-ui); letter-spacing: -.3px; color: var(--ink); padding: 0; min-width: 220px; }
 .rp-name:focus { outline: none; border-bottom: 1.5px solid var(--brand); }
-.rp-name::placeholder { color: var(--ink-3); }
+.rp-name::placeholder { color: var(--ink-2); }
 .rp-preview { flex: 1; min-height: 0; }
 .rp-totals { display: flex; gap: 24px; }
 .rp-preview__foot { display: flex; align-items: center; gap: 14px; border-top: 1px solid var(--hairline); padding-top: 10px; margin-top: auto; font-size: 11.5px; color: var(--ink-2); }
