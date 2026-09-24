@@ -15,6 +15,7 @@
                 </label>
             </div>
 
+            <AiModelNotice />
             <div class="ai-page__body ah-scroll">
                 <p class="ai-lead">{{ $t('Pipeline.lead') }}</p>
 
@@ -111,6 +112,7 @@
 </template>
 
 <script setup>
+import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vue';
 import { computed, inject, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";

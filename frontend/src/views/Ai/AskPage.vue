@@ -7,6 +7,7 @@
                 <div class="ah-toolbar__spacer"></div>
             </div>
 
+            <AiModelNotice />
             <div class="parity-page__body ah-scroll land" @click="closePops">
                 <div class="land__col">
                     <div class="land__hero">
@@ -250,6 +251,7 @@
 </template>
 
 <script setup>
+import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vue';
 import { computed, inject, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";

@@ -121,8 +121,8 @@ import { initOffline } from '@/offline';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
 import AiUnavailable from '@/components/molecules/AiUnavailable/AiUnavailable.vue';
-import { aiUsable, loadAiAvailability } from '@/composable/aiAvailability';
-import { isAiSectionRoute } from '@/router/ai/section';
+import { aiAvailability, loadAiAvailability } from '@/composable/aiAvailability';
+import { AI_GATE, aiGateFor } from '@/router/ai/gate';
 const {tabSync} = tabSyncHelper();
 const mainTour = ref();
 
@@ -165,7 +165,7 @@ const rules = ref({});
 const {connectServer} = socketHelper();
 const currentUser = computed(() => getters["users/currentUser"]);
 const currentCompany = computed(() => getters["settings/selectedCompany"]);
-const aiGated = computed(() => isAiSectionRoute(route.name) && !aiUsable.value);
+const aiGated = computed(() => aiGateFor(route.name, aiAvailability.state) === AI_GATE.PAGE);
 
 watch(() => [logged.value, currentCompany.value?._id], ([isLogged, cid]) => {
     if (isLogged && cid) loadAiAvailability(cid);

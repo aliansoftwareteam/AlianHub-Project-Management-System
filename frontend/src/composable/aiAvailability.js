@@ -28,6 +28,9 @@ export const aiAvailability = reactive(initial());
  * server refuses any call while AI is off whatever the screen shows. */
 export const aiUsable = computed(() => aiAvailability.state === AI_STATE.ON || aiAvailability.state === AI_STATE.UNKNOWN);
 
+/* Off hides the model-driven AI screens; no provider does not, since Ask still answers from sources. */
+export const aiOff = computed(() => aiAvailability.state === AI_STATE.OFF_INSTANCE || aiAvailability.state === AI_STATE.OFF_WORKSPACE);
+
 export function applyAiAvailability(data = {}) {
     Object.assign(aiAvailability, data || {});
 }

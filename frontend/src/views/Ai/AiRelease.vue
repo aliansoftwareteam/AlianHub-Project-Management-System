@@ -8,6 +8,7 @@
                 <span v-if="sinceLabel" class="ah-mono rel-since">{{ sinceLabel }}</span>
             </div>
 
+            <AiModelNotice />
             <div v-if="loading" class="ai-page__body"><div class="ah-empty">{{ $t('Pipeline.loading') }}</div></div>
             <div v-else-if="loadError" class="ai-page__body">
                 <EmptyState :title="$t('Ai.load_failed')" :message="loadError" :action-label="$t('Ai.retry')" @action="load" />
@@ -159,6 +160,7 @@
 </template>
 
 <script setup>
+import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vue';
 import { computed, inject, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import moment from "moment";

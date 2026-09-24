@@ -11,6 +11,7 @@
                 <router-link v-if="canManage" class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'WorkflowBuilder', params: { cid: companyId } }">{{ $t('WorkflowBuilder.nav') }}</router-link>
             </div>
 
+            <AiModelNotice />
             <div class="ai-page__body ah-scroll">
                 <p class="ai-lead">{{ $t('Ai.hub_lead') }}</p>
 
@@ -80,6 +81,7 @@
 </template>
 
 <script setup>
+import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vue';
 import { computed, inject, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
