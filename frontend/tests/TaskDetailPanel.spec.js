@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { config, flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { ref } from 'vue';
@@ -359,6 +359,14 @@ describe('TaskDetailPanel', () => {
     });
 
     describe('undo and the desktop tracker', () => {
+        beforeEach(() => {
+            for (const key of Object.keys(perms)) delete perms[key];
+            for (const key of Object.keys(exposed)) delete exposed[key];
+            projectPayload.sprintsObj = [];
+            projectPayload.sprintsfolders = [];
+            projectPayload.tasks[0] = { _id: 'task-1', TaskName: 'Write spec', TaskKey: 'AH-1', statusKey: 'st-open', statusType: 'open', AssigneeUserId: [], isParentTask: true };
+        });
+
         it('offers undo after ticking done and puts the previous status back', async () => {
             updateStatus.mockClear();
             const wrapper = mountPanel();

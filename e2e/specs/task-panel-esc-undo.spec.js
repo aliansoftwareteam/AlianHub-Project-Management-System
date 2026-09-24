@@ -24,12 +24,12 @@ test.describe('task panel: Esc and undo', () => {
 
     test('Esc with the assignee picker open closes the picker and keeps the panel', async ({ page, state, loginAs }) => {
         const { dialog } = await openFreshTask({ page, state, loginAs });
-        await dialog.locator('.ah-detail__props').getByRole('button', { name: 'Assignee', exact: true }).click();
-        const picker = page.locator('.sidebar-content[role="dialog"]').filter({ has: page.getByRole('listbox') });
+        await dialog.locator('.ah-detail__props').getByRole('button', { name: /^(Assignee|Add User)$/ }).first().click();
+        const picker = page.getByRole('dialog', { name: 'List Of User' });
         await expect(picker).toBeVisible();
 
         await page.keyboard.press('Escape');
-        await expect(picker).toHaveCount(0);
+        await expect(picker).toBeHidden();
         await expect(dialog).toBeVisible();
 
         await dialog.focus();
@@ -45,7 +45,7 @@ test.describe('task panel: Esc and undo', () => {
         await expect(statusButton).toHaveText(open.name);
 
         await statusButton.click();
-        await page.locator('.task-status-sidebar').getByRole('option', { name: next.name }).click();
+        await page.getByRole('dialog', { name: 'Select Task Status' }).getByRole('option', { name: next.name }).click();
         await expect(statusButton).toHaveText(next.name);
 
         const toast = page.getByRole('status').filter({ hasText: 'Status updated' });

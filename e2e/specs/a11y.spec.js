@@ -146,6 +146,30 @@ test.describe('accessibility: keyboard in the task overlay', () => {
         await expect(page.locator('.dp__menu')).toBeVisible();
     });
 
+    test('the undo toast after a status change is named, axe clean and works from the keyboard', async ({ page, state, loginAs }) => {
+        const owner = await loginAs('owner');
+        const project = await createProject(owner.api, { name: `A11Y ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid });
+        const task = await createTask(owner.api, { project, name: `Undo ${uniqueSuffix()}`, user: state.users.owner, companyOwnerId: owner.uid });
+        await page.goto(`/#/${state.companyId}/project/${project._id}/s/${task.sprintId}?task=${task._id}`);
+        await expect(page.getByRole('dialog', { name: 'Task detail' })).toBeVisible();
+
+        const status = page.locator('.ah-detail__panel button.task-status-name');
+        const before = (await status.textContent()).trim();
+        await status.focus();
+        await page.keyboard.press('Enter');
+        const picker = page.getByRole('dialog', { name: 'Select Task Status' });
+        await picker.getByRole('option', { name: 'In Progress' }).focus();
+        await page.keyboard.press('Enter');
+        await expect(status).toHaveText('In Progress');
+
+        const toast = page.getByRole('status').filter({ hasText: 'Status updated' });
+        await expect(toast.getByRole('button', { name: 'Undo' })).toBeVisible();
+        expect(await blockingViolations(page)).toEqual([]);
+        await expect(status).toBeFocused();
+        await page.keyboard.press('Control+z');
+        await expect(status).toHaveText(before);
+    });
+
     test('copy ID, complete and the quick actions work from the keyboard', async ({ page, context, state, loginAs }) => {
         await context.grantPermissions(['clipboard-read', 'clipboard-write']);
         const owner = await loginAs('owner');

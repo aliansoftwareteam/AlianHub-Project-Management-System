@@ -11,13 +11,13 @@ const { ops, stub, apps } = vi.hoisted(() => ({
         updateDueDate: vi.fn(() => Promise.resolve())
     },
     stub: (name) => ({ default: { name, render: () => null } }),
-    apps: { MultipleAssignees: true }
+    apps: { MultipleAssignees: true, Priority: true }
 }));
 
 vi.mock('@/utils/TaskOperations', () => ({ default: ops }));
 vi.mock('@/composable', () => ({
     useConvertDate: () => ({ convertDateFormat: (d) => String(d) }),
-    useCustomComposable: () => ({ checkPermission: () => true, checkApps: (name) => Boolean(apps[name]), getWasabiImageLink: async (cid, image) => image || '' }),
+    useCustomComposable: () => ({ checkPermission: () => true, checkApps: (name) => Boolean(apps[name]), getWasabiImageLink: async (cid, image) => image || '', sanitizeInput: (text) => text }),
     useGetterFunctions: () => ({
         getUser: (id) => ({ id, Employee_Name: `Name ${id}` }),
         getPriority: (value) => ({ LOW: { name: 'Low', image: 'low.png', value: 'LOW' }, HIGH: { name: 'High', image: 'high.png', value: 'HIGH' } }[value] || {})
