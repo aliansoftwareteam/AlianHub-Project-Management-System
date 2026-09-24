@@ -57,4 +57,14 @@ describe('Login', () => {
         expect(document.activeElement).toBe(wrapper.findAll('.auth__code input')[0].element);
         wrapper.unmount();
     });
+
+    it('says sign-in is paused for maintenance rather than blaming the server', async () => {
+        apiRequestWithoutSecure.mockRejectedValueOnce({ response: { status: 503, data: { status: false, maintenance: true } } });
+        const wrapper = mountLogin();
+        await signIn(wrapper);
+
+        expect(wrapper.find('.auth__banner').text()).toBe('Auth.maintenance_login');
+        expect(wrapper.text()).not.toContain('Auth.server_error');
+        wrapper.unmount();
+    });
 });

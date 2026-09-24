@@ -1411,6 +1411,7 @@
     "Auth.magic_sent_body": "A one-time login link is on its way to {email}. It works for 15 minutes on this device.",
     "Auth.magic_sent_title": "Check your inbox",
     "Auth.magic_unavailable": "Login links aren't enabled on this server. Use your password.",
+    "Auth.maintenance_login": "Sign-in is paused while the server is under maintenance. Try again in a few minutes.",
     "Auth.members_count": "{n} members",
     "Auth.more_tasks": "… {n} more, dated relative to your start",
     "Auth.name_placeholder": "Priya Sharma",

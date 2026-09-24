@@ -283,6 +283,8 @@ const handleSubmit = async () => {
             errors.password = t("Auth.too_many_attempts");
         } else if (msg === "Email Not Verified") {
             step.value = "verify";
+        } else if (data.maintenance === true) {
+            banner.value = { kind: "warn", text: t("Auth.maintenance_login") };
         } else {
             banner.value = { kind: "danger", text: t("Auth.server_error") };
         }
@@ -403,7 +405,8 @@ const sendMagicLink = async () => {
         resendWait.value = 60;
     } catch (error) {
         const status = error?.response?.status;
-        if (status === 404 || status === 501) banner.value = { kind: "warn", text: t("Auth.magic_unavailable") };
+        if (error?.response?.data?.maintenance === true) banner.value = { kind: "warn", text: t("Auth.maintenance_login") };
+        else if (status === 404 || status === 501) banner.value = { kind: "warn", text: t("Auth.magic_unavailable") };
         else if (status === 429) errors.email = t("Auth.too_many_attempts");
         else banner.value = { kind: "danger", text: t("Auth.server_error") };
     } finally {
