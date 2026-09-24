@@ -7,6 +7,8 @@ const state = readState();
 const anonymous = createApiClient({ baseURL: state.baseURL });
 const ROLE_MEMBER = 3;
 const TRANSPORT_DETAIL = /ECONNREFUSED|127\.0\.0\.1|connect |ETIMEDOUT|EHOSTUNREACH|getaddrinfo|:9\b/i;
+// The join link names this harness's own host, so it is left out of the transport check.
+const withoutLink = (body) => JSON.stringify({ ...body, joinLink: undefined });
 
 let client;
 const companyUsers = () => client.db(state.companyId).collection('company_users');
@@ -47,7 +49,7 @@ describe('sending an invite while mail is down', () => {
         expect(res.status).toBe(200);
         expect(res.body.status).toBe(false);
         expect(res.body.statusText).toBe('Invitation_mail_failed');
-        expect(JSON.stringify(res.body)).not.toMatch(TRANSPORT_DETAIL);
+        expect(withoutLink(res.body)).not.toMatch(TRANSPORT_DETAIL);
         expect(res.body.data).toEqual(expect.objectContaining({ userEmail: email, status: 1 }));
 
         const saved = await row(res.body.data._id);
@@ -61,7 +63,7 @@ describe('sending an invite while mail is down', () => {
         await sendInvite(email);
         const res = await sendInvite(email, { isResend: true });
         expect(res.body).toEqual(expect.objectContaining({ status: false, statusText: 'Invitation_mail_failed' }));
-        expect(JSON.stringify(res.body)).not.toMatch(TRANSPORT_DETAIL);
+        expect(withoutLink(res.body)).not.toMatch(TRANSPORT_DETAIL);
         expect(partsOf(res.body.joinLink).linkId).toBe((await row(res.body.data._id)).linkId);
     });
 });
