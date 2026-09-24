@@ -75,7 +75,7 @@ async function inviteMember({ baseURL, ownerApi, companyId, role, email, firstNa
     return { role, roleType, email, userId, companyUserId: String(inviteRow._id) };
 }
 
-async function createProject(api, { name, code, assigneeIds, createdBy, isPrivate = false }) {
+async function createProject(api, { name, code, assigneeIds, createdBy, isPrivate = false, apps = [] }) {
     const suffix = uniqueSuffix();
     const res = await api.post('/api/v1/createproject', {
         AssigneeUserId: assigneeIds,
@@ -106,7 +106,7 @@ async function createProject(api, { name, code, assigneeIds, createdBy, isPrivat
         customFiedlsValue: [],
         includeSampleTasks: false,
         sampleFocus: '',
-        apps: [],
+        apps,
     });
     return assertOk(res, `create project ${name}`).data;
 }

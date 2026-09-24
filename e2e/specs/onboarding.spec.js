@@ -20,8 +20,8 @@ test.describe('first run at 1280 × 800', () => {
     test('an open task keeps its timer and comment Send clickable', async ({ page, state, loginAs }) => {
         const owner = await loginAs('owner');
         const suffix = uniqueSuffix();
-        const project = await createProject(owner.api, { name: `FIRST RUN ${suffix}`, assigneeIds: [owner.uid], createdBy: owner.uid });
-        const task = await createTask(owner.api, { project, name: `First run ${suffix}`, user: state.users.owner, companyOwnerId: owner.uid });
+        const project = await createProject(owner.api, { name: `FIRST RUN ${suffix}`, assigneeIds: [owner.uid], createdBy: owner.uid, apps: ['TimeTracking'] });
+        const task = await createTask(owner.api, { project, name: `First run ${suffix}`, user: state.users.owner, companyOwnerId: owner.uid, assigneeIds: [owner.uid] });
 
         await page.goto(`/#/${state.companyId}/project/${project._id}/s/${task.sprintId}`);
         await page.locator('.lv2__row .lv2__name').first().click();
