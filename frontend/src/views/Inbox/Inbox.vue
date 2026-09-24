@@ -292,6 +292,7 @@ import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useHelper } from '@/components/organisms/Header/helper';
 import { openPanel } from '@/components/organisms/Shell/shellState';
+import { onTaskClosed, openTask, overlayState } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { noticeTextOf } from '@/views/Ai/rateAlerts';
 import { escapeHtml } from '@/utils/notificationHtml';
 import { renderNotice } from './renderNotice';
@@ -497,10 +498,18 @@ const post = async (path, body, { quiet = false } = {}) => {
 };
 
 const removeRow = (it) => {
+    const at = rows.value.findIndex((x) => rowKey(x) === rowKey(it));
     items.value = items.value.filter((x) => rowKey(x) !== rowKey(it));
     approvals.value = approvals.value.filter((x) => rowKey(x) !== rowKey(it));
     nextSkip.value = Math.max(0, nextSkip.value - 1);
+    if (at >= 0 && at < cursor.value) cursor.value -= 1;
     cursor.value = Math.min(cursor.value, Math.max(0, rows.value.length - 1));
+};
+// The removed card held focus, so without this it drops to <body> and the next key does nothing.
+const refocusAfterRemove = () => {
+    const active = document.activeElement;
+    if (overlayState.open) return;
+    if (!active || active === document.body || !active.isConnected || listEl.value?.contains(active)) focusCursor();
 };
 
 const setRead = async (it, read) => {
@@ -538,6 +547,7 @@ const runUndo = async () => {
 const snoozeRow = async (it, target) => {
     if (!(await post('/snooze', { items: [itemOf(it)], ...target }))) return;
     removeRow(it);
+    refocusAfterRemove();
     loadCounts();
     const text = target.untilChange ? t('Inbox.undo_snoozed_change') : t('Inbox.undo_snoozed', { when: whenLabel(target.until) });
     showUndo(text, async () => { if (await post('/unsnooze', { items: [itemOf(it)], unread: !!it.unread })) reload(); });
@@ -551,6 +561,7 @@ const unsnoozeRow = async (it) => {
 const clearRow = async (it) => {
     if (!(await post('/clear', { items: [itemOf(it)] }))) return;
     removeRow(it);
+    refocusAfterRemove();
     loadCounts();
     showUndo(t('Inbox.undo_cleared'), async () => { if (await post('/restore', { items: [itemOf(it)], unread: !!it.unread })) reload(); });
 };
@@ -723,10 +734,23 @@ const sendReply = async (it) => {
     }
 };
 
+const opensOverTheInbox = (it) => !!(it.taskId && it.projectId && it.sprintId && !it.mainChat && !alertNotice(it)
+    && (it.sourceType === 'mention' || String(it.type || '').toLowerCase() !== 'project'));
 const open = (it) => {
     if (it.unread && it.kind !== 'approval') setRead(it, true).then((ok) => { if (ok && tab.value !== 'done') removeRow(it); });
     if (alertNotice(it) && router.hasRoute('AiHealth')) {
         router.push({ name: 'AiHealth', params: { cid: companyId?.value } }).catch(() => {});
+        return;
+    }
+    if (opensOverTheInbox(it)) {
+        openTask({
+            companyId: it.companyId || companyId?.value,
+            projectId: it.projectId,
+            sprintId: it.sprintId,
+            folderId: it.folderId || '',
+            taskId: it.taskId,
+            tab: it.sourceType === 'mention' ? 'activity' : '',
+        });
         return;
     }
     openRoute(it, it.sourceType === 'notification' ? 'notifications' : 'mentions', { gettersVal: getters });
@@ -748,7 +772,8 @@ const decideProposal = async (it, verb) => {
 };
 const reviewInAiInbox = () => router.push({ name: 'AiInbox', params: { cid: companyId?.value } }).catch(() => {});
 
-const isTyping = (e) => ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName) || e.target?.isContentEditable;
+const typingIn = (el) => !!el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable);
+const isTyping = (e) => typingIn(e.target);
 const inList = (e) => !!(listEl.value && e.target && listEl.value.contains(e.target));
 const focusCursor = async () => {
     await nextTick();
@@ -776,6 +801,24 @@ const onKey = (e) => {
     }
 };
 
+// With focus on <body> the page's own keydown never fires, so j and k are caught here to enter the list.
+const onDocumentKey = (e) => {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || overlayState.open) return;
+    if (e.target !== document.body && e.target !== document.documentElement) return;
+    if ((e.key !== 'j' && e.key !== 'k') || !rows.value.length) return;
+    e.preventDefault();
+    focusCursor();
+};
+const focusFirstCard = () => {
+    if (overlayState.open || typingIn(document.activeElement) || !rows.value.length) return;
+    cursor.value = 0;
+    focusCursor();
+};
+const stopOnTaskClosed = onTaskClosed(() => {
+    const active = document.activeElement;
+    if (!active || active === document.body || !active.isConnected) focusCursor();
+});
+
 const migrateLater = async () => {
     let storage = null;
     try { storage = window.localStorage; } catch (e) { return; }
@@ -796,13 +839,17 @@ watch(() => route.query.tab, (next) => {
 
 onMounted(async () => {
     document.addEventListener('mousedown', onOutside);
+    document.addEventListener('keydown', onDocumentKey);
     if (route.query.tab !== tab.value) syncQuery();
     await migrateLater();
     await loadCounts();
     await load(false);
+    focusFirstCard();
 });
 onUnmounted(() => {
     document.removeEventListener('mousedown', onOutside);
+    document.removeEventListener('keydown', onDocumentKey);
+    stopOnTaskClosed();
     clearTimeout(liveTimer);
     clearTimeout(undoTimer);
 });
