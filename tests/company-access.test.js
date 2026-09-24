@@ -426,3 +426,38 @@ describe('PUT company update needs a live seat in the company it writes', () => 
         expect(callsOf('findOneAndUpdate')).toHaveLength(0);
     });
 });
+
+describe('PUT company details with optional phone, state and city', () => {
+    const put = (body) => app.call('PUT', '/api/v1/company', { token: signSession(OWNER, [COMPANY]), companyId: COMPANY, body });
+    const details = (fields) => ({ updateObject: { ...COMPANY_DETAILS_FORM.updateObject, ...fields } });
+    const written = () => callsOf('findOneAndUpdate')[0][1].data[1].$set;
+
+    it('saves the form with phone, state and city empty', async () => {
+        const res = await put(details({ Cst_Phone: '', Cst_State: '', Cst_City: '' }));
+        expect(res.status).toBe(200);
+        expect(written()).toMatchObject({ Cst_Phone: '', Cst_State: '', Cst_City: '' });
+    });
+
+    it('saves the form without phone, state and city at all', async () => {
+        const { Cst_Phone, Cst_State, Cst_City, ...rest } = COMPANY_DETAILS_FORM.updateObject;
+        const res = await put({ updateObject: rest });
+        expect(res.status).toBe(200);
+        expect(written()).toEqual(rest);
+    });
+
+    it('clears the setup wizard placeholder phone when the form sends it back', async () => {
+        const res = await put(details({ Cst_Phone: 'N/A' }));
+        expect(res.status).toBe(200);
+        expect(written().Cst_Phone).toBe('');
+    });
+
+    it.each([['letters', 'call me'], ['too short', '123'], ['too long', '1234567890123456'], ['not a string', 5550100]])(
+        'refuses a phone that is %s',
+        async (label, phone) => {
+            const res = await put(details({ Cst_Phone: phone }));
+            expect(res.status).toBe(400);
+            expect(res.body).toEqual({ status: false, message: expect.any(String) });
+            expect(callsOf('findOneAndUpdate')).toHaveLength(0);
+        }
+    );
+});
