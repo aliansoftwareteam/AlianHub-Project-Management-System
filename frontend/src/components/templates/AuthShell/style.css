@@ -150,4 +150,20 @@
     .auth__title { font-size: 26px; }
     .ah-input { height: 44px; font-size: 14px; }
     .auth__provider, .auth__actions .ah-btn { height: 44px; }
+    .auth__pw-eye { width: 34px; height: 34px; right: 5px; }
+}
+/* Same approach as the shared controls in tokens.css: text links keep their drawn size and get a
+   transparent ::before that makes them at least 32 px to tap. */
+@media (max-width: 767px) {
+    :where(.auth__brand, .auth__top-right a, .auth__field-link, .auth__links a, .auth__links button, .auth__foot a) { position: relative; }
+    .auth__brand::before, .auth__top-right a::before, .auth__field-link::before,
+    .auth__links a::before, .auth__links button::before, .auth__foot a::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: max(100%, 32px);
+        height: max(100%, 32px);
+        transform: translate(-50%, -50%);
+    }
 }

@@ -26,6 +26,16 @@ describe('auth card on a phone', () => {
         expect(ruleBody(css, '.auth__actions > :only-child')).toMatch(/grid-column:\s*1 \/ -1/);
     });
 
+    test('text links and the password eye are at least 32 px to tap on a phone', () => {
+        const phone = css.slice(css.indexOf('@media (max-width: 767px)'));
+        for (const selector of ['.auth__brand', '.auth__field-link', '.auth__links a', '.auth__links button', '.auth__foot a', '.auth__top-right a']) {
+            expect(phone).toContain(`${selector}::before`);
+        }
+        expect(phone).toMatch(/width:\s*max\(100%, 32px\);\s*height:\s*max\(100%, 32px\)/);
+        const small = css.slice(css.indexOf('@media (max-width: 560px)'));
+        expect(ruleBody(small, '.auth__pw-eye')).toMatch(/width:\s*34px;\s*height:\s*34px/);
+    });
+
     test('full-width link buttons fit inside the card', () => {
         expect(ruleBody(css, '.auth .ah-btn--block')).toMatch(/box-sizing:\s*border-box/);
     });
