@@ -165,6 +165,7 @@
 }
 .kanban-board .kanban-card:hover { border-color: var(--border); }
 .kanban-board .card-title-row { flex: 1; min-width: 0; }
+.kanban-board .kanban-card .card-title:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
 .kanban-board .kanban-card .card-title {
     color: var(--ink);
     font: 500 13px/1.35 var(--font-ui);

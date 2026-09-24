@@ -71,6 +71,7 @@ body:has(.calender-menu-class-duedate):after {
     padding-right: 0 !important;
 }
 :root[data-theme="dark"] .calendar-comp { color: var(--ink); }
+.date_format_cal:focus-visible, .calendar-trigger:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
 /* The picked date carries an inline black (red when overdue); only the black gives way. */
 :root[data-theme="dark"] .due_date-listing[style*="color: black"] { color: var(--ink) !important; }
 .calendar-comp-white {
