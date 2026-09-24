@@ -9,6 +9,7 @@ const { isInstanceOwner } = require("../../Instance/guard");
 const { tenantOf, namedCompanyIds, TenantError } = require("../../../Config/tenant");
 const { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, companyUpdateKind, seatFilter } = require("../helpers/companyAccessRules");
 const { evaluatePermission, isPrivileged, isWritable, ROLE_OWNER } = require("../../../Config/permissionGuard");
+const { checkCompanyDetails } = require("../helpers/companyDetails");
 
 const findSeat = (companyId, uid, kind) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.COMPANY_USERS,
@@ -80,9 +81,16 @@ exports.updateCompany = async(req,res) => {
             return res.status(403).json({ status: false, message: ROLE_REFUSAL[kind] || 'Only an owner or an admin can change the company.' });
         }
 
+        let body = req.body;
+        if (kind === 'details') {
+            const checked = checkCompanyDetails(body.updateObject);
+            if (!checked.ok) return res.status(400).json({ status: false, message: checked.error });
+            body = { ...body, updateObject: checked.updateObject };
+        }
+
         const mongoObj = {
             type: SCHEMA_TYPE.COMPANIES,
-            data: companyWrite(companyId, req.body, kind, req.uid)
+            data: companyWrite(companyId, body, kind, req.uid)
         };
 
         const company = await MongoDbCrudOpration('global', mongoObj, 'findOneAndUpdate');
