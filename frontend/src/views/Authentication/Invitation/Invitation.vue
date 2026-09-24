@@ -53,7 +53,7 @@
                             :aria-invalid="!!errors.password"
                             @input="errors.password = ''"
                         />
-                        <button type="button" class="auth__pw-eye" :aria-label="showPassword ? 'Hide password' : 'Show password'" @click="showPassword = !showPassword">
+                        <button type="button" class="auth__pw-eye" :aria-label="showPassword ? $t('Auth.hide_password') : $t('Auth.show_password')" @click="showPassword = !showPassword">
                             <ShellIcon :name="showPassword ? 'eyeOff' : 'eye'" :size="15" />
                         </button>
                     </div>

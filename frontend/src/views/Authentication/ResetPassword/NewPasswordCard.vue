@@ -25,7 +25,7 @@
                             :aria-invalid="!!errors.password"
                             @input="errors.password = ''; syncConfirm()"
                         />
-                        <button type="button" class="auth__pw-eye" :aria-label="show ? 'Hide password' : 'Show password'" @click="show = !show">
+                        <button type="button" class="auth__pw-eye" :aria-label="show ? $t('Auth.hide_password') : $t('Auth.show_password')" @click="show = !show">
                             <ShellIcon :name="show ? 'eyeOff' : 'eye'" :size="15" />
                         </button>
                     </div>

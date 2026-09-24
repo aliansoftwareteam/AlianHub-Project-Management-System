@@ -45,6 +45,19 @@ describe('provider buttons', () => {
     });
 });
 
+describe('signed-out screens', () => {
+    const screens = [
+        'views/Authentication/Login/Login.vue',
+        'views/Authentication/Invitation/Invitation.vue',
+        'views/Authentication/ResetPassword/NewPasswordCard.vue',
+        'views/Setup/SetupWizard.vue',
+    ];
+
+    test.each(screens)('%s has no English literal in a bound aria-label', (rel) => {
+        expect(read(rel)).not.toMatch(/:aria-label="[^"]*'[A-Z][a-z]+ [a-z]/);
+    });
+});
+
 describe('login proof panel', () => {
     test('the product shot takes the theme surface, so its dark-mode text stays readable', () => {
         const rule = ruleBody(read('components/templates/AuthShell/style.css'), '.auth__shot');

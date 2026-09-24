@@ -283,6 +283,8 @@ export default {
         "login_to_workspace": "Log in to your workspace.",
         "new_here": "New here?",
         "continue_with": "Continue with {provider}",
+        "show_password": "Show password",
+        "hide_password": "Hide password",
         "google_unavailable": "Google sign-in didn't load. Check your connection or ad blocker and reload, or log in with your email.",
         "continue_with_sso": "Continue with SSO (SAML / OIDC)",
         "or_with_email": "or with email",
