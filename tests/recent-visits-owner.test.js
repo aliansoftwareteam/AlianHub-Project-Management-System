@@ -2,10 +2,12 @@ const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn() }));
+jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({ hiddenSprintFilter: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn() }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
+const { hiddenSprintFilter } = require('../Modules/Sprints/helpers/sprintVisibility');
 const { recordVisit, listVisits } = require('../Modules/RecentVisits/controller');
 
 const C = '6f0000000000000000000c01';
@@ -14,6 +16,8 @@ const LOST_PROJECT = '6f0000000000000000000a02';
 const ME = '6f0000000000000000000001';
 const OTHER = '6f0000000000000000000002';
 const TASK = '6f0000000000000000000b01';
+const OPEN_SPRINT = '6f0000000000000000000d01';
+const HIDDEN_SPRINT = '6f0000000000000000000d02';
 
 const reply = () => {
     const res = { statusCode: 200 };
@@ -32,6 +36,7 @@ beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     jest.clearAllMocks();
     visibleProjectIds.mockResolvedValue([PROJECT]);
+    hiddenSprintFilter.mockResolvedValue({});
 });
 
 describe('TSK-08 recent visits belong to the signed-in user', () => {
@@ -68,5 +73,17 @@ describe('TSK-08 recent visits belong to the signed-in user', () => {
         expect(res.body.status).toBe(true);
         expect(res.body.data.map((row) => row.task.TaskName)).toEqual(['Still mine']);
         expect((await call(listVisits)).body.data.map((row) => row.task.TaskName)).toEqual(['Still mine']);
+    });
+
+    it('drops visited tasks in a private sprint the caller is not on', async () => {
+        const open = mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Open sprint', ProjectID: PROJECT, sprintId: OPEN_SPRINT, deletedStatusKey: 0 });
+        const hidden = mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Private sprint', ProjectID: PROJECT, sprintId: HIDDEN_SPRINT, deletedStatusKey: 0 });
+        mockDb.seed(SCHEMA_TYPE.RECENTVISITS, { userId: ME, entityType: 'task', entityId: open._id, visitedAt: new Date(1) });
+        mockDb.seed(SCHEMA_TYPE.RECENTVISITS, { userId: ME, entityType: 'task', entityId: hidden._id, visitedAt: new Date(2) });
+        hiddenSprintFilter.mockResolvedValue({ sprintId: { $nin: [HIDDEN_SPRINT] } });
+
+        const res = await call(listVisits);
+        expect(res.body.data.map((row) => row.task.TaskName)).toEqual(['Open sprint']);
+        expect(hiddenSprintFilter).toHaveBeenCalledWith(C, ME, [PROJECT]);
     });
 });
