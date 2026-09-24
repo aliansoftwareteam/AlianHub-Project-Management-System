@@ -28,7 +28,7 @@ describe('auth card on a phone', () => {
 
     test('text links and the password eye are at least 32 px to tap on a phone', () => {
         const phone = css.slice(css.indexOf('@media (max-width: 767px)'));
-        for (const selector of ['.auth__brand', '.auth__field-link', '.auth__links a', '.auth__links button', '.auth__foot a', '.auth__top-right a', '.av2-terms a']) {
+        for (const selector of ['.auth__brand', '.auth__field-link', '.auth__links a', '.auth__links button', '.auth__foot a', '.auth__top-right a', '.av2-terms a', '.av2-link-btn']) {
             expect(phone).toContain(`${selector}::before`);
         }
         expect(phone).toMatch(/width:\s*max\(100%, 32px\);\s*height:\s*max\(100%, 32px\)/);
