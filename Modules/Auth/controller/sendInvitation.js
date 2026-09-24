@@ -17,6 +17,23 @@ const { emitListener } = require("../../Company/eventController.js");
 const { newLinkToken } = require("../helpers/linkToken");
 const { pinSessionTenant } = require("../../../Config/tenant");
 
+const MAIL_FAILED = 'Invitation_mail_failed';
+const SEND_FAILED = 'Could not send the invitation.';
+
+/* The sign-up link from the invite mail, for the admin to share when mail cannot go out. It carries the
+ * row's token, and signing up through it still admits only the invited address. */
+const joinLinkFor = (companyId, row) => (row && row._id && row.linkId
+    ? `${config.WEBURL}/#/invitation?companyId=${companyId}-${row._id}&token=${row.linkId}`
+    : '');
+
+// Transport errors name hosts and ports; they go to the log, never to the client.
+const logFailure = (what, companyId, error) => {
+    logger.error(`invitation ${what} (company ${companyId}): ${error && error.message ? error.message : error}`);
+};
+
+exports.MAIL_FAILED = MAIL_FAILED;
+exports.joinLinkFor = joinLinkFor;
+
 
 async function batchUpdate(arr, eventId) {
     return new Promise((resolve, reject) => {
@@ -122,7 +139,7 @@ exports.sendInvitationEmailFun = (bodyData) => {
             // VALIDATE REQUEST BODY
             if(valid.length) {
                 valid += "fields are required.";
-                reject({status: false, statusText: new Error(valid)});
+                reject({status: false, statusText: valid});
                 return
             }
     
@@ -162,28 +179,32 @@ exports.sendInvitationEmailFun = (bodyData) => {
             */
             const sendMailFunction = (mailObj,row) => {
                 const data = memberRowView(row);
+                const joinLink = joinLinkFor(companyId, row);
                 try {
                     sendMail.SendEmail(mailObj.subject, mailObj.mail, email, true, (result) => {
                         if(result.status) {
                             resolve({
                                 status: true,
                                 statusText: 'Invitation_mail_sent_sucessfully',
-                                data
+                                data,
+                                joinLink
                             });
                         } else {
-                            // The invite row is already saved and its link works, so hand it
-                            // back: the person can copy the link when mail is not configured.
+                            logFailure('mail failed', companyId, result.error);
+                            // The row is saved, so hand it back with its join link to share instead.
                             resolve({
                                 status: false,
-                                statusText: result.error,
-                                data
+                                statusText: MAIL_FAILED,
+                                data,
+                                joinLink
                             });
                         }
                     });
                 } catch (error) {
+                    logFailure('mail failed', companyId, error);
                     reject({
                         status: false,
-                        statusText: error?.message || error
+                        statusText: SEND_FAILED
                     });
                 }
             };
@@ -230,7 +251,8 @@ exports.sendInvitationEmailFun = (bodyData) => {
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                                 }
                             }).catch((error) => {
-                                reject({status: false, statusText: error});
+                                logFailure('failed', companyId, error);
+                                reject({ status: false, statusText: SEND_FAILED });
                             })
                         } else {
                             // let alreadyIn = querySnapshot.docs.filter((userDoc) => userDoc.data().status === 2 && userDoc.data().userId === userId && !userDoc.data().isDelete);
@@ -272,20 +294,17 @@ exports.sendInvitationEmailFun = (bodyData) => {
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                                 }
                             }).catch((error)=>{
-                                reject({status: false, statusText: error});
+                                logFailure('failed', companyId, error);
+                                reject({ status: false, statusText: SEND_FAILED });
                             })
                         }
                     }).catch((error)=>{
-                        reject({
-                            status: false,
-                            statusText: error
-                        })
+                        logFailure('failed', bodyData.companyId, error);
+                        reject({ status: false, statusText: SEND_FAILED })
                     })
                 } catch(error) {
-                    reject({
-                        status: false,
-                        statusText: error?.message || error
-                    })
+                    logFailure('failed', bodyData.companyId, error);
+                    reject({ status: false, statusText: SEND_FAILED })
                 }
             }
     
@@ -305,22 +324,16 @@ exports.sendInvitationEmailFun = (bodyData) => {
                         sendCheckRequest(email, "", newLinkToken())
                     }
                 } catch (error) {
-                    reject({
-                        status: false,
-                        statusText: error?.message || error
-                    })
+                    logFailure('failed', bodyData.companyId, error);
+                    reject({ status: false, statusText: SEND_FAILED })
                 }
             }).catch((error)=>{
-                reject({
-                    status: false,
-                    statusText: error
-                })
+                logFailure('failed', bodyData.companyId, error);
+                reject({ status: false, statusText: SEND_FAILED })
             })
         } catch (error) {
-            reject({
-                status: false,
-                statusText: error
-            })
+            logFailure('failed', bodyData.companyId, error);
+            reject({ status: false, statusText: SEND_FAILED })
             exports.decreaseUserCount(bodyData.companyId);
         }
     })
@@ -349,7 +362,7 @@ exports.sendInvitationEmail = (req,res) => {
         // VALIDATE REQUEST BODY
         if(valid.length) {
             valid += "fields are required.";
-            res.send({status: false, statusText: new Error(valid)});
+            res.send({status: false, statusText: valid});
             return
         }
 
@@ -386,20 +399,23 @@ exports.sendInvitationEmail = (req,res) => {
         */
         const sendMailFunction = (mailObj,row) => {
             const data = memberRowView(row);
+            const joinLink = joinLinkFor(companyId, row);
             sendMail.SendEmail(mailObj.subject, mailObj.mail, email, true, (result) => {
                 if(result.status) {
                     res.send({
                         status: true,
                         statusText: 'Invitation_mail_sent_sucessfully',
-                        data
+                        data,
+                        joinLink
                     });
                 } else {
-                    // The invite row is saved and its link works, so hand it back:
-                    // the person can copy the link when mail is not configured.
+                    logFailure('mail failed', companyId, result.error);
+                    // The row is saved, so hand it back with its join link to share instead.
                     res.send({
                         status: false,
-                        statusText: result.error,
-                        data
+                        statusText: MAIL_FAILED,
+                        data,
+                        joinLink
                     });
                 }
             });
@@ -446,7 +462,8 @@ exports.sendInvitationEmail = (req,res) => {
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                         }
                     }).catch((error) => {
-                        res.send({status: false, statusText: error});
+                        logFailure('failed', companyId, error);
+                        res.send({ status: false, statusText: SEND_FAILED });
                     })
                 } else {
                     // let alreadyIn = querySnapshot.docs.filter((userDoc) => userDoc.data().status === 2 && userDoc.data().userId === userId && !userDoc.data().isDelete);
@@ -488,14 +505,13 @@ exports.sendInvitationEmail = (req,res) => {
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                         }
                     }).catch((error)=>{
-                        res.send({status: false, statusText: error});
+                        logFailure('failed', companyId, error);
+                        res.send({ status: false, statusText: SEND_FAILED });
                     })
                 }
             }).catch((error)=>{
-                res.send({
-                    status: false,
-                    statusText: error
-                })
+                logFailure('failed', sessionCompanyId, error);
+                res.send({ status: false, statusText: SEND_FAILED })
             })
         }
 
@@ -514,16 +530,12 @@ exports.sendInvitationEmail = (req,res) => {
                 sendCheckRequest(email, "", newLinkToken())
             }
         }).catch((error)=>{
-            res.send({
-                status: false,
-                statusText: error
-            })
+            logFailure('failed', sessionCompanyId, error);
+            res.send({ status: false, statusText: SEND_FAILED })
         })
     } catch (error) {
-        res.send({
-            status: false,
-            statusText: error
-        })
+        logFailure('failed', sessionCompanyId, error);
+        res.send({ status: false, statusText: SEND_FAILED })
         exports.decreaseUserCount(sessionCompanyId);
     }
 }
@@ -575,16 +587,12 @@ exports.checkSendInviatation = (req,res) => {
                 }
             }
         }).catch((error)=>{
-            res.send({
-                status: false,
-                statusText: error
-            });
+            logFailure('failed', req.headers && req.headers.companyid, error);
+            res.send({ status: false, statusText: SEND_FAILED });
         })       
     } catch (error) {
-        res.send({
-            status: false,
-            statusText: error
-        });
+        logFailure('failed', req.headers && req.headers.companyid, error);
+        res.send({ status: false, statusText: SEND_FAILED });
     }
 }
 
