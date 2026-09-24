@@ -61,7 +61,15 @@
     font: var(--text-small);
     color: var(--ink-2);
 }
-.mbv__meaning p { margin: 0; }
+.mbv__meaning p { margin: 0; min-width: 0; }
+.mbv__meaning .mbv__link {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
 .mbv__meaning strong { font-weight: 600; color: var(--ink); }
 
 .mbv__notice {
