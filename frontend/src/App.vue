@@ -11,20 +11,7 @@
                 <template v-if="legacyNav">
                     <HeaderComponent v-if="!$route.meta.hideHeader" @change="changeCompany($event)" @filter="handleFilter"/>
                     <div :style="`height: calc(100dvh - ${$route.meta.hideHeader ? '0' : '46'}px);`" class="billing__history-wrapper style-scroll overflow-auto">
-                        <AdvanceSearchModal
-                            v-if="!$route.meta.preventAdvanceSearch"
-                            headerClasses="border-0"
-                            :modelValue="isAdvanceSearch"
-                            :header="false"
-                            :footer="false"
-                            :showCloseIcon="false"
-                            :className="`advance_search_modal advanced__model-css`"
-                            @removeListners="removeKeyListner"
-                        >
-                            <template #body>
-                                <MainSearchComponent @closeModel="removeKeyListner"/>
-                            </template>
-                        </AdvanceSearchModal>
+                        <CommandPalette v-if="!$route.meta.preventAdvanceSearch" :open="isAdvanceSearch" @close="isAdvanceSearch = false"/>
                         <router-view/>
                         <TourCom ref="mainTour"/>
                     </div>
@@ -32,20 +19,7 @@
                 <div v-else class="ah-app">
                     <GlobalRail v-if="!$route.meta.hideHeader" @change="changeCompany($event)" />
                     <main class="ah-app__main" id="ah-main">
-                        <AdvanceSearchModal
-                            v-if="!$route.meta.preventAdvanceSearch"
-                            headerClasses="border-0"
-                            :modelValue="isAdvanceSearch"
-                            :header="false"
-                            :footer="false"
-                            :showCloseIcon="false"
-                            :className="`advance_search_modal advanced__model-css`"
-                            @removeListners="removeKeyListner"
-                        >
-                            <template #body>
-                                <MainSearchComponent @closeModel="removeKeyListner"/>
-                            </template>
-                        </AdvanceSearchModal>
+                        <CommandPalette v-if="!$route.meta.preventAdvanceSearch" :open="isAdvanceSearch" @close="isAdvanceSearch = false"/>
                         <div class="ah-app__view billing__history-wrapper style-scroll">
                             <router-view/>
                         </div>
@@ -118,9 +92,9 @@ import TaskDetailOverlay from '@/components/organisms/TaskDetailOverlay/TaskDeta
 import AgentLiveStrip from '@/views/Ai/AgentLiveStrip.vue'
 import '@/components/organisms/Shell/style.css'
 import CallOverlay from '@/components/organisms/CallOverlay/CallOverlay.vue'
-import AdvanceSearchModal from '@/components/atom/Modal/Modal.vue'
 import Modal from "@/components/atom/Modal/Modal.vue"
-import MainSearchComponent from '@/components/molecules/AdvanceSearch/MainComponent.vue'
+import CommandPalette from '@/components/molecules/AdvanceSearch/CommandPalette.vue'
+import { PALETTE_OPEN_EVENT, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys'
 import { useStore } from 'vuex';
 import axios from 'axios'
 import { fcmToken } from '@/composable/commonFunction';
@@ -139,7 +113,6 @@ import underMaintainanceImg from '@/assets/images/under_maintenance.png'
 import { useRoute, useRouter } from 'vue-router';
 import { languageTranslateHelper } from './composable/index';
 import {socketHelper} from './composable/socketHelper';
-import { useCustomComposable } from '@/composable';
 import { apiRequest,apiRequestWithoutCompnay } from './services';
 import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import { initOffline } from '@/offline';
@@ -153,14 +126,12 @@ defineComponent({
     name: 'App',
 
 	components: {
-        HeaderComponent,
-        AdvanceSearchModal
+        HeaderComponent
 	}
 })
 
 const {selectedLanguageCode, changeLanguage} = languageTranslateHelper();
 const { locale, setLocaleMessage } = useI18n();
-const { checkPermission } = useCustomComposable();
 
 const companyId = ref(localStorage.getItem('selectedCompany') !== null ? localStorage.getItem('selectedCompany') : "")
 // Escape hatch for one release: the old top bar stays reachable behind a flag.
@@ -186,9 +157,6 @@ const defaultTaskStatus = require("@/assets/images/defaut_task_status_img.png");
 const defaultGhostCustomUser = `${env.API_URI}/api/v1/getlogo?key=ghostuser`;
 
 const rules = ref({});
-const projectList = computed(() => checkPermission('project.project_list'));
-const taskList = computed(() => checkPermission('task.task_list'));
-const currentCompany = computed(() => getters["settings/selectedCompany"]);
 const {connectServer} = socketHelper();
 const currentUser = computed(() => getters["users/currentUser"]);
 
@@ -199,12 +167,6 @@ watch(() => currentUser.value, (val) => {
 })
 
 
-watch(() => projectList.value, (val) => {
-    projectList.value = val;
-})
-watch(() => taskList.value, (val) => {
-    taskList.value = val;
-})
 watch(() => getters['settings/rules'], (val) => {
 	rules.value = val;
 })
@@ -630,33 +592,10 @@ async function changeCompany(cid) {
 const handleFilter = () => {
     isAdvanceSearch.value = true;
 }
-// This function is used for the handle advance search modal key press event
-const _keyListener = (e) => {
-    if (e.key === "k" && (e.ctrlKey)) {
-        if(checkPermission('task.advance_search') !== true) {
-            return;
-        }
-        if(!currentCompany.value?.planFeature?.advanceFilterCtrlK) {
-            $toast.error(t('Toast.advance_search_feature_upgrade_message'),{position: 'top-right'});
-        }
-        else if(taskList.value !== null && projectList.value !== null && currentCompany.value?.planFeature?.advanceFilterCtrlK){
-            e.preventDefault();
-            isAdvanceSearch.value = true;
-        }
-        else{
-            $toast.error(t("Toast.Access_Denied"),{position: 'top-right'});
-        }
-    }
-    if(e.key === "Escape"){
-        isAdvanceSearch.value = false;
-    }
-}
-
-// This function is used for the remove event listners for the advance search modal on modal close
-const removeKeyListner = () => {
-  isAdvanceSearch.value = false;
-  document.removeEventListener('keydown', _keyListener);
-  document.addEventListener('keydown', _keyListener);
+const onPaletteKey = (e) => {
+    if (!logged.value || !route.meta.requiresAuth || route.meta.preventAdvanceSearch || !isPaletteShortcut(e)) return;
+    e.preventDefault();
+    isAdvanceSearch.value = !isAdvanceSearch.value;
 }
 
 function notificationPermissionRequest() {
@@ -858,7 +797,8 @@ onMounted(() => {
 	window.onresize = (e) => {
 		clientWidth.value = e.target.innerWidth;
 	}
-	document.addEventListener('keydown', _keyListener);
+	document.addEventListener('keydown', onPaletteKey);
+	window.addEventListener(PALETTE_OPEN_EVENT, handleFilter);
 })
 
 const urlRegex = ref(/(https?|ftp):\/\/[^\s/$.?#].[^\s]*/g)
@@ -898,11 +838,5 @@ body {
     height: 150px; 
     border: 2px solid #2F399035;
     border-radius: 50%;
-}
-.advanced__model-css{
-    width:100%; 
-    height:100%; 
-    max-width: 100%!important; 
-    border-radius:0!important;
 }
 </style>

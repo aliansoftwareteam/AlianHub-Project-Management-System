@@ -252,6 +252,7 @@
 <script setup>
 import { computed, inject, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 import { useToast } from "vue-toast-notification";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
@@ -281,8 +282,9 @@ const { agents, registryManifest, runs, routable, loadAgents, loadRegistry, load
 const { spend, skillManifest, loadSkills, loadSpend } = useAgents();
 const { canManage } = useAgentAccess();
 
+const route = useRoute();
 const tab = ref("ask");
-const question = ref("");
+const question = ref(typeof route?.query?.q === "string" ? route.query.q : "");
 const mode = ref("ask");
 const projectId = ref("");
 const busy = ref(false);

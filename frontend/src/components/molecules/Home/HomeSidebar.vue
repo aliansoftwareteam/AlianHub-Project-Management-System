@@ -1,9 +1,9 @@
 <template>
     <ContextSidebar :open="homeState.sidebarOpen" :label="$t('Shell.home')" @close="homeState.sidebarOpen = false">
-        <button type="button" class="hs-search" @click="openSearch">
+        <button type="button" class="hs-search" :aria-keyshortcuts="mac ? 'Meta+K' : 'Control+K'" @click="openPalette">
             <ShellIcon name="search" :size="14" />
             <span>{{ $t('Shell.search') }}</span>
-            <span class="hs-search__kbd">⌘K</span>
+            <span class="hs-search__kbd" aria-hidden="true">{{ mac ? '⌘K' : $t('Palette.key_ctrl_k') }}</span>
         </button>
 
         <nav class="hs-group" :aria-label="$t('Inbox.title')">
@@ -98,6 +98,7 @@ import { useCustomComposable } from "@/composable";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { homeState } from "./homeState";
+import { isMacPlatform, openPalette } from "@/components/molecules/AdvanceSearch/paletteKeys";
 import { projectColor } from "./homeFormat";
 
 defineOptions({ name: "HomeSidebar" });
@@ -124,6 +125,7 @@ const canCreate = computed(() => checkPermission("project.project_create") === t
 const pinned = computed(() => shellState.nav.pinned || []);
 const hidden = computed(() => shellState.nav.hidden || []);
 
+const mac = isMacPlatform();
 const to = (name, query) => ({ name, params: { cid: companyId.value }, query });
 const isProjectActive = (project) => String(route.params.id || "") === project._id;
 const goProject = (project) => router.push({ name: "Project", params: { cid: companyId.value, id: project._id } });
@@ -155,10 +157,6 @@ function unpin(id) {
 }
 function toggleSection(key) {
     shellState.nav.hidden = hidden.value.includes(key) ? hidden.value.filter((k) => k !== key) : [...hidden.value, key];
-}
-
-function openSearch() {
-    document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "k", ctrlKey: true }));
 }
 
 function loadCounts() {
