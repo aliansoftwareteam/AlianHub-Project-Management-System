@@ -1,3 +1,4 @@
+/* eslint-env browser */
 const AxeBuilder = require('@axe-core/playwright').default;
 const { test, expect, asRole } = require('../support/test');
 const { createProject, createTask, uniqueSuffix } = require('../support/fixtures');
