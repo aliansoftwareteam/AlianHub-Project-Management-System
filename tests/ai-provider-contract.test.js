@@ -1,4 +1,4 @@
-/* One contract, four adapters. Every provider in the registry is driven
+/* One contract, five adapters. Every provider in the registry is driven
  * through the same requests and the same failures here, so a new adapter —
  * Google is the first to arrive under it — cannot ship with a different
  * output ceiling story, a different structured-output story, a different
@@ -9,6 +9,7 @@ const OPENAI_KEY = 'sk-proj-OPENAISECRET0123456789';
 const DEEPSEEK_KEY = 'sk-DEEPSEEKSECRET0123456789';
 const ANTHROPIC_KEY = 'sk-ant-api03-ANTHROPICSECRET0123456789';
 const GOOGLE_KEY = 'AIzaSyGOOGLESECRET0123456789';
+const COMPATIBLE_KEY = 'sk-local-COMPATSECRET0123456789';
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
@@ -35,6 +36,9 @@ process.env.ANTHROPIC_API_KEY = ANTHROPIC_KEY;
 process.env.ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 process.env.GOOGLE_API_KEY = GOOGLE_KEY;
 process.env.GOOGLE_MODEL = 'gemini-3-flash';
+process.env.OPENAI_COMPATIBLE_BASE_URL = 'http://127.0.0.1:11434/v1';
+process.env.OPENAI_COMPATIBLE_API_KEY = COMPATIBLE_KEY;
+process.env.OPENAI_COMPATIBLE_MODEL = 'llama3.1:8b';
 
 const axios = require('axios');
 const { AxiosError, AxiosHeaders } = jest.requireActual('axios');
@@ -152,6 +156,21 @@ const DRIVERS = [
         sentCeiling: (params) => params.max_tokens,
         hasStructuredOutput: (params) => /valid JSON object/.test(params.system || ''),
     },
+    {
+        name: 'openai_compatible',
+        adapter: registry.ADAPTERS.openai_compatible,
+        key: COMPATIBLE_KEY,
+        configuredModel: 'llama3.1:8b',
+        otherModel: 'qwen2.5:14b',
+        reasoningModel: null,
+        succeed() { axios.post.mockResolvedValue(chatCompletion('llama3.1:8b')); },
+        failWith(status) { axios.post.mockRejectedValue(openAiBody(status, COMPATIBLE_KEY)); },
+        failTransport(code) { axios.post.mockRejectedValue(axiosTransport('socket hang up', code, COMPATIBLE_KEY)); },
+        sent: () => axios.post.mock.calls[0][1],
+        sentModel: () => axios.post.mock.calls[0][1].model,
+        sentCeiling: (body) => body.max_tokens,
+        hasStructuredOutput: (body) => body.response_format && body.response_format.type === 'json_object',
+    },
 ];
 
 const router = (state) => { process.env.AI_MODEL_ROUTER = state; };
@@ -168,7 +187,7 @@ beforeEach(() => {
 
 describe('the registry is the only place a provider is known', () => {
     it('holds an adapter per name, openai first so the fallback is unchanged', () => {
-        expect(PROVIDER_NAMES).toEqual(['openai', 'anthropic', 'deepseek', 'google']);
+        expect(PROVIDER_NAMES).toEqual(['openai', 'anthropic', 'deepseek', 'google', 'openai_compatible']);
         PROVIDER_NAMES.forEach((name) => expect(registry.ADAPTERS[name].name).toBe(name));
     });
 

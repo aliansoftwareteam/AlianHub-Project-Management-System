@@ -175,7 +175,7 @@ describe('instance console as the owner', () => {
         const res = await api.get('/api/v2/instance/ai/providers');
         expect(res.status).toBe(200);
         expect(res.body.data).toMatchObject({ node: expect.any(String), routerEnabled: expect.any(Boolean), breakerPolicy: { scope: 'process' } });
-        expect(res.body.data.providers.map((p) => p.provider)).toEqual(['openai', 'anthropic', 'deepseek', 'google']);
+        expect(res.body.data.providers.map((p) => p.provider)).toEqual(['openai', 'anthropic', 'deepseek', 'google', 'openai_compatible']);
         res.body.data.providers.forEach((row) => {
             expect(row).toMatchObject({
                 configured: expect.any(Boolean),
