@@ -178,6 +178,15 @@ describe('due and start date notifications are built on the server from stored f
         expect(historyRows().map((row) => row.Key)).toEqual(['Project_DueDate']);
     });
 
+    test('clearing the due date, as Undo does for a first date, is recorded as a removal with no notice', async () => {
+        hold({ DueDate: new Date(DUE), dueDateDeadLine: [{ date: new Date(DUE) }] });
+        const result = await call(PATCH, dueBody({ firebaseObj: { DueDate: null, dueDateDeadLine: [] } }));
+        expect(result).toMatchObject({ code: 200, body: { status: true } });
+        expect(storedTask().DueDate).toBeNull();
+        expect(notices()).toHaveLength(0);
+        expect(historyRows().map((row) => row.Message)).toEqual(['<b>Olivia Owner</b> has removed the <b>Due Date</b>.']);
+    });
+
     test('the date is shown in the format and time zone the caller uses', async () => {
         const result = await call(PATCH, dueBody({ timeZone: 'Asia/Kolkata', commonDateFormatString: 'YYYY-MM-DD', firebaseObj: { DueDate: IST_MIDNIGHT, dueDateDeadLine: [{ date: IST_MIDNIGHT }] } }));
         expect(result).toMatchObject({ code: 200, body: { status: true } });

@@ -30,7 +30,8 @@
             :placeholder="$t('errorPage.select_a_date')"
             @range-end="onRangeEnd"
             @range-start="onRangeStart"
-            @open="handleOpen"
+            @open="handleOpen(); menuOpen = true"
+            @closed="menuOpen = false"
             :title="dateValue ? dateValue.length === 2 ? `${convertDateFormat(dateValue[0],props.format ? props.format : '',{showDayName: false})} - ${convertDateFormat(dateValue[1],props.format ? props.format : '',{showDayName: false})}` : convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false}) : ''"
         >
             <!-- for range picker -->
@@ -149,6 +150,7 @@ import {useConvertDate} from '@/composable/index';
 import { useStore } from "vuex";
 const { getters } = useStore();
 import moment from 'moment';
+import { useEscapeLayer } from '@/composable/useEscapeLayer';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 //Define Emits, Props, & Refs
@@ -280,6 +282,8 @@ const props = defineProps({
 const dateValue = ref(props.modelValue);
 const prevaldate = ref(null);
 const datePicker = ref('');
+const menuOpen = ref(false);
+useEscapeLayer(menuOpen, () => datePicker.value?.closeMenu());
 const openCalendar = () => datePicker.value?.openMenu?.();
 const startDateVal = ref('');
 const endDateVal = ref('');

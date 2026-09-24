@@ -2,8 +2,12 @@ import { reactive, computed } from "vue";
 import moment from "moment";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
+import Store from "@/store/index";
 
+/* The one running timer per person. The task panel, Home and the Time pages all read and
+ * write this entry; `ah.timer` was the key Home and Time used before they shared it. */
 const STORAGE_PREFIX = "ah.timer.";
+const LEGACY_KEY = "ah.timer";
 const TICK_MS = 1000;
 
 export const timerState = reactive({
@@ -30,15 +34,85 @@ function ensureTick() {
     tickHandle = setInterval(() => { timerState.now = Date.now(); }, TICK_MS);
 }
 
-export function initTimer(userId) {
-    timerState.userId = String(userId || "");
+function readStored() {
     try {
         const raw = localStorage.getItem(storageKey());
-        timerState.entry = raw ? JSON.parse(raw) : null;
+        return raw ? JSON.parse(raw) : null;
     } catch (_e) {
-        timerState.entry = null;
+        return null;
+    }
+}
+
+function takeLegacy() {
+    try {
+        const raw = localStorage.getItem(LEGACY_KEY);
+        if (!raw) return null;
+        localStorage.removeItem(LEGACY_KEY);
+        const old = JSON.parse(raw);
+        if (!old || !old.taskId) return null;
+        const running = old.running !== false;
+        const startedAt = Number(old.startedAt) || Date.now();
+        return {
+            taskId: String(old.taskId),
+            taskName: old.taskName || "",
+            projectId: old.projectId || "",
+            projectName: old.projectName || "",
+            sprintId: old.sprintId || "",
+            description: old.note || "",
+            firstStartedAt: Number(old.firstStartedAt) || startedAt,
+            startedAt: running ? startedAt : 0,
+            accumulatedMs: Number(old.accumulated) || 0,
+            paused: !running
+        };
+    } catch (_e) {
+        return null;
+    }
+}
+
+export function initTimer(userId) {
+    timerState.userId = String(userId || "");
+    timerState.entry = readStored();
+    const legacy = takeLegacy();
+    if (!timerState.entry && legacy) {
+        timerState.entry = legacy;
+        persist();
     }
     ensureTick();
+}
+
+export function ensureTimerLoaded() {
+    if (timerState.userId) return;
+    let userId = "";
+    try { userId = localStorage.getItem("userId") || ""; } catch (_e) { /* storage unavailable */ }
+    if (userId) initTimer(userId);
+}
+
+if (typeof window !== "undefined") {
+    window.addEventListener("storage", (event) => {
+        if (!timerState.userId || event.key !== storageKey()) return;
+        timerState.entry = readStored();
+        ensureTick();
+    });
+}
+
+/* Home and Time start timers without the user details a time log needs; they are filled
+ * in from the signed-in user when the timer stops. */
+function withUserContext(entry) {
+    const getters = Store.getters || {};
+    const userId = entry.userId || timerState.userId;
+    const user = (getters["users/users"] || []).find((u) => u._id === userId) || {};
+    let companyId = entry.companyId || "";
+    try { companyId = companyId || localStorage.getItem("selectedCompany") || ""; } catch (_e) { /* storage unavailable */ }
+    return {
+        ...entry,
+        userId,
+        companyId,
+        userName: entry.userName || user.Employee_Name || "",
+        dateFormat: entry.dateFormat || getters["settings/companyDateFormat"]?.dateFormat || "DD/MM/YYYY",
+        companyOwnerId: entry.companyOwnerId || getters["settings/companyOwnerDetail"]?._id || "",
+        timeZone: entry.timeZone || user.timeZone || user.Time_Zone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timeFormat: entry.timeFormat || user.timeFormat || user.Time_Format || "24"
+    };
 }
 
 export const elapsedSeconds = computed(() => {
@@ -139,9 +213,9 @@ export async function stopTimer() {
     const elapsedMs = entry.accumulatedMs + (entry.paused || !entry.startedAt ? 0 : endedAt - entry.startedAt);
     timerState.entry = null;
     persist();
-    if (elapsedMs < 60000) return { ...entry, logged: false };
+    if (elapsedMs < 60000) return { ...entry, logged: false, tooShort: true };
     try {
-        const response = await apiRequest("post", env.ADD_TIMELOG, toLogPayload(entry, endedAt));
+        const response = await apiRequest("post", env.ADD_TIMELOG, toLogPayload(withUserContext(entry), endedAt));
         return { ...entry, logged: response?.data?.status !== false, statusText: response?.data?.statusText, code: response?.data?.code };
     } catch (error) {
         console.error("ERROR in stopTimer: ", error);
