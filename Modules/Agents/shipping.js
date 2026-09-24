@@ -42,6 +42,12 @@ const shapeTask = (t) => ({
     createdAt: t.createdAt || null,
 });
 
+/* A proposal that names a task stays hidden unless that task is one the viewer can read. */
+const onReadableTasks = async (companyId, proposals, visible, sprints) => {
+    const readable = new Set(ids((await findTasks(companyId, ids(proposals.map((p) => p.taskId)), visible, sprints)).map((t) => t._id)));
+    return proposals.filter((p) => !p.taskId || readable.has(String(p.taskId)));
+};
+
 const proposalTouchesGate = (p, keys) => (p.changes || []).some((c) => keys.includes(c.action)) || Boolean(p.gate);
 
 const shapeProposal = (p) => ({
@@ -130,7 +136,7 @@ const releaseCandidate = async (companyId, uid, { since } = {}) => {
             : Promise.resolve([]),
         MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.AGENT_PROPOSALS,
-            data: [{ $or: [{ gate: { $ne: null } }, { 'changes.action': { $in: keys } }] }, {}, { sort: { createdAt: -1 }, limit: 50 }],
+            data: [{ ...(privileged ? {} : { projectId: { $in: visible } }), $or: [{ gate: { $ne: null } }, { 'changes.action': { $in: keys } }] }, {}, { sort: { createdAt: -1 }, limit: 50 }],
         }, 'find').catch(() => []),
         MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data: [{ deletedStatusKey: { $ne: 1 }, status: 'connected' }, 'type name status'],
@@ -139,7 +145,8 @@ const releaseCandidate = async (companyId, uid, { since } = {}) => {
 
     const assisted = new Set((runsOnDone || []).map((r) => String(r.taskId)));
     const agentNames = ids((runsOnDone || []).map((r) => r.agentName));
-    const staging = (proposals || []).filter((p) => proposalTouchesGate(p, keys)).map(shapeProposal);
+    const gated = (proposals || []).filter((p) => proposalTouchesGate(p, keys));
+    const staging = (privileged ? gated : await onReadableTasks(companyId, gated, visible, sprints)).map(shapeProposal);
     const lastStagingDeploy = staging.find((p) => ['approved', 'edited'].includes(p.status)) || null;
 
     const refusals = privileged

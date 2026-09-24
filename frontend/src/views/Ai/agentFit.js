@@ -95,6 +95,13 @@ const coverage = (agent, work) => {
  * component can render it through $t while this file stays free of i18n. */
 const NOT_BLOCKED = { text: '', code: '', params: {} };
 
+/* The server lists only the projects the viewer can open and sets projectScoped whenever the agent
+ * has any, so an agent limited to projects hidden from the viewer is not mistaken for an unscoped one. */
+const projectScopeOf = (agent) => {
+    const ids = ((agent && agent.projectIds) || []).map(String);
+    return { scoped: Boolean(agent && agent.projectScoped) || ids.length > 0, ids };
+};
+
 const ineligibility = (agent, work, task = {}, index = null) => {
     if (work.needsPerson) return { text: `This needs a person — ${work.why}`, code: 'needs_person', params: { why: work.whyKey } };
     if (agent.paused) return { text: `Paused${agent.pausedReason ? ` (${agent.pausedReason})` : ''}.`, code: 'paused', params: { reason: agent.pausedReason || '' } };
@@ -102,7 +109,8 @@ const ineligibility = (agent, work, task = {}, index = null) => {
         return { text: `Spend cap reached — $${round2(monthSpend(agent))} of $${agent.spendCapUsd} this month.`, code: 'cap_reached', params: { spent: round2(monthSpend(agent)).toFixed(2), cap: agent.spendCapUsd } };
     }
     const projectId = task && task.ProjectID;
-    if (projectId && Array.isArray(agent.projectIds) && agent.projectIds.length && !agent.projectIds.map(String).includes(String(projectId))) {
+    const projects = projectScopeOf(agent);
+    if (projectId && projects.scoped && !projects.ids.includes(String(projectId))) {
         return { text: 'Not scoped to this project.', code: 'not_scoped', params: {} };
     }
     if (!canDo(agent, 'task.get')) return { text: 'It cannot read a task.', code: 'cannot_read', params: {} };
@@ -232,4 +240,4 @@ const routingTotals = (rows = []) => {
     return { routed: routed.length, forPeople: rows.length - routed.length, usd: round2(usd), priced: routed.filter((r) => r.agent.estimate.usd !== null).length };
 };
 
-module.exports = { classifyTask, fitFor, rankAgents, routeTasks, routingTotals, historyFor, taskInputs, missingInput, WORK_KINDS, READ_ACTIONS };
+module.exports = { classifyTask, fitFor, projectScopeOf, rankAgents, routeTasks, routingTotals, historyFor, taskInputs, missingInput, WORK_KINDS, READ_ACTIONS };

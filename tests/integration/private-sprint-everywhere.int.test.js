@@ -160,7 +160,8 @@ describe('the paths that used to guard at project level only', () => {
     });
 
     it('leaves the private sprint out of a custom report grouped by sprint', async () => {
-        const config = { source: 'tasks', dimension: 'sprint', metric: 'count', chartType: 'bar', filters: {} };
+        // Other suites fill the shared workspace with sprints; the report keeps only its top 100 groups.
+        const config = { source: 'tasks', dimension: 'sprint', metric: 'count', chartType: 'bar', filters: { project: String(target.project._id) } };
         const mine = await owner.api.post('/api/v1/reports/custom/run', config);
         expect(mine.status).toBe(200);
         expect(mine.body.data.result.map((row) => String(row.key))).toContain(sprintId);
