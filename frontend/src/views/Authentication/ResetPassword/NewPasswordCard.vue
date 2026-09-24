@@ -21,11 +21,10 @@
                             :class="{ 'ah-input--error': errors.password }"
                             autocomplete="new-password"
                             maxlength="150"
-                            placeholder="••••••••"
                             :aria-invalid="!!errors.password"
                             @input="errors.password = ''; syncConfirm()"
                         />
-                        <button type="button" class="auth__pw-eye" :aria-label="show ? 'Hide password' : 'Show password'" @click="show = !show">
+                        <button type="button" class="auth__pw-eye" :aria-label="show ? $t('Auth.hide_password') : $t('Auth.show_password')" @click="show = !show">
                             <ShellIcon :name="show ? 'eyeOff' : 'eye'" :size="15" />
                         </button>
                     </div>
@@ -41,7 +40,6 @@
                         :class="{ 'ah-input--error': errors.confirm }"
                         autocomplete="new-password"
                         maxlength="150"
-                        placeholder="••••••••"
                         :aria-invalid="!!errors.confirm"
                         @input="syncConfirm()"
                     />

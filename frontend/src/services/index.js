@@ -5,6 +5,7 @@ import Store from "@/store/index";
 import { useCustomComposable } from '@/composable';
 import * as offline from '@/offline';
 const { logOut } = useAuth();
+export const SESSION_EXPIRED_KEY = "ah.sessionExpired";
 const apiHost = env.API_URI;
 export const axiosInstance = axios.create({ baseURL: apiHost });
 export const axiosInstanceWithFormData = axios.create({ baseURL: apiHost });
@@ -115,12 +116,12 @@ const requestAuth = (id, retried = false) => new Promise((resolve, reject) => {
         }
         // Nothing to refresh with and the server has nothing to read: the session is gone.
         if (!sentHeader && error?.response?.status === 400) {
-            logOut();
+            logOut({ expired: true });
         }
         console.error('error', data);
         reject(data);
         if (data?.isLogout) {
-            logOut();
+            logOut({ expired: true });
         }
     });
 });
@@ -194,7 +195,7 @@ export const apiRequest = (type, endPoint, data, dataType, options) => {
                             return;
                         }
                         if (err?.response?.data?.isLogout) {
-                            logOut();
+                            logOut({ expired: true });
                         }else if (err?.response?.data?.isJwtError) {
                             const userId = localStorage.getItem('userId') || "";
                             await getAuth(userId);
@@ -249,7 +250,7 @@ export const apiRequestWithoutCompnay = (type, endPoint, data, dataType,options)
                             return;
                         }
                     if (err?.response?.data?.isLogout) {
-                        logOut();
+                        logOut({ expired: true });
                     } else if (err?.response?.data?.isJwtError) {
                         const userId = localStorage.getItem('userId') || "";
                         await getAuth(userId);
@@ -322,6 +323,9 @@ export function useAuth() {
     };
 
     async function logOut(data) {
+        if (data?.expired) {
+            try { sessionStorage.setItem(SESSION_EXPIRED_KEY, "1"); } catch (e) { /* the login page then just shows no notice */ }
+        }
         try {
             const userId = localStorage.getItem('userId') || '';
             

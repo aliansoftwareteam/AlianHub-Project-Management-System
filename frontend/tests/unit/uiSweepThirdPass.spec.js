@@ -234,7 +234,7 @@ describe('timesheets and the milestone report without the permission', () => {
         expect(en.Inbox.state_denied_secondary).toBeUndefined();
         const state = read('components/molecules/AppState/AppState.vue');
         expect(state).toMatch(/denied: false/);
-        expect(state).toMatch(/props\.kind === 'notfound' \|\| props\.kind === 'denied'\) goHome\(\)/);
+        expect(state).toMatch(/if \(props\.kind === 'unreachable' \|\| props\.kind === 'offline'\) retryNow\(\);\s*else goHome\(\);/);
     });
 });
 

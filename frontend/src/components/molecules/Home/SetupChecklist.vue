@@ -11,7 +11,7 @@
                     <s v-if="step.done">{{ $t(step.label) }}</s>
                     <strong v-else-if="step.key === active?.key">{{ $t(step.label) }}</strong>
                     <button v-else type="button" @click="$emit('action', step.key)">{{ $t(step.label) }}</button>
-                    <span v-if="step.note && !step.done"> {{ $t(step.note) }}</span>
+                    <span v-if="step.note && !step.done">&nbsp;{{ $t(step.note) }}</span>
                 </template>
             </div>
         </div>

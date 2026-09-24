@@ -8,6 +8,7 @@
 
 <script setup>
 import { publicConfig } from "@/config/publicConfig";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 /* global google */
 import { onMounted, ref, defineProps } from "vue";
 import { useToast } from 'vue-toast-notification';
@@ -47,12 +48,9 @@ let googleClient = null;
 const userData = ref();
 const isSpinner = ref(false)
 
-onMounted(() => {
-    if (!window.google) {
-        console.error("Google script not loaded!");
-        return;
-    }
-
+// The Google script loads async, so it can arrive after this button mounts.
+function initClient() {
+    if (googleClient || !window.google?.accounts?.oauth2) return googleClient;
     googleClient = google.accounts.oauth2.initCodeClient({
         client_id: publicConfig.auth.google.clientId,
         scope: "openid email profile",
@@ -60,7 +58,10 @@ onMounted(() => {
         redirect_uri: "postmessage",
         callback: handleGoogleCallback,
     });
-});
+    return googleClient;
+}
+
+onMounted(initClient);
 
 function parseJwt(token) {
     const base64Url = token.split(".")[1];
@@ -69,8 +70,8 @@ function parseJwt(token) {
 }
 
 function signInWithGoogle() {
-    if (!googleClient) {
-        console.error("Google client not initialized");
+    if (!initClient()) {
+        $toast.error(t("Auth.google_unavailable"), { position: "top-right" });
         return;
     }
     googleClient.requestCode();
