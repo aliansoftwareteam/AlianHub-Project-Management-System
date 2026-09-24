@@ -13,7 +13,7 @@
     min-width: 0;
 }
 .auth--single .auth__form {
-    width: 100%; max-width: 440px; margin: 0 auto;
+    box-sizing: border-box; width: calc(100% - 32px); max-width: 498px; margin: 0 auto;
     background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-modal);
     box-shadow: var(--shadow-card); min-height: 0; margin-top: 8vh; margin-bottom: 8vh; padding: 24px 28px 20px;
 }
@@ -26,6 +26,7 @@
 .auth__top-right { font: var(--text-small); }
 .auth__top-right a { color: var(--brand); font-weight: 600; text-decoration: none; }
 .auth__body { flex: 1; width: 100%; max-width: 400px; margin: 0 auto; }
+.auth .ah-btn--block { box-sizing: border-box; }
 .auth--single .auth__body { max-width: none; }
 .auth__title { font: var(--text-display); letter-spacing: -.8px; margin: 0 0 6px; color: var(--ink); }
 .auth__lead { font: var(--text-small); margin: 0 0 22px; }
