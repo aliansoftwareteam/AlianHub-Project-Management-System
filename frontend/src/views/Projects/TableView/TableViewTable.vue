@@ -45,7 +45,7 @@ import Skelaton from "@/components/atom/Skelaton/Skelaton.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
-import { taskListHelper } from "@/views/Projects/helper.js";
+import { taskInGroup } from "@/views/Projects/ListView/listFilter";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 
 defineOptions({ name: "TableViewTable" });
@@ -62,7 +62,6 @@ defineEmits(["open"]);
 const { getters, dispatch } = useStore();
 const { checkPermission } = useCustomComposable();
 const { getUser } = useGetterFunctions();
-const { checkCase } = taskListHelper();
 const selection = useTaskSelection();
 
 const project = inject("selectedProject");
@@ -85,16 +84,6 @@ watch(() => project.value?._id, (newId) => {
 
 const canGroupSelect = computed(() => checkPermission("task.task_status", project.value?.isGlobalPermission) === true && !showArchivedInj?.value);
 
-function matches(task) {
-    const { searchKey, searchValue, operation, value } = props.data;
-    if (searchKey === "DueDate") {
-        return task.DueDate ? checkCase(operation, searchValue, new Date(task.DueDate).getTime() / 1000) : operation === "non";
-    }
-    if (searchKey === "AssigneeUserId") {
-        return [...(task.AssigneeUserId || [])].sort().join("_") === value;
-    }
-    return task[searchKey] === searchValue;
-}
 
 const storeTasks = computed(() => {
     if (searchedTask?.value) {
@@ -104,7 +93,7 @@ const storeTasks = computed(() => {
 });
 
 const tasks = computed(() => storeTasks.value
-    .filter((task) => !task?.deletedStatusKey && matches(task))
+    .filter((task) => !task?.deletedStatusKey && taskInGroup(task, props.data))
     .sort((a, b) => (props.globalSortKey ? 0 : a[props.data.indexName] - b[props.data.indexName])));
 
 const groupTaskIds = computed(() => tasks.value.map((task) => String(task._id)).filter(Boolean));

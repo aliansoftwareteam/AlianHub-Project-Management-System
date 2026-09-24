@@ -56,7 +56,7 @@ const makeStore = ({ tasks = ELEVEN, searched = [] } = {}) => createStore({
 
 const RowStub = defineComponent({
     name: 'ListRow',
-    props: ['data', 'isSub'],
+    props: { data: Object, isSub: Boolean },
     setup: (props) => () => h('div', { class: props.isSub ? 'row-sub' : 'row', 'data-id': props.data._id }, props.data.TaskName)
 });
 const DraggableStub = defineComponent({

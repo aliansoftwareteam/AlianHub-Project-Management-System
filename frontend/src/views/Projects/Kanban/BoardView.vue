@@ -68,6 +68,7 @@ import isEqual from 'lodash/isEqual';
 // Components
 import KanbanBoard from '@/views/Projects/Kanban/KanbanBoard.vue';
 import ListBulkBar from '@/views/Projects/ListView/ListBulkBar.vue';
+import { taskInGroup } from '@/views/Projects/ListView/listFilter';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 
@@ -89,7 +90,7 @@ defineEmits(['change']);
 
 // --- Store & Injected State ---
 const { getters } = useStore();
-const { groupBy, checkCase } = taskListHelper();
+const { groupBy } = taskListHelper();
 const showArchiveVar = inject("showArchived");
 const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
@@ -143,15 +144,11 @@ const processedBoardData = computed(() => {
 
         switch (group.searchKey) {
             case "DueDate":
-                tasksForGroup = filteredSourceTasks.filter(task =>
-                    task.DueDate ? checkCase(group.operation, group.searchValue, (new Date(task.DueDate).getTime() / 1000)) : group.operation === "non"
-                );
+                tasksForGroup = filteredSourceTasks.filter(task => taskInGroup(task, group));
                 tasksForGroup.sort((a, b) => a.groupByDueDateIndex - b.groupByDueDateIndex);
                 break;
             case "AssigneeUserId":
-                tasksForGroup = filteredSourceTasks.filter(task =>
-                    (Array.isArray(task.AssigneeUserId) ? task.AssigneeUserId.slice().sort().join("_") : task.AssigneeUserId || "") === group.value
-                );
+                tasksForGroup = filteredSourceTasks.filter(task => taskInGroup(task, group));
                 tasksForGroup.sort((a, b) => a.groupByAssigneeIndex - b.groupByAssigneeIndex);
                 break;
             case "statusKey":

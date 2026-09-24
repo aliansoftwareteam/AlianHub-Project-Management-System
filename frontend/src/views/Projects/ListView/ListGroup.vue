@@ -89,6 +89,7 @@ import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { useListDragDrop } from "./useListDragDrop.js";
 import { useProjectAgentActivity } from "./useProjectAgentActivity.js";
 import { hasSubtasks, indexProgress, pendingExpandIds, progressQuery, progressSignature } from "./subtaskProgress";
+import { groupRows, listSourceTasks, searchExpandIds } from "./listFilter";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 
@@ -104,7 +105,7 @@ defineEmits(["toggle", "open", "review-agent"]);
 
 const { getters } = useStore();
 const { checkPermission } = useCustomComposable();
-const { checkCase, getSprintTasks } = taskListHelper();
+const { getSprintTasks } = taskListHelper();
 const { updateTaskByGroup } = useUpdateTasks();
 const selection = useTaskSelection();
 const agents = useProjectAgentActivity();
@@ -126,25 +127,17 @@ const canSetStatus = canSelect;
 const canDrag = computed(() => canSelect.value && !searchedTask.value && props.item.value !== "NO_DUE_DATE" && props.item.value !== "NEXT");
 
 const storeTasks = computed(() => getters["projectData/tasks"]?.[props.project._id]?.[sprintId.value]?.tasks || []);
-const found = computed(() => getters["projectData/tasks"]?.[props.project._id]?.[sprintId.value]?.found?.[`${props.item.searchKey}_${props.item.searchValue}`] ?? null);
+const sourceTasks = computed(() => listSourceTasks({
+    searched: searchedTask.value,
+    searchedTasks: getters["projectData/searchedTasks"],
+    storeTasks: storeTasks.value,
+    sprintId: sprintId.value
+}));
+const found = computed(() => (searchedTask.value
+    ? null
+    : getters["projectData/tasks"]?.[props.project._id]?.[sprintId.value]?.found?.[`${props.item.searchKey}_${props.item.searchValue}`] ?? null));
 
-const groupTasks = computed(() => {
-    const item = props.item;
-    const all = storeTasks.value.filter((task) => (showArchived.value ? task.deletedStatusKey === 2 : !task.deletedStatusKey));
-    if (item.searchKey === "DueDate") {
-        return all
-            .filter((task) => (task.DueDate ? checkCase(item.operation, item.searchValue, new Date(task.DueDate).getTime() / 1000) : item.operation === "non"))
-            .sort((a, b) => a.groupByDueDateIndex - b.groupByDueDateIndex);
-    }
-    if (item.searchKey === "AssigneeUserId") {
-        return all
-            .filter((task) => [...(task.AssigneeUserId || [])].sort((a, b) => (a > b ? 1 : -1)).join("_") === item.value)
-            .sort((a, b) => a.groupByAssigneeIndex - b.groupByAssigneeIndex);
-    }
-    return all
-        .filter((task) => task[item.searchKey] === item.searchValue)
-        .sort((a, b) => a[item.indexName] - b[item.indexName]);
-});
+const groupTasks = computed(() => groupRows(sourceTasks.value, props.item, showArchived.value));
 
 const rows = ref([]);
 watch(groupTasks, (value) => { rows.value = [...value]; }, { immediate: true, deep: true });
@@ -216,7 +209,10 @@ function toggleSubtasks(task) {
  * tasks only then. */
 const autoExpandedIds = ref([]);
 watch([taskCollapsed, rows], () => {
-    if (searchedTask.value) return;
+    if (searchedTask.value) {
+        expandedIds.value = [...new Set([...expandedIds.value, ...searchExpandIds(rows.value)])];
+        return;
+    }
     if (taskCollapsed.value) {
         expandedIds.value = [];
         autoExpandedIds.value = [];
@@ -229,8 +225,15 @@ watch([taskCollapsed, rows], () => {
     rows.value.filter((task) => pending.includes(String(task._id))).forEach(loadSubtasks);
 }, { immediate: true });
 
+/* A searched parent carries only its matching subtasks; when none matched, expanding it
+   shows the full set loaded into the sprint's own copy of the task. */
+function subtasksOf(task) {
+    if (task.subtaskArray?.length || !searchedTask.value) return task.subtaskArray || [];
+    return storeTasks.value.find((stored) => stored._id === task._id)?.subtaskArray || [];
+}
+
 function visibleSubtasks(task) {
-    return (task.subtaskArray || []).filter((sub) => (showArchived.value ? sub.deletedStatusKey === 2 : !sub.deletedStatusKey));
+    return subtasksOf(task).filter((sub) => (showArchived.value ? sub.deletedStatusKey === 2 : !sub.deletedStatusKey));
 }
 
 function onSelect(task, event) {
