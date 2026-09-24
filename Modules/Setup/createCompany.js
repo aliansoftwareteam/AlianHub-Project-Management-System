@@ -34,10 +34,10 @@ async function createOwner({ firstName, lastName, email, password }) {
     return ownerId;
 }
 
-/* The company details the wizard does not ask for. The schema requires them, and the
- * owner can fill them in under Settings > Company. */
+/* The company details the wizard does not ask for. The owner can fill them in under
+ * Settings > General; phone, state and city may stay empty. */
 const COMPANY_DEFAULTS = {
-    Cst_Phone: 'N/A',
+    Cst_Phone: '',
     Cst_Country: 'N/A',
     Cst_City: '',
     Cst_State: '',
