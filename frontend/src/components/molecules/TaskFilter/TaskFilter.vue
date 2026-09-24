@@ -110,6 +110,7 @@ import { apiRequest } from '../../../services';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 import { buildFilterQuery } from "@/composable/commonFunction";
+import { clearFilterSignal } from "@/views/Projects/composables/taskFilterSignal";
 
 // Utils
 const { getUser } = useGetterFunctions();
@@ -417,14 +418,18 @@ const applyFilter = (data) => {
 /**
  * This function is used to clear all the selected filters and close it
  */
-const clearFilter = () => {
+const resetPanel = () => {
     inputs.value = [];
     addRow();
-    emits('clear', true);
     isValidate.value = true;
     isEdit.value = false;
     isApplyed.value = false;
 }
+const clearFilter = () => {
+    resetPanel();
+    emits('clear', true);
+}
+watch(clearFilterSignal, resetPanel);
 
 /**
  * This function is used to save the filter to the database

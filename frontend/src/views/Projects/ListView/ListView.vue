@@ -57,7 +57,7 @@
                         <button type="button" class="lv2__sprint-head" :aria-expanded="!!sprint.isExpanded" @click="toggleSprints(sprint?.id)">
                             <span class="lv2__caret lv2__caret--sprint" aria-hidden="true">{{ sprint.isExpanded ? '▼' : '►' }}</span>
                             <span class="lv2__sprint-name">{{ sprint.name }}</span>
-                            <span class="lv2__sprint-meta" :title="$t('List.sprint_total_hint')">{{ sprint.tasks || 0 }}</span>
+                            <span class="lv2__sprint-meta" :title="$t('List.sprint_total_hint')">{{ sprintCount(sprint) }}</span>
                         </button>
                         </div></div>
 
@@ -108,9 +108,9 @@
                     :image="noSearchResult"
                     :title="showArchived ? $t('ProjectSlider.no_archived') : $t(emptyTitleKey)"
                     :message="showArchived ? '' : $t(emptyMessageKey)"
-                    :actionLabel="canCreateFirstTask ? $t('EmptyState.no_tasks_action') : ''"
+                    :actionLabel="emptyActionLabel"
                     :helpPath="showArchived ? '' : 'tasks'"
-                    @action="creatingFirstTask = true"
+                    @action="onEmptyAction"
                 />
             </div>
         </template>
@@ -126,6 +126,7 @@ import { ref, defineProps, defineEmits, nextTick, inject, watch,
 import { useStore } from 'vuex';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 
 // COMPONENTS
 import SprintListing from "@/components/organisms/SprinstList/SprintsList.vue"
@@ -140,17 +141,21 @@ import { useCustomComposable } from '@/composable';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { useProjectAgentActivity } from './useProjectAgentActivity.js';
 import * as listGroups from './listGroups.js';
+import { groupCountsFor, listSourceTasks } from './listFilter.js';
 import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 
 // UTILS
 const {getters} = useStore();
+const { t } = useI18n();
 const route = useRoute()
 const router = useRouter()
 const project = inject("selectedProject");
 const clientWidth = inject("$clientWidth");
 const companyId = inject("$companyId");
 const showArchived = inject("showArchived");
+const searchedTask = inject("searchedTask", ref(false));
+const clearTaskFilters = inject("clearTaskFilters", () => {});
 const {
     groupBy,
     getSprintTasks,
@@ -217,8 +222,17 @@ watch(() => project.value?._id, (newId) => {
     }
 }, { immediate: true });
 
+function searchedRows(sprint) {
+    return listSourceTasks({ searched: true, searchedTasks: getters['projectData/searchedTasks'], sprintId: sprint?.id });
+}
+
 function groupCounts(sprint) {
+    if (searchedTask.value) return groupCountsFor(searchedRows(sprint), sprint?.items, showArchived.value);
     return getters['projectData/tasks']?.[project.value?._id]?.[sprint?.id]?.found;
+}
+
+function sprintCount(sprint) {
+    return searchedTask.value ? searchedRows(sprint).length : (sprint.tasks || 0);
 }
 
 function groupCount(sprint, item) {
@@ -247,6 +261,19 @@ const canCreateFirstTask = computed(() => Boolean(groupedTasks.value.length)
     && !showArchived.value
     && checkPermission('task.task_create', project.value?.isGlobalPermission) === true
     && checkPermission('task.task_list', project.value?.isGlobalPermission) === true);
+
+const emptyActionLabel = computed(() => {
+    if (searchedTask.value && !showArchived.value) return t('EmptyState.no_match_action');
+    return canCreateFirstTask.value ? t('EmptyState.no_tasks_action') : '';
+});
+
+function onEmptyAction() {
+    if (searchedTask.value && !showArchived.value) {
+        clearTaskFilters();
+        return;
+    }
+    creatingFirstTask.value = true;
+}
 
 function openRow(task) {
     openTask({

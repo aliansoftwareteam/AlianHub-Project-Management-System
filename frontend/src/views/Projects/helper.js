@@ -9,7 +9,7 @@ const t = i18n.global.t;
 import * as env from '@/config/env';
 import { apiRequest } from '../../services';
 import { isOwnerOrAdmin } from "@/utils/roles";
-import { dueDateBuckets, dueDateCondition, restoreGroupState, sprintToLoad } from "./taskGroups";
+import { assigneeCondition, assigneeGroups, dueDateBuckets, dueDateCondition, restoreGroupState, sprintToLoad } from "./taskGroups";
 
 const projectsList = ref([]);
 const filterdProjects = ref([]);
@@ -883,53 +883,21 @@ export function taskListHelper() {
                 indexKey.value = "assigneeIndex";
 
                 // Groups used to come from a typesense group_by; with search gone they come from the company seats instead.
-                const memberIds = [...new Set((getters["settings/companyUsers"] || []).filter((member) => member && member.userId && member.isDelete !== true && Number(member.status) !== 3).map((member) => String(member.userId)))];
-                memberIds.forEach((id) => {
-                    if(!arr.filter((x) => x.value === id).length) {
-                        arr.push({
-                            isExpanded: true,
-                            name: "Assignee",
-                            users: [getUser(id)],
-                            value: id
-                        })
-                    }
-                })
-
-                    if(!arr.length) {
-                        arr.push({
-                            isExpanded: true,
-                            name: "Assignee",
-                            users: [],
-                            value: ""
-                        })
-                    }
-
-                    arr = arr.sort((a,b) => a.users.length < b.users.length ? 1 : -1)
+                const memberIds = (getters["settings/companyUsers"] || []).filter((member) => member && member.userId && member.isDelete !== true && Number(member.status) !== 3).map((member) => member.userId);
+                arr = assigneeGroups(memberIds, getUser, t("Projects.unassigned"));
 
                     sprints.forEach((sprint, index) => {
                         sprint.isExpanded = false;
-                        let tmp = []
-                        arr.forEach((x, arrIndex) => {
-                            tmp.push({
-                                key: `${index}_${arrIndex}_${x.name}`,
-                                ...x,
-                                tasksArray: tasks,
-
-                                conditions: [
-                                    {
-                                        AssigneeUserId: {$in: x.users}
-                                    }
-                                ],
-
-                                searchKey: "AssigneeUserId",
-                                indexName: "groupByAssigneeIndex",
-                                searchCondition: ":",
-                                searchValue: x.value.length ? x.value.split("_") : '[]'
-                            });
-                        })
-
-                        // sprint.items = tmp.filter((x) => x.tasksArray.length || !x.users.length).sort((a, b) => a.users.length < b.users.length ? 1 : -1);
-                        sprint.items = tmp;
+                        sprint.items = arr.map((x, arrIndex) => ({
+                            key: `${index}_${arrIndex}_${x.name}`,
+                            ...x,
+                            tasksArray: tasks,
+                            conditions: [assigneeCondition(x.value)],
+                            searchKey: "AssigneeUserId",
+                            indexName: "groupByAssigneeIndex",
+                            searchCondition: ":",
+                            searchValue: x.value ? [x.value] : '[]'
+                        }));
                     })
             } else if(type === 2) {
                 // PRIOTITIES
@@ -1089,6 +1057,4 @@ export function taskListHelper() {
         searchMongoDBTasks
     }
 }
-
-export const clearFilterSignal = ref(0);
 
