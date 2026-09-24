@@ -47,7 +47,16 @@
             </DropDown>
 
             <button
-                v-if="addUser && (showAddUser || !detailedUsers.length)"
+                v-if="addUser && emptyLabel && !detailedUsers.length"
+                type="button"
+                class="assignee__add-btn assignee__empty"
+                aria-haspopup="dialog"
+                :aria-label="`${emptyLabel}, ${$t('Members.adduser')}`"
+                :title="$t('Members.adduser')"
+                @click.stop="openSidebar()"
+            >{{ emptyLabel }}</button>
+            <button
+                v-else-if="addUser && (showAddUser || !detailedUsers.length)"
                 type="button"
                 class="assignee__add-btn"
                 aria-haspopup="dialog"
@@ -158,6 +167,11 @@ const props = defineProps({
         default: true 
     },
     tourId: {
+        type: String,
+        default: ''
+    },
+    /** Shown in place of the add-person icon while nobody is assigned. */
+    emptyLabel: {
         type: String,
         default: ''
     }

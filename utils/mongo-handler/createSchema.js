@@ -3,6 +3,7 @@ const fileSweep = require('../../Modules/Knowledge/ingest/fileSweep');
 const { FIGURES_INDEX_KEY } = require('../../Modules/Knowledge/figuresPipeline');
 const tombstonePurge = require('../../Modules/Knowledge/ingest/purgeFilter');
 const { schema } = require('./schema');
+const { CLEARED_RETENTION_SECONDS } = require('../../Modules/Inbox/helpers/inboxRules');
 // P1-SEC-11 — Core entity schemas hardened to `strict: true`. The
 // field lists in `./schema.js` cover every known write path; unknown
 // fields are now silently dropped instead of persisted, which blocks
@@ -49,6 +50,8 @@ const appsSchema = new Schema(schema.apps, {strict: true, timestamps: true})
 const notificationsSchema = new Schema(schema.notifications, {strict: true, timestamps: true})
 const notificationsSettingsSchema= new Schema(schema.notificationsSettings, {strict: true, timestamps: true})
 const mentionsSchema= new Schema(schema.mentions, {strict: true, timestamps: true})
+notificationsSchema.index({ clearedAt: 1 }, { expireAfterSeconds: CLEARED_RETENTION_SECONDS, name: 'cleared_purge' });
+mentionsSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0, name: 'cleared_purge' });
 const projectRulesSchema= new Schema(schema.projectRules, {strict: true, timestamps: true})
 const subscriptionPlanSchema = new Schema(schema.subscriptionPlan, {strict: true, timestamps: true});
 // `planFeature` / `planFeatureDisplay` intentionally hold an open-ended

@@ -656,7 +656,7 @@ watch(
     }
 );
 
-
+defineExpose({ pickFromComputer });
 </script>
 <style scoped src="./style.css"></style>
 <style>

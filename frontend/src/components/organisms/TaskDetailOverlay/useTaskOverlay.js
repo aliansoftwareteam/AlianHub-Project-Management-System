@@ -1,4 +1,5 @@
-import { reactive, computed } from "vue";
+import { reactive, computed, onBeforeUnmount, onMounted, unref } from "vue";
+import { neighbours, readSequence } from "./taskNavigation";
 
 const TASK_QUERY = "task";
 
@@ -8,11 +9,13 @@ export const overlayState = reactive({
     tab: "",
     meta: {},
     minimized: [],
-    hostMounted: 0
+    hostMounted: 0,
+    nav: null
 });
 
 let router = null;
 let route = null;
+let sequenceRoot = null;
 const closeListeners = new Set();
 
 export function bindRouter(routerInstance, routeInstance) {
@@ -52,7 +55,7 @@ function normalize(payload) {
 
 export const isExpanded = computed(() => Boolean(overlayState.current) && routeTaskId() === overlayState.current.taskId);
 
-export function openTask(payload = {}) {
+export function openTask(payload = {}, { history = "replace" } = {}) {
     const next = normalize(payload);
     if (!next.taskId) return;
     overlayState.minimized = overlayState.minimized.filter((item) => item.taskId !== next.taskId);
@@ -60,13 +63,93 @@ export function openTask(payload = {}) {
     if (overlayState.current?.taskId === next.taskId) {
         overlayState.current = { ...overlayState.current, ...next };
         overlayState.open = true;
+        refreshNavigation();
         return;
     }
     overlayState.current = next;
     overlayState.open = true;
+    refreshNavigation();
     if (router && route && routeTaskId() !== next.taskId && route.query?.[TASK_QUERY] !== next.taskId) {
-        router.replace({ query: { ...stripTaskQuery(route.query), [TASK_QUERY]: next.taskId } }).catch(() => {});
+        const to = { query: { ...stripTaskQuery(route.query), [TASK_QUERY]: next.taskId } };
+        (history === "push" ? router.push(to) : router.replace(to)).catch(() => {});
     }
+}
+
+export function refreshNavigation() {
+    const current = overlayState.current;
+    const root = sequenceRoot ? sequenceRoot() : null;
+    overlayState.nav = current && root ? neighbours(readSequence(root), current.taskId) : null;
+}
+
+/** The list, board or table on screen hands the overlay its root; the last one mounted wins. */
+export function registerTaskSequence(getRoot) {
+    sequenceRoot = getRoot;
+    refreshNavigation();
+    return () => {
+        if (sequenceRoot !== getRoot) return;
+        sequenceRoot = null;
+        refreshNavigation();
+    };
+}
+
+export function useTaskSequenceSource(rootRef) {
+    let unregister = null;
+    let observer = null;
+    let frame = 0;
+    const schedule = () => {
+        if (frame) return;
+        frame = requestAnimationFrame(() => {
+            frame = 0;
+            refreshNavigation();
+        });
+    };
+    onMounted(() => {
+        unregister = registerTaskSequence(() => unref(rootRef));
+        const root = unref(rootRef);
+        if (root && typeof MutationObserver !== "undefined") {
+            observer = new MutationObserver(schedule);
+            observer.observe(root, { childList: true, subtree: true });
+        }
+    });
+    onBeforeUnmount(() => {
+        observer?.disconnect();
+        if (frame) cancelAnimationFrame(frame);
+        unregister?.();
+    });
+}
+
+export function stepTask(direction) {
+    refreshNavigation();
+    const current = overlayState.current;
+    const nav = overlayState.nav;
+    const target = nav && (direction > 0 ? nav.next : nav.prev);
+    if (!current || !target) return false;
+    const payload = {
+        companyId: current.companyId,
+        projectId: target.projectId || current.projectId,
+        sprintId: target.sprintId || current.sprintId,
+        folderId: target.folderId,
+        taskId: target.taskId
+    };
+    if (router && route && routeTaskId() === current.taskId) {
+        const params = { cid: payload.companyId, id: payload.projectId, sprintId: payload.sprintId, taskId: payload.taskId };
+        if (payload.folderId) params.folderId = payload.folderId;
+        overlayState.current = normalize(payload);
+        refreshNavigation();
+        router.push({ name: taskRouteName(payload.folderId), params, query: stripTaskQuery(route.query) }).catch(() => {});
+        return true;
+    }
+    openTask(payload, { history: "push" });
+    return true;
+}
+
+/** Back and forward land on a task the view already lists; open it without a fetch. */
+export function restoreFromSequence(taskId, companyId) {
+    const root = sequenceRoot ? sequenceRoot() : null;
+    const item = readSequence(root).find((entry) => entry.taskId === String(taskId));
+    if (!item) return false;
+    openTask({ ...item, companyId: overlayState.current?.companyId || companyId });
+    return true;
 }
 
 export function setTaskMeta(taskId, meta) {
@@ -92,6 +175,7 @@ export function closeTask({ keepRoute = false } = {}) {
     overlayState.open = false;
     overlayState.current = null;
     overlayState.tab = "";
+    overlayState.nav = null;
     if (!current) return;
     if (!keepRoute) leaveTaskRoute(current);
     closeListeners.forEach((listener) => {

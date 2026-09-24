@@ -90,7 +90,7 @@
                             readonly
                             type="text"
                             :class="[{'calendar-comp':!calenderImage,'calendar-comp-white':calenderImage}]"
-                            :placeholder="props.format ? props.format : settingDateFormat"
+                            :placeholder="emptyText || (props.format ? props.format : settingDateFormat)"
                             :id="inputId"
                             :aria-label="ariaLabel || null"
                             @keydown.enter.prevent="openCalendar"
@@ -116,7 +116,7 @@
                             readonly
                             type="text"
                             :class="[{'bg-transparent border-0 cursor-pointer':!calenderImage,'calendar-comp-white':calenderImage,'text-ellipse':isEllipsis,'d-block':isEllipsis,'mw-150px':isEllipsis,'date_mw':isTask}]"
-                            :placeholder="`${props.format} , ${timeFormate?'24 Hour':'AM/PM'}`"
+                            :placeholder="emptyText || `${props.format} , ${timeFormate?'24 Hour':'AM/PM'}`"
                             :id="inputId"
                             :aria-label="ariaLabel || null"
                             @keydown.enter.prevent="openCalendar"
@@ -217,6 +217,10 @@ const props = defineProps({
         default: false
     },
     ariaLabel: {
+        type: String,
+        default: ''
+    },
+    emptyText: {
         type: String,
         default: ''
     },

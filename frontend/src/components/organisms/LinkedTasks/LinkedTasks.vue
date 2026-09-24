@@ -38,12 +38,14 @@
 
         <div v-if="isAdding" class="lt__add">
             <div class="lt__add-row">
-                <select v-model="selectedType" class="ah-input lt__add-type">
+                <select v-model="selectedType" class="ah-input lt__add-type" :aria-label="$t('TaskPanel.relation_type')">
                     <option v-for="opt in relationTypeOptions" :key="opt.value" :value="opt.value">{{ $t(opt.labelKey) }}</option>
                 </select>
                 <input
+                    ref="searchInputRef"
                     v-model="searchQuery"
                     type="text"
+                    :aria-label="$t('Members.search_task_ph')"
                     class="ah-input lt__add-search"
                     :placeholder="$t('Members.search_task_ph')"
                     @input="onSearchInput"
@@ -71,7 +73,7 @@
 
 <script setup>
 // PACKAGES
-import { computed, defineProps, inject, onMounted, ref, watch } from "vue";
+import { computed, defineProps, inject, nextTick, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
@@ -199,12 +201,15 @@ function fetchRelations() {
     });
 }
 
+const searchInputRef = ref(null);
 function startAdding() {
     isAdding.value = true;
     selectedType.value = 'blocks';
     searchQuery.value = '';
     searchResults.value = [];
+    nextTick(() => searchInputRef.value?.focus());
 }
+defineExpose({ startAdding });
 
 function cancelAdding() {
     isAdding.value = false;

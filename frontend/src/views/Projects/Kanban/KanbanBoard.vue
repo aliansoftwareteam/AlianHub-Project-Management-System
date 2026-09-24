@@ -1,5 +1,5 @@
 <template>
-    <div class="kanban-board style-scroll-6-px ah-scroll">
+    <div ref="boardRoot" class="kanban-board style-scroll-6-px ah-scroll">
         <div
             v-for="(column, columnIndex) in columns"
             :key="column.key"
@@ -58,7 +58,7 @@
                         :emptyInsertThreshold="24"
                     >
                         <template #item="{ element }">
-                            <div class="kanban-card" :class="{ 'is-agent-run': !!runFor(element._id) }">
+                            <div class="kanban-card" :class="{ 'is-agent-run': !!runFor(element._id) }" v-bind="taskNavAttrs(element)">
                                 <BoardViewDisplayCardComponent
                                     :data="element"
                                     :groupValue="groupValue"
@@ -99,6 +99,8 @@ import { useCustomComposable } from "@/composable";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { useProjectAgents } from "@/views/Projects/Kanban/useProjectAgents";
 import { tabUpdateMarker } from "@/utils/taskUpdateMarker";
+import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
+import { useTaskSequenceSource } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 
 //Props
 const props = defineProps({
@@ -113,6 +115,9 @@ const props = defineProps({
         type: String
     }
 })
+
+const boardRoot = ref(null)
+useTaskSequenceSource(boardRoot)
 
 // Variables
 const columns = ref(props.data)

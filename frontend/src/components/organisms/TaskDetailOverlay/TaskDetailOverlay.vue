@@ -13,6 +13,8 @@
                     :tab="overlayState.tab"
                     :expanded="isExpanded"
                     :agentRun="agentRun"
+                    :nav="overlayState.nav"
+                    @step="step"
                     @close="closeTask()"
                     @expand="expandTask()"
                     @minimize="minimizeTask()"
@@ -34,7 +36,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import TaskDetailPanel from "./TaskDetailPanel.vue";
@@ -44,8 +46,9 @@ import { initTimer } from "./useTaskTimer";
 import { useFocusTrap } from "@/composable/useFocusTrap";
 import {
     overlayState, isExpanded, bindRouter, openTask, closeTask, expandTask, minimizeTask,
-    restoreTask, dismissMinimized, TASK_QUERY_KEY
+    restoreTask, dismissMinimized, stepTask, restoreFromSequence, TASK_QUERY_KEY
 } from "./useTaskOverlay";
+import { navKeyDirection } from "./taskNavigation";
 import "./style.css";
 
 defineOptions({ name: "TaskDetailOverlay" });
@@ -93,6 +96,7 @@ function openFromRoute() {
 function restoreFromQuery() {
     const taskId = route.query?.[TASK_QUERY_KEY];
     if (!taskId || route.params?.taskId || overlayState.current?.taskId === taskId) return;
+    if (restoreFromSequence(taskId, companyId.value)) return;
     apiRequest("get", `${env.TASK}/${taskId}`).then((response) => {
         const task = response?.data;
         if (!task || !task._id) return;
@@ -106,13 +110,54 @@ function restoreFromQuery() {
     }).catch((error) => console.error("ERROR restoring task overlay: ", error));
 }
 
+/* The panel is keyed by task, so the control that had focus is replaced; put focus on
+ * its twin in the new panel, or on the dialog itself so the trap keeps holding it. */
+async function step(direction) {
+    const panel = panelRef.value;
+    const active = document.activeElement;
+    const navDir = panel && panel.contains(active) ? active.getAttribute("data-nav-dir") : null;
+    if (!stepTask(direction)) return;
+    await nextTick();
+    await nextTick();
+    const root = panelRef.value;
+    if (!root) return;
+    const twin = navDir ? root.querySelector(`[data-nav-dir="${navDir}"]:not([disabled])`) : null;
+    const fallback = navDir ? root.querySelector("[data-nav-dir]:not([disabled])") : null;
+    const target = twin || fallback;
+    if (target) target.focus({ preventScroll: true });
+    else root.focus({ preventScroll: true });
+}
+
+function onNavKey(event) {
+    const panel = panelRef.value;
+    if (!panel || !overlayState.nav) return;
+    const target = event.target;
+    if (target && target !== document.body && !panel.contains(target)) return;
+    const direction = navKeyDirection(event);
+    if (!direction) return;
+    event.preventDefault();
+    step(direction);
+}
+
 function onKeydown(event) {
-    if (event.key !== "Escape" || !overlayState.open) return;
+    if (!overlayState.open) return;
+    if (event.key !== "Escape") {
+        onNavKey(event);
+        return;
+    }
     const target = event.target;
     if (target && (target.closest?.(".sidebar-main, .modal, .swal2-container") || target.isContentEditable)) return;
     closeTask();
 }
 
+// Expanding releases the trap, which hands focus back to the row now hidden behind the page.
+watch(isExpanded, (expanded) => {
+    if (!expanded) return;
+    nextTick(() => {
+        const root = panelRef.value;
+        if (root && !root.contains(document.activeElement)) root.focus({ preventScroll: true });
+    });
+});
 watch(() => route.params?.taskId, openFromRoute);
 watch(() => route.query?.[TASK_QUERY_KEY], (value) => { if (value) restoreFromQuery(); });
 

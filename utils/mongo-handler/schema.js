@@ -3509,6 +3509,23 @@ const schema = {
         User_Employee_Verify: {
             type: Boolean,
             required:false
+        },
+        // 'watching' when the reader got this only because they watch the item (Inbox "Other").
+        reason: {
+            type: String,
+            required: false
+        },
+        snoozedUntil: {
+            type: Date,
+            required: false
+        },
+        snoozeUntilChange: {
+            type: Boolean,
+            required: false
+        },
+        clearedAt: {
+            type: Date,
+            required: false
         }
     },
     notificationsSettings: {
@@ -3649,6 +3666,21 @@ const schema = {
             type: Boolean,
             required: false,
             default: false
+        },
+        // One row serves every mentioned reader, so snooze and clear are kept per reader.
+        snoozes: {
+            type: Array,
+            required: false,
+            default: undefined
+        },
+        clearedFor: {
+            type: Array,
+            required: false,
+            default: undefined
+        },
+        purgeAt: {
+            type: Date,
+            required: false
         },
     },
     comments: {
