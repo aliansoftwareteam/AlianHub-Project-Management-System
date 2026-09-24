@@ -17,20 +17,20 @@ const PAGE_STYLE = `
     body{font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f6fa;color:#222;margin:0;padding:24px}
     .wrap{max-width:880px;margin:0 auto}
     h1{font-size:22px;margin:0 0 4px}
-    .muted{color:#777;font-size:13px;margin-bottom:20px}
+    .muted{color:#666;font-size:13px;margin-bottom:20px}
     .group{background:#fff;border:1px solid #e6e6e6;border-radius:10px;margin-bottom:14px;overflow:hidden}
     .group h2{font-size:14px;margin:0;padding:10px 14px;background:#fafafa;border-bottom:1px solid #eee}
     .task{display:flex;justify-content:space-between;gap:12px;padding:9px 14px;border-bottom:1px solid #f2f2f2;font-size:14px}
     .task:last-child{border-bottom:none}
-    .key{color:#7b68ee;font-weight:600;white-space:nowrap}
+    .key{color:#5b4ccc;font-weight:600;white-space:nowrap}
     .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .pill{background:#f0f0f0;border-radius:10px;padding:1px 9px;font-size:12px;color:#666;white-space:nowrap}
     form{background:#fff;border:1px solid #e6e6e6;border-radius:10px;padding:16px;margin-top:22px}
     form h2{font-size:15px;margin:0 0 10px}
     label{display:block;font-size:12px;color:#666;margin:10px 0 3px}
     input,textarea{width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:14px;font-family:inherit}
-    button{margin-top:14px;background:#7b68ee;border:none;color:#fff;border-radius:6px;padding:9px 18px;font-size:14px;cursor:pointer}
-    .footer{margin-top:26px;text-align:center;color:#aaa;font-size:12px}
+    button{margin-top:14px;background:#5b4ccc;border:none;color:#fff;border-radius:6px;padding:9px 18px;font-size:14px;cursor:pointer}
+    .footer{margin-top:26px;text-align:center;color:#5f6573;font-size:12px}
     /* ── Docs share ────────────────────────────────────────────────────────
        Full-bleed: a breadcrumb bar across the top, the page tree down the left,
        the document on a white sheet to the right. */
@@ -60,7 +60,7 @@ const PAGE_STYLE = `
        flex child refuses to shrink past its content and the window scrolls instead. */
     .dk{display:flex;align-items:stretch;flex:1;min-height:0;background:#fff}
     .dk__side{flex:0 0 320px;min-height:0;overflow-y:auto;background:#fff;border-right:1px solid #eef0f3;padding:14px 8px 20px}
-    .dk__side-label{font-size:12px;color:#8b90a0;padding:2px 10px 8px}
+    .dk__side-label{font-size:12px;color:#646a78;padding:2px 10px 8px}
     .dk__tree{display:flex;flex-direction:column}
     /* The row is the highlight and the hit area; the link fills what is left of
        it so the caret beside it stays independently clickable. */
@@ -83,7 +83,7 @@ const PAGE_STYLE = `
        both stack their own min-height plus padding made a short doc scroll. */
     .dk__doc-col{width:100%;max-width:760px;padding:40px 0 64px}
     .dk__title{font-size:34px;font-weight:700;letter-spacing:-.4px;margin:0 0 12px;line-height:1.2}
-    .dk__meta{display:flex;align-items:center;gap:8px;font-size:13px;color:#9aa0b0;margin-bottom:26px}
+    .dk__meta{display:flex;align-items:center;gap:8px;font-size:13px;color:#646a78;margin-bottom:26px}
     .dk__author{color:#4b5162}
     .dk__dot{color:#c9ccd6}
     .dk__avatar{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#7b68ee;color:#fff;font-size:10px;font-weight:700;flex:0 0 20px}
@@ -91,7 +91,7 @@ const PAGE_STYLE = `
     .dk__doc-col .doc{border:none;border-radius:0;padding:0;background:transparent;font-size:15px;line-height:1.75}
     .dk__subs{margin-top:40px}
     .dk__subs table{width:100%;border-collapse:collapse}
-    .dk__subs th{text-align:left;font-size:12.5px;font-weight:500;color:#9aa0b0;padding:0 0 8px;border-bottom:1px solid #eef0f3}
+    .dk__subs th{text-align:left;font-size:12.5px;font-weight:500;color:#646a78;padding:0 0 8px;border-bottom:1px solid #eef0f3}
     .dk__subs td{padding:12px 0;border-bottom:1px solid #f2f3f6;font-size:14px}
     .dk__owner-col{width:90px;text-align:left}
     .dk__sub-link{display:inline-flex;align-items:center;gap:10px;color:#111;font-weight:600;text-decoration:none}
