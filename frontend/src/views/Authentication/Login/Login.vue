@@ -224,14 +224,26 @@ const sessionExpired = () => {
         return false;
     }
 };
-const encode = (str) => Array.from(str).map((c) => c.charCodeAt(0)).join(", ");
-const decode = (src) => String.fromCharCode.apply(null, src.split(","));
+const REMEMBER_KEY = "remember";
+const parseRemembered = () => {
+    try {
+        return JSON.parse(localStorage.getItem(REMEMBER_KEY) || "null");
+    } catch {
+        return null;
+    }
+};
+const readRememberedEmail = () => {
+    const saved = parseRemembered();
+    const email = saved && typeof saved.email === "string" ? saved.email : "";
+    // Entries written before this version also held the password; rewrite them as email-only.
+    if (email) localStorage.setItem(REMEMBER_KEY, JSON.stringify({ email }));
+    else localStorage.removeItem(REMEMBER_KEY);
+    return email;
+};
 
 onMounted(() => {
-    try {
-        const rem = JSON.parse(localStorage.getItem("remember") || "null");
-        if (rem) { form.email = rem.email; form.password = decode(rem.password); rememberMe.value = true; }
-    } catch { /* ignore */ }
+    const rememberedEmail = readRememberedEmail();
+    if (rememberedEmail) { form.email = rememberedEmail; rememberMe.value = true; }
     if (sessionExpired()) banner.value = { kind: "warn", text: t("Auth.session_expired") };
     if (route.query.reason === "expired") banner.value = { kind: "warn", text: t("Auth.two_factor_session_expired") };
     if (route.query.magic === "invalid") banner.value = { kind: "danger", text: t("Auth.magic_invalid") };
@@ -263,8 +275,8 @@ const handleSubmit = async () => {
     if (!validate()) return;
     banner.value = null;
     busy.value = true;
-    if (rememberMe.value) localStorage.setItem("remember", JSON.stringify({ email: form.email, password: encode(form.password) }));
-    else localStorage.removeItem("remember");
+    if (rememberMe.value) localStorage.setItem(REMEMBER_KEY, JSON.stringify({ email: form.email }));
+    else localStorage.removeItem(REMEMBER_KEY);
     try {
         const user = await apiRequestWithoutSecure("post", env.LOGIN, { email: form.email, password: form.password, isLoginType: "frontend" });
         if (user.status !== 200) throw new Error("server");
@@ -280,7 +292,7 @@ const handleSubmit = async () => {
         clearSession();
         localStorage.removeItem("userId");
         localStorage.removeItem("isLogging");
-        localStorage.removeItem("remember");
+        localStorage.removeItem(REMEMBER_KEY);
         const data = error?.response?.data || {};
         const msg = data.message || error.message;
         if (data.isEmailVerified === false) {

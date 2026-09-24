@@ -294,7 +294,7 @@ export default {
         "log_in": "Log in",
         "email_me_link": "Email me a login link",
         "keep_signed_in": "Keep me signed in on this device",
-        "keep_signed_in_hint": "30-day token, no stored password",
+        "keep_signed_in_hint": "Remembers your email on this device. Your password is never stored.",
         "locked_out": "Locked out?",
         "use_password_instead": "Use a password instead",
         "email_required": "Enter your email address.",
