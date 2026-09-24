@@ -42,8 +42,7 @@ export function setFocus() {
         },
         phoneNumber: {
             value: "",
-            rules:
-                "required | regex:^[0-9]+$",
+            rules: "regex:^[0-9]*$",
             name: "phone number",
             error: ""
         },
@@ -56,15 +55,13 @@ export function setFocus() {
         },
         state: {
             value: "",
-            rules:
-                "required",
+            rules: "",
             name: "state",
             error: ""
         },
         city: {
             value: "",
-            rules:
-                "required",
+            rules: "",
             name: "city",
             error: ""
         },
@@ -122,13 +119,10 @@ export function setFocus() {
         const noCities = (await City.getCitiesOfState(state, country)).length === 0;
         if (key === 'country') {
             locationObj.value['state'].isStateVal = noStates;
-            formData.value.state.rules = noStates ? '' : 'required';
-            formData.value.city.rules = noStates ? '' : 'required';
             formData.value.state.error = '';
             formData.value.city.error = '';
         } else if (key === 'state') {
             locationObj.value['city'].isCityVal = noCities;
-            formData.value.city.rules = noCities ? '' : 'required';
             formData.value.city.error = '';
         }
     };
