@@ -207,6 +207,21 @@ describe('Inbox open task', () => {
         expect(focusedCard()).toBe(0);
     });
 
+    it('takes focus back from a panel that is still closing', async () => {
+        primaryRows = [mention(1), mention(2)];
+        await mountInbox();
+        await press(cards()[0].element, 'Enter');
+        const leaving = document.createElement('div');
+        leaving.className = 'ah-detail';
+        leaving.innerHTML = '<button type="button">Close</button>';
+        document.body.appendChild(leaving);
+        leaving.querySelector('button').focus();
+        closeTask();
+        await flushPromises();
+        leaving.remove();
+        expect(focusedCard()).toBe(0);
+    });
+
     it('a channel mention still leaves for the channel', async () => {
         primaryRows = [{ ...mention(1), mainChat: true }];
         await mountInbox();
