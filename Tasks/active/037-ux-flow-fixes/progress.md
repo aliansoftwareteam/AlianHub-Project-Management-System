@@ -5,7 +5,8 @@
 - [ ] 3 Task panel: Esc, undo and one timer
 - [ ] 4 Bulk edit
 - [ ] 5 First run and the Getting started card
-- [ ] 6 Inbox keyboard triage and invites
+- [x] 6 Inbox keyboard triage and invites (#959 Inbox, #960 invites)
 
 ## Log
 - 2026-09-24: flow audit and ClickUp comparison written; six slices started in parallel.
+- 2026-09-24: slice 6 in review. #959: Inbox focus on load and after clear or snooze, j/k without a click, Open task as the overlay over /inbox?task=. #960: plain mail-failure message with Copy link, join link with its token, Member role by default, optional designation. Open: invitees who already have an account still need the emailed link (no signed-in accept on /invitation yet).
