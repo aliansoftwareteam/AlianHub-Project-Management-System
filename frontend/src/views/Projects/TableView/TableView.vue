@@ -8,7 +8,7 @@
             :message="$t('Upgrades.the_feature_not_available')"
         />
     </div>
-    <div v-else class="w-100 ah-page tv2">
+    <div v-else ref="viewRoot" class="w-100 ah-page tv2">
         <ListBulkBar v-if="project" :project="project" />
         <div class="tv2__bar">
             <button
@@ -116,7 +116,7 @@ import { useCustomComposable } from "@/composable";
 import isEqual from 'lodash/isEqual';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
-import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 
 // PACKAGES
 import { useStore } from 'vuex';
@@ -145,6 +145,9 @@ const props = defineProps({
     class: { type: String, default: '' }
 });
 defineEmits(["openSeeAllProject"]);
+
+const viewRoot = ref(null);
+useTaskSequenceSource(viewRoot);
 
 const project = inject('selectedProject');
 const companyId = inject('$companyId');

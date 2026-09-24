@@ -99,6 +99,11 @@ function isDone(sub) {
     return statusType(sub) === "close";
 }
 
+function startCreate() {
+    if (canCreate.value) creating.value = true;
+}
+defineExpose({ startCreate });
+
 const rollup = computed(() => {
     const list = props.subtasks.filter((s) => s && (s.deletedStatusKey === 0 || s.deletedStatusKey === undefined));
     const total = list.length;

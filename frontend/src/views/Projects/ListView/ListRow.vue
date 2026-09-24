@@ -2,6 +2,7 @@
     <div
         class="lv2__row"
         role="row"
+        v-bind="taskNavAttrs(data)"
         :class="{ 'is-selected': selected, 'is-sub': isSub, 'is-done': done, 'is-agent': !!run }"
         @click="open"
     >
@@ -81,6 +82,7 @@ import { dueBucket, dueLabel, fmtEstimate, priorityMeta } from "@/components/mol
 import { timerState, isTimerFor, elapsedSeconds } from "@/components/organisms/TaskDetailOverlay/useTaskTimer";
 import { taskRisk } from "@/views/Projects/composables/taskRisk";
 import { isClosedTask, subtaskProgress, subtaskTotal } from "./subtaskProgress";
+import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
 
 defineOptions({ name: "ListRow" });
 

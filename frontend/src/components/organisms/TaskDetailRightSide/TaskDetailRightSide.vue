@@ -48,6 +48,7 @@
                     class="d-flex taskdetail-label task-detail-right-wrapper"
                     :taskStatusIndex="props.taskStatusIndex"
                 />
+                <slot name="status" />
             </div>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_assignee',project?.isGlobalPermission) !== null">
                 <h4>{{$t('ProjectDetails.assignee')}}</h4>
@@ -67,6 +68,7 @@
                         :zIndexAssigne="props.zIndexAssigne"
                         :isDisplayTeam="true"
                         :multiSelect="checkApps('MultipleAssignees')"
+                        :emptyLabel="$t('TaskPanel.empty')"
                     />
                     <Assignee
                         v-else
@@ -81,6 +83,7 @@
                         :zIndexAssigne="props.zIndexAssigne"
                         :isDisplayTeam="true"
                         :multiSelect="checkApps('MultipleAssignees')"
+                        :emptyLabel="$t('TaskPanel.empty')"
                     />
                 </template>
             </div>
@@ -152,6 +155,7 @@
                     :pointsVal="task.points"
                     :estimationScale="project?.estimationScale || 'fibonacci'"
                     :permission="true"
+                    :emptyLabel="$t('TaskPanel.empty')"
                     @select="updatePoints($event)"
                     class="taskdetail-label task-detail-right-wrapper ml-0"
                 />
@@ -165,6 +169,7 @@
                         class="taskdetail-label task-detail-right-wrapper"
                         :displyDate="task?.startDate? task.startDate : ''"
                         :label="$t('Milestone.start_date')"
+                        :emptyText="$t('TaskPanel.empty')"
                         :isShowDateAndicon="true"
                         @SelectedDate="($event) => updateStartDate($event)"
                         :position="`right`"
@@ -172,7 +177,7 @@
                     />
                     <template v-else>
                         <span v-if="task.startDate">{{convertDateFormat(task.startDate,'',{showDayName:false})}}</span>
-                        <span v-else>{{$t('ProjectDetails.no_start_date')}}</span>
+                        <span v-else class="task-detail-empty">{{$t('TaskPanel.empty')}}</span>
                     </template>
                 </template>
             </div>
@@ -185,6 +190,7 @@
                         class="taskdetail-label task-detail-right-wrapper"
                         :displyDate="task.DueDate? task.DueDate : ''"
                         :label="$t('Projects.due_date')"
+                        :emptyText="$t('TaskPanel.empty')"
                         :isShowDateAndicon="true"
                         :disabledDates="task.dueDateDeadLine"
                         @SelectedDate="($event) => updateDueDate($event)"
@@ -193,7 +199,7 @@
                     />
                     <template v-else>
                         <span v-if="task.DueDate">{{convertDateFormat(task.DueDate,'',{showDayName:false})}}</span>
-                        <span v-else>{{$t('ProjectDetails.no_due_date')}}</span>
+                        <span v-else class="task-detail-empty">{{$t('TaskPanel.empty')}}</span>
                     </template>
                 </template>
             </div>

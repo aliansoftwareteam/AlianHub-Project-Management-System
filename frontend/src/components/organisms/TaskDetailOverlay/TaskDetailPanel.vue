@@ -6,7 +6,8 @@
                     <ShellIcon name="chevron" :size="16" class="ah-detail__back-icon" />
                 </button>
                 <div class="ah-detail__crumb ah-detail__crumb--mobile ah-mono">
-                    <span>{{ task.TaskKey }}</span><span v-if="projectData.ProjectName"> · {{ projectData.ProjectName }}</span>
+                    <button v-if="task.TaskKey" type="button" class="ah-detail__key" :aria-label="$t('TaskPanel.copy_id', { key: task.TaskKey })" :title="$t('TaskPanel.copy_id', { key: task.TaskKey })" @click="copyKey">{{ task.TaskKey }}</button>
+                    <span v-if="projectData.ProjectName" class="ah-detail__crumb-project"> · {{ projectData.ProjectName }}</span>
                 </div>
             </template>
             <template v-else>
@@ -27,9 +28,33 @@
                         </template>
                     </template>
                 </nav>
-                <span class="ah-detail__key ah-mono">{{ task.TaskKey }}</span>
+                <button v-if="task.TaskKey" type="button" class="ah-detail__key ah-mono" :aria-label="$t('TaskPanel.copy_id', { key: task.TaskKey })" :title="$t('TaskPanel.copy_id', { key: task.TaskKey })" @click="copyKey">{{ task.TaskKey }}</button>
             </template>
+            <button v-if="task._id" type="button" class="ah-detail__icon-btn ah-detail__copy-link" :aria-label="$t('TaskPanel.copy_link')" :title="$t('TaskPanel.copy_link')" @click="copyLink">
+                <ShellIcon name="link" :size="14" />
+            </button>
             <div class="ah-detail__head-actions">
+                <div v-if="nav" class="ah-detail__nav" role="group" :aria-label="$t('TaskPanel.nav_group')">
+                    <button
+                        type="button"
+                        class="ah-detail__icon-btn"
+                        data-nav-dir="prev"
+                        :disabled="!nav.prev"
+                        :aria-label="$t('TaskPanel.nav_prev')"
+                        :title="$t('TaskPanel.nav_prev_hint')"
+                        @click="nav.prev && $emit('step', -1)"
+                    ><ShellIcon name="chevronDown" :size="15" class="ah-detail__nav-up" /></button>
+                    <span v-if="!isMobile" class="ah-detail__nav-pos ah-mono">{{ $t('TaskPanel.nav_position', { n: nav.index + 1, total: nav.total }) }}</span>
+                    <button
+                        type="button"
+                        class="ah-detail__icon-btn"
+                        data-nav-dir="next"
+                        :disabled="!nav.next"
+                        :aria-label="$t('TaskPanel.nav_next')"
+                        :title="$t('TaskPanel.nav_next_hint')"
+                        @click="nav.next && $emit('step', 1)"
+                    ><ShellIcon name="chevronDown" :size="15" /></button>
+                </div>
                 <button v-if="!isMobile && !expanded" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="$emit('expand')">
                     <ShellIcon name="expand" :size="13" />{{ $t('TaskPanel.expand') }}
                 </button>
@@ -82,6 +107,17 @@
 
                 <div v-if="isMobile && task._id" class="ah-detail__chips">
                     <button type="button" class="ah-chip ah-chip--brand" :style="statusChipStyle" @click="sheetOpen = true">{{ statusName }} ▾</button>
+                    <button
+                        v-if="doneStatus"
+                        type="button"
+                        class="ah-detail__complete"
+                        :class="{ 'is-done': isDone }"
+                        :aria-pressed="isDone ? 'true' : 'false'"
+                        :disabled="!canSetStatus || isSpinner"
+                        :aria-busy="statusPending ? 'true' : null"
+                        :title="completeHint"
+                        @click="toggleDone(!isDone)"
+                    ><ShellIcon name="check" :size="13" />{{ $t('TaskPanel.complete') }}</button>
                     <span v-if="priorityName" class="ah-chip ah-chip--warn">{{ priorityName }}</span>
                     <span v-if="task.DueDate" class="ah-chip">{{ formatDay(task.DueDate) }}</span>
                     <button type="button" class="ah-chip ah-detail__chips-more" @click="sheetOpen = true">{{ $t('TaskPanel.properties') }}</button>
@@ -112,11 +148,27 @@
                         :isMainSpinner="isSpinner"
                         :docsRefreshKey="docsRefreshKey"
                         :sections="descriptionSections"
+                        ref="descriptionTabRef"
                         @openSeeAll="activeTab = 'files'"
                         @openDoc="openDoc"
-                    />
+                    >
+                        <template #after-description>
+                            <div v-if="quickActions.length" class="ah-detail__quick" role="group" :aria-label="$t('TaskPanel.quick_actions')">
+                                <button
+                                    v-for="action in quickActions"
+                                    :key="action.id"
+                                    type="button"
+                                    class="ah-detail__quick-btn"
+                                    :data-action="action.id"
+                                    :title="action.hint || null"
+                                    @click="runQuickAction(action.id)"
+                                ><ShellIcon :name="action.icon" :size="13" />{{ action.label }}</button>
+                            </div>
+                        </template>
+                    </TaskDetailTab>
                     <TaskSubtaskList
                         v-else-if="activeTab === 'subtasks' && task._id && projectData._id"
+                        ref="subtaskListRef"
                         :task="task"
                         :project="projectData"
                         :subtasks="subTasks"
@@ -125,13 +177,14 @@
                     />
                     <TaskDetailTab
                         v-else-if="activeTab === 'files' && task._id && projectData._id"
+                        ref="filesTabRef"
                         :task="task"
                         :subTasksArray="subTasks"
                         :isMainSpinner="isSpinner"
                         :sections="filesSections"
                     />
                     <div v-else-if="activeTab === 'relations' && task._id" class="ah-detail__relations">
-                        <LinkedTasks :task="task" />
+                        <LinkedTasks ref="linkedTasksRef" :task="task" />
                         <p class="ah-detail__relations-note ah-small">{{ $t('TaskPanel.relations_note') }}</p>
                     </div>
                 </div>
@@ -163,6 +216,7 @@
                             :productData="productData"
                             :forSupport="isSupportProject"
                             :creator="{ uid: task.Task_Leader, date: task.createdAt }"
+                            :focusComposer="false"
                         />
                     </div>
                     <div v-else-if="activityView === 'history' && task._id" class="ah-detail__history">
@@ -196,7 +250,22 @@
                     :zIndexEstimate="10"
                     :isMainSpinner="isSpinner"
                     :clientWidth="clientWidth"
-                />
+                >
+                    <template #status>
+                        <button
+                            v-if="doneStatus && !isMobile"
+                            type="button"
+                            class="ah-detail__complete ah-detail__complete--icon"
+                            :class="{ 'is-done': isDone }"
+                            :aria-label="$t('TaskPanel.complete')"
+                            :aria-pressed="isDone ? 'true' : 'false'"
+                            :disabled="!canSetStatus || isSpinner"
+                            :aria-busy="statusPending ? 'true' : null"
+                            :title="completeHint"
+                            @click="toggleDone(!isDone)"
+                        ><ShellIcon name="check" :size="14" :stroke="2.25" /></button>
+                    </template>
+                </TaskDetailRightSide>
                 <div class="ah-detail__prop">
                     <span class="ah-detail__prop-label">{{ $t('TaskPanel.sprint') }}</span>
                     <button type="button" class="ah-detail__prop-link" @click="open('sprint')">{{ sprintName || '—' }}</button>
@@ -305,9 +374,11 @@ const props = defineProps({
     tab: { type: String, default: "" },
     expanded: { type: Boolean, default: false },
     /** @type {import('vue').PropType<{agentName:string,status:'running'|'review'|'done'|'failed',startedAt?:number|string,summary?:string,onStop?:Function}|null>} */
-    agentRun: { type: Object, default: null }
+    agentRun: { type: Object, default: null },
+    /** Where the task sits in the view it was opened from; null when it came from elsewhere. */
+    nav: { type: Object, default: null }
 });
-const emit = defineEmits(["close", "expand", "minimize", "loaded"]);
+const emit = defineEmits(["close", "expand", "minimize", "loaded", "step"]);
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -347,6 +418,11 @@ const aiDrafting = ref(false);
 const summaryRef = ref(null);
 const mainEl = ref(null);
 const activityEl = ref(null);
+const descriptionTabRef = ref(null);
+const filesTabRef = ref(null);
+const subtaskListRef = ref(null);
+const linkedTasksRef = ref(null);
+const statusPending = ref(false);
 
 const activeTab = ref(props.tab === "activity" && isMobile.value ? "activity" : "description");
 const activityView = ref("comments");
@@ -367,6 +443,30 @@ const productData = computed(() => ({
 }));
 
 const isDone = computed(() => (task.value?.status?.type || task.value?.statusType) === "close");
+const doneStatus = computed(() => (projectData.value?.taskStatusData || []).find((s) => s.type === "close") || null);
+const reopenStatus = computed(() => {
+    const statuses = projectData.value?.taskStatusData || [];
+    return statuses.find((s) => s.type === "open") || statuses.find((s) => s.type !== "close") || null;
+});
+const completeHint = computed(() => (isDone.value
+    ? t("TaskPanel.reopen_hint", { status: reopenStatus.value?.name || "" })
+    : t("TaskPanel.complete_hint", { status: doneStatus.value?.name || "" })));
+
+const quickActions = computed(() => {
+    const global = projectData.value?.isGlobalPermission;
+    const list = [];
+    if (task.value?.isParentTask !== false && checkPermission("task.sub_task_create", global) === true) {
+        list.push({ id: "subtask", icon: "plus", label: t("TaskPanel.action_subtask"), hint: "" });
+    }
+    list.push({ id: "relate", icon: "link", label: t("TaskPanel.action_relate"), hint: t("TaskPanel.action_relate_hint") });
+    if (checkPermission("task.task_checklist", global) === true) {
+        list.push({ id: "checklist", icon: "checkSquare", label: t("TaskPanel.action_checklist"), hint: t("TaskPanel.action_checklist_hint") });
+    }
+    if (checkPermission("task.task_attachments", global) === true) {
+        list.push({ id: "attach", icon: "file", label: t("TaskPanel.action_attach"), hint: t("TaskPanel.action_attach_hint") });
+    }
+    return list;
+});
 const statusName = computed(() => task.value?.status?.text || projectData.value?.taskStatusData?.find((s) => s.key === task.value?.statusKey)?.name || "");
 const statusChipStyle = computed(() => {
     const status = projectData.value?.taskStatusData?.find((s) => s.key === task.value?.statusKey);
@@ -511,9 +611,10 @@ function changeTaskType(status) {
 
 function toggleDone(done) {
     const statuses = projectData.value?.taskStatusData || [];
-    const next = done ? statuses.find((s) => s.type === "close") : (statuses.find((s) => s.type === "open") || statuses.find((s) => s.type !== "close"));
-    if (!next) return;
+    const next = done ? doneStatus.value : reopenStatus.value;
+    if (!next || statusPending.value) return;
     const current = statuses.find((s) => s.key === task.value.statusKey) || {};
+    statusPending.value = true;
     taskClass.updateStatus({
         newStatus: { status: { text: next.name, key: next.key, type: next.type, value: next.value }, statusType: next.type, statusKey: next.key },
         prevStatus: {
@@ -529,7 +630,44 @@ function toggleDone(done) {
         $toast.success(t("Toast.Status_updated_successfully"), { position: "top-right" });
     }).catch(() => {
         $toast.error(t("Toast.Status_not_updated"), { position: "top-right" });
+    }).finally(() => {
+        statusPending.value = false;
     });
+}
+
+async function copyText(text, successKey) {
+    try {
+        await navigator.clipboard.writeText(text);
+        $toast.success(t(successKey), { position: "top-right" });
+    } catch (error) {
+        console.error("ERROR copying to the clipboard: ", error);
+        $toast.error(t("Toast.something_went_wrong"), { position: "top-right" });
+    }
+}
+
+function copyKey() {
+    if (task.value?.TaskKey) copyText(task.value.TaskKey, "Toast.Task_Key_is_Copied_to_clipboard");
+}
+
+function copyLink() {
+    const folderId = task.value?.folderObjId || props.folderId;
+    const params = { cid: props.companyId, id: props.projectId, sprintId: task.value?.sprintId || props.sprintId, taskId: props.taskId };
+    if (folderId) params.folderId = folderId;
+    const { href } = router.resolve({ name: folderId ? "ProjectFolderSprintTask" : "ProjectSprintTask", params });
+    copyText(new URL(href, window.location.href).toString(), "Toast.Link_is_Copied_to_clipboard");
+}
+
+async function runQuickAction(id) {
+    if (id === "checklist") {
+        descriptionTabRef.value?.addChecklist?.();
+        return;
+    }
+    const tabFor = { subtask: "subtasks", relate: "relations", attach: "files" };
+    activeTab.value = tabFor[id];
+    await nextTick();
+    if (id === "subtask") subtaskListRef.value?.startCreate?.();
+    else if (id === "relate") linkedTasksRef.value?.startAdding?.();
+    else if (id === "attach") filesTabRef.value?.attachFile?.();
 }
 
 function open(val) {

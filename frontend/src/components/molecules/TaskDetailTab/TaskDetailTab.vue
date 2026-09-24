@@ -33,6 +33,7 @@
                 :task="task"
                 :isMainSpinner="isMainSpinner"
             />
+            <slot v-if="show.description" name="after-description" />
             <SubTasks
                 v-if="show.subtasks && task.isParentTask && checkPermission('task.sub_task_create',projectData?.isGlobalPermission) !== null"
                 :task="task"
@@ -88,8 +89,9 @@
                     appKey="CustomFields"
                 />
             </div>
-            <CheckListComponent 
+            <CheckListComponent
                 v-if="show.checklist && checkPermission('task.task_checklist',projectData?.isGlobalPermission) !== null"
+                ref="checklistRef"
                 :taskId="task._id"
                 :sprintId="task.sprintId"
                 :data="checkList"
@@ -102,6 +104,7 @@
             <Attachments
                 class="mt-20px"
                 v-if="show.attachments && checkPermission('task.task_attachments',projectData?.isGlobalPermission) !== null"
+                ref="attachmentsRef"
                 :permission="checkPermission('task.task_attachments',projectData?.isGlobalPermission)"
                 :attachments="task.attachments"
                 :extensions="fileExtentions"
@@ -760,6 +763,19 @@ const handleClose = () => {
     componentDetail.value = {};
     customFieldObject.value = {};
 };
+
+const checklistRef = ref(null);
+const attachmentsRef = ref(null);
+defineExpose({
+    addChecklist() {
+        if (!checklistRef.value) return;
+        checklistRef.value.addCheckList?.();
+        nextTick(() => checklistRef.value?.$el?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }));
+    },
+    attachFile() {
+        attachmentsRef.value?.pickFromComputer?.();
+    }
+});
 </script>
 <style>
 

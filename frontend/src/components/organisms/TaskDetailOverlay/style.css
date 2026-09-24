@@ -55,7 +55,19 @@
 .ah-detail__crumb-link:hover { color: var(--brand); }
 .ah-detail__crumb-sep { color: var(--ink-2); }
 .ah-detail__crumb-skeleton { width: 180px; height: 14px; border-radius: 4px; }
-.ah-detail__key { font: 500 10.5px var(--font-mono); color: var(--ink-2); flex: none; }
+.ah-detail__key {
+    font: 500 10.5px var(--font-mono); color: var(--ink-2); flex: none;
+    border: 0; background: transparent; padding: 3px 5px; margin: 0 -5px; border-radius: 5px; cursor: copy;
+}
+.ah-detail__key:hover { background: var(--surface-hover); color: var(--ink); }
+.ah-detail__key:focus-visible { outline: none; box-shadow: var(--focus); }
+.ah-detail__crumb--mobile .ah-detail__key { font: inherit; letter-spacing: inherit; }
+.ah-detail__crumb-project { overflow: hidden; text-overflow: ellipsis; }
+.ah-detail__copy-link { width: 24px; height: 24px; flex: none; }
+.ah-detail__icon-btn:disabled { opacity: .35; cursor: default; background: transparent; }
+.ah-detail__nav { display: inline-flex; align-items: center; gap: 2px; }
+.ah-detail__nav-up { transform: rotate(180deg); }
+.ah-detail__nav-pos { font: 500 10.5px var(--font-mono); color: var(--ink-2); min-width: 34px; text-align: center; }
 .ah-detail__head-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: none; }
 .ah-detail__head .ah-btn--sm { height: 28px; padding: 0 9px; font-size: 12px; font-weight: 500; border-radius: 7px; gap: 6px; }
 .ah-detail__icon-btn {
@@ -169,6 +181,16 @@
 .ah-detail__pane .description-comp { margin: 0; border: 0; }
 .ah-detail__pane .task-details-subtitle { font: 600 13px/1.3 var(--font-ui); color: var(--ink); }
 .ah-detail__pane .mobile__bg--withPadding { border: 0; padding: 0; margin-top: 12px; }
+.ah-detail__quick { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 2px; }
+.ah-detail__quick-btn {
+    display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 8px;
+    border: 0; border-radius: 6px; background: transparent; color: var(--ink-2);
+    font: 500 12px var(--font-ui); cursor: pointer;
+    transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease);
+}
+.ah-detail__quick-btn:hover { background: var(--surface-hover); color: var(--ink); }
+.ah-detail__quick-btn:focus-visible { outline: none; box-shadow: var(--focus); }
+.ah-detail__panel .priority__component > [role="button"] { min-width: 24px; min-height: 24px; justify-content: center; }
 .ah-detail__relations .linked-tasks__row { padding: 7px 0; border-color: var(--hairline) !important; }
 .ah-detail__relations .linked-tasks__type-label {
     display: inline-block; min-width: 66px; text-align: center; padding: 2px 6px; border-radius: 4px;
@@ -287,6 +309,35 @@
 .ah-detail__props .task-status-name { padding: 3px 9px; border-radius: 6px; font: 600 12px var(--font-ui); cursor: pointer; }
 .ah-detail__props .task-status-name::after { content: " ▾"; }
 .ah-detail__props .task-created-by { font-size: 12.5px !important; }
+.ah-detail__props .task-detail-empty,
+.ah-detail__props .sp-empty { color: var(--ink-2); font: 400 12.5px var(--font-ui); }
+/* CalenderCompo's phone rule paints this placeholder black at 16px with !important. */
+.ah-detail__props .task-detail-right-side-label .calendar-comp::placeholder,
+.ah-detail__props .task-detail-right-side-label input#inputId::placeholder { color: var(--ink-2) !important; font-size: 12.5px !important; opacity: 1; }
+.ah-detail__props .story-points .sp-trigger:has(.sp-empty),
+.ah-detail__panel .assignee__empty {
+    border: 0; background: transparent; padding: 2px 6px; margin-left: -6px; border-radius: 6px;
+    color: var(--ink-2); font: 400 12.5px var(--font-ui); cursor: pointer; height: auto; width: auto;
+}
+.ah-detail__props .story-points .sp-menu { left: auto; right: 0; }
+.ah-detail__props .story-points .sp-trigger:has(.sp-empty):hover,
+.ah-detail__panel .assignee__empty:hover { background: var(--surface-hover); color: var(--ink); }
+.ah-detail__panel .assignee__empty:focus-visible { outline: none; box-shadow: var(--focus); }
+
+.ah-detail__complete {
+    display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; flex: none;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--ink-2);
+    font: 500 11.5px var(--font-ui); cursor: pointer; white-space: nowrap;
+    transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
+}
+.ah-detail__complete:hover:not(:disabled) { border-color: var(--ok); color: var(--ok-ink); }
+.ah-detail__complete.is-done { background: var(--ok-bg); border-color: var(--ok); color: var(--ok-ink); }
+.ah-detail__complete:focus-visible { outline: none; box-shadow: var(--focus); }
+.ah-detail__complete:disabled { opacity: .5; cursor: not-allowed; }
+.ah-detail__chips .ah-detail__complete { height: 28px; padding: 0 10px; font-size: 12px; }
+.ah-detail__complete--icon { width: 24px; padding: 0; justify-content: center; border-radius: 50%; }
+.ah-detail__complete--icon.is-done { background: var(--ok); border-color: var(--ok); color: var(--on-brand); }
+.ah-detail__props .task-status-name { white-space: nowrap; }
 .ah-detail__props .start-in-tracker-wrap { order: 99; margin-top: 4px; }
 .ah-detail__props .start-in-tracker-btn {
     display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px;

@@ -1,5 +1,5 @@
 <template>
-<div class="w-100 list-view-wrapper ah-page lv2">
+<div ref="viewRoot" class="w-100 list-view-wrapper ah-page lv2">
     <div v-if="!currentCompany?.planFeature?.listView">
         <UpgradePlan
             :buttonText="$t('Upgrades.upgrade_your_plan')"
@@ -141,7 +141,7 @@ import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { useProjectAgentActivity } from './useProjectAgentActivity.js';
 import * as listGroups from './listGroups.js';
 import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
-import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 
 // UTILS
 const {getters} = useStore();
@@ -200,6 +200,8 @@ const initialDate = ref(0);
 const isLoading = ref(false);
 const creatingFirstTask = ref(false);
 const openedEmptyGroups = ref(new Set());
+const viewRoot = ref(null);
+useTaskSequenceSource(viewRoot);
 
 const currentCompany = computed(() => getters["settings/selectedCompany"])
 const isCalendarTab = computed(() => route?.query?.tab === 'Calendar');

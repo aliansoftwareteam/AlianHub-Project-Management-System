@@ -64,6 +64,13 @@ test.describe('accessibility: everyday flows as the owner', () => {
         await page.goto(`/#/${state.companyId}/project/${task.projectId}/s/${task.sprintId}?task=${task._id}`);
         await expect(page.getByRole('dialog', { name: 'Task detail' })).toBeVisible();
         await expect(page.locator('.ah-detail__panel .task-status-name')).toBeVisible();
+        const dialog = page.getByRole('dialog', { name: 'Task detail' });
+        await expect(dialog.getByRole('button', { name: 'Next task' })).toBeVisible();
+        await expect(dialog.getByRole('button', { name: /^Copy task ID / })).toBeVisible();
+        await expect(dialog.getByRole('button', { name: 'Copy task link' })).toBeVisible();
+        await expect(dialog.getByRole('button', { name: 'Complete' })).toBeVisible();
+        await expect(dialog.getByRole('group', { name: 'Quick actions' })).toBeVisible();
+        await expect(dialog.getByRole('button', { name: /^Empty/ }).first()).toBeVisible();
         expect(await blockingViolations(page)).toEqual([]);
     });
 
@@ -137,6 +144,42 @@ test.describe('accessibility: keyboard in the task overlay', () => {
         await due.focus();
         await page.keyboard.press('Enter');
         await expect(page.locator('.dp__menu')).toBeVisible();
+    });
+
+    test('copy ID, complete and the quick actions work from the keyboard', async ({ page, context, state, loginAs }) => {
+        await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+        const owner = await loginAs('owner');
+        const project = await createProject(owner.api, { name: `A11Y ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid });
+        const task = await createTask(owner.api, { project, name: `Quick ${uniqueSuffix()}`, user: state.users.owner, companyOwnerId: owner.uid });
+        await page.goto(`/#/${state.companyId}/project/${project._id}/s/${task.sprintId}?task=${task._id}`);
+        const dialog = page.getByRole('dialog', { name: 'Task detail' });
+        await expect(dialog).toBeVisible();
+
+        const copyId = dialog.getByRole('button', { name: /^Copy task ID / });
+        await copyId.focus();
+        await page.keyboard.press('Enter');
+        const key = (await copyId.textContent()).trim();
+        await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(key);
+
+        const complete = dialog.getByRole('button', { name: 'Complete' });
+        await complete.focus();
+        await page.keyboard.press('Enter');
+        await expect(complete).toHaveAttribute('aria-pressed', 'true');
+        await expect(page.locator('.ah-detail__panel button.task-status-name')).toHaveText('Done');
+        await page.keyboard.press('Enter');
+        await expect(complete).toHaveAttribute('aria-pressed', 'false');
+
+        const addSubtask = dialog.getByRole('group', { name: 'Quick actions' }).getByRole('button', { name: 'Add subtask' });
+        await addSubtask.focus();
+        await page.keyboard.press('Enter');
+        await expect(dialog.getByRole('tab', { name: /Subtasks/ })).toHaveAttribute('aria-selected', 'true');
+        await expect(dialog.locator('.ah-subtasks__create')).toBeVisible();
+
+        const points = dialog.locator('.story-points').getByRole('button', { name: 'Empty' });
+        await points.focus();
+        await page.keyboard.press('Enter');
+        await expect(dialog.locator('.story-points .sp-menu')).toBeVisible();
+        expect(await blockingViolations(page)).toEqual([]);
     });
 });
 
