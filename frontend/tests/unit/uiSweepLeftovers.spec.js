@@ -75,14 +75,6 @@ describe('the project calendar grid', () => {
     });
 });
 
-describe('the getting-started card', () => {
-    test('draws its 10 px tick with a stroke that stays over a pixel wide', () => {
-        const tick = /<ShellIcon v-if="item\.done" name="check" :size="10" :stroke="(\d+(?:\.\d+)?)"/.exec(read('components/organisms/Tour/TourComponet.vue'));
-        expect(tick).not.toBeNull();
-        expect(Number(tick[1]) * 10 / 24).toBeGreaterThanOrEqual(1.2);
-    });
-});
-
 describe('switch knobs', () => {
     const tokens = read('assets/css/tokens.css');
     const darkBlock = tokens.slice(tokens.indexOf(':root[data-theme="dark"] {'));

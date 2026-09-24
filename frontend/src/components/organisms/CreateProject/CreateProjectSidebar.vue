@@ -245,8 +245,6 @@ onMounted(async () => {
         if (globalRes.data.status) globalTemplates.value = (globalRes.data.statusText || []).map((tpl) => ({ ...tpl, useTemplateProj: "category" }));
         customTemplates.value = (getters["projectData/projectTemplate"]?.data || []).map((tpl) => ({ ...tpl, useTemplateProj: "withoutcategory", focus: "other" }));
         appCatalog.value = Array.isArray(appsRes?.data?.data) ? appsRes.data.data : [];
-        const first = shownGlobal.value[0];
-        if (first) selected.value = first;
         form.apps = defaultAppsFor(selected.value);
     } catch (error) {
         console.error("Error in getting projectTemplate", error);

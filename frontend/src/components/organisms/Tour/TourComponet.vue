@@ -1,88 +1,42 @@
 <template>
-    <aside v-if="showCard" class="ah-gs" :aria-label="$t('Auth.gs_title')">
-        <div class="ah-gs__head">
-            <div class="ah-gs__ring" :style="{ '--p': `${Math.round((doneCount / items.length) * 100)}%` }">
-                <span class="ah-gs__ring-in ah-mono">{{ doneCount }}/{{ items.length }}</span>
-            </div>
-            <div class="ah-gs__titles">
-                <strong>{{ $t('Auth.gs_title') }}</strong>
-                <span>{{ $t('Auth.gs_sub') }}</span>
-            </div>
-        </div>
-        <ul class="ah-gs__list">
-            <li v-for="item in items" :key="item.key" :class="{ 'is-done': item.done }">
-                <button type="button" class="ah-gs__item" :disabled="item.done" @click="item.go">
-                    <span class="ah-gs__box"><ShellIcon v-if="item.done" name="check" :size="10" :stroke="3" /></span>
-                    <span>{{ item.label }}</span>
-                </button>
-            </li>
-        </ul>
-        <div class="ah-gs__foot">
-            <button type="button" class="ah-gs__dismiss" @click="dismiss">{{ $t('Auth.gs_dismiss') }}</button>
-            <a v-if="helpLink" :href="helpLink" target="_blank" rel="noopener">{{ $t('Auth.gs_docs') }}</a>
-        </div>
-    </aside>
+    <span hidden></span>
 </template>
 
 <script setup>
-import { computed, inject, onUnmounted, ref, watch } from "vue";
+import { computed, inject, onUnmounted, watch } from "vue";
 
 defineOptions({ name: "TourComponet" });
-import { useRoute, useRouter } from "vue-router";
-import { useStore } from "vuex";
+import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
-import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useGetterFunctions } from "@/composable";
 import { tourHepler } from "@/components/organisms/Tour/helper";
-import { STEPS, screenFor, doneKey } from "@/components/organisms/Tour/tourSteps";
-import { SAMPLE_PROJECT_NAME } from "@/components/organisms/CreateProject/templates";
+import { STEPS, screenFor, doneKey, mayAutoOffer } from "@/components/organisms/Tour/tourSteps";
+import { onboardingRecord, saveOnboarding } from "@/composable/onboardingState";
 
 const STEP_STORAGE = "ah.tour.step";
-// Skip means "not now": the tour stops offering itself on every visit, but the
-// Getting-started card can still start it.
+// Skip means "not now": the tour stops offering itself, but the Home checklist can still start it.
 const SKIP_STORAGE = "ah.tour.skipped";
-const DISMISS_STORAGE = "ah.gs.dismissed";
 const MIN_WIDTH = 767;
 
 const { t } = useI18n();
 const route = useRoute();
-const router = useRouter();
-const { getters } = useStore();
 const { getUser } = useGetterFunctions();
 const { updateTourStatusInUser } = tourHepler();
 const userId = inject("$userId");
-const companyId = inject("$companyId");
 const clientWidth = inject("$clientWidth");
 
-const helpLink = computed(() => getters["brandSettingTab/brandSettings"]?.helpLink || "");
-const tourStatus = computed(() => getUser(userId.value)?.tourStatus || {});
+const me = computed(() => getUser(userId.value, "all") || {});
+const tourStatus = computed(() => me.value.tourStatus || {});
 const wideEnough = computed(() => clientWidth.value > MIN_WIDTH);
 const screen = computed(() => screenFor(route));
 const isDone = (which) => tourStatus.value[doneKey(which)] === true;
-const shellTourDone = computed(() => isDone("shell"));
 
 const stepKey = (which) => `${STEP_STORAGE}.${which}`;
 const skipKey = (which) => `${SKIP_STORAGE}.${which}`;
 const savedStep = (which) => Number(localStorage.getItem(stepKey(which)) || 0);
 const skipped = (which) => localStorage.getItem(skipKey(which)) === "1";
-
-const dismissed = ref(sessionStorage.getItem(DISMISS_STORAGE) === "1");
-const dismiss = () => { dismissed.value = true; sessionStorage.setItem(DISMISS_STORAGE, "1"); };
-
-const projects = computed(() => getters["projectData/allProjects"]?.data || []);
-const users = computed(() => getters["users/users"] || []);
-
-const go = (name) => router.push({ name, params: { cid: companyId.value } }).catch(() => {});
-const items = computed(() => [
-    { key: "tour", label: savedStep("shell") > 0 && !shellTourDone.value ? t("Auth.gs_resume_tour") : t("Auth.gs_take_tour"), done: shellTourDone.value, go: () => startTour("shell") },
-    { key: "invite", label: t("Auth.gs_invite"), done: users.value.length > 1, go: () => go("Members") },
-    { key: "project", label: t("Auth.gs_project"), done: projects.value.some((p) => p.ProjectName !== SAMPLE_PROJECT_NAME), go: () => go("Projects") },
-    { key: "track", label: t("Auth.gs_track"), done: tourStatus.value.hasTrackedTime === true, go: () => go("Home") }
-]);
-const doneCount = computed(() => items.value.filter((i) => i.done).length);
-const showCard = computed(() => !dismissed.value && !route.meta.hideHeader && doneCount.value < items.value.length && wideEnough.value);
 
 let driverObj = null;
 let activeScreen = "";
@@ -164,12 +118,17 @@ const startTour = (which = screen.value || "shell") => {
 };
 const startShellTour = () => startTour("shell");
 
-/* Each screen offers its tour once per session, to every role, on anything wider than a phone. */
-const offered = new Set();
 const offer = (which) => {
-    if (!which || !STEPS[which] || offered.has(which) || isDone(which) || skipped(which) || savedStep(which) > 0 || !wideEnough.value) return;
-    if (which !== "shell" && !shellTourDone.value && !skipped("shell")) return;
-    offered.add(which);
+    const allowed = mayAutoOffer(which, {
+        done: isDone(which),
+        skipped: skipped(which),
+        savedStep: savedStep(which),
+        offeredBefore: onboardingRecord(me.value.homeChecklist || {}).toursOffered.includes(which),
+        wide: wideEnough.value,
+        shellSettled: isDone("shell") || skipped("shell")
+    });
+    if (!allowed) return;
+    saveOnboarding({ tourOffered: which });
     setTimeout(() => { if (screen.value === which) startTour(which); }, 600);
 };
 watch(screen, (which) => offer(which), { immediate: true });
