@@ -141,7 +141,17 @@ test.describe('accessibility: keyboard in the task overlay', () => {
             expect(await inDialog(page), `Shift+Tab ${i + 1} left the overlay`).toBe(true);
         }
 
+        // Esc in a text field leaves the field and keeps what was typed; the next Esc closes the panel.
+        const inTextField = await page.evaluate(() => {
+            const el = document.activeElement;
+            return !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+        });
         await page.keyboard.press('Escape');
+        if (inTextField) {
+            await expect(page.getByRole('dialog', { name: 'Task detail' })).toBeVisible();
+            await expect.poll(() => inDialog(page)).toBe(true);
+            await page.keyboard.press('Escape');
+        }
         await expect(page.getByRole('dialog', { name: 'Task detail' })).toBeHidden();
         await expect(row).toBeFocused();
     });
