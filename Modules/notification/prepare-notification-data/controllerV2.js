@@ -12,6 +12,8 @@ const socketEmitter = require('../../../event/socketEventEmitter.js');
 const { getUserProfilePresignedUrlCallBackFunction } = require("../../storage/wasabi/controller.js")
 const { pinSessionTenant } = require('../../../Config/tenant');
 const { activeMemberIds } = require('../activeMembers');
+const { reasonFor } = require('../../Inbox/helpers/inboxRules');
+const { wakeOnActivity } = require('../../Inbox/helpers/inboxState');
 
 
 
@@ -141,6 +143,7 @@ exports.manageNotificationSettings = (notificationBody, settingRes) => {
 
       var notificationSetting = []
       var finalNotificationData = []
+      const { directUsers, ...rowBody } = notificationBody
       var assigneeUsers = notificationBody.assigneeUsers?.filter(item => item != notificationBody.userId) || []
       notificationSetting = [...settingRes]
       if (settingRes.length > 0) {
@@ -151,11 +154,11 @@ exports.manageNotificationSettings = (notificationBody, settingRes) => {
             if (Object.keys(settings).length > 0) {
               const uniqueId = generateUniqueId();
               if (settings.browser || settings.mobile) {
-                finalNotificationData.push({ ...notificationBody, receiverID: item, notificationType: 'push', isSchedule: false, uniqueId })
+                finalNotificationData.push({ ...rowBody, receiverID: item, reason: reasonFor(item, directUsers), notificationType: 'push', isSchedule: false, uniqueId })
               }
               if (settings.email) {
                 if (notificationBody.key != "message_create") {
-                  finalNotificationData.push({ ...notificationBody, receiverID: item, notificationType: 'email', isSchedule: false, uniqueId })
+                  finalNotificationData.push({ ...rowBody, receiverID: item, reason: reasonFor(item, directUsers), notificationType: 'email', isSchedule: false, uniqueId })
                 }
               }
             }
@@ -268,6 +271,10 @@ exports.createNotificationsBody = (notificationBody) => {
       }
       MongoDbCrudOpration(objects.companyId, obj, "save").then(response => {
         this.createCommonNotificationsBody({ ...objects, notificationId: response.id })
+        if (objects.notificationType === 'push' && objects.taskId) {
+          wakeOnActivity(objects.companyId, objects.receiverID, objects.taskId)
+            .catch((error) => logger.error(`Inbox wake on new activity failed: ${error.message}`))
+        }
         resolve(response)
       }).catch(error => {
         reject({ message: error.message })
