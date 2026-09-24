@@ -31,11 +31,12 @@ it('the setup wizard stores the company phone, state and city empty rather than 
     expect(saved).toMatchObject({ Cst_Phone: '', Cst_State: '', Cst_City: '' });
 });
 
-it('the company schema accepts a company with no phone, state or city', async () => {
-    const Company = mongoose.model('CcfCompanyContact', new mongoose.Schema(schema.companies, { strict: true }));
-    const company = new Company({
-        Cst_CompanyName: 'Acme', Cst_Country: 'India', Cst_DialCode: { name: '' }, Cst_LogTimeDays: '8',
-        Cst_Phone: '', Cst_State: '', Cst_City: '',
-    });
-    await expect(company.validate()).resolves.toBeUndefined();
+it.each([['empty', ''], ['absent', undefined]])('the company schema accepts a company whose phone, state and city are %s', (label, value) => {
+    const Company = mongoose.models.CcfCompanyContact || mongoose.model('CcfCompanyContact', new mongoose.Schema(schema.companies, { strict: true }));
+    const company = new Company({ Cst_CompanyName: 'Acme', Cst_Phone: value, Cst_State: value, Cst_City: value });
+    const failed = Object.keys(company.validateSync()?.errors || {});
+    expect(failed).toContain('Cst_Country');
+    expect(failed).not.toEqual(expect.arrayContaining(['Cst_Phone']));
+    expect(failed).not.toEqual(expect.arrayContaining(['Cst_State']));
+    expect(failed).not.toEqual(expect.arrayContaining(['Cst_City']));
 });
