@@ -14,9 +14,9 @@
                             <input
                                 type="checkbox"
                                 :checked="isCardSelected"
-                                @click.stop
+                                @click.stop="handleCardCheckboxChange($event)"
+                                @keydown.shift.stop="handleCardCheckboxChange($event)"
                                 @mousedown.stop
-                                @change="handleCardCheckboxChange($event)"
                                 :aria-label="$t('Common.select_task')"
                             />
                         </label>
@@ -298,18 +298,14 @@
     const element = ref(props.data)
     const {updateTaskByGroup} = useUpdateTasks();
 
-    // Multi-select on Kanban cards: checkbox renders on card hover OR when
-    // THIS card is selected. Permission-gated. Click/mousedown propagation
-    // stopped so it doesn't open the task detail or start a drag.
     const cardSelection = useTaskSelection();
     const canCardMultiSelect = computed(() => checkPermission('task.task_status', projectData.value?.isGlobalPermission) === true
         && !showArchiveVar.value);
     const isCardSelected = computed(() => cardSelection.isSelected(props.data?._id));
+    // A click, not change: only the click event says whether Shift was held.
     const handleCardCheckboxChange = (evt) => {
         if (!props.data?._id) return;
-        if (evt) evt.stopPropagation();
-        // Parent ↔ subtask cascade (mirrors list/table view behavior).
-        cardSelection.toggleAndCascade(props.data, evt);
+        cardSelection.selectFromEvent(props.data, evt, '.kanban-cards');
     };
     const chipCount = ref(4)
     const showSidebar = ref(false);
