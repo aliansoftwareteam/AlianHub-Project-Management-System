@@ -12,7 +12,7 @@
             </div>
             <div class="ah-state__actions">
                 <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="primary">
-                    {{ primaryLabel || $t(`Inbox.state_${kind}_primary`) }}
+                    {{ primaryLabel || $t(PRIMARY_KEY[kind] || `Inbox.state_${kind}_primary`) }}
                 </button>
                 <button
                     v-if="secondaryLabel || SECONDARY[kind]"
@@ -46,7 +46,9 @@ const props = defineProps({
 const emit = defineEmits(['primary', 'secondary']);
 
 const ICON = { offline: 'wifiOff', unreachable: 'alert', forbidden: 'lock', denied: 'lock', notfound: 'search' };
-const SECONDARY = { offline: false, unreachable: true, forbidden: true, denied: false, notfound: false };
+const SECONDARY = { offline: false, unreachable: true, forbidden: false, denied: false, notfound: false };
+// There is no request-access flow behind "Request access", so forbidden offers the way home.
+const PRIMARY_KEY = { forbidden: 'Inbox.state_forbidden_secondary' };
 
 const router = useRouter();
 const companyId = inject('$companyId', null);
@@ -61,12 +63,9 @@ const goHome = () => {
 const primary = () => {
     emit('primary');
     if (props.kind === 'unreachable' || props.kind === 'offline') retryNow();
-    else if (props.kind === 'notfound' || props.kind === 'denied') goHome();
+    else goHome();
 };
-const secondary = () => {
-    emit('secondary');
-    if (props.kind === 'forbidden') goHome();
-};
+const secondary = () => emit('secondary');
 </script>
 
 <style scoped>
