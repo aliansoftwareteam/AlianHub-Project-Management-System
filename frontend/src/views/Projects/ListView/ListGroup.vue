@@ -234,7 +234,7 @@ function visibleSubtasks(task) {
 }
 
 function onSelect(task, event) {
-    selection.toggleAndCascade(task, event);
+    selection.selectFromEvent(task, event, ".lv2");
 }
 
 function toggleDone(task, done) {

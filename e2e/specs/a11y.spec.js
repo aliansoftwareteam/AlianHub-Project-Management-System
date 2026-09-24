@@ -59,6 +59,31 @@ test.describe('accessibility: everyday flows as the owner', () => {
         await expect(page.getByRole('dialog', { name: 'Task detail' })).toBeVisible();
     });
 
+    test('List bulk bar and its undo notice', async ({ page, state, loginAs }) => {
+        const owner = await loginAs('owner');
+        const suffix = uniqueSuffix();
+        const project = await createProject(owner.api, { name: `A11Y BULK ${suffix}`, assigneeIds: [owner.uid], createdBy: owner.uid });
+        let sprintId = '';
+        for (const label of ['One', 'Two']) {
+            sprintId = (await createTask(owner.api, { project, name: `Bulk ${label} ${suffix}`, user: state.users.owner, companyOwnerId: owner.uid })).sprintId;
+        }
+        await page.goto(`/#/${state.companyId}/project/${project._id}/s/${sprintId}`);
+        const boxes = page.locator('.lv2__row .lv2__select input[type="checkbox"]');
+        await expect(boxes).toHaveCount(2);
+        await boxes.nth(0).click();
+        await boxes.nth(1).click({ modifiers: ['Shift'] });
+        const bar = page.getByRole('region', { name: 'Bulk task actions' });
+        await expect(bar).toContainText('2 selected');
+        expect(await blockingViolations(page)).toEqual([]);
+
+        await bar.getByRole('button', { name: /Status/ }).click();
+        await bar.locator('.lv2-bulk__item').last().click();
+        const notice = page.getByRole('status').filter({ hasText: 'Updated 2 tasks.' });
+        await expect(notice).toBeVisible();
+        await expect(notice.getByRole('button', { name: 'Undo' })).toBeVisible();
+        expect(await blockingViolations(page)).toEqual([]);
+    });
+
     test('task detail overlay', async ({ page, state }) => {
         const task = state.tasks[0];
         await page.goto(`/#/${state.companyId}/project/${task.projectId}/s/${task.sprintId}?task=${task._id}`);
