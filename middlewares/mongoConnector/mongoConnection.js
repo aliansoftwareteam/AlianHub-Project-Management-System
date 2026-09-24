@@ -1,4 +1,9 @@
-const { checkConnectionExists, createConnection, updateConnectionRecord, connections } = require("./helper");
+const mongoose = require("mongoose");
+const { checkConnectionExists, createConnection, updateConnectionRecord, connections, closeConnection } = require("./helper");
+const { isRetiring, retiringRefusal } = require("./retiring");
+const { dbCollections } = require("../../Config/collections");
+
+const COMPANY_DB = /^[a-f0-9]{24}$/i;
 
 const requestedDbs = []
 function removeFromArray(db) {
@@ -8,7 +13,7 @@ function removeFromArray(db) {
     }
 }
 
-exports.handleConnection = async (companyId) => {
+const openConnection = (companyId) => {
     return new Promise((resolve, reject) => {
         try {
             const db = companyId
@@ -102,3 +107,30 @@ exports.handleConnection = async (companyId) => {
         }
     })
 }
+
+/* The deleting process marks the company's global row before it drops the database, so a process
+ * that never saw the deletion start still refuses to open a connection that would recreate it. */
+const deletingElsewhere = async (db) => {
+    if (!COMPANY_DB.test(String(db)) || checkConnectionExists({ connections, db })) return false;
+    try {
+        const { database } = await openConnection(dbCollections.GLOBAL);
+        const row = await database.db.collection(dbCollections.COMPANIES).findOne(
+            { _id: new mongoose.Types.ObjectId(String(db)), deletingAt: { $exists: true } },
+            { projection: { _id: 1 } },
+        );
+        return Boolean(row);
+    } catch (error) {
+        return false;
+    }
+};
+
+exports.handleConnection = async (companyId) => {
+    if (isRetiring(companyId) || await deletingElsewhere(companyId)) throw retiringRefusal();
+    const opened = await openConnection(companyId);
+    // A connection that was still opening when the deletion started must not outlive the drop.
+    if (isRetiring(companyId)) {
+        closeConnection(companyId);
+        throw retiringRefusal();
+    }
+    return opened;
+};

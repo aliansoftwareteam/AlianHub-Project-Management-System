@@ -12,6 +12,7 @@ const { bearerRefusal } = require('../Modules/ApiTokens/helpers/bearerRules');
 const { sessionTokenQuery, readAccessSession, sessionCacheKey } = require('../Modules/Auth/helpers/refreshTokenRules');
 const { readCookie, clearOptions } = require('./cookies');
 const { ACTIVE_SEAT } = require('./seatStatus');
+const { isRetiring } = require('../middlewares/mongoConnector/retiring');
 
 // Mongo ObjectId pattern — used to reject regex/control characters in the
 // `companyid` request header before any token-membership check.
@@ -62,6 +63,7 @@ const verifyCompanyMembership = async (uid, companyId) => {
     if (!OBJECT_ID_PATTERN.test(String(uid)) || !OBJECT_ID_PATTERN.test(String(companyId))) {
         return false;
     }
+    if (isRetiring(companyId)) return false;
     const cacheKey = `${MEMBERSHIP_CACHE_PREFIX}${uid}:${companyId}`;
     const cached = myCache.get(cacheKey);
     if (cached === true) return true;

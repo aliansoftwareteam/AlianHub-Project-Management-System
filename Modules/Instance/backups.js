@@ -10,6 +10,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration, dropCompanyDatabase } = require('../../utils/mongo-handler/mongoQueries');
 const { handleConnection } = require('../../middlewares/mongoConnector/mongoConnection');
 const connectionRegistry = require('../../middlewares/mongoConnector/helper');
+const { clearAllRetiring } = require('../../middlewares/mongoConnector/retiring');
 const { state } = require('../../Config/instanceState');
 const { myCache } = require('../../Config/config');
 const logger = require('../../Config/loggerConfig');
@@ -261,6 +262,8 @@ function resetMongoConnections() {
     for (const entry of connectionRegistry.connections.splice(0)) {
         try { entry.connection.close(); } catch (e) { /* already closed */ }
     }
+    // The archive may bring back a company this process deleted.
+    clearAllRetiring();
 }
 
 /* Destructive by design: every collection named in the archive is dropped and
