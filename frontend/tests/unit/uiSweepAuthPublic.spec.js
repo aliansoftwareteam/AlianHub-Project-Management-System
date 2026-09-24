@@ -1,0 +1,110 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { describe, expect, test } from 'vitest';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const SRC = path.resolve(HERE, '../../src');
+const read = (rel) => fs.readFileSync(path.join(SRC, rel), 'utf8');
+
+const ruleBody = (css, selector) => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = new RegExp(`(^|[\\s,}])${escaped}\\s*\\{([^}]*)\\}`, 'm').exec(css);
+    return match ? match[2] : '';
+};
+
+describe('auth card on a phone', () => {
+    const css = read('components/templates/AuthShell/style.css');
+
+    test('the single card counts its padding in its width and keeps a gutter', () => {
+        const rule = ruleBody(css, '.auth--single .auth__form');
+        expect(rule).toMatch(/box-sizing:\s*border-box/);
+        expect(rule).toMatch(/width:\s*calc\(100% - 32px\)/);
+    });
+
+    test('a lone action (Create workspace) spans the row instead of sitting in half of it', () => {
+        expect(ruleBody(css, '.auth__actions > :only-child')).toMatch(/grid-column:\s*1 \/ -1/);
+    });
+
+    test('text links and the password eye are at least 32 px to tap on a phone', () => {
+        const phone = css.slice(css.indexOf('@media (max-width: 767px)'));
+        for (const selector of ['.auth__brand', '.auth__field-link', '.auth__links a', '.auth__links button', '.auth__foot a', '.auth__top-right a', '.av2-terms a', '.av2-link-btn']) {
+            expect(phone).toContain(`${selector}::before`);
+        }
+        expect(phone).toMatch(/width:\s*max\(100%, 32px\);\s*height:\s*max\(100%, 32px\)/);
+        const small = css.slice(css.indexOf('@media (max-width: 560px)'));
+        expect(ruleBody(small, '.auth__pw-eye')).toMatch(/width:\s*34px;\s*height:\s*34px/);
+    });
+
+    test('the six two-factor boxes share the card width instead of a fixed 44 px each', () => {
+        const rule = ruleBody(css, '.auth__code input');
+        expect(rule).toMatch(/flex:\s*1 1 0/);
+        expect(rule).toMatch(/min-width:\s*0/);
+        expect(rule).toMatch(/max-width:\s*44px/);
+        expect(rule).not.toMatch(/(^|[\s;])width:\s*44px/);
+    });
+
+    test('full-width link buttons fit inside the card', () => {
+        expect(ruleBody(css, '.auth .ah-btn--block')).toMatch(/box-sizing:\s*border-box/);
+    });
+});
+
+describe('provider buttons', () => {
+    const vueFiles = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) return vueFiles(full);
+        return entry.name.endsWith('.vue') ? [full] : [];
+    });
+
+    test('every component that draws a ShellIcon imports it, so no icon renders as an unknown tag', () => {
+        const missing = vueFiles(SRC)
+            .filter((file) => {
+                const source = fs.readFileSync(file, 'utf8');
+                return /<ShellIcon\b/.test(source) && !/import ShellIcon\b/.test(source);
+            })
+            .map((file) => path.relative(SRC, file));
+        expect(missing).toEqual([]);
+    });
+});
+
+describe('signed-out screens', () => {
+    const screens = [
+        'views/Authentication/Login/Login.vue',
+        'views/Authentication/Invitation/Invitation.vue',
+        'views/Authentication/ResetPassword/NewPasswordCard.vue',
+        'views/Setup/SetupWizard.vue',
+    ];
+
+    test.each(screens)('%s has no English literal in a bound aria-label', (rel) => {
+        expect(read(rel)).not.toMatch(/:aria-label="[^"]*'[A-Z][a-z]+ [a-z]/);
+    });
+
+    test.each(screens.filter((rel) => !rel.includes('Invitation')))('%s leaves an empty password field looking empty', (rel) => {
+        expect(read(rel)).not.toMatch(/placeholder="•+"/);
+    });
+});
+
+describe('invitation sign-up', () => {
+    test('labels stay visible, so the sample-name placeholder is never read as a filled value', () => {
+        const vue = read('views/Authentication/Invitation/Invitation.vue');
+        expect(vue).toMatch(/<label class="ah-field__label" for="inv-name">/);
+        expect(vue).not.toMatch(/ah-field__label ah-sr-only/);
+    });
+});
+
+describe('404 page', () => {
+    test('does not send a signed-out visitor to an audit log, or offer a button that only goes home', () => {
+        expect(read('views/NotFound.vue')).toMatch(/:body="\$t\('Inbox\.state_route_notfound_body'\)"/);
+        const state = read('components/molecules/AppState/AppState.vue');
+        expect(state).toMatch(/notfound: false \}/);
+        expect(state).not.toMatch(/props\.kind === 'forbidden' \|\| props\.kind === 'notfound'\) goHome\(\)/);
+    });
+});
+
+describe('login proof panel', () => {
+    test('the product shot takes the theme surface, so its dark-mode text stays readable', () => {
+        const rule = ruleBody(read('components/templates/AuthShell/style.css'), '.auth__shot');
+        expect(rule).toMatch(/background:\s*var\(--surface\)/);
+        expect(rule).not.toMatch(/#fff\b/);
+    });
+});

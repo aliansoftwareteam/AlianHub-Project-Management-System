@@ -114,14 +114,15 @@ const PAGE_STYLE = `
 const themeStyle = (s) => {
     const dark = s.theme === 'dark';
     const ink = dark ? '#e8e9f0' : '#222';
-    const muted = dark ? '#9aa0b4' : '#6b7280';
+    const muted = dark ? '#9aa0b4' : '#5f6573';
     const surface = dark ? '#1f2130' : '#fff';
     const edge = dark ? '#343850' : '#e6e6e6';
     return `
     body{background:${s.background};color:${ink}}
     .card{background:${surface};border:1px solid ${edge}}
     .head--rule{border-bottom-color:${edge}}
-    .intro,.help,.footer{color:${muted}}
+    .intro,.help,.footer,.drop .hint{color:${muted}}
+    .stars label{color:${dark ? '#6b7090' : '#8a8fa3'}}
     input[type=text],input[type=date],input[type=email],input[type=url],input[type=tel],
     input[type=number],textarea,select,.money .sym{background:${surface};color:${ink};
         border-color:${dark ? '#3b3f5a' : '#d7d9e6'}}
@@ -167,7 +168,7 @@ const redirectAfterSubmit = (res, token) => res
  * other caller cannot word it differently. */
 const sentBanner = (form) => {
     const thanks = form.successMessage || 'Thanks - your submission has been received.';
-    return `<div class="note ok"><span class="tick">&#10003;</span><span>${escapeHtml(thanks)}</span></div>`;
+    return `<div class="note ok" role="status"><span class="tick">&#10003;</span><span>${escapeHtml(thanks)}</span></div>`;
 };
 
 /* Resolve token -> tenant -> form. The GLOBAL index exists because a public

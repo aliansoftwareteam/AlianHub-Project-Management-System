@@ -1,5 +1,5 @@
 <template>
-    <AppState kind="notfound" />
+    <AppState kind="notfound" :title="$t('Inbox.state_route_notfound_title')" :body="$t('Inbox.state_route_notfound_body')" />
 </template>
 
 <script setup>

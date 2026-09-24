@@ -18,13 +18,16 @@ const maintenance = ref(false);
 let timer = null;
 
 async function check() {
+    const wasOn = maintenance.value;
     try {
         const res = await apiRequestWithoutSecure("get", "/health");
         maintenance.value = res?.data?.maintenance === true;
     } catch (error) {
         maintenance.value = error?.response?.data?.maintenance === true || maintenance.value;
     } finally {
-        timer = setTimeout(check, maintenance.value ? 5000 : 60000);
+        // Whatever loaded while the API refused calls is missing or stale, so the banner's promise is a reload.
+        if (wasOn && !maintenance.value) window.location.reload();
+        else timer = setTimeout(check, maintenance.value ? 5000 : 60000);
     }
 }
 

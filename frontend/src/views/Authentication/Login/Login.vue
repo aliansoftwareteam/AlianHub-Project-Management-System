@@ -55,12 +55,11 @@
                             maxlength="150"
                             class="ah-input"
                             :class="{ 'ah-input--error': errors.password }"
-                            placeholder="••••••••"
                             :aria-invalid="!!errors.password"
                             aria-describedby="password-error"
                             @input="errors.password = ''"
                         />
-                        <button type="button" class="auth__pw-eye" :aria-label="showPassword ? 'Hide password' : 'Show password'" @click="showPassword = !showPassword">
+                        <button type="button" class="auth__pw-eye" :aria-label="showPassword ? $t('Auth.hide_password') : $t('Auth.show_password')" @click="showPassword = !showPassword">
                             <ShellIcon :name="showPassword ? 'eyeOff' : 'eye'" :size="15" />
                         </button>
                     </div>
@@ -72,7 +71,7 @@
                 <button type="submit" class="ah-btn ah-btn--primary" :disabled="busy">
                     <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('Auth.loading') : $t('Auth.log_in') }}
                 </button>
-                <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="sendMagicLink">{{ $t('Auth.email_me_link') }}</button>
+                <button v-if="magicLinkOn" type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="sendMagicLink">{{ $t('Auth.email_me_link') }}</button>
             </div>
 
             <div class="auth__remember">
@@ -176,7 +175,7 @@ import { useToast } from "vue-toast-notification";
 import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ProviderButton from "@/plugins/oauth/ProviderButton.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth } from "@/services";
+import { apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth, SESSION_EXPIRED_KEY } from "@/services";
 import * as env from "@/config/env";
 import { publicConfig, enabledProviders } from "@/config/publicConfig";
 
@@ -191,6 +190,7 @@ const brand = computed(() => getters["brandSettingTab/brandSettings"] || {});
 const showRegister = computed(() => router.hasRoute("Sign-up") || router.hasRoute("Signup") || router.hasRoute("Register"));
 const providers = computed(() => enabledProviders());
 const ssoAvailable = computed(() => publicConfig.auth.sso !== false);
+const magicLinkOn = computed(() => publicConfig.auth.magicLink === true);
 
 const step = ref("login");
 const busy = ref(false);
@@ -215,6 +215,15 @@ const clearSession = () => {
     localStorage.removeItem("updateToken");
 };
 const rememberEmail = () => localStorage.setItem("ForgotEmail", form.email);
+const sessionExpired = () => {
+    try {
+        const expired = sessionStorage.getItem(SESSION_EXPIRED_KEY) === "1";
+        sessionStorage.removeItem(SESSION_EXPIRED_KEY);
+        return expired;
+    } catch {
+        return false;
+    }
+};
 const encode = (str) => Array.from(str).map((c) => c.charCodeAt(0)).join(", ");
 const decode = (src) => String.fromCharCode.apply(null, src.split(","));
 
@@ -223,6 +232,7 @@ onMounted(() => {
         const rem = JSON.parse(localStorage.getItem("remember") || "null");
         if (rem) { form.email = rem.email; form.password = decode(rem.password); rememberMe.value = true; }
     } catch { /* ignore */ }
+    if (sessionExpired()) banner.value = { kind: "warn", text: t("Auth.session_expired") };
     if (route.query.reason === "expired") banner.value = { kind: "warn", text: t("Auth.two_factor_session_expired") };
     if (route.query.magic === "invalid") banner.value = { kind: "danger", text: t("Auth.magic_invalid") };
     if (route.query.magic === "disabled") banner.value = { kind: "warn", text: t("Auth.magic_unavailable") };
@@ -284,6 +294,8 @@ const handleSubmit = async () => {
             errors.password = t("Auth.too_many_attempts");
         } else if (msg === "Email Not Verified") {
             step.value = "verify";
+        } else if (data.maintenance === true) {
+            banner.value = { kind: "warn", text: t("Auth.maintenance_login") };
         } else {
             banner.value = { kind: "danger", text: t("Auth.server_error") };
         }
@@ -349,6 +361,12 @@ const onDigitPaste = (e) => {
     codeInputs.value[Math.min(txt.length, 5)]?.focus();
     if (txt.length === 6) submit2fa();
 };
+const rejectCode = () => {
+    twoFactor.error = t("Auth.two_factor_invalid_code");
+    if (twoFactor.isRecovery) return;
+    twoFactor.digits = ["", "", "", "", "", ""];
+    codeInputs.value[0]?.focus();
+};
 const submit2fa = async () => {
     const code = twoFactor.isRecovery ? twoFactor.code.trim() : twoFactor.digits.join("");
     if (!code || (!twoFactor.isRecovery && code.length < 6)) { twoFactor.error = t("Auth.two_factor_enter_code"); return; }
@@ -357,13 +375,13 @@ const submit2fa = async () => {
     busy.value = true;
     try {
         const res = await apiRequestWithoutSecure("post", env.TWO_FA_VALIDATE, { tempToken: twoFactor.tempToken, code });
-        if (res.status !== 200 || !res?.data?.uid) { twoFactor.error = t("Auth.two_factor_invalid_code"); return; }
+        if (res.status !== 200 || !res?.data?.uid) { rejectCode(); return; }
         await proceedAfterAuth(res.data.uid);
     } catch (error) {
         const msg = error?.response?.data?.message;
         if (msg === "Auth.too_many_request") twoFactor.error = t("Toast.Too_many_request");
         else if (typeof msg === "string" && /expired/i.test(msg)) { backToLogin(); banner.value = { kind: "warn", text: t("Auth.two_factor_session_expired") }; }
-        else twoFactor.error = t("Auth.two_factor_invalid_code");
+        else rejectCode();
     } finally {
         busy.value = false;
     }
@@ -398,7 +416,8 @@ const sendMagicLink = async () => {
         resendWait.value = 60;
     } catch (error) {
         const status = error?.response?.status;
-        if (status === 404 || status === 501) banner.value = { kind: "warn", text: t("Auth.magic_unavailable") };
+        if (error?.response?.data?.maintenance === true) banner.value = { kind: "warn", text: t("Auth.maintenance_login") };
+        else if (status === 404 || status === 501) banner.value = { kind: "warn", text: t("Auth.magic_unavailable") };
         else if (status === 429) errors.email = t("Auth.too_many_attempts");
         else banner.value = { kind: "danger", text: t("Auth.server_error") };
     } finally {

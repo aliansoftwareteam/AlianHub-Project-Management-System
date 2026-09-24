@@ -8,6 +8,7 @@
 
 <script setup>
 import { publicConfig } from "@/config/publicConfig";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { onMounted, ref, defineProps } from "vue";
 import { useToast } from 'vue-toast-notification';
 import { useRouter, useRoute } from 'vue-router'
