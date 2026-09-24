@@ -67,5 +67,5 @@
 .driver-popover.ah-tour .driver-popover-arrow-side-bottom.driver-popover-arrow { border-bottom-color: var(--surface); }
 .driver-overlay { fill: rgba(23, 22, 28, .5) !important; }
 .driver-popover.ah-tour--legacy .driver-popover-prev-btn { display: inline-flex !important; }
-.driver-popover.ah-tour--legacy .driver-popover-close-btn { display: block; all: unset; position: absolute; top: 12px; right: 14px; cursor: pointer; color: var(--ink-3); font-size: 16px; line-height: 1; }
+.driver-popover.ah-tour--legacy .driver-popover-close-btn { display: block; all: unset; position: absolute; top: 12px; right: 14px; cursor: pointer; color: var(--ink-2); font-size: 16px; line-height: 1; }
 .driver-popover.ah-tour--legacy .driver-popover-close-btn:hover { color: var(--ink); }

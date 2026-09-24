@@ -17,8 +17,8 @@
 .wb__slots { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font: var(--text-body); }
 .wb__slots--after { padding-left: 14px; }
 .wb__kw { color: var(--ink-2); }
-.wb__kw--field { color: var(--ink-3); font: var(--text-small); }
-.wb__kw--id { color: var(--ink-3); font-size: 11px; margin-left: auto; }
+.wb__kw--field { color: var(--ink-2); font: var(--text-small); }
+.wb__kw--id { color: var(--ink-2); font-size: 11px; margin-left: auto; }
 .wb__slot {
     padding: 3px 8px; border-radius: var(--r-chip);
     background: var(--surface); border: 1px solid var(--border);
@@ -33,7 +33,7 @@
 
 .wb__add { border: 1px dashed var(--border); color: var(--ink-2); background: none; border-radius: var(--r-chip); padding: 3px 10px; font: var(--text-small); cursor: pointer; align-self: flex-start; }
 .wb__add:hover { color: var(--ink); }
-.wb__x { border: 0; background: none; color: var(--ink-3); font-size: 17px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.wb__x { border: 0; background: none; color: var(--ink-2); font-size: 17px; line-height: 1; cursor: pointer; padding: 0 4px; }
 .wb__x:hover { color: var(--danger-ink); }
 
 .wb__errors { margin: 0; padding: 10px 14px 10px 28px; background: var(--danger-bg); border-radius: var(--r-card); color: var(--danger-ink); font: var(--text-small); }

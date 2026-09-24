@@ -263,7 +263,7 @@ onUnmounted(closeEvents);
 .setup__toggle { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
 .setup__toggle > span { display: flex; flex-direction: column; gap: 2px; }
 .setup__progress { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.setup__progress li { display: flex; align-items: center; gap: 10px; color: var(--ink-3); }
+.setup__progress li { display: flex; align-items: center; gap: 10px; color: var(--ink-2); }
 .setup__progress li.is-active { color: var(--ink); }
 .setup__progress li.is-done { color: var(--ok-ink); }
 .setup__dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--border); flex: none; }

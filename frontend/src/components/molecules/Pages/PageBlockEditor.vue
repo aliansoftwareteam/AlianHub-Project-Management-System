@@ -200,7 +200,7 @@ onBeforeUnmount(() => {
     font: 400 15px/1.7 var(--font-ui);
     color: var(--ink);
 }
-.pbe :deep(.ce-paragraph[data-placeholder]:empty::before) { color: var(--ink-3); }
+.pbe :deep(.ce-paragraph[data-placeholder]:empty::before) { color: var(--ink-2); }
 .pbe :deep(.ce-header) {
     font-family: var(--font-ui);
     font-weight: 600;

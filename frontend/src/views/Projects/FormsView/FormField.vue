@@ -92,7 +92,7 @@ const placeholder = computed(() => t(`Projects.${PLACEHOLDER[props.type.widget] 
 .ff__help { display: block; font-weight: 400; color: var(--ink-2); font-size: 12px; margin-top: 2px; }
 .ff__input { width: 100%; border: 1px solid var(--border); border-radius: var(--r-input); padding: 9px 11px;
     font-size: 14px; font-family: inherit; color: var(--ink); background: var(--surface); }
-.ff__input::placeholder { color: var(--ink-3); }
+.ff__input::placeholder { color: var(--ink-2); }
 .ff__input:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus); }
 .ff__input:disabled { background: var(--surface); color: var(--ink-2); }
 .ff__area { min-height: 92px; resize: vertical; }
@@ -100,7 +100,7 @@ const placeholder = computed(() => t(`Projects.${PLACEHOLDER[props.type.widget] 
 .ff__choice { display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--ink); }
 .ff__choice input { margin: 0; accent-color: var(--brand); }
 .ff__stars { display: flex; gap: 6px; }
-.ff__star { font-size: 22px; line-height: 1; color: var(--ink-3); cursor: pointer; }
+.ff__star { font-size: 22px; line-height: 1; color: var(--ink-2); cursor: pointer; }
 .ff__star.is-on { color: var(--warn); }
 .ff__range { width: 100%; accent-color: var(--brand); }
 .ff__drop { border: 1px dashed var(--border); border-radius: var(--r-input); padding: 16px; text-align: center;

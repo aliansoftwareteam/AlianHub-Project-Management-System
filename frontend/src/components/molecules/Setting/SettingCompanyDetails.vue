@@ -92,7 +92,7 @@
                                             {{ $t('Settings.state') }}
                                         </label>
                                         <InputText :disabled="locationObj['state'].isStateVal" :readonly="true" :style="{ 'pointer-events': !props.editPermission ? 'none' : '' }" type="text" class="form-control login-input" v-model="formData.state.value"
-                                            :placeHolder="locationObj['state'].isStateVal == false ? 'State' : 'No States'" 
+                                            :placeHolder="locationObj['state'].isStateVal == false ? $t('Settings.state') : $t('PlaceHolder.No_States')" 
                                             inputId="refState" @click="setfocus('state')"
                                             :class="[{'cursor-pointer': locationObj['state'].isStateVal == false}]"
                                             @focus="setCurrentSidebarValue('state'), setfocus('state')" @keyup="checkErrors({
@@ -112,7 +112,7 @@
                                             {{ $t('Settings.city') }}
                                         </label>
                                         <InputText :disabled="(locationObj['state']?.isStateVal || locationObj['city']?.isCityVal)" :style="{ 'pointer-events': !props.editPermission ? 'none' : '' }" type="text" class="form-control login-input" v-model="formData.city.value"
-                                            :placeHolder="!(locationObj['state']?.isStateVal || locationObj['city']?.isCityVal) ? 'City' : 'No Cities'" 
+                                            :placeHolder="!(locationObj['state']?.isStateVal || locationObj['city']?.isCityVal) ? $t('Settings.city') : $t('PlaceHolder.No_Cities')" 
                                             inputId="refCity"
                                             :class="[{'cursor-pointer': !(locationObj['state']?.isStateVal || locationObj['city']?.isCityVal)}]"
                                             @keyup="checkErrors({
@@ -312,14 +312,17 @@ const openCropperTool = () => {
 const onSelect = (val) => {
     countryCodeObj.value = val
 }
+
+// Companies set up before phone became optional hold the setup wizard's "N/A" placeholder.
+const storedPhone = (value) => (value == null || value === 'N/A' ? '' : value);
 onMounted(() => {
     formData.value.companyprofileImage = selectedCompany.value?.Cst_profileImage == undefined ? '' : selectedCompany.value?.Cst_profileImage;
     formData.value.companyName.value = selectedCompany.value?.Cst_CompanyName;
-    formData.value.phoneNumber.value = selectedCompany.value?.Cst_Phone;
+    formData.value.phoneNumber.value = storedPhone(selectedCompany.value?.Cst_Phone);
     formData.value.country.value = selectedCompany.value?.Cst_Country;
-    formData.value.state.value = selectedCompany.value?.Cst_State;
+    formData.value.state.value = selectedCompany.value?.Cst_State ?? '';
     formData.value.Cst_DialCode = selectedCompany.value?.Cst_DialCode;
-    formData.value.city.value = selectedCompany.value?.Cst_City;
+    formData.value.city.value = selectedCompany.value?.Cst_City ?? '';
     formData.value.day.value = selectedCompany.value?.Cst_LogTimeDays;
     // Absent means a company that predates the setting, which has the cap today — so it
     // reads as ON. Only an explicit false turns it off.
@@ -447,8 +450,7 @@ const SaveChangeToDb = async () => {
 }
 
 function phoneValidation (number) {
-    // The setup wizard stores "N/A" (the schema requires a phone), and callers pass
-    // String(value), so a missing number arrives as "undefined".
+    // Callers pass String(value), so a missing number arrives as "undefined".
     if (["", "undefined", "null", "N/A"].includes(number)) {
         phoneError.value = '';
         return;

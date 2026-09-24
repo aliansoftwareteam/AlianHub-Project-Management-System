@@ -452,7 +452,7 @@ function createSubTasks () {
 }
 .stx__head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .stx__title { font-weight: 600; }
-.stx__rollup { color: var(--ink-3); }
+.stx__rollup { color: var(--ink-2); }
 .stx__bar {
     flex: 1;
     max-width: 120px;
@@ -495,7 +495,7 @@ function createSubTasks () {
 }
 .stx__name:hover { color: var(--brand); }
 .stx__row.is-done .stx__name { text-decoration: line-through; color: var(--ink-2); }
-.stx__hours { width: 44px; text-align: right; color: var(--ink-3); flex: none; }
+.stx__hours { width: 44px; text-align: right; color: var(--ink-2); flex: none; }
 
 .stx__empty { margin: 0; color: var(--ink-2); font-size: 12px; }
 .stx__skeleton { height: 30px; border-radius: 8px; }
@@ -519,6 +519,6 @@ function createSubTasks () {
 }
 .stx__add-plus { color: var(--brand); font-weight: 600; }
 .stx__add:hover { color: var(--ink); }
-.stx__add-hint { color: var(--ink-3); display: inline-flex; align-items: center; gap: 4px; }
+.stx__add-hint { color: var(--ink-2); display: inline-flex; align-items: center; gap: 4px; }
 .stx__create { margin: 0; }
 </style>

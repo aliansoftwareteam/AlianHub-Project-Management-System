@@ -231,7 +231,7 @@ watch(() => props.formId, () => { term.value = ''; load(1); });
 .fs__meta { font-size: 12px; color: var(--ink-2); margin: 3px 0 0; }
 .fs__search { flex: 0 0 240px; border: 1px solid var(--border); border-radius: var(--r-input); padding: 7px 11px;
     font-size: 13px; font-family: inherit; color: var(--ink); background: var(--surface); }
-.fs__search::placeholder { color: var(--ink-3); }
+.fs__search::placeholder { color: var(--ink-2); }
 .fs__search:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus); }
 .fs__btn { flex: 0 0 auto; border: 1px solid var(--border); background: var(--surface); color: var(--ink);
     border-radius: var(--r-input); padding: 6px 13px; font-size: 13px; cursor: pointer; }

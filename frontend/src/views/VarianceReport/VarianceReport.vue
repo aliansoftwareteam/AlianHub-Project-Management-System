@@ -214,7 +214,7 @@ onMounted(load);
 .vr__drivers, .vr__table { display: flex; flex-direction: column; gap: 9px; }
 .vr__driver { display: flex; align-items: center; gap: 10px; }
 .vr__driver-name { flex: 1; min-width: 0; }
-.vr__driver-name small { color: var(--ink-3); font-family: var(--font-mono); }
+.vr__driver-name small { color: var(--ink-2); font-family: var(--font-mono); }
 .vr__mini { width: 110px; height: 6px; background: rgba(0, 0, 0, .07); border-radius: 99px; overflow: hidden; }
 :root[data-theme="dark"] .vr__mini { background: rgba(255, 255, 255, .1); }
 .vr__mini-fill { display: block; height: 100%; border-radius: 99px; background: var(--ok); }
@@ -222,7 +222,7 @@ onMounted(load);
 .vr__mini-fill.is-warn { background: var(--warn); }
 .vr__mini-fill.is-flat { background: var(--ink-3); }
 .vr__thead, .vr__tr { display: grid; grid-template-columns: 1fr 64px 64px 72px; gap: 8px; align-items: center; }
-.vr__th { border: 0; background: transparent; padding: 0; text-align: right; font: var(--text-label); letter-spacing: .06em; color: var(--ink-3); cursor: pointer; }
+.vr__th { border: 0; background: transparent; padding: 0; text-align: right; font: var(--text-label); letter-spacing: .06em; color: var(--ink-2); cursor: pointer; }
 .vr__th:first-child { text-align: left; }
 .vr__td { font: 500 11.5px/1.2 var(--font-mono); text-align: right; }
 .vr__td--name { font: 400 12.5px/1.3 var(--font-ui); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; flex-direction: column; }

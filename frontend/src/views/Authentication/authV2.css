@@ -1,4 +1,4 @@
-.av2-step { font: var(--text-data); color: var(--ink-3); letter-spacing: .04em; }
+.av2-step { font: var(--text-data); color: var(--ink-2); letter-spacing: .04em; }
 .av2-chips { display: flex; gap: 6px; }
 .av2-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .av2-chip {

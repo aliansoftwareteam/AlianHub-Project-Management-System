@@ -317,7 +317,7 @@ function removeRelation(item) {
 }
 .lt__head { display: flex; align-items: center; gap: 8px; }
 .lt__title { font-weight: 600; }
-.lt__count { color: var(--ink-3); }
+.lt__count { color: var(--ink-2); }
 .lt__link {
     margin-left: auto;
     border: 0;
@@ -364,7 +364,7 @@ function removeRelation(item) {
 .lt__x {
     border: 0;
     background: transparent;
-    color: var(--ink-3);
+    color: var(--ink-2);
     font-size: 14px;
     line-height: 1;
     padding: 0 2px;

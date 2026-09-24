@@ -513,7 +513,7 @@ const WikiTable = defineComponent({
     font-size: 13px; overflow-y: auto;
 }
 .hub__search { position: relative; }
-.hub__search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
+.hub__search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ink-2); pointer-events: none; }
 /* Two classes: .ah-input loads later and would reset the padding under the icon. */
 .hub__search .hub__search-input { height: 32px; padding-left: 30px; font-size: 12.5px; }
 .hub__nav { display: flex; flex-direction: column; gap: 1px; }
@@ -526,10 +526,10 @@ const WikiTable = defineComponent({
 }
 .hub__item:hover { background: var(--surface-hover); }
 .hub__item.is-active { background: var(--brand-tint); color: var(--brand); font-weight: 600; }
-.hub__item-icon { color: var(--ink-3); flex: none; }
+.hub__item-icon { color: var(--ink-2); flex: none; }
 .hub__item.is-active .hub__item-icon { color: var(--brand); }
 .hub__item-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hub__item-count { margin-left: auto; font: 500 11px var(--font-mono); color: var(--ink-3); }
+.hub__item-count { margin-left: auto; font: 500 11px var(--font-mono); color: var(--ink-2); }
 .hub__item-badge { margin-left: auto; background: var(--brand); color: var(--on-brand); font: 700 10px/1 var(--font-mono); padding: 3px 6px; border-radius: 9px; }
 .hub__item-badge--warn { background: var(--warn); }
 .hub__swatch { width: 7px; height: 7px; border-radius: 2px; flex: none; }
@@ -560,7 +560,7 @@ const WikiTable = defineComponent({
 .hub__card-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .hub__card-project { max-width: 50%; overflow: hidden; text-overflow: ellipsis; display: inline-block; line-height: 22px; }
 .hub__card-meta { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
-.hub__mono { font: 500 10.5px var(--font-mono); color: var(--ink-3); }
+.hub__mono { font: 500 10.5px var(--font-mono); color: var(--ink-2); }
 .hub__mono--danger { color: var(--danger-ink); }
 
 .hub__list { display: flex; flex-direction: column; overflow: hidden; }
@@ -574,19 +574,19 @@ const WikiTable = defineComponent({
 .hub__row:hover { background: var(--surface-hover); }
 .hub__row--agent { cursor: default; padding: 10px 14px; }
 .hub__row--agent:hover { background: transparent; }
-.hub__row-icon { color: var(--ink-3); flex: none; }
+.hub__row-icon { color: var(--ink-2); flex: none; }
 .hub__row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
 .hub__row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .hub__row-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hub__row-project { color: var(--ink-2); flex: none; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hub__row-time { font: 500 10.5px var(--font-mono); color: var(--ink-3); flex: none; }
+.hub__row-time { font: 500 10.5px var(--font-mono); color: var(--ink-2); flex: none; }
 
 .hub__wiki { overflow: hidden; }
 .hub__wiki-head, .hub__wiki-row {
     display: grid; grid-template-columns: minmax(0, 1fr) 120px 90px 110px 120px; gap: 10px; align-items: center;
     padding: 9px 14px; border-bottom: 1px solid var(--hairline);
 }
-.hub__wiki-head { font: var(--text-label); letter-spacing: .06em; color: var(--ink-3); }
+.hub__wiki-head { font: var(--text-label); letter-spacing: .06em; color: var(--ink-2); }
 .hub__wiki-row { padding: 11px 14px; font-size: 12.5px; }
 .hub__wiki-row:last-child { border-bottom: 0; }
 .hub__wiki-row--stale { background: var(--danger-bg); }

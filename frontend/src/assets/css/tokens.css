@@ -275,7 +275,7 @@ html, body, #app {
     transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
     box-sizing: border-box;
 }
-.ah-input::placeholder { color: var(--ink-3); }
+.ah-input::placeholder { color: var(--ink-2); }
 .ah-input:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus); }
 .ah-input--error, .ah-input--error:focus { border-color: var(--danger); box-shadow: none; }
 .ah-field__error {

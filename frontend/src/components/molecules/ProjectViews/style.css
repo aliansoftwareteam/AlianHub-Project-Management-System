@@ -166,7 +166,7 @@
     font: var(--text-body);
 }
 
-.view__search-input::placeholder { color: var(--ink-3); }
+.view__search-input::placeholder { color: var(--ink-2); }
 .view__search-input:focus-visible { outline: 2px solid var(--brand); outline-offset: -1px; }
 
 .view__groups {
@@ -223,7 +223,7 @@
 
 /* The quiet second word ("Chart", "Kanban") names the view's genre without competing
    with the view's own name, so it never truncates first. */
-.view__cell-tag { font: var(--text-small); color: var(--ink-3); flex: 0 0 auto; }
+.view__cell-tag { font: var(--text-small); color: var(--ink-2); flex: 0 0 auto; }
 
 .view__empty { margin: 0; padding: 18px 4px; text-align: center; font: var(--text-small); color: var(--ink-2); }
 

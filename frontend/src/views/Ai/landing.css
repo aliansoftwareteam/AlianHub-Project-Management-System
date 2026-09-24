@@ -20,7 +20,7 @@
 .land__composer--off { border-color: var(--border); background: var(--surface-2); }
 .land__input { width: 100%; min-height: 62px; padding: 0; border: 0; background: transparent; color: var(--ink); font: var(--text-body); font-size: 14px; resize: vertical; }
 .land__input:focus { outline: none; }
-.land__input::placeholder { color: var(--ink-3); }
+.land__input::placeholder { color: var(--ink-2); }
 
 .land__controls { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .land__spacer { flex: 1; min-width: var(--sp-2); }
@@ -89,7 +89,7 @@
 .land__row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .land__row-to { display: flex; align-items: center; gap: var(--sp-2); width: 210px; flex: none; }
 .land__row--refused .land__row-to { color: var(--warn-ink); }
-.land__row-key { font: var(--text-data); color: var(--ink-3); flex: none; }
+.land__row-key { font: var(--text-data); color: var(--ink-2); flex: none; }
 
 .land__trust { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4); border-radius: var(--r-input); background: var(--surface-2); }
 .land__trust dl { margin: 0; display: flex; flex-direction: column; gap: var(--sp-2); font: var(--text-body); }

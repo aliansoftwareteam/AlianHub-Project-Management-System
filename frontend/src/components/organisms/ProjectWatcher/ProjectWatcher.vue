@@ -261,7 +261,7 @@ onMounted(() => {
 .pw__x {
     border: 0;
     background: transparent;
-    color: var(--ink-3);
+    color: var(--ink-2);
     font-size: 15px;
     line-height: 1;
     padding: 0 3px;

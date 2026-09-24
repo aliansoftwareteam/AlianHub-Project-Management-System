@@ -2290,7 +2290,7 @@ const schema = {
         },
         Cst_Phone: {
             type: String,
-            required: true
+            required: false
         },
         Cst_State: {
             type: String,

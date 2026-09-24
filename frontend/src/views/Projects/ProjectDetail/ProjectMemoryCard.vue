@@ -194,7 +194,7 @@ watch(() => props.projectId, (id) => {
 .pm__section { display: flex; flex-direction: column; gap: 6px; }
 .pm__section + .pm__section { padding-top: 12px; border-top: 1px solid var(--hairline); }
 .pm__section-title { font: 600 13px/1.2 var(--font-ui); color: var(--ink); }
-.pm__sub-title { font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin: 6px 0 2px; }
+.pm__sub-title { font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); margin: 6px 0 2px; }
 .pm__stages, .pm__list { margin: 0; padding-left: 18px; font: var(--text-small); color: var(--ink); line-height: 1.5; }
 .pm__goal { color: var(--ink-2); }
 .pm__details-trigger { cursor: pointer; font: var(--text-small); color: var(--brand); font-weight: 500; list-style: none; }
@@ -205,12 +205,12 @@ watch(() => props.projectId, (id) => {
 .pm__add-text, .pm__edit { flex: 1; min-width: 200px; height: 32px; }
 .pm__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .pm__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font: var(--text-small); color: var(--ink); }
-.pm__row.is-retired .pm__text { color: var(--ink-3); text-decoration: line-through; }
+.pm__row.is-retired .pm__text { color: var(--ink-2); text-decoration: line-through; opacity: .75; }
 .pm__text { flex: 1; min-width: 160px; }
 .pm__none, .pm__empty { margin: 0; }
 .pm__toggle { align-self: flex-start; }
 .pm__episodes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .pm__episode { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font: var(--text-small); color: var(--ink); }
-.pm__at { color: var(--ink-3); }
+.pm__at { color: var(--ink-2); }
 .pm__task { color: var(--ink-2); }
 </style>
