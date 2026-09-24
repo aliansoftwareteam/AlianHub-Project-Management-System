@@ -1525,8 +1525,15 @@ export default {
         next_month: "Next month",
         sort_hint: "Click a column to sort",
     },
+    UndoToast: {
+        undo: "Undo",
+        undo_hint: "Undo (Ctrl+Z or ⌘Z)",
+        dismiss: "Dismiss",
+    },
     TaskPanel: {
         dialog_label: "Task detail",
+        open_in_desktop_tracker: "Open in desktop tracker",
+        change_undone: "Change undone",
         tracker_start: "Start Tracker",
         tracker_start_hint: "Start this task in the AlianHub desktop tracker",
         tracker_start_accept: "Start tracking",

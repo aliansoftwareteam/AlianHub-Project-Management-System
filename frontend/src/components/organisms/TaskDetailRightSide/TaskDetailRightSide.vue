@@ -1,39 +1,6 @@
 <template>
     <div class="task-detail-right-side">
         <div>
-            <div class="start-in-tracker-wrap" v-if="isAssignee && !isTaskCompleted">
-                <button
-                    type="button"
-                    class="start-in-tracker-btn"
-                    @click="startInTracker"
-                    :title="$t('TaskPanel.tracker_start_hint')"
-                >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                    {{ $t('TaskPanel.tracker_start') }}
-                </button>
-            </div>
-
-            <Modal
-                :modelValue="showTrackerModal"
-                :title="$t('TaskPanel.tracker_start')"
-                :acceptButtonText="$t('TaskPanel.tracker_start_accept')"
-                bodyClasses="tracker-modal-body"
-                @close="showTrackerModal = false"
-                @accept="confirmStartTracker"
-            >
-                <template #body>
-                    <div class="tracker-modal-task">{{ task?.TaskKey }} · {{ task?.TaskName }}</div>
-                    <label class="tracker-modal-label">{{ $t('TaskPanel.tracker_working_on') }}</label>
-                    <textarea
-                        v-model="trackerComment"
-                        rows="4"
-                        class="tracker-modal-textarea"
-                        :placeholder="$t('TaskPanel.tracker_comment_ph')"
-                        @input="trackerCommentError = ''"
-                    ></textarea>
-                    <div class="tracker-modal-error" v-if="trackerCommentError">{{ trackerCommentError }}</div>
-                </template>
-            </Modal>
             <h4 class="details-heading">{{$t('ProjectDetails.details')}}</h4>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_list',project?.isGlobalPermission)!==null && checkPermission('task.task_status',project?.isGlobalPermission) !== null">
                 <h4>{{$t('ProjectDetails.status')}}</h4>
@@ -304,9 +271,9 @@ import { useI18n } from "vue-i18n";
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
-import { openInTracker, isTrackerCapableDevice } from '@/utils/trackerDeepLink';
 import { permittedAssignees, scopedAssignees, selfAssignable } from '@/utils/assigneeOptions';
 import Modal from '@/components/atom/Modal/Modal.vue';
+import { showUndoToast } from '@/composable/useUndoToast';
 
 // Icon for the "Generate estimate using AI" sidebar button. Same asset
 // the SubTasks / Checklist / Sprints components use for their AI actions
@@ -363,63 +330,6 @@ const props = defineProps({
     clientWidth: Number,
 })
 
-// Only assignees of the task can start tracking it.
-const isAssignee = computed(() => (props.task?.AssigneeUserId || []).includes(userId.value));
-
-// Only OPEN tasks can be tracked — hide "Start Tracker" on completed/closed
-// tasks. A task is completed when its status type is 'close' (the same rule the
-// per-task completion checks use in Task.vue / TaskDetail.vue + bucketForStatus).
-const isTaskCompleted = computed(() => {
-    const ty = props.task?.status?.type || props.task?.statusType || '';
-    return ty === 'close';
-});
-
-// Start Tracker modal (project Modal component) — collects a comment, then deep-links.
-const showTrackerModal = ref(false);
-const trackerComment = ref('');
-const trackerCommentError = ref('');
-
-const startInTracker = () => {
-    if (!isTrackerCapableDevice()) {
-        $toast.warning(t('TaskPanel.tracker_desktop_only'));
-        return;
-    }
-    trackerComment.value = '';
-    trackerCommentError.value = '';
-    showTrackerModal.value = true;
-};
-
-const confirmStartTracker = () => {
-    const comment = (trackerComment.value || '').trim();
-    if (!comment) {
-        trackerCommentError.value = t('TaskPanel.tracker_comment_required');
-        return;
-    }
-    const res = openInTracker({
-        taskId: props.task?._id,
-        projectId: props.task?.ProjectID,
-        sprintId: props.task?.sprintId,
-        folderId: props.task?.folderObjId || '',
-        comment,
-    }, {
-        // If the tracker doesn't come to the foreground shortly, it's either not
-        // installed or too old to support the myapp:// deep link — one generic
-        // toast covers both (the web can't tell them apart).
-        onNotOpened: () => $toast.warning(t('Toast.tracker_not_opened')),
-    });
-    showTrackerModal.value = false;
-    if (res.ok) {
-        $toast.success(t('TaskPanel.tracker_opening'));
-        return;
-    }
-    if (res.reason === 'unsupported') {
-        $toast.warning(t('TaskPanel.tracker_desktop_only'));
-    } else if (res.reason === 'missing') {
-        $toast.error(t('TaskPanel.tracker_task_incomplete'));
-    } else {
-        $toast.error(t('TaskPanel.tracker_open_failed'));
-    }
-};
 //ref
 const taskLeaderData = ref(getUser(props.task?.Task_Leader));
 const assigneeInProgress = ref({});
@@ -476,25 +386,27 @@ function getUserData() {
     };
 }
 
-const updateAssignee = (event, type) =>{
+const ASSIGNEE_OPERATION = { add: "assigneeAdd", remove: "assigneRemove", replace: "replace" };
+
+function undoneToast() {
+    $toast.success(t('TaskPanel.change_undone'), { position: 'top-right' });
+}
+
+function assigneeUndo(type, id, before) {
+    if (type === 'add') return () => updateAssignee({ id }, 'remove', { undoing: true });
+    if (type === 'remove') return () => updateAssignee({ id }, 'add', { undoing: true });
+    const previous = before.find((uid) => uid !== id);
+    return previous
+        ? () => updateAssignee({ id: previous }, 'replace', { undoing: true })
+        : () => updateAssignee({ id }, 'remove', { undoing: true });
+}
+
+const updateAssignee = (event, type, { undoing = false } = {}) =>{
     try {
         if(assigneeInProgress.value[event?.id] && assigneeInProgress.value[event?.id] === type) return;
         assigneeInProgress.value[event?.id] = type;
         const userData = getUserData();
-
-        let operation = ""
-
-        if(type === "add") {
-            operation = "assigneeAdd"
-        } else if(type === 'remove') {
-            operation = "assigneRemove"
-        } else if(type === 'replace') {
-            operation = "replace"
-        }
-
-        let updateObject = {
-            AssigneeUserId : event.id
-        }
+        const before = [...(props.task.AssigneeUserId || [])];
 
         const projectData = {
             _id: project.value._id,
@@ -505,16 +417,20 @@ const updateAssignee = (event, type) =>{
         }
 
         taskClass.updateAssignee({
-            firebaseObj: updateObject,
+            firebaseObj: { AssigneeUserId: event.id },
             projectData: projectData,
             taskData: props.task,
             employeeName: getUser(event.id).Employee_Name,
-            type: operation,
+            type: ASSIGNEE_OPERATION[type] || "",
             userData
         })
         .then(() => {
             delete assigneeInProgress.value[event?.id];
-            $toast.success(t(`Toast.Assignee ${type === "add" || type === "replace"? 'added' : 'removed'} successfully`),{position: 'top-right'});
+            if (undoing) return undoneToast();
+            showUndoToast({
+                message: t(`Toast.Assignee ${type === "add" || type === "replace"? 'added' : 'removed'} successfully`),
+                undo: assigneeUndo(type, event.id, before)
+            });
         })
         .catch((error) => {
             delete assigneeInProgress.value[event?.id];
@@ -565,13 +481,15 @@ const updateTaskLeader = (event) => {
     }
 }
 
-const updatePriority = async(val) => {
+function priorityOption(value) {
+    const priority = getPriority(value) || {};
+    return { value, name: priority.name, statusImage: priority.image };
+}
+
+const updatePriority = async(val, { undoing = false, from = null } = {}) => {
     try {
         const userData = getUserData();
-
-        let updateObj = {
-            Task_Priority : val.value
-        }
+        const previousValue = from ? from.value : props.task.Task_Priority;
 
         let projectData = {
             '_id': project.value._id ? project.value._id : "",
@@ -579,8 +497,7 @@ const updatePriority = async(val) => {
             "CompanyId": project.value.CompanyId,
         }
 
-
-        const priority = getPriority(props.task.Task_Priority)
+        const priority = getPriority(previousValue) || {};
 
         let priorityObj = {
             'statusImage' : await getWasabiImageLink(project.value.CompanyId,priority.image),
@@ -592,9 +509,14 @@ const updatePriority = async(val) => {
             'newPriorityName' : val.name
         }
 
-        taskClass.updatePriority({firebaseObj: updateObj, projectData: projectData, taskData: props.task, priorityObj, userData})
+        taskClass.updatePriority({firebaseObj: { Task_Priority: val.value }, projectData: projectData, taskData: props.task, priorityObj, userData})
         .then(() => {
-            $toast.success(t('Toast.Priority_updated_successfully'),{position: 'top-right'});
+            if (undoing) return undoneToast();
+            if (!previousValue) return $toast.success(t('Toast.Priority_updated_successfully'),{position: 'top-right'});
+            showUndoToast({
+                message: t('Toast.Priority_updated_successfully'),
+                undo: () => updatePriority(priorityOption(previousValue), { undoing: true, from: val })
+            });
         })
         .catch((error) => {
             console.error("ERROR in update priority: ", error);
@@ -629,7 +551,7 @@ const updatePoints = (val) => {
     }
 }
 
-const updateStatus = (oldVal, newval) => {
+const updateStatus = (oldVal, newval, { undoing = false } = {}) => {
     try {
         const userData = getUserData();
         const prev = {
@@ -665,7 +587,11 @@ const updateStatus = (oldVal, newval) => {
         }
         taskClass.updateStatus({ newStatus, prevStatus, projectData: projectData, task: props.task, userData})
         .then(() => {
-            $toast.success(t('Toast.Status_updated_successfully'),{position: 'top-right'});
+            if (undoing) return undoneToast();
+            showUndoToast({
+                message: t('Toast.Status_updated_successfully'),
+                undo: () => updateStatus(newval, oldVal, { undoing: true })
+            });
         })
         .catch(() => {
             $toast.error(t('Toast.Status_not_updated'),{position: 'top-right'});
@@ -680,6 +606,10 @@ const updateDueDate = (event) => {
     try {
         isSpinner.value = true;
         const userData = getUserData();
+        const before = {
+            DueDate: props.task.DueDate || null,
+            dueDateDeadLine: (props.task.dueDateDeadLine || []).map((x) => ({ date: x.date }))
+        };
         let newdueDateDeadLine = [];
         if(props.task.dueDateDeadLine.length > 0) {
             props.task.dueDateDeadLine.forEach((date) => {
@@ -727,7 +657,10 @@ const updateDueDate = (event) => {
             obj: notificationObj,
             userData
         }).then(() => {
-            $toast.success(t('Toast.Due_date_updated_successfully'),{position: 'top-right'});
+            showUndoToast({
+                message: t('Toast.Due_date_updated_successfully'),
+                undo: () => restoreDueDate(before, event.dateVal)
+            });
             nextTick(() => {
                 isSpinner.value = false;
             });
@@ -741,6 +674,49 @@ const updateDueDate = (event) => {
         $toast.error(t('Toast.Due_date_not_updated'),{position: 'top-right'});
         isSpinner.value = false;
     }
+}
+
+const asDate = (value) => (value && value.seconds ? new Date(value.seconds * 1000) : new Date(value));
+
+// Undo puts back the exact date and deadline list, including no date at all.
+function restoreDueDate(before, changedTo) {
+    const userData = getUserData();
+    const firebaseObj = {
+        DueDate: before.DueDate ? asDate(before.DueDate) : null,
+        dueDateDeadLine: before.dueDateDeadLine.map((x) => ({ date: asDate(x.date) }))
+    };
+    let notificationObj = {};
+    if (before.DueDate) {
+        notificationObj = {
+            key: "task_due_date",
+            projectId: props.task.ProjectID,
+            taskId: props.task._id,
+            sprintId: props.task.sprintId,
+            message: taskDueDateChange({
+                ProjectName: project.value.ProjectName,
+                TaskName: props.task.TaskName,
+                previousDate: changeDateFormate(asDate(changedTo)),
+                changedDate: changeDateFormate(firebaseObj.DueDate)
+            })
+        };
+    }
+    return taskClass.updateDueDate({
+        commonDateFormatString: dateFormat.value,
+        firebaseObj,
+        project: {
+            _id: project.value._id,
+            CompanyId: project.value.CompanyId,
+            lastTaskId: project.value.lastTaskId,
+            ProjectName: project.value.ProjectName,
+            ProjectCode: project.value.ProjectCode
+        },
+        task: props.task,
+        obj: notificationObj,
+        userData
+    }).then(undoneToast).catch((error) => {
+        console.error("ERROR in restoreDueDate: ", error);
+        $toast.error(t('Toast.Due_date_not_updated'),{position: 'top-right'});
+    });
 }
 
 const updateStartDate = (event) => {

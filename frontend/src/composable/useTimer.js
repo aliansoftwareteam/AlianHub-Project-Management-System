@@ -1,53 +1,32 @@
 import { ref, computed } from 'vue';
+import { timerState, elapsedSeconds, startTimer, stopTimer, discardTimer, ensureTimerLoaded } from '@/components/organisms/TaskDetailOverlay/useTaskTimer';
 import Store from '@/store/index';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 
-const STORAGE_KEY = 'ah.timer';
 const OVERNIGHT_MS = 12 * 3600 * 1000;
 const MAX_ENTRY_MINUTES = 24 * 60 - 1;
 
-const read = () => {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-        return null;
-    }
-};
-const write = (value) => {
-    try {
-        if (value) localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
-        else localStorage.removeItem(STORAGE_KEY);
-    } catch (e) {
-        // storage unavailable — the in-memory timer still runs for this tab
-    }
-};
-
-const active = ref(read());
-const elapsed = ref(0);
 const sessions = ref([]);
 const lastStopped = ref(null);
-let ticker = null;
 let reconciled = false;
 
-const refreshElapsed = () => {
-    elapsed.value = active.value ? Math.max(0, Math.floor((Date.now() - Number(active.value.startedAt)) / 1000)) : 0;
-};
-const syncTicker = () => {
-    if (active.value && !ticker) ticker = setInterval(refreshElapsed, 1000);
-    if (!active.value && ticker) { clearInterval(ticker); ticker = null; }
-};
-refreshElapsed();
-syncTicker();
-if (typeof window !== 'undefined') {
-    window.addEventListener('storage', (e) => {
-        if (e.key !== STORAGE_KEY) return;
-        active.value = read();
-        refreshElapsed();
-        syncTicker();
-    });
-}
+// The Time pages read the task panel's per-user timer, so a timer started anywhere shows here.
+const active = computed(() => {
+    const entry = timerState.entry;
+    if (!entry) return null;
+    return {
+        taskId: entry.taskId,
+        taskName: entry.taskName || '',
+        projectId: entry.projectId || '',
+        projectName: entry.projectName || '',
+        sprintId: entry.sprintId || '',
+        startedAt: entry.firstStartedAt,
+        note: entry.description || '',
+        billable: true,
+    };
+});
+const elapsed = elapsedSeconds;
 
 const pad2 = (n) => String(n).padStart(2, '0');
 export const formatClock = (seconds, withSeconds = false) => {
@@ -130,58 +109,46 @@ export async function logTime({ task, minutes, date, endAt, note, billable = tru
     return body.data;
 }
 
-/* One timer per person, globally. Starting a second one stops (and logs) the first.
- * The active entry lives in localStorage so it survives reloads; `reconcile()`
- * pulls open desktop-tracker sessions from the server so overnight timers can be trimmed. */
+/* `reconcile()` pulls open desktop-tracker sessions from the server so overnight timers
+ * can be trimmed; the browser timer itself is the shared one above. */
 export function useTimer() {
+    ensureTimerLoaded();
     const running = computed(() => !!active.value);
-    const overnight = computed(() => !!active.value && Date.now() - Number(active.value.startedAt) >= OVERNIGHT_MS);
+    const overnight = computed(() => !!active.value && timerState.now - Number(active.value.startedAt) >= OVERNIGHT_MS);
 
     const stop = async ({ minutes } = {}) => {
         const cur = active.value;
         if (!cur) return null;
-        const mins = minutes != null ? Number(minutes) : Math.max(1, Math.round((Date.now() - Number(cur.startedAt)) / 60000));
-        await logTime({
-            task: cur,
-            minutes: mins,
-            endAt: minutes != null ? Number(cur.startedAt) + mins * 60000 : Date.now(),
-            note: cur.note,
-            billable: cur.billable,
-        });
+        if (minutes == null) {
+            const ranMinutes = Math.max(1, Math.round(elapsed.value / 60));
+            const result = await stopTimer();
+            if (result && result.tooShort) return null;
+            if (result && !result.logged) throw Object.assign(new Error(result.statusText || 'log_failed'), { code: result.code });
+            lastStopped.value = { ...cur, minutes: ranMinutes, stoppedAt: Date.now() };
+            return lastStopped.value;
+        }
+        const mins = Number(minutes);
+        await logTime({ task: cur, minutes: mins, endAt: Number(cur.startedAt) + mins * 60000, note: cur.note, billable: cur.billable });
+        discardTimer();
         lastStopped.value = { ...cur, minutes: mins, stoppedAt: Date.now() };
-        active.value = null;
-        write(null);
-        refreshElapsed();
-        syncTicker();
         return lastStopped.value;
     };
 
-    const start = async (task, { note = '', billable = true } = {}) => {
+    const start = async (task, { note = '' } = {}) => {
         if (!task || !task.taskId) return { stoppedPrevious: null };
         if (active.value && active.value.taskId === task.taskId) return { stoppedPrevious: null };
-        const stoppedPrevious = active.value ? await stop() : null;
-        active.value = {
+        const stoppedPrevious = await startTimer({
             taskId: task.taskId,
             taskName: task.taskName || '',
             projectId: task.projectId || '',
             projectName: task.projectName || '',
             sprintId: task.sprintId || '',
-            startedAt: Date.now(),
-            note,
-            billable: billable !== false,
-        };
-        write(active.value);
-        refreshElapsed();
-        syncTicker();
+            description: note,
+        });
         return { stoppedPrevious };
     };
 
-    const discard = () => {
-        active.value = null;
-        write(null);
-        refreshElapsed();
-        syncTicker();
-    };
+    const discard = discardTimer;
 
     const reconcile = async () => {
         reconciled = true;

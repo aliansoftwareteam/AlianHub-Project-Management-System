@@ -58,7 +58,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="input-section d-flex" v-if="row.id === rowId">
+                            <div class="input-section d-flex" v-if="row.id === rowId" @keydown.esc.stop.prevent="rowId=''">
                                 <InputTextarea
                                     v-model.trim="inputModelValue"
                                     :placeHolder="$t('PlaceHolder.Add_an_item')"

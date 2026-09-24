@@ -4,7 +4,7 @@
             <span class="ah-subtasks__title">{{ $t('ProjectDetails.subtask') }}</span>
             <span class="ah-subtasks__rollup ah-mono">{{ rollupText }}</span>
             <div class="ah-subtasks__bar" v-if="rollup.total"><div class="ah-subtasks__bar-fill" :style="{ width: `${rollup.percent}%` }"></div></div>
-            <button v-if="canCreate" type="button" class="ah-subtasks__add" @click="creating = !creating">
+            <button v-if="canCreate" ref="addButton" type="button" class="ah-subtasks__add" @click="creating = !creating">
                 {{ creating ? $t('Projects.cancel') : `+ ${$t('Projects.add_subtask')}` }}
             </button>
         </header>
@@ -42,7 +42,7 @@
                 :project="project"
                 :assigneeOptions="subtaskAssigneeOptions"
                 :considerWidth="false"
-                @cancel="creating = false"
+                @cancel="cancelCreate"
             />
         </div>
         <p v-if="canCreate" class="ah-subtasks__hint ah-small">
@@ -52,7 +52,7 @@
 </template>
 
 <script setup>
-import { computed, inject, reactive, ref, watch } from "vue";
+import { computed, inject, nextTick, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
@@ -101,6 +101,12 @@ function isDone(sub) {
 
 function startCreate() {
     if (canCreate.value) creating.value = true;
+}
+const addButton = ref(null);
+// The row's input goes away with it; keep keyboard focus in the panel rather than on the page.
+function cancelCreate() {
+    creating.value = false;
+    nextTick(() => addButton.value?.focus({ preventScroll: true }));
 }
 defineExpose({ startCreate });
 

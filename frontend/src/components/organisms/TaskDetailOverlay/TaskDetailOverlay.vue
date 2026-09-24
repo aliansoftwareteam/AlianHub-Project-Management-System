@@ -23,6 +23,8 @@
         </div>
     </Transition>
 
+    <UndoToast />
+
     <div v-if="overlayState.minimized.length" class="ah-tray" :aria-label="$t('TaskPanel.tray_label')">
         <div v-for="item in overlayState.minimized" :key="item.taskId" class="ah-tray__chip">
             <button type="button" class="ah-tray__open" :title="item.taskName" @click="restoreTask(item.taskId)">
@@ -49,6 +51,9 @@ import {
     restoreTask, dismissMinimized, stepTask, restoreFromSequence, TASK_QUERY_KEY
 } from "./useTaskOverlay";
 import { navKeyDirection } from "./taskNavigation";
+import { handlePanelEscape } from "./panelEscape";
+import { escapeLayerMark } from "@/composable/useEscapeLayer";
+import UndoToast from "@/components/molecules/UndoToast/UndoToast.vue";
 import "./style.css";
 
 defineOptions({ name: "TaskDetailOverlay" });
@@ -145,10 +150,12 @@ function onKeydown(event) {
         onNavKey(event);
         return;
     }
-    const target = event.target;
-    if (target && (target.closest?.(".sidebar-main, .modal, .swal2-container") || target.isContentEditable)) return;
-    closeTask();
+    handlePanelEscape(event, { panel: panelRef.value, close: () => closeTask(), mark: layerMark });
 }
+
+// Layers opened before the panel sit underneath it, so Esc in the panel leaves them alone.
+let layerMark = escapeLayerMark();
+watch(() => overlayState.open, (open) => { if (open) layerMark = escapeLayerMark(); }, { immediate: true, flush: "sync" });
 
 // Expanding releases the trap, which hands focus back to the row now hidden behind the page.
 watch(isExpanded, (expanded) => {
