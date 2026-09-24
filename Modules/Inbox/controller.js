@@ -94,7 +94,6 @@ const readNotifications = async (companyId, userId, { limit, sort, match }) => {
         // stays right when someone changes their picture.
         actorId: String(r.userId || ''),
         unread: Array.isArray(r.notSeen) && r.notSeen.map(String).includes(userId),
-        reason: r.reason || undefined,
         snoozedUntil: r.snoozedUntil || null,
         snoozeUntilChange: !!r.snoozeUntilChange,
         clearedAt: r.clearedAt || null,
