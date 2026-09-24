@@ -139,3 +139,34 @@ test.describe('accessibility: keyboard in the task overlay', () => {
         await expect(page.locator('.dp__menu')).toBeVisible();
     });
 });
+
+test.describe('accessibility: command palette', () => {
+    test.use(asRole('owner'));
+    test.beforeEach(async ({ page }) => skipFirstRun(page));
+
+    test('Meta+K opens it from Home, its results are axe clean, and Escape hands focus back', async ({ page, state }) => {
+        await page.goto(`/#/${state.companyId}`);
+        await expect(page.getByRole('heading', { level: 1, name: 'Today & Overdue' })).toBeVisible();
+        const opener = page.getByRole('button', { name: 'Search or ask AI' });
+        await opener.focus();
+
+        await page.keyboard.press('Meta+k');
+        const palette = page.getByRole('dialog', { name: 'Command palette' });
+        await expect(palette).toBeVisible();
+        const field = palette.getByRole('combobox', { name: 'Search, go to or run a command' });
+        await expect(field).toBeFocused();
+
+        await page.keyboard.type('E2E Task');
+        const results = palette.getByRole('listbox');
+        await expect(results.getByRole('option', { name: /E2E Task One/ })).toBeVisible();
+        await expect(palette.getByRole('button', { name: 'Tasks', exact: true })).toBeVisible();
+        expect(await blockingViolations(page)).toEqual([]);
+
+        await page.keyboard.press('Tab');
+        await expect(palette.getByRole('toolbar').getByRole('button', { name: 'Open', exact: true })).toBeFocused();
+
+        await page.keyboard.press('Escape');
+        await expect(palette).toBeHidden();
+        await expect(opener).toBeFocused();
+    });
+});
