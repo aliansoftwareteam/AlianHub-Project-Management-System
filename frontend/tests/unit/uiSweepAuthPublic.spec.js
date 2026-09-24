@@ -62,6 +62,14 @@ describe('signed-out screens', () => {
     });
 });
 
+describe('invitation sign-up', () => {
+    test('labels stay visible, so the sample-name placeholder is never read as a filled value', () => {
+        const vue = read('views/Authentication/Invitation/Invitation.vue');
+        expect(vue).toMatch(/<label class="ah-field__label" for="inv-name">/);
+        expect(vue).not.toMatch(/ah-field__label ah-sr-only/);
+    });
+});
+
 describe('login proof panel', () => {
     test('the product shot takes the theme surface, so its dark-mode text stays readable', () => {
         const rule = ruleBody(read('components/templates/AuthShell/style.css'), '.auth__shot');

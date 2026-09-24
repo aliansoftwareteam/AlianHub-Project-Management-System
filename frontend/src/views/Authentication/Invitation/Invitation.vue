@@ -18,7 +18,7 @@
 
             <div class="auth__fields" style="gap:9px">
                 <div class="ah-field">
-                    <label class="ah-field__label ah-sr-only" for="inv-name">{{ $t('Auth.full_name') }}</label>
+                    <label class="ah-field__label" for="inv-name">{{ $t('Auth.full_name') }}</label>
                     <input
                         id="inv-name"
                         ref="nameInput"
@@ -35,11 +35,11 @@
                     <div v-if="errors.name" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.name }}</div>
                 </div>
                 <div class="ah-field">
-                    <label class="ah-field__label ah-sr-only" for="inv-email">{{ $t('Auth.email') }}</label>
+                    <label class="ah-field__label" for="inv-email">{{ $t('Auth.email') }}</label>
                     <div id="inv-email" class="av2-email">{{ email }}</div>
                 </div>
                 <div class="ah-field">
-                    <label class="ah-field__label ah-sr-only" for="inv-password">{{ $t('Auth.password') }}</label>
+                    <label class="ah-field__label" for="inv-password">{{ $t('Auth.password') }}</label>
                     <div class="auth__pw">
                         <input
                             id="inv-password"
