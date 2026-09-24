@@ -111,6 +111,31 @@ describe('TSK-05 global search is limited to the projects the caller can see', (
         expect(names(res.body.data.tasks, 'TaskName')).toEqual(['Budget payroll', 'Budget plan']);
     });
 
+    it('gives each task row its sprint location and age for the palette, and nothing else of the task', async () => {
+        const updatedAt = new Date('2026-09-20T10:00:00Z');
+        mockDb.seed(SCHEMA_TYPE.TASKS, {
+            TaskName: 'Budget review', TaskKey: 'AH-7', ProjectID: MINE, deletedStatusKey: 0, updatedAt,
+            sprintArray: { id: 'sprint-4', name: 'Sprint 4', folderName: 'Q3' }, description: 'private body', AssigneeUserId: [OTHER],
+        });
+        const res = await search('review');
+        expect(res.body.data.tasks).toHaveLength(1);
+        const [row] = res.body.data.tasks;
+        expect(row).toMatchObject({ TaskName: 'Budget review', TaskKey: 'AH-7', sprintName: 'Sprint 4', folderName: 'Q3' });
+        expect(new Date(row.updatedAt).toISOString()).toBe(updatedAt.toISOString());
+        expect(row).not.toHaveProperty('description');
+        expect(row).not.toHaveProperty('AssigneeUserId');
+        expect(row).not.toHaveProperty('sprintArray');
+    });
+
+    it('gives each project row its last update', async () => {
+        const updatedAt = new Date('2026-09-21T10:00:00Z');
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: '6f0000000000000000000a03', ProjectName: 'Budget audit', deletedStatusKey: 0, updatedAt });
+        visibleProjectIds.mockResolvedValue([MINE, '6f0000000000000000000a03']);
+        const res = await search('audit');
+        expect(res.body.data.projects).toHaveLength(1);
+        expect(new Date(res.body.data.projects[0].updatedAt).toISOString()).toBe(updatedAt.toISOString());
+    });
+
     it('refuses a caller who is not a member of the company', async () => {
         getRoleType.mockResolvedValue(null);
         const res = await search();
