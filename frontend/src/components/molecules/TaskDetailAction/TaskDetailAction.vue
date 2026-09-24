@@ -52,6 +52,12 @@
                                 <span class="dropdown-label">{{$t('ProjectDetails.remind_me')}}</span>
                             </div>
                         </DropDownOption>
+                        <DropDownOption v-if="canOpenTracker" @click="$refs['horizontalDocs'].click(),$emit('open', 'tracker')">
+                            <div>
+                                <img :src="trackerIcon" alt="" />
+                                <span class="dropdown-label">{{$t('TaskPanel.open_in_desktop_tracker')}}</span>
+                            </div>
+                        </DropDownOption>
                         <DropDownOption v-if="(task.queueListArray == undefined || (task.queueListArray && task.queueListArray.indexOf(userId) == -1)) && (task.AssigneeUserId && task.AssigneeUserId.indexOf(userId) !== -1) && checkPermission('task.queue_list',projectData.isGlobalPermission) == true" @click="$refs['horizontalDocs'].click(),addToQueue('add')">
                             <div>
                                 <img :src="cancelIcon" />
@@ -260,6 +266,7 @@
     // const deleteIcon = require("@/assets/images/DeleteIcon.png");
     const inventoryIcon = require("@/assets/images/inventory_2.png");
     const deleteIcon = require("@/assets/images/DeleteIcon.png");
+    const trackerIcon = require("@/assets/images/svg/clock_timer_gray_svg.svg");
 
     const emit = defineEmits(['update:watchers', 'open', 'close']);
 
@@ -270,6 +277,7 @@
     const watcherUsers = ref([]);
     const search = ref('');
     const userId = inject('$userId')
+    const canOpenTracker = computed(() => (props.task?.AssigneeUserId || []).includes(userId.value) && (props.task?.status?.type || props.task?.statusType) !== 'close');
     const companyId = inject('$companyId')
     const clientWidth = inject('$clientWidth');
     // Provided by TaskDetail.vue — { total, completed } for the subtask % badge.

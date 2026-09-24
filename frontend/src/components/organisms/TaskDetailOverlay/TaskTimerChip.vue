@@ -84,11 +84,11 @@ async function stop() {
     if (result.logged) {
         $toast.success(t("TaskPanel.timer_logged"), { position: "top-right" });
         emit("logged", result);
-    } else if (result.statusText) {
-        const key = timeLogFailureKey(result, "");
-        $toast.error(key ? t(key) : result.statusText, { position: "top-right" });
-    } else {
+    } else if (result.tooShort) {
         $toast.info(t("TaskPanel.timer_too_short"), { position: "top-right" });
+    } else {
+        const key = timeLogFailureKey(result, "");
+        $toast.error(key ? t(key) : (result.statusText || t("Home.timer_log_failed")), { position: "top-right" });
     }
 }
 </script>

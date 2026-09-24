@@ -325,6 +325,7 @@
         </div>
 
         <PagesPanel v-if="projectData._id" v-model="showDocs" :projectData="projectData" :openDocId="openDocId" />
+        <TaskTrackerHandoff v-if="task._id" ref="trackerRef" :task="task" />
     </div>
 </template>
 
@@ -348,6 +349,9 @@ import PagesPanel from "@/components/molecules/Pages/PagesPanel.vue";
 import TagChip from "@/components/atom/TagChip/TagChip.vue";
 import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
 import TaskSummaryBlock from "./TaskSummaryBlock.vue";
+import TaskTrackerHandoff from "./TaskTrackerHandoff.vue";
+import { showUndoToast } from "@/composable/useUndoToast";
+import { useEscapeLayer } from "@/composable/useEscapeLayer";
 import TaskSubtaskList from "./TaskSubtaskList.vue";
 import TaskTimerChip from "./TaskTimerChip.vue";
 import TaskAgentStrip from "./TaskAgentStrip.vue";
@@ -412,6 +416,8 @@ const commentTotal = ref(0);
 const tagChipArray = ref([]);
 const tagIds = ref({});
 const sheetOpen = ref(false);
+useEscapeLayer(sheetOpen, () => { sheetOpen.value = false; });
+const trackerRef = ref(null);
 const showDocs = ref(false);
 const openDocId = ref("");
 const docsRefreshKey = ref(0);
@@ -613,8 +619,12 @@ function changeTaskType(status) {
 function toggleDone(done) {
     const statuses = projectData.value?.taskStatusData || [];
     const next = done ? doneStatus.value : reopenStatus.value;
-    if (!next || statusPending.value) return;
     const current = statuses.find((s) => s.key === task.value.statusKey) || {};
+    setStatus(next, current);
+}
+
+function setStatus(next, current, { undoing = false } = {}) {
+    if (!next || statusPending.value) return;
     statusPending.value = true;
     taskClass.updateStatus({
         newStatus: { status: { text: next.name, key: next.key, type: next.type, value: next.value }, statusType: next.type, statusKey: next.key },
@@ -628,7 +638,9 @@ function toggleDone(done) {
         userData: userData()
     }).then(() => {
         reflectOwnUpdate({ status: { text: next.name, key: next.key, type: next.type, value: next.value }, statusType: next.type, statusKey: next.key });
-        $toast.success(t("Toast.Status_updated_successfully"), { position: "top-right" });
+        if (undoing) $toast.success(t("TaskPanel.change_undone"), { position: "top-right" });
+        else if (current.key) showUndoToast({ message: t("Toast.Status_updated_successfully"), undo: () => setStatus(current, next, { undoing: true }) });
+        else $toast.success(t("Toast.Status_updated_successfully"), { position: "top-right" });
     }).catch(() => {
         $toast.error(t("Toast.Status_not_updated"), { position: "top-right" });
     }).finally(() => {
@@ -706,6 +718,9 @@ function open(val) {
             break;
         case "filesLinks":
             activeTab.value = "files";
+            break;
+        case "tracker":
+            trackerRef.value?.start();
             break;
         default:
             break;

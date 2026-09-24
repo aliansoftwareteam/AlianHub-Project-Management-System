@@ -37,7 +37,9 @@ async function finish() {
     stopping.value = true;
     try {
         const result = await stop({ companyId: companyId.value, userId: userId.value });
-        if (result) {
+        if (result && !result.logged) {
+            $toast.info(t("TaskPanel.timer_too_short"), { position: "top-right" });
+        } else if (result) {
             $toast.success(t("Home.timer_logged", { duration: fmtEstimate(Math.max(1, Math.round(result.elapsedMs / 60000))), task: result.taskName }), { position: "top-right" });
         }
     } catch (error) {

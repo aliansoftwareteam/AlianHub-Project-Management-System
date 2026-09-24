@@ -1,24 +1,27 @@
 import { computed, inject, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { apiRequest, apiRequestWithoutCompnay } from "@/services";
-import * as env from "@/config/env";
+import { apiRequest } from "@/services";
 import { useGetterFunctions } from "@/composable";
 import { FIRST_RUN_STEPS, isFirstRunStepDone } from "@/composable/firstRunProgress";
+import { onboardingRecord, saveOnboarding } from "@/composable/onboardingState";
 import { isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
 
 const SAMPLE_CODE = "WELCOME";
 
+/* Facts about the workspace rather than the person: a member neither sees nor gets credit for them. */
+export const WORKSPACE_STEPS = ["company", "sample", "invite", "project", "permissions", "apps", "remove_sample"];
 export const MEMBER_STEPS = ["open_project", "complete_task", "log_time", "notifications", "tour"];
-export const ADMIN_STEPS = ["company", "sample", "invite", "project", "permissions", "board", "notifications", "apps", "remove_sample"];
+export const ADMIN_STEPS = ["company", "sample", "invite", "project", "permissions", "board", "notifications", "apps", "remove_sample", "tour"];
 
-/* Steps a click can settle live in the user document; the rest are read off data. */
 const FLAG = {
     permissions: "reviewedPermissions",
     open_project: "openedProject",
     complete_task: "completedTask",
     log_time: "loggedTime",
-    apps: "chosenApps"
+    apps: "chosenApps",
+    board: "viewedBoard",
+    notifications: "viewedNotifications"
 };
 
 export function useOnboardingChecklist({ openCreateProject = () => {}, startTour = () => {}, routeVersion = () => "" } = {}) {
@@ -35,28 +38,16 @@ export function useOnboardingChecklist({ openCreateProject = () => {}, startTour
     const me = computed(() => getUser(userId.value, "all") || {});
     const tourStatus = computed(() => me.value.tourStatus || {});
     const sampleProject = computed(() => projects.value.find((p) => p.ProjectCode === SAMPLE_CODE && p.deletedStatusKey !== 1) || null);
+    const record = computed(() => onboardingRecord(me.value.homeChecklist || {}));
 
-    const checklist = ref({ dismissed: false });
     const removingSample = ref(false);
-
-    const load = () => {
-        if (me.value.homeChecklist) checklist.value = { ...checklist.value, ...me.value.homeChecklist };
-    };
-
-    const save = (patch) => {
-        checklist.value = { ...checklist.value, ...patch };
-        return apiRequestWithoutCompnay("put", env.USER_UPATE, {
-            userId: userId.value,
-            updateObject: { $set: { homeChecklist: checklist.value } }
-        }).catch((error) => console.error("checklist save failed", error));
-    };
 
     const mark = (key) => {
         const flag = FLAG[key];
-        if (flag && !checklist.value[flag]) save({ [flag]: true });
+        if (flag && !record.value[flag]) saveOnboarding({ [flag]: true });
     };
 
-    const flagged = (key) => checklist.value[FLAG[key]] === true;
+    const flagged = (key) => record.value[FLAG[key]] === true;
     const firstRunDone = (step) => {
         void routeVersion();
         return isFirstRunStepDone(step);
@@ -68,8 +59,8 @@ export function useOnboardingChecklist({ openCreateProject = () => {}, startTour
         invite: () => companyUsers.value.length > 1,
         project: () => projects.value.some((p) => p.ProjectCode !== SAMPLE_CODE),
         permissions: () => flagged("permissions"),
-        board: () => firstRunDone(FIRST_RUN_STEPS.BOARD_VIEW),
-        notifications: () => firstRunDone(FIRST_RUN_STEPS.NOTIFICATIONS),
+        board: () => flagged("board") || firstRunDone(FIRST_RUN_STEPS.BOARD_VIEW),
+        notifications: () => flagged("notifications") || firstRunDone(FIRST_RUN_STEPS.NOTIFICATIONS),
         apps: () => flagged("apps"),
         remove_sample: () => projects.value.length > 0 && !sampleProject.value,
         open_project: () => flagged("open_project"),
@@ -103,8 +94,8 @@ export function useOnboardingChecklist({ openCreateProject = () => {}, startTour
         cta: CTA[key]
     })));
     const complete = computed(() => steps.value.every((s) => s.done));
-    const show = computed(() => !checklist.value.dismissed && !complete.value);
-    const dismiss = () => save({ dismissed: true });
+    const show = computed(() => record.value.dismissed !== true && !complete.value);
+    const dismiss = () => saveOnboarding({ dismissed: true });
 
     const go = (name, extra = {}) => router.push({ name, params: { cid: companyId.value }, ...extra }).catch(() => {});
 
@@ -144,5 +135,5 @@ export function useOnboardingChecklist({ openCreateProject = () => {}, startTour
         return true;
     };
 
-    return { steps, show, complete, isOwnerOrAdmin, sampleProject, removingSample, load, mark, dismiss, onAction, removeSample };
+    return { steps, show, complete, isOwnerOrAdmin, sampleProject, removingSample, mark, dismiss, onAction, removeSample };
 }

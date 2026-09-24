@@ -44,7 +44,7 @@
                     </span>
                 </div>
             </div>
-            <div class="input-section d-flex" v-if="item.id === rowId">
+            <div class="input-section d-flex" v-if="item.id === rowId" @keydown.esc.stop.prevent="$emit('hideInput', '')">
                 <InputTextarea
                     v-model.trim="inputModelValue"
                     :placeHolder="$t('PlaceHolder.Add_an_item')"

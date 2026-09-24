@@ -45,4 +45,11 @@ function screenFor(route) {
     return '';
 }
 
-module.exports = { STEPS, SCREENS, screenFor, doneKey };
+/* The shell tour is a step of the Home checklist, so it only starts when asked for; starting it on
+   landing stacked it on top of that checklist. A screen tour offers itself once per user, ever. */
+function mayAutoOffer(which, { done, skipped, savedStep, offeredBefore, wide, shellSettled }) {
+    if (which === 'shell' || !STEPS[which]) return false;
+    return !done && !skipped && !savedStep && !offeredBefore && wide && shellSettled;
+}
+
+module.exports = { STEPS, SCREENS, screenFor, doneKey, mayAutoOffer };
