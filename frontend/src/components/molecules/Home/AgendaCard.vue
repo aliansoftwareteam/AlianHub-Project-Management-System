@@ -3,9 +3,9 @@
         <div class="hc-card__head">
             <span class="hc-card__title">{{ $t('Home.agenda') }}</span>
             <span class="hc-agenda__nav">
-                <button type="button" :aria-label="$t('Home.day')" @click="$emit('shift', -1)">‹</button>
+                <button type="button" :aria-label="$t('Home.previous_day')" @click="$emit('shift', -1)">‹</button>
                 <button type="button" @click="$emit('shift', 0)">{{ dayLabel }}</button>
-                <button type="button" :aria-label="$t('Home.day')" @click="$emit('shift', 1)">›</button>
+                <button type="button" :aria-label="$t('Home.next_day')" @click="$emit('shift', 1)">›</button>
             </span>
         </div>
         <router-link v-if="!connected" class="hc-connect" :to="connectTo">

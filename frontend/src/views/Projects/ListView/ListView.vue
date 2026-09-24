@@ -42,7 +42,7 @@
                 <ListBulkBar v-if="project" :project="project" />
                 <div class="lv2__scroll ah-scroll" id="list_scroll" role="table">
                     <div class="lv2__cols" role="row">
-                        <span class="lv2__c-select" role="columnheader"></span>
+                        <span class="lv2__c-select" role="columnheader"><span class="ah-sr-only">{{ $t('List.col_select') }}</span></span>
                         <span class="lv2__c-title" role="columnheader">{{ $t('List.col_task') }}</span>
                         <span class="lv2__c-assignee" role="columnheader">{{ $t('List.col_assignee') }}</span>
                         <span class="lv2__c-due" role="columnheader">{{ $t('List.col_due') }}</span>

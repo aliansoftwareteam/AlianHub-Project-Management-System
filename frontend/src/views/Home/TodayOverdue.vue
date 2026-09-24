@@ -90,7 +90,7 @@
             </div>
         </div>
 
-        <input ref="dateInput" type="date" class="home__date-input" @change="onDatePicked" />
+        <input ref="dateInput" type="date" class="home__date-input" tabindex="-1" aria-hidden="true" @change="onDatePicked" />
 
         <TaskDetail
             v-if="detail.open"
