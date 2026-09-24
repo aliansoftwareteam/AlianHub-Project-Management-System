@@ -1,7 +1,8 @@
 # 037 progress
 
 - [x] 1 List view filters and remembered views (PR #958)
-- [ ] 2 Create a task from anywhere
+- [x] 2 Create a task from anywhere
+- [ ] 1 List view filters and remembered views
 - [ ] 3 Task panel: Esc, undo and one timer
 - [x] 4 Bulk edit
 - [ ] 5 First run and the Getting started card
@@ -10,4 +11,5 @@
 ## Log
 - 2026-09-24: flow audit and ClickUp comparison written; six slices started in parallel.
 - 2026-09-24: slice 1 in PR #958: List reads the searched tasks like Board and Table, Clear filters on an empty result, group, Me and search remembered per user per project, Assignee grouping, Add View menu labels.
+- 2026-09-24: slice 2 (ranks 4, 5) on `feat/create-task-anywhere`: one create dialog from the palette, the rail, the mobile tab bar, `c` and a project's + New; commands rank above Ask AI; the List add row stays open; Home's add field keeps focus.
 - 2026-09-24: slice 4 (bulk edit) done: bar above the tab bar at 390 px, shift-click and Shift+Space/Arrow range selection in List, Board and Table, Undo on "Updated n tasks." including archive and delete (both soft).

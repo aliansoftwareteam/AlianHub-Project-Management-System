@@ -11,6 +11,10 @@
             <ShellIcon :name="item.icon" :size="20" />
             <span>{{ $t(item.label) }}</span>
         </router-link>
+        <button type="button" class="ah-tabbar__item ah-tabbar__item--new" aria-keyshortcuts="c" @click="openQuickCreate()">
+            <ShellIcon name="plus" :size="20" />
+            <span>{{ $t('QuickCreate.rail_label') }}</span>
+        </button>
         <button type="button" class="ah-tabbar__item" :class="{ 'is-active': sheet }" @click="sheet = true">
             <ShellIcon name="more" :size="20" />
             <span>{{ $t('Shell.more') }}</span>
@@ -71,6 +75,7 @@ import { useGetterFunctions } from "@/composable/index.js";
 import { useAuth } from "@/services";
 import { useNavItems } from "./navItems";
 import { shellState, openPanel, toggleTheme } from "./shellState";
+import { openQuickCreate } from "@/components/organisms/QuickCreateTask/quickCreateTask";
 
 const companyId = inject("$companyId");
 const userId = inject("$userId");

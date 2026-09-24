@@ -238,3 +238,28 @@ test.describe('accessibility: command palette', () => {
         await expect(opener).toBeFocused();
     });
 });
+
+test.describe('accessibility: create task dialog', () => {
+    test.use(asRole('owner'));
+    test.beforeEach(async ({ page }) => skipFirstRun(page));
+
+    test('the rail opens it with the title focused, it is axe clean, and Escape hands focus back', async ({ page, state }) => {
+        await page.goto(`/#/${state.companyId}`);
+        await expect(page.getByRole('heading', { level: 1, name: 'Today & Overdue' })).toBeVisible();
+        const opener = page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'New task' });
+        await opener.click();
+
+        const dialog = page.getByRole('dialog', { name: 'New task' });
+        await expect(dialog).toBeVisible();
+        await expect(dialog.getByRole('textbox', { name: 'Task name' })).toBeFocused();
+        await expect(dialog.getByRole('group', { name: 'Task properties' })).toBeVisible();
+        expect(await blockingViolations(page)).toEqual([]);
+
+        await page.keyboard.press('Shift+Tab');
+        expect(await inDialog(page)).toBe(true);
+
+        await page.keyboard.press('Escape');
+        await expect(dialog).toBeHidden();
+        await expect(opener).toBeFocused();
+    });
+});

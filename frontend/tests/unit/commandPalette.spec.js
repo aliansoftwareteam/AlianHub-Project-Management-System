@@ -23,7 +23,8 @@ vi.mock('@/composable', () => ({
 
 import CommandPalette from '@/components/molecules/AdvanceSearch/CommandPalette.vue';
 import { isMacPlatform, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys';
-import { relativeAge, taskLocation } from '@/components/molecules/AdvanceSearch/paletteRows';
+import { commandLeads, relativeAge, taskLocation } from '@/components/molecules/AdvanceSearch/paletteRows';
+import { closeQuickCreate, quickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 
 const DAY = 24 * 60 * 60 * 1000;
 const twoDaysAgo = new Date(Date.now() - 2 * DAY - 60 * 1000).toISOString();
@@ -302,5 +303,42 @@ describe('CommandPalette', () => {
         await typeQuery(wrapper, 'home');
         expect(apiRequest).not.toHaveBeenCalledWith('post', '/api/v2/search', expect.anything());
         expect(kinds(wrapper)).toContain('nav');
+    });
+
+    it('ranks a matching command above the records and Ask AI, so "new task" + Enter opens the create dialog', async () => {
+        closeQuickCreate();
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'new task');
+        const order = kinds(wrapper);
+        expect(order[0]).toBe('command');
+        expect(order.indexOf('command')).toBeLessThan(order.indexOf('ask'));
+        expect(activeOption(wrapper).attributes('data-kind')).toBe('command');
+
+        await key(wrapper, { key: 'Enter' });
+        expect(quickCreate.open).toBe(true);
+        expect(router.push).not.toHaveBeenCalled();
+        expect(wrapper.emitted('close')).toBeTruthy();
+        closeQuickCreate();
+    });
+
+    it('keeps Ask AI below a command that only partly matches, and records first', async () => {
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'budget');
+        expect(kinds(wrapper)[0]).toBe('task');
+    });
+});
+
+describe('command ranking', () => {
+    it('leads with commands when the query starts a command label or alias', () => {
+        expect(commandLeads('new task', ['New task', 'new task'])).toBe(true);
+        expect(commandLeads('New', ['New task'])).toBe(true);
+        expect(commandLeads('  new t ', ['New task'])).toBe(true);
+    });
+
+    it('does not lead for a query that is too short or only appears inside a label', () => {
+        expect(commandLeads('n', ['New task'])).toBe(false);
+        expect(commandLeads('task', ['New task'])).toBe(false);
+        expect(commandLeads('budget', ['New task', 'New project'])).toBe(false);
+        expect(commandLeads('', ['New task'])).toBe(false);
     });
 });

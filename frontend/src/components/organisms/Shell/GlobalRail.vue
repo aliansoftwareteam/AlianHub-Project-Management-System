@@ -6,6 +6,17 @@
         </router-link>
 
         <div class="ah-rail__items">
+            <button
+                type="button"
+                class="ah-rail__item ah-rail__item--new"
+                :title="$t('QuickCreate.rail_title')"
+                aria-keyshortcuts="c"
+                :tabindex="focusIndex('new')"
+                @click="openQuickCreate()"
+            >
+                <span class="ah-rail__tile"><ShellIcon name="plus" :size="17" /></span>
+                <span class="ah-rail__label">{{ $t('QuickCreate.rail_label') }}</span>
+            </button>
             <router-link
                 v-for="item in rail"
                 :key="item.key"
@@ -134,6 +145,7 @@ import { useAppVersion } from "@/composable/useAppVersion";
 import { useAuth } from "@/services";
 import { useNavItems } from "./navItems";
 import { shellState, openPanel, closePopovers, toggleTheme } from "./shellState";
+import { openQuickCreate } from "@/components/organisms/QuickCreateTask/quickCreateTask";
 
 const emit = defineEmits(["change"]);
 const companyId = inject("$companyId");
@@ -155,7 +167,7 @@ const me = computed(() => getUser(userId.value) || {});
 const companies = computed(() => getters["settings/companies"] || []);
 const otherCompanies = computed(() => companies.value.filter((c) => c._id !== companyId.value));
 
-const focusOrder = computed(() => [...rail.value.map((i) => i.key), "more", "profile"]);
+const focusOrder = computed(() => ["new", ...rail.value.map((i) => i.key), "more", "profile"]);
 const focused = ref(0);
 const focusIndex = (key) => (focusOrder.value[focused.value] === key ? 0 : -1);
 const onKeydown = (e) => {
