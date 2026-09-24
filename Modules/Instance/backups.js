@@ -7,7 +7,7 @@ const tar = require('tar-stream');
 const { EJSON } = require('bson');
 const buildInfo = require('../../Config/buildInfo');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
-const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { MongoDbCrudOpration, dropCompanyDatabase } = require('../../utils/mongo-handler/mongoQueries');
 const { handleConnection } = require('../../middlewares/mongoConnector/mongoConnection');
 const connectionRegistry = require('../../middlewares/mongoConnector/helper');
 const { state } = require('../../Config/instanceState');
@@ -107,12 +107,7 @@ async function dropOrphanDatabase({ name, confirm }) {
     if (confirm !== name) throw httpError(400, 'Type the database name to confirm the drop.');
     const orphan = (await findOrphanDatabases()).find((db) => db.name === name);
     if (!orphan) throw httpError(409, 'That database is not orphaned: a company or user still references it, or it does not exist.');
-    const globalDb = await nativeDb('global');
-    await globalDb.client.db(name).dropDatabase();
-    for (const entry of connectionRegistry.connections.filter((c) => c.db === name)) {
-        connectionRegistry.connections.splice(connectionRegistry.connections.indexOf(entry), 1);
-        try { entry.connection.close(); } catch (e) { /* already closed */ }
-    }
+    await dropCompanyDatabase(name);
     logger.warn(`orphaned company database ${name} (${orphan.sizeOnDisk} bytes) dropped by the instance owner`);
     return orphan;
 }
