@@ -74,8 +74,10 @@ vi.mock('@/components/organisms/TaskDetailOverlay/TaskSummaryBlock.vue', () => s
 vi.mock('@/components/organisms/TaskDetailOverlay/TaskSubtaskList.vue', () => slotStub('TaskSubtaskList', 'none', ['startCreate']));
 vi.mock('@/components/organisms/TaskDetailOverlay/TaskTimerChip.vue', () => stub('TaskTimerChip'));
 vi.mock('@/components/organisms/TaskDetailOverlay/TaskAgentStrip.vue', () => stub('TaskAgentStrip'));
+vi.mock('@/components/organisms/TaskDetailOverlay/TaskTrackerHandoff.vue', () => slotStub('TaskTrackerHandoff', 'none', ['start']));
 
 import TaskDetailPanel from '@/components/organisms/TaskDetailOverlay/TaskDetailPanel.vue';
+import { undoToast, runUndo, dismissUndoToast } from '@/composable/useUndoToast';
 import en from '@/locales/en.js';
 
 const i18n = config.global.plugins[0];
@@ -353,6 +355,33 @@ describe('TaskDetailPanel', () => {
             await flushPromises();
             const labels = wrapper.get('.ah-detail__quick').findAll('button').map((button) => button.text());
             expect(labels).toEqual(['Relate']);
+        });
+    });
+
+    describe('undo and the desktop tracker', () => {
+        it('offers undo after ticking done and puts the previous status back', async () => {
+            updateStatus.mockClear();
+            const wrapper = mountPanel();
+            await flushPromises();
+            await wrapper.find('input.ah-detail__done').setValue(true);
+            await flushPromises();
+            expect(undoToast.current).not.toBeNull();
+            await runUndo();
+            await flushPromises();
+            expect(updateStatus).toHaveBeenCalledTimes(2);
+            const undo = updateStatus.mock.calls[1][0];
+            expect(undo.newStatus).toMatchObject({ statusKey: 'st-open', statusType: 'open' });
+            expect(undo.prevStatus).toMatchObject({ statusName: 'Done', updatedTaskName: 'Open' });
+            dismissUndoToast();
+        });
+
+        it('opens the desktop tracker hand-off from the more menu', async () => {
+            exposed['TaskTrackerHandoff.start'] = vi.fn();
+            const wrapper = mountPanel();
+            await flushPromises();
+            wrapper.findComponent({ name: 'TaskDetailAction' }).vm.$emit('open', 'tracker');
+            await flushPromises();
+            expect(exposed['TaskTrackerHandoff.start']).toHaveBeenCalledTimes(1);
         });
     });
 });
