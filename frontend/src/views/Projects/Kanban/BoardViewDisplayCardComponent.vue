@@ -20,7 +20,14 @@
                                 :aria-label="$t('Common.select_task')"
                             />
                         </label>
-                        <div class="card-title font-weight-500 ml-5px" :title="element.TaskName">
+                        <div
+                            class="card-title font-weight-500 ml-5px"
+                            :title="element.TaskName"
+                            role="button"
+                            tabindex="0"
+                            @keydown.enter.self.prevent="!showArchiveVar ? toggleTaskDetail(element) : ''"
+                            @keydown.space.self.prevent="!showArchiveVar ? toggleTaskDetail(element) : ''"
+                        >
                             <span v-if="taskKey" class="card-key">{{ taskKey }}</span>
                             <img v-if="element.deletedStatusKey === 2" :src="inventoryIcon" alt="inventory" class="ml-5px" />
                             <img v-if="element.deletedStatusKey === 1" :src="deleteIcon" alt="delete" class="ml-5px" />

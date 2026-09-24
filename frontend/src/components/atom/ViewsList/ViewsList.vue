@@ -6,9 +6,7 @@
     >
         <button
             type="button"
-            role="tab"
-            :aria-selected="active ? 'true' : 'false'"
-            :tabindex="active ? 0 : -1"
+            :aria-current="active ? 'true' : null"
             :class="{'border-left': firstChild && !active, 'border-right': !active, 'border-none activeViewList': active}"
             class="d-flex align-items-center font-size-14 view-list position-re cursor-pointer"
             :style="{ height: active ? '36px' : 'auto' }"

@@ -138,14 +138,11 @@
 .ph2__viewrow .wrapper.bg-light-gray .view-list .gray81 { color: var(--ink); font-weight: 600; }
 .ph2__viewrow .view-list .gray81 { color: var(--ink-2); font-size: 12.5px; }
 
-/* The shared --focus ring is 12% brand; on a tab with no border or fill of its
-   own that alone is not a visible focus state, so it is paired with an outline. */
-.ph2__viewrow [role="tab"]:focus-visible,
+.ph2__viewrow .view-list:focus-visible,
 .ph2__viewrow .ph2__tab:focus-visible {
     outline: 2px solid var(--brand);
     outline-offset: -2px;
     border-radius: var(--r-chip);
-    box-shadow: var(--focus);
 }
 
 .ph2__actions {

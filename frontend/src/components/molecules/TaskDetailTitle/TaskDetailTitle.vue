@@ -16,9 +16,8 @@
                     v-if="checkPermission('task.task_name_edit',selectedProject?.isGlobalPermission) === true"
                     class="title-name"
                     :title="taskName"
-                    @click="isEditName = true, editTaskName = taskName"
                 >
-                    {{ taskName }}
+                    <button type="button" class="title-name__edit" @click="isEditName = true, editTaskName = taskName">{{ taskName }}</button>
                 </h4>
                 <h4 
                     v-else
@@ -41,12 +40,16 @@
                         :isOutline="false"
                     />
                 </span>
-                <img
+                <button
                     v-if="!isEditName && !isSupport"
-                    src="@/assets/images/copy.png"
-                    class="copy-icon cursor-pointer"
+                    type="button"
+                    class="copy-icon__btn"
+                    :aria-label="$t('TaskPanel.copy_title')"
+                    :title="$t('TaskPanel.copy_title')"
                     @click="copyText(taskName)"
-                />
+                >
+                    <img src="@/assets/images/copy.png" alt="" class="copy-icon cursor-pointer" />
+                </button>
             </li>
         </ul>
     </div>
