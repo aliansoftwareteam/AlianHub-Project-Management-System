@@ -784,7 +784,10 @@ export default {
         "tracking_short": "tracking {time}",
         "this_week": "This week",
         "access_denied": "You don't have access to Home.",
-        "views_nav": "Views"
+        "views_nav": "Views",
+        "show_lists": "Show lists in {project}",
+        "previous_day": "Previous day",
+        "next_day": "Next day"
     },
     "Portfolio": {
         "new": "New portfolio",
@@ -1559,7 +1562,11 @@ export default {
         "agent_activity_action": "Action",
         "agent_activity_elicitation": "Question",
         "agent_activity_response": "Answer",
-        "agent_activity_error": "Error"
+        "agent_activity_error": "Error",
+        "more_actions": "More actions",
+        "watchers": "Watchers ({n})",
+        "copy_title": "Copy task name",
+        "cancel_reply": "Cancel reply"
     },
     "Ai": {
         "title": "AI",
@@ -2370,7 +2377,8 @@ export default {
         "due_group_tomorrow": "Tomorrow",
         "due_group_this_week": "This week",
         "due_group_later": "Later",
-        "due_group_none": "No due date"
+        "due_group_none": "No due date",
+        "col_select": "Select"
     },
     "Views": {
         "desktop_only_title": "Open this on a desktop",

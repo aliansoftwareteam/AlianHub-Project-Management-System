@@ -58,7 +58,7 @@
                     <button type="button" class="hs-item__action" :class="{ 'is-on': isPinned(project._id) }" :title="isPinned(project._id) ? $t('Home.unpin') : $t('Home.pin')" @click.stop="togglePin(project)">
                         <ShellIcon name="star" :size="12" />
                     </button>
-                    <button type="button" class="hs-item__chev" :class="{ 'is-open': expanded[project._id] }" :aria-expanded="!!expanded[project._id]" @click.stop="toggleExpand(project)">
+                    <button type="button" class="hs-item__chev" :class="{ 'is-open': expanded[project._id] }" :aria-expanded="!!expanded[project._id]" :aria-label="$t('Home.show_lists', { project: project.ProjectName })" @click.stop="toggleExpand(project)">
                         <ShellIcon name="chevronDown" :size="12" />
                     </button>
                 </div>

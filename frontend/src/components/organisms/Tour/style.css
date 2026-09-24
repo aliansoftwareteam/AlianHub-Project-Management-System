@@ -51,6 +51,7 @@
 }
 .driver-popover.ah-tour .driver-popover-navigation-btns button:hover,
 .driver-popover.ah-tour .ah-tour__skip:hover { background: var(--surface-hover); }
+.driver-popover.ah-tour .ah-tour__skip:focus-visible, .driver-popover.ah-tour .driver-popover-next-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand); }
 .driver-popover.ah-tour .driver-popover-next-btn { background: var(--brand) !important; color: var(--on-brand) !important; border-color: var(--brand) !important; }
 .driver-popover.ah-tour .driver-popover-next-btn:hover { background: var(--brand-deep) !important; }
 .driver-popover.ah-tour .driver-popover-prev-btn { display: none !important; }

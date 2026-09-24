@@ -13,6 +13,7 @@
     padding: 0px 10.157px 0px 10.156px;
     cursor: pointer;
 }
+button.task-status-name { border-style: none; }
 @media(max-width: 767px){
 .task-detail-right-side-label .task-status-name {
     min-width: 155px !important;

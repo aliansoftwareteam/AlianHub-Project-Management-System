@@ -56,7 +56,7 @@
                     </div>
                     <IconPicker v-if="iconSource === 'library'" v-model="selectedIconValue" v-model:color="selectedIconColor" />
                 </div>
-                <div class="overflow-y-auto sidebar-options overflow-x-hidden bg-white">
+                <div class="overflow-y-auto sidebar-options overflow-x-hidden bg-white" :role="filteredStatusOptions && filteredStatusOptions.length ? 'listbox' : null">
                     <template v-if="filteredStatusOptions && filteredStatusOptions.length">
                         <SidebarItems
                             v-for="(item, itemIndex) in filteredStatusOptions"

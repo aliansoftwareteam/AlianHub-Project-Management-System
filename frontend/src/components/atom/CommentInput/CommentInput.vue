@@ -51,7 +51,7 @@
                     <span v-else class="text-ellipsis cursor-default" :title="reply.mediaName">{{reply.mediaName}}</span>
                 </div>
                 <div class="d-flex align-items-center">
-                    <img :src="closeIcon" @click="$emit('cancel-reply')" alt="closeIcon" class="cursor-pointer cancel__reply">
+                    <button type="button" class="cancel__reply-btn" :aria-label="$t('TaskPanel.cancel_reply')" @click="$emit('cancel-reply')"><img :src="closeIcon" alt="" class="cursor-pointer cancel__reply"></button>
                 </div>
             </div>
 

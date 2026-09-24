@@ -136,7 +136,7 @@
                         <template v-if="!recording">
                             <img :src="attachIcon" alt="attachIcon" class="mx-1 cursor-pointer" :class="{'cursor-not-allowed' : disabled=!messageAllowed }"  @click="messageAllowed ? $refs.file_input.click() : null">
                             <input type="file" class="d-none" ref="file_input" @change="(e) => {checkMedia(Array.from(e.target.files)); e.target.value = null;}" id="filechat" multiple :disabled="!messageAllowed">
-                            <button class="btn-primary ml-1 send__media-btn border-radius-8-px" :class="{'disable__send-button' : disabled=!messageAllowed }" @click="messageAllowed ? (mediaFiles.length ? sendMedia() : sendMessageFun(message)) : null"><img :src="sendIcon" alt="sendIcon" class="cursor-pointer" :class="{'disable__send-button' : disabled=!messageAllowed }"></button>
+                            <button type="button" class="btn-primary ml-1 send__media-btn border-radius-8-px" :aria-label="$t('TaskPanel.send')" :class="{'disable__send-button' : disabled=!messageAllowed }" @click="messageAllowed ? (mediaFiles.length ? sendMedia() : sendMessageFun(message)) : null"><img :src="sendIcon" alt="" class="cursor-pointer" :class="{'disable__send-button' : disabled=!messageAllowed }"></button>
                         </template>
                     </div>
                 </div>

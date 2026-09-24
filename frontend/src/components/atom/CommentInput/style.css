@@ -42,3 +42,4 @@
 .emp__profile-wrapper{
     width: calc(100% - 25px) !important;
 }
+.cancel__reply-btn { display: inline-flex; padding: 0; border: 0; background: none; cursor: pointer; }

@@ -113,7 +113,7 @@
                                 <div class="project-views-row" id="projectview_driver">
                                     <template v-if="clientWidth > 765">
                                         <div class="d-flex view_list_scroll h-100">
-                                            <div class="ph2__tablist" role="tablist" :aria-label="$t('Projects.views_tablist')">
+                                            <div class="ph2__tablist" role="group" :aria-label="$t('Projects.views_tablist')">
                                                 <ViewsList
                                                     v-for="(view, index) in (viewsListArray)"
                                                     :key="view._id"

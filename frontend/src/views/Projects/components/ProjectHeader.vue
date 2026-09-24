@@ -1,6 +1,7 @@
 <template>
     <div class="ph2">
         <div class="ph2__bar">
+            <h1 class="ah-sr-only">{{ project?.ProjectName }}</h1>
             <select
                 v-if="projects.length > 1"
                 class="ph2__switch"

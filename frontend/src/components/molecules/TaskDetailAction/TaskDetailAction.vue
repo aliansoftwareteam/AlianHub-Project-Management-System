@@ -29,9 +29,9 @@
                 >
                     <template #button>
                         <Skelaton v-if="isSpinner" style="height: 30px;" class="w-30px border-radius-6-px"/>
-                        <div v-else class="h-100 w-100 d-flex align-items-center">
-                            <img :src="horizontalDots" ref="horizontalDocs">
-                        </div>
+                        <button v-else type="button" class="h-100 w-100 d-flex align-items-center task-action__btn" :aria-label="$t('TaskPanel.more_actions')">
+                            <img :src="horizontalDots" ref="horizontalDocs" alt="">
+                        </button>
                     </template> 
                     <template #options>
                         <DropDownOption @click="$refs['horizontalDocs'].click(),copyTaskLink()">
@@ -123,9 +123,9 @@
                 >
                     <template #button>
                         <Skelaton v-if="isSpinner" style="height: 30px;" class="w-30px border-radius-6-px"/>
-                        <a href="#" v-if="!isSpinner">
-                            <img src="@/assets/images/svg/PriorityIcon/watchProjectEye.svg">
-                        </a>
+                        <button type="button" v-if="!isSpinner" class="task-action__btn" :aria-label="$t('TaskPanel.watchers', { n: watchers && watchers.length ? watchers.length : 0 })">
+                            <img src="@/assets/images/svg/PriorityIcon/watchProjectEye.svg" alt="">
+                        </button>
                         <span v-if="!isSpinner" class="watcher-count">{{ watchers && watchers.length ? watchers.length : 0 }}</span>
                     </template>
                     <template #head>

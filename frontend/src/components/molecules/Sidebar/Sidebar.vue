@@ -8,6 +8,12 @@
         >
             <div class="back-drop" v-if="!disableBackdrop" @click="closeOnBackDrop ? $emit('update:visible', !visible) : ''"></div>
             <div
+                ref="panelRef"
+                role="dialog"
+                :aria-modal="disableBackdrop ? null : 'true'"
+                :aria-label="title"
+                tabindex="-1"
+                @keydown.esc.stop="$emit('update:visible', false)"
                 :style="`${width ? `width: ${width}` : ''}; top: ${top}; height: calc(100% - ${top});`"
                 :class="{'hide-side-left':!showSide && left, 'hide-side-right':!showSide && !left,}"
                 class="position-fi bg-white d-flex flex-column sidebar-content z-index-7"
@@ -27,7 +33,9 @@
                         <div class="cursor-pointer d-flex align-items-center text-nowrap">
                             <slot name="head-right">
                                 <button v-if="multiSelect && showClear" class="clear-all outline-primary bg-light-gray black mr-1" :class="{'opacity-5 cursor-default': !value.length, 'opacity-10 cursor-pointer': value.length}" @click="$emit('clear')">{{$t('Filters.clearall')}}</button>
-                                <img :src="closeBlueImage" alt="closeButton" class="cursor-pointer" @click="$emit('update:visible', !visible)"/>
+                                <button type="button" class="sidebar-close" :aria-label="$t('Projects.close')" @click="$emit('update:visible', !visible)">
+                                    <img :src="closeBlueImage" alt="" class="cursor-pointer"/>
+                                </button>
                             </slot>
                         </div>
                     </slot>
@@ -36,10 +44,10 @@
                     'height': (hideHeader ? '100%' : '')
                 }">
                     <div v-if="enableSearch" class="bg-white mobile-list-inputsearch-wrapper border-bottom p-15px">
-                        <input ref="sidebar_search" type="text" v-model="search" :placeHolder="$t('PlaceHolder.search')" class="form-control listsidebar-search font-size-16" @input="$emit('searchChange', search)">
+                        <input ref="sidebar_search" type="text" v-model="search" :placeHolder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" class="form-control listsidebar-search font-size-16" @input="$emit('searchChange', search)">
                     </div>
                     <slot name="body">
-                        <div v-if="defaultLayout" class="overflow-y-auto sidebar-options overflow-x-hidden" :style="`height: ${!enableSearch ? 'calc(100% - 0px);' : 'calc(100% - 62px);'}`">
+                        <div v-if="defaultLayout" class="overflow-y-auto sidebar-options overflow-x-hidden" :role="filteredOptions?.length ? 'listbox' : null" :aria-multiselectable="multiSelect ? 'true' : null" :style="`height: ${!enableSearch ? 'calc(100% - 0px);' : 'calc(100% - 62px);'}`">
                             <template v-if="!grouped">
                                 <template v-if="filteredOptions?.length">
                                     <SidebarItems
@@ -64,7 +72,7 @@
                             </template>
                             <template v-else>
                                 <template v-for="(group, index) in filteredOptions">
-                                    <div v-if="group.options.length" :key="index">
+                                    <div v-if="group.options.length" :key="index" role="group" :aria-label="group.label">
                                         <div class="group-title p-1">
                                             {{group.label}}
                                         </div>
@@ -102,13 +110,14 @@
 
 <script setup>
 // PACKAGES
-import { defineComponent, defineProps, defineEmits, ref, watch, nextTick, onMounted, onUnmounted } from "vue";
+import { computed, defineComponent, defineProps, defineEmits, ref, watch, nextTick, onMounted, onUnmounted } from "vue";
 
 // COMPONENTS
 import SidebarItems from "../SidebarItems/SidebarItems.vue";
 
 // COMPOSABLES
 import { useCustomComposable } from "@/composable";
+import { useFocusTrap } from "@/composable/useFocusTrap";
 
 // USE COMPOSABLES
 const { debounce } = useCustomComposable();
@@ -258,6 +267,7 @@ function stopListener() {
     document.removeEventListener("keydown", keyListener)
 }
 function keyListener(event) {
+    if (event.target?.closest?.('[role="option"]')) return;
     const currentGroup = filteredOptions.value[groupIndex.value];
     const options = currentGroup?.options || [];
     if(event.keyCode === 13) { // Enter
@@ -415,6 +425,9 @@ function searchOptions(val) {
 watch(() => props.options, () => {
     searchOptions(search.value);
 })
+
+const panelRef = ref(null);
+useFocusTrap(panelRef, computed(() => props.visible && !props.disableBackdrop));
 </script>
 
 <style>

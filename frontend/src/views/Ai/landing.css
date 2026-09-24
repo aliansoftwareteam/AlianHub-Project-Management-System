@@ -37,6 +37,7 @@
 .land__ctl:disabled { opacity: .55; cursor: not-allowed; }
 .land__ctl.is-on { border-color: var(--brand); background: var(--brand-tint); color: var(--brand); }
 .land__ctl--select { padding-right: var(--sp-2); }
+.land__ctl--select:focus-within { box-shadow: var(--focus); }
 .land__ctl--select select { border: 0; background: transparent; color: inherit; font: var(--text-small); max-width: 180px; cursor: pointer; }
 .land__ctl--select select:focus { outline: none; }
 .land__ctl--warn { border-color: var(--warn-ink); background: var(--warn-bg); color: var(--warn-ink); }

@@ -30,6 +30,7 @@
 .ah-detail-enter-from, .ah-detail-leave-to { opacity: 0; }
 .ah-detail-enter-from .ah-detail__panel, .ah-detail-leave-to .ah-detail__panel { transform: translateX(24px); }
 
+.ah-detail__panel:focus { outline: none; }
 .ah-detail__panel-inner { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 
 /* ---------- header ---------- */

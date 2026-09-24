@@ -13,6 +13,7 @@
             :maxDate="maxDate"
             :isWithoutBorderImage="isWithoutBorderImage"
             :format="format"
+            :ariaLabel="label"
         >
         </CalenderCompo>
     </div>
@@ -33,6 +34,10 @@ defineEmits(['SelectedDate'])
 const props = defineProps({
     displyDate: {
         required: true
+    },
+    label: {
+        type: String,
+        default: ''
     },
     disabledDates: {
         type: Array,

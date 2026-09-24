@@ -1,7 +1,7 @@
 <template>
-    <div class="auth" :class="{ 'auth--single': !proof }">
+    <div ref="rootRef" class="auth" :class="{ 'auth--single': !proof }">
         <section class="auth__form">
-            <header class="auth__top">
+            <header class="auth__top" :role="standalone ? 'banner' : null">
                 <router-link to="/login" class="auth__brand">
                     <img v-if="logoOk" :src="logo" alt="" class="auth__logo" @error="logoOk = false" />
                     <span v-else class="auth__mark">{{ initial }}</span>
@@ -9,10 +9,10 @@
                 </router-link>
                 <div class="auth__top-right"><slot name="top-right" /></div>
             </header>
-            <div class="auth__body">
+            <div class="auth__body" :role="standalone ? 'main' : null">
                 <slot />
             </div>
-            <footer class="auth__foot">
+            <footer class="auth__foot" :role="standalone ? 'contentinfo' : null">
                 <div class="auth__foot-links">
                     <a v-if="brand.termsLink" :href="brand.termsLink" target="_blank" rel="noopener">{{ $t('Auth.tearm') }}</a>
                     <a v-if="brand.privacyLink" :href="brand.privacyLink" target="_blank" rel="noopener">{{ $t('Auth.Privacy_Policy') }}</a>
@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-import { computed, defineProps, ref } from "vue";
+import { computed, defineProps, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import moment from "moment";
 import { useAppVersion } from "@/composable/useAppVersion";
@@ -66,6 +66,11 @@ const initial = computed(() => productName.value.charAt(0).toUpperCase());
 const logo = "/api/v1/getlogo?key=favicon";
 const logoOk = ref(true);
 const today = moment().format("ddd MMM D").toUpperCase();
+
+/* The app shell already provides main; a second one inside it would be a nested landmark. */
+const rootRef = ref(null);
+const standalone = ref(false);
+onMounted(() => { standalone.value = !rootRef.value?.parentElement?.closest("main, [role=main]"); });
 </script>
 
 <style>
