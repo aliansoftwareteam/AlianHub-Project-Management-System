@@ -1,5 +1,5 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
-// language for the agent modules (equality, array-element equality, a word-match $text, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type/$size, $set/$inc/$push/$addToSet/$pull,
+// language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type/$size, $set/$inc/$push/$addToSet/$pull,
 // conditional findOneAndUpdate answering the old document unless asked for the new one (null after an upsert insert, as
 // the driver does), updateOne and findOneAndUpdate with upsert and $setOnInsert and a unique _id, findOneAndDelete, deleteOne, deleteMany,
 // sort/skip/limit on find, sort on findOneAndUpdate, $type 'date', $match/$project/$addFields ($toString, $ifNull, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
@@ -34,6 +34,7 @@ const textScoreOf = (doc, search, fields) => {
 const matches = (doc, filter = {}, textFields) => Object.entries(filter).every(([key, cond]) => {
     if (key === '$or') return cond.some((f) => matches(doc, f, textFields));
     if (key === '$and') return cond.every((f) => matches(doc, f, textFields));
+    if (key === '$nor') return !cond.some((f) => matches(doc, f, textFields));
     if (key === '$text') return textMatches(doc, cond.$search, textFields);
     const raw = read(doc, key);
     const value = raw === undefined ? undefined : (raw instanceof Date ? raw.getTime() : (key === '_id' ? String(raw) : hex(raw)));
@@ -57,6 +58,7 @@ const matches = (doc, filter = {}, textFields) => Object.entries(filter).every((
         });
     }
     const want = cond instanceof Date ? cond.getTime() : (key === '_id' ? String(cond) : hex(cond));
+    if (want === null) return value === undefined || value === null;
     if (Array.isArray(value) && !Array.isArray(want)) return value.some((item) => hex(item) === want);
     return value === want;
 });

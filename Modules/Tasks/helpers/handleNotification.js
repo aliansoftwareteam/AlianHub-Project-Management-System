@@ -13,6 +13,18 @@ const narrowRecipients = async (keepRecipients, users, leader = '') => {
     return { users: users.filter((id) => kept.has(String(id))), leader: leader && kept.has(String(leader)) ? leader : '' };
 };
 
+const idsOf = (list) => (Array.isArray(list) ? list : [list]).filter(Boolean).map(String);
+
+/* Who an update is about, as opposed to who merely watches the item. Everyone else it
+ * reaches is filed under the Inbox's Other tab. Undefined for rows that have no such split. */
+exports.directUsersFor = ({ type, taskData, projectData, mentionUserId = [] } = {}) => {
+    if (['tasks', 'task'].includes(type)) {
+        return [...new Set([...idsOf(taskData?.Task_Leader), ...idsOf(taskData?.AssigneeUserId), ...idsOf(taskData?.LeadUserId), ...idsOf(mentionUserId)])];
+    }
+    if (type === 'project') return [...new Set([...idsOf(projectData?.LeadUserId), ...idsOf(mentionUserId)])];
+    return undefined;
+};
+
 exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId, sprintId, object, userData, changeType = '', changeData = {},comments_id = "", mentionUserId = [],isGroupChat, keepRecipients} = {}) => {
     return new Promise(async (resolve, reject) => {
         try {
@@ -139,7 +151,8 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                     "task_leader_ID": taskRecipients.leader,
                     "changeType": changeType || "",
                     "changeData": changeData || {},
-                    "comments_id": comments_id ? comments_id : ""
+                    "comments_id": comments_id ? comments_id : "",
+                    "directUsers": exports.directUsersFor({ type, taskData, mentionUserId })
                 }
                 handleNotificationtFun({body:obj})
                     .then((response) => {
@@ -179,7 +192,8 @@ exports.HandleBothNotification = ({ type, companyId, projectId, taskId, folderId
                     "companyId": companyId || "",
                     "changeType": changeType || "",
                     "changeData": changeData || {},
-                    "comments_id": comments_id ? comments_id : ""
+                    "comments_id": comments_id ? comments_id : "",
+                    "directUsers": exports.directUsersFor({ type, projectData, mentionUserId })
                 }
                 handleNotificationtFun({body:obj})
                     .then((response) => {

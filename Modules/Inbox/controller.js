@@ -1,19 +1,16 @@
-// Inbox — the header bell and the @ mention dropdown, on one page.
+// Inbox — the header bell and the @ mention dropdown on one page, plus snooze and clear.
 //
-// Purpose, and the whole design constraint: once this is live, those two dropdowns get
-// hidden. So it must do what they do — no more. The reads below are the SAME queries
-// app-notification/controller.js runs, and the only write is the same mark-read.
-//
-// It owns no collection and no state. Deleting this module would leave the existing
-// sidebars behaving identically, because nothing here reaches into them.
+// Reads the same rows those two read. Every write is filtered to the caller's own rows:
+// a notification by its receiverID, a mention by the reader's id in mentionIds (or in
+// clearedFor, once cleared), with the caller always taken from req.uid.
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
-const { Notification_key } = require('../../Config/notificationKey.js');
 const { updateUnReadCommentsCountFun } = require('../notification-count/controller');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const R = require('./helpers/inboxRules');
+const S = require('./helpers/inboxState');
 
 // The per-user counters document behind the header's red dot. `key` selects the field:
 // 5 is notification_counts, 4 is mention_counts.
@@ -44,30 +41,15 @@ const STRUCTURED_CHANGES = ['agent_alert', 'agent_session_assigned', 'oauth_clie
 const fail = (res, statusText) => res.send({ status: false, statusText });
 
 /**
- * The bell's notifications.
- *
- * Match copied verbatim from getNotificationMessages: addressed to this user, not a
- * mention row (those come from the mentions collection instead — counting them from both
- * would double every mention), push/null type only. `notSeen` holds the recipients who
- * have NOT read it, so membership is unread and absence is archived.
+ * The bell's notifications: addressed to this user, not a mention row (those come from the
+ * mentions collection instead, counting both would double every mention), push/null type
+ * only. `notSeen` holds the recipients who have NOT read it, so membership is unread.
  */
 // No `skip`: paging happens on the merged list, never inside a source. See list().
-const readNotifications = async (companyId, userId, { limit, read, sort, ids, exclude, keyOnly, keyNot }) => {
+const readNotifications = async (companyId, userId, { limit, sort, match }) => {
     const dir = R.sortDirection(sort);
-    const and = [
-        { assigneeUsers: { $in: [userId] } },
-        { key: { $ne: Notification_key.COMMENTS_IM_MENTIONS_IN } },
-        { $or: [{ notificationType: 'push' }, { notificationType: null }] },
-        { receiverID: userId },
-    ];
-    if (read === true) and.push({ notSeen: { $nin: [userId] } });
-    if (read === false) and.push({ notSeen: { $in: [userId] } });
-    if (ids) and.push({ _id: { $in: ids.map(oid).filter(Boolean) } });
-    if (exclude && exclude.length) and.push({ _id: { $nin: exclude.map(oid).filter(Boolean) } });
-    if (keyOnly) and.push({ key: keyOnly });
-    if (keyNot) and.push({ key: { $ne: keyNot } });
     const query = [
-        { $match: { $and: and } },
+        { $match: match || R.notificationMatch(userId, { tab: 'all' }) },
         { $sort: { createdAt: dir, _id: 1 } },
         { $limit: limit },
     ];
@@ -112,9 +94,14 @@ const readNotifications = async (companyId, userId, { limit, read, sort, ids, ex
         // stays right when someone changes their picture.
         actorId: String(r.userId || ''),
         unread: Array.isArray(r.notSeen) && r.notSeen.map(String).includes(userId),
+        snoozedUntil: r.snoozedUntil || null,
+        snoozeUntilChange: !!r.snoozeUntilChange,
+        clearedAt: r.clearedAt || null,
         createdAt: r.createdAt,
     }));
 };
+
+const entryFor = (list, userId) => (Array.isArray(list) ? list.filter((e) => e && String(e.userId) === userId).pop() : null) || null;
 
 /**
  * The @ dropdown's mentions — the same `mentionIds` filter it uses, plus a read filter.
@@ -128,12 +115,8 @@ const readNotifications = async (companyId, userId, { limit, read, sort, ids, ex
  * Mirroring readNotifications instead: membership in `notSeen` is unread, absence is
  * archived.
  */
-const readMentions = async (companyId, userId, { limit, read, sort, ids, exclude }) => {
-    const filter = { mentionIds: { $in: [userId] } };
-    if (read === true) filter.notSeen = { $nin: [userId] };
-    if (read === false) filter.notSeen = { $in: [userId] };
-    if (ids) filter._id = { $in: ids.map(oid).filter(Boolean) };
-    if (exclude && exclude.length) filter._id = { ...(filter._id || {}), $nin: exclude.map(oid).filter(Boolean) };
+const readMentions = async (companyId, userId, { limit, sort, match }) => {
+    const filter = match || R.mentionMatch(userId, { tab: 'all' });
 
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.MENTIONS,
@@ -164,8 +147,19 @@ const readMentions = async (companyId, userId, { limit, read, sort, ids, exclude
         // the @ dropdown resolves this id too rather than reading the row.
         actorId: String(r.userId || ''),
         unread: Array.isArray(r.notSeen) && r.notSeen.map(String).includes(userId),
+        ...mentionStateFor(r, userId),
         createdAt: r.createdAt,
     }));
+};
+
+const mentionStateFor = (r, userId) => {
+    const snooze = entryFor(r.snoozes, userId);
+    const cleared = entryFor(r.clearedFor, userId);
+    return {
+        snoozedUntil: (snooze && snooze.until) || null,
+        snoozeUntilChange: !!(snooze && snooze.untilChange),
+        clearedAt: (cleared && cleared.at) || null,
+    };
 };
 
 /**
@@ -273,15 +267,8 @@ exports.list = async (req, res) => {
         const sort = R.normalizeSort(req.query.sort);
         const plan = R.planFor(tab, source, kind);
         const now = new Date();
-
-        // The Later list lives with the reader (it is theirs, per device); Primary is
-        // told what to leave out and Later what to bring back.
-        const exclude = tab === 'primary' ? R.parseIdList(req.query.exclude) : [];
-        const ids = tab === 'later' ? R.parseIdList(req.query.ids) : null;
-        if (tab === 'later' && !ids.length) {
-            return res.send({ status: true, data: { tab, source, kind, sort, items: [], approvals: [], hasMore: false, nextSkip: 0 } });
-        }
-        const readOpts = { read: plan.read, sort, ids, exclude, keyOnly: plan.keyOnly, keyNot: plan.keyNot };
+        await S.wakeDue(companyId, userId, now);
+        const scope = { tab, source, kind, now };
 
         // Each source is read from the TOP through the end of the requested page, not from
         // `skip`. Skipping inside each source loses rows: page 1 fetches 10 of each, merges
@@ -299,8 +286,8 @@ exports.list = async (req, res) => {
         const probe = window + 1;
         const wantApprovals = tab === 'primary' && skip === 0 && (kind === 'all' || kind === 'approval');
         const [notifications, mentions, approvals, proposals] = await Promise.all([
-            plan.notifications && kind !== 'approval' ? readNotifications(companyId, userId, { ...readOpts, limit: probe }) : [],
-            plan.mentions && kind !== 'approval' ? readMentions(companyId, userId, { ...readOpts, limit: probe }) : [],
+            plan.notifications && kind !== 'approval' ? readNotifications(companyId, userId, { sort, limit: probe, match: R.notificationMatch(userId, scope) }) : [],
+            plan.mentions && kind !== 'approval' ? readMentions(companyId, userId, { sort, limit: probe, match: R.mentionMatch(userId, scope) }) : [],
             wantApprovals ? readApprovals(companyId, userId) : [],
             wantApprovals ? readProposals(companyId, userId) : [],
         ]);
@@ -385,27 +372,25 @@ exports.counts = async (req, res) => {
             return (rows && rows[0] && rows[0].n) || 0;
         };
 
-        const [notifications, mentions, approvals, proposals] = await Promise.all([
-            count(SCHEMA_TYPE.NOTIFICATIONS, {
-                assigneeUsers: { $in: [userId] },
-                key: { $ne: Notification_key.COMMENTS_IM_MENTIONS_IN },
-                $or: [{ notificationType: 'push' }, { notificationType: null }],
-                receiverID: userId,
-                notSeen: { $in: [userId] },
-            }, {
-                key: '$key',
-                taskId: '$taskId',
-                message: '$message',
-                at: { $dateTrunc: { date: '$createdAt', unit: 'second' } },
-            }),
-            count(SCHEMA_TYPE.MENTIONS, {
-                mentionIds: { $in: [userId] },
-                notSeen: { $in: [userId] },
-            }, {
-                taskId: '$taskId',
-                message: '$comment_message',
-                at: { $dateTrunc: { date: '$createdAt', unit: 'second' } },
-            }),
+        const now = new Date();
+        await S.wakeDue(companyId, userId, now);
+        const notificationGroup = {
+            key: '$key',
+            taskId: '$taskId',
+            message: '$message',
+            at: { $dateTrunc: { date: '$createdAt', unit: 'second' } },
+        };
+        const mentionGroup = {
+            taskId: '$taskId',
+            message: '$comment_message',
+            at: { $dateTrunc: { date: '$createdAt', unit: 'second' } },
+        };
+        const [notifications, mentions, other, laterNotifications, laterMentions, approvals, proposals] = await Promise.all([
+            count(SCHEMA_TYPE.NOTIFICATIONS, R.notificationMatch(userId, { tab: 'primary', now }), notificationGroup),
+            count(SCHEMA_TYPE.MENTIONS, R.mentionMatch(userId, { tab: 'primary', now }), mentionGroup),
+            count(SCHEMA_TYPE.NOTIFICATIONS, R.notificationMatch(userId, { tab: 'other', now }), notificationGroup),
+            count(SCHEMA_TYPE.NOTIFICATIONS, R.notificationMatch(userId, { tab: 'later', now }), notificationGroup),
+            count(SCHEMA_TYPE.MENTIONS, R.mentionMatch(userId, { tab: 'later', now }), mentionGroup),
             readApprovals(companyId, userId).then((rows) => rows.length),
             readProposals(companyId, userId).then((rows) => rows.length),
         ]);
@@ -418,13 +403,14 @@ exports.counts = async (req, res) => {
                 mentions,
                 // Archive is read rows; a badge there would count things already dealt with.
                 archive: 0,
-                // Primary is `all` plus what waits on this user; the client takes its own
-                // Later rows out of it. Done is read rows, so no badge either.
+                // Done and Cleared hold rows already dealt with, so they carry no badge.
                 primary: notifications + mentions + approvals + proposals,
+                other,
                 approvals,
                 proposals,
-                later: 0,
+                later: laterNotifications + laterMentions,
                 done: 0,
+                cleared: 0,
             },
         });
     } catch (e) {
@@ -539,10 +525,8 @@ exports.markRead = async (req, res) => {
 };
 
 /**
- * POST /api/v1/inbox/read-all — the sidebars' "Mark all as read".
- *
- * One updateMany per source rather than a loop, and scoped to the tab so marking all on
- * Mentions cannot silently clear the notification list too.
+ * POST /api/v1/inbox/read-all — marks the unread rows of one tab read. Other stays unread
+ * when Primary is marked, and the reverse, so the counter moves by the rows it read.
  */
 exports.markAllRead = async (req, res) => {
     try {
@@ -551,39 +535,205 @@ exports.markAllRead = async (req, res) => {
         if (!companyId || !userId) return fail(res, 'companyId and an authenticated user are required.');
 
         const tab = R.normalizeTab(req.body && req.body.tab);
-        if (tab === 'archive' || tab === 'done') return fail(res, 'Those are already read.');
-        const plan = R.planFor(tab === 'later' ? 'all' : tab);
+        if (['archive', 'done', 'later', 'cleared'].includes(tab)) return fail(res, 'Those are already read.');
+        const plan = R.planFor(tab);
+        const now = new Date();
 
         if (plan.notifications) {
-            await MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.NOTIFICATIONS,
-                data: [
-                    {
-                        assigneeUsers: { $in: [userId] },
-                        key: { $ne: Notification_key.COMMENTS_IM_MENTIONS_IN },
-                        receiverID: userId,
-                        notSeen: { $in: [userId] },
-                    },
-                    { $set: { notificationStatus: 'completed' }, $pull: { notSeen: userId } },
-                ],
-            }, 'updateMany');
-            // readAll clears the counter outright rather than decrementing per row —
-            // nothing is left unread, so the exact previous number does not matter.
-            await bumpCount(companyId, userId, 'notification', { read: true, readAll: true });
+            const read = await S.write(companyId, SCHEMA_TYPE.NOTIFICATIONS, 'updateMany',
+                R.notificationMatch(userId, { tab, now }),
+                { $set: { notificationStatus: 'completed' }, $pull: { notSeen: userId } });
+            await S.moveCounter(companyId, userId, 'notification', -read);
         }
         if (plan.mentions) {
-            await MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.MENTIONS,
-                data: [
-                    { mentionIds: { $in: [userId] }, notSeen: { $in: [userId] } },
-                    { $pull: { notSeen: userId } },
-                ],
-            }, 'updateMany');
-            await bumpCount(companyId, userId, 'mention', { read: true, readAll: true });
+            const read = await S.write(companyId, SCHEMA_TYPE.MENTIONS, 'updateMany',
+                R.mentionMatch(userId, { tab, now }),
+                { $pull: { notSeen: userId } });
+            await S.moveCounter(companyId, userId, 'mention', -read);
         }
         return res.send({ status: true, statusText: 'Marked all as read.', data: { tab } });
     } catch (e) {
         logger.error(`${LOG_PREFIX} markAllRead: ${e.message}`);
+        return fail(res, e.message);
+    }
+};
+
+const PURGE_MS = R.CLEARED_RETENTION_SECONDS * 1000;
+const UNSNOOZE = { snoozedUntil: '', snoozeUntilChange: '' };
+const withUnread = (filter, userId) => ({ ...filter, notSeen: userId });
+const withRead = (filter, userId) => ({ ...filter, notSeen: { $ne: userId } });
+
+/**
+ * Applies one change to a row, moving the unread counter when the change reads or unreads it.
+ * `toRead` is tried first on the row while unread (counter -1), `toUnread` on the row while
+ * read (counter +1); `plain` covers the row in whatever state is left.
+ */
+const changeRow = async (companyId, userId, sourceType, filter, { toRead, toUnread, plain }) => {
+    const type = sourceType === 'notification' ? SCHEMA_TYPE.NOTIFICATIONS : SCHEMA_TYPE.MENTIONS;
+    if (toRead && await S.write(companyId, type, 'updateOne', withUnread(filter, userId), toRead)) {
+        await S.moveCounter(companyId, userId, sourceType, -1);
+        return true;
+    }
+    if (toUnread && await S.write(companyId, type, 'updateOne', withRead(filter, userId), toUnread)) {
+        await S.moveCounter(companyId, userId, sourceType, 1);
+        return true;
+    }
+    return !!(plain && await S.write(companyId, type, 'updateOne', filter, plain));
+};
+
+const eachItem = (name, perItem) => async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        const userId = userOf(req);
+        if (!companyId || !userId) return fail(res, 'companyId and an authenticated user are required.');
+        const items = readItemList(req);
+        if (!items.length) return fail(res, 'No inbox items were given.');
+        const prepared = perItem.prepare ? perItem.prepare(req.body || {}, new Date()) : { ok: true };
+        if (!prepared.ok) return fail(res, prepared.error);
+
+        let count = 0;
+        for (const item of items) {
+            const id = oid(item.sourceId);
+            if (!id) continue;
+            const run = item.sourceType === 'notification' ? perItem.notification : perItem.mention;
+            if (await run({ companyId, userId, id, now: new Date(), ...prepared })) count++;
+        }
+        return res.send({ status: true, data: { count } });
+    } catch (e) {
+        logger.error(`${LOG_PREFIX} ${name}: ${e.message}`);
+        return fail(res, e.message);
+    }
+};
+
+const wantsUnread = (body) => String(body.unread) !== 'false';
+
+/** POST /api/v1/inbox/snooze — into Later until a time, or until the item changes. Read while it waits. */
+exports.snooze = eachItem('snooze', {
+    prepare: (body, now) => R.parseSnooze(body, now),
+    notification: ({ companyId, userId, id, until, untilChange }) => {
+        const set = untilChange
+            ? { $set: { snoozeUntilChange: true }, $unset: { snoozedUntil: '' } }
+            : { $set: { snoozedUntil: until, snoozeUntilChange: false } };
+        return changeRow(companyId, userId, 'notification', { _id: id, receiverID: userId, clearedAt: null }, {
+            toRead: { ...set, $pull: { notSeen: userId } },
+            plain: set,
+        });
+    },
+    mention: async ({ companyId, userId, id, until, untilChange }) => {
+        const filter = { _id: id, mentionIds: userId };
+        await S.write(companyId, SCHEMA_TYPE.MENTIONS, 'updateOne', filter, { $pull: { snoozes: { userId } } });
+        const push = { $push: { snoozes: { userId, until, untilChange } } };
+        return changeRow(companyId, userId, 'mention', filter, {
+            toRead: { ...push, $pull: { notSeen: userId } },
+            plain: push,
+        });
+    },
+});
+
+/** POST /api/v1/inbox/unsnooze — back to Primary, unread unless `unread: false`. */
+exports.unsnooze = eachItem('unsnooze', {
+    prepare: (body) => ({ ok: true, unread: wantsUnread(body) }),
+    notification: ({ companyId, userId, id, unread }) => {
+        const filter = { _id: id, receiverID: userId, clearedAt: null, $or: [{ snoozedUntil: { $ne: null } }, { snoozeUntilChange: true }] };
+        const unset = { $unset: UNSNOOZE };
+        return changeRow(companyId, userId, 'notification', filter, {
+            toUnread: unread ? { ...unset, $addToSet: { notSeen: userId } } : null,
+            plain: unset,
+        });
+    },
+    mention: ({ companyId, userId, id, unread }) => {
+        const filter = { _id: id, mentionIds: userId, 'snoozes.userId': userId };
+        const pull = { $pull: { snoozes: { userId } } };
+        return changeRow(companyId, userId, 'mention', filter, {
+            toUnread: unread ? { ...pull, $addToSet: { notSeen: userId } } : null,
+            plain: pull,
+        });
+    },
+});
+
+// A mention nobody reads any more is deleted by the TTL index on purgeAt.
+const schedulePurge = (companyId, userId, filter, now) => S.write(companyId, SCHEMA_TYPE.MENTIONS, 'updateMany',
+    { ...filter, mentionIds: { $size: 0 }, 'clearedFor.userId': userId, purgeAt: null },
+    { $set: { purgeAt: new Date(now.getTime() + PURGE_MS) } });
+
+/** POST /api/v1/inbox/clear — into Cleared for 30 days, then purged. */
+exports.clear = eachItem('clear', {
+    notification: ({ companyId, userId, id, now }) => {
+        const set = { $set: { clearedAt: now }, $unset: UNSNOOZE };
+        return changeRow(companyId, userId, 'notification', { _id: id, receiverID: userId, clearedAt: null }, {
+            toRead: { ...set, $pull: { notSeen: userId } },
+            plain: set,
+        });
+    },
+    mention: async ({ companyId, userId, id, now }) => {
+        const cleared = await changeRow(companyId, userId, 'mention', { _id: id, mentionIds: userId }, {
+            toRead: { $pull: { mentionIds: userId, notSeen: userId, snoozes: { userId } }, $push: { clearedFor: { userId, at: now } } },
+            plain: { $pull: { mentionIds: userId, snoozes: { userId } }, $push: { clearedFor: { userId, at: now } } },
+        });
+        if (cleared) await schedulePurge(companyId, userId, { _id: id }, now);
+        return cleared;
+    },
+});
+
+/** POST /api/v1/inbox/restore — out of Cleared, back to Primary unread unless `unread: false`. */
+exports.restore = eachItem('restore', {
+    prepare: (body) => ({ ok: true, unread: wantsUnread(body) }),
+    notification: ({ companyId, userId, id, now, unread }) => {
+        const unset = { $unset: { clearedAt: '' } };
+        return changeRow(companyId, userId, 'notification', { _id: id, receiverID: userId, clearedAt: { $gte: R.clearedCutoff(now) } }, {
+            toUnread: unread ? { ...unset, $addToSet: { notSeen: userId } } : null,
+            plain: unset,
+        });
+    },
+    mention: ({ companyId, userId, id, now, unread }) => {
+        const filter = { _id: id, clearedFor: { $elemMatch: { userId, at: { $gte: R.clearedCutoff(now) } } } };
+        const back = { $pull: { clearedFor: { userId } }, $unset: { purgeAt: '' } };
+        return changeRow(companyId, userId, 'mention', filter, {
+            toUnread: unread ? { ...back, $addToSet: { mentionIds: userId, notSeen: userId } } : null,
+            plain: { ...back, $addToSet: { mentionIds: userId } },
+        });
+    },
+});
+
+/** POST /api/v1/inbox/clear-all — clears every row of one tab (narrowed by kind) for the caller. */
+exports.clearAll = async (req, res) => {
+    try {
+        const companyId = companyOf(req);
+        const userId = userOf(req);
+        if (!companyId || !userId) return fail(res, 'companyId and an authenticated user are required.');
+        const tab = String((req.body && req.body.tab) || '');
+        if (!R.CLEARABLE_TABS.includes(tab)) return fail(res, 'That tab cannot be cleared.');
+        const kind = R.normalizeKind(req.body && req.body.kind);
+        if (kind === 'approval') return res.send({ status: true, data: { count: 0 } });
+
+        const now = new Date();
+        const plan = R.planFor(tab, 'all', kind);
+        const scope = { tab, kind, now };
+        let count = 0;
+
+        if (plan.notifications) {
+            const match = R.notificationMatch(userId, scope);
+            const set = { $set: { clearedAt: now }, $unset: UNSNOOZE };
+            const unread = await S.write(companyId, SCHEMA_TYPE.NOTIFICATIONS, 'updateMany',
+                { $and: [...match.$and, { notSeen: { $in: [userId] } }] },
+                { ...set, $pull: { notSeen: userId } });
+            await S.moveCounter(companyId, userId, 'notification', -unread);
+            count += unread + await S.write(companyId, SCHEMA_TYPE.NOTIFICATIONS, 'updateMany', match, set);
+        }
+        if (plan.mentions) {
+            const match = R.mentionMatch(userId, scope);
+            const push = { $push: { clearedFor: { userId, at: now } } };
+            const unread = await S.write(companyId, SCHEMA_TYPE.MENTIONS, 'updateMany',
+                { $and: [...match.$and, { notSeen: { $in: [userId] } }] },
+                { ...push, $pull: { mentionIds: userId, notSeen: userId, snoozes: { userId } } });
+            await S.moveCounter(companyId, userId, 'mention', -unread);
+            count += unread + await S.write(companyId, SCHEMA_TYPE.MENTIONS, 'updateMany', match,
+                { ...push, $pull: { mentionIds: userId, snoozes: { userId } } });
+            await schedulePurge(companyId, userId, {}, now);
+        }
+        return res.send({ status: true, statusText: 'Cleared.', data: { tab, count } });
+    } catch (e) {
+        logger.error(`${LOG_PREFIX} clearAll: ${e.message}`);
         return fail(res, e.message);
     }
 };

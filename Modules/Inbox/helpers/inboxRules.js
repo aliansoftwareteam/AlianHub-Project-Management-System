@@ -1,26 +1,46 @@
-// Inbox — the vocabulary.
+// Inbox — the vocabulary: which rows each tab reads, and the rules for snooze and clear.
 //
-// THE INBOX INVENTS NOTHING. It is the header bell and the @ mention dropdown shown on
-// one page instead of two, so that once it is live those two can be hidden.
-//
-// That means it reads exactly what they read, filters exactly how they filter, and acts
-// exactly how they act. No importance ranking, no snoozing, no clearing, no grouping —
-// none of that exists in the sidebars today, and adding it here would make the Inbox a
-// different feature rather than a replacement for them.
-//
-// It owns NO data of its own. The only write is mark-read, in the same shape
-// app-notification/controller.js already uses, so the bell's unread count cannot drift.
+// Reads the same two sources as the header bell and the @ dropdown (notifications and
+// mentions). Snooze and clear state lives on those rows: a notification row belongs to one
+// reader (receiverID), so it carries the state directly; a mention row serves every reader
+// it names, so it carries the state per reader.
+const { Notification_key } = require('../../../Config/notificationKey.js');
 
-// One tab per thing a user already has, plus All to see them together.
-//
-//   all           — both sources, unread
-//   notifications — what the bell shows  (its `filter=unread` list)
-//   mentions      — what the @ dropdown shows
-//   archive       — what the bell's "View Archive" toggle shows (already read)
-//   primary       — unread, minus the rows the reader has put aside for later
-//   later         — the rows the reader put aside (ids are held by the client)
-//   done          — read rows, both sources; the Archive tab under its new name
-const TABS = Object.freeze(['all', 'notifications', 'mentions', 'archive', 'primary', 'later', 'done']);
+const MENTION_KEY = Notification_key.COMMENTS_IM_MENTIONS_IN;
+
+//   all / notifications / mentions / archive — the tabs of the first Inbox, still served
+//   primary  — unread, not snoozed, not cleared, and not a watched-only update
+//   other    — the same, for updates that reached the reader only because they watch the item
+//   later    — snoozed rows, until their time comes (or, for "until it changes", new activity)
+//   done     — read rows
+//   cleared  — rows the reader cleared in the last 30 days
+const TABS = Object.freeze(['all', 'notifications', 'mentions', 'archive', 'primary', 'other', 'later', 'done', 'cleared']);
+const INBOX_TABS = Object.freeze(['primary', 'other', 'later', 'done', 'cleared']);
+const CLEARABLE_TABS = Object.freeze(['primary', 'other', 'later', 'done']);
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const CLEARED_RETENTION_SECONDS = 30 * 24 * 60 * 60;
+const clearedCutoff = (now = new Date()) => new Date(now.getTime() - CLEARED_RETENTION_SECONDS * 1000);
+const MAX_SNOOZE_MS = 366 * DAY_MS;
+
+const WATCHING = 'watching';
+const DIRECT = 'direct';
+const reasonFor = (receiverId, directUsers) => {
+    if (!Array.isArray(directUsers)) return undefined;
+    return directUsers.map(String).includes(String(receiverId)) ? DIRECT : WATCHING;
+};
+
+const parseSnooze = (body = {}, now = new Date()) => {
+    if (body.untilChange === true || body.untilChange === 'true') return { ok: true, until: null, untilChange: true };
+    if (body.until === undefined || body.until === null || body.until === '') {
+        return { ok: false, error: 'A snooze needs a time, or "until it changes".' };
+    }
+    const until = new Date(body.until);
+    if (Number.isNaN(until.getTime())) return { ok: false, error: 'That snooze time could not be read.' };
+    if (until <= now) return { ok: false, error: 'Pick a snooze time in the future.' };
+    if (until.getTime() - now.getTime() > MAX_SNOOZE_MS) return { ok: false, error: 'A snooze can last up to a year.' };
+    return { ok: true, until, untilChange: false };
+};
 
 // Row kinds the client can filter on. A reminder is a notification the reminder
 // scheduler wrote on its due date; everything else from that source is an update.
@@ -32,15 +52,6 @@ const kindOf = (item = {}) => {
     if (item.sourceType === 'mention') return 'mention';
     return item.key === REMINDER_KEY ? 'reminder' : 'update';
 };
-
-// A comma-separated list of ObjectIds from the query string, capped so a URL
-// cannot carry an unbounded $in.
-const MAX_ID_LIST = 200;
-const parseIdList = (raw) => String(raw || '')
-    .split(',')
-    .map((x) => x.trim())
-    .filter((x) => /^[a-f0-9]{24}$/i.test(x))
-    .slice(0, MAX_ID_LIST);
 
 // The two sidebars both page 10 at a time; matching that keeps the feel identical.
 const PAGE_SIZE = 10;
@@ -226,19 +237,65 @@ const planFor = (tab, source = 'all', kind = 'all') => {
             read: true,
         });
     }
-    // Later is read by id, whatever its read state: a row put aside stays put aside.
-    if (tab === 'later') return byKind({ notifications: true, mentions: true, read: null });
+    if (tab === 'later' || tab === 'cleared') return byKind({ notifications: true, mentions: true, read: null });
+    // A mention is always addressed to the reader, so it is never a watched-only update.
+    if (tab === 'other') return { ...byKind({ notifications: true, mentions: false, read: false }), mentions: false };
     return byKind({ notifications: true, mentions: true, read: false });
+};
+
+const snoozedNotification = (now) => ({ $or: [{ snoozedUntil: { $gt: now } }, { snoozeUntilChange: true }] });
+const snoozedMention = (userId, now) => ({
+    snoozes: { $elemMatch: { userId, $or: [{ until: { $gt: now } }, { untilChange: true }] } },
+});
+
+/** One reader's notifications on one tab: the match list, counts and clear-all share. */
+const notificationMatch = (userId, { tab, source = 'all', kind = 'all', now = new Date() } = {}) => {
+    const plan = planFor(tab, source, kind);
+    const and = [
+        { assigneeUsers: { $in: [userId] } },
+        // Mention notices are read from the mentions collection; counting both would double them.
+        { key: { $ne: MENTION_KEY } },
+        { $or: [{ notificationType: 'push' }, { notificationType: null }] },
+        { receiverID: userId },
+    ];
+    if (tab === 'cleared') and.push({ clearedAt: { $gte: clearedCutoff(now) } });
+    else and.push({ clearedAt: null }, tab === 'later' ? snoozedNotification(now) : { $nor: [snoozedNotification(now)] });
+    if (tab === 'primary') and.push({ reason: { $ne: WATCHING } });
+    if (tab === 'other') and.push({ reason: WATCHING });
+    if (plan.read === true) and.push({ notSeen: { $nin: [userId] } });
+    if (plan.read === false) and.push({ notSeen: { $in: [userId] } });
+    if (plan.keyOnly) and.push({ key: plan.keyOnly });
+    if (plan.keyNot) and.push({ key: { $ne: plan.keyNot } });
+    return { $and: and };
+};
+
+const mentionMatch = (userId, { tab, source = 'all', kind = 'all', now = new Date() } = {}) => {
+    const plan = planFor(tab, source, kind);
+    const and = [];
+    if (tab === 'cleared') and.push({ clearedFor: { $elemMatch: { userId, at: { $gte: clearedCutoff(now) } } } });
+    else and.push({ mentionIds: { $in: [userId] } }, tab === 'later' ? snoozedMention(userId, now) : { $nor: [snoozedMention(userId, now)] });
+    if (plan.read === true) and.push({ notSeen: { $nin: [userId] } });
+    if (plan.read === false) and.push({ notSeen: { $in: [userId] } });
+    return { $and: and };
 };
 
 module.exports = {
     TABS,
+    INBOX_TABS,
+    CLEARABLE_TABS,
+    MENTION_KEY,
+    CLEARED_RETENTION_SECONDS,
+    clearedCutoff,
+    WATCHING,
+    DIRECT,
+    reasonFor,
+    parseSnooze,
+    notificationMatch,
+    mentionMatch,
     KINDS,
     REMINDER_KEY,
     normalizeKind,
     kindOf,
-    parseIdList,
-    MAX_ID_LIST,
     SORTS,
     normalizeSort,
     sortDirection,

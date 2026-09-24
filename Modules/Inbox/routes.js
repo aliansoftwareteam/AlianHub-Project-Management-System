@@ -27,6 +27,11 @@ exports.init = (app) => {
     app.get('/api/v1/inbox/counts', safe('counts', ctrl.counts));
     app.post('/api/v1/inbox/read-all', safe('markAllRead', ctrl.markAllRead));
     app.post('/api/v1/inbox/read', safe('markRead', ctrl.markRead));
+    app.post('/api/v1/inbox/snooze', safe('snooze', ctrl.snooze));
+    app.post('/api/v1/inbox/unsnooze', safe('unsnooze', ctrl.unsnooze));
+    app.post('/api/v1/inbox/clear', safe('clear', ctrl.clear));
+    app.post('/api/v1/inbox/clear-all', safe('clearAll', ctrl.clearAll));
+    app.post('/api/v1/inbox/restore', safe('restore', ctrl.restore));
 
     app.get('/api/v1/inbox', safe('list', ctrl.list));
 };
