@@ -64,12 +64,6 @@
     height: 12px;
     width: 12px;
 }
-.advance_search_modal .modal-body {
-    padding: 0 !important;
-}
-.advance_search_modal {
-    top: calc(50% + 47px);
-}
 .modal_wrapper {
     background-color: rgba(31,31,31,.9) !important;
     max-width: 100% !important;

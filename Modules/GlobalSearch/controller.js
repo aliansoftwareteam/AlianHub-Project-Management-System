@@ -29,6 +29,24 @@ const onVisibleTasks = async (companyId, comments, projectIds, sprintClause) => 
     return comments.filter((comment) => !comment.taskId || visible.has(String(comment.taskId)));
 };
 
+const toTaskRow = (task) => {
+    const sprint = task.sprintArray || {};
+    return {
+        _id: task._id,
+        TaskName: task.TaskName,
+        TaskKey: task.TaskKey,
+        status: task.status,
+        statusType: task.statusType,
+        ProjectID: task.ProjectID,
+        sprintId: task.sprintId,
+        folderObjId: task.folderObjId,
+        deletedStatusKey: task.deletedStatusKey,
+        sprintName: sprint.name || '',
+        folderName: sprint.folderName || '',
+        updatedAt: task.updatedAt,
+    };
+};
+
 /* POST /api/v2/search  body: { query } */
 exports.globalSearch = async (req, res) => {
     try {
@@ -55,7 +73,7 @@ exports.globalSearch = async (req, res) => {
                 type: SCHEMA_TYPE.TASKS,
                 data: [
                     { ProjectID: { $in: projectIds }, ...sprintClause, deletedStatusKey: { $ne: 1 }, $or: [{ TaskName: rx }, { TaskKey: rx }] },
-                    'TaskName TaskKey status statusType ProjectID sprintId folderObjId deletedStatusKey',
+                    'TaskName TaskKey status statusType ProjectID sprintId folderObjId deletedStatusKey sprintArray updatedAt',
                     { limit: RESULT_LIMIT_PER_TYPE, sort: { updatedAt: -1 } },
                 ],
             }, 'find'),
@@ -63,7 +81,7 @@ exports.globalSearch = async (req, res) => {
                 type: SCHEMA_TYPE.PROJECTS,
                 data: [
                     { _id: { $in: projectIds }, deletedStatusKey: { $in: [0, undefined] }, ProjectName: rx },
-                    'ProjectName',
+                    'ProjectName updatedAt',
                     { limit: RESULT_LIMIT_PER_TYPE, sort: { updatedAt: -1 } },
                 ],
             }, 'find'),
@@ -119,6 +137,7 @@ exports.globalSearch = async (req, res) => {
                 return {
                     _id: project._id,
                     ProjectName: project.ProjectName,
+                    updatedAt: project.updatedAt,
                     sprintId: sprint ? sprint._id : null,
                     folderId: sprint && sprint.folderId ? sprint.folderId : null,
                 };
@@ -129,7 +148,7 @@ exports.globalSearch = async (req, res) => {
             status: true,
             statusText: 'Search complete.',
             data: {
-                tasks: tasks || [],
+                tasks: (tasks || []).map(toTaskRow),
                 projects: projectResults,
                 comments: visibleComments.map((comment) => ({
                     _id: comment._id,
