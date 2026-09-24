@@ -216,15 +216,16 @@ describe('CommandPalette', () => {
         const wrapper = await mountPalette();
         await typeQuery(wrapper);
         const ids = options(wrapper).map((o) => o.attributes('id'));
-        const input = wrapper.find('input');
-        expect(input.attributes('aria-activedescendant')).toBe(ids[0]);
+        // The teleport stub re-renders its children, so the field is looked up again after each key.
+        const activeId = () => wrapper.find('input').attributes('aria-activedescendant');
+        expect(activeId()).toBe(ids[0]);
         expect(options(wrapper)[0].attributes('aria-selected')).toBe('true');
 
         await key(wrapper, { key: 'ArrowDown' });
-        expect(input.attributes('aria-activedescendant')).toBe(ids[1]);
+        expect(activeId()).toBe(ids[1]);
         await key(wrapper, { key: 'ArrowUp' });
         await key(wrapper, { key: 'ArrowUp' });
-        expect(input.attributes('aria-activedescendant')).toBe(ids[0]);
+        expect(activeId()).toBe(ids[0]);
 
         expect(activeOption(wrapper).attributes('data-kind')).toBe('task');
         await key(wrapper, { key: 'Enter' });

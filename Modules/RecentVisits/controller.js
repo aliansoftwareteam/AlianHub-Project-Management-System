@@ -82,7 +82,7 @@ exports.listVisits = async (req, res) => {
             type: SCHEMA_TYPE.TASKS,
             data: [
                 { _id: { $in: visits.map((visit) => visit.entityId) }, ProjectID: { $in: projectIds }, deletedStatusKey: { $ne: 1 } },
-                'TaskName TaskKey status statusType ProjectID sprintId folderObjId deletedStatusKey',
+                'TaskName TaskKey status statusType ProjectID sprintId folderObjId deletedStatusKey sprintArray updatedAt',
             ],
         }, 'find');
         const taskById = new Map((tasks || []).map((task) => [String(task._id), task]));
