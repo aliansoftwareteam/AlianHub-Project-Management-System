@@ -1,5 +1,5 @@
 <template>
-    <div :style="`${considerWidth && containerWidth ? `width: calc(${containerWidth} - 25px);` : ''}`" class="d-flex justify-content-between border-primary mb-1 border-radius-5-px create__task-div" id="createtaskinput_driver">
+    <div :style="`${considerWidth && containerWidth ? `width: calc(${containerWidth} - 25px);` : ''}`" class="d-flex justify-content-between border-primary mb-1 border-radius-5-px create__task-div" id="createtaskinput_driver" @keydown.esc.stop.prevent="onEscape">
         <template v-if="sprint && Object.keys(sprint).length">
            <div :class="`d-flex align-items-center position-re ${clientWidth > 412 ? 'task-create-width' : 'w-100'}`">
                 <TaskType
@@ -96,6 +96,7 @@ const { t } = useI18n();
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { taskPlanPermission } from "@/composable/commonFunction";
 import taskClass from "@/utils/TaskOperations"
+import { closeTopEscapeLayer, escapeLayerMark } from "@/composable/useEscapeLayer";
 const projectRef = inject("selectedProject");
 import { useValidation } from "@/composable/Validation";
 import { useToast } from "vue-toast-notification";
@@ -157,6 +158,12 @@ const props = defineProps({
 })
 // EMITS
 const emits = defineEmits(["cancel", "submit"]);
+
+const layersBelowRow = escapeLayerMark();
+function onEscape() {
+    if (closeTopEscapeLayer({ after: layersBelowRow })) return;
+    emits("cancel");
+}
 const companyOwner = computed(() => {
     return getters["settings/companyOwnerDetail"];
 })

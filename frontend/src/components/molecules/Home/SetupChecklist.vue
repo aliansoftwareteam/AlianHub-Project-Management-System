@@ -1,10 +1,10 @@
 <template>
-    <section class="hc-setup" :aria-label="$t('Home.setup_label')">
+    <section class="hc-setup" aria-labelledby="hc-setup-title">
         <div class="hc-setup__ring" :style="{ '--pct': `${Math.round(doneCount / steps.length * 100)}%` }">
             <span>{{ doneCount }}/{{ steps.length }}</span>
         </div>
         <div class="hc-setup__body">
-            <div class="hc-setup__title">{{ title || $t('Home.setup_title', { company: companyName }) }}</div>
+            <div id="hc-setup-title" class="hc-setup__title">{{ title || $t('Home.setup_title', { company: companyName }) }}</div>
             <div class="hc-setup__steps">
                 <template v-for="(step, i) in steps" :key="step.key">
                     <span v-if="i > 0"> · </span>

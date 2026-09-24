@@ -186,7 +186,9 @@ describe('the sprint header count says what it counts', () => {
         const view = read('frontend/src/views/Projects/ListView/ListView.vue');
         const meta = view.split('\n').find((line) => line.includes('lv2__sprint-meta'));
         expect(meta).toMatch(/:title="\$t\('List\.sprint_total_hint'\)"/);
-        expect(meta).toContain('sprint.tasks');
+        expect(meta).toContain('sprintCount(sprint)');
+        // Unfiltered, the header still shows sprints.tasks; a search or filter shows the matching rows.
+        expect(view).toMatch(/function sprintCount\(sprint\) \{[^}]*sprint\.tasks/);
     });
 
     test('the hint is keyed in en.js and names both definitions', () => {

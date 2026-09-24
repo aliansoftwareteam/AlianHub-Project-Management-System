@@ -36,6 +36,9 @@ const instantOf = (value) => {
 };
 
 const noticeAsked = (obj) => Boolean(obj) && typeof obj === 'object' && Object.keys(obj).length > 0;
+const dueDateHistoryMessage = (name, due) => (due === null || due === undefined || due === ''
+    ? `<b>${name}</b> has removed the <b>Due Date</b>.`
+    : `<b>${name}</b> has added <b> Due Date</b> as <b>DATE_${new Date(due).getTime()}</b>.`);
 
 /* A history-only update runs after the date was written, so the stored list may already end with it. */
 const dueDateNotice = ({ project, task, storedTask, firebaseObj, isUpdateTask, commonDateFormatString, timeZone }) => {
@@ -116,7 +119,7 @@ module.exports = {
                     }
                     var historyObj = {};
                     historyObj.key = "Project_DueDate";
-                    historyObj.message = `<b>${userData.Employee_Name}</b> has added <b> Due Date</b> as <b>DATE_${new Date(firebaseObj.DueDate).getTime()}</b>.`;
+                    historyObj.message = dueDateHistoryMessage(userData.Employee_Name, firebaseObj.DueDate);
                     historyObj.sprintId = task.sprintId;
                     HandleHistory('task',project.CompanyId, project._id,task._id,historyObj, userData).
                     catch((error) => {
@@ -163,7 +166,7 @@ module.exports = {
                         }
                         var historyObj = {};
                         historyObj.key = "Project_DueDate";
-                        historyObj.message = `<b>${userData.Employee_Name}</b> has added <b> Due Date</b> as <b>DATE_${new Date(firebaseObj.DueDate).getTime()}</b>.`;
+                        historyObj.message = dueDateHistoryMessage(userData.Employee_Name, firebaseObj.DueDate);
                         historyObj.sprintId = task.sprintId;
                         HandleHistory('task',project.CompanyId, project._id,task._id,historyObj, userData).
                         catch((error) => {

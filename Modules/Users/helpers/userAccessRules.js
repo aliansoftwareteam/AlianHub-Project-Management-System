@@ -20,7 +20,7 @@ const AUTH_FIELDS = [
     'isActive', 'isEmailVerified', 'AssignCompany', 'languageCode', 'createdAt', 'updatedAt',
 ];
 const SELF_WRITABLE = [
-    'isOnline', 'lastActive', 'lastSelectedCompany', 'tour', 'homeChecklist', 'presence', 'languageCode',
+    'isOnline', 'lastActive', 'lastSelectedCompany', 'tour', 'presence', 'languageCode',
     'localePreferences', 'updatedAt', 'Employee_FName', 'Employee_LName', 'Employee_Name',
     'Employee_profileImage', 'Employee_profileImageURL', 'Time_Format', 'Time_Zone', 'workingHours',
 ];

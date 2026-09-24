@@ -1502,8 +1502,15 @@ export default {
         "next_month": "Next month",
         "sort_hint": "Click a column to sort"
     },
+    "UndoToast": {
+        "undo": "Undo",
+        "undo_hint": "Undo (Ctrl+Z or ⌘Z)",
+        "dismiss": "Dismiss"
+    },
     "TaskPanel": {
         "dialog_label": "Task detail",
+        "open_in_desktop_tracker": "Open in desktop tracker",
+        "change_undone": "Change undone",
         "tracker_start": "Start Tracker",
         "tracker_start_hint": "Start this task in the AlianHub desktop tracker",
         "tracker_start_accept": "Start tracking",
@@ -4159,6 +4166,8 @@ export default {
         "status": "સ્થિતિ",
         "priority": "પ્રાથમિકતા",
         "due_date": "નિયત તારીખ",
+        "assignee": "Assignee",
+        "unassigned": "Unassigned",
         "group_by": "દ્વારા જૂથ",
         "subtask": "ઉપકાર્ય",
         "task_name": "કાર્ય નામ",
@@ -4592,6 +4601,9 @@ export default {
         "menu_share": "Share & export",
         "menu_import": "Import",
         "menu_settings": "Project settings",
+        "menu_popular": "Popular",
+        "menu_integrations": "Integrations",
+        "menu_more_views": "More views",
         "expand_subtasks": "Expand subtasks",
         "collapse_subtasks": "Collapse subtasks",
         "assignee_count": "Assignee: {n} selected",
@@ -5834,6 +5846,7 @@ export default {
         "no_tasks_action": "Create task",
         "no_match_title": "Nothing matches your filters",
         "no_match_msg": "No task here matches the search, assignee or filter you have on. Clear them to see everything this view holds.",
+        "no_match_action": "Clear filters",
         "no_visible_tasks_title": "No tasks to show here",
         "no_visible_tasks_msg": "A task was created in this project at some point and nothing is narrowing this view, so we cannot tell you why it is empty. The tasks may have been archived or deleted, or this view may have failed to load them — reloading rules that last one out.",
         "no_archived_title": "No archived tasks to show",

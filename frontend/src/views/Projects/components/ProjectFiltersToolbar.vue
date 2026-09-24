@@ -3,7 +3,7 @@
         <div class="d-flex align-items-center justify-content-between flex-wrap task-filtersearchassignee-wrapper" :class="{'w-545' : clientWidth <=767 }" v-if="['ProjectListView', 'Calendar', 'ProjectKanban','TableView'].includes(activeTab)">
             <div class="d-flex align-items-center justify-content-start task-filtersearch" :class="[{ 'mb-10px': clientWidth <= 767 }]">
                 <TaskFilter :projectData="projectData" @apply="(q) => $emit('applyFilter', q)" @clear="$emit('clearFilter')" v-if="Object.keys(projectData).length > 0"/>
-                <button type="button" class="pft__search-toggle" :aria-label="$t('PlaceHolder.search')" @click="searchOpen = !searchOpen">
+                <button type="button" class="pft__search-toggle" :aria-label="$t('PlaceHolder.search')" :aria-expanded="searchOpen" @click="searchOpen = !searchOpen">
                     <ShellIcon name="search" :size="15" />
                 </button>
                 <div class="position-re task-fitler-search pft__search" id="projectviewfiltersearch_driver">
@@ -11,6 +11,7 @@
                     <input
                         type="text"
                         :placeHolder="$t('PlaceHolder.search')"
+                        :aria-label="$t('PlaceHolder.search')"
                         class="form-control pft__input"
                         :value="taskSearch"
                         @input="$emit('update:taskSearch', $event.target.value)"
@@ -79,7 +80,7 @@
                         <template #options>
                             <DropDownOption v-for="item in groupByOptions" :key="item.id" @click="$emit('update:groupBy', item.id); $refs.group_by_status.click(item)" :class="{'bg-light-gray' : item.id === groupBy}">
                                 <div>
-                                    <img :src="item.image" :alt="item.label" class="pr-10px">
+                                    <img :src="item.image" alt="" class="pr-10px">
                                     <span :class="{'purple' : item.id === groupBy}">{{ $t(`Projects.${item.label}`) }}</span>
                                 </div>
                             </DropDownOption>
@@ -201,7 +202,7 @@
 </template>
 
 <script setup>
-import { ref, computed, defineProps, defineEmits } from 'vue';
+import { ref, computed, defineProps, defineEmits, watch } from 'vue';
 import { aiUsable } from "@/composable/aiAvailability";
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useRoute } from 'vue-router';
@@ -263,7 +264,8 @@ const props = defineProps({
 });
 
 const route = useRoute();
-const searchOpen = ref(false);
+const searchOpen = ref(Boolean(props.taskSearch));
+watch(() => props.taskSearch, (value) => { if (value) searchOpen.value = true; });
 // The wizard files rows into one sprint: the one in the route, else the project's first.
 // 22b's "into Mobile App v2" headline reads from this.
 const importSprint = computed(() => {

@@ -31,7 +31,7 @@
             <div class="ah-page__body">
                 <div class="ah-page__content ah-scroll home__content">
                     <SetupChecklist
-                        v-if="showChecklist"
+                        v-if="showChecklist && !surfaceOpen"
                         :company-name="companyName"
                         :title="isOwnerOrAdmin ? '' : $t('Home.member_setup_title')"
                         :steps="checklistSteps"
@@ -131,6 +131,7 @@ import TimerChip from "@/components/molecules/Home/TimerChip.vue";
 import SetupChecklist from "@/components/molecules/Home/SetupChecklist.vue";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
 import { useOnboardingChecklist } from "@/composable/useOnboardingChecklist";
+import { useBlockingSurface } from "@/composable/blockingSurface";
 import StatusChip from "@/components/molecules/Home/StatusChip.vue";
 import { homeState } from "@/components/molecules/Home/homeState";
 import { useMyWork } from "@/components/molecules/Home/useMyWork";
@@ -173,7 +174,6 @@ const pendingDateTask = ref(null);
 const todayLabel = computed(() => moment().format("ddd MMM D"));
 const projects = computed(() => getters["projectData/projects"]?.data || []);
 const companyName = computed(() => getters["settings/selectedCompany"]?.Cst_CompanyName || "");
-const sampleProject = computed(() => projects.value[0] || null);
 
 const mainTour = inject("$mainTour", null);
 const onboarding = useOnboardingChecklist({
@@ -181,7 +181,8 @@ const onboarding = useOnboardingChecklist({
     startTour: (which) => mainTour?.value?.startTour?.(which),
     routeVersion: () => route.fullPath
 });
-const { steps: checklistSteps, show: showChecklist, complete: checklistComplete, isOwnerOrAdmin, dismiss: dismissChecklist } = onboarding;
+const { steps: checklistSteps, show: showChecklist, complete: checklistComplete, isOwnerOrAdmin, dismiss: dismissChecklist, sampleProject } = onboarding;
+const surfaceOpen = useBlockingSurface();
 const firstRun = computed(() => projects.value.length <= 1 || !checklistComplete.value);
 const confirmRemoveSample = ref(false);
 
@@ -317,7 +318,6 @@ const onVisible = () => { if (document.visibilityState === "visible") work.fetch
 
 onMounted(() => {
     const me = getUser(userId.value, "all") || {};
-    onboarding.load();
     if (me.presence) homeState.presence = { ...homeState.presence, ...me.presence };
     work.fetchOpen().catch((error) => console.error("my work failed", error));
     agenda.load().catch(() => {});

@@ -67,10 +67,6 @@ describe('text on the brand fill', () => {
         expect(block(tokens, '.ah-check:checked::after')).toMatch(/border:\s*2px solid var\(--on-brand\)/);
     });
 
-    test('the getting-started checklist tick uses --on-brand', () => {
-        expect(block(read('components/organisms/Tour/style.css'), '.ah-gs__box')).toMatch(/color:\s*var\(--on-brand\)/);
-    });
-
     test('a team mark without its own colour uses --on-brand', () => {
         expect(read('views/Settings/Teams/Teams.vue')).toMatch(/class="tm__mark"\s*\n\s*:style="\{ color: row\.teamColor\?\.bgColor \? \(row\.teamColor\.color \|\| '#fff'\) : 'var\(--on-brand\)'/);
     });

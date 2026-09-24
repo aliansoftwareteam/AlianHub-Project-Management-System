@@ -1,11 +1,14 @@
 import { ref, computed, inject, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useCustomComposable } from '@/composable';
+import { loadViewPrefs, saveViewPrefs } from './projectViewPrefs';
+import { clearFilterSignal } from './taskFilterSignal';
 
 export function useProjectSearch(projectData, showArchived) {
     const { commit, dispatch, getters } = useStore();
     const { checkPermission, debounce } = useCustomComposable();
     const userId = inject('$userId');
+    const companyId = inject('$companyId', ref(''));
 
     const taskSearch = ref('');
     const taskNameSearch = ref(true);
@@ -41,12 +44,25 @@ export function useProjectSearch(projectData, showArchived) {
         showAllTasks.value === undefined || showAllTasks.value === true || showAllTasks.value === 2
     ));
 
+    const prefsIds = () => ({ companyId: companyId?.value, userId: userId?.value, projectId: projectData.value?._id });
+
     function resetFilters() {
-        groupBy.value = 0;
-        filterUsers.value = [];
+        const prefs = loadViewPrefs(prefsIds());
+        groupBy.value = prefs.groupBy;
+        filterUsers.value = prefs.me && userId?.value ? [userId.value] : [];
+        taskSearch.value = prefs.search;
         searchTask.value = false;
         filterQuery.value = '';
         collapsed.value = true;
+        searchMongoDB();
+    }
+
+    function clearAllFilters() {
+        taskSearch.value = '';
+        filterUsers.value = [];
+        filterQuery.value = '';
+        clearFilterSignal.value += 1;
+        searchMongoDB();
     }
 
     function toggleSearch() {
@@ -151,6 +167,10 @@ export function useProjectSearch(projectData, showArchived) {
         searchMongoDB();
     });
 
+    watch([groupBy, taskSearch, () => filterUsers.value.includes(userId?.value)], ([group, search, me]) => {
+        saveViewPrefs(prefsIds(), { groupBy: group, search, me });
+    });
+
     return {
         taskSearch,
         taskNameSearch,
@@ -164,6 +184,7 @@ export function useProjectSearch(projectData, showArchived) {
         userSidebar,
         showTasks,
         resetFilters,
+        clearAllFilters,
         toggleSearch,
         searchMongoDB,
         manageFilterUsers,

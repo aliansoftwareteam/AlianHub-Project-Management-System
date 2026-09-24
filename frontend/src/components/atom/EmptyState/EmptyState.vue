@@ -6,7 +6,7 @@
         <button
             v-if="actionLabel"
             type="button"
-            class="blue_btn cursor-pointer font-roboto-sans empty-state__btn"
+            class="ah-btn ah-btn--primary empty-state__btn"
             @click="$emit('action')"
         >{{ actionLabel }}</button>
         <a

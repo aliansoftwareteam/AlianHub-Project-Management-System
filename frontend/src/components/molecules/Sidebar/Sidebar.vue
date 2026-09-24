@@ -118,6 +118,7 @@ import SidebarItems from "../SidebarItems/SidebarItems.vue";
 // COMPOSABLES
 import { useCustomComposable } from "@/composable";
 import { useFocusTrap } from "@/composable/useFocusTrap";
+import { useEscapeLayer } from "@/composable/useEscapeLayer";
 
 // USE COMPOSABLES
 const { debounce } = useCustomComposable();
@@ -250,6 +251,7 @@ const search = ref("");
 const sidebar_search = ref(null);
 // eslint-disable-next-line
 const visible = ref(false);
+useEscapeLayer(() => props.visible, () => emit('update:visible', false));
 // FILTER OPTIONS
 const filteredOptions = ref();
 
