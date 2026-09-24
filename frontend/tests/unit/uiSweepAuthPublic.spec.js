@@ -56,6 +56,10 @@ describe('signed-out screens', () => {
     test.each(screens)('%s has no English literal in a bound aria-label', (rel) => {
         expect(read(rel)).not.toMatch(/:aria-label="[^"]*'[A-Z][a-z]+ [a-z]/);
     });
+
+    test.each(screens.filter((rel) => !rel.includes('Invitation')))('%s leaves an empty password field looking empty', (rel) => {
+        expect(read(rel)).not.toMatch(/placeholder="•+"/);
+    });
 });
 
 describe('login proof panel', () => {

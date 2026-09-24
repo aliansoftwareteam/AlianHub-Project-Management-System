@@ -21,7 +21,6 @@
                             :class="{ 'ah-input--error': errors.password }"
                             autocomplete="new-password"
                             maxlength="150"
-                            placeholder="••••••••"
                             :aria-invalid="!!errors.password"
                             @input="errors.password = ''; syncConfirm()"
                         />
@@ -41,7 +40,6 @@
                         :class="{ 'ah-input--error': errors.confirm }"
                         autocomplete="new-password"
                         maxlength="150"
-                        placeholder="••••••••"
                         :aria-invalid="!!errors.confirm"
                         @input="syncConfirm()"
                     />

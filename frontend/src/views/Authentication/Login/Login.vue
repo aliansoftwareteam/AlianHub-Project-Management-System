@@ -55,7 +55,6 @@
                             maxlength="150"
                             class="ah-input"
                             :class="{ 'ah-input--error': errors.password }"
-                            placeholder="••••••••"
                             :aria-invalid="!!errors.password"
                             aria-describedby="password-error"
                             @input="errors.password = ''"

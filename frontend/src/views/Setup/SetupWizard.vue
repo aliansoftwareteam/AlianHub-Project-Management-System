@@ -53,7 +53,7 @@
                 <div class="ah-field">
                     <label class="ah-field__label" for="password">{{ $t('Setup.password') }}</label>
                     <div class="auth__pw">
-                        <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'" maxlength="150" autocomplete="new-password" class="ah-input" :class="{ 'ah-input--error': errors.password }" placeholder="••••••••" @input="errors.password = ''" />
+                        <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'" maxlength="150" autocomplete="new-password" class="ah-input" :class="{ 'ah-input--error': errors.password }" @input="errors.password = ''" />
                         <button type="button" class="auth__pw-eye" :aria-label="showPassword ? $t('Setup.hide_password') : $t('Setup.show_password')" @click="showPassword = !showPassword">
                             <ShellIcon :name="showPassword ? 'eyeOff' : 'eye'" :size="15" />
                         </button>
