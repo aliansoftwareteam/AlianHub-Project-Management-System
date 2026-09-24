@@ -14,6 +14,7 @@
                 :checked="selected"
                 :aria-label="data.TaskName"
                 @click="onSelect($event)"
+                @keydown.shift="onSelect($event)"
             />
         </span>
 

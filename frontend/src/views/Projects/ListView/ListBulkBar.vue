@@ -42,6 +42,10 @@
         :showSpinner="working"
         @confirm="runConfirmed"
     />
+    <div v-if="undo && !selection.hasSelection.value" class="lv2-undo" role="status">
+        <span>{{ undo.text }}</span>
+        <button v-if="undo.requests.length" type="button" class="lv2-undo__btn" :disabled="working" @click="runUndo">{{ $t('List.bulk_undo') }}</button>
+    </div>
 </template>
 
 <script setup>
@@ -55,6 +59,7 @@ import * as env from "@/config/env";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { useTaskSummaries } from "@/views/Projects/TableView/useTaskSummaries.js";
+import { snapshotTasks, statusPayload, undoRequests } from "./bulkUndo.js";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
 
 defineOptions({ name: "ListBulkBar" });
@@ -64,7 +69,8 @@ const props = defineProps({
 });
 
 const { t } = useI18n();
-const { getters } = useStore();
+const store = useStore();
+const { getters } = store;
 const $toast = useToast();
 const { getUser } = useGetterFunctions();
 const { checkPermission } = useCustomComposable();
@@ -147,14 +153,26 @@ function userData() {
     };
 }
 
+const UNDO_MS = 6000;
+const undo = ref(null);
+let undoTimer = null;
+
+function showUndo(text, requests) {
+    clearTimeout(undoTimer);
+    undo.value = { text, requests };
+    undoTimer = setTimeout(() => { undo.value = null; }, UNDO_MS);
+}
+
 async function run(action, payload) {
     if (working.value) return;
     working.value = true;
     open.value = "";
+    const taskIds = [...selection.selectedTaskIds.value];
+    const before = snapshotTasks(store.state.projectData, taskIds);
     try {
         const response = await apiRequest("post", env.V2_TASKS_BULK, {
             action,
-            taskIds: [...selection.selectedTaskIds.value],
+            taskIds,
             userData: userData(),
             ...payload
         });
@@ -162,8 +180,10 @@ async function run(action, payload) {
             $toast.error(response.data.statusText || t("List.bulk_failed"));
             return;
         }
-        const totals = response?.data?.data?.totals || {};
-        $toast.success(t("List.bulk_done", { n: totals.updated ?? selection.count.value }));
+        const result = response?.data?.data || {};
+        const updatedIds = Array.isArray(result.updated) ? result.updated : taskIds;
+        const requests = undoRequests({ action, payload, before, updatedIds, project: props.project });
+        showUndo(t("List.bulk_done", { n: result.totals?.updated ?? taskIds.length }), requests);
         selection.clear();
     } catch (error) {
         $toast.error(error?.message || t("List.bulk_failed"));
@@ -172,15 +192,27 @@ async function run(action, payload) {
     }
 }
 
-function pickStatus(option) {
-    const status = option.raw;
-    run("bulkUpdateStatus", {
-        newStatus: {
-            status: { key: status.key, value: "", text: status.name, type: status.type, bgColor: status.bgColor, textColor: status.textColor },
-            statusKey: status.key,
-            statusType: status.type
+async function runUndo() {
+    const requests = undo.value?.requests || [];
+    clearTimeout(undoTimer);
+    undo.value = null;
+    if (!requests.length || working.value) return;
+    working.value = true;
+    try {
+        for (const request of requests) {
+            const response = await apiRequest("post", env.V2_TASKS_BULK, { ...request, userData: userData() });
+            if (response?.data?.status === false) throw new Error(response.data.statusText);
         }
-    });
+        $toast.success(t("List.bulk_undone"));
+    } catch (error) {
+        $toast.error(t("List.bulk_undo_failed"));
+    } finally {
+        working.value = false;
+    }
+}
+
+function pickStatus(option) {
+    run("bulkUpdateStatus", { newStatus: statusPayload(option.raw) });
 }
 
 function pickAssignee(option) {
@@ -221,6 +253,7 @@ onMounted(() => {
     document.addEventListener("click", onClick);
 });
 onBeforeUnmount(() => {
+    clearTimeout(undoTimer);
     document.removeEventListener("keydown", onKey);
     document.removeEventListener("click", onClick);
 });
@@ -251,6 +284,30 @@ onBeforeUnmount(() => {
     z-index: 3;
 }
 .lv2 > .lv2-bulk ~ .lv2__scroll { padding-bottom: 48px; }
+.lv2-undo {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: calc(100vw - 32px);
+    padding: 9px 14px;
+    background: var(--rail);
+    color: var(--rail-ink-strong);
+    border-radius: 9px;
+    box-shadow: var(--shadow-pop);
+    font-size: 12.5px;
+}
+.lv2-undo__btn {
+    border: 0; background: transparent; padding: 0;
+    color: var(--rail-brand);
+    font: 600 12.5px/1 var(--font-ui);
+    cursor: pointer;
+}
+.lv2-undo__btn:disabled { opacity: .4; cursor: not-allowed; }
 .lv2-bulk__count { font-weight: 600; }
 .lv2-bulk__btn {
     background: none; border: 0; padding: 0;
@@ -299,8 +356,11 @@ onBeforeUnmount(() => {
 
 @media (max-width: 767px) {
     .lv2-bulk { padding: 0 16px; gap: 10px; overflow-x: auto; }
+    /* The tab bar is border-box, so --tabbar-h already includes its safe-area padding. */
+    .lv2 > .lv2-bulk { position: fixed; bottom: var(--tabbar-h); }
+    /* The bar scrolls sideways here, which would clip a menu positioned inside it. */
+    .lv2 > .lv2-bulk .lv2-bulk__menu { position: fixed; left: 16px; right: 16px; bottom: calc(var(--tabbar-h) + 48px); }
+    .lv2-undo { bottom: calc(var(--tabbar-h) + 12px); }
 }
 
-/* Projects.vue mounts the legacy floating bulk bar for every view; the
-   redesigned views carry this one instead. */
 </style>

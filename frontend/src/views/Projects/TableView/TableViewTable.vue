@@ -26,7 +26,7 @@
                 :selected="selection.isSelected(task._id)"
                 :can-select="canGroupSelect"
                 @open="$emit('open', $event)"
-                @select="(row, event) => selection.toggleAndCascade(row, event)"
+                @select="(row, event) => selection.selectFromEvent(row, event, '.tv2')"
             />
         </template>
         <template v-else>
