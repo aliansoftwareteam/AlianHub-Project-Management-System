@@ -135,6 +135,7 @@
   "author": "Alian Software <https://alianhub.com>",
   "license": "AGPL-3.0-or-later",
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@commitlint/cli": "^19.5.0",
     "@commitlint/config-conventional": "^19.5.0",
     "@modelcontextprotocol/sdk": "1.30.0",
