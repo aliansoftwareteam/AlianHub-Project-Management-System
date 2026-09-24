@@ -109,12 +109,15 @@ const openConnection = (companyId) => {
 }
 
 /* The deleting process marks the company's global row before it drops the database, so a process
- * that never saw the deletion start still refuses to open a connection that would recreate it. */
+ * that never saw the deletion start still refuses to open a connection that would recreate it.
+ * Only a pooled global connection is asked: opening one here would leave a connection nobody
+ * asked for, which kept test processes alive, and a serving process has global pooled anyway. */
 const deletingElsewhere = async (db) => {
     if (!COMPANY_DB.test(String(db)) || checkConnectionExists({ connections, db })) return false;
+    const global = checkConnectionExists({ connections, db: dbCollections.GLOBAL });
+    if (!global) return false;
     try {
-        const { database } = await openConnection(dbCollections.GLOBAL);
-        const row = await database.db.collection(dbCollections.COMPANIES).findOne(
+        const row = await global.connection.db.collection(dbCollections.COMPANIES).findOne(
             { _id: new mongoose.Types.ObjectId(String(db)), deletingAt: { $exists: true } },
             { projection: { _id: 1 } },
         );
