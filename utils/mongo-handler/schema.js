@@ -2036,6 +2036,19 @@ const schema = {
             type: Object,
             required: false
         },
+        // Written only by PUT /api/v2/users/onboarding (Modules/Users/onboarding.js). It was once
+        // $set through /api/v1/user while undeclared, and this strict schema dropped every write.
+        homeChecklist: {
+            dismissed: { type: Boolean, required: false },
+            openedProject: { type: Boolean, required: false },
+            completedTask: { type: Boolean, required: false },
+            loggedTime: { type: Boolean, required: false },
+            reviewedPermissions: { type: Boolean, required: false },
+            chosenApps: { type: Boolean, required: false },
+            viewedBoard: { type: Boolean, required: false },
+            viewedNotifications: { type: Boolean, required: false },
+            toursOffered: { type: [String], required: false, default: undefined }
+        },
         languageCode: {
             type: String,
             required: false,

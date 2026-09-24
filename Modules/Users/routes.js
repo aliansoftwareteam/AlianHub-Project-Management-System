@@ -1,5 +1,6 @@
 const ctrl = require('./controller');
 const sessions = require('./sessions');
+const onboarding = require('./onboarding');
 
 exports.init = (app) => {
     app.put('/api/v1/user', ctrl.updateUserStatus);
@@ -8,4 +9,5 @@ exports.init = (app) => {
     app.post('/api/v1/user/find', ctrl.getUserByQuey);
     app.get('/api/v2/users/sessions', sessions.listOwnSessions);
     app.delete('/api/v2/users/sessions/:sessionId', sessions.deleteOwnSession);
+    app.put('/api/v2/users/onboarding', onboarding.updateOwnOnboarding);
 };
