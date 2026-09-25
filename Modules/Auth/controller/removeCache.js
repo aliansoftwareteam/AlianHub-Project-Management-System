@@ -1,4 +1,5 @@
 const { myCache } = require('../../../Config/config');
+const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
@@ -16,16 +17,27 @@ const removeCallerCache = ({ cacheKey, isPrefix, companyId, uid }) => {
     return removable;
 };
 
-const removeCacheHandler = (req, res) => {
+const removeCompanyCache = (companyId) => {
+    if (!OBJECT_ID_PATTERN.test(companyId)) return [];
+    const removable = myCache.keys().filter((key) => key.includes(companyId));
+    if (removable.length) myCache.del(removable);
+    return removable;
+};
+
+const removeCacheHandler = async (req, res) => {
     try {
-        const { cacheKey, isPrefix, global: flushAll } = req.body || {};
-        if (flushAll) {
-            return res.status(403).json({ status: false, statusText: 'Forbidden', message: 'Flushing the whole cache is not available.' });
+        const { cacheKey, isPrefix, global: flushCompany } = req.body || {};
+        const scope = { companyId: String(req.headers.companyid || ''), uid: String(req.uid || '') };
+        if (flushCompany) {
+            if (!isPrivileged(await getRoleType(scope.companyId, scope.uid))) {
+                return res.status(403).json({ status: false, statusText: 'Forbidden', message: 'Only an owner or an admin can clear the company cache.' });
+            }
+            const removed = removeCompanyCache(scope.companyId);
+            return res.status(200).json({ status: true, statusText: 'Cache cleared successfully', data: { removed: removed.length } });
         }
         if (typeof cacheKey !== 'string' || !cacheKey) {
             return res.status(400).json({ status: false, statusText: 'Bad Request', message: 'cacheKey is required' });
         }
-        const scope = { companyId: String(req.headers.companyid || ''), uid: String(req.uid || '') };
         if (!isPrefix && !belongsToCaller(cacheKey, scope)) {
             return res.status(403).json({ status: false, statusText: 'Forbidden', message: 'That cache key does not belong to your company.' });
         }
@@ -36,4 +48,4 @@ const removeCacheHandler = (req, res) => {
     }
 };
 
-module.exports = { removeCacheHandler, removeCallerCache, belongsToCaller };
+module.exports = { removeCacheHandler, removeCallerCache, removeCompanyCache, belongsToCaller };
