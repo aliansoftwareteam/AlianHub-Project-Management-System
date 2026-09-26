@@ -19,8 +19,9 @@ exports.linkTokenAccepted = linkTokenAccepted;
 
 const INVALID = Object.freeze({ status: false, statusText: 'Invalid invitation link.' });
 
-/* The invitation page runs before the invitee has an account, so it gets only the fields it
- * renders, and only while the invitation is still waiting for them. */
+/* Anyone holding the link reaches the invitation page, so it gets only the fields it renders, and
+ * only while the invitation is still waiting for them. Never whether the address has an account:
+ * the admin holds the link too, and could invite any address to find out. */
 exports.invitationPreview = async (req, res) => {
     try {
         const { companyId, memberId, linkId } = req.body || {};
