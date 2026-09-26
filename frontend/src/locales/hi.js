@@ -370,7 +370,7 @@ export default {
         "Conform_pass": "कन्फ़र्म पासवर्ड",
         "RememberMeL": "मुझे याद रखें",
         "Remember_password": "पासवर्ड याद रखें",
-        "Forgot_Password": "पासवर्ड भूल गए",
+        "Forgot_Password": "पासवर्ड भूल गए?",
         "loading": "लोड हो रहा है",
         "loging": "लॉगिन कर रहे हैं",
         "Register": "रजिस्टर करें",
