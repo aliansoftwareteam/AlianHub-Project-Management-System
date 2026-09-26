@@ -48,7 +48,7 @@ import { initTimer } from "./useTaskTimer";
 import { useFocusTrap } from "@/composable/useFocusTrap";
 import {
     overlayState, isExpanded, bindRouter, openTask, closeTask, expandTask, minimizeTask,
-    restoreTask, dismissMinimized, stepTask, restoreFromSequence, TASK_QUERY_KEY
+    restoreTask, dismissMinimized, stepTask, restoreFromSequence, closeOnPageChange, TASK_QUERY_KEY
 } from "./useTaskOverlay";
 import { navKeyDirection } from "./taskNavigation";
 import { handlePanelEscape } from "./panelEscape";
@@ -167,6 +167,7 @@ watch(isExpanded, (expanded) => {
 });
 watch(() => route.params?.taskId, openFromRoute);
 watch(() => route.query?.[TASK_QUERY_KEY], (value) => { if (value) restoreFromQuery(); });
+watch(() => route.path, closeOnPageChange);
 
 onMounted(() => {
     overlayState.hostMounted += 1;
