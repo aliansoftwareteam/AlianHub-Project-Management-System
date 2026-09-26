@@ -17,9 +17,36 @@ const removeCallerCache = ({ cacheKey, isPrefix, companyId, uid }) => {
     return removable;
 };
 
+/* Where the company id sits in each company-scoped key type. Another slot can hold a user or
+ * project id equal to some company's id, so only the company slot is compared, and a key type
+ * missing from this list is never flushed. */
+const COMPANY_SLOT = {
+    ...Object.fromEntries([
+        'UserAllData', 'automation_rules', 'calendar_feeds', 'commonDateFormate', 'company_users', 'currency',
+        'customField', 'designation', 'email_inboxes', 'fileExtensions', 'integration_connections', 'knowledgeFigures',
+        'milestoneBillingPeriod', 'milestoneRange', 'milestoneStatus', 'portfolio_summary', 'portfolios', 'projectList',
+        'project_status_template', 'projectstatus', 'pto', 'report_schedules', 'role', 'rules', 'saved_reports',
+        'sprintPlanCheck', 'taskPriority', 'taskStatusTemplate', 'taskTypeTemplate', 'taskstatus', 'tasktype',
+        'timesheet', 'UserProjectData',
+    ].map((type) => [type, 1])),
+    membership: 2,
+    milestone: 2,
+    notification: 2,
+    roleType: 2,
+};
+const COMPANY_SUFFIX_TYPES = ['companyData_', 'project_template_', 'workloadSummary_'];
+
+const companyOfKey = (key) => {
+    const suffixType = COMPANY_SUFFIX_TYPES.find((type) => key.startsWith(type));
+    if (suffixType) return key.slice(suffixType.length);
+    const parts = key.split(':');
+    const slot = COMPANY_SLOT[parts[0]];
+    return slot === undefined ? null : parts[slot];
+};
+
 const removeCompanyCache = (companyId) => {
     if (!OBJECT_ID_PATTERN.test(companyId)) return [];
-    const removable = myCache.keys().filter((key) => key.includes(companyId));
+    const removable = myCache.keys().filter((key) => companyOfKey(key) === companyId);
     if (removable.length) myCache.del(removable);
     return removable;
 };

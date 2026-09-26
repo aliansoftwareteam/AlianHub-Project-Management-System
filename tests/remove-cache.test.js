@@ -100,6 +100,29 @@ describe('removeCacheHandler scope', () => {
         ].sort());
     });
 
+    it('matches the company slot of each key type, not the id anywhere in the key', async () => {
+        getRoleType.mockResolvedValue(ROLE_OWNER);
+        const foreign = [
+            `milestone:${COMPANY}:${OTHER_COMPANY}`,
+            `UserProjectData:${OTHER_COMPANY}:${COMPANY}`,
+            `notification:${COMPANY}:${OTHER_COMPANY}`,
+            `dashboard_${COMPANY}`,
+            `mystery:${COMPANY}`,
+        ];
+        foreign.forEach((key) => myCache.set(key, 'x'));
+        myCache.set(`milestone:${OTHER_USER}:${COMPANY}`, 'mine');
+        myCache.set(`roleType:active:${COMPANY}:${USER}`, 'mine');
+        myCache.set(`companyData_${COMPANY}`, 'mine');
+
+        const res = await call({ global: true });
+
+        expect(res.body).toMatchObject({ data: { removed: 6 } });
+        foreign.forEach((key) => expect(myCache.has(key)).toBe(true));
+        expect(myCache.has(`milestone:${OTHER_USER}:${COMPANY}`)).toBe(false);
+        expect(myCache.has(`roleType:active:${COMPANY}:${USER}`)).toBe(false);
+        expect(myCache.has(`companyData_${COMPANY}`)).toBe(false);
+    });
+
     it.each([
         ['a member', ROLE_MEMBER],
         ['a guest', ROLE_GUEST],
