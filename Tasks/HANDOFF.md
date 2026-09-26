@@ -1,8 +1,10 @@
 # Handoff — where to start next session
 
-Updated 2026-09-24. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
+Updated 2026-09-26. Read this first, then `Tasks/index.md`. Overwrite this file at the end of every session.
 
-## State of `beta` (5e4126f4, `14.36.0-beta.434`)
+## State of `beta` (0a26592e, `14.36.0-beta.439`)
+
+- **2026-09-26: builds 435–439 (#966, #968–#971).** Owners and admins can flush their own company's cache, and only the key types that name their company are cleared (#968, build 436). Tasks assigned only to a team show under each team member when grouping by assignee (#969, build 437, follow-up 129). The bell leaves out notifications cleared in the Inbox (#970, build 438, follow-up 126). Automation rule comments show the rule's name, a gear and an AUTOMATION chip instead of "Ghost User" (#971, build 439, task 020 closed); `automationName` is declared on the strict comments schema. CodeRabbit allows one review an hour on the current plan; the owner said to skip it for this batch.
 
 - **Task 038 done (build 434, #965):** List rows edit status (circle with a grouped picker), assignee, due date and priority in place, with row actions (rename, add subtask, copy link, new tab, row menu) and Undo on every change; at 390 px the cells fold under the title. The new row menu has no archive, delete, move or duplicate yet.
 
@@ -28,10 +30,10 @@ Updated 2026-09-24. Read this first, then `Tasks/index.md`. Overwrite this file 
 
 ## Next up
 
-1. **Nothing in flight at session end.** Tasks 036, 037 and 038 are complete; the next ClickUp-comparison items (top-10 rows 4 and 6–10 in `Tasks/active/034-end-to-end-qa-programme/findings/ux-comparison-clickup-2026-09-24.md`) wait for the owner to pick.
+1. **Draft PRs waiting for the owner (all CI green, reviewed by the integrator, not reviewed by CodeRabbit):** #972 U5-36 lone sign-in provider spans the row; #973 U5-27 no crash and a no-access message on a private project link; #974 U5-25 sample tasks never start overdue; #975 U5-29 public form thank-you state; #976 follow-up 125 snooze wakes the Inbox dot; #977 U5-32 one password rule, enforced on the server; #978 A11Y-O7 focus returns to the task title; #979 A11Y-O8 reduced motion stops shimmer and pulses; #981 U5-37 in-app 404 inside the shell. #980 (follow-up 128, accept an invitation while signed in) is being revised: the preview must not reveal whether an address has an account. In progress: U5-24, U5-34, U5-38, U5-26. The ClickUp-comparison items (top-10 rows 4 and 6–10 in `Tasks/active/034-end-to-end-qa-programme/findings/ux-comparison-clickup-2026-09-24.md`) still wait for the owner to pick.
 2. **Owner questions:** row 119 (decision 8 re-check once real downloads are logged); review existing Google sign-in links (details in the owner's private notes).
 3. **Owner actions:** edit the held-out question set (decision 12; Sprint 9 waits, decision 13); the sweeps in rows 77, 83 and 94 (headless passes done in #903 and #931); the Sprint 5 workflow screens (task 028); Stats, Upgrade and the Docker label (task 033); the quota recompute; the duplicate migration 021; rotating the two API keys named in the owner's local notes.
-4. **Open follow-ups:** 57, 77, 79, 83, 84, 89, 94, 96, 98, 101, 114, 119, 122, 124–129 in `Tasks/active/034-end-to-end-qa-programme/followups.md`. From #945: merge the two onboarding checklists, a no-access page for private project links, keep the public form's thank-you text, align the password rules, a maintenance card for signed-in pages. Accessibility open items A11Y-O1 to O8 are in #944's findings.
+4. **Open follow-ups:** 57, 77, 79, 83, 84, 89, 94, 96, 98, 101, 114, 119, 122, 124, 125, 127, 128, 130 in `Tasks/active/034-end-to-end-qa-programme/followups.md`. From #945: a maintenance card for signed-in pages (U5-28) is still open; the other #945 items are in the drafts above or were fixed by #962. Accessibility items A11Y-O1 to O5 remain open (O6 was fixed by 64e5274b; O7 and O8 are in drafts).
 
 ## Owner decisions recorded
 
