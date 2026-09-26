@@ -59,7 +59,7 @@
                     >{{ $t('Inbox.tab_' + t) }} <span v-if="tabCount(t)" class="ibx__tabcount">{{ tabCount(t) }}</span></button>
                 </div>
                 <span class="ah-toolbar__spacer"></span>
-                <span class="ibx__keys ah-mono" aria-hidden="true" :title="$t('Inbox.keys_hint')">j k e s</span>
+                <span class="ibx__keys ah-mono" aria-hidden="true" :title="$t('Inbox.keys_hint_full')">j k ↵ r e s</span>
                 <button
                     v-if="tab === 'primary' || tab === 'other'"
                     type="button"
@@ -584,15 +584,23 @@ const clearAll = async () => {
     nextSkip.value = 0;
     cursor.value = 0;
     loadCounts();
-    showUndo(t('Inbox.cleared_all', { n: Number(res.data?.count || 0) }));
+    const { count, clearedAt, unread = [] } = res.data || {};
+    showUndo(t('Inbox.cleared_all', { n: Number(count || 0) }), clearedAt
+        ? async () => { if (await post('/restore-all', { clearedAt, unread })) reload(); }
+        : null);
 };
 
 const markAllRead = async () => {
-    if (!(await post('/read-all', { tab: tab.value }))) return;
+    const res = await post('/read-all', { tab: tab.value });
+    if (!res) return;
     items.value = [];
     hasMore.value = false;
     nextSkip.value = 0;
     loadCounts();
+    const marked = res.data?.items || [];
+    showUndo(t('Inbox.marked_all_read', { n: marked.length }), marked.length
+        ? async () => { if (await post('/read', { items: marked, read: 'false' })) reload(); }
+        : null);
 };
 
 const isSnoozeOpen = (it) => snoozeFor.value === rowKey(it);
