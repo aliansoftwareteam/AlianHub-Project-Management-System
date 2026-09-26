@@ -34,10 +34,7 @@
                 </div>
                 <div class="bulk-menu__scroll">
                     <button v-for="status in filteredStatuses" :key="status.key" class="bulk-menu__item" @click="onStatusPick(status)">
-                        <span
-                            class="bulk-status-option"
-                            :style="`background-color: ${status.bgColor || '#f5f5f5'}; color: ${status.textColor || '#3a3a3a'}`"
-                        >{{ status.name }}</span>
+                        <span class="bulk-status-option ah-status-ink" :style="statusChipStyle(status)">{{ status.name }}</span>
                     </button>
                     <div v-if="!filteredStatuses.length" class="bulk-menu__empty">{{ $t('BulkActions.no_matches') }}</div>
                 </div>
@@ -356,6 +353,7 @@ import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { statusChipStyle } from '@/utils/statusChipColors';
 
 const store = useStore();
 const { getters, commit } = store;

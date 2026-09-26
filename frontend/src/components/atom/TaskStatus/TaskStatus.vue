@@ -5,7 +5,7 @@
                 <div :ref="uid" class="status-main-div d-flex align-items-center">
                     <slot name="head">
                         <span v-if="!showLabel" class="status_square" :style="{ 'background-color': (modelValue?.textColor || '#c1c1c1'), verticalAlign: 'middle', marginLeft: '6px'}" :title="modelValue?.name"></span>
-                        <span v-else class="border-radius-5-px text-nowrap p5px-p10px status-main_name" :style="{'color': (modelValue?.textColor || '#c1c1c1'), 'background-color': (modelValue?.bgColor || '#c1c1c1'), verticalAlign: 'middle', marginLeft: '10px'}" :title="modelValue?.name">{{modelValue?.name}}</span>
+                        <span v-else class="border-radius-5-px text-nowrap p5px-p10px status-main_name ah-status-ink" :style="[statusChipStyle(modelValue), { verticalAlign: 'middle', marginLeft: '10px' }]" :title="modelValue?.name">{{modelValue?.name}}</span>
                     </slot>
                 </div>
             </template>
@@ -35,7 +35,7 @@
         </DropDown>
     </div>
     <template v-else>
-        <div v-if="showLabel" :id="tourId" class="status-main-div cursor-default d-flex align-items-center justify-content-center border-radius-5-px w-fitcontent" :style="{ 'background-color': (modelValue?.bgColor || '#c1c1c1'), verticalAlign: 'middle', marginLeft: '6px', color: modelValue?.textColor}">
+        <div v-if="showLabel" :id="tourId" class="status-main-div cursor-default d-flex align-items-center justify-content-center border-radius-5-px w-fitcontent ah-status-ink" :style="[statusChipStyle(modelValue), { verticalAlign: 'middle', marginLeft: '6px' }]">
             <span class="text-nowrap p5px-p10px" :title="modelValue?.name">{{modelValue?.name}}</span>
         </div>
         <div v-else class="status_square cursor-default" :style="{ 'background-color': (modelValue?.textColor || '#c1c1c1'), verticalAlign: 'middle', marginLeft: '6px', minWidth:'12px'}">
@@ -44,16 +44,14 @@
 </template>
 
 <script setup>
-// PACKAGES
 import {computed, defineEmits, defineProps, inject, onMounted, ref} from 'vue';
 
-// COMPONENTS
 import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
 import InputText from '@/components/atom/InputText/InputText.vue'
 import { useCustomComposable } from '@/composable';
+import { statusChipStyle } from '@/utils/statusChipColors';
 
-// UTILS
 const clientWidth = inject('$clientWidth');
 const { makeUniqueId } = useCustomComposable();
 

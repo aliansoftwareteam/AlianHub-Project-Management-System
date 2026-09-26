@@ -29,7 +29,7 @@
                         </template>
                         <template v-else>
                             <img src="@/assets/images/svg/triangleBlack.svg" alt="traingle" class="mr-5px" :style="`transform: rotateZ(${item.isExpanded ? 90 : 0}deg); width: 6px;`">
-                            <span class="text-ellipse status-sprint font-weight-500" :style="`color: ${item.textColor ? item.textColor : ''}; background-color: ${item.bgColor ? item.bgColor : 'transparent'}`">
+                            <span class="text-ellipse status-sprint font-weight-500 ah-status-ink" :style="item.bgColor ? statusChipStyle(item) : { color: item.textColor || '' }">
                                 <WasabiImage v-if="item.image" :data="{url: item.image, title: item.name}" class="mr-5px"/>
                                 {{item.name}}
                             </span>
@@ -125,7 +125,7 @@
                     </template>
                     <template v-else>
                         <img src="@/assets/images/svg/triangleBlack.svg" alt="traingle" class="mr-5px" :style="`transform: rotateZ(${item.isExpanded ? 90 : 0}deg); width: 6px;`">
-                        <span class="text-ellipse status-sprint font-weight-500" :style="`color: ${item.textColor ? item.textColor : ''}; background-color: ${item.bgColor ? item.bgColor : 'transparent'}`">
+                        <span class="text-ellipse status-sprint font-weight-500 ah-status-ink" :style="item.bgColor ? statusChipStyle(item) : { color: item.textColor || '' }">
                             <WasabiImage v-if="item.image" :data="{url: item.image, title: item.name}" class="mr-5px"/>
                             {{item.name}}
                         </span>
@@ -202,6 +202,7 @@ import { computed, ref, watch, defineProps, unref, onMounted, inject, defineEmit
 import { useStore } from 'vuex';
 import { useCustomComposable } from '@/composable';
 import { taskListHelper } from '@/views/Projects/helper';
+import { statusChipStyle } from '@/utils/statusChipColors';
 
 // COMPONENTS
 import Task from '../Task/Task.vue';
