@@ -100,6 +100,7 @@ import * as env from "@/config/env";
 import { homeState } from "./homeState";
 import { isMacPlatform, openPalette } from "@/components/molecules/AdvanceSearch/paletteKeys";
 import { projectColor } from "./homeFormat";
+import { wakeTimer } from "@/views/Inbox/snoozeWake";
 
 defineOptions({ name: "HomeSidebar" });
 
@@ -159,10 +160,13 @@ function toggleSection(key) {
     shellState.nav.hidden = hidden.value.includes(key) ? hidden.value.filter((k) => k !== key) : [...hidden.value, key];
 }
 
+const snoozeWake = wakeTimer(() => loadCounts());
 function loadCounts() {
     apiRequest("get", `${env.INBOX}/counts`)
         .then((response) => {
-            if (response?.data?.status) counts.value = { all: 0, mentions: 0, notifications: 0, ...response.data.data };
+            if (!response?.data?.status) return;
+            counts.value = { all: 0, mentions: 0, notifications: 0, ...response.data.data };
+            snoozeWake.schedule(response.data.data);
         })
         .catch(() => {});
 }
@@ -176,5 +180,6 @@ onMounted(() => {
 onUnmounted(() => {
     document.removeEventListener("click", closePop);
     document.removeEventListener("visibilitychange", loadCounts);
+    snoozeWake.clear();
 });
 </script>

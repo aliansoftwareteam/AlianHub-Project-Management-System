@@ -75,4 +75,36 @@ const wakeOnActivity = async (companyId, userId, taskId) => {
     return notifications + mentions;
 };
 
-module.exports = { matchedOf, moveCounter, write, wakeDue, wakeOnActivity };
+const earliest = (dates) => dates.filter(Boolean).map((d) => new Date(d)).filter((d) => !Number.isNaN(d.getTime()))
+    .reduce((min, d) => (!min || d < min ? d : min), null);
+
+/** When the reader's next timed snooze falls due, so a client can re-check then instead of polling. */
+const nextWakeAt = async (companyId, userId, now = new Date()) => {
+    if (!companyId || !userId) return null;
+    const read = (type, method, data) => MongoDbCrudOpration(companyId, { type, data }, method).catch((e) => {
+        logger.error(`${LOG_PREFIX} next wake read on ${type} failed: ${e.message}`);
+        return [];
+    });
+    const due = { $gt: now };
+    const [notifications, mentions] = await Promise.all([
+        read(SCHEMA_TYPE.NOTIFICATIONS, 'find', [
+            { receiverID: userId, clearedAt: null, snoozeUntilChange: { $ne: true }, snoozedUntil: due },
+            { snoozedUntil: 1 },
+            { sort: { snoozedUntil: 1 }, limit: 1 },
+        ]),
+        // Sorting the documents on snoozes.until would order by any reader's entry, so the
+        // reader's own entries are unwound and the earliest taken from those.
+        read(SCHEMA_TYPE.MENTIONS, 'aggregate', [[
+            { $match: { mentionIds: userId, snoozes: { $elemMatch: { userId, untilChange: { $ne: true }, until: due } } } },
+            { $unwind: '$snoozes' },
+            { $match: { 'snoozes.userId': userId, 'snoozes.untilChange': { $ne: true }, 'snoozes.until': due } },
+            { $group: { _id: null, at: { $min: '$snoozes.until' } } },
+        ]]),
+    ]);
+    return earliest([
+        ...(notifications || []).map((r) => r && r.snoozedUntil),
+        ...(mentions || []).map((r) => r && r.at),
+    ]);
+};
+
+module.exports = { matchedOf, moveCounter, write, wakeDue, wakeOnActivity, nextWakeAt };

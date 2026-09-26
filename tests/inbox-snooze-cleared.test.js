@@ -249,6 +249,67 @@ describe('a snoozed row returns when it is due', () => {
     });
 });
 
+describe('the counts say when the next snooze falls due', () => {
+    const HOUR = 60 * 60 * 1000;
+    let db;
+    let base;
+    const at = (ms) => new Date(base + ms);
+    const notice = (extra) => db.seed(SCHEMA_TYPE.NOTIFICATIONS, {
+        receiverID: UID, assigneeUsers: [UID], key: 'task_status', notificationType: 'push', notSeen: [], createdAt: at(-DAY), ...extra,
+    });
+    const mention = (extra) => db.seed(SCHEMA_TYPE.MENTIONS, {
+        mentionIds: [UID, OTHER_UID], notSeen: [], comment_message: 'hi', createdAt: at(-DAY), ...extra,
+    });
+    const counts = async () => {
+        const res = resOf();
+        await ctrl.counts(reqOf(), res);
+        expect(sent(res).status).toBe(true);
+        return sent(res).data;
+    };
+
+    beforeEach(() => {
+        db = require('./fixtures/fakeMongo').create();
+        MongoDbCrudOpration.mockImplementation(db.crud);
+        base = Date.now();
+    });
+
+    it('is the earliest timed snooze still ahead, across notifications and mentions', async () => {
+        notice({ snoozedUntil: at(3 * HOUR), snoozeUntilChange: false });
+        mention({ snoozes: [{ userId: UID, until: at(2 * HOUR), untilChange: false }] });
+        notice({ snoozedUntil: at(5 * HOUR), snoozeUntilChange: false });
+        expect((await counts()).nextWakeAt).toBe(at(2 * HOUR).toISOString());
+    });
+
+    it('is null when nothing is snoozed to a time', async () => {
+        notice({});
+        mention({});
+        const data = await counts();
+        expect(data.nextWakeAt).toBeNull();
+    });
+
+    it('ignores "until it changes", cleared, already-due and other readers\' snoozes', async () => {
+        notice({ snoozeUntilChange: true, snoozedUntil: at(HOUR / 4) });
+        notice({ snoozedUntil: at(HOUR / 4), clearedAt: at(-HOUR) });
+        notice({ snoozedUntil: at(-HOUR), snoozeUntilChange: false });
+        notice({ receiverID: OTHER_UID, assigneeUsers: [OTHER_UID], snoozedUntil: at(HOUR / 4) });
+        mention({ snoozes: [{ userId: OTHER_UID, until: at(HOUR / 4), untilChange: false }, { userId: UID, until: at(4 * HOUR), untilChange: false }] });
+        mention({ snoozes: [{ userId: UID, until: null, untilChange: true }] });
+        mention({ mentionIds: [OTHER_UID], clearedFor: [{ userId: UID, at: at(-HOUR) }], snoozes: [{ userId: UID, until: at(HOUR / 4), untilChange: false }] });
+        notice({ snoozedUntil: at(6 * HOUR), snoozeUntilChange: false });
+        expect((await counts()).nextWakeAt).toBe(at(4 * HOUR).toISOString());
+    });
+
+    it('carries the server\'s own time, so the client can time the wake without trusting its clock', async () => {
+        const data = await counts();
+        expect(Math.abs(new Date(data.now).getTime() - Date.now())).toBeLessThan(5000);
+    });
+
+    it('reads only the caller\'s company', async () => {
+        await counts();
+        expect(db.calls.every((c) => c.companyId === 'c1')).toBe(true);
+    });
+});
+
 describe('the "Other" rule: updates that reached the reader only because they watch the item', () => {
     const notify = require('../Modules/Tasks/helpers/handleNotification');
     const prepare = require('../Modules/notification/prepare-notification-data/controllerV2');
