@@ -73,7 +73,7 @@
 
 #editorjs .codex-editor__redactor {
     padding: 10px;
-    min-height: 250px;
+    min-height: 64px;
     overflow-x: auto;
 }
 

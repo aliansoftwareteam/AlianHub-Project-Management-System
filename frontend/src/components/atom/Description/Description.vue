@@ -312,7 +312,6 @@ function checkContentSize() {
         // ADJUST BOTTOM PADDING DEPENDING ON CONTENT SIZE
         const editorTextArea = document.querySelector('.codex-editor__redactor');
         if(editorTextArea) {
-            editorTextArea.style.minHeight= '215px';
             if(contentExceeds.value) {
                 editorTextArea.style.paddingBottom = '0px';
             } else {
