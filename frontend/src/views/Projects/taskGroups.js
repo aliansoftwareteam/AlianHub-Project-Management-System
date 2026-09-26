@@ -97,16 +97,23 @@ export function sprintToLoad(sprints, canExpandFirst) {
     return first;
 }
 
-export function assigneeGroups(memberIds, getUser, unassignedName) {
+/* A team assignee is stored as `tId_<teamId>`, so a task given only to a team would match no
+   person's group; each person's group also carries the teams they belong to. */
+const teamIdsOf = (userId, teams) => (teams || [])
+    .filter((team) => (team?.assigneeUsersArray || []).map(String).includes(userId))
+    .map((team) => `tId_${team._id}`);
+
+export function assigneeGroups(memberIds, getUser, unassignedName, teams = []) {
     const members = [...new Set((memberIds || []).map(String))].map((id) => ({
         isExpanded: true,
         name: "Assignee",
         users: [getUser(id)],
-        value: id
+        value: id,
+        teamIds: teamIdsOf(id, teams)
     }));
-    return [...members, { isExpanded: true, name: unassignedName, users: [], value: "" }];
+    return [...members, { isExpanded: true, name: unassignedName, users: [], value: "", teamIds: [] }];
 }
 
-export function assigneeCondition(value) {
-    return value ? { AssigneeUserId: { $in: [value] } } : { AssigneeUserId: { $in: [null, []] } };
+export function assigneeCondition(value, teamIds = []) {
+    return value ? { AssigneeUserId: { $in: [value, ...teamIds] } } : { AssigneeUserId: { $in: [null, []] } };
 }
