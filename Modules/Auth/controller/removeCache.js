@@ -34,7 +34,7 @@ const COMPANY_SLOT = {
     notification: 2,
     roleType: 2,
 };
-const COMPANY_SUFFIX_TYPES = ['companyData_', 'project_template_', 'workloadSummary_'];
+const COMPANY_SUFFIX_TYPES = ['companyData_', 'project_template_'];
 
 const companyOfKey = (key) => {
     const suffixType = COMPANY_SUFFIX_TYPES.find((type) => key.startsWith(type));
