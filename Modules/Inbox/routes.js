@@ -32,6 +32,7 @@ exports.init = (app) => {
     app.post('/api/v1/inbox/clear', safe('clear', ctrl.clear));
     app.post('/api/v1/inbox/clear-all', safe('clearAll', ctrl.clearAll));
     app.post('/api/v1/inbox/restore', safe('restore', ctrl.restore));
+    app.post('/api/v1/inbox/restore-all', safe('restoreAll', ctrl.restoreAll));
 
     app.get('/api/v1/inbox', safe('list', ctrl.list));
 };
