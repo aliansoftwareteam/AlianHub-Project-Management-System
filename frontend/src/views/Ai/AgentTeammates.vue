@@ -94,8 +94,8 @@
                                                 <span class="member-row__mail">{{ person.email }}</span>
                                             </span>
                                         </span>
-                                        <span class="member-row__role">{{ roleName(person.roleType) }}</span>
-                                        <span class="member-row__access">{{ $t('Parity.everything') }}</span>
+                                        <span class="member-row__role">{{ $t(teammateRoleKeys(person.roleType).role) }}</span>
+                                        <span class="member-row__access">{{ $t(teammateRoleKeys(person.roleType).access) }}</span>
                                         <span class="member-row__active ah-mono">{{ person.status }}</span>
                                     </div>
                                 </template>
@@ -160,6 +160,7 @@ import AgentOutcomes from "./AgentOutcomes.vue";
 import { useParity } from "./useParity";
 import { reasonOf } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
+import { teammateRoleKeys } from "./teammateRoles";
 
 // Agents as teammates (13b): they appear in Members with an AGENT tag, they can
 // be @mentioned into a run, and assigning one states its scope and limits first.
@@ -174,7 +175,6 @@ const userId = inject("$userId");
 const { agents, registryManifest, runs, loadAgents, loadRegistry, loadRuns, startRun, stopRun } = useParity();
 const { mayStop } = useAgentAccess();
 
-const ROLE_NAMES = { 1: "owner", 2: "admin" };
 const tabs = ["all", "people", "agents"];
 const view = ref("all");
 const people = ref([]);
@@ -196,7 +196,6 @@ const searchError = ref("");
 const projectNameOf = (projectId) => ((getters["projectData/projects"]?.data || []).find((p) => String(p._id) === String(projectId)) || {}).ProjectName || "";
 const me = computed(() => getUser(userId.value) || {});
 
-const roleName = (roleType) => t(`Parity.role_${ROLE_NAMES[Number(roleType)] || "member"}`);
 
 const ownerNameOf = (agent) => {
     const owner = people.value.find((p) => p.id === String(agent.ownerId || ""));
