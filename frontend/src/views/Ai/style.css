@@ -56,7 +56,6 @@
 .ai-cost { margin-top: 14px; font: var(--text-data); color: var(--ink-2); }
 .ai-detail__empty { display: flex; align-items: center; justify-content: center; height: 100%; padding: 40px; }
 .ai-done { text-align: center; padding: 48px 24px; }
-.ai-done__n { font: var(--text-display); color: var(--ink); }
 
 .ai-soon { max-width: 560px; padding: 22px 24px 24px; }
 .ai-soon__flag { margin-bottom: 12px; }
