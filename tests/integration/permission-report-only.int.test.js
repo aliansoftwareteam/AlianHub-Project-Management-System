@@ -170,7 +170,7 @@ describe('with the instance default set in the Instance console', () => {
         });
         expect(created.body.status).toBe(true);
         const session = await login(state.baseURL, email, state.password);
-        return { rowId: String(sent.body.data._id), uid: session.uid, api: createApiClient({ baseURL: state.baseURL, accessToken: session.accessToken }) };
+        return { rowId: String(sent.body.data._id), linkId: sent.body.data.linkId, uid: session.uid, api: createApiClient({ baseURL: state.baseURL, accessToken: session.accessToken }) };
     };
 
     beforeAll(() => {
@@ -182,9 +182,9 @@ describe('with the instance default set in the Instance console', () => {
     });
 
     it('under enforce, an invited user still accepts the invitation', async () => {
-        const { rowId, uid, api } = await invitee();
+        const { rowId, linkId, uid, api } = await invitee();
         await setInstanceMode('enforce');
-        const accepted = await api.put('/api/v1/root-members', { id: rowId, data: { userId: uid, status: 2 }, companyId: state.companyId });
+        const accepted = await api.put('/api/v1/root-members', { id: rowId, data: { userId: uid, status: 2 }, companyId: state.companyId, linkId });
         expect(accepted.status).toBe(200);
         expect(accepted.body).toMatchObject({ status: true, data: { status: 2, userId: uid } });
     });

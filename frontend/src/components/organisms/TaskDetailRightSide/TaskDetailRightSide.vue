@@ -1,9 +1,9 @@
 <template>
     <div class="task-detail-right-side">
         <div>
-            <h4 class="details-heading">{{$t('ProjectDetails.details')}}</h4>
+            <h3 class="details-heading">{{$t('ProjectDetails.details')}}</h3>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_list',project?.isGlobalPermission)!==null && checkPermission('task.task_status',project?.isGlobalPermission) !== null">
-                <h4>{{$t('ProjectDetails.status')}}</h4>
+                <div class="task-detail-field-name">{{$t('ProjectDetails.status')}}</div>
                 <Skelaton v-if="(task?.statusKey === undefined || task?.statusKey === null || task?.statusKey === '') && isMainSpinner" :style="{ height: clientWidth <= 767 ? '38px' : '23px', width: clientWidth <= 767 ? '160px' : '70px' }"  class="border-radius-7-px"/>
                 <TaskStatus
                     v-else
@@ -18,7 +18,7 @@
                 <slot name="status" />
             </div>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_assignee',project?.isGlobalPermission) !== null">
-                <h4>{{$t('ProjectDetails.assignee')}}</h4>
+                <div class="task-detail-field-name">{{$t('ProjectDetails.assignee')}}</div>
                 <Skelaton v-if="task?.AssigneeUserId?.length <= 0 && isMainSpinner" style="height: 30px;" class="w-30px border-radius-50-per"/>
                 <template v-else>
                     <Assignee
@@ -55,7 +55,7 @@
                 </template>
             </div>
             <div class="d-flex task-detail-right-side-label">
-                <h4>{{$t('Comment.created_by')}}</h4>
+                <div class="task-detail-field-name">{{$t('Comment.created_by')}}</div>
                 <Skelaton v-if="!task?.Task_Leader && isMainSpinner" style="height: 30px;" class="w-30px border-radius-50-per"/>
                 <template v-else>
                     <!-- Editable picker — gated by the same permission as Assignee. -->
@@ -103,7 +103,7 @@
                 </template>
             </div>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_priority',project?.isGlobalPermission) !== null && checkApps('Priority')">
-                <h4>{{$t('Projects.priority')}}</h4>
+                <div class="task-detail-field-name">{{$t('Projects.priority')}}</div>
                 <Skelaton v-if="!task.Task_Priority && isMainSpinner" style="height: 36px;" class="w-100px border-radius-7-px"/>
                 <PriorityComp
                     v-else
@@ -117,7 +117,7 @@
             </div>
             <!-- Story Points: permission gate removed — free for anyone to view + edit. -->
             <div class="d-flex task-detail-right-side-label">
-                <h4>{{ $t('TaskPanel.story_points') }}</h4>
+                <div class="task-detail-field-name">{{ $t('TaskPanel.story_points') }}</div>
                 <StoryPoints
                     :pointsVal="task.points"
                     :estimationScale="project?.estimationScale || 'fibonacci'"
@@ -128,7 +128,7 @@
                 />
             </div>
             <div class="d-flex task-detail-right-side-label" v-if="isSupport === false && checkPermission('task.task_start_date',project?.isGlobalPermission) !== null">
-                <h4>{{$t('Milestone.start_date')}}</h4>
+                <div class="task-detail-field-name">{{$t('Milestone.start_date')}}</div>
                 <Skelaton v-if="!task?.startDate && isMainSpinner" style="height: 36px;" class="w-100px border-radius-7-px"/>
                 <template v-else>
                     <DueDateCompo
@@ -149,7 +149,7 @@
                 </template>
             </div>
             <div class="d-flex task-detail-right-side-label" v-if="checkPermission('task.task_due_date',project?.isGlobalPermission) !== null">
-                <h4>{{$t('Projects.due_date')}}</h4>
+                <div class="task-detail-field-name">{{$t('Projects.due_date')}}</div>
                 <Skelaton v-if="!task?.DueDate && isMainSpinner" style="height: 36px;" class="w-100px border-radius-7-px"/>
                 <template v-else>
                     <DueDateCompo
@@ -171,7 +171,7 @@
                 </template>
             </div>
              <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
-                <h4>{{$t('UserTimesheet.estimated')}}</h4>
+                <div class="task-detail-field-name">{{$t('UserTimesheet.estimated')}}</div>
                 <Skelaton v-if="isMainSpinner" style="height: 24px;" class="w-100px border-radius-7-px"/>
                 <div v-if="Object.keys(task || {}).length && !isMainSpinner" class="d-flex align-items-center estimated-with-ai">
                     <EstimatedTimeInput
@@ -229,7 +229,7 @@
                 </template>
             </Modal>
             <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
-                <h4>{{$t('UserTimesheet.task_planning')}}</h4>
+                <div class="task-detail-field-name">{{$t('UserTimesheet.task_planning')}}</div>
                 <Skelaton v-if="isMainSpinner" style="height: 24px;" class="w-100px border-radius-7-px"/>
                 <EstimateHours
                     v-if="Object.keys(task || {}).length && !isMainSpinner"
@@ -243,7 +243,7 @@
                 />
             </div>
                <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
-                <h4>{{$t('UserTimesheet.task_remaining_planning')}}</h4>
+                <div class="task-detail-field-name">{{$t('UserTimesheet.task_remaining_planning')}}</div>
                 <Skelaton v-if="isMainSpinner" style="height: 24px;" class="w-100px border-radius-7-px"/>
                 <div v-if="Object.keys(task || {}).length && !isMainSpinner" class="remaining-estimate-text">{{displayTime(task.remainingHours)}}</div>
             </div>

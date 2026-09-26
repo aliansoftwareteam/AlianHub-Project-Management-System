@@ -5,16 +5,18 @@ const { deriveBuildInfo, deriveBuildInfoAsync, GIT_TIMEOUT_MS, readPackage, repo
 const ROOT = path.resolve(__dirname, '..');
 const RETRY_DELAYS_MS = [15000, 60000, 300000];
 
-function logger() {
+/* Nobody awaits the background read, so a log call that throws would surface as an unhandled
+ * rejection; under jest, in whichever test file runs after the one that started the read. */
+function log(level, message) {
     try {
-        return require('./loggerConfig');
+        require('./loggerConfig')[level](message);
     } catch {
-        return console;
+        console[level](message);
     }
 }
 
-const warn = (message) => logger().warn(message);
-const info = (message) => logger().info(message);
+const warn = (message) => log('warn', message);
+const info = (message) => log('info', message);
 
 function fromPackage(root) {
     const pkg = readPackage(root);

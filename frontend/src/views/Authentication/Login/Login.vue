@@ -190,7 +190,8 @@ const axios = inject("$axios");
 const brand = computed(() => getters["brandSettingTab/brandSettings"] || {});
 const showRegister = computed(() => router.hasRoute("Sign-up") || router.hasRoute("Signup") || router.hasRoute("Register"));
 const providers = computed(() => enabledProviders());
-const ssoAvailable = computed(() => publicConfig.auth.sso !== false);
+// Only the server knows whether any workspace has an SSO connection, so no build-time default can show the button.
+const ssoAvailable = computed(() => publicConfig.loaded && publicConfig.auth.sso === true);
 const magicLinkOn = computed(() => publicConfig.auth.magicLink === true);
 
 const step = ref("login");
@@ -206,6 +207,7 @@ const workspaces = ref([]);
 const pendingUserId = ref("");
 
 const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}$/;
+const INVITATION_REDIRECT = /^\/invitation\?/;
 const validate = ({ password = true } = {}) => {
     errors.email = !form.email ? t("Auth.email_required") : !EMAIL_RE.test(form.email) ? t("Auth.email_invalid") : "";
     errors.password = password && !form.password ? t("Auth.password_required") : "";
@@ -314,7 +316,7 @@ const proceedAfterAuth = async (userId) => {
     const cid = localStorage.getItem("selectedCompany") ?? companyID;
     if (cid && isCompanyFind === false) { router.push({ name: "Create_Company" }); return; }
 
-    if (!localStorage.getItem("selectedCompany") && Array.isArray(companies) && companies.length > 1) {
+    if (!localStorage.getItem("selectedCompany") && !INVITATION_REDIRECT.test(String(route.query.redirect_url || "")) && Array.isArray(companies) && companies.length > 1) {
         workspaces.value = companies;
         pendingUserId.value = userId;
         step.value = "workspace";
@@ -332,7 +334,7 @@ const finishLogin = async (cid) => {
         if (redirect === "/") await router.replace(`/${cid}`);
         else {
             const tmpcid = redirect.split("/")[1];
-            const ok = (tmpcid && userData.value?.AssignCompany?.includes(tmpcid)) || tmpcid === "oauth2" || redirect === "/oauth/consent";
+            const ok = (tmpcid && userData.value?.AssignCompany?.includes(tmpcid)) || tmpcid === "oauth2" || redirect === "/oauth/consent" || INVITATION_REDIRECT.test(redirect);
             await router.replace(ok ? redirect : `/${cid}`);
         }
     }

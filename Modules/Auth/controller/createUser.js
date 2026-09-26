@@ -18,12 +18,14 @@ const {
     verifySocialIdentity,
 } = require("../helpers/socialIdentity");
 const { linkTokenAccepted } = require("./invitationPreview");
+const { PASSWORD_RULE_MESSAGE, meetsPasswordRule } = require("../helpers/passwordRule");
 
 
 exports.authenticateToken = "";
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const PENDING_INVITATION = 1;
+const ACCEPTED_INVITATION = 2;
 
 /* The body's assignCompany used to be taken on trust, which let anyone sign up straight
  * into any company. A company admits only an email it has a pending invitation row for. */
@@ -87,6 +89,18 @@ exports.addUserMongodbV2 = (data) => new Promise((resolve, reject) => {
 
 const isFilledString = (value) => typeof value === 'string' && value.trim() !== '';
 
+/* The token is stored before signup answers, so no write lands on it once the client holds the
+ * account; the mail is not awaited because SMTP must neither delay nor fail a signup. */
+const startEmailVerification = async ({ _id, Employee_Email }) => {
+    const logFailure = (error) => logger.error((error && error.statusText) || error);
+    try {
+        const token = await sendMailRef.storeVerificationToken(_id);
+        sendMailRef.mailVerificationLink(_id, Employee_Email, token).catch(logFailure);
+    } catch (error) {
+        logFailure(error);
+    }
+};
+
 exports.createUserV2 = (req, res) => {
     try {
         const registrant = exports.registrantFields(req.body);
@@ -94,16 +108,15 @@ exports.createUserV2 = (req, res) => {
         if (missing) {
             return res.send({ status: false, statusText: `${missing[1]} is required` });
         }
+        if (!meetsPasswordRule(registrant.password)) {
+            return res.send({ status: false, statusText: PASSWORD_RULE_MESSAGE });
+        }
         let admitted = registrant;
         exports.admitInvitee(registrant).then((body) => {
             admitted = body;
             return exports.addUserMongodbV2(body);
-        }).then((respo) => {
-            if (!admitted.isInvitation) {
-                sendMailRef.sendVerificationEmailPromise(respo.statusText._id, respo.statusText.Employee_Email).catch((error) => {
-                    logger.error(error.statusText);
-                });
-            }
+        }).then(async (respo) => {
+            if (!admitted.isInvitation) await startEmailVerification(respo.statusText);
             res.send(respo);
         }).catch((error) => {
             res.send({
@@ -127,10 +140,14 @@ exports.verifyToken = (req, res) => {
 };
 
 const joinInvitedCompany = async ({ companyId, invitation, userId, provider }) => {
-    await mongoRef.MongoDbCrudOpration(companyId, {
+    const claimed = await mongoRef.MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMPANY_USERS,
-        data: [{ _id: invitation._id }, { $set: { status: 2, userId } }],
+        data: [
+            { _id: invitation._id, status: PENDING_INVITATION, linkId: invitation.linkId },
+            { $set: { status: ACCEPTED_INVITATION, linkId: '', userId } },
+        ],
     }, 'findOneAndUpdate');
+    if (!claimed) return false;
     await recordInvitedOwner({ companyId, invitation, userId }).catch((error) => {
         logger.error(`Record invited owner error in ${provider} signup: ${error}`);
     });
@@ -140,15 +157,17 @@ const joinInvitedCompany = async ({ companyId, invitation, userId, provider }) =
     await addAndRemoveUserInMongodbNotificationCount(companyId, userId, 'Add').catch((error) => {
         logger.error(`Add user in mongodb notification count error in ${provider} signup: ${error}`);
     });
+    return true;
 };
 
 /* The account's email is the one the provider verified, which is also the only reason it starts
- * verified. An invitation admits the account only when the signup presents that invitation row. */
+ * verified. An invitation admits the account only when the signup presents that invitation row
+ * and the link token it was sent with; otherwise the account is made as for anyone uninvited. */
 const socialSignup = (provider) => async (req, res) => {
     const body = req.body || {};
     const refuse = (statusCode, message) => res.status(statusCode).json({ status: false, message });
     try {
-        const { firstName, lastName, assignCompany, companyUserDocID } = body;
+        const { firstName, lastName, assignCompany, companyUserDocID, linkId } = body;
         if (!isFilledString(firstName) || !isFilledString(lastName)) {
             return refuse(400, 'First name and last name are required');
         }
@@ -168,16 +187,16 @@ const socialSignup = (provider) => async (req, res) => {
         const invitation = assignCompany && companyUserDocID
             ? await exports.findPendingInvitation({ companyId: assignCompany, email, companyUserId: companyUserDocID })
             : null;
-        const invitedCompany = invitation ? String(assignCompany) : '';
+        const presented = invitation && linkTokenAccepted(invitation.linkId, linkId) ? invitation : null;
 
         const authRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, {
             type: dbCollections.USER_AUTH,
             data: { email, [idField]: providerId, isBlocked: false },
         }, 'save');
 
-        if (invitedCompany) {
-            await joinInvitedCompany({ companyId: invitedCompany, invitation, userId: authRes._id, provider });
-        }
+        const joined = presented
+            && await joinInvitedCompany({ companyId: String(assignCompany), invitation: presented, userId: authRes._id, provider });
+        const invitedCompany = joined ? String(assignCompany) : '';
 
         const userDoc = {
             ...exports.buildUserDocument({ firstName, lastName, email, assignCompany: invitedCompany }),

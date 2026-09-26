@@ -385,7 +385,7 @@ exports.counts = async (req, res) => {
             message: '$comment_message',
             at: { $dateTrunc: { date: '$createdAt', unit: 'second' } },
         };
-        const [notifications, mentions, other, laterNotifications, laterMentions, approvals, proposals] = await Promise.all([
+        const [notifications, mentions, other, laterNotifications, laterMentions, approvals, proposals, nextWakeAt] = await Promise.all([
             count(SCHEMA_TYPE.NOTIFICATIONS, R.notificationMatch(userId, { tab: 'primary', now }), notificationGroup),
             count(SCHEMA_TYPE.MENTIONS, R.mentionMatch(userId, { tab: 'primary', now }), mentionGroup),
             count(SCHEMA_TYPE.NOTIFICATIONS, R.notificationMatch(userId, { tab: 'other', now }), notificationGroup),
@@ -393,6 +393,7 @@ exports.counts = async (req, res) => {
             count(SCHEMA_TYPE.MENTIONS, R.mentionMatch(userId, { tab: 'later', now }), mentionGroup),
             readApprovals(companyId, userId).then((rows) => rows.length),
             readProposals(companyId, userId).then((rows) => rows.length),
+            S.nextWakeAt(companyId, userId, now),
         ]);
 
         return res.send({
@@ -411,6 +412,9 @@ exports.counts = async (req, res) => {
                 later: laterNotifications + laterMentions,
                 done: 0,
                 cleared: 0,
+                nextWakeAt: nextWakeAt ? nextWakeAt.toISOString() : null,
+                // The client times its re-check from this, not its own clock, which may be off.
+                now: now.toISOString(),
             },
         });
     } catch (e) {

@@ -19,6 +19,7 @@ import { useI18n } from "vue-i18n";
 // Utilities
 import { apiRequestWithoutSecure, apiRequestWithoutCompnay, getAuth } from "@/services";
 import * as env from '@/config/env';
+import { rememberInvitationLink, takeInvitationLink } from "../invitationLink";
 
 const props = defineProps({
     label: { type: String, default: "" },
@@ -33,6 +34,10 @@ const props = defineProps({
     companyUserDocID: {
         type: String,
         default: null
+    },
+    linkId: {
+        type: String,
+        default: ""
     }
 });
 
@@ -72,6 +77,7 @@ onMounted(async () => {
 // Trigger GitHub OAuth
 function loginWithGitHub() {
     localStorage.setItem("githubAuthMode", props.mode);
+    rememberInvitationLink(props.linkId);
     const clientId = publicConfig.auth.github.clientId;
     const scope = "read:user user:email";
     const redirectUri = window.location.origin; 
@@ -218,7 +224,8 @@ const signup = async (userInfo) => {
             githubId: userInfo.githubId,
             accessToken: userInfo.accessToken,
             assignCompany: companyId,
-            companyUserDocID: companyUserDocID
+            companyUserDocID: companyUserDocID,
+            linkId: takeInvitationLink()
         };
 
         const signupRes = await apiRequestWithoutSecure("post", env.API_SIGNUP_WITH_GITHUB, payload);

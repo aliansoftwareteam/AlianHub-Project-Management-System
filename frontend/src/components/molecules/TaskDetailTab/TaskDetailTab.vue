@@ -1,9 +1,6 @@
 <template>
     <div>
         <div class="createProjectListSidebarContentWrapper">
-            <a href="#" @click.prevent="scrollToBottom" class="btn-scroll-to-bottom" :style="{paddingBottom: checkApps('tags') ? '15px' : ''}" v-if="clientWidth < 767">
-                {{$t('general.scroll_to_bottom')}}
-            </a>
             <div class="d-flex mobile__bg--withPadding" v-if="show.tags && checkApps('tags')">
                 <div class="d-flex align-items-center overflow-auto style-scroll tagList__main-wrapper-sidebar pb-1px">
                     <div v-for="(item, index) in tagChipArray" :key="index" @click.stop="">
@@ -252,7 +249,6 @@ function recordRecentVisit() {
 onMounted(recordRecentVisit);
 watch(() => props.task?._id, recordRecentVisit);
 const companyId = inject('$companyId');
-const clientWidth = inject("$clientWidth");
 const projectData = inject("selectedProject");
 
 //getUser
@@ -261,16 +257,6 @@ const user = getUser(userId.value);
 onMounted(() => {
     allProjectsArrayFilter.value = props.isSupport ? [] : JSON.parse(JSON.stringify(projectsGetter.value.data));
 })
-
-const scrollToBottom = () => {
-    const targetDiv = document.querySelector('.task-detail-leftside');
-    if (targetDiv) {
-        targetDiv.scrollTo({
-            top: targetDiv.scrollHeight,
-            behavior: 'smooth'
-        });
-    }
-};
 
 const newAttachments = (files) => {
     if(!files.length) {

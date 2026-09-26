@@ -1,8 +1,8 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
-// language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type/$size, $set/$inc/$push/$addToSet/$pull,
+// language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type/$size/$elemMatch, $set/$inc/$push/$addToSet/$pull,
 // conditional findOneAndUpdate answering the old document unless asked for the new one (null after an upsert insert, as
 // the driver does), updateOne and findOneAndUpdate with upsert and $setOnInsert and a unique _id, findOneAndDelete, deleteOne, deleteMany,
-// sort/skip/limit on find, sort on findOneAndUpdate, $type 'date', $match/$project/$addFields ($toString, $ifNull, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
+// sort/skip/limit on find, sort on findOneAndUpdate, $type 'date', $match/$unwind (a top-level array)/$project/$addFields ($toString, $ifNull, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000, declared text indexes that bound $text to their fields) so a test can assert on what was written.
 
 let seq = 1;
@@ -51,6 +51,7 @@ const matches = (doc, filter = {}, textFields) => Object.entries(filter).every((
             if (op === '$lt') return value < want;
             if (op === '$exists') return (value !== undefined) === arg;
             if (op === '$size') return Array.isArray(value) && value.length === arg;
+            if (op === '$elemMatch') return Array.isArray(raw) && raw.some((item) => (isOperatorObject(arg) && !['$and', '$or', '$nor'].some((k) => k in arg) ? matches({ it: item }, { it: arg }) : matches(item, arg, textFields)));
             if (op === '$type') return arg === 'date' ? raw instanceof Date : (arg === 'string' ? typeof value === 'string' : typeof value === arg);
             if (op === '$regex') return new RegExp(arg, cond.$options || '').test(String(value));
             if (op === '$options') return true;
@@ -243,6 +244,15 @@ const create = ({ mongooseCasting = false } = {}) => {
                 if (stage.$match) {
                     if (stage.$match.$text) search = stage.$match.$text.$search;
                     return docs.filter((d) => matches(d, stage.$match, textFields));
+                }
+                if (stage.$unwind) {
+                    const path = String(stage.$unwind.path || stage.$unwind).replace(/^\$/, '');
+                    const keep = !!stage.$unwind.preserveNullAndEmptyArrays;
+                    return docs.flatMap((d) => {
+                        const v = d[path];
+                        if (Array.isArray(v) && v.length) return v.map((item) => ({ ...d, [path]: item }));
+                        return v == null || Array.isArray(v) ? (keep ? [d] : []) : [d];
+                    });
                 }
                 if (stage.$project) return docs.map((d) => project(d, stage.$project, search, textFields));
                 if (stage.$addFields) return docs.map((d) => ({ ...d, ...Object.fromEntries(Object.entries(stage.$addFields).map(([k, v]) => [k, computed(d, v, search, textFields)])) }));

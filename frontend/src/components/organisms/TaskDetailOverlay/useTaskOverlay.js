@@ -183,6 +183,15 @@ export function closeTask({ keepRoute = false } = {}) {
     });
 }
 
+/* The side panel belongs to the page it was opened on. The route has already moved,
+ * so it is left alone; a task the new page names in its URL stays open. */
+export function closeOnPageChange() {
+    const current = overlayState.current;
+    if (!overlayState.open || !current) return;
+    if (routeTaskId() === current.taskId || String(route?.query?.[TASK_QUERY] || "") === current.taskId) return;
+    closeTask({ keepRoute: true });
+}
+
 export function expandTask() {
     const current = overlayState.current;
     if (!current || !router || !route) return;

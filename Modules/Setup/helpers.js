@@ -1,8 +1,8 @@
 const buildInfo = require('../../Config/buildInfo');
 const { TEAM_FOCUS_OPTIONS } = require('../../utils/sampleTasks');
+const { meetsPasswordRule } = require('../Auth/helpers/passwordRule');
 
 const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD = 8;
 
 /* Pure: what the wizard learns from the two facts the server can check. */
 function computeSetupStatus({ db, userCount, appVersion = buildInfo.get().version }) {
@@ -31,10 +31,10 @@ function validateSetupPayload(body = {}) {
     if (!data.firstName) errors.firstName = 'required';
     if (!data.lastName) errors.lastName = 'required';
     if (!EMAIL_RX.test(data.email)) errors.email = 'invalid';
-    if (data.password.length < MIN_PASSWORD) errors.password = `min_${MIN_PASSWORD}`;
+    if (!meetsPasswordRule(data.password)) errors.password = 'weak';
     if (!data.companyName) errors.companyName = 'required';
     if (data.teamFocus && !TEAM_FOCUS_OPTIONS.includes(data.teamFocus)) errors.teamFocus = 'invalid';
     return { data, errors, valid: Object.keys(errors).length === 0 };
 }
 
-module.exports = { computeSetupStatus, validateSetupPayload, MIN_PASSWORD };
+module.exports = { computeSetupStatus, validateSetupPayload };

@@ -1098,10 +1098,6 @@
     "group": "frontend",
     "description": "Show the Google login button."
   },
-  "VUE_APP_IS_SSO_LOGIN": {
-    "group": "frontend",
-    "description": "Show the SSO login entry point."
-  },
   "VUE_APP_MEASUREMENTID": {
     "group": "frontend",
     "description": "Firebase analytics measurement id."

@@ -53,25 +53,6 @@
         <template v-if="userId && showReviewModal">
             <ReviewPromptModal/>
         </template>
-        <!-- NOTIFICATION REQUEST MODAL -->
-        <Modal
-            v-if="requestPermission"
-            v-model="requestPermission"
-            :title="$t('Home.Notification_Request')"
-            :cancelButtonText="$t('Home.no')"
-            :acceptButtonText="$t('Home.yes')"
-            :close-on-backdrop="false"
-            :closeIcon="false"
-            className="topAligned"
-            @close="requestPermission = false;showReviewModal=true;"
-            @accept="notificationPermissionRequest(), requestPermission = false;showReviewModal=true;"
-        >
-            <template #body>
-                <div class="d-flex align-items-center flex-column px-2">
-                    {{$t('Home.are_you_sure')}}
-                </div>
-            </template>
-        </Modal>
         <UpgradeProcessModel 
             v-if="openReleaseNoteModel === true" 
             :openReleaseNoteModel="openReleaseNoteModel"
@@ -96,13 +77,12 @@ import TaskDetailOverlay from '@/components/organisms/TaskDetailOverlay/TaskDeta
 import AgentLiveStrip from '@/views/Ai/AgentLiveStrip.vue'
 import '@/components/organisms/Shell/style.css'
 import CallOverlay from '@/components/organisms/CallOverlay/CallOverlay.vue'
-import Modal from "@/components/atom/Modal/Modal.vue"
 import CommandPalette from '@/components/molecules/AdvanceSearch/CommandPalette.vue'
 import QuickCreateTask from '@/components/organisms/QuickCreateTask/QuickCreateTask.vue'
 import { PALETTE_OPEN_EVENT, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys'
 import { useStore } from 'vuex';
 import axios from 'axios'
-import { fcmToken } from '@/composable/commonFunction';
+import { refreshWebPush } from '@/composable/browserNotifications';
 import { useToast } from "vue-toast-notification"
 
 // COMPOSABLES
@@ -144,7 +124,6 @@ const companyId = ref(localStorage.getItem('selectedCompany') !== null ? localSt
 // Escape hatch for one release: the old top bar stays reachable behind a flag.
 const legacyNav = ref(localStorage.getItem('ah.legacyNav') === '1');
 const logged = ref(false);
-const requestPermission = ref(false);
 const showReviewModal = ref(false);
 const showSpinner = ref(true);
 const clientWidth = ref(document.documentElement.clientWidth);
@@ -516,18 +495,8 @@ async function getFirebaseData() {
                     })
                 }
 
-                if ('Notification' in window) {
-                    if(Notification.permission === "default") {
-                        requestPermission.value = true;
-                    } else if(Notification.permission === "granted") {
-                        generateFcmToken();
-                        showReviewModal.value = true;
-                    } else {
-                        showReviewModal.value = true;
-                    }
-                } else {
-                    showReviewModal.value = true;
-                }
+                refreshWebPush(userId.value);
+                showReviewModal.value = true;
             }
         } else {
             logged.value = false;
@@ -614,93 +583,6 @@ const onPaletteKey = (e) => {
     isAdvanceSearch.value = !isAdvanceSearch.value;
 }
 
-function notificationPermissionRequest() {
-    if ('Notification' in window) {
-        if (Notification.permission === 'granted') {
-            generateFcmToken();
-        } else if (Notification.permission === 'denied') {
-            generateFcmToken(true);
-        } else {
-            Notification.requestPermission()
-            .then(permission => {
-                if (permission === 'granted') {
-                    generateFcmToken();
-                } else {
-                    generateFcmToken(true);
-                }
-            })
-            .catch(error => {
-                console.error('Error occurred while requesting notification permission:', error);
-            });
-        }
-    } else {
-        $toast.error(t("Toast.notification_permission"),{position: 'top-right'});
-        // generateFcmToken();
-    }
-}
-
-function generateFcmToken(type=false) {
-    try{
-        if(type == false) {
-            const userData = apiRequestWithoutCompnay('get',`${env.USER_UPATE}/${userId.value}`)
-            userData.then((user) => {
-                if(user.status !== 200 || !user.data) {
-                    return;
-                }
-                fcmToken().then((result) => {
-                    if(result.status && result.token !== '') {
-                        if(localStorage.getItem('webTokens') == null) {
-                            const updateObject = {
-                                webToken: result.token
-                            }
-                            apiRequestWithoutCompnay("put",env.UPDATE_SESSION,{
-                                userId: userId.value,
-                                updateObject:updateObject
-                            }).then(()=>{
-                                localStorage.setItem('webTokens',result.token);
-                            }).catch((err)=>{
-                                console.error("ERROR: ", err);
-                            });
-                        } else if((localStorage.getItem('webTokens') && localStorage.getItem('webTokens') !== result.token)) {
-                            let token = localStorage.getItem('webTokens');
-                            if(token) {
-                                const updateObject = {
-                                    webToken: result.token
-                                };
-                                apiRequestWithoutCompnay("put",env.UPDATE_SESSION,{
-                                    userId: userId.value,
-                                    updateObject:updateObject
-                                }).then(()=>{
-                                    localStorage.setItem('webTokens',result.token);
-                                }).catch((err)=>{
-                                    console.error("ERROR: ", err);
-                                });
-                            }
-                        }
-                    }
-                })
-            })
-        } 
-        else {
-            let token = localStorage.getItem('webTokens');
-            if(token) {
-                const updateObject = {
-                    webToken: ""
-                };
-                apiRequestWithoutCompnay("put",env.UPDATE_SESSION,{
-                    userId: userId.value,
-                    updateObject:updateObject
-                }).then(()=>{
-                    localStorage.removeItem('webTokens',token);
-                }).catch((err)=>{
-                    console.error("ERROR: ", err);
-                });
-            }
-        }
-    } catch(e) {
-        console.error(e);
-    }
-}
 
 const changeLanguageHandler = async () => {
     const updateLanguage = await changeLanguage(selectedLanguageCode.value);

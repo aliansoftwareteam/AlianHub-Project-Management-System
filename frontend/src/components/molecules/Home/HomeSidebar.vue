@@ -38,11 +38,11 @@
 
         <nav v-if="!hidden.includes('favorites')" class="hs-group" :aria-label="$t('Home.favorites')">
             <div class="hs-label">{{ $t('Home.favorites') }}</div>
-            <router-link v-for="fav in pinned" :key="fav.id" class="hs-item" :to="fav.to">
+            <div v-for="fav in pinned" :key="fav.id" class="hs-item hs-row">
                 <span class="hs-item__star">★</span>
-                <span class="hs-item__text">{{ fav.label }}</span>
-                <button type="button" class="hs-item__action" :title="$t('Home.unpin')" @click.prevent.stop="unpin(fav.id)"><ShellIcon name="x" :size="12" /></button>
-            </router-link>
+                <router-link class="hs-item__text hs-row__link" :to="fav.to">{{ fav.label }}</router-link>
+                <button type="button" class="hs-item__action" :title="$t('Home.unpin')" @click="unpin(fav.id)"><ShellIcon name="x" :size="12" /></button>
+            </div>
             <div v-if="!pinned.length" class="hs-empty">{{ $t('Home.no_favorites') }}</div>
         </nav>
 
@@ -52,13 +52,13 @@
                 <button v-if="canCreate" type="button" class="hs-label__btn" :title="$t('Home.new_project')" @click="$emit('create-project')"><ShellIcon name="plus" :size="13" /></button>
             </div>
             <template v-for="project in projects" :key="project._id">
-                <div class="hs-item" :class="{ 'is-active': isProjectActive(project) }" role="link" tabindex="0" @click="goProject(project)" @keydown.enter="goProject(project)">
+                <div class="hs-item hs-row" :class="{ 'is-active': isProjectActive(project) }">
                     <span class="hs-item__dot" :style="{ background: projectColor(project) }"></span>
-                    <span class="hs-item__text">{{ project.ProjectName }}</span>
-                    <button type="button" class="hs-item__action" :class="{ 'is-on': isPinned(project._id) }" :title="isPinned(project._id) ? $t('Home.unpin') : $t('Home.pin')" @click.stop="togglePin(project)">
+                    <router-link class="hs-item__text hs-row__link" :to="projectTo(project)">{{ project.ProjectName }}</router-link>
+                    <button type="button" class="hs-item__action" :class="{ 'is-on': isPinned(project._id) }" :title="isPinned(project._id) ? $t('Home.unpin') : $t('Home.pin')" @click="togglePin(project)">
                         <ShellIcon name="star" :size="12" />
                     </button>
-                    <button type="button" class="hs-item__chev" :class="{ 'is-open': expanded[project._id] }" :aria-expanded="!!expanded[project._id]" :aria-label="$t('Home.show_lists', { project: project.ProjectName })" @click.stop="toggleExpand(project)">
+                    <button type="button" class="hs-item__chev" :class="{ 'is-open': expanded[project._id] }" :aria-expanded="!!expanded[project._id]" :aria-label="$t('Home.show_lists', { project: project.ProjectName })" @click="toggleExpand(project)">
                         <ShellIcon name="chevronDown" :size="12" />
                     </button>
                 </div>
@@ -100,6 +100,7 @@ import * as env from "@/config/env";
 import { homeState } from "./homeState";
 import { isMacPlatform, openPalette } from "@/components/molecules/AdvanceSearch/paletteKeys";
 import { projectColor } from "./homeFormat";
+import { wakeTimer } from "@/views/Inbox/snoozeWake";
 
 defineOptions({ name: "HomeSidebar" });
 
@@ -128,7 +129,7 @@ const hidden = computed(() => shellState.nav.hidden || []);
 const mac = isMacPlatform();
 const to = (name, query) => ({ name, params: { cid: companyId.value }, query });
 const isProjectActive = (project) => String(route.params.id || "") === project._id;
-const goProject = (project) => router.push({ name: "Project", params: { cid: companyId.value, id: project._id } });
+const projectTo = (project) => ({ name: "Project", params: { cid: companyId.value, id: project._id } });
 const sprintTo = (project, sprint) => (sprint.folderId
     ? { name: "ProjectFolderSprint", params: { cid: companyId.value, id: project._id, folderId: sprint.folderId, sprintId: sprint.id } }
     : { name: "ProjectSprint", params: { cid: companyId.value, id: project._id, sprintId: sprint.id } });
@@ -150,7 +151,7 @@ function toggleExpand(project) {
 const isPinned = (id) => pinned.value.some((f) => f.id === id);
 function togglePin(project) {
     if (isPinned(project._id)) return unpin(project._id);
-    shellState.nav.pinned = [...pinned.value, { id: project._id, type: "project", label: project.ProjectName, to: { name: "Project", params: { cid: companyId.value, id: project._id } } }];
+    shellState.nav.pinned = [...pinned.value, { id: project._id, type: "project", label: project.ProjectName, to: projectTo(project) }];
 }
 function unpin(id) {
     shellState.nav.pinned = pinned.value.filter((f) => f.id !== id);
@@ -159,10 +160,13 @@ function toggleSection(key) {
     shellState.nav.hidden = hidden.value.includes(key) ? hidden.value.filter((k) => k !== key) : [...hidden.value, key];
 }
 
+const snoozeWake = wakeTimer(() => loadCounts());
 function loadCounts() {
     apiRequest("get", `${env.INBOX}/counts`)
         .then((response) => {
-            if (response?.data?.status) counts.value = { all: 0, mentions: 0, notifications: 0, ...response.data.data };
+            if (!response?.data?.status) return;
+            counts.value = { all: 0, mentions: 0, notifications: 0, ...response.data.data };
+            snoozeWake.schedule(response.data.data);
         })
         .catch(() => {});
 }
@@ -176,5 +180,6 @@ onMounted(() => {
 onUnmounted(() => {
     document.removeEventListener("click", closePop);
     document.removeEventListener("visibilitychange", loadCounts);
+    snoozeWake.clear();
 });
 </script>

@@ -113,7 +113,7 @@
                                 @cancel-reply="message.reply = {}"
                                 :showAll="mainChat && !projectData?.default"
                                 :userIds="users.map((x) => x.id)"
-                                @enter="mediaFiles.length ? sendMedia() : sendMessageFun(message)"
+                                @enter="sendFromComposer()"
                                 :sendMessageAllowed="messageAllowed"
                                 @pasteFile="checkMedia"
                                 :isHeight="props.isHeight"
@@ -136,7 +136,7 @@
                         <template v-if="!recording">
                             <img :src="attachIcon" alt="attachIcon" class="mx-1 cursor-pointer" :class="{'cursor-not-allowed' : disabled=!messageAllowed }"  @click="messageAllowed ? $refs.file_input.click() : null">
                             <input type="file" class="d-none" ref="file_input" @change="(e) => {checkMedia(Array.from(e.target.files)); e.target.value = null;}" id="filechat" multiple :disabled="!messageAllowed">
-                            <button type="button" class="btn-primary ml-1 send__media-btn border-radius-8-px" :aria-label="$t('TaskPanel.send')" :class="{'disable__send-button' : disabled=!messageAllowed }" @click="messageAllowed ? (mediaFiles.length ? sendMedia() : sendMessageFun(message)) : null"><img :src="sendIcon" alt="" class="cursor-pointer" :class="{'disable__send-button' : disabled=!messageAllowed }"></button>
+                            <button type="button" class="btn-primary ml-1 send__media-btn border-radius-8-px" :aria-label="$t('TaskPanel.send')" :class="{'disable__send-button' : disabled=!messageAllowed }" :disabled="sendingDraft" @click="messageAllowed ? sendFromComposer() : null"><img :src="sendIcon" alt="" class="cursor-pointer" :class="{'disable__send-button' : disabled=!messageAllowed }"></button>
                         </template>
                     </div>
                 </div>
@@ -430,6 +430,7 @@ const createEmptyMessage = () => ({
 const COMMENT_DRAFT_PREFIX = "alianhub:comment-draft";
 
 const message = ref(createEmptyMessage());
+const sendingDraft = ref(false);
 const mediaFiles = ref([]);
 const messages = ref([]);
 const showScrollBotton = ref(false);
@@ -892,6 +893,24 @@ function resetMessage() {
     const draftKey = getCommentDraftKey();
     message.value = createEmptyMessage();
     clearMessageDraft(draftKey);
+}
+
+// The composer clears as soon as Send is pressed, so a failed send has to put the text back,
+// ahead of anything typed while the request was in flight.
+function keepFailedDraft(draft) {
+    const current = getDraftPayload();
+    message.value = hasDraftPayload(current)
+        ? {...current, message: [draft.message, current.message].filter(Boolean).join("\n")}
+        : {...createEmptyMessage(), ...draft};
+    $toast.error(t("Comments.send_failed"), {position: "top-right"});
+}
+
+function returnMediaToTray(media) {
+    const pendingIndex = messages.value.findIndex((row) => row.isSending === media.isSending);
+    if(pendingIndex > -1) {
+        messages.value.splice(pendingIndex, 1);
+    }
+    mediaFiles.value.push(media);
 }
 
 function pinMessage(message) {
@@ -1553,6 +1572,9 @@ function uploadToStorage(file) {
 
             uploadToWasabi(file.data, path, companyId.value)
             .then((URL) => {
+                if(!URL) {
+                    throw new Error("Upload failed");
+                }
                 let msg = {...message.value};
                 msg.mediaURL= URL;
                 msg.mediaName= file.name;
@@ -1560,19 +1582,16 @@ function uploadToStorage(file) {
                 msg.mediaSize= file.data.size;
                 msg.type = file.fileType;
                 msg.createdAt = file.createdAt;
-                sendMessageFun({
+                return sendMessageFun({
                     ...msg
-                },false)
-                .then(() => {
-                    resolve();
-                })
-                .catch((error) => {
-                    reject(error);
-                    console.error("ERROR in send file: ", error);
-                })
+                },false);
+            })
+            .then(() => {
+                resolve();
             })
             .catch((error) => {
-                console.error("ERROR: ", error);
+                console.error("ERROR in send file: ", error);
+                reject(error);
             })
         } catch (error) {
             reject(error);
@@ -1648,6 +1667,7 @@ async function sendMedia() {
                                 resolve2()
                             })
                             .catch((error) => {
+                                returnMediaToTray(media);
                                 reject2(error);
                             })
                         } catch (error) {
@@ -1657,10 +1677,14 @@ async function sendMedia() {
                 )
             });
 
+            const caption = JSON.parse(JSON.stringify(tmpMessage));
             tmpMessage.createdAt = tempDate
-            sendMessageFun(tmpMessage, false);
+            sendMessageFun(tmpMessage, false).catch(() => keepFailedDraft(caption));
             Promise.allSettled(promises)
-                .then(() => {
+                .then((results) => {
+                    if(results.some((result) => result.status === "rejected")) {
+                        $toast.error(t("Comments.attachment_send_failed"), {position: "top-right"});
+                    }
                     resolve(true);
                 })
             .catch((error) => {
@@ -1950,10 +1974,25 @@ function updateLastMessageTime(msgObj = {}) {
     });
 }
 
+function sendFromComposer() {
+    if(mediaFiles.value.length) {
+        return sendMedia().catch(() => {});
+    }
+    if(sendingDraft.value) return;
+
+    sendingDraft.value = true;
+    return sendMessageFun(message.value)
+        .catch(() => {})
+        .finally(() => {
+            sendingDraft.value = false;
+        });
+}
+
 async function sendMessageFun(messageData,isReset = true) {
     if (!messageAllowed.value) {
         return;
     }
+    const draft = isReset ? JSON.parse(JSON.stringify(messageData)) : null;
     if(isReset){
         resetMessage();
     }
@@ -2106,6 +2145,12 @@ async function sendMessageFun(messageData,isReset = true) {
             console.error("ERROR in send message: ", error);
             reject(error);
         }
+    })
+    .catch((error) => {
+        if(draft) {
+            keepFailedDraft(draft);
+        }
+        throw error;
     })
 }
 function getSprintData(id) {

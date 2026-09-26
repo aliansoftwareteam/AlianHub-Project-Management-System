@@ -10,11 +10,22 @@
                 @click.stop="toggle(menu.key)"
             >{{ menu.label }} ▾</button>
             <div v-if="open === menu.key" class="lv2-bulk__menu" @click.stop>
+                <CalenderCompo
+                    v-if="menu.calendar"
+                    modelValue=""
+                    :hideExtraLayouts="['time', 'minutes', 'hours', 'seconds']"
+                    menuClass="calender-menu-class-duedate"
+                    @update:modelValue="pickDue"
+                >
+                    <template #trigger>
+                        <button type="button" class="lv2-bulk__item">{{ $t('List.bulk_due_pick') }}</button>
+                    </template>
+                </CalenderCompo>
                 <button v-for="option in menu.options" :key="option.id" type="button" class="lv2-bulk__item" @click="menu.pick(option)">
                     <span v-if="option.color" class="lv2-bulk__dot" :style="{ background: option.color }"></span>
                     {{ option.label }}
                 </button>
-                <p v-if="!menu.options.length" class="lv2-bulk__note">{{ $t('List.bulk_no_options') }}</p>
+                <p v-if="!menu.options.length && !menu.calendar" class="lv2-bulk__note">{{ $t('List.bulk_no_options') }}</p>
             </div>
         </span>
 
@@ -60,7 +71,9 @@ import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { useTaskSummaries } from "@/views/Projects/TableView/useTaskSummaries.js";
 import { snapshotTasks, statusPayload, undoRequests } from "./bulkUndo.js";
+import { priorityAppOn } from "./listRowEdit.js";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
+import CalenderCompo from "@/components/atom/CalenderCompo/CalenderCompo.vue";
 
 defineOptions({ name: "ListBulkBar" });
 
@@ -82,7 +95,9 @@ const open = ref("");
 const working = ref(false);
 
 const canStatus = computed(() => checkPermission("task.task_status", props.project?.isGlobalPermission) === true);
+const canPriority = computed(() => checkPermission("task.task_priority", props.project?.isGlobalPermission) === true);
 const canAssign = computed(() => checkPermission("task.task_assignee", props.project?.isGlobalPermission) === true);
+const canDue = computed(() => checkPermission("task.task_due_date", props.project?.isGlobalPermission) === true);
 const canMove = computed(() => checkPermission("task.task_move", props.project?.isGlobalPermission) === true || canStatus.value);
 const canTag = computed(() => checkPermission("task.task_tag", props.project?.isGlobalPermission) === true || canStatus.value);
 const canArchive = computed(() => checkPermission("task.task_archive", props.project?.isGlobalPermission) === true);
@@ -133,12 +148,23 @@ const tags = computed(() => (props.project?.tagsArray || []).map((tag) => ({
     id: tag.uid || tag._id || tag.id, label: tag.tagName || tag.name, raw: tag
 })));
 
+const priorities = computed(() => getters["settings/companyPriority"] || []);
+const showPriority = computed(() => priorityAppOn(props.project, getters["settings/selectedCompany"]?.planFeature));
+
 const menus = computed(() => [
     { key: "status", label: t("List.status"), enabled: canStatus.value, options: statuses.value, pick: pickStatus },
+    showPriority.value && {
+        key: "priority", label: t("List.priority"), enabled: canPriority.value,
+        options: priorities.value.map((priority) => ({ id: priority.value, label: priority.name, raw: priority })), pick: pickPriority
+    },
     { key: "assignee", label: t("List.assignee"), enabled: canAssign.value, options: people.value, pick: pickAssignee },
+    {
+        key: "due", label: t("List.due_date"), enabled: canDue.value, calendar: true,
+        options: [{ id: "clear", label: t("List.bulk_due_clear") }], pick: () => run("bulkUpdateDueDate", { DueDate: null })
+    },
     { key: "sprint", label: t("List.sprint"), enabled: canMove.value, options: sprints.value, pick: pickSprint },
     { key: "tags", label: t("List.tags"), enabled: canTag.value, options: tags.value, pick: pickTag }
-]);
+].filter(Boolean));
 
 function toggle(key) {
     open.value = open.value === key ? "" : key;
@@ -182,7 +208,7 @@ async function run(action, payload) {
         }
         const result = response?.data?.data || {};
         const updatedIds = Array.isArray(result.updated) ? result.updated : taskIds;
-        const requests = undoRequests({ action, payload, before, updatedIds, project: props.project });
+        const requests = undoRequests({ action, payload, before, updatedIds, project: props.project, priorities: priorities.value });
         showUndo(t("List.bulk_done", { n: result.totals?.updated ?? taskIds.length }), requests);
         selection.clear();
     } catch (error) {
@@ -213,6 +239,15 @@ async function runUndo() {
 
 function pickStatus(option) {
     run("bulkUpdateStatus", { newStatus: statusPayload(option.raw) });
+}
+
+function pickPriority(option) {
+    const name = option.raw.name;
+    run("bulkUpdatePriority", { firebaseObj: { Task_Priority: option.raw.value }, priorityObj: { priorityName: name, newPriorityName: name } });
+}
+
+function pickDue(date) {
+    if (date) run("bulkUpdateDueDate", { DueDate: date });
 }
 
 function pickAssignee(option) {
@@ -248,7 +283,9 @@ function onKey(event) {
     if (open.value) { open.value = ""; return; }
     if (selection.hasSelection.value) selection.clear();
 }
-function onClick() {
+// The due-date calendar is teleported to <body>; paging its months must not close the menu that owns it.
+function onClick(event) {
+    if (event.target?.closest?.(".dp__outer_menu_wrap, .dp__menu")) return;
     open.value = "";
 }
 

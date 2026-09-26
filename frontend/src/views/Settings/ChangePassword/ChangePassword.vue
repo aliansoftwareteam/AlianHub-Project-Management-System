@@ -90,6 +90,7 @@
     import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
     import { apiRequest,useAuth } from "../../../services";
     import { useI18n } from 'vue-i18n';
+    import { MIN_PASSWORD_LENGTH, PASSWORD_PATTERN } from '@passwordRule';
     const { t } = useI18n();
     const { logOut } = useAuth();
 
@@ -106,13 +107,13 @@
     const formDataChangePassword = ref({
         currentPassword: {
             value: "",
-            rules:"required | regex: ^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).*$ | min:8",
+            rules:"required",
             name: "current password",
             error: "",
         },
         newPassword: {
             value: "",
-            rules:"required | regex: ^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).*$ | min:8",
+            rules:`required | regex: ${PASSWORD_PATTERN.source} | min:${MIN_PASSWORD_LENGTH}`,
             name: "new password",
             error: "",
         },

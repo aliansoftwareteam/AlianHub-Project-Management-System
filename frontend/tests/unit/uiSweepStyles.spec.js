@@ -100,6 +100,109 @@ describe('the project calendar card in dark mode', () => {
     });
 });
 
+describe('keyframe animations under prefers-reduced-motion', () => {
+    const tokens = read('assets/css/tokens.css');
+
+    const reduceBlocks = () => {
+        const blocks = [];
+        let at = tokens.indexOf('@media (prefers-reduced-motion: reduce)');
+        while (at !== -1) {
+            let depth = 0;
+            let end = tokens.indexOf('{', at);
+            for (; end < tokens.length; end += 1) {
+                if (tokens[end] === '{') depth += 1;
+                if (tokens[end] === '}' && --depth === 0) break;
+            }
+            blocks.push(tokens.slice(at, end + 1));
+            at = tokens.indexOf('@media (prefers-reduced-motion: reduce)', end);
+        }
+        return blocks.join('\n');
+    };
+
+    const splitTopLevel = (list) => {
+        const parts = [];
+        let depth = 0;
+        let start = 0;
+        [...list].forEach((ch, i) => {
+            if (ch === '(') depth += 1;
+            if (ch === ')') depth -= 1;
+            if (ch === ',' && depth === 0) {
+                parts.push(list.slice(start, i).trim());
+                start = i + 1;
+            }
+        });
+        parts.push(list.slice(start).trim());
+        return parts;
+    };
+
+    const animationRule = () => {
+        const match = /([^{}]+)\{([^{}]*animation-duration[^{}]*)\}/.exec(reduceBlocks());
+        return match ? { selectors: splitTopLevel(match[1].replace(/\/\*[\s\S]*?\*\//g, '')), body: match[2] } : null;
+    };
+
+    const stopped = (html) => {
+        const rule = animationRule();
+        if (!rule) return false;
+        const host = document.createElement('div');
+        host.innerHTML = html;
+        const el = host.querySelector('[data-probe]') || host.firstElementChild;
+        const elementSelector = rule.selectors.filter((s) => !s.includes('::')).join(', ');
+        return el.matches(elementSelector);
+    };
+
+    test('shimmers and pulses end at once, on elements and their ::before and ::after', () => {
+        const rule = animationRule();
+        expect(rule).not.toBeNull();
+        expect(rule.body).toMatch(/animation-duration:\s*\.01ms\s*!important/);
+        expect(rule.body).toMatch(/animation-iteration-count:\s*1\s*!important/);
+        expect(rule.selectors.some((s) => s.endsWith('::before'))).toBe(true);
+        expect(rule.selectors.some((s) => s.endsWith('::after'))).toBe(true);
+    });
+
+    test.each([
+        '<div class="cskel-shimmer"></div>',
+        '<div class="skelaton-loader"></div>',
+        '<div class="skeleton-bar"></div>',
+        '<div class="plm-skel"></div>',
+        '<div class="lwc-skel"></div>',
+        '<span class="lwc-dot"></span>',
+        '<div class="ppm-skel"></div>',
+        '<div class="prc-skel"></div>',
+        '<div class="ubc-skel"></div>',
+        '<div class="cw__skeleton-line"></div>',
+        '<div class="pd-skeleton"></div>',
+        '<span class="ah-agent-strip__pulse"></span>',
+        '<span class="mt-banner__dot"></span>',
+        '<span class="ewr-running-badge"></span>',
+        '<span class="ttt__rec-live"></span>',
+        '<span class="clip__dot"></span>',
+    ])('%s stops', (html) => {
+        expect(stopped(html)).toBe(true);
+    });
+
+    test.each([
+        '<span class="ah-spin"></span>',
+        '<div class="auth__spinner"></div>',
+        '<span class="oauth-spinner"></span>',
+        '<span class="ttt__spinner"></span>',
+        '<span class="pal__spin"></span>',
+        '<span class="ah-off__spinner is-spinning"></span>',
+        '<div class="spinner"></div>',
+        '<span class="custom-spinner"></span>',
+        '<span class="ai-estimate-spinner"></span>',
+        '<span class="aitc__orb"></span>',
+        '<button class="ah-summary__refresh"></button>',
+        '<div class="custom-loader"><div class="loaderBar" data-probe></div></div>',
+        '<div class="loader"><div class="bar1" data-probe></div></div>',
+    ])('%s keeps turning, since a frozen spinner reads as stuck', (html) => {
+        expect(stopped(html)).toBe(false);
+    });
+
+    test('transitions stay near-instant as before', () => {
+        expect(reduceBlocks()).toMatch(/transition-duration:\s*\.01ms\s*!important/);
+    });
+});
+
 describe('legacy blocks inside the task panel in dark mode', () => {
     const css = read('components/organisms/TaskDetailOverlay/style.css');
     const dark = (selector) => ruleBody(css, `:root[data-theme="dark"] .ah-detail__panel ${selector}`);

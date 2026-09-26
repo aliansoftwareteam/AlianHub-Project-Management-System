@@ -13,6 +13,7 @@ const { removeCache } = require("../../../utils/commonFunctions.js");
 const { updateUserFun } = require("../../Users/controller.js");
 
 const { ACCOUNT_MAIL_ANSWER } = require("../helpers/accountMail");
+const { PASSWORD_RULE_MESSAGE, meetsPasswordRule } = require("../helpers/passwordRule");
 
 exports.changePassword = async (req, res) => {
     try {
@@ -31,6 +32,10 @@ exports.changePassword = async (req, res) => {
         }
         if (!(reqData && reqData.newPassword)) {
             res.status(400).json({message: "New Password is require"});
+            return;
+        }
+        if (!meetsPasswordRule(reqData.newPassword)) {
+            res.status(400).json({message: PASSWORD_RULE_MESSAGE});
             return;
         }
         let obj = {
@@ -183,6 +188,11 @@ exports.resetPassword = async (req, res, next) => {
         }, "findOne");
         if (!(tokenRecord && tokenRecord._id)) {
             req.errorMessageObject = {message: "Reset link is invalid or has already been used.", key: 5};
+            next();
+            return;
+        }
+        if (!meetsPasswordRule(reqData.password)) {
+            req.errorMessageObject = {message: PASSWORD_RULE_MESSAGE};
             next();
             return;
         }

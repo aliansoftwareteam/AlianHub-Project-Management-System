@@ -100,6 +100,17 @@ const routes = [
 		},
 		component: () => import(/* webpackChunkName: "changelog" */ '@/views/Changelog/Changelog.vue')
 	},
+	// requiresAuth is what makes App.vue draw the shell around it. A repeatable param ranks below
+	// every /:cid/... route and, unlike (.*), cannot match an empty tail, so /:cid/ still opens Home.
+	{
+		path: "/:cid/:catchAll+",
+		name: "404_in_app",
+		component: () => import(/* webpackChunkName: "404" */ '@/views/NotFound'),
+		meta: {
+			title: '404',
+			requiresAuth: true
+		}
+	},
 	{
 		path: "/:catchAll(.*)",
 		name: "404",
