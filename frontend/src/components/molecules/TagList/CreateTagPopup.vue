@@ -121,7 +121,7 @@ import InputText from "@/components/atom/InputText/InputText.vue";
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
 
 // utility 
-import { createTag,addTaskTag,updateTag,deleteTag} from "./helper.js";
+import { createTag,addTaskTag,updateTag,deleteTag,byTagName,taskTagChips} from "./helper.js";
 import { useCustomComposable } from "@/composable";
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from "vue-i18n";
@@ -202,12 +202,11 @@ watchEffect(()=>{
     array.value = props.project.tagsArray || [];
     tasksTagsArray.value = props.task.tagsArray || [];
     array.value = array.value.filter((item)=>{ return !(tasksTagsArray.value.includes(item['uid'])) })
-    array.value.sort((a,b) => (a.tagName.toLowerCase() < b.tagName.toLowerCase()) ? -1 : ((b.tagName.toLowerCase() < a.tagName.toLowerCase()) ? 1 : 0));  
+    array.value.sort(byTagName);
 
-    tagChipArray.value =  (props.project.tagsArray !== undefined) ? props.project.tagsArray.filter((item)=>{ return tasksTagsArray.value.includes(item['uid'])}) : []
+    tagChipArray.value = taskTagChips(props.project.tagsArray, tasksTagsArray.value)
 
     ids.value = {companyId:companyId.value,projectId:props.project._id,sprintId:props.task.sprintId,taskId:props.task._id, tagsArray: props.task.tagsArray}
-    tagChipArray.value.sort((a,b) => (a.tagName.toLowerCase() < b.tagName.toLowerCase()) ? -1 : ((b.tagName.toLowerCase() < a.tagName.toLowerCase()) ? 1 : 0));      
 
     emit("send:tagChipArray",tagChipArray.value)
     emit("send:ids",ids.value)
