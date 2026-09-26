@@ -109,7 +109,10 @@
                         :title="completeHint"
                         @click="toggleDone(!isDone)"
                     ><ShellIcon name="check" :size="13" />{{ $t('TaskPanel.complete') }}</button>
-                    <span v-if="priorityName" class="ah-chip ah-chip--warn">{{ priorityName }}</span>
+                    <span
+                        v-if="priorityName && checkPermission('task.task_priority', projectData?.isGlobalPermission) !== null && checkApps('Priority', projectData)"
+                        class="ah-chip ah-chip--warn"
+                    >{{ priorityName }}</span>
                     <span v-if="task.DueDate" class="ah-chip">{{ formatDay(task.DueDate) }}</span>
                     <button type="button" class="ah-chip ah-detail__chips-more" @click="sheetOpen = true">{{ $t('TaskPanel.properties') }}</button>
                 </div>
