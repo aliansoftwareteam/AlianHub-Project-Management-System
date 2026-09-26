@@ -34,7 +34,7 @@
             </div>
         </div>
     </div>
-    <AppState v-else kind="forbidden" />
+    <AppState v-else kind="denied" />
 </div>
 </template>
 

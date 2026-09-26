@@ -17,7 +17,7 @@
                                 @click.stop="handleCardCheckboxChange($event)"
                                 @keydown.shift.stop="handleCardCheckboxChange($event)"
                                 @mousedown.stop
-                                :aria-label="$t('Common.select_task')"
+                                :aria-label="$t('Common.select_task_named', { name: element.TaskName })"
                             />
                         </label>
                         <div
@@ -146,29 +146,16 @@
                     <div class="card-assignee" :class="{ 'card-assignee--agent': !!agentRun }" v-if="checkPermission('task.task_assignee',projectData?.isGlobalPermission) !== null && (groupValue !== 1 || isSubTask)">
                         <span v-if="agentRun" class="card-assignee__agent" :title="agentRun.agentName" aria-hidden="true">◉</span>
                         <Assignee
-                            v-if="checkPermission('task.task_assignee',projectData?.isGlobalPermission) === true && checkPermission('task.task_list',projectData?.isGlobalPermission) == true"
                             :users="element.AssigneeUserId"
-                            :options="permittedOptions"
+                            :options="canAssignOthers ? permittedOptions : nonPermittedOptions"
                             :num-of-users="1"
                             imageWidth="25px"
                             :addUser="!showArchiveVar"
+                            :buttonLabel="assigneeNames ? $t('List.cell_change', { field: $t('List.assignee'), value: assigneeNames }) : $t('List.cell_set', { field: $t('List.assignee') })"
                             @selected="changeAssignee(checkApps('MultipleAssignees',projectData) ? 'add' : 'replace', $event)"
                             @removed="changeAssignee('remove', $event)"
                             :isDisplayTeam="true"
                             :multiSelect="checkApps('MultipleAssignees')"
-                        />
-                        <Assignee
-                            v-else
-                            :users="element.AssigneeUserId"
-                            :options="nonPermittedOptions"
-                            :num-of-users="1"
-                            imageWidth="25px"
-                            :addUser="!showArchiveVar"
-                            @selected="changeAssignee(checkApps('MultipleAssignees',projectData) ? 'add' : 'replace', $event)"
-                            @removed="changeAssignee('remove', $event)"
-                            :isDisplayTeam="true"
-                            :multiSelect="checkApps('MultipleAssignees')"
-                            class=""
                         />
                     </div>
                     <div class="d-flex align-items-center board-view-action-wrapper">
@@ -186,6 +173,7 @@
                                 :disabledDates="element.dueDateDeadLine"
                                 @SelectedDate="($event) => updateDueDate($event)"
                                 :isWithoutBorderImage="true"
+                                :buttonLabel="dueDateText ? $t('List.cell_change', { field: $t('List.due_date'), value: dueDateText }) : $t('List.cell_set', { field: $t('List.due_date') })"
                             />
                             <span v-else>{{ element.DueDate ? convertDateFormat(element.DueDate, '', { showDayName: false }) : '' }}</span>
                         </span>
@@ -198,6 +186,7 @@
                                 @select="updatePriority"
                                 :permission="!showArchiveVar && checkPermission('task.task_priority',projectData?.isGlobalPermission) === true"
                                 :showName="true"
+                                :buttonLabel="priorityName ? $t('List.cell_change', { field: $t('List.priority'), value: priorityName }) : $t('List.cell_set', { field: $t('List.priority') })"
                             />
                         </span>
                         <span v-if="!isSubTask && element?.subTasks" class="d-flex align-items-center task-count-section" :class="myCounts > 0 ? 'mr-5px' : ''">
@@ -291,7 +280,7 @@
     const companyId = inject("$companyId");
     const {getters,commit} = useStore();
     const isSubtaskCreate = ref(false);
-    const {getUser} = useGetterFunctions();
+    const {getUser, getTeam, getPriorities} = useGetterFunctions();
     const projectData = inject("selectedProject");
     const $toast = useToast()
     const tagChipArray = ref([])
@@ -331,6 +320,15 @@
     const duplicateTaskSidebar = ref(false);
     const openSubTaskSideabr = ref(false)
     const dueDate = computed(() => element.value.DueDate)
+    const dueDateText = computed(() => (element.value.DueDate ? convertDateFormat(element.value.DueDate, '', { showDayName: false }) : ''))
+    const assigneeNames = computed(() => (element.value.AssigneeUserId || [])
+        .map((id) => (String(id).startsWith('tId_') ? getTeam(String(id).slice(4))?.name : getUser(id)?.Employee_Name))
+        .filter(Boolean)
+        .join(', '))
+    const priorityName = computed(() => {
+        const found = getPriorities().find((priority) => priority.value === element.value.Task_Priority);
+        return found?.name && found.name !== 'N/A' ? found.name : '';
+    })
 
     const router = useRouter();
     const { timer, elapsedMs, isTracking } = useTimer();
@@ -411,6 +409,8 @@
         companyUsers: companyUsers.value
     }))
     const permittedOptions = computed(() => permittedAssignees(assigneeInput.value))
+    const canAssignOthers = computed(() => checkPermission('task.task_assignee', projectData.value?.isGlobalPermission) === true
+        && checkPermission('task.task_list', projectData.value?.isGlobalPermission) == true)
     const nonPermittedOptions = computed(() => selfAssignable({ ...assigneeInput.value, userId: userId.value }))
 
     const emit = defineEmits(["subtaskOpen"]);

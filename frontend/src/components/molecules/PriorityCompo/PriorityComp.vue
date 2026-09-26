@@ -1,12 +1,15 @@
 <template>
     <div class="priority__component" :id="tourId">
         <slot name="trigger" :open="openPicker">
-        <div
+        <component
+            :is="triggerIsButton ? 'button' : 'div'"
+            :type="triggerIsButton ? 'button' : null"
             class="d-flex align-items-center cursor-pointer"
-            :role="permission ? 'button' : null"
-            :tabindex="permission ? 0 : null"
+            :class="{ 'priority__trigger-btn': triggerIsButton }"
+            :role="permission && !triggerIsButton ? 'button' : null"
+            :tabindex="permission && !triggerIsButton ? 0 : null"
             :title="selectedPriority.name"
-            :aria-label="selectedPriority.name"
+            :aria-label="triggerIsButton ? buttonLabel : selectedPriority.name"
             @click.stop.prevent="permission ? visible = true : ''"
             @keydown.enter.stop.prevent="permission ? visible = true : ''"
             @keydown.space.stop.prevent="permission ? visible = true : ''"
@@ -23,7 +26,7 @@
                 :data="{ url: selectedPriority.image }"
             />
             <span v-if="showName" class="ml-10px">{{ selectedPriority.name }}</span>
-        </div>
+        </component>
         </slot>
         <Sidebar
             :title="$t('Permissions.select_priorities')"
@@ -90,10 +93,16 @@ const props = defineProps({
     tourId: {
         type: String,
         default: ''
+    },
+    /** When set, the trigger is a real button with this accessible name. */
+    buttonLabel: {
+        type: String,
+        default: ''
     }
 })
 
 const visible = ref(false);
+const triggerIsButton = computed(() => props.permission && Boolean(props.buttonLabel));
 const openPicker = () => { visible.value = true; };
 
 //define computed methods
@@ -126,6 +135,7 @@ function selectedPriorityFromSidebar(val) {
 }
 </script>
 <style scoped>
+.priority__trigger-btn { margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: inherit; }
 .priority__wasabi-image{
     width: 10px !important; 
     height: 10px !important;

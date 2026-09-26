@@ -20,7 +20,14 @@ const COMMAND_LEAD_MIN = 3;
 export function commandLeads(query, labels) {
     const q = String(query || '').trim().toLowerCase();
     if (q.length < COMMAND_LEAD_MIN) return false;
-    return (labels || []).some((label) => String(label || '').toLowerCase().startsWith(q));
+    return (labels || []).some((label) => String(label || '').toLowerCase().startsWith(q)) || Boolean(commandArgument(query, labels));
+}
+
+export function commandArgument(query, labels) {
+    const q = String(query || '').trim();
+    const lower = q.toLowerCase();
+    const label = (labels || []).map((l) => String(l || '').toLowerCase()).find((l) => l && lower.startsWith(`${l} `));
+    return label ? q.slice(label.length).trim() : '';
 }
 
 export function relativeAge(value, t, now = Date.now()) {

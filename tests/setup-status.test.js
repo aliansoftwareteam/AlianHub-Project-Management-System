@@ -1,5 +1,6 @@
-const { computeSetupStatus, validateSetupPayload, MIN_PASSWORD } = require('../Modules/Setup/helpers');
+const { computeSetupStatus, validateSetupPayload } = require('../Modules/Setup/helpers');
 const { TEAM_FOCUS_OPTIONS } = require('../utils/sampleTasks');
+const passwords = require('./fixtures/passwordSamples.json');
 const { version } = require('../Config/buildInfo').get();
 
 describe('setup status — what the wizard learns from the server', () => {
@@ -16,7 +17,7 @@ describe('setup status — what the wizard learns from the server', () => {
 });
 
 describe('setup payload validation', () => {
-    const good = { firstName: ' Ada ', lastName: 'Lovelace', email: 'Ada@Example.com', password: 'correct horse', companyName: 'Analytical Engines' };
+    const good = { firstName: ' Ada ', lastName: 'Lovelace', email: 'Ada@Example.com', password: 'Correct-h0rse', companyName: 'Analytical Engines' };
 
     it('trims, lowercases the email, and defaults sample data to on', () => {
         const { data, errors, valid } = validateSetupPayload(good);
@@ -28,7 +29,17 @@ describe('setup payload validation', () => {
     it('names every missing or bad field at once', () => {
         const { errors, valid } = validateSetupPayload({ email: 'nope', password: 'short' });
         expect(valid).toBe(false);
-        expect(errors).toEqual({ firstName: 'required', lastName: 'required', email: 'invalid', password: `min_${MIN_PASSWORD}`, companyName: 'required' });
+        expect(errors).toEqual({ firstName: 'required', lastName: 'required', email: 'invalid', password: 'weak', companyName: 'required' });
+    });
+
+    it.each(passwords.weak)('refuses the owner password %j with the rule every new password follows', (password) => {
+        const { errors, valid } = validateSetupPayload({ ...good, password });
+        expect(valid).toBe(false);
+        expect(errors).toEqual({ password: 'weak' });
+    });
+
+    it.each(passwords.strong)('accepts the owner password %j', (password) => {
+        expect(validateSetupPayload({ ...good, password }).valid).toBe(true);
     });
 
     it('accepts the sample toggle as a boolean or the string the form sends', () => {

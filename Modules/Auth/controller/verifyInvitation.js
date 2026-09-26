@@ -48,6 +48,7 @@ const ACCEPTED = 2;
 const INVITATION_TTL_MS = 24 * 60 * 60 * 1000;
 
 const isObjectId = (value) => OBJECT_ID_PATTERN.test(String(value || ''));
+const isIdString = (value) => typeof value === 'string' && OBJECT_ID_PATTERN.test(value);
 const normalizedEmail = (value) => String(value || '').trim().toLowerCase();
 
 /* One answer for every refusal, so the link cannot be used to learn which accounts or
@@ -65,60 +66,88 @@ exports.invitationBindsAccount = (invitation, account) => {
         && normalizedEmail(invitation.userEmail) === normalizedEmail(account.Employee_Email);
 };
 
+const findInvitation = (companyId, memberId) => MongoDbCrudOpration(companyId, {
+    type: dbCollections.COMPANY_USERS,
+    data: [{ _id: new mongoose.Types.ObjectId(String(memberId)), isDelete: { $ne: true } }]
+}, 'findOne');
+
+const findAccount = (userId) => MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+    type: dbCollections.USERS,
+    data: [{ _id: new mongoose.Types.ObjectId(String(userId)) }, { Employee_Email: 1, isEmailVerified: 1, isActive: 1, isDeleted: 1 }]
+}, 'findOne');
+
+const acceptable = (invitation, linkId, account) => Boolean(invitation)
+    && invitation.status === PENDING
+    && typeof linkId === 'string'
+    && linkTokenAccepted(invitation.linkId, linkId)
+    && exports.invitationBindsAccount(invitation, account);
+
+/* Recorded as one conditional update, so a withdrawal or a second accept racing this one wins or loses whole. */
+const claimInvitation = async (companyId, invitation, account) => {
+    const userId = String(account._id);
+    const claimed = await updateMemberFunction(companyId, [
+        { _id: invitation._id, status: PENDING, linkId: invitation.linkId },
+        { $set: { status: ACCEPTED, linkId: '', userId } },
+        { returnDocument: 'after' }
+    ], 'findOneAndUpdate');
+    if (!claimed.data || !claimed.data._id) return false;
+
+    await Promise.all([
+        recordInvitedOwner({ companyId, invitation, userId }).catch((error) => {
+            logger.error(`ERROR in record invited owner: ${error.message}`);
+        }),
+        updateUserFun(SCHEMA_TYPE.GOLBAL, {
+            type: dbCollections.USERS,
+            data: [{ _id: new mongoose.Types.ObjectId(userId) }, { $addToSet: { AssignCompany: companyId } }]
+        }, 'updateOne', companyId, userId).catch((error) => {
+            logger.error(`ERROR in update user: ${error.message}`);
+        }),
+    ]);
+    importUserNotifications(companyId, userId).catch((error) => {
+        logger.error(`ERROR in import notification settings: ${error}`);
+    });
+    addAndRemoveUserInMongodbNotificationCount(companyId, userId, 'Add').catch((error) => {
+        logger.error(`ERROR in create user In mongodb: ${error}`);
+    });
+    return true;
+};
+
 exports.checkPermission = async (req, res) => {
     try {
         const invite = exports.parseInviteBlob(req.body && req.body.id);
         if (!invite || !isObjectId(invite.userId) || !isObjectId(invite.companyId) || !isObjectId(invite.docId) || !invite.linkId) {
             return refuse(res);
         }
-        const docId = new mongoose.Types.ObjectId(invite.docId);
-        const invitation = await MongoDbCrudOpration(invite.companyId, {
-            type: dbCollections.COMPANY_USERS,
-            data: [{ _id: docId, isDelete: { $ne: true } }]
-        }, 'findOne');
-        const account = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
-            type: dbCollections.USERS,
-            data: [{ _id: new mongoose.Types.ObjectId(invite.userId) }, { Employee_Email: 1, isEmailVerified: 1, isActive: 1, isDeleted: 1 }]
-        }, 'findOne');
-        if (!invitation
-            || invitation.status !== PENDING
-            || !linkTokenAccepted(invitation.linkId, invite.linkId)
-            || !exports.invitationBindsAccount(invitation, account)) {
-            return refuse(res);
-        }
+        const [invitation, account] = await Promise.all([findInvitation(invite.companyId, invite.docId), findAccount(invite.userId)]);
+        if (!acceptable(invitation, invite.linkId, account)) return refuse(res);
         if (new Date(invitation.sendInvitationTime).getTime() + INVITATION_TTL_MS < Date.now()) {
             return res.json({ status: false, key: 4, statusText: 'Link is Expired.' });
         }
-
-        const userId = String(account._id);
-        const claimed = await updateMemberFunction(invite.companyId, [
-            { _id: docId, status: PENDING, linkId: invitation.linkId },
-            { $set: { status: ACCEPTED, linkId: '', userId } },
-            { returnDocument: 'after' }
-        ], 'findOneAndUpdate');
-        if (!claimed.data || !claimed.data._id) return refuse(res);
-
-        await Promise.all([
-            recordInvitedOwner({ companyId: invite.companyId, invitation, userId }).catch((error) => {
-                logger.error(`ERROR in record invited owner: ${error.message}`);
-            }),
-            updateUserFun(SCHEMA_TYPE.GOLBAL, {
-                type: dbCollections.USERS,
-                data: [{ _id: new mongoose.Types.ObjectId(userId) }, { $addToSet: { AssignCompany: invite.companyId } }]
-            }, 'updateOne', invite.companyId, userId).catch((error) => {
-                logger.error(`ERROR in update user: ${error.message}`);
-            }),
-        ]);
+        if (!(await claimInvitation(invite.companyId, invitation, account))) return refuse(res);
         res.json({ status: true, key: 5, companyId: invite.companyId });
-
-        importUserNotifications(invite.companyId, userId).catch((error) => {
-            logger.error(`ERROR in import notification settings: ${error}`);
-        });
-        addAndRemoveUserInMongodbNotificationCount(invite.companyId, userId, 'Add').catch((error) => {
-            logger.error(`ERROR in create user In mongodb: ${error}`);
-        });
     } catch (error) {
         logger.error(`Check Permission Error: ${error}`);
         if (!res.headersSent) refuse(res);
+    }
+};
+
+const refuseSignedIn = (res) => res.status(403).json({ status: false, statusText: 'This invitation cannot be accepted.' });
+
+/* The copied join link names no account, so the account is the signed-in one. Unlike the emailed link it
+ * does not expire: it is useless without that account's session, and the preview it follows never expires
+ * a pending invitation either. */
+exports.acceptSignedIn = async (req, res) => {
+    try {
+        const { companyId, memberId, linkId } = req.body || {};
+        if (req.apiToken || !isObjectId(req.uid) || !isIdString(companyId) || !isIdString(memberId)) {
+            return refuseSignedIn(res);
+        }
+        const [invitation, account] = await Promise.all([findInvitation(companyId, memberId), findAccount(req.uid)]);
+        if (!acceptable(invitation, linkId, account)) return refuseSignedIn(res);
+        if (!(await claimInvitation(companyId, invitation, account))) return refuseSignedIn(res);
+        return res.json({ status: true, statusText: 'Invitation accepted.', companyId });
+    } catch (error) {
+        logger.error(`accept invitation signed in: ${error?.message || error}`);
+        if (!res.headersSent) refuseSignedIn(res);
     }
 };

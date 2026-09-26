@@ -6,6 +6,7 @@ import { useGetterFunctions } from "@/composable";
 import { FIRST_RUN_STEPS, isFirstRunStepDone } from "@/composable/firstRunProgress";
 import { onboardingRecord, saveOnboarding } from "@/composable/onboardingState";
 import { isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
+import { askForBrowserNotifications } from "@/composable/browserNotifications";
 
 const SAMPLE_CODE = "WELCOME";
 
@@ -129,8 +130,10 @@ export function useOnboardingChecklist({ openCreateProject = () => {}, startTour
                 if (key === "open_project") mark(key);
                 router.push({ name: "Project", params: { cid: companyId.value, id: target._id }, query: key === "board" ? { tab: "ProjectKanban" } : {} }).catch(() => {});
             }
-        } else if (key === "notifications") go("Notifications");
-        else if (key === "tour") startTour("shell");
+        } else if (key === "notifications") {
+            askForBrowserNotifications(userId.value);
+            go("Notifications");
+        } else if (key === "tour") startTour("shell");
         else if (key === "remove_sample") return false;
         return true;
     };
