@@ -86,7 +86,9 @@ exports.getNotificationMessages = async (req, res) => {
                     { notificationType: null }
                 ]
             },
-            { receiverID: userId }
+            { receiverID: userId },
+            // Clearing in the Inbox stamps clearedAt; the bell has no cleared view, so those rows stay out of both lists.
+            { clearedAt: null }
         ];
 
         if (normalizedFilter === 'archived') {
