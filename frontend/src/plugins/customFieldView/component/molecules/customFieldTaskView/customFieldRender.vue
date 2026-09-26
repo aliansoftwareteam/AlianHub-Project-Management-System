@@ -1,10 +1,10 @@
 <template>
     <div class="mt-1 custom-field__bg" :class="containerClasses">
         <div class="d-flex align-items-center justify-content-between">
-            <h4 :class="headerClasses">
+            <h3 class="custom-field__title" :class="headerClasses">
                 {{ $t('CustomField.custom_field') }}
-            </h4>
-            <h4 v-if="props.editPermission" class="font-roboto-sans font-size-14 font-weight-500 font-normal text-decoration-underline blue cursor-pointer" @click="emit('isCustomField', true)">+ {{ $t('CustomField.custom_field') }}</h4>
+            </h3>
+            <span v-if="props.editPermission" class="font-roboto-sans font-size-14 font-weight-500 font-normal text-decoration-underline blue cursor-pointer custom-field__add" @click="emit('isCustomField', true)">+ {{ $t('CustomField.custom_field') }}</span>
         </div>
         
         <!-- Loading skeleton -->
