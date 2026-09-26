@@ -89,7 +89,7 @@ Either SMTP (`NODEMAILER_HOST`, `NODEMAILER_PORT` 587 or 465, `NODEMAILER_EMAIL`
 `LLM_PROVIDER` (openai, anthropic, deepseek) plus the matching key and model. Test asks the provider to list models with the key. Nothing in the product requires AI; the AI pages simply stay empty without a key.
 
 ### Sign-in
-Google, GitHub and GitLab each have an enable switch, a client id and a client secret. The login page learns which buttons to show from `GET /api/v2/instance/public-config`, so nothing needs a rebuild. Set the provider's callback URL to your `WEBURL`. `SSO_LOGIN_ENABLED` hides the "Continue with SSO" button when you do not use SAML/OIDC.
+Google, GitHub and GitLab each have an enable switch, a client id and a client secret. The login page learns which buttons to show from `GET /api/v2/instance/public-config`, so nothing needs a rebuild. Set the provider's callback URL to your `WEBURL`. The "Continue with SSO" button shows only once a workspace has an enabled SAML/OIDC connection with a verified domain (checked at most once a minute, and again whenever a connection is saved or a domain verified); `SSO_LOGIN_ENABLED=false` hides it regardless.
 
 Push notifications (Firebase) are the one exception: the browser service worker is generated at build time, so those keys live in `frontend/.env` as `VUE_APP_*` and in `.env` as `APIKEY`, `PROJECTID`, ...; see `.env.example`.
 

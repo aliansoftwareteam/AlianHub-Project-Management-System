@@ -190,7 +190,8 @@ const axios = inject("$axios");
 const brand = computed(() => getters["brandSettingTab/brandSettings"] || {});
 const showRegister = computed(() => router.hasRoute("Sign-up") || router.hasRoute("Signup") || router.hasRoute("Register"));
 const providers = computed(() => enabledProviders());
-const ssoAvailable = computed(() => publicConfig.auth.sso !== false);
+// Only the server knows whether any workspace has an SSO connection, so no build-time default can show the button.
+const ssoAvailable = computed(() => publicConfig.loaded && publicConfig.auth.sso === true);
 const magicLinkOn = computed(() => publicConfig.auth.magicLink === true);
 
 const step = ref("login");
