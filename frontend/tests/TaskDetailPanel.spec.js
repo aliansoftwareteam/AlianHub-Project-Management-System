@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { config, flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { ref } from 'vue';
@@ -79,12 +79,13 @@ vi.mock('@/components/organisms/TaskDetailOverlay/TaskTrackerHandoff.vue', () =>
 import TaskDetailPanel from '@/components/organisms/TaskDetailOverlay/TaskDetailPanel.vue';
 import { undoToast, runUndo, dismissUndoToast } from '@/composable/useUndoToast';
 import en from '@/locales/en.js';
+import { inkOf, worstContrast } from './wcagContrast';
 
 const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);
 const t = i18n.global.t;
 
-function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null } = {}) {
+function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null, width = 1280 } = {}) {
     const store = createStore({
         getters: {
             'settings/companyUserDetail': () => ({ roleType }),
@@ -99,7 +100,7 @@ function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null } =
     });
     return mount(TaskDetailPanel, {
         props: { companyId: 'company-1', projectId: 'proj-1', sprintId: 'sprint-1', taskId: 'task-1', nav },
-        global: { plugins: [store], mocks: { $t: t }, provide: { $userId: ref(userId), ...(socket ? { $socket: ref(socket) } : {}) } }
+        global: { plugins: [store], mocks: { $t: t }, provide: { $userId: ref(userId), $clientWidth: ref(width), ...(socket ? { $socket: ref(socket) } : {}) } }
     });
 }
 
@@ -395,6 +396,28 @@ describe('TaskDetailPanel', () => {
             wrapper.findComponent({ name: 'TaskDetailAction' }).vm.$emit('open', 'tracker');
             await flushPromises();
             expect(exposed['TaskTrackerHandoff.start']).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('the phone status chip', () => {
+        const stored = { ...projectPayload.taskStatusData[0] };
+        beforeEach(() => {
+            projectPayload.sprintsObj = [];
+            projectPayload.sprintsfolders = [];
+            projectPayload.tasks[0] = { _id: 'task-1', TaskName: 'Write spec', TaskKey: 'AH-1', statusKey: 'st-open', statusType: 'open', AssigneeUserId: [] };
+            Object.assign(projectPayload.taskStatusData[0], { textColor: '#ff9600', bgColor: '#ff960035' });
+        });
+        afterEach(() => Object.assign(projectPayload.taskStatusData[0], stored));
+
+        it('keeps the status name readable on a workspace colour', async () => {
+            const wrapper = mountPanel({ width: 390 });
+            await flushPromises();
+            const chip = wrapper.get('.ah-detail__chips button.ah-chip');
+            const style = chip.element.style;
+            expect(chip.text()).toContain('Open');
+            expect(chip.classes()).toContain('ah-status-ink');
+            expect(worstContrast(inkOf(style), style.background, 'light')).toBeGreaterThanOrEqual(4.5);
+            expect(worstContrast(style.getPropertyValue('--status-ink-dark'), style.background, 'dark')).toBeGreaterThanOrEqual(4.5);
         });
     });
 });
