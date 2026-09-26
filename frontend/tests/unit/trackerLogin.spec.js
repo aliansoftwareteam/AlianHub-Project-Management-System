@@ -18,9 +18,11 @@ const CODE = 'Q2l0eS1jb2RlLWZvci10aGUtdHJhY2tlci1zaWduLWlu';
 const CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
 const originalLocation = window.location;
 
+const mountPage = () => mount(TrackerLogin, { global: { stubs: { RouterLink: RouterLinkStub } } });
+
 const open = async (query = {}) => {
     route.query = query;
-    const wrapper = mount(TrackerLogin);
+    const wrapper = mountPage();
     await flushPromises();
     return wrapper;
 };
@@ -90,7 +92,7 @@ describe('TrackerLogin', () => {
 describe('TrackerLogin when the tracker does not open', () => {
     const openAndContinue = async () => {
         apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { code: CODE } } });
-        const wrapper = mount(TrackerLogin, { global: { stubs: { RouterLink: RouterLinkStub } } });
+        const wrapper = mountPage();
         await wrapper.find('button').trigger('click');
         await flushPromises();
         return wrapper;
@@ -143,7 +145,7 @@ describe('TrackerLogin when the tracker does not open', () => {
 
     it('says nothing about a download when no code came back', async () => {
         apiRequestWithoutCompnay.mockRejectedValue(new Error('offline'));
-        const wrapper = mount(TrackerLogin, { global: { stubs: { RouterLink: RouterLinkStub } } });
+        const wrapper = mountPage();
         await wrapper.find('button').trigger('click');
         await flushPromises();
         await vi.advanceTimersByTimeAsync(5000);

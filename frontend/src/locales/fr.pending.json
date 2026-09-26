@@ -1487,6 +1487,8 @@
     "Auth.tracker_body": "Click Continue to sign in to the desktop tracker on this computer.",
     "Auth.tracker_code_failed": "Couldn't start the tracker sign-in. Refresh this page and try again.",
     "Auth.tracker_continue": "Continue",
+    "Auth.tracker_download": "Download the tracker",
+    "Auth.tracker_nothing_happened": "Nothing happened?",
     "Auth.tracker_title": "Authorize the desktop tracker",
     "Auth.try_again": "Try again",
     "Auth.two_factor_code_label": "Authentication code",

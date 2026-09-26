@@ -525,6 +525,8 @@ export default {
         tracker_body: "Click Continue to sign in to the desktop tracker on this computer.",
         tracker_continue: "Continue",
         tracker_code_failed: "Couldn't start the tracker sign-in. Refresh this page and try again.",
+        tracker_nothing_happened: "Nothing happened?",
+        tracker_download: "Download the tracker",
         new_project: "New project",
         search_templates: "Search templates",
         for_focus: "For {focus}",
