@@ -68,7 +68,7 @@ async function inviteMember({ baseURL, ownerApi, companyId, role, email, firstNa
 
     const session = await login(baseURL, email);
     const api = createApiClient({ baseURL, accessToken: session.accessToken, companyId });
-    assertOk(await api.put('/api/v1/root-members', { id: inviteRow._id, data: { userId, status: 2 }, companyId }), `accept invite for ${email}`);
+    assertOk(await api.put('/api/v1/root-members', { id: inviteRow._id, data: { userId, status: 2 }, companyId, linkId: inviteRow.linkId }), `accept invite for ${email}`);
     assertOk(await api.post('/api/v1/importSettingsNotification', { companyId, userId }), `notification settings for ${email}`);
     assertOk(await api.post('/api/v1/removeUserNotification', { companyId, userId, type: 'Add' }), `notification counter for ${email}`);
 
