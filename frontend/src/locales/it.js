@@ -7643,6 +7643,7 @@ export default {
         "Milestone_refund_amount_update_successfully": "Importo del rimborso del traguardo aggiornato con successo",
         "Error_in_updating_milestone_refund_amount": "Errore nell'aggiornamento dell'importo del rimborso del traguardo",
         "The_project_not_found": "Il progetto non è stato trovato.",
+        "project_not_available": "This project isn't available to you.",
         "The_project_is_archived": "Il progetto è archiviato.",
         "tracker_not_opened": "AlianHub Tracker didn't open. Please make sure it's installed or updated to the latest version.",
         "Start_date_of_project_should_be_smaller_than_current_date": "La data di inizio del progetto deve essere inferiore alla data corrente",

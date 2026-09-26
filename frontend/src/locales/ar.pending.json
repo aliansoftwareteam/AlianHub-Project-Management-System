@@ -7946,6 +7946,7 @@
     "Toast.name_should_be_at_least_3_characters_long": "name should be at least 3 characters long",
     "Toast.notification_permission": "To receive notifications, please allow Notification permission in site settings and reload page again.",
     "Toast.please_remove_the_advanced_filter_to_view_newly_created_projects": ", Please remove the advanced filter to view newly created projects.",
+    "Toast.project_not_available": "This project isn't available to you.",
     "Toast.queue_list_not_updated": "QueueList non mis à jour.",
     "Toast.require_image_format_message": "File format is not supported or not added in Company settings, you can add file format in Settings.",
     "Toast.something_went_wrong": "Something went wrong.",
