@@ -7631,6 +7631,7 @@ export default {
         "Milestone_refund_amount_update_successfully": "Η ενημέρωση του ποσού επιστροφής του ορόσημου έγινε με επιτυχία",
         "Error_in_updating_milestone_refund_amount": "Σφάλμα κατά την ενημέρωση του ποσού επιστροφής ορόσημου",
         "The_project_not_found": "Το έργο δεν βρέθηκε.",
+        "project_not_available": "This project isn't available to you.",
         "The_project_is_archived": "Το έργο είναι αρχειοθετημένο.",
         "tracker_not_opened": "AlianHub Tracker didn't open. Please make sure it's installed or updated to the latest version.",
         "Start_date_of_project_should_be_smaller_than_current_date": "Η ημερομηνία έναρξης του έργου πρέπει να είναι μικρότερη από την τρέχουσα ημερομηνία",

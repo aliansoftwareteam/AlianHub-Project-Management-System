@@ -7631,6 +7631,7 @@ export default {
         "Milestone_refund_amount_update_successfully": "Erstattung des Meilensteinbetrags erfolgreich aktualisiert.",
         "Error_in_updating_milestone_refund_amount": "Fehler beim Aktualisieren des Meilenstein-Erstattungsbetrags.",
         "The_project_not_found": "Das Projekt wurde nicht gefunden.",
+        "project_not_available": "This project isn't available to you.",
         "The_project_is_archived": "Das Projekt ist archiviert.",
         "tracker_not_opened": "AlianHub Tracker didn't open. Please make sure it's installed or updated to the latest version.",
         "Start_date_of_project_should_be_smaller_than_current_date": "Das Startdatum des Projekts sollte kleiner als das heutige Datum sein.",

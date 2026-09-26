@@ -7889,6 +7889,7 @@ export default {
         Error_in_updating_milestone_refund_amount:
             "Error in updating milestone refund amount",
         The_project_not_found: "The project not found.",
+        project_not_available: "This project isn't available to you.",
         The_project_is_archived: "The project is archived.",
         tracker_not_opened: "AlianHub Tracker didn't open. Please make sure it's installed or updated to the latest version.",
         Start_date_of_project_should_be_smaller_than_current_date:

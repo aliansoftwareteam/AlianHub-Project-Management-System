@@ -7631,6 +7631,7 @@ export default {
         "Milestone_refund_amount_update_successfully": "Monto de reembolso del hito actualizado con éxito",
         "Error_in_updating_milestone_refund_amount": "Error al actualizar el monto de reembolso del hito",
         "The_project_not_found": "Proyecto no encontrado.",
+        "project_not_available": "This project isn't available to you.",
         "The_project_is_archived": "El proyecto está archivado.",
         "tracker_not_opened": "AlianHub Tracker didn't open. Please make sure it's installed or updated to the latest version.",
         "Start_date_of_project_should_be_smaller_than_current_date": "La fecha de inicio del proyecto debe ser anterior a la fecha actual",

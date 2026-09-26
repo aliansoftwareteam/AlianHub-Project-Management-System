@@ -7631,6 +7631,7 @@ export default {
         "Milestone_refund_amount_update_successfully": "Сумма возврата для вехи успешно обновлена",
         "Error_in_updating_milestone_refund_amount": "Ошибка при обновлении суммы возврата для вехи",
         "The_project_not_found": "Проект не найден.",
+        "project_not_available": "This project isn't available to you.",
         "The_project_is_archived": "Проект архивирован.",
         "tracker_not_opened": "AlianHub Tracker didn't open. Please make sure it's installed or updated to the latest version.",
         "Start_date_of_project_should_be_smaller_than_current_date": "Дата начала проекта должна быть раньше текущей даты",

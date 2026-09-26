@@ -6597,6 +6597,7 @@
     "Toast.Skill_deactivated_successfully": "Skill deactivated successfully",
     "Toast.Skill_restored_successfully": "Skill restored successfully",
     "Toast.Sprint_not_found": "Sprint not found",
+    "Toast.project_not_available": "This project isn't available to you.",
     "Toast.tracker_not_opened": "AlianHub Tracker didn't open. Please make sure it's installed or updated to the latest version.",
     "Toast.two_factor_codes_copied": "Recovery codes copied to clipboard.",
     "Toast.two_factor_disabled": "Two-factor authentication disabled.",

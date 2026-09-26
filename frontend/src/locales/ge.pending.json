@@ -6621,6 +6621,7 @@
     "Toast.Task_Type_added_sucessfully": "Task Type added sucessfully",
     "Toast.Task_duplicate_sucessfully": "Task duplicate sucessfully",
     "Toast.Task_moved_sucessfully": "Task moved sucessfully",
+    "Toast.project_not_available": "This project isn't available to you.",
     "Toast.tracker_not_opened": "AlianHub Tracker didn't open. Please make sure it's installed or updated to the latest version.",
     "Toast.two_factor_codes_copied": "Recovery codes copied to clipboard.",
     "Toast.two_factor_disabled": "Two-factor authentication disabled.",
