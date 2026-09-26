@@ -1337,8 +1337,6 @@
     "Auth.invite_accepted_title": "Invitation accepted",
     "Auth.invite_cancelled": "This invitation was cancelled.",
     "Auth.invite_checking": "Checking your invitation…",
-    "Auth.invite_have_account_body": "Sign in with this address to accept the invitation.",
-    "Auth.invite_have_account_title": "You already have an account",
     "Auth.invite_invalid_body": "Ask the person who invited you for a new link, or log in if you already have an account.",
     "Auth.invite_invalid_title": "This invitation isn't valid any more",
     "Auth.invite_sign_in_to_accept": "Sign in to accept",

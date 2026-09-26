@@ -69,17 +69,8 @@
                 <template #terms><a v-if="termsLink" :href="termsLink" target="_blank" rel="noopener">{{ $t('Auth.tearm') }}</a><span v-else>{{ $t('Auth.tearm') }}</span></template>
                 <template #privacy><a v-if="privacyLink" :href="privacyLink" target="_blank" rel="noopener">{{ $t('Auth.Privacy_Policy') }}</a><span v-else>{{ $t('Auth.Privacy_Policy') }}</span></template>
             </i18n-t>
-            <p class="av2-terms" style="margin-top:4px">{{ $t('Auth.have_account') }} <strong><router-link :to="{ name: 'Log-in' }">{{ $t('Auth.log_in') }}</router-link></strong></p>
+            <p class="av2-terms" style="margin-top:4px">{{ $t('Auth.have_account') }} <strong><router-link :to="signInToAccept">{{ $t('Auth.invite_sign_in_to_accept') }}</router-link></strong></p>
         </form>
-
-        <div v-else-if="stage === 'signin'" class="av2-auth-card">
-            <h2 class="auth__h">{{ $t('Auth.invite_have_account_title') }}</h2>
-            <p class="auth__p">{{ $t('Auth.invite_have_account_body') }}</p>
-            <div class="auth__fields" style="gap:9px">
-                <div class="av2-email">{{ email }}</div>
-                <button type="button" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" @click="signInToAccept">{{ $t('Auth.invite_sign_in_to_accept') }}</button>
-            </div>
-        </div>
 
         <div v-else-if="stage === 'accept'" class="av2-auth-card">
             <h2 class="auth__h">{{ $t('Auth.invite_accept_title') }}</h2>
@@ -157,6 +148,7 @@ const nameInput = ref(null);
 const form = reactive({ name: "", password: "" });
 const errors = reactive({ name: "", password: "" });
 const linkId = String(route.query.token || "");
+const signInToAccept = { name: "Log-in", query: { redirect_url: route.fullPath } };
 
 const sameAddress = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
 
@@ -191,8 +183,6 @@ onMounted(async () => {
         signedInEmail.value = await readSignedInEmail();
         if (signedInEmail.value) {
             stage.value = sameAddress(signedInEmail.value, invite.email) ? "accept" : "wrong";
-        } else if (invite.hasAccount) {
-            stage.value = "signin";
         } else {
             stage.value = "form";
             setTimeout(() => nameInput.value?.focus(), 50);
@@ -268,8 +258,6 @@ const submit = async () => {
         busy.value = false;
     }
 };
-
-const signInToAccept = () => router.push({ name: "Log-in", query: { redirect_url: route.fullPath } });
 
 const switchAccount = () => logOut({ islogOut: true });
 

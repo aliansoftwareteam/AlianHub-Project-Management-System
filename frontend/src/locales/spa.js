@@ -459,8 +459,6 @@ export default {
         "invite_accepted_body": "You're in. Log in to open the workspace.",
         "invite_cancelled": "This invitation was cancelled.",
         "invite_used": "This invitation was already used. Log in instead.",
-        "invite_have_account_title": "You already have an account",
-        "invite_have_account_body": "Sign in with this address to accept the invitation.",
         "invite_sign_in_to_accept": "Sign in to accept",
         "invite_accept_title": "Accept your invitation",
         "invite_accept_body": "You're signed in as the invited address. Accept to join {workspace}.",

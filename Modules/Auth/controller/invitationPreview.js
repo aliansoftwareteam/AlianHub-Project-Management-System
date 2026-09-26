@@ -19,15 +19,9 @@ exports.linkTokenAccepted = linkTokenAccepted;
 
 const INVALID = Object.freeze({ status: false, statusText: 'Invalid invitation link.' });
 
-/* Sign-up refuses an address that already has an account. Only a holder of the row's token asks,
- * and the preview already shows them the address. */
-const addressHasAccount = async (email) => Boolean(await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
-    type: SCHEMA_TYPE.USER_AUTH,
-    data: [{ email: String(email || '').trim().toLowerCase() }, { _id: 1 }],
-}, 'findOne'));
-
-/* The invitation page runs before the invitee is signed in, so it gets only the fields it
- * renders, and only while the invitation is still waiting for them. */
+/* Anyone holding the link reaches the invitation page, so it gets only the fields it renders, and
+ * only while the invitation is still waiting for them. Never whether the address has an account:
+ * the admin holds the link too, and could invite any address to find out. */
 exports.invitationPreview = async (req, res) => {
     try {
         const { companyId, memberId, linkId } = req.body || {};
@@ -38,10 +32,7 @@ exports.invitationPreview = async (req, res) => {
         if (!member || member.isDelete === true || member.status !== PENDING || !linkTokenAccepted(member.linkId, linkId)) {
             return res.send({ ...INVALID });
         }
-        const [company, hasAccount] = await Promise.all([
-            MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: [{ _id: companyId }, { Cst_CompanyName: 1 }] }, 'findOne'),
-            addressHasAccount(member.userEmail),
-        ]);
+        const company = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: [{ _id: companyId }, { Cst_CompanyName: 1 }] }, 'findOne');
         if (!company) return res.send({ ...INVALID });
         return res.send({
             status: true,
@@ -50,7 +41,6 @@ exports.invitationPreview = async (req, res) => {
                 workspaceName: company.Cst_CompanyName || '',
                 status: member.status,
                 email: member.userEmail,
-                hasAccount,
             },
         });
     } catch (error) {
