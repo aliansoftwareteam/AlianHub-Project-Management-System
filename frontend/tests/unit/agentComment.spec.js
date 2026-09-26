@@ -19,7 +19,7 @@ vi.mock('@/composable', () => ({
     })
 }));
 
-import { agentAuthorOf, agentReplyHtml, pageRefIds } from '@/utils/agentComment';
+import { agentAuthorOf, agentReplyHtml, automationAuthorOf, pageRefIds } from '@/utils/agentComment';
 import Comment from '@/components/organisms/Comment/Comment.vue';
 
 const asDom = (html) => {
@@ -80,6 +80,45 @@ describe('agentAuthorOf', () => {
         expect(agentAuthorOf({ userId: PERSON, actorType: 'agent', isAgent: true, agentName: 'Alian' })).toEqual({ name: 'Alian', assistant: false });
         expect(agentAuthorOf({ userId: 'alian' })).toEqual({ name: '', assistant: true });
         expect(agentAuthorOf({ userId: PERSON })).toBeNull();
+    });
+});
+
+describe('automationAuthorOf', () => {
+    it('reads a rule comment, an older rule comment without a name, and a person row', () => {
+        expect(automationAuthorOf({ userId: 'automation:rule-1', actorType: 'automation', automationName: 'Nudge' })).toEqual({ name: 'Nudge' });
+        expect(automationAuthorOf({ userId: 'automation:rule-1' })).toEqual({ name: '' });
+        expect(automationAuthorOf({ userId: 'automation' })).toEqual({ name: '' });
+        expect(automationAuthorOf({ userId: PERSON })).toBeNull();
+        expect(automationAuthorOf({ userId: 'automations-fan' })).toBeNull();
+    });
+});
+
+describe('Comment thread row for an automation comment', () => {
+    const mountRow = (message) => shallowMount(Comment, {
+        props: { message: { _id: 'm1', type: 'text', createdAt: 1, updatedAt: 1, reactions: [], sent: false, ...message }, showUser: true, showOptions: false },
+    });
+
+    it('shows the rule, not the Ghost User placeholder', async () => {
+        const wrapper = mountRow({ userId: 'automation:rule-1', actorType: 'automation', automationName: 'Nudge', message: 'Reminder' });
+        await flushPromises();
+        expect(wrapper.text()).not.toContain('Ghost User');
+        expect(wrapper.find('.show__user').text()).toContain('Nudge');
+        expect(wrapper.find('.ah-chip--automation').exists()).toBe(true);
+        expect(wrapper.find('.ah-avatar--automation').exists()).toBe(true);
+    });
+
+    it('names an older rule comment as an automation', async () => {
+        const wrapper = mountRow({ userId: 'automation:rule-1', message: 'Reminder' });
+        await flushPromises();
+        expect(wrapper.text()).not.toContain('Ghost User');
+        expect(wrapper.find('.show__user').text()).toContain('Comments.an_automation');
+    });
+
+    it('names the automation when a person replies to it', async () => {
+        const wrapper = mountRow({ userId: PERSON, message: 'thanks', hasReply: true, reply_userId: 'automation:rule-1', reply_type: 'text', reply_message: 'Reminder' });
+        await flushPromises();
+        expect(wrapper.text()).not.toContain('Ghost User');
+        expect(wrapper.find('.message_replay').text()).toContain('Comments.an_automation');
     });
 });
 

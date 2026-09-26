@@ -884,7 +884,7 @@ export function taskListHelper() {
 
                 // Groups used to come from a typesense group_by; with search gone they come from the company seats instead.
                 const memberIds = (getters["settings/companyUsers"] || []).filter((member) => member && member.userId && member.isDelete !== true && Number(member.status) !== 3).map((member) => member.userId);
-                arr = assigneeGroups(memberIds, getUser, t("Projects.unassigned"));
+                arr = assigneeGroups(memberIds, getUser, t("Projects.unassigned"), getters["settings/teams"]);
 
                     sprints.forEach((sprint, index) => {
                         sprint.isExpanded = false;
@@ -892,7 +892,7 @@ export function taskListHelper() {
                             key: `${index}_${arrIndex}_${x.name}`,
                             ...x,
                             tasksArray: tasks,
-                            conditions: [assigneeCondition(x.value)],
+                            conditions: [assigneeCondition(x.value, x.teamIds)],
                             searchKey: "AssigneeUserId",
                             indexName: "groupByAssigneeIndex",
                             searchCondition: ":",

@@ -21,13 +21,16 @@ function dueDateMatches(task, item) {
     }
 }
 
-/* An assignee group holds every task that person is on, so a shared task appears under
-   each of its assignees; the group with no value holds the unassigned tasks. */
+/* An assignee group holds every task that person is on, directly or through a team, so a
+   shared task appears under each of its assignees; the group with no value holds the
+   unassigned tasks. */
 export function taskInGroup(task, item) {
     if (item.searchKey === "DueDate") return dueDateMatches(task, item);
     if (item.searchKey === "AssigneeUserId") {
         const ids = assigneeIds(task);
-        return item.value ? ids.includes(String(item.value)) : ids.length === 0;
+        if (!item.value) return ids.length === 0;
+        const groupIds = [String(item.value), ...(item.teamIds || [])];
+        return ids.some((id) => groupIds.includes(id));
     }
     return task[item.searchKey] === item.searchValue;
 }

@@ -14,6 +14,12 @@
                     :title="authorName"
                     aria-hidden="true"
                 >◉</span>
+                <span
+                    v-else-if="!message.sent && showUser && automationAuthor"
+                    class="ah-avatar ah-avatar--automation message__profile-image message__agent-avatar mr-10px"
+                    :title="authorName"
+                    aria-hidden="true"
+                >⚙</span>
                 <UserProfile
                     v-else-if="!message.sent && showUser"
                     :showDot="false"
@@ -32,6 +38,7 @@
                             {{!message.sent ? authorName : ''}}
                         </span>
                         <span v-if="showUser && !message.sent && agentAuthor" class="ah-chip ah-chip--agent ah-chip--mono mr-5px">{{ $t('Comments.agent_tag') }}</span>
+                        <span v-else-if="showUser && !message.sent && automationAuthor" class="ah-chip ah-chip--automation ah-chip--mono mr-5px">{{ $t('Comments.automation_tag') }}</span>
                         <span class="font-size-12 font-weight-300 gray text-lowercase show" v-if="showMessageTime">
                             {{getDateType(new Date(message.createdAt).getTime())}}
                         </span>
@@ -97,6 +104,11 @@
                                                     class="ah-avatar ah-avatar--agent message__profile-image message__agent-avatar mr-10px"
                                                     aria-hidden="true"
                                                 >◉</span>
+                                                <span
+                                                    v-else-if="replyAutomationAuthor"
+                                                    class="ah-avatar ah-avatar--automation message__profile-image message__agent-avatar mr-10px"
+                                                    aria-hidden="true"
+                                                >⚙</span>
                                                 <UserProfile
                                                     v-else
                                                     :showDot="false"
@@ -194,7 +206,7 @@ import { useConvertDate, useGetterFunctions } from '@/composable';
 import { useVisiblePages } from '@/composable/useVisiblePages';
 import { useProvenanceActors } from '@/components/molecules/Provenance/useProvenanceActors';
 import { commentHtml, commentPlainText } from '@/utils/commentHtml';
-import { agentAuthorOf, agentReplyHtml, pageRefIds } from '@/utils/agentComment';
+import { agentAuthorOf, agentReplyHtml, automationAuthorOf, pageRefIds } from '@/utils/agentComment';
 
 // COMPONENTS
 import WasabiImageComp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue"
@@ -280,13 +292,21 @@ const agentLabel = (author, row) => {
     return author.name || agentName(row) || t('Comments.an_agent');
 };
 
-const authorName = computed(() => (agentAuthor.value
-    ? agentLabel(agentAuthor.value, props.message)
-    : getUser(props.message.userId).Employee_Name));
+const automationAuthor = computed(() => automationAuthorOf(props.message));
+const replyAutomationAuthor = computed(() => automationAuthorOf({ userId: props.message?.reply_userId }));
+const automationLabel = (author) => author.name || t('Comments.an_automation');
 
-const replyAuthorName = computed(() => (replyAgentAuthor.value
-    ? agentLabel(replyAgentAuthor.value, {})
-    : getUser(props.message.reply_userId).Employee_Name));
+const authorName = computed(() => {
+    if (agentAuthor.value) return agentLabel(agentAuthor.value, props.message);
+    if (automationAuthor.value) return automationLabel(automationAuthor.value);
+    return getUser(props.message.userId).Employee_Name;
+});
+
+const replyAuthorName = computed(() => {
+    if (replyAgentAuthor.value) return agentLabel(replyAgentAuthor.value, {});
+    if (replyAutomationAuthor.value) return automationLabel(replyAutomationAuthor.value);
+    return getUser(props.message.reply_userId).Employee_Name;
+});
 
 const pageHref = (id) => `${window.location.origin}/${encodeURIComponent(String(companyId?.value || ''))}/pages/${id}`;
 
