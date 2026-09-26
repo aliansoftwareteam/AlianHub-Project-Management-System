@@ -99,10 +99,22 @@ describe('erasure by person over real audit rows', () => {
         verifiedBefore = await chain.verifyChain(COMPANY);
         await controls.erasePerson(COMPANY, PERSON, { removed: {} }, { by: ADMIN });
         expect(await sorted(COMPANY)).toEqual(before);
-        const runs = await Promise.allSettled([
+        // Two calls started together need not overlap: a winner that releases its lease before the other
+        // takes it leaves nothing to refuse. The winner waits at its audit row, lease held, until the other settles.
+        const saveAuditRow = chain.saveAuditRow;
+        let release;
+        const released = new Promise((resolve) => { release = resolve; });
+        const recording = jest.spyOn(chain, 'saveAuditRow').mockImplementationOnce(async (...args) => {
+            await released;
+            return saveAuditRow(...args);
+        });
+        const calls = [
             redact.redactPerson(COMPANY, PERSON, { by: ADMIN, reason: 'instance.audit_redact_person' }),
             redact.redactPerson(COMPANY, PERSON, { by: ADMIN, reason: 'instance.audit_redact_person' }),
-        ]);
+        ];
+        Promise.race(calls).then(release, release);
+        const runs = await Promise.allSettled(calls);
+        recording.mockRestore();
         refused = runs.filter((r) => r.status === 'rejected').map((r) => r.reason);
         result = runs.filter((r) => r.status === 'fulfilled').map((r) => r.value)[0];
     });
