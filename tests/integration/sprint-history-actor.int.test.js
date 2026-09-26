@@ -80,7 +80,7 @@ const registerAdmin = async (firstName, lastName) => {
 
     const session = await login(state.baseURL, email);
     const api = createApiClient({ baseURL: state.baseURL, accessToken: session.accessToken, companyId: state.companyId });
-    assertOk(await api.put('/api/v1/root-members', { id: String(row._id), data: { userId: session.uid, status: 2 }, companyId: state.companyId }), `accept ${email}`);
+    assertOk(await api.put('/api/v1/root-members', { id: String(row._id), data: { userId: session.uid, status: 2 }, companyId: state.companyId, linkId: row.linkId }), `accept ${email}`);
     return { uid: String(session.uid), api };
 };
 
