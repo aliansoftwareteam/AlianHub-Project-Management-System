@@ -180,13 +180,12 @@ describe('board card controls', () => {
     });
 });
 
-describe('the tag picker trigger the board card renders', () => {
-    const mountTagPopup = (buttonLabel) => mount(CreateTagPopup, {
+describe('the add-tag trigger of the tag picker (board card, task panel, list row)', () => {
+    const mountTagPopup = ({ isTaskList = false } = {}) => mount(CreateTagPopup, {
         props: {
             task: { _id: 't1', TaskName: TASK_NAME, sprintId: 's1', tagsArray: [] },
             project: { _id: 'p1', isGlobalPermission: true, tagsArray: [] },
-            isTaskList: false,
-            buttonLabel
+            isTaskList
         },
         global: {
             stubs: { DropDown: MenuDropDown, TagChip: true, ConfirmationSidebar: true }
@@ -195,21 +194,18 @@ describe('the tag picker trigger the board card renders', () => {
     const trigger = (wrapper) => wrapper.find('.menu').find('button, div');
     const opened = (wrapper) => wrapper.find('.menu').attributes('data-open') === 'true';
 
-    it('is a real button named by the card', () => {
-        const button = trigger(mountTagPopup('Add tag'));
+    it.each([false, true])('is a named button with a decorative image (list row: %s)', (isTaskList) => {
+        const button = trigger(mountTagPopup({ isTaskList }));
         expect(button.element.tagName).toBe('BUTTON');
         expect(button.attributes('type')).toBe('button');
-        expect(button.attributes('aria-label')).toBe('Add tag');
+        expect(button.attributes('aria-label')).toBe('Tags.add_tag');
+        expect(button.find('img').attributes('alt')).toBe('');
     });
 
     it.each(Object.keys(nativeActivations))('opens the tag menu on %s', async (how) => {
-        const wrapper = mountTagPopup('Add tag');
+        const wrapper = mountTagPopup();
         expect(opened(wrapper)).toBe(false);
         await nativeActivations[how](trigger(wrapper));
         expect(opened(wrapper)).toBe(true);
-    });
-
-    it('keeps its old markup where no label is passed', () => {
-        expect(trigger(mountTagPopup(undefined)).element.tagName).toBe('DIV');
     });
 });
