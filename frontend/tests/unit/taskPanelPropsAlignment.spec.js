@@ -32,7 +32,10 @@ beforeAll(() => {
                     <div class="taskdetail-label"><span class="task-esitmate-hours">00h 00m</span></div></div>
                 <div class="task-detail-right-side-label"><div class="task-detail-field-name">Remaining</div>
                     <div class="remaining-estimate-text">00h 00m</div></div>
+                <div class="task-detail-right-side-label"><div class="task-detail-field-name">Status</div>
+                    <button class="task-status-name">To Do</button></div>
             </div></div>
+            <div class="ah-detail__prop"><span class="ah-detail__prop-label">Sprint</span><button type="button" class="ah-detail__prop-link">List</button></div>
         </aside>`;
     document.body.appendChild(root);
 });
@@ -47,6 +50,12 @@ describe('the task panel property rows', () => {
         expect(parseFloat(style('.priority-comp.taskdetail-label').paddingLeft)).toBe(0);
         expect(parseFloat(style('.priority-comp .priority-name').paddingLeft)).toBe(0);
         expect(parseFloat(style('.due-date.taskdetail-label').paddingLeft)).toBe(0);
+    });
+
+    it('give every value control at least a 24px target (WCAG 2.5.8)', () => {
+        for (const selector of ['.ah-detail__prop-link', '.task-status-name', '.priority-comp.taskdetail-label', '.due-date.taskdetail-label']) {
+            expect(`${selector} ${style(selector).minHeight}`).toBe(`${selector} 24px`);
+        }
     });
 
     it('set every time figure in the same font as remaining hours', () => {
