@@ -49,7 +49,24 @@ describe('running build resolver under a slow git', () => {
 
     it('reports an unresolved version, not a release label, while git has not answered', () => {
         resolver = createResolver({ root: checkout(), run: () => new Promise(() => {}), onWarning: jest.fn() });
+        resolver.start();
         expect(resolver.get()).toMatchObject({ version: '14.35.0', channel: 'unknown', source: 'git-pending', build: null, commit: null });
+    });
+
+    it('reads git only once started: get() and summary() alone report an unresolved version and spawn nothing', async () => {
+        const run = jest.fn(betaGit);
+        resolver = createResolver({ root: checkout(), run });
+
+        const idle = resolver.get();
+        const summary = resolver.summary();
+        expect(run).not.toHaveBeenCalled();
+        expect(jest.getTimerCount()).toBe(0);
+        expect(idle).toMatchObject({ version: '14.35.0', channel: 'unknown', source: 'not-started', build: null, commit: null });
+        expect(summary).toMatchObject({ version: '14.35.0', channel: 'unknown', source: 'not-started' });
+
+        await resolver.start();
+        expect(run).toHaveBeenCalled();
+        expect(resolver.get()).toMatchObject({ version: '14.36.0-beta.1', channel: 'beta', source: 'git' });
     });
 
     it('a git timeout gives source git-unavailable with the contract fields and one warning', async () => {
@@ -139,5 +156,24 @@ describe('running build resolver under a slow git', () => {
 
         expect(run).not.toHaveBeenCalled();
         expect(jest.getTimerCount()).toBe(0);
+    });
+});
+
+describe('the process-wide build info', () => {
+    it('never spawns git from get() or summary(), so no test file or script leaves a read running', () => {
+        const execFile = jest.fn();
+        const execFileSync = jest.fn();
+        try {
+            jest.isolateModules(() => {
+                jest.doMock('child_process', () => ({ ...jest.requireActual('child_process'), execFile, execFileSync }));
+                const buildInfo = require('../Config/buildInfo');
+                expect(buildInfo.get()).toMatchObject({ version: require('../package.json').version });
+                buildInfo.summary();
+            });
+            expect(execFile).not.toHaveBeenCalled();
+            expect(execFileSync).not.toHaveBeenCalled();
+        } finally {
+            jest.dontMock('child_process');
+        }
     });
 });

@@ -1,5 +1,7 @@
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 jest.mock('../Modules/service.js', () => ({ sendAttachMail: jest.fn((subject, html, to, attachments, cb) => cb({ status: true })) }));
+// The index.js boot slice run below starts the git read, which would outlive this file.
+jest.mock('../Config/buildInfo', () => ({ start: jest.fn(() => Promise.resolve()) }));
 
 const fs = require('fs');
 const os = require('os');
