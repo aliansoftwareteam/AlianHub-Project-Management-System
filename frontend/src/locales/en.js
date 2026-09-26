@@ -1569,8 +1569,6 @@ export default {
         minimize: "Minimize to tray",
         close: "Close",
         untitled: "Untitled task",
-        mark_done: "Mark as done",
-        reopen: "Reopen task",
         properties: "Properties",
         summary: "Summary",
         summary_meta: "from {n} comments · updated {time}",

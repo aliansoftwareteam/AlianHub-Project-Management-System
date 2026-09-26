@@ -126,8 +126,6 @@
 .ah-detail__panel-inner.is-expanded .ah-detail__main { padding: 22px 28px; max-width: 980px; }
 
 .ah-detail__title-row { display: flex; align-items: flex-start; gap: 10px; }
-.ah-detail__done { width: 20px; height: 20px; border-radius: 6px; margin-top: 4px; }
-.ah-detail__done:checked::after { width: 10px; height: 6px; }
 .ah-detail__title-skeleton { height: 26px; width: 60%; border-radius: 5px; }
 .ah-detail__title { min-width: 0; flex: 1; }
 .ah-detail__title .task-detail-title ul { margin: 0; padding: 0; list-style: none; }
