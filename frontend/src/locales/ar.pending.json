@@ -2293,6 +2293,7 @@
     "Common.key_tab": "Tab",
     "Common.select_all_tasks": "Select all tasks in group",
     "Common.select_task": "Select task",
+    "Common.select_task_named": "Select {name}",
     "Company.company_created": "Your company was created. We have set up the initial steps. Please wait a moment.",
     "Company.creating_company": "Creating Company",
     "Company.fill_company_details": "Fill in your company details",
