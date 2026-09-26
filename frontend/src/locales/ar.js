@@ -7485,7 +7485,7 @@ export default {
         "Skill_restored_successfully": "Skill restored successfully",
         "Your_card_is_expired": "Your card is expired.",
         "Password_set_new_has_been_successfully": "New password set has been successfully",
-        "task_created_successfully": "Task Created Succeessfully",
+        "task_created_successfully": "Task created successfully",
         "please_remove_the_advanced_filter_to_view_newly_created_projects": ", Please remove the advanced filter to view newly created projects.",
         "create_task_plan_limit_message": "Upgrade your plan. You have reached the limit for creating tasks in the TASK_SPRINT sprint.",
         "something_went_wrong": "Something went wrong.",
