@@ -16,6 +16,7 @@ vi.mock('@/services', () => ({ apiRequest, apiRequestWithoutCompnay }));
 vi.mock('vue-router', () => ({ useRouter: () => ({ push, hasRoute: () => true }), useRoute: () => ({ fullPath: '/', meta: {}, name: 'Home', params: {}, query: {} }) }));
 vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: () => ({ _id: 'user-1', tourStatus: {}, homeChecklist: {} }) }) }));
 vi.mock('firebase/messaging', () => ({ getMessaging: () => ({}), getToken }));
+vi.mock('@/config/firebaseInit', () => ({ default: { name: '[DEFAULT]' }, firebaseConfigured: true }));
 vi.mock('@/composable/firstRunProgress', () => ({ markFirstRunStep: vi.fn(), isFirstRunStepDone: () => false, FIRST_RUN_STEPS: { BOARD_VIEW: 'board_view', NOTIFICATIONS: 'notifications' } }));
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', render: () => null } }));
 vi.mock('@/components/atom/SpinnerComp/SpinnerComp.vue', () => ({ default: { name: 'SpinnerComp', render: () => null } }));
