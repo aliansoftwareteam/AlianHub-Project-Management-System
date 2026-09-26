@@ -65,6 +65,11 @@ describe('provider buttons', () => {
             .map((file) => path.relative(SRC, file));
         expect(missing).toEqual([]);
     });
+
+    test('a lone last provider (the third of three) spans the row instead of sitting in half of it', () => {
+        const css = read('components/templates/AuthShell/style.css');
+        expect(ruleBody(css, '.auth__providers > :last-child:nth-child(odd)')).toMatch(/grid-column:\s*1 \/ -1/);
+    });
 });
 
 describe('signed-out screens', () => {
