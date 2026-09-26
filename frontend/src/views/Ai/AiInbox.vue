@@ -40,7 +40,6 @@
                     <div v-else-if="loading" class="ah-empty" style="margin:14px">{{ $t('Ai.loading') }}</div>
                     <EmptyState v-else-if="loadError" :title="$t('Ai.load_failed')" :message="loadError" :action-label="$t('Ai.retry')" @action="switchView(view)" />
                     <div v-else-if="!proposals.length && view === 'pending'" class="ai-done">
-                        <div class="ai-done__n ah-mono">{{ counts.doneByAi || 0 }}</div>
                         <p class="ah-h3">{{ $t('Ai.queue_clear') }}</p>
                         <p class="ah-small">{{ $t('Ai.queue_clear_body', { approved: counts.doneByAi || 0, declined: counts.declined || 0 }) }}</p>
                     </div>
