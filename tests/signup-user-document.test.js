@@ -4,7 +4,7 @@ jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
 jest.mock('../utils/data', () => ({ importUserNotifications: jest.fn(async () => undefined) }));
 jest.mock('../Modules/Auth/controller', () => ({ addAndRemoveUserInMongodbNotificationCount: jest.fn(async () => undefined), insertAuthFun: jest.fn() }));
-jest.mock('../Modules/Auth/controller/sendVerificationMail', () => ({ sendVerificationEmailPromise: jest.fn(async () => undefined) }));
+jest.mock('../Modules/Auth/controller/sendVerificationMail', () => ({ storeVerificationToken: jest.fn(async () => 'token'), mailVerificationLink: jest.fn(async () => undefined) }));
 jest.mock('../Modules/notification/defaults', () => ({ ensureNotificationDefaults: jest.fn() }));
 jest.mock('../Modules/ImportSettings/controller', () => ({ importSettingsFunction: jest.fn() }));
 jest.mock('../Modules/Company/controller/updateCompany', () => ({ updateCompanyFun: jest.fn() }));
