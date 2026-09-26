@@ -340,6 +340,7 @@ const verifyInvitationCtrl = require("./controller/verifyInvitation");
 const { removeCacheHandler } = require('./controller/removeCache');
 const { mongoOperation } = require('./controller/mongoOperation');
 const { invitationPreview } = require('./controller/invitationPreview');
+const { verifyJWTTokenV2 } = require('../../Config/jwt');
 const { handleEvents } = require('../Company/eventController');
 function initSignup(app) {
     app.post("/api/v2/createUser", createUserCtrl.createUserV2);
@@ -571,6 +572,8 @@ function initSignup(app) {
      */
      app.post('/api/v2/checkPermission', verifyInvitationCtrl.checkPermission);
     app.post('/api/v2/auth/invitation-preview', invitationPreview);
+    // Not in setMiddleware's lists: their company check refuses a caller who is not a member yet.
+    app.post('/api/v2/auth/invitation-accept', verifyJWTTokenV2, verifyInvitationCtrl.acceptSignedIn);
 
 
     

@@ -111,10 +111,10 @@ export default [
         path: '/invitation',
         name: 'Invitation',
         component: () => import(/* webpackChunkName: "Verify_Email" */ '@/views/Authentication/Invitation/Invitation.vue'),
+        // Open signed in or out: requiresAuth: false would send an invitee who is already signed in home before they could accept.
         meta: {
             title: 'Invitation',
-            hideHeader: true,
-            requiresAuth: false
+            hideHeader: true
         }
     }
 ]
