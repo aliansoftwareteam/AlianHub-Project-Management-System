@@ -89,7 +89,7 @@ The next action is clear: "Open a project" is the one primary button. The layers
   - In List view the create row closes after every ↵ (`views/Projects/ListView/ListGroup.vue:251-252`). The second task needs another click; the script's second title went nowhere. Board and Table keep the row open, so the three views behave differently.
   - On Home the input stays, but focus drops to `<body>` after save (observed), so the second task also needs a click.
 - **F2-c. Controls hidden under the card.** The inline assignee / due / priority / Save controls sit at the far right of the create row. At 1280×800 that is under the "Getting started" card (`f2e-create-row-1280.jpg`).
-- **F2-d.** The toast string has a typo, "Succeessfully" (`locales/en.js:7642`).
+- **F2-d.** The toast string has a typo, "Succeessfully" (`locales/en.js:7642`). **Fixed** by #997 (build 463).
 
 ## 3. Open a task, change status / assignee / due / priority, close
 
@@ -137,7 +137,7 @@ In the "UX Launch Plan" list.
   - At 390 px the palette is reachable only from the Home sidebar drawer (top-left toggle).
   - Project pages have only the list-search icon, and that search has the F4-a problem.
   - No tab-bar item opens search.
-- **F4-c. Palette opens tasks differently.** The palette opens a task expanded to full page, while a list click opens the side panel. Previous/next is then relative to a list the user never saw.
+- **F4-c. Palette opens tasks differently.** The palette opens a task expanded to full page, while a list click opens the side panel. Previous/next is then relative to a list the user never saw. **Fixed** by #999 (build 465).
 
 ## 5. Create a project and add its first task
 
@@ -156,8 +156,8 @@ In the "UX Launch Plan" list.
   - Typing a name and pressing ↵ creates a project with 10 example tasks ("An example task. Open it, try the controls, then delete it."), because the first template is pre-selected (`components/organisms/CreateProject/CreateProjectSidebar.vue:248-249`). "Blank" is listed first but is not the default.
   - A user wanting an empty project must notice and click Blank.
   - On the plus side, this is what switches on Priority, Time tracking and other apps; a Blank project lands without them (F3-c).
-- **F5-b.** Palette "New project" ignores the typed name (`CommandPalette.vue:371`), and `create=project` stays in the project URL afterwards.
-- **F5-c.** Landing on `/project/<id>/p?tab=ProjectListView` works. A bare `/project/<id>` link is a 404 (`router/projects/index.js` has no bare route).
+- **F5-b.** Palette "New project" ignores the typed name (`CommandPalette.vue:371`), and `create=project` stays in the project URL afterwards. **Fixed** by #1003 (build 466).
+- **F5-c.** Landing on `/project/<id>/p?tab=ProjectListView` works. A bare `/project/<id>` link is a 404 (`router/projects/index.js` has no bare route). **Fixed** by #1005 (build 457).
 
 ## 6. Invite a teammate
 
@@ -200,7 +200,7 @@ As the owner. SMTP is unreachable in the harness.
 **Friction**
 - **F7-a. Inbox replies are plain text.** A reply from the Inbox has no @ picker and sends `mentionIds: []` (`views/Inbox/Inbox.vue:699-714`). The original author is not mentioned and gets no Inbox item for the reply.
 - **F7-b. Send is covered.** At 1280×800 the comment Send button sits under the "Getting started" card (`f7-mention-1280-picker-1280.jpg`).
-- **F7-c. Failed sends are silent.** A failed comment send is logged only to the console and the text is cleared (`views/Projects/Comments/Comments.vue:2096-2098`) (*code*).
+- **F7-c. Failed sends are silent.** A failed comment send is logged only to the console and the text is cleared (`views/Projects/Comments/Comments.vue:2096-2098`) (*code*). **Fixed** by #1002 (build 469).
 
 ## 8. Switch views, group, filter, save
 
@@ -240,7 +240,7 @@ As the owner. SMTP is unreachable in the harness.
 - **F9-b. Two start buttons.** The panel shows **Start Tracker** (hands off to the desktop tracker, `TaskDetailRightSide.vue:4-13`) right above the in-browser timer. Both read as "start", and only the hint explains the difference.
 - **F9-c. Home doesn't see the panel timer.** A timer started in the task panel does not appear on Home: the panel uses `ah.timer.<uid>`, Home and Time use `ah.timer` (`composable/useTimer.js`, `components/molecules/Home/useTimer.js`, `TaskDetailOverlay/useTaskTimer.js`). Observed: no running chip on Home after starting in the panel.
 - **F9-d. No manual entry in the panel.** There is no "Add time manually" in the task panel. The user has to leave the task and pick it again in the Log time form.
-- **F9-e. The panel follows you.** After navigating to Home or Time, the open task panel stayed on top of the new page (observed after a route change), covering it until closed.
+- **F9-e. The panel follows you.** After navigating to Home or Time, the open task panel stayed on top of the new page (observed after a route change), covering it until closed. **Fixed** by #1006 (build 471).
 
 ## 10. Bulk-edit several tasks
 
@@ -256,7 +256,7 @@ As the owner. SMTP is unreachable in the harness.
 **Friction**
 - **F10-a. The bulk bar is off-screen on phones.** At 390 px `.lv2-bulk` renders below the viewport, so bulk edit is unreachable there (`views/Projects/ListView/ListBulkBar.vue`).
 - **F10-b. Shift-click range doesn't work.** `useTaskSelection.js:90` calls `toggle(id, evt)` without the visible-ID list, so range selection never happens.
-- **F10-c. Short action list, no undo.** The List bar has no Priority or Due date actions (the Board's older bar has them), and no undo.
+- **F10-c. Short action list, no undo.** The List bar has no Priority or Due date actions (the Board's older bar has them), and no undo. **Fixed** by #1004 (build 470).
 
 ## 11. Subtasks and checklist
 
