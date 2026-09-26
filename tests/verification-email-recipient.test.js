@@ -12,10 +12,11 @@ const ctrl = require('../Modules/Auth/controller/sendVerificationMail');
 const UID = '6f0000000000000000000a01';
 const STORED_EMAIL = 'account.owner@example.test';
 
+/* The answer does not wait for the mail, so let the mail go out before looking at it. */
 const callController = (body) => new Promise((resolve) => {
     const res = {};
     res.status = jest.fn(() => res);
-    res.send = jest.fn((payload) => resolve(payload));
+    res.send = jest.fn((payload) => settle().then(() => resolve(payload)));
     res.json = res.send;
     ctrl.sendVerificationEmail({ body }, res);
 });
@@ -66,7 +67,6 @@ describe('sendVerificationEmail', () => {
         SendEmail.mockClear();
         arrange();
         const payload = await callController({ uid: UID });
-        await settle();
         expect(payload).toEqual(sent);
         expect(SendEmail).not.toHaveBeenCalled();
     });

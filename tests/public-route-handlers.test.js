@@ -6,7 +6,7 @@ jest.mock('../Modules/Company/controller/updateCompany', () => ({ updateCompanyF
 jest.mock('../Modules/settings/Members/controller', () => ({ updateMemberFunction: jest.fn() }));
 jest.mock('../Modules/Users/controller', () => ({ updateUserFun: jest.fn(), getUserByQueyFun: jest.fn() }));
 jest.mock('../Modules/Auth/controller', () => ({ addAndRemoveUserInMongodbNotificationCount: jest.fn(), insertAuthFun: jest.fn() }));
-jest.mock('../Modules/Auth/controller/sendVerificationMail', () => ({ sendVerificationEmailPromise: jest.fn(async () => undefined) }));
+jest.mock('../Modules/Auth/controller/sendVerificationMail', () => ({ storeVerificationToken: jest.fn(async () => 'token'), mailVerificationLink: jest.fn(async () => undefined) }));
 jest.mock('../Modules/storage/server/helpers/bucket.helper.js', () => ({}));
 
 const path = require('path');

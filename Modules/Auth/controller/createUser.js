@@ -87,6 +87,18 @@ exports.addUserMongodbV2 = (data) => new Promise((resolve, reject) => {
 
 const isFilledString = (value) => typeof value === 'string' && value.trim() !== '';
 
+/* The token is stored before signup answers, so no write lands on it once the client holds the
+ * account; the mail is not awaited because SMTP must neither delay nor fail a signup. */
+const startEmailVerification = async ({ _id, Employee_Email }) => {
+    const logFailure = (error) => logger.error((error && error.statusText) || error);
+    try {
+        const token = await sendMailRef.storeVerificationToken(_id);
+        sendMailRef.mailVerificationLink(_id, Employee_Email, token).catch(logFailure);
+    } catch (error) {
+        logFailure(error);
+    }
+};
+
 exports.createUserV2 = (req, res) => {
     try {
         const registrant = exports.registrantFields(req.body);
@@ -98,12 +110,8 @@ exports.createUserV2 = (req, res) => {
         exports.admitInvitee(registrant).then((body) => {
             admitted = body;
             return exports.addUserMongodbV2(body);
-        }).then((respo) => {
-            if (!admitted.isInvitation) {
-                sendMailRef.sendVerificationEmailPromise(respo.statusText._id, respo.statusText.Employee_Email).catch((error) => {
-                    logger.error(error.statusText);
-                });
-            }
+        }).then(async (respo) => {
+            if (!admitted.isInvitation) await startEmailVerification(respo.statusText);
             res.send(respo);
         }).catch((error) => {
             res.send({
