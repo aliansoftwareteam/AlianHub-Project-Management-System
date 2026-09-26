@@ -10,6 +10,7 @@ jest.mock('../Modules/Auth/controller/sendVerificationMail', () => ({ sendVerifi
 jest.mock('../Modules/storage/server/helpers/bucket.helper.js', () => ({}));
 
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { insertAuthFun } = require('../Modules/Auth/controller');
@@ -18,7 +19,10 @@ const { changePassword, resetPassword } = require('../Modules/Auth/controller/pa
 const passwords = require('./fixtures/passwordSamples.json');
 
 const USER = '6f0000000000000000000001';
-const RULE = /8 characters.*uppercase letter.*lowercase letter.*number.*symbol/;
+const RULE = /8 to 256 characters.*uppercase letter.*lowercase letter.*number.*symbol/;
+const LONGEST = `Aa1!${'x'.repeat(252)}`;
+const TOO_LONG = `${LONGEST}x`;
+const preHashed = (input) => crypto.createHash('sha256').update(input, 'utf8').digest('base64');
 
 const response = () => {
     const res = { statusCode: 200, body: undefined };
@@ -60,6 +64,13 @@ describe('POST /api/v2/createUser checks the password a person chooses', () => {
         expect(res.body.status).toBe(true);
         expect(insertAuthFun.mock.calls[0][0]).toEqual({ email: 'ada@example.test', password });
     });
+
+    it('refuses a 257-character password and accepts a 256-character one', async () => {
+        expect((await signup(TOO_LONG)).body).toEqual({ status: false, statusText: expect.stringMatching(RULE) });
+        expect(insertAuthFun).not.toHaveBeenCalled();
+        expect((await signup(LONGEST)).body.status).toBe(true);
+        expect(insertAuthFun.mock.calls[0][0].password).toBe(LONGEST);
+    });
 });
 
 describe('POST /api/v2/auth/reset-password checks the new password', () => {
@@ -87,7 +98,17 @@ describe('POST /api/v2/auth/reset-password checks the new password', () => {
         expect(next).not.toHaveBeenCalled();
         expect(res.statusCode).toBe(200);
         const [[, update]] = writes();
-        expect(await bcrypt.compare(USER + password, update.data[1].passwordHash)).toBe(true);
+        expect(update.data[1].passwordHashVersion).toBe(2);
+        expect(await bcrypt.compare(preHashed(USER + password), update.data[1].passwordHash)).toBe(true);
+    });
+
+    it('refuses a 257-character password and stores a 256-character one', async () => {
+        const refused = await reset(TOO_LONG);
+        expect(refused.req.errorMessageObject).toEqual({ message: expect.stringMatching(RULE) });
+        expect(writes()).toEqual([]);
+        const stored = await reset(LONGEST);
+        expect(stored.res.statusCode).toBe(200);
+        expect(writes()).toHaveLength(1);
     });
 });
 
@@ -112,6 +133,15 @@ describe('PATCH /api/v2/auth/:id/change-password checks only the new password', 
     it.each(passwords.strong)('replaces an old password that predates the rule with %j', async (newPassword) => {
         const res = await change(newPassword);
         expect(res.statusCode).toBe(200);
+        expect(writes()).toHaveLength(1);
+    });
+
+    it('refuses a 257-character password and stores a 256-character one', async () => {
+        const refused = await change(TOO_LONG);
+        expect(refused.statusCode).toBe(400);
+        expect(refused.body).toEqual({ message: expect.stringMatching(RULE) });
+        expect(writes()).toEqual([]);
+        expect((await change(LONGEST)).statusCode).toBe(200);
         expect(writes()).toHaveLength(1);
     });
 });

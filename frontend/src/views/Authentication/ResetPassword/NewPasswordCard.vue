@@ -7,7 +7,7 @@
 
         <form v-else-if="stage === 'form'" class="av2-auth-card" novalidate @submit.prevent="submit">
             <h2 class="auth__h">{{ title }}</h2>
-            <p class="auth__p">{{ $t('Auth.new_password_rule', { n: MIN_PASSWORD_LENGTH }) }}</p>
+            <p class="auth__p">{{ $t('Auth.new_password_rule_range', { min: MIN_PASSWORD_LENGTH, max: MAX_PASSWORD_LENGTH }) }}</p>
             <div class="auth__fields">
                 <div class="ah-field">
                     <label class="ah-field__label" for="np-password">{{ $t('Auth.new_password') }}</label>
@@ -20,7 +20,6 @@
                             class="ah-input"
                             :class="{ 'ah-input--error': errors.password }"
                             autocomplete="new-password"
-                            maxlength="150"
                             :aria-invalid="!!errors.password"
                             @input="errors.password = ''; syncConfirm()"
                         />
@@ -39,7 +38,6 @@
                         class="ah-input"
                         :class="{ 'ah-input--error': errors.confirm }"
                         autocomplete="new-password"
-                        maxlength="150"
                         :aria-invalid="!!errors.confirm"
                         @input="syncConfirm()"
                     />
@@ -75,7 +73,7 @@ import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutSecure } from "@/services";
 import * as env from "@/config/env";
-import { MIN_PASSWORD_LENGTH, PASSWORD_RULE_MESSAGE, meetsPasswordRule } from "@passwordRule";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, PASSWORD_RULE_MESSAGE, meetsPasswordRule } from "@passwordRule";
 
 const props = defineProps({
     title: { type: String, required: true },
@@ -115,7 +113,7 @@ const syncConfirm = () => {
 };
 
 const validate = () => {
-    errors.password = meetsPasswordRule(password.value) ? "" : t("Auth.new_password_rule", { n: MIN_PASSWORD_LENGTH });
+    errors.password = meetsPasswordRule(password.value) ? "" : t("Auth.new_password_rule_range", { min: MIN_PASSWORD_LENGTH, max: MAX_PASSWORD_LENGTH });
     errors.confirm = !confirm.value ? t("Auth.confirm_required") : confirm.value !== password.value ? t("Auth.confirm_mismatch") : "";
     return !errors.password && !errors.confirm;
 };
@@ -136,7 +134,7 @@ const submit = async () => {
         } else if (data.message === "Auth.previous_wasnot_valid" || data.message === "Auth.password_wasnot_valid") {
             errors.password = t(data.message);
         } else if (data.message === PASSWORD_RULE_MESSAGE) {
-            errors.password = t("Auth.new_password_rule", { n: MIN_PASSWORD_LENGTH });
+            errors.password = t("Auth.new_password_rule_range", { min: MIN_PASSWORD_LENGTH, max: MAX_PASSWORD_LENGTH });
         } else {
             expiredMessage.value = data.message ? t(data.message) : t("Auth.server_error");
             stage.value = "expired";

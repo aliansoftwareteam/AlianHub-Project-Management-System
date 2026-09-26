@@ -1,3 +1,4 @@
+const bcrypt = require('bcrypt');
 const { MongoClient } = require('mongodb');
 const { createApiClient } = require('../../e2e/support/api');
 const { PASSWORD, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
@@ -23,8 +24,8 @@ const rawLogin = async (email, password) => {
     return { wire, ms: Number(process.hrtime.bigint() - started) / 1e6 };
 };
 
-const signUp = async (email) => {
-    const created = await anonymous.post('/api/v2/createUser', { firstName: 'Lou', lastName: 'Login', email, password: PASSWORD });
+const signUp = async (email, password = PASSWORD) => {
+    const created = await anonymous.post('/api/v2/createUser', { firstName: 'Lou', lastName: 'Login', email, password });
     expect(created.body.status).toBe(true);
     return String(created.body.statusText._id);
 };
@@ -94,5 +95,46 @@ describe('password sign-in with the right password', () => {
         const res = await anonymous.post('/api/v2/auth/login', { email, password: PASSWORD, isLoginType: 'frontend' });
         expect(res.status).toBe(400);
         expect(res.body.message).toMatch(/blocked/i);
+    });
+});
+
+describe('password sign-in reads every character of the password', () => {
+    const SHARED_START = `Aa1!${'x'.repeat(56)}`;
+    const CHOSEN = `${SHARED_START}-the-chosen-tail`;
+    const SAME_START = `${SHARED_START}-another-tail`;
+    const refused = async () => (await rawLogin(freshEmail('login.none'), WRONG)).wire;
+    const storedFormat = async (email) => {
+        for (let i = 0; i < 100; i += 1) {
+            const row = await userAuth().findOne({ email });
+            if (row.passwordHashVersion === 2) return row;
+            await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        return userAuth().findOne({ email });
+    };
+
+    it('signs in only with the whole password chosen at sign-up', async () => {
+        const email = freshEmail('login.long');
+        await signUp(email, CHOSEN);
+
+        expect((await userAuth().findOne({ email })).passwordHashVersion).toBe(2);
+        expect((await rawLogin(email, SAME_START)).wire).toBe(await refused());
+        expect((await rawLogin(email, CHOSEN)).wire).not.toBe(await refused());
+    });
+
+    it('still signs in with a password stored before the format version, and stores it in the current one', async () => {
+        const email = freshEmail('login.legacy');
+        const id = await signUp(email);
+        const legacyHash = await bcrypt.hash(id + CHOSEN, 4);
+        await userAuth().updateOne({ email }, { $set: { passwordHash: legacyHash }, $unset: { passwordHashVersion: '' } });
+
+        expect((await rawLogin(email, WRONG)).wire).toBe(await refused());
+        expect((await userAuth().findOne({ email })).passwordHash).toBe(legacyHash);
+
+        expect((await rawLogin(email, CHOSEN)).wire).not.toBe(await refused());
+        const upgraded = await storedFormat(email);
+        expect(upgraded.passwordHashVersion).toBe(2);
+        expect(upgraded.passwordHash).not.toBe(legacyHash);
+        expect((await rawLogin(email, SAME_START)).wire).toBe(await refused());
+        expect((await rawLogin(email, CHOSEN)).wire).not.toBe(await refused());
     });
 });

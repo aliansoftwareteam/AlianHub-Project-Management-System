@@ -52,7 +52,6 @@
                             v-model="form.password"
                             :type="showPassword ? 'text' : 'password'"
                             autocomplete="current-password"
-                            maxlength="150"
                             class="ah-input"
                             :class="{ 'ah-input--error': errors.password }"
                             :aria-invalid="!!errors.password"

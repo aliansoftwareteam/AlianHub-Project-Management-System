@@ -4400,6 +4400,11 @@ const schema = {
             type: String,
             required: false
         },
+        // No default: a missing value is what marks a hash made before this format (Modules/Auth/helpers/passwordHash.js).
+        passwordHashVersion: {
+            type: Number,
+            required: false
+        },
         isBlocked: {
             type: Boolean,
             default: false

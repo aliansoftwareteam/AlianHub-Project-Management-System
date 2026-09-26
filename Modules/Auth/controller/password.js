@@ -1,6 +1,5 @@
 const mongoC = require("../../../utils/mongo-handler/mongoQueries")
 const { dbCollections } = require('../../../Config/collections');
-const bcrypt = require('bcrypt');
 const config = require("../../../Config/config");
 const logger = require("../../../Config/loggerConfig");
 const serviceCtr = require("../../serviceFunction.js")
@@ -14,6 +13,7 @@ const { updateUserFun } = require("../../Users/controller.js");
 
 const { ACCOUNT_MAIL_ANSWER } = require("../helpers/accountMail");
 const { PASSWORD_RULE_MESSAGE, meetsPasswordRule } = require("../helpers/passwordRule");
+const { hashPassword, verifyPassword } = require("../helpers/passwordHash");
 
 exports.changePassword = async (req, res) => {
     try {
@@ -50,17 +50,15 @@ exports.changePassword = async (req, res) => {
                 res.status(400).json({message: "user not found"});
                 return;
             }
-            const checkOldPass = resUserData._id + reqData.oldPassword;
-            const isValid = await bcrypt.compare(checkOldPass, resUserData.passwordHash);
+            const isValid = await verifyPassword(resUserData._id + reqData.oldPassword, resUserData);
             if (!isValid) {
                 res.status(400).json({message: "Auth.previous_wasnot_valid"});
                 return;
             }
 
-            const salt = await bcrypt.genSalt(10);
             const checkNewPass = resUserData._id + reqData.newPassword;
-            const passwordHash = await bcrypt.hash(checkNewPass, salt);
-            const isNewValid = await bcrypt.compare(checkNewPass, passwordHash);
+            const stored = await hashPassword(checkNewPass);
+            const isNewValid = await verifyPassword(checkNewPass, stored);
             if (!isNewValid) {
                 res.status(400).json({message: "Auth.password_wasnot_valid"});
                 return;
@@ -71,9 +69,7 @@ exports.changePassword = async (req, res) => {
                     {
                         _id: req.params.id
                     },
-                    {
-                        passwordHash: passwordHash
-                    }
+                    stored
                 ]
             }
             mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, object, "findOneAndUpdate").then(()=>{
@@ -196,10 +192,9 @@ exports.resetPassword = async (req, res, next) => {
             next();
             return;
         }
-        const salt = await bcrypt.genSalt(10);
         const setNewPass = reqData.id + reqData.password;
-        const passwordHash = await bcrypt.hash(setNewPass, salt);
-        const isNewValid = await bcrypt.compare(setNewPass, passwordHash);
+        const stored = await hashPassword(setNewPass);
+        const isNewValid = await verifyPassword(setNewPass, stored);
         if (!isNewValid) {
             req.errorMessageObject = {message: "Auth.password_wasnot_valid"};
             next();
@@ -212,7 +207,7 @@ exports.resetPassword = async (req, res, next) => {
                     _id: reqData.id
                 },
                 {
-                    passwordHash: passwordHash,
+                    ...stored,
                     token: ""
                 }
             ]
