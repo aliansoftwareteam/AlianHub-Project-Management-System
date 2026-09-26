@@ -12,20 +12,20 @@
                     />
                 </template>
                 <template v-if="!isEditName">
-                <h4 
+                <h2 
                     v-if="checkPermission('task.task_name_edit',selectedProject?.isGlobalPermission) === true"
                     class="title-name"
                     :title="taskName"
                 >
                     <button ref="titleButton" type="button" class="title-name__edit" @click="isEditName = true, editTaskName = taskName">{{ taskName }}</button>
-                </h4>
-                <h4 
+                </h2>
+                <h2 
                     v-else
                     class="title-name"
                     :title="taskName"
                 >
                     {{ taskName }}
-                </h4>
+                </h2>
                 </template>
                 <span v-else class="task-name__edit">
                     <InputText
