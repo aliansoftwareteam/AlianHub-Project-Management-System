@@ -19,6 +19,7 @@ import { useI18n } from "vue-i18n";
 // Utilities
 import { apiRequestWithoutSecure, apiRequestWithoutCompnay, getAuth } from "@/services";
 import * as env from '@/config/env';
+import { rememberInvitationLink, takeInvitationLink } from "../invitationLink";
 
 const props = defineProps({
     label: { type: String, default: "" },
@@ -33,6 +34,10 @@ const props = defineProps({
     companyUserDocID: {
         type: String,
         default: null
+    },
+    linkId: {
+        type: String,
+        default: ""
     }
 });
 
@@ -73,6 +78,7 @@ onMounted(async () => {
 // Trigger GitLab OAuth (GitLab requires response_type=code in the authorize URL).
 function loginWithGitLab() {
     localStorage.setItem("gitlabAuthMode", props.mode);
+    rememberInvitationLink(props.linkId);
     const clientId = publicConfig.auth.gitlab.clientId;
     const scope = "read_user";
     const redirectUri = window.location.origin;
@@ -220,7 +226,8 @@ const signup = async (userInfo) => {
             gitlabId: userInfo.gitlabId,
             accessToken: userInfo.accessToken,
             assignCompany: companyId,
-            companyUserDocID: companyUserDocID
+            companyUserDocID: companyUserDocID,
+            linkId: takeInvitationLink()
         };
 
         const signupRes = await apiRequestWithoutSecure("post", env.API_SIGNUP_WITH_GITLAB, payload);

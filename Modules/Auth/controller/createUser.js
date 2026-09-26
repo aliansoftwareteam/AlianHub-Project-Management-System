@@ -24,6 +24,7 @@ exports.authenticateToken = "";
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const PENDING_INVITATION = 1;
+const ACCEPTED_INVITATION = 2;
 
 /* The body's assignCompany used to be taken on trust, which let anyone sign up straight
  * into any company. A company admits only an email it has a pending invitation row for. */
@@ -127,10 +128,14 @@ exports.verifyToken = (req, res) => {
 };
 
 const joinInvitedCompany = async ({ companyId, invitation, userId, provider }) => {
-    await mongoRef.MongoDbCrudOpration(companyId, {
+    const claimed = await mongoRef.MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMPANY_USERS,
-        data: [{ _id: invitation._id }, { $set: { status: 2, userId } }],
+        data: [
+            { _id: invitation._id, status: PENDING_INVITATION, linkId: invitation.linkId },
+            { $set: { status: ACCEPTED_INVITATION, linkId: '', userId } },
+        ],
     }, 'findOneAndUpdate');
+    if (!claimed) return false;
     await recordInvitedOwner({ companyId, invitation, userId }).catch((error) => {
         logger.error(`Record invited owner error in ${provider} signup: ${error}`);
     });
@@ -140,15 +145,17 @@ const joinInvitedCompany = async ({ companyId, invitation, userId, provider }) =
     await addAndRemoveUserInMongodbNotificationCount(companyId, userId, 'Add').catch((error) => {
         logger.error(`Add user in mongodb notification count error in ${provider} signup: ${error}`);
     });
+    return true;
 };
 
 /* The account's email is the one the provider verified, which is also the only reason it starts
- * verified. An invitation admits the account only when the signup presents that invitation row. */
+ * verified. An invitation admits the account only when the signup presents that invitation row
+ * and the link token it was sent with; otherwise the account is made as for anyone uninvited. */
 const socialSignup = (provider) => async (req, res) => {
     const body = req.body || {};
     const refuse = (statusCode, message) => res.status(statusCode).json({ status: false, message });
     try {
-        const { firstName, lastName, assignCompany, companyUserDocID } = body;
+        const { firstName, lastName, assignCompany, companyUserDocID, linkId } = body;
         if (!isFilledString(firstName) || !isFilledString(lastName)) {
             return refuse(400, 'First name and last name are required');
         }
@@ -168,16 +175,16 @@ const socialSignup = (provider) => async (req, res) => {
         const invitation = assignCompany && companyUserDocID
             ? await exports.findPendingInvitation({ companyId: assignCompany, email, companyUserId: companyUserDocID })
             : null;
-        const invitedCompany = invitation ? String(assignCompany) : '';
+        const presented = invitation && linkTokenAccepted(invitation.linkId, linkId) ? invitation : null;
 
         const authRes = await mongoRef.MongoDbCrudOpration(dbCollections.GLOBAL, {
             type: dbCollections.USER_AUTH,
             data: { email, [idField]: providerId, isBlocked: false },
         }, 'save');
 
-        if (invitedCompany) {
-            await joinInvitedCompany({ companyId: invitedCompany, invitation, userId: authRes._id, provider });
-        }
+        const joined = presented
+            && await joinInvitedCompany({ companyId: String(assignCompany), invitation: presented, userId: authRes._id, provider });
+        const invitedCompany = joined ? String(assignCompany) : '';
 
         const userDoc = {
             ...exports.buildUserDocument({ firstName, lastName, email, assignCompany: invitedCompany }),
