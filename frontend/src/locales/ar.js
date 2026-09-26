@@ -430,7 +430,7 @@ export default {
         "back_to_login": "Back to login",
         "new_password_title": "Choose a new password",
         "set_password_title": "Set your password",
-        "new_password_rule": "Use at least {n} characters, including an uppercase letter, a lowercase letter, a number and a symbol.",
+        "new_password_rule_range": "Use {min} to {max} characters, including an uppercase letter, a lowercase letter, a number and a symbol.",
         "new_password": "New password",
         "confirm_password": "Confirm Password",
         "save_password": "Save password",

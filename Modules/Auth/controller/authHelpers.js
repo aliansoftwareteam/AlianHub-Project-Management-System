@@ -1,6 +1,5 @@
 const mongoC = require("../../../utils/mongo-handler/mongoQueries")
 const { dbCollections } = require('../../../Config/collections');
-const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const config = require("../../../Config/config");
 const logger = require("../../../Config/loggerConfig");
@@ -15,6 +14,7 @@ const { removeCache } = require("../../../utils/commonFunctions.js");
 const { updateUserFun } = require("../../Users/controller.js");
 const { toAuthView } = require("../../Users/helpers/userAccessRules");
 const { SocialSignInRefusal, isSocialProvider, resolveSocialAccount, verifySocialIdentity } = require("../helpers/socialIdentity");
+const { hashPassword, isCurrentPasswordHash, verifyPassword } = require("../helpers/passwordHash");
 
 
 
@@ -154,12 +154,11 @@ exports.insertAuthFun = async (reqData, cb) => {
             });
             return;
         }
-        const salt = await bcrypt.genSalt(10);
         let obj = {
             type: dbCollections.USER_AUTH,
             data: {
                 email: reqData.email,
-                passwordHash: await bcrypt.hash(reqData.password, salt)
+                ...await hashPassword(reqData.password)
             }
         }
         mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "save").then(async (res)=>{
@@ -167,9 +166,8 @@ exports.insertAuthFun = async (reqData, cb) => {
                 type: dbCollections.USER_AUTH,
                 data: [{
                         email: reqData.email
-                    }, {
-                        passwordHash: await bcrypt.hash(res._id + reqData.password, salt)
-                    }
+                    },
+                    await hashPassword(res._id + reqData.password)
                 ]
             }
             mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, updateobj, "updateOne").then(()=>{
@@ -217,10 +215,18 @@ const verifySocialAuth = async (reqData, cb) => {
 const SIGN_IN_REFUSED = "The email or password is incorrect.";
 const BLOCKED_ANSWER = "Your email has been blocked. Please contact the administrator.";
 
-/* A missing account still pays for one bcrypt comparison, at the cost new passwords are
- * hashed with, so the answer's timing does not say whether the address has an account. */
-let standInHash;
-const standInPasswordHash = () => standInHash || (standInHash = bcrypt.hash(crypto.randomBytes(16).toString("hex"), 10));
+/* A missing account still pays for one password check, the one a new password gets, so the
+ * answer's timing does not say whether the address has an account. */
+let standInAccount;
+const standInPasswordAccount = () => standInAccount || (standInAccount = hashPassword(crypto.randomBytes(16).toString("hex")));
+
+/* Matched on the hash it replaces, so a reset or change that lands first is not overwritten. */
+const storeInCurrentFormat = async (account, input) => {
+    await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, {
+        type: dbCollections.USER_AUTH,
+        data: [{ _id: account._id, passwordHash: account.passwordHash }, await hashPassword(input)],
+    }, "updateOne");
+};
 
 const mailSetPasswordLink = async (email, isLoginType) => {
     const token = generateToken(600);
@@ -252,7 +258,7 @@ const verifyLocalAuth = async (reqData, cb) => {
             : null;
 
         if (!(resData?._id && resData.passwordHash)) {
-            await bcrypt.compare(password, await standInPasswordHash());
+            await verifyPassword(password, await standInPasswordAccount());
             if (resData?._id && !resData.isBlocked) {
                 mailSetPasswordLink(email, reqData.isLoginType).catch((error) => logger.error(`Set password mail: ${error.message || error}`));
             }
@@ -260,7 +266,7 @@ const verifyLocalAuth = async (reqData, cb) => {
             return;
         }
 
-        const isValid = await bcrypt.compare(resData._id + password, resData.passwordHash);
+        const isValid = await verifyPassword(resData._id + password, resData);
         if (!isValid) {
             cb({ status: false, message: SIGN_IN_REFUSED });
             return;
@@ -268,6 +274,10 @@ const verifyLocalAuth = async (reqData, cb) => {
         if (resData.isBlocked) {
             cb({ status: false, message: BLOCKED_ANSWER });
             return;
+        }
+        // Not awaited, so a sign-in takes no longer for an account still on the older format.
+        if (!isCurrentPasswordHash(resData)) {
+            storeInCurrentFormat(resData, resData._id + password).catch((error) => logger.error(`Password hash upgrade: ${error.message || error}`));
         }
 
         cb({

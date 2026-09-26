@@ -48,7 +48,6 @@
                             class="ah-input"
                             :class="{ 'ah-input--error': errors.password }"
                             autocomplete="new-password"
-                            maxlength="150"
                             :placeholder="$t('Auth.password_placeholder')"
                             :aria-invalid="!!errors.password"
                             @input="errors.password = ''"
@@ -58,7 +57,7 @@
                         </button>
                     </div>
                     <div v-if="errors.password" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.password }}</div>
-                    <div v-else class="ah-field__hint">{{ $t('Auth.new_password_rule', { n: MIN_PASSWORD_LENGTH }) }}</div>
+                    <div v-else class="ah-field__hint">{{ $t('Auth.new_password_rule_range', { min: MIN_PASSWORD_LENGTH, max: MAX_PASSWORD_LENGTH }) }}</div>
                 </div>
                 <button type="submit" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" :disabled="busy">
                     <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('Auth.loading') : $t('Auth.continue') }}
@@ -116,7 +115,7 @@ import { useCustomComposable } from "@/composable";
 import { apiRequest, apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth, useAuth } from "@/services";
 import * as env from "@/config/env";
 import { ROLE_OWNER } from "@/utils/roles";
-import { MIN_PASSWORD_LENGTH, PASSWORD_RULE_MESSAGE, meetsPasswordRule } from "@passwordRule";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, PASSWORD_RULE_MESSAGE, meetsPasswordRule } from "@passwordRule";
 
 const { t } = useI18n();
 const route = useRoute();
@@ -195,7 +194,7 @@ onMounted(async () => {
 
 const validate = () => {
     errors.name = !form.name ? t("Auth.name_required") : "";
-    errors.password = meetsPasswordRule(form.password) ? "" : t("Auth.new_password_rule", { n: MIN_PASSWORD_LENGTH });
+    errors.password = meetsPasswordRule(form.password) ? "" : t("Auth.new_password_rule_range", { min: MIN_PASSWORD_LENGTH, max: MAX_PASSWORD_LENGTH });
     return !errors.name && !errors.password;
 };
 
@@ -219,7 +218,7 @@ const submit = async () => {
             linkId
         });
         if (!response.data.status) {
-            if (response.data.statusText === PASSWORD_RULE_MESSAGE) errors.password = t("Auth.new_password_rule", { n: MIN_PASSWORD_LENGTH });
+            if (response.data.statusText === PASSWORD_RULE_MESSAGE) errors.password = t("Auth.new_password_rule_range", { min: MIN_PASSWORD_LENGTH, max: MAX_PASSWORD_LENGTH });
             else banner.value = response.data.statusText?.status == 409 ? t("Auth.email_in_use") : t("Auth.server_error");
             return;
         }
