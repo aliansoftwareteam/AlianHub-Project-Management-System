@@ -193,7 +193,8 @@ const submit = async () => {
         const result = await apiRequestWithoutCompnay("put", env.API_ROOT_MEMBERS, {
             id: requestId.value,
             data: { userId: signedInUserId, status: 2 },
-            companyId: companyIdRoute.value
+            companyId: companyIdRoute.value,
+            linkId: String(route.query.token || "")
         });
         if (!result.data.status) { logOut({ islogOut: true }); banner.value = t("Auth.server_error"); return; }
         if (result.data.data?.roleType === ROLE_OWNER) {
