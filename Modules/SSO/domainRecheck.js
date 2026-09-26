@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const { domainTxtRecord, txtRecordsInclude, keepVerifications, keepLapses } = require('./helpers/ssoRules');
 const { resolveTxt, saysRecordAbsent } = require('./helpers/dnsTxt');
+const { forgetSsoOnInstance } = require('./discover');
 
 // One missed day is a DNS migration or a typo being fixed; three in a row is a domain the company let go.
 const LAPSE_AFTER_FAILED_CHECKS = 3;
@@ -51,6 +52,7 @@ const recheckCompanyDomains = async (companyId) => {
         data: [{ deletedStatusKey: 0, domainVerificationToken: token }, { $set: { verifiedDomains: stillVerified, lapsedDomains } }],
     }, 'findOneAndUpdate');
     if (!saved) return { lapsed: [] };
+    if (lapsed.length) forgetSsoOnInstance();
 
     lapsed.forEach(({ domain, failedChecks }) => {
         try {
