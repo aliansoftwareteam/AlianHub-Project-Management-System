@@ -98,11 +98,11 @@ describe('a member leaving the workspace', () => {
 });
 
 describe('a departure sticks until the member rejoins', () => {
-    const accept = async (userId, data) => {
+    const accept = async (userId, data, linkId) => {
         const res = { code: 200 };
         res.status = (c) => { res.code = c; return res; };
         res.json = (b) => { res.body = b; return res; };
-        await members.rootUpdateMember({ uid: userId, headers: {}, body: { id: String(rowOf(userId)._id), data, companyId: C }, params: {}, query: {} }, res);
+        await members.rootUpdateMember({ uid: userId, headers: {}, body: { id: String(rowOf(userId)._id), data, companyId: C, linkId }, params: {}, query: {} }, res);
         await events.drain();
         return res;
     };
@@ -128,7 +128,7 @@ describe('a departure sticks until the member rejoins', () => {
         await indexer.reindexProject(C, PROJECT);
         expect(live(pagesOf.leaverPrivate._id)).toEqual([]);
 
-        const res = await accept(LEAVER, { status: 2 });
+        const res = await accept(LEAVER, { status: 2 }, 'reinvite');
 
         expect(res.code).toBe(200);
         expect(live(pagesOf.leaverPrivate._id)).toHaveLength(1);

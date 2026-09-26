@@ -25,11 +25,11 @@ const inviteAndRegister = async () => {
     }), `register ${email}`);
     const session = await login(state.baseURL, email);
     const api = createApiClient({ baseURL: state.baseURL, accessToken: session.accessToken, companyId });
-    return { memberId, uid: String(session.uid), api };
+    return { memberId, linkId, uid: String(session.uid), api };
 };
 
 const accept = (invited) => invited.api.put('/api/v1/root-members', {
-    id: invited.memberId, data: { userId: invited.uid, status: 2 }, companyId,
+    id: invited.memberId, data: { userId: invited.uid, status: 2 }, companyId, linkId: invited.linkId,
 });
 
 beforeAll(async () => {

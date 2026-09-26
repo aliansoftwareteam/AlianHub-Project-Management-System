@@ -28,7 +28,7 @@ async function register(invited) {
 }
 
 const accept = async (user) => assertOk(
-    await user.api.put('/api/v1/root-members', { id: user.memberId, data: { userId: user.uid, status: 2 }, companyId }),
+    await user.api.put('/api/v1/root-members', { id: user.memberId, data: { userId: user.uid, status: 2 }, companyId, linkId: user.linkId }),
     `accept ${user.email}`,
 );
 

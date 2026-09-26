@@ -18,6 +18,7 @@ const MEMBER = '6f0000000000000000000003';
 const OTHER_MEMBER = '6f0000000000000000000013';
 const GUEST = '6f0000000000000000000004';
 const INVITEE = '6f0000000000000000000005';
+const LINK = 'a'.repeat(64);
 
 const rows = () => mockDb.store[SCHEMA_TYPE.COMPANY_USERS];
 const rowOf = (userId) => rows().find((r) => r.userId === userId);
@@ -133,12 +134,12 @@ describe('INS-02 PUT /api/v1/root-members', () => {
     const seedInvite = (extra = {}) => {
         mockDb.seed(SCHEMA_TYPE.USERS, { _id: INVITEE, Employee_Email: 'invitee@e2e.test', Employee_Name: 'In Vitee' });
         return mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, {
-            userId: '', roleType: 2, status: 1, isDelete: false, companyId: CID, designation: 0, userEmail: 'invitee@e2e.test', ...extra,
+            userId: '', roleType: 2, status: 1, isDelete: false, companyId: CID, designation: 0, userEmail: 'invitee@e2e.test', linkId: LINK, ...extra,
         });
     };
 
     it('refuses a guest promoting themselves to admin', async () => {
-        const res = await call(ctrl.rootUpdateMember, { uid: GUEST, companyId: undefined, body: { id: rowOf(GUEST)._id, data: { roleType: 2 }, companyId: CID } });
+        const res = await call(ctrl.rootUpdateMember, { uid: GUEST, companyId: undefined, body: { id: rowOf(GUEST)._id, data: { roleType: 2 }, companyId: CID, linkId: LINK } });
         expect(res.code).toBe(403);
         expect(res.body.status).toBe(false);
         expect(rowOf(GUEST).roleType).toBe(0);
@@ -146,7 +147,7 @@ describe('INS-02 PUT /api/v1/root-members', () => {
 
     it('accepts an invitation with the role stored on the invitation', async () => {
         const invite = seedInvite();
-        const res = await call(ctrl.rootUpdateMember, { uid: INVITEE, companyId: undefined, body: { id: invite._id, data: { userId: INVITEE, status: 2 }, companyId: CID } });
+        const res = await call(ctrl.rootUpdateMember, { uid: INVITEE, companyId: undefined, body: { id: invite._id, data: { userId: INVITEE, status: 2 }, companyId: CID, linkId: LINK } });
         expect(res.code).toBe(200);
         expect(res.body).toMatchObject({ status: true, data: { roleType: 2, status: 2, userId: INVITEE } });
         expect(rowByEmail('invitee@e2e.test')).toMatchObject({ roleType: 2, status: 2, userId: INVITEE });
@@ -154,28 +155,39 @@ describe('INS-02 PUT /api/v1/root-members', () => {
 
     it('refuses a role sent with the acceptance', async () => {
         const invite = seedInvite({ roleType: 3 });
-        const res = await call(ctrl.rootUpdateMember, { uid: INVITEE, companyId: undefined, body: { id: invite._id, data: { userId: INVITEE, status: 2, roleType: 1 }, companyId: CID } });
+        const res = await call(ctrl.rootUpdateMember, { uid: INVITEE, companyId: undefined, body: { id: invite._id, data: { userId: INVITEE, status: 2, roleType: 1 }, companyId: CID, linkId: LINK } });
         expect(res.code).toBe(403);
         expect(rowByEmail('invitee@e2e.test')).toMatchObject({ roleType: 3, status: 1 });
     });
 
     it('refuses accepting an invitation sent to someone else', async () => {
         const invite = seedInvite();
-        const res = await call(ctrl.rootUpdateMember, { uid: MEMBER, companyId: undefined, body: { id: invite._id, data: { userId: MEMBER, status: 2 }, companyId: CID } });
+        const res = await call(ctrl.rootUpdateMember, { uid: MEMBER, companyId: undefined, body: { id: invite._id, data: { userId: MEMBER, status: 2 }, companyId: CID, linkId: LINK } });
         expect(res.code).toBe(403);
         expect(rowByEmail('invitee@e2e.test').status).toBe(1);
     });
 
     it('refuses linking the invitation to another account', async () => {
         const invite = seedInvite();
-        const res = await call(ctrl.rootUpdateMember, { uid: INVITEE, companyId: undefined, body: { id: invite._id, data: { userId: MEMBER, status: 2 }, companyId: CID } });
+        const res = await call(ctrl.rootUpdateMember, { uid: INVITEE, companyId: undefined, body: { id: invite._id, data: { userId: MEMBER, status: 2 }, companyId: CID, linkId: LINK } });
         expect(res.code).toBe(403);
         expect(rowByEmail('invitee@e2e.test').userId).toBe('');
     });
 
+    it.each([
+        ['no link token', {}],
+        ['a wrong link token', { linkId: 'b'.repeat(64) }],
+    ])('refuses an invitation presented with %s and leaves it pending', async (_label, link) => {
+        const invite = seedInvite();
+        const res = await call(ctrl.rootUpdateMember, { uid: INVITEE, companyId: undefined, body: { id: invite._id, data: { userId: INVITEE, status: 2 }, companyId: CID, ...link } });
+        expect(res.code).toBe(403);
+        expect(res.body.statusText).toBe('That invitation is no longer valid.');
+        expect(rowByEmail('invitee@e2e.test')).toMatchObject({ status: 1, userId: '', linkId: LINK });
+    });
+
     it('refuses a cancelled invitation', async () => {
         const invite = seedInvite({ status: 3, isDelete: true });
-        const res = await call(ctrl.rootUpdateMember, { uid: INVITEE, companyId: undefined, body: { id: invite._id, data: { userId: INVITEE, status: 2 }, companyId: CID } });
+        const res = await call(ctrl.rootUpdateMember, { uid: INVITEE, companyId: undefined, body: { id: invite._id, data: { userId: INVITEE, status: 2 }, companyId: CID, linkId: LINK } });
         expect(res.code).toBe(403);
         expect(rowByEmail('invitee@e2e.test').status).toBe(3);
     });
