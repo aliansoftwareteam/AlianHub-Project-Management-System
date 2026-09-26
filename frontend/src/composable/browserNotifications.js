@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { getMessaging, getToken } from "firebase/messaging";
 import { apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
+import firebaseApp from "@/config/firebaseInit";
 
 const STORED_TOKEN = "webTokens";
 
@@ -17,9 +18,10 @@ export function browserNotificationPermission () {
 const saveWebToken = (userId, webToken) => apiRequestWithoutCompnay("put", env.UPDATE_SESSION, { userId, updateObject: { webToken } });
 
 async function registerWebPush (userId) {
+    if (!firebaseApp) return;
     const user = await apiRequestWithoutCompnay("get", `${env.USER_UPATE}/${userId}`);
     if (user?.status !== 200 || !user.data) return;
-    const token = await getToken(getMessaging());
+    const token = await getToken(getMessaging(firebaseApp));
     if (!token || localStorage.getItem(STORED_TOKEN) === token) return;
     await saveWebToken(userId, token);
     localStorage.setItem(STORED_TOKEN, token);
