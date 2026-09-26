@@ -3,7 +3,7 @@ import { config, flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { ref } from 'vue';
 
-const { updateStatus, stub, slotStub, exposed, perms, toast, projectPayload } = vi.hoisted(() => ({
+const { updateStatus, stub, slotStub, exposed, perms, apps, toast, projectPayload } = vi.hoisted(() => ({
     updateStatus: vi.fn(() => Promise.resolve()),
     stub: (name) => ({ default: { name, render: () => null } }),
     slotStub: (name, slot, methods = []) => ({
@@ -17,6 +17,7 @@ const { updateStatus, stub, slotStub, exposed, perms, toast, projectPayload } = 
     }),
     exposed: {},
     perms: {},
+    apps: {},
     toast: { success: () => {}, error: () => {}, info: () => {}, warning: () => {} },
     projectPayload: {
     _id: 'proj-1',
@@ -49,8 +50,8 @@ vi.mock('@/services', () => ({
 vi.mock('@/utils/TaskOperations', () => ({ default: { updateStatus } }));
 vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
 vi.mock('@/composable', () => ({
-    useCustomComposable: () => ({ checkPermission: (key) => (key in perms ? perms[key] : true), checkApps: () => true }),
-    useGetterFunctions: () => ({ getUser: () => ({}), getPriority: () => ({}) })
+    useCustomComposable: () => ({ checkPermission: (key) => (key in perms ? perms[key] : true), checkApps: (app) => apps[app] !== false }),
+    useGetterFunctions: () => ({ getUser: () => ({}), getPriority: (key) => (key === 'high' ? { name: 'High' } : {}) })
 }));
 vi.mock('@/views/Projects/helper', () => ({ useUpdateTasks: () => ({ updateTaskByGroup: vi.fn() }) }));
 vi.mock('vue-router', () => ({
@@ -84,7 +85,7 @@ const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);
 const t = i18n.global.t;
 
-function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null } = {}) {
+function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null, width = 1280 } = {}) {
     const store = createStore({
         getters: {
             'settings/companyUserDetail': () => ({ roleType }),
@@ -99,7 +100,7 @@ function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null } =
     });
     return mount(TaskDetailPanel, {
         props: { companyId: 'company-1', projectId: 'proj-1', sprintId: 'sprint-1', taskId: 'task-1', nav },
-        global: { plugins: [store], mocks: { $t: t }, provide: { $userId: ref(userId), ...(socket ? { $socket: ref(socket) } : {}) } }
+        global: { plugins: [store], mocks: { $t: t }, provide: { $userId: ref(userId), $clientWidth: ref(width), ...(socket ? { $socket: ref(socket) } : {}) } }
     });
 }
 
@@ -360,6 +361,36 @@ describe('TaskDetailPanel', () => {
             await flushPromises();
             const labels = wrapper.get('.ah-detail__quick').findAll('button').map((button) => button.text());
             expect(labels).toEqual(['Relate']);
+        });
+    });
+
+    describe('the phone header chips', () => {
+        beforeEach(() => {
+            for (const key of Object.keys(perms)) delete perms[key];
+            for (const key of Object.keys(apps)) delete apps[key];
+            projectPayload.sprintsObj = [];
+            projectPayload.sprintsfolders = [];
+            projectPayload.tasks[0] = { _id: 'task-1', TaskName: 'Write spec', TaskKey: 'AH-1', statusKey: 'st-open', statusType: 'open', AssigneeUserId: [], Task_Priority: 'high' };
+        });
+
+        it('shows the priority chip when the Priority app is on', async () => {
+            const wrapper = mountPanel({ width: 390 });
+            await flushPromises();
+            expect(wrapper.get('.ah-detail__chips').text()).toContain('High');
+        });
+
+        it('shows no priority chip when the Priority app is off, as the properties list does', async () => {
+            apps.Priority = false;
+            const wrapper = mountPanel({ width: 390 });
+            await flushPromises();
+            expect(wrapper.get('.ah-detail__chips').text()).not.toContain('High');
+        });
+
+        it('shows no priority chip to a member who may not see priority', async () => {
+            perms['task.task_priority'] = null;
+            const wrapper = mountPanel({ width: 390 });
+            await flushPromises();
+            expect(wrapper.get('.ah-detail__chips').text()).not.toContain('High');
         });
     });
 
