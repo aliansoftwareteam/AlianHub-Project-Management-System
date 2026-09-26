@@ -58,6 +58,7 @@ async function main() {
         return;
     }
     if (command === 'up') {
+        await require('../Config/buildInfo').start();
         const result = await runMigrations(deps);
         if (result.skipped) { console.log(`Skipped: ${result.skipped} (another process is migrating).`); return; }
         result.applied.forEach((id) => console.log(`  ✓ ${id}`));
