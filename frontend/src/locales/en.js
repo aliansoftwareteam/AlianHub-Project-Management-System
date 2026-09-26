@@ -7127,6 +7127,8 @@ export default {
         an_automation: "An automation",
         cited_page: "page",
         cited_page_hidden: "a page you cannot open",
+        send_failed: "Couldn't send your comment. Your text is still here.",
+        attachment_send_failed: "Couldn't send your attachment. It's still here to try again.",
     },
     PlaceHolder: {
         enter_task_type: "Enter Task Type",
