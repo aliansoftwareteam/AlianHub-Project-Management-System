@@ -310,6 +310,11 @@
 .ah-detail__props .priority-comp.taskdetail-label,
 .ah-detail__props .due-date.taskdetail-label { width: auto; padding: 2px 0; border-radius: 4px; }
 .ah-detail__props .priority-comp span { padding: 0; }
+/* Every value control is a click target: WCAG 2.5.8 wants at least 24px. */
+.ah-detail__prop-link,
+.ah-detail__props .task-status-name,
+.ah-detail__props .priority-comp.taskdetail-label,
+.ah-detail__props .due-date.taskdetail-label { min-height: 24px; display: inline-flex; align-items: center; box-sizing: border-box; }
 .ah-detail__props .priority-comp:hover,
 .ah-detail__props .due-date.taskdetail-label:hover { padding-left: 0; width: auto; outline: 4px solid var(--hairline); background: var(--hairline); }
 .ah-detail__props .task-status-name { padding: 3px 9px; border-radius: 6px; font: 600 12px var(--font-ui); cursor: pointer; }
