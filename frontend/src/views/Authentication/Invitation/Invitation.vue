@@ -12,7 +12,7 @@
             <div v-if="banner" class="auth__banner auth__banner--danger"><ShellIcon name="alert" :size="15" /><span>{{ banner }}</span></div>
 
             <div v-if="providers.length" class="auth__providers">
-                <ProviderButton v-for="p in providers" :key="p" :provider="p" mode="register" :companyID="companyIdRoute" :companyUserDocID="requestId" />
+                <ProviderButton v-for="p in providers" :key="p" :provider="p" mode="register" :companyID="companyIdRoute" :companyUserDocID="requestId" :linkId="String(route.query.token || '')" />
             </div>
             <div v-if="providers.length" class="auth__or">{{ $t('Auth.or') }}</div>
 

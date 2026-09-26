@@ -34,6 +34,10 @@ const props = defineProps({
     companyUserDocID: {
         type: String,
         default: null
+    },
+    linkId: {
+        type: String,
+        default: ""
     }
 });
 
@@ -210,7 +214,8 @@ const signup = async (userInfo) => {
             googleId: userInfo.sub,
             idToken: userInfo.idToken,
             assignCompany: props.companyID,
-            companyUserDocID: props.companyUserDocID
+            companyUserDocID: props.companyUserDocID,
+            linkId: props.linkId
         };
 
         const signupRes = await apiRequestWithoutSecure("post", env.API_SIGNUP_WITH_GOOGLE, payload);
