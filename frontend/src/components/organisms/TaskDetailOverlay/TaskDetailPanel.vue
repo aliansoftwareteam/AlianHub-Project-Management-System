@@ -82,15 +82,6 @@
         <div class="ah-detail__body">
             <div class="ah-detail__main ah-scroll" ref="mainEl">
                 <div class="ah-detail__title-row">
-                    <input
-                        type="checkbox"
-                        class="ah-check ah-detail__done"
-                        :checked="isDone"
-                        :disabled="!canSetStatus || isSpinner"
-                        :aria-label="$t('TaskPanel.mark_done')"
-                        :title="isDone ? $t('TaskPanel.reopen') : $t('TaskPanel.mark_done')"
-                        @change="toggleDone($event.target.checked)"
-                    />
                     <Skelaton v-if="isSpinner && !task.TaskName" class="ah-detail__title-skeleton" />
                     <TaskDetailTitle
                         v-else-if="task.TaskName && projectData._id"
