@@ -43,7 +43,7 @@ vi.mock('@/components/templates/AuthShell/AuthShell.vue', async () => {
 import * as env from '@/config/env';
 import Invitation from '@/views/Authentication/Invitation/Invitation.vue';
 
-const previewSays = (fields) => ({
+const previewSays = (fields = {}) => ({
     post: vi.fn(async () => ({ data: { status: true, data: { status: 1, email: INVITED, workspaceName: 'Acme', ...fields } } })),
 });
 
@@ -60,7 +60,7 @@ const mountPage = async ($axios) => {
     const wrapper = mount(Invitation, {
         global: {
             provide: { $axios, addSubscription: vi.fn() },
-            stubs: { 'router-link': { template: '<a><slot /></a>' } },
+            stubs: { 'router-link': { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' } },
         },
     });
     await flushPromises();
@@ -68,9 +68,10 @@ const mountPage = async ($axios) => {
 };
 
 const buttonNamed = (wrapper, key) => wrapper.findAll('button').find((button) => button.text().includes(key));
+const linkNamed = (wrapper, key) => wrapper.findAll('a').find((link) => link.text().includes(key));
 const acceptCalls = () => mocks.apiRequestWithoutCompnay.mock.calls.filter((call) => call[1] === ACCEPT_URL);
 
-describe('Invitation page for an address that already has an account', () => {
+describe('Invitation page for an invitee who may already have an account', () => {
     let reload;
 
     beforeEach(() => {
@@ -87,33 +88,28 @@ describe('Invitation page for an address that already has an account', () => {
         vi.restoreAllMocks();
     });
 
-    it('asks a signed-out invitee to sign in to accept, not to sign up', async () => {
-        const wrapper = await mountPage(previewSays({ hasAccount: true }));
-
-        expect(wrapper.find('#inv-name').exists()).toBe(false);
-        expect(wrapper.find('#inv-password').exists()).toBe(false);
-        expect(wrapper.text()).toContain('Auth.invite_have_account_title');
-        expect(wrapper.text()).toContain(INVITED);
-
-        await buttonNamed(wrapper, 'Auth.invite_sign_in_to_accept').trigger('click');
-
-        expect(mocks.push).toHaveBeenCalledWith({ name: 'Log-in', query: { redirect_url: INVITATION_PATH } });
-        expect(acceptCalls()).toHaveLength(0);
-    });
-
-    it('still offers sign-up to a signed-out invitee whose address has no account', async () => {
-        const wrapper = await mountPage(previewSays({ hasAccount: false }));
+    /* The page cannot know whether the address has an account: the preview never says, so an admin holding the link learns nothing. */
+    it.each([
+        ['says nothing about accounts', {}],
+        ['carries a stray hasAccount: true', { hasAccount: true }],
+        ['carries a stray hasAccount: false', { hasAccount: false }],
+    ])('shows a signed-out visitor the sign-up form and a sign-in-to-accept line when the preview %s', async (_label, fields) => {
+        const wrapper = await mountPage(previewSays(fields));
 
         expect(wrapper.find('#inv-name').exists()).toBe(true);
-        expect(wrapper.text()).not.toContain('Auth.invite_have_account_title');
+        expect(wrapper.find('#inv-email').text()).toBe(INVITED);
+        const signIn = linkNamed(wrapper, 'Auth.invite_sign_in_to_accept');
+        expect(signIn).toBeDefined();
+        expect(JSON.parse(signIn.attributes('data-to'))).toEqual({ name: 'Log-in', query: { redirect_url: INVITATION_PATH } });
+        expect(buttonNamed(wrapper, 'Auth.invite_accept')).toBeUndefined();
+        expect(acceptCalls()).toHaveLength(0);
     });
 
     it('lets the invited account, once signed in, accept with one button and opens the workspace', async () => {
         signedInAs(' Ines.Invited@Example.TEST ');
-        const wrapper = await mountPage(previewSays({ hasAccount: true }));
+        const wrapper = await mountPage(previewSays());
 
         expect(wrapper.find('#inv-name').exists()).toBe(false);
-        expect(wrapper.text()).not.toContain('Auth.invite_have_account_title');
 
         await buttonNamed(wrapper, 'Auth.invite_accept').trigger('click');
         await flushPromises();
@@ -128,7 +124,7 @@ describe('Invitation page for an address that already has an account', () => {
 
     it('says plainly when signed in as another account, offers to switch, and never accepts', async () => {
         signedInAs('someone.else@example.test');
-        const wrapper = await mountPage(previewSays({ hasAccount: true }));
+        const wrapper = await mountPage(previewSays());
 
         expect(wrapper.text()).toContain('Auth.invite_wrong_account_title');
         expect(wrapper.find('#inv-name').exists()).toBe(false);
@@ -141,21 +137,13 @@ describe('Invitation page for an address that already has an account', () => {
         expect(acceptCalls()).toHaveLength(0);
     });
 
-    it('does not offer sign-up to a signed-in account when the invited address has none yet', async () => {
-        signedInAs('someone.else@example.test');
-        const wrapper = await mountPage(previewSays({ hasAccount: false }));
-
-        expect(wrapper.text()).toContain('Auth.invite_wrong_account_title');
-        expect(wrapper.find('#inv-name').exists()).toBe(false);
-    });
-
     it('stays on the page with a plain message when the invitation cannot be accepted', async () => {
         signedInAs(INVITED);
         mocks.apiRequestWithoutCompnay.mockImplementation(async (type) => {
             if (type === 'get') return { status: 200, data: { _id: USER_ID, Employee_Email: INVITED } };
             throw Object.assign(new Error('Request failed with status code 403'), { response: { status: 403, data: { status: false } } });
         });
-        const wrapper = await mountPage(previewSays({ hasAccount: true }));
+        const wrapper = await mountPage(previewSays());
 
         await buttonNamed(wrapper, 'Auth.invite_accept').trigger('click');
         await flushPromises();

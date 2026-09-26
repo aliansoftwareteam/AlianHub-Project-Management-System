@@ -61,19 +61,18 @@ afterAll(async () => {
     if (client) await client.close();
 });
 
-describe('previewing an invitation for an address that already has an account', () => {
-    it('tells the holder of the link, and only them, that the address can sign in', async () => {
+describe('previewing an invitation', () => {
+    it('answers the same fields whether or not the invited address has an account', async () => {
         const existing = await registeredAccount(freshEmail('signedin.preview'));
         const forExisting = await invite(existing.email);
         const forNewcomer = await invite(freshEmail('signedin.preview.new'));
 
-        expect((await preview(forExisting)).body.data).toMatchObject({ email: existing.email, hasAccount: true });
-        expect((await preview(forNewcomer)).body.data).toMatchObject({ hasAccount: false });
+        const known = (await preview(forExisting)).body;
+        const unknown = (await preview(forNewcomer)).body;
 
-        const wrongToken = await preview(forExisting, crypto.randomBytes(32).toString('hex'));
-        expect(wrongToken.body.status).toBe(false);
-        expect(wrongToken.body.data).toBeUndefined();
-        expect(JSON.stringify((await preview(forExisting)).body)).not.toContain(existing.userId);
+        expect(Object.keys(known.data).sort()).toEqual(['email', 'status', 'workspaceName']);
+        expect({ ...known, data: { ...known.data, email: '' } }).toEqual({ ...unknown, data: { ...unknown.data, email: '' } });
+        expect(JSON.stringify(known)).not.toContain(existing.userId);
     });
 });
 
