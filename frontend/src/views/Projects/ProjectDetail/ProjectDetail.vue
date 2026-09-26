@@ -1,8 +1,5 @@
 <template>
     <div class="project__detail-component"  v-if="clientWidth > 767 || isvisible === true">
-        <a href="#" @click.prevent="scrollToBottom" class="btn-scroll-to-bottom" v-if="clientWidth < 767">
-            {{$t('general.scroll_to_bottom')}}
-        </a>
         <div v-if="!currentCompany?.planFeature?.projectDetailsView">
             <UpgradePlan
                 :buttonText="$t('Upgrades.upgrade_your_plan')"
@@ -144,16 +141,6 @@
     const fileExtentions = computed(() => {
         return getters['settings/fileExtentions'];
     });
-
-    const scrollToBottom = () => {
-        const targetDiv = document.querySelector('.project__detail-component');
-        if (targetDiv) {
-            targetDiv.scrollTo({
-                top: targetDiv.scrollHeight,
-                behavior: 'smooth'
-            });
-        }
-    }
 
     /**
      * AHE-3838 — attach files picked from a cloud drive to the project.

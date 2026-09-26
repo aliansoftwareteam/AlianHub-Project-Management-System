@@ -8223,7 +8223,6 @@ export default {
         keyboard: "Keyboard",
         mouse: "Mouse",
         Create: "Create",
-        scroll_to_bottom: "Scroll to Bottom",
         unassigned: "Unassigned",
         entries: "entries",
         showing: "Showing",

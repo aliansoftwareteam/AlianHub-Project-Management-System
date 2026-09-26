@@ -7919,7 +7919,6 @@ export default {
         "keyboard": "કિબોર્ડ",
         "mouse": "માઉસ",
         "Create": "બનાવો",
-        "scroll_to_bottom": "તળિયે સ્ક્રોલ કરો",
         "unassigned": "અસાઇનમેન્ટ નથી",
         "entries": "પ્રવેશો",
         "showing": "બતાવી રહ્યા છે",

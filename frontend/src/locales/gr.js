@@ -7919,7 +7919,6 @@ export default {
         "keyboard": "Πληκτρολόγιο",
         "mouse": "Ποντίκι",
         "Create": "Δημιουργία",
-        "scroll_to_bottom": "Κύληση στο Κάτω Μέρος",
         "unassigned": "Μη Ανατεθειμένο",
         "entries": "καταχωρήσεις",
         "showing": "Εμφάνιση",
