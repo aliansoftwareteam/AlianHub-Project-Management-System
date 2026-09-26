@@ -149,6 +149,7 @@ import { toggleTheme, shellState } from '@/components/organisms/Shell/shellState
 import { isMacPlatform } from './paletteKeys';
 import { CHIPS, RECORD_CHIPS, chipAllows, commandLeads, projectPath, relativeAge, taskLocation, taskPath } from './paletteRows';
 import { openQuickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
+import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import '@/components/molecules/AdvanceSearch/style.css';
 
 defineOptions({ name: 'CommandPalette' });
@@ -243,6 +244,7 @@ const taskRow = (task, when) => ({
     id: `task:${task._id}`, kind: 'task', swatch: task.status?.color || 'var(--brand)', bold: true,
     code: task.TaskKey && task.TaskKey !== '--' ? task.TaskKey : '', title: task.TaskName,
     sub: taskLocation(task, projectName(task.ProjectID)), age: relativeAge(when || task.updatedAt, t), to: taskPath(cid.value, task),
+    task: { companyId: cid.value, projectId: task.ProjectID, sprintId: task.sprintId, folderId: task.folderObjId || '', taskId: task._id },
 });
 const projectRow = (p) => ({ id: `project:${p._id}`, kind: 'project', icon: 'projects', title: p.ProjectName, sub: t('Header.Projects'), age: relativeAge(p.updatedAt, t), to: projectPath(cid.value, p) });
 const pageRow = (p) => ({
@@ -386,6 +388,7 @@ const run = (row) => {
     if (row.kind === 'command') return command(row.command);
     remember(query.value);
     if (row.kind === 'ask') return askAi();
+    if (row.task) { close(); openTask(row.task); return; }
     if (row.to) return go(row.to);
     return close();
 };
