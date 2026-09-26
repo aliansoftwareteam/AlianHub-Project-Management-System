@@ -13,6 +13,8 @@ jest.mock('../Modules/Tasks/helpers/completionStore', () => ({
 }));
 jest.mock('../Modules/Agents/permissions', () => ({ holderMay: jest.fn(async () => ({ allowed: true, reason: '' })) }));
 
+const mongoose = require('mongoose');
+const { schema } = require('../utils/mongo-handler/schema.js');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const actions = require('../Modules/Agents/actions');
 const tools = require('../Modules/Automations/engine/tools');
@@ -64,5 +66,25 @@ describe('an agent reply in a task thread is stored as the agent', () => {
         await tools.addComment(CID, TASK_ID, 'Reminder', { ruleId: '6f0000000000000000000b01', ruleName: 'Nudge', runId: 'r1', depth: 0 });
 
         expect(onlyComment()).toMatchObject({ userId: 'automation:6f0000000000000000000b01', actorType: 'automation', automationName: 'Nudge' });
+    });
+});
+
+// fakeMongo keeps any field; the real comments schema is strict and drops undeclared ones on save.
+describe('every field a thread comment is written with survives the strict comments schema', () => {
+    const commentSchema = new mongoose.Schema(schema.comments, { strict: true, timestamps: true });
+    const undeclared = (row) => Object.keys(row).filter((key) => row[key] !== undefined && !commentSchema.path(key));
+
+    it.each([
+        ['a rule comment', () => tools.addComment(CID, TASK_ID, 'Reminder', { ruleId: '6f0000000000000000000b01', ruleName: 'Nudge', runId: 'r1', depth: 0 })],
+        ['an agent comment', () => actions.perform({
+            companyId: CID,
+            actor: { kind: 'agent', userId: '', agentId: AGENT_ID, agentName: 'Alian', runId: RUN_ID, viaAccount: 'workspace' },
+            action: 'task.comment',
+            params: { taskId: TASK_ID, body: 'Done' },
+        })],
+    ])('%s', async (_label, write) => {
+        await write();
+
+        expect(undeclared(onlyComment())).toEqual([]);
     });
 });
