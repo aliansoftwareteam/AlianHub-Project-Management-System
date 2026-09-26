@@ -32,7 +32,6 @@
     text-overflow: ellipsis;
     overflow: hidden;
     white-space: nowrap;
-    /* max-width: 500px; */
     font-family: 'Roboto', sans-serif;
     font-weight: 700;
     color: #000000;
@@ -40,7 +39,6 @@
     line-height: 27px;
     padding-left: 9px;
     margin: 0;
-    text-transform: capitalize;
 }
 
 .input-border-color{
