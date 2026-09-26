@@ -2411,6 +2411,8 @@ export default {
         "bulk_undo": "Undo",
         "bulk_undone": "Change undone.",
         "bulk_undo_failed": "That change could not be undone.",
+        "bulk_due_pick": "Pick a date…",
+        "bulk_due_clear": "Clear due date",
         "ai_summarise": "Summarise the selected tasks",
         "ai_scope_note": "Runs on up to 10 tasks at a time.",
         "ai_unavailable": "AI is not set up for this workspace.",
