@@ -4612,6 +4612,7 @@ export default {
         "wip_none": "No limit",
         "more_count": "+{n} more",
         "task_actions": "Task actions",
+        "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
         "archive_task": "Archive task",
@@ -4789,7 +4790,8 @@ export default {
         "delete_tag_desc": "¿Estás seguro de que deseas eliminar la etiqueta en todo este Espacio?",
         "note_msg": "Presiona Enter para crear una nueva etiqueta",
         "This_tag_has_already_been_added": "Esta etiqueta ya ha sido añadida",
-        "Tag_name_required": "Se requiere nombre de etiqueta"
+        "Tag_name_required": "Se requiere nombre de etiqueta",
+        "add_tag": "Add tag"
     },
     "Embeded": {
         "Anything": "Cualquier cosa",
