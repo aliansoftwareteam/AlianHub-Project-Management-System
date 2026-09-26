@@ -191,6 +191,7 @@ import * as env from '@/config/env';
 import { useGetterFunctions } from '@/composable';
 import pageContent from '@pageContent';
 import { richHtml } from '@/utils/richHtml';
+import { statusChipCss } from '@/utils/statusChipColors';
 import { relativeTime, shortDate, toDateInput, reviewChipClass, reviewLabelKey, headingsOf } from './docsFormat';
 
 const { contentToEditorData, blocksToRawText, TASK_TOKEN_PATTERN } = pageContent.default || pageContent;
@@ -480,8 +481,8 @@ function escapeHtml(value) {
 }
 
 function chipSpan({ taskKey, statusName, bgColor, textColor, taskName }) {
-    const style = bgColor && textColor ? ` style="background:${escapeHtml(bgColor)};color:${escapeHtml(textColor)}"` : '';
-    return `<span class="ah-chip ah-chip--mono"${style} title="${escapeHtml(taskName)}">${escapeHtml(taskKey)}: ${escapeHtml(statusName)}</span>`;
+    const style = bgColor && textColor ? ` style="${escapeHtml(statusChipCss({ bgColor, textColor }))}"` : '';
+    return `<span class="ah-chip ah-chip--mono ah-status-ink"${style} title="${escapeHtml(taskName)}">${escapeHtml(taskKey)}: ${escapeHtml(statusName)}</span>`;
 }
 
 // Preview hydrates every task token with the task's current status, fetched on open.

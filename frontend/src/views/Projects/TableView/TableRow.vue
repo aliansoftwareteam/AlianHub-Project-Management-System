@@ -16,7 +16,7 @@
             <button type="button" class="tv2__name" :title="data.TaskName" @click.stop="$emit('open', data)">{{ data.TaskName }}</button>
         </span>
 
-        <span role="cell" class="ah-chip tv2__status" :style="statusStyle">{{ status.name }}</span>
+        <span role="cell" class="ah-chip tv2__status ah-status-ink" :style="statusStyle">{{ status.name }}</span>
 
         <span role="cell">
             <span v-if="owner" class="ah-avatar" :title="owner.Employee_Name">
@@ -83,6 +83,7 @@ import { taskRisk } from "@/views/Projects/composables/taskRisk";
 import { useTaskSummaries } from "./useTaskSummaries.js";
 import { useTaskCategories } from "./useTaskCategories.js";
 import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
+import { statusChipStyle } from "@/utils/statusChipColors";
 
 defineOptions({ name: "TableRow" });
 
@@ -101,9 +102,7 @@ const rowRef = ref(null);
 let observer = null;
 
 const status = computed(() => getTaskStatus(props.data.statusKey) || { name: props.data.status?.text || "" });
-const statusStyle = computed(() => (status.value.bgColor
-    ? { background: status.value.bgColor, color: status.value.textColor }
-    : {}));
+const statusStyle = computed(() => (status.value.bgColor ? statusChipStyle(status.value) : {}));
 
 const owner = computed(() => {
     const id = props.data.AssigneeUserId?.[0];
