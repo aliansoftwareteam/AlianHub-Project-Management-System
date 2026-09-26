@@ -2,17 +2,15 @@
     <div class="d-flex taglist__dropdown-mobile__margin" @click="(e)=>{e.stopPropagation()}" :class="[{'pointer-none' : (tagChipArray.length >= 3 && isTaskList) || !checkApps('tags') }]">
         <DropDown @isVisible="tagClosed">   
         <template  #button>
-            <component
-                :is="buttonLabel ? 'button' : 'div'"
+            <button
                 v-show="(tagChipArray.length < 3 || !isTaskList) && checkApps('tags') && checkPermission('task.task_tag',project?.isGlobalPermission) === true"
-                :type="buttonLabel ? 'button' : null"
-                class="d-flex"
-                :class="{ 'taglist__add-btn': buttonLabel }"
-                :aria-label="buttonLabel || null"
+                type="button"
+                class="d-flex taglist__add-btn"
+                :aria-label="$t('Tags.add_tag')"
                 ref="clickDropDown"
             >
-                <img id="openTagDropdown" :src="!isTaskList? tag:tag2" class="cursor-pointer tag-div" :alt="buttonLabel ? '' : null">
-            </component>
+                <img id="openTagDropdown" :src="!isTaskList? tag:tag2" class="cursor-pointer tag-div" alt="">
+            </button>
         </template>
         <template #head>
             <div class="tagInputwrapper">
@@ -186,11 +184,6 @@ const props = defineProps({
     },
     stringObj:{
         type:String,
-    },
-    /** When set, the trigger is a real button with this accessible name. */
-    buttonLabel: {
-        type: String,
-        default: ''
     },
 });
 

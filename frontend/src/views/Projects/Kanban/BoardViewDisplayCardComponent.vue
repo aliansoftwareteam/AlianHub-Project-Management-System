@@ -125,7 +125,7 @@
                         <div v-if="index == chipCount" class="tagcount"> +{{tagChipArray.length - chipCount}} </div>         
                     </div>
                     <div v-if="checkPermission('task.task_tag',projectData?.isGlobalPermission) !== null">
-                        <CreateTagPopup :task="element" @send:tagChipArray="(val)=>tagChipArray = val" @send:ids="(val)=>ids = val" :project="projectData" :chipCount="chipCount" :isTaskList="false" :buttonLabel="$t('Tags.add_tag')" />
+                        <CreateTagPopup :task="element" @send:tagChipArray="(val)=>tagChipArray = val" @send:ids="(val)=>ids = val" :project="projectData" :chipCount="chipCount" :isTaskList="false" />
                     </div>
                 </div>
                 <div v-if="agentRun" class="agent-strip">
