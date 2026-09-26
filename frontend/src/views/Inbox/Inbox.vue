@@ -298,6 +298,7 @@ import { escapeHtml } from '@/utils/notificationHtml';
 import { renderNotice } from './renderNotice';
 import { SNOOZE_PRESETS, formatWhen, resolveTimeZone, snoozeTarget, toZonedInput } from './snoozePresets';
 import { laterStorageKey, migrateLegacyLater } from './laterMigration';
+import { wakeTimer } from './snoozeWake';
 
 defineOptions({ name: 'InboxPage' });
 
@@ -401,7 +402,10 @@ const ptoLabel = (type) => t(`Pto.types.${type}`, type);
 const loadCounts = async () => {
     try {
         const res = await apiRequest('get', `${env.INBOX}/counts`);
-        if (res?.data?.status) counts.value = res.data.data || counts.value;
+        if (res?.data?.status) {
+            counts.value = res.data.data || counts.value;
+            snoozeWake.schedule(res.data.data);
+        }
     } catch (e) { /* badges are decoration */ }
 };
 
@@ -434,6 +438,7 @@ const load = async (append = false) => {
 
 const reload = async () => { await Promise.all([load(false), loadCounts()]); };
 const loadMore = () => load(true);
+const snoozeWake = wakeTimer(() => (busy.value ? loadCounts() : reload()));
 
 // A new arrival moves the per-user counters document; only a rise means a new row.
 const liveCounts = computed(() => {
@@ -854,6 +859,7 @@ onUnmounted(() => {
     stopOnTaskClosed();
     clearTimeout(liveTimer);
     clearTimeout(undoTimer);
+    snoozeWake.clear();
 });
 </script>
 
