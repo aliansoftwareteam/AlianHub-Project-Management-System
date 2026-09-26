@@ -3817,7 +3817,8 @@ const schema = {
         actorType: { type: String, default: "" },
         agentId: { type: String, default: "" },
         viaAccount: { type: String, default: "" },
-        runId: { type: String, default: "" }
+        runId: { type: String, default: "" },
+        automationName: { type: String, required: false }
     },
     mainChat: {
         ProjectCode: {

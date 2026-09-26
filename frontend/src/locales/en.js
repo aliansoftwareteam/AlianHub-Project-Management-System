@@ -7123,6 +7123,8 @@ export default {
         agent_tag: "AGENT",
         an_agent: "An agent",
         ai_assistant: "AI assistant",
+        automation_tag: "AUTOMATION",
+        an_automation: "An automation",
         cited_page: "page",
         cited_page_hidden: "a page you cannot open",
     },

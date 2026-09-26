@@ -169,6 +169,23 @@ describe('grouping by assignee', () => {
         expect(assigneeCondition(ME)).toEqual({ AssigneeUserId: { $in: [ME] } });
         expect(assigneeCondition('')).toEqual({ AssigneeUserId: { $in: [null, []] } });
     });
+
+    const TEAM = 'tId_team-1';
+    const teams = [{ _id: 'team-1', assigneeUsersArray: [ME] }, { _id: 'team-2', assigneeUsersArray: [] }];
+
+    test('a task assigned only to a team appears under each member of that team', () => {
+        const teamTask = task(1, { AssigneeUserId: [TEAM] });
+        const [other, me, none] = assigneeGroups([OTHER, ME], getUser, 'Unassigned', teams).map((g) => ({ ...g, searchKey: 'AssigneeUserId' }));
+        expect(me.teamIds).toEqual([TEAM]);
+        expect(other.teamIds).toEqual([]);
+        expect(taskInGroup(teamTask, me)).toBe(true);
+        expect(taskInGroup(teamTask, other)).toBe(false);
+        expect(taskInGroup(teamTask, none)).toBe(false);
+    });
+
+    test('the server query fetches a member\'s team tasks with their own', () => {
+        expect(assigneeCondition(ME, [TEAM])).toEqual({ AssigneeUserId: { $in: [ME, TEAM] } });
+    });
 });
 
 describe('group labels', () => {
