@@ -65,6 +65,31 @@ describe('MSG-02 notifications are read for the session user', () => {
     });
 });
 
+describe('the bell leaves out what the Inbox cleared', () => {
+    const CLEARED_READ = '6f0000000000000000000d03';
+    const CLEARED_UNREAD = '6f0000000000000000000d04';
+    const KEPT_READ = '6f0000000000000000000d05';
+
+    beforeEach(() => {
+        const row = (id, over) => mockDb.seed(SCHEMA_TYPE.NOTIFICATIONS, {
+            _id: id, key: 'task_reminder', notificationType: 'push', assigneeUsers: [GUEST], receiverID: GUEST, ...over,
+        });
+        row(CLEARED_READ, { notSeen: [], clearedAt: new Date('2026-09-24T10:00:00Z') });
+        row(CLEARED_UNREAD, { notSeen: [GUEST], clearedAt: new Date('2026-09-24T10:00:00Z') });
+        row(KEPT_READ, { notSeen: [] });
+    });
+
+    it('keeps cleared notifications out of the archive', async () => {
+        const r = await call(ctrl.getNotificationMessages, { query: { filter: 'archived' } });
+        expect(r.body.data.map((n) => String(n._id))).toEqual([KEPT_READ]);
+    });
+
+    it('keeps cleared notifications out of the unread list', async () => {
+        const r = await call(ctrl.getNotificationMessages, { query: { filter: 'unread' } });
+        expect(r.body.data.map((n) => String(n._id))).toEqual(['6f0000000000000000000d02']);
+    });
+});
+
 describe('MSG-02 marks change only the session user', () => {
     it('refuses marking a notification read for someone else', async () => {
         const r = await call(ctrl.updateMarkRead, { body: { key: 'notifications', id: MEMBER_ROW, userId: MEMBER } });
