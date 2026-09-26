@@ -335,7 +335,7 @@ function sentBody(form, token, settings) {
     const thanks = form.successMessage || 'Thanks - your submission has been received.';
     return formHead(form, settings)
         + `<div class="note ok" role="status"><span class="tick">&#10003;</span><span>${escapeHtml(thanks)}</span></div>`
-        + `<a class="again" href="/form/${escapeHtml(token)}">Submit another response</a>`;
+        + `<a class="again" href="/form/${escapeHtml(encodeURIComponent(token))}">Submit another response</a>`;
 }
 
 /* GET /form/:token — the public form. */
