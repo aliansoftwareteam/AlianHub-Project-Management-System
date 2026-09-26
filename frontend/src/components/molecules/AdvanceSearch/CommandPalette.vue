@@ -147,7 +147,7 @@ import { aiOff } from '@/composable/aiAvailability';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { toggleTheme, shellState } from '@/components/organisms/Shell/shellState';
 import { isMacPlatform } from './paletteKeys';
-import { CHIPS, RECORD_CHIPS, chipAllows, commandLeads, projectPath, relativeAge, taskLocation, taskPath } from './paletteRows';
+import { CHIPS, RECORD_CHIPS, chipAllows, commandArgument, commandLeads, projectPath, relativeAge, taskLocation, taskPath } from './paletteRows';
 import { openQuickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 import '@/components/molecules/AdvanceSearch/style.css';
 
@@ -230,7 +230,7 @@ const NAV = computed(() => [
 
 const COMMANDS = computed(() => [
     { key: 'new-task', label: t('Inbox.cmd_new_task'), icon: 'plus' },
-    { key: 'new-project', label: t('Inbox.cmd_new_project'), icon: 'projects', show: allowed('project.project_list') },
+    { key: 'new-project', label: t('Inbox.cmd_new_project'), icon: 'projects', show: allowed('project.project_list'), takesName: true },
     { key: 'start-timer', label: t('Inbox.cmd_start_timer'), icon: 'play', show: !!timesheetRoute() },
     { key: 'toggle-theme', label: shellState.theme === 'dark' ? t('Shell.theme_light') : t('Shell.theme_dark'), icon: shellState.theme === 'dark' ? 'sun' : 'moon' },
     { key: 'logout', label: t('Shell.logout'), icon: 'logout' },
@@ -256,7 +256,11 @@ const personRow = (u) => ({
     to: router.hasRoute('Members') ? { name: 'Members', params: { cid: cid.value }, query: { q: u.Employee_Email || u.Employee_Name } } : null,
 });
 const navRow = (n) => ({ id: `nav:${n.key}`, kind: 'nav', icon: n.icon, title: n.label, sub: n.sub, to: to(n.route) });
-const commandRow = (c) => ({ id: `cmd:${c.key}`, kind: 'command', icon: c.icon, title: c.label, command: c.key });
+const nameFor = (c) => (c.takesName ? commandArgument(query.value, [c.label, c.alias]) : '');
+const commandRow = (c) => {
+    const name = nameFor(c);
+    return { id: `cmd:${c.key}`, kind: 'command', icon: c.icon, title: c.label, sub: name, command: c.key, name };
+};
 
 const groups = computed(() => {
     let index = 0;
@@ -277,7 +281,7 @@ const groups = computed(() => {
         return out;
     }
 
-    const commands = COMMANDS.value.filter((c) => matches(c.label, c.alias)).slice(0, 3);
+    const commands = COMMANDS.value.filter((c) => matches(c.label, c.alias) || nameFor(c)).slice(0, 3);
     const addCommands = () => add('commands', t('Inbox.group_commands'), commands.map(commandRow));
     const commandsLead = commandLeads(query.value, commands.flatMap((c) => [c.label, c.alias]));
     if (commandsLead) addCommands();
@@ -370,12 +374,12 @@ const askAi = (row) => {
     go({ name: 'AiAsk', params: { cid: cid.value }, query: text ? { q: text } : {} });
 };
 
-const command = (key) => {
+const command = (key, name = '') => {
     if (key === 'toggle-theme') { toggleTheme(); close(); return; }
     if (key === 'logout') { close(); logOut({ islogOut: true }); return; }
     window.dispatchEvent(new CustomEvent('ah:command', { detail: { command: key, query: query.value.trim() } }));
     if (key === 'new-task') { close(); openQuickCreate(); return; }
-    if (key === 'new-project') return go({ name: 'Projects', params: { cid: cid.value }, query: { create: 'project', name: query.value.trim() || undefined } });
+    if (key === 'new-project') return go({ name: 'Projects', params: { cid: cid.value }, query: { create: 'project', name: name || undefined } });
     if (key === 'start-timer') { const r = timesheetRoute(); return r ? go(to(r)) : close(); }
     return close();
 };
@@ -383,7 +387,7 @@ const command = (key) => {
 const run = (row) => {
     if (!row) return;
     if (row.kind === 'recent') { query.value = row.value; onInput(); focusInput(); return; }
-    if (row.kind === 'command') return command(row.command);
+    if (row.kind === 'command') return command(row.command, row.name);
     remember(query.value);
     if (row.kind === 'ask') return askAi();
     if (row.to) return go(row.to);
