@@ -433,12 +433,10 @@ export default {
         "back_to_login": "Back to login",
         "new_password_title": "Choose a new password",
         "set_password_title": "Set your password",
-        "password_rules": "8+ characters with a capital letter, a number and a symbol.",
+        "new_password_rule": "Use at least {n} characters, including an uppercase letter, a lowercase letter, a number and a symbol.",
         "new_password": "New password",
         "confirm_password": "Επιβεβαίωση κωδικού πρόσβασης",
         "save_password": "Save password",
-        "password_short": "Use at least 8 characters.",
-        "password_weak": "Add a capital letter, a number and a symbol.",
         "confirm_required": "Type the password again.",
         "confirm_mismatch": "Those passwords don't match.",
         "checking_link": "Checking your link…",
@@ -8647,7 +8645,6 @@ export default {
         "last_name": "Last name",
         "email": "Email",
         "password": "Password",
-        "password_hint": "At least {n} characters.",
         "show_password": "Show password",
         "hide_password": "Hide password",
         "company": "Workspace name",
@@ -8678,8 +8675,7 @@ export default {
         "done_title": "All set",
         "done_lead": "Taking you to your workspace…",
         "err_required": "Required.",
-        "err_invalid": "That does not look right.",
-        "err_password": "Use at least {n} characters."
+        "err_invalid": "That does not look right."
     },
     "Providers": {
         "nav": "AI providers",

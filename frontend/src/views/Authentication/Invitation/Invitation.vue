@@ -58,7 +58,7 @@
                         </button>
                     </div>
                     <div v-if="errors.password" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.password }}</div>
-                    <div v-else class="ah-field__hint">{{ $t('Auth.password_rules') }}</div>
+                    <div v-else class="ah-field__hint">{{ $t('Auth.new_password_rule', { n: MIN_PASSWORD_LENGTH }) }}</div>
                 </div>
                 <button type="submit" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" :disabled="busy">
                     <span v-if="busy" class="ah-spin"></span>{{ busy ? $t('Auth.loading') : $t('Auth.continue') }}
@@ -97,6 +97,7 @@ import { useCustomComposable } from "@/composable";
 import { apiRequest, apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth, useAuth } from "@/services";
 import * as env from "@/config/env";
 import { ROLE_OWNER } from "@/utils/roles";
+import { MIN_PASSWORD_LENGTH, PASSWORD_RULE_MESSAGE, meetsPasswordRule } from "@passwordRule";
 
 const { t } = useI18n();
 const route = useRoute();
@@ -112,8 +113,6 @@ const brand = computed(() => getters["brandSettingTab/brandSettings"] || {});
 const termsLink = computed(() => brand.value.termsLink || brand.value.termsOfService || "");
 const privacyLink = computed(() => brand.value.privacyLink || brand.value.privacyPolicy || "");
 const providers = computed(() => enabledProviders());
-
-const PASSWORD_RE = /^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).*$/;
 
 const stage = ref("checking");
 const busy = ref(false);
@@ -156,9 +155,7 @@ onMounted(async () => {
 
 const validate = () => {
     errors.name = !form.name ? t("Auth.name_required") : "";
-    errors.password = !form.password || form.password.length < 8
-        ? t("Auth.password_short")
-        : !PASSWORD_RE.test(form.password) ? t("Auth.password_weak") : "";
+    errors.password = meetsPasswordRule(form.password) ? "" : t("Auth.new_password_rule", { n: MIN_PASSWORD_LENGTH });
     return !errors.name && !errors.password;
 };
 
@@ -182,7 +179,8 @@ const submit = async () => {
             linkId: String(route.query.token || "")
         });
         if (!response.data.status) {
-            banner.value = response.data.statusText?.status == 409 ? t("Auth.email_in_use") : t("Auth.server_error");
+            if (response.data.statusText === PASSWORD_RULE_MESSAGE) errors.password = t("Auth.new_password_rule", { n: MIN_PASSWORD_LENGTH });
+            else banner.value = response.data.statusText?.status == 409 ? t("Auth.email_in_use") : t("Auth.server_error");
             return;
         }
         const user = await apiRequestWithoutSecure("post", env.LOGIN, { email: email.value, password: form.password });

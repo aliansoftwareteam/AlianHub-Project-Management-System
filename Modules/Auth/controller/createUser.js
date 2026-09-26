@@ -18,6 +18,7 @@ const {
     verifySocialIdentity,
 } = require("../helpers/socialIdentity");
 const { linkTokenAccepted } = require("./invitationPreview");
+const { PASSWORD_RULE_MESSAGE, meetsPasswordRule } = require("../helpers/passwordRule");
 
 
 exports.authenticateToken = "";
@@ -93,6 +94,9 @@ exports.createUserV2 = (req, res) => {
         const missing = REQUIRED_SIGNUP_FIELDS.find(([field]) => !isFilledString(registrant[field]));
         if (missing) {
             return res.send({ status: false, statusText: `${missing[1]} is required` });
+        }
+        if (!meetsPasswordRule(registrant.password)) {
+            return res.send({ status: false, statusText: PASSWORD_RULE_MESSAGE });
         }
         let admitted = registrant;
         exports.admitInvitee(registrant).then((body) => {

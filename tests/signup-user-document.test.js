@@ -103,7 +103,7 @@ describe('addUserMongodbV2', () => {
 describe('POST /api/v2/createUser', () => {
     it('saves an anonymous signup without ownership, verification or billing fields', async () => {
         const res = response();
-        createUser.createUserV2({ body: { firstName: 'Ada', lastName: 'L', email: 'a@b.c', password: 'p', ...PRIVILEGED } }, res);
+        createUser.createUserV2({ body: { firstName: 'Ada', lastName: 'L', email: 'a@b.c', password: 'Sup3r-Secret!', ...PRIVILEGED } }, res);
         await settle();
 
         expect(res.body.status).toBe(true);
