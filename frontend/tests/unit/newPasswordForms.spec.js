@@ -5,7 +5,9 @@ import passwords from '../../../tests/fixtures/passwordSamples.json';
 const COMPANY_ID = '6f0000000000000000000c01';
 const INVITE_ID = '6f00000000000000000a0001';
 const USER_ID = '6f0000000000000000000009';
-const RULE_KEY = 'Auth.new_password_rule';
+const RULE_KEY = 'Auth.new_password_rule_range';
+const LONGEST = `Aa1!${'x'.repeat(252)}`;
+const TOO_LONG = `${LONGEST}x`;
 
 const mocks = vi.hoisted(() => ({
     apiRequest: vi.fn(),
@@ -177,6 +179,34 @@ describe('a reset refuses a weak password before submitting', () => {
     it.each(passwords.strong)('submits %j', async (password) => {
         await submitReset(password);
         expect(callsTo(mocks.apiRequestWithoutSecure, env.RESETPASSWORD)).toHaveLength(1);
+    });
+});
+
+describe('every form takes a password of up to 256 characters', () => {
+    it.each([
+        ['setup', async () => (await openSetup()).find('#password')],
+        ['an invitation', async () => (await openInvitation()).find('#inv-password')],
+        ['a reset', async () => (await openReset()).find('#np-password')],
+        ['a reset confirmation', async () => (await openReset()).find('#np-confirm')],
+    ])('%s does not cut a long password short', async (_label, field) => {
+        expect(Number((await field()).attributes('maxlength') ?? Infinity)).toBeGreaterThanOrEqual(LONGEST.length);
+    });
+
+    it.each([
+        ['setup', submitSetup, () => callsTo(mocks.apiRequestWithoutSecure, env.SETUP_COMPLETE)],
+        ['an invitation', submitInvitation, () => callsTo(mocks.apiRequestWithoutCompnay, env.CREATE_USER_V2)],
+        ['a reset', submitReset, () => callsTo(mocks.apiRequestWithoutSecure, env.RESETPASSWORD)],
+    ])('%s refuses a 257-character password with the rule and submits a 256-character one', async (_label, submit, sent) => {
+        const refused = await submit(TOO_LONG);
+        expect(sent()).toEqual([]);
+        expect(refused.find('.ah-field__error').text()).toContain(RULE_KEY);
+        await submit(LONGEST);
+        expect(sent()).toHaveLength(1);
+    });
+
+    it('change password refuses a 257-character new password', async () => {
+        await submitChange('Abcdefg1!', TOO_LONG);
+        expect(callsTo(mocks.apiRequest, `${env.AUTH}/user-1/change-password`)).toEqual([]);
     });
 });
 

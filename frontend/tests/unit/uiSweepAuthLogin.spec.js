@@ -45,6 +45,12 @@ describe('Login', () => {
         sessionStorage.clear();
     });
 
+    it('takes a password as long as the longest one a person can choose', () => {
+        const wrapper = mountLogin();
+        expect(Number(wrapper.find('#password').attributes('maxlength') ?? Infinity)).toBeGreaterThanOrEqual(256);
+        wrapper.unmount();
+    });
+
     it('clears the six code boxes after a wrong two-factor code, ready for the next try', async () => {
         apiRequestWithoutSecure.mockResolvedValueOnce({ status: 200, data: { twoFactorRequired: true, tempToken: 'tmp' } });
         const wrapper = mountLogin();

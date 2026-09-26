@@ -1,5 +1,8 @@
-const { MIN_PASSWORD_LENGTH, PASSWORD_PATTERN, PASSWORD_RULE_MESSAGE, meetsPasswordRule } = require('../Modules/Auth/helpers/passwordRule');
+const { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, PASSWORD_PATTERN, PASSWORD_RULE_MESSAGE, meetsPasswordRule } = require('../Modules/Auth/helpers/passwordRule');
 const passwords = require('./fixtures/passwordSamples.json');
+
+const LONGEST = `Aa1!${'x'.repeat(252)}`;
+const TOO_LONG = `${LONGEST}x`;
 
 describe('the rule for a password a person chooses', () => {
     it.each(passwords.weak)('refuses %j', (password) => {
@@ -14,19 +17,26 @@ describe('the rule for a password a person chooses', () => {
         expect(meetsPasswordRule(value)).toBe(false);
     });
 
+    it('takes up to 256 characters and refuses a 257th', () => {
+        expect(MAX_PASSWORD_LENGTH).toBe(256);
+        expect(LONGEST).toHaveLength(256);
+        expect(meetsPasswordRule(LONGEST)).toBe(true);
+        expect(meetsPasswordRule(TOO_LONG)).toBe(false);
+    });
+
     it('counts any character other than a letter, a digit or a space as the symbol', () => {
         ['.', '_', '~', '"', '/', '€'].forEach((symbol) => expect(meetsPasswordRule(`Abcdefg1${symbol}`)).toBe(true));
     });
 
     it('gives the change-password form a pattern it can carry in its rule string', () => {
         expect(PASSWORD_PATTERN.source).not.toMatch(/[|:]/);
-        [...passwords.weak, ...passwords.strong].forEach((password) => {
+        [...passwords.weak, ...passwords.strong, LONGEST, TOO_LONG].forEach((password) => {
             expect(new RegExp(PASSWORD_PATTERN.source).test(password)).toBe(meetsPasswordRule(password));
         });
     });
 
-    it('names the length and all four requirements in the message the server answers with', () => {
+    it('names both lengths and all four requirements in the message the server answers with', () => {
         expect(MIN_PASSWORD_LENGTH).toBe(8);
-        expect(PASSWORD_RULE_MESSAGE).toMatch(/8 characters.*uppercase letter.*lowercase letter.*number.*symbol/);
+        expect(PASSWORD_RULE_MESSAGE).toMatch(/8 to 256 characters.*uppercase letter.*lowercase letter.*number.*symbol/);
     });
 });
