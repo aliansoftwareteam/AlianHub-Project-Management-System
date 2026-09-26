@@ -104,17 +104,22 @@ function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null } =
 }
 
 describe('TaskDetailPanel', () => {
-    it('moves the task to the close status when the done checkbox is ticked', async () => {
+    it('moves the task to the close status from the complete button', async () => {
         const wrapper = mountPanel();
         await flushPromises();
-        const done = wrapper.find('input.ah-detail__done');
-        expect(done.exists()).toBe(true);
+        const done = wrapper.get('button.ah-detail__complete');
         expect(done.element.disabled).toBe(false);
-        await done.setValue(true);
+        await done.trigger('click');
         expect(updateStatus).toHaveBeenCalledTimes(1);
         const call = updateStatus.mock.calls[0][0];
         expect(call.newStatus).toMatchObject({ statusKey: 'st-done', statusType: 'close' });
         expect(call.task._id).toBe('task-1');
+    });
+
+    it('puts no checkbox beside the title, so the type icon is not read as a second one', async () => {
+        const wrapper = mountPanel();
+        await flushPromises();
+        expect(wrapper.find('.ah-detail__title-row input[type="checkbox"]').exists()).toBe(false);
     });
 
     it('shows no agent strip when the task has no open run', async () => {
@@ -371,7 +376,7 @@ describe('TaskDetailPanel', () => {
             updateStatus.mockClear();
             const wrapper = mountPanel();
             await flushPromises();
-            await wrapper.find('input.ah-detail__done').setValue(true);
+            await wrapper.get('button.ah-detail__complete').trigger('click');
             await flushPromises();
             expect(undoToast.current).not.toBeNull();
             await runUndo();
