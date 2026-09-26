@@ -245,6 +245,8 @@ export const sendMessage = async ({messageData, edited}) => {
                         if(response.data.status) {
                             const data = response.data.data
                             resolve({...messageData, _id: data._id, id: data._id});
+                        } else {
+                            reject(new Error(response.data.message || response.data.statusText || "Comment not saved"));
                         }
                     })
                     .catch((error) => {
@@ -264,6 +266,8 @@ export const sendMessage = async ({messageData, edited}) => {
                     apiRequest('put', `${env.API_COMMENTS}`, params).then((response) => {
                         if(response.data.status) {
                             resolve(messageData);
+                        } else {
+                            reject(new Error(response.data.message || response.data.statusText || "Comment not saved"));
                         }
                     })
                     .catch((error) => {
