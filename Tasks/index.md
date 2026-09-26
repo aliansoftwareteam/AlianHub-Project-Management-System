@@ -45,3 +45,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 037 | UX flow fixes from the ClickUp flow comparison | active | — | — | active/037-ux-flow-fixes |
 | 038 | Edit tasks from List rows | active | — | — | active/038-list-inline-edit |
 | 039 | Make the shared DropDown keyboard and screen-reader accessible | backlog | medium | — | backlog/039-accessible-dropdown |
+| 040 | Store each reference id in one form, with a migration | backlog | medium | — | backlog/040-one-stored-form-per-id |
