@@ -306,9 +306,10 @@
 .ah-detail__props .task-detail-right-side-label { display: flex; align-items: center; gap: 6px; margin: 0; padding: 0; min-height: 24px; }
 .ah-detail__props .task-detail-right-side-label > .task-detail-field-name { width: 82px; flex: none; margin: 0; font: 400 12.5px var(--font-ui); color: var(--ink-2); }
 .ah-detail__props .task-detail-right-side-label .taskdetail-label { margin: 0 !important; }
-/* The legacy row gave these values side padding for a hover pill; an outline keeps the pill without moving the text off the value column. */
+/* The legacy row gave these values side padding for a hover pill; an outline keeps the pill without moving the text off the value column.
+   The vertical padding stays: shorter rows put the next control half under the open story-points menu, which axe reports as target-size. */
 .ah-detail__props .priority-comp.taskdetail-label,
-.ah-detail__props .due-date.taskdetail-label { width: auto; padding: 2px 0; border-radius: 4px; }
+.ah-detail__props .due-date.taskdetail-label { width: auto; padding: 8.5px 0; border-radius: 4px; }
 .ah-detail__props .priority-comp span { padding: 0; }
 /* Every value control is a click target: WCAG 2.5.8 wants at least 24px. */
 .ah-detail__prop-link,
