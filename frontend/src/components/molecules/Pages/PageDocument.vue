@@ -9,7 +9,16 @@
 
             <div class="pd__head">
                 <div class="pd__title-row">
-                    <input v-model="draftTitle" type="text" class="pd__title" :placeholder="$t('Docs.untitled')" />
+                    <div class="pd__title-wrap" :data-title="draftTitle">
+                        <textarea
+                            :value="draftTitle"
+                            rows="1"
+                            class="pd__title"
+                            :placeholder="$t('Docs.untitled')"
+                            @input="onTitleInput"
+                            @keydown.enter="onTitleEnter"
+                        ></textarea>
+                    </div>
                     <div class="pd__actions">
                         <div class="ah-tabs">
                             <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'edit' }" @click="openEditor">{{ $t('Docs.edit') }}</button>
@@ -300,6 +309,22 @@ function loadPage(id) {
 
 watch(() => props.pageId, (id) => loadPage(id), { immediate: true });
 
+// A title is one line that wraps; a pasted line break becomes a space, one for one, so the caret stays put.
+function onTitleInput(event) {
+    const field = event.target;
+    const oneLine = field.value.replace(/[\r\n]/g, ' ');
+    if (oneLine !== field.value) {
+        const caret = field.selectionStart;
+        field.value = oneLine;
+        field.setSelectionRange(caret, caret);
+    }
+    draftTitle.value = oneLine;
+}
+
+function onTitleEnter(event) {
+    if (!event.isComposing) event.preventDefault();
+}
+
 function savePage() {
     if (!page.value || isSaving.value || !isDirty.value) return;
     isSaving.value = true;
@@ -573,10 +598,17 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 .pd__head { padding: 18px 20px 6px; display: flex; flex-direction: column; gap: 10px; flex: none; }
 .pd--page .pd__head { padding: 26px 40px 8px; }
 .pd__title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* The hidden copy of the title sizes the grid cell, so the textarea grows with every wrapped line. */
+.pd__title-wrap { flex: 1 1 320px; min-width: 0; display: grid; }
+.pd__title-wrap::after { content: attr(data-title) " "; visibility: hidden; white-space: pre-wrap; }
+.pd__title, .pd__title-wrap::after {
+    grid-area: 1 / 1;
+    border: 0; padding: 0; overflow-wrap: anywhere;
+    font: 700 27px/1.2 var(--font-ui); letter-spacing: -.7px;
+}
 .pd__title {
-    flex: 1 1 320px; min-width: 0;
-    border: 0; outline: none; background: transparent; padding: 0;
-    font: 700 27px/1.2 var(--font-ui); letter-spacing: -.7px; color: var(--ink);
+    width: 100%; resize: none; overflow: hidden;
+    outline: none; background: transparent; color: var(--ink);
 }
 .pd__title::placeholder { color: var(--ink-2); }
 .pd__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -663,7 +695,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 @media (max-width: 767px) {
     .pd__head, .pd--page .pd__head { padding: 14px 16px 6px; }
     .pd__body, .pd--page .pd__body { padding: 0 16px; }
-    .pd__title { font-size: 22px; }
+    .pd__title, .pd__title-wrap::after { font-size: 22px; }
     .pd__prop--muted { margin-left: 0; }
 }
 </style>
