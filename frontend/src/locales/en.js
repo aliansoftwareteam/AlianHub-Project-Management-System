@@ -10134,6 +10134,8 @@ export default {
         switch_account: "Not you? Switch account",
         expired: "This sign-in request has expired or is not valid. Start again from the app that sent you here.",
         other_browser: "This sign-in request was started in another browser. Start again from the app that sent you here.",
+        error_title: "This sign-in can't continue",
+        back_to_app: "Back to AlianHub",
         scope_tasks_read: "Read tasks you can see",
         scope_tasks_write: "Create and change tasks for you",
         scope_projects_read: "Read projects you can see",

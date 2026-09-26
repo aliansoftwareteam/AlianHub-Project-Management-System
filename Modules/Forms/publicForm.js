@@ -150,7 +150,8 @@ const ERROR_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false
     + '<rect x="7.1" y="4" width="1.8" height="5" rx=".9" fill="#fff"/>'
     + '<circle cx="8" cy="11.4" r="1" fill="#fff"/></svg>';
 
-const gone = (res) => send(res, 404, 'Not available', '<h1>This form is not available.</h1>');
+const gone = (res) => send(res, 404, 'Not available', '<h1>This form is not available.</h1>'
+    + '<p class="intro">Ask the person who sent you this link for a new one.</p>');
 
 /* Where a completed submission is sent.
  *
