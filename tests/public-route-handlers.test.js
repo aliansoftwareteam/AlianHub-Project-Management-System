@@ -237,10 +237,29 @@ describe('invitationPreview', () => {
     const TOKEN = 'e'.repeat(64);
 
     it('shows the email of a pending invitation to the holder of its token', async () => {
-        MongoDbCrudOpration.mockResolvedValueOnce({ status: 1, userEmail: 'new@example.com', linkId: TOKEN }).mockResolvedValueOnce({ Cst_CompanyName: 'Acme' });
+        MongoDbCrudOpration.mockResolvedValueOnce({ status: 1, userEmail: 'new@example.com', linkId: TOKEN }).mockResolvedValueOnce({ Cst_CompanyName: 'Acme' }).mockResolvedValueOnce(null);
         const res = response();
         await invitationPreview(request({ body: { companyId: COMPANY, memberId: MEMBER_ROW, linkId: TOKEN } }), res);
-        expect(res.body.data).toEqual({ workspaceName: 'Acme', status: 1, email: 'new@example.com' });
+        expect(res.body.data).toEqual({ workspaceName: 'Acme', status: 1, email: 'new@example.com', hasAccount: false });
+    });
+
+    it('tells the holder of its token that the invited address already has an account, and nothing more about it', async () => {
+        MongoDbCrudOpration.mockResolvedValueOnce({ status: 1, userEmail: 'known@example.com', linkId: TOKEN, userId: USER }).mockResolvedValueOnce({ Cst_CompanyName: 'Acme' }).mockResolvedValueOnce({ _id: USER });
+        const res = response();
+        await invitationPreview(request({ body: { companyId: COMPANY, memberId: MEMBER_ROW, linkId: TOKEN } }), res);
+        expect(res.body.data).toEqual({ workspaceName: 'Acme', status: 1, email: 'known@example.com', hasAccount: true });
+        expect(MongoDbCrudOpration).toHaveBeenCalledWith('global', { type: 'userAuth', data: [{ email: 'known@example.com' }, { _id: 1 }] }, 'findOne');
+    });
+
+    it.each([
+        ['no token', undefined],
+        ['a wrong token', 'f'.repeat(64)],
+    ])('never looks up an account for a caller with %s', async (_label, linkId) => {
+        MongoDbCrudOpration.mockResolvedValueOnce({ status: 1, userEmail: 'known@example.com', linkId: TOKEN });
+        const res = response();
+        await invitationPreview(request({ body: { companyId: COMPANY, memberId: MEMBER_ROW, linkId } }), res);
+        expect(res.body).toEqual({ status: false, statusText: 'Invalid invitation link.' });
+        expect(MongoDbCrudOpration).toHaveBeenCalledTimes(1);
     });
 
     it.each([
