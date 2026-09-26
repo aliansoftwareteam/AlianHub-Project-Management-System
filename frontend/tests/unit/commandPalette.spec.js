@@ -6,6 +6,7 @@ const { apiRequest, router, perms, toast } = vi.hoisted(() => ({
     apiRequest: vi.fn(),
     router: {
         push: vi.fn(() => Promise.resolve()),
+        replace: vi.fn(() => Promise.resolve()),
         resolve: vi.fn((loc) => ({ href: `#${typeof loc === 'string' ? loc : `/named/${loc.name}`}` })),
         hasRoute: vi.fn(() => true)
     },
@@ -25,6 +26,8 @@ import CommandPalette from '@/components/molecules/AdvanceSearch/CommandPalette.
 import { isMacPlatform, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys';
 import { commandLeads, relativeAge, taskLocation } from '@/components/molecules/AdvanceSearch/paletteRows';
 import { closeQuickCreate, quickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
+import { bindRouter, closeTask, isExpanded, overlayState, registerTaskSequence } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+import { taskNavAttrs } from '@/components/organisms/TaskDetailOverlay/taskNavigation';
 
 const DAY = 24 * 60 * 60 * 1000;
 const twoDaysAgo = new Date(Date.now() - 2 * DAY - 60 * 1000).toISOString();
@@ -75,12 +78,23 @@ const options = (wrapper) => wrapper.findAll('[role="option"]');
 const kinds = (wrapper) => options(wrapper).map((o) => o.attributes('data-kind'));
 const key = (wrapper, init) => wrapper.find('input').trigger('keydown', init);
 const activeOption = (wrapper) => wrapper.find(`#${wrapper.find('input').attributes('aria-activedescendant')}`);
+const currentRoute = { name: 'inbox', path: '/company-1/inbox', params: { cid: 'company-1' }, query: {} };
+const expectTaskPanel = (taskId, extra = {}) => {
+    expect(overlayState.open).toBe(true);
+    expect(overlayState.current).toMatchObject({ companyId: 'company-1', projectId: 'p1', sprintId: 's1', folderId: '', taskId, ...extra });
+    expect(isExpanded.value).toBe(false);
+    expect(router.push).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith({ query: { task: taskId } });
+};
 
 beforeEach(() => {
     apiRequest.mockReset();
     serve();
     Object.assign(perms, { 'task.advance_search': true });
     router.push.mockClear();
+    router.replace.mockClear();
+    closeTask({ keepRoute: true });
+    bindRouter(router, currentRoute);
     window.open = vi.fn();
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn(() => Promise.resolve()) }, configurable: true });
 });
@@ -230,7 +244,7 @@ describe('CommandPalette', () => {
 
         expect(activeOption(wrapper).attributes('data-kind')).toBe('task');
         await key(wrapper, { key: 'Enter' });
-        expect(router.push).toHaveBeenCalledWith('/company-1/project/p1/s/s1/t1');
+        expectTaskPanel('t1');
         expect(wrapper.emitted('close')).toBeTruthy();
     });
 
@@ -279,7 +293,7 @@ describe('CommandPalette', () => {
         const again = await mountPalette();
         await typeQuery(again);
         await again.find('[role="toolbar"] button[aria-label="Palette.action_open"]').trigger('click');
-        expect(router.push).toHaveBeenCalledWith('/company-1/project/p1/s/s1/t1');
+        expectTaskPanel('t1');
     });
 
     it('closes on Escape', async () => {
@@ -325,6 +339,58 @@ describe('CommandPalette', () => {
         const wrapper = await mountPalette();
         await typeQuery(wrapper, 'budget');
         expect(kinds(wrapper)[0]).toBe('task');
+    });
+});
+
+describe('opening a task from the palette', () => {
+    it('opens a clicked task in the side panel over the current page', async () => {
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper);
+        await options(wrapper).find((o) => o.attributes('data-kind') === 'task').trigger('click');
+        expectTaskPanel('t1');
+        expect(wrapper.emitted('close')).toBeTruthy();
+    });
+
+    it('keeps the folder of a recently opened task', async () => {
+        apiRequest.mockImplementation((type, url) => (url === '/api/v2/recent-visits'
+            ? ok([{ visitedAt: twoDaysAgo, task: { ...TASK, _id: 't9', TaskName: 'Recently seen', folderObjId: 'f1' } }])
+            : ok([])));
+        const wrapper = await mountPalette();
+        await options(wrapper).find((o) => o.text().includes('Recently seen')).trigger('click');
+        expectTaskPanel('t9', { folderId: 'f1' });
+    });
+
+    it('still copies and opens in a new tab the task\'s full page link', async () => {
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper);
+        const action = (name) => wrapper.find(`[role="toolbar"] button[aria-label="Palette.action_${name}"]`);
+        await action('copy').trigger('click');
+        await flushPromises();
+        const fullPage = new URL('#/company-1/project/p1/s/s1/t1', window.location.href).href;
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(fullPage);
+        await action('new_tab').trigger('click');
+        await key(wrapper, { key: 'Enter', metaKey: true });
+        expect(window.open.mock.calls.map((c) => c[0])).toEqual([fullPage, fullPage]);
+        expect(overlayState.open).toBe(false);
+    });
+
+    it('offers no previous or next through a list on screen that does not hold the task', async () => {
+        const root = document.createElement('div');
+        ['a1', 'a2'].forEach((id) => {
+            const row = document.createElement('div');
+            Object.entries(taskNavAttrs({ _id: id, ProjectID: 'p2', sprintId: 's2' })).forEach(([k, v]) => row.setAttribute(k, v));
+            root.appendChild(row);
+        });
+        const unregister = registerTaskSequence(() => root);
+        try {
+            const wrapper = await mountPalette();
+            await typeQuery(wrapper);
+            await key(wrapper, { key: 'Enter' });
+            expect(overlayState.current?.taskId).toBe('t1');
+            expect(overlayState.nav).toBeNull();
+        } finally {
+            unregister();
+        }
     });
 });
 
