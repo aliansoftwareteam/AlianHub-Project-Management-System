@@ -3809,6 +3809,8 @@
     "List.ask_ai": "Ask AI to…",
     "List.assignee": "Assignee",
     "List.bulk_done": "Updated {n} tasks.",
+    "List.bulk_due_clear": "Clear due date",
+    "List.bulk_due_pick": "Pick a date…",
     "List.bulk_failed": "That bulk change did not go through.",
     "List.bulk_no_options": "Nothing to choose from here.",
     "List.bulk_region": "Bulk task actions",
