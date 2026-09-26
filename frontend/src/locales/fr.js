@@ -6964,6 +6964,7 @@ export default {
         "This_message_is_deleted": "Ce message est supprimé",
         "You_deleted_this_message": "Vous avez supprimé ce message",
         "no_user_found": "Aucun utilisateur trouvé.",
+        "mention_suggestions": "People to mention",
         "unlock_comment_view": "Pour déverrouiller la vue des commentaires",
         "agent_tag": "AGENT",
         "an_agent": "An agent",

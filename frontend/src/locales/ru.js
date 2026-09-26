@@ -6964,6 +6964,7 @@ export default {
         "This_message_is_deleted": "Это сообщение удалено",
         "You_deleted_this_message": "Вы удалили это сообщение",
         "no_user_found": "Пользователь не найден",
+        "mention_suggestions": "People to mention",
         "unlock_comment_view": "Для разблокировки просмотра комментариев",
         "agent_tag": "AGENT",
         "an_agent": "An agent",

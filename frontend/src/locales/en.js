@@ -7119,6 +7119,7 @@ export default {
         This_message_is_deleted: "This message is deleted",
         You_deleted_this_message: "You deleted this message",
         no_user_found: "No User Found",
+        mention_suggestions: "People to mention",
         unlock_comment_view: "To Unlock Comment View",
         agent_tag: "AGENT",
         an_agent: "An agent",

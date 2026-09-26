@@ -6964,6 +6964,7 @@ export default {
         "This_message_is_deleted": "Αυτό το μήνυμα έχει διαγραφεί",
         "You_deleted_this_message": "Διαγράψατε αυτό το μήνυμα",
         "no_user_found": "Δεν βρέθηκε χρήστης",
+        "mention_suggestions": "People to mention",
         "unlock_comment_view": "Για να ξεκλειδώσετε την προβολή σχολίων",
         "agent_tag": "AGENT",
         "an_agent": "An agent",
