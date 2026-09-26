@@ -178,7 +178,8 @@ import { blankTemplate, templateGlyph, colorForName, keyFromName, statusTone } f
 
 const props = defineProps({
     isActiveCreateSidebar: { type: Boolean, default: false },
-    isAdvanceFilterApplied: { type: Boolean, default: false }
+    isAdvanceFilterApplied: { type: Boolean, default: false },
+    initialName: { type: String, default: "" }
 });
 const emit = defineEmits(["update:visible", "click:closeSidebar", "closeSidebar", "update:manageTempList", "useTemplate", "update-processing"]);
 
@@ -214,7 +215,8 @@ const busy = ref(false);
 const banner = ref("");
 const nameInput = ref(null);
 
-const form = reactive({ name: "", key: "", keyTouched: false, isPrivate: false, source: DEFAULT_SOURCE, proposalId: "", dueDate: "", leads: [], skills: [], includeSamples: true, apps: [] });
+const initialName = props.initialName.trim().slice(0, 100);
+const form = reactive({ name: initialName, key: keyFromName(initialName), keyTouched: false, isPrivate: false, source: DEFAULT_SOURCE, proposalId: "", dueDate: "", leads: [], skills: [], includeSamples: true, apps: [] });
 const appCatalog = ref([]);
 const defaultAppsFor = (tpl) => {
     const fromTemplate = (tpl?.apps || []).filter((a) => a.appStatus).map((a) => a.key);

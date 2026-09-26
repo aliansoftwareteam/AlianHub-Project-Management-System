@@ -27,6 +27,9 @@
 .custom-field__height{
     height: 200px;
 }
+/* The browser font size and margins these had as h4s, before they became an h3 and plain text. */
+.custom-field__title { font-size: 1em; margin: 1.33em 0; }
+.custom-field__add { margin: 1.33em 0; }
 .custom__field_project_detail_wrapper {
     margin: 0px 0px 20px 0px;
 }

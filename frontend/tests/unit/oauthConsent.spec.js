@@ -143,4 +143,29 @@ describe('the OAuth consent screen', () => {
         expect(apiRequestWithoutCompnay).not.toHaveBeenCalled();
         expect(wrapper.find('[data-test="consent-error"]').exists()).toBe(true);
     });
+
+    it('gives the error a heading, the reason as body text and a way back to the app', async () => {
+        const wrapper = await mountWith({ data: () => Promise.reject({ response: { status: 403 } }) });
+        const heading = wrapper.find('h2[data-test="consent-error-title"]');
+        expect(heading.text()).toBe('OAuthConsent.error_title');
+        const body = wrapper.find('[data-test="consent-error"]');
+        expect(body.element.tagName).toBe('P');
+        expect(body.text()).toBe('OAuthConsent.other_browser');
+        const back = wrapper.find('a[data-test="consent-back"]');
+        expect(back.attributes('href')).toBe('/');
+        expect(back.text()).toBe('OAuthConsent.back_to_app');
+    });
+
+    it('offers the way back when the address carries no request too', async () => {
+        window.history.replaceState({}, '', '/oauth/consent#/oauth/consent');
+        const wrapper = await mountWith();
+        expect(wrapper.find('[data-test="consent-error-title"]').exists()).toBe(true);
+        expect(wrapper.find('a[data-test="consent-back"]').attributes('href')).toBe('/');
+    });
+
+    it('shows no error heading or way back on a request that opens', async () => {
+        const wrapper = await mountWith();
+        expect(wrapper.find('[data-test="consent-error-title"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="consent-back"]').exists()).toBe(false);
+    });
 });

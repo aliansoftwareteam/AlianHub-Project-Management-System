@@ -333,23 +333,76 @@ describe.each(Object.keys(PROVIDERS))('%s signup takes identity from the provide
         expect(row.status).toBe(1);
     });
 
-    it('joins the invited company when the invitation row is presented for the verified email', async () => {
-        const row = mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { _id: '6f0000000000000000000d01', userEmail: NEW_EMAIL, status: 1, roleType: 3 });
+    const LINK = 'a1'.repeat(32);
+    const invitationFor = (userEmail, fields = {}) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, {
+        _id: '6f0000000000000000000d01', userEmail, status: 1, roleType: 3, linkId: LINK, ...fields,
+    });
+    const fromInvitation = (row, extra = {}) => ({ email: NEW_EMAIL, assignCompany: COMPANY, companyUserDocID: row._id, ...extra });
 
-        const res = await register(token(9308, { email: NEW_EMAIL }), { email: NEW_EMAIL, assignCompany: COMPANY, companyUserDocID: row._id });
+    it('creates the account but leaves the invitation waiting when the signup does not carry its link', async () => {
+        const row = invitationFor(NEW_EMAIL);
+
+        const res = await register(token(9308, { email: NEW_EMAIL }), fromInvitation(row));
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body.data).toMatchObject({ Employee_Email: NEW_EMAIL, isEmailVerified: true, AssignCompany: [] });
+        expect(authRows().find((created) => created.email === NEW_EMAIL)).toBeTruthy();
+        expect(row).toMatchObject({ status: 1, linkId: LINK });
+        expect(row.userId).toBeUndefined();
+    });
+
+    it('answers a signup without the link the same as one with no invitation', async () => {
+        const row = invitationFor(NEW_EMAIL);
+
+        const withoutLink = await register(token(9309, { email: NEW_EMAIL }), fromInvitation(row));
+        const noInvitation = await register(token(9310, { email: 'uninvited@example.test' }), { email: 'uninvited@example.test' });
+
+        expect([withoutLink.statusCode, withoutLink.body.status, withoutLink.body.message])
+            .toEqual([noInvitation.statusCode, noInvitation.body.status, noInvitation.body.message]);
+    });
+
+    it('joins the invited company and uses up the link when the signup carries it', async () => {
+        const row = invitationFor(NEW_EMAIL);
+
+        const res = await register(token(9311, { email: NEW_EMAIL }), fromInvitation(row, { linkId: LINK }));
 
         expect(res.statusCode).toBe(200);
         expect(res.body.data.AssignCompany).toEqual([COMPANY]);
         expect(row.status).toBe(2);
+        expect(String(row.userId)).toBe(String(res.body.data._id));
+        expect(row.linkId).toBeFalsy();
     });
 
-    it('does not join a company whose invitation was issued to another email', async () => {
-        const row = mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { _id: '6f0000000000000000000d02', userEmail: 'invitee@example.test', status: 1, roleType: 3 });
+    it.each([
+        ['a wrong link', { linkId: 'b2'.repeat(32) }],
+        ['an empty link', { linkId: '' }],
+        ['a link that is not a string', { linkId: { $ne: null } }],
+    ])('does not join the invited company with %s', async (label, extra) => {
+        const row = invitationFor(NEW_EMAIL);
 
-        const res = await register(token(9309, { email: NEW_EMAIL }), { email: NEW_EMAIL, assignCompany: COMPANY, companyUserDocID: row._id });
+        const res = await register(token(9312, { email: NEW_EMAIL }), fromInvitation(row, extra));
 
         expect(res.statusCode).toBe(200);
         expect(res.body.data.AssignCompany).toEqual([]);
+        expect(row).toMatchObject({ status: 1, linkId: LINK });
+    });
+
+    it('does not join through an invitation row that holds no link', async () => {
+        const row = invitationFor(NEW_EMAIL, { linkId: '' });
+
+        const res = await register(token(9313, { email: NEW_EMAIL }), fromInvitation(row, { linkId: '' }));
+
+        expect(res.body.data.AssignCompany).toEqual([]);
         expect(row.status).toBe(1);
+    });
+
+    it('does not join a company whose invitation was issued to another email, even with its link', async () => {
+        const row = invitationFor('invitee@example.test');
+
+        const res = await register(token(9314, { email: NEW_EMAIL }), fromInvitation(row, { linkId: LINK }));
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body.data.AssignCompany).toEqual([]);
+        expect(row).toMatchObject({ status: 1, linkId: LINK });
     });
 });

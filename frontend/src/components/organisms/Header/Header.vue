@@ -295,6 +295,7 @@ import { useRouter } from "vue-router";
 import {version} from "../../../../../package.json";
 import {useHelper} from "./helper"
 import { useMainChat } from "@/views/Chat/helper";
+import { wakeTimer } from "@/views/Inbox/snoozeWake";
 import { useStore } from "vuex";
 import { useCustomComposable, useGetterFunctions } from "@/composable/index.js";
 
@@ -442,7 +443,10 @@ const loadInboxCount = () => {
     clearTimeout(inboxCountTimer);
     inboxCountTimer = setTimeout(() => {
         apiRequest("get", `${env.INBOX}/counts`).then((response) => {
-            if (response?.data?.status) inboxUnreadCount.value = Number(response.data.data?.all) || 0;
+            if (response?.data?.status) {
+                inboxUnreadCount.value = Number(response.data.data?.all) || 0;
+                snoozeWake.schedule(response.data.data);
+            }
         }).catch(() => {
             // Deliberately NOT zeroed. A failed request is not evidence of an empty inbox,
             // and the checks after this one are all event-driven — myCounts changing, or
@@ -452,6 +456,8 @@ const loadInboxCount = () => {
         });
     }, 400);
 };
+// A snooze falling due changes nothing that would otherwise trigger a check.
+const snoozeWake = wakeTimer(() => loadInboxCount());
 
 // These two watches sit HERE, not up beside onMounted, because `watch` evaluates its
 // getter immediately during setup — referencing totalNotification above its own `const`
@@ -479,6 +485,7 @@ onMounted(() => { document.addEventListener('visibilitychange', recheckInboxCoun
 onUnmounted(() => {
     document.removeEventListener('visibilitychange', recheckInboxCount);
     clearTimeout(inboxCountTimer);
+    snoozeWake.clear();
 })
 
 const companyUser = ref(getters['settings/companyUserDetail']);

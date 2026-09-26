@@ -4,6 +4,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 const COMPANY_ID = '6f0000000000000000000c01';
 const INVITE_ID = '6f00000000000000000a0001';
 const USER_ID = '6f0000000000000000000009';
+const LINK_TOKEN = 'a'.repeat(64);
 
 const mocks = vi.hoisted(() => ({
     apiRequest: vi.fn(),
@@ -22,7 +23,7 @@ vi.mock('@/services', () => ({
     useAuth: () => ({ logOut: mocks.logOut }),
 }));
 vi.mock('vue-router', () => ({
-    useRoute: () => ({ query: { companyId: `${COMPANY_ID}-${INVITE_ID}` } }),
+    useRoute: () => ({ query: { companyId: `${COMPANY_ID}-${INVITE_ID}`, token: LINK_TOKEN } }),
     useRouter: () => ({ push: mocks.push }),
 }));
 vi.mock('vuex', () => ({ useStore: () => ({ getters: {} }) }));
@@ -79,9 +80,9 @@ describe('Invitation page accepting an invitation', () => {
         expect(mocks.push).toHaveBeenCalledWith({ name: 'Log-in' });
     });
 
-    it('links the invitation row to the signed-in user', async () => {
+    it('links the invitation row to the signed-in user, presenting the link token', async () => {
         await submitInvitation(1);
-        expect(callsTo(env.API_ROOT_MEMBERS)[0][2]).toEqual({ id: INVITE_ID, data: { userId: USER_ID, status: 2 }, companyId: COMPANY_ID });
+        expect(callsTo(env.API_ROOT_MEMBERS)[0][2]).toEqual({ id: INVITE_ID, data: { userId: USER_ID, status: 2 }, companyId: COMPANY_ID, linkId: LINK_TOKEN });
     });
 
     it('does not claim the company for an invited admin', async () => {

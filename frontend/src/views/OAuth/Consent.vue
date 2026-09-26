@@ -1,10 +1,16 @@
 <template>
     <AuthShell :proof="false">
         <div class="av2-auth-card oc">
-            <div class="auth__glyph auth__glyph--brand"><ShellIcon name="key" :size="15" /></div>
+            <div v-if="error" class="auth__glyph av2-glyph-danger"><ShellIcon name="x" :size="15" /></div>
+            <div v-else class="auth__glyph auth__glyph--brand"><ShellIcon name="key" :size="15" /></div>
 
             <p v-if="loading" class="auth__p">{{ $t('OAuthConsent.loading') }}</p>
-            <p v-else-if="error" class="auth__p oc__error" role="alert" data-test="consent-error">{{ error }}</p>
+            <template v-else-if="error">
+                <h2 class="auth__h" data-test="consent-error-title">{{ $t('OAuthConsent.error_title') }}</h2>
+                <p class="auth__p" role="alert" data-test="consent-error">{{ error }}</p>
+                <!-- A full load rather than a router link: a hash route would keep this address, its request and its narrower CSP. -->
+                <a href="/" class="ah-btn ah-btn--primary ah-btn--block ah-btn--lg" data-test="consent-back">{{ $t('OAuthConsent.back_to_app') }}</a>
+            </template>
 
             <template v-else-if="info">
                 <h2 class="auth__h">

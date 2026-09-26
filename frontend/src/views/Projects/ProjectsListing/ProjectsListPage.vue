@@ -124,6 +124,7 @@
         <CreateProjectSidebar
             v-if="creating"
             :isActiveCreateSidebar="creating"
+            :initialName="createName"
             @click:closeSidebar="creating = false"
             @closeSidebar="creating = false"
         />
@@ -143,7 +144,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { aiUsable } from "@/composable/aiAvailability";
 import { escapeHtml } from '@/utils/notificationHtml';
 import { useStore } from 'vuex';
@@ -177,6 +178,7 @@ const onlyFavourites = ref(localStorage.getItem('favoriteFilter') === 'true');
 const filterOpen = ref(false);
 const menuFor = ref('');
 const creating = ref(false);
+const createName = ref('');
 const aiCreating = ref(false);
 
 // The lifecycle composable acts on one project at a time; the row menu points it
@@ -315,9 +317,18 @@ const closeMenus = () => {
     menuFor.value = '';
 };
 
+// ⌘K "New project" lands here with ?create=project&name=…; watched, not read on mount, because Projects may already be open.
+watch(() => route.query?.create, (create) => {
+    if (create !== 'project') return;
+    const rest = { ...route.query };
+    delete rest.create;
+    delete rest.name;
+    createName.value = typeof route.query.name === 'string' ? route.query.name : '';
+    creating.value = true;
+    router.replace({ query: rest }).catch(() => {});
+}, { immediate: true });
+
 onMounted(() => {
-    // ⌘K "new project" lands here with ?create=project.
-    if (route.query?.create === 'project') creating.value = true;
     dispatchProjects().catch(() => {});
     document.addEventListener('click', closeMenus);
 });

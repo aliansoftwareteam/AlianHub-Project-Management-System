@@ -1,10 +1,11 @@
 <template>
-	<div v-if="!underMaintainance">
+	<div>
 		<OfflineBanner/>
 		<DemoBanner/>
 		<MaintenanceBanner/>
-		<template v-if="$route.meta.requiresAuth">
-			<template v-if="logged && (rules && Object.keys(rules).length && companyUserDetail && Object.keys(companyUserDetail).length) && socketSettled">
+		<MaintenanceCard v-if="maintenanceBlocksPage"/>
+		<template v-else-if="$route.meta.requiresAuth">
+			<template v-if="shellReady">
                 <!-- Mounted at the root so an incoming call rings wherever the user is,
                      not only when the conversation that called them is on screen. -->
                 <CallOverlay />
@@ -52,34 +53,12 @@
         <template v-if="userId && showReviewModal">
             <ReviewPromptModal/>
         </template>
-        <!-- NOTIFICATION REQUEST MODAL -->
-        <Modal
-            v-if="requestPermission"
-            v-model="requestPermission"
-            :title="$t('Home.Notification_Request')"
-            :cancelButtonText="$t('Home.no')"
-            :acceptButtonText="$t('Home.yes')"
-            :close-on-backdrop="false"
-            :closeIcon="false"
-            className="topAligned"
-            @close="requestPermission = false;showReviewModal=true;"
-            @accept="notificationPermissionRequest(), requestPermission = false;showReviewModal=true;"
-        >
-            <template #body>
-                <div class="d-flex align-items-center flex-column px-2">
-                    {{$t('Home.are_you_sure')}}
-                </div>
-            </template>
-        </Modal>
         <UpgradeProcessModel 
             v-if="openReleaseNoteModel === true" 
             :openReleaseNoteModel="openReleaseNoteModel"
             :fromWhich="'App'"
             @closeReleaseNoteModel="(val) => {openReleaseNoteModel = val}" >
         </UpgradeProcessModel>
-	</div>
-	<div v-else class="d-flex align-items-center justify-content-center w-100vw h-100dvh">
-		<img :src="underMaintainanceImg" alt="underMaintainance">
 	</div>
 </template>
 <script setup>
@@ -88,6 +67,8 @@ import { computed, defineComponent, onMounted, provide, ref, watch, inject} from
 // COMPONENTS
 import TourCom from "@/components/organisms/Tour/TourComponet.vue"
 import MaintenanceBanner from "@/views/Settings/Instance/MaintenanceBanner.vue"
+import MaintenanceCard from "@/views/Settings/Instance/MaintenanceCard.vue"
+import { maintenanceOn } from "@/composable/maintenanceState"
 import HeaderComponent from '@/components/organisms/Header/Header.vue'
 import GlobalRail from '@/components/organisms/Shell/GlobalRail.vue'
 import MobileTabBar from '@/components/organisms/Shell/MobileTabBar.vue'
@@ -96,13 +77,12 @@ import TaskDetailOverlay from '@/components/organisms/TaskDetailOverlay/TaskDeta
 import AgentLiveStrip from '@/views/Ai/AgentLiveStrip.vue'
 import '@/components/organisms/Shell/style.css'
 import CallOverlay from '@/components/organisms/CallOverlay/CallOverlay.vue'
-import Modal from "@/components/atom/Modal/Modal.vue"
 import CommandPalette from '@/components/molecules/AdvanceSearch/CommandPalette.vue'
 import QuickCreateTask from '@/components/organisms/QuickCreateTask/QuickCreateTask.vue'
 import { PALETTE_OPEN_EVENT, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys'
 import { useStore } from 'vuex';
 import axios from 'axios'
-import { fcmToken } from '@/composable/commonFunction';
+import { refreshWebPush } from '@/composable/browserNotifications';
 import { useToast } from "vue-toast-notification"
 
 // COMPOSABLES
@@ -114,7 +94,6 @@ const paymentInit = inject("paymentInit");
 // IMAGES
 // import logo from '@/assets/images/png/logo.png'
 const logo = "/api/v1/getlogo?key=logo&type=desktop";
-import underMaintainanceImg from '@/assets/images/under_maintenance.png'
 import { useRoute, useRouter } from 'vue-router';
 import { languageTranslateHelper } from './composable/index';
 import {socketHelper} from './composable/socketHelper';
@@ -144,9 +123,7 @@ const { locale, setLocaleMessage } = useI18n();
 const companyId = ref(localStorage.getItem('selectedCompany') !== null ? localStorage.getItem('selectedCompany') : "")
 // Escape hatch for one release: the old top bar stays reachable behind a flag.
 const legacyNav = ref(localStorage.getItem('ah.legacyNav') === '1');
-const underMaintainance = ref(false);
 const logged = ref(false);
-const requestPermission = ref(false);
 const showReviewModal = ref(false);
 const showSpinner = ref(true);
 const clientWidth = ref(document.documentElement.clientWidth);
@@ -259,6 +236,10 @@ watch(() => getters['settings/companyUserDetail'], async(val) => {
     }
 	companyUserDetail.value = val;
 })
+
+const shellReady = computed(() => Boolean(logged.value && rules.value && Object.keys(rules.value).length && companyUserDetail.value && Object.keys(companyUserDetail.value).length && socketSettled.value));
+// A page that loaded before maintenance began keeps its content under the banner; one whose boot calls were refused would otherwise stay blank or spin forever.
+const maintenanceBlocksPage = computed(() => maintenanceOn.value && (route.meta.requiresAuth ? !shellReady.value : !route.matched.length));
 
 watch(() => getters['settings/selectedCompany'], async(val) => {
     if(val.isDisable === true){
@@ -514,18 +495,8 @@ async function getFirebaseData() {
                     })
                 }
 
-                if ('Notification' in window) {
-                    if(Notification.permission === "default") {
-                        requestPermission.value = true;
-                    } else if(Notification.permission === "granted") {
-                        generateFcmToken();
-                        showReviewModal.value = true;
-                    } else {
-                        showReviewModal.value = true;
-                    }
-                } else {
-                    showReviewModal.value = true;
-                }
+                refreshWebPush(userId.value);
+                showReviewModal.value = true;
             }
         } else {
             logged.value = false;
@@ -612,99 +583,6 @@ const onPaletteKey = (e) => {
     isAdvanceSearch.value = !isAdvanceSearch.value;
 }
 
-function notificationPermissionRequest() {
-    if ('Notification' in window) {
-        if (Notification.permission === 'granted') {
-            generateFcmToken();
-        } else if (Notification.permission === 'denied') {
-            generateFcmToken(true);
-        } else {
-            Notification.requestPermission()
-            .then(permission => {
-                if (permission === 'granted') {
-                    generateFcmToken();
-                } else {
-                    generateFcmToken(true);
-                }
-            })
-            .catch(error => {
-                console.error('Error occurred while requesting notification permission:', error);
-            });
-        }
-    } else {
-        $toast.error(t("Toast.notification_permission"),{position: 'top-right'});
-        // generateFcmToken();
-    }
-}
-
-function generateFcmToken(type=false) {
-    try{
-        if(type == false) {
-            const userData = apiRequestWithoutCompnay('get',`${env.USER_UPATE}/${userId.value}`)
-            userData.then((user) => {
-                if(user.status !== 200 || !user.data) {
-                    return;
-                }
-                fcmToken().then((result) => {
-                    if(result.status && result.token !== '') {
-                        if(localStorage.getItem('webTokens') == null) {
-                            const updateObject = {
-                                webToken: result.token
-                            }
-                            apiRequestWithoutCompnay("put",env.UPDATE_SESSION,{
-                                userId: userId.value,
-                                updateObject:updateObject
-                            }).then(()=>{
-                                localStorage.setItem('webTokens',result.token);
-                            }).catch((err)=>{
-                                console.error("ERROR: ", err);
-                            });
-                        } else if((localStorage.getItem('webTokens') && localStorage.getItem('webTokens') !== result.token)) {
-                            let token = localStorage.getItem('webTokens');
-                            if(token) {
-                                const updateObject = {
-                                    webToken: result.token
-                                };
-                                apiRequestWithoutCompnay("put",env.UPDATE_SESSION,{
-                                    userId: userId.value,
-                                    updateObject:updateObject
-                                }).then(()=>{
-                                    localStorage.setItem('webTokens',result.token);
-                                }).catch((err)=>{
-                                    console.error("ERROR: ", err);
-                                });
-                            }
-                        }
-                    }
-                })
-            })
-        } 
-        else {
-            let token = localStorage.getItem('webTokens');
-            if(token) {
-                const updateObject = {
-                    webToken: ""
-                };
-                apiRequestWithoutCompnay("put",env.UPDATE_SESSION,{
-                    userId: userId.value,
-                    updateObject:updateObject
-                }).then(()=>{
-                    localStorage.removeItem('webTokens',token);
-                }).catch((err)=>{
-                    console.error("ERROR: ", err);
-                });
-            }
-        }
-    } catch(e) {
-        console.error(e);
-    }
-}
-
-watch(underMaintainance, (newVal, oldVal) => {
-	if(newVal !== oldVal && newVal === false)  {
-		window.location.reload();
-	}
-})
 
 const changeLanguageHandler = async () => {
     const updateLanguage = await changeLanguage(selectedLanguageCode.value);

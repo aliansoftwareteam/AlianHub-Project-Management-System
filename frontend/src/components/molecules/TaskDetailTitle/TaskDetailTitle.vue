@@ -12,20 +12,20 @@
                     />
                 </template>
                 <template v-if="!isEditName">
-                <h4 
+                <h2 
                     v-if="checkPermission('task.task_name_edit',selectedProject?.isGlobalPermission) === true"
                     class="title-name"
                     :title="taskName"
                 >
-                    <button type="button" class="title-name__edit" @click="isEditName = true, editTaskName = taskName">{{ taskName }}</button>
-                </h4>
-                <h4 
+                    <button ref="titleButton" type="button" class="title-name__edit" @click="isEditName = true, editTaskName = taskName">{{ taskName }}</button>
+                </h2>
+                <h2 
                     v-else
                     class="title-name"
                     :title="taskName"
                 >
                     {{ taskName }}
-                </h4>
+                </h2>
                 </template>
                 <span v-else class="task-name__edit">
                     <InputText
@@ -35,7 +35,8 @@
                         :max-length="250"
                         @blur="editFocusOut()"
                         :place-holder="$t('Projects.task_name')"
-                        @enter="$emit('update:taskName', editTaskName), isEditName = false"
+                        @enter="saveName"
+                        @keydown="cancelOnEscape"
                         height="25px"
                         :isOutline="false"
                     />
@@ -56,7 +57,7 @@
 </template>
 <script setup>
     import { useCustomComposable } from '@/composable';
-    import { computed, defineProps, defineEmits,inject,ref } from 'vue';
+    import { computed, defineProps, defineEmits, inject, nextTick, ref } from 'vue';
     import InputText from '@/components/atom/InputText/InputText.vue';
     import { useToast } from 'vue-toast-notification';
     import ProjectTaskType from "@/components/atom/TaskTypeSelection/TaskTypeSelection.vue"
@@ -66,7 +67,7 @@
 
     const { checkPermission } = useCustomComposable();
 
-    defineEmits(["update:taskName", "update:favourite", "update:taskType"])
+    const emit = defineEmits(["update:taskName", "update:favourite", "update:taskType"])
     const props = defineProps({
         favourites: Array,
         taskType: Number,
@@ -87,7 +88,26 @@
         return selectedProject.value?.taskTypeCounts?.find((x) => x?.key === props?.taskType)
     })
 
-    const isEditName = ref(false); 
+    const isEditName = ref(false);
+    const titleButton = ref(null);
+
+    // Only a keyboard exit returns focus: a blur means the user already moved it somewhere.
+    const focusTitle = () => nextTick(() => titleButton.value?.focus());
+
+    const saveName = () => {
+        emit('update:taskName', editTaskName.value);
+        isEditName.value = false;
+        focusTitle();
+    }
+
+    // Marking Esc handled keeps the task overlay from also treating it as its own Esc.
+    const cancelOnEscape = ({ event }) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        isEditName.value = false;
+        editTaskName.value = '';
+        focusTitle();
+    }
 
     const editFocusOut = () => {
         if(isEditName.value) {

@@ -9,7 +9,7 @@
     padding-bottom: 9px;
     align-items: center;
 }
-.task-detail-right-side-label h4{
+.task-detail-right-side-label .task-detail-field-name{
     padding: 0px;
     margin: 0px;
     width: 40.5%;
@@ -109,7 +109,7 @@
 }
 @media(max-width: 1199px){
     .task-detail-right-side {max-width: 310px;}
-    .task-detail-right-side-label h4{width: 46%;}
+    .task-detail-right-side-label .task-detail-field-name{width: 46%;}
     .due-date.taskdetail-label {width: 60%;}
     .priority-comp:hover,.priority-comp.taskdetail-label {width: 59%;}
 }
@@ -117,14 +117,14 @@
     .task-detail-right-side {max-width: 288px;}
 }
 @media(max-width: 767px){
-    h4.details-heading {font-size: 16px;font-weight: 600 !important;}
+    .task-detail-right-side .details-heading {font-size: 16px;font-weight: 600 !important;}
     .due-date.taskdetail-label:hover {background-color: transparent;}
     .task-detail-right-side {max-width: 100%; background-color: #fff;padding:0;margin-top: 20px;padding: 10px;}
     .due-date.taskdetail-label {width: calc(100% - 35%);text-align: right;padding: 0 !important;}
     .task-detail-right-side-label{margin-bottom: 0;height: 50px;border-bottom: 1px solid #DFE1E6;justify-content: space-between;}
     .task-detail-right-wrapper{justify-content: flex-end;text-align: right;width: auto;width: calc(100% - 35%);display: flex;}
     .priority-comp:hover,.priority-comp.taskdetail-label {text-align: right;width: calc(100% - 35%);justify-content: end;display: flex;}
-    .task-detail-right-side-label h4{width: 35%;font-size: 16px;font-weight: 400;}
+    .task-detail-right-side-label .task-detail-field-name{width: 35%;font-size: 16px;font-weight: 400;}
     .taskdetail-label, .task-esitmate-hours{font-size: 16px !important;padding-right: 0 !important;}
 }
 

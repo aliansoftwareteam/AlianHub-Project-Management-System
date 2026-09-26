@@ -18,6 +18,7 @@ const backups = require('./backups');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { csvCell: formulaSafeCell } = require('../../utils/csv');
 const llmProvider = require('../AICore/llmProvider');
+const { ssoOnInstance } = require('../SSO/discover');
 
 const PUBLIC_CONFIG_KEY = 'instance:public-config';
 const LATEST_RELEASE_KEY = 'instance:latest-release';
@@ -53,13 +54,24 @@ exports.testSettings = async (req, res) => {
     return res.send({ ...result, data: { group, ...(result.data || {}) } });
 };
 
-exports.publicConfig = (req, res) => {
+const ssoOffered = async (switchedOn) => {
+    if (!switchedOn) return false;
+    try {
+        return await ssoOnInstance();
+    } catch (error) {
+        logger.error(`public config sso check failed: ${error.message}`);
+        return false;
+    }
+};
+
+exports.publicConfig = async (req, res) => {
     let payload = myCache.get(PUBLIC_CONFIG_KEY);
     if (!payload) {
         payload = settings.publicConfig();
         myCache.set(PUBLIC_CONFIG_KEY, payload, 60);
     }
-    return ok(res, 'Public config.', payload);
+    const sso = await ssoOffered(payload.auth.sso);
+    return ok(res, 'Public config.', { ...payload, auth: { ...payload.auth, sso } });
 };
 
 async function agendaCounts() {

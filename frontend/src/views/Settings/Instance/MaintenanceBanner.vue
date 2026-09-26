@@ -6,15 +6,15 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted } from "vue";
 import { apiRequestWithoutSecure } from "@/services";
+import { maintenanceOn as maintenance } from "@/composable/maintenanceState";
 
 defineOptions({ name: "MaintenanceBanner" });
 
 /* /health keeps answering during a restore; polling it is how every open tab
  * learns the API is back without a reload. Slow while all is well, quick while
  * maintenance is on. */
-const maintenance = ref(false);
 let timer = null;
 
 async function check() {

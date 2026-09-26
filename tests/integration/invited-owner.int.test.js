@@ -124,7 +124,7 @@ describe('QA-47 an invited owner is recorded as the company owner however they a
 
         const signup = await anonymous.post('/api/v2/gitlab-signup', {
             firstName: 'Otto', lastName: 'Oauth', email, accessToken: gitlabToken({ id: 820000 + parseInt(suffix, 16), email }),
-            assignCompany: state.companyId, companyUserDocID: String(row._id),
+            assignCompany: state.companyId, companyUserDocID: String(row._id), linkId: row.linkId,
         });
         expect(signup.status).toBe(200);
         const userId = String(signup.body.data._id);
@@ -140,7 +140,7 @@ describe('QA-47 an invited owner is recorded as the company owner however they a
 
         const signup = await anonymous.post('/api/v2/gitlab-signup', {
             firstName: 'Mia', lastName: 'Member', email, accessToken: gitlabToken({ id: 830000 + parseInt(suffix, 16), email }),
-            assignCompany: state.companyId, companyUserDocID: String(row._id),
+            assignCompany: state.companyId, companyUserDocID: String(row._id), linkId: row.linkId,
         });
         expect(signup.status).toBe(200);
 

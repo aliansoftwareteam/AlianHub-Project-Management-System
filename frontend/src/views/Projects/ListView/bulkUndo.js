@@ -1,4 +1,4 @@
-const FIELDS = ["statusKey", "AssigneeUserId", "tagsArray", "sprintId", "deletedStatusKey"];
+const FIELDS = ["statusKey", "AssigneeUserId", "tagsArray", "sprintId", "deletedStatusKey", "Task_Priority", "DueDate"];
 
 function* storedTasks(projectData = {}) {
     for (const bucket of [projectData.tasks, projectData.tableTasks]) {
@@ -27,11 +27,11 @@ export function snapshotTasks(projectData, taskIds) {
     return Object.fromEntries([...wanted].filter((id) => found[id]).map((id) => [id, found[id]]));
 }
 
-function groupBy(ids, keyOf) {
+function groupBy(ids, keyOf, { keepEmpty = false } = {}) {
     const groups = new Map();
     for (const id of ids) {
         const key = keyOf(id);
-        if (key === undefined || key === null || key === "") continue;
+        if (!keepEmpty && (key === undefined || key === null || key === "")) continue;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(id);
     }
@@ -46,6 +46,13 @@ export function statusPayload(status) {
     };
 }
 
+/* null marks a stored date that cannot be read: undo leaves that task alone rather than clear it. */
+function dueKey(value) {
+    if (!value) return "";
+    const time = new Date(value.seconds ? value.seconds * 1000 : value).getTime();
+    return Number.isNaN(time) ? null : new Date(time).toISOString();
+}
+
 function projectSprints(project) {
     const inFolders = Object.values(project?.sprintsfolders || {}).flatMap((folder) => Object.values(folder?.sprintsObj || {}));
     return [...Object.values(project?.sprintsObj || {}), ...inFolders].filter(Boolean);
@@ -53,7 +60,7 @@ function projectSprints(project) {
 
 /* Each request is one existing bulk call. The API takes one new value per call, so tasks
  * that shared a previous value go back together and the rest get a call each. */
-export function undoRequests({ action, payload = {}, before = {}, updatedIds = [], project }) {
+export function undoRequests({ action, payload = {}, before = {}, updatedIds = [], project, priorities = [] }) {
     const known = updatedIds.map(String).filter((id) => before[id]);
     if (!known.length) return [];
 
@@ -83,6 +90,22 @@ export function undoRequests({ action, payload = {}, before = {}, updatedIds = [
         const tagId = String(payload.tagId);
         const taskIds = known.filter((id) => !(before[id].tagsArray || []).includes(tagId));
         return taskIds.length ? [{ action, tagId: payload.tagId, operation: "remove", taskIds }] : [];
+    }
+
+    if (action === "bulkUpdatePriority") {
+        const target = payload.firebaseObj?.Task_Priority || "";
+        const groups = groupBy(known.filter((id) => (before[id].Task_Priority || "") !== target), (id) => before[id].Task_Priority || "", { keepEmpty: true });
+        return [...groups].map(([value, taskIds]) => {
+            const name = priorities.find((priority) => priority.value === value)?.name || "N/A";
+            return { action, taskIds, firebaseObj: { Task_Priority: value }, priorityObj: { priorityName: name, newPriorityName: name } };
+        });
+    }
+
+    if (action === "bulkUpdateDueDate") {
+        const target = dueKey(payload.DueDate);
+        const changed = known.filter((id) => dueKey(before[id].DueDate) !== null && dueKey(before[id].DueDate) !== target);
+        const groups = groupBy(changed, (id) => dueKey(before[id].DueDate), { keepEmpty: true });
+        return [...groups].map(([date, taskIds]) => ({ action, taskIds, DueDate: date || null }));
     }
 
     if (action === "bulkMove") {

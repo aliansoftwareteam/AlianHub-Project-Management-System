@@ -54,12 +54,12 @@ const response = () => {
     return res;
 };
 
-const seedLiveForm = (settings) => {
+const seedLiveForm = (settings, questions = []) => {
     const form = mockDb.seed(SCHEMA_TYPE.FORMS, {
         title: 'Intake',
         ProjectID: PROJECT,
         CompanyId: COMPANY,
-        questions: [],
+        questions,
         state: 'live',
         settings,
         createdBy: OWNER,
@@ -179,5 +179,47 @@ describe('a form submission that files no task', () => {
         expect(Object.keys(envelope.data).sort()).toEqual([...ENVELOPE_DATA_KEYS].sort());
         expect(envelope.data).toMatchObject({ formId: String(form._id), submissionId: String(submission._id), taskId: null, taskKey: null, TaskName: null, answers: { q1: 'Blocking' } });
         expect(rows(SCHEMA_TYPE.FORMS)[0].submissionCount).toBe(1);
+    });
+});
+
+/* The confirmation used to fade after two seconds above an empty form, so someone who looked away
+ * came back to a blank form and could send it again. */
+describe('the page a sender lands on after a submission', () => {
+    const QUESTIONS = [{ id: 'qname', type: 'short_text', mapTo: 'TaskName', label: 'Summary', required: true }];
+    const render = async (query) => {
+        const res = response();
+        await publicForm.renderForm({ params: { token: TOKEN }, query }, res);
+        return res;
+    };
+
+    it('is a thank-you state with a link to a fresh copy of the same form, and no form', async () => {
+        seedLiveForm({ createTask: false }, QUESTIONS);
+        const { res: sent } = await submit();
+        expect(sent.location).toBe(`/form/${TOKEN}?sent=1`);
+
+        const res = await render({ sent: '1' });
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toMatch(/<div class="note ok" role="status">.*received/);
+        expect(res.body).toMatch(new RegExp(`<a [^>]*href="/form/${TOKEN}"[^>]*>Submit another response</a>`));
+        expect(res.body).not.toMatch(/<form\b|<input\b|<textarea\b|<select\b|<button\b/);
+    });
+
+    it('stays on screen: the stylesheet has no animation that takes it away', async () => {
+        seedLiveForm({ createTask: false }, QUESTIONS);
+
+        const res = await render({ sent: '1' });
+
+        expect(res.body).not.toMatch(/sent-away|@keyframes|animation/);
+    });
+
+    it('a plain visit still shows the form, without the confirmation', async () => {
+        seedLiveForm({ createTask: false }, QUESTIONS);
+
+        const res = await render({});
+
+        expect(res.body).toMatch(new RegExp(`<form method="POST" action="/form/${TOKEN}"`));
+        expect(res.body).toMatch(/<input id="qname"/);
+        expect(res.body).not.toMatch(/note ok|Submit another response/);
     });
 });

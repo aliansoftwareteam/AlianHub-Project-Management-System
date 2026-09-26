@@ -153,7 +153,7 @@
                 </div>
             </section>
         </template>
-        <AppState v-else kind="forbidden" />
+        <AppState v-else kind="denied" />
     </div>
 </template>
 

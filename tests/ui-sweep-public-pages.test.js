@@ -68,7 +68,7 @@ describe('public form', () => {
         expect(source).toMatch(/\.intro,\.help,\.footer,\.drop \.hint\{color:\$\{muted\}\}/);
     });
 
-    test('the sent confirmation is announced, since it fades after two seconds', () => {
+    test('the sent confirmation is announced to screen readers', () => {
         expect(source).toMatch(/<div class="note ok" role="status">/);
     });
 

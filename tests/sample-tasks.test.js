@@ -259,3 +259,33 @@ describe('the demo project is split across sprints', () => {
         }
     });
 });
+
+/* A brand-new workspace opened on "Overdue · 1": the welcome row planned as done resolved to the
+   template's "Done" column, which is an active status, so it was open work due yesterday. */
+describe('no sample task starts overdue', () => {
+    const startOfToday = () => new Date(new Date().setHours(0, 0, 0, 0));
+    const openAndOverdue = (docs) => docs
+        .filter((d) => d.statusType !== 'close' && d.DueDate && d.DueDate < startOfToday())
+        .map((d) => `${d.TaskName} (${d.status.text})`);
+
+    test.each(TEAM_FOCUS_OPTIONS)('answer %s: nothing open is past its due date', (focus) => {
+        expect(openAndOverdue(demo(focus).docs)).toEqual([]);
+    });
+
+    test.each(TEAM_FOCUS_OPTIONS)('answer %s: work planned as finished is in a close status', (focus) => {
+        const rows = demoTasksForFocus(focus);
+        const parents = demo(focus).docs.filter((d) => d.isParentTask !== false);
+        const planned = rows.map((r, i) => [r[2].status, parents[i]])
+            .filter(([intent]) => intent === 'done' || intent === 'complete');
+        expect(planned.map(([intent]) => intent)).toContain('done');
+        for (const [, doc] of planned) expect(`${doc.TaskName}: ${doc.statusType}`).toBe(`${doc.TaskName}: close`);
+    });
+
+    test('a status list without a close status still starts nothing overdue', () => {
+        const noClose = { ...project, taskStatusData: project.taskStatusData.filter((s) => s.type !== 'close') };
+        for (const focus of TEAM_FOCUS_OPTIONS) {
+            const { docs } = buildTaskDocs(noClose, sprint, demoTasksForFocus(focus), 0, OWNER);
+            expect(openAndOverdue(docs)).toEqual([]);
+        }
+    });
+});
