@@ -114,9 +114,6 @@ export default {
         "templatename": "Vorlagenname",
         "description": "Beschreibung",
         "Template_name_is_required": "Vorlagenname ist erforderlich",
-        "This_template_name_is_required": {
-            "": "Vorlagenname ist erforderlich."
-        },
         "status": "Status",
         "zipcode": "Postleitzahl",
         "address2": "Adresse 2",
@@ -7558,9 +7555,7 @@ export default {
         "Filter_saved_successfully": "Filter erfolgreich gespeichert.",
         "Filter_update_successfully": "Filter erfolgreich aktualisiert.",
         "Filter_deleted_successfully": "Filter erfolgreich gelöscht.",
-        "Checklist_creted_succesfully": {
-            "": "Checklist creted succesfully."
-        },
+        "checklist_created_successfully": "Checklist created successfully",
         "Please_select_checklist": "Bitte wählen Sie eine Checkliste aus.",
         "already_exists": "EXIST_VALUE existiert bereits.",
         "Converted_sucessfully": "Converted sucessfully",

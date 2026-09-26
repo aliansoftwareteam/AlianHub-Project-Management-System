@@ -114,9 +114,6 @@ export default {
         "templatename": "templatename",
         "description": "description",
         "Template_name_is_required": "Template name is required",
-        "This_template_name_is_required": {
-            "": "This template name is required."
-        },
         "status": "status",
         "zipcode": "zipcode",
         "address2": "address2",
@@ -7558,9 +7555,7 @@ export default {
         "Filter_saved_successfully": "Filter saved successfully.",
         "Filter_update_successfully": "Filter updated successfully.",
         "Filter_deleted_successfully": "Filter deleted successfully.",
-        "Checklist_creted_succesfully": {
-            "": "Checklist creted succesfully."
-        },
+        "checklist_created_successfully": "Checklist created successfully",
         "Please_select_checklist": "Please select checklist.",
         "already_exists": "EXIST_VALUE is already exists",
         "Converted_sucessfully": "Converted sucessfully",

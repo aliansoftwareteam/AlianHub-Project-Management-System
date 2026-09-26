@@ -114,9 +114,6 @@ export default {
         "templatename": "nom du modèle",
         "description": "description",
         "Template_name_is_required": "Le nom du modèle est requis",
-        "This_template_name_is_required": {
-            "": "Ce nom de modèle est requis."
-        },
         "status": "statut",
         "zipcode": "code postal",
         "address2": "adresse 2",
@@ -7558,9 +7555,7 @@ export default {
         "Filter_saved_successfully": "Filtre enregistré avec succès.",
         "Filter_update_successfully": "Filtre mis à jour avec succès.",
         "Filter_deleted_successfully": "Filtre supprimé avec succès.",
-        "Checklist_creted_succesfully": {
-            "": "Liste de contrôle créée avec succès."
-        },
+        "checklist_created_successfully": "Liste de contrôle créée avec succès.",
         "Please_select_checklist": "Veuillez sélectionner une liste de contrôle.",
         "already_exists": "EXIST_VALUE existe déjà.",
         "Converted_sucessfully": "Converti avec succès.",

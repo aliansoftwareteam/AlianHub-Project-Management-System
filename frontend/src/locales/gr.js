@@ -114,9 +114,6 @@ export default {
         "templatename": "Όνομα προτύπου",
         "description": "Περιγραφή",
         "Template_name_is_required": "Το όνομα προτύπου είναι υποχρεωτικό",
-        "This_template_name_is_required": {
-            "": "Το όνομα προτύπου είναι υποχρεωτικό."
-        },
         "status": "Κατάσταση",
         "zipcode": "ΤΚ",
         "address2": "Διεύθυνση 2",
@@ -7558,9 +7555,7 @@ export default {
         "Filter_saved_successfully": "Το φίλτρο αποθηκεύτηκε με επιτυχία.",
         "Filter_update_successfully": "Το φίλτρο ενημερώθηκε με επιτυχία.",
         "Filter_deleted_successfully": "Το φίλτρο διαγράφηκε με επιτυχία.",
-        "Checklist_creted_succesfully": {
-            "": "Η λίστα ελέγχου δημιουργήθηκε με επιτυχία."
-        },
+        "checklist_created_successfully": "Η λίστα ελέγχου δημιουργήθηκε με επιτυχία.",
         "Please_select_checklist": "Παρακαλώ επιλέξτε λίστα ελέγχου.",
         "already_exists": "Η EXIST_VALUE υπάρχει ήδη",
         "Converted_sucessfully": "Μετατράπηκε με επιτυχία",
