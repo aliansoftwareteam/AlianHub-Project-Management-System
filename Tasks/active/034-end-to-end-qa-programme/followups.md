@@ -151,7 +151,7 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 125 | A snooze that falls due only returns (and relights the header's unread dot) the next time the Inbox list or counts are read; nothing wakes it in the background. | #953 | Query-time return was the agreed design for slice 2; a timer or socket nudge is a separate change. |
 | 126 | The legacy bell dropdown's archive still lists notifications cleared in the Inbox. | #953 | The bell module was left untouched in slice 2. |
 | 127 | Task 036 screenshots for #951 (Instance › Settings › AI provider fields, AI-off panel, no-provider notice) in dark mode and at 390 px were not taken. | #951 | The machine was loaded when the slice finished; take them in the next UI sweep. |
-| 128 | An invitee who already has an account can't use the copied join link: it opens the sign-up form, which refuses their email. Their emailed link carries their account id and isn't given to the admin. Needs accepting an invitation while signed in on `/invitation`. | #960 | Separate change to the acceptance flow. |
+| 128 | An invitee who already has an account can't use the copied join link: it opens the sign-up form, which refuses their email. Their emailed link carries their account id and isn't given to the admin. Needs accepting an invitation while signed in on `/invitation`. | #960 | Separate change to the acceptance flow. **Closed** by #980. |
 | 129 | Grouping by assignee leaves out tasks assigned only to a team. | #958 | Team membership isn't expanded in the grouping yet. |
 
 ## Owner decisions recorded
