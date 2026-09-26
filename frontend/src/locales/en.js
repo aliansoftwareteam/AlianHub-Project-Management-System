@@ -1329,6 +1329,7 @@ export default {
     },
     Common: {
         select_task: "Select task",
+        select_task_named: "Select {name}",
         select_all_tasks: "Select all tasks in group",
         close: "Close",
         key_esc: "Esc",

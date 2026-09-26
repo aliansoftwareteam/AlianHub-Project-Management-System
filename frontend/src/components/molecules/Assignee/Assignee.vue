@@ -1,11 +1,14 @@
 <template>
     <div>
         <slot name="trigger" :open="openSidebar">
-        <div
+        <component
+            :is="rowIsButton ? 'button' : 'div'"
+            :type="rowIsButton ? 'button' : null"
             class="d-flex align-items-center"
-            :role="rowOpensPicker ? 'button' : null"
-            :tabindex="rowOpensPicker ? 0 : null"
-            :aria-label="rowOpensPicker ? $t('ProjectDetails.assignee') : null"
+            :class="{ 'assignee__row-btn': rowIsButton }"
+            :role="rowOpensPicker && !rowIsButton ? 'button' : null"
+            :tabindex="rowOpensPicker && !rowIsButton ? 0 : null"
+            :aria-label="rowOpensPicker ? (buttonLabel || $t('ProjectDetails.assignee')) : null"
             :aria-haspopup="rowOpensPicker ? 'dialog' : null"
             @click.stop.prevent="!showAddUser ? addUser ? openSidebar() : '' : ''"
             @keydown.enter.self.prevent="rowOpensPicker && openSidebar()"
@@ -61,14 +64,14 @@
                 type="button"
                 class="assignee__add-btn"
                 aria-haspopup="dialog"
-                :aria-label="$t('Members.adduser')"
+                :aria-label="(!detailedUsers.length && buttonLabel) || $t('Members.adduser')"
                 :title="$t('Members.adduser')"
                 @click.stop="openSidebar()"
             >
                 <img :src="addUserIcon" alt="" class="cursor-pointer add__user" :style="{marginLeft: (detailedUsers.length ? '5px' : '0px'), width: imageWidth, height: imageWidth}" />
             </button>
             <span v-if="!addUser && !detailedUsers.length" class="font-size-13">N/A</span>
-        </div>
+        </component>
         </slot>
 
         <Sidebar
@@ -176,6 +179,11 @@ const props = defineProps({
     emptyLabel: {
         type: String,
         default: ''
+    },
+    /** When set, the trigger is a real button with this accessible name. */
+    buttonLabel: {
+        type: String,
+        default: ''
     }
 })
 
@@ -278,6 +286,7 @@ const detailedOptions = computed(() => {
 });
 
 const rowOpensPicker = computed(() => props.addUser && !props.showAddUser && detailedUsers.value.length > 0);
+const rowIsButton = computed(() => rowOpensPicker.value && Boolean(props.buttonLabel));
 
 function openSidebar () {
     visible.value = true;
@@ -323,4 +332,5 @@ function openSidebar () {
     min-width: 25px;
 }
 .assignee__add-btn { display: inline-flex; padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; }
+.assignee__row-btn { margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: inherit; cursor: pointer; }
 </style>

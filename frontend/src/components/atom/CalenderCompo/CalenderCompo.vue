@@ -58,12 +58,15 @@
             <!-- for simple date picker -->
             <template #trigger v-if="range === false">
                 <slot name="trigger" :value="dateValue">
-                <div
+                <component
+                    :is="buttonLabel ? 'button' : 'div'"
                     v-if="!isShowDateAndicon"
+                    :type="buttonLabel ? 'button' : null"
                     class="d-flex calendar-trigger"
-                    role="button"
-                    tabindex="0"
-                    :aria-label="ariaLabel || $t('errorPage.select_a_date')"
+                    :class="{ 'calendar-trigger--button': buttonLabel }"
+                    :role="buttonLabel ? null : 'button'"
+                    :tabindex="buttonLabel ? null : 0"
+                    :aria-label="buttonLabel || ariaLabel || $t('errorPage.select_a_date')"
                     @keydown.enter.self.prevent="openCalendar"
                     @keydown.space.self.prevent="openCalendar"
                 >
@@ -71,7 +74,7 @@
                         {{convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false})}}
                     </span>
                     <img v-else :src="isWithoutBorderImage ? withoutBorderImageIcon : dateImage" class="cursor-pointer" alt="dateImage">
-                </div>
+                </component>
                 <div v-if="isShowDateAndicon">
                     <div v-if="!showTimeFormate">
                         <input
@@ -221,6 +224,11 @@ const props = defineProps({
         default: false
     },
     ariaLabel: {
+        type: String,
+        default: ''
+    },
+    /** When set, the icon or date trigger is a real button with this accessible name. */
+    buttonLabel: {
         type: String,
         default: ''
     },

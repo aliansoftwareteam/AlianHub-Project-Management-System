@@ -2088,6 +2088,7 @@
     "Common.key_tab": "Tab",
     "Common.select_all_tasks": "Select all tasks in group",
     "Common.select_task": "Select task",
+    "Common.select_task_named": "Select {name}",
     "ConnectedApps.empty": "You have not connected any app.",
     "ConnectedApps.last_used": "Last used",
     "ConnectedApps.lead": "Outside agents you allowed to act for you. Revoking one ends its access at once.",
