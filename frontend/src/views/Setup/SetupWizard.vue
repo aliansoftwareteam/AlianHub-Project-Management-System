@@ -53,13 +53,13 @@
                 <div class="ah-field">
                     <label class="ah-field__label" for="password">{{ $t('Setup.password') }}</label>
                     <div class="auth__pw">
-                        <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'" maxlength="150" autocomplete="new-password" class="ah-input" :class="{ 'ah-input--error': errors.password }" @input="errors.password = ''" />
+                        <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'" autocomplete="new-password" class="ah-input" :class="{ 'ah-input--error': errors.password }" @input="errors.password = ''" />
                         <button type="button" class="auth__pw-eye" :aria-label="showPassword ? $t('Setup.hide_password') : $t('Setup.show_password')" @click="showPassword = !showPassword">
                             <ShellIcon :name="showPassword ? 'eyeOff' : 'eye'" :size="15" />
                         </button>
                     </div>
                     <div v-if="errors.password" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.password }}</div>
-                    <span v-else class="ah-small">{{ $t('Auth.new_password_rule', { n: MIN_PASSWORD_LENGTH }) }}</span>
+                    <span v-else class="ah-small">{{ $t('Auth.new_password_rule_range', { min: MIN_PASSWORD_LENGTH, max: MAX_PASSWORD_LENGTH }) }}</span>
                 </div>
 
                 <hr class="ah-divider" />
@@ -140,7 +140,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutSecure, getAuth } from "@/services";
 import * as env from "@/config/env";
 import { readSetupStatus, markInstalled } from "@/router/setupStatus";
-import { MIN_PASSWORD_LENGTH, meetsPasswordRule } from "@passwordRule";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, meetsPasswordRule } from "@passwordRule";
 
 defineOptions({ name: "SetupWizard" });
 
@@ -182,7 +182,7 @@ async function loadStatus() {
 const serverError = (key) => ({
     required: t("Setup.err_required"),
     invalid: t("Setup.err_invalid"),
-    weak: t("Auth.new_password_rule", { n: MIN_PASSWORD_LENGTH }),
+    weak: t("Auth.new_password_rule_range", { min: MIN_PASSWORD_LENGTH, max: MAX_PASSWORD_LENGTH }),
 }[key] || key);
 
 function validate() {

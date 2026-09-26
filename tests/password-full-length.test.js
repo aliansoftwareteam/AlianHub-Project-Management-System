@@ -24,7 +24,7 @@ const SHARED_START = `Aa1!${'x'.repeat(56)}`;
 const CHOSEN = `${SHARED_START}-the-chosen-tail`;
 const SAME_START = `${SHARED_START}-another-tail`;
 
-/* The stored format is bcrypt over the base64 SHA-256 of what each path hashed before. */
+/* Written out rather than imported, so a change to the stored format fails here instead of locking accounts out. */
 const preHashed = (input) => crypto.createHash('sha256').update(input, 'utf8').digest('base64');
 
 let rows;

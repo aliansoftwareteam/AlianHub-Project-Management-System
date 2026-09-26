@@ -1452,7 +1452,7 @@
     "Auth.name_workspace_lead": "Usually your company or team.",
     "Auth.new_here": "New here?",
     "Auth.new_password": "New password",
-    "Auth.new_password_rule": "Use at least {n} characters, including an uppercase letter, a lowercase letter, a number and a symbol.",
+    "Auth.new_password_rule_range": "Use {min} to {max} characters, including an uppercase letter, a lowercase letter, a number and a symbol.",
     "Auth.new_password_title": "Choose a new password",
     "Auth.new_project": "New project",
     "Auth.no_sample": "Starts empty. Add your first task after creating.",
