@@ -6621,6 +6621,7 @@ export default {
         "reply_placeholder": "Reply to {name}…",
         "reply_empty": "Write something before sending.",
         "reply_sent": "Reply posted.",
+        "reply_mentions": "Mentions {name}, so the reply reaches their Inbox.",
         "send": "Send",
         "approve": "Approve",
         "decline": "Decline",

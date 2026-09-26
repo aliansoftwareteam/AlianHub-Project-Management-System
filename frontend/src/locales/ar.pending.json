@@ -3493,6 +3493,7 @@
     "Inbox.reminder": "Reminder",
     "Inbox.reply_empty": "Write something before sending.",
     "Inbox.reply_here": "Reply here",
+    "Inbox.reply_mentions": "Mentions {name}, so the reply reaches their Inbox.",
     "Inbox.reply_placeholder": "Reply to {name}…",
     "Inbox.reply_sent": "Reply posted.",
     "Inbox.requested_off": "requested {range} off",

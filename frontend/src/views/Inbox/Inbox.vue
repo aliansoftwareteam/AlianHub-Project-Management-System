@@ -174,6 +174,7 @@
                             <div v-if="replyError" class="ah-field__error">{{ replyError }}</div>
                             <div class="ibx__reply-actions">
                                 <span class="ah-small ah-mono">⌘↵</span>
+                                <span v-if="replyMention(it)" class="ah-small ibx__reply-to" data-reply-mentions>{{ $t('Inbox.reply_mentions', { name: replyMention(it).name }) }}</span>
                                 <span class="ah-toolbar__spacer"></span>
                                 <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="closeReply">{{ $t('Projects.cancel') }}</button>
                                 <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !replyText.trim()" @click="sendReply(it)">{{ $t('Inbox.send') }}</button>
@@ -700,6 +701,14 @@ const openReply = async (it) => {
     if (replyEl && replyEl.focus) replyEl.focus();
 };
 const closeReply = () => { expanded.value = ''; replyText.value = ''; replyError.value = ''; };
+// Agents and people who have left get no Inbox item, so naming them would only clutter the reply.
+const replyMention = (it) => {
+    const id = String(it.actorId || '');
+    if (!id || it.agent || id === String(userId?.value || '')) return null;
+    const user = actorOf(it);
+    return user && !user.ghostUser && user.Employee_Name ? { id, name: user.Employee_Name } : null;
+};
+const withMention = (text, mention) => (mention && !text.includes(`](${mention.id})`) ? `@[${mention.name}](${mention.id}) ${text}` : text);
 const onReplyKey = (e, it) => {
     if (e.key === 'Escape') { closeReply(); return; }
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); sendReply(it); }
@@ -709,17 +718,18 @@ const sendReply = async (it) => {
     if (!text) { replyError.value = t('Inbox.reply_empty'); return; }
     busy.value = true;
     replyError.value = '';
+    const mention = replyMention(it);
     try {
         const objId = { projectId: it.projectId, sprintId: it.sprintId, taskId: it.taskId };
         if (it.folderId) objId.folderId = it.folderId;
         const res = await apiRequest('post', env.API_COMMENTS, {
             data: {
-                message: escapeHtml(text),
+                message: escapeHtml(withMention(text, mention)),
                 type: 'text',
                 userId: userId?.value,
                 objId,
                 project: false,
-                mentionIds: [],
+                mentionIds: mention ? [mention.id] : [],
                 isDeleted: false,
                 hasReply: false,
                 replyMessageId: '',
@@ -943,6 +953,7 @@ onUnmounted(() => {
 .ibx__reply { display: flex; flex-direction: column; gap: 6px; }
 .ibx__reply-input { min-height: 56px; font-size: 12.5px; }
 .ibx__reply-actions { display: flex; align-items: center; gap: 6px; }
+.ibx__reply-to { color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ibx__more { align-self: center; margin-top: 6px; }
 .ibx__foot { margin-top: auto; padding-top: 12px; text-align: center; font-size: 11.5px; color: var(--ink-2); }
 
