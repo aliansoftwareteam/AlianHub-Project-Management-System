@@ -7,14 +7,14 @@
             :class="{ 'z-index-9': showDropZone === true }" @dragLeave="showDropZone = false" @drop="showDropZone = false">
         </DragAndDropDivCompo>
         <div class="d-flex justify-content-between">
-            <h4 class="task-details-subtitle m-0"
+            <h3 class="task-details-subtitle m-0"
                 :class="{ 'font-size-16 font-weight-600': clientWidth <= 767, 'font-size-14 font-weight-700': clientWidth > 767 }">
                 {{ $t('Attachments.attachments') }}({{ attachments.length }})
                 <span class="custom-popover position-re pl-5px" v-if="permission === true && clientWidth > 767">
                     <img src="@/assets/images/help_icon.png" alt="">
                     <span class="popover-content">{{ $t('Attachments.drag_file') }}</span>
                 </span>
-            </h4>
+            </h3>
             <div class="d-flex align-items-center">
                 <span v-if="props.isMainSpinner === true || isLoadingAttachments"
                     class="d-block text-right p-1 blue text-decoration-underline font-weight-500 font-size-14 cursor-pointer">

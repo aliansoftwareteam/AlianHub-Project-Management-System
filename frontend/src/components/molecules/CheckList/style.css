@@ -24,6 +24,9 @@
 .checklist-main {
     border-bottom: 1px solid #c2c2c2;
 }
+/* The browser margins these had as an h4 and an h5, before they became an h3 and plain text. */
+.checklist-main .checklist-main__title { margin: 1.33em 0; }
+.checklist-main .checklist-main__suggest { margin: 1.67em 0; }
 .checklist-main .new-checklist-section {
     margin: 0px 0;
 }
