@@ -60,7 +60,9 @@ function resolveBuildInfo({ root = ROOT, derive = deriveBuildInfo, onWarning = w
 
 /* Git is read asynchronously so a slow machine never delays the HTTP server.
  * Until git answers, the channel is 'unknown' rather than a release label that
- * may be wrong (seen under heavy load), and a failed read retries with backoff. */
+ * may be wrong (seen under heavy load), and a failed read retries with backoff.
+ * Only start() reads git: a getter that did would leave the read running after
+ * whichever script or jest file first asked for the version had finished. */
 function createResolver({ root = ROOT, run, delays = RETRY_DELAYS_MS, onWarning = warn, onInfo = info } = {}) {
     let current = null;
     let pending = null;
@@ -83,10 +85,12 @@ function createResolver({ root = ROOT, run, delays = RETRY_DELAYS_MS, onWarning 
         return current;
     }
 
+    const withoutGit = () => fromStamp(root, onWarning) || fromPackage(root);
+
     function start() {
-        if (current) return pending;
+        if (pending) return pending;
         if (!hasGit(root)) {
-            current = fromStamp(root, onWarning) || fromPackage(root);
+            current = withoutGit();
             pending = Promise.resolve(current);
             return pending;
         }
@@ -95,10 +99,7 @@ function createResolver({ root = ROOT, run, delays = RETRY_DELAYS_MS, onWarning 
         return pending;
     }
 
-    const get = () => {
-        start();
-        return current;
-    };
+    const get = () => current || (current = hasGit(root) ? unresolved(root, 'not-started') : withoutGit());
 
     const summary = () => {
         const result = { ...get() };
