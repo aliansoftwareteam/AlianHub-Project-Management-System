@@ -110,6 +110,23 @@ describe('running build resolver under a slow git', () => {
         expect(onWarning).toHaveBeenCalledTimes(1);
     });
 
+    it.each([
+        ['the logger module is gone, as after the test file that started the read was torn down', () => undefined],
+        ['the logger throws', () => ({ warn: () => { throw new Error('transport closed'); }, info: () => {} })],
+    ])('a failed read still settles on git-unavailable when %s, warning on the console instead', async (_, logger) => {
+        jest.doMock('../Config/loggerConfig', logger);
+        const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        try {
+            resolver = createResolver({ root: checkout(), run: failingThenWorking(Infinity) });
+            await expect(resolver.start()).resolves.toMatchObject({ channel: 'unknown', source: 'git-unavailable' });
+            expect(consoleWarn).toHaveBeenCalledWith(expect.stringMatching(/could not read git \(git timed out after \d+ ms\)/));
+        } finally {
+            consoleWarn.mockRestore();
+            jest.dontMock('../Config/loggerConfig');
+            jest.resetModules();
+        }
+    });
+
     it('never calls git when there is no .git, reading build-info.json and then package.json', async () => {
         const run = jest.fn();
         const stamp = { version: '14.36.0-beta.9', release: '14.35.0', base: '14.35.0', next: '14.36.0', channel: 'beta', build: 9, commit: 'abcdef12', builtAt: '2026-09-11T00:00:00.000Z', source: 'git', repoUrl: 'https://github.com/o/r' };
