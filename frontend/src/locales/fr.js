@@ -7919,7 +7919,6 @@ export default {
         "keyboard": "Clavier",
         "mouse": "Souris",
         "Create": "Créer",
-        "scroll_to_bottom": "Faire défiler jusqu'en bas",
         "unassigned": "Non assigné",
         "entries": "entrées",
         "showing": "Affichage",

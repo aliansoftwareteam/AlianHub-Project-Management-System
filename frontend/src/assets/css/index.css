@@ -338,15 +338,6 @@ input[type="color"]::-moz-color-swatch {
     width: fill-available;
 }
 
-.btn-scroll-to-bottom {
-    text-align: center;
-    display: block;
-    color: #2F3990;
-    text-decoration: none;
-    padding: 15px 15px 0px;
-    font-size: 14px;
-    font-weight: 500;
-}
 .mh-500{
     max-height: 500px;
 }
