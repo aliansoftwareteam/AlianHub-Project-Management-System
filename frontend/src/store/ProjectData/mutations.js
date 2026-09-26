@@ -60,7 +60,7 @@ export const mutateProjects = (state, payload) => {
                 }
             }
         } else if(op === "modified") {
-            const index = state.allProjects.data.findIndex((x) => x._id === data._id);
+            const index = (state.allProjects?.data || []).findIndex((x) => x._id === data._id);
             if(index !== -1) {
                 if (!data.sprintsfolders) {
                     data.sprintsfolders = {};
@@ -94,22 +94,9 @@ export const mutateProjects = (state, payload) => {
                         state.allProjects.data[index] = data;
                     }
                 }
-            } else {
-                data.sprintsObj = sortObject({...state.allProjects.data[index].sprintsObj, ...data.sprintsObj});
-
-                let object = {...state.allProjects.data[index].sprintsfolders, ...data.sprintsfolders};
-                if(object && Object.keys(object || {}).length) {
-                    Object.keys(object || {}).forEach((key) => {
-                        if (!data.sprintsfolders[key]) {
-                            data.sprintsfolders[key] = {};
-                        }
-                        data.sprintsfolders[key] = {...object[key], sprintsObj : sortObject(object[key]?.sprintsObj)};
-                    })
-                }
-                state.allProjects.data.push(data);
             }
         } else if(op === "removed") {
-            const index = state.allProjects.data.findIndex((x) => x._id === data._id);
+            const index = (state.allProjects?.data || []).findIndex((x) => x._id === data._id);
             if(index !== -1) {
                 state.allProjects.data.splice(index, 1);
             }

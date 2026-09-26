@@ -7643,6 +7643,7 @@ export default {
         "Milestone_refund_amount_update_successfully": "માઇલસ્ટોન રિફંડ રકમ સફળતાપૂર્વક અપડેટ થઈ",
         "Error_in_updating_milestone_refund_amount": "માઇલસ્ટોન રિફંડ રકમ અપડેટ કરવામાં ભૂલ",
         "The_project_not_found": "પ્રોજેક્ટ મળ્યો નથી.",
+        "project_not_available": "This project isn't available to you.",
         "The_project_is_archived": "પ્રોજેક્ટ આર્કાઇવ છે.",
         "tracker_not_opened": "AlianHub Tracker didn't open. Please make sure it's installed or updated to the latest version.",
         "Start_date_of_project_should_be_smaller_than_current_date": "પ્રોજેક્ટની પ્રારંભ તારીખ વર્તમાન તારીખ કરતાં નાની હોવી જોઈએ",

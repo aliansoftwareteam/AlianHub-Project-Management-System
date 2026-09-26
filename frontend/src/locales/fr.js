@@ -7643,6 +7643,7 @@ export default {
         "Milestone_refund_amount_update_successfully": "Mise à jour du montant du remboursement de l'étape réussie",
         "Error_in_updating_milestone_refund_amount": "Erreur lors de la mise à jour du montant du remboursement de l'étape",
         "The_project_not_found": "Le projet n'a pas été trouvé.",
+        "project_not_available": "This project isn't available to you.",
         "The_project_is_archived": "Le projet est archivé.",
         "tracker_not_opened": "AlianHub Tracker didn't open. Please make sure it's installed or updated to the latest version.",
         "Start_date_of_project_should_be_smaller_than_current_date": "La date de début du projet doit être antérieure à la date actuelle",

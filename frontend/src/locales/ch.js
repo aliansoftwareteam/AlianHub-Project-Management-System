@@ -7643,6 +7643,7 @@ export default {
         "Milestone_refund_amount_update_successfully": "里程碑退款金额更新成功",
         "Error_in_updating_milestone_refund_amount": "更新里程碑退款金额时出错",
         "The_project_not_found": "未找到项目。",
+        "project_not_available": "This project isn't available to you.",
         "The_project_is_archived": "项目已归档。",
         "tracker_not_opened": "AlianHub Tracker didn't open. Please make sure it's installed or updated to the latest version.",
         "Start_date_of_project_should_be_smaller_than_current_date": "项目开始日期必须小于当前日期。",

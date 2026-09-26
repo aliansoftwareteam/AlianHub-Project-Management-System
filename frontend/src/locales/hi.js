@@ -7643,6 +7643,7 @@ export default {
         "Milestone_refund_amount_update_successfully": "मील का पत्थर रिफंड राशि सफलतापूर्वक अपडेट की गई",
         "Error_in_updating_milestone_refund_amount": "मील का पत्थर रिफंड राशि अपडेट करने में त्रुटि",
         "The_project_not_found": "परियोजना नहीं मिली",
+        "project_not_available": "This project isn't available to you.",
         "The_project_is_archived": "परियोजना आर्काइव की गई है",
         "tracker_not_opened": "AlianHub Tracker didn't open. Please make sure it's installed or updated to the latest version.",
         "Start_date_of_project_should_be_smaller_than_current_date": "परियोजना की शुरुआत तिथि वर्तमान तिथि से छोटी होनी चाहिए",

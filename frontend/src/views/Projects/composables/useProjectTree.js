@@ -96,13 +96,14 @@ export function useProjectTree(projectData) {
     }
 
     /* Open the project the URL names; fall back to the first one and say so, since a
-       silent fallback made every stale deep link look like it had opened what was clicked. */
+       silent fallback made every stale deep link look like it had opened what was clicked.
+       The message must not tell a member whether a private project they cannot see exists. */
     function resolveRouteProject() {
         if (!projects.value?.length) return;
         const wanted = route.params?.id;
         if (wanted && String(projectData.value?._id) === String(wanted)) return;
         const routed = wanted ? (byId(projects.value, wanted) || storeProject(wanted)) : null;
-        if (wanted && !routed) $toast.info(t('Toast.The_project_not_found'), { position: 'top-right' });
+        if (wanted && !routed) $toast.info(t('Toast.project_not_available'), { position: 'top-right' });
         selectProject(routed || projects.value[0], !routed);
     }
 
