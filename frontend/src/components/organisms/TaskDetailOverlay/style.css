@@ -177,6 +177,11 @@
 .ah-detail__pane { font-size: 13px; line-height: 1.6; }
 .ah-detail__pane .createProjectListSidebarContentWrapper { padding: 0; }
 .ah-detail__pane .description-comp { margin: 0; border: 0; }
+/* The description sheet adds a 60px left gutter for the Editor.js toolbar above 651px; in this narrow pane
+   Editor.js already reserves room on the right, so the toolbar goes there and the text starts at the padding. */
+.ah-detail__pane #editorjs .ce-block__content,
+.ah-detail__pane #editorjs .ce-toolbar__content { margin-left: 0; max-width: 100% !important; }
+.ah-detail__pane #editorjs .ce-toolbar__actions { right: 0; }
 .ah-detail__pane .task-details-subtitle { font: 600 13px/1.3 var(--font-ui); color: var(--ink); }
 .ah-detail__pane .mobile__bg--withPadding { border: 0; padding: 0; margin-top: 12px; }
 .ah-detail__quick { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 2px; }
