@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { validateCreateShare, generateShareToken, isObjectIdString } = require('./helpers/shareRules');
 const { canManageShare } = require('./helpers/shareAccess');
-const bcrypt = require('bcrypt');
+const { hashPassword } = require('../Auth/helpers/passwordHash');
 
 // Parse a client-supplied expiry into a Date (null when absent / to clear).
 const parseExpiry = (v) => {
@@ -18,6 +18,7 @@ const sanitizeShare = (doc) => {
     const obj = doc.toObject ? doc.toObject() : { ...doc };
     obj.hasPassword = !!obj.passwordHash;
     delete obj.passwordHash;
+    delete obj.passwordHashVersion;
     return obj;
 };
 
@@ -84,7 +85,7 @@ exports.createShare = async (req, res) => {
         };
         const exp = parseExpiry(expiresAt);
         if (exp) shareData.expiresAt = exp;
-        if (password && String(password).length) shareData.passwordHash = await bcrypt.hash(String(password), 10);
+        if (password && String(password).length) Object.assign(shareData, await hashPassword(String(password)));
 
         const share = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PUBLIC_SHARES,
@@ -139,7 +140,11 @@ exports.updateShare = async (req, res) => {
         if (enabled !== undefined) update.enabled = enabled === true;
         if (allowIntake !== undefined) update.allowIntake = allowIntake === true;
         if (expiresAt !== undefined) update.expiresAt = parseExpiry(expiresAt); // null clears expiry
-        if (password !== undefined) update.passwordHash = (password && String(password).length) ? await bcrypt.hash(String(password), 10) : null; // empty clears the password
+        if (password !== undefined) {
+            Object.assign(update, (password && String(password).length)
+                ? await hashPassword(String(password))
+                : { passwordHash: null, passwordHashVersion: null });
+        }
         if (!Object.keys(update).length) {
             return res.send({ status: false, statusText: 'Nothing to update.' });
         }

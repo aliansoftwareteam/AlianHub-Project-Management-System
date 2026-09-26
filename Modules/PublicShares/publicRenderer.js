@@ -6,7 +6,7 @@ const { isShareToken, validateIntakeSubmission, escapeHtml, sanitizeDocHtml } = 
 const { shareStillAuthorised } = require('./helpers/shareAccess');
 const reportRules = require('../CustomReports/helpers/reportRules'); // REP-09 — share saved reports
 const customReports = require('../CustomReports/controller');
-const bcrypt = require('bcrypt');
+const { hashPassword, isCurrentPasswordHash, verifyPassword } = require('../Auth/helpers/passwordHash');
 const crypto = require('crypto');
 
 // Unauthenticated public pages, server-rendered as plain HTML so the public
@@ -297,6 +297,23 @@ async function resolveShare(token) {
     if (!(await shareStillAuthorised(index.companyId, share))) return null;
     return { companyId: index.companyId, share };
 }
+
+/* Matched on the hash it replaces, so a password changed or removed meanwhile is not overwritten. */
+const storeSharePasswordInCurrentFormat = async (companyId, share, supplied) => {
+    await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PUBLIC_SHARES,
+        data: [{ _id: share._id, passwordHash: share.passwordHash }, { $set: await hashPassword(supplied) }],
+    }, 'updateOne');
+};
+
+const sharePasswordMatches = async (companyId, share, supplied) => {
+    if (!supplied || !(await verifyPassword(supplied, share))) return false;
+    if (!isCurrentPasswordHash(share)) {
+        storeSharePasswordInCurrentFormat(companyId, share, supplied)
+            .catch((error) => logger.error(`Share password hash upgrade: ${error.message || error}`));
+    }
+    return true;
+};
 
 // --- REP-09: report shares — a read-only public view of a saved report (REP-02). ---
 const DIM_LABELS = { status: 'Status', project: 'Project', sprint: 'Sprint' };
@@ -688,8 +705,7 @@ exports.renderShare = async (req, res) => {
         // Optional password gate (stateless — re-entered per visit).
         if (share.passwordHash) {
             const supplied = (req.body && req.body.password) ? String(req.body.password) : '';
-            const ok = supplied && await bcrypt.compare(supplied, share.passwordHash);
-            if (!ok) {
+            if (!(await sharePasswordMatches(companyId, share, supplied))) {
                 return sendPage(res, 200, 'Protected', passwordForm(req.params.token, req.method === 'POST'));
             }
         }
