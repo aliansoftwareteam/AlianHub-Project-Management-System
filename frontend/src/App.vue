@@ -1,10 +1,11 @@
 <template>
-	<div v-if="!underMaintainance">
+	<div>
 		<OfflineBanner/>
 		<DemoBanner/>
 		<MaintenanceBanner/>
-		<template v-if="$route.meta.requiresAuth">
-			<template v-if="logged && (rules && Object.keys(rules).length && companyUserDetail && Object.keys(companyUserDetail).length) && socketSettled">
+		<MaintenanceCard v-if="maintenanceBlocksPage"/>
+		<template v-else-if="$route.meta.requiresAuth">
+			<template v-if="shellReady">
                 <!-- Mounted at the root so an incoming call rings wherever the user is,
                      not only when the conversation that called them is on screen. -->
                 <CallOverlay />
@@ -59,9 +60,6 @@
             @closeReleaseNoteModel="(val) => {openReleaseNoteModel = val}" >
         </UpgradeProcessModel>
 	</div>
-	<div v-else class="d-flex align-items-center justify-content-center w-100vw h-100dvh">
-		<img :src="underMaintainanceImg" alt="underMaintainance">
-	</div>
 </template>
 <script setup>
 // PACKAGES
@@ -69,6 +67,8 @@ import { computed, defineComponent, onMounted, provide, ref, watch, inject} from
 // COMPONENTS
 import TourCom from "@/components/organisms/Tour/TourComponet.vue"
 import MaintenanceBanner from "@/views/Settings/Instance/MaintenanceBanner.vue"
+import MaintenanceCard from "@/views/Settings/Instance/MaintenanceCard.vue"
+import { maintenanceOn } from "@/composable/maintenanceState"
 import HeaderComponent from '@/components/organisms/Header/Header.vue'
 import GlobalRail from '@/components/organisms/Shell/GlobalRail.vue'
 import MobileTabBar from '@/components/organisms/Shell/MobileTabBar.vue'
@@ -94,7 +94,6 @@ const paymentInit = inject("paymentInit");
 // IMAGES
 // import logo from '@/assets/images/png/logo.png'
 const logo = "/api/v1/getlogo?key=logo&type=desktop";
-import underMaintainanceImg from '@/assets/images/under_maintenance.png'
 import { useRoute, useRouter } from 'vue-router';
 import { languageTranslateHelper } from './composable/index';
 import {socketHelper} from './composable/socketHelper';
@@ -124,7 +123,6 @@ const { locale, setLocaleMessage } = useI18n();
 const companyId = ref(localStorage.getItem('selectedCompany') !== null ? localStorage.getItem('selectedCompany') : "")
 // Escape hatch for one release: the old top bar stays reachable behind a flag.
 const legacyNav = ref(localStorage.getItem('ah.legacyNav') === '1');
-const underMaintainance = ref(false);
 const logged = ref(false);
 const showReviewModal = ref(false);
 const showSpinner = ref(true);
@@ -238,6 +236,10 @@ watch(() => getters['settings/companyUserDetail'], async(val) => {
     }
 	companyUserDetail.value = val;
 })
+
+const shellReady = computed(() => Boolean(logged.value && rules.value && Object.keys(rules.value).length && companyUserDetail.value && Object.keys(companyUserDetail.value).length && socketSettled.value));
+// A page that loaded before maintenance began keeps its content under the banner; one whose boot calls were refused would otherwise stay blank or spin forever.
+const maintenanceBlocksPage = computed(() => maintenanceOn.value && (route.meta.requiresAuth ? !shellReady.value : !route.matched.length));
 
 watch(() => getters['settings/selectedCompany'], async(val) => {
     if(val.isDisable === true){
@@ -581,11 +583,6 @@ const onPaletteKey = (e) => {
     isAdvanceSearch.value = !isAdvanceSearch.value;
 }
 
-watch(underMaintainance, (newVal, oldVal) => {
-	if(newVal !== oldVal && newVal === false)  {
-		window.location.reload();
-	}
-})
 
 const changeLanguageHandler = async () => {
     const updateLanguage = await changeLanguage(selectedLanguageCode.value);
