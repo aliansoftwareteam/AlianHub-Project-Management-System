@@ -357,6 +357,13 @@ html, body, #app {
     border: 2px solid var(--on-brand); border-top: 0; border-right: 0;
     transform: rotate(-45deg) translate(1px, -1px);
 }
+.ah-check[type="radio"] { border-radius: 50%; }
+.ah-check[type="radio"]:checked::after {
+    content: ""; width: 6px; height: 6px;
+    border: 0; border-radius: 50%;
+    background: var(--on-brand);
+    transform: none;
+}
 .ah-check:focus-visible { outline: none; box-shadow: var(--focus); }
 
 .ah-tabs { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: rgba(0, 0, 0, .05); }

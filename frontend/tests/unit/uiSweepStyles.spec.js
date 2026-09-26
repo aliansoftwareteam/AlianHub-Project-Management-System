@@ -217,3 +217,24 @@ describe('legacy blocks inside the task panel in dark mode', () => {
         expect(dark(selector)).toMatch(expected);
     });
 });
+
+describe('radio inputs that use .ah-check', () => {
+    const tokens = read('assets/css/tokens.css');
+
+    test('are drawn round, not as a square box', () => {
+        expect(ruleBody(tokens, '.ah-check[type="radio"]')).toMatch(/border-radius:\s*50%/);
+    });
+
+    test('show a centre dot when checked instead of the tick', () => {
+        const dot = ruleBody(tokens, '.ah-check[type="radio"]:checked::after');
+        expect(dot).toMatch(/border-radius:\s*50%/);
+        expect(dot).toMatch(/background:\s*var\(--on-brand\)/);
+        expect(dot).toMatch(/border:\s*0/);
+        expect(dot).toMatch(/transform:\s*none/);
+    });
+
+    test('checkboxes keep their square box and tick', () => {
+        expect(ruleBody(tokens, '.ah-check')).toMatch(/border-radius:\s*4px/);
+        expect(ruleBody(tokens, '.ah-check:checked::after')).toMatch(/transform:\s*rotate\(-45deg\)/);
+    });
+});
