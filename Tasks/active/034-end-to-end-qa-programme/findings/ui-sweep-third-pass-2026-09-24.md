@@ -76,7 +76,7 @@ low = polish.
 | U3-34 | Agents as teammates, People | owner | all / both | The guest row shows role "Member" and access "Everything"; every person's subtitle in People reads "Owner" (the fixture's designation 0), so the job title reads like a role | low | no — needs a look at the role label mapping **Fixed** by #1000 (build 467). |
 | U3-35 | Route tasks to agents | both | all / both | Every open task is pre-selected on load ("3 selected") | low | no — product call |
 | U3-36 | Global search | both | all / both | The palette panel runs to the bottom of the viewport with an empty area under its footer; it also stays open across a hash-route change | low | no |
-| U3-37 | "+ Dashboard" dialog | owner | all / both | The mutually exclusive "Start with" options are drawn as checkboxes | low | no |
+| U3-37 | "+ Dashboard" dialog | owner | all / both | The mutually exclusive "Start with" options are drawn as checkboxes | low | no **Fixed** by #1020 (build 496). |
 | U3-38 | Doc view | both | all / both | A long title is clipped inside the single-line title field with no wrap or ellipsis; a stray dot sits left of the editor body | low | no **Fixed** by #1009 (build 473). |
 | U3-39 | Workflow builder | both | all / both | With `WORKFLOW_ENGINE` off the page shows its "not running" state but still calls `GET /api/v2/workflows/step-types` (503 in the console) | low | no |
 | U3-40 | Automations → dry run | owner | all / both | For a rule that is switched off the verdict chip reads "Would run" while the reasons say "The rule is switched off, so it will not run"; the project pickers also offer the owner's "Personal" list project | low | no — verdict wording is a product call |

@@ -112,10 +112,10 @@ In the "UX Launch Plan" list.
 **Friction**
 - **F3-a. Esc closes the whole panel from inside a picker.** With the assignee picker open, Esc closed the task panel (observed at 1280). The panel's Esc handler skips sidebars, modals and SweetAlert, but not an open dropdown (`components/organisms/TaskDetailOverlay/TaskDetailOverlay.vue:143-152`). The user then has to reopen the task.
 - **F3-b. No undo on any property change.** Each change shows only a success toast (`components/organisms/TaskDetailRightSide/TaskDetailRightSide.vue:517, 597, 668, 730`).
-- **F3-c. Properties depend on project apps.** On a project without the Priority app (both seeded projects), the desktop panel shows **no priority row at all** (`TaskDetailRightSide.vue:138`). The phone header still shows a read-only "Medium" chip (`TaskDetailOverlay/TaskDetailPanel.vue:121`). New users cannot tell why priority is missing.
+- **F3-c. Properties depend on project apps.** On a project without the Priority app (both seeded projects), the desktop panel shows **no priority row at all** (`TaskDetailRightSide.vue:138`). The phone header still shows a read-only "Medium" chip (`TaskDetailOverlay/TaskDetailPanel.vue:121`). New users cannot tell why priority is missing. **Fixed** by #1025 (build 491).
 - **F3-d. Phone priority.** At 390 px, tapping Priority in the Properties sheet opened no picker in three runs. `PriorityComp.vue` opens a `Sidebar` component, which may be stacked under the sheet. This needs a manual check on a device.
 - **F3-e. Phone due date.** At 390 px the date picker stayed open after a day was tapped and covered the Sprint and Type rows. At 1280 it closed. `CalenderCompo.vue:7` has `close-on-auto-apply="false"`.
-- **F3-f. Title casing.** The panel title is shown in Title Case ("Attach The Vendor Contract") while the list shows the stored sentence case.
+- **F3-f. Title casing.** The panel title is shown in Title Case ("Attach The Vendor Contract") while the list shows the stored sentence case. **Fixed** by #1014 (build 481).
 - **F3-g. Two checkboxes by the title.** Next to the title sit two checkbox-like icons: "Mark as done" and a green ticked task-type icon. The ticked one reads as "done" on a task that is not done (`f3-detail-1280-open-1280.jpg`).
 
 ## 4. Find a known task by name
@@ -198,7 +198,7 @@ As the owner. SMTP is unreachable in the harness.
 | author 0; member 1 | none | ok; at 390 ↵ does not send (by design, `CommentInput.vue:190`), tap Send |
 
 **Friction**
-- **F7-a. Inbox replies are plain text.** A reply from the Inbox has no @ picker and sends `mentionIds: []` (`views/Inbox/Inbox.vue:699-714`). The original author is not mentioned and gets no Inbox item for the reply.
+- **F7-a. Inbox replies are plain text.** A reply from the Inbox has no @ picker and sends `mentionIds: []` (`views/Inbox/Inbox.vue:699-714`). The original author is not mentioned and gets no Inbox item for the reply. **Fixed** by #1021 (build 488).
 - **F7-b. Send is covered.** At 1280×800 the comment Send button sits under the "Getting started" card (`f7-mention-1280-picker-1280.jpg`).
 - **F7-c. Failed sends are silent.** A failed comment send is logged only to the console and the text is cleared (`views/Projects/Comments/Comments.vue:2096-2098`) (*code*). **Fixed** by #1002 (build 469).
 
@@ -291,8 +291,8 @@ As the member, with three mentions.
 **Friction**
 - **F12-a. The keyboard path is broken at both ends.** On load nothing has focus, and `j` did not move focus into the list (observed). After `e` clears a card, focus falls back to `<body>`, so the next `s` or ↵ does nothing. Keyboard triage therefore needs a mouse click per item (`views/Inbox/Inbox.vue:763-777`).
 - **F12-b. Open leaves the Inbox.** Open navigates away instead of opening the task over the Inbox, so triaging several items costs a Back per item (`components/organisms/Header/helper.js:132-272`).
-- **F12-c. No undo for bulk actions.** "Clear all" and "Mark all read" have no confirmation and no undo (`Inbox.vue:563-580`) (*code*).
-- **F12-d. The hint is incomplete.** The key hint shows "j k e s" only; `r` and ↵ are not listed.
+- **F12-c. No undo for bulk actions.** "Clear all" and "Mark all read" have no confirmation and no undo (`Inbox.vue:563-580`) (*code*). **Fixed** by #1031 (build 489).
+- **F12-d. The hint is incomplete.** The key hint shows "j k e s" only; `r` and ↵ are not listed. **Fixed** by #1031 (build 489).
 
 ---
 
