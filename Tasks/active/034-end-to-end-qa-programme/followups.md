@@ -154,6 +154,10 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 128 | An invitee who already has an account can't use the copied join link: it opens the sign-up form, which refuses their email. Their emailed link carries their account id and isn't given to the admin. Needs accepting an invitation while signed in on `/invitation`. | #960 | Separate change to the acceptance flow. |
 | 129 | Grouping by assignee leaves out tasks assigned only to a team. | #958 | Team membership isn't expanded in the grouping yet. **Fixed** by #969 (build 437). |
 | 130 | New passwords have no server-side maximum length; add one, with the same limit on the client. Details are in the owner's private notes. | #977 review | Separate change to the password rule. |
+| 131 | Test suites that reach `buildInfo.get()` without mocking it start a real git read that can outlive the test file. #1008 stops a late failure there from throwing, but under `--runInBand` jest's "after teardown" notice can still exit 1. Mock `Config/buildInfo` in those suites, or skip the git read under jest. | #1008 | Beyond that PR's fix. |
+| 132 | In Greek and Gujarati the login page's "Forgot password" link shows a doubled question mark: those translations already end in one and the template adds "?". | #996 | Separate from the English copy fix; wait for #996 to merge. |
+| 133 | Board cards: the tag "+" and the comment-count shortcut are still click-only images. #995 made the other quick edits buttons. | #995 | Left out of #995's scope. |
+| 134 | Pages: a stray dot shows to the left of the doc body (the second half of finding U3-38). | #1009 | #1009 fixed only the clipped title. |
 
 ## Owner decisions recorded
 
