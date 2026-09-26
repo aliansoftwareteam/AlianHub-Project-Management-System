@@ -4612,6 +4612,7 @@ export default {
         "wip_none": "No limit",
         "more_count": "+{n} more",
         "task_actions": "Task actions",
+        "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
         "archive_task": "Archive task",
@@ -4789,7 +4790,8 @@ export default {
         "delete_tag_desc": "Είστε σίγουροι ότι θέλετε να διαγράψετε την ετικέτα παντού σε αυτόν τον χώρο;",
         "note_msg": "Πατήστε Enter για να δημιουργήσετε μια νέα ετικέτα",
         "This_tag_has_already_been_added": "Αυτή η ετικέτα έχει ήδη προστεθεί",
-        "Tag_name_required": "Απαιτείται το όνομα της ετικέτας"
+        "Tag_name_required": "Απαιτείται το όνομα της ετικέτας",
+        "add_tag": "Add tag"
     },
     "Embeded": {
         "Anything": "Οτιδήποτε",

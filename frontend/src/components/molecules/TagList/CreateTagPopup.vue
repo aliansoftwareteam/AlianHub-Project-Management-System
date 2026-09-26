@@ -2,9 +2,15 @@
     <div class="d-flex taglist__dropdown-mobile__margin" @click="(e)=>{e.stopPropagation()}" :class="[{'pointer-none' : (tagChipArray.length >= 3 && isTaskList) || !checkApps('tags') }]">
         <DropDown @isVisible="tagClosed">   
         <template  #button>
-            <div v-show="(tagChipArray.length < 3 || !isTaskList) && checkApps('tags') && checkPermission('task.task_tag',project?.isGlobalPermission) === true" class="d-flex " ref="clickDropDown" >
-                <img id="openTagDropdown" :src="!isTaskList? tag:tag2"  class="cursor-pointer tag-div">
-            </div>
+            <button
+                v-show="(tagChipArray.length < 3 || !isTaskList) && checkApps('tags') && checkPermission('task.task_tag',project?.isGlobalPermission) === true"
+                type="button"
+                class="d-flex taglist__add-btn"
+                :aria-label="$t('Tags.add_tag')"
+                ref="clickDropDown"
+            >
+                <img id="openTagDropdown" :src="!isTaskList? tag:tag2" class="cursor-pointer tag-div" alt="">
+            </button>
         </template>
         <template #head>
             <div class="tagInputwrapper">
@@ -333,6 +339,7 @@ const HandleColors = (key,i,item) =>{
 .tagname__threedots{
     height:4px;
 }
+.taglist__add-btn { margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; }
 .edit__status-key{
     height:26px !important;
 }

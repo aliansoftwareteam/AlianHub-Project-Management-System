@@ -4612,6 +4612,7 @@ export default {
         "wip_none": "No limit",
         "more_count": "+{n} more",
         "task_actions": "Task actions",
+        "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
         "archive_task": "Archive task",
@@ -4789,7 +4790,8 @@ export default {
         "delete_tag_desc": "क्या आप सुनिश्चित हैं कि आप इस स्पेस में हर जगह से टैग हटाना चाहते हैं?",
         "note_msg": "नया टैग बनाने के लिए एंटर दबाएं",
         "This_tag_has_already_been_added": "यह टैग पहले ही जोड़ा जा चुका है",
-        "Tag_name_required": "टैग का नाम आवश्यक है"
+        "Tag_name_required": "टैग का नाम आवश्यक है",
+        "add_tag": "Add tag"
     },
     "Embeded": {
         "Anything": "कुछ भी",

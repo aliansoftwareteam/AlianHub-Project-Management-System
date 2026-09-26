@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { defineComponent, h, ref } from 'vue';
+import { defineComponent, h, nextTick, ref } from 'vue';
 import { createStore } from 'vuex';
 
 const composable = vi.hoisted(() => {
@@ -42,18 +42,23 @@ vi.mock('@vuepic/vue-datepicker', () => ({
 }));
 
 import BoardCard from '@/views/Projects/Kanban/BoardViewDisplayCardComponent.vue';
+import CreateTagPopup from '@/components/molecules/TagList/CreateTagPopup.vue';
+import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 
 const TASK_NAME = 'Write the launch post';
+const UNREAD_COMMENTS = 3;
 const store = createStore({
     getters: {
         'settings/companyUsers': () => [{ userId: 'u1', isDelete: false }],
         'settings/designations': () => [],
         'settings/companyOwnerDetail': () => ({ userId: 'u1' }),
         'settings/companyDateFormat': () => ({ dateFormat: 'DD/MM/YYYY' }),
-        'users/myCounts': () => ({ data: {} })
+        'users/myCounts': () => ({ data: { task_p1_s1_t1_comments: UNREAD_COMMENTS } })
     }
 });
 const PickerSidebar = { name: 'Sidebar', props: ['visible'], template: '<div class="picker" :data-open="String(!!visible)"></div>' };
+// Like the real DropDown, the menu opens when anything in its button slot is clicked.
+const MenuDropDown = { name: 'DropDown', data: () => ({ open: false }), template: '<div class="menu" :data-open="String(open)" @click.stop.prevent="open = !open"><slot name="button" /></div>' };
 
 const mountCard = ({ archived = false } = {}) => mount(BoardCard, {
     props: {
@@ -67,7 +72,7 @@ const mountCard = ({ archived = false } = {}) => mount(BoardCard, {
         provide: {
             showArchived: ref(archived),
             toggleTaskDetail: vi.fn(),
-            selectedProject: ref({ _id: 'p1', isGlobalPermission: true, viewColumn: [], tagsArray: [] }),
+            selectedProject: ref({ _id: 'p1', isGlobalPermission: true, viewColumn: [{ key: 'commentCounts', show: true }], tagsArray: [] }),
             searchedTask: ref(false),
             taskCollapsed: ref(true),
             $defaultTaskStatusImg: ref('default.png')
@@ -113,6 +118,19 @@ const activations = {
     Space: (el) => el.trigger('keydown', { key: ' ' })
 };
 
+// jsdom does not synthesise the click a browser fires when Enter or Space reaches a <button>.
+const pressOnButton = (key) => async (el) => {
+    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+    el.element.dispatchEvent(event);
+    if (!event.defaultPrevented && el.element.tagName === 'BUTTON') el.element.click();
+    await nextTick();
+};
+const nativeActivations = {
+    click: (el) => el.trigger('click'),
+    Enter: pressOnButton('Enter'),
+    Space: pressOnButton(' ')
+};
+
 describe('board card controls', () => {
     it('names the select checkbox after its task', () => {
         const checkbox = mountCard().find('.kanban-card-multi-select input[type="checkbox"]');
@@ -137,10 +155,57 @@ describe('board card controls', () => {
         });
     });
 
+    describe('the unread-comments shortcut', () => {
+        const trigger = (wrapper) => wrapper.find('.board-task-comment-count');
+
+        it('is a real button named with its count', () => {
+            const button = trigger(mountCard());
+            expect(button.element.tagName).toBe('BUTTON');
+            expect(button.attributes('type')).toBe('button');
+            expect(button.attributes('aria-label')).toBe(`Projects.unread_comments_open|${UNREAD_COMMENTS}`);
+        });
+
+        it.each(Object.keys(nativeActivations))('opens the task on its activity tab on %s', async (how) => {
+            await nativeActivations[how](trigger(mountCard()));
+            expect(openTask).toHaveBeenCalledTimes(1);
+            expect(openTask).toHaveBeenCalledWith(expect.objectContaining({ taskId: 't1', tab: 'activity' }));
+        });
+    });
+
     it('offers no quick-edit buttons on an archived card', () => {
         const wrapper = mountCard({ archived: true });
         expect(wrapper.find('.card-assignee button').exists()).toBe(false);
         expect(wrapper.find('.priority__compo button').exists()).toBe(false);
         expect(wrapper.find('.date-picker button').exists()).toBe(false);
+    });
+});
+
+describe('the add-tag trigger of the tag picker (board card, task panel, list row)', () => {
+    const mountTagPopup = ({ isTaskList = false } = {}) => mount(CreateTagPopup, {
+        props: {
+            task: { _id: 't1', TaskName: TASK_NAME, sprintId: 's1', tagsArray: [] },
+            project: { _id: 'p1', isGlobalPermission: true, tagsArray: [] },
+            isTaskList
+        },
+        global: {
+            stubs: { DropDown: MenuDropDown, TagChip: true, ConfirmationSidebar: true }
+        }
+    });
+    const trigger = (wrapper) => wrapper.find('.menu').find('button, div');
+    const opened = (wrapper) => wrapper.find('.menu').attributes('data-open') === 'true';
+
+    it.each([false, true])('is a named button with a decorative image (list row: %s)', (isTaskList) => {
+        const button = trigger(mountTagPopup({ isTaskList }));
+        expect(button.element.tagName).toBe('BUTTON');
+        expect(button.attributes('type')).toBe('button');
+        expect(button.attributes('aria-label')).toBe('Tags.add_tag');
+        expect(button.find('img').attributes('alt')).toBe('');
+    });
+
+    it.each(Object.keys(nativeActivations))('opens the tag menu on %s', async (how) => {
+        const wrapper = mountTagPopup();
+        expect(opened(wrapper)).toBe(false);
+        await nativeActivations[how](trigger(wrapper));
+        expect(opened(wrapper)).toBe(true);
     });
 });
