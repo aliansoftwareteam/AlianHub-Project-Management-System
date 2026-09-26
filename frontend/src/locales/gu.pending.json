@@ -3280,6 +3280,8 @@
     "Instance.log_reading": "Reading {file} ({size}).",
     "Instance.log_track": "Warnings",
     "Instance.maintenance_banner": "Maintenance mode is on: members see a banner and cannot use the app until you leave it.",
+    "Instance.maintenance_card_body": "We'll be back shortly. This page reloads when it's ready.",
+    "Instance.maintenance_card_title": "AlianHub is under maintenance",
     "Instance.maintenance_confirm": "Every API call except health and this console answers 503 until you leave maintenance. Continue?",
     "Instance.maintenance_off": "Leave maintenance",
     "Instance.maintenance_on": "Enter maintenance",
