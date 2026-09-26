@@ -59,4 +59,10 @@ describe('an agent reply in a task thread is stored as the agent', () => {
         expect(row.isAgent).toBeUndefined();
         expect(row.agentName).toBeUndefined();
     });
+
+    it('a rule comment names the rule, so the thread shows it instead of a missing user', async () => {
+        await tools.addComment(CID, TASK_ID, 'Reminder', { ruleId: '6f0000000000000000000b01', ruleName: 'Nudge', runId: 'r1', depth: 0 });
+
+        expect(onlyComment()).toMatchObject({ userId: 'automation:6f0000000000000000000b01', actorType: 'automation', automationName: 'Nudge' });
+    });
 });

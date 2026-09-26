@@ -21,6 +21,14 @@ export const agentAuthorOf = (row) => {
     return null;
 };
 
+const AUTOMATION_USER = /^automation(:|$)/;
+
+export const automationAuthorOf = (row) => {
+    if (!row) return null;
+    if (row.actorType === "automation" || AUTOMATION_USER.test(String(row.userId || ""))) return { name: String(row.automationName || "") };
+    return null;
+};
+
 export const pageRefIds = (value) => [...new Set(
     [...decodeCommentText(value).matchAll(PAGE_REF)].map((match) => match[1].toLowerCase())
 )];

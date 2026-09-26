@@ -305,6 +305,7 @@ html, body, #app {
 .ah-chip--danger { background: var(--danger-bg); color: var(--danger-ink); }
 .ah-chip--brand { background: var(--brand-tint); color: var(--brand); }
 .ah-chip--agent { background: var(--agent-bg); color: var(--agent); }
+.ah-chip--automation { background: var(--fill); color: var(--ink-2); }
 .ah-chip--mono { font: var(--text-data); }
 .ah-chip--dark { background: var(--rail); color: #fff; }
 .ah-chip--sm { height: 18px; font-size: 10.5px; }
@@ -322,6 +323,7 @@ html, body, #app {
     flex: none; overflow: hidden; object-fit: cover;
 }
 .ah-avatar--agent { border-radius: 6px; background: var(--agent); color: #fff; }
+.ah-avatar--automation { border-radius: 6px; background: var(--fill); color: var(--ink); }
 .ah-avatar--sm { width: 20px; height: 20px; font-size: 9.5px; }
 .ah-avatar--lg { width: 32px; height: 32px; font-size: 13px; }
 .ah-avatar img { width: 100%; height: 100%; object-fit: cover; }
