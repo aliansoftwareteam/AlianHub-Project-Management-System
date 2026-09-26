@@ -7956,7 +7956,7 @@
     "Toast.queue_list_not_updated": "QueueList non mis à jour.",
     "Toast.require_image_format_message": "File format is not supported or not added in Company settings, you can add file format in Settings.",
     "Toast.something_went_wrong": "Something went wrong.",
-    "Toast.task_created_successfully": "Task Created Succeessfully",
+    "Toast.task_created_successfully": "Task created successfully",
     "Toast.tracker_not_opened": "AlianHub Tracker didn't open. Please make sure it's installed or updated to the latest version.",
     "Toast.two_factor_codes_copied": "Recovery codes copied to clipboard.",
     "Toast.two_factor_disabled": "Two-factor authentication disabled.",
