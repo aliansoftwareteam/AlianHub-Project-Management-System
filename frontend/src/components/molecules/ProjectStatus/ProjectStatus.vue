@@ -1,9 +1,9 @@
 <template>
     <div>
         <span
-            class="project-status-name cursor-pointer d-inline-block text-ellipsis"
+            class="project-status-name cursor-pointer d-inline-block text-ellipsis ah-status-ink"
             :class="{'font-size-13 font-weight-400 border-radius-7-px' : clientWidth > 767 ,'font-size-16 font-weight-500 border-radius-6-px d-block align-items-center justify-content-center text-ellipsis' : clientWidth <=767}"
-            :style="{ color: projectStatus.textColor , backgroundColor: projectStatus.backgroundColor }"
+            :style="chipStyle"
             @click="isVisible = true"
 
         >
@@ -25,6 +25,7 @@
 <script setup>
     import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue';
     import { useCustomComposable } from '@/composable';
+    import { statusChipStyle } from '@/utils/statusChipColors';
 
     import { computed, ref, defineProps, inject } from 'vue';
 
@@ -46,6 +47,7 @@
     const projectStatus = computed(() => {
         return projectData.value.projectStatusData.find((status) => status.value.toLowerCase() === props.projectKey.toLowerCase());
     });
+    const chipStyle = computed(() => statusChipStyle({ textColor: projectStatus.value?.textColor, bgColor: projectStatus.value?.backgroundColor }));
 
     const options = computed(() => {
         return projectData.value.projectStatusData.filter((status) => status.type !== "close").map((status) => {

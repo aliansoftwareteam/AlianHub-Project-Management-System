@@ -3,18 +3,18 @@
         <button
             v-if="canChangeStatus"
             type="button"
-            class="task-status-name"
+            class="task-status-name ah-status-ink"
             aria-haspopup="dialog"
             :aria-expanded="isVisible ? 'true' : 'false'"
-            :style="{ color: taskStatus?.textColor , backgroundColor: taskStatus?.bgColor }"
+            :style="chipStyle"
             @click="isVisible = true"
         >
             {{ taskStatus?.name }}
         </button>
         <span
             v-else
-            class="task-status-name"
-            :style="{ color: taskStatus?.textColor , backgroundColor: taskStatus?.bgColor }"
+            class="task-status-name ah-status-ink"
+            :style="chipStyle"
         >
             {{ taskStatus?.name }}
         </span>
@@ -36,6 +36,7 @@ import Sidebar from '@/components/molecules/Sidebar/Sidebar.vue';
 
 import { computed, ref, defineProps, inject } from 'vue';
 import { useCustomComposable } from '@/composable'
+import { statusChipStyle } from '@/utils/statusChipColors';
 
 const props = defineProps({
     taskKey: {
@@ -73,7 +74,7 @@ const taskStatus = computed(() => {
         return {}
     }
 });
-
+const chipStyle = computed(() => statusChipStyle(taskStatus.value));
 
 const options = computed(() => {
     if (taskStatuses.value) {       

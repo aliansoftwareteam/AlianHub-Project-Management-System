@@ -97,7 +97,7 @@
                 </div>
 
                 <div v-if="isMobile && task._id" class="ah-detail__chips">
-                    <button type="button" class="ah-chip ah-chip--brand" :style="statusChipStyle" @click="sheetOpen = true">{{ statusName }} ▾</button>
+                    <button type="button" class="ah-chip ah-chip--brand ah-status-ink" :style="statusStyle" @click="sheetOpen = true">{{ statusName }} ▾</button>
                     <button
                         v-if="doneStatus"
                         type="button"
@@ -354,6 +354,7 @@ import * as env from "@/config/env";
 import { publicConfig } from "@/config/publicConfig";
 import { aiUsable } from "@/composable/aiAvailability";
 import { dbCollections } from "@/utils/Collections";
+import { statusChipStyle } from "@/utils/statusChipColors";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useUpdateTasks } from "@/views/Projects/helper";
 import { openTask, setTaskMeta } from "./useTaskOverlay";
@@ -466,9 +467,9 @@ const quickActions = computed(() => {
     return list;
 });
 const statusName = computed(() => task.value?.status?.text || projectData.value?.taskStatusData?.find((s) => s.key === task.value?.statusKey)?.name || "");
-const statusChipStyle = computed(() => {
+const statusStyle = computed(() => {
     const status = projectData.value?.taskStatusData?.find((s) => s.key === task.value?.statusKey);
-    return status?.bgColor ? { background: status.bgColor, color: status.textColor } : {};
+    return status?.bgColor ? statusChipStyle(status) : {};
 });
 const priorityName = computed(() => (task.value?.Task_Priority ? getPriority(task.value.Task_Priority)?.name : ""));
 const taskTypeName = computed(() => projectData.value?.taskTypeCounts?.find((x) => x.key === task.value?.TaskTypeKey)?.name || "");

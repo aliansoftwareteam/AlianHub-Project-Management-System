@@ -13,7 +13,7 @@
                         @change="selection.toggleGroup(groupTaskIds)"
                     />
                 </label>
-                <span class="ah-chip" :style="chipStyle">{{ groupLabel }}</span>
+                <span class="ah-chip ah-status-ink" :style="chipStyle">{{ groupLabel }}</span>
                 <span v-if="hasFetched || tasks.length" class="tv2__group-count">{{ tasks.length }}</span>
             </span>
         </div>
@@ -47,6 +47,7 @@ import * as env from "@/config/env";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { taskInGroup } from "@/views/Projects/ListView/listFilter";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
+import { statusChipStyle } from "@/utils/statusChipColors";
 
 defineOptions({ name: "TableViewTable" });
 
@@ -106,9 +107,7 @@ const groupLabel = computed(() => {
     }
     return props.data.name;
 });
-const chipStyle = computed(() => (props.data.bgColor
-    ? { background: props.data.bgColor, color: props.data.textColor }
-    : {}));
+const chipStyle = computed(() => (props.data.bgColor ? statusChipStyle(props.data) : {}));
 
 function addIntersections() {
     setTimeout(() => {

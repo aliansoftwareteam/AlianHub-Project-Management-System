@@ -1,4 +1,5 @@
 import { richHtml } from '@/utils/richHtml';
+import { statusChipCss } from '@/utils/statusChipColors';
 
 const CALLOUT_TONES = ['info', 'warn', 'ok', 'danger'];
 const STATUS_TYPES = ['open', 'close', 'all'];
@@ -47,8 +48,8 @@ const avatarHtml = (ctx, userId) => {
 const statusChipHtml = (ctx, task) => {
     const status = ctx.statusOf(task);
     if (!status || !status.name) return '';
-    const style = status.bgColor && status.textColor ? ` style="background:${escape(status.bgColor)};color:${escape(status.textColor)}"` : '';
-    const cls = status.bgColor ? 'ah-chip' : (status.type === 'close' ? 'ah-chip ah-chip--ok' : 'ah-chip');
+    const style = status.bgColor && status.textColor ? ` style="${escape(statusChipCss(status))}"` : '';
+    const cls = status.bgColor ? 'ah-chip ah-status-ink' : (status.type === 'close' ? 'ah-chip ah-chip--ok' : 'ah-chip');
     return `<span class="${cls} pb-task__status"${style}>${escape(status.name)}</span>`;
 };
 
