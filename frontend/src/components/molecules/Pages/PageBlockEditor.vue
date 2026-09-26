@@ -240,14 +240,15 @@ onBeforeUnmount(() => {
 .pbe :deep(.ce-toolbar__plus:hover),
 .pbe :deep(.ce-toolbar__settings-btn:hover) { background: var(--surface-hover); color: var(--ink); }
 
+/* Editor.js paints a popover on its __container from these variables; the .ce-popover holder stays in the
+   DOM while closed, so a box drawn on it shows as a ring beside the + button. */
 .pbe :deep(.ce-popover) {
     --width: 300px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 11px;
-    box-shadow: var(--shadow-pop);
-    padding: 6px;
+    --border-radius: 11px;
+    --color-background: var(--surface);
+    --color-border: var(--border);
 }
+.pbe :deep(.ce-popover__container) { box-shadow: var(--shadow-pop); }
 .pbe :deep(.ce-popover-item) { padding: 7px 9px; border-radius: 7px; gap: 9px; }
 .pbe :deep(.ce-popover-item:hover:not(.ce-popover-item--disabled)),
 .pbe :deep(.ce-popover-item--focused:not(.ce-popover-item--no-hover)) { background: var(--brand-tint) !important; }
@@ -261,10 +262,6 @@ onBeforeUnmount(() => {
 .pbe :deep(.ce-popover-item__title) { font: 500 12.5px/1.2 var(--font-ui); color: var(--ink); }
 .pbe :deep(.ce-popover__search) { background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 7px; }
 .pbe :deep(.ce-popover__search input) { font: 400 12.5px var(--font-ui); color: var(--ink); }
-.pbe :deep(.ce-inline-toolbar),
-.pbe :deep(.ce-conversion-toolbar) {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-pop);
-}
 .pbe :deep(.ce-block--selected .ce-block__content) { background: var(--brand-tint); }
 
 .pbe :deep(.pb-callout) {
