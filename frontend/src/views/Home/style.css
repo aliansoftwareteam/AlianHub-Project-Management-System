@@ -7,7 +7,14 @@
 
 @media (max-width: 1279px) {
     .home__sidebar-toggle { display: inline-flex; }
-    .home__planner { position: absolute; right: 0; top: var(--toolbar-h); bottom: 0; z-index: 25; box-shadow: var(--shadow-pop); }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+    /* The open planner takes 300px, which leaves the content phone-narrow here. */
+    .home:has(.home__planner) .hc-setup { flex-wrap: wrap; align-items: flex-start; gap: 10px 12px; }
+    .home:has(.home__planner) .hc-setup__body { flex: 1 1 100%; order: 3; }
+    .home:has(.home__planner) .hc-setup__ring { order: 1; }
+    .home:has(.home__planner) .hc-setup__cta { order: 2; margin-left: auto; }
+    .home:has(.home__planner) .hc-setup__dismiss { order: 4; }
 }
 @media (max-width: 991px) {
     .home__grid { grid-template-columns: 1fr; }
@@ -20,8 +27,7 @@
     .ah-tbtn { height: 44px; }
     .hc-row { min-height: 44px; }
     .hc-row__meta { max-width: 80px; }
-    /* The planner opens by default; as an overlay it hid My Work and the agenda on a phone,
-       so it follows them in the page scroll instead. */
+    /* Beside the content the planner leaves a phone no room, so it follows My Work and the agenda. */
     .home .ah-page__body { flex-direction: column; overflow-y: auto; }
     .home .ah-page__content { flex: none; overflow: visible; }
     .home__planner { position: static; width: 100%; height: 480px; box-shadow: none; border-left: 0; border-top: 1px solid var(--hairline); }

@@ -6,6 +6,14 @@ const PRESENCE_KEY = "ah.presence";
 const PLANNER_KEY = "ah.home.planner";
 const FOCUS_KEY = "ah.planner.focus";
 
+const PLANNER_OPEN_BY_DEFAULT_MIN_WIDTH = 1280;
+
+function plannerStartsOpen() {
+    const remembered = localStorage.getItem(PLANNER_KEY);
+    if (remembered === "1" || remembered === "0") return remembered === "1";
+    return window.innerWidth >= PLANNER_OPEN_BY_DEFAULT_MIN_WIDTH;
+}
+
 function readJson(key, fallback) {
     try {
         const raw = localStorage.getItem(key);
@@ -17,7 +25,7 @@ function readJson(key, fallback) {
 
 export const homeState = reactive({
     sidebarOpen: false,
-    plannerOpen: localStorage.getItem(PLANNER_KEY) !== "0",
+    plannerOpen: plannerStartsOpen(),
     presence: readJson(PRESENCE_KEY, { dnd: false, until: null }),
     focusBlocks: readJson(FOCUS_KEY, []),
     refreshKey: 0
