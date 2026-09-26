@@ -31,6 +31,7 @@
 .auth__title { font: var(--text-display); letter-spacing: -.8px; margin: 0 0 6px; color: var(--ink); }
 .auth__lead { font: var(--text-small); margin: 0 0 22px; }
 .auth__providers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.auth__providers > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 .auth__provider {
     display: flex; align-items: center; justify-content: center; gap: 9px;
     height: 40px; border: 1.5px solid var(--border); border-radius: var(--r-input); background: var(--surface);
