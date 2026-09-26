@@ -7,7 +7,7 @@
 
         <form v-else-if="stage === 'form'" class="av2-auth-card" novalidate @submit.prevent="submit">
             <h2 class="auth__h">{{ $t('Auth.create_account') }}</h2>
-            <p class="auth__p">{{ workspaceName ? $t('Auth.join_lead', { workspace: workspaceName }) : $t('Auth.create_account_lead') }}</p>
+            <p v-if="workspaceName" class="auth__p">{{ $t('Auth.join_lead', { workspace: workspaceName }) }}</p>
 
             <div v-if="banner" class="auth__banner auth__banner--danger"><ShellIcon name="alert" :size="15" /><span>{{ banner }}</span></div>
 
