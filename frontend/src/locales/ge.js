@@ -7897,7 +7897,6 @@ export default {
         "keyboard": "Tastatur",
         "mouse": "Maus",
         "Create": "Erstellen",
-        "scroll_to_bottom": "Zum Ende scrollen",
         "unassigned": "Nicht zugewiesen",
         "entries": "Einträge",
         "showing": "Zeigt",

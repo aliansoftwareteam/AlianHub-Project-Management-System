@@ -7897,7 +7897,6 @@ export default {
         "keyboard": "कीबोर्ड",
         "mouse": "माउस",
         "Create": "बनाएं",
-        "scroll_to_bottom": "नीचे स्क्रॉल करें",
         "unassigned": "असाइन नहीं किया गया",
         "entries": "एंट्रीज़",
         "showing": "दिखा रहे हैं",

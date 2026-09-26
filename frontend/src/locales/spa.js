@@ -7897,7 +7897,6 @@ export default {
         "keyboard": "Teclado",
         "mouse": "Ratón",
         "Create": "Crear",
-        "scroll_to_bottom": "Desplazar hasta el Final",
         "unassigned": "Sin Asignar",
         "entries": "entradas",
         "showing": "Mostrando",

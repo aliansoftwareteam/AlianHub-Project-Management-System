@@ -7897,7 +7897,6 @@ export default {
         "keyboard": "键盘",
         "mouse": "鼠标",
         "Create": "创建",
-        "scroll_to_bottom": "滚动到底部",
         "unassigned": "未分配",
         "entries": "条目",
         "showing": "显示",

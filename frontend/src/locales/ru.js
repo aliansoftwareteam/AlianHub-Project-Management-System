@@ -7897,7 +7897,6 @@ export default {
         "keyboard": "Клавиатура",
         "mouse": "Мышь",
         "Create": "Создать",
-        "scroll_to_bottom": "Прокрутить вниз",
         "unassigned": "Не назначено",
         "entries": "записи",
         "showing": "Показано",

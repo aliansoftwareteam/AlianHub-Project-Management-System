@@ -7897,7 +7897,6 @@ export default {
         "keyboard": "Tastiera",
         "mouse": "Mouse",
         "Create": "Crea",
-        "scroll_to_bottom": "Scorri fino in fondo",
         "unassigned": "Non assegnato",
         "entries": "voci",
         "showing": "Mostrando",
