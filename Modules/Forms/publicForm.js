@@ -89,20 +89,11 @@ const PAGE_STYLE = `
     button:hover{filter:brightness(.94)}
     .note{margin-top:18px;font-size:13px;padding:11px 13px;border-radius:8px}
     .note.err{background:#fdf1f0;color:#a33227;border:1px solid #f0cfcb}
-    /* Sent confirmation. The form stays on screen so another submission needs no
-       navigation, and the banner takes itself away after a couple of seconds.
-       Done in CSS because this page runs no script — the policy forbids it. */
-    /* Sits above the form, so it needs room beneath it or the first label touches
-       it. The collapse below has to zero this margin too. */
     .note.ok{display:flex;align-items:center;gap:9px;margin-bottom:20px;background:#eef8f2;color:#1c6b41;
-        border:1px solid #c8e6d5;overflow:hidden;animation:sent-away .45s ease 2s forwards}
+        border:1px solid #c8e6d5}
     .note.ok .tick{flex:0 0 20px;width:20px;height:20px;border-radius:50%;background:#1c7a43;color:#fff;
         display:flex;align-items:center;justify-content:center;font-size:12px}
-    @keyframes sent-away{
-        to{opacity:0;visibility:hidden;max-height:0;margin-top:0;margin-bottom:0;
-            padding-top:0;padding-bottom:0;border-width:0}
-    }
-    @media (prefers-reduced-motion:reduce){.note.ok{animation-duration:.01s}}
+    .again{display:inline-block;font-size:14px;font-weight:600;color:inherit}
     .footer{margin-top:22px;text-align:center;font-size:12px}
     /* One per row on a phone: thirds and quarters are unusable at that width. */
     @media (max-width:640px){.q,.q--3,.q--4,.q--6{grid-column:span 12}}
@@ -163,13 +154,6 @@ const SENT_QUERY = 'sent=1';
 const redirectAfterSubmit = (res, token) => res
     .set('Cache-Control', 'no-store')
     .redirect(303, `/form/${encodeURIComponent(token)}?${SENT_QUERY}`);
-
-/* The confirmation banner. Shared, so the GET that follows a submission and any
- * other caller cannot word it differently. */
-const sentBanner = (form) => {
-    const thanks = form.successMessage || 'Thanks - your submission has been received.';
-    return `<div class="note ok" role="status"><span class="tick">&#10003;</span><span>${escapeHtml(thanks)}</span></div>`;
-};
 
 /* Resolve token -> tenant -> form. The GLOBAL index exists because a public
  * request carries no company: the token has to name the tenant first. */
@@ -314,19 +298,20 @@ function renderQuestion(q, values, errors, layout) {
         + `${error ? `<span class="err-line">${ERROR_ICON}${escapeHtml(error)}</span>` : ''}</div>`;
 }
 
-/* The whole card: heading, an optional banner, and the questions. Used for the
- * first view, a rejected submission and the view after a successful one, so all
- * three cannot drift apart. */
-function formBody(form, token, questions, opts) {
-    const o = opts || {};
-    const s = o.settings || normalizeSettings({});
+function formHead(form, s) {
     // Title and description are ruled off and aligned together: a centred title
     // above a left-aligned description of itself reads as a mistake.
     const head = `head head--${s.titleAlign}${s.titleDivider ? ' head--rule' : ''}`;
     let body = `<div class="${head}"><h1>${escapeHtml(form.title || 'Form')}</h1>`;
     if (form.description) body += `<p class="intro">${escapeHtml(form.description)}</p>`;
-    body += '</div>';
-    if (o.banner) body += o.banner;
+    return `${body}</div>`;
+}
+
+/* Used for the first view and a rejected submission, so the two cannot drift apart. */
+function formBody(form, token, questions, opts) {
+    const o = opts || {};
+    const s = o.settings || normalizeSettings({});
+    let body = formHead(form, s);
     // novalidate: the page validates on the server and renders its own message
     // per field, which the native popup would otherwise pre-empt.
     // multipart only when a file can be sent: it is a heavier encoding, and the
@@ -344,6 +329,15 @@ function formBody(form, token, questions, opts) {
     return body;
 }
 
+/* Shown in place of the form, and it stays: an empty form under a confirmation
+ * that fades invites someone who looked away to send it again. */
+function sentBody(form, token, settings) {
+    const thanks = form.successMessage || 'Thanks - your submission has been received.';
+    return formHead(form, settings)
+        + `<div class="note ok" role="status"><span class="tick">&#10003;</span><span>${escapeHtml(thanks)}</span></div>`
+        + `<a class="again" href="/form/${escapeHtml(encodeURIComponent(token))}">Submit another response</a>`;
+}
+
 /* GET /form/:token — the public form. */
 exports.renderForm = async (req, res) => {
     try {
@@ -352,14 +346,12 @@ exports.renderForm = async (req, res) => {
         const form = liveForm(resolved.form);
         const settings = normalizeSettings(form.settings);
         // Reached by the redirect that follows a submission. A stray ?sent=1 on a
-        // hand-typed url only shows a banner above an empty form, which is
-        // harmless — nothing is recorded by rendering.
+        // hand-typed url only shows the thank-you state, which is harmless —
+        // nothing is recorded by rendering.
         const justSent = String(req.query.sent || '') === '1';
-        return send(res, 200, form.title || 'Form',
-            formBody(form, req.params.token, visibleQuestions(form), {
-                banner: justSent ? sentBanner(form) : '',
-                settings,
-            }), settings);
+        return send(res, 200, form.title || 'Form', justSent
+            ? sentBody(form, req.params.token, settings)
+            : formBody(form, req.params.token, visibleQuestions(form), { settings }), settings);
     } catch (error) {
         logger.error(`ERROR in render public form: ${error.message}`);
         return send(res, 500, 'Error', '<h1>Something went wrong.</h1>');
@@ -532,8 +524,8 @@ exports.submitForm = async (req, res) => {
             actor: { kind: 'system' },
         });
 
-        // Redirected, not rendered: the empty form with its self-dismissing banner
-        // is served by the GET that follows, so reloading it repeats nothing.
+        // Redirected, not rendered: the thank-you state is served by the GET that
+        // follows, so reloading it repeats nothing.
         return redirectAfterSubmit(res, req.params.token);
     } catch (error) {
         logger.error(`ERROR in submit public form: ${error.message}`);
