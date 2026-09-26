@@ -370,7 +370,7 @@ export default {
         "Conform_pass": "Confirmar Contraseña",
         "RememberMeL": "Recuérdame",
         "Remember_password": "Recordar contraseña",
-        "Forgot_Password": "Olvidé la contraseña",
+        "Forgot_Password": "¿Olvidaste tu contraseña?",
         "loading": "Cargando",
         "loging": "Iniciar sesión",
         "Register": "Registrarse",

@@ -370,7 +370,7 @@ export default {
         "Conform_pass": "确认密码",
         "RememberMeL": "记住我",
         "Remember_password": "记住密码",
-        "Forgot_Password": "忘记密码",
+        "Forgot_Password": "忘记密码？",
         "loading": "加载中",
         "loging": "登录",
         "Register": "注册",

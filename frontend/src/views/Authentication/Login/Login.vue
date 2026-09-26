@@ -44,7 +44,7 @@
                 <div class="ah-field">
                     <label class="ah-field__label" for="password">
                         <span>{{ $t('Auth.password') }}</span>
-                        <router-link class="auth__field-link" to="/forgot-password" @click="rememberEmail">{{ $t('Auth.Forgot_Password') }}?</router-link>
+                        <router-link class="auth__field-link" to="/forgot-password" @click="rememberEmail">{{ $t('Auth.Forgot_Password') }}</router-link>
                     </label>
                     <div class="auth__pw">
                         <input
