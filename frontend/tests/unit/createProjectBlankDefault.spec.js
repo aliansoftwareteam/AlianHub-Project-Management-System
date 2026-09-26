@@ -50,3 +50,17 @@ describe('a new project', () => {
         expect(wrapper.find('.ah-cp__sample').text()).toContain('Auth.sample_tasks_label');
     });
 });
+
+describe('a new project started from the palette', () => {
+    it('prefills the typed name and derives the key from it', async () => {
+        apiRequest.mockImplementation((method, url) => Promise.resolve({ data: url.includes('app') ? { data: [] } : { status: true, statusText: [STARTER] } }));
+        const wrapper = mount(CreateProjectSidebar, {
+            props: { isActiveCreateSidebar: true, initialName: '  Website relaunch ' },
+            global: { plugins: [store], stubs: { teleport: true } }
+        });
+        await flushPromises();
+
+        expect(wrapper.find('#cp-name').element.value).toBe('Website relaunch');
+        expect(wrapper.find('#cp-key').element.value).toBe('WR');
+    });
+});

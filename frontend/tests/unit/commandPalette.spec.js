@@ -342,3 +342,24 @@ describe('command ranking', () => {
         expect(commandLeads('', ['New task'])).toBe(false);
     });
 });
+
+describe('the "New project" command', () => {
+    const runNewProject = async (value) => {
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, value);
+        expect(activeOption(wrapper).attributes('data-kind')).toBe('command');
+        expect(activeOption(wrapper).text()).toContain('Inbox.cmd_new_project');
+        await key(wrapper, { key: 'Enter' });
+        return wrapper;
+    };
+
+    it('takes the text typed after the command as the project name', async () => {
+        await runNewProject('new project Website relaunch');
+        expect(router.push).toHaveBeenCalledWith({ name: 'Projects', params: { cid: 'company-1' }, query: { create: 'project', name: 'Website relaunch' } });
+    });
+
+    it('does not use the command\'s own words as the name', async () => {
+        await runNewProject('new proj');
+        expect(router.push).toHaveBeenCalledWith({ name: 'Projects', params: { cid: 'company-1' }, query: { create: 'project', name: undefined } });
+    });
+});

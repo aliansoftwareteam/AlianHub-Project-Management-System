@@ -1,16 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
-import { ref } from 'vue';
+import { nextTick, reactive, ref } from 'vue';
 
-const { push, stub } = vi.hoisted(() => ({
+const { push, replace, currentRoute, stub } = vi.hoisted(() => ({
     push: vi.fn(),
-    stub: (name) => ({ default: { name, render: () => null } })
+    replace: vi.fn(() => Promise.resolve()),
+    currentRoute: { value: null },
+    stub: (name, props = []) => ({ default: { name, props, render: () => null } })
 }));
 
 vi.mock('vue-router', () => ({
-    useRouter: () => ({ push, hasRoute: () => false }),
-    useRoute: () => ({ params: {}, query: {} })
+    useRouter: () => ({ push, replace, hasRoute: () => false }),
+    useRoute: () => currentRoute.value
 }));
 vi.mock('@/composable', () => ({
     useCustomComposable: () => ({ checkPermission: () => true }),
@@ -26,7 +28,7 @@ vi.mock('@/views/Projects/ProjectsListing/useProjectHealth', () => ({
     projectSnapshot: () => null,
     sprintWindow: () => null
 }));
-vi.mock('@/components/organisms/CreateProject/CreateProjectSidebar.vue', () => stub('CreateProjectSidebar'));
+vi.mock('@/components/organisms/CreateProject/CreateProjectSidebar.vue', () => stub('CreateProjectSidebar', ['isActiveCreateSidebar', 'initialName']));
 vi.mock('@/components/organisms/AiProjectCreator/AiProjectCreator.vue', () => stub('AiProjectCreator'));
 vi.mock('@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue', () => stub('ConfirmationSidebar'));
 
@@ -34,7 +36,8 @@ import ProjectsListPage from '@/views/Projects/ProjectsListing/ProjectsListPage.
 
 const project = { _id: 'proj-1', ProjectName: 'Alpha', deletedStatusKey: 0, favouriteTasks: [] };
 
-function mountPage() {
+function mountPage(query = {}) {
+    currentRoute.value = reactive({ params: { cid: 'company-1' }, query });
     const store = createStore({
         getters: {
             'projectData/allProjects': () => ({ data: [project] }),
@@ -51,5 +54,38 @@ describe('ProjectsListPage', () => {
         expect(row.exists()).toBe(true);
         await row.trigger('click');
         expect(push).toHaveBeenCalledWith({ name: 'Project', params: { cid: 'company-1', id: 'proj-1' } });
+    });
+});
+
+describe('ProjectsListPage from the palette\'s "New project"', () => {
+    const sidebar = (wrapper) => wrapper.findComponent({ name: 'CreateProjectSidebar' });
+
+    it('opens the create sidebar with the typed name and clears the query', async () => {
+        const wrapper = mountPage({ create: 'project', name: 'Website relaunch', view: 'grid' });
+        await flushPromises();
+        expect(sidebar(wrapper).exists()).toBe(true);
+        expect(sidebar(wrapper).props('initialName')).toBe('Website relaunch');
+        expect(replace).toHaveBeenCalledWith({ query: { view: 'grid' } });
+    });
+
+    it('opens it with an empty name when none was typed', async () => {
+        const wrapper = mountPage({ create: 'project' });
+        await flushPromises();
+        expect(sidebar(wrapper).props('initialName')).toBe('');
+        expect(replace).toHaveBeenCalledWith({ query: {} });
+    });
+
+    it('opens it when the query arrives while Projects is already open', async () => {
+        const wrapper = mountPage();
+        await flushPromises();
+        expect(sidebar(wrapper).exists()).toBe(false);
+        expect(replace).not.toHaveBeenCalled();
+
+        currentRoute.value.query = { create: 'project', name: 'Ops' };
+        await nextTick();
+        await flushPromises();
+        expect(sidebar(wrapper).exists()).toBe(true);
+        expect(sidebar(wrapper).props('initialName')).toBe('Ops');
+        expect(replace).toHaveBeenCalledWith({ query: {} });
     });
 });
