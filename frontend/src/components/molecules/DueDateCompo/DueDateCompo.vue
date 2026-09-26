@@ -14,6 +14,7 @@
             :isWithoutBorderImage="isWithoutBorderImage"
             :format="format"
             :ariaLabel="label"
+            :buttonLabel="buttonLabel"
             :emptyText="emptyText"
         >
         </CalenderCompo>
@@ -37,6 +38,10 @@ const props = defineProps({
         required: true
     },
     label: {
+        type: String,
+        default: ''
+    },
+    buttonLabel: {
         type: String,
         default: ''
     },
