@@ -75,6 +75,15 @@ describe('useProjectTree', () => {
         expect(push).toHaveBeenCalledWith({ name: 'Project', params: { cid: 'company-1', id: 'p1' }, query: { tab: 'ProjectListView' } });
     });
 
+    it('tells a member a private project link is unavailable without confirming it exists (U5-27)', () => {
+        projects.value = [alpha, beta];
+        routeParams.id = 'owner-only';
+        const { projectData } = mountTree();
+        expect(toast.info).toHaveBeenCalledWith("This project isn't available to you.", { position: 'top-right' });
+        expect(projectData.value._id).toBe('p1');
+        expect(push).toHaveBeenCalledWith({ name: 'Project', params: { cid: 'company-1', id: 'p1' }, query: { tab: 'ProjectListView' } });
+    });
+
     it('selectProject keeps the current tab when the project has it, else its default', () => {
         projects.value = [alpha, beta];
         routeParams.id = 'p1';
