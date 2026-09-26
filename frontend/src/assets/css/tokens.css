@@ -437,12 +437,21 @@ html, body, #app {
 .ah-slide-right-enter-active, .ah-slide-right-leave-active { transition: transform var(--t-panel) var(--ease), opacity var(--t-panel) var(--ease); }
 .ah-slide-right-enter-from, .ah-slide-right-leave-to { transform: translateX(24px); opacity: 0; }
 
-/* Transitions only: spinners and progress bars keep turning, since a frozen one reads as "stuck". */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         transition-duration: .01ms !important;
         transition-delay: 0s !important;
         scroll-behavior: auto !important;
+    }
+    /* Animations end rather than being removed, so animationend still fires and a one-shot entrance
+       lands on its end frame. Spinners and progress bars are exempt: a frozen one reads as "stuck",
+       and the MacLoader bars rest at opacity 0. */
+    :not([class*="spin"], .aitc__orb, .ah-summary__refresh, .loaderBar, .loader > div),
+    :not([class*="spin"], .aitc__orb, .ah-summary__refresh, .loaderBar, .loader > div)::before,
+    :not([class*="spin"], .aitc__orb, .ah-summary__refresh, .loaderBar, .loader > div)::after {
+        animation-duration: .01ms !important;
+        animation-delay: 0s !important;
+        animation-iteration-count: 1 !important;
     }
 }
 
