@@ -114,9 +114,6 @@ export default {
         "templatename": "nombre de la plantilla",
         "description": "descripción",
         "Template_name_is_required": "Se requiere el nombre de la plantilla",
-        "This_template_name_is_required": {
-            "": "Se requiere el nombre de la plantilla."
-        },
         "status": "estado",
         "zipcode": "código postal",
         "address2": "dirección2",
@@ -7556,9 +7553,7 @@ export default {
         "Filter_saved_successfully": "Filtro guardado con éxito.",
         "Filter_update_successfully": "Filtro actualizado con éxito.",
         "Filter_deleted_successfully": "Filtro eliminado con éxito.",
-        "Checklist_creted_succesfully": {
-            "": "Lista de verificación creada con éxito."
-        },
+        "checklist_created_successfully": "Lista de verificación creada con éxito.",
         "Please_select_checklist": "Por favor selecciona la lista de verificación.",
         "already_exists": "EXIST_VALUE ya existe",
         "Converted_sucessfully": "Convertido con éxito",

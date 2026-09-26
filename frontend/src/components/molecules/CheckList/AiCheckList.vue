@@ -305,7 +305,7 @@ function saveChecklist() {
         }
         taskClass.updateAiChecklist({companyId: companyId.value, taskId: props.task._id,checklistArray:finalData, userData:userData,sprintId:props.task.sprintId, projectId: props.task.ProjectID})
         .then(() => {
-            $toast.success(t("Toast.Checklist_creted_succesfully"), {position: 'top-right'});
+            $toast.success(t("Toast.checklist_created_successfully"), {position: 'top-right'});
         })
     }else{
         $toast.error(t(`Toast.Please_select_checklist`), {position:"top-right"});

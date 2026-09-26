@@ -114,9 +114,6 @@ export default {
         "templatename": "模板名称",
         "description": "描述",
         "Template_name_is_required": "模板名称是必填的",
-        "This_template_name_is_required": {
-            "": "此模板名称是必填的。"
-        },
         "status": "状态",
         "zipcode": "邮政编码",
         "address2": "地址2",
@@ -7556,9 +7553,7 @@ export default {
         "Filter_saved_successfully": "筛选条件保存成功。",
         "Filter_update_successfully": "筛选条件更新成功。",
         "Filter_deleted_successfully": "筛选条件删除成功。",
-        "Checklist_creted_succesfully": {
-            "": "检查清单创建成功。"
-        },
+        "checklist_created_successfully": "检查清单创建成功。",
         "Please_select_checklist": "请选择检查清单。",
         "already_exists": "EXIST_VALUE 已存在。",
         "Converted_sucessfully": "转换成功。",

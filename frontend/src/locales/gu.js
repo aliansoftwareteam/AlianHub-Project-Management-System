@@ -114,9 +114,6 @@ export default {
         "templatename": "ટેમ્પલેટ નામ",
         "description": "વર્ણન",
         "Template_name_is_required": "ટેમ્પલેટ નામ જરૂરી છે",
-        "This_template_name_is_required": {
-            "": "આ ટેમ્પલેટ નામ જરૂરી છે."
-        },
         "status": "સ્થિતિ",
         "zipcode": "ઝિપકોડ",
         "address2": "સરનામું 2",
@@ -7556,9 +7553,7 @@ export default {
         "Filter_saved_successfully": "ફિલ્ટર સફળતાપૂર્વક સાચવ્યું.",
         "Filter_update_successfully": "ફિલ્ટર સફળતાપૂર્વક અપડેટ થયું.",
         "Filter_deleted_successfully": "ફિલ્ટર સફળતાપૂર્વક કાઢી નાખ્યું.",
-        "Checklist_creted_succesfully": {
-            "": "ચેકલિસ્ટ સફળતાપૂર્વક બનાવવામાં આવ્યું."
-        },
+        "checklist_created_successfully": "ચેકલિસ્ટ સફળતાપૂર્વક બનાવવામાં આવ્યું.",
         "Please_select_checklist": "કૃપા કરીને ચેકલિસ્ટ પસંદ કરો.",
         "already_exists": "EXIST_VALUE પહેલેથી જ અસ્તિત્વમાં છે",
         "Converted_sucessfully": "સફળતાપૂર્વક રૂપાંતરિત થયું",

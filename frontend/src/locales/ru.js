@@ -114,9 +114,6 @@ export default {
         "templatename": "Название шаблона",
         "description": "Описание",
         "Template_name_is_required": "Название шаблона обязательно для заполнения",
-        "This_template_name_is_required": {
-            "": "Это название шаблона обязательно для заполнения."
-        },
         "status": "Статус",
         "zipcode": "Почтовый индекс",
         "address2": "Адрес 2",
@@ -7556,9 +7553,7 @@ export default {
         "Filter_saved_successfully": "Фильтр успешно сохранен.",
         "Filter_update_successfully": "Фильтр успешно обновлен.",
         "Filter_deleted_successfully": "Фильтр успешно удален.",
-        "Checklist_creted_succesfully": {
-            "": "Чеклист успешно создан."
-        },
+        "checklist_created_successfully": "Чеклист успешно создан.",
         "Please_select_checklist": "Пожалуйста, выберите чеклист.",
         "already_exists": "EXIST_VALUE уже существует",
         "Converted_sucessfully": "Успешно преобразовано",
