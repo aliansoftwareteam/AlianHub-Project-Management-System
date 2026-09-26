@@ -38,6 +38,14 @@
             </template>
         </section>
 
+        <section v-if="browserAlerts !== 'unsupported'" class="ah-card nt__switch-card" data-test="browser-alerts">
+            <div class="nt__switch-text">
+                <strong>{{ $t('Settings.browser_alerts') }}</strong>
+                <div class="ah-small">{{ $t(BROWSER_ALERT_HINT[browserAlerts] || 'Settings.browser_alerts_hint') }}</div>
+            </div>
+            <button v-if="browserAlerts === 'default'" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="browser-alerts-ask" @click="askForBrowserNotifications(userId)">{{ $t('Settings.browser_alerts_turn_on') }}</button>
+        </section>
+
         <section class="ah-card">
             <div class="ah-card__body nt__quiet">
                 <div class="nt__quiet-head">
@@ -112,6 +120,7 @@ import AhSwitch from "@/components/molecules/Setting/AhSwitch.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
 import { markFirstRunStep, FIRST_RUN_STEPS } from "@/composable/firstRunProgress";
+import { askForBrowserNotifications, browserNotificationPermission } from "@/composable/browserNotifications";
 import { ALERT_FORMS, ALERT_TYPES, explanationOf } from "@/views/Ai/rateAlerts";
 
 defineOptions({ name: "NotificationSettings" });
@@ -138,11 +147,13 @@ const channels = [
     { key: "chat", field: "chat", label: "Settings.ch_chat" }
 ];
 const durations = ["10_m", "30_m", "1_h", "2_h", "3_h", "4_h", "8_h", "12_h", "1_d", "2_d", "3_d"];
+const BROWSER_ALERT_HINT = { granted: "Settings.browser_alerts_on", denied: "Settings.browser_alerts_blocked" };
 
 const isSpinner = ref(false);
 const sections = ref([]);
 const prefs = ref({ quietHours: { enabled: false, start: "19:00", end: "09:00", respectTimeOff: true }, agentActivity: true, dailyDigest: false });
 const prefsError = ref("");
+const browserAlerts = browserNotificationPermission();
 
 const rulesGetter = computed(() => getters["settings/notificationSettings"]);
 const aiAlerts = ref({ eligible: false, values: {} });

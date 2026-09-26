@@ -1,37 +1,11 @@
 import { WASABI_RETRIVE_OBJECT, WASABI_RETRIVE_USER_PROFILE } from "@/config/env";
 import { apiRequest, apiRequestWithoutCompnay } from "@/services";
-import { getMessaging, getToken } from "firebase/messaging";
 import Store from '@/store/index'
 import { enabledProviders } from '@/config/publicConfig'
 import { computed } from "vue";
 import * as env from '@/config/env';
 import moment from 'moment';
 import { storageQueryBuilder } from '@/utils/storageQueryBuild';
-
-export const fcmToken = () => {
-    return new Promise((resolve, reject) => {
-        try {
-            const messaging = getMessaging();
-            if (Notification.permission === 'granted') {
-                getToken(messaging).then((currentToken) => {
-                    if (currentToken) {
-                        resolve({ status: true, token: currentToken, message: 'granted' });
-                    } else {
-                        console.info('No registration token available. Request permission to generate one.');
-                    }
-                }).catch((err) => {
-                    reject({ status: true, token: '', message: err });
-                    console.error('An error occurred while retrieving token. ', err);
-                });
-            } else {
-                reject({ status: true, token: '', message: 'denied' });
-            }
-        } catch (error) {
-            reject(error);
-        }
-    })
-}
-
 
 export const getConvertedTimeString = (n, type) => {
     try {
