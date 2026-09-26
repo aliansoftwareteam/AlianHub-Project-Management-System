@@ -6976,6 +6976,7 @@ export default {
         "This_message_is_deleted": "આ સંદેશ કાઢી નાખવામાં આવ્યો છે",
         "You_deleted_this_message": "તમે આ સંદેશ કાઢી નાખ્યો છે",
         "no_user_found": "કોઈ વપરાશકર્તા મળ્યો નથી",
+        "mention_suggestions": "People to mention",
         "unlock_comment_view": "ટિપ્પણી દૃશ્ય અનલૉક કરવા માટે",
         "agent_tag": "AGENT",
         "an_agent": "An agent",
