@@ -25,7 +25,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 017 | Agent memory the product owns | done | high | 015, 016 | done/017-agent-memory |
 | 018 | Sprint 10 — external agents: OAuth, scopes, delegation | active | medium | 028, 031 | active/018-agent-interop |
 | 019 | Sprint 9 — evals and routing measurement | backlog | medium | 026, 027, 030 | backlog/019-agent-evals-observability |
-| 020 | Automation comments show as Ghost User | backlog | medium | — | backlog/020-automation-comment-author |
+| 020 | Automation comments show as Ghost User | done | medium | — | done/020-automation-comment-author |
 | 021 | Maintainability leftovers verified 2026-09-10 | backlog | medium | — | backlog/021-maintainability-leftovers |
 | 022 | Pieces worth porting from the closed pre-redesign PRs | backlog | low | — | backlog/022-salvage-from-closed-prs |
 | 023 | Sprint 0 — stop the bleeding: exploitable findings and cost correctness | done | high | — | done/023-sprint-0-stop-the-bleeding |

@@ -1,7 +1,7 @@
 ---
 id: 020
 title: Automation comments show as Ghost User
-status: backlog
+status: done
 priority: medium
 depends_on: []
 created: 2026-09-10
@@ -25,9 +25,9 @@ A comment written by an automation rule reads as that rule, not as a missing use
 - Reworking the comments schema beyond what author rendering needs.
 
 ## Acceptance criteria
-- [ ] A status-change rule that adds a comment shows the rule name and an automation icon in the comment list and in notifications.
-- [ ] No "Ghost User" anywhere.
-- [ ] One test covers the author rendering.
+- [x] A status-change rule that adds a comment shows the rule name and an automation icon in the comment list and in notifications. (Rule comments send no notifications, so the comment list is the only surface.)
+- [x] No "Ghost User" anywhere.
+- [x] One test covers the author rendering.
 
 ## Constraints & notes
 - Found on 2026-08-24 while building task 005 (its progress.md, "New known issue"); filed here on
