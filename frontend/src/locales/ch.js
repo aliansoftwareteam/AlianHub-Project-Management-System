@@ -6976,6 +6976,7 @@ export default {
         "This_message_is_deleted": "此消息已被删除",
         "You_deleted_this_message": "您已删除此消息",
         "no_user_found": "未找到用户",
+        "mention_suggestions": "People to mention",
         "unlock_comment_view": "解锁评论视图",
         "agent_tag": "AGENT",
         "an_agent": "An agent",
