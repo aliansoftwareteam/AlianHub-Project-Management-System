@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { RouterLinkStub, flushPromises, mount } from '@vue/test-utils';
 
 const { apiRequestWithoutCompnay, route } = vi.hoisted(() => ({
     apiRequestWithoutCompnay: vi.fn(),
@@ -84,5 +84,69 @@ describe('TrackerLogin', () => {
         await flushPromises();
         expect(window.location.href).toBe('');
         expect(wrapper.find('[data-test="tracker-code-error"]').exists()).toBe(true);
+    });
+});
+
+describe('TrackerLogin when the tracker does not open', () => {
+    const openAndContinue = async () => {
+        apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { code: CODE } } });
+        const wrapper = mount(TrackerLogin, { global: { stubs: { RouterLink: RouterLinkStub } } });
+        await wrapper.find('button').trigger('click');
+        await flushPromises();
+        return wrapper;
+    };
+    const hint = (wrapper) => wrapper.find('[data-test="tracker-not-opened"]');
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        apiRequestWithoutCompnay.mockReset();
+        route.query = {};
+        Object.defineProperty(window, 'location', { configurable: true, value: { href: '' } });
+    });
+    afterEach(() => {
+        vi.useRealTimers();
+        Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+        delete document.hidden;
+    });
+
+    it('points to the tracker download after a couple of seconds', async () => {
+        const wrapper = await openAndContinue();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(hint(wrapper).exists()).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(4000);
+        expect(hint(wrapper).exists()).toBe(true);
+        expect(hint(wrapper).findComponent(RouterLinkStub).props('to')).toEqual({ name: 'Time Tracking', params: { cid: 'company-1' } });
+    });
+
+    it('stays quiet when the page loses focus to the tracker', async () => {
+        const wrapper = await openAndContinue();
+        window.dispatchEvent(new Event('blur'));
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(hint(wrapper).exists()).toBe(false);
+    });
+
+    it('stays quiet when the page is hidden', async () => {
+        const wrapper = await openAndContinue();
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+        document.dispatchEvent(new Event('visibilitychange'));
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(hint(wrapper).exists()).toBe(false);
+    });
+
+    it('stops waiting when the page goes away', async () => {
+        const wrapper = await openAndContinue();
+        expect(vi.getTimerCount()).toBe(1);
+        wrapper.unmount();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('says nothing about a download when no code came back', async () => {
+        apiRequestWithoutCompnay.mockRejectedValue(new Error('offline'));
+        const wrapper = mount(TrackerLogin, { global: { stubs: { RouterLink: RouterLinkStub } } });
+        await wrapper.find('button').trigger('click');
+        await flushPromises();
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(hint(wrapper).exists()).toBe(false);
     });
 });
