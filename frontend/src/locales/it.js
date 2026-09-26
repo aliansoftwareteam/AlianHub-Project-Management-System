@@ -4617,6 +4617,7 @@ export default {
         "wip_none": "No limit",
         "more_count": "+{n} more",
         "task_actions": "Task actions",
+        "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
         "archive_task": "Archive task",
@@ -4794,7 +4795,8 @@ export default {
         "delete_tag_desc": "Sei sicuro di voler eliminare il tag ovunque in questo spazio?",
         "note_msg": "Premi Invio per creare un nuovo tag",
         "This_tag_has_already_been_added": "Questo tag è già stato aggiunto",
-        "Tag_name_required": "Nome del tag richiesto"
+        "Tag_name_required": "Nome del tag richiesto",
+        "add_tag": "Add tag"
     },
     "Embeded": {
         "Anything": "Qualsiasi cosa",

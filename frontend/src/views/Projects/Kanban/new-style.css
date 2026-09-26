@@ -346,6 +346,7 @@
 .kanban-board .priority__compo .ml-10px { margin-left: 4px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kanban-board .priority__compo .priority__image { width: 11px; height: 11px; }
 
+.kanban-board .board-task-comment-count { margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; }
 .kanban-board .board-task-comment-count img {
     width: 13px;
     height: 13px;

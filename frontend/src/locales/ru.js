@@ -4617,6 +4617,7 @@ export default {
         "wip_none": "No limit",
         "more_count": "+{n} more",
         "task_actions": "Task actions",
+        "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
         "archive_task": "Archive task",
@@ -4794,7 +4795,8 @@ export default {
         "delete_tag_desc": "Вы уверены, что хотите удалить тег везде в этом пространстве?",
         "note_msg": "Нажмите Enter, чтобы создать новый тег",
         "This_tag_has_already_been_added": "Этот тег уже добавлен",
-        "Tag_name_required": "Требуется имя тега"
+        "Tag_name_required": "Требуется имя тега",
+        "add_tag": "Add tag"
     },
     "Embeded": {
         "Anything": "Что угодно",

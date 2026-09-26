@@ -125,7 +125,7 @@
                         <div v-if="index == chipCount" class="tagcount"> +{{tagChipArray.length - chipCount}} </div>         
                     </div>
                     <div v-if="checkPermission('task.task_tag',projectData?.isGlobalPermission) !== null">
-                        <CreateTagPopup :task="element" @send:tagChipArray="(val)=>tagChipArray = val" @send:ids="(val)=>ids = val" :project="projectData" :chipCount="chipCount" :isTaskList="false" />
+                        <CreateTagPopup :task="element" @send:tagChipArray="(val)=>tagChipArray = val" @send:ids="(val)=>ids = val" :project="projectData" :chipCount="chipCount" :isTaskList="false" :buttonLabel="$t('Tags.add_tag')" />
                     </div>
                 </div>
                 <div v-if="agentRun" class="agent-strip">
@@ -196,13 +196,16 @@
                             </span>
                             <span v-if="myParentCounts > 0" class="sub-task-count">{{myParentCounts > 99 ? "+99" : myParentCounts}}</span>
                         </span>
-                        <span class="d-flex align-items-center board-task-comment-count position-re cursor-pointer"
+                        <button
+                            type="button"
+                            class="d-flex align-items-center board-task-comment-count position-re cursor-pointer"
                             v-if="projectData.viewColumn?.find((x)=> x.key === 'commentCounts')?.show && myCounts > 0"
+                            :aria-label="$t('Projects.unread_comments_open', { n: myCounts })"
                             @click.stop="!showArchiveVar ? changeRoute() : ''"
                         >
-                            <img class="mr-5px" src="@/assets/images/svg/ChatIcon.svg" alt="chatIcon" />
-                            <span class="parent-task-count">{{myCounts > 99 ? "+99" : myCounts}}</span>
-                        </span>
+                            <img class="mr-5px" src="@/assets/images/svg/ChatIcon.svg" alt="" />
+                            <span class="parent-task-count" aria-hidden="true">{{myCounts > 99 ? "+99" : myCounts}}</span>
+                        </button>
                     </div>
                 </div>
             </div>

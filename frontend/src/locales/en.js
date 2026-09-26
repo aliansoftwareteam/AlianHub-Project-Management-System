@@ -4675,6 +4675,7 @@ export default {
         wip_none: "No limit",
         more_count: "+{n} more",
         task_actions: "Task actions",
+        unread_comments_open: "Unread comments: {n}, open",
         column_empty_drop: "Drop a task here",
         add_task_to_column: "Add a task to {name}",
         archive_task: "Archive task",
@@ -4857,6 +4858,7 @@ export default {
         note_msg: "Press Enter to create a new tag",
         This_tag_has_already_been_added: "This tag has already been added",
         Tag_name_required: "Tag name required",
+        add_tag: "Add tag",
     },
     Embeded: {
         Anything: "Anything",
