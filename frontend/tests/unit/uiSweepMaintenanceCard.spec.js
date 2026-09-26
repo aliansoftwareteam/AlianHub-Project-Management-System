@@ -64,18 +64,22 @@ async function mountApp({ maintenance, guardFails = true }) {
     return wrapper;
 }
 
+const originalLocation = window.location;
+
 describe('App during maintenance', () => {
-    let errorSpy;
+    let consoleSpies;
     beforeEach(() => {
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-        errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        consoleSpies = [vi.spyOn(console, 'error').mockImplementation(() => {}), vi.spyOn(console, 'warn').mockImplementation(() => {})];
+        // The banner's state outlives each mount, so a test after an "on" one sees maintenance end and reloads.
+        Object.defineProperty(window, 'location', { configurable: true, value: { ...originalLocation, reload: vi.fn() } });
         services.apiRequestWithoutCompnay.mockImplementation(() => Promise.reject(unavailable));
         services.apiRequest.mockImplementation(() => Promise.reject(unavailable));
     });
     afterEach(() => {
         vi.useRealTimers();
-        errorSpy.mockRestore();
+        consoleSpies.forEach((spy) => spy.mockRestore());
+        Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
     });
 
     it('shows the maintenance card, not an empty page, when the boot calls answer 503', async () => {
