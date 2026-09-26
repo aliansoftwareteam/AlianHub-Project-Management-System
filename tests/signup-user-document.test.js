@@ -4,7 +4,7 @@ jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
 jest.mock('../utils/data', () => ({ importUserNotifications: jest.fn(async () => undefined) }));
 jest.mock('../Modules/Auth/controller', () => ({ addAndRemoveUserInMongodbNotificationCount: jest.fn(async () => undefined), insertAuthFun: jest.fn() }));
-jest.mock('../Modules/Auth/controller/sendVerificationMail', () => ({ sendVerificationEmailPromise: jest.fn(async () => undefined) }));
+jest.mock('../Modules/Auth/controller/sendVerificationMail', () => ({ storeVerificationToken: jest.fn(async () => 'token'), mailVerificationLink: jest.fn(async () => undefined) }));
 jest.mock('../Modules/notification/defaults', () => ({ ensureNotificationDefaults: jest.fn() }));
 jest.mock('../Modules/ImportSettings/controller', () => ({ importSettingsFunction: jest.fn() }));
 jest.mock('../Modules/Company/controller/updateCompany', () => ({ updateCompanyFun: jest.fn() }));
@@ -103,7 +103,7 @@ describe('addUserMongodbV2', () => {
 describe('POST /api/v2/createUser', () => {
     it('saves an anonymous signup without ownership, verification or billing fields', async () => {
         const res = response();
-        createUser.createUserV2({ body: { firstName: 'Ada', lastName: 'L', email: 'a@b.c', password: 'p', ...PRIVILEGED } }, res);
+        createUser.createUserV2({ body: { firstName: 'Ada', lastName: 'L', email: 'a@b.c', password: 'Sup3r-Secret!', ...PRIVILEGED } }, res);
         await settle();
 
         expect(res.body.status).toBe(true);

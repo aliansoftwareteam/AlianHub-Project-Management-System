@@ -41,3 +41,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 033 | Beta build version and log — every merge is a numbered build | active | high | — | active/033-beta-build-version-and-log |
 | 034 | End-to-end QA programme — sweep every function, keep it covered in CI | active | high | — | active/034-end-to-end-qa-programme |
 | 035 | QA follow-ups — fix what the QA fix PRs left out | active | high | 034 | active/035-qa-followups |
+| 036 | ClickUp parity: command palette, task navigation, self-hosted AI, inbox snooze | active | — | — | active/036-clickup-parity |
+| 037 | UX flow fixes from the ClickUp flow comparison | active | — | — | active/037-ux-flow-fixes |
+| 038 | Edit tasks from List rows | active | — | — | active/038-list-inline-edit |
+| 039 | Make the shared DropDown keyboard and screen-reader accessible | backlog | medium | — | backlog/039-accessible-dropdown |

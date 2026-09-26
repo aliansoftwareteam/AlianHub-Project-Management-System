@@ -29,7 +29,7 @@ const inviteAndRegister = async () => {
 };
 
 const acceptThroughInvitationPage = (invited) => invited.api.put('/api/v1/root-members', {
-    id: invited.memberId, data: { userId: invited.uid, status: 2 }, companyId,
+    id: invited.memberId, data: { userId: invited.uid, status: 2 }, companyId, linkId: invited.linkId,
 });
 
 const preview = (invited) => anonymous.post('/api/v2/auth/invitation-preview', { companyId, memberId: invited.memberId, linkId: invited.linkId });

@@ -95,6 +95,15 @@
 .hs-item:hover .hs-item__action { display: inline-flex; }
 .hs-item__action:hover { color: var(--warn); }
 .hs-item__action.is-on { display: inline-flex; color: var(--warn); }
+/* A link may not contain controls, so the name link stretches over its row to keep the
+   whole row clickable and the row's buttons are lifted above that overlay. */
+.hs-row { position: relative; }
+.hs-row:focus-within .hs-item__action { display: inline-flex; }
+.hs-row__link, .hs-row__link:hover { color: inherit; text-decoration: none; }
+.hs-row__link::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.hs-row__link:focus-visible { outline: none; }
+.hs-row__link:focus-visible::after { box-shadow: var(--focus); }
+.hs-row .hs-item__action, .hs-row .hs-item__chev { position: relative; z-index: 1; }
 .hs-empty { padding: 4px 9px; font: 400 12px/1.4 var(--font-ui); color: var(--ink-2); }
 .hs-foot { margin-top: auto; padding: 0 9px; font: 400 12px/1.3 var(--font-ui); color: var(--ink-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .hs-foot button { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; }

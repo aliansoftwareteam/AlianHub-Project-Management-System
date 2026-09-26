@@ -59,7 +59,7 @@
                         </button>
                     </div>
                     <div v-if="errors.password" class="ah-field__error"><ShellIcon name="x" :size="12" />{{ errors.password }}</div>
-                    <span v-else class="ah-small">{{ $t('Setup.password_hint', { n: MIN_PASSWORD }) }}</span>
+                    <span v-else class="ah-small">{{ $t('Auth.new_password_rule', { n: MIN_PASSWORD_LENGTH }) }}</span>
                 </div>
 
                 <hr class="ah-divider" />
@@ -140,6 +140,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequestWithoutSecure, getAuth } from "@/services";
 import * as env from "@/config/env";
 import { readSetupStatus, markInstalled } from "@/router/setupStatus";
+import { MIN_PASSWORD_LENGTH, meetsPasswordRule } from "@passwordRule";
 
 defineOptions({ name: "SetupWizard" });
 
@@ -147,7 +148,6 @@ const { t } = useI18n();
 const router = useRouter();
 
 const PROGRESS_KEYS = ["seeds", "account", "company", "settings", "sample"];
-const MIN_PASSWORD = 8;
 
 const step = ref("checking");
 const status = ref({});
@@ -182,7 +182,7 @@ async function loadStatus() {
 const serverError = (key) => ({
     required: t("Setup.err_required"),
     invalid: t("Setup.err_invalid"),
-    [`min_${MIN_PASSWORD}`]: t("Setup.err_password", { n: MIN_PASSWORD }),
+    weak: t("Auth.new_password_rule", { n: MIN_PASSWORD_LENGTH }),
 }[key] || key);
 
 function validate() {
@@ -190,7 +190,7 @@ function validate() {
     if (!form.firstName) errors.firstName = serverError("required");
     if (!form.lastName) errors.lastName = serverError("required");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = serverError("invalid");
-    if (form.password.length < MIN_PASSWORD) errors.password = serverError(`min_${MIN_PASSWORD}`);
+    if (!meetsPasswordRule(form.password)) errors.password = serverError("weak");
     if (!form.companyName) errors.companyName = serverError("required");
     return !Object.values(errors).some(Boolean);
 }

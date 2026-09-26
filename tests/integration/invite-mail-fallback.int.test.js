@@ -92,7 +92,7 @@ describe('the copied join link', () => {
         const intruderSession = await login(state.baseURL, intruder.body.statusText.Employee_Email, state.password);
         const intruderApi = createApiClient({ baseURL: state.baseURL, accessToken: intruderSession.accessToken, companyId: parts.companyId });
         const claim = await intruderApi.put('/api/v1/root-members', {
-            id: parts.memberId, data: { userId: intruderSession.uid, status: 2 }, companyId: parts.companyId,
+            id: parts.memberId, data: { userId: intruderSession.uid, status: 2 }, companyId: parts.companyId, linkId: parts.linkId,
         });
         expect(claim.body.status).not.toBe(true);
 
@@ -113,7 +113,7 @@ describe('the copied join link', () => {
         const session = await login(state.baseURL, invited, state.password);
         const api = createApiClient({ baseURL: state.baseURL, accessToken: session.accessToken, companyId: parts.companyId });
         const accepted = await api.put('/api/v1/root-members', {
-            id: parts.memberId, data: { userId: session.uid, status: 2 }, companyId: parts.companyId,
+            id: parts.memberId, data: { userId: session.uid, status: 2 }, companyId: parts.companyId, linkId: parts.linkId,
         });
         expect(accepted.body.status).toBe(true);
         expect((await row(parts.memberId)).status).toBe(2);

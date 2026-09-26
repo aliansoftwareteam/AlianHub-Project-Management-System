@@ -1,13 +1,16 @@
 <template>
     <!-- <div> -->
         <div v-if="showUsersList" class="position-fi overflow-y-auto bg-white style-scroll border-radius-5-px z-index-6 show__userlist">
-            <ul class="d-flex flex-column m-0 p-0">
+            <ul :id="listboxId" role="listbox" :aria-label="$t('Comments.mention_suggestions')" class="d-flex flex-column m-0 p-0">
                 <template v-if="filteredUsers.length">
                     <li
                         class="d-flex align-items-center cursor-pointer p5px-p10px"
                         :class="{'bg-blue white': selectedUserIndex === index}"
                         v-for="(data, index) in filteredUsers"
+                        :id="optionId(index)"
                         :key="index"
+                        role="option"
+                        :aria-selected="selectedUserIndex === index"
                         @mouseover="selectedUserIndex = index"
                         @click="addMention(data)"
                     >
@@ -26,7 +29,7 @@
                     </li>
                 </template>
                 <template v-else>
-                    <li class="d-flex align-items-center cursor-pointer p5px-p10px" @click="focusTextArea()">
+                    <li :id="optionId('none')" role="option" aria-disabled="true" class="d-flex align-items-center cursor-pointer p5px-p10px" @click="focusTextArea()">
                         {{$t('Comments.no_user_found')}}
                     </li>
                 </template>
@@ -61,6 +64,11 @@
                 class="write-message style-scroll"
                 id="message-box"
                 ref="messageBox"
+                role="combobox"
+                aria-autocomplete="list"
+                :aria-expanded="showUsersList"
+                :aria-controls="showUsersList ? listboxId : undefined"
+                :aria-activedescendant="activeOptionId"
                 :placeHolder="$t('PlaceHolder.Type_here')"
                 @keypress="handleEnter"
                 @keydown="keyDown"
@@ -80,7 +88,7 @@
 // PACKAGES
 import { useGetterFunctions } from "@/composable";
 import { commentHtml, commentPlainText } from "@/utils/commentHtml";
-import {defineProps, defineEmits, computed, onMounted, onBeforeUnmount, watch, ref, nextTick, inject} from "vue";
+import {defineProps, defineEmits, computed, onMounted, onBeforeUnmount, watch, ref, nextTick, inject, useId} from "vue";
 
 // COMPONENTS
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue"
@@ -183,6 +191,14 @@ watch(()=> props.userIds, (val) => {
 
 const filteredUsers = computed(() => {
     return users.value.filter((x) => !x.ghost && x.name.replaceAll(" ", "").toLowerCase().includes(mentionSearch.value.toLowerCase()))
+});
+
+const listboxId = `comment-mentions-${useId()}`;
+const optionId = (key) => `${listboxId}-${key}`;
+const activeOptionId = computed(() => {
+    if(!showUsersList.value) return undefined;
+    if(!filteredUsers.value.length) return optionId("none");
+    return selectedUserIndex.value < filteredUsers.value.length ? optionId(selectedUserIndex.value) : undefined;
 });
 
 function handleEnter(e) {

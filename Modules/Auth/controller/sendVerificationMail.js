@@ -9,53 +9,54 @@ const logger = require('../../../Config/loggerConfig');
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
-/**
- * Send Verification Email
- * @param {Object} UserId - Id of user For which We need to send the email
- * @param {Object} Email - Email of user For which We need to send the email
- * @returns
- */
-exports.sendVerificationEmailPromise = (userId,email) => {
-    return new Promise((resolve, reject) => {
-        const failed = (error) => reject({
-            status: false,
-            statusText: `Error sending verification email for user ${userId} : ${error && error.message ? error.message : error}`
-        });
-        try {
-            const token = newLinkToken();
-            const userEmail = String(email).toLowerCase();
-            const obj = {
-                type: dbCollections.USERS,
-                data: [
-                    { _id: userId },
-                    {
-                        verificationToken: token,
-                        verificationTokenTime: new Date(),
-                    }
-                ]
-            };
-            mongoRef.MongoDbCrudOpration('global', obj, "updateOne").then(()=>{
-                const verificationLink = `${config.WEBURL}/#/verify-email/${userId}/${token}`;
-                const mail = verificationMailTemplate(verificationLink, config.WEBURL);
-                sendMail.SendEmail(mail.subject, mail.mail, userEmail, true, (result) => {
-                    if(result.status) {
-                        resolve({
-                            status: true,
-                            statusText: 'Verification email sent sucessfully.'
-                        });
-                    } else {
-                        reject({
-                            status: false,
-                            statusText: result.error
-                        });
-                    }
-                });
-            }).catch(failed);
-        } catch (error) {
-            failed(error);
-        }
-    });
+const failure = (userId, error) => ({
+    status: false,
+    statusText: `Error sending verification email for user ${userId} : ${error && error.message ? error.message : error}`
+});
+
+exports.storeVerificationToken = async (userId) => {
+    try {
+        const token = newLinkToken();
+        await mongoRef.MongoDbCrudOpration('global', {
+            type: dbCollections.USERS,
+            data: [
+                { _id: userId },
+                {
+                    verificationToken: token,
+                    verificationTokenTime: new Date(),
+                }
+            ]
+        }, "updateOne");
+        return token;
+    } catch (error) {
+        throw failure(userId, error);
+    }
 };
+
+exports.mailVerificationLink = (userId, email, token) => new Promise((resolve, reject) => {
+    try {
+        const verificationLink = `${config.WEBURL}/#/verify-email/${userId}/${token}`;
+        const mail = verificationMailTemplate(verificationLink, config.WEBURL);
+        sendMail.SendEmail(mail.subject, mail.mail, String(email).toLowerCase(), true, (result) => {
+            if(result.status) {
+                resolve({
+                    status: true,
+                    statusText: 'Verification email sent sucessfully.'
+                });
+            } else {
+                reject({
+                    status: false,
+                    statusText: result.error
+                });
+            }
+        });
+    } catch (error) {
+        reject(failure(userId, error));
+    }
+});
+
+exports.sendVerificationEmailPromise = (userId, email) => exports.storeVerificationToken(userId)
+    .then((token) => exports.mailVerificationLink(userId, email, token));
 
 /* The same answer whatever state the account is in; a link goes out only to an account that
  * still needs one, and the answer does not wait for the mail. */

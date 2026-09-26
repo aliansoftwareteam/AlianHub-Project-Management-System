@@ -1,10 +1,14 @@
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { myCache } = require('../../Config/config');
+const { removeCache } = require('../../utils/commonFunctions');
 const logger = require('../../Config/loggerConfig');
-const { domainOfEmail, isVerifiedDomain } = require('./helpers/ssoRules');
+const { domainOfEmail, isVerifiedDomain, verifiedDomainsOf } = require('./helpers/ssoRules');
 
 const MAX_COMPANIES = 200;
+const SSO_ON_INSTANCE_KEY = 'sso:instance-has-connection';
+const SSO_ON_INSTANCE_TTL_SECONDS = 60;
 
 const loadEnabledConfig = async (companyId) => {
     try {
@@ -14,6 +18,42 @@ const loadEnabledConfig = async (companyId) => {
     } catch {
         return null;
     }
+};
+
+const searchableCompanies = async () => (await MongoDbCrudOpration('global', {
+    type: dbCollections.COMPANIES,
+    data: [{ isDisable: { $in: [false, undefined] } }, {}, { limit: MAX_COMPANIES }]
+}, 'find')) || [];
+
+const anyDiscoverableConnection = async () => {
+    for (const company of await searchableCompanies()) {
+        if (verifiedDomainsOf(await loadEnabledConfig(company._id)).length) return true;
+    }
+    return false;
+};
+
+let scan = null;
+
+/* Whether discovery can answer for any address at all. The configs live one per tenant database and the login page
+ * asks on every load, so the answer is cached, and a scan cleared mid-flight by a save never writes its stale result. */
+const ssoOnInstance = () => {
+    const cached = myCache.get(SSO_ON_INSTANCE_KEY);
+    if (typeof cached === 'boolean') return Promise.resolve(cached);
+    if (!scan) {
+        const current = anyDiscoverableConnection()
+            .then((found) => {
+                if (scan === current) myCache.set(SSO_ON_INSTANCE_KEY, found, SSO_ON_INSTANCE_TTL_SECONDS);
+                return found;
+            })
+            .finally(() => { if (scan === current) scan = null; });
+        scan = current;
+    }
+    return scan;
+};
+
+const forgetSsoOnInstance = () => {
+    scan = null;
+    removeCache(SSO_ON_INSTANCE_KEY);
 };
 
 const hostOf = (url) => { try { return new URL(url).host; } catch { return ''; } };
@@ -40,11 +80,7 @@ exports.discover = async (req, res) => {
         const domain = domainOfEmail(email);
         if (!email || !domain) return res.status(400).json({ status: false, message: 'email is required' });
 
-        const companies = await MongoDbCrudOpration('global', {
-            type: dbCollections.COMPANIES,
-            data: [{ isDisable: { $in: [false, undefined] } }, {}, { limit: MAX_COMPANIES }]
-        }, 'find');
-        for (const company of companies || []) {
+        for (const company of await searchableCompanies()) {
             const cfg = await loadEnabledConfig(company._id);
             if (cfg && isVerifiedDomain(cfg, domain)) return res.send({ status: true, data: describe(company, cfg) });
         }
@@ -54,3 +90,6 @@ exports.discover = async (req, res) => {
         return res.status(500).json({ status: false, message: error.message });
     }
 };
+
+exports.ssoOnInstance = ssoOnInstance;
+exports.forgetSsoOnInstance = forgetSsoOnInstance;

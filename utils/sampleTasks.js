@@ -132,8 +132,9 @@ function resolveStatus(taskStatusData, want) {
     if (want === 'in_progress') hit = byName('in progress') || actives[0];
     else if (want === 'in_review') hit = byName('in review') || actives[1] || actives[0];
     else if (want === 'backlog') hit = byName('backlog') || actives[actives.length - 1];
-    else if (want === 'done') hit = byType('done') || byName('done') || actives[actives.length - 1];
-    else if (want === 'complete') hit = byType('close') || byName('complete');
+    // The seeded templates' "Done" is an ACTIVE status, so finished work landing there stays open
+    // and, dated in the past, shows as overdue on a brand-new workspace.
+    else if (want === 'done' || want === 'complete') hit = byType('close');
     hit = hit || byType('default_active') || list[0];
 
     return hit ? { text: hit.name, key: hit.key, type: hit.type } : null;
@@ -210,7 +211,12 @@ function buildTaskDocs(project, sprints, rows, startingNumber, ownerId) {
         }
         if (opts.assign) doc.AssigneeUserId = [ownerId];
         if (opts.priority) doc.Task_Priority = opts.priority;
-        if (opts.dueInDays !== undefined) doc.DueDate = new Date(today.getTime() + (opts.dueInDays * dayMs));
+        if (opts.dueInDays !== undefined) {
+            // A project with no close status leaves even finished rows open, and open work dated
+            // in the past is overdue before the owner has done anything.
+            const days = doc.statusType === 'close' ? opts.dueInDays : Math.max(0, opts.dueInDays);
+            doc.DueDate = new Date(today.getTime() + (days * dayMs));
+        }
 
         const kids = Array.isArray(opts.subtasks) ? opts.subtasks : [];
         doc.subTasks = kids.length;
@@ -375,13 +381,6 @@ function sampleTasksForTemplate(templateName) {
     return SAMPLE_TASKS[String(templateName || '').trim()] || null;
 }
 
-// How the demo project is populated. Applied BY POSITION over whatever list the demo ends up
-// with, not attached to particular rows — picking "Marketing" during setup swaps most of the
-// rows out, and attaching the variety to specific rows meant that choice produced a flat,
-// all-To-Do project with no subtasks and no comment.
-//
-// Statuses are names of intent, resolved against the project's own status list, so a company
-// that renames or reorders its statuses still gets a sensible spread.
 // The demo project is split like a real one: work that is finished, work in flight, and work
 // not started. The project arrives with a single sprint called "List" — that one is renamed to
 // the first of these and the other two are created alongside it.

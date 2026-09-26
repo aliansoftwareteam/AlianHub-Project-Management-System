@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { getRoleType, isPrivileged, ROLE_OWNER, ROLE_ADMIN } = require('../../../Config/permissionGuard');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
+const { linkTokenAccepted } = require('../../Auth/controller/invitationPreview');
 const logger = require('../../../Config/loggerConfig');
 
 const { SEAT_PENDING: PENDING, SEAT_ACTIVE: ACTIVE, SEAT_CANCELLED: CANCELLED } = require('../../../Config/seatStatus');
@@ -57,11 +58,14 @@ const acceptanceShapeRefusal = (callerId, data) => {
 };
 
 /* Accepting an invitation links the caller's own account and activates the seat; the role is whatever the invitation stored.
- * Only a pending one: once an admin has withdrawn, removed or deactivated the seat, accepting again would undo that. */
-const judgeInvitationAcceptance = ({ callerId, callerEmail, invite, data }) => {
+ * Only a pending one: once an admin has withdrawn, removed or deactivated the seat, accepting again would undo that.
+ * Only with its link (#908): a missing or wrong token gets the same answer as a seat that is no longer pending. */
+const judgeInvitationAcceptance = ({ callerId, callerEmail, invite, data, linkId }) => {
     const shape = acceptanceShapeRefusal(callerId, data);
     if (shape) return shape;
-    if (invite.isDelete === true || Number(invite.status) !== PENDING) return refuse('That invitation is no longer valid.');
+    if (invite.isDelete === true || Number(invite.status) !== PENDING || !linkTokenAccepted(invite.linkId, linkId)) {
+        return refuse('That invitation is no longer valid.');
+    }
     const linkedToCaller = Boolean(invite.userId) && String(invite.userId) === String(callerId);
     const sentToCaller = Boolean(callerEmail) && String(invite.userEmail || '').toLowerCase() === String(callerEmail).toLowerCase();
     if (!linkedToCaller && !sentToCaller) return refuse('That invitation was sent to someone else.');

@@ -6,7 +6,7 @@ jest.mock('../Modules/Company/controller/updateCompany', () => ({ updateCompanyF
 jest.mock('../Modules/settings/Members/controller', () => ({ updateMemberFunction: jest.fn() }));
 jest.mock('../Modules/Users/controller', () => ({ updateUserFun: jest.fn(), getUserByQueyFun: jest.fn() }));
 jest.mock('../Modules/Auth/controller', () => ({ addAndRemoveUserInMongodbNotificationCount: jest.fn(), insertAuthFun: jest.fn() }));
-jest.mock('../Modules/Auth/controller/sendVerificationMail', () => ({ sendVerificationEmailPromise: jest.fn(async () => undefined) }));
+jest.mock('../Modules/Auth/controller/sendVerificationMail', () => ({ storeVerificationToken: jest.fn(async () => 'token'), mailVerificationLink: jest.fn(async () => undefined) }));
 jest.mock('../Modules/storage/server/helpers/bucket.helper.js', () => ({}));
 
 const path = require('path');
@@ -241,6 +241,19 @@ describe('invitationPreview', () => {
         const res = response();
         await invitationPreview(request({ body: { companyId: COMPANY, memberId: MEMBER_ROW, linkId: TOKEN } }), res);
         expect(res.body.data).toEqual({ workspaceName: 'Acme', status: 1, email: 'new@example.com' });
+    });
+
+    /* An admin holds the link too, and could invite any address to learn whether it has an account. */
+    it.each([
+        ['had an account when it was sent', { userId: USER }],
+        ['had none', {}],
+    ])('answers the same fields for an address that %s, and never reads accounts', async (_label, row) => {
+        MongoDbCrudOpration.mockResolvedValueOnce({ status: 1, userEmail: 'new@example.com', linkId: TOKEN, ...row }).mockResolvedValueOnce({ Cst_CompanyName: 'Acme' });
+        const res = response();
+        await invitationPreview(request({ body: { companyId: COMPANY, memberId: MEMBER_ROW, linkId: TOKEN } }), res);
+        expect(res.body).toEqual({ status: true, statusText: 'Invitation found.', data: { workspaceName: 'Acme', status: 1, email: 'new@example.com' } });
+        expect(MongoDbCrudOpration).toHaveBeenCalledTimes(2);
+        for (const [, query] of MongoDbCrudOpration.mock.calls) expect(['users', 'userAuth']).not.toContain(query.type);
     });
 
     it.each([

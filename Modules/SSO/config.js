@@ -9,6 +9,7 @@ const {
 const { resolveTxt } = require("./helpers/dnsTxt");
 const logger = require("../../Config/loggerConfig");
 const { pinSessionTenant } = require("../../Config/tenant");
+const { forgetSsoOnInstance } = require("./discover");
 
 // SSO config holds IdP secrets — only owner/admin may read/write it.
 const callerIsAdmin = async (companyId, uid) => isPrivileged(await getRoleType(companyId, uid));
@@ -81,6 +82,7 @@ exports.setSsoConfig = async (req, res) => {
                 { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
             ],
         }, 'findOneAndUpdate'));
+        forgetSsoOnInstance();
         // SEC-04: audit SSO config changes.
         try {
             require('../Audit/recorder').recordAuditFromReq(req, {
@@ -114,6 +116,7 @@ exports.verifySsoDomain = async (req, res) => {
         const verifiedDomains = [...keepVerifications(cfg.verifiedDomains, cfg.domains).filter((v) => v.domain !== domain), { domain, verifiedAt }];
         const lapsedDomains = keepLapses(cfg.lapsedDomains, cfg.domains, verifiedDomains);
         const saved = await updateConfig(companyId, { verifiedDomains, lapsedDomains });
+        forgetSsoOnInstance();
         try {
             require('../Audit/recorder').recordAuditFromReq(req, { action: 'sso.domain_verified', entityType: 'sso', entityName: domain });
         } catch (e) { /* audit is best-effort */ }

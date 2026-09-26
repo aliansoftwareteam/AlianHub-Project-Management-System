@@ -17,7 +17,7 @@ export const publicConfig = reactive({
         google: { enabled: flag("VUE_APP_IS_GOOGLE_LOGIN"), clientId: process.env.VUE_APP_GOOGLE_CLIENT_ID || "" },
         github: { enabled: flag("VUE_APP_IS_GITHUB_LOGIN"), clientId: process.env.VUE_APP_GITHUB_CLIENT_ID || "", baseUrl: process.env.VUE_APP_GITHUB_BASE_OAUTH_URL || "https://github.com/login/oauth" },
         gitlab: { enabled: flag("VUE_APP_IS_GITLAB_LOGIN"), clientId: process.env.VUE_APP_GITLAB_CLIENT_ID || "", baseUrl: process.env.VUE_APP_GITLAB_BASE_OAUTH_URL || "https://gitlab.com/oauth" },
-        sso: process.env.VUE_APP_IS_SSO_LOGIN !== "false",
+        sso: false,
         magicLink: false,
     },
     firebase: {},

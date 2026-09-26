@@ -76,15 +76,15 @@ describe('INS-01 and INS-02 role and membership changes', () => {
         const session = await login(state.baseURL, email);
         const api = createApiClient({ baseURL: state.baseURL, accessToken: session.accessToken, companyId: state.companyId });
 
-        const escalated = await api.put('/api/v1/root-members', { id: inviteRow._id, data: { userId: session.uid, status: 2, roleType: 1 }, companyId: state.companyId });
+        const escalated = await api.put('/api/v1/root-members', { id: inviteRow._id, data: { userId: session.uid, status: 2, roleType: 1 }, companyId: state.companyId, linkId: inviteRow.linkId });
         expect(forbidden(escalated)).toBe(true);
 
-        const accepted = await api.put('/api/v1/root-members', { id: inviteRow._id, data: { userId: session.uid, status: 2 }, companyId: state.companyId });
+        const accepted = await api.put('/api/v1/root-members', { id: inviteRow._id, data: { userId: session.uid, status: 2 }, companyId: state.companyId, linkId: inviteRow.linkId });
         expect(accepted.body).toMatchObject({ status: true, data: { roleType: 3, status: 2, userId: session.uid } });
 
         const stranger = await freshUser('member');
         const second = await owner.api.post('/api/v2/sendInvitationEmail', { email: emailFor('member', `insother${uniqueSuffix()}`), companyId: state.companyId, companyName: state.companyName, role: 3, designation: 0 });
-        expect(forbidden(await stranger.api.put('/api/v1/root-members', { id: second.body.data._id, data: { userId: stranger.userId, status: 2 }, companyId: state.companyId }))).toBe(true);
+        expect(forbidden(await stranger.api.put('/api/v1/root-members', { id: second.body.data._id, data: { userId: stranger.userId, status: 2 }, companyId: state.companyId, linkId: second.body.data.linkId }))).toBe(true);
     });
 
     it('keeps invitations to owners and admins with the owner', async () => {

@@ -11,6 +11,10 @@ export default [
         component: () => import(/* webpackChunkName: "projects-list" */ '@/views/Projects/ProjectsListing/ProjectsListPage.vue'),
     },
     {
+        path: '/:cid/project/:id',
+        redirect: (to) => ({ name: 'Project', params: { cid: to.params.cid, id: to.params.id }, query: to.query, hash: to.hash }),
+    },
+    {
         path: '/:cid/project/:id/p',
         name: 'Project',
         meta: {

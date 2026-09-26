@@ -399,7 +399,7 @@ exports.updateMemberFunction = (companyId, queryObject, method) => {
 /* The invitation-accept call (Invitation.vue): the invitee links their own account to the pending row. */
 exports.rootUpdateMember = async (req, res) => {
     try {
-        const { id, data, companyId } = req.body;
+        const { id, data, companyId, linkId } = req.body;
 
         if (!id || !OBJECT_ID_PATTERN.test(String(id))) {
             return refuse(res, 400, `'id' parameter is required.`);
@@ -423,7 +423,7 @@ exports.rootUpdateMember = async (req, res) => {
             data: [{ _id: String(req.uid) }, { Employee_Email: 1 }]
         }, 'findOne');
 
-        const verdict = judgeInvitationAcceptance({ callerId: req.uid, callerEmail: caller && caller.Employee_Email, invite, data });
+        const verdict = judgeInvitationAcceptance({ callerId: req.uid, callerEmail: caller && caller.Employee_Email, invite, data, linkId });
         if (!verdict.ok) {
             return refuse(res, verdict.code, verdict.statusText);
         }
@@ -432,7 +432,7 @@ exports.rootUpdateMember = async (req, res) => {
         const response = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
             data: [
-                { _id: new mongoose.Types.ObjectId(id), status: SEAT_PENDING, isDelete: { $ne: true } },
+                { _id: new mongoose.Types.ObjectId(id), status: SEAT_PENDING, isDelete: { $ne: true }, linkId: invite.linkId },
                 { $set: { ...accepted, linkId: '' } },
                 { returnDocument: 'after' }
             ]
