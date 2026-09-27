@@ -245,7 +245,7 @@ function useThis() {
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
     padding: 16px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
 }
 .aiwd-header {
     display: flex;
@@ -284,7 +284,7 @@ function useThis() {
     font-weight: 500;
     padding: 6px 14px;
     cursor: pointer;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
 }
 .aiwd-mode + .aiwd-mode { border-left: 1px solid #d7d7d7; }
 .aiwd-mode-active { background: #2f3990; color: #ffffff; }
@@ -297,7 +297,7 @@ function useThis() {
     font-size: 13px;
     color: #1f1f1f;
     background: #ffffff;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     resize: vertical;
     box-sizing: border-box;
 }

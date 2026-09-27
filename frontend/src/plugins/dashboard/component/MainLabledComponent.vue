@@ -50,7 +50,7 @@
                             </div>
                         </template>
                     </draggable>
-                    <div :key="`no-task-message-${lable}`" v-if="(!taskArrayValue || (taskArrayValue && taskArrayValue.length == 0)) && !isLoading" class="d-flex justify-content-between font-weight-400 justify-content-center align-items-center bg-white p-10px gray81 font-roboto-sans font-size-12 ml-15px no__task-msg">
+                    <div :key="`no-task-message-${lable}`" v-if="(!taskArrayValue || (taskArrayValue && taskArrayValue.length == 0)) && !isLoading" class="d-flex justify-content-between font-weight-400 justify-content-center align-items-center bg-white p-10px gray81 font-ui font-size-12 ml-15px no__task-msg">
                      {{$t('Home.no')}} {{ `${lable.toLowerCase()}`}} {{  $t('Home.task_assign_to_you')   }}
                     </div>
                 </TransitionGroup>

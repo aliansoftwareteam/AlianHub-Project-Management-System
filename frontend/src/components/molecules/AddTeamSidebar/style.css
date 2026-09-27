@@ -5,13 +5,13 @@
     padding: 3px 14px;
     font-size: 16px;
     line-height: 24px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
 }
 .mainTeamCreate .sidebar-head.bg-white.d-flex.align-items-center.justify-content-between.px-1.blue.border-bottom.cursor-default {
     height: 60px !important;
 }
 .common-sidebar-div label{
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-weight: 500;
     font-size: 14px;
     color: #3A3A3A;
@@ -53,7 +53,7 @@ form.createteamSiebarform {
     border-radius: 4px;
     margin-left: auto;
     display: block;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
 }
 
 .blue_btn_save.disable-btn {
@@ -86,7 +86,7 @@ form.createteamSiebarform {
         display: block;
         width: 63px;
         font-size: 18px;
-        font-family: 'Roboto', sans-serif;
+        font-family: var(--font-ui);
     }
     .createteamSiebarform .common-sidebar-div{
         max-width: 100%;

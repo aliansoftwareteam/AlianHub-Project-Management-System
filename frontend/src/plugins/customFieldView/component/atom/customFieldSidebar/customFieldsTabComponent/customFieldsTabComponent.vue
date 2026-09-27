@@ -4,7 +4,7 @@
             <h4 
                 v-for="(tabValue,ind) in tabs.tab" :key="ind"
                 :class="[{'activeClass' : tabIndex === ind + 1,'mr-40px':tabs.tab.length !== ind +1}]" 
-                class="font-roboto-sans font-size-14 font-weight-500 line-height-30px m-0 GunPowder cursor-pointer pb-7px" 
+                class="font-ui font-size-14 font-weight-500 line-height-30px m-0 GunPowder cursor-pointer pb-7px" 
                 @click="tabIndex = ind + 1,emit('handleIndex',ind + 1)"
             >
                 {{tabValue}}

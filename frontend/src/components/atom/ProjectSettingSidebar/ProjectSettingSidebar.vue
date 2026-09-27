@@ -3,7 +3,7 @@
     <SpinnerComp :is-spinner="isSpinner" v-if="isSpinner"/>
         <Sidebar width="607px" :top ="clientWidth > 767 ? '46px' : '0px' " >
              <template #head-left>
-                <div class="blue font-roboto-sans text-ellipsis text-nowrap pr-15px">{{sidebarTitle === 'projectStatus' ? `${projectData.ProjectName} ${$t('Projects.status')}` : sidebarTitle === 'taskType' ? `${projectData.ProjectName} ${$t('Projects.task_type')}` : sidebarTitle === 'taskStatus' ? `${projectData.ProjectName} ${$t('Templates.task_status')}` : ''}}</div>
+                <div class="blue font-ui text-ellipsis text-nowrap pr-15px">{{sidebarTitle === 'projectStatus' ? `${projectData.ProjectName} ${$t('Projects.status')}` : sidebarTitle === 'taskType' ? `${projectData.ProjectName} ${$t('Projects.task_type')}` : sidebarTitle === 'taskStatus' ? `${projectData.ProjectName} ${$t('Templates.task_status')}` : ''}}</div>
             </template>
             <template #head-right>
                 <button class="bg-white cancelButtonProject blue mr-010 cursor-pointer" @click="closeSidebarFun()">{{$t('Projects.cancel')}}</button>
@@ -675,7 +675,7 @@ function confirmData () {
     padding: 3px 14px;
     font-size: 16px;
     line-height: 24px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
 }
 .project__setting--blankproject{
     padding: 20px;

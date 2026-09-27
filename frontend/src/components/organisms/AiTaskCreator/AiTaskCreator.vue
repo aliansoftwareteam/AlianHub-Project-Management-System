@@ -443,9 +443,7 @@ function successMessage(totals) {
 .aitc__overlay {
     position: fixed;
     inset: 0;
-    /* Teleported to <body>, outside #app — so the app's `#app { font-family: 'Roboto' }`
-       doesn't reach it and text falls back to the browser serif. Set it explicitly. */
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     background: rgba(20, 22, 40, 0.55);
     backdrop-filter: blur(2px);
     display: flex;

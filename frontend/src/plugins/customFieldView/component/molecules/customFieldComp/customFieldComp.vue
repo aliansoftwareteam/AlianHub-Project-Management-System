@@ -1,5 +1,5 @@
 <template>
-    <button @click="isCustomField = true" class="btn-primary font-size-16 font-roboto-sans">+ {{$t('CustomField.add_custom_field')}}</button>
+    <button @click="isCustomField = true" class="btn-primary font-size-16 font-ui">+ {{$t('CustomField.add_custom_field')}}</button>
     <div class="d-flex mt-15px style-scroll w-100">
         <div v-if="customFieldVal.length > 0" class="w-100">
             <div class="createProject__table-header style-scroll overflow-auto">

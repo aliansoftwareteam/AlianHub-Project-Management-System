@@ -11,7 +11,7 @@
     border-bottom: 1px solid #DAE1E7;
 }
 .milestone_reports_family {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 18px;
     font-style: normal;
     font-weight: 700;
@@ -74,7 +74,7 @@
     min-width: 150px;
     width: 150px;
     font-weight: normal;
-    font-family: "Roboto-Medium";
+    font-family: var(--font-ui);
     color: #000;
     background-color: #e0e1e6;
 }
@@ -108,7 +108,7 @@
     border-radius: 4px;
 }
 .milestone-report-wrapper .milestone-report-table .thtitle_family {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 16px;
     font-style: normal;
     font-weight: 500;
@@ -119,7 +119,7 @@
     padding: 0px 27px 0 23px;
 } */
 .milestone-report-wrapper .milestone-report-table thead tr:nth-child(1) th.fixed .thtitle div {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 500;
     font-size: 16px;
@@ -176,7 +176,7 @@
 }
 
 .milestone-report-wrapper .milestone-report-table tr th div.days-selected-dropdown {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 500 !important;
     font-size: 16px !important;
@@ -276,7 +276,7 @@ tr.fixed th {
     background-color: #EEEEEE;
 }
 .milestone-report-wrapper .milestone-report-table .thtitle_currency_family {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 14px;
     font-style: normal;
     font-weight: 700;
@@ -311,14 +311,14 @@ tr.fixed th {
     vertical-align: middle;
 }
 .thtitle_currency_family_mil {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 14px;
     font-style: normal;
     font-weight: 400;
     line-height: normal;
 }
 .thtitle_currency_family_status {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 13px;
     font-style: normal;
     font-weight: 400;
@@ -346,13 +346,13 @@ tr.fixed th {
     border-left: 1px solid #CFD0D3;
 }
 .totalAmountCurrencyFamily {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 14px;
     font-style: normal;
     line-height: 20.72px;
 }
 .totalMilestoneCurrencyFamily {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 14px;
     font-style: normal;
     font-weight: 400;
@@ -362,7 +362,7 @@ tr.fixed th {
     color: #505050;
 }
 .monthFamily {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 16px;
     font-style: normal;
     font-weight: 400;
@@ -370,7 +370,7 @@ tr.fixed th {
     text-decoration-line: underline;
 }
 .monthDateFamily {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 14px;
     font-style: normal;
     line-height: 23.68px;
@@ -385,7 +385,7 @@ tr.fixed th {
     position: inherit !important;
 }
 .days-selected-dropdown .select-option__label.text-ellipsis {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 16px;
     font-style: normal;
     font-weight: 500;
@@ -411,7 +411,7 @@ tr.fixed th {
     background-color: #F4F5F7;
 }
 .filter_family {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 16px;
     font-style: normal;
     font-weight: 400;
@@ -424,7 +424,7 @@ tr.fixed th {
     border-radius: 10px;
     margin-right: 10px;
     padding: 3px 8px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     font-weight: 500;
     margin-bottom: 4px;
     margin-top: 5px;
@@ -504,7 +504,7 @@ tr.fixed th {
     border-bottom: 1px solid #DFE1E6;
 }
 #dd_FilterDropDownSheet .statusHeader span {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 14px;
     font-style: normal;
     font-weight: 500;
@@ -512,7 +512,7 @@ tr.fixed th {
     color: black;
 }
 #dd_FilterDropDownSheet .drop-down-item span {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 13px;
     font-style: normal;
     font-weight: 400;

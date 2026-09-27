@@ -5,7 +5,7 @@
             :top="clientWidth > 767 ? '46px' : '0px'"
         >
         <template #head-left>
-            <div class="blue font-roboto-sans screenShotPreview">{{$t('TimeTracker.screenshot_preview')}}</div>
+            <div class="blue font-ui screenShotPreview">{{$t('TimeTracker.screenshot_preview')}}</div>
         </template>
         <template #head-right>
             <span><img :src="closeScreenshotPreview" @click="closeSidebar()" class="close_icon_sidebar"/></span>
@@ -13,11 +13,11 @@
         <template #body>
             <div class="screnshotpreviewMain bg-white overflow-auto style-scroll h-100">
                 <div class="projectAndTasknamekeyDiv bg-light-gray text-ellipsis w-100 d-inline-block">
-                    <div class="d-inline-block projectDetailkeyScreenshotPreview align-items-center justify-content-center font-roboto-sans gray text-ellipsis w-100 text-center pr-10px pl-10px">{{screenShotdetail.projectKey}}  |  {{screenShotdetail.projectName}}  / <img class="folderIconImg" v-if="screenShotdetail.isFolderSprint === true" src="@/assets/images/folder.png"> {{screenShotdetail.folderName}} {{screenShotdetail.isFolderSprint === true ? '/' : ''}} {{screenShotdetail.sprintName}}</div>
-                    <div class="d-block tasknameScreenshotpreview justify-content-around black font-roboto-sans text-ellipsis font-size-16 font-weight-500 w-100 text-center pr-10px pl-10px">{{screenShotdetail.taskName}}</div>
+                    <div class="d-inline-block projectDetailkeyScreenshotPreview align-items-center justify-content-center font-ui gray text-ellipsis w-100 text-center pr-10px pl-10px">{{screenShotdetail.projectKey}}  |  {{screenShotdetail.projectName}}  / <img class="folderIconImg" v-if="screenShotdetail.isFolderSprint === true" src="@/assets/images/folder.png"> {{screenShotdetail.folderName}} {{screenShotdetail.isFolderSprint === true ? '/' : ''}} {{screenShotdetail.sprintName}}</div>
+                    <div class="d-block tasknameScreenshotpreview justify-content-around black font-ui text-ellipsis font-size-16 font-weight-500 w-100 text-center pr-10px pl-10px">{{screenShotdetail.taskName}}</div>
                 </div>
                 <div class="d-flex startEndMaidiv justify-content-between align-items-center">
-                    <span class="starttoEndTime font-roboto-sans black font-weight-500">{{(screenShotdetail.screenShotTime.seconds || screenShotdetail.screenShotTime._seconds) ? getDateType(screenShotdetail.screenShotTime.seconds ? screenShotdetail.screenShotTime.seconds : screenShotdetail.screenShotTime._seconds * 1000) : getDateType(parseInt(screenShotdetail.screenShotTime))}}</span>
+                    <span class="starttoEndTime font-ui black font-weight-500">{{(screenShotdetail.screenShotTime.seconds || screenShotdetail.screenShotTime._seconds) ? getDateType(screenShotdetail.screenShotTime.seconds ? screenShotdetail.screenShotTime.seconds : screenShotdetail.screenShotTime._seconds * 1000) : getDateType(parseInt(screenShotdetail.screenShotTime))}}</span>
                     <span class="d-flex align-items-center">
                         <UserProfile
                             :showDot="false"
@@ -34,7 +34,7 @@
                     </span>
                 </div>
                 <div class="d-flex commentsidebarMaindiv">
-                    <span class="commentinSidebar font-roboto-sans GunPowder font-size-16 text-ellipsis mw-70">{{screenShotdetail.memoName}}</span>
+                    <span class="commentinSidebar font-ui GunPowder font-size-16 text-ellipsis mw-70">{{screenShotdetail.memoName}}</span>
                 </div>
                 <div class="fullImgDiv" v-if="!screenShotdetail.deleted">
                     <img class="selectedOPenImgTimeSheet" v-if="screenShotdetail.image.includes('http')" :src="screenShotdetail.image">

@@ -13,7 +13,7 @@
 }
 .WrapperPresetRange li {
     font-size: 13px !important;
-    font-family: 'Roboto', sans-serif !important;
+    font-family: var(--font-ui) !important;
     padding: 5px;
     width: 90%;
     border-radius: 0;
@@ -28,7 +28,7 @@
     font-weight: 400;
     font-size: 16px;
     line-height: 24px;
-    font-family: 'Roboto', sans-serif !important;
+    font-family: var(--font-ui) !important;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -107,7 +107,7 @@ body:has(.calender-menu-class-duedate):after {
     border: 1px solid transparent;
     cursor: pointer;
     padding: 2px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
 }
 .dp__calendar_item {
     margin: 0px;
@@ -155,20 +155,20 @@ body:has(.calender-menu-class-duedate):after {
     line-height: 24px;
     font-size: 12px;
     padding: 2px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
 }
 .dp__cell_inner.dp__pointer.dp__range_start {
     background-color: #2f3990;
     font-size: 12px;
     line-height: 24px;
     height: 29px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
 }
 .dp__month_year_wrap button.dp__btn.dp__month_year_select {
     padding: 2px !important;
     font-size: 14px;
     color: #000;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
 }
 .dp__cell_inner.dp__pointer,
 .dp__cell_inner.dp__cell_disabled.dp__range_end,
@@ -177,7 +177,7 @@ body:has(.calender-menu-class-duedate):after {
     height: 29px;
     font-size: 12px;
     padding: 2px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
 }
 .dp__cell_inner.dp__cell_disabled.dp__range_end,
 .dp__overlay_cell_active,
@@ -185,7 +185,7 @@ body:has(.calender-menu-class-duedate):after {
     background-color: #2f3990;
     font-size: 12px;
     padding: 2px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
 }
 .dp__calendar_header_separator {
     display: none;
@@ -205,7 +205,7 @@ body:has(.calender-menu-class-duedate):after {
     border-radius: 50% !important;
     font-size: 14px;
     color: #000;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-weight: 500;
 }
 .dp__calendar_item .dp__cell_inner {
@@ -237,7 +237,7 @@ span.vc-day-content.vc-focusable.is-disabled {
 button.dp__btn.dp__month_year_select {
     padding: 0 !important;
     font-size: 18px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     color: #000;
 }
 .dp__overlay_cell.dp__overlay_cell_pad {
@@ -249,12 +249,12 @@ button.dp__btn.dp__month_year_select {
     border: 0;
 }
 .dp__overlay_col {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 14px;
 }
 .vue__time-picker .dropdown ul li{
     font-size: 14px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     color: #000;
 }
 .tracker-timesheet-calender .calendar-comp::placeholder{

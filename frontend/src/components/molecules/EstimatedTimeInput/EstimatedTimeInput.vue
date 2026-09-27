@@ -208,7 +208,7 @@ onUnmounted(() => {
     border-width: 2px;
     height: 24px;
     font-size: 13px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 400;
     line-height: 23px;
