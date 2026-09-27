@@ -7,16 +7,26 @@ const { updateSprintFun } = require('../Sprints/controller');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
 const pages = require('../Pages/controller');
 const rules = require('./rules');
+const { tenantOf, TenantError } = require('../../Config/tenant');
 
-const companyOf = (req) => String(req.headers['companyid'] || '');
 const ObjectId = mongoose.Types.ObjectId;
 
 const fail = (res, statusText, code = 400) => res.status(code).send({ status: false, statusText });
 
+const companyOrRefuse = (req, res) => {
+    try {
+        return tenantOf(req);
+    } catch (error) {
+        if (!(error instanceof TenantError)) throw error;
+        fail(res, error.message, error.statusCode);
+        return '';
+    }
+};
+
 exports.list = async (req, res) => {
-    const companyId = companyOf(req);
+    const companyId = companyOrRefuse(req, res);
+    if (!companyId) return undefined;
     const kind = String(req.query.kind || 'projects');
-    if (!companyId) return fail(res, 'companyId is required.');
     if (!rules.isKind(kind)) return fail(res, `kind must be one of ${rules.KINDS.join(', ')}.`);
     try {
         const q = rules.listQuery(kind);
@@ -63,9 +73,9 @@ const restoreList = async (companyId, id, userData) => {
 };
 
 exports.restore = async (req, res) => {
-    const companyId = companyOf(req);
+    const companyId = companyOrRefuse(req, res);
+    if (!companyId) return undefined;
     const { kind, id } = req.params;
-    if (!companyId) return fail(res, 'companyId is required.');
     if (!rules.isKind(kind)) return fail(res, `kind must be one of ${rules.KINDS.join(', ')}.`);
     if (!mongoose.isValidObjectId(id)) return fail(res, 'id must be a valid id.');
     const userData = (req.body && req.body.userData) || { id: String(req.uid || ''), Employee_Name: '' };
@@ -81,10 +91,9 @@ exports.restore = async (req, res) => {
     }
 };
 
-/* DELETE /api/v2/sample-data — trash every welcome project and its tasks. */
 exports.removeSampleData = async (req, res) => {
-    const companyId = companyOf(req);
-    if (!companyId) return fail(res, 'companyId is required.');
+    const companyId = companyOrRefuse(req, res);
+    if (!companyId) return undefined;
     try {
         const projects = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PROJECTS,

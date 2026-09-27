@@ -10,6 +10,7 @@ const { canReadProject } = require('../../../Config/projectAccess');
 const { namedIds, nonMembersOf, NOT_A_MEMBER } = require('../../../Config/companyMembers');
 const { mayAttachKey, taskAttachmentKey, formUploadKey, clipKey } = require('../../../common-storage/taskFileKeys');
 const { REPORT, scopeMode, countReported } = require('../../../common-storage/storedFileScope');
+const { tenantOf, TenantError } = require('../../../Config/tenant');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
@@ -39,12 +40,16 @@ const isScalar = (value) => value === null || ['string', 'number', 'boolean'].in
 
 const escapeText = (value) => sanitizeInput(String(value === undefined || value === null ? '' : value));
 
-/* verifyJWTTokenWithCV2 only lets the companyid header through when the token's audience holds it; checking again keeps a route mounted without it from trusting a bare header. */
+/* tenantOf would fall back to a body company and trusts a request with no audience; a task write needs both the header and a token, so a route mounted without verifyJWTTokenWithCV2 never trusts a bare header. */
 const validatedCompanyOf = (req) => {
     const header = String((req && req.headers && req.headers.companyid) || '').trim();
-    if (!OBJECT_ID.test(header) || !req.aud) return '';
-    const audience = Array.isArray(req.aud) ? req.aud : String(req.aud).split(',');
-    return audience.some((entry) => String(entry).trim() === header) ? header : '';
+    if (!OBJECT_ID.test(header) || !req.aud) refuse(400, 'A valid company is required for this request.');
+    try {
+        return tenantOf(req);
+    } catch (error) {
+        if (error instanceof TenantError) refuse(error.statusCode, error.message);
+        throw error;
+    }
 };
 
 /* The one id a value names, read as the task handlers and the permission guard read it: hex in any case, a lone { id } / { _id }, or the ObjectId a stored row carries. */
@@ -368,7 +373,6 @@ const logDropped = (label, dropped) => {
 /* Fields an action does not change are dropped rather than refused, so API clients that send extra harmless fields keep working. */
 const prepareTaskWrite = (req, taskSpec, label) => {
     const company = validatedCompanyOf(req);
-    if (!company) refuse(400, 'A valid company is required for this request.');
     if (!taskSpec) refuse(400, 'This task action is not accepted.');
     const body = req.body;
     if (!isPlainObject(body)) refuse(400, 'The request body must be an object.');
