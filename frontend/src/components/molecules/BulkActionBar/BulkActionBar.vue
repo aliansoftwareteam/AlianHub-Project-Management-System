@@ -173,7 +173,7 @@
                         @click="onTagRowClick(tag)"
                     >
                         <span class="bulk-menu__row-label">
-                            <span class="bulk-tag-chip" :style="tagChipColors(tag)">
+                            <span class="bulk-tag-chip" :style="tagChipColors(tag, tagState(tag) !== 'none' ? SELECTED_ROW : undefined)">
                                 {{ tag.tagName || tag.name }}
                             </span>
                             <span v-if="tagState(tag) === 'some'" class="bulk-menu__partial-pill">{{ $t('BulkActions.partial') }}</span>
@@ -354,6 +354,9 @@ import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { statusChipStyle, tagChipColors } from '@/utils/statusChipColors';
+
+// The selected row's hover tint (.bulk-menu__row--selected:hover), the darkest a selected tag chip sits on.
+const SELECTED_ROW = { surface: [227, 230, 255] };
 
 const store = useStore();
 const { getters, commit } = store;
