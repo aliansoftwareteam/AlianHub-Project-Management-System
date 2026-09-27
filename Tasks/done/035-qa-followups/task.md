@@ -1,7 +1,7 @@
 ---
 id: 035
 title: QA follow-ups — fix what the QA fix PRs left out
-status: active
+status: done
 priority: high
 depends_on: [034]
 created: 2026-09-11

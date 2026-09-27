@@ -158,7 +158,9 @@ Items the fix PRs found and deliberately left out, plus bugs and harness problem
 | 132 | In Greek and Gujarati the login page's "Forgot password" link shows a doubled question mark: those translations already end in one and the template adds "?". | #996 | Separate from the English copy fix; wait for #996 to merge. **Closed** by #1030 (build 495). |
 | 133 | Board cards: the tag "+" and the comment-count shortcut are still click-only images. #995 made the other quick edits buttons. | #995 | Left out of #995's scope. **Closed** by #1022 (build 497). |
 | 134 | Pages: a stray dot shows to the left of the doc body (the second half of finding U3-38). | #1009 | #1009 fixed only the clipped title. **Closed** by #1029 (build 498). |
-| 135 | Board cards never show their tags: the card's tag row renders only after the tag picker inside it has run, so no card shows its tags or the tag "+" on first render. | #1022 | Changes how every tagged card looks; its own PR. |
+| 135 | Board cards never show their tags: the card's tag row renders only after the tag picker inside it has run, so no card shows its tags or the tag "+" on first render. | #1022 | Changes how every tagged card looks; its own PR. **Closed** by #1037 (build 501). |
+| 136 | Tag chips colour their text with the tag colour on a 21% tint of it: about 1.6:1 in dark mode for a navy tag (#2F3990), against 6.9:1 in light. The white tag "+" icon is also bright in dark mode. Affects every chip (board card, List row, task panel). | #1037 | Pre-existing and shared by every chip; its own PR, reusing the contrast helper from #1032. |
+| 137 | A List row mounts the tag picker, which fills its chips, only for editors with fewer than 3 tags or anyone with 3 or more, so a view-only member with 1 or 2 tags sees no chips there. | #1037 | Pre-existing, outside the board card fix; `taskTagChips` from #1037 can fill the row the same way. |
 
 ## Owner decisions recorded
 
