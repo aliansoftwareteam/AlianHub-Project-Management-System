@@ -11,7 +11,7 @@
 - [x] Build + tests
 - [ ] Remove Roboto (`assets/css/font.css:3-35`, `App.vue:866`, `input.css:8`, `text.css:66`)
 - [ ] Replace the literal `#2F3990` in `components/organisms/Shell/style.css:22` with a token
-- [ ] Persist nav preferences on the user-settings endpoint, not only localStorage
+- [x] Persist nav preferences on the user-settings endpoint, not only localStorage — 2026-09-27, PR #1042: pinned nav items on the user record via `PUT /api/v2/users/nav-preferences`, read back in the self view; local-only pins migrate once; theme and sidebar collapse stay per-device
 
 ## Last step
 Stage 1 verified in the running app. Three scope items remain open as of 2026-09-10: Roboto still shipped, a literal `#2F3990` in `Shell/style.css:22`, and nav preferences in localStorage only. See the log.
