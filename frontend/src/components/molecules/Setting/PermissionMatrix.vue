@@ -9,7 +9,10 @@
 
         <template v-for="group in groups" :key="group.parent._id">
             <div class="pm__group" :style="gridStyle" role="row">
-                <span class="ah-label pm__group-name">{{ ruleName(group.parent) }} · {{ group.rows.length }}</span>
+                <span class="pm__perm">
+                    <span class="ah-label pm__group-name">{{ ruleName(group.parent) }} · {{ group.rows.length }}</span>
+                    <span v-if="ruleDesc(group.parent)" class="ah-small pm__perm-desc">{{ ruleDesc(group.parent) }}</span>
+                </span>
                 <span class="pm__cell pm__static" v-for="col in fixedColumns" :key="col.id"><ShellIcon name="check" :size="14" /></span>
                 <span v-for="role in editableRoles" :key="role.key" class="pm__cell">
                     <AhSwitch
@@ -40,7 +43,7 @@
             >
                 <span class="pm__perm" role="cell">
                     <span class="pm__perm-name">{{ ruleName(rule) }}</span>
-                    <span v-if="rule.desc" class="ah-small pm__perm-desc">{{ rule.desc }}</span>
+                    <span v-if="ruleDesc(rule)" class="ah-small pm__perm-desc">{{ ruleDesc(rule) }}</span>
                 </span>
                 <span v-for="col in fixedColumns" :key="col.id" class="pm__cell pm__static" role="cell"><ShellIcon name="check" :size="14" /></span>
                 <span v-for="role in editableRoles" :key="role.key" class="pm__cell" role="cell">
@@ -142,6 +145,7 @@ const columns = computed(() => [
 const gridStyle = computed(() => ({ gridTemplateColumns: `minmax(0, 1fr) repeat(${columns.value.length - 1}, 78px) 96px` }));
 
 const ruleName = (rule) => (te(`SecurityAndPermission.${rule.key}`) ? t(`SecurityAndPermission.${rule.key}`) : rule.name);
+const ruleDesc = (rule) => (te(`PermissionDesc.${rule.key}`) ? t(`PermissionDesc.${rule.key}`) : String(rule.desc || ""));
 const rowId = (rule) => `${String(rule.name || "").replaceAll(" ", "_")}${rule.key}`;
 const isDestructive = (rule) => DESTRUCTIVE_RE.test(rule.key || "");
 const agentMode = (rule) => (PROPOSES_RE.test(rule.key || "") ? "proposes" : READ_RE.test(rule.key || "") ? "read" : "none");
@@ -171,7 +175,7 @@ function setValue(rule, role, next) {
 const matches = (rule) => {
     const q = props.searchValue.trim().toLowerCase();
     if (!q) return true;
-    return ruleName(rule).toLowerCase().includes(q) || String(rule.desc || "").toLowerCase().includes(q) || String(rule.name || "").toLowerCase().includes(q);
+    return ruleName(rule).toLowerCase().includes(q) || ruleDesc(rule).toLowerCase().includes(q) || String(rule.name || "").toLowerCase().includes(q);
 };
 
 const groups = computed(() => {

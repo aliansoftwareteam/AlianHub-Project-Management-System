@@ -123,7 +123,7 @@
                                 <div class="d-flex align-items-center" v-if="item.name.value === 'tagsArray'">
                                     <span v-for="(option, i) in item.displayData" :key="i">
                                         <span v-if="i < numberOfItem" class="d-flex align-items-center">
-                                            <span class="ml-5-px border-radius-12-px font-size-12 tags__array" :style="{'background-color': option.tagBgColor, 'color': option.tagColor }">{{ option.name }}</span>
+                                            <span class="ml-5-px border-radius-12-px font-size-12 tags__array" :style="tagChipColors(option)">{{ option.name }}</span>
                                         </span>
                                     </span>
                                     <span v-if="item.displayData.length > numberOfItem" class="font-size-12 ml-5-px mr-5-px span-count">+{{ item.displayData.length - numberOfItem}}</span>
@@ -270,7 +270,7 @@
                                         <div v-for="(option, i) in tagsArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1)" :key="i" class="dropdown-item checkbox-dropdown" :class="{'border-radius-6-px' : clientWidth > 767 , 'border-radius-8-px' : clientWidth <= 767}">
                                             <label :for="'tags'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14">
                                                 <CheckboxComponent :id="'tags'+i" :value="option.uid" v-model="item.values" @change="handleChecked(item)"/>
-                                                <span class="ml-5-px border-radius-5-px p1px-15px text-ellipse tag_filter" :style="{'background-color': option.tagBgColor, 'color': option.tagColor}"
+                                                <span class="ml-5-px border-radius-5-px p1px-15px text-ellipse tag_filter" :style="tagChipColors(option)"
                                                 :class="{'font-size-14' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }" 
                                                 >{{ option.name }}</span>
                                             </label>
@@ -348,10 +348,8 @@
 </template>
 
 <script setup>
-// Packages
 import { defineProps, defineEmits, ref, inject, onMounted } from 'vue';
 
-// Component
 import CalenderCompo from '@/components/atom/CalenderCompo/CalenderCompo.vue';
 import CustomDropDown from '@/components/molecules/DropDown/CustomDropDown.vue';
 import CheckboxComponent from '@/components/atom/Checkbox/CheckboxComponent.vue';
@@ -359,8 +357,8 @@ import WasabiIamgeCompp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeComp
 import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
 import InputText from "@/components/atom/InputText/InputText.vue";
-// import { useI18n } from "vue-i18n";
 import { useGetterFunctions } from "@/composable";
+import { tagChipColors } from "@/utils/statusChipColors";
 
 // Emites
 defineEmits(["delete"])

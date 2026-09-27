@@ -16,13 +16,13 @@
   }
   .Usertimesheet_view tr.white-row td.fixed div,.Usertimesheet_view tr.white-row td {
     font-weight: normal;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     font-weight: 700;
     color: #505050;
     font-size: 13px;
   }
   .Usertimesheet_view tr.white-row td.fixed div:first-child {
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     font-weight: 400;
   }
   button.dot-btn {
@@ -72,13 +72,13 @@ img.timesheet_user_profile {
 }
 .Usertimesheet_view tr.white-row td.fixed div,.Usertimesheet_view tr.white-row td {
   font-weight: normal;
-  font-family: 'Roboto', sans-serif;
+  font-family: var(--font-ui);
   font-weight: 700;
   color: #505050;
   font-size: 13px;
 }
 .Usertimesheet_view tr.white-row td.fixed div:first-child {
-  font-family: 'Roboto', sans-serif;
+  font-family: var(--font-ui);
 }
 a.add_log {
   display: block;
@@ -246,9 +246,8 @@ table.table.timesheet_table tr td.fixed::after, table.table.timesheet_table tr t
   box-shadow: 1px 0px 1px 1px rgb(0 0 0 / 2%);
 }
 table.table.timesheet_table tr th {
-  /* font-family: 'Roboto-Medium'; */
   font-weight: normal;
-  font-family: 'Roboto', sans-serif;
+  font-family: var(--font-ui);
   font-weight: 500;
   color: #000;
 }
@@ -269,7 +268,7 @@ table.table.timesheet_table thead,table.table.timesheet_table th {
 table.table.timesheet_table tr th span {
   color: #474747;
   font-weight: normal!important;
-  font-family: 'Roboto', sans-serif;
+  font-family: var(--font-ui);
   font-weight: 400;
   font-size: 13px;
 }
@@ -312,13 +311,13 @@ table.table.timesheet_table tr th.current_date:before {
 tr.total_hours_row td, tr.total_hours_row td div {
   font-size: 15px;
   font-weight: normal;
-  font-family: 'Roboto', sans-serif;
+  font-family: var(--font-ui);
   font-weight: 500;
   color: #000;
 }
 tr.white-row td.fixed div {
   font-weight: normal;
-  font-family: 'Roboto', sans-serif;
+  font-family: var(--font-ui);
   font-weight: 500;
   color: #000;
 }
@@ -358,7 +357,7 @@ table.table.timesheet_table p {
   margin: 0;
 }
 .assignee-headtitle p.user_hrs_name {
-  font-family: 'Roboto', sans-serif;
+  font-family: var(--font-ui);
   font-weight: 500;
   color: #2F3990;
   white-space: nowrap;

@@ -2,7 +2,7 @@
     <div class="mainTeamCreate team-management-settings">
         <Sidebar className="mainTeamSidebar" width="607px" :top="clientWidth<=767 ? '0px' : '46px' ">
             <template #head-left>
-                <div class="blue font-roboto-sans">{{$t('subProjectRulesNames.Create_Team')}}</div>
+                <div class="blue font-ui">{{$t('subProjectRulesNames.Create_Team')}}</div>
             </template>
             <template #head-right>
                 <button class="bg-white cancelButtonTeam blue cursor-pointer" @click="closeSidebarFun()">{{$t('Projects.cancel')}}</button>

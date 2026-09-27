@@ -26,9 +26,9 @@
                         </slot>
                     </div>
                         <div class="d-flex align-items-center archive-delete-btnwrapper mb--10px mt-30px">
-                            <button class="outline-primary mr-1 font-size-16 d-flex align-items-center font-roboto-sans" @click="$emit('update:modelValue', false), confirmName = ''">{{$t('Projects.cancel')}}</button>
-                            <button v-if="confirmName !== confirmationString && isShowInput" class="btn-secondary cursor-default font-size-16 px3-py14 font-roboto-sans">{{acceptButton}}</button>
-                            <button v-else :class="acceptButtonClass" class="px-1 font-size-16 font-roboto-sans" @click="$emit('confirm'), confirmName=''">{{acceptButton}}</button>
+                            <button class="outline-primary mr-1 font-size-16 d-flex align-items-center font-ui" @click="$emit('update:modelValue', false), confirmName = ''">{{$t('Projects.cancel')}}</button>
+                            <button v-if="confirmName !== confirmationString && isShowInput" class="btn-secondary cursor-default font-size-16 px3-py14 font-ui">{{acceptButton}}</button>
+                            <button v-else :class="acceptButtonClass" class="px-1 font-size-16 font-ui" @click="$emit('confirm'), confirmName=''">{{acceptButton}}</button>
                         </div>
                     </div>
             </div>

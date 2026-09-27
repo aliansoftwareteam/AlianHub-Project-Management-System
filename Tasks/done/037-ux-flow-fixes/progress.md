@@ -16,3 +16,4 @@
 - 2026-09-24: slice 4 (bulk edit) done: bar above the tab bar at 390 px, shift-click and Shift+Space/Arrow range selection in List, Board and Table, Undo on "Updated n tasks." including archive and delete (both soft).
 - 2026-09-24: slice 5 (first run) done: the floating Getting started card is merged into the one Home checklist, per role (members see personal steps only), hidden while a task panel, bulk bar or modal is open; dismissal and progress on the user record via PUT /api/v2/users/onboarding; the shell tour starts from the checklist and screen tours offer once per user; new projects start Blank.
 - 2026-09-24: all slices merged as builds 425–431; localhost on build 431. Follow-ups 128 and 129 in task 034.
+- 2026-09-27: closed. All slices merged (builds 425–431); follow-ups 128 (#980) and 129 (#969) are closed in task 034.

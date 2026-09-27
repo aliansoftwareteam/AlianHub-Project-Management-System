@@ -7,7 +7,7 @@
     <div v-if="!manageTemplate" class="setting_templateDetail_wrapper">
         <h4 class="text-blue" :class="[{'useTemplateDetailArrow':route.name !== 'Template'}]">
             <button v-if="route.name == 'Template'" type="button"  @click="$emit('click:updateSidebarVal',false)" class="backButtonTemplateList d-flex align-items-center cursor-pointer">
-                <span class="d-flex align-items-center font-size-16 font-roboto-sans cursor-pointer blue"><img :src="back_arrow" class="mr-6px">{{$t('UserTimesheet.back')}}</span>
+                <span class="d-flex align-items-center font-size-16 font-ui cursor-pointer blue"><img :src="back_arrow" class="mr-6px">{{$t('UserTimesheet.back')}}</span>
             </button>
         </h4>
        <div class="template-backdelete-wrapper">

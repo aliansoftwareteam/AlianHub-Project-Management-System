@@ -63,7 +63,7 @@
     margin: 0;
     padding: 0.5em 1em;
     word-break: break-word;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     font-size: 14px!important;
 }
 .vertical-middle{

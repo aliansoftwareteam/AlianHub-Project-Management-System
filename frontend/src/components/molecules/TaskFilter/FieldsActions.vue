@@ -89,7 +89,7 @@
         </div>
         <div class="action-section">
             <a href="#" class="mr-10px" @click.stop.prevent="$emit('clear', $event)" v-if="clientWidth > 767"  :class="{'font-weight-400 font-size-12' : clientWidth > 767 }">{{ $t('Filters.clearall') }}</a>
-            <button v-if="from === ''" class="btn-primary font-roboto-sans" type="button" @click.stop.prevent="$emit('apply', {item: $event, type: 'custom'})">{{ $t('Filters.show_result') }}</button>
+            <button v-if="from === ''" class="btn-primary font-ui" type="button" @click.stop.prevent="$emit('apply', {item: $event, type: 'custom'})">{{ $t('Filters.show_result') }}</button>
         </div>
     </div>
 </template>

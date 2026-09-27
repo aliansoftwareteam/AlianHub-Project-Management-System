@@ -289,7 +289,7 @@ onBeforeUnmount(() => {
 .call-ring,
 .call-win,
 .call-toast {
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }

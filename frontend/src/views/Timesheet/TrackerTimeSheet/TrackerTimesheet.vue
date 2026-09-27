@@ -814,7 +814,7 @@ ul.breadcrumb.title_strip li {
     list-style: none;
     padding: 0px 20px;
     border-left: 1px solid #b7b7b7;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     font-weight:700;
 }
 .dp__main.dp__theme_light {

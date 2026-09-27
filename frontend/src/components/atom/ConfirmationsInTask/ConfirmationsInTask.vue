@@ -3,7 +3,7 @@
             v-model="showSidebarData"
             :title="`${statusConfirmData === true ? $t('general.Different_Statuses') : ''}`"
             :message="`${subTaskConfirm === true ? `<b class='black'>${escapeHtml(task?.TaskName)}’s</b> ${$t('conformationmsg.subtasks_will_become_subtasks_of')} <b class='black'>${escapeHtml(selectedTask?.TaskName)}</b>.` : taskConfirm ? `<b class='black'>${escapeHtml(task?.TaskName)}’s</b> ${$t('conformationmsg.task_will_become_subtasks_of')} <b class='black'>${escapeHtml(selectedTask?.TaskName)}</b>.` : ''}`"
-            :acceptButtonClass="'btn-primary font-roboto-sans'"
+            :acceptButtonClass="'btn-primary font-ui'"
             :acceptButton="$t('general.Continue')"
             :isShowInput="false"
             @update:modelValue="$emit('closeModel')"
@@ -16,8 +16,8 @@
             <div class="mw-100 w-100 conforms__task-component">
                 <div class="overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar" :style="[{maxHeight : clientWidth > 767 ? 'calc(100vh - 550px)' : 'calc(100vh - 275px)'}]">
                     <div class="d-flex justify-content-between position-sti z-index-1 bg-white old__newstatustitle-wrapper">
-                        <p class="font-size-12 font-roboto-sans position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.Old_Status')}}</p>
-                        <p class="font-size-12 font-roboto-sans position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.New_Status')}}</p>
+                        <p class="font-size-12 font-ui position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.Old_Status')}}</p>
+                        <p class="font-size-12 font-ui position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.New_Status')}}</p>
                     </div>
                     <div class="d-flex justify-content-between border-bottom-mobiledrop status__deatil-wrapper p20px-0px" v-for="(data,index) in oldStatus" :key="index"> 
                         <div class="d-flex align-items-center justify-content-between w-50 pr-20px pl-10px">
@@ -38,7 +38,7 @@
                                 <span v-if="data.convertStatus === undefined || data.convertStatus === ''" class="font-size-16 color94">{{$t('general.Select_Status')}}</span>
                                 <div class="d-flex align-items-center" v-if="data.convertStatus !== undefined">
                                     <div class="sattus-color-div" :style="[{'background-color': data.convertStatus.bgColor,'color':data.convertStatus.textColor}]"></div>
-                                    <span :style="[{'color':data.convertStatus.textColor}]" class="font-roboto-sans pl-8px" :class="{'font-size-13' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}"  >{{data.convertStatus ? data.convertStatus.name : ''}}</span>
+                                    <span :style="[{'color':data.convertStatus.textColor}]" class="font-ui pl-8px" :class="{'font-size-13' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}"  >{{data.convertStatus ? data.convertStatus.name : ''}}</span>
                                 </div>
                                 <span class="red position-ab font-size-11 mt-50px" v-if="(data.convertStatus === undefined || data.convertStatus === '')">{{errorMsg}}</span>
                             </template>
@@ -52,8 +52,8 @@
             <div class="mw-100 w-100">
                 <div class="overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar" :style="[{maxHeight : clientWidth > 767 ? 'calc(100vh - 550px)' : 'calc(100vh - 275px)'}]">
                     <div class="d-flex justify-content-between position-sti z-index-1 bg-white old__newstatustitle-wrapper">
-                        <p class="font-size-12 font-roboto-sans text-left gray81 mb-6px w-50">{{$t('general.Old_Task_Type')}}</p>
-                        <p class="font-size-12 font-roboto-sans text-left gray81 mb-6px w-50">{{$t('general.New_Task_Type')}}</p>
+                        <p class="font-size-12 font-ui text-left gray81 mb-6px w-50">{{$t('general.Old_Task_Type')}}</p>
+                        <p class="font-size-12 font-ui text-left gray81 mb-6px w-50">{{$t('general.New_Task_Type')}}</p>
                     </div>
                     <div  class="d-flex justify-content-between border-bottom-mobiledrop status__deatil-wrapper p20px-0px" v-for="(data,index) in oldTaskType" :key="index">
                         <div class="d-flex align-items-center justify-content-between w-50 pr-20px pl-10px">
@@ -91,8 +91,8 @@
             <div class="mw-100 w-100">
                 <div class="overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar" :style="[{maxHeight : clientWidth > 767 ? 'calc(100vh - 550px)' : 'calc(100vh - 275px)'}]">
                     <div class="d-flex justify-content-between position-sti z-index-1 bg-white old__newstatustitle-wrapper">
-                        <p class="font-size-12 font-roboto-sans position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.Old_Status')}}</p>
-                        <p class="font-size-12 font-roboto-sans position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.Old_Status')}}</p>
+                        <p class="font-size-12 font-ui position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.Old_Status')}}</p>
+                        <p class="font-size-12 font-ui position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.Old_Status')}}</p>
                     </div>
                     <div class="d-flex justify-content-between border-bottom-mobiledrop status__deatil-wrapper p20px-0px" v-for="(data,index) in oldProjectStatus" :key="index"> 
                         <div class="d-flex align-items-center justify-content-between w-50 pr-20px pl-10px">
@@ -114,7 +114,7 @@
                                 <span v-if="data.convertStatus === undefined || data.convertStatus === ''" class="font-size-16 color94" >{{$t('general.Select_Status')}}</span>
                                 <div class="d-flex align-items-center" v-if="data.convertStatus !== undefined">
                                     <div class="sattus-color-div" :style="[{'background-color': data.convertStatus.bgColor,'color':data.convertStatus.textColor}]"></div>
-                                    <span :style="[{'color':data.convertStatus.textColor}]" class="font-roboto-sans pl-8px" :class="{'font-size-13' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}" >{{data.convertStatus ? data.convertStatus.name : ''}}</span>
+                                    <span :style="[{'color':data.convertStatus.textColor}]" class="font-ui pl-8px" :class="{'font-size-13' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}" >{{data.convertStatus ? data.convertStatus.name : ''}}</span>
                                 </div>
                                 <span class="red position-ab font-size-11 mt-50px" v-if="(data.convertStatus === undefined || data.convertStatus === '')">{{errorMsg}}</span>
                             </template>
@@ -129,8 +129,8 @@
             <div class="mw-100 w-100 conforms__task-component">
                 <div class="overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar" :style="[{maxHeight : clientWidth > 767 ? 'calc(100vh - 550px)' : 'calc(100vh - 275px)'}]">
                     <div class="d-flex justify-content-between position-sti z-index-1 bg-white old__newstatustitle-wrapper">
-                        <p class="font-size-12 font-roboto-sans position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.Old_Task_Assignee')}}</p>
-                        <p class="font-size-12 font-roboto-sans position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.New_Task_Assignee')}}</p>
+                        <p class="font-size-12 font-ui position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.Old_Task_Assignee')}}</p>
+                        <p class="font-size-12 font-ui position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.New_Task_Assignee')}}</p>
                     </div>
                     <div class="d-flex justify-content-between border-bottom-mobiledrop status__deatil-wrapper p20px-0px"> 
                         <div class="d-flex align-items-center justify-content-between w-50 pr-20px pl-10px">
@@ -192,8 +192,8 @@
             <div class="mw-100 w-100 conforms__task-component pt-3">
                 <div class="overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar" :style="[{maxHeight : clientWidth > 767 ? 'calc(100vh - 550px)' : 'calc(100vh - 275px)'}]">
                     <div class="d-flex justify-content-between position-sti z-index-1 bg-white old__newstatustitle-wrapper">
-                        <p class="font-size-12 font-roboto-sans position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.Old_Task_Watchers')}}</p>
-                        <p class="font-size-12 font-roboto-sans position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.New_Task_Watchers')}}</p>
+                        <p class="font-size-12 font-ui position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.Old_Task_Watchers')}}</p>
+                        <p class="font-size-12 font-ui position-re old__newstatus-title text-left gray81 mb-6px w-50">{{$t('general.New_Task_Watchers')}}</p>
                     </div>
                     <div class="d-flex justify-content-between border-bottom-mobiledrop status__deatil-wrapper p20px-0px"> 
                         <div class="d-flex align-items-center justify-content-between w-50 pr-20px pl-10px">

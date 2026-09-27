@@ -173,7 +173,7 @@
                         @click="onTagRowClick(tag)"
                     >
                         <span class="bulk-menu__row-label">
-                            <span class="bulk-tag-chip" :style="`background:${tag.tagBgColor || '#f4f5f7'}; color:${tag.tagColor || '#3a3a3a'}`">
+                            <span class="bulk-tag-chip" :style="tagChipColors(tag)">
                                 {{ tag.tagName || tag.name }}
                             </span>
                             <span v-if="tagState(tag) === 'some'" class="bulk-menu__partial-pill">{{ $t('BulkActions.partial') }}</span>
@@ -353,7 +353,7 @@ import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
-import { statusChipStyle } from '@/utils/statusChipColors';
+import { statusChipStyle, tagChipColors } from '@/utils/statusChipColors';
 
 const store = useStore();
 const { getters, commit } = store;

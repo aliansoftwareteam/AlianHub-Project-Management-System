@@ -802,7 +802,7 @@
         list-style: none;
         padding-right:15px;
         border-left: 1px solid #b7b7b7;
-        font-family: 'Roboto', sans-serif;
+        font-family: var(--font-ui);
         font-weight:700;
         padding-left: 15px;
     }
@@ -817,7 +817,7 @@
         border-radius: 10px;
         margin-right: 10px;
         padding: 2px 4px 2px 8px;
-        font-family: 'Roboto', sans-serif;
+        font-family: var(--font-ui);
         font-weight: 500;
         align-items: center;
         min-width: fit-content;

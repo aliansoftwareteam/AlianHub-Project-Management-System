@@ -206,7 +206,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
     justify-content: center;
     padding: 16px;
     background: rgba(17, 20, 33, .45);
-    font-family: Roboto, -apple-system, "Segoe UI", sans-serif;
+    font-family: var(--font-ui);
 }
 .ssm {
     width: 100%;

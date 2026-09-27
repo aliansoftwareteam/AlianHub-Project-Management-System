@@ -61,6 +61,11 @@ watch(() => route.name, revealActiveTab);
 .in__body { flex: 1; min-height: 0; overflow: auto; padding: 16px 20px 32px; display: flex; flex-direction: column; gap: 16px; }
 /* Each tab renders one root element, so the body's gap never reaches the cards inside it. */
 .in__body > * { display: flex; flex-direction: column; gap: 16px; }
+.in__body a:not(.ah-btn) { color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
+.in__body .in-banner a { color: inherit; }
+.in-actions .ah-tabs { min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.in-actions .ah-tabs::-webkit-scrollbar { display: none; }
+.in-actions .ah-tab { flex: none; white-space: nowrap; }
 .in-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .in-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
 .in-card > p { margin: 0; }

@@ -16,13 +16,13 @@
 }
 .Usertimesheet_view tr.white-row td.fixed div,.Usertimesheet_view tr.white-row td {
   font-weight: normal;
-  font-family: 'Roboto', sans-serif;
+  font-family: var(--font-ui);
   font-weight: 700;
   color: #505050;
   font-size: 13px;
 }
 .Usertimesheet_view tr.white-row td.fixed div:first-child {
-  font-family: 'Roboto', sans-serif;
+  font-family: var(--font-ui);
   font-weight: 400;
 }
 button.dot-btn {
@@ -72,13 +72,13 @@ transform: rotate(90deg);
 }
 .Usertimesheet_view tr.white-row td.fixed div,.Usertimesheet_view tr.white-row td {
 font-weight: normal;
-font-family: 'Roboto', sans-serif;
+font-family: var(--font-ui);
 font-weight: 700;
 color: #505050;
 font-size: 13px;
 }
 .Usertimesheet_view tr.white-row td.fixed div:first-child {
-font-family: 'Roboto', sans-serif;
+font-family: var(--font-ui);
 }
 a.add_log {
 display: block;
@@ -255,9 +255,8 @@ box-shadow: 1px 0px 1px 1px rgb(0 0 0 / 2%);
   display: none!important;
   }
 table.table.timesheet_table tr th {
-/* font-family: 'Roboto-Medium'; */
 font-weight: normal;
-font-family: 'Roboto', sans-serif;
+font-family: var(--font-ui);
 font-weight: 500;
 color: #000;
 }
@@ -278,7 +277,7 @@ border-radius: 5px;
 table.table.timesheet_table tr th span {
 color: #474747;
 font-weight: normal!important;
-font-family: 'Roboto', sans-serif;
+font-family: var(--font-ui);
 font-weight: 400;
 font-size: 13px;
 }
@@ -329,7 +328,7 @@ border-right: 0px;
 tr.total_hours_row td, tr.total_hours_row td div {
 font-size: 15px;
 font-weight: normal;
-font-family: 'Roboto', sans-serif;
+font-family: var(--font-ui);
 font-weight: 500;
 color: #000;
 }
@@ -338,7 +337,7 @@ color: #000;
 
 tr.white-row td.fixed div {
 font-weight: normal;
-font-family: 'Roboto', sans-serif;
+font-family: var(--font-ui);
 font-weight: 500;
 color: #000;
 }
@@ -378,7 +377,7 @@ table.table.timesheet_table p {
 margin: 0;
 }
 p.user_hrs_name {
-font-family: 'Roboto', sans-serif;
+font-family: var(--font-ui);
 font-weight: 500;
 color: #000;
 white-space: nowrap;

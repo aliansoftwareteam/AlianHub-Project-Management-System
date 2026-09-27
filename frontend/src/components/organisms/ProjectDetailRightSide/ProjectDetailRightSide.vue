@@ -1,7 +1,7 @@
 <template>
     <div class="projectRightside overflow-y-auto style-scroll">
         <div :class="{'border-bottom-mobiledrop' : clientWidth > 767}" :style="[{paddingBottom : clientWidth > 767 ? '5px' : '0px'}]" v-if="checkPermission('project.project_details',projectData?.isGlobalPermission)!== null">
-            <h4 class="black font-roboto-sans detailsHead" :class="`${clientWidth > 767 ? 'font-size-14 font-weight-700' : 'font-size-16 font-weight-600'}`">{{$t('ProjectDetails.details')}}</h4>
+            <h4 class="black font-ui detailsHead" :class="`${clientWidth > 767 ? 'font-size-14 font-weight-700' : 'font-size-16 font-weight-600'}`">{{$t('ProjectDetails.details')}}</h4>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_status_change',projectData?.isGlobalPermission)!== null">
                 <h4 :class="{'font-size-14 font-weight-500 status__title' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.status')}}</h4>
                 <ProjectStatus

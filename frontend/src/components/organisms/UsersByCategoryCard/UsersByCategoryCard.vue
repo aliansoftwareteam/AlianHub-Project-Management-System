@@ -285,7 +285,7 @@ watch(() => globalRange && globalRange.value, () => { if (timerange.value === 0)
 </script>
 
 <style scoped>
-.ubc { height: 100%; width: 100%; padding: 6px 8px; overflow: hidden; display: flex; flex-direction: column; font-family: Roboto, sans-serif; }
+.ubc { height: 100%; width: 100%; padding: 6px 8px; overflow: hidden; display: flex; flex-direction: column; font-family: var(--font-ui); }
 
 /* Header */
 .ubc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-shrink: 0; }
