@@ -130,7 +130,20 @@ ul.templated_name_ul{
     display: block;
 }
 .statusHeader h3.heading_text{
+    padding: 30.5px 16px;
     margin-bottom: 30px;
+}
+.taskStatusLeft {
+    width: 47%;
+}
+.taskStatusRight {
+    width: 46.742%;
+}
+.taskStatusRight h4 {
+    font-weight: 500;
+    font-size: 14px;
+    line-height: 21px;
+    color: #3A3A3A;
 }
 p.box-text {
     margin-top: 10px;

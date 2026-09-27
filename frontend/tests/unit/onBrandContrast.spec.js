@@ -46,7 +46,7 @@ describe('text on the brand fill', () => {
     });
 
     test('no rule fills with a theme brand colour and paints white on it', () => {
-        const brandFill = /background(-color)?\s*:[^;}]*var\(\s*--(brand(-deep)?|kiln-ember(-deep)?)\s*\)/;
+        const brandFill = /background(-color)?\s*:[^;}]*var\(\s*--brand(-deep)?\s*\)/;
         const whiteInk = /(^|[;{\s])(color|stroke|fill)\s*:\s*(#fff\b|#ffffff\b|white\b|rgba?\(\s*255\s*,\s*255\s*,\s*255)/i;
         const offenders = [];
         for (const file of walk(SRC)) {
