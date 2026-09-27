@@ -81,7 +81,7 @@
                         <template v-if="checkApps('tags') && clientWidth > 768">
                             <div v-for="(item, index) in tagChipArray" :key="index" @click.stop="">
                                 <div v-if="(index < chipCount)" class="tagList">
-                                    <TagChip :data="item" :isBorder="false" :ids="ids" :tagsArray="projectData.tagsArray" :prjectGlobalPermission='projectData?.isGlobalPermission' :taskId="task._id" :sprintId="task.sprintId" :taskName="task.TaskName"/>
+                                    <TagChip :data="item" :isBorder="false" :ids="ids" :tagsArray="projectData.tagsArray" :prjectGlobalPermission='projectData?.isGlobalPermission' :taskId="task._id" :sprintId="task.sprintId" :taskName="task.TaskName" light-surface/>
                                 </div>
                                 <div v-if="index == chipCount" class="tagcount" @click="openDropDwon()"> +{{tagChipArray.length - chipCount}} </div>
                             </div>

@@ -1,6 +1,5 @@
 <template lang="">
         <div class="tagList_inner d-flex align-items-center">
-        <!-- Edit Tag input -->
         <InputText
         v-if="editStatus && editStatus === 'isRename'"
         :modelValue="renameVal"
@@ -14,8 +13,7 @@
         :width="`80px`"
         />
         <div class="error position-ab red bg-white font-size-10 error_top" v-if="renameErrorMessage">{{renameErrorMessage}}</div>
-        
-        <!-- Edit color input -->
+
         <div v-if="editStatus && editStatus === 'isColor'" class="d-flex align-items-center mr-5px borderdarkgray border-radius-3-px is__color-status">
         <input
         type="color"
@@ -26,10 +24,9 @@
         <img :src="cancelimage" class=" cursor-pointer color-edit_img ml-0" @click="(e)=> HandleChange(e,'isColorCancel')"/>
         </div>
 
-        <!-- tagchip with dropdown -->
-        <div class="tagList tagListContent d-flex align-items-center " :class="[{'remove_hover' : checkPermission('task.task_tag',prjectGlobalPermission) == false}]" v-if="editStatus != 'isRename'" :style="{backgroundColor:data.tagBgColor,border:isBorder?'1px solid':'0px',borderColor: isBorder?data.tagColor:'none'}">
+        <div class="tagList tagListContent d-flex align-items-center " :class="[{'remove_hover' : checkPermission('task.task_tag',prjectGlobalPermission) == false, 'ah-status-ink': !lightSurface}]" v-if="editStatus != 'isRename'" :style="[chipStyle, {border:isBorder?'1px solid':'0px',borderColor: isBorder?data.tagColor:'none'}]">
             <div class="tagname__contianer d-flex">
-                <span class="tagname" :title="data.tagName" :style="{color:data.tagColor}" :class="[{'threedots' : clientWidth < 767 || showClass}]">{{data.tagName}}</span>
+                <span class="tagname" :title="data.tagName" :class="[{'threedots' : clientWidth < 767 || showClass}]">{{data.tagName}}</span>
             </div>
             <DropDown @isVisible="(val)=> visible = val" v-if="checkPermission('task.task_tag',prjectGlobalPermission) === true">
                 <template #button>       
@@ -71,20 +68,17 @@
     </div>
 
 </template>
-<script setup> 
-
-// components
+<script setup>
 import { removeTaskTag } from "@/components/molecules/TagList/helper.js";
 import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import InputText from "@/components/atom/InputText/InputText.vue";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
 
-// packages
-import {ref, watchEffect,watch , inject} from 'vue'
+import {ref, watchEffect,watch , inject, computed} from 'vue'
 
-// utility
 import { useCustomComposable } from "@/composable";
 import {updateTag,deleteTag} from "@/components/molecules/TagList/helper.js";
+import { tagChipStyle } from "@/utils/statusChipColors";
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
@@ -146,8 +140,15 @@ const props = defineProps({
     prjectGlobalPermission: {
         type: Boolean,
         default: true,
+    },
+    // The tag picker and the legacy list stay white in the dark theme, so their chips keep the light text.
+    lightSurface: {
+        type: Boolean,
+        default: false,
     }
 });
+
+const chipStyle = computed(() => tagChipStyle(props.data));
 
 watchEffect(()=>{
         Data.value = props.data  
