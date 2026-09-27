@@ -225,8 +225,8 @@ watch(
 .time-reminder-card {
     margin-top: 24px;
     padding: 20px;
-    background: #ffffff;
-    color: #17161c;
+    background: var(--surface);
+    color: var(--ink);
     border: 1px solid #e5e7eb;
     border-radius: 10px;
 }
@@ -396,4 +396,17 @@ watch(
 .time-reminder-switch input:checked + .time-reminder-slider::before {
     transform: translateX(20px);
 }
+:root[data-theme="dark"] .time-reminder-card { border-color: var(--hairline); }
+:root[data-theme="dark"] :is(.time-reminder-subtitle, .time-reminder-row-hint, .time-reminder-selectall, .time-reminder-member-email, .time-reminder-empty, .time-reminder-count) { color: var(--ink-2); }
+:root[data-theme="dark"] :is(.time-reminder-row, .time-reminder-recipients) { border-top-color: var(--hairline); }
+:root[data-theme="dark"] :is(.time-reminder-list, .time-reminder-list-item) { border-color: var(--hairline); }
+:root[data-theme="dark"] .time-reminder-search-input { background: var(--surface-2); border-color: var(--ink-3); color: var(--ink); }
+:root[data-theme="dark"] .time-reminder-search-input::placeholder { color: var(--ink-2); }
+:root[data-theme="dark"] .time-reminder-search-input:focus { border-color: var(--brand); }
+:root[data-theme="dark"] .time-reminder-member-name { color: var(--ink); }
+:root[data-theme="dark"] .time-reminder-save-btn { background: var(--brand); color: var(--on-brand); }
+:root[data-theme="dark"] .time-reminder-slider { background: var(--ink-3); }
+:root[data-theme="dark"] .time-reminder-slider::before { background: var(--knob); }
+:root[data-theme="dark"] .time-reminder-switch input:checked + .time-reminder-slider { background: var(--brand); }
+:root[data-theme="dark"] .time-reminder-switch input:checked + .time-reminder-slider::before { background: var(--on-brand); }
 </style>

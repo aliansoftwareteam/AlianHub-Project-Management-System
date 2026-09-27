@@ -222,8 +222,8 @@ watch(
 .screenshot-retention-card {
     margin-top: 24px;
     padding: 20px;
-    background: #ffffff;
-    color: #17161c;
+    background: var(--surface);
+    color: var(--ink);
     border: 1px solid #e5e7eb;
     border-radius: 10px;
 }
@@ -313,4 +313,13 @@ watch(
 .screenshot-retention-switch input:checked + .screenshot-retention-slider::before {
     transform: translateX(20px);
 }
+:root[data-theme="dark"] .screenshot-retention-card { border-color: var(--hairline); }
+:root[data-theme="dark"] :is(.screenshot-retention-subtitle, .screenshot-retention-row-hint, .screenshot-retention-stats) { color: var(--ink-2); }
+:root[data-theme="dark"] .screenshot-retention-row { border-top-color: var(--hairline); }
+:root[data-theme="dark"] .screenshot-retention-select { background: var(--surface-2); border-color: var(--ink-3); color: var(--ink); }
+:root[data-theme="dark"] .screenshot-retention-stats { background: var(--fill); }
+:root[data-theme="dark"] .screenshot-retention-slider { background: var(--ink-3); }
+:root[data-theme="dark"] .screenshot-retention-slider::before { background: var(--knob); }
+:root[data-theme="dark"] .screenshot-retention-switch input:checked + .screenshot-retention-slider { background: var(--brand); }
+:root[data-theme="dark"] .screenshot-retention-switch input:checked + .screenshot-retention-slider::before { background: var(--on-brand); }
 </style>
