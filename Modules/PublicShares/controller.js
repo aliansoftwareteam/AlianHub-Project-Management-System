@@ -31,6 +31,11 @@ const refuse = (res, decision, notFoundText = 'Not found.') => (decision.statusC
     ? res.status(403).send({ status: false, statusText: 'You do not have permission to manage public links here.' })
     : res.status(404).send({ status: false, statusText: notFoundText }));
 
+/* A form's public page never asks for a share password, so one set on a form link would promise
+ * protection that does not exist; forms stay public (owner, 2026-09-27). */
+const FORM_PASSWORD_REFUSED = 'A public form link cannot have a password.';
+const setsPasswordOnForm = (entityType, password) => entityType === 'form' && Boolean(password && String(password).length);
+
 const managedShare = async (companyId, uid, filter) => {
     const share = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PUBLIC_SHARES, data: [filter] }, 'findOne');
     if (!share) return { share: null, decision: { ok: false, statusCode: 404 } };
@@ -46,6 +51,9 @@ exports.createShare = async (req, res) => {
         const check = validateCreateShare({ companyId, entityType, entityId });
         if (!check.valid) {
             return res.send({ status: false, statusText: check.reason });
+        }
+        if (setsPasswordOnForm(entityType, password)) {
+            return res.send({ status: false, statusText: FORM_PASSWORD_REFUSED });
         }
 
         // Taken from the JWT, never the body: a caller-supplied id would let anyone
@@ -151,6 +159,9 @@ exports.updateShare = async (req, res) => {
         const { share, decision } = await managedShare(companyId, String(req.uid || ''), { _id: new mongoose.Types.ObjectId(id) });
         if (!decision.ok) {
             return refuse(res, decision, 'Share not found.');
+        }
+        if (setsPasswordOnForm(share.entityType, password)) {
+            return res.send({ status: false, statusText: FORM_PASSWORD_REFUSED });
         }
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PUBLIC_SHARES,
