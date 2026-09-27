@@ -4,7 +4,7 @@ const WHITE = [255, 255, 255];
 // The hardest surface a chip sits on in each theme: --canvas in light, --surface-2 in dark.
 const LIGHT_SURFACE = [247, 246, 243];
 const DARK_SURFACE = [29, 29, 34];
-// Stored tints are the status colour at alpha 0x35, as the status editors save them.
+// Stored tints are the chip colour at alpha 0x35, as the status and tag editors save them.
 const TINT_ALPHA = 0.21;
 const THEME_FALLBACK = { background: "var(--fill)", color: "var(--ink)" };
 
@@ -81,3 +81,9 @@ export function statusChipCss(status) {
     const style = statusChipStyle(status);
     return `background:${style.background};color:${style.color};--status-ink-dark:${style["--status-ink-dark"]}`;
 }
+
+const asStatusColors = (tag) => ({ textColor: tag?.tagColor, bgColor: tag?.tagBgColor });
+
+export const tagChipColors = (tag, options) => statusChipColors(asStatusColors(tag), options);
+
+export const tagChipStyle = (tag) => statusChipStyle(asStatusColors(tag));

@@ -309,7 +309,7 @@ html, body, #app {
 .ah-chip--mono { font: var(--text-data); }
 .ah-chip--dark { background: var(--rail); color: #fff; }
 .ah-chip--sm { height: 18px; font-size: 10.5px; }
-/* Status colours are workspace data, so statusChipStyle() computes the dark-theme text per chip. */
+/* Status and tag colours are workspace data, so statusChipStyle() and tagChipStyle() compute the dark-theme text per chip. */
 :root[data-theme="dark"] .ah-status-ink { --status-ink: var(--status-ink-dark); }
 
 .ah-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
