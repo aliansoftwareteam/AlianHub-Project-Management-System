@@ -1442,6 +1442,8 @@ const schema = {
         createdBy: { type: String, required: false },
         expiresAt: { type: Date, required: false },
         passwordHash: { type: String, required: false },
+        // No default: a missing value is what marks a hash made before this format (Modules/Auth/helpers/passwordHash.js).
+        passwordHashVersion: { type: Number, required: false },
     },
     /* Forms — a form belongs to a project and files every submission as a task in
      * one sprint. That sprint IS the response list: there is no separate response

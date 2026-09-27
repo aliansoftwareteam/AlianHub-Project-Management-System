@@ -2,6 +2,16 @@ import taskClass from '@/utils/TaskOperations'
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 
+export const byTagName = (a, b) => {
+    const left = a.tagName.toLowerCase();
+    const right = b.tagName.toLowerCase();
+    return left < right ? -1 : (right < left ? 1 : 0);
+}
+
+export const taskTagChips = (projectTags, taskTagIds) => (projectTags || [])
+    .filter((tag) => (taskTagIds || []).includes(tag.uid))
+    .sort(byTagName);
+
 export const createTag = async (ids, payload) => {
     const axiosData = {
         "id": ids.projectId,

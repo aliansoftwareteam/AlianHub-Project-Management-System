@@ -116,17 +116,15 @@
                         </div>
                     </Transition>
                 </div>
-                <div class="d-flex mt-10px align-items-center" :class="{'ml--5px' :tagChipArray?.length}" v-if="!showArchiveVar && tagChipArray.length && checkApps('tags')">
-                    <!-- Tags -->
-                    <div v-for="(item, index) in tagChipArray" :key="index" @click.stop.prevent="">
-                        <div v-if="(index < chipCount)" class="tagList">
-                            <TagChip  :data="item" :isBorder="false" :prjectGlobalPermission="projectData?.isGlobalPermission"  :ids="ids" :tagsArray="projectData.tagsArray"/>
-                        </div>
-                        <div v-if="index == chipCount" class="tagcount"> +{{tagChipArray.length - chipCount}} </div>         
+                <div
+                    v-if="!showArchiveVar && taskTags.length && checkApps('tags') && checkPermission('task.task_tag',projectData?.isGlobalPermission) !== null"
+                    class="card-tags d-flex align-items-center mt-10px ml--5px"
+                >
+                    <div v-for="item in taskTags.slice(0, TAG_CHIP_LIMIT)" :key="item.uid" class="tagList" @click.stop>
+                        <TagChip :data="item" :isBorder="false" :prjectGlobalPermission="projectData?.isGlobalPermission" :ids="tagIds" :tagsArray="projectData.tagsArray"/>
                     </div>
-                    <div v-if="checkPermission('task.task_tag',projectData?.isGlobalPermission) !== null">
-                        <CreateTagPopup :task="element" @send:tagChipArray="(val)=>tagChipArray = val" @send:ids="(val)=>ids = val" :project="projectData" :chipCount="chipCount" :isTaskList="false" />
-                    </div>
+                    <div v-if="taskTags.length > TAG_CHIP_LIMIT" class="tagcount">+{{ taskTags.length - TAG_CHIP_LIMIT }}</div>
+                    <CreateTagPopup :task="element" :project="projectData" :isTaskList="false" @send:ids="(val) => tagIds = val" />
                 </div>
                 <div v-if="agentRun" class="agent-strip">
                     <span class="agent-strip__dot"></span>
@@ -253,6 +251,7 @@
     import {useConvertDate,useCustomComposable,useGetterFunctions } from "@/composable";
     import { useTaskSelection } from "@/composable/useTaskSelection.js";
     import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
+    import { taskTagChips } from "@/components/molecules/TagList/helper.js";
     import DropDown from '@/components/molecules/DropDown/DropDown.vue'
     import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
     import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
@@ -286,8 +285,11 @@
     const {getUser, getTeam, getPriorities} = useGetterFunctions();
     const projectData = inject("selectedProject");
     const $toast = useToast()
-    const tagChipArray = ref([])
     const element = ref(props.data)
+    const TAG_CHIP_LIMIT = 4
+    const taskTags = computed(() => taskTagChips(projectData.value?.tagsArray, element.value?.tagsArray))
+    // TagChip requires ids, and the row's tag picker only reports them after the chips first render.
+    const tagIds = ref({})
     const {updateTaskByGroup} = useUpdateTasks();
 
     const cardSelection = useTaskSelection();
@@ -299,7 +301,6 @@
         if (!props.data?._id) return;
         cardSelection.selectFromEvent(props.data, evt, '.kanban-cards');
     };
-    const chipCount = ref(4)
     const showSidebar = ref(false);
     const archive = ref(false);
     const horizontalDots = require("@/assets/images/svg/horizontalDots.svg");
