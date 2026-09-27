@@ -16,7 +16,7 @@ const pages = require('../Modules/Pages/controller');
 const rules = require('../Modules/Trash/rules');
 const ctrl = require('../Modules/Trash/controller');
 
-const COMPANY = 'c1';
+const COMPANY = '6f00000000000000000000c1';
 const ID = new mongoose.Types.ObjectId();
 const PROJECT = new mongoose.Types.ObjectId();
 
@@ -69,7 +69,7 @@ describe('GET /api/v2/trash', () => {
     test('needs a company', async () => {
         const res = mockRes();
         await ctrl.list({ headers: {}, query: {} }, res);
-        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.status).toHaveBeenCalledWith(403);
     });
 });
 
