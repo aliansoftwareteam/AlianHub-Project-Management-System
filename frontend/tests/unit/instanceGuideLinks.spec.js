@@ -6,10 +6,9 @@ const shell = readFileSync(path.resolve(__dirname, '../../src/views/Settings/Ins
 const styles = shell.slice(shell.indexOf('<style'));
 
 const rule = (selector) => {
-    const at = styles.indexOf(selector);
-    if (at === -1) return '';
-    const open = styles.indexOf('{', at);
-    return styles.slice(open, styles.indexOf('}', open));
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = new RegExp(`(^|\\n)${escaped}\\s*\\{([^}]*)\\}`).exec(styles);
+    return match ? match[2] : '';
 };
 
 describe('instance settings pages', () => {
