@@ -9,17 +9,7 @@
                 <!-- Mounted at the root so an incoming call rings wherever the user is,
                      not only when the conversation that called them is on screen. -->
                 <CallOverlay />
-                <template v-if="legacyNav">
-                    <HeaderComponent v-if="!$route.meta.hideHeader" @change="changeCompany($event)" @filter="handleFilter"/>
-                    <div :style="`height: calc(100dvh - ${$route.meta.hideHeader ? '0' : '46'}px);`" class="billing__history-wrapper style-scroll overflow-auto">
-                        <CommandPalette v-if="!$route.meta.preventAdvanceSearch" :open="isAdvanceSearch" @close="isAdvanceSearch = false"/>
-                        <QuickCreateTask />
-                        <AiUnavailable v-if="aiGated"/>
-                        <router-view v-else/>
-                        <TourCom ref="mainTour"/>
-                    </div>
-                </template>
-                <div v-else class="ah-app">
+                <div class="ah-app">
                     <GlobalRail v-if="!$route.meta.hideHeader" @change="changeCompany($event)" />
                     <main class="ah-app__main" id="ah-main">
                         <CommandPalette v-if="!$route.meta.preventAdvanceSearch" :open="isAdvanceSearch" @close="isAdvanceSearch = false"/>
@@ -69,7 +59,6 @@ import TourCom from "@/components/organisms/Tour/TourComponet.vue"
 import MaintenanceBanner from "@/views/Settings/Instance/MaintenanceBanner.vue"
 import MaintenanceCard from "@/views/Settings/Instance/MaintenanceCard.vue"
 import { maintenanceOn } from "@/composable/maintenanceState"
-import HeaderComponent from '@/components/organisms/Header/Header.vue'
 import GlobalRail from '@/components/organisms/Shell/GlobalRail.vue'
 import MobileTabBar from '@/components/organisms/Shell/MobileTabBar.vue'
 import ShellPanels from '@/components/organisms/Shell/ShellPanels.vue'
@@ -108,21 +97,14 @@ import { AI_GATE, aiGateFor } from '@/router/ai/gate';
 const {tabSync} = tabSyncHelper();
 const mainTour = ref();
 
-// COMPONENT
 defineComponent({
-    name: 'App',
-
-	components: {
-        HeaderComponent
-	}
+    name: 'App'
 })
 
 const {selectedLanguageCode, changeLanguage} = languageTranslateHelper();
 const { locale, setLocaleMessage } = useI18n();
 
 const companyId = ref(localStorage.getItem('selectedCompany') !== null ? localStorage.getItem('selectedCompany') : "")
-// Escape hatch for one release: the old top bar stays reachable behind a flag.
-const legacyNav = ref(localStorage.getItem('ah.legacyNav') === '1');
 const logged = ref(false);
 const showReviewModal = ref(false);
 const showSpinner = ref(true);
