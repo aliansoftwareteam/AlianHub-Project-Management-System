@@ -47,7 +47,7 @@ Derived from `task.md`: the workstream deliverables A.1–A.5, B.1–B.8, C.1–
 
 **G10, folded in from the retired task 005**
 
-- [ ] G10 Permission descriptions — **outstanding.** `frontend/src/components/molecules/Setting/PermissionMatrix.vue:43` still renders only the seeded (empty) `rule.desc`; the 107 `PermissionDesc.*` sentences at `frontend/src/locales/en.js:4983` have zero consumers outside the locale files. Either re-wire `PermissionDesc.<key>` as a `te()`-guarded fallback or delete the block deliberately.
+- [x] G10 Permission descriptions — `frontend/src/components/molecules/Setting/PermissionMatrix.vue` shows `PermissionDesc.<rule.key>` under every permission row and group header, `te()`-guarded, falling back to a stored `rule.desc` and never showing a raw key; search matches the description shown. `frontend/tests/unit/permissionDescriptions.spec.js` mounts the matrix with the seeded catalogue and keeps the 98 keys (6 parents + 92 children) one to one with the seeded rules (no orphans; only the never-rendered `toggle` holder has no sentence) — PR #1041
 
 ## Last step
 
@@ -64,3 +64,4 @@ The admin and member passes (V4) and the "a Member never sees the Instance group
 | 2026-09-04 | Build and merge | done | Full detail in `progress-A.md`, `progress-B.md`, `progress-C.md`, `progress-integration.md`; PR #542, merge `d75df67b`, build `14.36.0-beta.19` |
 | 2026-09-10 | Leftovers audit | 3 open | `progress-integration.md` "Verified remaining": B.2, B.4 and G10; task 021 was filed for the *other* leftovers and explicitly leaves these three on 013 |
 | 2026-09-12 | Record audited | stays active | Checklist above rebuilt from `task.md` against `origin/beta` `71c9332f`. Everything in workstreams A and C is delivered; B is delivered apart from B.2's `main.yml` trigger (still `staging`) and B.4's three unadopted modules (Trash, Instance, Tasks bulk); G10 is still open (0 `PermissionDesc` consumers, 107 dead keys). The V1 gate is green on the tip of `beta` (`gh pr checks 684`). V4's admin and member passes and V2's member check have no record and were never run. Status line corrected from "active · Started 2026-09-04" to name what remains; YAML frontmatter added (it had none). |
+| 2026-09-27 | G10 permission descriptions | done | PR #1041 (`fix/permission-descriptions`): the matrix reads `PermissionDesc.<rule.key>` for rows and group headers. The namespace holds 98 keys, not 107, all matching seeded rules. The failing-first `permissionDescriptions.spec.js` was 14/18 red on beta and 18/18 green after the fix; CI green (backend, frontend, e2e) |
