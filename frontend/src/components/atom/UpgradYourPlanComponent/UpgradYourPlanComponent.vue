@@ -1,7 +1,7 @@
 <template>
     <div class="upw w-100 position-ab position-center z-index-1 p-5px border-radius-5-px text-center p0x-15px">
         <div v-if="props.isImage" class="mb-30px">
-            <img :src="upgradePlan">
+            <img class="upw__image" :src="upgradePlan" alt="">
         </div>
         <div>
             <h3 class="upw__title font-size-22 font-weight-700 text-center line-height-33">
@@ -51,6 +51,7 @@
 </script>
 
 <style scoped>
+.upw__image { max-width: 100%; height: auto; }
 .upw__title { color: var(--ink); }
 .upw__accent { color: var(--brand); }
 .upw__message { color: var(--ink-label); }
