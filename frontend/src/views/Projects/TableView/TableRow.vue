@@ -25,6 +25,10 @@
             </span>
         </span>
 
+        <span role="cell" class="tv2__tags">
+            <TaskTagCell :task="data" />
+        </span>
+
         <span role="cell" class="tv2__cell-ai" @click.stop>
             <span v-if="summary.state === 'ready'" class="tv2__summary" :title="summary.summary">{{ summary.summary }}</span>
             <span v-else-if="summary.state === 'loading'" class="tv2__summary tv2__summary--empty">{{ $t('List.ai_loading') }}</span>
@@ -83,6 +87,7 @@ import { useI18n } from "vue-i18n";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import ProvenanceBadge from "@/components/molecules/Provenance/ProvenanceBadge.vue";
+import TaskTagCell from "@/components/molecules/TagList/TaskTagCell.vue";
 import { useGetterFunctions } from "@/composable";
 import { taskRisk } from "@/views/Projects/composables/taskRisk";
 import { useTaskSummaries } from "./useTaskSummaries.js";

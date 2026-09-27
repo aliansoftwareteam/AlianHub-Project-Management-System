@@ -44,6 +44,7 @@
                     <div class="lv2__cols" role="row">
                         <span class="lv2__c-select" role="columnheader"><span class="ah-sr-only">{{ $t('List.col_select') }}</span></span>
                         <span class="lv2__c-title" role="columnheader">{{ $t('List.col_task') }}</span>
+                        <span class="lv2__c-tags" role="columnheader"><template v-if="tagsOn">{{ $t('List.col_tags') }}</template></span>
                         <span class="lv2__c-assignee" role="columnheader">{{ $t('List.col_assignee') }}</span>
                         <span class="lv2__c-due" role="columnheader">{{ $t('List.col_due') }}</span>
                         <span class="lv2__c-prio" role="columnheader"><template v-if="rowEdit.showPriority.value">{{ $t('List.col_priority') }}</template></span>
@@ -162,7 +163,8 @@ const {
     getSprintTasks,
     getMongoDBUpdate
 } = taskListHelper();
-const { checkPermission } = useCustomComposable();
+const { checkApps, checkPermission } = useCustomComposable();
+const tagsOn = computed(() => checkApps("tags") && checkPermission("task.task_tag", project.value?.isGlobalPermission) !== null);
 const agents = useProjectAgentActivity();
 const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
 const rowEdit = useListRowEdit(project, showArchived);
