@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import { describe, expect, it, vi } from 'vitest';
 import { config, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
@@ -8,28 +6,11 @@ vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 
 
 import PermissionMatrix from '@/components/molecules/Setting/PermissionMatrix.vue';
 import en from '@/locales/en.js';
+import { CHILDREN_OF, SEEDED_KEYS, seed, seededBody } from '../permissionSeed.js';
 
 const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);
 const t = i18n.global.t;
-
-/* utils/data.js requires half the backend, so the catalogue's literal declarations are evaluated
-   straight from the source: the block from `let rules = [` up to the first branch on `type`. */
-const seed = (() => {
-    const source = fs.readFileSync(path.join(__dirname, '../../../utils/data.js'), 'utf8');
-    const from = source.indexOf('let rules = [', source.indexOf('exports.importCompanyRules'));
-    const declarations = source.slice(from, source.indexOf("if(type === 'project')", from));
-    const names = [...declarations.matchAll(/^\s*let\s+(\w+)\s*=/gm)].map((match) => match[1]);
-    return new Function(`${declarations}\nreturn { ${names.join(', ')} };`)();
-})();
-const SEEDED_KEYS = Object.values(seed).filter(Array.isArray).flat().map((rule) => rule.key);
-
-// The parentId each forEach in importCompanyRules gives its array.
-const CHILDREN_OF = { project: 'subProjectRules', task: 'taskRules', settings: 'settingRules', sheet_settings: 'sheet_settings', artificial_intelligence: 'aiRules', chat: 'chat_settings' };
-const seededBody = () => seed.rules.flatMap((parent) => [
-    { ...parent, _id: parent.key, roles: [] },
-    ...seed[CHILDREN_OF[parent.key]].map((rule, index) => ({ ...seed.obj, ...rule, _id: rule.key, parentId: parent.key, priorityIndex: index, roles: [] }))
-]);
 
 const store = () => createStore({
     modules: { settings: { namespaced: true, getters: { selectedCompany: () => ({ planFeature: { aiPermission: true, aiRequest: 100 } }) } } }
