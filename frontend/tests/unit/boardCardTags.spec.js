@@ -31,8 +31,9 @@ vi.mock('@vuepic/vue-datepicker/dist/main.css', () => ({}));
 vi.mock('@vuepic/vue-datepicker', () => ({ default: defineComponent({ name: 'VueDatePicker', setup: () => () => h('div') }) }));
 
 import BoardCard from '@/views/Projects/Kanban/BoardViewDisplayCardComponent.vue';
+import { inkOf, worstContrast } from '../wcagContrast';
 
-const tag = (uid, tagName) => ({ uid, tagName, tagColor: '#1f7a4d', tagBgColor: '#1f7a4d35' });
+const tag = (uid, tagName, colour = '#1f7a4d') => ({ uid, tagName, tagColor: colour, tagBgColor: `${colour}35` });
 const PROJECT_TAGS = [
     tag('tag-ux', 'UX'),
     tag('tag-api', 'api'),
@@ -40,7 +41,9 @@ const PROJECT_TAGS = [
     tag('tag-docs', 'Docs'),
     tag('tag-perf', 'Perf'),
     tag('tag-qa', 'QA'),
-    tag('tag-unused', 'Unused')
+    tag('tag-unused', 'Unused'),
+    tag('tag-navy', 'Navy', '#2f3990'),
+    tag('tag-lemon', 'Lemon', '#ffff00')
 ];
 
 const store = createStore({
@@ -132,6 +135,18 @@ describe('board card tags', () => {
         expect(chipNames(wrapper)).toEqual(['UX']);
         const button = addTagButton(wrapper);
         expect(button.exists() && button.isVisible()).toBe(false);
+    });
+
+    it('keeps every chip name readable on its tint in both themes', async () => {
+        const wrapper = await mountSettled({ tagsArray: ['tag-navy', 'tag-lemon'] });
+        const chips = wrapper.findAll('.card-tags .tagListContent');
+        expect(chips.map((chip) => chip.text())).toEqual(['Lemon', 'Navy']);
+        for (const chip of chips) {
+            const style = chip.element.style;
+            expect(chip.classes()).toContain('ah-status-ink');
+            expect(worstContrast(inkOf(style), style.background, 'light'), chip.text()).toBeGreaterThanOrEqual(4.5);
+            expect(worstContrast(style.getPropertyValue('--status-ink-dark'), style.background, 'dark'), chip.text()).toBeGreaterThanOrEqual(4.5);
+        }
     });
 
     it('removes a tag from this task with its chip', async () => {
