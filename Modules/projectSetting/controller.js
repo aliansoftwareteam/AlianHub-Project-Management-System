@@ -399,6 +399,9 @@ exports.migrateProject = (project,companyId) => {
     })
 };
 
+/* tasks.sprintArray is an untyped object: Mongoose casts neither .id nor .folderId, and moving a sprint writes folderId as an ObjectId. */
+const idForms = (id) => [String(id), new mongoose.Types.ObjectId(String(id))];
+
 exports.updateTaksSprints = (projectId,companyId) => {
     return new Promise((resolve, reject) => {
         try {
@@ -415,7 +418,7 @@ exports.updateTaksSprints = (projectId,companyId) => {
                         const updateObj = {
                             type: SCHEMA_TYPE.TASKS,
                             data: [
-                                { "sprintArray.id": {$in : [legacyId,sprintId]} , ProjectID: new mongoose.Types.ObjectId(projectId)},
+                                { "sprintArray.id": {$in : [legacyId, ...idForms(sprintId)]} , ProjectID: new mongoose.Types.ObjectId(projectId)},
                                 { sprintId:  new mongoose.Types.ObjectId(sprintId)}
                             ]
                         }
@@ -429,7 +432,7 @@ exports.updateTaksSprints = (projectId,companyId) => {
                         const uObj = {
                             type: SCHEMA_TYPE.TASKS,
                             data: [
-                                { "sprintArray.id": sprintId , ProjectID: new mongoose.Types.ObjectId(projectId)},
+                                { "sprintArray.id": {$in : idForms(sprintId)} , ProjectID: new mongoose.Types.ObjectId(projectId)},
                                 { "sprintId":  new mongoose.Types.ObjectId(sprintId)}
                             ]
                         }
@@ -471,7 +474,7 @@ exports.updateTaksFolders = (projectId,companyId) => {
                         const updateObj = {
                             type: SCHEMA_TYPE.TASKS,
                             data: [
-                                {"sprintArray.folderId": {$in : [legacyId,folderId]} , ProjectID: new mongoose.Types.ObjectId(projectId)},
+                                {"sprintArray.folderId": {$in : [legacyId, ...idForms(folderId)]} , ProjectID: new mongoose.Types.ObjectId(projectId)},
                                 { folderObjId : new mongoose.Types.ObjectId(folderId)}
                             ]
                         }
