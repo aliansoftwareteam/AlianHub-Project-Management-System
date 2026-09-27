@@ -42,7 +42,7 @@ tr.estimate__daysdate-tr th {
     border: 1px solid #cfd0d3;
 }
 table.table.table-astimated-hour tr th {
-    font-family: Roboto;
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 700;
     font-size: 13px;
@@ -73,7 +73,7 @@ table.table.table-astimated-hour th.full-width {
 }
 
 table.table.table-astimated-hour thead tr:first-child th {
-    font-family: Roboto;
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 500;
     font-size: 16px;

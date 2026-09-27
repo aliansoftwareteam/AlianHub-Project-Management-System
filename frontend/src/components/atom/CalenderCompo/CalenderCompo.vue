@@ -80,7 +80,7 @@
                         <input
                             v-if="dateValue != ''"
                             readonly 
-                            class="date_format_cal font-roboto-sans"
+                            class="date_format_cal font-ui"
                             :class="[{'calendar-comp':!calenderImage,'calendar-comp-white':calenderImage}]"
                             type="text"
                             :placeholder="convertDateFormat(dateValue,props.format ? props.format : '',{showDayName: false})"
@@ -91,7 +91,7 @@
                         >
                         <input
                             v-else
-                            class="date_format_cal font-roboto-sans"
+                            class="date_format_cal font-ui"
                             readonly
                             type="text"
                             :class="[{'calendar-comp':!calenderImage,'calendar-comp-white':calenderImage}]"
@@ -106,7 +106,7 @@
                         <input
                             v-if="dateValue != ''"
                             readonly 
-                            class="date_format_cal font-roboto-sans"
+                            class="date_format_cal font-ui"
                             :class="[{'bg-transparent border-0 cursor-pointer':!calenderImage,'calendar-comp-white':calenderImage,'text-ellipse':isEllipsis,'d-block':isEllipsis,'mw-150px':isEllipsis,'date_mw':isTask}]"
                             type="text"
                             :placeholder="convertDateAndTime(timeFormate,dateValue,props.format)"
@@ -117,7 +117,7 @@
                         >
                         <input
                             v-else
-                            class="date_format_cal font-roboto-sans"
+                            class="date_format_cal font-ui"
                             readonly
                             type="text"
                             :class="[{'bg-transparent border-0 cursor-pointer':!calenderImage,'calendar-comp-white':calenderImage,'text-ellipse':isEllipsis,'d-block':isEllipsis,'mw-150px':isEllipsis,'date_mw':isTask}]"

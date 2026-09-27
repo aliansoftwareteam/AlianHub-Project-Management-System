@@ -219,7 +219,7 @@
 </script>
 <style scoped>
     .formkit__content-currency{
-        font-family: 'Roboto';
+        font-family: var(--font-ui);
         font-size: 13px;
         font-style: normal;
         font-weight: 400;

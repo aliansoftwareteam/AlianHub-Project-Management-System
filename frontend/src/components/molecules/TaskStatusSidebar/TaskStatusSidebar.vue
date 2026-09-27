@@ -2,7 +2,7 @@
     <div class="list__taskstatus-sidebar">
         <Sidebar width="374px" :zIndex="props.zTndex" >
             <template #head-left>
-                <div class="font-size-18 font-weight-700 black font-roboto-sans">{{title}}</div>
+                <div class="font-size-18 font-weight-700 black font-ui">{{title}}</div>
             </template>
             <template #head-right>
                 <span class="add_status font-size-12 font-weight-400" v-if="isOpenAddStatus === false && isAddStatus === true" @click="isOpenAddStatus = true,formData.status.value = ''">+ {{props.type === 'task_type' ? $t("Home.add_task_type") : $t("Projects.add_status")}}</span>

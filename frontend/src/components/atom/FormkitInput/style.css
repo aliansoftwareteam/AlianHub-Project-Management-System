@@ -13,7 +13,7 @@
 }
 .formkit-label__font {
     color: #3E3E3E;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-weight: 400;
     line-height: 17.919px; 
 }

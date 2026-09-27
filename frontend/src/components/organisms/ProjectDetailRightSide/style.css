@@ -19,7 +19,7 @@
     font-weight: 500;
     color: #000000;
     margin-bottom: 5px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
 }
 .projectRightside .project-right-side-label {

@@ -190,7 +190,7 @@ const filterCategories = computed(() => {
     border: 1px solid #E0E0E0;
     border-radius: 8px;
     padding: 10px 20px 10px 20px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     font-weight: 400;
     color: #959595;
     font-size: 16px;

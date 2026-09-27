@@ -9,7 +9,7 @@
 }
 .formkit__content-wrapper label.formkit-label {
     color: #505050;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 13px;
     font-style: normal;
     font-weight: 400;
@@ -30,7 +30,7 @@
     padding: 10px 20px 10px;
 }
 .formkit__content-wrapper .formkit-input,.formkit__content-wrapper-project-detail .formkit-input  {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 13px;
     font-style: normal;
     font-weight: 400;
@@ -67,7 +67,7 @@
     font-size: 14px;
     font-weight: 500;
     color: #000000;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     display: flex;
     justify-content: space-between;
     align-items: center;

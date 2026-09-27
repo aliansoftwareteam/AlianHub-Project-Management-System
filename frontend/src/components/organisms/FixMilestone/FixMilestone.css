@@ -14,7 +14,7 @@
     text-align: left;
 }
 .fix-milestone-wrapper th {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 500;
     font-size: 16px;
@@ -22,7 +22,7 @@
     color: #000000;
 }
 .fix-milestone-wrapper td {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 400;
     font-size: 13px;
@@ -89,7 +89,7 @@
     border-bottom: 1px solid #DFE1E6;
 }
 .add_new {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 400;
     font-size: 13px;
@@ -109,7 +109,7 @@
     padding-left: 12px;
 }
 .total_amount {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 500;
     font-size: 16px;
@@ -170,7 +170,7 @@
 .clear_status {
     text-align: right;
     padding: 10px 20px 5px 0px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 500;
     font-size: 14px;
@@ -210,7 +210,7 @@ img {
     align-items: center;
 }
 .milestone_font {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 700;
     font-size: 14px;

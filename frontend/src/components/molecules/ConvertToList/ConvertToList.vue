@@ -3,10 +3,10 @@
         <div v-if="isFolder === true">
             <Sidebar width="607px" :top="clientWidth <= 767 ? '0px' : '46px'">
                 <template #head-left>
-                    <div class="blue font-roboto-sans screenShotPreview">{{$t('ProjectDetails.convert_list')}}</div>
+                    <div class="blue font-ui screenShotPreview">{{$t('ProjectDetails.convert_list')}}</div>
                 </template>
                 <template #head-right>
-                <button class="outline-primary d-flex align-items-center font-roboto-sans font-size-16 convertlist__cancel-btn" @click="$emit('closeSidebar',false)">{{$t('Projects.cancel')}}</button>
+                <button class="outline-primary d-flex align-items-center font-ui font-size-16 convertlist__cancel-btn" @click="$emit('closeSidebar',false)">{{$t('Projects.cancel')}}</button>
                 </template>
                 <template #body>
                         <div class="bg-white overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar p15x-20px" :class="{'border-radius-12-px' : clientWidth > 767, 'border-radius-0 ' : clientWidth <= 767}"  :style="[{margin : clientWidth > 767 ? '15px' : '0px' ,  height : clientWidth <= 767 ?  '100%' : ''}]">
@@ -15,7 +15,7 @@
                             <div class="d-flex align-items-center text-ellipsis projectDivInList">
                                 <span v-if="selectedProjectData.projectIcon && selectedProjectData.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center font-weight-400 inital-box ml-6px" :style="[{'background-color': selectedProjectData.projectIcon.data}]">{{ selectedProjectData.ProjectName.charAt(0).toUpperCase()}}</span>
                                 <img v-if="selectedProjectData.projectIcon && selectedProjectData.projectIcon.type === 'image'" class="profile-sm-square ml-6px" :src="selectedProjectData.projectIcon.data" alt=""/>
-                                <span class="text-ellipsis Project-name-sidebar-inlist black font-weight-500 font-roboto-sans pl-10px" :class="{'font-size-13' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}"  @click="showSidebar = true">{{selectedProjectData.ProjectCode}} | {{selectedProjectData.ProjectName}}</span>
+                                <span class="text-ellipsis Project-name-sidebar-inlist black font-weight-500 font-ui pl-10px" :class="{'font-size-13' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}"  @click="showSidebar = true">{{selectedProjectData.ProjectCode}} | {{selectedProjectData.ProjectName}}</span>
                             </div>
                         </div>
                         <SideBarSprintFolderData
@@ -32,14 +32,14 @@
                     <ConfirmationSidebar
                         v-model="showSidebar"
                         :title="$t('Converttolist.are_you_sure_convert')"
-                        :acceptButtonClass="'btn-primary font-roboto-sans'"
+                        :acceptButtonClass="'btn-primary font-ui'"
                         :acceptButton="$t('Converttolist.convert_to_list')"
                         @confirm="showSidebar = false,convertToListFun()">
                         <template #head>
                             <img @click="$emit('closeSidebar',false)" :src="closeImage" alt="closeImage" class="position-ab cursor-pointer close_image-icon">
                         </template>
                         <template #body>
-                            <span class="d-block text-center convert-list-message font-size-16 font-weight-400 font-roboto-sans gray81 pt-17px important__note-desc" ><span class="red">{{$t('Converttolist.important')}}:</span> {{$t('Converttolist.you_will_lose')}}</span>
+                            <span class="d-block text-center convert-list-message font-size-16 font-weight-400 font-ui gray81 pt-17px important__note-desc" ><span class="red">{{$t('Converttolist.important')}}:</span> {{$t('Converttolist.you_will_lose')}}</span>
                         </template>
                     </ConfirmationSidebar>
                 </template>
@@ -49,14 +49,14 @@
             <ConfirmationSidebar
                 v-model="showSidebar"
                 :title="$t('Converttolist.are_you_sure_convert')"
-                :acceptButtonClass="'btn-primary font-roboto-sans'"
+                :acceptButtonClass="'btn-primary font-ui'"
                 :acceptButton="$t('Converttolist.convert_to_list')"
                 @confirm="showSidebar = false,convertToListFun()">
                 <template #head>
                     <img @click="$emit('closeSidebar',false)" :src="closeImage" alt="closeImage" class="position-ab cursor-pointer close_image-icon">
                 </template>
                 <template #body>
-                    <span class="d-block text-center convert-list-message font-size-16 font-weight-400 font-roboto-sans gray81 pt-17px important__note-desc"><span class="red">{{$t('Converttolist.important')}}:</span> {{$t('Converttolist.you_will_lose')}}</span>
+                    <span class="d-block text-center convert-list-message font-size-16 font-weight-400 font-ui gray81 pt-17px important__note-desc"><span class="red">{{$t('Converttolist.important')}}:</span> {{$t('Converttolist.you_will_lose')}}</span>
                 </template>
             </ConfirmationSidebar>
         </div>

@@ -4,8 +4,8 @@
             <img :src="getImageData(props.cfIcon)" :alt="props.cfTitle"> 
         </div>
         <div class="custom_field__wrapper-tittle">
-            <h5 class="font-roboto-sans font-size-14 font-weight-500 line-height-22px">{{props.cfTitle}}</h5>
-            <span class="font-roboto-sans font-size-13 font-weight-400 gray">{{props.cfDescrption}}</span>
+            <h5 class="font-ui font-size-14 font-weight-500 line-height-22px">{{props.cfTitle}}</h5>
+            <span class="font-ui font-size-13 font-weight-400 gray">{{props.cfDescrption}}</span>
         </div>
     </div>
 </template>

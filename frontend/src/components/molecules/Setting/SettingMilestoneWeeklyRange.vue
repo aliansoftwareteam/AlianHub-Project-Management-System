@@ -142,7 +142,7 @@ const handleSelect = (value) => {
     margin-bottom: 20px !important;
 }
 .font_family_status_date {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 16px;
     font-weight: 400;
     line-height: 19px;

@@ -32,19 +32,19 @@
                             <li role="none">
                                 <button type="button" role="menuitem" class="embed-edit-options mb-7px view-list__menuitem cursor-pointer" @click.stop="editOptions('Pin'),$refs[item._id].click()">
                                     <img :src="pin" class="mr-14-px list__edit" alt="" aria-hidden="true" />
-                                    <span class="font-roboto-sans font-weight-400 font-size-14 line-height-19 text-left gray81">{{item?.isPin ? $t('Projects.unpin') :$t('Projects.pinview') }}</span>
+                                    <span class="font-ui font-weight-400 font-size-14 line-height-19 text-left gray81">{{item?.isPin ? $t('Projects.unpin') :$t('Projects.pinview') }}</span>
                                 </button>
                             </li>
                             <li role="none" v-if="project?.ProjectRequiredComponent && (project?.ProjectRequiredComponent?.filter((e)=>e.setAsDefault === true).length == 0 || project?.ProjectRequiredComponent?.find((e)=>e.setAsDefault === true).keyName === item?.keyName)">
                                 <button type="button" role="menuitem" class="embed-edit-options mb-7px view-list__menuitem cursor-pointer" @click.stop="editOptions('AddDefault'),$refs[item._id].click()">
                                     <img :src="defaultView" class="mr-14-px list__edit" alt="" aria-hidden="true" />
-                                    <span class="font-roboto-sans font-weight-400 font-size-14 line-height-19 text-left gray81">{{!item?.setAsDefault ? $t('ViewList.set_as_default') :$t('ViewList.remove_as_default') }}</span>
+                                    <span class="font-ui font-weight-400 font-size-14 line-height-19 text-left gray81">{{!item?.setAsDefault ? $t('ViewList.set_as_default') :$t('ViewList.remove_as_default') }}</span>
                                 </button>
                             </li>
                             <li role="none" v-if="isDeleteDisabled == false">
                                 <button type="button" role="menuitem" class="embed-edit-options view-list__menuitem cursor-pointer" @click.stop="isDelete = true, $refs[item._id].click()">
                                     <img :src="deleteImage" class="mr-14-px list__edit" alt="" aria-hidden="true"/>
-                                    <span class="font-roboto-sans font-weight-400 font-size-14 line-height-19 text-left red pt-2px">{{$t('Projects.deleteview')}}</span>
+                                    <span class="font-ui font-weight-400 font-size-14 line-height-19 text-left red pt-2px">{{$t('Projects.deleteview')}}</span>
                                 </button>
                             </li>
                         </ul>

@@ -7,7 +7,7 @@
             <div class="d-flex align-items-center">
                 <img v-if="dataObj.logAddType" src="@/assets/images/svg/green_dot.svg" class="active_inactivedot p0x-15px" alt="greenDot">
                 <img v-else src="@/assets/images/svg/Purple_dot.svg" class="active_inactivedot p0x-15px" alt="purpleDot">
-                <span class="totalHours font-weight-500 black font-roboto-sans">{{ $t('TimeTracker.hours_value', { time: convertedTimeString(dataObj.duration,'update') ? convertedTimeString(dataObj.duration,'update') : '00:00' }) }}</span>
+                <span class="totalHours font-weight-500 black font-ui">{{ $t('TimeTracker.hours_value', { time: convertedTimeString(dataObj.duration,'update') ? convertedTimeString(dataObj.duration,'update') : '00:00' }) }}</span>
         </div>
     </div>
     <div class="d-flex timelogtimeDetail justify-content-between bg-white text-ellipsis mb-10px" v-if="isUser">
@@ -17,7 +17,7 @@
         <div class="d-flex align-items-center justify-content-end w-35">
             <img v-if="dataObj.logAddType" src="@/assets/images/svg/green_dot.svg" class="active_inactivedot p0x-15px" alt="greenDot">
             <img v-else src="@/assets/images/svg/Purple_dot.svg" class="active_inactivedot p0x-15px" alt="purpleDot">
-            <span class="totalHours font-weight-500 black font-roboto-sans converted__timestring">{{ $t('TimeTracker.hours_value', { time: convertedTimeString(dataObj.duration,'update') ? convertedTimeString(dataObj.duration,'update') : '00:00' }) }}</span>
+            <span class="totalHours font-weight-500 black font-ui converted__timestring">{{ $t('TimeTracker.hours_value', { time: convertedTimeString(dataObj.duration,'update') ? convertedTimeString(dataObj.duration,'update') : '00:00' }) }}</span>
         </div>
     </div>
     <div class="d-flex timelogtimeDetail justify-content-between bg-white pt-0" v-if="isUser">
@@ -26,7 +26,7 @@
     </div>
     <div class="commentMain position-re">
         <div class="cooment_titledesc-wrapper bg-white">
-            <p class="commentDetail font-roboto-sans GunPowder text-ellipsis font-size-16 font-weight-400 start__hours-lineheight">{{dataObj.discription}}</p>
+            <p class="commentDetail font-ui GunPowder text-ellipsis font-size-16 font-weight-400 start__hours-lineheight">{{dataObj.discription}}</p>
         </div>
         <div class="d-flex mainImageDiv flex-wrap" v-if="dataObj.trackShotArray !== undefined && dataObj.trackShotArray">
             <div class="timelogImage bg-white position-re overflow-hidden" v-for="(trackDetail,ind) in dataObj.trackShotArray" v-bind:key="ind">

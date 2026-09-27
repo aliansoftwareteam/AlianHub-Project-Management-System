@@ -1,16 +1,16 @@
 <template>
     <div class="projectInfoDiv bg-white" :class="[{'opacity-5 pointer-event-none' : item?.isRestrict === true}]">
-        <div class="projectInfoTopLine d-flex align-items-center justify-content-between font-roboto-sans">
+        <div class="projectInfoTopLine d-flex align-items-center justify-content-between font-ui">
             <div class="d-flex align-items-center project__inToplinetextimg-wrapper">
                 <img :class="[{'cursor-pointer' : activeTab === 0}]" :src="item?.favouriteTasks?.filter((x) => x.userId === userId)?.length ? projectStar : blankStar" @click="!item.isRestrict ? updateFavourite(item) : ''" :title="$t('Projects.favourite')"/>
-                <span class="ProjectFirstLatter light-purple d-flex align-items-center justify-content-center font-weight-400 font-roboto-sans white font-size-13 text-uppercase" v-if="item.projectIcon.type === 'color'" :style="[{'background-color': item.projectIcon.type === 'color' ? item.projectIcon.data : ''}]">{{item.ProjectName ? item.ProjectName.charAt(0) : ''}}</span>
+                <span class="ProjectFirstLatter light-purple d-flex align-items-center justify-content-center font-weight-400 font-ui white font-size-13 text-uppercase" v-if="item.projectIcon.type === 'color'" :style="[{'background-color': item.projectIcon.type === 'color' ? item.projectIcon.data : ''}]">{{item.ProjectName ? item.ProjectName.charAt(0) : ''}}</span>
                 <WasabiImage
                     v-else
                     :style="[{'height': '20px','width': '20px','border-radius': '20px','margin-left': '5px'}]"
                     :data="{url: item.projectIcon.data}"
                 />
                 <p class="font-weight-500 dark-gray d-block font-size-14 text-ellipsis"><span>{{item.ProjectCode}}</span> | <span :title="item.ProjectName">{{item.ProjectName}}</span></p>
-                <a v-if="activeTab === 0" class="d-flex font-weight-400 font-size-13 text-decoration-none font-roboto-sans cursor-pointer" href.prevent="#" @click="!item.isRestrict ? redirectProjectList(item) : ''"><img :src="projectGoToLink">{{ $t('Projects.go_to_project') }}</a>
+                <a v-if="activeTab === 0" class="d-flex font-weight-400 font-size-13 text-decoration-none font-ui cursor-pointer" href.prevent="#" @click="!item.isRestrict ? redirectProjectList(item) : ''"><img :src="projectGoToLink">{{ $t('Projects.go_to_project') }}</a>
             </div>
             <DropDown v-if="checkPermission('settings.settings_project_list') == true && checkPermission('project.project_details') == true && checkPermission('project.project_close') == true" :bodyClass="{'setting__project-dropdown' : true}">
                 <template #button>
@@ -43,7 +43,7 @@
         <div class="project_status_info_area d-flex">
             <div class="p_owner">
                 <div class="p__owner-wrapper">
-                    <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Watcher.owner')}}</span>
+                    <span class="sub-title-span d-block font-ui font-weight-400 gray81 font-size-13">{{$t('Watcher.owner')}}</span>
                     <Assignee class="Assignee-component"
                         :users="item.LeadUserId"
                         :options="users.map((x) => x._id)"
@@ -59,20 +59,20 @@
             </div>
             <div class="p_sharewith" :class="[{'pointer-event-none' : isSpinner === true}]">
                 <div class="p__sharewith-wrapper">
-                    <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Projects.share_with')}}</span>
+                    <span class="sub-title-span d-block font-ui font-weight-400 gray81 font-size-13">{{$t('Projects.share_with')}}</span>
                     <div class="share-with-wrapperdata d-flex align-items-center justify-content-start">
-                        <button class="border-radius-8-px font-size-13 d-flex align-items-center justify-content-center mr-010 font-roboto-sans"  @click="!item.isRestrict ? updateProjectSpace(item,'public') : ''" :class="[{'outline-primary share__everyone' : item.isPrivateSpace === false,'outline-secondary share__private':item.isPrivateSpace !== false,'cursor-pointer': activeTab === 0}]">{{$t('Projects.everyone')}}</button>                    
-                        <button class="border-radius-8-px font-size-13 d-flex align-items-center justify-content-center font-roboto-sans"  @click="!item.isRestrict ? updateProjectSpace(item,'private') : ''" :class="[{'outline-primary share__everyone' : item.isPrivateSpace === true,'outline-secondary share__private':item.isPrivateSpace !== true,'cursor-pointer': activeTab === 0}]">{{$t('Projects.private')}}</button>
+                        <button class="border-radius-8-px font-size-13 d-flex align-items-center justify-content-center mr-010 font-ui"  @click="!item.isRestrict ? updateProjectSpace(item,'public') : ''" :class="[{'outline-primary share__everyone' : item.isPrivateSpace === false,'outline-secondary share__private':item.isPrivateSpace !== false,'cursor-pointer': activeTab === 0}]">{{$t('Projects.everyone')}}</button>                    
+                        <button class="border-radius-8-px font-size-13 d-flex align-items-center justify-content-center font-ui"  @click="!item.isRestrict ? updateProjectSpace(item,'private') : ''" :class="[{'outline-primary share__everyone' : item.isPrivateSpace === true,'outline-secondary share__private':item.isPrivateSpace !== true,'cursor-pointer': activeTab === 0}]">{{$t('Projects.private')}}</button>
                     </div>
                 </div>
             </div>
             <div class="p_status" v-if="checkPermission('project.project_status_change') != null">
                 <div class="p_status-wrapper">
-                    <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Templates.project_status')}}</span>
+                    <span class="sub-title-span d-block font-ui font-weight-400 gray81 font-size-13">{{$t('Templates.project_status')}}</span>
                     <ul class="pro_block d-flex align-items-center justify-content-start flex-wrap" @click="!item.isRestrict ? openEditSidebar(item,'projectStatus') : ''">
                         <li class="projectDataColorli" v-for="(statusObj,statusKey) in item.projectStatusData"
                         :key="statusKey">
-                            <span class="font-roboto-sans font-weight-400 font-size-13 white" :class="[{'cursor-pointer' : activeTab === 0}]" :style="[{'color': statusObj.textColor+'!important','background-color': statusObj.backgroundColor}]">
+                            <span class="font-ui font-weight-400 font-size-13 white" :class="[{'cursor-pointer' : activeTab === 0}]" :style="[{'color': statusObj.textColor+'!important','background-color': statusObj.backgroundColor}]">
                                 {{statusObj.name}}
                             </span>
                         </li>
@@ -81,12 +81,12 @@
             </div>
             <div class="task_type_status">
                 <div class="task__type-wrapper">
-                    <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Projects.task_type')}}</span>
+                    <span class="sub-title-span d-block font-ui font-weight-400 gray81 font-size-13">{{$t('Projects.task_type')}}</span>
                     <ul class="d-flex task_type_statusul" @click="!item.isRestrict ? openEditSidebar(item,'taskType') : ''">
                         <li class="projectDataColorli" v-for="(taskType,taskTypeKey) in item.taskTypeCounts" :key="taskTypeKey">
                             <div class="task_type d-flex align-items-center border-radius-6-px bg-lightgray" :class="[{'cursor-pointer' : activeTab === 0}]">
                                 <TaskTypeIcon :taskType="taskType" :style="[{'height':'13.85px','width':'13.85px'}]" />
-                                <span class="font-size-13 font-roboto-sans font-weight-400 GunPowder ml-8px" :class="[{'cursor-pointer' : activeTab === 0}]">{{taskType.name}}</span>
+                                <span class="font-size-13 font-ui font-weight-400 GunPowder ml-8px" :class="[{'cursor-pointer' : activeTab === 0}]">{{taskType.name}}</span>
                             </div>
                         </li>
                     </ul>
@@ -94,10 +94,10 @@
             </div>
             <div class="task_type_status_todo" v-if="checkPermission('task.task_status') != null">
                 <div class="task__typestatustodo-wrapper">
-                    <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Templates.task_status')}}</span>
+                    <span class="sub-title-span d-block font-ui font-weight-400 gray81 font-size-13">{{$t('Templates.task_status')}}</span>
                     <ul class="d-flex task_type_statusul" @click="!item.isRestrict ? openEditSidebar(item,'taskStatus') : ''">
                         <li class="cursor_pointer projectDataColorli" v-for="(statusObj,statusKey) in item.taskStatusData" :key="statusKey">
-                            <span class="font-roboto-sans font-weight-400 font-size-13 bg-black white" :style="[{'background-color': statusObj.bgColor, 'color': statusObj.textColor+'!important'}]" :class="[{'cursor-pointer' : activeTab === 0}]">
+                            <span class="font-ui font-weight-400 font-size-13 bg-black white" :style="[{'background-color': statusObj.bgColor, 'color': statusObj.textColor+'!important'}]" :class="[{'cursor-pointer' : activeTab === 0}]">
                                 {{statusObj.name}}
                             </span>
                         </li>
@@ -106,7 +106,7 @@
             </div>
             <div class="p_erpApp">
                 <div class="p__erpApp-wrapper">
-                    <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Templates.apps')}}</span>
+                    <span class="sub-title-span d-block font-ui font-weight-400 gray81 font-size-13">{{$t('Templates.apps')}}</span>
                     <ProjectAppsList
                         v-if="appref.length > 0"
                         class="pls__apps"
@@ -124,7 +124,7 @@
             </div>
             <div class="p_requiredViews">
                 <div class="p__requiredViews-wrapper">
-                    <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Projects.required_view')}}</span>
+                    <span class="sub-title-span d-block font-ui font-weight-400 gray81 font-size-13">{{$t('Projects.required_view')}}</span>
                     <ul class="d-flex flex-wrap" v-if="requireComp && requireComp.length > 0" >
                         <li class="pro_block cursor_pointer projectDataColorli" :class="[{'cursor-pointer' : activeTab === 0}]" v-for="(requireObj,requireKey) in requireComp" :key="requireKey">
                             <img v-if="item.ProjectRequiredComponent?.filter((x) => x.keyName === requireObj.keyName).length > 0" :src="projectComponentsIcons(requireObj.keyName).activeIcon"

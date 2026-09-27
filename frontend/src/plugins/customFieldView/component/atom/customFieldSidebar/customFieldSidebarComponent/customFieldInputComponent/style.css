@@ -1,5 +1,5 @@
 .formkit__form-wrapper .formkit-label, .formkit__form-wrapper .formkit-legend{
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 14px !important;
     font-style: normal;
     font-weight: 500 !important;
@@ -65,7 +65,7 @@
     margin-bottom: 10px !important;
 }
 .formkit__form-wrapper .formkit-help {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 12px;
     font-style: normal;
     font-weight: 400;
@@ -209,7 +209,7 @@
     width: 117px;
 }
 .formkit__form-wrapper .custom__field-radio span.formkit-label {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 12px !important;
     font-style: normal;
     font-weight: 400 !important;
@@ -257,7 +257,7 @@
 }
 .formkit__form-wrapper .custom__field-checkbox .formkit-wrapper .formkit-label {
     color: #3B3B3B;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 12px !important;
     font-style: normal;
     font-weight: 400 !important;

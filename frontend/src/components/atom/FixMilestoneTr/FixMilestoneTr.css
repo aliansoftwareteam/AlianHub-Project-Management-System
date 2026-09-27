@@ -29,7 +29,7 @@
     padding-top: 40px;
 }
 .refund_cancel_font {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 500;
     font-size: 14px;

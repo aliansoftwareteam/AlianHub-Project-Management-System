@@ -328,7 +328,7 @@
     border-radius: 4px !important;
     color: #2F3990 !important;
     height: 30px !important;
-    font-family: 'Roboto', sans-serif !important;
+    font-family: var(--font-ui) !important;
 }
 .driver-popover-next-btn {
     background: #2F3990 !important;
@@ -336,7 +336,7 @@
     color: white !important;
     border: none !important;
     height: 30px !important;
-    font-family: 'Roboto', sans-serif !important;
+    font-family: var(--font-ui) !important;
 }
 .driver-popover-close-btn {
     background: #2F3990 !important;
@@ -345,7 +345,7 @@
     border: none !important;
     height: 13px !important;
     width: 12px !important;
-    font-family: 'Roboto', sans-serif !important;
+    font-family: var(--font-ui) !important;
     margin: 3px;
 }
 @media(max-width: 1900px){
