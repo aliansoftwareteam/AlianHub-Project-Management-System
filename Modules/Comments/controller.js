@@ -372,14 +372,16 @@ exports.searchComments = async (req, res) => {
                 ]
             }
         }
+        /* Legacy sprints hold folderId as text, and the folder $lookup below matches BSON types strictly. */
+        const sprintFields = {
+            $project: {
+                name: 1,
+                folderId: { $convert: { input: '$folderId', to: 'objectId', onError: '$folderId', onNull: '$folderId' } },
+                isAccessible: 1,
+            },
+        };
         if (privileged) {
-            sprintLookup.$lookup.pipeline.push({
-                $project: {
-                    name: 1,
-                    folderId: 1,
-                    isAccessible: 1,
-                },
-            });
+            sprintLookup.$lookup.pipeline.push(sprintFields);
         } else{
             /* The assignee list holds user ids and `tId_<teamId>`, and the caller comes from the
              * session: a body userId would let a client read someone else's private sprints. */
@@ -395,13 +397,7 @@ exports.searchComments = async (req, res) => {
                         isAccessible: true,
                     },
                 },
-                {
-                    $project: {
-                        name: 1,
-                        folderId: 1,
-                        isAccessible: 1,
-                    },
-                }
+                sprintFields
             );
         }
 
