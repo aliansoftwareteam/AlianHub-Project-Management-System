@@ -7,6 +7,7 @@
             :isBorder="false"
             :ids="{}"
             :tagsArray="project.tagsArray"
+            :style="{ flexShrink: tag.tagName.length ** 3 }"
             readonly
         />
         <span v-if="hidden.length" class="tagcount task-tags__more" :title="hiddenNames">
@@ -64,7 +65,10 @@ const hiddenNames = computed(() => hidden.value.map((tag) => tag.tagName).join("
     max-width: 100%;
     overflow: hidden;
 }
-.task-tags .tagList_inner { flex: 0 1 auto; min-width: 0; }
+/* The inline flex-shrink grows with the cube of the name's length: flex shrinks in
+   proportion to width times that factor, so a long name gives up the room and "api" stays
+   whole beside it. */
+.task-tags .tagList_inner { min-width: 0; }
 .task-tags .tagList { min-width: 0; max-width: 100%; }
 .task-tags .tagname__contianer { min-width: 0; max-width: 96px; }
 .task-tags .remove_hover span.tagname { min-width: 0 !important; }

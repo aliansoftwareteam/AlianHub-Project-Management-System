@@ -40,7 +40,7 @@
     background: var(--surface);
     border: 1px solid var(--hairline);
     border-radius: var(--r-card);
-    min-width: 1180px;
+    min-width: 1160px;
 }
 
 .tv2__head {
