@@ -7,6 +7,7 @@ const { hasScope } = require('./helpers/apiTokenRules');
 const { visibilityStage } = require('../Tasks/helpers/taskQueryGuard');
 const { visibleProjectIds } = require('../Agents/scope');
 const { runNarrowed } = require('../../Config/tokenNarrowing');
+const { verifyCompanyMembership } = require('../../Config/jwt');
 
 // Token-authenticated public REST namespace (/api/public-v1/*). Fully
 // self-contained: its own middleware, zero coupling with the session-JWT
@@ -26,6 +27,9 @@ const tokenAuth = async (req, res, next) => {
         const { token: tokenDoc, refusal } = await resolveToken(companyId, rawToken);
         if (!tokenDoc) {
             return res.status(401).send({ status: false, statusText: refusal || 'Invalid or expired API token.' });
+        }
+        if (!(await verifyCompanyMembership(String(tokenDoc.userId || ''), companyId))) {
+            return res.status(403).send({ status: false, statusText: 'You are no longer a member of this company.' });
         }
         req.apiToken = tokenDoc;
         req.apiCompanyId = companyId;
