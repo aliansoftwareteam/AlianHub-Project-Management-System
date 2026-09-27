@@ -1,6 +1,8 @@
+import { ALL, cleanDoneBy } from '@/components/molecules/Provenance/doneByQuery';
+
 const GROUP_BY_IDS = [0, 1, 2, 3];
 const MAX_SEARCH = 200;
-const DEFAULTS = Object.freeze({ groupBy: 0, me: false, search: '' });
+const DEFAULTS = Object.freeze({ groupBy: 0, me: false, search: '', doneBy: ALL });
 
 export const viewPrefsKey = ({ companyId, userId, projectId }) => `ah.projectView.${companyId}.${userId}.${projectId}`;
 
@@ -22,6 +24,7 @@ export function loadViewPrefs(ids, storage = defaultStorage()) {
             groupBy: GROUP_BY_IDS.includes(saved.groupBy) ? saved.groupBy : DEFAULTS.groupBy,
             me: saved.me === true,
             search: typeof saved.search === 'string' ? saved.search.slice(0, MAX_SEARCH) : DEFAULTS.search,
+            doneBy: cleanDoneBy(saved.doneBy),
         };
     } catch {
         return { ...DEFAULTS };
@@ -34,9 +37,10 @@ export function saveViewPrefs(ids, prefs, storage = defaultStorage()) {
         groupBy: GROUP_BY_IDS.includes(prefs.groupBy) ? prefs.groupBy : DEFAULTS.groupBy,
         me: prefs.me === true,
         search: String(prefs.search || '').slice(0, MAX_SEARCH),
+        doneBy: cleanDoneBy(prefs.doneBy),
     };
     try {
-        if (value.groupBy === DEFAULTS.groupBy && !value.me && !value.search) {
+        if (value.groupBy === DEFAULTS.groupBy && !value.me && !value.search && value.doneBy === ALL) {
             storage.removeItem(viewPrefsKey(ids));
         } else {
             storage.setItem(viewPrefsKey(ids), JSON.stringify(value));

@@ -56,11 +56,12 @@
                     <span role="columnheader" class="tv2__head-ai" :title="$t('List.ai_source_hint')">✦ {{ $t('List.col_summary') }}</span>
                     <span role="columnheader" class="tv2__head-ai" :title="$t('List.risk_formula')">✦ {{ $t('List.col_risk') }}</span>
                     <span role="columnheader" class="tv2__head-ai" :title="$t('List.ai_source_hint')">✦ {{ $t('List.col_area') }}</span>
+                    <span role="columnheader">{{ $t('Provenance.col_done_by') }}</span>
                 </div>
 
                 <template v-for="sprint in groupedTasks" :key="sprintKey(sprint)">
                     <div class="tv2__sprint-row" role="row">
-                        <span role="cell" class="tv2__sprint-cell" :aria-colspan="7">
+                        <span role="cell" class="tv2__sprint-cell" :aria-colspan="8">
                             <button
                                 type="button"
                                 class="tv2__sprint-head"
