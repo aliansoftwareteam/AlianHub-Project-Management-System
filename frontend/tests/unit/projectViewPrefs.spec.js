@@ -38,8 +38,8 @@ describe('view preferences storage', () => {
     test('what is saved is what is loaded', () => {
         const storage = memoryStorage();
         saveViewPrefs(IDS, { groupBy: 1, me: true, search: 'invoice' }, storage);
-        expect(loadViewPrefs(IDS, storage)).toEqual({ groupBy: 1, me: true, search: 'invoice' });
-        expect(loadViewPrefs({ ...IDS, projectId: 'p2' }, storage)).toEqual({ groupBy: 0, me: false, search: '' });
+        expect(loadViewPrefs(IDS, storage)).toEqual({ groupBy: 1, me: true, search: 'invoice', doneBy: 'all' });
+        expect(loadViewPrefs({ ...IDS, projectId: 'p2' }, storage)).toEqual({ groupBy: 0, me: false, search: '', doneBy: 'all' });
     });
 
     test('defaults leave nothing behind in storage', () => {
@@ -52,16 +52,16 @@ describe('view preferences storage', () => {
     test('corrupt or foreign values fall back to the defaults', () => {
         const storage = memoryStorage();
         storage.setItem(viewPrefsKey(IDS), '{not json');
-        expect(loadViewPrefs(IDS, storage)).toEqual({ groupBy: 0, me: false, search: '' });
+        expect(loadViewPrefs(IDS, storage)).toEqual({ groupBy: 0, me: false, search: '', doneBy: 'all' });
         storage.setItem(viewPrefsKey(IDS), JSON.stringify({ groupBy: 42, me: 'yes', search: 7 }));
-        expect(loadViewPrefs(IDS, storage)).toEqual({ groupBy: 0, me: false, search: '' });
+        expect(loadViewPrefs(IDS, storage)).toEqual({ groupBy: 0, me: false, search: '', doneBy: 'all' });
     });
 
     test('a storage that throws (private window, blocked site data) never breaks the view', () => {
         const throwing = { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('denied'); }, removeItem: () => { throw new Error('denied'); } };
-        expect(loadViewPrefs(IDS, throwing)).toEqual({ groupBy: 0, me: false, search: '' });
+        expect(loadViewPrefs(IDS, throwing)).toEqual({ groupBy: 0, me: false, search: '', doneBy: 'all' });
         expect(() => saveViewPrefs(IDS, { groupBy: 1, me: true, search: 'x' }, throwing)).not.toThrow();
-        expect(loadViewPrefs({ ...IDS, userId: '' }, memoryStorage())).toEqual({ groupBy: 0, me: false, search: '' });
+        expect(loadViewPrefs({ ...IDS, userId: '' }, memoryStorage())).toEqual({ groupBy: 0, me: false, search: '', doneBy: 'all' });
     });
 });
 
@@ -112,8 +112,8 @@ describe('useProjectSearch remembers the view', () => {
         api.manageFilterUsers('user-1');
         api.taskSearch.value = 'roadmap';
         await nextTick();
-        expect(loadViewPrefs(IDS)).toEqual({ groupBy: 1, me: true, search: 'roadmap' });
-        expect(loadViewPrefs({ ...IDS, projectId: 'p2' })).toEqual({ groupBy: 0, me: false, search: '' });
+        expect(loadViewPrefs(IDS)).toEqual({ groupBy: 1, me: true, search: 'roadmap', doneBy: 'all' });
+        expect(loadViewPrefs({ ...IDS, projectId: 'p2' })).toEqual({ groupBy: 0, me: false, search: '', doneBy: 'all' });
     });
 
     test('another project starts from its own saved state, not the last one\'s', async () => {
@@ -128,7 +128,7 @@ describe('useProjectSearch remembers the view', () => {
         expect(api.filterUsers.value).toEqual([]);
         expect(api.taskSearch.value).toBe('');
         expect(api.searchTask.value).toBe(false);
-        expect(loadViewPrefs(IDS)).toEqual({ groupBy: 2, me: true, search: 'invoice' });
+        expect(loadViewPrefs(IDS)).toEqual({ groupBy: 2, me: true, search: 'invoice', doneBy: 'all' });
     });
 
     test('search text, "Me" and a saved filter each narrow the query', async () => {
