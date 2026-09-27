@@ -2051,6 +2051,9 @@ const schema = {
             viewedNotifications: { type: Boolean, required: false },
             toursOffered: { type: [String], required: false, default: undefined }
         },
+        navPreferences: {
+            pinned: { type: [String], required: false, default: undefined }
+        },
         languageCode: {
             type: String,
             required: false,

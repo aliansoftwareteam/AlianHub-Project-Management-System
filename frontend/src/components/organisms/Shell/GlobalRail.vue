@@ -135,7 +135,7 @@
 </template>
 
 <script setup>
-import { computed, defineEmits, inject, onMounted, onUnmounted, ref } from "vue";
+import { computed, defineEmits, inject, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ShellIcon from "./ShellIcon.vue";
@@ -144,7 +144,7 @@ import { useGetterFunctions } from "@/composable/index.js";
 import { useAppVersion } from "@/composable/useAppVersion";
 import { useAuth } from "@/services";
 import { useNavItems } from "./navItems";
-import { shellState, openPanel, closePopovers, toggleTheme } from "./shellState";
+import { shellState, openPanel, closePopovers, toggleTheme, syncNavPreferences } from "./shellState";
 import { openQuickCreate } from "@/components/organisms/QuickCreateTask/quickCreateTask";
 
 const emit = defineEmits(["change"]);
@@ -164,6 +164,8 @@ const productName = computed(() => brand.value.productName || "AlianHub");
 const productInitial = computed(() => productName.value.charAt(0).toUpperCase());
 
 const me = computed(() => getUser(userId.value) || {});
+const myRecord = computed(() => (getters["users/users"] || []).find((u) => u._id === userId.value));
+watch(myRecord, (record) => { if (record) syncNavPreferences(userId.value, record.navPreferences); }, { immediate: true });
 const companies = computed(() => getters["settings/companies"] || []);
 const otherCompanies = computed(() => companies.value.filter((c) => c._id !== companyId.value));
 

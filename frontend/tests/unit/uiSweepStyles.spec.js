@@ -238,3 +238,13 @@ describe('radio inputs that use .ah-check', () => {
         expect(ruleBody(tokens, '.ah-check:checked::after')).toMatch(/transform:\s*rotate\(-45deg\)/);
     });
 });
+
+describe('the global rail', () => {
+    test('takes the brand colour from the tokens, not a literal navy', () => {
+        const navy = /#2f3990|47,\s*57,\s*144/i;
+        const offenders = walk(path.join(SRC, 'components/organisms/Shell'))
+            .filter((file) => navy.test(fs.readFileSync(file, 'utf8')))
+            .map((file) => path.relative(SRC, file));
+        expect(offenders).toEqual([]);
+    });
+});

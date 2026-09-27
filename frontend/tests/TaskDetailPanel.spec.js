@@ -50,7 +50,7 @@ vi.mock('@/services', () => ({
 vi.mock('@/utils/TaskOperations', () => ({ default: { updateStatus } }));
 vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
 vi.mock('@/composable', () => ({
-    useCustomComposable: () => ({ checkPermission: (key) => (key in perms ? perms[key] : true), checkApps: (app) => apps[app] !== false }),
+    useCustomComposable: () => ({ checkPermission: (key) => (key in perms ? perms[key] : true), checkApps: (app) => apps[app] !== false, makeUniqueId: () => 'id' }),
     useGetterFunctions: () => ({ getUser: () => ({}), getPriority: (key) => (key === 'high' ? { name: 'High' } : {}) })
 }));
 vi.mock('@/views/Projects/helper', () => ({ useUpdateTasks: () => ({ updateTaskByGroup: vi.fn() }) }));
@@ -69,8 +69,20 @@ vi.mock('@/components/organisms/LinkedTasks/LinkedTasks.vue', () => slotStub('Li
 vi.mock('@/views/Projects/Comments/Comments.vue', () => stub('Comments'));
 vi.mock('@/components/templates/ActivityLog/ActivityLog.vue', () => stub('ActivityLog'));
 vi.mock('@/components/molecules/Pages/PagesPanel.vue', () => stub('PagesPanel'));
-vi.mock('@/components/atom/TagChip/TagChip.vue', () => stub('TagChip'));
-vi.mock('@/components/molecules/TagList/CreateTagPopup.vue', () => stub('CreateTagPopup'));
+vi.mock('@/components/molecules/TagList/CreateTagPopup.vue', async () => {
+    const { taskTagChips } = await import('@/components/molecules/TagList/helper.js');
+    return {
+        default: {
+            name: 'CreateTagPopup',
+            props: ['task', 'project', 'isTaskList'],
+            emits: ['send:tagChipArray', 'send:ids'],
+            setup(props, { emit }) {
+                emit('send:tagChipArray', taskTagChips(props.project?.tagsArray, props.task?.tagsArray));
+                return () => null;
+            }
+        }
+    };
+});
 vi.mock('@/components/organisms/TaskDetailOverlay/TaskSummaryBlock.vue', () => stub('TaskSummaryBlock'));
 vi.mock('@/components/organisms/TaskDetailOverlay/TaskSubtaskList.vue', () => slotStub('TaskSubtaskList', 'none', ['startCreate']));
 vi.mock('@/components/organisms/TaskDetailOverlay/TaskTimerChip.vue', () => stub('TaskTimerChip'));
@@ -86,7 +98,7 @@ const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);
 const t = i18n.global.t;
 
-function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null, width = 1280 } = {}) {
+function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null, width = 1280, stubs = {} } = {}) {
     const store = createStore({
         getters: {
             'settings/companyUserDetail': () => ({ roleType }),
@@ -101,7 +113,7 @@ function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null, wi
     });
     return mount(TaskDetailPanel, {
         props: { companyId: 'company-1', projectId: 'proj-1', sprintId: 'sprint-1', taskId: 'task-1', nav },
-        global: { plugins: [store], mocks: { $t: t }, provide: { $userId: ref(userId), $clientWidth: ref(width), ...(socket ? { $socket: ref(socket) } : {}) } }
+        global: { plugins: [store], mocks: { $t: t }, stubs, provide: { $userId: ref(userId), $clientWidth: ref(width), ...(socket ? { $socket: ref(socket) } : {}) } }
     });
 }
 
@@ -449,6 +461,32 @@ describe('TaskDetailPanel', () => {
             expect(chip.classes()).toContain('ah-status-ink');
             expect(worstContrast(inkOf(style), style.background, 'light')).toBeGreaterThanOrEqual(4.5);
             expect(worstContrast(style.getPropertyValue('--status-ink-dark'), style.background, 'dark')).toBeGreaterThanOrEqual(4.5);
+        });
+    });
+
+    describe('the tag chips', () => {
+        beforeEach(() => {
+            projectPayload.sprintsObj = [];
+            projectPayload.sprintsfolders = [];
+            projectPayload.tagsArray = [
+                { uid: 'tag-navy', tagName: 'Navy', tagColor: '#2f3990', tagBgColor: '#2f399035' },
+                { uid: 'tag-lemon', tagName: 'Lemon', tagColor: '#ffff00', tagBgColor: '#ffff0035' }
+            ];
+            projectPayload.tasks[0] = { _id: 'task-1', TaskName: 'Write spec', TaskKey: 'AH-1', statusKey: 'st-open', statusType: 'open', AssigneeUserId: [], tagsArray: ['tag-navy', 'tag-lemon'] };
+        });
+        afterEach(() => { delete projectPayload.tagsArray; });
+
+        it('keeps every tag name readable on its tint in both themes', async () => {
+            const wrapper = mountPanel({ stubs: { DropDown: true, ConfirmationSidebar: true, InputText: true } });
+            await flushPromises();
+            const chips = wrapper.findAll('.ah-detail__tags .tagListContent');
+            expect(chips.map((chip) => chip.text())).toEqual(['Lemon', 'Navy']);
+            for (const chip of chips) {
+                const style = chip.element.style;
+                expect(chip.classes()).toContain('ah-status-ink');
+                expect(worstContrast(inkOf(style), style.background, 'light'), chip.text()).toBeGreaterThanOrEqual(4.5);
+                expect(worstContrast(style.getPropertyValue('--status-ink-dark'), style.background, 'dark'), chip.text()).toBeGreaterThanOrEqual(4.5);
+            }
         });
     });
 });

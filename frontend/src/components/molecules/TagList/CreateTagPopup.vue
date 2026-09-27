@@ -27,7 +27,7 @@
             <div class="chipDiv-wrapper" v-if="checkApps('tags')"> 
                 <SpinnerComp :is-spinner="isSpinner || isChipSpinner"/>  
                 <div v-for="(item, index) in tagChipArray" :key="index" class="tagList">
-                    <TagChip :data="item" :isBorder="false" :ids="ids" :tagsArray="project.tagsArray" :prjectGlobalPermission="project?.isGlobalPermission" :taskId="task.id" :sprintId="task.sprintId" :taskName="task.TaskName" @isSpinner="(val)=> isChipSpinner = val"/>
+                    <TagChip :data="item" :isBorder="false" :ids="ids" :tagsArray="project.tagsArray" :prjectGlobalPermission="project?.isGlobalPermission" :taskId="task.id" :sprintId="task.sprintId" :taskName="task.TaskName" light-surface @isSpinner="(val)=> isChipSpinner = val"/>
                 </div>
             </div>
                 <div class="chipDiv-hr"></div>
@@ -49,7 +49,7 @@
                             <h5 v-if="renameErrorMessage" class="red" >{{renameErrorMessage}}</h5>
                         </div>
                             <div class="change-color-wrapper" v-else-if="editStatus && editStatus.key === 'isColor' && editStatus.uid === item.uid">
-                                <span class="changeColorTextTagName" :title="item.tagName" :style="{color:item.tagColor}">{{item.tagName}}</span>
+                                <span class="changeColorTextTagName" :title="item.tagName" :style="{color: tagChipColors(item).color}">{{item.tagName}}</span>
                                 <input
                                     type="color"
                                     v-model.trim="tagColor"
@@ -59,7 +59,7 @@
                                 <img :src="cancelimage" class="deleteTagImage cursor-pointer ml-5px" @click="()=>HandleColors('cancel',index)"/>
                             </div>
                             <div class="d-flex justify-content-between w-100" v-else @click="addTag(item.uid)">
-                                <span class="tag_name"  :title="item.tagName" :style="{color:item.tagColor}" >{{item.tagName}}</span>
+                                <span class="tag_name"  :title="item.tagName" :style="{color: tagChipColors(item).color}" >{{item.tagName}}</span>
                                 <span @click.stop="()=>dropdown(item)"><img  :src="threedots" class="cursor-pointer p0x-5px ml-auto mt-7px tagname__threedots" :class="[{'threedots': clientWidth > 767}]" alt=""/> </span> 
                             </div>
 
@@ -110,18 +110,16 @@
 </template>
 <script setup>
 
-// packages
 import {ref,watchEffect,inject} from 'vue'
 
-// components
 import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import TagChip from '@/components/atom/TagChip/TagChip.vue'
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
 import InputText from "@/components/atom/InputText/InputText.vue";
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
 
-// utility 
 import { createTag,addTaskTag,updateTag,deleteTag,byTagName,taskTagChips} from "./helper.js";
+import { tagChipColors } from "@/utils/statusChipColors";
 import { useCustomComposable } from "@/composable";
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from "vue-i18n";
