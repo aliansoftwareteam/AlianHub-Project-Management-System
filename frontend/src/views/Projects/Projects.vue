@@ -274,6 +274,7 @@
                                 v-model:taskKeySearch="taskKeySearch"
                                 v-model:taskDescriptionSearch="taskDescriptionSearch"
                                 :filterUsers="filterUsers"
+                                :doneBy="doneBy"
                                 v-model:userSidebar="userSidebar"
                                 v-model:collapsed="collapsed"
                                 v-model:groupBy="groupBy"
@@ -290,6 +291,7 @@
                                 @search="searchMongoDB"
                                 @toggleSearch="toggleSearch"
                                 @manageFilterUsers="manageFilterUsers"
+                                @update:doneBy="setDoneBy"
                                 @changeAssignee="(type, $event) => changeAssignee(type, $event)"
                                 @openAi="openAiSidebar = true"
                                 @openAiAssist="openAiTaskCreator()"
@@ -681,7 +683,7 @@ const { editProject, projectName, updateProjectName } = useProjectNameEdit(proje
 const { changeAssignee } = useProjectAssignee(projectData);
 const { archive, showSidebar, showSpinner, updateProject, markProjectFavourite } = useProjectLifecycle(projectData);
 const { showColorAvatar, savingAvatar, formData, resetFormData, assignAvatarData, updateImageValue, saveProjectAvatar } = useProjectAvatar(projectData);
-const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, searchTask, collapsed, groupBy, userSidebar, resetFilters, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter } = useProjectSearch(projectData, showArchived);
+const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, searchTask, collapsed, groupBy, userSidebar, resetFilters, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy } = useProjectSearch(projectData, showArchived);
 const { sprintLoading, loadSprintFolderData, selectProject } = useProjectTree(projectData);
 
 const Uid = ref('embed' + makeUniqueId(6));

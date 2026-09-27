@@ -120,6 +120,7 @@
                             <span v-if="assigneeFilterCount" class="pft__count">{{ assigneeFilterCount }}</span>
                         </button>
                     </div>
+                    <ProvenanceFilter :modelValue="doneBy" @update:modelValue="(v) => $emit('update:doneBy', v)" />
                 </template>
                 <span v-else class="pft__mode-chip">{{ $t('ProjectSlider.archived_list') }}</span>
                 <DropDown id="more_features" :zIndex="10">
@@ -211,6 +212,7 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 import Toggle from '@/components/atom/Toggle/Toggle.vue';
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
 import TaskFilter from '@/components/molecules/TaskFilter/TaskFilter.vue';
+import ProvenanceFilter from '@/components/molecules/Provenance/ProvenanceFilter.vue';
 import MonthlyCalendarMilestone from '@/components/atom/MonthlyCalendarMilestone/MonthlyCalendarMilestone.vue';
 import BurndownModal from '@/components/molecules/Burndown/BurndownModal.vue';
 import RecentVisitsDropdown from '@/components/molecules/RecentVisits/RecentVisitsDropdown.vue';
@@ -250,6 +252,7 @@ const props = defineProps({
     taskKeySearch: { type: Boolean, default: false },
     taskDescriptionSearch: { type: Boolean, default: false },
     filterUsers: { type: Array, default: () => [] },
+    doneBy: { type: String, default: 'all' },
     userSidebar: { type: Boolean, default: false },
     collapsed: { type: Boolean, default: true },
     groupBy: { type: Number, default: 0 },
@@ -292,6 +295,7 @@ const emit = defineEmits([
     'search',
     'toggleSearch',
     'manageFilterUsers',
+    'update:doneBy',
     'changeAssignee',
     'openAi',
     'openAiAssist',

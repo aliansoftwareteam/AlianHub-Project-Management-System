@@ -3,6 +3,7 @@ import { useStore } from 'vuex';
 import { useCustomComposable } from '@/composable';
 import { loadViewPrefs, saveViewPrefs } from './projectViewPrefs';
 import { clearFilterSignal } from './taskFilterSignal';
+import { ALL, cleanDoneBy, doneByMatch } from '@/components/molecules/Provenance/doneByQuery';
 
 export function useProjectSearch(projectData, showArchived) {
     const { commit, dispatch, getters } = useStore();
@@ -16,6 +17,7 @@ export function useProjectSearch(projectData, showArchived) {
     const taskDescriptionSearch = ref(false);
     const filterUsers = ref([]);
     const filterQuery = ref({});
+    const doneBy = ref(ALL);
     const searchTask = ref(false);
     const collapsed = ref(true);
     const groupBy = ref(0);
@@ -51,6 +53,7 @@ export function useProjectSearch(projectData, showArchived) {
         groupBy.value = prefs.groupBy;
         filterUsers.value = prefs.me && userId?.value ? [userId.value] : [];
         taskSearch.value = prefs.search;
+        doneBy.value = prefs.doneBy;
         searchTask.value = false;
         filterQuery.value = '';
         collapsed.value = true;
@@ -61,6 +64,7 @@ export function useProjectSearch(projectData, showArchived) {
         taskSearch.value = '';
         filterUsers.value = [];
         filterQuery.value = '';
+        doneBy.value = ALL;
         clearFilterSignal.value += 1;
         searchMongoDB();
     }
@@ -72,7 +76,8 @@ export function useProjectSearch(projectData, showArchived) {
     }
 
     function searchMongoDB() {
-        if (!taskSearch.value.trim().length && !filterUsers.value.length && !showArchived.value && !Object.keys(filterQuery.value).length) {
+        const doneByCondition = doneByMatch(doneBy.value);
+        if (!taskSearch.value.trim().length && !filterUsers.value.length && !showArchived.value && !Object.keys(filterQuery.value).length && !doneByCondition) {
             commit('projectData/mutateSearchTask', { data: [], op: 'added' });
             searchTask.value = false;
             return;
@@ -128,6 +133,10 @@ export function useProjectSearch(projectData, showArchived) {
             query[0].$match.$and.push({ AssigneeUserId: { $in: filterUsers.value } });
         }
 
+        if (doneByCondition) {
+            query[0].$match.$and.push(doneByCondition);
+        }
+
         if (!seesEveryonesTasks.value) {
             query[0].$match.$and.push({ AssigneeUserId: { $in: [userId.value] } });
         }
@@ -154,6 +163,11 @@ export function useProjectSearch(projectData, showArchived) {
         searchMongoDB();
     };
 
+    const setDoneBy = (value) => {
+        doneBy.value = cleanDoneBy(value);
+        searchMongoDB();
+    };
+
     const clearFilter = () => {
         filterQuery.value = '';
         searchMongoDB();
@@ -167,8 +181,8 @@ export function useProjectSearch(projectData, showArchived) {
         searchMongoDB();
     });
 
-    watch([groupBy, taskSearch, () => filterUsers.value.includes(userId?.value)], ([group, search, me]) => {
-        saveViewPrefs(prefsIds(), { groupBy: group, search, me });
+    watch([groupBy, taskSearch, () => filterUsers.value.includes(userId?.value), doneBy], ([group, search, me, provenance]) => {
+        saveViewPrefs(prefsIds(), { groupBy: group, search, me, doneBy: provenance });
     });
 
     return {
@@ -178,6 +192,7 @@ export function useProjectSearch(projectData, showArchived) {
         taskDescriptionSearch,
         filterUsers,
         filterQuery,
+        doneBy,
         searchTask,
         collapsed,
         groupBy,
@@ -189,6 +204,7 @@ export function useProjectSearch(projectData, showArchived) {
         searchMongoDB,
         manageFilterUsers,
         applyFilter,
+        setDoneBy,
         clearFilter,
     };
 }

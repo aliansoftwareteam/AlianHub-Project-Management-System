@@ -1,7 +1,7 @@
 <template>
     <div role="rowgroup">
         <div class="tv2__group" role="row">
-            <span role="cell" :aria-colspan="7" class="tv2__group-cell">
+            <span role="cell" :aria-colspan="8" class="tv2__group-cell">
                 <label v-if="canGroupSelect && groupTaskIds.length" @click.stop>
                     <input
                         type="checkbox"

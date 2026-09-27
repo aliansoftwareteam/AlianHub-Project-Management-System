@@ -87,6 +87,8 @@
                     </div>
                 </div>
             </div>
+
+            <ProvenanceRollup class="rp-card" :sprintId="sprintId" :sprintName="sprintName" />
         </template>
     </div>
 </template>
@@ -100,6 +102,7 @@ import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import ReportsTabs from './ReportsTabs.vue';
+import ProvenanceRollup from '@/components/molecules/Provenance/ProvenanceRollup.vue';
 
 defineOptions({ name: 'SprintReportPage' });
 

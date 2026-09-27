@@ -70,6 +70,10 @@
                 </button>
             </span>
         </span>
+
+        <span role="cell" class="tv2__done">
+            <ProvenanceBadge :task="data" />
+        </span>
     </div>
 </template>
 
@@ -78,6 +82,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import ProvenanceBadge from "@/components/molecules/Provenance/ProvenanceBadge.vue";
 import { useGetterFunctions } from "@/composable";
 import { taskRisk } from "@/views/Projects/composables/taskRisk";
 import { useTaskSummaries } from "./useTaskSummaries.js";

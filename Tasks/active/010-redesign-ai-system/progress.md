@@ -6,7 +6,7 @@
 - [x] Agents as teammates, AI fields, NL automations, connections, Ask, Team page, Planner v2 — routes `AgentTeammates`, `AgentRouting`, `AiAsk`, `Connections`, `ExternalData`, `PeopleDirectory`, `Planner` all registered and reachable from the AI sidebar / rail
 - [x] MCP server + PAT scopes + CLI setup snippet + personal accounts (27a–d: `AiAccounts`, `AccountAttribution`, `AgentIdentity`)
 - [x] Pipeline surfaces, release & deploy (28a, 28c: `AiPipeline`, `AiRelease`); agent picker via `AgentMentionBox`
-- [ ] Provenance badge and filter in List, Table and Board, with the 29c rollup wired to `GET /api/v1/agile/provenance`
+- [x] Provenance badge and filter in List, Table and Board, with the 29c rollup wired to `GET /api/v1/agile/provenance` (#1046)
 
 ## Last step
 Verified remaining on 2026-09-10: acceptance 5 (provenance badge and filter in List/Table/Board) is unmet — the filter and rollup components were added by d3229ad5 but never mounted, then deleted by the dead-code purge. Everything else verified. See the log.
@@ -36,3 +36,10 @@ AND filter in List, Table and Board — is unmet:
   frontend caller.
 
 Remaining: rebuild and mount the provenance filter and rollup.
+
+### 2026-09-27 — provenance filter and rollup (#1046)
+- Table gains the Done by column; the Done by filter (All/Human/Agent/Mixed/Unchecked) joins the
+  project toolbar and rides the shared task search, so List, Table and Board narrow from one query;
+  remembered with group, Me and search.
+- `ProvenanceRollup` on the Sprint report reads `GET /api/v1/agile/provenance?sprintId=`.
+- Stays on when AI is switched off: it describes work already done. CI green on #1046.
