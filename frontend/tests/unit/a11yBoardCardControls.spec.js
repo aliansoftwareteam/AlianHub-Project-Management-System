@@ -194,12 +194,13 @@ describe('the add-tag trigger of the tag picker (board card, task panel, list ro
     const trigger = (wrapper) => wrapper.find('.menu').find('button, div');
     const opened = (wrapper) => wrapper.find('.menu').attributes('data-open') === 'true';
 
-    it.each([false, true])('is a named button with a decorative image (list row: %s)', (isTaskList) => {
+    it.each([false, true])('is a named button with a decorative icon (list row: %s)', (isTaskList) => {
         const button = trigger(mountTagPopup({ isTaskList }));
         expect(button.element.tagName).toBe('BUTTON');
         expect(button.attributes('type')).toBe('button');
         expect(button.attributes('aria-label')).toBe('Tags.add_tag');
-        expect(button.find('img').attributes('alt')).toBe('');
+        expect(button.find('img').exists()).toBe(false);
+        expect(button.find('svg').attributes('aria-hidden')).toBe('true');
     });
 
     it.each(Object.keys(nativeActivations))('opens the tag menu on %s', async (how) => {

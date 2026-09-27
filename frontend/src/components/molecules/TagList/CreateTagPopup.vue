@@ -9,7 +9,14 @@
                 :aria-label="$t('Tags.add_tag')"
                 ref="clickDropDown"
             >
-                <img id="openTagDropdown" :src="!isTaskList? tag:tag2" class="cursor-pointer tag-div" alt="">
+                <svg v-if="!isTaskList" id="openTagDropdown" class="cursor-pointer tag-div" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path class="taglist__add-disc taglist__add-ring" d="M12 23.5C18.3513 23.5 23.5 18.3513 23.5 12C23.5 5.64873 18.3513 0.5 12 0.5C5.64873 0.5 0.5 5.64873 0.5 12C0.5 18.3513 5.64873 23.5 12 23.5Z"/>
+                    <path class="taglist__add-glyph" d="M13.1327 16.7121C12.9408 16.904 12.703 17 12.4193 17C12.1356 17 11.8978 16.904 11.7059 16.7121L7.30038 12.3066C7.20859 12.2149 7.13567 12.1064 7.0816 11.9812C7.0272 11.8561 7 11.7226 7 11.5807V8.00125C7 7.72591 7.09812 7.49011 7.29437 7.29387C7.49028 7.09796 7.72591 7 8.00125 7H11.5807C11.7226 7 11.8561 7.02703 11.9812 7.0811C12.1064 7.1355 12.2149 7.20859 12.3066 7.30038L16.7121 11.7184C16.904 11.9103 17 12.1459 17 12.4253C17 12.705 16.904 12.9408 16.7121 13.1327L13.1327 16.7121ZM12.4193 16.0113L15.9987 12.4318L11.5807 8.00125H8.00125V11.5807L12.4193 16.0113ZM9.25282 10.0038C9.46141 10.0038 9.63863 9.93066 9.78448 9.78448C9.93066 9.63863 10.0038 9.46141 10.0038 9.25282C10.0038 9.04422 9.93066 8.867 9.78448 8.72115C9.63863 8.57497 9.46141 8.50188 9.25282 8.50188C9.04422 8.50188 8.867 8.57497 8.72115 8.72115C8.57497 8.867 8.50188 9.04422 8.50188 9.25282C8.50188 9.46141 8.57497 9.63863 8.72115 9.78448C8.867 9.93066 9.04422 10.0038 9.25282 10.0038Z"/>
+                </svg>
+                <svg v-else id="openTagDropdown" class="cursor-pointer tag-div" width="27" height="23" viewBox="0 0 27 23" aria-hidden="true" focusable="false">
+                    <rect class="taglist__add-ring" x="0.699219" y="1.49805" width="25" height="21" rx="3.5" fill="none"/>
+                    <path class="taglist__add-glyph" d="M14.5584 17.6526C14.3281 17.8829 14.0428 17.998 13.7023 17.998C13.3619 17.998 13.0766 17.8829 12.8463 17.6526L7.55967 12.366C7.44953 12.2559 7.36202 12.1257 7.29714 11.9755C7.23186 11.8253 7.19922 11.6651 7.19922 11.4949V7.19955C7.19922 6.86914 7.31697 6.58618 7.55246 6.35069C7.78755 6.11559 8.07031 5.99805 8.40072 5.99805H12.6961C12.8663 5.99805 13.0265 6.03049 13.1767 6.09537C13.3269 6.16065 13.457 6.24836 13.5672 6.3585L18.8538 11.6601C19.0841 11.8904 19.1992 12.1732 19.1992 12.5084C19.1992 12.844 19.0841 13.127 18.8538 13.3572L14.5584 17.6526ZM13.7023 16.8116L17.9977 12.5162L12.6961 7.19955H8.40072V11.4949L13.7023 16.8116ZM9.9026 9.60255C10.1529 9.60255 10.3656 9.51484 10.5406 9.33942C10.716 9.1644 10.8037 8.95174 10.8037 8.70143C10.8037 8.45111 10.716 8.23845 10.5406 8.06343C10.3656 7.88801 10.1529 7.8003 9.9026 7.8003C9.65229 7.8003 9.43962 7.88801 9.2646 8.06343C9.08918 8.23845 9.00147 8.45111 9.00147 8.70143C9.00147 8.95174 9.08918 9.1644 9.2646 9.33942C9.43962 9.51484 9.65229 9.60255 9.9026 9.60255Z"/>
+                </svg>
             </button>
         </template>
         <template #head>
@@ -127,8 +134,6 @@ const { t } = useI18n();
 
 const companyId = inject("$companyId")
 const threedots = require("@/assets/images/svg/tagdots.svg")
-const tag = require("@/assets/images/svg/Tag.svg");
-const tag2 = require("@/assets/images/svg/SquareTag.svg");
 const array = ref([])
 const array2 = ref([])
 const clientWidth = inject('$clientWidth');
@@ -337,6 +342,9 @@ const HandleColors = (key,i,item) =>{
     height:4px;
 }
 .taglist__add-btn { margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; }
+.taglist__add-disc { fill: var(--surface); }
+.taglist__add-ring { stroke: var(--ink-3); }
+.taglist__add-glyph { fill: var(--ink-2); }
 .edit__status-key{
     height:26px !important;
 }
