@@ -1,7 +1,7 @@
 ---
 id: 008
 title: Redesign stage 1 — tokens, login/auth, global rail shell, Home, task detail panel
-status: active
+status: done
 priority: high
 depends_on: []
 created: 2026-09-03

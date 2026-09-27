@@ -9,7 +9,7 @@
 - [x] Provenance badge and filter in List, Table and Board, with the 29c rollup wired to `GET /api/v1/agile/provenance` (#1046)
 
 ## Last step
-Verified remaining on 2026-09-10: acceptance 5 (provenance badge and filter in List/Table/Board) is unmet — the filter and rollup components were added by d3229ad5 but never mounted, then deleted by the dead-code purge. Everything else verified. See the log.
+Closed 2026-09-27: acceptance 5 met by #1046 (build 512), the last open item.
 
 ## Blockers
 None.
@@ -43,3 +43,6 @@ Remaining: rebuild and mount the provenance filter and rollup.
   remembered with group, Me and search.
 - `ProvenanceRollup` on the Sprint report reads `GET /api/v1/agile/provenance?sprintId=`.
 - Stays on when AI is switched off: it describes work already done. CI green on #1046.
+
+### 2026-09-27
+- Closed. #1046 (build 512) added the Done by column to Table, the Done by filter to the shared task search (List, Table, Board) and the provenance rollup on the Sprint report. The Agent, Mixed and Unchecked cases are covered by tests only: the dev database has human-closed tasks only.
