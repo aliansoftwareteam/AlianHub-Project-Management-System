@@ -5295,7 +5295,7 @@
     "Provenance.points": "{n} POINTS",
     "Provenance.rollup_title": "{name} · who finished what",
     "Provenance.someone": "someone",
-    "Provenance.tasks_closed": "{n} tasks closed",
+    "Provenance.tasks_closed": "{n} task closed | {n} tasks closed",
     "Provenance.this_project": "This project",
     "Provenance.unchecked_line": "{n} closed with agent work nobody checked.",
     "Provenance.velocity_line": "Velocity reads two ways: {total} points closed in all, {human} by people alone. Plan the next sprint on the human line if your agent access might change.",

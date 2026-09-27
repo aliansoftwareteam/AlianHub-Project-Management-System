@@ -3931,7 +3931,7 @@ export default {
         "opt_unchecked": "Unchecked",
         "rollup_title": "{name} · who finished what",
         "this_project": "This project",
-        "tasks_closed": "{n} tasks closed",
+        "tasks_closed": "{n} task closed | {n} tasks closed",
         "points": "{n} POINTS",
         "legend_human": "human",
         "legend_agent": "agent-built",
