@@ -1,7 +1,10 @@
 import { reactive, watch } from "vue";
+import { apiRequestWithoutCompnay } from "@/services";
+import * as env from "@/config/env";
 
 const THEME_KEY = "ah.theme";
 const NAV_KEY = "ah.nav";
+const NAV_SAVE_DELAY_MS = 800;
 
 function readJson(key, fallback) {
     try {
@@ -52,7 +55,45 @@ export function initTheme() {
     }
 }
 
-watch(() => shellState.nav, (val) => localStorage.setItem(NAV_KEY, JSON.stringify(val)), { deep: true });
+const navSync = { userId: null, saved: null, timer: null };
+const pinnedBody = (nav) => ({ pinned: [...((nav && nav.pinned) || [])] });
+
+function saveNav() {
+    navSync.timer = null;
+    const body = pinnedBody(shellState.nav);
+    const snapshot = JSON.stringify(body);
+    if (snapshot === navSync.saved) return;
+    const previous = navSync.saved;
+    navSync.saved = snapshot;
+    apiRequestWithoutCompnay("put", env.USER_NAV_PREFERENCES, body).catch((error) => {
+        // Only the next change retries, so an offline session never loops; the pins stay local meanwhile.
+        if (navSync.saved === snapshot) navSync.saved = previous;
+        console.warn("nav preferences not saved", error);
+    });
+}
+
+/* The user record is the source of truth once it arrives; pins kept only in this browser
+   from before are uploaded the first time. Later refreshes of the same record are ignored
+   so they cannot overwrite a change that is still waiting to be saved. */
+export function syncNavPreferences(userId, stored) {
+    if (!userId || navSync.userId === userId) return;
+    navSync.userId = userId;
+    if (stored && Array.isArray(stored.pinned)) {
+        navSync.saved = JSON.stringify(pinnedBody(stored));
+        shellState.nav = { ...shellState.nav, pinned: [...stored.pinned] };
+    } else if (shellState.nav.pinned && shellState.nav.pinned.length) {
+        saveNav();
+    } else {
+        navSync.saved = JSON.stringify(pinnedBody(shellState.nav));
+    }
+}
+
+watch(() => shellState.nav, (val) => {
+    localStorage.setItem(NAV_KEY, JSON.stringify(val));
+    if (!navSync.userId) return;
+    clearTimeout(navSync.timer);
+    navSync.timer = setTimeout(saveNav, NAV_SAVE_DELAY_MS);
+}, { deep: true });
 
 export function openPanel(name) {
     shellState.moreOpen = false;
