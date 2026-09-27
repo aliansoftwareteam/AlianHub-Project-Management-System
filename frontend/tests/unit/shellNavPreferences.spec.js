@@ -20,6 +20,7 @@ const settle = async () => {
 
 beforeEach(() => {
     localStorage.clear();
+    localStorage.setItem('userId', 'user-1');
     apiRequestWithoutCompnay.mockReset();
     apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { pinned: [] } } });
     vi.useFakeTimers();
@@ -28,7 +29,7 @@ afterEach(() => vi.useRealTimers());
 
 describe('pinned nav items follow the user across devices', () => {
     it('takes the pins stored on the user over the ones in this browser', async () => {
-        localStorage.setItem(NAV_KEY, JSON.stringify({ pinned: ['docs'] }));
+        localStorage.setItem(NAV_KEY, JSON.stringify({ pinned: ['docs'], uid: 'user-1' }));
         const { shellState, syncNavPreferences } = await load();
 
         syncNavPreferences('user-1', { pinned: ['chat', 'time'] });
@@ -39,9 +40,10 @@ describe('pinned nav items follow the user across devices', () => {
         expect(navPuts()).toHaveLength(0);
     });
 
-    it('uploads pins kept only in this browser once', async () => {
-        localStorage.setItem(NAV_KEY, JSON.stringify({ pinned: ['docs'] }));
+    it('uploads the user\'s own pins kept only in this browser once', async () => {
+        localStorage.setItem(NAV_KEY, JSON.stringify({ pinned: ['docs'], uid: 'user-1' }));
         const { shellState, syncNavPreferences } = await load();
+        expect(shellState.nav.pinned).toEqual(['docs']);
 
         syncNavPreferences('user-1', undefined);
         await settle();
@@ -110,5 +112,57 @@ describe('pinned nav items follow the user across devices', () => {
         expect(navPuts()).toHaveLength(2);
         expect(navPuts()[1][2]).toEqual({ pinned: ['chat', 'time'] });
         errors.mockRestore();
+    });
+});
+
+describe('pins kept in this browser belong to the user who made them', () => {
+    it('tags every local save with the signed-in user', async () => {
+        const { shellState, syncNavPreferences } = await load();
+        syncNavPreferences('user-1', { pinned: [] });
+        await settle();
+
+        shellState.nav.pinned.push('chat');
+        await nextTick();
+
+        expect(JSON.parse(localStorage.getItem(NAV_KEY))).toEqual({ pinned: ['chat'], uid: 'user-1' });
+    });
+
+    it('neither shows nor uploads another user\'s pins', async () => {
+        localStorage.setItem(NAV_KEY, JSON.stringify({ pinned: ['docs'], uid: 'user-a' }));
+        localStorage.setItem('userId', 'user-b');
+        const { shellState, syncNavPreferences } = await load();
+
+        expect(shellState.nav.pinned).toEqual([]);
+
+        syncNavPreferences('user-b', undefined);
+        await settle();
+
+        expect(shellState.nav.pinned).toEqual([]);
+        expect(navPuts()).toHaveLength(0);
+        expect(JSON.parse(localStorage.getItem(NAV_KEY)).uid).toBe('user-b');
+    });
+
+    it('drops the previous user\'s pins when another user signs in without a reload', async () => {
+        const { shellState, syncNavPreferences } = await load();
+        syncNavPreferences('user-a', { pinned: ['docs'] });
+        await settle();
+
+        localStorage.setItem('userId', 'user-b');
+        syncNavPreferences('user-b', undefined);
+        await settle();
+
+        expect(shellState.nav.pinned).toEqual([]);
+        expect(navPuts()).toHaveLength(0);
+    });
+
+    it('never uploads untagged pins saved before owners were recorded', async () => {
+        localStorage.setItem(NAV_KEY, JSON.stringify({ pinned: ['docs'] }));
+        const { shellState, syncNavPreferences } = await load();
+
+        syncNavPreferences('user-1', undefined);
+        await settle();
+
+        expect(navPuts()).toHaveLength(0);
+        expect(shellState.nav.pinned).toEqual([]);
     });
 });
