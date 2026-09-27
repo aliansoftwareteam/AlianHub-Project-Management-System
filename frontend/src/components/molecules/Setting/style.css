@@ -7,8 +7,8 @@
 }
 
 .mySettingSection {
-    background: #FFFFFF;
-    color: #17161c;
+    background: var(--surface);
+    color: var(--ink);
     -webkit-box-shadow: 0px 2px 12px rgb(0 0 0 / 15%);
     box-shadow: 0px 2px 12px rgb(0 0 0 / 15%);
     border-radius: 5px;
@@ -1034,3 +1034,26 @@ max-width: 100%;
     line-height: 1.5;
     color: #8b90a3;
 }
+
+/* The card rules above keep their light-mode literals; dark mode repaints them from the tokens. */
+:root[data-theme="dark"] .mySettingSection { box-shadow: 0 0 0 1px var(--hairline); }
+:root[data-theme="dark"] .mySettingSection :is(.form-control, .vs-input--input, select, textarea) {
+    background-color: var(--surface-2);
+    border-color: var(--ink-3);
+    color: var(--ink) !important;
+}
+:root[data-theme="dark"] .mySettingSection :is(input, textarea)::placeholder { color: var(--ink-2); }
+:root[data-theme="dark"] .mySettingSection :is(.dropdown, .img_uploadpriority_wrapper .from-group label, .milestone-table-overflow, .milestone_wrapper_table td) { border-color: var(--ink-3); }
+:root[data-theme="dark"] .mySettingSection :is(label, .black, h3.date_milestone, .milestone_wrapper_table th, .company__setting-toggle-copy label) { color: var(--ink); }
+:root[data-theme="dark"] .mySettingSection :is(.vs-input--placeholder, span.font_family_status, .milestone_wrapper_table td, .Upload_img_span, .company__setting-toggle-copy p) { color: var(--ink-2); }
+:root[data-theme="dark"] .mySettingSection :is(.con-vs-chip, .currencies_wrapper_setting, .milestone_wrapper_table thead) { background: var(--fill); }
+:root[data-theme="dark"] .mySettingSection .company__setting-toggle { border-top-color: var(--hairline); }
+:root[data-theme="dark"] .mySettingSection .form-group-milestone label:before { border-color: var(--brand); }
+:root[data-theme="dark"] .mySettingSection .form-group-milestone input:checked + label:before { background: var(--brand); }
+:root[data-theme="dark"] .mySettingSection .form-group-milestone input:checked + label:after {
+    background: var(--on-brand);
+    box-shadow: 2px 0 0 var(--on-brand), 4px 0 0 var(--on-brand), 4px -2px 0 var(--on-brand), 4px -4px 0 var(--on-brand), 4px -6px 0 var(--on-brand), 4px -8px 0 var(--on-brand);
+}
+:root[data-theme="dark"] .mySettingSection .blue_btn { background: var(--brand) !important; color: var(--on-brand); }
+:root[data-theme="dark"] .mySettingSection .white_btn { background: transparent !important; color: var(--brand); border-color: var(--brand); }
+:root[data-theme="dark"] .mySettingSection :is(.dropdown-arrow, .Upload_icon img) { filter: invert(1) hue-rotate(180deg); }

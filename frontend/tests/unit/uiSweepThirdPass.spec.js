@@ -87,12 +87,13 @@ describe('Settings → General in dark mode', () => {
         expect(ruleBody(css, 'h2.task_priority_wrapper_value')).toMatch(/color:\s*inherit/);
     });
 
-    test('the white sections and cards keep dark ink for the text they inherit', () => {
-        expect(ruleBody(css, '.mySettingSection')).toMatch(/color:\s*#17161c/);
+    test('the sections and cards pair the theme surface with the theme ink for the text they inherit', () => {
+        const themed = /background:\s*var\(--surface\);\s*color:\s*var\(--ink\)/;
+        expect(ruleBody(css, '.mySettingSection')).toMatch(themed);
         const card = (rel, sel) => { const vue = read(rel); return ruleBody(vue.slice(vue.indexOf('<style')), sel); };
-        expect(card('components/molecules/Setting/SettingScreenshotRetention.vue', '.screenshot-retention-card')).toMatch(/color:\s*#17161c/);
-        expect(card('components/molecules/Setting/SettingTimeReminder.vue', '.time-reminder-card')).toMatch(/color:\s*#17161c/);
-        expect(card('components/molecules/Setting/SettingAutoCloseProjects.vue', '.acp-card')).toMatch(/color:\s*#17161c/);
+        expect(card('components/molecules/Setting/SettingScreenshotRetention.vue', '.screenshot-retention-card')).toMatch(themed);
+        expect(card('components/molecules/Setting/SettingTimeReminder.vue', '.time-reminder-card')).toMatch(themed);
+        expect(card('components/molecules/Setting/SettingAutoCloseProjects.vue', '.acp-card')).toMatch(themed);
     });
 });
 
