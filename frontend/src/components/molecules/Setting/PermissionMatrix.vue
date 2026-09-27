@@ -1,97 +1,101 @@
 <template>
     <div class="pm ah-card">
-        <div class="pm__row pm__row--head" :style="gridStyle" role="row">
-            <span class="ah-label pm__perm" role="columnheader">{{ $t('Settings.col_permission') }}</span>
-            <span v-for="col in columns" :key="col.id" class="ah-label pm__cell" :class="{ 'pm__cell--agents': col.agents }" role="columnheader">{{ col.name }}</span>
+        <div class="pm__scroll">
+            <div class="pm__table" role="table" :style="tableStyle">
+                <div class="pm__row pm__row--head" :style="gridStyle" role="row">
+                    <span class="ah-label pm__perm" role="columnheader">{{ $t('Settings.col_permission') }}</span>
+                    <span v-for="col in columns" :key="col.id" class="ah-label pm__cell" :class="{ 'pm__cell--agents': col.agents }" role="columnheader">{{ col.name }}</span>
+                </div>
+
+                <div v-if="!groups.length" class="ah-empty pm__empty">{{ $t('Settings.matrix_empty') }}</div>
+
+                <template v-for="group in groups" :key="group.parent._id">
+                    <div class="pm__group" :style="gridStyle" role="row">
+                        <span class="pm__perm" role="cell">
+                            <span class="ah-label pm__group-name">{{ ruleName(group.parent) }} · {{ group.rows.length }}</span>
+                            <span v-if="ruleDesc(group.parent)" class="ah-small pm__perm-desc">{{ ruleDesc(group.parent) }}</span>
+                        </span>
+                        <span class="pm__cell pm__static" v-for="col in fixedColumns" :key="col.id" role="cell"><ShellIcon name="check" :size="14" /></span>
+                        <span v-for="role in editableRoles" :key="role.key" class="pm__cell" role="cell">
+                            <AhSwitch
+                                small
+                                :modelValue="value(group.parent, role) !== null"
+                                :disabled="!planCondition"
+                                :label="`${ruleName(group.parent)} · ${role.name}`"
+                                @update:modelValue="(on) => setValue(group.parent, role, on ? true : null)"
+                            />
+                        </span>
+                        <span class="pm__cell pm__agent" role="cell">—</span>
+                    </div>
+
+                    <div v-if="group.parent.key === 'artificial_intelligence' && !aiPlanPermission" class="pm__upgrade">
+                        <span>{{ $t('AI.please_upgrade_plan_to_use_ai') }}</span>
+                        <router-link class="ah-btn ah-btn--primary ah-btn--sm" :to="{ name: 'Upgrade', params: { cid: companyId } }">{{ $t('Upgrades.upgrade_your_plan') }}</router-link>
+                    </div>
+
+                    <div
+                        v-else
+                        v-for="rule in group.rows"
+                        :key="rule._id"
+                        :id="rowId(rule)"
+                        class="pm__row"
+                        :class="{ 'pm__row--danger': isDestructive(rule) }"
+                        :style="gridStyle"
+                        role="row"
+                    >
+                        <span class="pm__perm" role="cell">
+                            <span class="pm__perm-name">{{ ruleName(rule) }}</span>
+                            <span v-if="ruleDesc(rule)" class="ah-small pm__perm-desc">{{ ruleDesc(rule) }}</span>
+                        </span>
+                        <span v-for="col in fixedColumns" :key="col.id" class="pm__cell pm__static" role="cell"><ShellIcon name="check" :size="14" /></span>
+                        <span v-for="role in editableRoles" :key="role.key" class="pm__cell" role="cell">
+                            <template v-if="rule.key === 'per_user_generate_limit'">
+                                <input
+                                    type="number"
+                                    class="ah-input pm__num"
+                                    :value="numberValue(rule, role)"
+                                    :min="minLimit"
+                                    :max="maxLimit === null ? undefined : maxLimit"
+                                    :disabled="cellDisabled(rule, role)"
+                                    :aria-label="`${ruleName(rule)} · ${role.name}`"
+                                    @change="setValue(rule, role, Number($event.target.value))"
+                                />
+                            </template>
+                            <template v-else-if="rule.selectionField">
+                                <select class="pm__select" :value="String(value(rule, role))" :disabled="cellDisabled(rule, role)" :aria-label="`${ruleName(rule)} · ${role.name}`" @change="setValue(rule, role, parseOption($event.target.value))">
+                                    <option value="null">{{ $t('Permissions.None') }}</option>
+                                    <option v-if="rule.key === 'task_estimated_hours'" value="false">{{ $t('Permissions.Read') }}</option>
+                                    <option value="1">{{ $t('Permissions.own') }}</option>
+                                    <option value="2">{{ $t('Projects.everyone') }}</option>
+                                </select>
+                            </template>
+                            <template v-else-if="mode === 'simple'">
+                                <AhSwitch
+                                    small
+                                    :modelValue="value(rule, role) === true"
+                                    :disabled="cellDisabled(rule, role)"
+                                    :label="`${ruleName(rule)} · ${role.name}`"
+                                    @update:modelValue="(on) => setValue(rule, role, on ? true : null)"
+                                />
+                            </template>
+                            <template v-else>
+                                <select class="pm__select" :value="String(value(rule, role))" :disabled="cellDisabled(rule, role)" :aria-label="`${ruleName(rule)} · ${role.name}`" @change="setValue(rule, role, parseOption($event.target.value))">
+                                    <option value="null">{{ $t('Permissions.None') }}</option>
+                                    <option value="false">{{ $t('Permissions.Read') }}</option>
+                                    <option value="true">{{ $t('Permissions.Write') }}</option>
+                                </select>
+                            </template>
+                        </span>
+                        <span class="pm__cell pm__agent" role="cell">
+                            <span v-if="isDestructive(rule)" class="pm__never">{{ $t('Settings.agent_never') }}</span>
+                            <span v-else-if="agentMode(rule) === 'proposes'" class="ah-chip ah-chip--warn ah-chip--mono">{{ $t('Settings.agent_proposes') }}</span>
+                            <span v-else-if="agentMode(rule) === 'read'" class="pm__read">{{ $t('Settings.agent_read') }}</span>
+                            <span v-else class="pm__dash">—</span>
+                        </span>
+                    </div>
+                </template>
+            </div>
         </div>
-
-        <div v-if="!groups.length" class="ah-empty pm__empty">{{ $t('Settings.matrix_empty') }}</div>
-
-        <template v-for="group in groups" :key="group.parent._id">
-            <div class="pm__group" :style="gridStyle" role="row">
-                <span class="pm__perm">
-                    <span class="ah-label pm__group-name">{{ ruleName(group.parent) }} · {{ group.rows.length }}</span>
-                    <span v-if="ruleDesc(group.parent)" class="ah-small pm__perm-desc">{{ ruleDesc(group.parent) }}</span>
-                </span>
-                <span class="pm__cell pm__static" v-for="col in fixedColumns" :key="col.id"><ShellIcon name="check" :size="14" /></span>
-                <span v-for="role in editableRoles" :key="role.key" class="pm__cell">
-                    <AhSwitch
-                        small
-                        :modelValue="value(group.parent, role) !== null"
-                        :disabled="!planCondition"
-                        :label="`${ruleName(group.parent)} · ${role.name}`"
-                        @update:modelValue="(on) => setValue(group.parent, role, on ? true : null)"
-                    />
-                </span>
-                <span class="pm__cell pm__agent">—</span>
-            </div>
-
-            <div v-if="group.parent.key === 'artificial_intelligence' && !aiPlanPermission" class="pm__upgrade">
-                <span>{{ $t('AI.please_upgrade_plan_to_use_ai') }}</span>
-                <router-link class="ah-btn ah-btn--primary ah-btn--sm" :to="{ name: 'Upgrade', params: { cid: companyId } }">{{ $t('Upgrades.upgrade_your_plan') }}</router-link>
-            </div>
-
-            <div
-                v-else
-                v-for="rule in group.rows"
-                :key="rule._id"
-                :id="rowId(rule)"
-                class="pm__row"
-                :class="{ 'pm__row--danger': isDestructive(rule) }"
-                :style="gridStyle"
-                role="row"
-            >
-                <span class="pm__perm" role="cell">
-                    <span class="pm__perm-name">{{ ruleName(rule) }}</span>
-                    <span v-if="ruleDesc(rule)" class="ah-small pm__perm-desc">{{ ruleDesc(rule) }}</span>
-                </span>
-                <span v-for="col in fixedColumns" :key="col.id" class="pm__cell pm__static" role="cell"><ShellIcon name="check" :size="14" /></span>
-                <span v-for="role in editableRoles" :key="role.key" class="pm__cell" role="cell">
-                    <template v-if="rule.key === 'per_user_generate_limit'">
-                        <input
-                            type="number"
-                            class="ah-input pm__num"
-                            :value="numberValue(rule, role)"
-                            :min="minLimit"
-                            :max="maxLimit === null ? undefined : maxLimit"
-                            :disabled="cellDisabled(rule, role)"
-                            :aria-label="`${ruleName(rule)} · ${role.name}`"
-                            @change="setValue(rule, role, Number($event.target.value))"
-                        />
-                    </template>
-                    <template v-else-if="rule.selectionField">
-                        <select class="pm__select" :value="String(value(rule, role))" :disabled="cellDisabled(rule, role)" :aria-label="`${ruleName(rule)} · ${role.name}`" @change="setValue(rule, role, parseOption($event.target.value))">
-                            <option value="null">{{ $t('Permissions.None') }}</option>
-                            <option v-if="rule.key === 'task_estimated_hours'" value="false">{{ $t('Permissions.Read') }}</option>
-                            <option value="1">{{ $t('Permissions.own') }}</option>
-                            <option value="2">{{ $t('Projects.everyone') }}</option>
-                        </select>
-                    </template>
-                    <template v-else-if="mode === 'simple'">
-                        <AhSwitch
-                            small
-                            :modelValue="value(rule, role) === true"
-                            :disabled="cellDisabled(rule, role)"
-                            :label="`${ruleName(rule)} · ${role.name}`"
-                            @update:modelValue="(on) => setValue(rule, role, on ? true : null)"
-                        />
-                    </template>
-                    <template v-else>
-                        <select class="pm__select" :value="String(value(rule, role))" :disabled="cellDisabled(rule, role)" :aria-label="`${ruleName(rule)} · ${role.name}`" @change="setValue(rule, role, parseOption($event.target.value))">
-                            <option value="null">{{ $t('Permissions.None') }}</option>
-                            <option value="false">{{ $t('Permissions.Read') }}</option>
-                            <option value="true">{{ $t('Permissions.Write') }}</option>
-                        </select>
-                    </template>
-                </span>
-                <span class="pm__cell pm__agent" role="cell">
-                    <span v-if="isDestructive(rule)" class="pm__never">{{ $t('Settings.agent_never') }}</span>
-                    <span v-else-if="agentMode(rule) === 'proposes'" class="ah-chip ah-chip--warn ah-chip--mono">{{ $t('Settings.agent_proposes') }}</span>
-                    <span v-else-if="agentMode(rule) === 'read'" class="pm__read">{{ $t('Settings.agent_read') }}</span>
-                    <span v-else class="pm__dash">—</span>
-                </span>
-            </div>
-        </template>
     </div>
 </template>
 
@@ -143,6 +147,7 @@ const columns = computed(() => [
     { id: "agents", name: t("Settings.role_agents"), agents: true }
 ]);
 const gridStyle = computed(() => ({ gridTemplateColumns: `minmax(0, 1fr) repeat(${columns.value.length - 1}, 78px) 96px` }));
+const tableStyle = computed(() => ({ "--pm-role-cols": columns.value.length - 1 }));
 
 const ruleName = (rule) => (te(`SecurityAndPermission.${rule.key}`) ? t(`SecurityAndPermission.${rule.key}`) : rule.name);
 const ruleDesc = (rule) => (te(`PermissionDesc.${rule.key}`) ? t(`PermissionDesc.${rule.key}`) : String(rule.desc || ""));
@@ -193,16 +198,21 @@ const groups = computed(() => {
 </script>
 
 <style scoped>
-.pm { overflow: hidden; font: var(--text-small); color: var(--ink); }
-.pm__row { display: grid; gap: 8px; padding: 8px 16px; align-items: center; border-bottom: 1px solid var(--hairline); transition: background var(--t-state) var(--ease); }
+.pm { --pm-perm-min: 240px; --pm-tint: transparent; overflow: hidden; font: var(--text-small); color: var(--ink); }
+.pm__scroll { overflow-x: auto; overscroll-behavior-x: contain; }
+/* 86px per role column (78px track + 8px gap); 136px is the 96px agents track, its gap and the row's side padding. */
+.pm__table { min-width: calc(var(--pm-perm-min) + var(--pm-role-cols) * 86px + 136px); }
+.pm__row { display: grid; gap: 8px; padding: 8px 16px; align-items: center; border-bottom: 1px solid var(--hairline); background: var(--pm-tint); transition: background var(--t-state) var(--ease); }
 .pm__row--head { padding: 10px 16px; }
 .pm__row:last-child { border-bottom: 0; }
-.pm__row--danger { background: var(--danger-bg); }
+.pm__row--danger { --pm-tint: var(--danger-bg); }
 .pm__row--danger .pm__perm-name { color: var(--danger-ink); font-weight: 600; }
-.pm__row.highlightRow { background: var(--brand-tint); }
+.pm__row.highlightRow { --pm-tint: var(--brand-tint); }
 .pm__group { display: grid; gap: 8px; padding: 8px 16px; align-items: center; background: var(--surface-2); border-bottom: 1px solid var(--hairline); }
 .pm__group-name { color: var(--ink-label); }
-.pm__perm { display: flex; flex-direction: column; min-width: 0; text-align: left; }
+/* Sticky over the row's left padding, and the row tint is layered on --surface because the dark tints are translucent. */
+.pm__perm { position: sticky; left: 0; z-index: 1; align-self: stretch; justify-content: center; margin-left: -16px; padding-left: 16px; background: linear-gradient(var(--pm-tint), var(--pm-tint)), var(--surface); display: flex; flex-direction: column; min-width: 0; text-align: left; }
+.pm__group .pm__perm { background: var(--surface-2); }
 .pm__perm-name { font-weight: 500; }
 .pm__perm-desc { line-height: 1.4; }
 .pm__cell { display: flex; justify-content: center; align-items: center; text-align: center; }
@@ -218,4 +228,5 @@ const groups = computed(() => {
 .pm__empty { margin: 14px; }
 .pm__upgrade { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--hairline); }
 .pm__upgrade a { text-decoration: none; }
+@media (max-width: 767px) { .pm { --pm-perm-min: 170px; } }
 </style>
