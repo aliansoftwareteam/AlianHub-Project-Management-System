@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a), validateObjectId: (id) => /^[0-9a-fA-F]{24}$/.test(String(id)) }));
@@ -51,7 +52,7 @@ const response = () => {
 };
 const call = async (handler, { uid, params = {}, body = {} }) => {
     const res = response();
-    await handler({ uid, params, body, query: {}, headers: { companyid: C } }, res);
+    await handler(verified({ uid, params, body, query: {}, headers: { companyid: C } }), res);
     return res;
 };
 

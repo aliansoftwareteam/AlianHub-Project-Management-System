@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 jest.mock('../Modules/Workflows/store');
 jest.mock('../Modules/Workflows/queue');
 jest.mock('../Modules/Agents/access');
@@ -23,7 +24,7 @@ const TASK_ID = 'cccccccccccccccccccccccc';
 const OWNER = 'dddddddddddddddddddddddd';
 const MEMBER = 'eeeeeeeeeeeeeeeeeeeeeeee';
 
-const reqFor = (over = {}) => ({ headers: { companyid: COMPANY }, params: {}, query: {}, body: {}, ip: '', ...over });
+const reqFor = (over = {}) => verified({ headers: { companyid: COMPANY }, params: {}, query: {}, body: {}, ip: '', ...over });
 
 const resSpy = () => {
     const res = { statusCode: 200, body: null };

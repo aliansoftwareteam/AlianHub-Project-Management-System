@@ -21,6 +21,7 @@ jest.mock('../Config/jwt', () => {
             || /(?:^|;\s*)accessToken=user:([a-f0-9]{24})(?:;|$)/.exec(String(req.headers.cookie || ''));
         if (!signedIn) return res.status(401).json({ status: false, error: 'Unauthorized' });
         req.uid = signedIn[1];
+        req.aud = req.headers.companyid;
         if (req.headers['x-test-api-token']) req.apiToken = { _id: 'pat' };
         return next();
     };

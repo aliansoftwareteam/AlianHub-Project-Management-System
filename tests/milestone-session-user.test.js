@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockCrud = jest.fn();
 const mockHistory = jest.fn(async () => true);
 const mockNotify = jest.fn(async () => true);
@@ -83,7 +84,7 @@ const call = async (handler, body, uid = ME) => {
     r.status = (c) => { r.code = c; return r; };
     r.send = (b) => { r.body = b; return r; };
     r.json = r.send;
-    await handler({ headers: { companyid: C }, body, query: {}, params: {}, uid }, r);
+    await handler(verified({ headers: { companyid: C }, body, query: {}, params: {}, uid }), r);
     await settle();
     return r;
 };

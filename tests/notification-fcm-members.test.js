@@ -30,6 +30,7 @@ const call = async (body) => {
     const r = res();
     await sendFcmNotificationsHandler({
         headers: { companyid: C },
+        aud: C,
         uid: SENDER,
         body: { companyId: C, message: 'hi', key: 'message_create', type: 'chat', actionUrl: `${C}/chat/p/t`, senderUserDetail: { Employee_Name: 'Someone Else' }, ...body },
     }, r);

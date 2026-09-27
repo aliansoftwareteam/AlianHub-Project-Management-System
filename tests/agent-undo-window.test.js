@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -35,7 +36,7 @@ const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const rows = (type) => mockDb.store[type] || [];
 const auditRows = (action) => rows(SCHEMA_TYPE.AUDIT_LOGS).filter((r) => r.action === action);
 const res = () => { const r = { code: 200, body: null }; r.status = (c) => { r.code = c; return r; }; r.send = (b) => { r.body = b; return r; }; r.json = r.send; return r; };
-const req = (id, uid, over = {}) => ({ headers: { companyid: C }, params: { id: String(id) }, query: {}, body: {}, uid, ip: '', ...over });
+const req = (id, uid, over = {}) => verified({ headers: { companyid: C }, params: { id: String(id) }, query: {}, body: {}, uid, ip: '', ...over });
 
 const seedRun = (over = {}) => mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, {
     agentId: AGENT_ID, agentName: 'Reviewer', taskId: TASK_ID, projectId: 'p1', status: 'done', startedBy: 'u1',
