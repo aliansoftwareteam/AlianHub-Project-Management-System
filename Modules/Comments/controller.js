@@ -13,6 +13,12 @@ const { commentThreadAccess, refuseThread } = require("./helpers/threadAccess");
 const { threadOf, canPostToThread, canChangeComment, changesThreadOrAuthor } = require("./helpers/threadWriteAccess");
 const { resolveMentionIds, deliverMentions } = require("./helpers/commentNotifications");
 
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+/* comments.taskId is Mixed: rows hold a task id as an ObjectId or as text, Mongoose casts neither, and 'default' names the main chat. */
+const taskIdMatch = (taskId) => (OBJECT_ID.test(String(taskId))
+    ? { $in: [String(taskId), new mongoose.Types.ObjectId(String(taskId))] }
+    : taskId);
+
 /**
  * This endpoint is used to save data in comments collection
  * @param {*} req 
@@ -198,7 +204,7 @@ exports.getPaginatedMessages = async (req, res) => {
                     ...(!isDefault && mainChat
                         ? [{ taskId: "default" }]
                         : taskId
-                            ? [{ taskId: taskId !== 'default' ?  new mongoose.Types.ObjectId(taskId) : taskId }]
+                            ? [{ taskId: taskIdMatch(taskId) }]
                             : [{ project: true }]),
                 ]
             }
@@ -254,7 +260,7 @@ exports.searchMessageFromMainChat = async (req, res) => {
                 {
                     projectId: new mongoose.Types.ObjectId(projectId),
                     ...(sprintId ? {sprintId: new mongoose.Types.ObjectId(sprintId)} : { project: true }),
-                    taskId: (taskId && taskId !== "default") ? new mongoose.Types.ObjectId(taskId) : 'default',
+                    taskId: taskId ? taskIdMatch(taskId) : 'default',
                     ...((isPinnedMessage === "true") ? { pinnedMessage: true } : {}),
                     ...(searchText && searchText !== ''
                         ? {
@@ -537,7 +543,7 @@ exports.updateCommentCollection = (companyId, task, sprintObj, newProjectData,ta
                 data: [
                     {
                         sprintId: new mongoose.Types.ObjectId(task.sprintId),
-                        taskId: new mongoose.Types.ObjectId(task._id)
+                        taskId: taskIdMatch(task._id)
                     },
                     {
                         sprintId: new mongoose.Types.ObjectId(sprintObj.id),
