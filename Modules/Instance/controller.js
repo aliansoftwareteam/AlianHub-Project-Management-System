@@ -19,6 +19,7 @@ const socketEmitter = require('../../event/socketEventEmitter');
 const { csvCell: formulaSafeCell } = require('../../utils/csv');
 const llmProvider = require('../AICore/llmProvider');
 const { ssoOnInstance } = require('../SSO/discover');
+const { tenantOf, TenantError } = require('../../Config/tenant');
 
 const PUBLIC_CONFIG_KEY = 'instance:public-config';
 const LATEST_RELEASE_KEY = 'instance:latest-release';
@@ -327,7 +328,8 @@ const csvCell = (value) => formulaSafeCell(String(value === null || value === un
 
 exports.auditExport = async (req, res) => {
     try {
-        const companyId = String(req.query?.companyId || req.headers['companyid'] || '');
+        const named = String(req.query?.companyId || ''); // tenant-scoping: the instance admin exports whichever workspace it names
+        const companyId = named || tenantOf(req);
         if (!/^[a-f0-9]{24}$/i.test(companyId)) return fail(res, 400, 'companyId is required.');
         const filter = {};
         const from = req.query?.from ? new Date(req.query.from) : null;
@@ -350,6 +352,7 @@ exports.auditExport = async (req, res) => {
         });
         return res.send('﻿' + lines.join('\r\n'));
     } catch (error) {
+        if (error instanceof TenantError) return fail(res, error.statusCode, error.message);
         return fail(res, 500, error.message);
     }
 };

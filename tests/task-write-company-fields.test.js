@@ -238,15 +238,15 @@ describe('every task write takes its company from the validated request', () => 
     });
 
     test.each([
-        ['no companyid header', { companyid: undefined }],
-        ['a header that is not an id', { companyid: 'not-a-company' }],
-        ['a header outside the token audience', { companyid: CID, aud: OTHER_COMPANY }],
-        ['no audience at all', { companyid: CID, aud: undefined }],
-    ])('refuses with 400 and writes nothing when there is %s', async (_, request) => {
+        ['no companyid header', { companyid: undefined }, 400],
+        ['a header that is not an id', { companyid: 'not-a-company' }, 400],
+        ['a header outside the token audience', { companyid: CID, aud: OTHER_COMPANY }, 403],
+        ['no audience at all', { companyid: CID, aud: undefined }, 400],
+    ])('refuses and writes nothing when there is %s', async (_, request, code) => {
         for (const [route, action, method] of WRITES.filter(([route]) => !route.includes('taskIndex') && !route.includes('Onload'))) {
             mockDb.calls.length = 0;
             const result = await call(route, bodyForWrite(route, action, method), request);
-            expect({ route, action, code: result.code, calls: mockDb.calls.length }).toEqual({ route, action, code: 400, calls: 0 });
+            expect({ route, action, code: result.code, calls: mockDb.calls.length }).toEqual({ route, action, code, calls: 0 });
         }
     });
 

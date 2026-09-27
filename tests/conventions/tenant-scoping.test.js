@@ -1,5 +1,6 @@
+const fs = require('fs');
 const path = require('path');
-const { countTenantReads, countTenantReadsIn } = require('./tenant-reads');
+const { countTenantReads, countTenantReadsIn, countHeaderReadsIn } = require('./tenant-reads');
 const baseline = require('./tenant-scoping.baseline.json');
 
 const MODULES = path.join(__dirname, '..', '..', 'Modules');
@@ -48,5 +49,22 @@ describe('a read that is correct by design carries its reason on the same line',
 
     it('still counts every unannotated read', () => {
         expect(countTenantReadsIn('f(req.body.companyId, req.query.CompanyId);\ng(req.body.CompanyId);')).toBe(3);
+    });
+
+    it('counts an optional-chained read', () => {
+        expect(countTenantReadsIn('const id = req.query?.companyId || req.body?.CompanyId;')).toBe(2);
+    });
+});
+
+// These took the company straight from the header, unchecked against the token; they now go through Config/tenant.
+const HEADER_FREE = ['Trash/controller.js', 'Instance/controller.js'];
+
+describe('a module moved onto Config/tenant does not read the companyid header itself', () => {
+    it('recognises every spelling of a header read', () => {
+        expect(countHeaderReadsIn("a(req.headers.companyid, req.headers['companyid'], req.headers?.companyid, req.headers?.[\"companyid\"]);")).toBe(4);
+    });
+
+    it.each(HEADER_FREE)('%s', (file) => {
+        expect(countHeaderReadsIn(fs.readFileSync(path.join(MODULES, file), 'utf8'))).toBe(0);
     });
 });

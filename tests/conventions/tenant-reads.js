@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const TENANT_READ = /req\.(?:body|query)\.(?:companyId|CompanyId)\b/g;
+const TENANT_READ = /req\.(?:body|query)\??\.(?:companyId|CompanyId)\b/g;
+const HEADER_READ = /req\.headers(?:\??\.companyid\b|\??\.?\[\s*['"`]companyid['"`]\s*\])/gi;
 // A pre-session or transport read (IdP callbacks, MCP endpoint URLs, bucket claims checked where
 // they are read) is correct by design; it is exempt only while its own line says why.
 const EXEMPTION = /\/\/\s*tenant-scoping:\s*\S.{11,}/;
@@ -21,6 +22,8 @@ function countTenantReadsIn(source) {
         .reduce((sum, line) => sum + (line.match(TENANT_READ) || []).length, 0);
 }
 
+const countHeaderReadsIn = (source) => (source.match(HEADER_READ) || []).length;
+
 // Per-file count of tenant ids read from the request body or query. The tenant
 // belongs in the companyid header (tenantOf), so this number may only fall.
 function countTenantReads(modulesDir) {
@@ -32,4 +35,4 @@ function countTenantReads(modulesDir) {
     return counts;
 }
 
-module.exports = { countTenantReads, countTenantReadsIn };
+module.exports = { countTenantReads, countTenantReadsIn, countHeaderReadsIn };
