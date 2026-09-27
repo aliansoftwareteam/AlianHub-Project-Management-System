@@ -784,6 +784,7 @@ exports.renderShare = async (req, res) => {
                 <label>Details</label><textarea name="description" rows="4" maxlength="5000"></textarea>
                 <label>Your name</label><input name="name" maxlength="120">
                 <label>Email</label><input name="email" type="email" maxlength="120">
+                ${share.passwordHash ? '<label>Password *</label><input name="password" type="password" required>' : ''}
                 <button type="submit">Send</button>
             </form>`;
         }
@@ -799,7 +800,18 @@ exports.renderShare = async (req, res) => {
 exports.submitIntake = async (req, res) => {
     try {
         const resolved = await resolveShare(req.params.token);
-        if (!resolved || !resolved.share.allowIntake) {
+        if (!resolved) {
+            return sendPage(res, 404, 'Not found', '<h1>This link is not available.</h1>');
+        }
+        // Asked before intake is looked at, so without the password nothing says whether the form is on.
+        if (resolved.share.passwordHash) {
+            const supplied = (req.body && req.body.password) ? String(req.body.password) : '';
+            const ok = supplied && await verifyPassword(supplied, resolved.share);
+            if (!ok) {
+                return sendPage(res, 200, 'Protected', passwordForm(req.params.token, true));
+            }
+        }
+        if (!resolved.share.allowIntake) {
             return sendPage(res, 404, 'Not found', '<h1>This link is not available.</h1>');
         }
         const { title, description, name, email } = req.body || {};
