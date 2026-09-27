@@ -2,7 +2,7 @@
     <section class="pv-roll" :aria-labelledby="headingId">
         <header class="pv-roll__head">
             <h2 :id="headingId" class="pv-roll__title">{{ title }}</h2>
-            <span v-if="loaded && closed" class="pv-roll__note">{{ $t('Provenance.tasks_closed', { n: closed }) }}</span>
+            <span v-if="loaded && closed" class="pv-roll__note">{{ $t('Provenance.tasks_closed', { n: closed }, closed) }}</span>
         </header>
 
         <p v-if="error" class="pv-roll__error" role="alert">{{ error }}</p>
