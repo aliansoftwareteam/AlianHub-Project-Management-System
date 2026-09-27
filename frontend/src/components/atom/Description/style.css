@@ -165,7 +165,7 @@ max-width: 100% !important;
     font-weight: 400;
     font-size: 16px;
     line-height: 24px;
-    font-family: 'Roboto', sans-serif !important;
+    font-family: var(--font-ui) !important;
     display: flex;
     align-items: center;
     justify-content: flex-start;

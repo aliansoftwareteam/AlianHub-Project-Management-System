@@ -3,7 +3,7 @@
     width: -webkit-fill-available;
     padding: 10px 15px;
     /* border-radius: 6px; */
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     font-weight: 500; 
     resize: none;
     height: 56px; /* Initial height */

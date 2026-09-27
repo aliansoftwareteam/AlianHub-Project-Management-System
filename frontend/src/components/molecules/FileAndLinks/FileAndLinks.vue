@@ -3,7 +3,7 @@
     Assignee: Parth Detroja
 -->
 <template>
-    <div class="font-roboto-sans overflow-y-auto bg-white h-100 all__filelinks-wrapper">
+    <div class="font-ui overflow-y-auto bg-white h-100 all__filelinks-wrapper">
         <div class="bg-white position-re h-100">
             <div class="files-links-tabs position-sti bg-white">    
                 <ul class="d-flex">
@@ -12,21 +12,21 @@
                         :class="activeTab == 'all' ? 'active' : ''"
                         @click="activeTab !== 'all' ? activeTab = 'all': ''"
                     >
-                        <span class="font-size-18 font-weight-700 font-roboto-sans cursor-pointer">{{$t('Projects.all')}}</span>
+                        <span class="font-size-18 font-weight-700 font-ui cursor-pointer">{{$t('Projects.all')}}</span>
                     </li>
                     <li
                         class="d-flex"
                         :class="activeTab == 'files' ? 'active' : ''"
                         @click="activeTab !== 'files' ? activeTab = 'files': ''"
                     >
-                        <span class="font-size-18 font-weight-700 font-roboto-sans cursor-pointer">{{$t('Projects.files')}}</span>
+                        <span class="font-size-18 font-weight-700 font-ui cursor-pointer">{{$t('Projects.files')}}</span>
                     </li>
                     <li
                         class="d-flex"
                         :class="activeTab == 'links' ? 'active' : ''"
                         @click="activeTab !== 'links' ? activeTab = 'links': ''"
                     >
-                        <span class="font-size-18 font-weight-700 font-roboto-sans cursor-pointer">{{$t('Projects.links')}}</span>
+                        <span class="font-size-18 font-weight-700 font-ui cursor-pointer">{{$t('Projects.links')}}</span>
                     </li>
                 </ul>
             </div>

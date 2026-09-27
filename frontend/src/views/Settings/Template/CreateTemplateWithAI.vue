@@ -11,7 +11,7 @@
             @update:visible="$emit('closeSidebar', $event)" :top="clientWidth <= 767 ? '0px' : '46px'"
         >
             <template #head-left>
-                <div class="blue font-roboto-sans">{{ $t('Templates.ai_sidebar_title') }}</div>
+                <div class="blue font-ui">{{ $t('Templates.ai_sidebar_title') }}</div>
             </template>
             <template #body>
                 <div class="sidbar-bodytamplate" v-if="activeTab === 1">
@@ -445,7 +445,7 @@ onMounted(() => {
 <style scoped>
     label {
         font-size: 14px;
-        font-family: Roboto;
+        font-family: var(--font-ui);
         font-weight: 500;
         line-height: 20.72px;
     }

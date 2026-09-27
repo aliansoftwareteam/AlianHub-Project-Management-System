@@ -48,7 +48,7 @@ ul.task_detail_navbar_ul li:last-child span {
     background-color: #DFE1E6;
     border-radius: 20px;
     display: block;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 500;
     font-size: 9px;

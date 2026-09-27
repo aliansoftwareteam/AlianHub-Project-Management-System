@@ -6,7 +6,7 @@
     border-radius: 7px;
     border-width: 2px;
     font-size: 13px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 400;
     line-height: 23px;

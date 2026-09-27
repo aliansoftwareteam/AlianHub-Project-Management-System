@@ -197,7 +197,7 @@
 <style scoped>
 .textCustomField__error_msg {
     bottom: -25px !important;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 12px;
     font-style: normal;
     font-weight: 400;

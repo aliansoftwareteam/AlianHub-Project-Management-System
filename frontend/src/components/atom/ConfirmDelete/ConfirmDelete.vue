@@ -55,7 +55,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
    own copy of this markup. */
 .cd__wrap { position: fixed; inset: 0; z-index: 1300; display: flex; align-items: center;
     justify-content: center; padding: 16px; background: rgba(23, 24, 36, .45);
-    font-family: 'Roboto', sans-serif; }
+    font-family: var(--font-ui); }
 .cd { width: 100%; max-width: 384px; padding: 20px; background: #fff; border-radius: 12px;
     box-shadow: 0 18px 50px rgba(23, 24, 36, .28); }
 .cd__icon { display: inline-flex; align-items: center; justify-content: center; width: 34px;

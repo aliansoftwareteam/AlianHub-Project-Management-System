@@ -12,7 +12,7 @@
     margin: 15px 0px;
 }
 .custom_field-btn .formkit-input {
-    font-family: 'Roboto' !important;
+    font-family: var(--font-ui) !important;
     font-size: 16px !important;
     font-style: normal;
     font-weight: 400;

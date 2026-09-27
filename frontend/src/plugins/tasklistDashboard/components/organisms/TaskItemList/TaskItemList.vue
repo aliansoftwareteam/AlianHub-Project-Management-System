@@ -159,7 +159,7 @@
                                     <input type="text" class="customfield__form-control" :placeholder="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
                                 </DropDownOption>
                                 <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields')">
-                                    <span class="font-weight-500 line-height-19 font-roboto-sans blue" @click="isCustomField = true">+ {{$t('CustomField.custom_field')}}</span>
+                                    <span class="font-weight-500 line-height-19 font-ui blue" @click="isCustomField = true">+ {{$t('CustomField.custom_field')}}</span>
                                 </DropDownOption>
                                 <template v-if="headerHideShow && headerHideShow.length">
                                     <DropDownOption
@@ -167,7 +167,7 @@
                                         :key="index"
                                     >
                                         <div class="d-flex align-items-center justify-content-between w-100">
-                                            <span class="font-weight-400 line-height-19 font-roboto-sans">
+                                            <span class="font-weight-400 line-height-19 font-ui">
                                                 {{obj.label}}
                                             </span>
                                             <span>

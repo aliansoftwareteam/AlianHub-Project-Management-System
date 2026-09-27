@@ -12,12 +12,12 @@
                 </div>
 
                 <div class="custom-padding-1">
-                    <h2 class="font-size-22 font-weight-bold dark-gray font-roboto">{{ title }}</h2>
-                    <p class="font-size-16 mt-10px color52 font-roboto" v-if="isHtml" v-html="richHtml(message)"></p>
-                    <p class="font-size-16 mt-10px color52 font-roboto" v-else>{{ message }}</p>
+                    <h2 class="font-size-22 font-weight-bold dark-gray font-ui">{{ title }}</h2>
+                    <p class="font-size-16 mt-10px color52 font-ui" v-if="isHtml" v-html="richHtml(message)"></p>
+                    <p class="font-size-16 mt-10px color52 font-ui" v-else>{{ message }}</p>
                     <div v-if="fields.length" class="gap d-flex justify-content-center flex-wrap mt-10px">
                         <span v-for="field in fields" :key="field"
-                            class="border-gray p-5px border-radius-5-px font-size-14 font-weight-bold dark-gray font-roboto">{{
+                            class="border-gray p-5px border-radius-5-px font-size-14 font-weight-bold dark-gray font-ui">{{
                                 field
                             }}</span>
                     </div>
@@ -129,10 +129,6 @@ const handleAction = (confirmed) => {
 <style>
 .gap {
     gap: 10px;
-}
-
-.font-roboto {
-    font-family: "Roboto";
 }
 
 .top-50px {

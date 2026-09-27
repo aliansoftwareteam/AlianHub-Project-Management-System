@@ -1,7 +1,7 @@
 <template>
     <div class="queue__list-wrapper">
         <div class="queue__title-wrapper d-flex align-items-center mb-10px">
-            <h2 class="font-size-22 font-weight-500 black font-roboto-sans m-0 d-flex align-items-center position-re quelist__title">{{ title }}<span class="font-size-13 font-weight-400 GunPowder ml-10px">({{ searchResultTotal }})</span></h2>
+            <h2 class="font-size-22 font-weight-500 black font-ui m-0 d-flex align-items-center position-re quelist__title">{{ title }}<span class="font-size-13 font-weight-400 GunPowder ml-10px">({{ searchResultTotal }})</span></h2>
             <button class="btn__task ml-10px border-radius-4-px black font-weight-400 border-0 font-size-12 cursor-pointer bg-colorlightgray mr-2px vertical-middle" @click="queueButtonClick"> + {{$t('Home.AddtoQueue')}}</button>
             <div v-if="allProjectsArrayFilter.length">
                 <ConvertToSubTaskSidebar @dataToMainComp="(ele)=>{taskOperations(ele,'add')}" :allProjectsArrayFilter="allProjectsArrayFilter" v-if="openConvertSubTaskSidebar === true" :closeSideBar="openConvertSubTaskSidebar"  @isConvertSubtaskOPen="(val) => {openConvertSubTaskSidebar = val}" :openMoveSubTask="false" :isMergeTask="false" :isDuplicate="false" :isOpenSubTask="false" :selectedProjectObject="allProjectsArrayFilter[0]" :fromWhich="'dashboard'"/>   

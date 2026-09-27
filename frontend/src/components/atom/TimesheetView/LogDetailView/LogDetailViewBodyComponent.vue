@@ -30,7 +30,7 @@
                             <div class="text-ellipsis cursor-default"><span class="font-size-16 font-weight-500 text-ellipsis pr-10px data__task-name" :title="data.name">{{data.name}}</span></div>
                     </div>
                     <div class="d-flex align-items-center justify-content-end w-35">
-                        <span class="timelogHours black font-roboto-sans">
+                        <span class="timelogHours black font-ui">
                             {{ $t('TimeTracker.hours_value', { time: convertedTimeString(data.total,'update') }) }}
                         </span>
                     </div>

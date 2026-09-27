@@ -43,7 +43,7 @@
         text-align:left;
         padding:13px 10px;
         border:0px;
-        font-family: Roboto;
+        font-family: var(--font-ui);
         font-size: 12px;
         font-style: normal;
         font-weight: 500;

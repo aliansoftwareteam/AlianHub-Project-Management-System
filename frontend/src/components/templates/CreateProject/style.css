@@ -122,7 +122,7 @@ ul.templated_name_ul{
     cursor: pointer;
     margin-top: 12px;
     margin-bottom: 6px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
 }
 .closeStatus .style_changes_value {
     font-size: 13px !important;

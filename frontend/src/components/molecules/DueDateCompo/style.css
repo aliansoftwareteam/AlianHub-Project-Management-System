@@ -16,7 +16,7 @@
     color: #818181 !important;
     position: relative;
     top: 1px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
 }
 @media(max-width: 576px){
     .create__task-div .due_date-listing{

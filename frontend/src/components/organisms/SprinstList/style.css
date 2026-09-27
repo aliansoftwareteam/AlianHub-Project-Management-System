@@ -299,7 +299,7 @@ span.duedate-new .due-date span, span.key-new {
 .closeProjectWrapper h1{
     width: 217px;
     height: 47px;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 700;
     font-size: 36px;
@@ -310,7 +310,7 @@ span.duedate-new .due-date span, span.key-new {
     margin-bottom: 20px
 }
 .closeProjectWrapper p{
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-size: 16px;
     line-height: 24px;
@@ -349,7 +349,7 @@ span.duedate-new .due-date span, span.key-new {
     border: 0!important;
     padding: 0!important;
     cursor: pointer!important;
-    font-family: 'Roboto', sans-serif !important;
+    font-family: var(--font-ui) !important;
 }
  .prev_next:nth-child(1) button,
  .prev_next:nth-child(2) button  {
@@ -401,7 +401,7 @@ span.duedate-new .due-date span, span.key-new {
 }
 .calendar__view-wrapper .calender-view-task-title{
     color: #000!important;
-    font-family: 'Roboto', sans-serif !important;
+    font-family: var(--font-ui) !important;
     font-size: 14px!important;
     font-style: normal!important;
     font-weight: 500!important;
@@ -708,7 +708,7 @@ span.duedate-new .due-date span, span.key-new {
     background-color: #DFE1E6;
     border-radius: 20px;
     display: block;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 500;
     font-size: 9px;

@@ -142,7 +142,7 @@ span.tag_name {
 }
 
 .tag-instruct-text{
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 400;
     font-size: 12px;
@@ -169,7 +169,7 @@ span.tag_name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 400;
     font-size: 12px;
@@ -208,7 +208,7 @@ img.tagHover__icon-close {
     height: 12px;
     min-width: 22px;
     /* min-height: 19px; */
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-weight: 500;
     font-size: 10px;
     display: flex;

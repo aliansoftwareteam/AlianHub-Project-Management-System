@@ -102,7 +102,7 @@ ul.imageUplaod li span {
     -webkit-box-align: center;
     -ms-flex-align: center;
     align-items: center;
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 400;
     font-size: 16px;
@@ -187,7 +187,7 @@ ul.imageUplaod li span.no-img{
 }
 
 .sidebarHeader h3.primaryColor {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-style: normal;
     font-weight: 700;
     font-size: 18px;
@@ -231,7 +231,7 @@ form.createCompanyform {
     background: #F4F5F7;
     border: 1px dashed #959595;
     border-radius: 5px;
-    font-family: "Roboto";
+    font-family: var(--font-ui);
     font-size: 13px;
     font-weight: 400;
     line-height: 19px;
@@ -292,7 +292,7 @@ form.createCompanyform .teaminput-sidebar {
     border: 1px solid #E0E0E0;
     border-radius: 6px;
     padding: 0px 10px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     font-weight: 400;
     color: #949DA8;
     font-size: 13px;
@@ -306,7 +306,7 @@ form.createCompanyform .teaminput-sidebar {
     border: 1px solid #E0E0E0;
     border-radius: 6px;
     padding: 0px 10px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     font-weight: 400;
     color: #949DA8;
     font-size: 13px;

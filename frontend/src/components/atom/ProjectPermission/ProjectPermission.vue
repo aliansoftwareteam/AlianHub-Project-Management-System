@@ -7,9 +7,9 @@
             <template #body>
                 <div :class="[{'pointer-event-none opacity-5 blur-3-px':!currentCompany?.planFeature?.projectWisePermisson}]" class="add_permission_project bg-white d-flex justify-content-between align-items-center"> 
                     <div class="add_permission_para">
-                        <span class="main_para d-block black font-size-14 font-roboto-sans font-weight-500" v-if="projectRawRules?.length">{{$t('Permissions.project_permission_title_enable')}}</span>
-                        <span class="main_para d-block black font-size-14 font-roboto-sans font-weight-500" v-else>{{$t('Permissions.project_permission_title_disable')}}</span>
-                        <span v-if="projectRawRules?.length === 0" class="second_para d-block GunPowder font-size-12 font-roboto-sans font-weight-400">{{$t('Permissions.project_permission_description')}}.</span>
+                        <span class="main_para d-block black font-size-14 font-ui font-weight-500" v-if="projectRawRules?.length">{{$t('Permissions.project_permission_title_enable')}}</span>
+                        <span class="main_para d-block black font-size-14 font-ui font-weight-500" v-else>{{$t('Permissions.project_permission_title_disable')}}</span>
+                        <span v-if="projectRawRules?.length === 0" class="second_para d-block GunPowder font-size-12 font-ui font-weight-400">{{$t('Permissions.project_permission_description')}}.</span>
                     </div>
                     <div v-if="checkPermission('settings.settings_security_permissions') == true">
                         <button :disabled="!currentCompany?.planFeature?.projectWisePermisson" v-if="projectRawRules?.length === 0" class="bg-white permissionButton border-primary font-size-16 blue mr-010 cursor-pointer" :class="[{'disableButton font-size-16':isSpinner}]" @click="applyProjectPermision">{{$t('Permissions.apply_permission')}}</button>

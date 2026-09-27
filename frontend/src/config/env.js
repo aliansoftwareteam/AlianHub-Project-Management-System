@@ -331,6 +331,7 @@ module.exports.GLOBAL_SEARCH = '/api/v2/search';
 module.exports.RECENT_VISITS = '/api/v2/recent-visits';
 module.exports.USER_SESSIONS = '/api/v2/users/sessions';
 module.exports.USER_ONBOARDING = '/api/v2/users/onboarding';
+module.exports.USER_NAV_PREFERENCES = '/api/v2/users/nav-preferences';
 module.exports.NOTIFICATION_PREFERENCES = '/api/v1/notifications/preferences';
 module.exports.PAGES = '/api/v2/pages';
 module.exports.PERSONAL_PROJECT = '/api/v1/project/personal';

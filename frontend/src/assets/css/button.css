@@ -5,7 +5,7 @@
     border-radius: 4px;
     color: #2F3990;
     cursor: pointer;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
 }
 
 .outline-secondary {
@@ -15,7 +15,7 @@
     border-radius: 4px;
     color: #959595;
     cursor: pointer;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
 }
 .outline-secondary-bg-gray{
     border: 1px solid #E8E8E8;
@@ -27,7 +27,7 @@
     border-radius: 4px;
     color:#959595;
     cursor: pointer;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
 }
 .outline-required{
     height: 30px;
@@ -36,7 +36,7 @@
     border-radius: 7px;
     color: #959595;
     cursor: pointer;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
 }
 .btn-primary {
     cursor: pointer;
@@ -45,7 +45,7 @@
     color: white;
     border: none;
     height: 30px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
 }
 .btn-danger {
     cursor: pointer;
@@ -54,7 +54,7 @@
     color: white;
     border: none;
     height: 30px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
 }
 /* The confirm button on a type-to-confirm dialog (bulk Delete / Archive).
    It was referenced by name but never defined, so the moment the typed phrase
@@ -71,7 +71,7 @@
     height: 38px;
     padding: 0 18px;
     font-weight: 500;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     transition: background 0.15s ease;
 }
 .archive-delete-btn-bg-red:hover {
@@ -96,7 +96,7 @@
     height: 38px;
     padding: 0 18px;
     font-weight: 500;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     transition: background 0.15s ease;
 }
 .archive-confirm-btn:hover { background: #27306F; }
@@ -110,7 +110,7 @@
     color: white;
     border: none;
     height: 30px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
 }
 
 .btn-white {
@@ -119,7 +119,7 @@
     background: #FFFFFF;
     border-radius: 4px;
     cursor: pointer;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
 }
 .btn{
     margin-left: 5px;
@@ -127,7 +127,7 @@
     font-weight: 400;
     font-size: 16px;
     line-height: 24px;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     display: flex;
     align-items: center;
     justify-content: center;

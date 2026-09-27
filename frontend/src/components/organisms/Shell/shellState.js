@@ -1,14 +1,22 @@
 import { reactive, watch } from "vue";
+import { apiRequestWithoutCompnay } from "@/services";
+import * as env from "@/config/env";
 
 const THEME_KEY = "ah.theme";
 const NAV_KEY = "ah.nav";
+const NAV_SAVE_DELAY_MS = 800;
 
-function readJson(key, fallback) {
+const signedInUserId = () => localStorage.getItem("userId") || "";
+
+/* ah.nav is shared by everyone who signs in on this browser, so a local copy counts only for
+   the user it is tagged with; an untagged copy predates the tag and belongs to nobody. */
+function localPinsOf(userId) {
     try {
-        const raw = localStorage.getItem(key);
-        return raw ? { ...fallback, ...JSON.parse(raw) } : fallback;
+        const stored = JSON.parse(localStorage.getItem(NAV_KEY) || "null");
+        if (!userId || !stored || stored.uid !== userId || !Array.isArray(stored.pinned)) return [];
+        return stored.pinned.filter((id) => typeof id === "string");
     } catch {
-        return fallback;
+        return [];
     }
 }
 
@@ -22,7 +30,7 @@ export const shellState = reactive({
     profileOpen: false,
     sidebarCollapsed: false,
     theme: localStorage.getItem(THEME_KEY) || "light",
-    nav: readJson(NAV_KEY, { pinned: [] }),
+    nav: { pinned: localPinsOf(signedInUserId()) },
     agentsRunning: 0
 });
 
@@ -52,7 +60,48 @@ export function initTheme() {
     }
 }
 
-watch(() => shellState.nav, (val) => localStorage.setItem(NAV_KEY, JSON.stringify(val)), { deep: true });
+const navSync = { userId: null, saved: null, timer: null };
+const pinnedBody = (nav) => ({ pinned: [...((nav && nav.pinned) || [])] });
+
+function saveNav() {
+    navSync.timer = null;
+    const body = pinnedBody(shellState.nav);
+    const snapshot = JSON.stringify(body);
+    if (snapshot === navSync.saved) return;
+    const previous = navSync.saved;
+    navSync.saved = snapshot;
+    apiRequestWithoutCompnay("put", env.USER_NAV_PREFERENCES, body).catch((error) => {
+        // Only the next change retries, so an offline session never loops; the pins stay local meanwhile.
+        if (navSync.saved === snapshot) navSync.saved = previous;
+        console.warn("nav preferences not saved", error);
+    });
+}
+
+/* The user record is the source of truth once it arrives; this user's own pins kept only in
+   this browser are uploaded the first time. Later refreshes of the same record are ignored
+   so they cannot overwrite a change that is still waiting to be saved. */
+export function syncNavPreferences(userId, stored) {
+    if (!userId || navSync.userId === userId) return;
+    clearTimeout(navSync.timer);
+    navSync.timer = null;
+    navSync.userId = userId;
+    if (stored && Array.isArray(stored.pinned)) {
+        navSync.saved = JSON.stringify(pinnedBody(stored));
+        shellState.nav = { ...shellState.nav, pinned: [...stored.pinned] };
+        return;
+    }
+    const local = localPinsOf(userId);
+    navSync.saved = JSON.stringify({ pinned: [] });
+    shellState.nav = { ...shellState.nav, pinned: local };
+    if (local.length) saveNav();
+}
+
+watch(() => shellState.nav, (val) => {
+    localStorage.setItem(NAV_KEY, JSON.stringify({ ...val, uid: navSync.userId || signedInUserId() }));
+    if (!navSync.userId) return;
+    clearTimeout(navSync.timer);
+    navSync.timer = setTimeout(saveNav, NAV_SAVE_DELAY_MS);
+}, { deep: true });
 
 export function openPanel(name) {
     shellState.moreOpen = false;

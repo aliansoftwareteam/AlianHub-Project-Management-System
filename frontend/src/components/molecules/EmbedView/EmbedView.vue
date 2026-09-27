@@ -43,7 +43,7 @@
                     <label  for="r2" class="font-size-13 dark-gray2">{{$t('ViewListdescription.embed_HTML')}}</label>
                 </span>
                 <div class="mt-10px embed__text-area">
-                    <textarea class="textArea w-100 font-roboto-sans font-size-13 p-10px color94 border-gray border-radius-3-px " :class="{'disabled':radioValue == 'url'}" v-if="selectedEmbed.id == 1" @keyup="inputValues.html.error = ''"  :placeHolder="$t('PlaceHolder.Enter_HTML')" v-model="inputValues.html.value" :disabled="radioValue == 'url'"> </textarea>
+                    <textarea class="textArea w-100 font-ui font-size-13 p-10px color94 border-gray border-radius-3-px " :class="{'disabled':radioValue == 'url'}" v-if="selectedEmbed.id == 1" @keyup="inputValues.html.error = ''"  :placeHolder="$t('PlaceHolder.Enter_HTML')" v-model="inputValues.html.value" :disabled="radioValue == 'url'"> </textarea>
                     <div class="red error font-size-11 position-ab mb-0" v-if="inputValues.html.error">{{inputValues.html.error}}</div>
                 </div>
             </div>
@@ -59,7 +59,7 @@
                     <label   for="c2" class="font-size-13 pl-3px dark-gray2 m-0">{{$t('Projects.pin')}}{{$t('Projects.view')}}</label>
                 </div>
             </div>
-            <button class="btn-primary font-roboto-sans d-flex align-items-center justify-content-end font-size-16 ml-15px add__view-btn" @click="HandleSubmit">{{$t('Projects.add_view')}}</button>
+            <button class="btn-primary font-ui d-flex align-items-center justify-content-end font-size-16 ml-15px add__view-btn" @click="HandleSubmit">{{$t('Projects.add_view')}}</button>
         </div>
        </div>
     </div>
