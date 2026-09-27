@@ -1,5 +1,6 @@
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
+jest.mock('../Config/knownCompany', () => ({ isKnownCompany: jest.fn(async () => true) }));
 jest.mock('../utils/data', () => ({ importUserNotifications: jest.fn(async () => undefined) }));
 jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(), isPrivileged: (roleType) => roleType === 1 || roleType === 2, evaluatePermission: jest.fn(), isWritable: (permission) => permission === true }));
 jest.mock('../Modules/Company/controller/updateCompany', () => ({ updateCompanyFun: jest.fn() }));

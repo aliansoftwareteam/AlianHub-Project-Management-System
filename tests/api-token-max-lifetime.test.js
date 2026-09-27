@@ -86,6 +86,7 @@ beforeEach(() => {
     strict(false);
     maxDays(undefined);
     globalDb().seed(SCHEMA_TYPE.INSTANCE_SETTINGS, { _id: 'instance', values: {}, apiTokenStrictSince: new Date(T0 - 5 * DAY) });
+    globalDb().seed(SCHEMA_TYPE.COMPANIES, { _id: COMPANY });
     globalDb().seed(SCHEMA_TYPE.USERS, { _id: OWNER, AssignCompany: COMPANY, Employee_Name: 'Olivia Owner' });
     globalDb().seed(SCHEMA_TYPE.USERS, { _id: MEMBER, AssignCompany: COMPANY, Employee_Name: 'Max Member' });
     db().seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
