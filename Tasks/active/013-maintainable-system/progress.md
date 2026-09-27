@@ -51,7 +51,7 @@ Derived from `task.md`: the workstream deliverables A.1–A.5, B.1–B.8, C.1–
 
 ## Last step
 
-Audited 2026-09-12. The build is on `beta` and its gate is green, but four items from `task.md` are genuinely unfinished (B.2 `main.yml`, B.4 tenant adoption in three modules, G10 permission descriptions, V4 admin and member passes) and V2 has not been re-verified since merge, so the task stays in `active/`.
+Audited 2026-09-12. The build is on `beta` and its gate is green, but four items from `task.md` were unfinished (B.2 `main.yml`, B.4 tenant adoption in three modules, G10 permission descriptions, V4 admin and member passes); G10 is done since #1041 (build 505, 2026-09-27) and V2 has not been re-verified since merge, so the task stays in `active/`.
 
 ## Blockers
 

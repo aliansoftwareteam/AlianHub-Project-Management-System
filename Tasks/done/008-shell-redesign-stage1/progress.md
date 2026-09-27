@@ -9,12 +9,12 @@
 - [x] Task detail overlay
 - [x] Personal List
 - [x] Build + tests
-- [ ] Remove Roboto (`assets/css/font.css:3-35`, `App.vue:866`, `input.css:8`, `text.css:66`)
-- [ ] Replace the literal `#2F3990` in `components/organisms/Shell/style.css:22` with a token
+- [x] Remove Roboto (`assets/css/font.css:3-35`, `App.vue:866`, `input.css:8`, `text.css:66`) — 2026-09-27, #1045 (build 510): 182 declarations to `var(--font-ui)`, the `font-roboto` classes to `font-ui`, font files and `@font-face` removed
+- [x] Replace the literal `#2F3990` in `components/organisms/Shell/style.css:22` with a token — 2026-09-27, #1039 (build 507): both dark-theme overrides removed, so the rail mark and New tile use `var(--brand)` in both themes
 - [x] Persist nav preferences on the user-settings endpoint, not only localStorage — 2026-09-27, PR #1042: pinned nav items on the user record via `PUT /api/v2/users/nav-preferences`, read back in the self view; local-only pins migrate once; theme and sidebar collapse stay per-device
 
 ## Last step
-Stage 1 verified in the running app. Three scope items remain open as of 2026-09-10: Roboto still shipped, a literal `#2F3990` in `Shell/style.css:22`, and nav preferences in localStorage only. See the log.
+Closed 2026-09-27: the three items left open on 2026-09-10 merged as #1039 (build 507), #1042 (509) and #1045 (510).
 
 ## Blockers
 None. Kiln tokens retired (aliases kept in tokens.css until Pages is restyled).
@@ -50,3 +50,6 @@ Checked against origin/beta (64f4f507). Everything else in scope verified. Still
    "no new literal brand colours".
 3. Nav preferences (rail pins, theme, sidebar collapse) persist only in localStorage
    (`Shell/shellState.js:4,24,38,55`), not on the user-settings endpoint as scoped.
+
+### 2026-09-27
+- Closed. Roboto removed (#1045, build 510), the Shell literal navy replaced by the brand token (#1039, build 507), pinned nav items stored on the user (#1042, build 509; no pin control in the interface yet). In dark mode the rail mark and New tile are now lavender (`--brand`); keeping navy there would need a theme-invariant token, an owner call recorded in `Tasks/HANDOFF.md`.

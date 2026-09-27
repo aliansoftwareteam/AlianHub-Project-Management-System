@@ -1,7 +1,7 @@
 ---
 id: 010
 title: Redesign stage 4 — auditable AI agent system
-status: active
+status: done
 priority: high
 depends_on: [009]
 created: 2026-09-03
