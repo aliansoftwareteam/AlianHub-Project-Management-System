@@ -1,6 +1,9 @@
 <template>
     <div
         :id="id"
+        :role="role"
+        :tabindex="role ? -1 : undefined"
+        :aria-selected="role === 'option' ? String(selected) : undefined"
         class="d-flex align-items-center  hover-bg-lighter-gray-dropdown hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px"
         :class="{'bg-gray91 border-radius-8-px': clientWidth <= 767 , 'border-radius-4-px' : clientWidth > 767,'bg-blue white': highlight}"
         @click.prevent="$emit('click')"
@@ -15,7 +18,7 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits, onMounted, ref } from "vue";
+import { computed, defineProps, defineEmits, inject, onMounted, ref } from "vue";
 
 defineEmits(["click"]);
 defineProps({
@@ -36,15 +39,20 @@ defineProps({
         type: Boolean,
         default: false
     },
+    selected: {
+        type: Boolean,
+        default: false
+    },
 })
+
+const ROLES = { menu: "menuitem", listbox: "option" };
+const dropDownMode = inject("dropDownMode", null);
+const role = computed(() => ROLES[dropDownMode?.value]);
 
 const clientWidth = ref(document.body.clientWidth);
 onMounted(() => {
     clientWidth.value = document.body.clientWidth;
 })
-
-
-
 </script>
 
 <style>

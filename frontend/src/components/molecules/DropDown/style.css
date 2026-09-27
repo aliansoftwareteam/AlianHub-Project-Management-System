@@ -99,6 +99,22 @@
  * native button chrome so the visual result matches the legacy markup,
  * but preserve :focus-visible for keyboard discoverability.
  */
+/* Zero specificity: the button looks like the div it replaced, and any class a call site passes still wins. */
+:where(button.dropdown-trigger) {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-align: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+}
 .dropdown-close-btn {
     background: none;
     border: 0;
