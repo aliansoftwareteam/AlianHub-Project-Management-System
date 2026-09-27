@@ -34,7 +34,7 @@
                 </div>
                 <div class="bulk-menu__scroll">
                     <button v-for="status in filteredStatuses" :key="status.key" class="bulk-menu__item" @click="onStatusPick(status)">
-                        <span class="bulk-status-option ah-status-ink" :style="statusChipStyle(status)">{{ status.name }}</span>
+                        <span class="bulk-status-option" :style="statusChipStyle(status)">{{ status.name }}</span>
                     </button>
                     <div v-if="!filteredStatuses.length" class="bulk-menu__empty">{{ $t('BulkActions.no_matches') }}</div>
                 </div>
