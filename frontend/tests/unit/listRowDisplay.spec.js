@@ -112,10 +112,10 @@ describe('the risk cell reads like the Table view\'s', () => {
 });
 
 describe('every cell is announced as one', () => {
-    test('the row is a row and each of its eight cells carries a cell role', () => {
+    test('the row is a row and each of its nine cells carries a cell role', () => {
         const wrapper = renderRow(task({ Task_Priority: 'HIGH' }));
         expect(wrapper.find('[role="row"]').exists()).toBe(true);
-        expect(wrapper.findAll('[role="row"] > [role="cell"]')).toHaveLength(8);
+        expect(wrapper.findAll('[role="row"] > [role="cell"]')).toHaveLength(9);
     });
 });
 
@@ -176,7 +176,7 @@ describe('the real empty state is reached only when the project is really empty'
 
 describe('the grid declares one track per cell it still shows', () => {
     const css = fs.readFileSync(path.join(SRC, 'views/Projects/ListView/style.css'), 'utf8');
-    const METADATA = ['lv2__c-assignee', 'lv2__c-due', 'lv2__c-prio', 'lv2__c-est', 'lv2__c-risk', 'lv2__c-done'];
+    const METADATA = ['lv2__c-tags', 'lv2__c-assignee', 'lv2__c-due', 'lv2__c-prio', 'lv2__c-est', 'lv2__c-risk', 'lv2__c-done'];
 
     /* Rebuilds what the cascade leaves at a width: the last --lv2-cols whose query
        matches, and every metadata cell not hidden by a matching query. */
@@ -188,15 +188,18 @@ describe('the grid declares one track per cell it still shows', () => {
         const live = blocks.filter((b) => width <= b.query);
 
         let tracks = 0;
+        let titleSpansRow = false;
         const hidden = new Set();
         live.forEach((block) => {
             const cols = [...block.body.matchAll(/--lv2-cols:([^;]+);/g)].pop();
             if (cols) tracks = cols[1].trim().replace(/minmax\([^)]*\)/g, 'x').split(/\s+/).length;
+            if (/\.lv2__c-title[^{]*\{[^}]*grid-column: 2 \/ -1/.test(block.body)) titleSpansRow = true;
             [...block.body.matchAll(/([^{}]+)\{[^{}]*display:\s*none[^{}]*\}/g)].forEach((rule) => {
                 rule[1].split(',').forEach((sel) => METADATA.forEach((c) => { if (sel.includes(c)) hidden.add(c); }));
             });
         });
-        return { tracks, cells: 2 + METADATA.filter((c) => !hidden.has(c)).length };
+        /* At phone width the title spans the first line and the cells fold under it, so it owns no track. */
+        return { tracks, cells: (titleSpansRow ? 1 : 2) + METADATA.filter((c) => !hidden.has(c)).length };
     };
 
     test.each([1440, 1280, 1200, 1100, 1024, 900, 767, 375])('%ipx', (width) => {
