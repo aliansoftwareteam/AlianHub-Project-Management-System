@@ -53,12 +53,12 @@ function readableInk(ink, background) {
     return toHex(target);
 }
 
-export function statusChipColors(status, { dark = false } = {}) {
+export function statusChipColors(status, { dark = false, surface } = {}) {
     const text = parseColor(status?.textColor);
     const tint = parseColor(status?.bgColor);
     if (!text && !tint) return { ...THEME_FALLBACK };
     const fill = tint || { rgb: text.rgb, alpha: TINT_ALPHA };
-    const background = over(fill.rgb, fill.alpha, dark ? DARK_SURFACE : LIGHT_SURFACE);
+    const background = over(fill.rgb, fill.alpha, surface || (dark ? DARK_SURFACE : LIGHT_SURFACE));
     const ink = text ? over(text.rgb, text.alpha, background) : fill.rgb;
     return {
         background: tint ? status.bgColor.trim() : `rgba(${text.rgb.join(", ")}, ${TINT_ALPHA})`,
