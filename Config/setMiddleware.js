@@ -349,6 +349,10 @@ const verifyJWTTokenWithCRoute = [
     '/api/v2/provider-keys',
     // The AI switch (Modules/AiSwitch): any member reads the state, only an owner or admin changes it.
     "/api/v2/ai-switch",
+    // Dashboards (Modules/UserDashboard) read the company from the header, so they get the same live seat check.
+    '/api/v1/dashboard',
+    '/api/v1/dashboards',
+    '/api/v1/cardcomponent',
     // Not listed, on purpose (Modules/OAuthServer, MCP_OAUTH): /.well-known/oauth-authorization-server and /oauth/* are
     // public by design, since a client reaches them before anyone holds a token and the token endpoint authenticates
     // the client itself; /api/v2/oauth-clients, /api/v2/oauth-client-approvals and /api/v2/oauth-grants check the
@@ -404,10 +408,6 @@ const verifyJWTToken = [
     '/api/v1/customer-update',
     '/api/v2/logout',
     '/api/v1/root-members',
-    '/api/v1/dashboard/:id',
-    '/api/v1/dashboard',
-    '/api/v1/dashboards',
-    '/api/v1/cardcomponent',
     '/api/v1/validateRefferalCode',
     '/api/v1/getreferralpercentage',
     '/api/v1/customeModals/checkUserReviewWithModal',
