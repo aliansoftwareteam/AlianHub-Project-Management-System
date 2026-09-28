@@ -31,7 +31,7 @@
                     :class="[{'selected-blue-border-img border-radius-10-px': usersFilterIDsArray.includes(user.id)}]"
                     @click="usersFilter(user)"
                 />
-                <DropDown :id="'timeloguser_'+makeUniqueId(6)" v-if="userData.length > 4" mode="listbox" :bodyClass="{'timelog-usercount-dropdown' : true}">
+                <DropDown :id="'timeloguser_'+makeUniqueId(6)" v-if="userData.length > 4" mode="listbox" multiselectable :bodyClass="{'timelog-usercount-dropdown' : true}">
                     <template #button>
                         <div class="d-flex align-items-center justify-content-center profile-image GunPowder blue text-nowrap border-2px-blue" :style="{width: '30px', height: '30px'}">
                             +{{userData.length - 4}}
@@ -45,7 +45,7 @@
                             @click="usersFilter(user)"
                         >
                             <div class="d-flex align-items-center" :title="user.label">
-                                <input type="checkbox" :id="'checkbox'+user.id" v-model="user.isChecked" tabindex="-1" aria-hidden="true" :class="[{'checkboxBlue' : user.isChecked}]"/>
+                                <input type="checkbox" :id="'checkbox'+user.id" v-model="user.isChecked" :class="[{'checkboxBlue' : user.isChecked}]"/>
                                 <UserProfile
                                     :showDot="false"
                                     :data="{

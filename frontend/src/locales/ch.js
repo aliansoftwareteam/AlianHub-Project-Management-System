@@ -4189,6 +4189,7 @@ export default {
         "copy_link": "复制链接",
         "watchers": "关注者",
         "watchers_count": "{n} watcher | {n} watchers",
+        "stop_watching": "Stop watching",
         "list_actions": "List actions",
         "active_members": "People active in this project",
         "files_links": "文件和链接",
@@ -4805,7 +4806,7 @@ export default {
         "This_tag_has_already_been_added": "该标签已添加",
         "Tag_name_required": "标签名称必填",
         "add_tag": "Add tag",
-        "more_tags": "{count} more: {names}",
+        "more_tags": "{count} more: {names}"
     },
     "Embeded": {
         "Anything": "任何内容",

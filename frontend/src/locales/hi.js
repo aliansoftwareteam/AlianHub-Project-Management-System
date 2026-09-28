@@ -4189,6 +4189,7 @@ export default {
         "copy_link": "लिंक कॉपी करें",
         "watchers": "देखने वाले",
         "watchers_count": "{n} watcher | {n} watchers",
+        "stop_watching": "Stop watching",
         "list_actions": "List actions",
         "active_members": "People active in this project",
         "files_links": "फ़ाइलें और लिंक",
@@ -4805,7 +4806,7 @@ export default {
         "This_tag_has_already_been_added": "यह टैग पहले ही जोड़ा जा चुका है",
         "Tag_name_required": "टैग का नाम आवश्यक है",
         "add_tag": "Add tag",
-        "more_tags": "{count} more: {names}",
+        "more_tags": "{count} more: {names}"
     },
     "Embeded": {
         "Anything": "कुछ भी",

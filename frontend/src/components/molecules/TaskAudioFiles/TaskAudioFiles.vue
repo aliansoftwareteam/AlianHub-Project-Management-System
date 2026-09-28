@@ -22,7 +22,7 @@
                             />
                         </li>
                         <li v-if="index == 3 && Number(userList.length-4) !== 0" class="position-re li__equal-four">
-                            <DropDown mode="listbox" :id="'Assignee_'+'fileandlinks'" :bodyClass="{'audio__user-sidebar' : true}">
+                            <DropDown mode="listbox" multiselectable :id="'Assignee_'+'fileandlinks'" :bodyClass="{'audio__user-sidebar' : true}">
                                 <template #button>
                                     <div @click="toggleUsers = true" class="cursor-pointer d-flex align-items-center justify-content-center profile-image GunPowder blue text-nowrap">
                                         + {{ Number(userList.length-4) }}

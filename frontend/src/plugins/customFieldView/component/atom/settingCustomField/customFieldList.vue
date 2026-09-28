@@ -59,7 +59,7 @@
                                     </div>
                                 </td>
                                 <td :class="[{'pointer-event-none':!item.isDelete}]">
-                                    <DropDown mode="listbox" @isVisible="handelSubmit(index), handleOutsideClick($event)" :bodyClass="{'custom__field__dropdown':true}">
+                                    <DropDown mode="listbox" multiselectable @isVisible="handelSubmit(index), handleOutsideClick($event)" :bodyClass="{'custom__field__dropdown':true}">
                                         <template #button="{ triggerAttrs }">
                                             <button type="button" class="dropdown-trigger project_bg d-flex GunPowder font-size-13" v-bind="triggerAttrs" :disabled="!item.isDelete">
                                                 <span v-if="item?.global" class="project_ellipsis">{{ $t('CustomField.all_projects') }}</span>
@@ -75,7 +75,7 @@
                                                 <img :src="selectArrowMobile" alt="" class="cursor-pointer ml_1" />
                                             </button>
                                         </template>
-                                        <template #options v-if="item.isDelete">
+                                        <template #search v-if="item.isDelete">
                                             <div class="d-flex align-items-center pb-7px">
                                                 <InputText
                                                     v-model="searchProject"
@@ -86,6 +86,8 @@
                                                 />
                                                 <span class="text-nowrap ml-5-px font-size-12 font-weight-400 blue cursor-pointer" @click="handleChecked(index)" v-if="!searchProject">{{finalCustomFieldDataTest[index].global === true ? $t('Filters.unselect_all') : $t('Filters.select_all')}}</span>
                                             </div>
+                                        </template>
+                                        <template #options v-if="item.isDelete">
                                             <div v-if="projectListSearch && projectListSearch.length">
                                                 <DropDownOption
                                                     v-for="(project, indexs) in projectListSearch"

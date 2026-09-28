@@ -4189,6 +4189,7 @@ export default {
         "copy_link": "Copiar Enlace",
         "watchers": "Observadores",
         "watchers_count": "{n} watcher | {n} watchers",
+        "stop_watching": "Stop watching",
         "list_actions": "List actions",
         "active_members": "People active in this project",
         "files_links": "Archivos y Enlaces",
@@ -4805,7 +4806,7 @@ export default {
         "This_tag_has_already_been_added": "Esta etiqueta ya ha sido añadida",
         "Tag_name_required": "Se requiere nombre de etiqueta",
         "add_tag": "Add tag",
-        "more_tags": "{count} more: {names}",
+        "more_tags": "{count} more: {names}"
     },
     "Embeded": {
         "Anything": "Cualquier cosa",

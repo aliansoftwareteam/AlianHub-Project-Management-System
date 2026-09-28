@@ -68,32 +68,32 @@
                             </div>
                             <div class="d-flex justify-content-between w-100" v-else role="option" aria-selected="false" @click="addTag(item.uid)">
                                 <span class="tag_name"  :title="item.tagName" :style="{color: tagChipColors(item).color}" >{{item.tagName}}</span>
-                                <span @click.stop="()=>dropdown(item)"><img  :src="threedots" class="cursor-pointer p0x-5px ml-auto mt-7px tagname__threedots" :class="[{'threedots': clientWidth > 767}]" alt=""/> </span> 
+                                <DropDown mode="menu" :id="`${tagActionsId}_${item.uid}`" v-if="checkPermission('task.task_tag',project?.isGlobalPermission) === true" @isVisible="(open) => open && (dataItem = item)">
+                                    <template #button="{ triggerAttrs }">
+                                        <button type="button" class="taglist__add-btn d-block" :aria-label="$t('Tags.tag_actions', { name: item.tagName })" v-bind="triggerAttrs">
+                                            <img :src="threedots" class="cursor-pointer p0x-5px ml-auto mt-7px tagname__threedots" :class="[{'threedots': clientWidth > 767}]" alt=""/>
+                                        </button>
+                                    </template>
+                                    <template #options>
+                                        <div class="">
+                                            <ul class="tag-edit-option justify-content-start" role="none">
+                                                <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isRename')">
+                                                    <img :src="renameimage" class="inner-tagedit-list-item"/>
+                                                    <span>{{$t("Projects.rename")}}</span>
+                                                </li>
+                                                <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isColor')">
+                                                    <img :src="colorimage" class="inner-tagedit-list-item"/>
+                                                    <span>{{$t("Tags.change_color")}}</span>
+                                                </li>
+                                                <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isDelete'),showSidebar = true,sendMethod()">
+                                                    <img :src="deleteimage" class="inner-tagedit-list-item"/>
+                                                    <span class="red">{{$t("Projects.delete")}}</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </template>
+                                </DropDown>
                             </div>
-
-                            <DropDown mode="menu" :id="Did" v-if="checkPermission('task.task_tag',project?.isGlobalPermission) === true">
-                                <template #button="{ triggerAttrs }">
-                                    <button type="button" hidden :aria-label="$t('Tags.tag_actions', { name: item.tagName })" v-bind="triggerAttrs"></button>
-                                </template>
-                                <template #options>
-                                    <div class="">
-                                        <ul class="tag-edit-option justify-content-start" role="none">
-                                            <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isRename')">
-                                                <img :src="renameimage" class="inner-tagedit-list-item"/>
-                                                <span>{{$t("Projects.rename")}}</span>
-                                            </li>
-                                            <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isColor')">
-                                                <img :src="colorimage" class="inner-tagedit-list-item"/>
-                                                <span>{{$t("Tags.change_color")}}</span>
-                                            </li>
-                                            <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isDelete'),showSidebar = true,sendMethod()">
-                                                <img :src="deleteimage" class="inner-tagedit-list-item"/>
-                                                <span class="red">{{$t("Projects.delete")}}</span>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </template>
-                            </DropDown>
                     </div>
                 </div>
                 <p class="tag-instruct-text" v-if="searchtag">{{$t('Tags.note_msg')}}</p>
@@ -152,7 +152,7 @@ const tagBgColor = ref('#000000')
 const toast = useToast()
 const {makeUniqueId , checkApps, checkPermission } = useCustomComposable();
 const searchtag =  ref()
-const Did = ref("custom"+makeUniqueId(5));
+const tagActionsId = "custom"+makeUniqueId(5);
 const renameimage = require("@/assets/images/editmilestone.png")
 const deleteimage = require("@/assets/images/Deletemilestone.png")
 const colorimage = require("@/assets/images/palette.png")
@@ -229,11 +229,6 @@ function tagClosed(val) {
 
 const EditChips = (key) => {
     editStatus.value = {...dataItem.value, key:key}    
-}
-
-const dropdown = (item) => {
-    document.getElementById(`${Did.value}_trigger`).click();
-    dataItem.value = item
 }
 
 //  search , create , rename tag function
@@ -341,6 +336,9 @@ const HandleColors = (key,i,item) =>{
 }
 .tagname__threedots{
     height:4px;
+}
+.mainDiv:focus-within .threedots{
+    display: block;
 }
 .taglist__add-btn { margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; }
 .taglist__add-disc { fill: var(--surface); }

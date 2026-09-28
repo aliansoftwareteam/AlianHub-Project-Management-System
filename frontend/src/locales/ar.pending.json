@@ -6031,6 +6031,7 @@
     "Projects.start_import": "Import",
     "Projects.status": "Status",
     "Projects.status_actions": "Status actions",
+    "Projects.stop_watching": "Stop watching",
     "Projects.submit": "Submit",
     "Projects.subtask": "Subtask",
     "Projects.switch_project": "Switch project",

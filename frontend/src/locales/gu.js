@@ -4189,6 +4189,7 @@ export default {
         "copy_link": "લિંક નકલ કરો",
         "watchers": "વોચર્સ",
         "watchers_count": "{n} watcher | {n} watchers",
+        "stop_watching": "Stop watching",
         "list_actions": "List actions",
         "active_members": "People active in this project",
         "files_links": "ફાઇલો અને લિંક્સ",
@@ -4805,7 +4806,7 @@ export default {
         "This_tag_has_already_been_added": "આ ટૅગ પહેલેથી જ ઉમેરવામાં આવ્યો છે",
         "Tag_name_required": "ટૅગ નામ જરૂરી છે",
         "add_tag": "Add tag",
-        "more_tags": "{count} more: {names}",
+        "more_tags": "{count} more: {names}"
     },
     "Embeded": {
         "Anything": "કંઈપણ",

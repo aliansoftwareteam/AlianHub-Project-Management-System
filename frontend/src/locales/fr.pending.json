@@ -5225,6 +5225,7 @@
     "Projects.sprint_planned_hint": "Hours planned across every task in this sprint, subtasks included",
     "Projects.start_import": "Import",
     "Projects.status_actions": "Status actions",
+    "Projects.stop_watching": "Stop watching",
     "Projects.switch_project": "Switch project",
     "Projects.task": "Task",
     "Projects.task_actions": "Task actions",

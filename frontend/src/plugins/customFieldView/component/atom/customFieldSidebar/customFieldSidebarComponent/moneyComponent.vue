@@ -77,8 +77,10 @@
                         </div>
                     </div>
                 </template>
-                <template #options>
+                <template #search>
                     <input type="text" class="customfield__form-control" :placeHolder="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
+                </template>
+                <template #options>
                     <div v-if="allCurrencyArray && allCurrencyArray.length">
                         <DropDownOption v-for="(Currency,index) in allCurrencyArray" :key="index" :selected="Currency.name === currency" @click="$refs[customFieldUniqueId].click(),handleUpdate(Currency)">
                             <div class="d-flex align-items-center">

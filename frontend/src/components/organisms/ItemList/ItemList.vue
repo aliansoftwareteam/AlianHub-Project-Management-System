@@ -74,28 +74,29 @@
                             </template>
                         </draggable>
                         <span class="span_wrapper task_right cursor-pointer custom_sticky" v-if="!projectData?.deletedStatusKey && checkPermission('task.list_view_column',project?.isGlobalPermission) == true">
-                            <DropDown mode="listbox" v-if="props.statusIndex === 0">
+                            <DropDown mode="listbox" multiselectable v-if="props.statusIndex === 0">
                                 <template #button>
                                     <img :src="addCustomField" :alt="$t('ProjectDetails.show_hide_columns')" />
                                 </template>
-                                <template #options>
-                                    <DropDownOption>
+                                <template #search>
+                                    <div class="d-flex align-items-center text-nowrap drop-down-item gray81 p-7px" :class="clientWidth <= 767 ? 'bg-gray91 border-radius-8-px' : 'border-radius-4-px'">
                                         <input type="text" class="customfield__form-control" :placeHolder="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
-                                    </DropDownOption>
-                                    <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields') && isCustomFields()">
-                                        <span class="font-weight-500 line-height-19 font-ui blue" @click="isCustomField = true">+ {{$t('CustomField.custom_field')}}</span>
+                                    </div>
+                                </template>
+                                <template #options>
+                                    <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields') && isCustomFields()" @click="isCustomField = true">
+                                        <span class="font-weight-500 line-height-19 font-ui blue">+ {{$t('CustomField.custom_field')}}</span>
                                     </DropDownOption>
                                     <template v-if="headerHideShow && headerHideShow.length">
                                         <DropDownOption
                                             v-for="(obj, index) in headerHideShow.filter((head)=> (head.funcPermission ? checkPermission(head.funcPermission,projectData.isGlobalPermission) !== null : true ) && (head.appPermission ? checkApps(head.appPermission) : true ))"
                                             :key="index"
                                             :selected="Boolean(obj.show)"
+                                            @click="obj.show = !obj.show, toggleButton(obj.show,obj.key,obj)"
                                         >
                                             <div class="d-flex align-items-center justify-content-between w-100">
                                                 <span class="font-weight-400 line-height-19 font-ui">
                                                     {{ obj.label }}
-                                                    <!--option DropDown Name-->
-
                                                 </span>
                                                 <span>
                                                     <Toggle
@@ -253,22 +254,25 @@
                         </template>
                     </draggable>
                     <span class="span_wrapper task_right cursor-pointer" v-if="!projectData?.deletedStatusKey && checkPermission('task.list_view_column',project?.isGlobalPermission) == true">
-                        <DropDown mode="listbox" v-if="props.statusIndex === 0">
+                        <DropDown mode="listbox" multiselectable v-if="props.statusIndex === 0">
                             <template #button>
                                 <img :src="addCustomField" :alt="$t('ProjectDetails.show_hide_columns')" />
                             </template>
-                            <template #options>
-                                <DropDownOption>
+                            <template #search>
+                                <div class="d-flex align-items-center text-nowrap drop-down-item gray81 p-7px" :class="clientWidth <= 767 ? 'bg-gray91 border-radius-8-px' : 'border-radius-4-px'">
                                     <input type="text" class="customfield__form-control" :placeholder="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
-                                </DropDownOption>
-                                <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields')">
-                                    <span class="font-weight-500 line-height-19 font-ui blue" @click="isCustomField = true">+ {{$t('CustomField.custom_field')}}</span>
+                                </div>
+                            </template>
+                            <template #options>
+                                <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields')" @click="isCustomField = true">
+                                    <span class="font-weight-500 line-height-19 font-ui blue">+ {{$t('CustomField.custom_field')}}</span>
                                 </DropDownOption>
                                 <template v-if="headerHideShow && headerHideShow.length">
                                     <DropDownOption
                                         v-for="(obj, index) in headerHideShow.filter((head)=> (head.funcPermission ? checkPermission(head.funcPermission,projectData.isGlobalPermission) !== null : true ) && (head.appPermission ? checkApps(head.appPermission) : true ))"
                                         :key="index"
                                         :selected="Boolean(obj.show)"
+                                        @click="obj.show = !obj.show, toggleButton(obj.show,obj.key,obj)"
                                     >
                                         <div class="d-flex align-items-center justify-content-between w-100">
                                             <span class="font-weight-400 line-height-19 font-ui">
