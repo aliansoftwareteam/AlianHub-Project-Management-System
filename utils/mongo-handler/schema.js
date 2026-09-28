@@ -2084,6 +2084,7 @@ const schema = {
             chosenApps: { type: Boolean, required: false },
             viewedBoard: { type: Boolean, required: false },
             viewedNotifications: { type: Boolean, required: false },
+            importedWork: { type: Boolean, required: false },
             toursOffered: { type: [String], required: false, default: undefined }
         },
         navPreferences: {
