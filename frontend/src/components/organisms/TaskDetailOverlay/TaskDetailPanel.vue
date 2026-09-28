@@ -102,6 +102,7 @@
                         @update:taskType="(val) => changeTaskType(val)"
                     />
                 </div>
+                <TaskAiRow v-if="task._id && projectData._id" :task="task" :project="projectData" :canComment="canComment" />
 
                 <div v-if="isMobile && task._id" class="ah-detail__chips">
                     <button type="button" class="ah-chip ah-chip--brand ah-status-ink" :style="statusStyle" @click="sheetOpen = true">{{ statusName }} ▾</button>
@@ -364,6 +365,7 @@ import FavouriteStar from "@/components/atom/FavouriteStar/FavouriteStar.vue";
 import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
 import TaskSummaryBlock from "./TaskSummaryBlock.vue";
 import TaskActionItems from "./TaskActionItems.vue";
+import TaskAiRow from "./TaskAiRow.vue";
 import TaskTrackerHandoff from "./TaskTrackerHandoff.vue";
 import { showUndoToast } from "@/composable/useUndoToast";
 import { useEscapeLayer } from "@/composable/useEscapeLayer";

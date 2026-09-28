@@ -5,7 +5,7 @@ export const DEFAULT_QUALITY_WINDOW = 30;
 export const FEATURE_LABELS = Object.freeze([
     "agent_run", "project_plan", "project_tasks", "clarifier", "meeting_notes", "task_summary", "description", "task_category",
     "task_estimate", "workload_summary", "ask", "assist", "project_template", "portfolio_summary", "page_compose", "guide",
-    "mcp_brief", "knowledge_embed", "ai_field", "assignment_rules", "automation_draft", "agent_builder"
+    "mcp_brief", "knowledge_embed", "ai_field", "assignment_rules", "automation_draft", "agent_builder", "task_assist", "writing_assist"
 ]);
 
 export const KIND_LABELS = Object.freeze(["ask_turn", "preview", "proposal"]);
