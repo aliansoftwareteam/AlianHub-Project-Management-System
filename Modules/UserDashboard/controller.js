@@ -1,6 +1,7 @@
 const { myCache } = require("../../Config/config");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
+const { idForms } = require("../../utils/mongo-handler/objectIdKeys");
 const axios = require("axios");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
@@ -828,7 +829,7 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         // Project scoping from the card selector: all / include ($in) / exclude ($nin).
         const projectMode = req.body?.projectMode || 'all';
         const projClause = projectScopeClause(projectMode, req.body?.projectId);
-        const tsProjClause = projectScopeClause(projectMode, req.body?.projectId, { string: true });
+        const tsProjClause = projectScopeClause(projectMode, req.body?.projectId, { bothForms: true });
 
         // 1 + 3 — active projects and their ProjectType mix. Drill-down also
         // needs each project's status + its per-project status palette
@@ -1218,7 +1219,7 @@ exports.getTeamTaskTypeBreakdown = async (req, res) => {
             // don't apply here (no task join).
             const tsFilter = { LogStartTime: { $gte: fromSec, $lte: toSec } };
             if (Array.isArray(visibleUserIds)) tsFilter.Loggeduser = { $in: visibleUserIds.map(String) };
-            if (projectIds.length) tsFilter.ProjectId = { $in: projectIds.map(String) };
+            if (projectIds.length) tsFilter.ProjectId = { $in: idForms(projectIds.map(String)) };
             const tlogs = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TIMESHEET,
                 data: [tsFilter, { Loggeduser: 1, LogTimeDuration: 1, billable: 1 }],

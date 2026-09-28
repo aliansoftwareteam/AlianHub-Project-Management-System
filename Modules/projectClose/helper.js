@@ -21,6 +21,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 
 let HandleHistory = null;
 try {
@@ -124,7 +125,7 @@ async function projectHasActivitySince(companyId, projectId, cutoff) {
 
     const loggedTime = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TIMESHEET,
-        data: [{ ProjectId: String(projectId), LogStartTime: { $gte: cutoffSec } }, { _id: 1 }],
+        data: [{ ProjectId: { $in: idForms(projectId) }, LogStartTime: { $gte: cutoffSec } }, { _id: 1 }],
     }, 'findOne');
     if (loggedTime) return true;
 

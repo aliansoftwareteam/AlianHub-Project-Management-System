@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 
 const MAX_ESTIMATE_MINUTES = 24 * 60;
 
@@ -78,7 +79,7 @@ const buildEstimateWrite = (body, scope) => {
      * the caller may already reach — the scope stays in the filter so a stolen id
      * matches nothing. */
     const filter = plan.id
-        ? { _id: new mongoose.Types.ObjectId(plan.id), ...(scope.everyone ? {} : ownRowsMatch(scope)), ...(scope.visible ? { ProjectId: { $in: scope.visible } } : {}) }
+        ? { _id: new mongoose.Types.ObjectId(plan.id), ...(scope.everyone ? {} : ownRowsMatch(scope)), ...(scope.visible ? { ProjectId: { $in: idForms(scope.visible) } } : {}) }
         : { userId: plan.userId, Date: plan.date, TaskId: plan.taskId };
 
     return {

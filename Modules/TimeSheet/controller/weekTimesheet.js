@@ -11,6 +11,7 @@ const R = require('../helpers/weekRules');
 
 const RUNNING_WINDOW_SEC = 10 * 60;
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const safeZone = (z) => (z && DateTime.local().setZone(z).isValid ? z : 'UTC');
 
@@ -59,7 +60,7 @@ exports.getWeekTimesheet = async (req, res) => {
         const days = R.dayKeys(q.start, q.end);
 
         const match = { Loggeduser: userId, LogStartTime: { $gte: Math.floor(startDt.toSeconds()), $lte: Math.floor(endDt.toSeconds()) } };
-        if (q.projectId) match.ProjectId = String(q.projectId);
+        if (q.projectId) match.ProjectId = { $in: idForms(String(q.projectId)) };
         const entries = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: [match, { TicketID: 1, ProjectId: 1, LogTimeDuration: 1, LogStartTime: 1, billable: 1 }],

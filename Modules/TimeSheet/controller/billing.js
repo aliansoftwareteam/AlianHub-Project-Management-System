@@ -8,6 +8,7 @@ const { resolveTimeScope } = require("../helpers/timeScope");
 // billing_rates collection (one per scope+refId). Invoices are generated from
 // billable time entries at the resolved rates (user > project > default).
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const MONEY_RESTRICTED = 'Only an owner or admin can see billing amounts.';
 
 /* POST /api/v1/timesheet/rates — upsert a rate. body { scope, refId?, rate, currency?, userData } */
@@ -71,7 +72,7 @@ exports.generateInvoice = async (req, res) => {
         const match = { billable: { $ne: false } };
         if (start && end) match.LogStartTime = { $gte: Number(start), $lte: Number(end) };
         if (Array.isArray(userArray) && userArray.length) match.Loggeduser = { $in: userArray };
-        if (Array.isArray(projectArray) && projectArray.length) match.ProjectId = { $in: projectArray };
+        if (Array.isArray(projectArray) && projectArray.length) match.ProjectId = { $in: idForms(projectArray) };
         const entries = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: [match, { Loggeduser: 1, ProjectId: 1, LogTimeDuration: 1, billable: 1 }],

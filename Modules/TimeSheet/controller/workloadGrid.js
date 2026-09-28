@@ -11,6 +11,7 @@ const R = require('../helpers/weekRules');
 
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const { acceptedMemberIds } = require('../../../utils/companyMembers');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const safeZone = (z) => (z && DateTime.local().setZone(z).isValid ? z : 'UTC');
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
@@ -64,7 +65,7 @@ exports.getWorkloadGrid = async (req, res) => {
 
         const estMatch = { UserId: { $in: userIds }, Date: { $gte: rangeStart, $lte: rangeEnd } };
         const logMatch = { Loggeduser: { $in: userIds }, LogStartTime: { $gte: startSec, $lte: endSec } };
-        if (projectIds.length) { estMatch.ProjectId = { $in: projectIds }; logMatch.ProjectId = { $in: projectIds }; }
+        if (projectIds.length) { estMatch.ProjectId = { $in: idForms(projectIds) }; logMatch.ProjectId = { $in: idForms(projectIds) }; }
 
         const [estimates, logs, ptoRows, names] = await Promise.all([
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.ESTIMATES_TIME, data: [estMatch, { UserId: 1, TaskId: 1, ProjectId: 1, Date: 1, EstimatedTime: 1 }] }, 'find').catch(() => []),
