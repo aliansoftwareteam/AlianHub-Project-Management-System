@@ -19,11 +19,11 @@
                             <img v-if="trData?.trackdLoggedHours?.time ? trData?.trackdLoggedHours?.time : ''" :src="green_line" />&nbsp;
                             <img v-if="trData?.manuallyLoggedHours?.time ? trData?.manuallyLoggedHours?.time : ''" :src="purple_line" /> 
                         </div>
-                        <DropDown v-if="trData?.trackdLoggedHours?.time && trData?.manuallyLoggedHours?.time" class="p-0 tracktime_dropdown" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true">
+                        <DropDown v-if="trData?.trackdLoggedHours?.time && trData?.manuallyLoggedHours?.time" class="p-0 tracktime_dropdown" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true" mode="menu">
                             <template #button>
                                 <div class="logType__Img--show p-0">
-                                    <img v-if="trData?.trackdLoggedHours?.time ? trData?.trackdLoggedHours?.time : ''" :src="green_line" />&nbsp;
-                                    <img v-if="trData?.manuallyLoggedHours?.time ? trData?.manuallyLoggedHours?.time : ''" :src="purple_line" /> 
+                                    <img v-if="trData?.trackdLoggedHours?.time ? trData?.trackdLoggedHours?.time : ''" :src="green_line" :alt="$t('UserTimesheet.tracked_time')" />&nbsp;
+                                    <img v-if="trData?.manuallyLoggedHours?.time ? trData?.manuallyLoggedHours?.time : ''" :src="purple_line" :alt="$t('UserTimesheet.manual_time')" /> 
                                 </div>
                             </template>
                             <template #options>
@@ -54,11 +54,11 @@
                         <img v-if="colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours ? colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours : ''" :src="green_line" />&nbsp;
                         <img v-if="colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours ? colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours : ''" :src="purple_line" /> 
                     </div>
-                    <DropDown v-if="colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours && colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours" class="p-0 tracktime_dropdown" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true">
+                    <DropDown v-if="colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours && colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours" class="p-0 tracktime_dropdown" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true" mode="menu">
                         <template #button>
                             <div class="logType__Img--show p-0">
-                                <img v-if="colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours ? colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours : ''" :src="green_line" />&nbsp;
-                                <img v-if="colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours ? colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours : ''" :src="purple_line" /> 
+                                <img v-if="colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours ? colName.totalLogsType[`${trData.id}`]?.trackdLoggedHours : ''" :src="green_line" :alt="$t('UserTimesheet.tracked_time')" />&nbsp;
+                                <img v-if="colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours ? colName.totalLogsType[`${trData.id}`]?.manuallyLoggedHours : ''" :src="purple_line" :alt="$t('UserTimesheet.manual_time')" /> 
                             </div>
                         </template>
                         <template #options>
@@ -112,11 +112,11 @@
                                             <img v-if="taskObject?.trackdLoggedHours ? taskObject?.trackdLoggedHours : ''" :src="green_line" />&nbsp;
                                             <img v-if="taskObject?.manuallyLoggedHours ? taskObject?.manuallyLoggedHours : ''" :src="purple_line" /> 
                                         </div>
-                                        <DropDown v-if="taskObject?.trackdLoggedHours && taskObject?.manuallyLoggedHours" class="p-0 tracktime_dropdown" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true">
+                                        <DropDown v-if="taskObject?.trackdLoggedHours && taskObject?.manuallyLoggedHours" class="p-0 tracktime_dropdown" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true" mode="menu">
                                             <template #button>
                                                 <div class="logType__Img--show p-0">
-                                                    <img v-if="taskObject?.trackdLoggedHours ? taskObject?.trackdLoggedHours : ''" :src="green_line" />&nbsp;
-                                                    <img v-if="taskObject?.manuallyLoggedHours ? taskObject?.manuallyLoggedHours : ''" :src="purple_line" /> 
+                                                    <img v-if="taskObject?.trackdLoggedHours ? taskObject?.trackdLoggedHours : ''" :src="green_line" :alt="$t('UserTimesheet.tracked_time')" />&nbsp;
+                                                    <img v-if="taskObject?.manuallyLoggedHours ? taskObject?.manuallyLoggedHours : ''" :src="purple_line" :alt="$t('UserTimesheet.manual_time')" /> 
                                                 </div>
                                             </template>
                                             <template #options>
@@ -147,11 +147,11 @@
                                         <img v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours ? colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours : ''" :src="green_line" />&nbsp;
                                         <img v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours ? colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours : ''" :src="purple_line" /> 
                                     </div>
-                                    <DropDown v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours && colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours" class="p-0 tracktime_dropdown" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true">
+                                    <DropDown v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours && colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours" class="p-0 tracktime_dropdown" :bodyClass="{'tracktime_dropdown_wrapper' : true}" :hover="true" mode="menu">
                                         <template #button>
                                             <div class="logType__Img--show p-0">
-                                                <img v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours ? colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours : ''" :src="green_line" />&nbsp;
-                                                <img v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours ? colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours : ''" :src="purple_line" /> 
+                                                <img v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours ? colName.totalTaskLogsType[`${taskObject.id}`]?.trackdLoggedHours : ''" :src="green_line" :alt="$t('UserTimesheet.tracked_time')" />&nbsp;
+                                                <img v-if="colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours ? colName.totalTaskLogsType[`${taskObject.id}`]?.manuallyLoggedHours : ''" :src="purple_line" :alt="$t('UserTimesheet.manual_time')" /> 
                                             </div>
                                         </template>
                                         <template #options>
