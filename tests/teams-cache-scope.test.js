@@ -52,7 +52,7 @@ describe('a team write drops the caller company cache only', () => {
         myCache.set(teamsListKey(B), ['kept']);
         myCache.set(teamIdentitiesKey(B, USER), [USER]);
 
-        await addTeam({ headers: { companyid: A }, uid: USER, body: { name: 'New' } }, response());
+        await addTeam({ headers: { companyid: A }, uid: USER, body: { name: 'New', value: 'NEW', teamColor: { bgColor: '#074354', color: '#ffffff' } } }, response());
 
         expect(myCache.has(teamsListKey(A))).toBe(false);
         expect(myCache.has(teamIdentitiesKey(A, USER))).toBe(false);
