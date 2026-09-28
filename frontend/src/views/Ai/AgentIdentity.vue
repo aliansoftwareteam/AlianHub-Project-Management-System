@@ -3,7 +3,7 @@
         <span class="ah-avatar ah-avatar--agent" :class="avatarSize"><ShellIcon name="agent" :size="glyph" /></span>
         <span class="agent-id__text">
             <span class="agent-id__name">
-                <strong>{{ name }}</strong>
+                <strong :title="name">{{ name }}</strong>
                 <span class="ah-chip ah-chip--agent ah-chip--mono agent-id__tag">{{ $t('Parity.agent_tag') }}</span>
             </span>
             <span v-if="sub" class="agent-id__sub">{{ sub }}</span>
