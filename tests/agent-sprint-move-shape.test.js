@@ -9,6 +9,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { executors } = require('../Modules/Agents/actions');
 const { inverses } = require('../Modules/Agents/undo');
+const { driverWrites, sprintArraysIn, isObjectId } = require('./fixtures/realTaskStore');
 
 const C = '6f0000000000000000000c01';
 const PROJECT = '6f0000000000000000000a01';
@@ -31,6 +32,7 @@ const COUNTS = { [OLD_SPRINT]: 5, [FOLDER_SPRINT]: 2, [ROOT_SPRINT]: 0 };
 
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
+    mockDb.calls.length = 0;
     jest.clearAllMocks();
     mockDb.seed(SCHEMA_TYPE.TASKS, {
         _id: oid(TASK), CompanyId: C, ProjectID: oid(PROJECT), TaskName: 'Ship it', deletedStatusKey: 0,
@@ -56,6 +58,16 @@ describe('task.sprint.move writes the sprint element the app reads', () => {
         expect(t.sprintArray).not.toHaveProperty('_id');
         expect(String(t.sprintId)).toBe(FOLDER_SPRINT);
         expect(String(t.folderObjId)).toBe(FOLDER);
+    });
+
+    it('keeps both ids as ObjectIds through the real task schema', async () => {
+        await move(FOLDER_SPRINT);
+        const write = mockDb.calls.find((c) => c.type === SCHEMA_TYPE.TASKS && c.method === 'findOneAndUpdate');
+        const { writes, error } = await driverWrites('findOneAndUpdate', write.data);
+        expect(error).toBeNull();
+        const [stored] = sprintArraysIn(writes.map((w) => w.args));
+        expect(isObjectId(stored.id) && isObjectId(stored.folderId)).toBe(true);
+        expect([String(stored.id), String(stored.folderId)]).toEqual([FOLDER_SPRINT, FOLDER]);
     });
 
     it('is found by a reader that filters on sprintArray.id or sprintArray.folderId', async () => {
