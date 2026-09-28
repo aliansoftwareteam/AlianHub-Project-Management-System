@@ -2,6 +2,7 @@ const { myCache } = require("../../../Config/config");
 const { removeCache } = require("../../../utils/commonFunctions");
 const { dbCollections } = require("../../../Config/collections");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
+const { settingsUpdateProblem, SETTINGS_UPDATES } = require("../settingsDocUpdate");
 const mongoose = require("mongoose");
 
 
@@ -32,6 +33,8 @@ exports.updateSecurityPermissions = async (req, res) => {
         }else{
             return res.status(400).json({message: 'Invalid type'});
         }
+        const problem = settingsUpdateProblem(SETTINGS_UPDATES.rule, key, updateObject);
+        if (problem) return res.status(400).json({ status: false, message: problem });
         const currentDate = new Date();
 
         const updateObjectDate = {

@@ -116,7 +116,7 @@
                                     <span class="ibx__dim">· {{ $t('Inbox.needs_your_approval') }}</span>
                                 </template>
                                 <template v-else-if="it.kind === 'proposal'">
-                                    <strong>{{ it.agentName }}</strong> {{ $t('Inbox.wants_to') }} {{ it.what }}
+                                    <strong>{{ it.agentName }}</strong> {{ $t('Inbox.wants_to') }} {{ proposalTitle(t, it) }}
                                     <span class="ibx__dim">· {{ $t('Inbox.needs_your_approval') }}</span>
                                 </template>
                                 <template v-else-if="it.kind === 'reminder'">
@@ -283,7 +283,7 @@
 
 <script setup>
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { aiOff } from "@/composable/aiAvailability";
+import { aiReachable } from "@/composable/aiAvailability";
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
@@ -292,6 +292,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { sendProposalDecision } from '@/composable/agentProposals';
+import { proposalTitle } from '@/views/Ai/plainLabels';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useHelper } from '@/components/organisms/Header/helper';
@@ -355,7 +356,7 @@ const customError = ref('');
 let undoTimer = null;
 let replyEl = null;
 
-const hasAiHub = computed(() => !aiOff.value && router.hasRoute('AiHub'));
+const hasAiHub = computed(() => aiReachable.value && router.hasRoute('AiHub'));
 const timeZone = computed(() => resolveTimeZone((getUser(userId?.value) || {}).Time_Zone));
 
 const rowKey = (it) => `${it.sourceType}:${it.sourceId}`;

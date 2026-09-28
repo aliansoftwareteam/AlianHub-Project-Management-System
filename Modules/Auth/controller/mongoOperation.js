@@ -1,9 +1,22 @@
 const logger = require('../../../Config/loggerConfig');
+const { dbCollections } = require('../../../Config/collections');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
+const { resolveSheetScope, scopedTimeMatch, SHEET_PERMISSION } = require('../../TimeSheet/helpers/timeScope');
 const { replaceObjectKey } = require('../helper');
 const { checkGatewayRequest, toPlainResult } = require('./mongoGatewayRules');
 
 const STATUS_TEXT = { 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden' };
+
+/* Time rows answer only what the timesheet screens would show the caller; the scope stage runs first, so
+ * nothing later in the client's pipeline can reach a row outside it. It is added after replaceObjectKey,
+ * which would flatten its ObjectIds into plain objects. */
+const scopedDataObj = async (checked, uid) => {
+    const dataObj = replaceObjectKey(checked.dataObj, ['objId']);
+    if (checked.collection !== dbCollections.TIMESHEET) return dataObj;
+    const scope = await resolveSheetScope(checked.dbName, uid, Object.values(SHEET_PERMISSION));
+    const [pipeline] = dataObj;
+    return [[{ $match: scopedTimeMatch(scope) }, ...pipeline]];
+};
 
 exports.mongoOperation = async (req, res) => {
     if (!req.uid) {
@@ -16,7 +29,7 @@ exports.mongoOperation = async (req, res) => {
     try {
         const result = await MongoDbCrudOpration(
             checked.dbName,
-            { type: checked.collection, data: replaceObjectKey(checked.dataObj, ['objId']) },
+            { type: checked.collection, data: await scopedDataObj(checked, req.uid) },
             checked.methodName,
         );
         return res.status(200).json({ status: true, statusText: 'OK', data: toPlainResult(result) });

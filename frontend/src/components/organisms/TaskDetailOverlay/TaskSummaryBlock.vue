@@ -65,7 +65,7 @@ async function load(force = false) {
             commentCount.value = Number(payload.data.commentCount) || 0;
             updatedAt.value = payload.data.updatedAt || "";
             emit("count", commentCount.value);
-        } else if (/no LLM provider/i.test(payload.statusText || "")) {
+        } else if (payload.aiState) {
             unavailable.value = true;
         } else {
             error.value = payload.statusText || t("TaskPanel.summary_failed");
@@ -85,6 +85,10 @@ function stopPolling() {
     if (pollHandle) clearInterval(pollHandle);
     pollHandle = null;
 }
+
+watch(() => props.enabled, (enabled) => {
+    if (enabled) load(false);
+});
 
 watch(() => props.taskId, () => {
     summary.value = "";

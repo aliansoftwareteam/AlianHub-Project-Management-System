@@ -96,6 +96,7 @@ import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue";
 import taskClass from "@/utils/TaskOperations";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useAiApiFunction } from "@/composable/aiHelper";
+import { canUseAi as canUseAiFor } from "@/composable/aiAvailability";
 import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
@@ -103,7 +104,7 @@ import { subtaskCreateAssignees } from "@/utils/assigneeOptions";
 import { isTitledItem, parseGeneratedList } from "@/utils/parseGeneratedList";
 
 const { t } = useI18n();
-const { checkPermission, checkApps, debouncerWithPromise, debounce } = useCustomComposable();
+const { checkPermission, debouncerWithPromise, debounce } = useCustomComposable();
 
 // PROPS
 const props = defineProps({
@@ -155,7 +156,7 @@ const subtaskAssigneeOptions = computed(() => subtaskCreateAssignees({
 
 const canCreate = computed(() => checkPermission("task.sub_task_create", project.value?.isGlobalPermission) === true);
 const canSetStatus = computed(() => checkPermission("task.task_status", project.value?.isGlobalPermission) === true);
-const canUseAi = computed(() => checkApps("AI", project.value) && canCreate.value);
+const canUseAi = computed(() => canUseAiFor({ project: project.value, permitted: canCreate.value }));
 
 const visibleSubTasks = computed(() => subTasks.value.filter((sub) => sub && (sub.deletedStatusKey === 0 || sub.deletedStatusKey === undefined)));
 const selectedAiCount = computed(() => subTasksList.value.filter((x) => x.isSelected === true).length);

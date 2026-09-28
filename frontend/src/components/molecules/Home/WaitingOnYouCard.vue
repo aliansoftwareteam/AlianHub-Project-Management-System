@@ -36,6 +36,7 @@ import { fetchPendingProposals, sendProposalDecision } from "@/composable/agentP
 import { useWorkflowApprovals } from "@/views/Ai/useWorkflowApprovals";
 import { canDecide as canDecideApproval } from "@/views/Ai/workflowApprovals";
 import { useAgentAccess } from "@/views/Ai/agentAccess";
+import { proposalTitle } from "@/views/Ai/plainLabels";
 
 defineOptions({ name: "WaitingOnYouCard" });
 defineEmits(["hide"]);
@@ -61,7 +62,7 @@ const top = computed(() => items.value.slice(0, SHOWN));
 const time = (value) => (value ? new Date(value).getTime() || 0 : 0);
 
 /* The server has the last word on every decision; this only keeps off the card what the AI Inbox would lock. */
-const fromProposal = (p) => ({ kind: "proposal", id: String(p._id), what: p.what || t("Home.waiting_untitled"), who: p.agentName || "", at: time(p.createdAt), source: p });
+const fromProposal = (p) => ({ kind: "proposal", id: String(p._id), what: proposalTitle(t, p) || t("Home.waiting_untitled"), who: p.agentName || "", at: time(p.createdAt), source: p });
 const fromApproval = (a) => ({ kind: "approval", id: String(a._id), what: a.title || t("Workflows.approval_untitled"), who: a.run?.name || a.ownerName || "", at: time(a.createdAt || a.deadlineAt), source: a });
 
 async function load() {
