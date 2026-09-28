@@ -876,6 +876,8 @@ const schema = {
         // Opt-in to reacting to automation-authored events. Off by default: this
         // is the switch that stops rule A and rule B triggering each other forever.
         reactToAutomation: { type: Boolean, default: false, required: false },
+        // Round-robin turn per assign step id, advanced atomically by Modules/Automations/engine/assignees.
+        assignCursors: { type: Object, default: {}, required: false },
         enabled: { type: Boolean, default: true, required: false },
         // The v1 on-demand bulk apply only: when it last ran and how many tasks it
         // changed. A v2 rule is fired by events, never applied, so these stay unset

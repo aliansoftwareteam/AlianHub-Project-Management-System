@@ -7,6 +7,7 @@ const socketEmitter = require('../../../event/socketEventEmitter');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { canPostToThread } = require('../../Comments/helpers/threadWriteAccess');
 const { sprintPlacementOf } = require('../../Tasks/helpers/sprintPlacement');
+const logger = require('../../../Config/loggerConfig');
 
 // The only way an action is allowed to touch data.
 //
@@ -95,6 +96,71 @@ const updateTask = async (companyId, taskId, set, context = {}, unset = null) =>
         meta: { runId: context.runId || null, ruleId: context.ruleId || null, fields: Object.keys(set) },
     });
 
+    return { changed: true, task: updated };
+};
+
+const ASSIGNEE_HISTORY_TYPE = { add: 'assigneeAdd', remove: 'assigneRemove', replace: 'replace', clear: 'replace' };
+
+const assigneeWrite = (mode, plan) => {
+    const { next } = plan;
+    const added = plan.added.map((p) => p.userId);
+    const removed = plan.removed.map((p) => p.userId);
+    const update = { $unset: { groupByAssigneeIndex: '' } };
+    if (mode === 'add') update.$addToSet = { AssigneeUserId: { $each: added } };
+    else if (mode === 'remove') update.$pull = { AssigneeUserId: { $in: removed }, watchers: { $in: removed } };
+    else update.$set = { AssigneeUserId: next };
+    if (added.length) update.$addToSet = { ...(update.$addToSet || {}), watchers: { $each: added } };
+    return update;
+};
+
+const shownNames = (people) => {
+    const names = people.map((p) => p.name || p.userId);
+    return names.length === 1 ? names[0] : names;
+};
+
+/* History and notifications go through the task panel's own assignee helper in its record-only mode
+ * (isUpdateTask:false), so an automation's change reads and notifies exactly like a person's. */
+const recordAssigneeChange = async (companyId, task, plan, context) => {
+    const { updateAssignee } = require('../../Tasks/helpers/taskMongo/updateAssignment');
+    const project = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(task.ProjectID) }, { ProjectName: 1, CompanyId: 1 }],
+    }, 'findOne').catch(() => null);
+    if (!project) return;
+    const type = ASSIGNEE_HISTORY_TYPE[plan.mode];
+    const shown = type === 'assigneRemove' || !plan.next.length ? plan.removed : (type === 'assigneeAdd' ? plan.added : plan.targets);
+    const assignee = type === 'replace' ? plan.next : (shown.length === 1 ? shown[0].userId : shown.map((p) => p.userId));
+    await updateAssignee({
+        firebaseObj: { AssigneeUserId: assignee },
+        projectData: { _id: String(project._id), ProjectName: project.ProjectName || '', CompanyId: String(companyId) },
+        taskData: { _id: String(task._id), TaskName: task.TaskName || '', sprintId: task.sprintId || '', folderObjId: task.folderObjId || '' },
+        employeeName: shownNames(shown),
+        type,
+        userData: { id: context.actingUserId || null, Employee_Name: `Automation "${context.ruleName || 'Automation'}"` },
+        isUpdateTask: false,
+    });
+};
+
+/* Writes an assign plan (engine/assignees.planAssignment) to a task read with getTask. Removals re-check nothing:
+ * taking a person off never widens access. The emit carries the automation actor and depth+1, which is the loop guard. */
+const setAssignees = async (companyId, task, plan, context = {}) => {
+    const taskId = String(task._id);
+    if (!plan.changed) return { changed: false, task };
+    const updated = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [{ _id: task._id }, assigneeWrite(plan.mode, plan), { returnDocument: 'after' }],
+    }, 'findOneAndUpdate');
+    if (!updated || !updated._id) throw new DeterministicError(`task ${taskId} not found`);
+
+    emitAutomationUpdate(updated, { AssigneeUserId: updated.AssigneeUserId }, context.depth);
+    recordAutomationAudit(companyId, context, {
+        action: context.action || 'automation.task.assign',
+        entityType: 'task',
+        entityId: String(taskId),
+        entityName: updated.TaskName || '',
+        meta: { runId: context.runId || null, ruleId: context.ruleId || null, added: plan.added.map((p) => p.userId), removed: plan.removed.map((p) => p.userId) },
+    });
+    await recordAssigneeChange(companyId, updated, plan, context)
+        .catch((error) => logger.error(`[automation-tools] assignee history for task ${taskId}: ${error.message}`));
     return { changed: true, task: updated };
 };
 
@@ -376,4 +442,4 @@ const createTask = async (companyId, projectId, { title, description = '', sprin
     return { changed: true, taskId: String(task._id), key: task.TaskKey || '', title: name };
 };
 
-module.exports = { DeterministicError, getTask, updateTask, addComment, commentThreadOf, ruleOwner, createSubtask, createTask, resolveStatus, oid };
+module.exports = { DeterministicError, getTask, updateTask, setAssignees, addComment, commentThreadOf, ruleOwner, createSubtask, createTask, resolveStatus, oid };
