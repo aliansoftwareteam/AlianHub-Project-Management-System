@@ -3,7 +3,7 @@ const { resolveMongoUrl } = require('../../e2e/support/env');
 const { loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 
 const state = readState();
-const NEEDS_A_TASK = 'This agent needs a task to run on. Start the run from a task, or mention the agent in a comment.';
+const NEEDS_A_TASK = 'This agent needs a task to run on. Assign the agent to a task, @mention it in a task comment, or run it on a task from the agent\'s page.';
 
 let client;
 let db;

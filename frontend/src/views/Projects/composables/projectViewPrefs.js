@@ -2,6 +2,7 @@ import { ALL, cleanDoneBy } from '@/components/molecules/Provenance/doneByQuery'
 
 const GROUP_BY_IDS = [0, 1, 2, 3];
 const MAX_SEARCH = 200;
+/* Read only: task 042 moved these onto the saved view, and a project's entry is cleared once its view is saved or reset. */
 const DEFAULTS = Object.freeze({ groupBy: 0, me: false, search: '', doneBy: ALL });
 
 export const viewPrefsKey = ({ companyId, userId, projectId }) => `ah.projectView.${companyId}.${userId}.${projectId}`;
@@ -31,21 +32,11 @@ export function loadViewPrefs(ids, storage = defaultStorage()) {
     }
 }
 
-export function saveViewPrefs(ids, prefs, storage = defaultStorage()) {
+export function clearViewPrefs(ids, storage = defaultStorage()) {
     if (!hasIds(ids) || !storage) return;
-    const value = {
-        groupBy: GROUP_BY_IDS.includes(prefs.groupBy) ? prefs.groupBy : DEFAULTS.groupBy,
-        me: prefs.me === true,
-        search: String(prefs.search || '').slice(0, MAX_SEARCH),
-        doneBy: cleanDoneBy(prefs.doneBy),
-    };
     try {
-        if (value.groupBy === DEFAULTS.groupBy && !value.me && !value.search && value.doneBy === ALL) {
-            storage.removeItem(viewPrefsKey(ids));
-        } else {
-            storage.setItem(viewPrefsKey(ids), JSON.stringify(value));
-        }
+        storage.removeItem(viewPrefsKey(ids));
     } catch {
-        // Private windows and blocked site data refuse writes; the view still works unsaved.
+        return;
     }
 }

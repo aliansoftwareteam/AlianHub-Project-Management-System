@@ -113,6 +113,7 @@
                                 @cancel-reply="message.reply = {}"
                                 :showAll="mainChat && !projectData?.default"
                                 :userIds="users.map((x) => x.id)"
+                                :agents="mentionAgents"
                                 @enter="sendFromComposer()"
                                 :sendMessageAllowed="messageAllowed"
                                 @pasteFile="checkMedia"
@@ -245,6 +246,7 @@ import ImagesPreviewer from "@/components/organisms/ImagePreviewer/ImagesPreview
 import { storageHelper } from "@/composable/commonFunction";
 import { ROLE_ADMIN } from "@/utils/roles";
 import { isOnViewerSide } from "@/utils/commentSide";
+import { fetchRunnableAgents } from "@/views/Ai/useRunnableAgents";
 
 const { t } = useI18n();
 
@@ -445,6 +447,13 @@ const messageLimit = ref(25);
 const snapshotListener = ref(null);
 const initalUser = ref(null);
 const users = ref([]);
+const mentionAgents = ref([]);
+/* Only a task's own thread gives an agent something to work on; chat and project threads do not. */
+watch(() => [props.taskId, props.mainChat, props.newChat], async ([taskId]) => {
+    const onTask = !props.mainChat && !props.newChat && /^[0-9a-fA-F]{24}$/.test(String(taskId || ""));
+    const agents = onTask ? await fetchRunnableAgents(taskId) : [];
+    if (taskId === props.taskId) mentionAgents.value = agents;
+}, { immediate: true });
 const unreadMessages = ref(0);
 let debounceTimeout;
 const countGetter = computed(() => {
@@ -1709,7 +1718,7 @@ function checkMentions(message){
             let id = data.split("(")[1].replace(")", "");
             let msgName = data.split("(")[0].replace("[", "").replace("]", "");
             const user = id === "everyone" ? {id, name: "All"} : users.value.filter((x) => x.id === id)[0];
-            if(`@${user.name}` === msgName) {
+            if(user && `@${user.name}` === msgName) {
                 mentions.push(user.id)
                 msg = msg.replace(data, `@[${user.name}](${user.id})`);
             }

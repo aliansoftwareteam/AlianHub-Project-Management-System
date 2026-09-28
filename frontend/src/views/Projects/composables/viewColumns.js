@@ -1,5 +1,6 @@
-import { computed, inject, ref, unref, watch } from 'vue';
+import { computed, unref } from 'vue';
 import { viewPrefsKey } from './projectViewPrefs';
+import { useViewSettings } from './viewSettingsContext';
 
 export const FIELD_PREFIX = 'cf:';
 const MAX_IDS = 200;
@@ -179,33 +180,43 @@ export function loadColumnState(ids, viewId, storage = defaultStorage()) {
     }
 }
 
-export function saveColumnState(ids, viewId, state, storage = defaultStorage()) {
+export function clearColumnState(ids, viewId, storage = defaultStorage()) {
     if (!ids?.companyId || !ids?.userId || !ids?.projectId || !storage) return;
-    const clean = cleanColumnState(state);
     try {
-        if (!clean.order.length && !Object.keys(clean.shown).length) storage.removeItem(columnStorageKey(ids, viewId));
-        else storage.setItem(columnStorageKey(ids, viewId), JSON.stringify(clean));
+        storage.removeItem(columnStorageKey(ids, viewId));
     } catch {
-        // Private windows and blocked site data refuse writes; the columns still work unsaved.
+        return;
     }
 }
 
-/* Per user and per project for now; 042 slice 4 moves the same state onto the saved view. */
-export function useViewColumns(projectId, viewId, catalogue, { storage } = {}) {
-    const companyId = inject('$companyId', ref(''));
-    const userId = inject('$userId', ref(''));
-    const ids = computed(() => ({ companyId: unref(companyId), userId: unref(userId), projectId: unref(projectId) }));
-    const state = ref(loadColumnState(ids.value, viewId, storage ?? defaultStorage()));
+/* The saved view stores ids as values (order, shown, hidden); the chooser works on a map. */
+export function columnStateFromSettings(columns) {
+    const shown = Object.fromEntries((columns?.shown || []).map((id) => [id, true]));
+    (columns?.hidden || []).forEach((id) => { shown[id] = false; });
+    return cleanColumnState({ order: columns?.order || [], shown });
+}
 
-    watch(ids, (next) => { state.value = loadColumnState(next, viewId, storage ?? defaultStorage()); });
+export function settingsFromColumnState(state) {
+    const clean = cleanColumnState(state);
+    const entries = Object.entries(clean.shown);
+    return {
+        order: clean.order,
+        shown: entries.filter(([, on]) => on).map(([id]) => id),
+        hidden: entries.filter(([, on]) => !on).map(([id]) => id),
+    };
+}
 
+export const VIEW_COLUMN_SETS = Object.freeze({ ProjectListView: 'list', TableView: 'table', ProjectKanban: 'board' });
+
+/* The open saved view's columns (task 042 slice 4). `projectId` stays in the signature for
+   the views that pass it; the view in the address decides whose columns these are. */
+export function useViewColumns(projectId, viewId, catalogue) {
+    const view = useViewSettings();
+    const state = computed(() => columnStateFromSettings(view.columns.value));
     const columns = computed(() => resolveColumns(viewId, unref(catalogue) || [], state.value));
     const visibleColumns = computed(() => columns.value.filter((column) => column.visible));
 
-    function commit(next) {
-        state.value = cleanColumnState(next);
-        saveColumnState(ids.value, viewId, state.value, storage ?? defaultStorage());
-    }
+    const commit = (next) => view.setColumns(settingsFromColumnState(next));
 
     return {
         columns,

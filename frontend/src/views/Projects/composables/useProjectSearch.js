@@ -1,15 +1,15 @@
 import { ref, computed, inject, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useCustomComposable } from '@/composable';
-import { loadViewPrefs, saveViewPrefs } from './projectViewPrefs';
 import { clearFilterSignal } from './taskFilterSignal';
 import { ALL, cleanDoneBy, doneByMatch } from '@/components/molecules/Provenance/doneByQuery';
 
-export function useProjectSearch(projectData, showArchived) {
+const withComparisons = (rows) => rows.map((row) => ({ ...row, comparisonsData: [row.comparison] }));
+
+export function useProjectSearch(projectData, showArchived, { buildFilterQuery = () => '' } = {}) {
     const { commit, dispatch, getters } = useStore();
     const { checkPermission, debounce } = useCustomComposable();
     const userId = inject('$userId');
-    const companyId = inject('$companyId', ref(''));
 
     const taskSearch = ref('');
     const taskNameSearch = ref(true);
@@ -17,6 +17,7 @@ export function useProjectSearch(projectData, showArchived) {
     const taskDescriptionSearch = ref(false);
     const filterUsers = ref([]);
     const filterQuery = ref({});
+    const filterRows = ref([]);
     const doneBy = ref(ALL);
     const searchTask = ref(false);
     const collapsed = ref(true);
@@ -46,17 +47,44 @@ export function useProjectSearch(projectData, showArchived) {
         showAllTasks.value === undefined || showAllTasks.value === true || showAllTasks.value === 2
     ));
 
-    const prefsIds = () => ({ companyId: companyId?.value, userId: userId?.value, projectId: projectData.value?._id });
-
     function resetFilters() {
-        const prefs = loadViewPrefs(prefsIds());
-        groupBy.value = prefs.groupBy;
-        filterUsers.value = prefs.me && userId?.value ? [userId.value] : [];
-        taskSearch.value = prefs.search;
-        doneBy.value = prefs.doneBy;
+        groupBy.value = 0;
+        filterUsers.value = [];
+        taskSearch.value = '';
+        doneBy.value = ALL;
         searchTask.value = false;
         filterQuery.value = '';
+        filterRows.value = [];
         collapsed.value = true;
+        searchMongoDB();
+    }
+
+    const me = () => userId?.value;
+
+    function viewState() {
+        return {
+            groupBy: groupBy.value,
+            me: Boolean(me()) && filterUsers.value.includes(me()),
+            assignees: filterUsers.value.filter((id) => id !== me()),
+            search: taskSearch.value,
+            searchIn: { name: taskNameSearch.value, key: taskKeySearch.value, description: taskDescriptionSearch.value },
+            doneBy: doneBy.value,
+            subtasks: collapsed.value ? 'collapsed' : 'expanded',
+            filters: filterRows.value,
+        };
+    }
+
+    function applyViewState(state) {
+        groupBy.value = state.groupBy;
+        filterUsers.value = [...(state.me && me() ? [me()] : []), ...state.assignees.filter((id) => id !== me())];
+        taskSearch.value = state.search;
+        taskNameSearch.value = state.searchIn.name;
+        taskKeySearch.value = state.searchIn.key;
+        taskDescriptionSearch.value = state.searchIn.description;
+        doneBy.value = cleanDoneBy(state.doneBy);
+        collapsed.value = state.subtasks !== 'expanded';
+        filterRows.value = state.filters;
+        filterQuery.value = state.filters.length ? buildFilterQuery(withComparisons(state.filters)) : '';
         searchMongoDB();
     }
 
@@ -64,6 +92,7 @@ export function useProjectSearch(projectData, showArchived) {
         taskSearch.value = '';
         filterUsers.value = [];
         filterQuery.value = '';
+        filterRows.value = [];
         doneBy.value = ALL;
         clearFilterSignal.value += 1;
         searchMongoDB();
@@ -170,6 +199,7 @@ export function useProjectSearch(projectData, showArchived) {
 
     const clearFilter = () => {
         filterQuery.value = '';
+        filterRows.value = [];
         searchMongoDB();
     };
 
@@ -181,10 +211,6 @@ export function useProjectSearch(projectData, showArchived) {
         searchMongoDB();
     });
 
-    watch([groupBy, taskSearch, () => filterUsers.value.includes(userId?.value), doneBy], ([group, search, me, provenance]) => {
-        saveViewPrefs(prefsIds(), { groupBy: group, search, me, doneBy: provenance });
-    });
-
     return {
         taskSearch,
         taskNameSearch,
@@ -192,6 +218,7 @@ export function useProjectSearch(projectData, showArchived) {
         taskDescriptionSearch,
         filterUsers,
         filterQuery,
+        filterRows,
         doneBy,
         searchTask,
         collapsed,
@@ -199,6 +226,8 @@ export function useProjectSearch(projectData, showArchived) {
         userSidebar,
         showTasks,
         resetFilters,
+        viewState,
+        applyViewState,
         clearAllFilters,
         toggleSearch,
         searchMongoDB,

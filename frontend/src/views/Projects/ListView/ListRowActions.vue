@@ -33,6 +33,7 @@
                 <button v-if="taskKey" type="button" class="ah-pop__item" role="menuitem" data-item="copy-key" @click="choose('copy-key')">{{ t('List.menu_copy_key') }}</button>
                 <a class="ah-pop__item" role="menuitem" data-item="new-tab" :href="href" target="_blank" rel="noopener" @click="close(false)">{{ t('List.menu_new_tab') }}</a>
                 <button type="button" class="ah-pop__item" role="menuitem" data-item="open" @click="choose('open')">{{ t('List.menu_open') }}</button>
+                <button v-if="canTemplate" type="button" class="ah-pop__item" role="menuitem" data-item="save-template" @click="choose('save-template')">{{ t('TaskTemplates.save_as') }}</button>
                 <template v-if="canArchive || canDelete || canMove || canDuplicate">
                     <div class="ah-pop__sep" role="separator"></div>
                     <button v-if="canMove" type="button" class="ah-pop__item" role="menuitem" data-item="move" @click="choose('move')">{{ t('List.menu_move') }}</button>
@@ -59,12 +60,13 @@ const props = defineProps({
     href: { type: String, default: "" },
     canRename: { type: Boolean, default: false },
     canSubtask: { type: Boolean, default: false },
+    canTemplate: { type: Boolean, default: false },
     canArchive: { type: Boolean, default: false },
     canDelete: { type: Boolean, default: false },
     canMove: { type: Boolean, default: false },
     canDuplicate: { type: Boolean, default: false }
 });
-const emit = defineEmits(["rename", "add-subtask", "copy-link", "copy-key", "open", "archive", "delete", "move", "duplicate", "duplicate-subtasks"]);
+const emit = defineEmits(["rename", "add-subtask", "copy-link", "copy-key", "open", "save-template", "archive", "delete", "move", "duplicate", "duplicate-subtasks"]);
 
 const { t } = useI18n();
 const open = ref(false);
@@ -117,7 +119,7 @@ function close(returnFocus) {
     if (returnFocus) nextTick(() => menuButton.value?.focus());
 }
 
-const MOVES_FOCUS = ["rename", "add-subtask", "open", "move"];
+const MOVES_FOCUS = ["rename", "add-subtask", "open", "save-template", "move"];
 
 function choose(action) {
     close(!MOVES_FOCUS.includes(action));

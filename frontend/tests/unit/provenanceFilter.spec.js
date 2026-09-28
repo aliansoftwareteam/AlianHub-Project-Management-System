@@ -36,7 +36,8 @@ import BoardView from '@/views/Projects/Kanban/BoardView.vue';
 import ProvenanceFilter from '@/components/molecules/Provenance/ProvenanceFilter.vue';
 import { badgeOf } from '@/components/molecules/Provenance/provenance';
 import { DONE_BY_OPTIONS, doneByMatch } from '@/components/molecules/Provenance/doneByQuery';
-import { loadViewPrefs, saveViewPrefs } from '@/views/Projects/composables/projectViewPrefs';
+import { loadViewPrefs, viewPrefsKey } from '@/views/Projects/composables/projectViewPrefs';
+import { cleanViewSettings } from '@/views/Projects/composables/savedViewSettings';
 import { useProjectSearch } from '@/views/Projects/composables/useProjectSearch';
 
 const PID = 'p1';
@@ -205,19 +206,18 @@ describe('Done by rides the shared task search', () => {
         expect(lastMatch()).toContainEqual(doneByMatch('unchecked'));
     });
 
-    test('it is remembered per user and project like group, "Me" and search', async () => {
+    test('it travels with the view\'s state like group, "Me" and search, not the browser', async () => {
         mountSearch();
         api.resetFilters();
         api.setDoneBy('mixed');
         await nextTick();
-        expect(loadViewPrefs(IDS).doneBy).toBe('mixed');
-        expect(loadViewPrefs({ ...IDS, projectId: 'p2' }).doneBy).toBe('all');
+        expect(api.viewState().doneBy).toBe('mixed');
+        expect(window.localStorage.getItem(viewPrefsKey(IDS))).toBe(null);
     });
 
-    test('a remembered choice comes back on reload and narrows the query', async () => {
-        saveViewPrefs(IDS, { groupBy: 0, me: false, search: '', doneBy: 'agent' });
+    test('a saved view\'s choice comes back and narrows the query', async () => {
         mountSearch();
-        api.resetFilters();
+        api.applyViewState(cleanViewSettings({ doneBy: 'agent' }));
         await nextTick();
         expect(api.doneBy.value).toBe('agent');
         expect(lastMatch()).toContainEqual(doneByMatch('agent'));
