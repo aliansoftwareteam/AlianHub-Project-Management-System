@@ -48,6 +48,7 @@ module.exports.AI_PROJECT_TASKS_BASE = "/api/v1/ai/project";
 module.exports.AI_WRITE_DESCRIPTION = "/api/v1/ai/description";
 module.exports.AI_TRANSCRIBE = "/api/v1/ai/transcribe";
 module.exports.AI_MEETING_NOTES = "/api/v1/ai/meeting-notes";
+module.exports.AI_CHAT_SUMMARY = "/api/v1/ai/chat-summary";
 module.exports.AI_TASK_SUMMARY = "/api/v1/ai/task-summary";
 module.exports.AI_TASK_CATEGORY = "/api/v1/ai/task-category";
 module.exports.WASABI_UPLOAD_FILE = "/api/v1/wasabi/uploadFile";

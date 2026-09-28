@@ -6914,6 +6914,8 @@ export default {
         "summary_title": "Thread summary",
         "summary_empty": "Nothing to summarize yet.",
         "summary_failed": "Could not summarize this thread.",
+        "summary_ai_off": "AI is turned off, so this thread cannot be summarized.",
+        "close_summary": "Close summary",
         "action_items": "Action items",
         "create_task": "Create task",
         "created": "created",
