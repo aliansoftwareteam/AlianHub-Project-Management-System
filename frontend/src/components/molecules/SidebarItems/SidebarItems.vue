@@ -38,6 +38,7 @@
                 <span class="d-block emp_label" :class="[{'font-weight-400' : isDisable === true , 'font-weight-500 font-size-13' : isDisable === false, 'pl-5px': imageDisplayForPriority,'pl-10px' : taskType}]" :style="[{'font-size-13' : clientWidth > 767 &&  isDisable === true , 'font-size-16' : clientWidth <= 767 &&  isDisable === true }]">{{item.label}}</span>
                 <span v-if="item.designation" class="font-size-12 d-block designationAssignee emp_label">{{item.designation ? item.designation : ''}}</span>
             </div>
+            <span v-if="item.tag" class="ah-chip ah-chip--agent ah-chip--mono ml-10px">{{ item.tag }}</span>
         </div>
 
         <div class="d-flex align-items-center">

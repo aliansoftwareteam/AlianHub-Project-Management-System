@@ -14,6 +14,7 @@
                     <main class="ah-app__main" id="ah-main">
                         <CommandPalette v-if="!$route.meta.preventAdvanceSearch" :open="isAdvanceSearch" @close="isAdvanceSearch = false"/>
                         <QuickCreateTask />
+                        <TaskTemplateDialogHost />
                         <div class="ah-app__view billing__history-wrapper style-scroll">
                             <AiOffPage v-if="aiGated"/>
                             <router-view v-else/>
@@ -68,6 +69,7 @@ import '@/components/organisms/Shell/style.css'
 import CallOverlay from '@/components/organisms/CallOverlay/CallOverlay.vue'
 import CommandPalette from '@/components/molecules/AdvanceSearch/CommandPalette.vue'
 import QuickCreateTask from '@/components/organisms/QuickCreateTask/QuickCreateTask.vue'
+import TaskTemplateDialogHost from '@/components/molecules/TaskTemplates/TaskTemplateDialogHost.vue'
 import { PALETTE_OPEN_EVENT, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys'
 import { useStore } from 'vuex';
 import axios from 'axios'

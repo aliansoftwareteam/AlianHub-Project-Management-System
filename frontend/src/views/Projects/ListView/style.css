@@ -191,6 +191,9 @@
 .lv2__add:hover { color: var(--ink-2); background: var(--surface-hover); }
 .lv2__add-plus { color: var(--brand); }
 .lv2__create { padding: 8px 12px; }
+.lv2__template { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px; max-width: 100%; color: var(--ink-label); font: 500 11px/1.2 var(--font-ui); }
+.lv2__template-select { min-width: 0; max-width: 220px; border: 1px solid var(--border); border-radius: var(--r-input, 8px); padding: 4px 6px; background: var(--surface); color: var(--ink); font: 400 12px/1.2 var(--font-ui); }
+.lv2__template-select:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .lv2__first-task { width: 100%; max-width: 560px; }
 
 .lv2__collapsed-item {

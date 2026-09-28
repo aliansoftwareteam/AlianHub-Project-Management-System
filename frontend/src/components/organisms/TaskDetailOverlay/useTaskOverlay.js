@@ -1,5 +1,6 @@
 import { reactive, computed, onBeforeUnmount, onMounted, unref } from "vue";
 import { neighbours, readSequence } from "./taskNavigation";
+import { TRAY_CAP, readTrayIds, trayItemFor, trayStorageKey, writeTrayIds } from "./minimizedTray";
 
 const TASK_QUERY = "task";
 
@@ -16,6 +17,8 @@ export const overlayState = reactive({
 let router = null;
 let route = null;
 let sequenceRoot = null;
+let trayKey = "";
+let trayLoad = 0;
 const closeListeners = new Set();
 
 export function bindRouter(routerInstance, routeInstance) {
@@ -58,7 +61,9 @@ export const isExpanded = computed(() => Boolean(overlayState.current) && routeT
 export function openTask(payload = {}, { history = "replace" } = {}) {
     const next = normalize(payload);
     if (!next.taskId) return;
-    overlayState.minimized = overlayState.minimized.filter((item) => item.taskId !== next.taskId);
+    if (overlayState.minimized.some((item) => item.taskId === next.taskId)) {
+        setMinimized(overlayState.minimized.filter((item) => item.taskId !== next.taskId));
+    }
     overlayState.tab = payload.tab || "";
     if (overlayState.current?.taskId === next.taskId) {
         overlayState.current = { ...overlayState.current, ...next };
@@ -210,10 +215,10 @@ export function minimizeTask() {
     const current = overlayState.current;
     if (!current) return;
     const meta = overlayState.meta[current.taskId] || {};
-    overlayState.minimized = [
+    setMinimized([
         ...overlayState.minimized.filter((item) => item.taskId !== current.taskId),
         { ...current, taskKey: meta.taskKey || "", taskName: meta.taskName || "" }
-    ];
+    ]);
     closeTask();
 }
 
@@ -223,7 +228,32 @@ export function restoreTask(taskId) {
 }
 
 export function dismissMinimized(taskId) {
-    overlayState.minimized = overlayState.minimized.filter((item) => item.taskId !== taskId);
+    setMinimized(overlayState.minimized.filter((item) => item.taskId !== taskId));
+}
+
+function setMinimized(items) {
+    overlayState.minimized = items.slice(-TRAY_CAP);
+    writeTrayIds(trayKey, overlayState.minimized.map((item) => item.taskId));
+}
+
+/* Runs on sign-in, on a company switch and when another tab changes the tray. Tasks
+ * docked here while the reads were in flight are kept after the restored ones. */
+export async function loadMinimizedTray({ userId, companyId, fetchTask }) {
+    const key = trayStorageKey(userId, companyId);
+    const sameTray = key === trayKey;
+    const run = ++trayLoad;
+    trayKey = key;
+    const ids = readTrayIds(key);
+    const known = new Map(sameTray ? overlayState.minimized.map((item) => [item.taskId, item]) : []);
+    if (!sameTray) overlayState.minimized = [];
+    const items = await Promise.all(ids.map((taskId) => known.get(taskId) || trayItemFor(taskId, companyId, fetchTask)));
+    if (run !== trayLoad) return;
+    const restored = items.filter(Boolean);
+    const restoredIds = new Set(ids);
+    const dockedMeanwhile = overlayState.minimized.filter((item) => !known.has(item.taskId) && !restoredIds.has(item.taskId));
+    overlayState.minimized = [...restored, ...dockedMeanwhile].slice(-TRAY_CAP);
+    const kept = overlayState.minimized.map((item) => item.taskId);
+    if (kept.join() !== ids.join()) writeTrayIds(key, kept);
 }
 
 export function isSameProjectPage(projectId, sprintId) {

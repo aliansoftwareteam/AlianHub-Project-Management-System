@@ -109,10 +109,10 @@ afterEach(() => dismissUndoToast());
 
 describe('who may edit from a row', () => {
     const rightsFor = (values, opts) => rowEditRights((path) => values[path.replace('task.', '')] ?? null, opts);
-    const ALL = { task_list: true, task_status: true, task_assignee: true, task_due_date: true, task_priority: true, task_name_edit: true, sub_task_create: true };
+    const ALL = { task_list: true, task_status: true, task_assignee: true, task_due_date: true, task_priority: true, task_name_edit: true, sub_task_create: true, task_create: true };
 
     it('an owner or admin (every rule true) gets every picker and action', () => {
-        expect(rightsFor(ALL)).toEqual({ status: true, assignee: true, due: true, priority: true, rename: true, subtask: true });
+        expect(rightsFor(ALL)).toEqual({ status: true, assignee: true, due: true, priority: true, rename: true, subtask: true, template: true });
     });
 
     it('read access (false) shows values but opens nothing, the same as the task panel', () => {

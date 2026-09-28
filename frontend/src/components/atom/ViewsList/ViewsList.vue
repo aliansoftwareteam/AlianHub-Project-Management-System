@@ -13,7 +13,7 @@
             @click.stop="$emit('click', item)"
         >
            <img :src="active ? projectComponentsIcons(item.keyName)?.activeIcon : projectComponentsIcons(item.keyName)?.icon" alt="" aria-hidden="true" class="mr-10px">
-           <span class="gray81">{{$t(`ViewList.${item.name}`)}}</span>
+           <span class="gray81">{{ viewName }}</span>
            <span v-if="commentCount" class="count-block comment__count white">{{commentBadge}}</span>
            <img class="list__default-home" v-if="item.setAsDefault" :src="viewDefaultIcon" :alt="$t('ViewList.set_as_default')" />
            <img :src="active ? activePin : pin" v-if="item?.isPin && item.isPin" class="ml-10px active__pin-condition" :alt="$t('Projects.pinview')">
@@ -22,7 +22,7 @@
         <div class="view-list__menu" v-if="hasViewMenu">
            <DropDown :id="item._id" mode="menu" :zIndex="6">
                 <template #button="{ triggerAttrs }">
-                    <button type="button" class="dots ml-5px" v-bind="triggerAttrs" :aria-label="$t('Projects.view_options', {view: $t(`ViewList.${item.name}`)})">
+                    <button type="button" class="dots ml-5px" v-bind="triggerAttrs" :aria-label="$t('Projects.view_options', {view: viewName})">
                         <img :src="dots" alt="" aria-hidden="true">
                     </button>
                 </template>
@@ -35,7 +35,7 @@
                                     <span class="font-ui font-weight-400 font-size-14 line-height-19 text-left gray81">{{item?.isPin ? $t('Projects.unpin') :$t('Projects.pinview') }}</span>
                                 </button>
                             </li>
-                            <li role="none" v-if="project?.ProjectRequiredComponent && (project?.ProjectRequiredComponent?.filter((e)=>e.setAsDefault === true).length == 0 || project?.ProjectRequiredComponent?.find((e)=>e.setAsDefault === true).keyName === item?.keyName)">
+                            <li role="none" v-if="canToggleDefault">
                                 <button type="button" role="menuitem" class="embed-edit-options mb-7px view-list__menuitem cursor-pointer" @click="editOptions('AddDefault')">
                                     <img :src="defaultView" class="mr-14-px list__edit" alt="" aria-hidden="true" />
                                     <span class="font-ui font-weight-400 font-size-14 line-height-19 text-left gray81">{{!item?.setAsDefault ? $t('ViewList.set_as_default') :$t('ViewList.remove_as_default') }}</span>
@@ -55,7 +55,7 @@
         <ConfirmationSidebar
             v-model="isDelete"
             :title="$t('Projects.deleteview')"
-            :message="`${$t('Filters.are_you_sure')}  ${escapeHtml(item.name)} ${$t('Projects.view')}?`"
+            :message="`${$t('Filters.are_you_sure')}  ${escapeHtml(viewName)} ${$t('Projects.view')}?`"
             acceptButtonClass="btn-danger"
             @confirm="() => editOptions('Delete')"
             :acceptButton="$t('Projects.delete')"
@@ -72,6 +72,7 @@
 import { defineProps, defineEmits, ref , inject ,computed} from 'vue';
 import { escapeHtml } from '@/utils/notificationHtml';
 import { useToast } from 'vue-toast-notification';
+import { useI18n } from 'vue-i18n';
 
 // UTILS
 import { deleteView , editView} from '@/components/molecules/EmbedView/helper';
@@ -102,6 +103,7 @@ const {commit} = useStore()
 // same permission -- a user without the menu should not get a pointless gap.
 const hasViewMenu = computed(() => checkPermission('project.view_list', project.value?.isGlobalPermission) === true);
 const toast = useToast()
+const { t } = useI18n()
 
 // PROPS
 const props = defineProps({
@@ -128,6 +130,14 @@ const props = defineProps({
 })
 
 const commentBadge = computed(() => (props.commentCount > 99 ? '+99' : props.commentCount));
+const viewName = computed(() => props.item?.title || t(`ViewList.${props.item?.name}`));
+/* A private view is not in the project's list, so the project default cannot point at it. */
+const canToggleDefault = computed(() => {
+    const views = project.value?.ProjectRequiredComponent;
+    if (!views || props.item?.isPrivate) return false;
+    const current = views.find((view) => view.setAsDefault === true);
+    return !current || current._id === props.item?._id;
+});
 
 const editOptions = (type) =>{
     if(type === 'Pin') {
