@@ -82,7 +82,7 @@ async function fetchOne(taskId, force) {
             entry.commentCount = Number(payload.data.commentCount) || 0;
             entry.updatedAt = payload.data.updatedAt || "";
             entry.state = entry.summary ? "ready" : "empty";
-        } else if (/no LLM provider/i.test(payload.statusText || "")) {
+        } else if (payload.aiState) {
             unavailable = true;
             entry.state = "unavailable";
         } else {

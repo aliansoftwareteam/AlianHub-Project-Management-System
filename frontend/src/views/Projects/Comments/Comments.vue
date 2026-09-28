@@ -1739,7 +1739,7 @@ function checkMentions(message){
     return {mentions, msg};
 }
 
-function updateCount(reset = false, count = 0, otherUsers = []) {
+function updateCount(reset = false, count = 0) {
     let taskId = props.taskId;
     if(props.newChat) {
         taskId = newMainChat.value;
@@ -1796,41 +1796,6 @@ function updateCount(reset = false, count = 0, otherUsers = []) {
         .catch((error) => {
             console.error(error,"ERROR");
         })
-    } else {
-        let userArr = Array.from(new Set([...(props?.watchers || []), ...otherUsers]));
-
-        userArr = filterUsers(userArr);
-        userArr = [...new Set(userArr)].filter(x => x && x !== userId.value);
-
-        if(!taskId.length) {
-            let axiosData = {
-                companyId : companyId.value,
-                key : 1,
-                projectId: projectData.value._id,
-                userIds: userArr
-            }
-            apiRequest("post", env.UPDATE_UNREADREAD_COMMENTS_COUNT, axiosData).catch((error) => {
-                console.error(error,"ERROR");
-            })
-        } else {
-            let axiosData = {
-                companyId : companyId.value,
-                key : 2,
-                projectId: projectData.value._id,
-                userIds: userArr,
-                taskId: taskId,
-                sprintId: props.sprintId,
-                prevCount: prevCount 
-            }
-
-            if(props.parentTaskId) {
-                axiosData.parentTaskId = props.parentTaskId;
-            }
-
-            apiRequest("post", env.UPDATE_UNREADREAD_COMMENTS_COUNT, axiosData).catch((error) => {
-                console.error(error,"ERROR");
-            })
-        }
     }
 }
 
@@ -1928,39 +1893,7 @@ function createTaskForMainChat() {
     })
 }
 
-function filterUsers(users = null) {
-    if(!users) return [];
-
-    let projectWatchersFilter = [];
-
-    Object.keys(projectData.value?.watchers || {}).forEach((key) => {
-        if(projectData.value?.watchers?.[key] === "all_activity") {
-            projectWatchersFilter.push(key)
-        }
-    })
-
-    users.forEach((uid) => {
-        const ignore = projectData.value?.watchers?.[uid] === "ignore";
-        if(!ignore) {
-            projectWatchersFilter.push(uid);
-        }
-    })
-
-    return projectWatchersFilter;
-}
-
 function sendNotification(messageData, otherUsers = []) {
-    const receivers = Array.from(new Set([...otherUsers])).filter((x) => x !== userId.value);
-
-    apiRequest("post", env.UPDATE_UNREADREAD_COMMENTS_COUNT, {
-        companyId : companyId.value,
-        key : 4,
-        userIds: receivers,
-        readAll: false
-    }).catch((error) => {
-        console.error(error,"ERROR");
-    })
-
     if(!props?.mainChat || otherUsers?.length || !props?.watchers?.length || !messageData?.userId) return;
 
     const userIds = props.watchers.filter((id) => id !== messageData.userId);
@@ -2136,10 +2069,6 @@ async function sendMessageFun(messageData,isReset = true) {
                         });
                     } else {
                         debounce(updateLastMessageTime({ ...messageObj }), 500)
-                    }
-
-                    if(!edited) {
-                        updateCount(false, 1, (msg?.mentionIds || []));
                     }
 
                     if(!edited) {

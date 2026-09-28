@@ -1,7 +1,7 @@
 <template>
     <div>
         <div v-if="showDay" class="position-re bg-gray my-1 w-100 show__day">
-            <span class="bg-light-gray position-ab px-1 border-radius-5-px cursor-default show__day-format">{{convertDateFormat(message.createdAt)}}</span>
+            <span class="position-ab px-1 border-radius-5-px cursor-default show__day-format">{{convertDateFormat(message.createdAt)}}</span>
         </div>
         <div v-if="showUnread" class="d-flex justify-content-center w-100 mt-10px">
             <span class="border-radius-10-px cursor-default text-center unread__message-text bg-lightgreen py-10px">{{showUnread}} {{$t('Comments.unread_message')}}</span>

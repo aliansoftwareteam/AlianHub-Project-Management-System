@@ -103,7 +103,7 @@
             <span class="ut2-prev">{{ $t('Time.last_week') }} <strong>{{ previous.label }}</strong><span v-if="previous.detail">, {{ previous.detail }}</span><span v-if="previous.hours"> · {{ previous.hours }}</span></span>
         </div>
         <div v-if="underHint" class="tv-card">
-            <span class="tv-spark">✦</span>
+            <ShellIcon name="info" :size="13" class="tv-spark" />
             <span class="ut2-hint">{{ underHint.text }}</span>
             <button type="button" class="tv-link ut2-hint__cta" @click="openLog(null, underHint.day, underHint.minutes)">{{ $t('Time.add_hours', { h: formatHm(underHint.minutes) }) }}</button>
         </div>
@@ -119,6 +119,7 @@
 
 <script setup>
 import { ref, computed, inject, onMounted, watch } from 'vue';
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';

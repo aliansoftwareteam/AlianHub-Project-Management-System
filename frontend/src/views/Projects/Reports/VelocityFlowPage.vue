@@ -70,7 +70,7 @@
         </div>
 
         <p class="rp-note rp-note--brand">
-            <span class="rp-spark">✦</span>
+            <ShellIcon name="info" :size="13" class="rp-spark" />
             {{ forecast.ok ? $t('Reports.forecast_line', { low: forecast.low, high: forecast.high, n: forecast.samples }) : $t('Reports.forecast_none', { n: forecast.samples, min: forecast.minSamples }) }}
         </p>
     </div>
@@ -78,6 +78,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';

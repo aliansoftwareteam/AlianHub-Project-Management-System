@@ -3,8 +3,6 @@ const logger = require("../../Config/loggerConfig");
 const { dbCollections } = require('../../Config/collections');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { escapeRegex } = require('../../utils/escapeRegex');
-const { SCHEMA_TYPE } = require('../../Config/schemaType');
-const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 const { pinSessionTenant } = require('../../Config/tenant');
 
 // Key 1 is Project Comments
@@ -174,47 +172,33 @@ exports.updateCount = (companyId,userIds, manageQuery, cb) => {
     }
 }
 
-// Clearing, setting or decrementing a count is the reader's own business; only a bump (a new
-// comment, mention or notification) is sent on behalf of other people.
+// The people a new comment reaches have their counts raised by the server when it is saved, so a client
+// only ever changes its own.
 const changesOwnCount = (body) => Boolean(body.read || body.set || body.readAll);
 
-const activeMemberIds = async (companyId, userIds) => {
-    const ids = [...new Set(userIds.map(String))];
-    if (!ids.length) return [];
-    const seats = await mongoCm.MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.COMPANY_USERS,
-        data: [{ userId: { $in: ids }, ...ACTIVE_SEAT }, { userId: 1 }],
-    }, 'find');
-    const active = new Set((seats || []).map((seat) => String(seat.userId)));
-    return ids.filter((id) => active.has(id));
-};
-
-/* The comment panels raise project, task and mention counts for the people a new comment reaches;
- * chat and notification counts are raised only by the server. */
+/* Chat and notification counts are raised only by the server. */
 const CLIENT_BUMP_KEYS = [1, 2, 4];
 
-const countTargets = async (req, res, companyId) => {
+const countTargets = (req, res) => {
     const body = req.body || {};
     const claimed = Array.isArray(body.userIds) ? body.userIds.filter(Boolean).map(String) : [];
-    if (changesOwnCount(body)) {
-        if (claimed.some((id) => id !== String(req.uid))) {
-            res.status(403).send({ status: false, statusText: 'You can only read or change your own unread counts.' });
-            return null;
-        }
-        return [String(req.uid)];
+    if (claimed.some((id) => id !== String(req.uid))) {
+        res.status(403).send({ status: false, statusText: 'You can only change your own unread counts.' });
+        return null;
     }
+    if (changesOwnCount(body)) return [String(req.uid)];
     if (!CLIENT_BUMP_KEYS.includes(body.key)) {
         res.status(403).send({ status: false, statusText: 'Only comment and mention counts can be raised here.' });
         return null;
     }
-    return activeMemberIds(companyId, claimed);
+    return claimed;
 };
 
 exports.updateUnReadCommentsCount = async (req, res) => {
     try {
         const companyId = pinSessionTenant(req, res);
         if (!companyId) return;
-        const userIds = await countTargets(req, res, companyId);
+        const userIds = countTargets(req, res);
         if (!userIds) return;
         if (!userIds.length) {
             res.send({ status: true, data: 'No recipients in this company' });

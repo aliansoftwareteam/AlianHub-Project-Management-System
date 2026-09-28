@@ -18,9 +18,13 @@ const TOKEN_PATTERNS = [
 const BASE64 = /[A-Za-z0-9+/_]{40,}={0,2}/g;
 const looksEncoded = (s) => /[A-Z]/.test(s) && /[a-z]/.test(s) && /\d/.test(s);
 
+/* A person's private AI profile (AI/aiProfile) rides in some prompts; a stored copy keeps only that it was there. */
+const PRIVATE_PROFILE = /<about_the_asker>[\s\S]*?<\/about_the_asker>/g;
+const PRIVATE_MASK = '<about_the_asker>[private]</about_the_asker>';
+
 function redact(text) {
     if (typeof text !== 'string') return text;
-    let out = text.replace(JSON_SECRET, `$1"${MASK}"`).replace(ESCAPED_JSON_SECRET, `$1\\"${MASK}\\"`);
+    let out = text.replace(PRIVATE_PROFILE, PRIVATE_MASK).replace(JSON_SECRET, `$1"${MASK}"`).replace(ESCAPED_JSON_SECRET, `$1\\"${MASK}\\"`);
     TOKEN_PATTERNS.forEach(([pattern, replacement]) => { out = out.replace(pattern, replacement); });
     return out.replace(BASE64, (match) => (looksEncoded(match) ? MASK : match));
 }
