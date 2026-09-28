@@ -255,6 +255,7 @@ module.exports.WORKFLOW_DEFINITIONS = '/api/v2/workflows/definitions';
 module.exports.WORKFLOW_DRY_RUN = '/api/v2/workflows/dry-run';
 module.exports.AUTOMATIONS_COMPILE = '/api/v2/automations/compile';
 module.exports.AUTOMATIONS_BACKTEST = '/api/v2/automations/backtest';
+module.exports.AUTOMATIONS_AI_DRAFT = '/api/v2/automations/draft';
 module.exports.AI_ASK = '/api/v1/ai/ask';
 module.exports.AI_ASK_SOURCES = '/api/v1/ai/ask/sources';
 module.exports.AI_ASK_STREAM = '/api/v1/ai/ask/stream';
