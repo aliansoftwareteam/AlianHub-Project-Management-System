@@ -1,4 +1,5 @@
 const ctrl = require('./controller');
+const aiDraft = require('./aiDraft');
 
 exports.init = (app) => {
     // JWT + companyId: setMiddleware protects the /api/v1/automations and
@@ -6,6 +7,7 @@ exports.init = (app) => {
     // literal path is never swallowed by the param route.
     app.get('/api/v2/automations/registry', ctrl.getRegistry);
     app.post('/api/v2/automations/compile', ctrl.compileSentence);
+    app.post('/api/v2/automations/draft', aiDraft.draftHandler);
     app.post('/api/v2/automations/backtest', ctrl.backtest);
     app.get('/api/v2/automations', ctrl.listRulesV2);
     app.post('/api/v2/automations', ctrl.createRuleV2);
