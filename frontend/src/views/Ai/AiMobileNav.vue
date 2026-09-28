@@ -63,7 +63,7 @@ const root = ref(null);
 const moreButton = ref(null);
 const moreOpen = ref(false);
 
-const available = (items) => items.filter((item) => !router || router.hasRoute(item.name));
+const available = (items) => items.filter((item) => typeof router?.hasRoute !== "function" || router.hasRoute(item.name));
 
 const primary = computed(() => available(props.primary));
 const extra = computed(() => available(props.extra));
