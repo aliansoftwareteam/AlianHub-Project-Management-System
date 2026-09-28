@@ -103,6 +103,58 @@ describe('a time-log report for a limited viewer', () => {
     });
 });
 
+/* Just enough of the server to run a report pipeline: $match, $group on a field or on $convert to
+   text, $sum, $sort and $limit. Anything else throws, so the test cannot pass on an operator it
+   does not understand. */
+const evaluate = (expr, row) => {
+    if (typeof expr === 'string' && expr.startsWith('$')) return row[expr.slice(1)];
+    if (expr && expr.$convert && expr.$convert.to === 'string') {
+        const input = evaluate(expr.$convert.input, row);
+        if (input === undefined || input === null) return evaluate(expr.$convert.onNull ?? null, row);
+        if (input instanceof mongoose.Types.ObjectId) return input.toHexString();
+        if (['string', 'number', 'boolean'].includes(typeof input)) return String(input);
+        return evaluate(expr.$convert.onError, row);
+    }
+    if (expr === null || typeof expr !== 'object') return expr;
+    throw new Error(`unsupported expression ${JSON.stringify(expr)}`);
+};
+const groupKey = (value) => (value instanceof mongoose.Types.ObjectId ? `oid:${value}` : `${typeof value}:${value}`);
+const aggregate = (rows, pipeline) => pipeline.reduce((docs, stage) => {
+    if (stage.$match) return docs.filter((row) => sift(bson(stage.$match))(bson(row)));
+    if (stage.$group) {
+        const groups = new Map();
+        docs.forEach((row) => {
+            const _id = evaluate(stage.$group._id, row);
+            const group = groups.get(groupKey(_id)) || { _id, value: 0 };
+            const { $sum } = stage.$group.value;
+            group.value += typeof $sum === 'number' ? $sum : Number(evaluate($sum, row)) || 0;
+            groups.set(groupKey(_id), group);
+        });
+        return [...groups.values()];
+    }
+    if (stage.$sort) return [...docs].sort((a, b) => b.value - a.value);
+    if (stage.$limit) return docs.slice(0, stage.$limit);
+    throw new Error(`unsupported stage ${Object.keys(stage)[0]}`);
+}, rows);
+
+describe('a time-log report by project', () => {
+    const LOGGED = [
+        { _id: 'as-text', ProjectId: MINE, LogTimeDuration: 60 },
+        { _id: 'as-object-id', ProjectId: oid(MINE), LogTimeDuration: 30 },
+    ];
+
+    test.each([['a limited viewer', MEMBER], ['an owner', OWNER]])('shows one row per project for %s while records hold both forms', async (who, uid) => {
+        MongoDbCrudOpration.mockImplementation(async (companyId, { type, data }, method) => {
+            if (method === 'aggregate' && type === SCHEMA_TYPE.TIMESHEET) return aggregate(LOGGED, data[0]);
+            if (type === SCHEMA_TYPE.PROJECTS) return [{ _id: oid(MINE), ProjectName: 'Mine' }];
+            return [];
+        });
+        const { res } = await run(uid, logReport());
+        const { result } = res.json.mock.calls[0][0].data;
+        expect(result).toEqual([{ key: MINE, label: 'Mine', value: 1.5 }]);
+    });
+});
+
 describe('a task report for a limited viewer keeps its scope', () => {
     test('their project only, minus the private sprints they are not on', async () => {
         const { call } = await run(MEMBER, taskReport());
