@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const fakeMongo = require('./fixtures/fakeMongo');
 
 const mockDbs = {};
@@ -28,7 +29,7 @@ const listSkills = async (companyId) => {
     const r = { code: 200 };
     r.status = (c) => { r.code = c; return r; };
     r.send = (b) => { r.body = b; return r; };
-    await skillsCtrl.listSkills({ headers: { companyid: companyId }, uid: 'member1', params: {}, query: {}, body: {} }, r);
+    await skillsCtrl.listSkills(verified({ headers: { companyid: companyId }, uid: 'member1', params: {}, query: {}, body: {} }), r);
     return r.body;
 };
 

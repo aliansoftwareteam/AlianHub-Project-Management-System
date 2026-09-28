@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const crypto = require('crypto');
 const fakeMongo = require('./fixtures/fakeMongo');
 
@@ -157,7 +158,7 @@ describe(ID, () => {
         res.send = (b) => { res.body = b; return res; };
         res.json = res.send;
         const controller = require('../Modules/Integrations/controller');
-        await controller.connect({ headers: { companyid: COMPANY }, uid: OWNER, body: { type: 'github', config: { token, repo: 'acme/app' } }, params: {}, query: {}, ip: '10.0.0.1' }, res);
+        await controller.connect(verified({ headers: { companyid: COMPANY }, uid: OWNER, body: { type: 'github', config: { token, repo: 'acme/app' } }, params: {}, query: {}, ip: '10.0.0.1' }), res);
         return res;
     };
 

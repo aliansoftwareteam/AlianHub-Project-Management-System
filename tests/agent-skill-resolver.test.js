@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -29,7 +30,7 @@ const skillDoc = (over = {}) => validateSkill({
     ...over,
 }).value;
 
-const req = (over = {}) => ({ headers: { companyid: C }, uid: 'u1', params: {}, query: {}, body: {}, ...over });
+const req = (over = {}) => verified({ headers: { companyid: C }, uid: 'u1', params: {}, query: {}, body: {}, ...over });
 const res = () => { const r = { code: 200 }; r.status = (c) => { r.code = c; return r; }; r.send = (b) => { r.body = b; return r; }; return r; };
 const call = async (fn, request) => { const r = res(); await fn(request, r); return r; };
 

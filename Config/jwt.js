@@ -594,11 +594,13 @@ const verifyJWTTokenV2 = (req, res, next) => {
  * the JWT audience claim. Routes that legitimately operate without a
  * company scope pass through unchanged.
  *
- * Non-ObjectId candidates (e.g. the global "USER_PROFILES" bucket name
- * used for user profile pictures) pass through too — they aren't real
- * company tenants, and the controllers that accept them have their own
+ * A non-ObjectId `companyid` header is refused, because handlers open the
+ * header's value as a database name. Non-ObjectId values in the
+ * body, params or query (e.g. the global "USER_PROFILES" bucket name used
+ * for user profile pictures) pass through — they aren't real company
+ * tenants, and the controllers that accept them have their own
  * authorization for that bucket. Forcing them through this check would
- * 400-block legitimate uploads.
+ * block legitimate uploads.
  *
  * Every company the request names is checked, the `companyid` header first: this used to judge
  * the body before the header, while `tenantOf` takes the header before the body, so a request
@@ -608,6 +610,15 @@ const verifyJWTTokenV2 = (req, res, next) => {
  */
 const requireCompanyAud = (req, res, next) => {
     try {
+        const header = String((req.headers && req.headers.companyid) || '').trim();
+        if (header && !OBJECT_ID_PATTERN.test(header)) {
+            return res.status(403).json({
+                status: false,
+                error: 'Invalid company id',
+                statusText: 'Forbidden',
+                isJwtError: true,
+            });
+        }
         const candidates = [
             req.headers && req.headers.companyid,
             req.params && req.params.companyId,
@@ -615,8 +626,6 @@ const requireCompanyAud = (req, res, next) => {
             req.body && req.body.companyId,
             req.body && req.body.CompanyId,
         ].map((value) => String(value == null ? '' : value).trim())
-            // Non-ObjectId values (special buckets like USER_PROFILES) aren't tenants and have
-            // controller-level checks; forcing them through here would block legitimate uploads.
             .filter((value) => OBJECT_ID_PATTERN.test(value));
 
         if (candidates.some((companyId) => !isCompanyInAudience(req.aud, companyId))) {

@@ -52,7 +52,7 @@
                                 height="25px"
                                 :thumbnail="'26x26'"
                             />
-                            <DropDown v-if="assigneeArray.length > 1">
+                            <DropDown v-if="assigneeArray.length > 1" mode="listbox">
                                 <template #button>
                                     <div class="d-flex align-items-center justify-content-center profile-image GunPowder blue text-nowrap border-2px-blue">
                                         +{{assigneeArray.length - 1}}
@@ -61,7 +61,7 @@
                                 <template #options>
                                     <DropDownOption
                                         v-for="(user, index) in assigneeArray.filter((x, index) => index >= 1).map((x) => ({...x,label: x.Employee_Name, image: x.profileImage}))"
-                                        :key="'user'+index" @click="usersFilter(user)"
+                                        :key="'user'+index"
                                     >
                                     <UserProfile
                                         :showDot="true"
@@ -90,7 +90,7 @@
                                 :thumbnail="'26x26'"
                                 height="25px"
                             />
-                            <DropDown v-if="watchersArray.length > 1">
+                            <DropDown v-if="watchersArray.length > 1" mode="listbox">
                                 <template #button>
                                     <div class="d-flex align-items-center justify-content-center profile-image GunPowder blue text-nowrap border-2px-blue">
                                         +{{watchersArray.length - 1}}
@@ -99,7 +99,7 @@
                                 <template #options>
                                     <DropDownOption
                                         v-for="(user, index) in watchersArray.filter((x, index) => index >= 1).map((x) => ({...x,label: x.Employee_Name, image: x.profileImage}))"
-                                        :key="'user'+index" @click="usersFilter(user)"
+                                        :key="'user'+index"
                                     >
                                     <UserProfile
                                         :showDot="true"

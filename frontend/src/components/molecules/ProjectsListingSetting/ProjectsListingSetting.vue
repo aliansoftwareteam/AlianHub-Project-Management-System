@@ -12,27 +12,27 @@
                 <p class="font-weight-500 dark-gray d-block font-size-14 text-ellipsis"><span>{{item.ProjectCode}}</span> | <span :title="item.ProjectName">{{item.ProjectName}}</span></p>
                 <a v-if="activeTab === 0" class="d-flex font-weight-400 font-size-13 text-decoration-none font-ui cursor-pointer" href.prevent="#" @click="!item.isRestrict ? redirectProjectList(item) : ''"><img :src="projectGoToLink">{{ $t('Projects.go_to_project') }}</a>
             </div>
-            <DropDown v-if="checkPermission('settings.settings_project_list') == true && checkPermission('project.project_details') == true && checkPermission('project.project_close') == true" :bodyClass="{'setting__project-dropdown' : true}">
+            <DropDown v-if="checkPermission('settings.settings_project_list') == true && checkPermission('project.project_details') == true && checkPermission('project.project_close') == true" mode="menu" :bodyClass="{'setting__project-dropdown' : true}">
                 <template #button>
-                    <img ref="setting" :src="dots" alt="dots" class="position-re ml-20px setting__dots">
+                    <img :src="dots" :alt="$t('Projects.project_actions', { name: item.ProjectName })" class="position-re ml-20px setting__dots">
                 </template>
                 <template #options>
-                    <DropDownOption v-if="item.deletedStatusKey === 2">
-                        <div class="d-flex align-items-center font-size-14 GunPowder setting__close-project" @click="$refs.setting.click(), !item.isRestrict ? unarchiveProject(item) : ''">
+                    <DropDownOption v-if="item.deletedStatusKey === 2" @click="!item.isRestrict ? unarchiveProject(item) : ''">
+                        <div class="d-flex align-items-center font-size-14 GunPowder setting__close-project">
                             {{$t('Projects.restore_project')}}
                         </div>
                     </DropDownOption>
-                    <DropDownOption v-if="item.deletedStatusKey === 2">
-                        <div class="d-flex align-items-center font-size-14 GunPowder setting__close-project" @click="$refs.setting.click(), showSidebar=true">
+                    <DropDownOption v-if="item.deletedStatusKey === 2" @click="showSidebar=true">
+                        <div class="d-flex align-items-center font-size-14 GunPowder setting__close-project">
                             {{$t('Projects.delete_project')}}
                         </div>
                     </DropDownOption>
-                    <DropDownOption v-if="item.statusType !== 'close' && item.deletedStatusKey !== 2" @click="$refs.setting.click(), showSidebar=true">
+                    <DropDownOption v-if="item.statusType !== 'close' && item.deletedStatusKey !== 2" @click="showSidebar=true">
                         <div class="d-flex align-items-center font-size-14 GunPowder setting__close-project">
                             {{ $t('Projects.close_project') }}
                         </div>
                     </DropDownOption>
-                    <DropDownOption @click="$refs.setting.click(), !item.isRestrict ? colseProject(item,'reopen') : ''" v-if="item.statusType === 'close'">
+                    <DropDownOption @click="!item.isRestrict ? colseProject(item,'reopen') : ''" v-if="item.statusType === 'close'">
                         <div class="d-flex align-items-center font-size-14 GunPowder setting__close-project">
                             {{ $t('Projects.reopen_project') }}
                         </div>

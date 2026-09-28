@@ -1,6 +1,6 @@
 <template>
     <div class="d-flex justify-content-end mb-10px">
-        <DropDown :id="cardUID">
+        <DropDown :id="cardUID" mode="listbox">
             <template #button>
                 <div :ref="cardUID"
                     class="status-estimate d-flex align-items-center font-weight-500 font-size-14 p-4px cursor-pointer w-max-content dark-gray">
@@ -9,7 +9,7 @@
                 </div>
             </template>
             <template #options>
-                <DropDownOption v-for="(status, statusIndex) in allOptions" :key="statusIndex"
+                <DropDownOption v-for="(status, statusIndex) in allOptions" :key="statusIndex" :selected="status.id === selectedTime"
                     @click="selectedTime = status.id,updateData(status.id),$refs[cardUID].click()">
                     <div class="d-flex align-items-center">
                         <span class="ml-5px">{{$t(`dashboardCard.${status.name}`)}}</span>

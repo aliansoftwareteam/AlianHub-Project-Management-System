@@ -1,5 +1,6 @@
 <template>
     <div
+        ref="root"
         :id="id"
         :role="role"
         :tabindex="role ? -1 : undefined"
@@ -18,7 +19,7 @@
 </template>
 
 <script setup>
-import { computed, defineProps, defineEmits, inject, onMounted, ref } from "vue";
+import { computed, defineProps, defineEmits, inject, onMounted, onUpdated, ref } from "vue";
 
 defineEmits(["click"]);
 defineProps({
@@ -49,10 +50,23 @@ const ROLES = { menu: "menuitem", listbox: "option" };
 const dropDownMode = inject("dropDownMode", null);
 const role = computed(() => ROLES[dropDownMode?.value]);
 
+const root = ref(null);
+
+// The option itself carries focus and aria-selected; a checkbox inside it would be a second tab stop announcing the same state.
+function hideInnerCheckboxes() {
+    if (role.value !== "option" || !root.value) return;
+    root.value.querySelectorAll('input[type="checkbox"]').forEach((box) => {
+        box.setAttribute("tabindex", "-1");
+        box.setAttribute("aria-hidden", "true");
+    });
+}
+
 const clientWidth = ref(document.body.clientWidth);
 onMounted(() => {
     clientWidth.value = document.body.clientWidth;
+    hideInnerCheckboxes();
 })
+onUpdated(hideInnerCheckboxes);
 </script>
 
 <style>

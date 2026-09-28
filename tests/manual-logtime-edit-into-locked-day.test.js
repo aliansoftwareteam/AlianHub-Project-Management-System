@@ -1,3 +1,4 @@
+const verified = require('./fixtures/verifiedRequest');
 process.env.STORAGE_TYPE = process.env.STORAGE_TYPE || 'server';
 
 const mockCrud = jest.fn();
@@ -58,7 +59,7 @@ const call = (body) => new Promise((resolve, reject) => {
     r.status = (c) => { r.code = c; return r; };
     r.send = (b) => { r.body = b; resolve(r); return r; };
     r.json = r.send;
-    Promise.resolve(manualLogTime({ headers: { companyid: C }, body, query: {}, params: {}, uid: ME }, r)).catch(reject);
+    Promise.resolve(manualLogTime(verified({ headers: { companyid: C }, body, query: {}, params: {}, uid: ME }), r)).catch(reject);
 });
 
 const updates = () => mockCrud.mock.calls.filter(([, , m]) => m === 'findOneAndUpdate');

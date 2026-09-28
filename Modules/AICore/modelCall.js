@@ -4,6 +4,7 @@ const { emptyUsage, usageFromResult, addUsage } = require('./usage');
 const { estimateCall } = require('./estimate');
 const { isProviderError } = require('./providerError');
 const { validatePin } = require('./modelPin');
+const untrusted = require('./untrusted');
 const telemetry = require('../../Config/telemetry');
 
 const LOG_PREFIX = '[agent]';
@@ -47,8 +48,8 @@ async function askModel(skill, { prompt, budget, spend, agent }) {
             const provider = getProvider(selection);
             const requestModel = options.model || provider.model || null;
             const request = {
-                systemPrompt: skill.systemPrompt,
-                messages: [{ role: 'user', content: prompt }],
+                systemPrompt: untrusted.withNotice(skill.systemPrompt),
+                messages: [{ role: 'user', content: untrusted.wrap(prompt) }],
                 maxTokens: Math.min(skill.maxTokens, budget.maxTokens || skill.maxTokens),
                 temperature: 0.2,
                 jsonMode: true,
