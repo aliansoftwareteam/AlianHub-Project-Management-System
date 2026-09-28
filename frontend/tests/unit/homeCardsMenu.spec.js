@@ -30,8 +30,8 @@ describe('Home cards preferences', () => {
         resetHomeCards();
     });
 
-    it('offers the waiting and standup cards', () => {
-        expect(HOME_CARDS.map((c) => c.id)).toEqual(['waiting', 'standup']);
+    it('offers the waiting, standup and assigned comments cards', () => {
+        expect(HOME_CARDS.map((c) => c.id)).toEqual(['waiting', 'standup', 'assigned_comments']);
     });
 
     it('shows every card until the person hides one', () => {
@@ -72,8 +72,8 @@ describe('Manage cards menu', () => {
     it('lists each Home card with whether it is on Home', async () => {
         const wrapper = await open();
         const boxes = wrapper.findAll('[data-test="home-card-option"] input[type="checkbox"]');
-        expect(boxes).toHaveLength(2);
-        expect(boxes.map((b) => b.element.checked)).toEqual([true, false]);
+        expect(boxes).toHaveLength(3);
+        expect(boxes.map((b) => b.element.checked)).toEqual([true, false, true]);
         wrapper.unmount();
     });
 

@@ -125,6 +125,7 @@
                 </div>
 
                 <TaskSummaryBlock v-if="task._id && canComment" ref="summaryRef" :taskId="task._id" :enabled="aiUsable" @count="(n) => commentTotal = n" />
+                <TaskActionItems v-if="task._id && canComment" :task="task" @open="openActionItem" />
 
                 <div class="ah-detail__tabs" role="tablist">
                     <button
@@ -365,6 +366,7 @@ import TagChip from "@/components/atom/TagChip/TagChip.vue";
 import FavouriteStar from "@/components/atom/FavouriteStar/FavouriteStar.vue";
 import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
 import TaskSummaryBlock from "./TaskSummaryBlock.vue";
+import TaskActionItems from "./TaskActionItems.vue";
 import TaskTrackerHandoff from "./TaskTrackerHandoff.vue";
 import { showUndoToast } from "@/composable/useUndoToast";
 import { useEscapeLayer } from "@/composable/useEscapeLayer";
@@ -904,6 +906,15 @@ watch(() => props.tab, (value) => {
 watch(isMobile, (mobile) => {
     if (!mobile && activeTab.value === "activity") activeTab.value = "description";
 });
+
+function openActionItem(item) {
+    activityView.value = "comments";
+    if (isMobile.value) activeTab.value = "activity";
+    setTimeout(() => {
+        const target = document.getElementById(String(item.parentId || item._id)) || activityEl.value;
+        target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 300);
+}
 
 function jumpToComposer() {
     activeTab.value = "activity";

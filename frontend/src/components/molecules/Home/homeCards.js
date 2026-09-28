@@ -5,7 +5,8 @@ import * as env from "@/config/env";
 // Every id here must be in HOME_CARD_IDS (Modules/Users/helpers/homeCardsRules.js), or the server refuses the save.
 export const HOME_CARDS = Object.freeze([
     { id: "waiting", labelKey: "Home.card_waiting", hintKey: "Home.card_waiting_hint" },
-    { id: "standup", labelKey: "Home.card_standup", hintKey: "Home.card_standup_hint" }
+    { id: "standup", labelKey: "Home.card_standup", hintKey: "Home.card_standup_hint" },
+    { id: "assigned_comments", labelKey: "Home.assigned_comments", hintKey: "Home.card_assigned_comments_hint" }
 ]);
 
 export const homeCards = reactive({ userId: null, hidden: [] });

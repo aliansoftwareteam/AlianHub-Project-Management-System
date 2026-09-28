@@ -69,6 +69,7 @@
                         <div class="home__side">
                             <WaitingOnYouCard v-if="isHomeCardShown('waiting')" @hide="hideCard('waiting')" />
                             <AgendaCard :day="agendaDay" :items="agendaItems" :connected="agenda.connected.value" :first-run="firstRun" @shift="shiftAgenda" />
+                            <AssignedCommentsCard v-if="isHomeCardShown('assigned_comments')" @open="openTask" @hide="hideCard('assigned_comments')" />
                             <section v-if="firstRun && !timer.active" class="hc-card">
                                 <div class="hc-personal__title">{{ $t('Home.personal_list') }}</div>
                                 <p class="hc-hint" style="margin: 0">{{ $t('Home.personal_hint') }}</p>
@@ -118,6 +119,7 @@ import CreateProjectSidebar from "@/components/organisms/CreateProject/CreatePro
 import HomeSidebar from "@/components/molecules/Home/HomeSidebar.vue";
 import MyWorkCard from "@/components/molecules/Home/MyWorkCard.vue";
 import AgendaCard from "@/components/molecules/Home/AgendaCard.vue";
+import AssignedCommentsCard from "@/components/molecules/Home/AssignedCommentsCard.vue";
 import PlannerPanel from "@/components/molecules/Home/PlannerPanel.vue";
 import TimerChip from "@/components/molecules/Home/TimerChip.vue";
 import SetupChecklist from "@/components/molecules/Home/SetupChecklist.vue";
