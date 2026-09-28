@@ -20,8 +20,8 @@ const expected = (route, state) => {
 };
 
 describe('the AI gate, per state and route', () => {
-    it('treats Ask, the agents hub, the AI Inbox, a run, pipeline and release as model-driven', () => {
-        expect([...MODEL_DRIVEN_ROUTES].sort()).toEqual(['AiAsk', 'AiHub', 'AiInbox', 'AiPipeline', 'AiRelease', 'AiRun']);
+    it('treats Ask, the agents hub, the AI Inbox, a run, pipeline, release and quality as model-driven', () => {
+        expect([...MODEL_DRIVEN_ROUTES].sort()).toEqual(['AiAsk', 'AiHub', 'AiInbox', 'AiPipeline', 'AiQuality', 'AiRelease', 'AiRun']);
     });
 
     it('classifies every AI-section route as model-driven or configuration', () => {
