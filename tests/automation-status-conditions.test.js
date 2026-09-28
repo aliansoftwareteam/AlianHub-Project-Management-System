@@ -98,6 +98,13 @@ describe('"status is <name>" compiles to the statuses it names, by key', () => {
         expect(holds(conditions, created(task(OPS, 4, 'active')))).toBe(false);
     });
 
+    test('"Blocked or In Review" names both statuses', () => {
+        const sentence = 'When a task is created, if the status is Blocked or In Review, set the priority to HIGH.';
+        const out = S.parseSentence(sentence, { statuses: STATUSES });
+        expect(out.rule.conditions).toEqual({ op: 'in', field: 'statusRef', value: [WEB_BLOCKED, OPS_BLOCKED, `${WEB}:5`], label: 'Blocked or In Review' });
+        expect(S.describeRule(out.rule)).toBe(sentence);
+    });
+
     test('the sentence reads the name back, so sentence → rule → sentence stays fixed', () => {
         const sentence = 'When a task status changes to Blocked, if the status is not In Review, set the priority to HIGH.';
         const out = S.parseSentence(sentence, { statuses: STATUSES });

@@ -265,6 +265,22 @@ describe('people, statuses and projects resolve only among what the caller may u
         expect(hidden.body.data.rule).toBeNull();
         expect(hidden.body.data.rejected.join(' ')).toContain('Shipped');
     });
+
+    it('drafts a status condition by key, the way the compiler does, and a generic word as its type', async () => {
+        modelSays(draftOf({ trigger: 'task.status_changed', conditions: [{ field: 'statusRef', op: 'changedTo', value: 'done' }] }));
+        const named = await call({ body: { sentence: 'When a task moves to Done, tell the team' } });
+        expect(named.body.data.rule.conditions).toEqual({ op: 'changedTo', field: 'statusRef', value: [`${WEBSITE}:6`], label: 'Done' });
+        expect(named.body.data.sentence).toBe('When a task status changes to Done, post a comment saying "Escalated".');
+
+        modelSays(draftOf({ trigger: 'task.status_changed', conditions: [{ field: 'statusRef', op: 'in', value: ['closed'] }] }));
+        const generic = await call({ body: { sentence: 'When a closed task changes status, tell the team' } });
+        expect(generic.body.data.rule.conditions).toEqual({ op: 'eq', field: 'statusType', value: 'close' });
+
+        modelSays(draftOf({ trigger: 'task.status_changed', conditions: [{ field: 'statusRef', op: 'in', value: ['Shipped'] }] }));
+        const hidden = await call({ body: { sentence: 'When a shipped task changes status, tell the team' } });
+        expect(hidden.body.data.rule).toBeNull();
+        expect(hidden.body.data.rejected).toEqual(['I do not know a status called "Shipped". The statuses are To Do and Done.']);
+    });
 });
 
 describe('the assign action takes people as a list', () => {
