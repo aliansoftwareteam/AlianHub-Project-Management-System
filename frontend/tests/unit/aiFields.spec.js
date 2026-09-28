@@ -10,7 +10,7 @@ vi.mock('@/composable/aiAvailability', async () => {
     const { ref: vueRef } = await import('vue');
     const usable = vueRef(true);
     aiUsableRef.ref = usable;
-    return { aiUsable: usable };
+    return { aiUsable: usable, canUseAi: () => usable.value };
 });
 vi.mock('@/views/Projects/TableView/useTaskSummaries.js', () => ({ useTaskSummaries: () => ({ generateMany: vi.fn() }) }));
 vi.mock('@/composable', () => ({

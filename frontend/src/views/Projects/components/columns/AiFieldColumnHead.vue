@@ -1,7 +1,7 @@
 <template>
     <span class="afh">
         <span class="afh__label" :title="field.fieldTitle"><span class="afh__mark" aria-hidden="true">✦</span> {{ field.fieldTitle }}</span>
-        <span v-if="editable && aiUsable" ref="wrapEl" class="afh__wrap">
+        <span v-if="editable && aiOn" ref="wrapEl" class="afh__wrap">
             <button
                 ref="triggerEl"
                 type="button"
@@ -33,9 +33,9 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, ref } from "vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { aiUsable } from "@/composable/aiAvailability";
+import { canUseAi } from "@/composable/aiAvailability";
 import { openAiFill } from "@/composable/aiFieldFill";
 import { storedEntry } from "@/views/Projects/composables/projectCustomFields";
 
@@ -46,6 +46,9 @@ const props = defineProps({
     tasks: { type: Array, default: () => [] },
     editable: { type: Boolean, default: false }
 });
+
+const project = inject("selectedProject", null);
+const aiOn = computed(() => canUseAi(project?.value ? { project: project.value } : {}));
 
 const open = ref(false);
 const triggerEl = ref(null);

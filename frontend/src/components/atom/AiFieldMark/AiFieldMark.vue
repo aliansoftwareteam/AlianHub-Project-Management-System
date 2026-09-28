@@ -5,7 +5,7 @@
             <span :class="showText ? 'aim__text' : 'ah-sr-only'">{{ tooltip }}</span>
         </span>
         <button
-            v-if="canFill && aiUsable"
+            v-if="canFill && aiOn"
             type="button"
             class="aim__fill"
             data-ai-fill
@@ -23,7 +23,7 @@ import { computed, inject, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import { aiUsable } from "@/composable/aiAvailability";
+import { canUseAi } from "@/composable/aiAvailability";
 import { openAiFill } from "@/composable/aiFieldFill";
 import { aiFillOf } from "@/views/Projects/composables/aiFields";
 
@@ -38,6 +38,9 @@ const props = defineProps({
 
 const { t } = useI18n();
 const dateFormat = inject("$dateFormat", ref("DD/MM/YYYY"));
+const project = inject("selectedProject", null);
+
+const aiOn = computed(() => canUseAi(project?.value ? { project: project.value } : {}));
 
 const tooltip = computed(() => {
     const last = aiFillOf(props.task, props.def);
