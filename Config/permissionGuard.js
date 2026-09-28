@@ -25,6 +25,7 @@
  */
 const mongoose = require("mongoose");
 const { myCache } = require("./config");
+const { idForms } = require("../utils/mongo-handler/objectIdKeys");
 const { SCHEMA_TYPE } = require("./schemaType");
 const { MongoDbCrudOpration } = require("../utils/mongo-handler/mongoQueries");
 const { fetchRules } = require("../Modules/settings/securityPermissions/controller");
@@ -129,7 +130,7 @@ const loadProjectRules = async (companyId, projectId) => {
     const key = `projectRules:${projectId}`;
     const cached = myCache.get(key);
     if (Array.isArray(cached) && cached.length) return cached;
-    const rules = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECT_RULES, data: [{ projectId: String(projectId) }] }, 'find');
+    const rules = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECT_RULES, data: [{ projectId: { $in: idForms(String(projectId)) } }] }, 'find');
     myCache.set(key, rules || [], PROJECT_RULES_TTL_SECONDS);
     return rules || [];
 };

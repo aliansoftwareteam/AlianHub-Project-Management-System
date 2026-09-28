@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
 const usage = require('../AICore/usage');
@@ -241,7 +242,7 @@ const recordSpend = async (companyId, run, tokens, model) => {
  * read. Both sit under $and so a projectId or taskId filter the caller sends narrows them, never replaces them. */
 const inProjects = (projectIds, hiddenTaskIds) => {
     const clauses = [];
-    if (Array.isArray(projectIds)) clauses.push({ projectId: { $in: projectIds.map(String) } });
+    if (Array.isArray(projectIds)) clauses.push({ projectId: { $in: idForms(projectIds.map(String)) } });
     if (Array.isArray(hiddenTaskIds) && hiddenTaskIds.length) clauses.push({ taskId: { $nin: hiddenTaskIds.map(String) } });
     return clauses.length ? { $and: clauses } : {};
 };
@@ -250,7 +251,7 @@ const list = async (companyId, { status, projectId, agentId, taskId, errorType, 
     const match = { ...inProjects(projectIds, hiddenTaskIds) };
     if (status === 'open') match.status = { $in: OPEN };
     else if (status) match.status = String(status);
-    if (projectId) match.projectId = String(projectId);
+    if (projectId) match.projectId = { $in: idForms(String(projectId)) };
     if (agentId) match.agentId = String(agentId);
     if (taskId) match.taskId = String(taskId);
     if (errorType) match['failure.type'] = String(errorType);
@@ -262,7 +263,7 @@ const list = async (companyId, { status, projectId, agentId, taskId, errorType, 
 /* What the rail footer and the project header chip show. */
 const summary = async (companyId, { projectId, projectIds, hiddenTaskIds } = {}) => {
     const match = { status: { $in: OPEN }, ...inProjects(projectIds, hiddenTaskIds) };
-    if (projectId) match.projectId = String(projectId);
+    if (projectId) match.projectId = { $in: idForms(String(projectId)) };
     const open = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [match, 'agentId agentName status startedAt spend taskId'] }, 'find');
     const now = Date.now();
     const running = (open || []).filter((r) => r.status === STATUS.RUNNING);
@@ -279,7 +280,7 @@ const summary = async (companyId, { projectId, projectIds, hiddenTaskIds } = {})
 /* Runs by status, for the counts a page shows next to the live summary. */
 const countsByStatus = async (companyId, { projectId, agentId, projectIds, hiddenTaskIds } = {}) => {
     const match = { ...inProjects(projectIds, hiddenTaskIds) };
-    if (projectId) match.projectId = String(projectId);
+    if (projectId) match.projectId = { $in: idForms(String(projectId)) };
     if (agentId) match.agentId = String(agentId);
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_RUNS, data: [[{ $match: match }, { $group: { _id: '$status', n: { $sum: 1 } } }]],

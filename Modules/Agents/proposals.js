@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const socketEmitter = require('../../event/socketEventEmitter');
 const registry = require('./registry');
 const actions = require('./actions');
@@ -161,7 +162,7 @@ const skillSourcesOfRuns = async (companyId, rows) => {
  * cannot read; the counts follow the same scope. */
 const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds, hiddenTaskIds } = {}) => {
     const scoped = {
-        ...(Array.isArray(projectIds) ? { projectId: { $in: projectIds.map(String) } } : {}),
+        ...(Array.isArray(projectIds) ? { projectId: { $in: idForms(projectIds.map(String)) } } : {}),
         ...(Array.isArray(hiddenTaskIds) && hiddenTaskIds.length ? { taskId: { $nin: hiddenTaskIds.map(String) } } : {}),
     };
     const match = { ...scoped };
