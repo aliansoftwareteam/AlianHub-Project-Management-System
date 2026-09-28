@@ -150,6 +150,8 @@ const TASK_WRITE_ROUTES = Object.freeze({
     'PATCH /api/v1/recurring-tasks/:id': judgedBy('requireProjectAccess on the definition\'s project'),
     'DELETE /api/v1/recurring-tasks/:id': judgedBy('requireProjectAccess on the definition\'s project'),
     'POST /api/v1/recurring-tasks/:id/run-now': judgedBy('requireProjectAccess with task.task_create on the route'),
+    'PUT /api/v1/recurring-tasks/task/:taskId': judgedBy('requireProjectAccess with task.task_due_date and task.task_create on the task\'s project'),
+    'DELETE /api/v1/recurring-tasks/task/:taskId': judgedBy('requireProjectAccess with task.task_due_date on the task\'s project'),
     'POST /api/v2/task-templates': judgedBy('Modules/TaskTemplates/access.js: task.task_create in the task\'s project, owner or admin for a workspace template'),
     'PATCH /api/v2/task-templates/:id': judgedBy('Modules/TaskTemplates/access.js canManage on the stored template'),
     'DELETE /api/v2/task-templates/:id': judgedBy('Modules/TaskTemplates/access.js canManage on the stored template'),

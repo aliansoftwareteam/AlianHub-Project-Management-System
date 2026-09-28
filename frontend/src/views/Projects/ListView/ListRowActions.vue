@@ -34,6 +34,14 @@
                 <a class="ah-pop__item" role="menuitem" data-item="new-tab" :href="href" target="_blank" rel="noopener" @click="close(false)">{{ t('List.menu_new_tab') }}</a>
                 <button type="button" class="ah-pop__item" role="menuitem" data-item="open" @click="choose('open')">{{ t('List.menu_open') }}</button>
                 <button v-if="canTemplate" type="button" class="ah-pop__item" role="menuitem" data-item="save-template" @click="choose('save-template')">{{ t('TaskTemplates.save_as') }}</button>
+                <template v-if="canArchive || canDelete || canMove || canDuplicate">
+                    <div class="ah-pop__sep" role="separator"></div>
+                    <button v-if="canMove" type="button" class="ah-pop__item" role="menuitem" data-item="move" @click="choose('move')">{{ t('List.menu_move') }}</button>
+                    <button v-if="canDuplicate" type="button" class="ah-pop__item" role="menuitem" data-item="duplicate" @click="choose('duplicate')">{{ t('List.menu_duplicate') }}</button>
+                    <button v-if="canDuplicate && hasSubtasks" type="button" class="ah-pop__item" role="menuitem" data-item="duplicate-subtasks" @click="choose('duplicate-subtasks')">{{ t('List.menu_duplicate_subtasks') }}</button>
+                    <button v-if="canArchive" type="button" class="ah-pop__item" role="menuitem" data-item="archive" @click="choose('archive')">{{ t('List.menu_archive') }}</button>
+                    <button v-if="canDelete" type="button" class="ah-pop__item lv2__menu-danger" role="menuitem" data-item="delete" @click="choose('delete')">{{ t('List.menu_delete') }}</button>
+                </template>
             </div>
         </span>
     </span>
@@ -52,9 +60,13 @@ const props = defineProps({
     href: { type: String, default: "" },
     canRename: { type: Boolean, default: false },
     canSubtask: { type: Boolean, default: false },
-    canTemplate: { type: Boolean, default: false }
+    canTemplate: { type: Boolean, default: false },
+    canArchive: { type: Boolean, default: false },
+    canDelete: { type: Boolean, default: false },
+    canMove: { type: Boolean, default: false },
+    canDuplicate: { type: Boolean, default: false }
 });
-const emit = defineEmits(["rename", "add-subtask", "copy-link", "copy-key", "open", "save-template"]);
+const emit = defineEmits(["rename", "add-subtask", "copy-link", "copy-key", "open", "save-template", "archive", "delete", "move", "duplicate", "duplicate-subtasks"]);
 
 const { t } = useI18n();
 const open = ref(false);
@@ -63,6 +75,7 @@ const menuButton = ref(null);
 const menuStyle = ref({});
 
 const name = computed(() => props.task.TaskName || "");
+const hasSubtasks = computed(() => Number(props.task.subTasks || 0) > 0);
 const taskKey = computed(() => (props.task.TaskKey && props.task.TaskKey !== "--" ? props.task.TaskKey : ""));
 
 const items = () => [...(menu.value?.querySelectorAll('[role="menuitem"]') || [])];
@@ -83,7 +96,7 @@ function toggle() {
     nextTick(() => items()[0]?.focus());
 }
 
-const MENU_ROOM = 260;
+const MENU_ROOM = 400;
 
 /* Fixed to the viewport: the group card clips its rows, so an anchored menu on the last
  * row would be cut off. It opens upwards when there is no room below. */
@@ -106,7 +119,7 @@ function close(returnFocus) {
     if (returnFocus) nextTick(() => menuButton.value?.focus());
 }
 
-const MOVES_FOCUS = ["rename", "add-subtask", "open", "save-template"];
+const MOVES_FOCUS = ["rename", "add-subtask", "open", "save-template", "move"];
 
 function choose(action) {
     close(!MOVES_FOCUS.includes(action));

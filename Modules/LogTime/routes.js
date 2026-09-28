@@ -4,6 +4,17 @@ const multer = require("multer");
 const { DEFAULT_LIMITS } = require('../../utils/uploadConfig');
 const { USER_PROFILES_BUCKET, refuseBeforeWrite, refuseUpload, uploadRefusal } = require('../storage/bucketAccess');
 const { ownSessionRefusal } = require('./controllerV2/sessionUser');
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { READ, requireProjectAccess, projectIdsFrom } = require('../../Config/projectAccess');
+
+/* Anyone who can open the task may log time on it; the task's project is read off the stored task. */
+const onAVisibleTask = requireProjectAccess({
+    mode: READ,
+    projectIds: projectIdsFrom({
+        records: [[SCHEMA_TYPE.TASKS, (req) => req.body && req.body.ticketId]],
+        direct: (req) => req.body && req.body.projectId,
+    }),
+});
 
 /* The storage engine writes to the bucket named in the body, while the middleware only verified the companyid header. */
 const captureRefusal = async (req) => {
@@ -149,7 +160,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v2/manualLogtime', ctrlV2.manualLogTime);
+    app.post('/api/v2/manualLogtime', onAVisibleTask, ctrlV2.manualLogTime);
 
 
       /**
@@ -256,7 +267,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v2/deleteManualLogtime', ctrlV2.deleteManualLogtime);
+    app.post('/api/v2/deleteManualLogtime', onAVisibleTask, ctrlV2.deleteManualLogtime);
 
         /**
      * @swagger

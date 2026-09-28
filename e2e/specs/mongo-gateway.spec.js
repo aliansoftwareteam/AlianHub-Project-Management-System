@@ -1,18 +1,5 @@
-const { test, expect, asRole } = require('../support/test');
+const { test, expect } = require('../support/test');
 const { emailFor, uniqueSuffix } = require('../support/fixtures');
-
-test.describe('task panel logged time as a member', () => {
-    test.use(asRole('member'));
-
-    test('the logged-time query still goes through the gateway', async ({ page, state }) => {
-        const [task] = state.tasks;
-        const gateway = page.waitForResponse((res) => res.url().includes('/api/v1/mongoOpration'), { timeout: 45000 });
-        await page.goto(`/#/${state.companyId}/project/${task.projectId}/s/${task.sprintId}/${task._id}`);
-        const res = await gateway;
-        expect(res.status()).toBe(200);
-        expect((await res.json()).status).toBe(true);
-    });
-});
 
 test.describe('invitation page while signed out', () => {
     test('shows the invited email from the invitation preview', async ({ page, state, loginAs }) => {

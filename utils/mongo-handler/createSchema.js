@@ -125,6 +125,7 @@ publicShareIndexSchema.index({ token: 1 }, { unique: true });
 const recurringTasksSchema = new Schema(schema.recurringTasks, {strict: true, timestamps: true});
 recurringTasksSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 recurringTasksSchema.index({ enabled: 1, deletedStatusKey: 1, nextRunAt: 1 });
+recurringTasksSchema.index({ sourceTaskId: 1, deletedStatusKey: 1 });
 const taskTemplatesSchema = new Schema(schema.task_templates, {strict: true, timestamps: true});
 taskTemplatesSchema.index({ scope: 1, ProjectID: 1, deletedStatusKey: 1 });
 const remindersSchema = new Schema(schema.reminders, {strict: true, timestamps: true});

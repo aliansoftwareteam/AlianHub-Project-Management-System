@@ -13,6 +13,7 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { agentRunsSchema } = require('../utils/mongo-handler/createSchema');
 const tools = require('../Modules/Automations/engine/tools');
 const runs = require('../Modules/Agents/runs');
+const triggers = require('../Modules/Agents/triggers');
 const ctrl = require('../Modules/Agents/controller');
 
 const C = '6f0000000000000000000c01';
@@ -30,6 +31,7 @@ beforeAll(() => mockDb.uniqueFromSchema(SCHEMA_TYPE.AGENT_RUNS, agentRunsSchema)
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     jest.clearAllMocks();
+    jest.spyOn(triggers, 'mayRunOn').mockResolvedValue(true);
     jest.spyOn(runs, 'executeSkill').mockResolvedValue({ status: 'done' });
     tools.getTask.mockResolvedValue(TASK);
     mockDb.seed(SCHEMA_TYPE.AGENTS, agent());

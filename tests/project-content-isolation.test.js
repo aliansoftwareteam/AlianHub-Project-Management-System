@@ -30,6 +30,7 @@ jest.mock('../Modules/Milestone/controller', () => mockModule());
 jest.mock('../Modules/ProjectDashboard/controller', () => mockModule());
 jest.mock('../Modules/Calendar/controller', () => mockModule());
 jest.mock('../Modules/RecurringTasks/controller', () => mockModule());
+jest.mock('../Modules/RecurringTasks/taskRule', () => mockModule());
 jest.mock('../Modules/projectSetting/controller', () => mockModule());
 jest.mock('../Modules/projectSetting/autoArchive', () => mockModule());
 jest.mock('../Modules/projectSetting/estimationScale', () => mockModule());
@@ -118,6 +119,7 @@ const GRANTS = {
     'project.project_milestone': true,
     'project.project_milestone_status_change': true,
     'task.task_create': true,
+    'task.task_due_date': true,
 };
 
 beforeEach(() => {
@@ -157,6 +159,7 @@ const READS = [
     [MILESTONE, 'GET /api/v2/billing/client-view', (pid) => ({ query: { projectId: pid } })],
     [DASHBOARD, 'GET /api/v1/project-dashboard/:projectId', (pid) => ({ params: { projectId: pid } })],
     [RECURRING, 'GET /api/v1/recurring-tasks/project/:pid', (pid) => ({ params: { pid } })],
+    [RECURRING, 'GET /api/v1/recurring-tasks/task/:taskId', (pid) => ({ params: { taskId: taskIn(pid) } })],
     [SETTINGS, 'GET /api/v1/projectSetting/autoArchive/:pid', (pid) => ({ params: { pid } })],
     [RULES, 'GET /api/v1/projectRules/:pid', (pid) => ({ params: { pid } })],
 ];
@@ -192,6 +195,8 @@ const WRITES = [
     [RECURRING, 'PATCH /api/v1/recurring-tasks/:id', (pid) => ({ params: { id: definitionIn(pid) }, body: { enabled: false } })],
     [RECURRING, 'DELETE /api/v1/recurring-tasks/:id', (pid) => ({ params: { id: definitionIn(pid) } })],
     [RECURRING, 'POST /api/v1/recurring-tasks/:id/run-now', (pid) => ({ params: { id: definitionIn(pid) } })],
+    [RECURRING, 'PUT /api/v1/recurring-tasks/task/:taskId', (pid) => ({ params: { taskId: taskIn(pid) }, body: { freq: 'weekly' } })],
+    [RECURRING, 'DELETE /api/v1/recurring-tasks/task/:taskId', (pid) => ({ params: { taskId: taskIn(pid) } })],
 ];
 
 const call = (modulePath, route, uid, build, project) => run(routesOf(modulePath)[route], request({ uid, ...build(String(project._id)) }));

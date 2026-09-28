@@ -465,7 +465,10 @@ const schema = {
         monthday: { type: Number, required: false },
         runHour: { type: Number, default: 9 },
         skipIfOpen: { type: Boolean, default: false },
+        missedPolicy: { type: String, required: false },
         until: { type: Date, required: false },
+        maxRuns: { type: Number, required: false },
+        sourceTaskId: { type: String, required: false },
         nextRunAt: { type: Date, required: false },
         lastRunAt: { type: Date, required: false },
         lastInstanceTaskId: { type: String, required: false },
@@ -2116,6 +2119,9 @@ const schema = {
         },
         navPreferences: {
             pinned: { type: [String], required: false, default: undefined }
+        },
+        accessibilityPreferences: {
+            singleKeyShortcuts: { type: Boolean, required: false }
         },
         // Stars across companies live on the global user record, so each entry names its company.
         favourites: {

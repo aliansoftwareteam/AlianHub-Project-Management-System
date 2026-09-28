@@ -129,6 +129,7 @@ const queueRuns = async ({ companyId, uid, projectId, pairs, agents }) => {
     const runs = require('../Agents/runs');
     const proposals = require('../Agents/proposals');
     const actions = require('../Agents/actions');
+    const triggers = require('../Agents/triggers');
     const byId = new Map(agents.map((a) => [String(a._id), a]));
     let runsQueued = 0;
     const runsRefused = [];
@@ -136,6 +137,8 @@ const queueRuns = async ({ companyId, uid, projectId, pairs, agents }) => {
         const split = planTask.split;
         if (!split || split.label !== 'agent') continue;
         const taskId = String(doc._id);
+        // eslint-disable-next-line no-await-in-loop
+        if (!(await triggers.mayRunOn(companyId, uid, doc))) { runsRefused.push({ taskId, reason: 'Task not found.' }); continue; }
         const agent = byId.get(String(split.agentId));
         if (!agent) { runsRefused.push({ taskId, reason: 'The agent is no longer available.' }); continue; }
         if (Array.isArray(agent.projectIds) && agent.projectIds.length && !agent.projectIds.map(String).includes(String(projectId))) {

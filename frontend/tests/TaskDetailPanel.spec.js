@@ -136,6 +136,14 @@ describe('TaskDetailPanel', () => {
         expect(wrapper.find('.ah-detail__title-row input[type="checkbox"]').exists()).toBe(false);
     });
 
+    it('offers the timer to a member who can open the task without being assigned to it', async () => {
+        Object.assign(projectPayload, { sprintsObj: [], sprintsfolders: [] });
+        const wrapper = mountPanel({ roleType: 3, userId: 'u9' });
+        await flushPromises();
+        expect(wrapper.find('.ah-time').exists()).toBe(true);
+        expect(wrapper.findComponent({ name: 'TaskTimerChip' }).vm.$attrs.canStart).toBe(true);
+    });
+
     it('shows no agent strip when the task has no open run', async () => {
         openRuns.rows = [];
         const wrapper = mountPanel();
