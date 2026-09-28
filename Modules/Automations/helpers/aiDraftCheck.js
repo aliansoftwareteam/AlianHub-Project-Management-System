@@ -39,12 +39,16 @@ const WRITE_AS = {
     task_type: 'the task type name exactly as the sentence says it',
 };
 
+const takesList = (spec = {}) => /_multi$/.test(lower(spec.type));
+
 const describeSpec = (spec) => {
     const kind = kindOf(spec);
     const out = { type: spec.type, label: spec.label };
     if (spec.required) out.required = true;
     if (kind === 'option') out.options = spec.options;
     if (WRITE_AS[kind]) out.writeAs = WRITE_AS[kind];
+    if (takesList(spec)) out.list = true;
+    if (Array.isArray(spec.roles) && spec.roles.length) out.alsoAccepts = spec.roles;
     return out;
 };
 
@@ -168,6 +172,14 @@ const checkAction = (raw, index, entity, ctx, rejected) => {
         const value = given[field];
         if (value === undefined || value === null || value === '') {
             if (spec.required) { rejected.push(`"${action.label}" needs ${spec.label}.`); ok = false; }
+            return;
+        }
+        if (takesList(spec)) {
+            const roles = Array.isArray(spec.roles) ? spec.roles : [];
+            const items = (Array.isArray(value) ? value : [value])
+                .map((v) => (roles.includes(v) ? { value: v } : resolveOne(kindOf(spec), v, spec, ctx)));
+            items.filter((v) => v.error).forEach((v) => { rejected.push(v.error); ok = false; });
+            config[field] = [...new Set(items.filter((v) => !v.error).map((v) => v.value))];
             return;
         }
         const one = resolveOne(kindOf(spec), value, spec, ctx);

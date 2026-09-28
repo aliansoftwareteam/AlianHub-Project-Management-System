@@ -267,6 +267,30 @@ describe('people, statuses and projects resolve only among what the caller may u
     });
 });
 
+describe('the assign action takes people as a list', () => {
+    it('resolves each named person to their id and keeps a role the action accepts', async () => {
+        modelSays(draftOf({ actions: [{ action: 'assign', config: { mode: 'add', userIds: ['Priya', 'task_creator'] } }] }));
+        const res = await call({ body: { sentence: 'When a task becomes urgent, assign it to Priya and the creator' } });
+        expect(res.body.data.rejected).toEqual([]);
+        expect(res.body.data.rule.steps[0].config).toEqual({ mode: 'add', userIds: [PRIYA, 'task_creator'] });
+        expect(res.body.data.sentence).toContain('Priya Shah');
+    });
+
+    it('rejects the draft when one of the people is outside the caller\'s projects', async () => {
+        modelSays(draftOf({ actions: [{ action: 'assign', config: { mode: 'add', userIds: ['Priya', 'Sam Secret'] } }] }));
+        const res = await call({ body: { sentence: 'When a task becomes urgent, assign it to Priya and Sam' } });
+        expect(res.body.data.rule).toBeNull();
+        expect(res.body.data.rejected.join(' ')).toContain('Sam Secret');
+    });
+
+    it('lets the action\'s own validator refuse a mode that needs people but names none', async () => {
+        modelSays(draftOf({ actions: [{ action: 'assign', config: { mode: 'add', userIds: [] } }] }));
+        const res = await call({ body: { sentence: 'When a task becomes urgent, assign it' } });
+        expect(res.body.data.rule).toBeNull();
+        expect(res.body.data.rejected.join(' ')).toMatch(/userIds/);
+    });
+});
+
 describe('who may draft, and when AI is off', () => {
     it('refuses a member without calling the model', async () => {
         modelSays(draftOf());

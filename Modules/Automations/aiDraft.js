@@ -100,13 +100,14 @@ async function draftHandler(req, res) {
         const parsed = parseModelJson(answer && answer.content);
         if (!parsed.ok) return res.send({ status: false, statusText: UNREADABLE });
 
-        const out = checkDraft(parsed.value, await loadRefs(companyId, req.uid));
+        const refs = await loadRefs(companyId, req.uid);
+        const out = checkDraft(parsed.value, refs);
         return res.send({
             status: true,
             data: {
                 drafted: true,
                 rule: out.rule,
-                sentence: out.rule ? describeRule(out.rule) : sentence,
+                sentence: out.rule ? describeRule(out.rule, { people: refs.people }) : sentence,
                 unmapped: out.unmapped,
                 rejected: out.rejected,
             },
