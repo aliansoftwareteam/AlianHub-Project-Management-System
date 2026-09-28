@@ -921,6 +921,8 @@ const schema = {
         // How the agent is meant to be started ('mention' for a project Guide). Informational; runs.canStart enforces the rest.
         trigger: { type: String, required: false },
         rateLimitPerDay: { type: Number, required: false },
+        // Overrides the skill's verifier floor (Modules/Agents/engine/confidence.js); null uses the skill's.
+        confidenceFloor: { type: Number, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     agentRuns: {
