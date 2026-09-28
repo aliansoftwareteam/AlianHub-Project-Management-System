@@ -28,7 +28,7 @@ const storeFor = (roleType) => createStore({
     modules: { settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType }) } } },
 });
 
-const open = async (roleType = 1, start = 'AiHome') => {
+const open = async (roleType = 1, start = 'AiAsk') => {
     const router = routerFor();
     await router.push({ name: start, params: { cid: 'c1' } });
     await router.isReady();
@@ -48,11 +48,18 @@ const setup = (wrapper) => labels(wrapper.findAll('.ai-side__group-body .ai-side
 describe('AI sidebar structure', () => {
     beforeEach(() => localStorage.clear());
 
-    it('offers six everyday entries and keeps the consoles out of them', async () => {
+    it('leads the everyday entries with Ask and keeps the consoles out of them', async () => {
         const wrapper = await open();
-        expect(everyday(wrapper)).toEqual(['Ai.nav_home', 'Ai.inbox', 'Ai.agents', 'Ai.skills', 'Ai.nav_analytics', 'Parity.nav_connections']);
+        expect(everyday(wrapper)).toEqual(['Parity.nav_ask', 'Ai.inbox', 'Ai.agents', 'Ai.skills', 'Parity.nav_connections']);
         expect(wrapper.find('.ai-side__count').text()).toBe('2');
         expect(setup(wrapper)).toContain('AiHealth.nav');
+        expect(setup(wrapper)).not.toContain('Parity.nav_ask');
+    });
+
+    it('marks Ask as the current page on the AI home', async () => {
+        const first = (await open()).find('.ai-side__nav > .ai-side__item');
+        expect(first.classes()).toContain('router-link-active');
+        expect(first.attributes('aria-current')).toBe('page');
     });
 
     it('starts the setup group collapsed and remembers the toggle', async () => {
@@ -68,7 +75,7 @@ describe('AI sidebar structure', () => {
 
     it('opens the group when the page behind it is the one being shown', async () => {
         expect(groupOpen(await open(1, 'AiHealth'))).toBe(true);
-        expect(groupOpen(await open(1, 'AiHome'))).toBe(false);
+        expect(groupOpen(await open(1, 'AiAsk'))).toBe(false);
     });
 
     it('keeps the workflow builder out of a member setup group', async () => {
@@ -79,7 +86,7 @@ describe('AI sidebar structure', () => {
 
 describe('AI section membership', () => {
     it('claims the section screens that are not named with the Ai prefix', () => {
-        ['AiHome', 'AiHub', 'AgentTeammates', 'AgentRouting', 'WorkflowBuilder', 'WorkflowRun', 'WorkflowLineage', 'Connections']
+        ['AiAsk', 'AiHub', 'AgentTeammates', 'AgentRouting', 'WorkflowBuilder', 'WorkflowRun', 'WorkflowLineage', 'Connections']
             .forEach((name) => expect(isAiSectionRoute(name)).toBe(true));
     });
 
