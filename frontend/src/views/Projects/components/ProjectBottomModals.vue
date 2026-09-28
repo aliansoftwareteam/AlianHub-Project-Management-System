@@ -1,8 +1,8 @@
 <template>
     <div>
-        <DropDown :title="$t('Projects.all_views')" :ref="projectAddView" :bodyClass="{'viewlist-mobile-dropdown-new' : true}" maxHeight="unset" v-if="clientWidth <= 768">
-            <template #button>
-                <span ref="allViewsTrigger"></span>
+        <DropDown mode="dialog" :aria-label="$t('Projects.all_views')" :title="$t('Projects.all_views')" :ref="projectAddView" :bodyClass="{'viewlist-mobile-dropdown-new' : true}" maxHeight="unset" v-if="clientWidth <= 768">
+            <template #button="{ triggerAttrs }">
+                <span ref="allViewsTrigger" v-bind="triggerAttrs"></span>
             </template>
             <template #options>
                 <div>

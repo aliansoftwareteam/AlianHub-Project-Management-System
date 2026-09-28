@@ -2,7 +2,7 @@
     <div class="d-flex justify-content-between w-100 save-filter-wrapper">
         <div class="save-filter-section d-flex align-items-center cursor-pointer" v-if="from === ''">
             <span class="text">
-                <DropDown v-if="!isEdit" :bodyClass="{'save-thisfilters-dropdown' : true}" z-index="999">
+                <DropDown v-if="!isEdit" mode="dialog" :aria-label="$t('Filters.save_this_filters')" :bodyClass="{'save-thisfilters-dropdown' : true}" z-index="999">
                     <template #head>
                         <div class="d-flex align-items-center justify-content-between mobile__field-actions" v-if="clientWidth <=767">
                             <a href="#" class="mr-10px" @click.stop.prevent="$refs.saveFilterRef.click(), inputName='', isInvalid=false" :class="{'font-size-16' : clientWidth <=767 }" :style="{color : clientWidth <=767 ? '#646464' : '#2F3990'}">{{$t('Projects.cancel')}}</a>
@@ -51,7 +51,7 @@
                     <template #button>
                         <img ref="saveFilterRef" src="@/assets/images/svg/save_filter_fdropdown.svg" :alt="$t('Filters.my_filter')" class="saveFilterDropArrow position-re"/>
                     </template>
-                    <template #options>
+                    <template #search>
                         <div :style="{width : clientWidth <=767 ? '100%' : ' 225px'}" class="saved-filters">
                             <div class="savefilter-inputserach-wrapper">
                             <InputText
@@ -65,6 +65,10 @@
                             <div class="mt-10px border-top-lightwhite" v-if="clientWidth > 767">
                                 <h5 class="filter-list-title p0x-10px">{{ $t('Filters.my_filter') }}</h5>
                             </div>
+                        </div>
+                    </template>
+                    <template #options>
+                        <div :style="{width : clientWidth <=767 ? '100%' : ' 225px'}" class="saved-filters">
                             <div class="saved-filterdropdownlist-wrapper">
                                 <DropDownOption v-for="(item, index) in filteredOptions" :key="index" class="dropdown-item justify-content-between saved-filters-dropdown" :class="{'edit-input-mobile' : clientWidth <=767 && item.isEdit }" @click="!item.isEdit && $emit('apply', {item: item, type: 'saved'})">
                                     <span class="saved-serach-title text-capitalize w-100 font-size-14" v-if="!item.isEdit"

@@ -110,7 +110,7 @@
                             </div>
                             <!-- <div class="count-block parent-count-block">5</div> -->
                             <template v-if="Object.keys(userActivityObj || {}).length">
-                                <DropDown mode="menu" @isVisible="(visible) => visible && userActivityClick()">
+                                <DropDown mode="dialog" :aria-label="$t('Projects.active_members')" @isVisible="(visible) => visible && userActivityClick()">
                                     <template #button>
                                         <img :src="Object.keys(userActivityObj || {}).length ? clockBlue : clockGray" :alt="$t('Projects.active_members')" class="ml-5px">
                                     </template>
