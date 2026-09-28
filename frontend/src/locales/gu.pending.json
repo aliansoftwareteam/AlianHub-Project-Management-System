@@ -2867,6 +2867,7 @@
     "Home.calendar": "Calendar",
     "Home.calendar_not_connected": "Calendar · not connected",
     "Home.calendar_synced": "Calendar · synced",
+    "Home.card_assigned_comments_hint": "Open comments assigned to you, ready to resolve.",
     "Home.card_hidden": "Card hidden. Bring it back from Manage cards.",
     "Home.card_standup": "Your standup",
     "Home.card_standup_hint": "Yesterday, today and what is blocked, from your own activity.",

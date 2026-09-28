@@ -3,6 +3,9 @@
         <div class="hc-card__head">
             <h2 :id="headingId" class="hc-card__title hc-assigned__title">{{ $t('Home.assigned_comments') }}</h2>
             <span v-if="items.length" class="ah-mono hc-assigned__count">{{ items.length }}</span>
+            <button type="button" class="hc-assigned__hide" data-test="assigned-comments-hide" :aria-label="$t('Home.hide_card')" :title="$t('Home.hide_card')" @click="$emit('hide')">
+                <ShellIcon name="x" :size="13" />
+            </button>
         </div>
         <p v-if="loading && !items.length" class="hc-hint hc-assigned__hint">{{ $t('Home.assigned_comments_loading') }}</p>
         <p v-else-if="!items.length" class="hc-hint hc-assigned__hint">{{ $t('Home.assigned_comments_empty') }}</p>
@@ -25,10 +28,11 @@ import { useI18n } from "vue-i18n";
 import { useGetterFunctions } from "@/composable";
 import { commentPlainText } from "@/utils/commentHtml";
 import { loadAssignedToMe, resolveComment } from "@/composable/commentThreads";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 
 defineOptions({ name: "AssignedCommentsCard" });
 
-const emit = defineEmits(["open"]);
+const emit = defineEmits(["open", "hide"]);
 const { t } = useI18n();
 const { getUser } = useGetterFunctions();
 
@@ -77,6 +81,12 @@ defineExpose({ load });
 <style scoped>
 .hc-assigned__title { margin: 0; }
 .hc-assigned__count { color: var(--ink-2); font-size: 11px; }
+.hc-assigned__hide { width: 26px; height: 26px; display: grid; place-items: center; flex: none; border: 0; border-radius: var(--r-chip); background: transparent; color: var(--ink-2); cursor: pointer; }
+.hc-assigned__hide:hover { background: var(--surface-hover); color: var(--ink); }
+.hc-assigned__hide:focus-visible { outline: none; box-shadow: var(--focus); }
+@media (max-width: 767px) {
+    .hc-assigned__hide { width: 44px; height: 44px; }
+}
 .hc-assigned__hint { margin: 0; }
 .hc-assigned__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .hc-assigned__item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; border-top: 1px solid var(--hairline); padding-top: 8px; }

@@ -686,6 +686,7 @@ export default {
         "assigned_comments": "Assigned comments",
         "assigned_comments_loading": "Loading assigned comments…",
         "assigned_comments_empty": "No open comments are assigned to you.",
+        "card_assigned_comments_hint": "Open comments assigned to you, ready to resolve.",
         "assigned_by": "From {name}",
         "untitled_task": "Untitled task",
         "unlock": "Entsperren",

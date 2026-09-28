@@ -69,7 +69,7 @@
                         <div class="home__side">
                             <WaitingOnYouCard v-if="isHomeCardShown('waiting')" @hide="hideCard('waiting')" />
                             <AgendaCard :day="agendaDay" :items="agendaItems" :connected="agenda.connected.value" :first-run="firstRun" @shift="shiftAgenda" />
-                            <AssignedCommentsCard @open="openTask" />
+                            <AssignedCommentsCard v-if="isHomeCardShown('assigned_comments')" @open="openTask" @hide="hideCard('assigned_comments')" />
                             <section v-if="firstRun && !timer.active" class="hc-card">
                                 <div class="hc-personal__title">{{ $t('Home.personal_list') }}</div>
                                 <p class="hc-hint" style="margin: 0">{{ $t('Home.personal_hint') }}</p>
