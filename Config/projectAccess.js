@@ -190,7 +190,7 @@ const projectIdsFrom = ({ records = [], direct = () => [] }) => async (req) => {
  * 'write' (visible, plus the permission keys). `projectIds(req)` returns one id or a list
  * (sync or async); a request that names no well-formed id passes through so the handler's
  * own validation answers it. `permissions(req)` returns permission keys or any-of lists.
- * An id with no project behind it passes when `passMissing(req)` says so (reads always):
+ * An id with no project behind it passes when `passMissing(req, id)` says so (reads always):
  * there is nothing to protect, and chat containers live outside the projects collection.
  * Some handlers take the tenant from the body rather than the header, so a body companyId
  * that disagrees with the header is refused here: otherwise the check would run in one
@@ -208,7 +208,7 @@ const requireProjectAccess = ({ mode = WRITE, projectIds, permissions = () => []
         const keys = mode === READ ? [] : await permissions(req);
         for (const id of [...new Set(ids)]) {
             const decision = await decideProjectAccess(companyId, req.uid, id, { mode, permissions: keys });
-            if (decision.missing && passMissing(req)) continue;
+            if (decision.missing && await passMissing(req, id)) continue;
             if (!decision.allowed) return refuse(res, decision);
         }
         return next();

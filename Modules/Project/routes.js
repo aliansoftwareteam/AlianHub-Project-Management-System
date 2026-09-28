@@ -12,6 +12,8 @@ const getQueryCtrl = require('./controller/getQueryFun');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { projectUpdateNamesOnlyMembers } = require('./helpers/projectPeople');
 const { sprintUpdateNamesOnlyMembers } = require('../Sprints/helpers/sprintPeople');
+const { requireSprintAccess } = require('../Sprints/helpers/sprintVisibility');
+const { CHAT_CHANNEL, isChatSpace, requireChatAccess } = require('../Sprints/helpers/chatAccess');
 const { READ, requireProjectAccess, keepVisibleProjects, projectIdsFrom, fieldsOf, permissionsForProjectUpdate, DELETE_OR_CLOSE } = require('../../Config/projectAccess');
 
 const CHECKLIST_ASSIGN_KEYS = ['assigneeAdd', 'assigneeRemove'];
@@ -22,7 +24,9 @@ const checklistPermissions = (req) => (req.body.operation === 'update' && CHECKL
     ? [['project.project_checklist_assign_remove', 'project.project_checklist']]
     : ['project.project_checklist']);
 
-const sprintUpdatePermissions = (req) => (fieldsOf(req.body && req.body.updateObject).every((field) => OWN_SPRINT_FIELDS.includes(field)) ? [] : [SPRINT_EDIT]);
+const ownSprintFieldsOnly = (req) => fieldsOf(req.body && req.body.updateObject).every((field) => OWN_SPRINT_FIELDS.includes(field));
+const sprintUpdatePermissions = (req) => (ownSprintFieldsOnly(req) ? [] : [SPRINT_EDIT]);
+const sprintUpdateContainers = projectIdsFrom({ records: [[SCHEMA_TYPE.SPRINTS, (req) => req.params.id]], direct: (req) => req.body && req.body.updateObject && req.body.updateObject.projectId });
 
 const readsProject = (projectIds) => requireProjectAccess({ mode: READ, projectIds });
 
@@ -34,10 +38,11 @@ exports.init = (app) => {
     app.put('/api/v1/project/allTask/:id', requireProjectAccess({ projectIds: (req) => req.params.id, permissions: () => [DELETE_OR_CLOSE] }), projectAlltaskUpdateCtrl.projectAlltaskUpdate);
     app.get('/api/v1/project/sprintFolder/:id', readsProject((req) => req.params.id), projectSprintFolderCtrl.getSprintFolder);
     app.put('/api/v1/project/sprint/:id', requireProjectAccess({
-        projectIds: projectIdsFrom({ records: [[SCHEMA_TYPE.SPRINTS, (req) => req.params.id]], direct: (req) => req.body && req.body.updateObject && req.body.updateObject.projectId }),
+        projectIds: sprintUpdateContainers,
         permissions: sprintUpdatePermissions,
-        passMissing: () => true,
-    }), sprintUpdateNamesOnlyMembers, projectSprintUpdateCtrl.updateSprint);
+        passMissing: isChatSpace,
+    }), requireChatAccess({ containers: sprintUpdateContainers, permission: (req) => (ownSprintFieldsOnly(req) ? null : CHAT_CHANNEL) }),
+    requireSprintAccess((req) => req.params.id), sprintUpdateNamesOnlyMembers, projectSprintUpdateCtrl.updateSprint);
     app.post('/api/v1/project/filter/create', manageGlobalFilterCtrl.saveFilter);
     app.get('/api/v1/project/filter/:userId', manageGlobalFilterCtrl.getFilter);
     app.delete('/api/v1/project/filter/delete/:cid/:id', manageGlobalFilterCtrl.deleteFilter);
