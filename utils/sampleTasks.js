@@ -3,6 +3,7 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { MongoDbCrudOpration } = require('./mongo-handler/mongoQueries');
 const { removeCache } = require('./commonFunctions');
 const logger = require('../Config/loggerConfig');
+const { sprintPlacementOf } = require('../Modules/Tasks/helpers/sprintPlacement');
 
 // Sample tasks are inserted directly rather than through Modules/Tasks/helpers/taskMongo/create.js.
 // That helper writes history and fires notifications, and at project-creation time there is no
@@ -146,10 +147,10 @@ const dayMs = 24 * 60 * 60 * 1000;
 // and so come out looking exactly as they did before; only the welcome set uses them, to make the
 // demo project look like a project someone has actually been working in — statuses spread across
 // the board, real owners, dates on the calendar, mixed priorities and one task with subtasks.
-// `sprints` is either one sprint document or an array of them; a row's plan picks by index.
-function buildTaskDocs(project, sprints, rows, startingNumber, ownerId) {
-    const sprintList = Array.isArray(sprints) ? sprints : [sprints];
-    const sprintAt = (i) => sprintList[Math.min(Number(i) || 0, sprintList.length - 1)] || sprintList[0];
+// `placements` is one sprintPlacementOf(...).set or an array of them; a row's plan picks by index.
+function buildTaskDocs(project, placements, rows, startingNumber, ownerId) {
+    const placementList = Array.isArray(placements) ? placements : [placements];
+    const placementAt = (i) => placementList[Math.min(Number(i) || 0, placementList.length - 1)] || placementList[0];
     const projectId = String(project._id);
     const companyId = String(project.CompanyId);
     const code = project.ProjectCode || 'TASK';
@@ -168,18 +169,15 @@ function buildTaskDocs(project, sprints, rows, startingNumber, ownerId) {
         },
     });
 
-    const base = (TaskName, text, n, sprint) => ({
+    const base = (TaskName, text, n, placement) => ({
         ...TASK_DEFAULTS,
         TaskName,
         ...describe(text),
         TaskKey: `${code}-${n}`,
         ProjectID: projectId,
         CompanyId: companyId,
-        sprintId: String(sprint._id),
-        // Real tasks carry the whole sprint document here, not an array, and Task_Leader is a
-        // user id string. status is an object too — every existing task in the wild has all
-        // three in exactly this shape.
-        sprintArray: sprint,
+        ...placement,
+        // Task_Leader is a user id string and status an object, as on every task in the wild.
         Task_Leader: ownerId,
         status: fallback,
         statusType: fallback.type,
@@ -200,8 +198,8 @@ function buildTaskDocs(project, sprints, rows, startingNumber, ownerId) {
 
         // Ids are generated up front so a subtask can name its parent in the same insert.
         const _id = new mongoose.Types.ObjectId();
-        const sprint = sprintAt(opts.sprint);
-        const doc = { ...base(TaskName, text, n, sprint), _id, groupByStatusIndex: i };
+        const placement = placementAt(opts.sprint);
+        const doc = { ...base(TaskName, text, n, placement), _id, groupByStatusIndex: i };
 
         const status = opts.status ? resolveStatus(statuses, opts.status) : null;
         if (status) {
@@ -226,7 +224,7 @@ function buildTaskDocs(project, sprints, rows, startingNumber, ownerId) {
             n += 1;
             docs.push({
                 // A subtask always lives in the same sprint as its parent.
-                ...base(kidName, `An example subtask of "${TaskName}".`, n, sprint),
+                ...base(kidName, `An example subtask of "${TaskName}".`, n, placement),
                 _id: new mongoose.Types.ObjectId(),
                 isParentTask: false,
                 ParentTaskId: String(_id),
@@ -246,7 +244,7 @@ function buildTaskDocs(project, sprints, rows, startingNumber, ownerId) {
                 project: false,
                 projectId,
                 taskId: String(_id),
-                sprintId: String(sprint._id),
+                sprintId: String(placement.sprintId),
                 userId: ownerId,
                 type: 'text',
                 message: opts.comment,
@@ -321,7 +319,8 @@ async function seedSampleTasks(project, sprint, rows, ownerId) {
         const wantsSprints = rows.some((r) => r[2] && r[2].sprint !== undefined);
         const sprints = wantsSprints ? await ensureDemoSprints(project, sprint, leader) : [sprint];
 
-        const { docs, comments } = buildTaskDocs(project, sprints, rows, startingNumber, leader);
+        const placements = await Promise.all(sprints.map(async (s) => (await sprintPlacementOf(companyId, s)).set));
+        const { docs, comments } = buildTaskDocs(project, placements, rows, startingNumber, leader);
 
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -353,7 +352,7 @@ async function seedSampleTasks(project, sprint, rows, ownerId) {
         const perSprint = {};
         for (const d of docs) {
             if (d.isParentTask === false) continue;
-            perSprint[d.sprintId] = (perSprint[d.sprintId] || 0) + 1;
+            perSprint[String(d.sprintId)] = (perSprint[String(d.sprintId)] || 0) + 1;
         }
         for (const [sprintId, count] of Object.entries(perSprint)) {
             // eslint-disable-next-line no-await-in-loop
