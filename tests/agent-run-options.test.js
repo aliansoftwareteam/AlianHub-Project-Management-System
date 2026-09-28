@@ -17,6 +17,7 @@ const memory = require('../Modules/Agents/engine/findingMemory');
 const { summarize } = require('../Modules/AICore/usage');
 const { handleNotificationtFun } = require('../Modules/notification/prepare-notification-data/controllerV2');
 const runs = require('../Modules/Agents/runs');
+const triggers = require('../Modules/Agents/triggers');
 const ctrl = require('../Modules/Agents/controller');
 
 const C = '6f0000000000000000000c01';
@@ -40,6 +41,7 @@ beforeAll(() => require('../Modules/AICore/persistence').useInMemory());
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     jest.clearAllMocks();
+    jest.spyOn(triggers, 'mayRunOn').mockResolvedValue(true);
     memory.load.mockResolvedValue(new Map());
     memory.decide.mockImplementation(async (companyId, taskId, findings) => findings.map((f) => ({ finding: f, action: 'file', reason: 'new' })));
     summarize.mockReturnValue({ costUsd: 0, totalTokens: 0, model: 'm' });
