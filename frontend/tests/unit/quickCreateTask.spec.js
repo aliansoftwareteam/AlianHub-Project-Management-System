@@ -34,7 +34,6 @@ import {
     canCreateTasksIn,
     closeQuickCreate,
     creatableProjects,
-    isCreateTaskShortcut,
     listsOf,
     openQuickCreate,
     pickDefaultProject,
@@ -46,6 +45,7 @@ import {
     submitIntent
 } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 import QuickCreateTask from '@/components/organisms/QuickCreateTask/QuickCreateTask.vue';
+import { bindShortcut, handleShortcutKey } from '@/composable/shortcuts';
 
 const STATUSES = [
     { name: 'To Do', key: 1, value: 'to_do', type: 'default_active' },
@@ -64,36 +64,40 @@ const CLOSED = project('closed', { statusType: 'close' });
 const SPECIFIC = project('specific', { isGlobalPermission: false });
 
 describe('the c shortcut', () => {
-    const ev = (init = {}, target = document.body) => ({ key: 'c', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, repeat: false, isComposing: false, defaultPrevented: false, target, ...init });
+    const ev = (init = {}, target = document.body) => ({ key: 'c', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, repeat: false, isComposing: false, defaultPrevented: false, target, preventDefault() {}, ...init });
     const el = (tag, attrs = {}) => { const e = document.createElement(tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); document.body.appendChild(e); return e; };
+    const fires = (event, options) => handleShortcutKey(event, options) === 'create-task';
+    let unbind = () => {};
+    beforeEach(() => { unbind = bindShortcut('create-task', () => {}); });
+    afterEach(() => unbind());
 
     it('opens on a bare c outside text fields', () => {
-        expect(isCreateTaskShortcut(ev())).toBe(true);
-        expect(isCreateTaskShortcut(ev({}, el('button')))).toBe(true);
-        expect(isCreateTaskShortcut(ev({}, el('input', { type: 'checkbox' })))).toBe(true);
+        expect(fires(ev())).toBe(true);
+        expect(fires(ev({}, el('button')))).toBe(true);
+        expect(fires(ev({}, el('input', { type: 'checkbox' })))).toBe(true);
     });
 
     it('never fires with a modifier, on repeat, while composing or once handled', () => {
         ['metaKey', 'ctrlKey', 'altKey', 'shiftKey', 'repeat', 'isComposing', 'defaultPrevented'].forEach((flag) => {
-            expect(isCreateTaskShortcut(ev({ [flag]: true }))).toBe(false);
+            expect(fires(ev({ [flag]: true }))).toBe(false);
         });
-        expect(isCreateTaskShortcut(ev({ key: 'C' }))).toBe(false);
-        expect(isCreateTaskShortcut(ev({ key: 'x' }))).toBe(false);
+        expect(fires(ev({ key: 'C' }))).toBe(false);
+        expect(fires(ev({ key: 'x' }))).toBe(false);
     });
 
     it('leaves text fields, selects and editors alone', () => {
-        expect(isCreateTaskShortcut(ev({}, el('input', { type: 'text' })))).toBe(false);
-        expect(isCreateTaskShortcut(ev({}, el('input')))).toBe(false);
-        expect(isCreateTaskShortcut(ev({}, el('textarea')))).toBe(false);
-        expect(isCreateTaskShortcut(ev({}, el('select')))).toBe(false);
+        expect(fires(ev({}, el('input', { type: 'text' })))).toBe(false);
+        expect(fires(ev({}, el('input')))).toBe(false);
+        expect(fires(ev({}, el('textarea')))).toBe(false);
+        expect(fires(ev({}, el('select')))).toBe(false);
         const editor = el('div', { contenteditable: 'true' });
         const inner = document.createElement('p');
         editor.appendChild(inner);
-        expect(isCreateTaskShortcut(ev({}, inner))).toBe(false);
+        expect(fires(ev({}, inner))).toBe(false);
     });
 
     it('does nothing while a dialog is open', () => {
-        expect(isCreateTaskShortcut(ev(), { dialogOpen: true })).toBe(false);
+        expect(fires(ev(), { dialogOpen: true })).toBe(false);
     });
 });
 
