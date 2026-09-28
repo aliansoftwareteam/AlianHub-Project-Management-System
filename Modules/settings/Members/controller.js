@@ -10,6 +10,7 @@ const { judgeMemberUpdate, judgeInvitationAcceptance, memberRowView } = require(
 const { SEAT_CANCELLED, SEAT_PENDING } = require('../../../Config/seatStatus');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { recordPrivateViewChange } = require('./privateViewHistory');
+const { revokeMemberTokens } = require('../../ApiTokens/memberTokens');
 const logger = require('../../../Config/loggerConfig');
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
@@ -334,6 +335,7 @@ exports.updateMember = async (req, res) => {
         }
         // A guest is still in the workspace and can still read their own private pages.
         if (data.isDelete === true || Number(data.status) === SEAT_CANCELLED) {
+            await revokeMemberTokens(companyId, subject.userId);
             knowledgeEvents.publishMemberDeparted(companyId, subject.userId);
         } else if (holdsSeat(response) && !holdsSeat(subject)) {
             knowledgeEvents.publishMemberActivated(companyId, subject.userId);
