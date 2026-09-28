@@ -14,11 +14,13 @@ const DETAILS = 'project.project_details';
 const DELETE_OR_CLOSE = ['project.project_delete', 'project.project_close'];
 const STATUS_OR_CLOSE = ['project.project_status_change', 'project.project_close'];
 const SECURITY_SETTINGS = 'settings.settings_security_permissions';
+const PROJECT_LIST_SETTINGS = 'settings.settings_project_list';
 
 // Each entry is an any-of list: the edit passes when one of the keys is writable. The pairs
-// mirror the web app, which reaches the same field from more than one gated control.
-// An empty list means the field belongs to the caller (favourites, watch settings), so
-// project membership is enough. A field not listed falls back to project_details.
+// mirror the web app, which reaches the same field from more than one gated control. A list
+// of lists needs every group (the web app shows the privacy switch only to a caller holding
+// both). An empty list means the field belongs to the caller (favourites, watch settings), so
+// membership is enough for the caller's own entry. A field not listed falls back to project_details.
 const FIELD_PERMISSIONS = {
     ProjectName: ['project.project_name_edit'],
     Description: ['project.project_description'],
@@ -45,18 +47,72 @@ const FIELD_PERMISSIONS = {
     ProjectRequiredComponent: ['project.view_list', DETAILS],
     viewColumn: ['task.list_view_column'],
     isGlobalPermission: [SECURITY_SETTINGS],
+    isPrivateSpace: [[PROJECT_LIST_SETTINGS], [DETAILS]],
     favouriteTasks: [],
     watchers: [],
+};
+
+// Kept by the server: who owns the project, its tenant, and the counters and activity other
+// writes maintain. No client screen edits them through the project update.
+const SERVER_ONLY_FIELDS = new Set([
+    '_id', 'CompanyId', 'companyId', 'projectCreatedBy', 'personalOwner', 'isPersonal', 'isRestrict',
+    'sprintsObj', 'sprintsfolders', 'lastTaskId', 'milestoneAmount', 'proposalIdNumeric',
+    'lastProjectActivity', 'userActivity', 'legacyId', 'demo',
+]);
+
+const PROJECT_UPDATE_OPERATORS = ['$set', '$unset', '$push', '$pull', '$addToSet'];
+
+const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const projectUpdateError = (body) => {
+    const { updateObject, key } = body || {};
+    if (key !== undefined && key !== null && key !== '' && !PROJECT_UPDATE_OPERATORS.includes(key)) {
+        return 'This update operator is not supported.';
+    }
+    if (updateObject === undefined || updateObject === null) return null;
+    if (!isPlainObject(updateObject)) return 'Update Object must be an object.';
+    for (const path of Object.keys(updateObject)) {
+        if (!path || path.startsWith('$')) return 'This update operator is not supported.';
+        if (SERVER_ONLY_FIELDS.has(path.split('.')[0])) return `${path.split('.')[0]} cannot be changed.`;
+    }
+    return null;
+};
+
+const requireSupportedProjectUpdate = (req, res, next) => {
+    const error = projectUpdateError(req.body);
+    if (!error) return next();
+    return res.status(400).json({ status: false, statusText: error, message: error });
 };
 
 const fieldsOf = (updateObject) => Object.entries(updateObject || {}).flatMap(([field, value]) => (
     field.startsWith('$') && value && typeof value === 'object' ? fieldsOf(value) : [field.split('.')[0]]
 ));
 
-const permissionsForProjectUpdate = (updateObject) => {
-    const groups = fieldsOf(updateObject).map((field) => FIELD_PERMISSIONS[field] || [DETAILS]);
+const entriesOf = (updateObject) => Object.entries(updateObject || {}).flatMap(([path, value]) => (
+    path.startsWith('$') && isPlainObject(value) ? entriesOf(value) : [[path, value]]
+));
+
+const isCallersOwn = (path, value, uid) => {
+    const [field, ...rest] = path.split('.');
+    if (!uid) return false;
+    if (field === 'watchers') return rest.length === 1 && rest[0] === String(uid);
+    if (field === 'favouriteTasks') {
+        return rest.length === 0 && isPlainObject(value) && Object.keys(value).length === 1 && String(value.userId) === String(uid);
+    }
+    return false;
+};
+
+const groupsFor = (path, value, uid) => {
+    const entry = FIELD_PERMISSIONS[path.split('.')[0]];
+    if (!entry) return [[DETAILS]];
+    if (!entry.length) return isCallersOwn(path, value, uid) ? [] : [[DETAILS]];
+    return Array.isArray(entry[0]) ? entry : [entry];
+};
+
+const permissionsForProjectUpdate = (updateObject, uid) => {
+    const groups = entriesOf(updateObject).flatMap(([path, value]) => groupsFor(path, value, uid));
     const seen = new Set();
-    return groups.filter((group) => group.length).filter((group) => {
+    return groups.filter((group) => {
         const id = group.join('|');
         if (seen.has(id)) return false;
         seen.add(id);
@@ -236,10 +292,12 @@ module.exports = {
     DELETE_OR_CLOSE,
     STATUS_OR_CLOSE,
     SECURITY_SETTINGS,
+    PROJECT_LIST_SETTINGS,
     DETAILS,
     READ,
     WRITE,
     fieldsOf,
+    requireSupportedProjectUpdate,
     permissionsForProjectUpdate,
     canEditProject,
     canReadProject,

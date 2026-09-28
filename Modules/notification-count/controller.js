@@ -189,6 +189,10 @@ const activeMemberIds = async (companyId, userIds) => {
     return ids.filter((id) => active.has(id));
 };
 
+/* The comment panels raise project, task and mention counts for the people a new comment reaches;
+ * chat and notification counts are raised only by the server. */
+const CLIENT_BUMP_KEYS = [1, 2, 4];
+
 const countTargets = async (req, res, companyId) => {
     const body = req.body || {};
     const claimed = Array.isArray(body.userIds) ? body.userIds.filter(Boolean).map(String) : [];
@@ -198,6 +202,10 @@ const countTargets = async (req, res, companyId) => {
             return null;
         }
         return [String(req.uid)];
+    }
+    if (!CLIENT_BUMP_KEYS.includes(body.key)) {
+        res.status(403).send({ status: false, statusText: 'Only comment and mention counts can be raised here.' });
+        return null;
     }
     return activeMemberIds(companyId, claimed);
 };
@@ -212,7 +220,8 @@ exports.updateUnReadCommentsCount = async (req, res) => {
             res.send({ status: true, data: 'No recipients in this company' });
             return;
         }
-        res.send(await applyUnreadCount(companyId, { ...req.body, userIds }));
+        const step = changesOwnCount(req.body) ? {} : { messageCount: 1 };
+        res.send(await applyUnreadCount(companyId, { ...req.body, userIds, ...step }));
     } catch (error) {
         // Rejections are { status: false, statusText } objects without a message; answering them 200 with an
         // empty body made a refused write look like a stored one.

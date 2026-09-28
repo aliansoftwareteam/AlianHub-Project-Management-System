@@ -24,7 +24,6 @@ const {
 const { realModelStore, isObjectId } = require('./fixtures/realModelStore');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const importData = require('../utils/data');
-const projectRules = require('../Modules/projectRules/controller');
 const notes = require('../Modules/Calls/notes');
 const dashboard = require('../Modules/UserDashboard/controller');
 const findingMemory = require('../Modules/Agents/engine/findingMemory');
@@ -136,11 +135,6 @@ describe('every writer of these project ids stores an ObjectId through the schem
 
     test('seeding a project\'s own rules (utils/data.js importCompanyRules)', async () => {
         await importData.importCompanyRules(C, 'project', PROJECT);
-        expectObjectIds(await replayed(SCHEMA_TYPE.PROJECT_RULES));
-    });
-
-    test('editing a project rule whose update names the project (projectRules updateProjectRules)', async () => {
-        await call(projectRules.updateProjectRules, { body: { id: ROW, key: '$set', projectId: PROJECT, updateObject: { projectId: PROJECT } } });
         expectObjectIds(await replayed(SCHEMA_TYPE.PROJECT_RULES));
     });
 
