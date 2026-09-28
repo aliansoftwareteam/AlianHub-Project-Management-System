@@ -13,6 +13,7 @@ const { recordPrivateViewChange } = require('./privateViewHistory');
 const { cleanViewSettings, cleanViewTitle } = require('../../Project/helpers/viewSettings');
 const { revokeMemberTokens } = require('../../ApiTokens/memberTokens');
 const logger = require('../../../Config/loggerConfig');
+const { releaseMemberSeat } = require('../../Company/helpers/companyCounters');
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const ACTIVE = 2;
@@ -281,6 +282,22 @@ exports.handlePrivateView = async (req, res) => {
     }
 }
 
+/* Only the request that actually flips the row to deleted gives its seat back, so a repeated removal releases nothing. */
+const claimSeatRelease = async (companyId, id) => {
+    const before = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMPANY_USERS,
+        data: [
+            { _id: new mongoose.Types.ObjectId(id), isDelete: { $ne: true } },
+            { $set: { isDelete: true, isTrackerUser: false } },
+            { projection: { isTrackerUser: 1 } }
+        ]
+    }, 'findOneAndUpdate');
+    if (!before) return;
+    await releaseMemberSeat(companyId, { tracker: before.isTrackerUser === true }).catch((error) => {
+        logger.error(`releaseMemberSeat ${companyId}: ${error && error.message ? error.message : error}`);
+    });
+};
+
 exports.updateMember = async (req, res) => {
     try {
         const { id, data } = req.body;
@@ -326,6 +343,8 @@ exports.updateMember = async (req, res) => {
             }
             data.managerId = check.managerId;
         }
+
+        if (data.isDelete === true) await claimSeatRelease(companyId, id);
 
         const params = {
             type: SCHEMA_TYPE.COMPANY_USERS,

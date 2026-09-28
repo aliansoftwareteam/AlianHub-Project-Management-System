@@ -46,6 +46,15 @@ test.describe('ai agents as the owner', () => {
         await owner.api.delete(`/api/v2/agents/${agent._id}`);
     });
 
+    test('the AI index opens Ask, and the old Home and Analytics links land there too', async ({ page, state }) => {
+        for (const path of ['ai', 'ai/home', 'ai/analytics']) {
+            await page.goto(`/#/${state.companyId}/${path}`);
+            await expect(page).toHaveURL(new RegExp(`/#/${state.companyId}/ai/ask(\\?.*)?$`));
+            await expect(page.locator('.ai-side__nav > .ai-side__item').first()).toHaveAttribute('aria-current', 'page');
+        }
+        await expect(page.locator('[data-test="ai-soon"]')).toHaveCount(0);
+    });
+
     test('the skill library lists the action registry', async ({ page, state }) => {
         await page.goto(`/#/${state.companyId}/ai/skills`);
         await expect(page.locator('.ah-toolbar__title')).toHaveText('Skill library');

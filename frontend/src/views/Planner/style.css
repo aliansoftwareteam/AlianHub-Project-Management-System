@@ -7,11 +7,14 @@
 .planner__range button:focus-visible { outline: none; box-shadow: var(--focus); }
 
 .planner__grid-wrap {
+    flex: 1;
     min-width: 0;
+    min-height: 0;
     overflow: auto;
     background: var(--surface);
     border-right: 1px solid var(--hairline);
 }
+.planner__grid-wrap:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
 .planner__grid {
     display: grid;
@@ -70,7 +73,14 @@
 .planner__col {
     position: relative;
     border-right: 1px solid var(--hairline);
-    background-image: repeating-linear-gradient(to bottom, transparent 0 51px, var(--hairline) 51px 52px);
+    background-image: linear-gradient(to bottom, transparent calc(100% - 1px), var(--hairline) calc(100% - 1px));
+}
+.planner__off {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+    pointer-events: none;
 }
 .planner__col.is-today { background-color: var(--brand-tint); }
 .planner__col.is-over { background-color: var(--surface-2); outline: 1.5px dashed var(--brand); outline-offset: -2px; }
@@ -121,7 +131,8 @@
     background: var(--surface);
 }
 .ah-sidebar > .planner__tray { flex: 1; }
-.planner__tray-list { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; overflow: auto; }
+/* The top padding keeps the first card's border and shadow inside the scroll box. */
+.planner__tray-list { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; overflow: auto; padding-top: 4px; }
 .planner__tray-count { color: var(--ink-2); }
 .planner__tray-empty { margin: 0 14px; }
 .planner__card--picked { border-color: var(--brand); box-shadow: 0 0 0 1.5px var(--brand-ring), var(--shadow-card); }

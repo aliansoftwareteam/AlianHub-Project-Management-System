@@ -517,33 +517,15 @@ async function restoreChildTasks(projectId, restoreKey = 8) {
 
 async function updateProjectType (projectObj,isPrivate) {
     try {
-        let queryObj;
-        if(isPrivate === true){
-            queryObj = {'projectCount.privateCount':1, 'projectCount.publicCount':-1};
-        }else{
-            queryObj = {'projectCount.publicCount':1, 'projectCount.privateCount':-1};
-        }
-        await apiRequest("put",`${env.COMPANYACTIONS}`,{updateObject: queryObj,key: '$inc'});
         let type = isPrivate === true ? 'private' : 'public';
         if(checkSpecificTypeCount(type) === true){
-            let queryObj = {
-                isPrivateSpace: isPrivate
-            };
-            await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${projectObj._id}`,{updateObject: queryObj})
+            await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${projectObj._id}`,{updateObject: {isPrivateSpace: isPrivate}})
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
             commit('projectData/projectLocalUpdate', {itemData:{...projectObj,isPrivateSpace: isPrivate},projectId:projectObj._id,key:'ProjectTypeChange',subKey:"",userId: ''});
         }
-        //If you don't have plans to update private or public projects, that time count is decresed
         else{
             isSpinner.value = false;
             $toast.error(t('Toast.Upgrade_Your_Plan'),{position: 'top-right'})
-            let queryObj;
-            if(isPrivate === true){
-                queryObj = {'projectCount.privateCount':-1, 'projectCount.publicCount':1};
-            }else{
-                queryObj = {'projectCount.publicCount':-1, 'projectCount.privateCount':1};
-            }
-            await apiRequest("put",`${env.COMPANYACTIONS}`,{updateObject: queryObj,key: '$inc'});
             commit('projectData/projectLocalUpdate', {itemData:{...projectObj,isPrivateSpace: isPrivate},projectId:projectObj._id,key:'ProjectTypeChange',subKey:"",userId: ''});
         }
     } catch (error) {
