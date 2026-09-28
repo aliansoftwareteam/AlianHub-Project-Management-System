@@ -2,6 +2,7 @@ const ctrl = require('./controller');
 const memoryCtrl = require('./memoryController');
 const skillsCtrl = require('./skillsController');
 const metricsCtrl = require('./metricsController');
+const schedulesCtrl = require('./schedulesController');
 const { agentPerimeter } = require('./guard');
 
 exports.init = (app) => {
@@ -46,6 +47,9 @@ exports.init = (app) => {
     app.get('/api/v2/agents/preferences', memoryCtrl.getPreferences);
     app.put('/api/v2/agents/preferences', memoryCtrl.putPreferences);
 
+    app.get('/api/v2/agents/reports', schedulesCtrl.listReports);
+    app.get('/api/v2/agents/reports/:id', schedulesCtrl.getReport);
+
     app.get('/api/v2/agents/runs/summary', ctrl.runSummary);
     app.get('/api/v2/agents/runs', ctrl.listRuns);
     app.post('/api/v2/agents/runs', ctrl.startRun);
@@ -72,6 +76,10 @@ exports.init = (app) => {
     app.delete('/api/v2/agents/:id', ctrl.deleteAgent);
     app.post('/api/v2/agents/:id/pause', ctrl.setPaused(true));
     app.post('/api/v2/agents/:id/resume', ctrl.setPaused(false));
+    app.get('/api/v2/agents/:id/schedules', schedulesCtrl.listSchedules);
+    app.post('/api/v2/agents/:id/schedules', schedulesCtrl.createSchedule);
+    app.put('/api/v2/agents/:id/schedules/:scheduleId', schedulesCtrl.updateSchedule);
+    app.delete('/api/v2/agents/:id/schedules/:scheduleId', schedulesCtrl.deleteSchedule);
     app.get('/api/v2/agents/:id/revisions', ctrl.listRevisions);
     app.post('/api/v2/agents/:id/revisions', ctrl.createRevision);
     app.get('/api/v2/agents/:id/revisions/:n', ctrl.getRevision);

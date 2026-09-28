@@ -245,6 +245,34 @@ describe('the report reads only what the schedule owner can open', () => {
         expect(reportText(reportRuns()[0])).not.toContain('Visible launch checklist');
     });
 
+    it('lists only unanswered mentions on tasks the owner can open', async () => {
+        seedAgent();
+        seedSchedule({ report: 'mentions_digest' });
+        seedTask(T_OPEN, OPEN_PROJECT, { TaskName: 'Visible launch checklist' });
+        seedTask(T_HIDDEN, HIDDEN_PROJECT, { TaskName: 'Secret board merger' });
+        const T_REPLIED = '6f0000000000000000000703';
+        seedTask(T_REPLIED, OPEN_PROJECT, { TaskName: 'Already answered' });
+        const at = new Date('2026-09-27T10:00:00.000Z');
+        [T_OPEN, T_HIDDEN, T_REPLIED].forEach((taskId) => store().seed(SCHEMA_TYPE.MENTIONS, { taskId, mentionIds: [MEMBER], userId: ADMIN, comment_message: `ping on ${taskId}`, createdAt: at }));
+        store().seed(SCHEMA_TYPE.COMMENTS, { taskId: T_REPLIED, userId: MEMBER, createdAt: new Date(at.getTime() + HOUR) });
+        await scheduler.tickCompany(A, { now: NOW });
+        const [run] = reportRuns();
+        const unanswered = run.report.sections.find((sec) => sec.key === 'unanswered');
+        expect(unanswered.items.map((i) => i.taskName)).toEqual(['Visible launch checklist']);
+    });
+
+    it('sums the week per project the owner can open', async () => {
+        seedAgent();
+        seedSchedule({ report: 'weekly_status' });
+        seedTask(T_OPEN, OPEN_PROJECT, { DueDate: new Date('2026-09-20T12:00:00.000Z'), updatedAt: new Date('2026-09-27T10:00:00.000Z') });
+        seedTask('6f0000000000000000000704', OPEN_PROJECT, { statusType: 'close', updatedAt: new Date('2026-09-26T10:00:00.000Z') });
+        seedTask(T_HIDDEN, HIDDEN_PROJECT, { statusType: 'close', updatedAt: new Date('2026-09-26T10:00:00.000Z') });
+        await scheduler.tickCompany(A, { now: NOW });
+        const projects = reportRuns()[0].report.sections;
+        expect(projects).toHaveLength(1);
+        expect(projects[0]).toMatchObject({ key: 'project', projectId: OPEN_PROJECT, counts: { done: 1, slipped: 1, blocked: 0 } });
+    });
+
     it('does not run for an owner who is no longer allowed to own it', async () => {
         seedAgent({ ownerId: ADMIN });
         seedSchedule({ ownerId: MEMBER });
@@ -268,7 +296,8 @@ describe('delivery', () => {
         seedTask(T_OPEN, OPEN_PROJECT);
         await scheduler.tickCompany(A, { now: NOW });
         const [run] = reportRuns();
-        const notices = rows(SCHEMA_TYPE.NOTIFICATIONS).filter((n) => n.changeType === 'agent_report');
+        // The global copy lands in the same fake store; it is the one carrying notificationId.
+        const notices = rows(SCHEMA_TYPE.NOTIFICATIONS).filter((n) => n.changeType === 'agent_report' && !('notificationId' in n));
         expect(notices).toHaveLength(1);
         expect(notices[0]).toMatchObject({ receiverID: MEMBER, notSeen: [MEMBER], type: 'agent' });
         expect(notices[0].changeData).toMatchObject({ runId: String(run._id), report: 'daily_briefing', agentName: 'Briefer' });
@@ -452,6 +481,15 @@ describe('the schedules API', () => {
         const r = await call(ctrl.createSchedule, { uid: MEMBER, params: { id: AGENT }, body: valid });
         expect(r.code).toBe(200);
         expect(r.body.data.ownerId).toBe(MEMBER);
+    });
+
+    it('does not let the agent\'s owner make it run as an admin', async () => {
+        seedAgent({ ownerId: MEMBER });
+        const r = await call(ctrl.createSchedule, { uid: MEMBER, params: { id: AGENT }, body: { ...valid, ownerId: ADMIN } });
+        expect(r.code).toBe(403);
+        const own = seedSchedule({ ownerId: MEMBER });
+        const moved = await call(ctrl.updateSchedule, { uid: MEMBER, params: { id: AGENT, scheduleId: String(own._id) }, body: { ownerId: ADMIN } });
+        expect(moved.code).toBe(403);
     });
 
     it('lists a report only to the person it was delivered to', async () => {
