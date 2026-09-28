@@ -7,6 +7,7 @@ const askController = require('./ask');
 const askStream = require('./askStream');
 const askThreads = require('./askThreads');
 const { chatSummaryHandler } = require('./chatSummary');
+const notesToTasks = require('./notesToTasks');
 
 exports.init = (app) => {
     app.post('/api/v1/generatePrompt', ctrl.generatePrompt);
@@ -41,6 +42,9 @@ exports.init = (app) => {
     app.post('/api/v1/ai/transcribe', ...transcribe.transcribe);
     app.post('/api/v1/ai/meeting-notes', meetingNotes.meetingNotesHandler);
     app.post('/api/v1/ai/chat-summary', chatSummaryHandler);
+    app.post('/api/v1/ai/notes-to-tasks/propose', notesToTasks.proposeHandler);
+    app.post('/api/v1/ai/notes-to-tasks', notesToTasks.createHandler);
+    app.post('/api/v1/ai/notes-to-tasks/undo', notesToTasks.undoHandler);
     app.get('/api/v1/generatePrompt/events/:id', (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');

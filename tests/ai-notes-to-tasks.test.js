@@ -374,3 +374,26 @@ describe('parseDue', () => {
         expect(notesToTasks.parseDue('2026-02-31', today)).toBe('');
     });
 });
+
+describe('Summarise this page', () => {
+    const summarise = (uid, body) => call(require('../Modules/Pages/controller').composeWithAi, uid, body);
+
+    beforeEach(() => {
+        mockChat.mockResolvedValue({ content: JSON.stringify({ markdown: 'In short: ship on the 2nd.' }) });
+    });
+
+    test('reads a page the caller can open and books the spend to them', async () => {
+        const { body } = await summarise(ALICE, { action: 'summarize', pageId: PAGE });
+
+        expect(body.status).toBe(true);
+        expect(promptSent()).toContain('Dave will draft the budget');
+        expect(mockChat.mock.calls[0][0].spend).toEqual(expect.objectContaining({ feature: FEATURES.PAGE_COMPOSE, companyId: COMPANY, userId: ALICE }));
+    });
+
+    test('refuses a page the caller cannot open even when the text is sent along', async () => {
+        const { body } = await summarise(ALICE, { action: 'summarize', pageId: HIDDEN_PAGE, title: 'Board', currentText: 'anything' });
+
+        expect(body.status).toBe(false);
+        expect(mockChat).not.toHaveBeenCalled();
+    });
+});

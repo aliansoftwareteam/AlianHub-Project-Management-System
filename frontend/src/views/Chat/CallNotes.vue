@@ -45,7 +45,28 @@
             </template>
 
             <template v-else>
-                <div class="ah-label">{{ $t('Chat.action_items') }}</div>
+                <div class="cn__actions-head">
+                    <div class="ah-label">{{ $t('Chat.action_items') }}</div>
+                    <button
+                        v-if="canExtract && !extracting"
+                        ref="extractButton"
+                        type="button"
+                        class="ah-btn ah-btn--secondary ah-btn--sm cn__extract"
+                        @click="extracting = true"
+                    >
+                        <ShellIcon name="ai" :size="13" />{{ $t('Chat.create_tasks_from_items') }}
+                    </button>
+                </div>
+                <AiTaskChecklist
+                    v-if="extracting"
+                    class="cn__checklist"
+                    kind="call"
+                    :source-id="String(route.params.noteId)"
+                    :return-focus="() => extractButton"
+                    @created="reload"
+                    @undone="reload"
+                    @close="extracting = false"
+                />
                 <div v-if="!items.length" class="ah-empty">{{ $t('Chat.no_action_items') }}</div>
                 <ul v-else class="cn__items">
                     <li v-for="(item, i) in items" :key="i" class="cn__item">
@@ -86,6 +107,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import MakeTaskSheet from '@/components/organisms/MainChat/MakeTaskSheet.vue';
+import AiTaskChecklist from '@/components/molecules/AiPreview/AiTaskChecklist.vue';
+import { aiUsable } from '@/composable/aiAvailability';
 import { useGetterFunctions } from '@/composable';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
@@ -103,8 +126,11 @@ const error = ref('');
 const notes = ref({});
 const tab = ref('summary');
 const draft = ref(null);
+const extracting = ref(false);
+const extractButton = ref(null);
 
 const items = computed(() => notes.value.actionItems || []);
+const canExtract = computed(() => aiUsable.value || items.value.some((item) => !item.taskId));
 const pageUrl = computed(() => `${window.location.origin}${window.location.pathname}#${route.fullPath}`);
 
 const duration = computed(() => {
@@ -144,17 +170,22 @@ const onTaskCreated = (created) => {
     apiRequest('patch', `${env.CALL_NOTES}/${route.params.noteId}`, { actionItems: next }).catch(() => {});
 };
 
+async function fetchNotes() {
+    const res = await apiRequest('get', `${env.CALL_NOTES}/${route.params.noteId}`);
+    if (!res?.data?.status) throw new Error(res?.data?.statusText || t('Chat.notes_not_found'));
+    notes.value = res.data.data || {};
+}
+
+function reload() {
+    fetchNotes().catch(() => {});
+}
+
 onMounted(async () => {
     try {
-        const res = await apiRequest('get', `${env.CALL_NOTES}/${route.params.noteId}`);
-        if (!res?.data?.status) {
-            error.value = res?.data?.statusText || t('Chat.notes_not_found');
-            return;
-        }
-        notes.value = res.data.data || {};
+        await fetchNotes();
         if (!notes.value.summary && items.value.length) tab.value = 'actions';
     } catch (e) {
-        error.value = t('Chat.notes_not_found');
+        error.value = e.message || t('Chat.notes_not_found');
     } finally {
         loading.value = false;
     }
@@ -171,6 +202,9 @@ onMounted(async () => {
 .cn__count { margin-left: 6px; color: var(--ink-2); }
 .cn__summary { font: var(--text-body); color: var(--ink); background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); padding: 14px 16px; margin: 8px 0 0; }
 .cn__transcript { font: 400 12.5px/1.6 var(--font-mono); color: var(--ink); background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); padding: 14px 16px; margin: 8px 0 0; white-space: pre-wrap; word-break: break-word; }
+.cn__actions-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.cn__extract { display: inline-flex; align-items: center; gap: 6px; }
+.cn__checklist { margin-top: 8px; }
 .cn__items { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .cn__item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); box-shadow: var(--shadow-card); }
 .cn__item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
