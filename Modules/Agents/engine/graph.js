@@ -4,6 +4,7 @@ const persistence = require('../../AICore/persistence');
 const orchestrator = require('./orchestrator');
 const findingMemory = require('./findingMemory');
 const memory = require('../memory');
+const aiProfile = require('../../AI/aiProfile');
 const skillIndex = require('../skills');
 const policy = require('../policy');
 const { rating: ratingOf } = require('../actions');
@@ -117,9 +118,10 @@ async function analyse(state, config) {
         run = await taint.mark(companyId, run, [found]);
         Object.assign(spendContext, taint.record(run) || {});
     };
+    const about = state.result ? '' : (await quietly(run._id, 'starter profile unavailable', () => aiProfile.aboutRunStarter(companyId, run))) || '';
     const { out: result, found } = state.result
         ? { out: state.result, found: [] }
-        : await taint.collect(() => orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: { ...MODEL_BUDGET, guard }, spend: spendContext, companyId, agent, onExternal }));
+        : await taint.collect(() => orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: { ...MODEL_BUDGET, guard }, spend: spendContext, companyId, agent, onExternal, about }));
     run = await taint.mark(companyId, run, found);
     const spend = await runs.recordSpend(companyId, run, result.usage, result.model);
     if (result.status !== 'success') {

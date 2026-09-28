@@ -15,7 +15,7 @@
                 <span class="ah-avatar ah-avatar--sm">{{ editorInitials }}</span>
                 <span class="ah-small">{{ $t('Projects.page_edited_by_ago', { who: editorName, when: relativeTime(page.updatedAt, t) }) }}</span>
             </span>
-            <button type="button" class="ah-btn ah-btn--sm ah-btn--outline" @click="doc && doc.askAi()">
+            <button v-if="canUseAi()" type="button" class="ah-btn ah-btn--sm ah-btn--outline" @click="doc && doc.askAi()">
                 <ShellIcon name="ai" :size="13" />{{ $t('Docs.ask_about_doc') }}
             </button>
             <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary pev__icon-btn" :aria-label="$t('Docs.present')" @click="doc && doc.present()">
@@ -66,6 +66,7 @@ import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import FavouriteStar from '@/components/atom/FavouriteStar/FavouriteStar.vue';
 import PageDocument from '@/components/molecules/Pages/PageDocument.vue';
 import { useGetterFunctions } from '@/composable';
+import { canUseAi } from "@/composable/aiAvailability";
 import { relativeTime, initials, reviewChipClass, reviewLabelKey } from '@/components/molecules/Pages/docsFormat';
 
 defineOptions({ name: 'PageEditorView' });

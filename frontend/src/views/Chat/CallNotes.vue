@@ -108,7 +108,7 @@ import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import MakeTaskSheet from '@/components/organisms/MainChat/MakeTaskSheet.vue';
 import AiTaskChecklist from '@/components/molecules/AiPreview/AiTaskChecklist.vue';
-import { aiUsable } from '@/composable/aiAvailability';
+import { canUseAi } from '@/composable/aiAvailability';
 import { useGetterFunctions } from '@/composable';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
@@ -130,7 +130,7 @@ const extracting = ref(false);
 const extractButton = ref(null);
 
 const items = computed(() => notes.value.actionItems || []);
-const canExtract = computed(() => aiUsable.value || items.value.some((item) => !item.taskId));
+const canExtract = computed(() => canUseAi() || items.value.some((item) => !item.taskId));
 const pageUrl = computed(() => `${window.location.origin}${window.location.pathname}#${route.fullPath}`);
 
 const duration = computed(() => {

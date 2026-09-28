@@ -1012,7 +1012,7 @@ const schema = {
         steps: { type: Array, default: [], required: false },
         // Set once the run took in content from outside the workspace (Modules/Agents/taint.js); absent on a clean run
         tainted: { type: Boolean, required: false },
-        // [{ kind: fetch | email | form | webhook | file | passage, ref, at }] — where it came from, never the content
+        // [{ kind: fetch | email | form | webhook | file | passage | client | instruction, ref, at }] — where it came from, never the content
         taintSources: { type: Array, default: undefined, required: false },
     },
     agentRevisions: {
@@ -1767,6 +1767,25 @@ const schema = {
         turnCount: { type: Number, required: false, default: 0 },
         lastTurnAt: { type: Date, required: false },
     },
+    // One person's AI memory (Modules/AI/aiProfile): private to ownerId, admins included, and read only into
+    // prompts that person starts.
+    aiProfiles: {
+        ownerId: { type: String, required: true },
+        enabled: { type: Boolean, required: false, default: true },
+        nickname: { type: String, required: false, default: '' },
+        role: { type: String, required: false, default: '' },
+        preferences: { type: String, required: false, default: '' },
+        facts: {
+            type: [{
+                _id: false,
+                id: { type: String, required: true },
+                text: { type: String, required: true },
+                source: { type: String, required: false, default: 'manual' },
+                createdAt: { type: Date, required: false },
+            }],
+            required: false,
+        },
+    },
     // Client invoices raised against a project (handoff 19c). Distinct from the
     // global `invoices` collection, which is AlianHub's own subscription billing.
     // Every line keeps the ids it was drafted from so a client question about a
@@ -2122,6 +2141,15 @@ const schema = {
         },
         accessibilityPreferences: {
             singleKeyShortcuts: { type: Boolean, required: false }
+        },
+        // Written by Settings > Language (frontend/src/views/Settings/Language/localePrefs.js).
+        localePreferences: {
+            language: { type: String, required: false },
+            numerals: { type: String, required: false },
+            dateFormat: { type: String, required: false },
+            numberFormat: { type: String, required: false },
+            weekStart: { type: String, required: false },
+            currency: { type: String, required: false }
         },
         // Stars across companies live on the global user record, so each entry names its company.
         favourites: {

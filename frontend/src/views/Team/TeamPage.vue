@@ -5,7 +5,7 @@
             <span class="parity-count">{{ headline }}</span>
             <div class="ah-toolbar__spacer"></div>
             <button type="button" class="ah-btn ah-btn--outline ah-btn--sm" :disabled="!loaded" @click="showStandup = !showStandup">
-                <ShellIcon name="ai" :size="14" />{{ $t('Parity.generate_standup') }}
+                <ShellIcon name="users" :size="14" />{{ $t('Parity.generate_standup') }}
             </button>
             <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="!loaded" @click="showBalance = !showBalance">
                 {{ $t('Parity.balance_workload') }}

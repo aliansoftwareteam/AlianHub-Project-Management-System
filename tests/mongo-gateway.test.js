@@ -29,16 +29,20 @@ const loggedTimeBody = (overrides = {}) => ({
 
 const MEMBERSHIP_READS = [dbCollections.SESSIONS, dbCollections.USERS, dbCollections.COMPANY_USERS];
 const gatewayCalls = () => mockDb.calls.filter((call) => !MEMBERSHIP_READS.includes(call.type));
+const realCrud = mockDb.crud.getMockImplementation();
+const answerTimeRowsWith = (impl) => mockDb.crud.mockImplementation((companyId, query, method) => (
+    query.type === dbCollections.TIMESHEET ? impl() : realCrud(companyId, query, method)));
 
 const resetStore = () => {
     myCache.flushAll();
+    mockDb.crud.mockImplementation(realCrud);
     mockDb.calls.length = 0;
     Object.keys(mockDb.store).forEach((type) => { delete mockDb.store[type]; });
     mockDb.seed(dbCollections.USERS, { _id: USER, AssignCompany: COMPANY });
-    mockDb.seed(dbCollections.COMPANY_USERS, { userId: USER, status: 2, isDelete: false });
-    mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-1', LogTimeDuration: 30 });
-    mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-1', LogTimeDuration: 15 });
-    mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-2', LogTimeDuration: 99 });
+    mockDb.seed(dbCollections.COMPANY_USERS, { userId: USER, status: 2, isDelete: false, roleType: 3 });
+    mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-1', Loggeduser: USER, LogTimeDuration: 30 });
+    mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-1', Loggeduser: USER, LogTimeDuration: 15 });
+    mockDb.seed(dbCollections.TIMESHEET, { TicketID: 'task-2', Loggeduser: USER, LogTimeDuration: 99 });
 };
 
 const SESSION = '6f00000000000000000005e1';
@@ -191,7 +195,7 @@ describe('POST /api/v1/mongoOpration', () => {
 
         it('runs in the session company database and caps the result size', async () => {
             await asMember(loggedTimeBody());
-            const [call] = gatewayCalls();
+            const call = gatewayCalls().find(({ type }) => type === dbCollections.TIMESHEET);
             expect(call).toMatchObject({ companyId: COMPANY, type: dbCollections.TIMESHEET, method: 'aggregate' });
             expect(call.data[0][call.data[0].length - 1]).toEqual({ $limit: MAX_RESULTS });
         });
@@ -216,7 +220,7 @@ describe('mongoOperation', () => {
     });
 
     it('strips password hashes, web tokens and secrets from what it returns', async () => {
-        mockDb.crud.mockImplementationOnce(async () => [{
+        answerTimeRowsWith(async () => [{
             _id: null,
             total: 1,
             password: '$2b$10$hash',
@@ -230,7 +234,7 @@ describe('mongoOperation', () => {
     });
 
     it('does not echo a database error back to the caller', async () => {
-        mockDb.crud.mockImplementationOnce(async () => { throw new Error('connection string mongodb://user:pw@host'); });
+        answerTimeRowsWith(async () => { throw new Error('connection string mongodb://user:pw@host'); });
         const res = await call(loggedTimeBody());
         expect(res.statusCode).toBe(500);
         expect(JSON.stringify(res.body)).not.toMatch(/mongodb:\/\//);

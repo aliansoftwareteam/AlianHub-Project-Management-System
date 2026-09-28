@@ -5,7 +5,7 @@
             <div class="ah-toolbar">
                 <div class="ah-toolbar__title">{{ $t('Ai.agents') }}</div>
                 <div class="ah-toolbar__spacer"></div>
-                <button v-if="canManage" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="new-agent" @click="creating = true">
+                <button v-if="canManage" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="new-agent" @click="browsing = true">
                     <ShellIcon name="plus" :size="14" />{{ $t('Ai.new_agent') }}
                 </button>
                 <router-link v-if="canManage" class="ah-btn ah-btn--secondary ah-btn--sm" :to="{ name: 'WorkflowBuilder', params: { cid: companyId } }">{{ $t('WorkflowBuilder.nav') }}</router-link>
@@ -22,9 +22,10 @@
                     <h3 class="ah-h3">{{ $t('Ai.empty_title') }}</h3>
                     <p class="ai-lead" style="margin:6px 0 12px">{{ $t('Ai.empty_lead') }}</p>
                     <div v-if="canManage" class="ai-templates" data-test="templates">
-                        <button v-for="tpl in templates" :key="tpl.slug" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="startFromTemplate(tpl)">
-                            {{ tpl.name }}
+                        <button v-for="tpl in templates" :key="tpl.slug" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="openWizard(templateToPrefill(t, tpl))">
+                            {{ templateName(t, tpl) }}
                         </button>
+                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="browse-templates" @click="browsing = true">{{ $t('AgentCatalogue.browse_all') }}</button>
                     </div>
                 </div>
 
@@ -75,7 +76,8 @@
             </div>
         </div>
 
-        <AgentWizard v-if="creating" :template="wizardTemplate" @close="creating = false; wizardTemplate = null" @created="onCreated" />
+        <AgentCatalogue v-if="browsing" @close="browsing = false" @pick="openWizard" />
+        <AgentWizard v-if="creating" :prefill="wizardPrefill" @close="creating = false; wizardPrefill = null" @created="onCreated" />
         <RunTaskPicker v-if="picking" :agent="picking" :busy="busyId === picking._id" :error="runError" @close="picking = null; runError = ''" @run="onRunNow" />
     </div>
 </template>
@@ -88,10 +90,11 @@ import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "./AiSidebar.vue";
 import AgentWizard from "./AgentWizard.vue";
+import AgentCatalogue from "./AgentCatalogue.vue";
 import RunTaskPicker from "./RunTaskPicker.vue";
 import { useAgents } from "./useAgents";
 import { actionLabel, autonomyName, autonomyTip, skillAbout, skillLabel } from "./plainLabels";
-import { AGENT_TEMPLATES } from "./agentTemplates";
+import { selectableTemplates, templateName, templateToPrefill } from "./agentCatalogue";
 import { requirementsOf } from "./skillInputs";
 import { projectScopeOf } from "./agentFit";
 import { useAgentAccess } from "./agentAccess";
@@ -105,8 +108,11 @@ const { agents, spend, registryManifest, loading, lastError, AUTONOMY, loadAll, 
 const { canManage, mayStop } = useAgentAccess();
 const stoppableRuns = (agent) => (activeRuns.value[agent._id] || []).filter(mayStop);
 
+const EMPTY_HUB_TEMPLATES = 4;
+
+const browsing = ref(false);
 const creating = ref(false);
-const wizardTemplate = ref(null);
+const wizardPrefill = ref(null);
 const busyId = ref("");
 const picking = ref(null);
 const runError = ref("");
@@ -128,7 +134,7 @@ const onPause = (agent) => withAgent(agent, async () => {
     $toast.success(t(agent.paused ? "Ai.resumed_toast" : "Ai.paused_toast", { name: agent.name }), { position: "top-right" });
 });
 
-const templates = AGENT_TEMPLATES;
+const templates = computed(() => selectableTemplates().slice(0, EMPTY_HUB_TEMPLATES));
 
 const neverList = computed(() => (registryManifest.value.never || []).map((key) => actionLabel(t, key)).join(" · "));
 
@@ -145,14 +151,15 @@ const monthLine = (agent) => {
 
 const needsLine = (agent) => t("Ai.needs_line", { what: requirementsOf(agent).map((code) => t(`Ai.req_${code}`)).join(" · ") });
 
-const startFromTemplate = (tpl) => {
-    wizardTemplate.value = tpl;
+const openWizard = (prefill) => {
+    browsing.value = false;
+    wizardPrefill.value = prefill || null;
     creating.value = true;
 };
 
 const onCreated = () => {
     creating.value = false;
-    wizardTemplate.value = null;
+    wizardPrefill.value = null;
     loadAll();
     loadActiveRuns();
 };

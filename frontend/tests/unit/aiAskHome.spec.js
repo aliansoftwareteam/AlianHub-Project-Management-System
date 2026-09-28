@@ -74,6 +74,7 @@ describe('Ask is the AI home', () => {
     });
 
     it('points the rail AI tile, and so the phone tab, at Ask', async () => {
+        applyAiAvailability({ state: 'on', loaded: true });
         const router = routerFor();
         await router.push('/c1/home');
         await router.isReady();

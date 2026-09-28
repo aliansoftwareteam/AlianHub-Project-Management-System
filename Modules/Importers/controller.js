@@ -15,6 +15,7 @@ const { mapStatusName } = require('./helpers/jiraRules');
 const { importTargetAccess, previewAccess, refuseImport } = require('./helpers/importAccess');
 const { findCompanyMembers, activeMemberIdSet } = require('./helpers/companyMembers');
 const { sessionActor } = require('../Tasks/helpers/taskWriteFields');
+const { sprintPlacementOf } = require('../Tasks/helpers/sprintPlacement');
 const { pinSessionTenant } = require('../../Config/tenant');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { updateUnReadCommentsCountFun } = require('../notification-count/controller');
@@ -586,7 +587,7 @@ const createListProject = async ({ companyId, userId, actor, name }) => {
         body: { companyId, projectId: String(created.projectId), sprintName: name, userData: actor, projectName: name, isPreCompany: true, mainChat: false, private: false, sendMessage: false },
     });
     if (!sprint || !sprint.data || !sprint.data._id) throw new Error('The list could not be created in the new project.');
-    return { projectId: String(created.projectId), sprint: { id: String(sprint.data._id), name } };
+    return { projectId: String(created.projectId), sprint: (await sprintPlacementOf(companyId, { _id: sprint.data._id, name })).set.sprintArray };
 };
 
 /* POST /api/v2/imports/clickup/project
