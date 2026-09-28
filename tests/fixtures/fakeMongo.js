@@ -2,7 +2,7 @@
 // language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type/$size/$elemMatch, $set/$inc/$push/$addToSet/$pull,
 // conditional findOneAndUpdate answering the old document unless asked for the new one (null after an upsert insert, as
 // the driver does), updateOne and findOneAndUpdate with upsert and $setOnInsert and a unique _id, findOneAndDelete, deleteOne, deleteMany,
-// bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project/$addFields ($toString, $ifNull, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
+// bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project (inclusion or exclusion)/$addFields ($toString, $ifNull, $size, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000, declared text indexes that bound $text to their fields) so a test can assert on what was written.
 
 let seq = 1;
@@ -186,11 +186,19 @@ const computed = (doc, value, search, textFields) => {
         const found = computed(doc, value.$ifNull[0], search, textFields);
         return found == null ? computed(doc, value.$ifNull[1], search, textFields) : found;
     }
+    if (value && typeof value === 'object' && value.$size !== undefined) { const list = computed(doc, value.$size, search, textFields); return Array.isArray(list) ? list.length : 0; }
     if (value && typeof value === 'object' && value.$strLenBytes !== undefined) return Buffer.byteLength(String(computed(doc, value.$strLenBytes, search, textFields)));
     return fieldOf(doc, value);
 };
 
 const project = (doc, spec, search, textFields) => {
+    const fields = Object.entries(spec).filter(([key]) => key !== '_id');
+    if (fields.length && fields.every(([, value]) => value === 0 || value === false)) {
+        const out = { ...doc };
+        fields.forEach(([key]) => { delete out[key]; });
+        if (spec._id === 0) delete out._id;
+        return out;
+    }
     const out = spec._id === 0 ? {} : { _id: doc._id };
     Object.entries(spec).filter(([key]) => key !== '_id').forEach(([key, value]) => {
         const kept = value === 1 || value === true ? read(doc, key) : computed(doc, value, search, textFields);

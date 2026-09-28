@@ -30,6 +30,16 @@
                 </nav>
                 <button v-if="task.TaskKey" type="button" class="ah-detail__key ah-mono" :aria-label="$t('TaskPanel.copy_id', { key: task.TaskKey })" :title="$t('TaskPanel.copy_id', { key: task.TaskKey })" @click="copyKey">{{ task.TaskKey }}</button>
             </template>
+            <FavouriteStar
+                v-if="task._id"
+                class="ah-detail__star"
+                type="task"
+                :id="String(task._id)"
+                :name="task.TaskName || ''"
+                :projectId="projectData._id ? String(projectData._id) : undefined"
+                :sprintId="task.sprintId ? String(task.sprintId) : undefined"
+                :folderId="task.folderObjId ? String(task.folderObjId) : undefined"
+            />
             <button v-if="task._id" type="button" class="ah-detail__icon-btn ah-detail__copy-link" :aria-label="$t('TaskPanel.copy_link')" :title="$t('TaskPanel.copy_link')" @click="copyLink">
                 <ShellIcon name="link" :size="14" />
             </button>
@@ -88,9 +98,6 @@
                         class="ah-detail__title"
                         :taskName="task.TaskName"
                         :taskType="task.TaskTypeKey"
-                        :favourites="task.favouriteTasks"
-                        :userId="user.id"
-                        @update:favourite="updateFavourite"
                         @update:taskName="(val) => updateTaskName(val)"
                         @update:taskType="(val) => changeTaskType(val)"
                     />
@@ -118,6 +125,7 @@
                 </div>
 
                 <TaskSummaryBlock v-if="task._id && canComment" ref="summaryRef" :taskId="task._id" :enabled="canUseAi()" @count="(n) => commentTotal = n" />
+                <TaskActionItems v-if="task._id && canComment" :task="task" @open="openActionItem" />
 
                 <div class="ah-detail__tabs" role="tablist">
                     <button
@@ -355,8 +363,10 @@ import { mentionsAnAgent } from "@/utils/agentMention";
 import ActivityLog from "@/components/templates/ActivityLog/ActivityLog.vue";
 import PagesPanel from "@/components/molecules/Pages/PagesPanel.vue";
 import TagChip from "@/components/atom/TagChip/TagChip.vue";
+import FavouriteStar from "@/components/atom/FavouriteStar/FavouriteStar.vue";
 import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
 import TaskSummaryBlock from "./TaskSummaryBlock.vue";
+import TaskActionItems from "./TaskActionItems.vue";
 import TaskTrackerHandoff from "./TaskTrackerHandoff.vue";
 import { showUndoToast } from "@/composable/useUndoToast";
 import { useEscapeLayer } from "@/composable/useEscapeLayer";
@@ -584,22 +594,6 @@ function updateTaskName(val) {
         reflectOwnUpdate({ TaskName: val });
         $toast.success(t("Toast.Task_name_updated_successfully"), { position: "top-right" });
     }).catch((err) => console.error(err));
-}
-
-function updateFavourite() {
-    taskClass.markAsFavourite({
-        companyId: projectData.value.CompanyId,
-        projectId: projectData.value._id,
-        sprintId: props.sprintId,
-        taskData: task.value,
-        userId: user.id
-    }).then((res) => {
-        if (res.status === 200) $toast.success(res.statusText, { position: "top-right" });
-        else $toast.error(t("Toast.something_went_wrong"), { position: "top-right" });
-    }).catch((error) => {
-        console.error("ERROR in markAsFavourite: ", error);
-        $toast.error(t("Toast.something_went_wrong"), { position: "top-right" });
-    });
 }
 
 function updateWatchers(userId, type) {
@@ -912,6 +906,15 @@ watch(() => props.tab, (value) => {
 watch(isMobile, (mobile) => {
     if (!mobile && activeTab.value === "activity") activeTab.value = "description";
 });
+
+function openActionItem(item) {
+    activityView.value = "comments";
+    if (isMobile.value) activeTab.value = "activity";
+    setTimeout(() => {
+        const target = document.getElementById(String(item.parentId || item._id)) || activityEl.value;
+        target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 300);
+}
 
 function jumpToComposer() {
     activeTab.value = "activity";

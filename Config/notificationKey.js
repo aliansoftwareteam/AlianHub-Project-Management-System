@@ -2,6 +2,8 @@
 const Notification_key = {
   //TASK
   COMMENTS_IM_MENTIONS_IN:"comments_I'm_@mentioned_in",
+  COMMENT_REPLY:"comment_reply",
+  COMMENT_ASSIGNED:"comment_assigned",
   CREATE_TASK:"task_create",
   TASK_NAME:"task_edit",
   TASK_NOTIFICATION:"task_notification",
@@ -77,8 +79,15 @@ const ChangeTypes={
   PROJECT_CLOSE:"project_close"
 }
 
+// Task notice types added after users had settings documents; Modules/Comments/helpers/noticeItems.js adds them to older ones.
+const COMMENT_NOTICE_ITEMS = Object.freeze([
+  { name: "Replies to my comments", email: false, browser: true, mobile: true, key: Notification_key.COMMENT_REPLY },
+  { name: "Comments assigned to me", email: false, browser: true, mobile: true, key: Notification_key.COMMENT_ASSIGNED },
+]);
+
 module.exports = {
     Notification_key,
+    COMMENT_NOTICE_ITEMS,
     TemplateType,
     ChangeTypes
 };

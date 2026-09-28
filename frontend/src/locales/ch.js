@@ -683,6 +683,12 @@ export default {
     },
     "Home": {
         "overdue": "Overdue",
+        "assigned_comments": "Assigned comments",
+        "assigned_comments_loading": "Loading assigned comments…",
+        "assigned_comments_empty": "No open comments are assigned to you.",
+        "card_assigned_comments_hint": "Open comments assigned to you, ready to resolve.",
+        "assigned_by": "From {name}",
+        "untitled_task": "Untitled task",
         "unlock": "解锁",
         "lock": "锁定",
         "dashboardLockSuccess": "仪表板已成功锁定",
@@ -1653,6 +1659,8 @@ export default {
     },
     "TaskPanel": {
         "dialog_label": "Task detail",
+        "action_items": "Action items ({n})",
+        "open_comment": "Go to the comment",
         "open_in_desktop_tracker": "Open in desktop tracker",
         "change_undone": "Change undone",
         "tracker_start": "Start Tracker",
@@ -6512,6 +6520,8 @@ export default {
     },
     "Notification": {
         "Notification": "通知",
+        "comment_reply": "Replies to my comments",
+        "comment_assigned": "Comments assigned to me",
         "notification_setting": "通知设置",
         "browser": "浏览器",
         "mobile": "移动端",
@@ -6907,6 +6917,9 @@ export default {
         "kind_approval": "Approvals",
         "kind_reminder": "Reminders",
         "kind_update": "Updates",
+        "kind_assigned": "Assigned comments",
+        "assigned_you_comment": "assigned you a comment",
+        "replied_in_thread": "replied in a thread you're in",
         "mark_all_read": "Mark all as read",
         "marked_all_read": "Marked {n} as read.",
         "zero_primary": "You're all caught up",
@@ -7304,7 +7317,27 @@ export default {
         "cited_page": "page",
         "cited_page_hidden": "a page you cannot open",
         "send_failed": "Couldn't send your comment. Your text is still here.",
-        "attachment_send_failed": "Couldn't send your attachment. It's still here to try again."
+        "attachment_send_failed": "Couldn't send your attachment. It's still here to try again.",
+        "assigned_to": "Assigned to {name}",
+        "resolved_by_assignee": "Resolved · {name}",
+        "resolve": "Resolve",
+        "reopen": "Reopen",
+        "assign": "Assign",
+        "reassign": "Reassign",
+        "assign_to": "Assign to",
+        "unassign": "Unassign",
+        "search_people": "Search people",
+        "no_people_found": "No one found",
+        "someone": "Someone",
+        "hide_replies": "Hide replies",
+        "replies_count": "{n} reply | {n} replies",
+        "reply_in_thread": "Reply in thread",
+        "thread_label": "Replies",
+        "loading_replies": "Loading replies…",
+        "replies_failed": "Replies could not be loaded.",
+        "reply_placeholder": "Write a reply. Enter sends, Shift+Enter adds a line.",
+        "send_reply": "Send reply",
+        "reply_failed": "The reply could not be sent."
     },
     "PlaceHolder": {
         "enter_task_type": "输入任务类型",
@@ -10148,6 +10181,22 @@ export default {
         "revoke": "Revoke",
         "revoke_confirm": "Revoke {name}? It loses access at once.",
         "revoke_failed": "The app could not be revoked."
+    },
+    "Favourites": {
+        "add": "Add to favourites",
+        "remove": "Remove from favourites",
+        "toggle": "Favourite {name}",
+        "remove_named": "Remove {name} from favourites",
+        "reorder_named": "Move {name}",
+        "reorder_hint": "Drag, or use the up and down arrow keys, to reorder.",
+        "moved": "{name} moved to position {n} of {total}"
+    },
+    "ProjectTree": {
+        "label": "Projects and lists",
+        "show": "Show the project tree",
+        "hide": "Hide the project tree",
+        "close": "Close the project tree",
+        "tasks": "{n} tasks"
     },
     "TaskTemplates": {
         "save_as": "Save as template",

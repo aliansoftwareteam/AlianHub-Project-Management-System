@@ -2117,6 +2117,17 @@ const schema = {
         navPreferences: {
             pinned: { type: [String], required: false, default: undefined }
         },
+        // Stars across companies live on the global user record, so each entry names its company.
+        favourites: {
+            type: [new mongoose.Schema({
+                companyId: { type: String, required: true },
+                type: { type: String, required: true },
+                id: { type: String, required: true },
+                addedAt: { type: Date, required: false }
+            }, { _id: false })],
+            required: false,
+            default: undefined
+        },
         // Written only by PUT /api/v2/users/home-cards (Modules/Users/homeCards.js).
         homeCards: {
             hidden: { type: [String], required: false, default: undefined }
@@ -3892,7 +3903,15 @@ const schema = {
         agentId: { type: String, default: "" },
         viaAccount: { type: String, default: "" },
         runId: { type: String, default: "" },
-        automationName: { type: String, required: false }
+        automationName: { type: String, required: false },
+        // A threaded reply's first comment; the reply always carries that comment's thread ids.
+        parentId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        assigneeId: { type: String, required: false },
+        assignedBy: { type: String, required: false },
+        assignedAt: { type: Date, required: false },
+        resolved: { type: Boolean, required: false },
+        resolvedBy: { type: String, required: false },
+        resolvedAt: { type: Date, required: false }
     },
     mainChat: {
         ProjectCode: {

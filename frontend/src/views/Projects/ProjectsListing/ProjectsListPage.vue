@@ -158,6 +158,7 @@ import AiProjectCreator from '@/components/organisms/AiProjectCreator/AiProjectC
 import { SAMPLE_PROJECT_NAME } from '@/components/organisms/CreateProject/templates';
 import { useProjectsHelper } from '../helper';
 import { useProjectLifecycle } from '../composables/useProjectLifecycle';
+import { useFavourites } from '@/composable/favourites';
 import { lifecycleOf, ARCHIVED, TRASHED } from '@/utils/lifecycle';
 import { deriveHealth, loadProjectSnapshot, projectSnapshot, sprintWindow } from './useProjectHealth';
 
@@ -169,7 +170,6 @@ const { checkPermission } = useCustomComposable();
 const { getUser } = useGetterFunctions();
 const { dispatchProjects } = useProjectsHelper();
 
-const userId = inject('$userId');
 const companyId = inject('$companyId');
 
 const showArchived = ref(false);
@@ -198,7 +198,8 @@ const activeCount = computed(() => visible.value.filter((p) => !isArchived(p)).l
 const archivedCount = computed(() => visible.value.filter((p) => isArchived(p)).length);
 const filterOn = computed(() => showArchived.value || onlyFavourites.value);
 
-const isFavourite = (project) => Boolean((project.favouriteTasks || []).find((x) => x.userId === userId.value));
+const { isFavourite: isStarred } = useFavourites();
+const isFavourite = (project) => isStarred('project', project._id);
 
 const rows = computed(() => {
     let list = visible.value.filter((p) => (showArchived.value ? isArchived(p) : !isArchived(p)));

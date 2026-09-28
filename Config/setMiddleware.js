@@ -69,6 +69,7 @@ const verifyJWTTokenWithCRoute = [
     "/api/v2/imports",
     "/api/v2/reactions",
     "/api/v2/recent-visits",
+    "/api/v2/users/favourites",
     "/api/v2/search",
     "/api/v2/pages",
     "/api/v2/trash",

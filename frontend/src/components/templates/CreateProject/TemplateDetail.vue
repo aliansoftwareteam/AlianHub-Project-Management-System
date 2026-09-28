@@ -18,7 +18,7 @@
             </h4> -->
         </div>
         <div v-if="templateView && Object.keys(templateView).length > 0" class="template-scroll-wrapper overflow-x-hidden style-scroll">
-            <button v-if="route.name === 'Template' && currentSelectedKey == 0" type="button" @click="deleteSelectedTemplate(templateView)" class="deleteTemplateBtn cursor-pointer" >{{ $t('Templates.delete_template') }}</button>
+            <button v-if="canManageTemplates && route.name === 'Template' && currentSelectedKey == 0" type="button" @click="deleteSelectedTemplate(templateView)" class="deleteTemplateBtn cursor-pointer" >{{ $t('Templates.delete_template') }}</button>
             <ConfirmModal
                 :modelValue="showConfirmModal"
                 :acceptButtonText="$t('Home.Confirm')"
@@ -120,7 +120,7 @@
 </div>
 </template>
 <script setup>
-import { ref, inject, watch } from 'vue';
+import { ref, inject, watch, computed } from 'vue';
 import TemplateAllDetail from '@/components/templates/CreateProject/TemplateAllDetail.vue';
 import ConfirmModal from '@/components/atom/Modal/Modal.vue';
 import { useRoute } from "vue-router";
@@ -133,10 +133,12 @@ import { projectComponentsIcons,getImageUrl } from '@/composable/commonFunction'
 import { storageQueryBuilder } from '@/utils/storageQueryBuild';
 import { useI18n } from "vue-i18n";
 import * as env from '@/config/env';
+import { isOwnerOrAdmin } from '@/utils/roles';
 const { t } = useI18n();
 
 const $toast = useToast();
-const { commit } = useStore();
+const { commit, getters } = useStore();
+const canManageTemplates = computed(() => isOwnerOrAdmin(Number(getters['settings/companyUserDetail']?.roleType)));
  const route = useRoute()
     const props = defineProps({
         modelValue: {

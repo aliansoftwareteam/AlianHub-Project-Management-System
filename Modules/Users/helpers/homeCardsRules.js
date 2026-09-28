@@ -1,5 +1,5 @@
 // Must list every `id` in frontend/src/components/molecules/Home/homeCards.js; tests/user-home-cards.test.js checks it.
-const HOME_CARD_IDS = Object.freeze(['waiting', 'standup']);
+const HOME_CARD_IDS = Object.freeze(['waiting', 'standup', 'assigned_comments']);
 
 const refuse = (error) => ({ ok: false, error });
 
