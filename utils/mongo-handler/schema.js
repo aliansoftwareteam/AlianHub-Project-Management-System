@@ -1041,6 +1041,40 @@ const schema = {
         tainted: { type: Boolean, required: false },
         // [{ kind: fetch | email | form | webhook | file | passage | client | instruction, ref, at }] — where it came from, never the content
         taintSources: { type: Array, default: undefined, required: false },
+        // 'report' for a scheduled report run (no task); absent on a task run
+        kind: { type: String, required: false },
+        scheduleId: { type: String, required: false },
+        slotAt: { type: Date, required: false },
+        // { key, title, summary, sections, counts, text, delivered: { inbox, email, comment, page }, shared: { comment, page: { projectId, counts } }, notes }
+        report: { type: Object, required: false },
+    },
+    // Modules/Agents/schedules — when an L3 agent runs a report, and as whom
+    agentSchedules: {
+        agentId: { type: String, required: true },
+        // the person whose access the run reads with and who receives the report
+        ownerId: { type: String, required: true },
+        createdBy: { type: String, required: false },
+        // daily_briefing | deadline_watch | mentions_digest | weekly_status
+        report: { type: String, required: true },
+        // daily | weekdays | weekly
+        every: { type: String, required: true },
+        // HH:MM in `timezone`
+        at: { type: String, required: true },
+        // 0 (Sunday) to 6, weekly only
+        weekday: { type: Number, required: false },
+        timezone: { type: String, default: 'UTC', required: false },
+        // { days } for deadline_watch
+        options: { type: Object, required: false },
+        // { email, taskId, pageProjectId }
+        deliver: { type: Object, required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        // slots at or before this never fire, so saving a schedule does not fire the slot just gone
+        since: { type: Date, required: false },
+        lastSlotAt: { type: Date, required: false },
+        // { status: done | failed | skipped | missed, reason, code, slot, runId, at }
+        lastResult: { type: Object, required: false },
+        nextRunAt: { type: Date, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
     },
     agentRevisions: {
         agentId: { type: String, required: true },

@@ -262,10 +262,16 @@ agentRunsSchema.index({ 'failure.type': 1, startedAt: -1 }, { partialFilterExpre
 // hits the index instead of starting a second run.
 agentRunsSchema.index({ agentId: 1, taskId: 1, status: 1 }, { unique: true, partialFilterExpression: { taskId: { $type: 'string' }, status: { $in: ['queued', 'running', 'waiting_approval'] } } });
 agentRunsSchema.index({ idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } });
+agentRunsSchema.index({ startedBy: 1, kind: 1, startedAt: -1 }, { partialFilterExpression: { kind: { $type: 'string' } } });
 
 const agentRevisionsSchema = new Schema(schema.agentRevisions, {strict: true, timestamps: true});
 agentRevisionsSchema.index({ agentId: 1, n: 1 }, { unique: true });
 agentRevisionsSchema.index({ agentId: 1, state: 1 });
+
+const agentSchedulesSchema = new Schema(schema.agentSchedules, {strict: true, timestamps: true});
+agentSchedulesSchema.index({ enabled: 1, nextRunAt: 1 });
+agentSchedulesSchema.index({ agentId: 1 });
+agentSchedulesSchema.index({ ownerId: 1 });
 
 const aiUsageSchema = new Schema(schema.aiUsage, {strict: true, timestamps: true});
 aiUsageSchema.index({ at: -1 });
@@ -501,6 +507,7 @@ module.exports = {
     agentsSchema,
     agentRunsSchema,
     agentRevisionsSchema,
+    agentSchedulesSchema,
     aiUsageSchema,
     aiReservationsSchema,
     aiReplaysSchema,

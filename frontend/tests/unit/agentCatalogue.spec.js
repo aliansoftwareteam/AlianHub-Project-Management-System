@@ -13,6 +13,7 @@ vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 
 import AgentCatalogue from '@/views/Ai/AgentCatalogue.vue';
 import AgentWizard from '@/views/Ai/AgentWizard.vue';
 import { CATALOGUE_CATEGORIES, CATALOGUE_TEMPLATES, filterTemplates, templateToPrefill, draftToPrefill } from '@/views/Ai/agentCatalogue';
+import { REPORT_KEYS } from '@/views/Ai/agentSchedule';
 import { applyAiAvailability, resetAiAvailability, AI_STATE } from '@/composable/aiAvailability';
 
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
@@ -94,8 +95,22 @@ describe('the template catalogue as data', () => {
             expect(tpl.autonomy).toBeLessThanOrEqual(1);
             expect(t(`AgentCatalogue.tpl_${tpl.slug}_name`)).not.toBe(`AgentCatalogue.tpl_${tpl.slug}_name`);
             expect(t(`AgentCatalogue.tpl_${tpl.slug}_about`)).not.toBe(`AgentCatalogue.tpl_${tpl.slug}_about`);
-            if (!tpl.blockedBy) expect(tpl.skills.length).toBeGreaterThan(0);
+            if (!tpl.blockedBy) expect(tpl.skills.length + (tpl.schedule ? 1 : 0)).toBeGreaterThan(0);
+            if (tpl.schedule) expect(REPORT_KEYS).toContain(tpl.schedule.report);
         });
+    });
+
+    it('offers the four scheduled reports, the mentions digest included', () => {
+        const reports = CATALOGUE_TEMPLATES.filter((tpl) => tpl.schedule).map((tpl) => tpl.schedule.report).sort();
+        expect(reports).toEqual(['daily_briefing', 'deadline_watch', 'mentions_digest', 'weekly_status']);
+        expect(CATALOGUE_TEMPLATES.find((x) => x.slug === 'mentions_digest').blockedBy).toBeNull();
+    });
+
+    it('pre-fills a schedule and L3 from a scheduled template, never from a builder draft', () => {
+        const prefill = templateToPrefill(t, CATALOGUE_TEMPLATES.find((x) => x.slug === 'status_reporter'));
+        expect(prefill).toMatchObject({ autonomy: 1, scheduledAutonomy: 3, schedule: { report: 'weekly_status', every: 'weekly', weekday: 5, at: '16:00' } });
+        expect(templateToPrefill(t, CATALOGUE_TEMPLATES.find((x) => x.slug === 'work_breakdown')).schedule).toBeNull();
+        expect(draftToPrefill({ ...DRAFT, schedule: { report: 'daily_briefing' } })).toMatchObject({ schedule: null, scheduledAutonomy: null });
     });
 
     it('filters by category', () => {
@@ -229,6 +244,45 @@ describe('the wizard opened from the catalogue', () => {
         expect(save[2].allowedActions).not.toContain('deploy.staging');
         expect(save[2].skills.map((s) => s.key)).toEqual(['digest.ceo']);
         expect(save[2].schedule).toBeUndefined();
+    });
+
+    it('opens a scheduled template with its schedule ticked, saves the agent at L3 and then its schedule', async () => {
+        const prefill = templateToPrefill(t, CATALOGUE_TEMPLATES.find((x) => x.slug === 'daily_briefing'));
+        const wrapper = await mountWith(AgentWizard, { prefill });
+        await wrapper.find('.aw__foot .ah-btn--primary').trigger('click');
+        await wrapper.find('.aw__foot .ah-btn--primary').trigger('click');
+        const box = wrapper.find('[data-test="wizard-schedule"] input');
+        expect(box.element.checked).toBe(true);
+        expect(wrapper.find('input[type="radio"]:checked').element.value).toBe('3');
+        await wrapper.find('.aw__foot .ah-btn--primary').trigger('click');
+        await flushPromises();
+        const save = apiRequest.mock.calls.find(([type, url]) => type === 'post' && url === '/api/v2/agents');
+        expect(save[2].autonomy).toBe(3);
+        const schedule = apiRequest.mock.calls.find(([type, url]) => type === 'post' && url === '/api/v2/agents/new/schedules');
+        expect(schedule[2]).toMatchObject({ report: 'daily_briefing', every: 'weekdays', at: '08:30', deliver: { email: false } });
+        expect(schedule[2].timezone).toBeTruthy();
+    });
+
+    it('saves a scheduled template at its own level with no schedule when the box is cleared', async () => {
+        const prefill = templateToPrefill(t, CATALOGUE_TEMPLATES.find((x) => x.slug === 'deadline_watch'));
+        const wrapper = await mountWith(AgentWizard, { prefill });
+        await wrapper.find('.aw__foot .ah-btn--primary').trigger('click');
+        await wrapper.find('.aw__foot .ah-btn--primary').trigger('click');
+        await wrapper.find('[data-test="wizard-schedule"] input').setValue(false);
+        expect(wrapper.find('input[type="radio"]:checked').element.value).toBe('1');
+        await wrapper.find('.aw__foot .ah-btn--primary').trigger('click');
+        await flushPromises();
+        const save = apiRequest.mock.calls.find(([type, url]) => type === 'post' && url === '/api/v2/agents');
+        expect(save[2].autonomy).toBe(1);
+        expect(apiRequest.mock.calls.some(([, url]) => String(url).endsWith('/schedules'))).toBe(false);
+    });
+
+    it('never offers a schedule for a builder draft', async () => {
+        const wrapper = await mountWith(AgentWizard, { prefill: draftToPrefill(DRAFT) });
+        await wrapper.find('.aw__foot .ah-btn--primary').trigger('click');
+        await wrapper.find('.aw__foot .ah-btn--primary').trigger('click');
+        expect(wrapper.find('[data-test="wizard-schedule"]').exists()).toBe(false);
+        expect(wrapper.findAll('input[type="radio"]').map((i) => i.element.value)).not.toContain('3');
     });
 
     it('still refuses to go on without a name', async () => {

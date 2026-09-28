@@ -61,14 +61,21 @@
                         <div class="ah-field">
                             <span class="ah-field__label">{{ $t('Ai.autonomy') }}</span>
                             <div class="ai-radios">
-                                <label v-for="level in WIZARD_LEVELS" :key="level" class="ai-radio" :class="{ 'is-on': form.autonomy === level }" :title="autonomyTip(t, level)">
+                                <label v-for="level in wizardLevels" :key="level" class="ai-radio" :class="{ 'is-on': form.autonomy === level }" :title="autonomyTip(t, level)">
                                     <input v-model.number="form.autonomy" type="radio" :value="level" class="ah-check" />
                                     <span class="aw__level"><strong>{{ autonomyName(t, level) }}</strong><span class="ah-small">{{ autonomyAbout(t, level) }}</span></span>
                                 </label>
                             </div>
                             <span class="ah-field__hint">{{ $t('Ai.start_suggesting') }}</span>
                             <p v-if="whyOf('autonomy')" class="ah-small aw__why" data-test="why-autonomy">{{ whyOf('autonomy') }}</p>
-                            <p v-if="props.prefill && props.prefill.cadence" class="ah-small aw__why" data-test="wizard-cadence">{{ $t(`AgentCatalogue.cadence_${props.prefill.cadence}`) }} · {{ $t('AgentCatalogue.schedule_later') }}</p>
+                            <template v-if="prefillSchedule">
+                                <label class="aw__schedule" data-test="wizard-schedule">
+                                    <input v-model="scheduleOn" type="checkbox" class="ah-check" />
+                                    <span>{{ $t('AgentCatalogue.schedule_on', { report: $t(`Ai.report_${prefillSchedule.report}`), when: describeSchedule(t, { ...prefillSchedule, timezone: viewerTimeZone() }) }) }}</span>
+                                </label>
+                                <span class="ah-field__hint">{{ $t('AgentCatalogue.schedule_on_hint') }}</span>
+                            </template>
+                            <p v-else-if="props.prefill && props.prefill.cadence" class="ah-small aw__why" data-test="wizard-cadence">{{ $t(`AgentCatalogue.cadence_${props.prefill.cadence}`) }} · {{ $t('AgentCatalogue.schedule_in_settings') }}</p>
                         </div>
                         <div class="ah-field">
                             <span class="ah-field__label">{{ $t('Ai.scope') }}</span>
@@ -113,6 +120,9 @@ import { useAgents, NEW_AGENT_DEFAULTS } from "./useAgents";
 import { selectableTemplates, templateName } from "./agentCatalogue";
 import { requirementsOf, indexSkills } from "./skillInputs";
 import { actionLabel, autonomyAbout, autonomyName, autonomyTip, skillAbout, skillLabel } from "./plainLabels";
+import { blankSchedule, describeSchedule, schedulePayload, scheduleForm, viewerTimeZone } from "./agentSchedule";
+import { apiRequest } from "@/services";
+import * as env from "@/config/env";
 
 defineOptions({ name: "AgentWizard" });
 
@@ -120,6 +130,7 @@ const props = defineProps({ prefill: { type: Object, default: null } });
 const emit = defineEmits(["close", "created"]);
 
 const WIZARD_LEVELS = [0, 1, 2];
+const SCHEDULED = 3;
 
 const { t } = useI18n();
 const { getters } = useStore();
@@ -152,6 +163,18 @@ const initialForm = (prefill) => ({
 });
 const form = reactive(initialForm(props.prefill));
 
+// Only a template brings a schedule; a builder draft never does, so a sentence cannot make an agent run unattended.
+const prefillSchedule = computed(() => (props.prefill && props.prefill.source === "template" && props.prefill.schedule) || null);
+const scheduleOn = ref(Boolean(prefillSchedule.value));
+const wizardLevels = computed(() => (scheduleOn.value ? [...WIZARD_LEVELS, SCHEDULED] : WIZARD_LEVELS));
+const levelBeforeSchedule = form.autonomy;
+if (scheduleOn.value) form.autonomy = SCHEDULED;
+watch(scheduleOn, (on) => {
+    if (on) form.autonomy = SCHEDULED;
+    else if (form.autonomy === SCHEDULED) form.autonomy = levelBeforeSchedule;
+});
+watch(() => form.autonomy, (level) => { if (scheduleOn.value && level !== SCHEDULED) scheduleOn.value = false; });
+
 watch(chosenTemplate, (tpl) => {
     form.allowedActions = [...(tpl ? tpl.actions : NEW_AGENT_DEFAULTS.allowedActions)];
 });
@@ -180,7 +203,7 @@ const create = async () => {
     busy.value = true;
     errors.form = "";
     try {
-        await saveAgent({
+        const created = await saveAgent({
             name: form.name,
             description: form.description,
             allowedActions: form.allowedActions,
@@ -189,12 +212,20 @@ const create = async () => {
             projectIds: form.projectIds,
             skills: skillKeys.value.map((key) => ({ key, name: key, actions: form.allowedActions, enabled: true }))
         });
+        if (scheduleOn.value && created && created._id) await saveSchedule(created._id);
         emit("created");
     } catch (e) {
         errors.form = e.message;
     } finally {
         busy.value = false;
     }
+};
+
+/* The agent already exists when this runs; a schedule that fails to save is added on the agent's page instead. */
+const saveSchedule = async (agentId) => {
+    const s = prefillSchedule.value;
+    const values = { ...blankSchedule(viewerTimeZone()), ...scheduleForm({ ...s, options: { days: s.days } }), timezone: viewerTimeZone() };
+    await apiRequest("post", `${env.AGENTS}/${agentId}/schedules`, schedulePayload(values)).catch(() => null);
 };
 
 /* A prefill comes from a model or a template: keep only actions the checkboxes can show. */
@@ -222,4 +253,5 @@ onMounted(async () => {
 .aw__level { display: flex; flex-direction: column; gap: 2px; }
 .aw__skills { display: flex; flex-wrap: wrap; gap: 4px; }
 .aw__why { margin: 2px 0 0; color: var(--ink-2); }
+.aw__schedule { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; font: var(--text-body); cursor: pointer; }
 </style>
