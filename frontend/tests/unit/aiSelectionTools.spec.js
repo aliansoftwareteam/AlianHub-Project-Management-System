@@ -193,6 +193,7 @@ describe('Turn selection into tasks', () => {
         await wrapper.findAll('[data-test="ai-task-title"] input')[2].setValue(false);
         await wrapper.get('[data-test="ai-task-list"]').setValue('list-2');
         await wrapper.get('.aip__replace').trigger('click');
+        await vi.waitFor(() => expect(ops.createSubTaskWithAi).toHaveBeenCalled());
         await flushPromises();
         expect(ops.createSubTaskWithAi).toHaveBeenCalledWith(expect.objectContaining({
             type: 'task',

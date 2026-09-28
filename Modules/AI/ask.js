@@ -12,6 +12,7 @@ const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const knowledgeFlag = require('../Knowledge/flag');
 const { askSources } = require('../Knowledge/askSources');
 const { structuredTasks } = require('./askStructured');
+const { gatherForTask } = require('./taskContext');
 
 // Ask (handoff 13i) — a question box over the workspace.
 //
@@ -195,18 +196,21 @@ const promptFor = (question, sources, intent) => [
     ...sources.map((s) => `[${s.ref}] ${s.kind} · ${s.project || 'no project'} · ${s.title}${s.detail ? ` — ${s.detail}` : ''}`),
 ].join('\n');
 
-/* POST /api/v1/ai/ask  body: { question, mode?: 'ask'|'research', projectId? } */
+/* POST /api/v1/ai/ask  body: { question, mode?: 'ask'|'research', projectId?, taskId? } */
 const ask = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
         const uid = req.uid;
-        const { question, mode, projectId } = req.body || {};
+        const { question, mode, projectId, taskId } = req.body || {};
         // Each displayed sentence keeps its English text for older clients; the screen translates the code beside it.
         if (!companyId || !uid) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.', code: 'unauthenticated' });
         if (!String(question || '').trim()) return res.send({ status: false, statusText: 'Ask a question first.', code: 'question_required' });
 
         const research = mode === 'research';
-        const gathered = await gather(companyId, uid, { question, projectId, limit: research ? MAX_PER_TYPE * 2 : MAX_PER_TYPE, tokenProjectIds: tokenProjectIdsOf(req) });
+        const gathered = taskId
+            ? await gatherForTask(companyId, uid, taskId, tokenProjectIdsOf(req))
+            : await gather(companyId, uid, { question, projectId, limit: research ? MAX_PER_TYPE * 2 : MAX_PER_TYPE, tokenProjectIds: tokenProjectIdsOf(req) });
+        if (!gathered) return res.send({ status: false, statusText: 'Task not found.', code: 'task_not_found' });
         const roleType = await getRoleType(companyId, uid).catch(() => null);
         const found = gathered.intent ? { intent: gathered.intent } : {};
 
@@ -244,7 +248,7 @@ const ask = async (req, res) => {
         const provider = getProvider();
         const result = await provider.chat({
             systemPrompt: research ? RESEARCH_SYSTEM : SYSTEM,
-            messages: [{ role: 'user', content: promptFor(question, gathered.sources, gathered.intent) }],
+            messages: [{ role: 'user', content: promptFor(gathered.focus ? `${gathered.focus}\n${question}` : question, gathered.sources, gathered.intent) }],
             maxTokens: research ? RESEARCH_TOKENS : ASK_TOKENS,
             temperature: 0.2,
             spend: { feature: FEATURES.ASK, companyId, userId: uid },

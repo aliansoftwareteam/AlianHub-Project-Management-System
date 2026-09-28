@@ -1,11 +1,12 @@
 <template>
     <div class="pbe">
         <div :id="holderId" class="pbe__holder"></div>
+        <AiSelectionPanel ref="selectionPanel" :editor="currentEditor" :target="selectionTarget" @changed="emitChange" />
     </div>
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
@@ -20,8 +21,12 @@ import Embed from '@editorjs/embed';
 import Table from '@editorjs/table';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
-import { useGetterFunctions } from '@/composable';
+import { useCustomComposable, useGetterFunctions } from '@/composable';
 import pageContent from '@pageContent';
+import { aiUsable } from '@/composable/aiAvailability';
+import AiSelectionPanel from '@/components/molecules/AiSelection/AiSelectionPanel.vue';
+import { createSelectionTools } from '@/components/molecules/AiSelection/selectionTools';
+import { listsOfProject } from '@/utils/aiTargets';
 import { createBlockTools, TASK_LIST_LIMIT } from './blockTools';
 import { initials } from './docsFormat';
 
@@ -34,6 +39,7 @@ const route = useRoute();
 const router = useRouter();
 const store = useStore();
 const { getUser } = useGetterFunctions();
+const { checkPermission } = useCustomComposable();
 
 const props = defineProps({
     seed: { type: Object, default: null },
@@ -124,6 +130,20 @@ const tools = {
     inlineCode: { class: InlineCode },
 };
 
+const selectionPanel = ref(null);
+const currentEditor = () => editor.value;
+const selectionTarget = computed(() => {
+    const project = props.projectId ? projects().find((p) => String(p._id) === String(props.projectId)) : null;
+    if (!project || checkPermission('task.task_create', project.isGlobalPermission) !== true) return null;
+    const lists = listsOfProject(project);
+    return lists.length ? { projectData: project, lists } : null;
+});
+
+function selectionTools() {
+    if (props.readOnly || !aiUsable.value) return {};
+    return createSelectionTools({ t, onPick: (pick) => selectionPanel.value?.open(pick), canSplit: Boolean(selectionTarget.value) });
+}
+
 function seedData() {
     return contentToEditorData(props.seed || {});
 }
@@ -137,7 +157,7 @@ async function emitChange() {
 function initEditor() {
     editor.value = new EditorJS({
         holder: holderId,
-        tools,
+        tools: { ...tools, ...selectionTools() },
         data: seedData(),
         readOnly: props.readOnly,
         placeholder: t('Docs.slash_hint'),

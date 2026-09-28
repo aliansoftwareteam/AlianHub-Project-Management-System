@@ -4,7 +4,7 @@ import { flushPromises, shallowMount } from '@vue/test-utils';
 const { api } = vi.hoisted(() => ({ api: { apiRequest: vi.fn() } }));
 vi.mock('@/services', () => api);
 vi.mock('vuex', () => ({ useStore: () => ({ getters: {}, commit: vi.fn(), dispatch: vi.fn() }) }));
-vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: () => ({}) }) }));
+vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: () => ({}) }), useCustomComposable: () => ({ checkPermission: () => true }) }));
 
 import PageDocument from '@/components/molecules/Pages/PageDocument.vue';
 

@@ -19,6 +19,7 @@
                 <span v-if="showMessage" class="saved_message">{{$t('Description.saved')}}</span>
             </Transition>
             <Skelaton class="w-100 border-radius-8-px" style="height: 60px;" v-if="!contentLoaded"/>
+            <AiSelectionPanel ref="selectionPanel" :editor="currentEditor" :target="selectionTarget" @changed="saveData()" />
             <div v-show="false" id="editor-converter"></div>
             <div class="hide_show_wrapper" v-if="contentExceeds" :class="{'ml-10px mr-10-px': clientWidth < 767 }">
                 <button v-if="!isShow" @click="isShow = true" class="hide_show">{{$t('Description.show_more')}}</button>
@@ -76,6 +77,9 @@ import InlineCode from '@editorjs/inline-code';
 import Embed from '@editorjs/embed';
 import Table from '@editorjs/table';
 import writeWithAi from './writeWithAi.js';
+import AiSelectionPanel from '@/components/molecules/AiSelection/AiSelectionPanel.vue';
+import { createSelectionTools } from '@/components/molecules/AiSelection/selectionTools';
+import { sprintObjOf } from '@/utils/aiTargets';
 
 import { apiRequest } from '../../../services';
 import * as env from '@/config/env';
@@ -251,10 +255,23 @@ watch(() => props.isMainSpinner, (newVal) => {
 }, {flush: 'post'});
 
 
+const selectionPanel = ref(null);
+const currentEditor = () => editor.value;
+const selectionTarget = computed(() => {
+    const list = props.from === 'task' ? sprintObjOf(props.task?.sprintArray) : null;
+    if (!list || !list.id || checkPermission('task.task_create', props.projectData?.isGlobalPermission, {gettersVal: getters}) !== true) return null;
+    return { projectData: props.projectData, lists: [list] };
+});
+
+function selectionTools() {
+    if (!aiUsable.value || !checkAiProject.value) return {};
+    return createSelectionTools({ t, onPick: (pick) => selectionPanel.value?.open(pick), canSplit: Boolean(selectionTarget.value) });
+}
+
 function initEditor() {
     editor.value = new EditorJS({
         holder: 'editorjs',
-        tools: {...editorTools},
+        tools: {...editorTools, ...selectionTools()},
         placeholder: t('Description.description_placeholder'),
         readOnly: !props.editPermission,
         onChange: debounce(() => {
