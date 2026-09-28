@@ -8,7 +8,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     validateObjectId: (id) => /^[a-f0-9]{24}$/i.test(String(id)),
 }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
-jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
+jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn((key) => require('../Config/config').myCache.del(key)) }));
 jest.mock('../Modules/notification/prepare-notification-data/controllerV2', () => ({ handleNotificationtFun: jest.fn(async () => ({ status: true })) }));
 jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({ taskMongo: { updateAssignee: (...args) => mockUpdateAssignee(...args) } }));
 jest.mock('../Modules/AICore/llmProvider/openaiProvider', () => ({ name: 'openai', model: 'gpt-4.1', isConfigured: true, chat: jest.fn() }));
@@ -159,7 +159,6 @@ beforeEach(() => {
         if (type === 'assigneRemove') row.AssigneeUserId = (row.AssigneeUserId || []).filter((x) => x !== id);
         return { status: true };
     });
-    removeCache.mockClear();
     emitted = [];
     socketEmitter.on('update', (payload) => emitted.push(payload));
 });

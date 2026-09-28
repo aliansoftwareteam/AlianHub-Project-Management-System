@@ -129,6 +129,8 @@ const {
     agentSessionsSchema,
     agentSessionEndpointsSchema,
     askThreadsSchema,
+    assignmentRulesSchema,
+    assignmentDecisionsSchema,
     secretsSchema,
     oauthClientsSchema,
     oauthGrantsSchema,
@@ -389,6 +391,10 @@ exports.checkType = (type) => {
             return agentSessionEndpointsSchema
         case SCHEMA_TYPE.ASK_THREADS:
             return askThreadsSchema
+        case SCHEMA_TYPE.ASSIGNMENT_RULES:
+            return assignmentRulesSchema
+        case SCHEMA_TYPE.ASSIGNMENT_DECISIONS:
+            return assignmentDecisionsSchema
         case SCHEMA_TYPE.SECRETS:
             return secretsSchema
         case SCHEMA_TYPE.OAUTH_CLIENTS:
@@ -657,6 +663,10 @@ exports.tableType = (type) => {
                 return `${dbCollections.AGENT_SESSION_ENDPOINTS}`
         case SCHEMA_TYPE.ASK_THREADS:
                 return `${dbCollections.ASK_THREADS}`
+        case SCHEMA_TYPE.ASSIGNMENT_RULES:
+                return `${dbCollections.ASSIGNMENT_RULES}`
+        case SCHEMA_TYPE.ASSIGNMENT_DECISIONS:
+                return `${dbCollections.ASSIGNMENT_DECISIONS}`
         case SCHEMA_TYPE.SECRETS:
                 return `${dbCollections.SECRETS}`
         case SCHEMA_TYPE.OAUTH_CLIENTS:
