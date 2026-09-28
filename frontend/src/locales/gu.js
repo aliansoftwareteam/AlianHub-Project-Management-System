@@ -5668,6 +5668,7 @@ export default {
         "back": "પાછા",
         "tracked_time": "ટ્રેક કરેલ સમય",
         "manual_time": "મેન્યુઅલ સમય",
+        "time_split": "Tracked and manual time",
         "users": "વપરાશકર્તાઓ",
         "logged": "લૉગ કરેલ",
         "hours": "કલાક",

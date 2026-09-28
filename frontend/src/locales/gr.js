@@ -5668,6 +5668,7 @@ export default {
         "back": "Πίσω",
         "tracked_time": "Καταγεγραμμένος Χρόνος",
         "manual_time": "Χρόνος Χειροκίνητης Καταγραφής",
+        "time_split": "Tracked and manual time",
         "users": "Χρήστες",
         "logged": "Καταχωρημένο",
         "hours": "Ώρες",

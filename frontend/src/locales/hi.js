@@ -5668,6 +5668,7 @@ export default {
         "back": "वापस",
         "tracked_time": "ट्रैक किया गया समय",
         "manual_time": "मैन्युअल समय",
+        "time_split": "Tracked and manual time",
         "users": "उपयोगकर्ता",
         "logged": "लॉग इन किया गया",
         "hours": "घंटे",

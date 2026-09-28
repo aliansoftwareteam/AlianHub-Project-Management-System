@@ -18,6 +18,11 @@ describe('mobile sheet titles', () => {
         expect(groupBy).toMatch(/:title="\$t\('Projects\.group_by'\)"/);
     });
 
+    it('names the more-features sheet with its More label', () => {
+        const [more] = openTags(read(TOOLBAR), /id="more_features"/);
+        expect(more).toMatch(/:title="\$t\('Projects\.more_features'\)"/);
+    });
+
     it('names every tracked/manual split sheet in the project timesheet row', () => {
         const splits = openTags(read(TIMESHEET_ROW), /tracktime_dropdown/);
         expect(splits.length).toBeGreaterThan(0);

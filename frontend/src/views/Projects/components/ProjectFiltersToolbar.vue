@@ -85,7 +85,7 @@
                     >
                         <ShellIcon name="ai" :size="15" />
                     </button>
-                    <DropDown mode="listbox" id="group_by" class="group_by" :zIndex="sheetMode ? SHEET_MENU_Z : 7">
+                    <DropDown mode="listbox" id="group_by" class="group_by" :title="$t('Projects.group_by')" :zIndex="sheetMode ? SHEET_MENU_Z : 7">
                         <template #button="{ triggerAttrs }">
                             <button type="button" class="text-nowrap btn-white border-groupBy pft__pill cursor-pointer" ref="group_by_status" :title="$t('Projects.group_by')" :aria-label="$t('Projects.group_by')" v-bind="triggerAttrs">
                                 <ShellIcon name="layout" :size="14" />
@@ -138,7 +138,7 @@
                     <ProvenanceFilter :modelValue="doneBy" @update:modelValue="(v) => $emit('update:doneBy', v)" />
                 </template>
                 <span v-else class="pft__mode-chip">{{ $t('ProjectSlider.archived_list') }}</span>
-                <DropDown mode="menu" id="more_features" :zIndex="sheetMode ? SHEET_MENU_Z : 10">
+                <DropDown mode="menu" id="more_features" :title="$t('Projects.more_features')" :zIndex="sheetMode ? SHEET_MENU_Z : 10">
                     <template #button="{ triggerAttrs }">
                         <button type="button" class="border-groupBy pft__icon-btn cursor-pointer" :title="$t('Projects.more_features')" :aria-label="$t('Projects.more_features')" v-bind="triggerAttrs">
                             <ShellIcon name="dots" :size="15" />

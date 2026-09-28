@@ -5668,6 +5668,7 @@ export default {
         "back": "Назад",
         "tracked_time": "Отслеживаемое время",
         "manual_time": "Ручное время",
+        "time_split": "Tracked and manual time",
         "users": "Пользователи",
         "logged": "Зарегистрировано",
         "hours": "Часы",

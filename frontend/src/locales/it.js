@@ -5668,6 +5668,7 @@ export default {
         "back": "Indietro",
         "tracked_time": "Tempo Tracciato",
         "manual_time": "Tempo Manuale",
+        "time_split": "Tracked and manual time",
         "users": "Utenti",
         "logged": "Registrato",
         "hours": "Ore",

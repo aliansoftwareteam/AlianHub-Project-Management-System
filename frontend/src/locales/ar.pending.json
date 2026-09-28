@@ -8675,6 +8675,7 @@
     "UserTimesheet.project_timesheet": "Project Timesheet",
     "UserTimesheet.task_planning": "Task Planning",
     "UserTimesheet.task_remaining_planning": "Remaining Hours",
+    "UserTimesheet.time_split": "Tracked and manual time",
     "UserTimesheet.tracked_time": "Tracked Time",
     "UserTimesheet.tracker_timesheet": "Tracker Timesheet",
     "UserTimesheet.user_timesheet": "User Timesheet",
