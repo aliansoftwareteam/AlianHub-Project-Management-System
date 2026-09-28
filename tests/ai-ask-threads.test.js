@@ -104,6 +104,7 @@ beforeEach(() => {
     Object.keys(mockDbs).forEach((key) => { delete mockDbs[key]; });
     jest.clearAllMocks();
     isAnyProviderConfigured.mockReturnValue(true);
+    require('../Config/permissionGuard').getRoleType.mockResolvedValue(3);
     visibleProjects.mockResolvedValue([{ _id: OPS, ProjectName: 'Ops' }]);
 });
 

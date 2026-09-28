@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent, h, ref } from 'vue';
 
-const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
+const { apiRequest, routeQuery } = vi.hoisted(() => ({ apiRequest: vi.fn(), routeQuery: {} }));
 
 vi.mock('@/services', () => ({ apiRequest }));
-vi.mock('vue-router', () => ({ useRoute: () => ({ query: {}, params: {} }), useRouter: () => null }));
+vi.mock('vue-router', () => ({ useRoute: () => ({ query: routeQuery, params: {} }), useRouter: () => null }));
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', render: () => null } }));
 vi.mock('@/components/molecules/AiUnavailable/AiModelNotice.vue', () => ({ default: { name: 'AiModelNotice', render: () => null } }));
 vi.mock('@/components/organisms/MainChat/MainChatRecorder.vue', () => ({ default: { name: 'MainChatRecorder', render: () => null } }));
@@ -28,6 +28,7 @@ import { answerHtml } from '@/views/Ai/askMarkdown';
 import { readSse } from '@/views/Ai/askStream';
 import { quickCreate, closeQuickCreate, readDraft } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 import * as env from '@/config/env';
+import { leaveAskHandoff } from '@/components/molecules/AdvanceSearch/askHandoff';
 
 const TASK = { kind: 'task', id: 't1', ref: 'OPS-1', title: 'Budget review', project: 'Ops', projectId: 'p1', detail: '' };
 
@@ -94,6 +95,7 @@ beforeEach(() => {
     apiRequest.mockReset();
     closeQuickCreate();
     sessionStorage.clear();
+    Object.keys(routeQuery).forEach((key) => { delete routeQuery[key]; });
 });
 afterEach(() => {
     if (wrapper) wrapper.unmount();
@@ -195,7 +197,8 @@ describe('Ask is a conversation', () => {
         expect(body.find('li strong').text()).toBe('one');
         expect(body.find('script').exists()).toBe(false);
         expect(body.find('img').exists()).toBe(false);
-        expect(body.html()).not.toMatch(/onerror=/i);
+        expect(body.element.querySelectorAll('[onerror]')).toHaveLength(0);
+        expect(body.text()).toContain('<script>');
         expect(body.findAll('a').every((a) => !/^javascript:/i.test(a.attributes('href') || ''))).toBe(true);
         expect(window.pwned).toBeUndefined();
     });
@@ -205,6 +208,25 @@ describe('Ask is a conversation', () => {
         wrapper = await mountPage();
         await ask(wrapper, 'budget');
         expect(wrapper.find('[data-test="ask-turn-error"]').text()).toBe('Model m-9 has no price.');
+    });
+});
+
+describe('continue in Ask from the command palette', () => {
+    it('shows the handed-over answer as the first turn, and a follow-up starts a thread', async () => {
+        routeQuery.q = 'what is the budget';
+        leaveAskHandoff('what is the budget', done({ threadId: undefined, turnId: undefined }));
+        const fetch = vi.fn().mockImplementation(streamed([sse(done({ threadId: 'th2' }))]));
+        vi.stubGlobal('fetch', fetch);
+        wrapper = await mountPage();
+
+        const turns = wrapper.findAll('[data-test="ask-turn"]');
+        expect(turns).toHaveLength(1);
+        expect(turns[0].text()).toContain('what is the budget');
+        expect(wrapper.find('.ask__answer strong').text()).toBe('12k');
+        expect(wrapper.find('#land-q').element.value).toBe('');
+
+        await ask(wrapper, 'who owns it');
+        expect(bodyOf(fetch.mock.calls[0])).toEqual({ question: 'who owns it', mode: 'ask' });
     });
 });
 

@@ -4,6 +4,8 @@ const { handleEvents } = require('./eventController');
 const transcribe = require('./transcribe');
 const meetingNotes = require('./meetingNotes');
 const askController = require('./ask');
+const askStream = require('./askStream');
+const askThreads = require('./askThreads');
 
 exports.init = (app) => {
     app.post('/api/v1/generatePrompt', ctrl.generatePrompt);
@@ -29,6 +31,11 @@ exports.init = (app) => {
     // already open, so this endpoint can never widen anyone's permissions.
     app.get('/api/v1/ai/ask/sources', askController.sources);
     app.post('/api/v1/ai/ask', askController.ask);
+    app.post('/api/v1/ai/ask/stream', askStream.askStream);
+    app.get('/api/v1/ai/ask/threads', askThreads.listThreads);
+    app.get('/api/v1/ai/ask/threads/:id', askThreads.getThread);
+    app.put('/api/v1/ai/ask/threads/:id', askThreads.renameThread);
+    app.delete('/api/v1/ai/ask/threads/:id', askThreads.deleteThread);
     // Talk to Text — audio → text via OpenAI Whisper (multipart, field "file").
     app.post('/api/v1/ai/transcribe', ...transcribe.transcribe);
     app.post('/api/v1/ai/meeting-notes', meetingNotes.meetingNotesHandler);
