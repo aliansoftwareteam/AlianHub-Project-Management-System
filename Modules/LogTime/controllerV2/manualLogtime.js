@@ -458,7 +458,7 @@ exports.deleteManualLogtime = async (req, res) => {
         })
         return;
     }
-    let type = req.body.type || SCHEMA_TYPE.TIMESHEET
+    const type = SCHEMA_TYPE.TIMESHEET;
 
     const actor = await actingUser(req);
     if (!actor) return refuse(res, 401, SIGNED_IN_REQUIRED);
