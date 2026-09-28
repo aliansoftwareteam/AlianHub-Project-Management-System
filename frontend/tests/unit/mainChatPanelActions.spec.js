@@ -41,6 +41,7 @@ import MainChatHeader from '@/components/organisms/MainChat/MainChatHeader.vue';
 import MainChatComposer from '@/components/organisms/MainChat/MainChatComposer.vue';
 import MainChatMessageList from '@/components/organisms/MainChat/MainChatMessageList.vue';
 import MakeTaskSheet from '@/components/organisms/MainChat/MakeTaskSheet.vue';
+import CommentInput from '@/components/atom/CommentInput/CommentInput.vue';
 import { shellState } from '@/components/organisms/Shell/shellState';
 import { aiAvailability, AI_STATE } from '@/composable/aiAvailability';
 
@@ -77,6 +78,8 @@ describe('MainChatPanel listens to every event its children raise', () => {
         'MainChatMessageList',
         'MainChatInfo',
         'MainChatSearch',
+        'MainChatSummary',
+        'MakeTaskSheet',
     ])('%s', (child) => {
         const bound = boundEvents(child);
         const unbound = declaredEmits(`${child}.vue`)
@@ -211,5 +214,24 @@ describe('MainChatPanel AI and task actions', () => {
     it('the talk command opens talk to text', async () => {
         wrapper.findComponent(MainChatComposer).vm.$emit('command', { name: 'talk', text: '' });
         expect(shellState.talkToText).toBe(true);
+    });
+});
+
+describe('MainChatComposer commands', () => {
+    const commandsShown = async (state) => {
+        aiAvailability.state = state;
+        const wrapper = shallowMount(MainChatComposer, { props: { conversationKey: `k-${state}` } });
+        wrapper.findComponent(CommentInput).vm.$emit('update:modelValue', '/');
+        await flushPromises();
+        const shown = wrapper.findAll('.mc-cmd kbd').map((node) => node.text());
+        wrapper.unmount();
+        return shown;
+    };
+
+    it('offers /summarize only while AI is usable', async () => {
+        expect(await commandsShown(AI_STATE.ON)).toContain('/summarize');
+        const off = await commandsShown(AI_STATE.OFF_INSTANCE);
+        expect(off).not.toContain('/summarize');
+        expect(off).toEqual(expect.arrayContaining(['/task', '/clip', '/voice']));
     });
 });

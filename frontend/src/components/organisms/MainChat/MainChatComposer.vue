@@ -60,19 +60,19 @@
                     </div>
 
                     <div class="mc-comp-row">
-                        <button type="button" class="mc-tool" :title="$t('MainChat.attach')" @click="picker && picker.click()">
+                        <button type="button" class="mc-tool" :title="$t('MainChat.attach')" :aria-label="$t('MainChat.attach')" @click="picker && picker.click()">
                             <ShellIcon name="paperclip" :size="13" /><span>{{ $t('Chat.attach') }}</span>
                         </button>
-                        <button type="button" class="mc-tool" :title="$t('Chat.cmd_clip')" @click="$emit('command', { name: 'clip', text: '' })">
+                        <button type="button" class="mc-tool" :title="$t('Chat.cmd_clip')" :aria-label="$t('Chat.cmd_clip')" @click="$emit('command', { name: 'clip', text: '' })">
                             <ShellIcon name="film" :size="13" /><span>{{ $t('Chat.clip') }}</span>
                         </button>
-                        <button v-if="aiUsable" type="button" class="mc-tool" :title="$t('Chat.talk_to_text')" @click="$emit('command', { name: 'talk', text: '' })">
+                        <button v-if="aiUsable" type="button" class="mc-tool" :title="$t('Chat.talk_to_text')" :aria-label="$t('Chat.talk_to_text')" @click="$emit('command', { name: 'talk', text: '' })">
                             <ShellIcon name="mic" :size="13" /><span>{{ $t('Chat.talk_to_text') }}</span>
                         </button>
-                        <button type="button" class="mc-tool" :title="$t('Chat.voice_note')" @click="startRecording">
+                        <button type="button" class="mc-tool" :title="$t('Chat.voice_note')" :aria-label="$t('Chat.voice_note')" @click="startRecording">
                             <ShellIcon name="wave" :size="13" /><span>{{ $t('Chat.voice_note') }}</span>
                         </button>
-                        <button v-if="aiUsable" type="button" class="mc-tool mc-tool--ai" :class="{ 'is-on': commandsOpen }" :title="$t('Chat.ask_ai')" @click.stop="commandsOpen = !commandsOpen">
+                        <button v-if="aiUsable" type="button" class="mc-tool mc-tool--ai" :class="{ 'is-on': commandsOpen }" :title="$t('Chat.ask_ai')" :aria-label="$t('Chat.ask_ai')" :aria-expanded="commandsOpen" @click.stop="commandsOpen = !commandsOpen">
                             <ShellIcon name="ai" :size="13" /><span>{{ $t('Chat.ask_ai') }}</span>
                         </button>
 
@@ -135,7 +135,7 @@ const DRAFT_PREFIX = 'alianhub:mainchat-draft';
 
 const COMMANDS = [
     { key: 'task', label: 'Chat.cmd_task', icon: 'checkSquare' },
-    { key: 'summarize', label: 'Chat.cmd_summarize', icon: 'ai' },
+    { key: 'summarize', label: 'Chat.cmd_summarize', icon: 'ai', ai: true },
     { key: 'clip', label: 'Chat.cmd_clip', icon: 'film' },
     { key: 'voice', label: 'Chat.cmd_voice', icon: 'mic' },
 ];
@@ -172,8 +172,9 @@ const slash = computed(() => {
 
 const filteredCommands = computed(() => {
     const term = (slash.value || '').split(/\s+/)[0].toLowerCase();
-    if (!term) return COMMANDS;
-    return COMMANDS.filter((c) => c.key.startsWith(term));
+    return COMMANDS
+        .filter((c) => !c.ai || aiUsable.value)
+        .filter((c) => !term || c.key.startsWith(term));
 });
 
 watch(slash, (value) => {

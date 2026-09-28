@@ -726,6 +726,21 @@ export function useMainChatConversation(options) {
         }
     }
 
+    /** Post media that is already in storage, such as a saved clip, without uploading it again. */
+    async function sendMedia({ type, mediaURL, mediaName = '', mediaOriginalName = '', mediaSize = 0 }) {
+        if (!type || !mediaURL) return;
+        const media = { type, mediaURL, mediaName: mediaName || mediaOriginalName, mediaOriginalName, mediaSize };
+        const row = pendingRow({ ...media, message: '' });
+        try {
+            const doc = await persist({ ...media, message: '' }, {});
+            settle(row.tempId, doc);
+            announce(doc);
+        } catch (error) {
+            console.error('MainChat: could not post media', error);
+            markFailed(row.tempId);
+        }
+    }
+
     /* ------------------------------------------------------------------ *
      * message actions (parity with the existing comment menu)
      * ------------------------------------------------------------------ */
@@ -859,7 +874,8 @@ export function useMainChatConversation(options) {
                 touchConversationPreview({ ...msg, type: 'text', message: 'general.message_deleted' });
             }
 
-            if (msg.type !== 'text' && msg.type !== 'link' && msg.mediaURL) {
+            // A posted clip points at the sender's clip library file, which outlives the message.
+            if (msg.type !== 'text' && msg.type !== 'link' && msg.mediaURL && !/(^|\/)Clips\//.test(String(msg.mediaURL))) {
                 deleteFromWasabi(msg.mediaURL, companyId.value)
                     .catch((error) => console.error('MainChat: media cleanup failed', error));
             }
@@ -881,6 +897,7 @@ export function useMainChatConversation(options) {
         attach,
         detach,
         sendText,
+        sendMedia,
         sendFiles,
         retry,
         removeMessage,
