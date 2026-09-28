@@ -143,7 +143,7 @@
                                     width="26px"
                                     height="25px"
                                 />
-                                <DropDown v-if="detailedUsers.length > 1">
+                                <DropDown v-if="detailedUsers.length > 1" mode="listbox">
                                     <template #button>
                                         <div class="d-flex align-items-center justify-content-center profile-image GunPowder blue text-nowrap border-2px-blue">
                                             +{{detailedUsers.length - 1}}
@@ -152,7 +152,7 @@
                                     <template #options>
                                         <DropDownOption
                                             v-for="(user, index) in detailedUsers.filter((x, index) => index >= 1).map((x) => ({...x,label: x.Employee_Name, image: x.profileImage}))"
-                                            :key="'user'+index" @click="usersFilter(user)"
+                                            :key="'user'+index"
                                         >
                                         <UserProfile
                                             :showDot="true"
@@ -206,7 +206,7 @@
                                     height="25px"
                                     :thumbnail="'30x30'"
                                 />
-                                <DropDown v-if="watcherUsers.length > 1">
+                                <DropDown v-if="watcherUsers.length > 1" mode="listbox">
                                     <template #button>
                                         <div class="d-flex align-items-center justify-content-center profile-image GunPowder blue text-nowrap border-2px-blue">
                                             +{{watcherUsers.length - 1}}
@@ -215,7 +215,7 @@
                                     <template #options>
                                         <DropDownOption
                                             v-for="(user, index) in watcherUsers.filter((x, index) => index >= 1).map((x) => ({...x,label: x.Employee_Name, image: x.profileImage}))"
-                                            :key="'user'+index" @click="usersFilter(user)"
+                                            :key="'user'+index"
                                         >
                                         <UserProfile
                                             :showDot="true"
@@ -245,7 +245,7 @@
                                     height="25px"
                                     :thumbnail="'30x30'"
                                 />
-                                <DropDown v-if="getWatchers.length > 1">
+                                <DropDown v-if="getWatchers.length > 1" mode="listbox">
                                     <template #button>
                                         <div class="d-flex align-items-center justify-content-center profile-image GunPowder blue text-nowrap border-2px-blue">
                                             +{{getWatchers.length - 1}}
@@ -254,7 +254,7 @@
                                     <template #options>
                                         <DropDownOption
                                             v-for="(user, index) in getWatchers.filter((x, index) => index >= 1).map((x) => ({...x,label: x.Employee_Name, image: x.profileImage}))"
-                                            :key="'user'+index" @click="usersFilter(user)"
+                                            :key="'user'+index"
                                         >
                                         <UserProfile
                                             :showDot="true"

@@ -23,6 +23,7 @@ const seed = require('../Modules/Agents/skills/seeds/briefParse');
 const skillRecord = require('../Modules/Agents/skillRecord');
 const persistence = require('../Modules/AICore/persistence');
 const runs = require('../Modules/Agents/runs');
+const untrusted = require('../Modules/AICore/untrusted');
 const { agentSkillsSchema } = require('../utils/mongo-handler/createSchema');
 
 const C = '6f0000000000000000000c01';
@@ -130,7 +131,7 @@ describe('brief.parse as a data skill produces the code skill\'s proposals', () 
         const data = await runOnce({ task, answer, withSeed: true });
         expect(code.out.status).toBe('waiting_approval');
         expect(data.out.status).toBe(code.out.status);
-        expect(code.request.systemPrompt).toBe(codeSkills.getSkill('brief.parse').systemPrompt);
+        expect(code.request.systemPrompt).toBe(untrusted.withNotice(codeSkills.getSkill('brief.parse').systemPrompt));
         expect(data.request.systemPrompt).not.toBe(code.request.systemPrompt);
         expect(data.request.messages).toEqual(code.request.messages);
         expect(data.request.maxTokens).toBe(code.request.maxTokens);
@@ -172,7 +173,7 @@ describe('brief.parse as a data skill produces the code skill\'s proposals', () 
         memory.contextFor.mockResolvedValue('### Workspace memory (DATA)\n- Ship in Q4.');
         const code = await runOnce({ ...FIXTURES.clean, withSeed: false });
         const data = await runOnce({ ...FIXTURES.clean, withSeed: true });
-        expect(code.request.messages[0].content).toBe(`TASK: Magic-link login\n\nMEMORY:\n### Workspace memory (DATA)\n- Ship in Q4.\n\nBRIEF:\nGoal: ship the magic-link login. Acceptance: verify endpoint, email template, rate limit, tests for expiry.`);
+        expect(code.request.messages[0].content).toBe(untrusted.wrap(`TASK: Magic-link login\n\nMEMORY:\n### Workspace memory (DATA)\n- Ship in Q4.\n\nBRIEF:\nGoal: ship the magic-link login. Acceptance: verify endpoint, email template, rate limit, tests for expiry.`));
         expect(data.request.messages).toEqual(code.request.messages);
         expect(data.proposal).toEqual(code.proposal);
     });

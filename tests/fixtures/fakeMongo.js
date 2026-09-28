@@ -2,7 +2,7 @@
 // language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $in/$nin/$ne/$gt(e)/$lt(e)/$exists/$type/$size/$elemMatch, $set/$inc/$push/$addToSet/$pull,
 // conditional findOneAndUpdate answering the old document unless asked for the new one (null after an upsert insert, as
 // the driver does), updateOne and findOneAndUpdate with upsert and $setOnInsert and a unique _id, findOneAndDelete, deleteOne, deleteMany,
-// sort/skip/limit on find, sort on findOneAndUpdate, $type 'date', $match/$unwind (a top-level array)/$project/$addFields ($toString, $ifNull, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
+// bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project/$addFields ($toString, $ifNull, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000, declared text indexes that bound $text to their fields) so a test can assert on what was written.
 
 let seq = 1;
@@ -31,6 +31,13 @@ const textScoreOf = (doc, search, fields) => {
     return textStrings(doc, fields).flatMap(words).filter((w) => wanted.has(w)).length;
 };
 
+/* $type reads the stored value: an ObjectId is not a string, though the other operators compare its hex. */
+const TYPE_CHECKS = {
+    date: (raw) => raw instanceof Date,
+    string: (raw) => typeof raw === 'string',
+    objectId: (raw) => Boolean(raw) && raw._bsontype === 'ObjectId',
+};
+
 const matches = (doc, filter = {}, textFields) => Object.entries(filter).every(([key, cond]) => {
     if (key === '$or') return cond.some((f) => matches(doc, f, textFields));
     if (key === '$and') return cond.every((f) => matches(doc, f, textFields));
@@ -52,7 +59,7 @@ const matches = (doc, filter = {}, textFields) => Object.entries(filter).every((
             if (op === '$exists') return (value !== undefined) === arg;
             if (op === '$size') return Array.isArray(value) && value.length === arg;
             if (op === '$elemMatch') return Array.isArray(raw) && raw.some((item) => (isOperatorObject(arg) && !['$and', '$or', '$nor'].some((k) => k in arg) ? matches({ it: item }, { it: arg }) : matches(item, arg, textFields)));
-            if (op === '$type') return arg === 'date' ? raw instanceof Date : (arg === 'string' ? typeof value === 'string' : typeof value === arg);
+            if (op === '$type') return TYPE_CHECKS[arg] ? TYPE_CHECKS[arg](raw) : typeof value === arg;
             if (op === '$regex') return new RegExp(arg, cond.$options || '').test(String(value));
             if (op === '$options') return true;
             throw new Error(`fakeMongo: unsupported operator ${op}`);
@@ -235,6 +242,19 @@ const create = ({ mongooseCasting = false } = {}) => {
             return { matchedCount: 0, modifiedCount: 0, upsertedCount: 1, upsertedId: inserted._id };
         }
         if (method === 'updateMany') { const hit = list.filter((d) => matches(d, data[0], textFields)); hit.forEach((d) => apply(d, data[1])); return { modifiedCount: hit.length }; }
+        if (method === 'bulkWrite') {
+            const counts = { insertedCount: 0, matchedCount: 0, modifiedCount: 0 };
+            (data[0] || []).forEach((operation) => {
+                const [kind, spec] = Object.entries(operation)[0];
+                if (kind === 'insertOne') { list.push({ _id: nextId(), ...spec.document }); counts.insertedCount += 1; return; }
+                if (kind !== 'updateOne' && kind !== 'updateMany') throw new Error(`fakeMongo: unsupported bulkWrite ${kind}`);
+                const hit = list.filter((d) => matches(d, spec.filter, textFields)).slice(0, kind === 'updateOne' ? 1 : undefined);
+                hit.forEach((d) => apply(d, spec.update));
+                counts.matchedCount += hit.length;
+                counts.modifiedCount += hit.length;
+            });
+            return counts;
+        }
         if (method === 'findOneAndDelete') { const at = list.findIndex((d) => matches(d, data[0], textFields)); return at === -1 ? null : clone(list.splice(at, 1)[0]); }
         if (method === 'deleteOne') { const at = list.findIndex((d) => matches(d, data[0], textFields)); if (at !== -1) list.splice(at, 1); return { deletedCount: at === -1 ? 0 : 1 }; }
         if (method === 'aggregate') {

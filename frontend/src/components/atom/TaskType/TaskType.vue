@@ -1,16 +1,17 @@
 <template>
     <div :id="tourId">
-        <DropDown :id="id">
+        <DropDown :id="id" mode="listbox">
             <template #button>
                 <div :ref="id" :class="`task__type-width ${isBoardView ? `task__type-width-board` : `task__type-width-list`}`">
                     <slot name="head">
                         <TaskTypeIcon :taskType="modelValue" class="position-re vertical-middle task__image" />
+                        <span class="ah-sr-only">{{ modelValue?.name }}</span>
                     </slot>
                 </div>
             </template>
 
             <template #options>
-                <DropDownOption v-for="(item, typeIndex) in options" :key="typeIndex" @click="$emit('update:modelValue', item), $emit('select', item,convertTaskType), $refs[id].click()">
+                <DropDownOption v-for="(item, typeIndex) in options" :key="typeIndex" :selected="modelValue?.key !== undefined && item.key === modelValue.key" @click="$emit('update:modelValue', item), $emit('select', item,convertTaskType), $refs[id].click()">
                     <div class="d-flex align-items-center">
                         <TaskTypeIcon :taskType="item" :title="item?.name" class="task__type-image vertical-middle ml-6px" />
                         <span class="ml-5px" >{{item.name}}</span>
