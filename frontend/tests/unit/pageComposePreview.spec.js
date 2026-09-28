@@ -126,7 +126,7 @@ describe('the page editor keeps what an AI result replaced', () => {
         }
         vi.doMock('vue-router', () => ({ useRoute: () => ({ params: {} }), useRouter: () => ({ push: vi.fn() }) }));
         vi.doMock('vuex', () => ({ useStore: () => ({ getters: {} }) }));
-        vi.doMock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: () => null }) }));
+        vi.doMock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: () => null }), useCustomComposable: () => ({ checkPermission: () => true }) }));
         vi.doMock('@/components/molecules/Pages/blockTools', () => ({ createBlockTools: () => ({}), TASK_LIST_LIMIT: 20 }));
         const { default: PageBlockEditor } = await import('@/components/molecules/Pages/PageBlockEditor.vue');
         const wrapper = mount(PageBlockEditor, { attachTo: document.body.appendChild(document.createElement('div')), props: { seed: {}, editorKey: 'k1' } });

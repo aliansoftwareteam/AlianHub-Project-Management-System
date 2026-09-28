@@ -21,6 +21,8 @@ const FEATURES = Object.freeze({
     MCP_BRIEF: 'mcp_brief',
     KNOWLEDGE_EMBED: 'knowledge_embed',
     ACTION_ITEMS: 'action_items',
+    TASK_ASSIST: 'task_assist',
+    WRITING_ASSIST: 'writing_assist',
     ASSIGNMENT_RULES: 'assignment_rules',
     AUTOMATION_DRAFT: 'automation_draft',
     AI_FIELD: 'ai_field',

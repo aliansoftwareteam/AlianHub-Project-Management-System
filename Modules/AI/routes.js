@@ -13,6 +13,7 @@ const { requireTaskWritePermission } = require('../../Config/permissionGuard');
 const { TASK_WRITE_ROUTES } = require('../../Config/taskWritePermissions');
 const { chatSummaryHandler } = require('./chatSummary');
 const notesToTasks = require('./notesToTasks');
+const assist = require('./assistController');
 const { chatAskHandler, chatAskPostHandler } = require('./chatAsk');
 
 exports.init = (app) => {
@@ -35,6 +36,11 @@ exports.init = (app) => {
     // category custom field, else the project tags, else the company task
     // types). Never invents a vocabulary — a project with none gets a reason.
     app.post('/api/v1/ai/task-category', ctrl.categoriseTask);
+    app.get('/api/v1/ai/task-assist', assist.capabilities);
+    app.post('/api/v1/ai/task-next-steps', assist.nextSteps);
+    app.post('/api/v1/ai/task-research', assist.research);
+    app.post('/api/v1/ai/selection/improve', assist.improve);
+    app.post('/api/v1/ai/selection/tasks', assist.splitTasks);
     // Ask (handoff 13i). Retrieval is scoped to the projects the caller can
     // already open, so this endpoint can never widen anyone's permissions.
     app.get('/api/v1/ai/ask/sources', askController.sources);
