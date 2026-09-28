@@ -103,7 +103,6 @@
                                 class="land__input"
                                 :placeholder="turns.length ? $t('Ask.follow_up_placeholder') : $t('Ask.composer_placeholder')"
                                 aria-autocomplete="list"
-                                :aria-expanded="composer.menu.kind ? 'true' : 'false'"
                                 :aria-controls="composer.menu.kind ? MENU_ID : undefined"
                                 :aria-activedescendant="composer.activeId.value || undefined"
                                 @input="composer.onInput"

@@ -201,7 +201,7 @@ describe('/ picks a skill', () => {
         const box = await type(wrapper, '/');
         const menu = wrapper.find('[data-test="ask-menu"]');
         expect(menu.exists()).toBe(true);
-        expect(box.attributes('aria-expanded')).toBe('true');
+        expect(box.attributes('aria-controls')).toBe('ask-menu');
         expect(wrapper.findAll('[data-test="ask-menu-item"]').map((i) => i.text())).toEqual([expect.stringContaining('Reporter'), expect.stringContaining('Brief parser')]);
 
         await box.trigger('keydown', { key: 'ArrowDown' });
