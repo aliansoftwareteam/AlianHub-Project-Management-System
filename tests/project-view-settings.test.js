@@ -118,7 +118,7 @@ const SETTINGS = {
     doneBy: 'agent',
     subtasks: 'expanded',
     sort: { field: 'DueDate', dir: -1 },
-    columns: [{ key: 'DueDate', visible: true }, { key: 'Task_Priority', visible: false }],
+    columns: { order: ['due', 'assignee', 'cf:6a0000000000000000000001'], shown: ['start'], hidden: ['tags'] },
     filters: [{ name: { value: 'statusKey', name: 'status', type: 'array', filterOn: 'statusKey' }, comparison: { value: ':', name: 'Is' }, values: [3], condition: '&&', date: '' }],
 };
 
@@ -144,6 +144,11 @@ describe('the stored settings shape', () => {
             filters: SETTINGS.filters,
         });
         expect(clean).not.toHaveProperty('planted');
+    });
+
+    it('keeps column ids as values, sorted where order does not matter, and drops ids that could name a path', () => {
+        const clean = cleanViewSettings({ columns: { order: ['due', 'due', 'a.b', '$x'], shown: ['start', 'points', 'tags'], hidden: ['tags', 'risk'] } });
+        expect(clean.columns).toEqual({ order: ['due'], shown: ['points', 'start'], hidden: ['risk', 'tags'] });
     });
 
     it('refuses filter rows that would name an operator as a field', () => {

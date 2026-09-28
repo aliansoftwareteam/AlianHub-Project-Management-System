@@ -9,10 +9,10 @@ const FILTER_TYPES = ['array', 'string', 'date', 'object', 'arrayOfObject'];
 const COMPARISONS = [':', ':!=', ':>', ':<', ':='];
 const CONDITIONS = ['&&', '||'];
 const FIELD = /^[A-Za-z][A-Za-z0-9_.]{0,63}$/;
-const COLUMN_KEY = /^[A-Za-z0-9_][A-Za-z0-9_.:-]{0,79}$/;
+const COLUMN_ID = /^[A-Za-z0-9_][A-Za-z0-9_:-]{0,63}$/;
 const ASSIGNEE = /^[A-Za-z0-9_-]{1,64}$/;
 
-const LIMITS = Object.freeze({ search: 200, title: 60, label: 80, value: 200, date: 40, filters: 20, values: 200, columns: 100, assignees: 200 });
+const LIMITS = Object.freeze({ search: 200, title: 60, label: 80, value: 200, date: 40, filters: 20, values: 200, columns: 200, assignees: 200 });
 
 const DEFAULT_VIEW_SETTINGS = Object.freeze({
     groupBy: 0,
@@ -24,7 +24,7 @@ const DEFAULT_VIEW_SETTINGS = Object.freeze({
     subtasks: 'collapsed',
     filters: [],
     sort: null,
-    columns: [],
+    columns: Object.freeze({ order: [], shown: [], hidden: [] }),
 });
 
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
@@ -63,13 +63,15 @@ const cleanSort = (sort) => {
     return dir === 1 || dir === -1 ? { field: sort.field, dir } : null;
 };
 
+const columnIds = (list) => [...new Set((Array.isArray(list) ? list : [])
+    .filter((id) => typeof id === 'string' && COLUMN_ID.test(id)))].slice(0, LIMITS.columns);
+
+/* Column ids become array values, never object keys, so a custom field id cannot name a path. */
 const cleanColumns = (columns) => {
-    const seen = new Set();
-    return (Array.isArray(columns) ? columns : []).filter((column) => {
-        if (!isPlainObject(column) || !COLUMN_KEY.test(String(column.key)) || seen.has(column.key)) return false;
-        seen.add(column.key);
-        return true;
-    }).slice(0, LIMITS.columns).map((column) => ({ key: column.key, visible: column.visible !== false }));
+    const raw = isPlainObject(columns) ? columns : {};
+    const hidden = columnIds(raw.hidden).sort();
+    const shown = columnIds(raw.shown).filter((id) => !hidden.includes(id)).sort();
+    return { order: columnIds(raw.order), shown, hidden };
 };
 
 const cleanAssignees = (assignees) => [...new Set((Array.isArray(assignees) ? assignees : [])

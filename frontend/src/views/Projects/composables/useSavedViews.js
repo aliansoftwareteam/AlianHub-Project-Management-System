@@ -2,6 +2,7 @@ import { computed, inject, ref, shallowRef, watch } from 'vue';
 import { useStore } from 'vuex';
 import { cleanViewSettings, DEFAULT_VIEW_SETTINGS, FILTERABLE_VIEWS, resolveActiveView, sameSettings, settingsFromPrefs, viewKeyOf } from './savedViewSettings';
 import { clearViewPrefs, loadViewPrefs } from './projectViewPrefs';
+import { VIEW_COLUMN_SETS, clearColumnState, loadColumnState, settingsFromColumnState } from './viewColumns';
 import * as api from './savedViewApi';
 
 const PRIVATE_ID_LENGTH = 10;
@@ -20,7 +21,7 @@ export function useSavedViews({ project, activeTab, views, requestedViewKey, com
     const companyId = inject('$companyId', ref(''));
 
     const sort = ref(null);
-    const columns = ref([]);
+    const columns = ref(cleanViewSettings(DEFAULT_VIEW_SETTINGS).columns);
     const saving = ref(false);
     const drafts = new Map();
     const closed = () => ({ key: '', saved: cleanViewSettings(DEFAULT_VIEW_SETTINGS) });
@@ -35,6 +36,20 @@ export function useSavedViews({ project, activeTab, views, requestedViewKey, com
     const dirty = computed(() => isFilterable.value && opened.value.key === activeKey.value && !sameSettings(currentSettings.value, opened.value.saved));
 
     const prefsIds = () => ({ companyId: companyId.value, userId: userId.value, projectId: projectId.value });
+    const columnSet = () => VIEW_COLUMN_SETS[activeTab.value];
+
+    /* What older builds kept in this browser: group, "Me", search and done-by per project,
+       and the chosen columns per project and view kind. */
+    function legacySettings() {
+        const prefs = settingsFromPrefs(loadViewPrefs(prefsIds()));
+        const columns = columnSet() ? settingsFromColumnState(loadColumnState(prefsIds(), columnSet())) : undefined;
+        return cleanViewSettings({ ...prefs, columns });
+    }
+
+    function forgetLegacy() {
+        clearViewPrefs(prefsIds());
+        if (columnSet()) clearColumnState(prefsIds(), columnSet());
+    }
 
     function apply(settings) {
         const clean = cleanViewSettings(settings);
@@ -46,8 +61,8 @@ export function useSavedViews({ project, activeTab, views, requestedViewKey, com
     function openingSettings(view) {
         if (drafts.has(activeKey.value)) return drafts.get(activeKey.value);
         if (view?.settings) return view.settings;
-        const prefs = settingsFromPrefs(loadViewPrefs(prefsIds()));
-        return sameSettings(prefs, DEFAULT_VIEW_SETTINGS) ? DEFAULT_VIEW_SETTINGS : prefs;
+        const legacy = legacySettings();
+        return sameSettings(legacy, DEFAULT_VIEW_SETTINGS) ? DEFAULT_VIEW_SETTINGS : legacy;
     }
 
     watch(activeKey, (key) => {
@@ -82,14 +97,14 @@ export function useSavedViews({ project, activeTab, views, requestedViewKey, com
     function settled(settings) {
         drafts.delete(activeKey.value);
         opened.value = { key: activeKey.value, saved: settings };
-        clearViewPrefs(prefsIds());
+        forgetLegacy();
     }
 
     /* The changes now belong to the view being opened, so the one left behind keeps no draft. */
     function handOver(view) {
         drafts.delete(activeKey.value);
         opened.value = closed();
-        clearViewPrefs(prefsIds());
+        forgetLegacy();
         onSelect(view);
     }
 
@@ -167,7 +182,7 @@ export function useSavedViews({ project, activeTab, views, requestedViewKey, com
 
     function reset() {
         drafts.delete(activeKey.value);
-        clearViewPrefs(prefsIds());
+        forgetLegacy();
         apply(opened.value.saved);
     }
 

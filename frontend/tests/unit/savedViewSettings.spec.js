@@ -23,6 +23,8 @@ import { useProjectSearch } from '@/views/Projects/composables/useProjectSearch'
 import { useSavedViews } from '@/views/Projects/composables/useSavedViews';
 import { resolveActiveView, viewKeyOf } from '@/views/Projects/composables/savedViewSettings';
 import { viewPrefsKey } from '@/views/Projects/composables/projectViewPrefs';
+import { columnCatalogue, columnStorageKey, useViewColumns } from '@/views/Projects/composables/viewColumns';
+import { provideViewSettings } from '@/views/Projects/composables/viewSettingsContext';
 import SavedViewBar from '@/views/Projects/components/SavedViewBar.vue';
 
 const LIST = 'a'.repeat(24);
@@ -35,7 +37,7 @@ let localUpdates;
 let memberUpdates;
 let dispatch;
 
-const mountViews = ({ views, tab = 'ProjectListView', requested, canSaveShared = true, privateViews = [] }) => {
+const mountViews = ({ views, tab = 'ProjectListView', requested, canSaveShared = true, privateViews = [], columnsOf }) => {
     const project = ref({ _id: 'p1', isGlobalPermission: true, ProjectRequiredComponent: views });
     const companyUser = ref({ _id: 'row-1', userId: 'user-1', ProjectRequiredComponent: privateViews });
     const store = createStore({
@@ -62,7 +64,14 @@ const mountViews = ({ views, tab = 'ProjectListView', requested, canSaveShared =
                 canSaveShared: ref(canSaveShared),
                 onSelect
             });
-            return () => h('div');
+            provideViewSettings(out.saved);
+            return () => h(Columns);
+        }
+    });
+    const Columns = defineComponent({
+        setup() {
+            if (columnsOf) out.columns = useViewColumns(ref('p1'), columnsOf, computed(() => columnCatalogue(columnsOf)));
+            return () => null;
         }
     });
     out.wrapper = mount(Host, { global: { plugins: [store] } });
@@ -126,7 +135,7 @@ describe('unsaved changes', () => {
         expect(saved.dirty.value).toBe(true);
         saved.setSort(null);
 
-        saved.setColumns([{ key: 'DueDate', visible: false }]);
+        saved.setColumns({ order: [], shown: [], hidden: ['due'] });
         await nextTick();
         expect(saved.dirty.value).toBe(true);
     });
@@ -168,10 +177,10 @@ describe('saving', () => {
         const { search, saved } = mountViews({ views: [listView()] });
         await flushPromises();
         search.groupBy.value = 2;
-        saved.setColumns([{ key: 'DueDate', visible: false }]);
+        saved.setColumns({ order: ['due'], shown: [], hidden: ['tags'] });
         await nextTick();
         await saved.save();
-        expect(api.saveSharedViewSettings).toHaveBeenCalledWith('p1', LIST, expect.objectContaining({ groupBy: 2, columns: [{ key: 'DueDate', visible: false }] }));
+        expect(api.saveSharedViewSettings).toHaveBeenCalledWith('p1', LIST, expect.objectContaining({ groupBy: 2, columns: { order: ['due'], shown: [], hidden: ['tags'] } }));
         expect(localUpdates.at(-1)).toMatchObject({ key: 'ProjectView', subKey: 'edit', projectId: 'p1', itemData: { elementId: LIST, field: 'settings' } });
         expect(saved.dirty.value).toBe(false);
     });
@@ -270,6 +279,53 @@ describe('the old per-browser preferences', () => {
         window.localStorage.setItem(PREFS, JSON.stringify({ groupBy: 2 }));
         await saved.save();
         expect(window.localStorage.getItem(PREFS)).toBe(null);
+    });
+});
+
+describe('columns', () => {
+    const LIST_COLUMNS = { order: ['due', 'assignee'], shown: ['start'], hidden: ['tags'] };
+
+    test('a saved view restores its columns, and the chooser marks the view', async () => {
+        const { saved, columns } = mountViews({ views: [listView({ settings: { columns: LIST_COLUMNS } })], columnsOf: 'list' });
+        await flushPromises();
+        expect(columns.isVisible('tags')).toBe(false);
+        expect(columns.isVisible('start')).toBe(true);
+        expect(columns.visibleColumns.value.map((c) => c.id).slice(0, 2)).toEqual(['due', 'assignee']);
+        expect(saved.dirty.value).toBe(false);
+
+        columns.setVisible('tags', true);
+        await nextTick();
+        expect(saved.dirty.value).toBe(true);
+        expect(columns.isVisible('tags')).toBe(true);
+
+        saved.reset();
+        await nextTick();
+        expect(columns.isVisible('tags')).toBe(false);
+        expect(saved.dirty.value).toBe(false);
+    });
+
+    test('the Board\'s card fields are part of its saved view', async () => {
+        const board = { _id: 'd'.repeat(24), id: 'd'.repeat(24), name: 'Board', keyName: 'ProjectKanban', settings: { columns: { order: [], shown: ['points'], hidden: [] } } };
+        const { columns } = mountViews({ views: [board], tab: 'ProjectKanban', columnsOf: 'board' });
+        await flushPromises();
+        expect(columns.isVisible('points')).toBe(true);
+    });
+
+    test('columns chosen in this browser by an older build arrive as unsaved changes, and are never written again', async () => {
+        const key = columnStorageKey({ companyId: 'company-1', userId: 'user-1', projectId: 'p1' }, 'list');
+        window.localStorage.setItem(key, JSON.stringify({ order: ['due'], shown: { tags: false } }));
+        const { saved, columns } = mountViews({ views: [listView()], columnsOf: 'list' });
+        await flushPromises();
+        expect(columns.isVisible('tags')).toBe(false);
+        expect(saved.dirty.value).toBe(true);
+
+        columns.setVisible('start', true);
+        await nextTick();
+        expect(JSON.parse(window.localStorage.getItem(key))).toEqual({ order: ['due'], shown: { tags: false } });
+
+        await saved.save();
+        expect(api.saveSharedViewSettings).toHaveBeenCalledWith('p1', LIST, expect.objectContaining({ columns: { order: ['due'], shown: ['start'], hidden: ['tags'] } }));
+        expect(window.localStorage.getItem(key)).toBe(null);
     });
 });
 
