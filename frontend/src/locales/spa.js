@@ -4804,7 +4804,6 @@ export default {
         "Tag_name_required": "Se requiere nombre de etiqueta",
         "add_tag": "Add tag",
         "more_tags": "{count} more: {names}",
-        "tag_actions": "Tag actions"
     },
     "Embeded": {
         "Anything": "Cualquier cosa",

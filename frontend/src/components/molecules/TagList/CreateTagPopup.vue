@@ -73,7 +73,7 @@
 
                             <DropDown mode="menu" :id="Did" v-if="checkPermission('task.task_tag',project?.isGlobalPermission) === true">
                                 <template #button="{ triggerAttrs }">
-                                    <button type="button" hidden :aria-label="$t('Tags.tag_actions')" v-bind="triggerAttrs"></button>
+                                    <button type="button" hidden :aria-label="$t('Tags.tag_actions', { name: item.tagName })" v-bind="triggerAttrs"></button>
                                 </template>
                                 <template #options>
                                     <div class="">

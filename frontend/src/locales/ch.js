@@ -4804,7 +4804,6 @@ export default {
         "Tag_name_required": "标签名称必填",
         "add_tag": "Add tag",
         "more_tags": "{count} more: {names}",
-        "tag_actions": "Tag actions"
     },
     "Embeded": {
         "Anything": "任何内容",
