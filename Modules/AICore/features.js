@@ -22,6 +22,8 @@ const FEATURES = Object.freeze({
     KNOWLEDGE_EMBED: 'knowledge_embed',
     TASK_ASSIST: 'task_assist',
     WRITING_ASSIST: 'writing_assist',
+    ASSIGNMENT_RULES: 'assignment_rules',
+    AUTOMATION_DRAFT: 'automation_draft',
     AI_FIELD: 'ai_field',
     AGENT_BUILDER: 'agent_builder',
 });

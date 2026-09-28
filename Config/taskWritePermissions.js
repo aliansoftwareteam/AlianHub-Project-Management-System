@@ -135,6 +135,7 @@ const notATaskWrite = (by) => Object.freeze({ judged: NOT_A_TASK_WRITE, by });
 const TASK_WRITE_ROUTES = Object.freeze({
 'PATCH /api/tasks/': { judged: ACTIONS, actions: PRE_V2_TASK_ACTIONS },
     'POST /api/v2/tasks': { judged: ROUTE, entry: tokenEnforcedEntry('task.task_create') },
+    'POST /api/v1/ai/ask/create-tasks': { judged: ROUTE, entry: tokenEnforcedEntry('task.task_create') },
     'PATCH /api/v2/tasks': { judged: ACTIONS, actions: TASK_ACTIONS },
     'POST /api/v2/tasks/bulk': { judged: ACTIONS, actions: TASK_ACTIONS },
     'POST /api/v2/tasks/relations': { judged: ACTIONS, actions: RELATION_ACTIONS },
@@ -158,6 +159,9 @@ const TASK_WRITE_ROUTES = Object.freeze({
     'PUT /api/v2/task-templates/default': judgedBy('Modules/TaskTemplates/access.js: project.project_details in the project'),
     'POST /api/v2/task-templates/:id/apply': judgedBy('Modules/TaskTemplates/controller.js: task.task_create in the task\'s project, then each field\'s own key'),
     'POST /api/v1/recurring-tasks/run-due': judgedBy('runs the workspace\'s stored definitions; its key is a follow-up'),
+    'POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/accept': judgedBy('requireProjectAccess with task.task_assignee on the task\'s project; Modules/AssignmentRules/decisions.js re-checks the task and the suggested person'),
+    'POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/undo': judgedBy('requireProjectAccess with task.task_assignee on the task\'s project'),
+    'POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/dismiss': notATaskWrite('marks the suggestion dismissed; the task is not written'),
     'POST /api/v1/ai/project/:projectId/tasks/execute': judgedBy('guardTaskTarget in Modules/AIProjectGenerator/controller.js'),
     'POST /api/v1/ai/project/:projectId/tasks/plan': notATaskWrite('generates a plan; execute writes it'),
     'POST /api/v1/ai/task-summary': notATaskWrite('a read, cached in memory'),

@@ -171,6 +171,7 @@ const DUE_WORDS = {
     next_week: (i) => `due next week (${i.dueFrom} to ${i.dueTo})`,
     soon: (i) => `due in the next seven days (${i.dueFrom} to ${i.dueTo})`,
     none: () => 'with no due date',
+    urgent: (i) => `that are urgent: not done and either overdue, due before ${i.dueBefore}, or high or urgent priority`,
 };
 
 const describeFilter = (intent) => {
