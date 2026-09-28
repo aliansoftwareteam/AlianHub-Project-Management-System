@@ -13,7 +13,7 @@
 - [x] `run_agent` action (synchronous, so `waitForResult` is implicit)
 - [ ] Review inbox + `AGENT_REVIEW_ITEMS`
 - [ ] Two-week trial on a real sprint — folds into 019 (evals)
-- [ ] Prompt-injection regression test on the agent run path
+- [x] Prompt-injection regression test on the agent run path — #1079
 - [x] Evaluate `run.spendCapUsd` before the model call — done in 024 (#571)
 - [ ] Confidence floor in `verify()`
 
@@ -148,3 +148,6 @@ Checked against origin/beta (64f4f507). Still open:
 
 Correction: the 180-day TTL index on `agent_runs` does exist
 (`utils/mongo-handler/createSchema.js:193`), so it is not an open item.
+
+### 2026-09-28 — prompt-injection regression test (#1079)
+`tests/agent-run-prompt-injection.test.js` drives the real run path with only the provider mocked. It found that task text reached the model unwrapped, so `askModel` now puts the user message inside an escaped `<workspace_data>` block and adds a system-prompt notice (`Modules/AICore/untrusted.js`). Verifier drops no longer read "undefined" in the proposal.
