@@ -16,27 +16,27 @@
                         :value="taskSearch"
                         @input="$emit('update:taskSearch', $event.target.value)"
                     >
-                    <DropDown :title="$t('Projects.search_in')" id="searchfilterdropdownoptions_driver" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
+                    <DropDown mode="listbox" :title="$t('Projects.search_in')" id="searchfilterdropdownoptions_driver" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
                         <template #head>
                             <h4 class="black font-size-13 font-weight-500 p-10px m-0 search__in" :class="{'border-bottom': clientWidth > 767}">
                                 {{ $t('Projects.search_in') }}
                             </h4>
                         </template>
-                        <template #button>
-                            <button type="button" class="pft__search-scope" id="searchfilterdropdown_driver" :title="$t('Projects.search_in')" :aria-label="$t('Projects.search_in')">
+                        <template #button="{ triggerAttrs }">
+                            <button type="button" class="pft__search-scope" :title="$t('Projects.search_in')" :aria-label="$t('Projects.search_in')" v-bind="triggerAttrs">
                                 <ShellIcon name="chevronDown" :size="13" />
                             </button>
                         </template>
                         <template #options>
-                            <DropDownOption @click="taskDescriptionSearch || taskKeySearch ? $emit('update:taskNameSearch', !taskNameSearch) : ''" class="task-serachstatus-dropdown border-radius-4-px">
+                            <DropDownOption :selected="taskNameSearch" @click="taskDescriptionSearch || taskKeySearch ? $emit('update:taskNameSearch', !taskNameSearch) : ''" class="task-serachstatus-dropdown border-radius-4-px">
                                 <span class="project-mobile-desc mr-10px">{{ $t('Projects.task_name') }}</span>
                                 <Toggle width="20" :modelValue="taskNameSearch" @update:modelValue="(v) => $emit('update:taskNameSearch', v)" :disabled="taskNameSearch && !taskDescriptionSearch && !taskKeySearch" @change="$emit('search')"/>
                             </DropDownOption>
-                            <DropDownOption @click="$emit('update:taskKeySearch', !taskKeySearch)" class="task-serachstatus-dropdown border-radius-4-px">
+                            <DropDownOption :selected="taskKeySearch" @click="$emit('update:taskKeySearch', !taskKeySearch)" class="task-serachstatus-dropdown border-radius-4-px">
                                 <span class="project-mobile-desc mr-10px">{{ $t('Projects.task_key') }}</span>
                                 <Toggle width="20" :modelValue="taskKeySearch" @update:modelValue="(v) => $emit('update:taskKeySearch', v)" @change="$emit('toggleSearch'),$emit('search')"/>
                             </DropDownOption>
-                            <DropDownOption @click="$emit('update:taskDescriptionSearch', !taskDescriptionSearch)" class="task-serachstatus-dropdown border-radius-4-px">
+                            <DropDownOption :selected="taskDescriptionSearch" @click="$emit('update:taskDescriptionSearch', !taskDescriptionSearch)" class="task-serachstatus-dropdown border-radius-4-px">
                                 <span class="project-mobile-desc mr-10px">{{ $t('ProjectDetails.description') }}</span>
                                 <Toggle width="20" :modelValue="taskDescriptionSearch" @update:modelValue="(v) => $emit('update:taskDescriptionSearch', v)" @change="$emit('toggleSearch'),$emit('search')"/>
                             </DropDownOption>
@@ -70,15 +70,15 @@
                     >
                         <ShellIcon name="ai" :size="15" />
                     </button>
-                    <DropDown id="group_by" class="group_by">
-                        <template #button>
-                            <button type="button" class="text-nowrap btn-white border-groupBy pft__pill cursor-pointer" ref="group_by_status" :title="$t('Projects.group_by')" :aria-label="$t('Projects.group_by')">
+                    <DropDown mode="listbox" id="group_by" class="group_by">
+                        <template #button="{ triggerAttrs }">
+                            <button type="button" class="text-nowrap btn-white border-groupBy pft__pill cursor-pointer" ref="group_by_status" :title="$t('Projects.group_by')" :aria-label="$t('Projects.group_by')" v-bind="triggerAttrs">
                                 <ShellIcon name="layout" :size="14" />
                                 <span>{{ $t(`Projects.${groupByOptions.find(x => x.id === groupBy).label}`) }}</span>
                             </button>
                         </template>
                         <template #options>
-                            <DropDownOption v-for="item in groupByOptions" :key="item.id" @click="$emit('update:groupBy', item.id); $refs.group_by_status.click(item)" :class="{'bg-light-gray' : item.id === groupBy}">
+                            <DropDownOption v-for="item in groupByOptions" :key="item.id" :selected="item.id === groupBy" @click="$emit('update:groupBy', item.id); $refs.group_by_status.click()" :class="{'bg-light-gray' : item.id === groupBy}">
                                 <div>
                                     <img :src="item.image" alt="" class="pr-10px">
                                     <span :class="{'purple' : item.id === groupBy}">{{ $t(`Projects.${item.label}`) }}</span>
@@ -123,17 +123,17 @@
                     <ProvenanceFilter :modelValue="doneBy" @update:modelValue="(v) => $emit('update:doneBy', v)" />
                 </template>
                 <span v-else class="pft__mode-chip">{{ $t('ProjectSlider.archived_list') }}</span>
-                <DropDown id="more_features" :zIndex="10">
-                    <template #button>
-                        <button type="button" class="border-groupBy pft__icon-btn cursor-pointer" ref="more_features_trigger" :title="$t('Projects.more_features')" :aria-label="$t('Projects.more_features')">
+                <DropDown mode="menu" id="more_features" :zIndex="10">
+                    <template #button="{ triggerAttrs }">
+                        <button type="button" class="border-groupBy pft__icon-btn cursor-pointer" :title="$t('Projects.more_features')" :aria-label="$t('Projects.more_features')" v-bind="triggerAttrs">
                             <ShellIcon name="dots" :size="15" />
                         </button>
                     </template>
                     <template #options>
                         <template v-for="(group, gi) in moreGroups" :key="group.key">
-                            <div v-if="gi" class="ah-pop__sep"></div>
+                            <div v-if="gi" class="ah-pop__sep" role="separator"></div>
                             <div class="ah-label ah-pop__label">{{ $t(`Projects.menu_${group.key}`) }}</div>
-                            <DropDownOption v-for="item in group.items" :key="item.key" @click="$refs.more_features_trigger.click(); item.open()">
+                            <DropDownOption v-for="item in group.items" :key="item.key" @click="item.open()">
                                 <div><span class="dropdown-label">{{ $t(item.label) }}</span></div>
                             </DropDownOption>
                         </template>

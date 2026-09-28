@@ -4613,6 +4613,8 @@ export default {
         "wip_none": "No limit",
         "more_count": "+{n} more",
         "task_actions": "Task actions",
+        "show_hide_columns": "Show or hide columns",
+        "embed_view_actions": "Embed view actions",
         "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
@@ -8077,7 +8079,8 @@ export default {
         "ignore_field_button": "Αγνόηση αυτού του πεδίου",
         "matched_to_field": "Αντιστοιχίστηκε στο πεδίο:",
         "duplication_warning": "Αυτό το πεδίο είναι διπλό και δεν μπορεί να επιβεβαιωθεί. Επιλέξτε άλλο πεδίο.",
-        "confirm_map_button": "Επιβεβαίωση αντιστοίχισης"
+        "confirm_map_button": "Επιβεβαίωση αντιστοίχισης",
+        "clear_selection": "Clear the matched field"
     },
     "reviewMaping": {
         "title": "Ελέγξτε τα δεδομένα που έχουν αντιστοιχιστεί στα πεδία. (Μπορείτε επίσης να επεξεργαστείτε τις τιμές εδώ.)",

@@ -44,25 +44,25 @@
                 <div class="d-flex align-items-center justify-content-start filter-list">
                     <div class="position-re task-fitler-search" id="projectviewfiltersearch_driver">
                         <input type="text" :placeHolder="$t('PlaceHolder.search')" class="form-control search-datas-das" v-model="taskSearch">
-                        <DropDown :id="cardUID" :title="$t('Projects.search_in')" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
+                        <DropDown mode="listbox" :id="cardUID" :title="$t('Projects.search_in')" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
                         <template #head>
                             <h4 class="black font-size-13 font-weight-500 p-10px m-0 search__in" :class="{'border-bottom': containerWidth > 767}">
                                 {{$t('Projects.search_in')}}
                             </h4>
                         </template>
                         <template #button>
-                            <img :ref="cardUID" :src="horizontalDots" alt="horizontalDots" class="vertical-middle" id="searchfilterdropdown_driver">
+                            <img :ref="cardUID" :src="horizontalDots" :alt="$t('Projects.search_in')" class="vertical-middle" id="searchfilterdropdown_driver">
                         </template>
                         <template #options>
-                            <DropDownOption @click="taskDescriptionSearch || taskKeySearch ? taskNameSearch = !taskNameSearch : ''" class="task-serachstatus-dropdown border-radius-4-px">
+                            <DropDownOption :selected="Boolean(taskNameSearch)" @click="taskDescriptionSearch || taskKeySearch ? taskNameSearch = !taskNameSearch : ''" class="task-serachstatus-dropdown border-radius-4-px">
                                 <span class="project-mobile-desc mr-10px">{{$t('Projects.task_name')}}</span>
                                 <Toggle  width="20" v-model="taskNameSearch" :disabled="taskNameSearch && !taskDescriptionSearch && !taskKeySearch" @change="searchMongoDB()"/>
                             </DropDownOption>
-                            <DropDownOption @click="taskKeySearch = !taskKeySearch" class="task-serachstatus-dropdown border-radius-4-px">
+                            <DropDownOption :selected="Boolean(taskKeySearch)" @click="taskKeySearch = !taskKeySearch" class="task-serachstatus-dropdown border-radius-4-px">
                                 <span class="project-mobile-desc mr-10px">{{$t('Projects.task_key')}}</span>
                                 <Toggle width="20" v-model="taskKeySearch" @change="toggleSearch(),searchMongoDB()"/>
                             </DropDownOption>
-                            <DropDownOption @click="taskDescriptionSearch = !taskDescriptionSearch" class="task-serachstatus-dropdown border-radius-4-px">
+                            <DropDownOption :selected="Boolean(taskDescriptionSearch)" @click="taskDescriptionSearch = !taskDescriptionSearch" class="task-serachstatus-dropdown border-radius-4-px">
                                 <span class="project-mobile-desc mr-10px">{{$t('ProjectDetails.description')}}</span>
                                 <Toggle width="20" v-model="taskDescriptionSearch" @change="toggleSearch(),searchMongoDB()"/>
                             </DropDownOption>

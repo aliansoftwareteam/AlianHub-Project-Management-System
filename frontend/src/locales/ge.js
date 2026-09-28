@@ -4613,6 +4613,8 @@ export default {
         "wip_none": "No limit",
         "more_count": "+{n} more",
         "task_actions": "Task actions",
+        "show_hide_columns": "Show or hide columns",
+        "embed_view_actions": "Embed view actions",
         "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
@@ -8077,7 +8079,8 @@ export default {
         "ignore_field_button": "Dieses Feld ignorieren",
         "matched_to_field": "Zugeordnet zu Feld:",
         "duplication_warning": "Dieses Feld ist doppelt vorhanden und kann nicht bestätigt werden. Bitte wählen Sie ein anderes Feld.",
-        "confirm_map_button": "Zuordnung bestätigen"
+        "confirm_map_button": "Zuordnung bestätigen",
+        "clear_selection": "Clear the matched field"
     },
     "reviewMaping": {
         "title": "Bitte überprüfen Sie die den Feldern zugeordneten Daten. (Sie können die Werte hier auch bearbeiten.)",

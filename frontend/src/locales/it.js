@@ -4613,6 +4613,8 @@ export default {
         "wip_none": "No limit",
         "more_count": "+{n} more",
         "task_actions": "Task actions",
+        "show_hide_columns": "Show or hide columns",
+        "embed_view_actions": "Embed view actions",
         "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
@@ -8077,7 +8079,8 @@ export default {
         "ignore_field_button": "Ignora questo campo",
         "matched_to_field": "Mappato al campo:",
         "duplication_warning": "Questo campo è duplicato e non può essere confermato. Seleziona un altro campo.",
-        "confirm_map_button": "Conferma mappatura"
+        "confirm_map_button": "Conferma mappatura",
+        "clear_selection": "Clear the matched field"
     },
     "reviewMaping": {
         "title": "Rivedi i dati mappati ai campi. (Puoi anche modificare i valori qui.)",

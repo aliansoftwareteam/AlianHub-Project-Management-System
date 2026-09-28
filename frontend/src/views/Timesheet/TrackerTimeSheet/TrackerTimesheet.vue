@@ -45,20 +45,20 @@
                         <span class="cursor-pointer"><img class="position-re right__arrow-img" src="@/assets/images/rectangle_rightArrow.png" @click="dateChange('right')" ></span>
                         <div class="wf_filter cursor-pointer" @click.stop="$refs.filter_tt_click.click()"  :style="[{marginTop : clientWidth <= 767 ? '15px' : '0px', marginLeft : clientWidth <=767 ? '0' : '17px' }]">
                             <span class="timesheet_user_filter bg-white">
-                                <DropDown id="" class="status_change_dropdown" :bodyClass="{'timesheetDropdown_wrapper' : true}">
-                                    <template #button>
-                                        <button ref="filter_tt_click" class="btn-white border dot-btn">
-                                            <a href="#" class="link_disable_css">{{$t('Filters.filter_by')}}</a>
+                                <DropDown mode="listbox" id="" class="status_change_dropdown" :bodyClass="{'timesheetDropdown_wrapper' : true}">
+                                    <template #button="{ triggerAttrs }">
+                                        <button type="button" ref="filter_tt_click" class="btn-white border dot-btn" v-bind="triggerAttrs">
+                                            <span class="link_disable_css">{{$t('Filters.filter_by')}}</span>
                                         </button>
                                     </template>
                                     <template #options>
-                                    <DropDownOption v-show="filterType=='' && isEveryOne" @click="handleFilterType('select','Users')">
+                                    <DropDownOption v-if="filterType=='' && isEveryOne" @click="handleFilterType('select','Users')">
                                         {{$t('UserTimesheet.Users')}}
                                     </DropDownOption>
-                                    <DropDownOption v-show="filterType=='' && isEveryOne" @click="handleFilterType('select','Teams')">
+                                    <DropDownOption v-if="filterType=='' && isEveryOne" @click="handleFilterType('select','Teams')">
                                         {{$t('UserTimesheet.Teams')}}
                                     </DropDownOption>
-                                    <DropDownOption v-show="filterType==''" @click="handleFilterType('select','Projects')">
+                                    <DropDownOption v-if="filterType==''" @click="handleFilterType('select','Projects')">
                                         {{$t('UserTimesheet.Projects')}}
                                     </DropDownOption>
                                     <div v-if="filterType!=''">
@@ -832,7 +832,7 @@ span.chipusername_wrapper {
     align-items: center;
     min-width: fit-content;
 }
-a.link_disable_css {
+.link_disable_css {
     color: #000;
     text-decoration: none;
     font-size: 16px;

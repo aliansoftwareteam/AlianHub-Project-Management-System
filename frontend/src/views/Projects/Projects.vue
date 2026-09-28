@@ -58,7 +58,7 @@
                                                     <img v-else class="vertical-middle profile-sm-square mobile-projectlist-icon" :src="projectData.projectIcon.data" alt=""/>
                                                 </template>
                                             </div>
-                                            <DropDown id="project_avail_views" maxHeight="90vh" :title="$t('Projects.all_views')" :bodyClass="{'viewlist-mobile-dropdown' : true}">
+                                            <DropDown mode="listbox" id="project_avail_views" maxHeight="90vh" :title="$t('Projects.all_views')" :bodyClass="{'viewlist-mobile-dropdown' : true}">
                                                 <template #button>
                                                     <div
                                                         class="d-flex align-items-center text-nowrap border-top-radius-10-px cursor-pointer h-100"
@@ -68,22 +68,23 @@
                                                         <span class="font-size-14 text-ellipsis d-inline-block gray81 project__requirement">
                                                             <img :src="activeTab !== 'EmbedView'
                                                                     ? projectComponentsIcons(projectData?.ProjectRequiredComponent?.find(x => x.keyName === activeTab)?.keyName)?.icon
-                                                                    : projectComponentsIcons(projectData?.ProjectRequiredComponent?.find(x => x.name === embedViewName)?.type)?.icon" alt="list" class="mr-5px">
+                                                                    : projectComponentsIcons(projectData?.ProjectRequiredComponent?.find(x => x.name === embedViewName)?.type)?.icon" alt="" class="mr-5px">
                                                             {{activeTab !== 'EmbedView' ? viewLabel(projectData?.ProjectRequiredComponent?.find(x => x.keyName === activeTab)?.name) : embedViewName || "N/A"}}
                                                         </span>
-                                                        <img :src="listDropIcon" alt="ListDropIcon" :style="[{marginLeft : clientWidth <=375 ? '2px' : '10px'}]"/>
+                                                        <img :src="listDropIcon" alt="" :style="[{marginLeft : clientWidth <=375 ? '2px' : '10px'}]"/>
                                                     </div>
                                                 </template>
                                                 <template #options>
                                                     <DropDownOption
                                                         v-for="view in projectData.ProjectRequiredComponent"
                                                         :key="view.id"
+                                                        :selected="activeTab === 'EmbedView' ? !view?.keyName && view.name === embedViewName : activeTab === view.keyName"
                                                         @click="$refs[projectView].click(),handleView(view),!view?.keyName ? openEmbedView(view) : ''"
                                                     >
                                                         <div class="d-flex align-items-center justify-content-between w-100">
                                                             <div class="viewlistIcon d-flex align-items-center">
                                                                 <span class="d-flex align-items-center justify-content-center border-radius-6-px mr-20px bg-white border-gray view__activeproject-name">
-                                                                    <img :src="view?.keyName ? activeTab === view.keyName ? projectComponentsIcons(view?.keyName)?.activeIcon || '' : projectComponentsIcons(view?.keyName)?.icon || '' : icons?.[view?.type] || ''" alt="view.icon" class="mr-0">
+                                                                    <img :src="view?.keyName ? activeTab === view.keyName ? projectComponentsIcons(view?.keyName)?.activeIcon || '' : projectComponentsIcons(view?.keyName)?.icon || '' : icons?.[view?.type] || ''" alt="" class="mr-0">
                                                                 </span>
                                                                 <span class="font-size-16 font-weight-500 text-ellipsis d-inline-block gray81 mw-66" @click="handleViewName(view.name)">{{ $t(`ViewList.${view.name}`) }}</span>
                                                             </div>
@@ -127,20 +128,20 @@
                                                 />
                                             </div>
                                             <div class="project__requirementcomponent-wrapper" v-if="projectData?.ProjectRequiredComponent && (embedViews).length">
-                                                <DropDown :bodyClass="{'dropdown-width':true}" @isVisible="(val)=> !val? (renameValue = {name:'',id:''}) :''">
+                                                <DropDown mode="listbox" :bodyClass="{'dropdown-width':true}" @isVisible="(val)=> !val? (renameValue = {name:'',id:''}) :''">
                                                     <template #button>
                                                         <div class="d-flex p9x-13px" ref="project_tabs_components" :class="{'bg-light-gray':activeTab == 'EmbedView'}">
                                                             <img :src="!selectedEmbedView ? icons[embedViews[0].type] : icons[selectedEmbedView.type]" alt="" class="list_make_as_defaultimg">
                                                             <span class="font-size-14 text-ellipsis gray81 mw-50 ml-10px">{{!selectedEmbedView ? embedViews[0].name : selectedEmbedView.name}}</span>
                                                             <div class="view-count">
                                                                 {{ (embedViews).length }}
-                                                                <img :src="whiteDownArrow" class="ml-2px">
+                                                                <img :src="whiteDownArrow" alt="" class="ml-2px">
                                                             </div>
                                                         </div>
                                                     </template>
                                                     <template #options>
                                                         <template v-for="(element, index) in (embedViews)" :key="index">
-                                                            <div class="cursor-pointer d-flex embed-option justify-content-between" @click="openEmbedView(element),$refs['project_tabs_components'].click()">
+                                                            <div class="cursor-pointer d-flex embed-option justify-content-between" role="option" tabindex="-1" :aria-selected="String(activeTab === 'EmbedView' && selectedEmbedView?.id === element.id)" @click="openEmbedView(element),$refs['project_tabs_components'].click()">
                                                                 <div class="align-items-center d-flex" v-if="element.id != renameValue.id">
                                                                     <img class="embed_view_dropdown mr-10-px" :src="icons[element.type]" alt="">
                                                                     <span class="d-block text-ellipsis embeded__element-name" :title="element.name">{{ element.name }}</span>
@@ -151,23 +152,23 @@
                                                                 <div v-if="element.id != renameValue.id" class="d-flex align-items-center p5x-0px" @click.stop="">
                                                                     <img :src="require('@/assets/images/svg/active-pin.svg')" v-if="element?.isPin && element.isPin" class="ml-10px active__pin-img">
                                                                     <span class="notification-tick blinking position-sti ml-7px" v-if="element?.isPrivate"></span>
-                                                                    <DropDown :id="Uid">
+                                                                    <DropDown mode="menu" :id="`${Uid}_${index}`">
                                                                         <template #button>
-                                                                            <img :src="threedots" :ref="Uid" class="vertical-middle"/>
+                                                                            <img :src="threedots" :ref="Uid" :alt="$t('Projects.embed_view_actions')" class="vertical-middle"/>
                                                                         </template>
                                                                         <template #options>
                                                                             <div>
-                                                                                <ul class="p-0 m-0 justify-content-start cursor-pointer">
-                                                                                    <li class="embed-edit-options" @click.stop="renameValue = {name:element.name,id:element.id}">
-                                                                                        <img :src="renameImage" class="inner-tagedit-list-item embed__options"/>
+                                                                                <ul class="p-0 m-0 justify-content-start cursor-pointer" role="none">
+                                                                                    <li class="embed-edit-options" role="menuitem" tabindex="-1" @click.stop="renameValue = {name:element.name,id:element.id}">
+                                                                                        <img :src="renameImage" alt="" class="inner-tagedit-list-item embed__options"/>
                                                                                         <span>{{ $t('Projects.rename') }}</span>
                                                                                     </li>
-                                                                                    <li class="embed-edit-options" @click="copyToClipboard(element.id),$refs[Uid][index].click()">
-                                                                                        <img :src="copy" class="inner-tagedit-list-item embed__options">
+                                                                                    <li class="embed-edit-options" role="menuitem" tabindex="-1" @click="copyToClipboard(element.id)">
+                                                                                        <img :src="copy" alt="" class="inner-tagedit-list-item embed__options">
                                                                                         <span>{{ $t('Projects.copy_link') }}</span>
                                                                                     </li>
-                                                                                    <li class="embed-edit-options cursor-pointer" @click.stop="openDelete = {flag:true,data:element},$refs[Uid][index].click(),$refs.project_tabs_components.click()">
-                                                                                        <img :src="deleteImage" class="inner-tagedit-list-item embed__options"/>
+                                                                                    <li class="embed-edit-options cursor-pointer" role="menuitem" tabindex="-1" @click.stop="openDelete = {flag:true,data:element},$refs[Uid][index].click(),$refs.project_tabs_components.click()">
+                                                                                        <img :src="deleteImage" alt="" class="inner-tagedit-list-item embed__options"/>
                                                                                         <span class="red">{{ $t('Projects.delete') }}</span>
                                                                                     </li>
                                                                                 </ul>

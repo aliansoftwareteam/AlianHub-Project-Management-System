@@ -26,7 +26,7 @@
                 </div>
             </li>
             <li :style="[{marginLeft : clientWidth > 767 ? '1rem' : '20px'}]" class="audio-list-wrapper">
-                <DropDown maxHeight="64dvh" class="audio_dropdown" :bodyClass="{'assigneelist-audiofile-dropdown' : true}">
+                <DropDown mode="menu" maxHeight="64dvh" class="audio_dropdown" :bodyClass="{'assigneelist-audiofile-dropdown' : true}">
                     <template #head v-if="clientWidth <= 767">
                         <div class="mobiledropdown-projecttitleimage-wrapper">
                             <span v-if="projectData?.projectIcon && projectData?.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center ml-9px" :class="{'inital-box' : clientWidth > 767 , 'project-firtsleeter-box' : clientWidth <=767}" :style="[{'background-color': projectData?.projectIcon.data}]">{{ projectData?.ProjectName.charAt(0).toUpperCase() }}</span>
@@ -41,14 +41,14 @@
                             </div>
                         </div>
                     </template>
-                    <template #button>
-                        <button type="button" class="cursor-pointer dot-btn border-0" :aria-label="$t('Projects.more_features')" :title="$t('Projects.more_features')" :ref="`projectdd_${projectData._id || ''}`">
+                    <template #button="{ triggerAttrs }">
+                        <button type="button" class="cursor-pointer dot-btn border-0" :aria-label="$t('Projects.more_features')" :title="$t('Projects.more_features')" v-bind="triggerAttrs">
                             <img :src="clientWidth > 767 ? horizontalDots : horizontalDotsMobile" id="projectoptions_driver" alt="" aria-hidden="true"/>
                         </button>
                     </template>
                     <template #options>
                         <div id="projectoptionslist_driver">
-                            <DropDownOption v-if="projectData?.isPrivateSpace && clientWidth <= 767" class="border-bottom mb-20px">
+                            <div v-if="projectData?.isPrivateSpace && clientWidth <= 767" class="d-flex align-items-center hover-bg-lighter-gray-dropdown hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px bg-gray91 border-radius-8-px border-bottom mb-20px">
                                 <Assignee
                                     class="assignee-data ml-15px"
                                     :users="projectData.AssigneeUserId"
@@ -62,72 +62,72 @@
                                     :isDisplayTeam="true"
                                     :z-index-assigne="8"
                                 />
-                            </DropDownOption>
+                            </div>
                             <template v-if="clientWidth <= 767">
-                                <DropDownOption @click="$refs[`projectdd_${projectData._id || ''}`].click(); $emit('openWatcher')">
+                                <DropDownOption @click="$emit('openWatcher')">
                                     <div :style="[{padding : clientWidth <= 767 ? '10px 0px !important' : '3.5px 10px !important'}]" class="d-flex align-items-center">
                                         <div class="position-re mr-15px">
                                             <div class="d-flex align-items-center justify-content-center border border-radius-5-px open__watcher">
-                                                <img :src="eyeIcon">
+                                                <img :src="eyeIcon" alt="">
                                             </div>
                                             <span class="sprint-watcher-count" aria-hidden="true">{{ watcherCount }}</span>
                                         </div>
                                         <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.watchers') }}</span>
                                     </div>
                                 </DropDownOption>
-                                <DropDownOption @click="$refs[`projectdd_${projectData._id || ''}`].click(); $emit('openSidebar', 'filesLinks')">
+                                <DropDownOption @click="$emit('openSidebar', 'filesLinks')">
                                     <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
                                         <div class="d-flex align-items-center">
-                                            <img :src="fileLink" class="mr-20px"/>
+                                            <img :src="fileLink" alt="" class="mr-20px"/>
                                         </div>
                                         <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.files_links') }}</span>
                                     </div>
                                 </DropDownOption>
-                                <DropDownOption @click="$refs[`projectdd_${projectData._id || ''}`].click(); $emit('openSidebar', 'audio')" class="border-bottom pb-20px">
+                                <DropDownOption @click="$emit('openSidebar', 'audio')" class="border-bottom pb-20px">
                                     <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
                                         <div class="d-flex align-items-center">
-                                            <img :src="audioLinkMobile" class="mr-20px"/>
+                                            <img :src="audioLinkMobile" alt="" class="mr-20px"/>
                                         </div>
                                         <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.audio_files') }}</span>
                                     </div>
                                 </DropDownOption>
                             </template>
-                            <DropDownOption @click="$refs[`projectdd_${projectData._id || ''}`].click(); $emit('openPermissionSidebar')" v-if="checkPermission('settings.settings_security_permissions') !== null">
+                            <DropDownOption @click="$emit('openPermissionSidebar')" v-if="checkPermission('settings.settings_security_permissions') !== null">
                                 <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
                                     <div class="d-flex align-items-center">
-                                        <img :src="lockIcon" alt="lockIcon" class="mr-20px">
+                                        <img :src="lockIcon" alt="" class="mr-20px">
                                     </div>
                                     <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.project_permissions') }}</span>
                                 </div>
                             </DropDownOption>
-                            <DropDownOption @click="$refs[`projectdd_${projectData._id || ''}`].click(); $emit('startEditName')" v-if="checkPermission('project.project_name_edit',projectData.isGlobalPermission) === true">
+                            <DropDownOption @click="$emit('startEditName')" v-if="checkPermission('project.project_name_edit',projectData.isGlobalPermission) === true">
                                 <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
                                     <div class="d-flex align-items-center">
-                                        <img :src="listIcon" alt="listIcon" class="mr-20px">
+                                        <img :src="listIcon" alt="" class="mr-20px">
                                     </div>
                                     <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.rename') }}</span>
                                 </div>
                             </DropDownOption>
-                            <DropDownOption @click="$refs[`projectdd_${projectData._id || ''}`].click(); $emit('openColorAvatar')" v-if="checkPermission('project.project_create',projectData.isGlobalPermission) === true">
+                            <DropDownOption @click="$emit('openColorAvatar')" v-if="checkPermission('project.project_create',projectData.isGlobalPermission) === true">
                                 <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
                                     <div class="d-flex align-items-center">
-                                        <img :src="colorPalletIcon" alt="colorPalletIcon" class="mr-20px">
+                                        <img :src="colorPalletIcon" alt="" class="mr-20px">
                                     </div>
                                     <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.color_avatar') }}</span>
                                 </div>
                             </DropDownOption>
-                            <DropDownOption @click="$refs[`projectdd_${projectData._id || ''}`].click(); $emit('archiveProject', 0)" v-if="checkPermission('project.project_close',projectData.isGlobalPermission) === true">
+                            <DropDownOption @click="$emit('archiveProject', 0)" v-if="checkPermission('project.project_close',projectData.isGlobalPermission) === true">
                                 <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
                                     <div class="d-flex align-items-center">
-                                        <img :src="cancelIcon" alt="cancelIcon" class="mr-20px">
+                                        <img :src="cancelIcon" alt="" class="mr-20px">
                                     </div>
                                     <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.close_project') }}</span>
                                 </div>
                             </DropDownOption>
-                            <DropDownOption v-if="checkPermission('project.project_delete',projectData.isGlobalPermission) === true" @click="$refs[`projectdd_${projectData._id || ''}`].click(); $emit('archiveProject', 2)">
+                            <DropDownOption v-if="checkPermission('project.project_delete',projectData.isGlobalPermission) === true" @click="$emit('archiveProject', 2)">
                                 <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
                                     <div class="d-flex align-items-center">
-                                        <img :src="deleteIcon" alt="deleteIcon" class="mr-20px">
+                                        <img :src="deleteIcon" alt="" class="mr-20px">
                                     </div>
                                     <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.delete') }}</span>
                                 </div>

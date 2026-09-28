@@ -4613,6 +4613,8 @@ export default {
         "wip_none": "No limit",
         "more_count": "+{n} more",
         "task_actions": "Task actions",
+        "show_hide_columns": "Show or hide columns",
+        "embed_view_actions": "Embed view actions",
         "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
@@ -8077,7 +8079,8 @@ export default {
         "ignore_field_button": "Игнорировать это поле",
         "matched_to_field": "Совпадает с полем:",
         "duplication_warning": "Это дублирующееся поле и его нельзя подтвердить. Пожалуйста, выберите другое поле.",
-        "confirm_map_button": "Подтвердить сопоставление"
+        "confirm_map_button": "Подтвердить сопоставление",
+        "clear_selection": "Clear the matched field"
     },
     "reviewMaping": {
         "title": "Пожалуйста, просмотрите данные, сопоставленные с нашими полями. (Вы также можете редактировать значения данных здесь.)",

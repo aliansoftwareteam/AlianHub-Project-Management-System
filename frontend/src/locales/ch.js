@@ -4613,6 +4613,8 @@ export default {
         "wip_none": "No limit",
         "more_count": "+{n} more",
         "task_actions": "Task actions",
+        "show_hide_columns": "Show or hide columns",
+        "embed_view_actions": "Embed view actions",
         "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
@@ -8077,7 +8079,8 @@ export default {
         "ignore_field_button": "忽略此字段",
         "matched_to_field": "映射到字段：",
         "duplication_warning": "此字段重复，无法确认。请选择另一个字段。",
-        "confirm_map_button": "确认映射"
+        "confirm_map_button": "确认映射",
+        "clear_selection": "Clear the matched field"
     },
     "reviewMaping": {
         "title": "请检查映射到字段的数据。（您也可以在此编辑值。）",

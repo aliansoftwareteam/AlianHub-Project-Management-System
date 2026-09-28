@@ -4613,6 +4613,8 @@ export default {
         "wip_none": "No limit",
         "more_count": "+{n} more",
         "task_actions": "Task actions",
+        "show_hide_columns": "Show or hide columns",
+        "embed_view_actions": "Embed view actions",
         "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
@@ -8077,7 +8079,8 @@ export default {
         "ignore_field_button": "Ignore this Field",
         "matched_to_field": "Matched to the field:",
         "duplication_warning": "This field is a duplicate and cannot be confirmed. Please choose a different field.",
-        "confirm_map_button": "Confirm Mapping"
+        "confirm_map_button": "Confirm Mapping",
+        "clear_selection": "Clear the matched field"
     },
     "reviewMaping": {
         "title": "Kindly review your data mapped in our fields. (You can also edit the data values here.)",

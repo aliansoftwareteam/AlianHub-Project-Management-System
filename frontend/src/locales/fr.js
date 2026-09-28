@@ -4613,6 +4613,8 @@ export default {
         "wip_none": "No limit",
         "more_count": "+{n} more",
         "task_actions": "Task actions",
+        "show_hide_columns": "Show or hide columns",
+        "embed_view_actions": "Embed view actions",
         "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
@@ -8077,7 +8079,8 @@ export default {
         "ignore_field_button": "Ignorer ce champ",
         "matched_to_field": "Associé au champ :",
         "duplication_warning": "Ce champ est un doublon et ne peut pas être confirmé. Veuillez choisir un champ différent.",
-        "confirm_map_button": "Confirmer l'association"
+        "confirm_map_button": "Confirmer l'association",
+        "clear_selection": "Clear the matched field"
     },
     "reviewMaping": {
         "title": "Veuillez examiner vos données associées à nos champs. (Vous pouvez également modifier les valeurs des données ici.)",
