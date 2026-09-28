@@ -1,16 +1,21 @@
 const S = require('../Modules/Automations/helpers/sentenceRules');
 const { validateRuleV2 } = require('../Modules/Automations/helpers/ruleSchemaV2');
+const { catalogueOf } = require('../Modules/Automations/helpers/statusConditions');
+
+const PROJECT = '6f0000000000000000000a01';
+const statuses = catalogueOf([{ _id: PROJECT, taskStatusData: [{ key: 4, name: 'Blocked', type: 'active' }, { key: 5, name: 'High', type: 'active' }] }]);
+const BLOCKED = { field: 'statusRef', value: [`${PROJECT}:4`], label: 'Blocked' };
 
 describe('parseSentence — a sentence it understands', () => {
     test('compiles trigger, conditions and actions into a v2 rule', () => {
-        const out = S.parseSentence('When a task status changes to Blocked, if the priority is HIGH, post a comment saying "needs help" and set the priority to LOW.');
+        const out = S.parseSentence('When a task status changes to Blocked, if the priority is HIGH, post a comment saying "needs help" and set the priority to LOW.', { statuses });
         expect(out.ok).toBe(true);
         expect(out.errors).toEqual([]);
         expect(out.rule.trigger).toEqual({ type: 'event', event: 'task.status_changed' });
         expect(out.rule.conditions).toEqual({
             op: 'and',
             args: [
-                { op: 'changedTo', field: 'statusType', value: 'Blocked' },
+                { op: 'changedTo', ...BLOCKED },
                 { op: 'eq', field: 'Task_Priority', value: 'HIGH' },
             ],
         });
@@ -72,7 +77,7 @@ describe('parseSentence — a sentence it cannot parse', () => {
 
 describe('parseSentence — an ambiguous sentence', () => {
     test('"marked High" is flagged because High is both a status name and a priority', () => {
-        const out = S.parseSentence('When a task is marked High, post a comment saying "check it".');
+        const out = S.parseSentence('When a task is marked High, post a comment saying "check it".', { statuses });
         expect(out.ok).toBe(true);
         expect(out.ambiguities).toHaveLength(1);
         expect(out.ambiguities[0].at).toBe('trigger');
@@ -83,13 +88,13 @@ describe('parseSentence — an ambiguous sentence', () => {
     });
 
     test('an unambiguous status name raises nothing', () => {
-        expect(S.parseSentence('When a task is marked Blocked, post a comment saying "check it".').ambiguities).toEqual([]);
+        expect(S.parseSentence('When a task is marked Blocked, post a comment saying "check it".', { statuses }).ambiguities).toEqual([]);
     });
 
     test('picking either option removes the ambiguity', () => {
-        const out = S.parseSentence('When a task is marked High, post a comment saying "check it".');
+        const out = S.parseSentence('When a task is marked High, post a comment saying "check it".', { statuses });
         const chosen = out.ambiguities[0].options[1].sentence;
-        const resolved = S.parseSentence(`When ${chosen}, post a comment saying "check it".`);
+        const resolved = S.parseSentence(`When ${chosen}, post a comment saying "check it".`, { statuses });
         expect(resolved.ambiguities).toEqual([]);
         expect(resolved.rule.trigger.event).toBe('task.priority_changed');
         expect(resolved.rule.conditions).toEqual({ op: 'changedTo', field: 'Task_Priority', value: 'HIGH' });
@@ -106,17 +111,17 @@ describe('round trip', () => {
     ];
 
     test.each(canonical)('sentence → rule → sentence is a fixed point: %s', (sentence) => {
-        const first = S.parseSentence(sentence);
+        const first = S.parseSentence(sentence, { statuses });
         expect(first.ok).toBe(true);
         expect(S.describeRule(first.rule)).toBe(sentence);
     });
 
     test('a non-canonical phrasing normalises to the canonical sentence and stays stable', () => {
-        const out = S.parseSentence('When a task is moved to Blocked, then set the priority to HIGH');
+        const out = S.parseSentence('When a task is moved to Blocked, then set the priority to HIGH', { statuses });
         expect(out.ok).toBe(true);
         const canonicalSentence = S.describeRule(out.rule);
         expect(canonicalSentence).toBe('When a task status changes to Blocked, set the priority to HIGH.');
-        expect(S.describeRule(S.parseSentence(canonicalSentence).rule)).toBe(canonicalSentence);
+        expect(S.describeRule(S.parseSentence(canonicalSentence, { statuses }).rule)).toBe(canonicalSentence);
     });
 
     test('rule → sentence works on a rule that was never a sentence', () => {

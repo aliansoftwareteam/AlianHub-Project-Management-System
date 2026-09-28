@@ -54,6 +54,9 @@ const readField = (path, ctx) => {
 
 const asArray = (v) => (Array.isArray(v) ? v : [v]);
 const norm = (v) => (v === null || v === undefined ? v : String(v));
+/* A list value on a change operator means "any of": one status name can be a
+ * different key in every project. */
+const isOrAmong = (actual, expected) => (Array.isArray(expected) ? expected.map(norm).includes(norm(actual)) : norm(actual) === norm(expected));
 const isEmpty = (v) => v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
 
 /* Every operator a condition may use. Adding one here is the only way to extend
@@ -109,9 +112,9 @@ function evaluateNode(node, ctx, depth) {
         const rootField = field.split('.')[0];
         if (!changed.has(rootField)) return false;
         if (op === 'changed') return true;
-        if (op === 'changedTo') return norm(readField(field, ctx)) === norm(node.value);
+        if (op === 'changedTo') return isOrAmong(readField(field, ctx), node.value);
         // changedFrom: `previous` is a snapshot of the task, so read the bare field off it.
-        return norm(readField(`previous.${field}`, ctx)) === norm(node.value);
+        return isOrAmong(readField(`previous.${field}`, ctx), node.value);
     }
 
     if (COMPARISON_OPS.includes(op)) {

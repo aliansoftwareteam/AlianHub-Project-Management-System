@@ -5,6 +5,7 @@ const createSubtaskAction = require('./actions/createSubtask');
 const runAgent = require('./actions/runAgent');
 const assignTask = require('./actions/assignTask');
 const { COMPARISON_OPS, CHANGE_OPS, LOGICAL_OPS } = require('./expression');
+const { STATUS_TYPES } = require('../helpers/statusConditions');
 const timeTrigger = require('../../Workflows/timeTrigger');
 const workflowEngine = require('../../Workflows/flag');
 
@@ -64,7 +65,9 @@ const availableTriggers = () => (workflowEngine.enabled() ? TRIGGERS.concat(TIME
  * the builder offers "is empty" for assignees and "greater than" for subtask
  * counts, rather than every operator against every field. */
 const CONDITION_FIELDS = [
-    { field: 'statusType', label: 'Status', type: 'status', ops: ['eq', 'neq', 'in', 'notIn', 'changed', 'changedTo', 'changedFrom'] },
+    // A named status is held by `<projectId>:<key>` refs (helpers/statusConditions), a list because one name is a different key per project.
+    { field: 'statusRef', label: 'Status', type: 'status', ops: ['in', 'notIn', 'changed', 'changedTo', 'changedFrom'] },
+    { field: 'statusType', label: 'Status type', type: 'select', options: STATUS_TYPES, ops: ['eq', 'neq', 'changed', 'changedTo', 'changedFrom'] },
     { field: 'Task_Priority', label: 'Priority', type: 'select', options: ['LOW', 'MEDIUM', 'HIGH'], ops: ['eq', 'neq', 'in', 'notIn', 'changed', 'changedTo', 'changedFrom'] },
     { field: 'taskType', label: 'Task type', type: 'task_type', ops: ['eq', 'neq', 'in', 'notIn'] },
     { field: 'AssigneeUserId', label: 'Assignees', type: 'user_multi', ops: ['contains', 'empty', 'notEmpty', 'changed'] },

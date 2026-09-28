@@ -1,5 +1,6 @@
 const registry = require('../engine/registry');
 const { validateRuleV2, MAX_STEPS } = require('./ruleSchemaV2');
+const { statusClause } = require('./statusConditions');
 
 const TOP_KEYS = ['trigger', 'project', 'conditions', 'actions', 'unmapped'];
 const CONDITION_KEYS = ['field', 'op', 'value'];
@@ -33,7 +34,7 @@ const kindOf = (spec = {}) => {
 };
 
 const WRITE_AS = {
-    status: 'a status name exactly as the sentence says it',
+    status: 'a status name exactly as the sentence says it; open, in progress or done for any status of that kind',
     person: "the person's name or email exactly as the sentence says it",
     project: 'the project name exactly as the sentence says it',
     task_type: 'the task type name exactly as the sentence says it',
@@ -144,6 +145,13 @@ const checkCondition = (raw, fields, ctx, rejected) => {
     if (!field.ops.includes(raw.op)) { rejected.push(`${field.label} cannot be compared with "${raw.op}" (it allows ${field.ops.join(', ')}).`); return null; }
     if (UNARY_OPS.includes(raw.op)) return { op: raw.op, field: field.field };
     const kind = kindOf(field);
+    if (kind === 'status') {
+        const words = Array.isArray(raw.value) ? raw.value : [raw.value];
+        if (!words.length || words.some((w) => typeof w !== 'string' || !w.trim())) { rejected.push(`${field.label} needs a status name.`); return null; }
+        const clause = statusClause(raw.op, words.join(' or '), ctx.statusCatalogue());
+        if (clause.error) { rejected.push(clause.error); return null; }
+        return clause;
+    }
     if (LIST_OPS.includes(raw.op)) {
         const list = Array.isArray(raw.value) ? raw.value : [raw.value];
         const values = list.map((v) => resolveOne(kind, v, field, ctx));
@@ -198,7 +206,8 @@ const statusesOf = (projects) => {
 /* The model's JSON → a v2 rule, or null with the reasons. Any part that is not
  * in the registry, or any reference outside `refs`, rejects the whole draft:
  * dropping a condition would quietly widen the rule. `refs` holds only what
- * the caller may use: { projects: [{ id, name, statuses }], people: [{ id, name, email }], taskTypes }. */
+ * the caller may use: { projects: [{ id, name, statuses }], people: [{ id, name, email }], taskTypes,
+ * statusCatalogue } (statusCatalogue from statusConditions.catalogueOf, so a condition resolves a status to its keys). */
 const checkDraft = (raw, refs) => {
     const rejected = [];
     if (!isPlainObject(raw)) return { rule: null, unmapped: [], rejected: ['The draft was not a rule.'] };
@@ -215,7 +224,11 @@ const checkDraft = (raw, refs) => {
         scopeProject = typeof raw.project === 'string' ? findProject(refs, raw.project) : null;
         if (!scopeProject) rejected.push(`There is no project called "${String(raw.project)}" that you can use.`);
     }
-    const ctx = { refs, statuses: () => statusesOf(scopeProject ? [scopeProject] : refs.projects) };
+    const ctx = {
+        refs,
+        statuses: () => statusesOf(scopeProject ? [scopeProject] : refs.projects),
+        statusCatalogue: () => (refs.statusCatalogue || []).filter((s) => !scopeProject || s.projectId === String(scopeProject.id)),
+    };
 
     const hasTrigger = raw.trigger !== undefined && raw.trigger !== null && raw.trigger !== '';
     const trigger = hasTrigger ? eventTriggers().find((t) => t.key === raw.trigger) : null;
