@@ -303,12 +303,14 @@ test.describe('accessibility: shared dropdowns from the keyboard', () => {
     test('the task type picker in the task panel opens as a listbox, is axe clean, and Escape hands focus back', async ({ page, state, loginAs }) => {
         const owner = await loginAs('owner');
         const project = await createProject(owner.api, { name: `A11Y ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid });
-        const task = await createTask(owner.api, { project, name: `Listbox ${uniqueSuffix()}`, user: state.users.owner, companyOwnerId: owner.uid });
+        const name = `Listbox ${uniqueSuffix()}`;
+        const task = await createTask(owner.api, { project, name, user: state.users.owner, companyOwnerId: owner.uid });
         await page.goto(`/#/${state.companyId}/project/${project._id}/s/${task.sprintId}?task=${task._id}`);
         const dialog = page.getByRole('dialog', { name: 'Task detail' });
         await expect(dialog).toBeVisible();
 
-        const trigger = dialog.locator('[id="task_type_detail_trigger"]');
+        const title = dialog.getByRole('listitem').filter({ has: page.getByRole('heading', { level: 2, name }) });
+        const trigger = title.locator('[aria-haspopup="listbox"]');
         await expect(trigger).toHaveAttribute('aria-haspopup', 'listbox');
         await trigger.focus();
         await page.keyboard.press('Enter');
