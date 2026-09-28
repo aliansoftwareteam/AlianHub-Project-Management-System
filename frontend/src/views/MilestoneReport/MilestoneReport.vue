@@ -35,10 +35,10 @@
                         <div class="filterSection">
                             <div class="wf_filter" @click.stop="$refs.filter_ut_click_empty.click()">
                                 <span class="timesheet_user_filter">
-                                    <DropDown id="FilterDropDownSheet" :title="`status`" :dropDownClass="true" class="status_change_dropdown">
-                                        <template #button>
-                                            <button class="btn-white border cursor-pointer dot-btn" ref="filter_ut_click_empty">
-                                                <a href="#" class="link_disable_css">{{$t('Filters.filter_by')}} {{$t('ProjectDetails.status')}}</a>
+                                    <DropDown mode="listbox" id="FilterDropDownSheet" :title="`status`" :dropDownClass="true" class="status_change_dropdown">
+                                        <template #button="{ triggerAttrs }">
+                                            <button type="button" class="btn-white border cursor-pointer dot-btn" v-bind="triggerAttrs" ref="filter_ut_click_empty">
+                                                <span class="link_disable_css">{{$t('Filters.filter_by')}} {{$t('ProjectDetails.status')}}</span>
                                             </button>
                                         </template>
                                         <template #head v-if="clientWidth > 767">

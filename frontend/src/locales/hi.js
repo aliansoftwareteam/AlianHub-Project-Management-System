@@ -4622,6 +4622,8 @@ export default {
         "wip_none": "No limit",
         "more_count": "+{n} more",
         "task_actions": "Task actions",
+        "show_hide_columns": "Show or hide columns",
+        "embed_view_actions": "Embed view actions",
         "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
@@ -8094,7 +8096,8 @@ export default {
         "ignore_field_button": "इस फ़ील्ड को अनदेखा करें",
         "matched_to_field": "मेल खाती फ़ील्ड:",
         "duplication_warning": "यह फ़ील्ड डुप्लिकेट है और इसे पुष्टि नहीं किया जा सकता। कृपया दूसरी फ़ील्ड चुनें।",
-        "confirm_map_button": "मैपिंग की पुष्टि करें"
+        "confirm_map_button": "मैपिंग की पुष्टि करें",
+        "clear_selection": "Clear the matched field"
     },
     "reviewMaping": {
         "title": "कृपया हमारी फ़ील्ड्स में मैप किए गए अपने डेटा की समीक्षा करें। (आप यहाँ डेटा मानों को संपादित भी कर सकते हैं।)",

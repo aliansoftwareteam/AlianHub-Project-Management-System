@@ -429,7 +429,7 @@ tr.fixed th {
     margin-bottom: 4px;
     margin-top: 5px;
 }
-.milestone-report-wrapper  a.link_disable_css {
+.milestone-report-wrapper  .link_disable_css {
     color: #000;
     text-decoration: none;
     font-size: 16px;

@@ -15,20 +15,6 @@
     "frontend/src/plugins/customFieldView/component/atom/customFieldTaskView/phoneComponentListing.vue": 2,
     "frontend/src/plugins/customFieldView/component/atom/customFieldViewColumn/phoneComponentViewColumn.vue": 2,
     "frontend/src/plugins/customFieldView/component/atom/settingCustomField/customFieldList.vue": 2,
-    "frontend/src/plugins/importTasks/components/molecules/HeaderEditing.vue": 1,
-    "frontend/src/plugins/importUsers/components/molecules/DesignationMapping.vue": 1,
-    "frontend/src/plugins/importUsers/components/molecules/HeaderEditing.vue": 1,
-    "frontend/src/plugins/importUsers/components/molecules/RoleMapping.vue": 1,
-    "frontend/src/plugins/importUsers/components/organisms/ReviewMapping.vue": 2,
-    "frontend/src/plugins/tasklistDashboard/components/organisms/TaskItemList/TaskItemList.vue": 1,
-    "frontend/src/plugins/tasklistDashboard/views/DashBoardList/DashBoardList.vue": 1,
-    "frontend/src/views/MilestoneReport/MilestoneReport.vue": 1,
-    "frontend/src/views/Projects/Kanban/BoardViewDisplayCardComponent.vue": 1,
-    "frontend/src/views/Projects/Kanban/BoardViewTaskCreate.vue": 1,
-    "frontend/src/views/Projects/Projects.vue": 4,
-    "frontend/src/views/Projects/components/ProjectActionsBar.vue": 1,
-    "frontend/src/views/Projects/components/ProjectBottomModals.vue": 1,
-    "frontend/src/views/Projects/components/ProjectFiltersToolbar.vue": 3,
-    "frontend/src/views/Timesheet/ProjectTimesheet/ProjectTimesheet.vue": 1,
-    "frontend/src/views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue": 1
+    "frontend/src/views/Projects/Projects.vue": 1,
+    "frontend/src/views/Projects/components/ProjectBottomModals.vue": 1
 }

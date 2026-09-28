@@ -4622,6 +4622,8 @@ export default {
         "wip_none": "No limit",
         "more_count": "+{n} more",
         "task_actions": "Task actions",
+        "show_hide_columns": "Show or hide columns",
+        "embed_view_actions": "Embed view actions",
         "unread_comments_open": "Unread comments: {n}, open",
         "column_empty_drop": "Drop a task here",
         "add_task_to_column": "Add a task to {name}",
@@ -8094,7 +8096,8 @@ export default {
         "ignore_field_button": "આ ક્ષેત્ર અવગણો",
         "matched_to_field": "મેચ થયેલ ક્ષેત્ર:",
         "duplication_warning": "આ ક્ષેત્ર નકલ છે અને તેને પુષ્ટિ કરી શકાય નથી. કૃપા કરીને બીજું ક્ષેત્ર પસંદ કરો.",
-        "confirm_map_button": "મૅપિંગની પુષ્ટિ કરો"
+        "confirm_map_button": "મૅપિંગની પુષ્ટિ કરો",
+        "clear_selection": "Clear the matched field"
     },
     "reviewMaping": {
         "title": "મહેરબાની કરીને અમારી ફીલ્ડ્સમાં નકશાયેલ તમારું ડેટા સમીક્ષા કરો. (તમે અહીં ડેટા મૂલ્યો પણ સંપાદિત કરી શકો છો.)",

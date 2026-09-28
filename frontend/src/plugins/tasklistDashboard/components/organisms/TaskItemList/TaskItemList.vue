@@ -150,21 +150,23 @@
                         </span>
                     </div>
                     <span class="span_wrapper task_right cursor-pointer" v-if="!projectData?.deletedStatusKey && checkPermission('task.list_view_column',project?.isGlobalPermission) == true">
-                        <DropDown>
+                        <DropDown v-if="props.statusIndex === 0" mode="listbox">
                             <template #button>
-                                <img :src="addCustomField" :alt="addCustomField" v-if="props.statusIndex === 0" />
+                                <img :src="addCustomField" :alt="$t('Projects.show_hide_columns')" />
                             </template>
                             <template #options>
-                                <DropDownOption>
-                                    <input type="text" class="customfield__form-control" :placeholder="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
-                                </DropDownOption>
-                                <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields')">
-                                    <span class="font-weight-500 line-height-19 font-ui blue" @click="isCustomField = true">+ {{$t('CustomField.custom_field')}}</span>
+                                <div class="d-flex align-items-center hover-bg-lighter-gray-dropdown hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px border-radius-4-px">
+                                    <input type="text" class="customfield__form-control" :placeholder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
+                                </div>
+                                <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields')" @click="isCustomField = true">
+                                    <span class="font-weight-500 line-height-19 font-ui blue">+ {{$t('CustomField.custom_field')}}</span>
                                 </DropDownOption>
                                 <template v-if="headerHideShow && headerHideShow.length">
                                     <DropDownOption
                                         v-for="(obj, index) in headerHideShow.filter((head)=> (head.funcPermission ? checkPermission(head.funcPermission,projectData.isGlobalPermission) !== null : true ) && (head.appPermission ? checkApps(head.appPermission) : true ))"
                                         :key="index"
+                                        :selected="Boolean(obj.show)"
+                                        @click="obj.show = !obj.show; toggleButton(obj.show,obj.key,obj)"
                                     >
                                         <div class="d-flex align-items-center justify-content-between w-100">
                                             <span class="font-weight-400 line-height-19 font-ui">
