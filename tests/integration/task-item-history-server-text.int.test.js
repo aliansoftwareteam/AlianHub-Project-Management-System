@@ -16,7 +16,7 @@ let member;
 let project;
 
 const db = () => client.db(state.companyId);
-const historyOf = (query) => db().collection('history').find({ ProjectId: String(project._id), ...query }).toArray();
+const historyOf = (query) => db().collection('history').find({ ProjectId: new ObjectId(String(project._id)), ...query }).toArray();
 const nameOf = async (uid) => (await client.db('global').collection('users').findOne({ _id: new ObjectId(String(uid)) })).Employee_Name;
 
 const waitFor = async (read, what) => {

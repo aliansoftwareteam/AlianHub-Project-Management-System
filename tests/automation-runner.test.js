@@ -212,7 +212,7 @@ describe('registry', () => {
     it('exposes every registered action with a renderable schema', () => {
         const m = registry.manifest();
         expect(m.actions.map((a) => a.key).sort())
-            .toEqual(['add_comment', 'create_subtask', 'run_agent', 'set_priority', 'set_status']);
+            .toEqual(['add_comment', 'assign', 'create_subtask', 'run_agent', 'set_priority', 'set_status']);
         m.actions.forEach((a) => {
             expect(typeof a.label).toBe('string');
             expect(Object.keys(a.schema).length).toBeGreaterThan(0);

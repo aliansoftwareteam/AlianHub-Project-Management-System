@@ -20,7 +20,7 @@ const entriesDescribed = (description) => db().collection('timesheets').find({ L
 
 /* The project is this suite's own, so its history rows are only ours; since narrows them to one call. */
 const timeLogHistory = (since) => db().collection('history')
-    .find({ ProjectId: String(project._id), Key: 'TimeLog', createdAt: { $gte: since } }).toArray();
+    .find({ ProjectId: new ObjectId(String(project._id)), Key: 'TimeLog', createdAt: { $gte: since } }).toArray();
 
 const logBody = (session, overrides = {}) => ({
     logTimeDate: '2026-03-02',

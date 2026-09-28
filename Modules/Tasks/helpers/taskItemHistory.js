@@ -16,13 +16,15 @@ const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
 
-const describeCustomFieldValue = ({ actor, definition, next, previous }) => {
+const describeCustomFieldValue = ({ actor, definition, next, previous, viaAi = false }) => {
     if (!definition || !next) return null;
     const shown = fieldValueText(definition, next);
     if (previous && fieldValueText(definition, previous) === shown) return null;
     return {
         key: HISTORY.CUSTOM_FIELD_VALUE,
-        message: `<b>${actor.Employee_Name}</b> has added value in <b> ${escapeText(definition.fieldTitle)}</b> Custom Field as <b>${escapeText(shown)}</b>.`,
+        message: viaAi
+            ? `<b>${actor.Employee_Name}</b> filled the <b>${escapeText(definition.fieldTitle)}</b> Custom Field with AI as <b>${escapeText(shown)}</b>.`
+            : `<b>${actor.Employee_Name}</b> has added value in <b> ${escapeText(definition.fieldTitle)}</b> Custom Field as <b>${escapeText(shown)}</b>.`,
     };
 };
 
@@ -51,10 +53,10 @@ const projectTagsOf = async (companyId, projectId) => {
 
 const logFailure = (what) => (error) => logger.error(`${what}: ${(error && error.message) || JSON.stringify(error)}`);
 
-const recordCustomFieldValue = async ({ companyId, task, customFieldId, updateDetail, actor }) => {
+const recordCustomFieldValue = async ({ companyId, task, customFieldId, updateDetail, actor, viaAi = false }) => {
     const stored = plain(task);
     const definition = await customFieldDefinitionOf(companyId, customFieldId);
-    const entry = describeCustomFieldValue({ actor, definition, next: updateDetail, previous: stored.customField && stored.customField[customFieldId] });
+    const entry = describeCustomFieldValue({ actor, definition, next: updateDetail, previous: stored.customField && stored.customField[customFieldId], viaAi });
     if (!entry) return;
     await HandleHistory('task', companyId, String(stored.ProjectID), String(stored._id), entry, actor).catch(logFailure('custom field value history'));
 };

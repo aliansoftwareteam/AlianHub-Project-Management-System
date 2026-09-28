@@ -19,9 +19,9 @@ const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArr
 
 /* The one composer of a rule's own words: `sentence` on every read and `name` on
  * every save come from here, so the two can never describe different rules. */
-const composedName = (rule) => describeRule(rule).slice(0, MAX_NAME);
+const composedName = (rule, people) => describeRule(rule, { people }).slice(0, MAX_NAME);
 
-const validateStep = (step, index, errors) => {
+const validateStep = (step, index, errors, { trigger } = {}) => {
     const at = `steps[${index}]`;
     if (!isPlainObject(step)) { errors.push(`${at}: must be an object`); return; }
     if (!step.id || typeof step.id !== 'string') errors.push(`${at}.id: required`);
@@ -49,9 +49,10 @@ const validateStep = (step, index, errors) => {
             errors.push(`${at}.config.${field}: must be one of ${spec.options.join(', ')}`);
         }
     });
+    if (typeof action.validate === 'function') action.validate(config, { trigger }).forEach((error) => errors.push(`${at}.config.${error}`));
 };
 
-const validateRuleV2 = (input = {}) => {
+const validateRuleV2 = (input = {}, { people = [] } = {}) => {
     const errors = [];
 
     const name = String(input.name || '').trim();
@@ -78,7 +79,7 @@ const validateRuleV2 = (input = {}) => {
     const steps = Array.isArray(input.steps) ? input.steps : [];
     if (!steps.length) errors.push('steps: at least one action is required');
     if (steps.length > MAX_STEPS) errors.push(`steps: at most ${MAX_STEPS} allowed`);
-    steps.forEach((step, i) => validateStep(step, i, errors));
+    steps.forEach((step, i) => validateStep(step, i, errors, { trigger: trigger.event }));
 
     const ids = steps.map((s) => s && s.id).filter(Boolean);
     if (new Set(ids).size !== ids.length) errors.push('steps: step ids must be unique');
@@ -113,7 +114,7 @@ const validateRuleV2 = (input = {}) => {
     // composed here rather than by the caller: a name the client derived from an
     // earlier compile can be a step behind the rule it is attached to, and then the
     // list, the audit trail and the run log all quote a rule that was never saved.
-    if (!value.name) value.name = composedName(value);
+    if (!value.name) value.name = composedName(value, people);
 
     return { valid: true, errors: [], value };
 };
